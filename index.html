@@ -6,7 +6,7 @@
   <title>모여라 달력 - 사모임 일정 조율 & 가능 날짜 달력</title>
   <meta name="description" content="사모임 참여자들의 가능 날짜를 달력에 표기하고 전원 모임 가능한 날짜를 자동으로 찾아주는 깃허브 단독 구동 웹 프로그램입니다.">
   
-  <!-- Google Fonts & Tailwind CDN -->
+  <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
@@ -15,15 +15,29 @@
   <style>
     :root {
       --font-sans: 'Plus Jakarta Sans', 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
-      --bg-primary: #0b0f19;
-      --bg-secondary: #111827;
-      --bg-card: rgba(17, 24, 39, 0.78);
-      --border-subtle: rgba(255, 255, 255, 0.08);
-      --text-main: #F9FAFB;
-      --text-muted: #9CA3AF;
-      --accent-gradient: linear-gradient(135deg, #6366F1 0%, #8B5CF6 50%, #EC4899 100%);
+      
+      /* White / Light Theme Colors */
+      --bg-primary: #F8FAFC;
+      --bg-secondary: #FFFFFF;
+      --bg-card: #FFFFFF;
+      --border-subtle: #E2E8F0;
+      --border-hover: #CBD5E1;
+      
+      --text-main: #0F172A;
+      --text-muted: #64748B;
+      --text-light: #94A3B8;
+      
+      --accent-primary: #4F46E5; /* Crisp Indigo */
+      --accent-secondary: #7C3AED;
+      --accent-gradient: linear-gradient(135deg, #4F46E5 0%, #7C3AED 50%, #EC4899 100%);
+      
+      --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
+      --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -1px rgba(0, 0, 0, 0.04);
+      --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.03);
+
       --radius-lg: 16px;
       --radius-md: 12px;
+      --radius-sm: 8px;
       --radius-full: 9999px;
     }
 
@@ -33,9 +47,9 @@
       font-family: var(--font-sans);
       background-color: var(--bg-primary);
       background-image: 
-        radial-gradient(at 10% 10%, rgba(99, 102, 241, 0.18) 0px, transparent 50%),
-        radial-gradient(at 90% 80%, rgba(236, 72, 153, 0.15) 0px, transparent 50%),
-        radial-gradient(at 50% 50%, rgba(16, 185, 129, 0.1) 0px, transparent 50%);
+        radial-gradient(at 10% 10%, rgba(79, 70, 229, 0.06) 0px, transparent 40%),
+        radial-gradient(at 90% 80%, rgba(236, 72, 153, 0.05) 0px, transparent 40%),
+        radial-gradient(at 50% 50%, rgba(16, 185, 129, 0.04) 0px, transparent 40%);
       background-attachment: fixed;
       color: var(--text-main);
       min-height: 100vh;
@@ -48,19 +62,17 @@
       margin: 0 auto;
     }
 
-    /* Header */
+    /* Header Card */
     .header-card {
       background: var(--bg-card);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
       border: 1px solid var(--border-subtle);
       border-radius: var(--radius-lg);
       padding: 20px 24px;
-      margin-bottom: 24px;
+      margin-bottom: 20px;
       display: flex;
       flex-direction: column;
       gap: 16px;
-      box-shadow: 0 16px 32px -8px rgba(0, 0, 0, 0.5);
+      box-shadow: var(--shadow-md);
     }
     @media (min-width: 768px) {
       .header-card { flex-direction: row; align-items: center; justify-content: space-between; }
@@ -70,11 +82,11 @@
     .logo-icon {
       width: 44px; height: 44px; border-radius: var(--radius-md);
       background: var(--accent-gradient); display: flex; align-items: center; justify-content: center;
-      font-size: 1.4rem; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+      font-size: 1.4rem; color: #fff; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
     }
 
-    .calendar-title { font-size: 1.35rem; font-weight: 800; color: #fff; }
-    .calendar-desc { font-size: 0.875rem; color: var(--text-muted); }
+    .calendar-title { font-size: 1.35rem; font-weight: 800; color: var(--text-main); letter-spacing: -0.02em; }
+    .calendar-desc { font-size: 0.875rem; color: var(--text-muted); margin-top: 2px; }
 
     .header-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 
@@ -84,110 +96,117 @@
       padding: 10px 16px; border-radius: var(--radius-md); font-size: 0.875rem; font-weight: 700;
       cursor: pointer; transition: all 0.2s ease; border: 1px solid transparent; font-family: inherit;
     }
-    .btn-primary { background: var(--accent-gradient); color: #fff; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3); }
-    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(99, 102, 241, 0.45); }
-    .btn-secondary { background: rgba(255, 255, 255, 0.07); border-color: var(--border-subtle); color: #fff; }
-    .btn-secondary:hover { background: rgba(255, 255, 255, 0.14); }
-    .btn-danger { background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.3); color: #F87171; }
-    .btn-danger:hover { background: rgba(239, 68, 68, 0.25); }
+    .btn-primary { background: var(--accent-gradient); color: #ffffff; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25); }
+    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(79, 70, 229, 0.35); }
+    
+    .btn-secondary { background: #F1F5F9; border-color: var(--border-subtle); color: var(--text-main); }
+    .btn-secondary:hover { background: #E2E8F0; border-color: var(--border-hover); }
+    
+    .btn-danger { background: #FEF2F2; border-color: #FCA5A5; color: #DC2626; }
+    .btn-danger:hover { background: #FEE2E2; }
 
     .form-select, .form-input, .form-textarea {
-      padding: 10px 14px; background: rgba(255, 255, 255, 0.06); border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-md); color: #fff; font-size: 0.9rem; font-family: inherit; outline: none;
+      padding: 10px 14px; background: #FFFFFF; border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md); color: var(--text-main); font-size: 0.9rem; font-family: inherit; outline: none;
+      transition: border-color 0.2s ease;
     }
-    .form-select:focus, .form-input:focus, .form-textarea:focus { border-color: #6366F1; }
-    .form-select option { background: #1F2937; color: #fff; }
+    .form-select:focus, .form-input:focus, .form-textarea:focus { border-color: var(--accent-primary); box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15); }
+
+    /* ID Direct URL Indicator Banner */
+    .id-banner {
+      background: #EEF2FF; border: 1px solid #C7D2FE; color: #3730A3;
+      border-radius: var(--radius-md); padding: 10px 16px; margin-bottom: 20px;
+      font-size: 0.875rem; font-weight: 600; display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    }
 
     /* Participants Chip Bar */
     .participants-bar {
-      background: var(--bg-card); backdrop-filter: blur(12px); border: 1px solid var(--border-subtle);
+      background: var(--bg-card); border: 1px solid var(--border-subtle);
       border-radius: var(--radius-lg); padding: 16px 20px; margin-bottom: 24px;
       display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+      box-shadow: var(--shadow-sm);
     }
     .participant-chip {
-      display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px;
-      border-radius: var(--radius-full); background: rgba(255, 255, 255, 0.05);
-      border: 1px solid var(--border-subtle); font-size: 0.85rem; font-weight: 600;
+      display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px;
+      border-radius: var(--radius-full); background: #F8FAFC;
+      border: 1px solid var(--border-subtle); font-size: 0.85rem; font-weight: 700; color: var(--text-main);
     }
     .color-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
 
-    /* Calendar Grid */
+    /* Calendar Card */
     .calendar-card {
-      background: var(--bg-card); backdrop-filter: blur(16px); border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-lg); padding: 24px; margin-bottom: 28px; box-shadow: 0 16px 32px -8px rgba(0,0,0,0.5);
+      background: var(--bg-card); border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg); padding: 24px; margin-bottom: 28px; box-shadow: var(--shadow-lg);
     }
     .calendar-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
-    .month-display { font-size: 1.4rem; font-weight: 800; }
+    .month-display { font-size: 1.4rem; font-weight: 800; color: var(--text-main); letter-spacing: -0.02em; }
 
     .weekday-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; margin-bottom: 10px; text-align: center; }
     .weekday-label { font-size: 0.8rem; font-weight: 700; color: var(--text-muted); padding: 6px 0; }
-    .weekday-label.sun { color: #F87171; }
-    .weekday-label.sat { color: #60A5FA; }
+    .weekday-label.sun { color: #EF4444; }
+    .weekday-label.sat { color: #2563EB; }
 
     .days-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
     .day-cell {
-      min-height: 104px; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-subtle);
+      min-height: 108px; background: #FFFFFF; border: 1px solid var(--border-subtle);
       border-radius: var(--radius-md); padding: 8px; cursor: pointer; transition: all 0.2s ease;
       display: flex; flex-direction: column; justify-content: space-between; position: relative;
     }
     @media (max-width: 640px) { .day-cell { min-height: 76px; padding: 5px; } }
-    .day-cell:hover { background: rgba(255, 255, 255, 0.08); border-color: rgba(99, 102, 241, 0.5); transform: translateY(-2px); }
-    .day-cell.other-month { opacity: 0.3; }
-    .day-cell.today { border-color: #6366F1; background: rgba(99, 102, 241, 0.12); }
+    .day-cell:hover { background: #F8FAFC; border-color: var(--accent-primary); transform: translateY(-2px); box-shadow: var(--shadow-md); }
+    .day-cell.other-month { opacity: 0.3; background: #F8FAFC; }
+    .day-cell.today { border-color: var(--accent-primary); background: #EEF2FF; }
     
+    /* All Available 100% Match */
     .day-cell.all-available {
-      background: rgba(16, 185, 129, 0.12); border: 2px solid #10B981;
-      box-shadow: 0 0 16px rgba(16, 185, 129, 0.35);
+      background: #ECFDF5; border: 2px solid #10B981;
+      box-shadow: 0 4px 14px rgba(16, 185, 129, 0.25);
     }
     .day-number { font-size: 0.95rem; font-weight: 700; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; }
-    .sun .day-number { color: #F87171; }
-    .sat .day-number { color: #60A5FA; }
+    .sun .day-number { color: #EF4444; }
+    .sat .day-number { color: #2563EB; }
 
     .badges-container { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
     .participant-badge {
       display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: var(--radius-full);
-      font-size: 0.72rem; font-weight: 700; line-height: 1.2; box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+      font-size: 0.72rem; font-weight: 700; line-height: 1.2; box-shadow: 0 1px 3px rgba(0,0,0,0.12);
     }
     .badge-dot { width: 5px; height: 5px; border-radius: 50%; }
 
     /* Summary Card */
     .summary-card {
-      background: var(--bg-card); backdrop-filter: blur(16px); border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-lg); padding: 24px;
+      background: var(--bg-card); border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg); padding: 24px; box-shadow: var(--shadow-md);
     }
-    .summary-title { font-size: 1.15rem; font-weight: 800; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
-    .summary-grid { display: grid; grid-template-columns: 1fr; gap: 20px; }
-    @media (min-width: 768px) { .summary-grid { grid-template-columns: 1fr 1fr; } }
-
-    .summary-box {
-      background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 16px;
-    }
-    .summary-box.full-match { border-color: rgba(16, 185, 129, 0.4); background: rgba(16, 185, 129, 0.04); }
+    .summary-title { font-size: 1.15rem; font-weight: 800; color: var(--text-main); margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+    .summary-box { background: #F8FAFC; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 16px; }
+    .summary-box.full-match { border-color: rgba(16, 185, 129, 0.4); background: #ECFDF5; }
+    
     .date-item-btn {
       width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 12px 14px;
-      background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
-      color: #fff; cursor: pointer; transition: all 0.2s ease; margin-bottom: 8px; text-align: left;
+      background: #FFFFFF; border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
+      color: var(--text-main); cursor: pointer; transition: all 0.2s ease; margin-bottom: 8px; text-align: left;
     }
-    .date-item-btn:hover { background: rgba(99, 102, 241, 0.15); border-color: #6366F1; transform: translateX(4px); }
+    .date-item-btn:hover { background: #EEF2FF; border-color: var(--accent-primary); transform: translateX(4px); }
 
-    /* Modal */
+    /* Modal Overlay & Card */
     .modal-overlay {
-      position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(3, 7, 18, 0.82);
-      backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 16px;
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.6);
+      backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 16px;
     }
     .modal-container {
-      background: #111827; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: var(--radius-lg);
-      width: 100%; max-width: 480px; box-shadow: 0 20px 40px rgba(0,0,0,0.6); overflow: hidden;
+      background: #FFFFFF; border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
+      width: 100%; max-width: 480px; box-shadow: var(--shadow-lg); overflow: hidden; color: var(--text-main);
     }
-    .modal-header { padding: 18px 20px; border-bottom: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: space-between; }
+    .modal-header { padding: 18px 20px; border-bottom: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: space-between; background: #F8FAFC; }
     .modal-body { padding: 20px; display: flex; flex-direction: column; gap: 16px; }
-    .modal-footer { padding: 16px 20px; border-top: 1px solid var(--border-subtle); display: flex; justify-content: flex-end; gap: 10px; }
+    .modal-footer { padding: 16px 20px; border-top: 1px solid var(--border-subtle); display: flex; justify-content: flex-end; gap: 10px; background: #F8FAFC; }
   </style>
 </head>
 <body>
   <div id="root"></div>
 
-  <!-- React & React-DOM UMD CDNs for 100% Zero-Build Standalone GitHub Pages Execution -->
+  <!-- React CDNs -->
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -204,45 +223,70 @@
       const r = parseInt(hex.substring(0, 2), 16) || 0;
       const g = parseInt(hex.substring(2, 4), 16) || 0;
       const b = parseInt(hex.substring(4, 6), 16) || 0;
-      return (r * 299 + g * 587 + b * 114) / 1000 >= 128 ? '#111827' : '#FFFFFF';
+      return (r * 299 + g * 587 + b * 114) / 1000 >= 128 ? '#0F172A' : '#FFFFFF';
+    }
+
+    // Smart URL ID extractor: parses ?id=kkot, ?id=cw, #id=kkot, or /id=kkot
+    function getCalendarIdFromURL() {
+      const href = window.location.href;
+      
+      // 1. Query param check: ?id=kkot or ?cal=kkot
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('id')) return urlParams.get('id');
+      if (urlParams.get('cal')) return urlParams.get('cal');
+
+      // 2. Regex check for id=kkot, id=cw in path or hash (e.g. /id=kkot or #id=kkot)
+      const match = href.match(/[?&#/]id=([a-zA-Z0-9_-]+)/);
+      if (match && match[1]) return match[1];
+
+      return null;
     }
 
     const INITIAL_CALENDARS = [
       {
-        id: 'cal_vacation',
-        title: '🏝️ 8월 여름휴가 친목 모임',
-        description: '친구들과 함께 떠나는 여름 휴가 및 계곡 사모임 일정 조율',
+        id: 'kkot',
+        title: '🌸 꽃모임 사모임 달력 (kkot)',
+        description: '꽃모임 멤버들의 모임 가능 일자를 선택해주세요',
         participants: [
           { id: 'p1', name: '김민준', color: '#EF4444' },
           { id: 'p2', name: '이서연', color: '#3B82F6' },
           { id: 'p3', name: '박도현', color: '#10B981' },
-          { id: 'p4', name: '최지아', color: '#EC4899' },
-          { id: 'p5', name: '정현우', color: '#8B5CF6' }
+          { id: 'p4', name: '최지아', color: '#EC4899' }
         ],
         availabilities: [
-          { date: '2026-08-08', participantId: 'p1', note: '주말 전일 가능' },
-          { date: '2026-08-08', participantId: 'p2', note: '차량 운전 가능' },
-          { date: '2026-08-08', participantId: 'p3', note: '오후 1시 이후' },
-          { date: '2026-08-08', participantId: 'p4', note: '참석 가능' },
-          { date: '2026-08-08', participantId: 'p5', note: '참석 가능' },
+          { date: '2026-08-08', participantId: 'p1', note: '주말 가능' },
+          { date: '2026-08-08', participantId: 'p2', note: '가능' },
+          { date: '2026-08-08', participantId: 'p3', note: '가능' },
+          { date: '2026-08-08', participantId: 'p4', note: '가능' }
+        ]
+      },
+      {
+        id: 'cw',
+        title: '☕ cw 동창회 사모임 달력 (cw)',
+        description: 'cw 동창 모임 참여자들의 일정 조율',
+        participants: [
+          { id: 'p1', name: '강동원', color: '#F97316' },
+          { id: 'p2', name: '한소희', color: '#06B6D4' },
+          { id: 'p3', name: '송중기', color: '#6366F1' }
+        ],
+        availabilities: [
           { date: '2026-08-15', participantId: 'p1', note: '공휴일 가능' },
-          { date: '2026-08-15', participantId: 'p2', note: '펜션 예약 담당' },
-          { date: '2026-08-15', participantId: 'p3', note: '좋습니다' },
-          { date: '2026-08-15', participantId: 'p4', note: '참석' },
-          { date: '2026-08-15', participantId: 'p5', note: '무조건 참석' }
+          { date: '2026-08-15', participantId: 'p2', note: '가능' },
+          { date: '2026-08-15', participantId: 'p3', note: '가능' }
         ]
       }
     ];
 
     function App() {
       const [calendars, setCalendars] = React.useState(() => {
-        const raw = localStorage.getItem('gather_calendars_data');
+        const raw = localStorage.getItem('gather_calendars_data_v2');
         return raw ? JSON.parse(raw) : INITIAL_CALENDARS;
       });
 
       const [activeCalId, setActiveCalId] = React.useState(() => {
-        const params = new URLSearchParams(window.location.search);
-        return params.get('cal') || calendars[0]?.id || '';
+        const requestedId = getCalendarIdFromURL();
+        if (requestedId) return requestedId;
+        return calendars[0]?.id || 'kkot';
       });
 
       const [currentMonthDate, setCurrentMonthDate] = React.useState(new Date());
@@ -251,13 +295,41 @@
       const [isAdminOpen, setIsAdminOpen] = React.useState(false);
       const [isShareOpen, setIsShareOpen] = React.useState(false);
 
+      // Auto-create calendar if URL requested a specific ID (e.g. id=kkot or id=cw) that doesn't exist yet!
       React.useEffect(() => {
-        localStorage.setItem('gather_calendars_data', JSON.stringify(calendars));
+        const requestedId = getCalendarIdFromURL();
+        if (requestedId && !calendars.some(c => c.id === requestedId)) {
+          const newCal = {
+            id: requestedId,
+            title: `📅 ${requestedId} 모임 달력`,
+            description: `${requestedId} 사모임 멤버들의 참석 가능 일자를 표기해 주세요`,
+            participants: [
+              { id: 'p1', name: '참여자 1', color: '#EF4444' },
+              { id: 'p2', name: '참여자 2', color: '#3B82F6' },
+              { id: 'p3', name: '참여자 3', color: '#10B981' }
+            ],
+            availabilities: []
+          };
+          const updated = [newCal, ...calendars];
+          setCalendars(updated);
+          setActiveCalId(requestedId);
+        }
+      }, []);
+
+      React.useEffect(() => {
+        localStorage.setItem('gather_calendars_data_v2', JSON.stringify(calendars));
       }, [calendars]);
 
       const activeCal = calendars.find(c => c.id === activeCalId) || calendars[0];
 
-      // Availability Handler
+      const handleSelectCalendar = (id) => {
+        setActiveCalId(id);
+        const url = new URL(window.location.href);
+        url.searchParams.set('id', id);
+        window.history.replaceState({}, '', url.toString());
+      };
+
+      // Availability Handlers
       const handleSaveAvailability = (dateStr, participantId, note) => {
         const existing = activeCal.availabilities || [];
         const index = existing.findIndex(e => e.date === dateStr && e.participantId === participantId);
@@ -271,10 +343,9 @@
         const updatedCal = { ...activeCal, availabilities: nextAvail };
         setCalendars(calendars.map(c => c.id === updatedCal.id ? updatedCal : c));
 
-        // Confetti check
         const dateCount = nextAvail.filter(e => e.date === dateStr).length;
         if (dateCount === activeCal.participants.length && typeof confetti === 'function') {
-          confetti({ particleCount: 70, spread: 60, origin: { y: 0.6 } });
+          confetti({ particleCount: 75, spread: 65, origin: { y: 0.6 } });
         }
       };
 
@@ -286,17 +357,19 @@
         setCalendars(calendars.map(c => c.id === updatedCal.id ? updatedCal : c));
       };
 
-      // Admin Handlers
       const handleSaveAdmin = (updatedCal) => {
         setCalendars(calendars.map(c => c.id === updatedCal.id ? updatedCal : c));
       };
 
       const handleCreateNewCal = () => {
-        const title = prompt('새 모임 달력의 이름을 입력해 주세요:', '9월 정기 사모임 달력');
+        const id = prompt('새 모임 달력의 영문/한글 ID를 입력하세요 (예: kkot, cw, travel):', 'meeting_' + Date.now().toString().slice(-4));
+        if (!id) return;
+        const title = prompt('달력 제목을 입력해 주세요:', `${id} 사모임 달력`);
         if (!title) return;
+
         const newCal = {
-          id: 'cal_' + Date.now(),
-          title,
+          id: id.trim(),
+          title: title.trim(),
           description: '자유롭게 모임 가능 일자를 선택해주세요',
           participants: [
             { id: 'p1', name: '참여자 1', color: '#EF4444' },
@@ -305,11 +378,17 @@
           availabilities: []
         };
         setCalendars([newCal, ...calendars]);
-        setActiveCalId(newCal.id);
+        handleSelectCalendar(newCal.id);
       };
 
       return (
         <div className="app-container">
+          {/* Active URL ID Banner */}
+          <div className="id-banner">
+            <span>🔗 현재 달력 접속 코드: <strong>?id={activeCal?.id}</strong></span>
+            <span style={{ fontSize: '0.8rem', color: '#4F46E5' }}>주소창 URL로 바로 접속 가능</span>
+          </div>
+
           {/* Header */}
           <header className="header-card">
             <div className="header-left">
@@ -325,7 +404,7 @@
                 className="form-select"
                 style={{ fontWeight: '700' }}
                 value={activeCal?.id}
-                onChange={(e) => setActiveCalId(e.target.value)}
+                onChange={(e) => handleSelectCalendar(e.target.value)}
               >
                 {calendars.map(c => (
                   <option key={c.id} value={c.id}>{c.title}</option>
@@ -337,7 +416,7 @@
             </div>
           </header>
 
-          {/* Participants Chip Bar */}
+          {/* Participants Bar */}
           <div className="participants-bar">
             <span style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-muted)' }}>
               👥 참여자 ({activeCal?.participants?.length || 0}명):
@@ -352,7 +431,7 @@
             </div>
           </div>
 
-          {/* Main Monthly Calendar Grid */}
+          {/* Monthly Calendar View */}
           <CalendarGrid
             calendar={activeCal}
             monthDate={currentMonthDate}
@@ -362,13 +441,13 @@
             onSelectDate={(d) => { setSelectedDate(d); setIsModalOpen(true); }}
           />
 
-          {/* Bottom Summary List of All Available Dates */}
+          {/* Bottom Summary List */}
           <SummaryList
             calendar={activeCal}
             onSelectDate={(d) => { setSelectedDate(d); setIsModalOpen(true); }}
           />
 
-          {/* Modal Popups */}
+          {/* Modals */}
           {isModalOpen && (
             <DateModal
               dateStr={selectedDate}
@@ -506,12 +585,12 @@
           <div className="modal-container" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <h3 style={{ fontSize: '1.1rem', fontWeight: 800 }}>📅 {dateStr} 모임 일정 등록</h3>
-              <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#fff', fontSize: '1.2rem', cursor: 'pointer' }}>✕</button>
+              <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer' }}>✕</button>
             </div>
             <form onSubmit={handleSubmit}>
               <div className="modal-body">
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px' }}>참여자 선택</label>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px', color: '#64748B' }}>참여자 선택</label>
                   <select
                     className="form-select"
                     style={{ width: '100%' }}
@@ -525,7 +604,7 @@
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px' }}>메모 입력 (선택)</label>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px', color: '#64748B' }}>메모 입력 (선택)</label>
                   <input
                     type="text"
                     className="form-input"
@@ -587,17 +666,17 @@
           <div className="modal-container" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <h3 style={{ fontSize: '1.1rem', fontWeight: 800 }}>⚙️ 어드민: 달력 & 참여자 설정</h3>
-              <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#fff', fontSize: '1.2rem', cursor: 'pointer' }}>✕</button>
+              <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer' }}>✕</button>
             </div>
             <form onSubmit={handleSubmit}>
               <div className="modal-body">
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px' }}>달력명 (상단 표기)</label>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px', color: '#64748B' }}>달력명 (상단 표기)</label>
                   <input type="text" className="form-input" style={{ width: '100%' }} value={title} onChange={e => setTitle(e.target.value)} required />
                 </div>
 
                 <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '12px' }}>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px' }}>참여자 설정 ({participants.length}명)</label>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px', color: '#64748B' }}>참여자 설정 ({participants.length}명)</label>
                   <div style={{ display: 'flex', gap: '6px', marginBottom: '10px' }}>
                     <input type="text" className="form-input" style={{ flex: 1 }} placeholder="새 참여자 이름" value={newName} onChange={e => setNewName(e.target.value)} />
                     <button type="button" className="btn btn-secondary" onClick={handleAddParticipant}>추가</button>
@@ -624,15 +703,17 @@
 
     // Share Modal
     function ShareModal({ calendar, onClose }) {
-      const shareUrl = window.location.href;
+      const baseUrl = `${window.location.origin}${window.location.pathname}`;
+      const shareUrl = `${baseUrl}?id=${calendar.id}`;
       return (
         <div className="modal-overlay" onClick={onClose}>
           <div className="modal-container" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <h3 style={{ fontSize: '1.1rem', fontWeight: 800 }}>🔗 달력 공유 URL</h3>
-              <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#fff', fontSize: '1.2rem', cursor: 'pointer' }}>✕</button>
+              <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer' }}>✕</button>
             </div>
             <div className="modal-body">
+              <label style={{ fontSize: '0.85rem', fontWeight: 700, color: '#64748B' }}>현재 달력 ({calendar.id}) 전용 공유 URL</label>
               <input type="text" className="form-input" style={{ width: '100%' }} value={shareUrl} readOnly />
               <button className="btn btn-primary" onClick={() => { navigator.clipboard.writeText(shareUrl); alert('URL이 복사되었습니다!'); }}>URL 복사하기</button>
             </div>
@@ -662,7 +743,7 @@
               {fullDates.map(d => (
                 <button key={d} className="date-item-btn" onClick={() => onSelectDate(d)}>
                   <span style={{ fontWeight: 800, color: '#10B981' }}>{d}</span>
-                  <span style={{ fontSize: '0.75rem', background: '#10B981', color: '#000', padding: '2px 8px', borderRadius: '9999px', fontWeight: 700 }}>전원 가능 ({totalCount}/{totalCount}명)</span>
+                  <span style={{ fontSize: '0.75rem', background: '#10B981', color: '#FFF', padding: '3px 10px', borderRadius: '9999px', fontWeight: 700 }}>전원 가능 ({totalCount}/{totalCount}명)</span>
                 </button>
               ))}
             </div>
