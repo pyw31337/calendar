@@ -1780,6 +1780,112 @@ async function fetchAllServerCalendars() {
   throw new Error('Firebase 연결이 없어 캘린더 데이터를 불러올 수 없습니다.');
 }
 
+function getMonthKey(dateStr) {
+  return isValidDateString(dateStr) ? dateStr.slice(0, 7) : 'unknown';
+}
+
+function estimateFirestoreDocumentSize(calendar) {
+  return new Blob([JSON.stringify({
+    calendar,
+    lastModified: calendar?.updatedAt || 0,
+    revision: calendar?.revision || 0
+  })]).size;
+}
+
+function buildAdminDashboardMetrics(calendarsList) {
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const calendarStats = calendarsList.map(cal => {
+    const participants = getActiveParticipants(cal);
+    const schedules = getActiveAvailabilities(cal);
+    const dateBuckets = new Map();
+    const monthBuckets = new Map();
+    const participantBuckets = new Map(participants.map(participant => [participant.id, {
+      ...participant,
+      count: 0,
+      memoCount: 0,
+      upcomingCount: 0,
+      latestDate: ''
+    }]));
+    let memoCount = 0;
+    schedules.forEach(item => {
+      if (!dateBuckets.has(item.date)) dateBuckets.set(item.date, []);
+      dateBuckets.get(item.date).push(item);
+      const monthKey = getMonthKey(item.date);
+      monthBuckets.set(monthKey, (monthBuckets.get(monthKey) || 0) + 1);
+      const participantStat = participantBuckets.get(item.participantId);
+      if (participantStat) {
+        participantStat.count += 1;
+        if (item.date >= todayStr) participantStat.upcomingCount += 1;
+        if (!participantStat.latestDate || item.date > participantStat.latestDate) participantStat.latestDate = item.date;
+        if (item.note) participantStat.memoCount += 1;
+      }
+      if (item.note) memoCount += 1;
+    });
+    const fullDates = Array.from(dateBuckets.entries())
+      .filter(([, items]) => participants.length > 0 && new Set(items.map(item => item.participantId)).size >= participants.length)
+      .map(([date, items]) => ({ date, count: items.length }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+    const popularDates = Array.from(dateBuckets.entries())
+      .map(([date, items]) => ({ date, count: new Set(items.map(item => item.participantId)).size }))
+      .sort((a, b) => b.count - a.count || a.date.localeCompare(b.date))
+      .slice(0, 8);
+    const participantStats = Array.from(participantBuckets.values())
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+    const monthStats = Array.from(monthBuckets.entries())
+      .map(([month, count]) => ({ month, count }))
+      .sort((a, b) => a.month.localeCompare(b.month));
+    const storedAvailabilities = Array.isArray(cal.availabilities) ? cal.availabilities.length : 0;
+    const deletedCount = storedAvailabilities - schedules.length;
+    const sizeBytes = estimateFirestoreDocumentSize(cal);
+    return {
+      calendar: cal,
+      participants,
+      schedules,
+      dateCount: dateBuckets.size,
+      upcomingCount: schedules.filter(item => item.date >= todayStr).length,
+      pastCount: schedules.filter(item => item.date < todayStr).length,
+      memoCount,
+      fullDates,
+      popularDates,
+      participantStats,
+      monthStats,
+      storedAvailabilities,
+      deletedCount,
+      sizeBytes,
+      sizePercent: Math.round(sizeBytes / 1048576 * 1000) / 10
+    };
+  });
+  const allSchedules = calendarStats.flatMap(stat => stat.schedules.map(item => ({ ...item, calendarId: stat.calendar.id })));
+  const totalParticipants = calendarStats.reduce((sum, stat) => sum + stat.participants.length, 0);
+  const totalSchedules = allSchedules.length;
+  const uniqueDateCount = new Set(allSchedules.map(item => `${item.calendarId}_${item.date}`)).size;
+  const upcomingCount = allSchedules.filter(item => item.date >= todayStr).length;
+  const memoCount = allSchedules.filter(item => item.note).length;
+  const maxSchedules = Math.max(1, ...calendarStats.map(stat => stat.schedules.length));
+  const maxMonthCount = Math.max(1, ...calendarStats.flatMap(stat => stat.monthStats.map(item => item.count)));
+  const qualityWarnings = calendarStats.flatMap(stat => {
+    const warnings = [];
+    if (stat.sizePercent >= 75) warnings.push(`${stat.calendar.id}: Firestore 문서 크기 ${stat.sizePercent}%`);
+    if (stat.deletedCount > 200) warnings.push(`${stat.calendar.id}: 삭제 이력 ${stat.deletedCount}건 정리 검토`);
+    if (stat.participants.length === 0) warnings.push(`${stat.calendar.id}: 활성 참여자 없음`);
+    if (stat.schedules.some(item => !stat.participants.some(participant => participant.id === item.participantId))) {
+      warnings.push(`${stat.calendar.id}: 참여자와 연결되지 않은 일정 존재`);
+    }
+    return warnings;
+  });
+  return {
+    calendarStats,
+    totalParticipants,
+    totalSchedules,
+    uniqueDateCount,
+    upcomingCount,
+    memoCount,
+    maxSchedules,
+    maxMonthCount,
+    qualityWarnings
+  };
+}
+
 function AdminDashboard({ initialCalendars }) {
   const [serverCalendars, setServerCalendars] = React.useState(cloneCalendarList(initialCalendars || []));
   const [loadedAt, setLoadedAt] = React.useState(null);
@@ -1826,51 +1932,8 @@ function AdminDashboard({ initialCalendars }) {
   const calendarsList = serverCalendars
     .filter(cal => cal && !isInternalTestCalendarId(cal.id))
     .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
-  const totalParticipants = calendarsList.reduce((sum, cal) => sum + getActiveParticipants(cal).length, 0);
-  const activeAvailabilities = calendarsList.flatMap(cal => getActiveAvailabilities(cal).map(item => ({ ...item, calendarId: cal.id })));
-  const totalSchedules = activeAvailabilities.length;
-  const uniqueDateCount = new Set(activeAvailabilities.map(item => `${item.calendarId}_${item.date}`)).size;
-  const todayStr = new Date().toISOString().slice(0, 10);
-  const upcomingCount = activeAvailabilities.filter(item => item.date >= todayStr).length;
-  const maxSchedules = Math.max(1, ...calendarsList.map(cal => getActiveAvailabilities(cal).length));
+  const dashboard = buildAdminDashboardMetrics(calendarsList);
   const adminUpdatedText = loadedAt ? loadedAt.toLocaleString('ko-KR') : '불러오는 중';
-  const handleCreateCalendar = async () => {
-    const rawId = prompt('새 모임 캘린더의 영문/한글 ID를 입력하세요 (예: kkot, cw, trip):', 'cal_' + Date.now().toString().slice(-4));
-    const id = (rawId || '').trim();
-    if (!id) return;
-    if (!/^[A-Za-z0-9_-]{1,64}$/.test(id)) {
-      showAdminToast('캘린더 ID는 영문, 숫자, -, _ 조합으로 입력해 주세요.', 'error');
-      return;
-    }
-    if (!isAllowedCalendarId(id)) {
-      showAdminToast('운영 캘린더는 kkot, cw만 사용할 수 있습니다.', 'error');
-      return;
-    }
-    if (calendarsList.some(cal => cal.id === id)) {
-      showAdminToast('이미 존재하는 캘린더 ID입니다.', 'error');
-      return;
-    }
-    const rawTitle = prompt('캘린더 제목을 입력해 주세요:', `${id} 모임 캘린더`);
-    const title = (rawTitle || '').trim();
-    if (!title) return;
-    const now = Date.now();
-    const newCal = {
-      ...createDefaultCalendar(id),
-      title,
-      description: `${title} 참여자들의 일정 조율`,
-      updatedAt: now,
-      revision: 1
-    };
-    const nextCalendars = [newCal, ...calendarsList];
-    setError('');
-    const saved = await pushSingleCloudCalendar(newCal, now, 18, nextCalendars, 'replace');
-    if (!saved) {
-      showAdminToast('새 캘린더 생성에 실패했습니다. 다시 시도해 주세요.', 'error');
-      return;
-    }
-    setServerCalendars(cloneCalendarList(nextCalendars).map(normalizeCalendarForSave));
-    showAdminToast('새 캘린더가 생성되었습니다.', 'success');
-  };
 
   return /*#__PURE__*/React.createElement("div", {
     className: "app-container"
@@ -1882,10 +1945,7 @@ function AdminDashboard({ initialCalendars }) {
     className: "calendar-desc"
   }, "Firestore 기준 전체 캘린더 현황 · ", adminUpdatedText)), /*#__PURE__*/React.createElement("div", {
     className: "header-actions"
-  }, /*#__PURE__*/React.createElement("button", {
-    className: "btn btn-primary",
-    onClick: handleCreateCalendar
-  }, "+ 새 캘린더"), /*#__PURE__*/React.createElement("a", {
+  }, /*#__PURE__*/React.createElement("a", {
     className: "btn btn-secondary",
     href: `${window.location.pathname}?id=kkot`
   }, "kkot 열기"), /*#__PURE__*/React.createElement("a", {
@@ -1908,16 +1968,19 @@ function AdminDashboard({ initialCalendars }) {
     value: calendarsList.length
   }, {
     label: '총 참여자',
-    value: totalParticipants
+    value: dashboard.totalParticipants
   }, {
     label: '총 일정',
-    value: totalSchedules
+    value: dashboard.totalSchedules
   }, {
     label: '등록 날짜',
-    value: uniqueDateCount
+    value: dashboard.uniqueDateCount
   }, {
     label: '예정 일정',
-    value: upcomingCount
+    value: dashboard.upcomingCount
+  }, {
+    label: '메모 일정',
+    value: dashboard.memoCount
   }].map(card => /*#__PURE__*/React.createElement("div", {
     key: card.label,
     style: {
@@ -1934,12 +1997,11 @@ function AdminDashboard({ initialCalendars }) {
     className: "summary-card"
   }, /*#__PURE__*/React.createElement("div", {
     className: "summary-title"
-  }, "캘린더별 현황"), calendarsList.length === 0 ? /*#__PURE__*/React.createElement("div", {
+  }, "캘린더별 현황"), dashboard.calendarStats.length === 0 ? /*#__PURE__*/React.createElement("div", {
     style: { color: 'var(--text-muted)', fontSize: '0.9rem' }
-  }, "아직 표시할 캘린더가 없습니다.") : calendarsList.map(cal => {
-    const participants = getActiveParticipants(cal);
-    const schedules = getActiveAvailabilities(cal);
-    const width = `${Math.max(4, Math.round(schedules.length / maxSchedules * 100))}%`;
+  }, "아직 표시할 캘린더가 없습니다.") : dashboard.calendarStats.map(stat => {
+    const cal = stat.calendar;
+    const width = `${Math.max(4, Math.round(stat.schedules.length / dashboard.maxSchedules * 100))}%`;
     const calendarUrl = `${window.location.pathname}?id=${encodeURIComponent(cal.id)}`;
     return /*#__PURE__*/React.createElement("a", {
       key: cal.id,
@@ -1953,20 +2015,120 @@ function AdminDashboard({ initialCalendars }) {
       style: { display: 'flex', justifyContent: 'space-between', gap: '10px', width: '100%', flexWrap: 'wrap' }
     }, /*#__PURE__*/React.createElement("strong", null, cal.title || cal.id), /*#__PURE__*/React.createElement("span", {
       className: "date-item-badge"
-    }, participants.length, "명 · ", schedules.length, "건")), /*#__PURE__*/React.createElement("div", {
+    }, stat.participants.length, "명 · ", stat.schedules.length, "건 · ", stat.dateCount, "일")), /*#__PURE__*/React.createElement("div", {
       style: { color: 'var(--text-muted)', fontSize: '0.84rem' }
     }, cal.description || cal.id), /*#__PURE__*/React.createElement("div", {
+      style: { color: 'var(--text-muted)', fontSize: '0.8rem', fontWeight: 700 }
+    }, "예정 ", stat.upcomingCount, "건 · 지난 일정 ", stat.pastCount, "건 · 메모 ", stat.memoCount, "건 · 문서 ", stat.sizePercent, "%"), /*#__PURE__*/React.createElement("div", {
       style: { width: '100%', height: '8px', borderRadius: '999px', background: '#E2E8F0', overflow: 'hidden' }
     }, /*#__PURE__*/React.createElement("div", {
       style: { width, height: '100%', background: '#10B981' }
     })), /*#__PURE__*/React.createElement("div", {
       style: { display: 'flex', gap: '5px', flexWrap: 'wrap' }
-    }, participants.slice(0, 12).map(p => /*#__PURE__*/React.createElement("span", {
+    }, stat.participants.slice(0, 12).map(p => /*#__PURE__*/React.createElement("span", {
       key: p.id,
       className: "participant-badge",
       style: { backgroundColor: p.color, color: getContrastTextColor(p.color) }
     }, p.name)))));
-  })), toast && /*#__PURE__*/React.createElement("div", {
+  })), /*#__PURE__*/React.createElement("section", {
+    className: "summary-card",
+    style: { marginTop: '20px' }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "summary-title"
+  }, "참여자별 입력 현황"), dashboard.calendarStats.flatMap(stat => stat.participantStats.map(participant => ({
+    stat,
+    participant
+  }))).length === 0 ? /*#__PURE__*/React.createElement("div", {
+    style: { color: 'var(--text-muted)', fontSize: '0.9rem' }
+  }, "참여자 데이터가 없습니다.") : dashboard.calendarStats.map(stat => /*#__PURE__*/React.createElement("div", {
+    key: `${stat.calendar.id}_participants`,
+    style: { marginBottom: '18px' }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { fontWeight: 900, marginBottom: '8px', color: 'var(--text-main)' }
+  }, stat.calendar.id, " · ", stat.calendar.title), stat.participantStats.map(participant => {
+    const width = `${Math.max(4, Math.round(participant.count / Math.max(1, stat.schedules.length) * 100))}%`;
+    return /*#__PURE__*/React.createElement("div", {
+      key: participant.id,
+      style: { marginBottom: '8px' }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: { display: 'flex', justifyContent: 'space-between', gap: '8px', fontSize: '0.84rem', fontWeight: 800 }
+    }, /*#__PURE__*/React.createElement("span", null, participant.name), /*#__PURE__*/React.createElement("span", {
+      style: { color: 'var(--text-muted)' }
+    }, participant.count, "건 · 예정 ", participant.upcomingCount, "건 · 메모 ", participant.memoCount, "건")), /*#__PURE__*/React.createElement("div", {
+      style: { width: '100%', height: '7px', borderRadius: '999px', background: '#E2E8F0', overflow: 'hidden', marginTop: '4px' }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: { width, height: '100%', background: participant.color || '#64748B' }
+    })));
+  })))), /*#__PURE__*/React.createElement("section", {
+    className: "summary-card",
+    style: { marginTop: '20px' }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "summary-title"
+  }, "날짜별 가능 인원 Top"), dashboard.calendarStats.map(stat => /*#__PURE__*/React.createElement("div", {
+    key: `${stat.calendar.id}_popular`,
+    style: { marginBottom: '18px' }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { fontWeight: 900, marginBottom: '8px', color: 'var(--text-main)' }
+  }, stat.calendar.id, " · 전원 가능 ", stat.fullDates.length, "일"), stat.popularDates.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    style: { color: 'var(--text-muted)', fontSize: '0.9rem' }
+  }, "등록된 날짜가 없습니다.") : stat.popularDates.map(item => /*#__PURE__*/React.createElement("div", {
+    key: `${stat.calendar.id}_${item.date}`,
+    className: "date-item-btn",
+    style: { cursor: 'default' }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "date-item-left"
+  }, /*#__PURE__*/React.createElement("strong", null, formatDateWithDayName(item.date)), /*#__PURE__*/React.createElement("span", null, item.count, "/", stat.participants.length, "명 가능")), item.count >= stat.participants.length ? /*#__PURE__*/React.createElement("span", {
+    className: "date-item-badge",
+    style: { background: '#DCFCE7', color: '#166534' }
+  }, "전원") : /*#__PURE__*/React.createElement("span", {
+    className: "date-item-badge"
+  }, item.count, "명"))))), /*#__PURE__*/React.createElement("section", {
+    className: "summary-card",
+    style: { marginTop: '20px' }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "summary-title"
+  }, "월별 일정 분포"), dashboard.calendarStats.map(stat => /*#__PURE__*/React.createElement("div", {
+    key: `${stat.calendar.id}_months`,
+    style: { marginBottom: '18px' }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { fontWeight: 900, marginBottom: '8px', color: 'var(--text-main)' }
+  }, stat.calendar.id), stat.monthStats.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    style: { color: 'var(--text-muted)', fontSize: '0.9rem' }
+  }, "월별 데이터가 없습니다.") : stat.monthStats.map(item => /*#__PURE__*/React.createElement("div", {
+    key: `${stat.calendar.id}_${item.month}`,
+    style: { marginBottom: '8px' }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { display: 'flex', justifyContent: 'space-between', fontSize: '0.84rem', fontWeight: 800 }
+  }, /*#__PURE__*/React.createElement("span", null, item.month), /*#__PURE__*/React.createElement("span", null, item.count, "건")), /*#__PURE__*/React.createElement("div", {
+    style: { width: '100%', height: '7px', borderRadius: '999px', background: '#E2E8F0', overflow: 'hidden', marginTop: '4px' }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { width: `${Math.max(4, Math.round(item.count / dashboard.maxMonthCount * 100))}%`, height: '100%', background: '#3B82F6' }
+  })))))), /*#__PURE__*/React.createElement("section", {
+    className: "summary-card",
+    style: { marginTop: '20px' }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "summary-title"
+  }, "데이터 품질 및 운영 규칙"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+      gap: '12px'
+    }
+  }, dashboard.calendarStats.map(stat => /*#__PURE__*/React.createElement("div", {
+    key: `${stat.calendar.id}_quality`,
+    style: {
+      border: '1px solid var(--border-subtle)',
+      borderRadius: '8px',
+      padding: '14px',
+      background: '#F8FAFC'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { fontWeight: 900, marginBottom: '8px' }
+  }, stat.calendar.id), /*#__PURE__*/React.createElement("div", {
+    style: { color: 'var(--text-muted)', fontSize: '0.84rem', lineHeight: 1.7 }
+  }, "Firestore 문서 크기: ", stat.sizePercent, "%", /*#__PURE__*/React.createElement("br", null), "저장 레코드: ", stat.storedAvailabilities, "건", /*#__PURE__*/React.createElement("br", null), "삭제 이력: ", stat.deletedCount, "건", /*#__PURE__*/React.createElement("br", null), "Revision: ", stat.calendar.revision || 0)))), /*#__PURE__*/React.createElement("div", {
+    style: { marginTop: '12px', color: dashboard.qualityWarnings.length ? '#B45309' : '#047857', fontSize: '0.9rem', fontWeight: 800 }
+  }, dashboard.qualityWarnings.length ? dashboard.qualityWarnings.join(' · ') : '현재 운영 데이터 품질 경고가 없습니다.'))), toast && /*#__PURE__*/React.createElement("div", {
     className: "toast",
     style: {
       position: 'fixed',
@@ -1983,7 +2145,7 @@ function AdminDashboard({ initialCalendars }) {
       fontWeight: '800',
       pointerEvents: 'none'
     }
-  }, toast.message));
+  }, toast.message)));
 }
 function App() {
   const [calendars, setCalendarsState] = React.useState(() => loadLocalCache());

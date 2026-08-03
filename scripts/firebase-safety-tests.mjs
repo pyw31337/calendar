@@ -17,6 +17,7 @@ function createContext(url) {
     clearTimeout,
     URL,
     URLSearchParams,
+    Blob,
     alert() {},
     window: {
       location: {
@@ -162,6 +163,30 @@ runAppScript(invalidContext, `
   if (!validateCalendarShape({ ...valid, availabilities: [{ date: '2026-08-29', participantId: 'missing' }] })) {
     throw new Error('missing participant accepted');
   }
+`);
+
+const adminMetricsContext = createContext('https://pyw31337.github.io/calendar/?admin=1');
+runAppScript(adminMetricsContext, `
+  const dashboard = buildAdminDashboardMetrics([{
+    id: 'kkot',
+    title: 'KKOT',
+    participants: [
+      { id: 'kkot_p1', name: 'A', color: '#EF4444' },
+      { id: 'kkot_p2', name: 'B', color: '#3B82F6' }
+    ],
+    availabilities: [
+      { date: '2026-08-10', participantId: 'kkot_p1', note: 'memo', updatedAt: 1 },
+      { date: '2026-08-10', participantId: 'kkot_p2', note: '', updatedAt: 2 },
+      { date: '2026-08-11', participantId: 'kkot_p1', note: '', deletedAt: 3, updatedAt: 3 }
+    ],
+    updatedAt: 2,
+    revision: 1
+  }]);
+  if (dashboard.totalParticipants !== 2) throw new Error('admin participant metric failed');
+  if (dashboard.totalSchedules !== 2) throw new Error('admin active schedule metric failed');
+  if (dashboard.calendarStats[0].fullDates.length !== 1) throw new Error('admin full-date metric failed');
+  if (dashboard.calendarStats[0].deletedCount !== 1) throw new Error('admin deleted history metric failed');
+  if (dashboard.calendarStats[0].memoCount !== 1) throw new Error('admin memo metric failed');
 `);
 
 const restContext = createContext('https://pyw31337.github.io/calendar/?id=cw');
