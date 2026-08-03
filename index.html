@@ -463,6 +463,12 @@
 
     const STORAGE_KEY = 'gather_calendars_cache_v7';
     const STORAGE_META_KEY = 'gather_calendars_meta_v1'; // tracks lastModified timestamp
+    const LEGACY_STORAGE_KEYS = [
+      STORAGE_KEY,
+      'gather_calendars_cache_v6',
+      'gather_calendars_persistent_v5',
+      'gather_calendars_persistent_v4'
+    ];
     // Unlimited Zero-Rate-Limit Cloud DB endpoint powered by JSONBlob
     const MASTER_CLOUD_BLOB_ID = '019fc4ff-8b04-74ab-af71-bdd91c03ea11';
     const CLOUD_API_URL = `https://jsonblob.com/api/jsonBlob/${MASTER_CLOUD_BLOB_ID}`;
@@ -599,12 +605,130 @@
       } catch(e) {}
     }
 
+    function parseCalendarPayload(raw) {
+      if (!raw) return null;
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (parsed && Array.isArray(parsed.calendars) && parsed.calendars.length > 0) return parsed.calendars;
+      } catch (e) {}
+      return null;
+    }
+
+    function normalizeCalendar(calendar) {
+      if (!calendar || !calendar.id) return null;
+      return {
+        ...calendar,
+        participants: Array.isArray(calendar.participants) ? calendar.participants : [],
+        availabilities: Array.isArray(calendar.availabilities) ? calendar.availabilities : []
+      };
+    }
+
+    function mergeCalendarRecords(baseCalendar, incomingCalendar, options = {}) {
+      const { preferIncoming = false } = options;
+      const base = normalizeCalendar(baseCalendar);
+      const incoming = normalizeCalendar(incomingCalendar);
+      if (!base) return incoming;
+      if (!incoming) return base;
+
+      const merged = { ...base };
+      if (preferIncoming) {
+        if (incoming.title) merged.title = incoming.title;
+        if (incoming.description) merged.description = incoming.description;
+        if (incoming.createdAt) merged.createdAt = incoming.createdAt;
+      } else {
+        if (!merged.title && incoming.title) merged.title = incoming.title;
+        if (!merged.description && incoming.description) merged.description = incoming.description;
+        if (!merged.createdAt && incoming.createdAt) merged.createdAt = incoming.createdAt;
+      }
+
+      const participantsById = new Map();
+      merged.participants.forEach((participant) => {
+        if (participant && participant.id) {
+          participantsById.set(participant.id, { ...participant });
+        }
+      });
+      incoming.participants.forEach((participant) => {
+        if (!participant || !participant.id) return;
+        const existing = participantsById.get(participant.id);
+        if (!existing) {
+          participantsById.set(participant.id, { ...participant });
+          return;
+        }
+        participantsById.set(
+          participant.id,
+          preferIncoming
+            ? { ...existing, ...participant }
+            : {
+                ...participant,
+                ...existing,
+                name: existing.name || participant.name,
+                color: existing.color || participant.color
+              }
+        );
+      });
+      merged.participants = Array.from(participantsById.values());
+
+      const availabilitiesByKey = new Map();
+      const addAvailability = (entry) => {
+        if (!entry || !entry.date || !entry.participantId) return;
+        const key = `${entry.date}__${entry.participantId}`;
+        const existing = availabilitiesByKey.get(key);
+        if (!existing) {
+          availabilitiesByKey.set(key, { ...entry });
+          return;
+        }
+
+        if (preferIncoming) {
+          availabilitiesByKey.set(key, { ...existing, ...entry });
+          return;
+        }
+
+        const existingNote = (existing.note || '').trim();
+        const incomingNote = (entry.note || '').trim();
+        if (!existingNote && incomingNote) {
+          availabilitiesByKey.set(key, { ...existing, ...entry });
+          return;
+        }
+
+        if (incomingNote.length > existingNote.length) {
+          availabilitiesByKey.set(key, { ...existing, ...entry });
+        }
+      };
+
+      merged.availabilities.forEach(addAvailability);
+      incoming.availabilities.forEach(addAvailability);
+      merged.availabilities = Array.from(availabilitiesByKey.values());
+      return merged;
+    }
+
+    function mergeCalendarCollections(collections, options = {}) {
+      const calendarsById = new Map();
+      (collections || []).forEach((collection) => {
+        (collection || []).forEach((calendar) => {
+          const normalized = normalizeCalendar(calendar);
+          if (!normalized) return;
+          const existing = calendarsById.get(normalized.id);
+          calendarsById.set(normalized.id, existing
+            ? mergeCalendarRecords(existing, normalized, options)
+            : normalized);
+        });
+      });
+      return Array.from(calendarsById.values());
+    }
+
+    function hasCalendarDifferences(baseCalendars, nextCalendars) {
+      return JSON.stringify(baseCalendars || []) !== JSON.stringify(nextCalendars || []);
+    }
+
     function loadSavedLocalCalendars() {
       try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        const savedCollections = LEGACY_STORAGE_KEYS
+          .map((key) => parseCalendarPayload(localStorage.getItem(key)))
+          .filter((calendars) => Array.isArray(calendars) && calendars.length > 0);
+
+        if (savedCollections.length > 0) {
+          return mergeCalendarCollections(savedCollections);
         }
       } catch (e) {}
       return null;
@@ -675,28 +799,16 @@
         const result = await fetchMasterCloudCalendars();
         const cloudCalendars = Array.isArray(result?.calendars) ? result.calendars : null;
         const mergedCalendars = (cloudCalendars && cloudCalendars.length > 0)
-          ? (() => {
-              const merged = [...cloudCalendars];
-              nextCalendars.forEach((cal) => {
-                const idx = merged.findIndex(c => c.id === cal.id);
-                if (idx >= 0) {
-                  if (cal.id === updatedCalendar.id) {
-                    merged[idx] = cal;
-                  }
-                } else {
-                  merged.push(cal);
-                }
-              });
-              return merged;
-            })()
+          ? mergeCalendarCollections([cloudCalendars, nextCalendars], { preferIncoming: true })
           : nextCalendars;
 
         setCalendarsState(mergedCalendars);
         saveLocalCache(mergedCalendars);
 
-        const saved = await pushMasterCloudCalendars(mergedCalendars, now);
+        const mergedLastModified = result?.lastModified ? Math.max(result.lastModified, now) : now;
+        const saved = await pushMasterCloudCalendars(mergedCalendars, mergedLastModified);
         if (saved) {
-          saveLocalMeta({ lastModified: now });
+          saveLocalMeta({ lastModified: mergedLastModified });
           if (successMessage) showToast(successMessage, 'success');
           return true;
         }
@@ -719,26 +831,33 @@
             const localMeta = loadLocalMeta();
             // Guard 2: only apply cloud data if it is provably NEWER than local data
             // This prevents stale GETs from overwriting fresh local saves
-            if (result.lastModified > localMeta.lastModified) {
-              // Guard 3: re-check that no local save happened during the async fetch
-              if (Date.now() - lastLocalSaveRef.current >= LOCAL_SAVE_GUARD_MS) {
-                const savedLocalCalendars = loadSavedLocalCalendars();
-                const mergedCalendars = savedLocalCalendars && savedLocalCalendars.length > 0
-                  ? (() => {
-                      const merged = [...result.calendars];
-                      savedLocalCalendars.forEach((cal) => {
-                        if (!merged.some(item => item.id === cal.id)) {
-                          merged.push(cal);
-                        }
-                      });
-                      return merged;
-                    })()
-                  : result.calendars;
-                setCalendarsState(mergedCalendars);
-                saveLocalCache(mergedCalendars);
+          if (result.lastModified > localMeta.lastModified) {
+            // Guard 3: re-check that no local save happened during the async fetch
+            if (Date.now() - lastLocalSaveRef.current >= LOCAL_SAVE_GUARD_MS) {
+              const savedLocalCalendars = loadSavedLocalCalendars();
+              const mergedCalendars = savedLocalCalendars && savedLocalCalendars.length > 0
+                ? mergeCalendarCollections([result.calendars, savedLocalCalendars], { preferIncoming: false })
+                : result.calendars;
+              setCalendarsState(mergedCalendars);
+              saveLocalCache(mergedCalendars);
+
+              const hasMigratedLegacyData = savedLocalCalendars && hasCalendarDifferences(result.calendars, mergedCalendars);
+              const mergedLastModified = hasMigratedLegacyData
+                ? Math.max(result.lastModified || 0, Date.now())
+                : result.lastModified;
+
+              if (hasMigratedLegacyData) {
+                const migrated = await pushMasterCloudCalendars(mergedCalendars, mergedLastModified);
+                if (migrated) {
+                  saveLocalMeta({ lastModified: mergedLastModified });
+                } else {
+                  saveLocalMeta({ lastModified: result.lastModified });
+                }
+              } else {
                 saveLocalMeta({ lastModified: result.lastModified });
               }
             }
+          }
           }
 
           if (isMounted) setIsSyncing(false);
