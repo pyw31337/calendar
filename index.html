@@ -1028,6 +1028,13 @@
         updateCalendars(nextCalendars);
       };
 
+      const handleDeleteAllForDate = (dateStr) => {
+        const nextAvail = (activeCal.availabilities || []).filter(e => e.date !== dateStr);
+        const updatedCal = { ...activeCal, availabilities: nextAvail };
+        const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
+        updateCalendars(nextCalendars);
+      };
+
       const handleSaveAdmin = (updatedCal, newCalCreated) => {
         if (newCalCreated) {
           const nextCalendars = [newCalCreated, ...calendars];
@@ -1111,6 +1118,7 @@
               calendar={activeCal}
               onSave={handleSaveAvailability}
               onDelete={handleDeleteAvailability}
+              onDeleteDate={handleDeleteAllForDate}
               onClose={() => setIsModalOpen(false)}
             />
           )}
@@ -1394,7 +1402,7 @@
     }
 
     // Date Layer Popup Modal
-    function DateModal({ dateStr, calendar, onSave, onDelete, onClose }) {
+    function DateModal({ dateStr, calendar, onSave, onDelete, onDeleteDate, onClose }) {
       const [participantId, setParticipantId] = React.useState(calendar?.participants[0]?.id || '');
       const [note, setNote] = React.useState('');
       const [isSheetOpen, setIsSheetOpen] = React.useState(false);
@@ -1421,9 +1429,34 @@
       return (
         <div className="modal-overlay" onClick={onClose}>
           <div className="modal-container" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
+            <div className="modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 style={{ fontSize: '1.1rem', fontWeight: 800 }}>{getShortTitle(dateStr)}</h3>
-              <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer' }}>✕</button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  style={{
+                    padding: '4px 10px',
+                    fontSize: '0.78rem',
+                    fontWeight: 800,
+                    color: '#EF4444',
+                    borderColor: '#FCA5A5',
+                    backgroundColor: '#FEF2F2',
+                    whiteSpace: 'nowrap'
+                  }}
+                  onClick={() => {
+                    const titleText = getShortTitle(dateStr).replace(' 일정', '');
+                    if (window.confirm(`${titleText}에 등록된 모든 일정을 삭제하시겠습니까?`)) {
+                      onDeleteDate(dateStr);
+                      onClose();
+                    }
+                  }}
+                  title="해당 날짜의 모든 참여자 일정 삭제"
+                >
+                  일정 삭제
+                </button>
+                <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>✕</button>
+              </div>
             </div>
             <form onSubmit={handleSubmit}>
               <div className="modal-body">
