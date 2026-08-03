@@ -79,7 +79,7 @@ export default function AvailableDatesList({ calendar, onSelectDate }) {
                     {formatted}
                   </span>
 
-                  {/* Render Capsule Memo Badges ONLY for participants who typed a note */}
+                  {/* Render Capsule Memo Badges with ONLY memo text (Personal Color identifies the participant) */}
                   {memoEntries.length > 0 && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                       {memoEntries.map((e) => {
@@ -98,8 +98,9 @@ export default function AvailableDatesList({ calendar, onSelectDate }) {
                               borderRadius: '9999px',
                               fontWeight: '700'
                             }}
+                            title={`${p.name}: ${memoText}`}
                           >
-                            {p.name}: {memoText}
+                            {memoText}
                           </span>
                         );
                       })}

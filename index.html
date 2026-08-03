@@ -917,7 +917,7 @@
       );
     }
 
-    // Summary List - Only display capsule memo badges if the participant actually entered a non-empty note
+    // Summary List - Displays ONLY the memo content inside the capsule badge
     function SummaryList({ calendar, onSelectDate }) {
       const totalCount = calendar?.participants?.length || 0;
       const availabilities = calendar?.availabilities || [];
@@ -961,7 +961,7 @@
                         {formattedDateStr}
                       </span>
 
-                      {/* Render Capsule Memo Badges ONLY for participants who typed a note */}
+                      {/* Render Capsule Memo Badges with ONLY memo text (Personal Color identifies the participant) */}
                       {memoEntries.length > 0 && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                           {memoEntries.map(e => {
@@ -978,7 +978,7 @@
                                 }}
                                 title={`${p.name}: ${memoText}`}
                               >
-                                {p.name}: {memoText}
+                                {memoText}
                               </span>
                             );
                           })}
