@@ -569,6 +569,23 @@ function assertCalendarLinks(calendar) {
   return getActiveAvailabilities(calendar).every((availability) => participantIds.has(availability.participantId));
 }
 
+function pruneAvailabilitiesForParticipantSettings(calendar, now = Date.now()) {
+  const activeParticipantIds = new Set(getActiveParticipants(calendar).map((participant) => participant.id));
+  return {
+    ...calendar,
+    availabilities: (calendar.availabilities || []).map((availability) => {
+      if (!availability?.participantId || activeParticipantIds.has(availability.participantId) || isTombstone(availability)) {
+        return availability;
+      }
+      return {
+        ...availability,
+        deletedAt: now,
+        updatedAt: now
+      };
+    })
+  };
+}
+
 function mergeParticipantRecord(existing, incoming) {
   const existingClone = cloneParticipant(existing);
   const incomingClone = cloneParticipant(incoming);
@@ -1571,6 +1588,12 @@ function AdminDashboard({ initialCalendars }) {
   const [serverCalendars, setServerCalendars] = React.useState(cloneCalendarList(initialCalendars || []));
   const [loadedAt, setLoadedAt] = React.useState(null);
   const [error, setError] = React.useState('');
+  const [toast, setToast] = React.useState(null);
+
+  const showAdminToast = (message, type = 'success', duration = 3000) => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), duration);
+  };
 
   React.useEffect(() => {
     let isMounted = true;
@@ -1623,6 +1646,39 @@ function AdminDashboard({ initialCalendars }) {
   const upcomingCount = activeAvailabilities.filter(item => item.date >= todayStr).length;
   const maxSchedules = Math.max(1, ...calendarsList.map(cal => getActiveAvailabilities(cal).length));
   const adminUpdatedText = loadedAt ? loadedAt.toLocaleString('ko-KR') : '불러오는 중';
+  const handleCreateCalendar = async () => {
+    const rawId = prompt('새 모임 캘린더의 영문/한글 ID를 입력하세요 (예: kkot, cw, trip):', 'cal_' + Date.now().toString().slice(-4));
+    const id = (rawId || '').trim();
+    if (!id) return;
+    if (!/^[A-Za-z0-9_-]{1,64}$/.test(id)) {
+      showAdminToast('캘린더 ID는 영문, 숫자, -, _ 조합으로 입력해 주세요.', 'error');
+      return;
+    }
+    if (calendarsList.some(cal => cal.id === id)) {
+      showAdminToast('이미 존재하는 캘린더 ID입니다.', 'error');
+      return;
+    }
+    const rawTitle = prompt('캘린더 제목을 입력해 주세요:', `${id} 모임 캘린더`);
+    const title = (rawTitle || '').trim();
+    if (!title) return;
+    const now = Date.now();
+    const newCal = {
+      ...createDefaultCalendar(id),
+      title,
+      description: `${title} 참여자들의 일정 조율`,
+      updatedAt: now,
+      revision: 1
+    };
+    const nextCalendars = [newCal, ...calendarsList];
+    setError('');
+    const saved = await pushSingleCloudCalendar(newCal, now, 3, nextCalendars);
+    if (!saved) {
+      showAdminToast('새 캘린더 생성에 실패했습니다. 다시 시도해 주세요.', 'error');
+      return;
+    }
+    setServerCalendars(cloneCalendarList(nextCalendars).map(normalizeCalendarForSave));
+    showAdminToast('새 캘린더가 생성되었습니다.', 'success');
+  };
 
   return /*#__PURE__*/React.createElement("div", {
     className: "app-container"
@@ -1634,7 +1690,10 @@ function AdminDashboard({ initialCalendars }) {
     className: "calendar-desc"
   }, "Firestore 기준 전체 캘린더 현황 · ", adminUpdatedText)), /*#__PURE__*/React.createElement("div", {
     className: "header-actions"
-  }, /*#__PURE__*/React.createElement("a", {
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-primary",
+    onClick: handleCreateCalendar
+  }, "+ 새 캘린더"), /*#__PURE__*/React.createElement("a", {
     className: "btn btn-secondary",
     href: `${window.location.pathname}?id=kkot`
   }, "kkot 열기"), /*#__PURE__*/React.createElement("a", {
@@ -1715,7 +1774,24 @@ function AdminDashboard({ initialCalendars }) {
       className: "participant-badge",
       style: { backgroundColor: p.color, color: getContrastTextColor(p.color) }
     }, p.name)))));
-  })));
+  })), toast && /*#__PURE__*/React.createElement("div", {
+    className: "toast",
+    style: {
+      position: 'fixed',
+      bottom: '32px',
+      left: '50%',
+      transform: 'translateX(-50%)',
+      zIndex: 99999,
+      backgroundColor: toast.type === 'error' ? '#EF4444' : '#10B981',
+      color: '#FFFFFF',
+      padding: '12px 24px',
+      borderRadius: '30px',
+      boxShadow: '0 12px 32px rgba(0,0,0,0.25)',
+      fontSize: '0.95rem',
+      fontWeight: '800',
+      pointerEvents: 'none'
+    }
+  }, toast.message));
 }
 function App() {
   const [calendars, setCalendarsState] = React.useState(() => loadLocalCache());
@@ -1976,12 +2052,12 @@ function App() {
       return updateCalendars(nextCalendars, '새 캘린더가 생성되었습니다. ✅', 'success', newCalCreated.id);
     } else {
       const now = Date.now();
-      const stampedCal = {
+      const stampedCal = pruneAvailabilitiesForParticipantSettings({
         ...updatedCal,
         updatedAt: now,
         revision: (updatedCal.revision || 0) + 1,
         participants: stampParticipantSettings(updatedCal.participants, now)
-      };
+      }, now);
       if (!assertCalendarLinks(stampedCal)) {
         showToast('참여자와 일정 연결을 확인해 주세요.', 'error');
         return false;
@@ -2151,13 +2227,6 @@ function App() {
     allCalendars: calendars,
     onSelectCalendar: handleSelectCalendar,
     onSave: handleSaveAdmin,
-    onCreateNewCal: async newCal => {
-      const nextCalendars = [newCal, ...calendars];
-      const saved = await updateCalendars(nextCalendars, '새 캘린더가 생성되었습니다. ✅', 'success', newCal.id);
-      if (saved === false) return;
-      handleSelectCalendar(newCal.id);
-      setIsAdminOpen(false);
-    },
     onClose: () => setIsAdminOpen(false)
   }), isShareOpen && /*#__PURE__*/React.createElement(ShareModal, {
     calendar: activeCal,
@@ -2760,7 +2829,6 @@ function AdminModal({
   allCalendars,
   onSelectCalendar,
   onSave,
-  onCreateNewCal,
   onClose
 }) {
   const [title, setTitle] = React.useState(calendar.title);
@@ -2773,18 +2841,6 @@ function AdminModal({
     setParticipants(getActiveParticipants(calendar));
     setNewName('');
   }, [calendar?.id]);
-  const handleCreateNewCalClick = () => {
-    const id = prompt('새 모임 캘린더의 영문/한글 ID를 입력하세요 (예: kkot, cw, trip):', 'cal_' + Date.now().toString().slice(-4));
-    if (!id) return;
-    const calTitle = prompt('캘린더 제목을 입력해 주세요:', `${id} 모임 캘린더`);
-    if (!calTitle) return;
-    const newCal = {
-      ...createDefaultCalendar(id.trim()),
-      title: calTitle.trim(),
-      description: `${calTitle.trim()} 참여자들의 일정 조율`
-    };
-    if (onCreateNewCal) onCreateNewCal(newCal);
-  };
   const handleAddParticipant = e => {
     if (e) {
       e.preventDefault();
@@ -2842,23 +2898,7 @@ function AdminModal({
       fontSize: '1.1rem',
       fontWeight: 800
     }
-  }, "\uCE98\uB9B0\uB354 \uC124\uC815"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: '8px'
-    }
-  }, /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    className: "btn btn-secondary",
-    style: {
-      padding: '5px 10px',
-      fontSize: '0.78rem',
-      fontWeight: 800,
-      whiteSpace: 'nowrap'
-    },
-    onClick: handleCreateNewCalClick
-  }, "+ \uC0C8 \uCE98\uB9B0\uB354"), /*#__PURE__*/React.createElement("button", {
+  }, "\uCE98\uB9B0\uB354 \uC124\uC815"), /*#__PURE__*/React.createElement("button", {
     onClick: onClose,
     style: {
       background: 'none',
@@ -2867,7 +2907,7 @@ function AdminModal({
       fontSize: '1.2rem',
       cursor: 'pointer'
     }
-  }, "\u2715"))), /*#__PURE__*/React.createElement("form", {
+  }, "\u2715")), /*#__PURE__*/React.createElement("form", {
     onSubmit: handleSubmit
   }, /*#__PURE__*/React.createElement("div", {
     className: "modal-body"
