@@ -1247,10 +1247,9 @@
       const today = new Date();
       const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
-      // Minimum threshold is 4 (hard-coded as per user requirement)
-      const MIN_THRESHOLD = 4;
-      // Show partial list only when totalCount > MIN_THRESHOLD (so there are dates between 4 and totalCount-1)
-      const thresholdN = totalCount > MIN_THRESHOLD ? MIN_THRESHOLD : 0;
+      // Threshold = totalCount - 2, only show partial section when totalCount >= 6
+      // 4명 → 전원만 | 6명 → 4명 이상 + 전원 | 8명 → 6명 이상 + 전원
+      const thresholdN = totalCount >= 6 ? totalCount - 2 : 0;
 
       // 1. All-available dates: only count active participants (those still in participantsMap)
       const allAvailableDates = Object.keys(dateMap).filter(d => {
@@ -1282,12 +1281,12 @@
       return (
         <div className="summary-card" style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
           
-          {/* 1. Partial Availability List (only if thresholdN > 0, meaning totalCount > 4) */}
+          {/* 1. Partial Availability List (only if thresholdN > 0, meaning totalCount >= 6) */}
           {thresholdN > 0 && (
             <div>
               <div className="summary-title" style={{ color: '#2563EB', marginBottom: '12px' }}>
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style={{ marginRight: '4px' }}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                4명 이상 참석 가능 ({sortedPartialDates.length}일)
+                {thresholdN}명 이상 참석 가능 ({sortedPartialDates.length}일)
               </div>
               {sortedPartialDates.length === 0 ? (
                 <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', padding: '10px 0' }}>해당하는 날짜가 아직 없습니다.</div>
