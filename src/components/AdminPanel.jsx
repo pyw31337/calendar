@@ -27,9 +27,9 @@ export default function AdminPanel({ calendar, allCalendars, onSelectCalendar, o
   };
 
   const handleCreateNewCalInAdmin = () => {
-    const id = prompt('새 모임 달력의 영문/한글 ID를 입력하세요 (예: kkot, cw, trip):', 'cal_' + Date.now().toString().slice(-4));
+    const id = prompt('새 모임 캘린더의 영문/한글 ID를 입력하세요 (예: kkot, cw, trip):', 'cal_' + Date.now().toString().slice(-4));
     if (!id) return;
-    const calTitle = prompt('달력 제목을 입력해 주세요:', `${id} 모임 달력`);
+    const calTitle = prompt('캘린더 제목을 입력해 주세요:', `${id} 모임 캘린더`);
     if (!calTitle) return;
 
     const newCal = {
@@ -69,7 +69,7 @@ export default function AdminPanel({ calendar, allCalendars, onSelectCalendar, o
           <div className="modal-body">
             {/* Calendar Switcher & Create New Calendar Button */}
             <div style={{ background: '#F8FAFC', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
-              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#64748B', marginBottom: '6px' }}>달력 선택 및 관리</label>
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#64748B', marginBottom: '6px' }}>캘린더 선택 및 관리</label>
               <div style={{ display: 'flex', gap: '8px' }}>
                 <select
                   className="form-select"
@@ -82,18 +82,18 @@ export default function AdminPanel({ calendar, allCalendars, onSelectCalendar, o
                   ))}
                 </select>
                 <button type="button" className="btn btn-secondary" onClick={handleCreateNewCalInAdmin}>
-                  + 새 달력 생성
+                  + 새 캘린더 생성
                 </button>
               </div>
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px', color: '#64748B' }}>달력명</label>
+              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px', color: '#64748B' }}>캘린더명</label>
               <input type="text" className="form-input" style={{ width: '100%' }} value={title} onChange={e => setTitle(e.target.value)} required />
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px', color: '#64748B' }}>달력 설명</label>
+              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px', color: '#64748B' }}>캘린더 설명</label>
               <input type="text" className="form-input" style={{ width: '100%' }} placeholder="예: cw 동창 모임 참여자들의 일정 조율" value={description} onChange={e => setDescription(e.target.value)} />
             </div>
 

@@ -10,7 +10,7 @@ export default function Header({
       <div className="header-title-section">
         <div>
           <div className="header-calendar-title">
-            <span>{activeCalendar?.title || '사모임 일정 달력'}</span>
+            <span>{activeCalendar?.title || '사모임 일정 캘린더'}</span>
           </div>
           {activeCalendar?.description && (
             <p className="header-calendar-desc">{activeCalendar.description}</p>

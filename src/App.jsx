@@ -109,7 +109,7 @@ export default function App() {
     const remaining = calendars.filter(c => c.id !== id);
     if (remaining.length === 0) {
       // Create new default if all deleted
-      const newCal = createNewCalendar('기본 모임 달력');
+      const newCal = createNewCalendar('기본 모임 캘린더');
       setCalendars([newCal]);
       handleSelectCalendar(newCal.id);
     } else {

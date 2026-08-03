@@ -47,7 +47,7 @@ export default function ShareModal({ calendar, allCalendars, onImportData, onClo
         <div className="modal-header">
           <div className="modal-title">
             <Share2 size={20} style={{ color: 'var(--accent-primary)' }} />
-            <span>달력 공유 및 데이터 백업</span>
+            <span>캘린더 공유 및 데이터 백업</span>
           </div>
           <button id="btn-share-close" className="modal-close-btn" onClick={onClose}>
             <X size={20} />
@@ -58,7 +58,7 @@ export default function ShareModal({ calendar, allCalendars, onImportData, onClo
           {/* Direct URL Link Sharing */}
           <div className="form-group">
             <label className="form-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span>현재 달력 접속 URL (PC & 모바일 공유)</span>
+              <span>현재 캘린더 접속 URL (PC & 모바일 공유)</span>
               {copied && <span style={{ color: '#10B981', fontSize: '0.8rem', fontWeight: 700 }}>✓ 복사되었습니다!</span>}
             </label>
             <div style={{ display: 'flex', gap: '8px' }}>
@@ -80,7 +80,7 @@ export default function ShareModal({ calendar, allCalendars, onImportData, onClo
               </button>
             </div>
             <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-              이 URL로 접속하면 PC와 모바일 디바이스에서 동일한 달력으로 바로 접속할 수 있습니다.
+              이 URL로 접속하면 PC와 모바일 디바이스에서 동일한 캘린더로 바로 접속할 수 있습니다.
             </p>
           </div>
 

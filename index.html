@@ -7,14 +7,14 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   
-  <title>모여라 달력 - 사모임 일정 조율 & 가능 날짜 달력</title>
-  <meta name="description" content="사모임 참여자들의 가능 날짜를 달력에 표기하고 전원 모임 가능한 날짜를 클라우드 DB로 실시간 공유해주는 웹 프로그램입니다.">
+  <title>모여라 캘린더 - 사모임 일정 조율 & 가능 날짜 캘린더</title>
+  <meta name="description" content="사모임 참여자들의 가능 날짜를 캘린더에 표기하고 전원 모임 가능한 날짜를 클라우드 DB로 실시간 공유해주는 웹 프로그램입니다.">
   
   <!-- OpenGraph Metadata for KakaoTalk & Social Sharing -->
   <meta property="og:type" content="website">
-  <meta property="og:site_name" content="모여라 달력">
-  <meta property="og:title" id="og-title" content="모여라 달력 - 사모임 일정 조율 & 가능 날짜 달력">
-  <meta property="og:description" id="og-desc" content="사모임 참여자들의 가능 날짜를 달력에 표기하고 전원 모임 가능한 날짜를 한눈에 파악해보세요.">
+  <meta property="og:site_name" content="모여라 캘린더">
+  <meta property="og:title" id="og-title" content="모여라 캘린더 - 사모임 일정 조율 & 가능 날짜 캘린더">
+  <meta property="og:description" id="og-desc" content="사모임 참여자들의 가능 날짜를 캘린더에 표기하고 전원 모임 가능한 날짜를 한눈에 파악해보세요.">
   <meta property="og:image" content="https://pyw31337.github.io/calendar/og-thumb.jpg">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
@@ -22,7 +22,7 @@
   
   <!-- Twitter Cards -->
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" id="tw-title" content="모여라 달력">
+  <meta name="twitter:title" id="tw-title" content="모여라 캘린더">
   <meta name="twitter:description" content="사모임 일정 조율 플랫폼">
   <meta name="twitter:image" content="https://pyw31337.github.io/calendar/og-thumb.jpg">
 
@@ -189,11 +189,6 @@
 
     .color-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
 
-    /* Calendar Card */
-    .calendar-card {
-      background: var(--bg-card); border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-lg); padding: 24px; margin-bottom: 28px; box-shadow: var(--shadow-lg);
-    }
     /* Calendar Card */
     .calendar-card {
       background: var(--bg-card); border: 1px solid var(--border-subtle);
@@ -953,8 +948,8 @@
 
       React.useEffect(() => {
         if (activeCal) {
-          const calTitle = `${activeCal.title} - 모여라 달력`;
-          const calDesc = activeCal.description || `${activeCal.title} 사모임 멤버들의 참석 가능 날짜 조율 달력입니다.`;
+          const calTitle = `${activeCal.title} - 모여라 캘린더`;
+          const calDesc = activeCal.description || `${activeCal.title} 사모임 멤버들의 참석 가능 날짜 조율 캘린더입니다.`;
           const currentShareUrl = `${window.location.origin}${window.location.pathname}?id=${activeCal.id}`;
 
           document.title = calTitle;
@@ -978,7 +973,7 @@
         if (requestedId && !calendars.some(c => c.id === requestedId)) {
           const newCal = {
             id: requestedId,
-            title: `${requestedId} 사모임 달력`,
+            title: `${requestedId} 사모임 캘린더`,
             description: `${requestedId} 멤버들의 참석 가능 일자를 표기해 주세요`,
             participants: [
               { id: 'p1', name: '참여자 1', color: '#EF4444' },
@@ -1583,9 +1578,9 @@
       const [newName, setNewName] = React.useState('');
 
       const handleCreateNewCalClick = () => {
-        const id = prompt('새 모임 달력의 영문/한글 ID를 입력하세요 (예: kkot, cw, trip):', 'cal_' + Date.now().toString().slice(-4));
+        const id = prompt('새 모임 캘린더의 영문/한글 ID를 입력하세요 (예: kkot, cw, trip):', 'cal_' + Date.now().toString().slice(-4));
         if (!id) return;
-        const calTitle = prompt('달력 제목을 입력해 주세요:', `${id} 모임 달력`);
+        const calTitle = prompt('캘린더 제목을 입력해 주세요:', `${id} 모임 캘린더`);
         if (!calTitle) return;
         const newCal = {
           id: id.trim(),
@@ -1643,7 +1638,7 @@
                   style={{ padding: '5px 10px', fontSize: '0.78rem', fontWeight: 800, whiteSpace: 'nowrap' }}
                   onClick={handleCreateNewCalClick}
                 >
-                  + 새 달력
+                  + 새 캘린더
                 </button>
                 <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer' }}>✕</button>
               </div>
@@ -1651,12 +1646,12 @@
             <form onSubmit={handleSubmit}>
               <div className="modal-body">
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px', color: '#64748B' }}>달력명</label>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px', color: '#64748B' }}>캘린더명</label>
                   <input type="text" className="form-input" style={{ width: '100%' }} value={title} onChange={e => setTitle(e.target.value)} required />
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px', color: '#64748B' }}>달력 설명</label>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px', color: '#64748B' }}>캘린더 설명</label>
                   <input type="text" className="form-input" style={{ width: '100%' }} placeholder="예: cw 동창 모임 참여자들의 일정 조율" value={description} onChange={e => setDescription(e.target.value)} />
                 </div>
 
@@ -1715,9 +1710,9 @@
       const shareUrl = `${baseUrl}?id=${calendar.id}`;
 
       const handleCreateNewCalClick = () => {
-        const id = prompt('새 모임 달력의 영문/한글 ID를 입력하세요 (예: kkot, cw, trip):', 'cal_' + Date.now().toString().slice(-4));
+        const id = prompt('새 모임 캘린더의 영문/한글 ID를 입력하세요 (예: kkot, cw, trip):', 'cal_' + Date.now().toString().slice(-4));
         if (!id) return;
-        const calTitle = prompt('달력 제목을 입력해 주세요:', `${id} 모임 달력`);
+        const calTitle = prompt('캘린더 제목을 입력해 주세요:', `${id} 모임 캘린더`);
         if (!calTitle) return;
 
         const newCal = {
@@ -1737,11 +1732,11 @@
         <div className="modal-overlay" onClick={onClose}>
           <div className="modal-container" onClick={e => e.stopPropagation()}>
             <div className="modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 800 }}>달력 공유 URL</h3>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 800 }}>캘린더 공유 URL</h3>
               <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>✕</button>
             </div>
             <div className="modal-body">
-              <label style={{ fontSize: '0.85rem', fontWeight: 700, color: '#64748B' }}>현재 달력 ({calendar.id}) 전용 공유 URL</label>
+              <label style={{ fontSize: '0.85rem', fontWeight: 700, color: '#64748B' }}>현재 캘린더 ({calendar.id}) 전용 공유 URL</label>
               <input type="text" className="form-input" style={{ width: '100%' }} value={shareUrl} readOnly />
               <button className="btn btn-primary" onClick={() => { navigator.clipboard.writeText(shareUrl); alert('URL이 복사되었습니다!'); }}>URL 복사하기</button>
             </div>
@@ -1907,7 +1902,7 @@
               전원 참석 가능 ({sortedAllDates.length}일)
             </div>
             {sortedAllDates.length === 0 ? (
-              <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', padding: '10px 0' }}>아직 참여자 전원이 가능한 날짜가 없습니다. 달력에서 날짜를 선택하여 가능 여부를 표기해보세요!</div>
+              <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', padding: '10px 0' }}>아직 참여자 전원이 가능한 날짜가 없습니다. 캘린더에서 날짜를 선택하여 가능 여부를 표기해보세요!</div>
             ) : (
               <div>
                 {sortedAllDates.map(d => {

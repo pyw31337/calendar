@@ -39,7 +39,7 @@ export default function CreateCalendarModal({ onCreateCalendar, onClose }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!title.trim()) {
-      alert('달력명을 입력해 주세요.');
+      alert('캘린더명을 입력해 주세요.');
       return;
     }
     onCreateCalendar(title.trim(), description.trim(), participants);
@@ -52,7 +52,7 @@ export default function CreateCalendarModal({ onCreateCalendar, onClose }) {
         <div className="modal-header">
           <div className="modal-title">
             <PlusCircle size={20} style={{ color: 'var(--accent-primary)' }} />
-            <span>새 모임 달력 생성</span>
+            <span>새 모임 캘린더 생성</span>
           </div>
           <button id="btn-create-close" className="modal-close-btn" onClick={onClose}>
             <X size={20} />
@@ -63,13 +63,13 @@ export default function CreateCalendarModal({ onCreateCalendar, onClose }) {
           <div className="modal-body" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
             <div className="form-group">
               <label htmlFor="new-cal-title-input" className="form-label">
-                달력 제목
+                캘린더 제목
               </label>
               <input
                 id="new-cal-title-input"
                 type="text"
                 className="form-input"
-                placeholder="예: 8월 제주도 여행 일정 달력"
+                placeholder="예: 8월 제주도 여행 일정 캘린더"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 required
@@ -78,7 +78,7 @@ export default function CreateCalendarModal({ onCreateCalendar, onClose }) {
 
             <div className="form-group">
               <label htmlFor="new-cal-desc-input" className="form-label">
-                달력 설명 (선택)
+                캘린더 설명 (선택)
               </label>
               <input
                 id="new-cal-desc-input"
@@ -163,7 +163,7 @@ export default function CreateCalendarModal({ onCreateCalendar, onClose }) {
             </button>
             <button id="btn-submit-create-cal" type="submit" className="btn btn-primary">
               <PlusCircle size={16} />
-              <span>달력 만들기</span>
+              <span>캘린더 만들기</span>
             </button>
           </div>
         </form>

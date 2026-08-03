@@ -60,7 +60,7 @@ export default function AvailableDatesList({ calendar, onSelectDate }) {
 
       {fullMatchDates.length === 0 ? (
         <div style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>
-          아직 참여자 전원이 가능한 날짜가 없습니다. 달력에서 날짜를 선택하여 가능 여부를 표기해보세요!
+          아직 참여자 전원이 가능한 날짜가 없습니다. 캘린더에서 날짜를 선택하여 가능 여부를 표기해보세요!
         </div>
       ) : (
         <div>

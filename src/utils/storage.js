@@ -29,7 +29,7 @@ const INITIAL_CALENDARS = [
   },
   {
     id: 'cw',
-    title: 'cw 동창회 사모임 달력',
+    title: 'cw 동창회 사모임 캘린더',
     description: 'cw 동창 모임 참여자들의 일정 조율',
     createdAt: new Date().toISOString(),
     participants: [
