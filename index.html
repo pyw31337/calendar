@@ -817,12 +817,11 @@
 
     function App() {
       const [calendars, setCalendarsState] = React.useState(() => loadLocalCache());
-      const [isSyncing, setIsSyncing] = React.useState(false);
-      const [toast, setToast] = React.useState(null);
-
-      const showToast = (message, type = 'info', duration = 3000) => {
+      const toastTimeoutRef = React.useRef(null);
+      const showToast = (message, type = 'info', duration = 3500) => {
+        if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
         setToast({ message, type });
-        setTimeout(() => {
+        toastTimeoutRef.current = setTimeout(() => {
           setToast(t => t?.message === message ? null : t);
         }, duration);
       };
@@ -840,7 +839,7 @@
 
         // Find active calendar and push to its isolated Firestore document
         const currentCal = nextCalendars.find(c => c.id === activeCalId) || nextCalendars[0];
-        showToast(toastMsg, toastType, 2500);
+        showToast(toastMsg, toastType, 3500);
 
         if (currentCal) {
           pushSingleCloudCalendar(currentCal, now);
