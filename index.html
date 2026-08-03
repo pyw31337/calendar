@@ -814,6 +814,12 @@
               allCalendars={calendars}
               onSelectCalendar={handleSelectCalendar}
               onSave={handleSaveAdmin}
+              onCreateNewCal={(newCal) => {
+                const nextCalendars = [newCal, ...calendars];
+                updateCalendars(nextCalendars);
+                handleSelectCalendar(newCal.id);
+                setIsAdminOpen(false);
+              }}
               onClose={() => setIsAdminOpen(false)}
             />
           )}
@@ -1109,11 +1115,29 @@
     }
 
     // Admin Modal
-    function AdminModal({ calendar, allCalendars, onSelectCalendar, onSave, onClose }) {
+    function AdminModal({ calendar, allCalendars, onSelectCalendar, onSave, onCreateNewCal, onClose }) {
       const [title, setTitle] = React.useState(calendar.title);
       const [description, setDescription] = React.useState(calendar.description || '');
       const [participants, setParticipants] = React.useState(calendar.participants);
       const [newName, setNewName] = React.useState('');
+
+      const handleCreateNewCalClick = () => {
+        const id = prompt('새 모임 달력의 영문/한글 ID를 입력하세요 (예: kkot, cw, trip):', 'cal_' + Date.now().toString().slice(-4));
+        if (!id) return;
+        const calTitle = prompt('달력 제목을 입력해 주세요:', `${id} 모임 달력`);
+        if (!calTitle) return;
+        const newCal = {
+          id: id.trim(),
+          title: calTitle.trim(),
+          description: `${calTitle.trim()} 참여자들의 일정 조율`,
+          participants: [
+            { id: 'p1', name: '참여자 1', color: '#EF4444' },
+            { id: 'p2', name: '참여자 2', color: '#3B82F6' }
+          ],
+          availabilities: []
+        };
+        if (onCreateNewCal) onCreateNewCal(newCal);
+      };
 
       const handleAddParticipant = (e) => {
         if (e) {
@@ -1149,9 +1173,19 @@
       return (
         <div className="modal-overlay" onClick={onClose}>
           <div className="modal-container" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 800 }}>어드민: 달력 & 참여자 설정</h3>
-              <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer' }}>✕</button>
+            <div className="modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 800 }}>어드민: 달력 &amp; 참여자 설정</h3>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  style={{ padding: '5px 10px', fontSize: '0.78rem', fontWeight: 800, whiteSpace: 'nowrap' }}
+                  onClick={handleCreateNewCalClick}
+                >
+                  + 새 달력
+                </button>
+                <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer' }}>✕</button>
+              </div>
             </div>
             <form onSubmit={handleSubmit}>
               <div className="modal-body">
@@ -1243,17 +1277,7 @@
           <div className="modal-container" onClick={e => e.stopPropagation()}>
             <div className="modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 style={{ fontSize: '1.1rem', fontWeight: 800 }}>달력 공유 URL</h3>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <button 
-                  type="button" 
-                  className="btn btn-secondary" 
-                  style={{ padding: '6px 12px', fontSize: '0.8rem', fontWeight: '800' }}
-                  onClick={handleCreateNewCalClick}
-                >
-                  + 새 달력 생성
-                </button>
-                <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>✕</button>
-              </div>
+              <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>✕</button>
             </div>
             <div className="modal-body">
               <label style={{ fontSize: '0.85rem', fontWeight: 700, color: '#64748B' }}>현재 달력 ({calendar.id}) 전용 공유 URL</label>
