@@ -476,6 +476,110 @@ function cloneAvailability(availability) {
   return availability ? { ...availability } : availability;
 }
 
+function getItemStamp(item) {
+  if (!item) return 0;
+  const values = [item.updatedAt, item.deletedAt, item.removedAt];
+  return values.reduce((max, value) => {
+    const ts = value ? new Date(value).getTime() : 0;
+    return ts > max ? ts : max;
+  }, 0);
+}
+
+function isTombstone(item) {
+  return Boolean(item && (item.deletedAt || item.removedAt));
+}
+
+function getActiveParticipants(calendar) {
+  return Array.isArray(calendar?.participants) ? calendar.participants.filter(p => !isTombstone(p)) : [];
+}
+
+function getActiveAvailabilities(calendar) {
+  return Array.isArray(calendar?.availabilities) ? calendar.availabilities.filter(a => !isTombstone(a)) : [];
+}
+
+function mergeParticipantRecord(existing, incoming) {
+  const existingClone = cloneParticipant(existing);
+  const incomingClone = cloneParticipant(incoming);
+  if (!existingClone) return incomingClone;
+  if (!incomingClone) return existingClone;
+  const existingStamp = getItemStamp(existingClone);
+  const incomingStamp = getItemStamp(incomingClone);
+  if (incomingStamp > existingStamp) return { ...existingClone, ...incomingClone };
+  if (existingStamp > incomingStamp) return existingClone;
+  return {
+    ...existingClone,
+    ...incomingClone,
+    removedAt: incomingClone.removedAt || existingClone.removedAt || null,
+    deletedAt: incomingClone.deletedAt || existingClone.deletedAt || null
+  };
+}
+
+function mergeAvailabilityRecord(existing, incoming) {
+  const existingClone = cloneAvailability(existing);
+  const incomingClone = cloneAvailability(incoming);
+  if (!existingClone) return incomingClone;
+  if (!incomingClone) return existingClone;
+  const existingStamp = getItemStamp(existingClone);
+  const incomingStamp = getItemStamp(incomingClone);
+  if (incomingStamp > existingStamp) return { ...existingClone, ...incomingClone };
+  if (existingStamp > incomingStamp) return existingClone;
+  return {
+    ...existingClone,
+    ...incomingClone,
+    deletedAt: incomingClone.deletedAt || existingClone.deletedAt || null
+  };
+}
+
+function mergeCalendarRecord(existing, incoming) {
+  const base = cloneCalendar(existing) || {};
+  const next = cloneCalendar(incoming) || {};
+  if (!base.id) return next;
+  if (!next.id) return base;
+  if (base.id !== next.id) return next;
+
+  const participantMap = new Map();
+  (base.participants || []).forEach((participant) => {
+    if (participant?.id) participantMap.set(participant.id, participant);
+  });
+  (next.participants || []).forEach((participant) => {
+    if (!participant?.id) return;
+    const current = participantMap.get(participant.id);
+    participantMap.set(participant.id, mergeParticipantRecord(current, participant));
+  });
+
+  const availabilityMap = new Map();
+  (base.availabilities || []).forEach((availability) => {
+    if (availability?.date && availability?.participantId) {
+      availabilityMap.set(`${availability.date}_${availability.participantId}`, availability);
+    }
+  });
+  (next.availabilities || []).forEach((availability) => {
+    if (!availability?.date || !availability?.participantId) return;
+    const key = `${availability.date}_${availability.participantId}`;
+    const current = availabilityMap.get(key);
+    availabilityMap.set(key, mergeAvailabilityRecord(current, availability));
+  });
+
+  const mergedTitle = next.title || base.title;
+  const mergedDescription = next.description || base.description;
+  const mergedUpdatedAt = [base.updatedAt, next.updatedAt].reduce((max, value) => {
+    const ts = value ? new Date(value).getTime() : 0;
+    return ts > max ? ts : max;
+  }, 0);
+  const mergedRevision = Math.max(base.revision || 0, next.revision || 0);
+
+  return {
+    ...base,
+    ...next,
+    title: mergedTitle,
+    description: mergedDescription,
+    participants: Array.from(participantMap.values()),
+    availabilities: Array.from(availabilityMap.values()),
+    updatedAt: mergedUpdatedAt || next.updatedAt || base.updatedAt || null,
+    revision: mergedRevision
+  };
+}
+
 function cloneCalendar(calendar) {
   if (!calendar) return calendar;
   return {
@@ -505,38 +609,10 @@ function mergeCalendarCollections(sourceList, targetList, options = {}) {
     } else {
       const existing = map.get(nextCalendar.id);
       if (replaceMatchingId) {
-        map.set(nextCalendar.id, nextCalendar);
+        map.set(nextCalendar.id, mergeCalendarRecord(existing, nextCalendar));
         return;
       }
-      // Merge participants strictly within THIS calendar only
-      const partMap = new Map();
-      existing.participants.forEach(p => partMap.set(p.id, p));
-      (nextCalendar.participants || []).forEach(p => {
-        if (!partMap.has(p.id)) partMap.set(p.id, p);
-      });
-
-      // Merge availabilities strictly within THIS calendar only
-      const availMap = new Map();
-      existing.availabilities.forEach(a => availMap.set(`${a.date}_${a.participantId}`, a));
-      (nextCalendar.availabilities || []).forEach(a => {
-        const key = `${a.date}_${a.participantId}`;
-        if (!availMap.has(key)) {
-          availMap.set(key, a);
-        } else {
-          const prev = availMap.get(key);
-          const prevTs = prev?.updatedAt ? new Date(prev.updatedAt).getTime() : 0;
-          const nextTs = a?.updatedAt ? new Date(a.updatedAt).getTime() : 0;
-          if (nextTs > prevTs) {
-            availMap.set(key, a);
-          } else if (a.note && a.note.trim() && !prev.note) {
-            availMap.set(key, a);
-          }
-        }
-      });
-      existing.participants = Array.from(partMap.values());
-      existing.availabilities = Array.from(availMap.values());
-      if (nextCalendar.title) existing.title = nextCalendar.title;
-      if (nextCalendar.description) existing.description = nextCalendar.description;
+      map.set(nextCalendar.id, mergeCalendarRecord(existing, nextCalendar));
     }
   });
   return Array.from(map.values());
@@ -1221,11 +1297,17 @@ async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 2) 
   if (!targetCal || !targetCal.id) return false;
   if (firebaseDb) {
     try {
-      // Store directly into its isolated calendar document (Replaces whole state so deletions are exact)
+      const ref = firebaseDb.collection('calendars').doc(`cal_${targetCal.id}`);
       await Promise.race([
-        firebaseDb.collection('calendars').doc(`cal_${targetCal.id}`).set({
-          calendar: targetCal,
-          lastModified: lastModified
+        firebaseDb.runTransaction(async tx => {
+          const snap = await tx.get(ref);
+          const serverCalendar = snap.exists && snap.data() ? snap.data().calendar : null;
+          const mergedCalendar = serverCalendar ? mergeCalendarRecord(serverCalendar, targetCal) : cloneCalendar(targetCal);
+          tx.set(ref, {
+            calendar: mergedCalendar,
+            lastModified,
+            revision: (mergedCalendar?.revision || 0) + 1
+          });
         }),
         new Promise((_, reject) => setTimeout(() => reject(new Error('Firestore push timeout')), 1800))
       ]);
@@ -1498,6 +1580,7 @@ function App() {
     window.history.replaceState({}, '', url.toString());
   };
   const handleSaveAvailability = (dateStr, participantId, note) => {
+    const now = Date.now();
     const existing = activeCal.availabilities || [];
     const index = existing.findIndex(e => e.date === dateStr && e.participantId === participantId);
     let nextAvail = [...existing];
@@ -1505,35 +1588,53 @@ function App() {
       nextAvail[index] = {
         date: dateStr,
         participantId,
-        note
+        note,
+        updatedAt: now
       };
     } else {
       nextAvail.push({
         date: dateStr,
         participantId,
-        note
+        note,
+        updatedAt: now
       });
     }
     const updatedCal = {
       ...activeCal,
+      updatedAt: now,
+      revision: (activeCal.revision || 0) + 1,
       availabilities: nextAvail
     };
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
     return updateCalendars(nextCalendars, '일정이 등록되었습니다.', 'success', updatedCal.id);
   };
   const handleDeleteAvailability = (dateStr, participantId) => {
-    const nextAvail = (activeCal.availabilities || []).filter(e => !(e.date === dateStr && e.participantId === participantId));
+    const now = Date.now();
+    const nextAvail = (activeCal.availabilities || []).map(e => e.date === dateStr && e.participantId === participantId ? {
+      ...e,
+      deletedAt: now,
+      updatedAt: now
+    } : e);
     const updatedCal = {
       ...activeCal,
+      updatedAt: now,
+      revision: (activeCal.revision || 0) + 1,
       availabilities: nextAvail
     };
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
     updateCalendars(nextCalendars, '참여자 일정이 삭제되었습니다. 🗑️', 'delete', updatedCal.id);
   };
   const handleDeleteAllForDate = dateStr => {
-    const nextAvail = (activeCal.availabilities || []).filter(e => e.date !== dateStr);
+    const now = Date.now();
+    const nextAvail = (activeCal.availabilities || []).map(e => e.date === dateStr ? {
+      ...e,
+      deletedAt: now,
+      updatedAt: now
+    } : e);
     const updatedCal = {
       ...activeCal,
+      updatedAt: now,
+      revision: (activeCal.revision || 0) + 1,
       availabilities: nextAvail
     };
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
@@ -1545,8 +1646,18 @@ function App() {
       updateCalendars(nextCalendars, '새 캘린더가 생성되었습니다. ✅', 'success', newCalCreated.id);
       handleSelectCalendar(newCalCreated.id);
     } else {
-      const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-      updateCalendars(nextCalendars, '캘린더 설정이 저장되었습니다. ✅', 'success', updatedCal.id);
+      const now = Date.now();
+      const stampedCal = {
+        ...updatedCal,
+        updatedAt: now,
+        revision: (updatedCal.revision || 0) + 1,
+        participants: (updatedCal.participants || []).map(p => ({
+          ...p,
+          updatedAt: p.updatedAt || now
+        }))
+      };
+      const nextCalendars = calendars.map(c => c.id === stampedCal.id ? stampedCal : c);
+      updateCalendars(nextCalendars, '캘린더 설정이 저장되었습니다. ✅', 'success', stampedCal.id);
     }
   };
   return /*#__PURE__*/React.createElement("div", {
@@ -1596,7 +1707,7 @@ function App() {
     d: "M16 3.13a4 4 0 0 1 0 7.75"
   }), /*#__PURE__*/React.createElement("path", {
     d: "M21 21v-2a4 4 0 0 0 -3 -3.85"
-  })), /*#__PURE__*/React.createElement("span", null, "\uCC38\uC5EC\uC790 (", activeCal?.participants?.length || 0, "\uBA85)")), /*#__PURE__*/React.createElement("button", {
+  })), /*#__PURE__*/React.createElement("span", null, "\uCC38\uC5EC\uC790 (", getActiveParticipants(activeCal)?.length || 0, "\uBA85)")), /*#__PURE__*/React.createElement("button", {
     className: "btn btn-secondary",
     onClick: () => setIsShareOpen(true),
     title: "\uACF5\uC720",
@@ -1665,7 +1776,7 @@ function App() {
       paddingBottom: '6px',
       marginBottom: '4px'
     }
-  }, "\uCC38\uC5EC\uC790 \uBAA9\uB85D"), activeCal?.participants?.map(p => /*#__PURE__*/React.createElement("div", {
+  }, "\uCC38\uC5EC\uC790 \uBAA9\uB85D"), getActiveParticipants(activeCal).map(p => /*#__PURE__*/React.createElement("div", {
     key: p.id,
     style: {
       display: 'flex',
@@ -1814,16 +1925,16 @@ function CalendarGrid({
       isCurrentMonth: false
     });
   }
-  const availMap = (calendar?.availabilities || []).reduce((acc, entry) => {
+  const availMap = getActiveAvailabilities(calendar).reduce((acc, entry) => {
     if (!acc[entry.date]) acc[entry.date] = [];
     acc[entry.date].push(entry);
     return acc;
   }, {});
-  const participantsMap = (calendar?.participants || []).reduce((acc, p) => {
+  const participantsMap = getActiveParticipants(calendar).reduce((acc, p) => {
     acc[p.id] = p;
     return acc;
   }, {});
-  const totalPartCount = calendar?.participants?.length || 0;
+  const totalPartCount = getActiveParticipants(calendar).length || 0;
   return /*#__PURE__*/React.createElement("div", {
     className: "calendar-card",
     style: {
@@ -2051,12 +2162,13 @@ function DateModal({
   onDeleteDate,
   onClose
 }) {
-  const [participantId, setParticipantId] = React.useState(calendar?.participants[0]?.id || '');
+  const [participantId, setParticipantId] = React.useState(getActiveParticipants(calendar)[0]?.id || '');
   const [note, setNote] = React.useState('');
   const [isSheetOpen, setIsSheetOpen] = React.useState(false);
-  const dateEntries = (calendar?.availabilities || []).filter(e => e.date === dateStr);
+  const activeParticipants = getActiveParticipants(calendar);
+  const dateEntries = getActiveAvailabilities(calendar).filter(e => e.date === dateStr);
   React.useEffect(() => {
-    setParticipantId(calendar?.participants[0]?.id || '');
+    setParticipantId(getActiveParticipants(calendar)[0]?.id || '');
     setNote('');
     setIsSheetOpen(false);
   }, [calendar?.id, dateStr]);
@@ -2071,7 +2183,7 @@ function DateModal({
     );
     existingOtherIds.add(participantId);
 
-    if (calendar?.participants?.length > 0 && existingOtherIds.size === calendar.participants.length && typeof confetti === 'function') {
+    if (activeParticipants.length > 0 && existingOtherIds.size === activeParticipants.length && typeof confetti === 'function') {
       try {
         confetti({
           particleCount: 80,
@@ -2183,9 +2295,9 @@ function DateModal({
   }, /*#__PURE__*/React.createElement("span", {
     className: "color-dot",
     style: {
-      backgroundColor: calendar.participants.find(p => p.id === participantId)?.color || '#CCC'
+      backgroundColor: activeParticipants.find(p => p.id === participantId)?.color || '#CCC'
     }
-  }), /*#__PURE__*/React.createElement("span", null, calendar.participants.find(p => p.id === participantId)?.name || '선택하세요')), /*#__PURE__*/React.createElement("span", {
+  }), /*#__PURE__*/React.createElement("span", null, activeParticipants.find(p => p.id === participantId)?.name || '선택하세요')), /*#__PURE__*/React.createElement("span", {
     style: {
       color: '#64748B',
       fontSize: '0.8rem'
@@ -2220,7 +2332,7 @@ function DateModal({
       marginBottom: '8px'
     }
   }, "\uD604\uC7AC \uB4F1\uB85D\uB41C \uCC38\uC5EC\uC790:"), dateEntries.map(e => {
-    const p = calendar.participants.find(part => part.id === e.participantId);
+    const p = activeParticipants.find(part => part.id === e.participantId);
     if (!p) return null;
     return /*#__PURE__*/React.createElement("div", {
       key: p.id,
@@ -2280,7 +2392,7 @@ function DateModal({
     onClick: () => setIsSheetOpen(false)
   }, "\u2715")), /*#__PURE__*/React.createElement("div", {
     className: "bottom-sheet-body"
-  }, calendar.participants.map(p => /*#__PURE__*/React.createElement("button", {
+  }, activeParticipants.map(p => /*#__PURE__*/React.createElement("button", {
     key: p.id,
     type: "button",
     className: "bottom-sheet-item",
@@ -2321,12 +2433,12 @@ function AdminModal({
 }) {
   const [title, setTitle] = React.useState(calendar.title);
   const [description, setDescription] = React.useState(calendar.description || '');
-  const [participants, setParticipants] = React.useState(calendar.participants);
+  const [participants, setParticipants] = React.useState(getActiveParticipants(calendar));
   const [newName, setNewName] = React.useState('');
   React.useEffect(() => {
     setTitle(calendar.title);
     setDescription(calendar.description || '');
-    setParticipants(calendar.participants || []);
+    setParticipants(getActiveParticipants(calendar));
     setNewName('');
   }, [calendar?.id]);
   const handleCreateNewCalClick = () => {
@@ -2338,14 +2450,18 @@ function AdminModal({
       id: id.trim(),
       title: calTitle.trim(),
       description: `${calTitle.trim()} 참여자들의 일정 조율`,
+      updatedAt: Date.now(),
+      revision: 1,
       participants: [{
         id: 'p1',
         name: '참여자 1',
-        color: '#EF4444'
+        color: '#EF4444',
+        updatedAt: Date.now()
       }, {
         id: 'p2',
         name: '참여자 2',
-        color: '#3B82F6'
+        color: '#3B82F6',
+        updatedAt: Date.now()
       }],
       availabilities: []
     };
@@ -2362,18 +2478,25 @@ function AdminModal({
     const newParticipant = {
       id: 'p_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
       name: trimmed,
-      color: PRESET_COLORS[participants.length % PRESET_COLORS.length]
+      color: PRESET_COLORS[participants.filter(p => !isTombstone(p)).length % PRESET_COLORS.length],
+      updatedAt: Date.now()
     };
     setParticipants(prev => [...prev, newParticipant]);
     setNewName('');
   };
   const handleSubmit = async e => {
     e.preventDefault();
+    const now = Date.now();
     const saved = await Promise.resolve(onSave({
       ...calendar,
       title: title.trim(),
       description: description.trim(),
-      participants
+      updatedAt: now,
+      revision: (calendar.revision || 0) + 1,
+      participants: participants.map(p => ({
+        ...p,
+        updatedAt: p.updatedAt || now
+      }))
     }, null));
     if (saved === false) return;
     onClose();
@@ -2472,7 +2595,7 @@ function AdminModal({
       marginBottom: '6px',
       color: '#64748B'
     }
-  }, "\uCC38\uC5EC\uC790 \uC124\uC815 (", participants.length, "\uBA85)"), /*#__PURE__*/React.createElement("div", {
+  }, "\uCC38\uC5EC\uC790 \uC124\uC815 (", participants.filter(p => !isTombstone(p)).length, "\uBA85)"), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       gap: '8px',
@@ -2503,7 +2626,7 @@ function AdminModal({
       flexShrink: 0
     },
     onClick: handleAddParticipant
-  }, "\uCD94\uAC00")), participants.map(p => /*#__PURE__*/React.createElement("div", {
+  }, "\uCD94\uAC00")), participants.map(p => isTombstone(p) ? null : /*#__PURE__*/React.createElement("div", {
     key: p.id,
     style: {
       display: 'flex',
@@ -2516,7 +2639,8 @@ function AdminModal({
     value: p.color,
     onChange: e => setParticipants(participants.map(item => item.id === p.id ? {
       ...item,
-      color: e.target.value
+      color: e.target.value,
+      updatedAt: Date.now()
     } : item)),
     style: {
       width: '28px',
@@ -2535,7 +2659,8 @@ function AdminModal({
     value: p.name,
     onChange: e => setParticipants(participants.map(item => item.id === p.id ? {
       ...item,
-      name: e.target.value
+      name: e.target.value,
+      updatedAt: Date.now()
     } : item))
   }), /*#__PURE__*/React.createElement("button", {
     type: "button",
@@ -2543,7 +2668,11 @@ function AdminModal({
     style: {
       padding: '4px 8px'
     },
-    onClick: () => setParticipants(participants.filter(item => item.id !== p.id))
+    onClick: () => setParticipants(participants.map(item => item.id === p.id ? {
+      ...item,
+      removedAt: Date.now(),
+      updatedAt: Date.now()
+    } : item))
   }, "\u2715"))))), /*#__PURE__*/React.createElement("div", {
     className: "modal-footer"
   }, /*#__PURE__*/React.createElement("button", {
@@ -2573,14 +2702,18 @@ function ShareModal({
       id: id.trim(),
       title: calTitle.trim(),
       description: `${calTitle.trim()} 참여자들의 일정 조율`,
+      updatedAt: Date.now(),
+      revision: 1,
       participants: [{
         id: 'p1',
         name: '참여자 1',
-        color: '#EF4444'
+        color: '#EF4444',
+        updatedAt: Date.now()
       }, {
         id: 'p2',
         name: '참여자 2',
-        color: '#3B82F6'
+        color: '#3B82F6',
+        updatedAt: Date.now()
       }],
       availabilities: []
     };
@@ -2645,9 +2778,9 @@ function SummaryList({
   calendar,
   onSelectDate
 }) {
-  const totalCount = calendar?.participants?.length || 0;
-  const availabilities = calendar?.availabilities || [];
-  const participantsMap = (calendar?.participants || []).reduce((acc, p) => {
+  const totalCount = getActiveParticipants(calendar).length || 0;
+  const availabilities = getActiveAvailabilities(calendar);
+  const participantsMap = getActiveParticipants(calendar).reduce((acc, p) => {
     acc[p.id] = p;
     return acc;
   }, {});
@@ -2738,7 +2871,7 @@ function SummaryList({
       padding: '10px 0'
     }
   }, "\uD574\uB2F9\uD558\uB294 \uB0A0\uC9DC\uAC00 \uC544\uC9C1 \uC5C6\uC2B5\uB2C8\uB2E4.") : /*#__PURE__*/React.createElement("div", null, sortedPartialDates.map(d => {
-    const dateEntries = dateMap[d] || [];
+    const dateEntries = (dateMap[d] || []).filter(e => participantsMap[e.participantId] && !isTombstone(e));
     const formattedDateStr = formatDateWithDayName(d);
     const memoEntries = dateEntries.filter(e => e.note && e.note.trim().length > 0);
     const isPast = d < todayStr;
@@ -2831,7 +2964,7 @@ function SummaryList({
       padding: '10px 0'
     }
   }, "\uC544\uC9C1 \uCC38\uC5EC\uC790 \uC804\uC6D0\uC774 \uAC00\uB2A5\uD55C \uB0A0\uC9DC\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4. \uCE98\uB9B0\uB354\uC5D0\uC11C \uB0A0\uC9DC\uB97C \uC120\uD0DD\uD558\uC5EC \uAC00\uB2A5 \uC5EC\uBD80\uB97C \uD45C\uAE30\uD574\uBCF4\uC138\uC694!") : /*#__PURE__*/React.createElement("div", null, sortedAllDates.map(d => {
-    const dateEntries = dateMap[d] || [];
+    const dateEntries = (dateMap[d] || []).filter(e => participantsMap[e.participantId] && !isTombstone(e));
     const formattedDateStr = formatDateWithDayName(d);
     const memoEntries = dateEntries.filter(e => e.note && e.note.trim().length > 0);
     const isPast = d < todayStr;
@@ -2944,7 +3077,7 @@ function SummaryList({
     x2: "21",
     y2: "10"
   })), "\uACFC\uAC70 \uBAA8\uC784 (", pastMeetingDates.length, "\uC77C)"), /*#__PURE__*/React.createElement("div", null, pastMeetingDates.map(d => {
-    const dateEntries = dateMap[d].filter(e => participantsMap[e.participantId]);
+    const dateEntries = dateMap[d].filter(e => participantsMap[e.participantId] && !isTombstone(e));
     const formattedDateStr = formatDateWithDayName(d);
     const memoEntries = dateEntries.filter(e => e.note && e.note.trim().length > 0);
     const uniqueCount = new Set(dateEntries.map(e => e.participantId)).size;
