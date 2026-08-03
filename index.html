@@ -262,6 +262,43 @@
       background: var(--bg-card); border: 1px solid var(--border-subtle);
       border-radius: var(--radius-lg); padding: 16px; margin-bottom: 20px; box-shadow: var(--shadow-lg);
     }
+    .calendar-loading-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 80;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding-top: 82px;
+      border-radius: var(--radius-lg);
+      background: rgba(248, 250, 252, 0.78);
+      backdrop-filter: blur(3px);
+      pointer-events: none;
+    }
+    .calendar-loading-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 16px;
+      border: 1px solid rgba(59, 130, 246, 0.22);
+      border-radius: var(--radius-full);
+      background: rgba(255, 255, 255, 0.94);
+      color: #1E3A8A;
+      font-size: 0.88rem;
+      font-weight: 800;
+      box-shadow: 0 12px 30px rgba(15, 23, 42, 0.14);
+    }
+    .calendar-spinner {
+      width: 18px;
+      height: 18px;
+      border: 3px solid rgba(59, 130, 246, 0.18);
+      border-top-color: #2563EB;
+      border-radius: 9999px;
+      animation: calendar-spin 0.8s linear infinite;
+    }
+    @keyframes calendar-spin {
+      to { transform: rotate(360deg); }
+    }
     @media (min-width: 640px) {
       .calendar-card { padding: 24px; margin-bottom: 28px; }
     }
@@ -2778,6 +2815,7 @@ function App() {
   const [isAdminOpen, setIsAdminOpen] = React.useState(false);
   const [isShareOpen, setIsShareOpen] = React.useState(false);
   const [isParticipantsOpen, setIsParticipantsOpen] = React.useState(false);
+  const [isInitialDataLoading, setIsInitialDataLoading] = React.useState(() => Boolean(firebaseDb && !FORCE_LOCAL_STORAGE));
 
   if (isAdminDashboardRoute()) {
     return /*#__PURE__*/React.createElement(AdminDashboard, {
@@ -2787,10 +2825,19 @@ function App() {
 
   // Firebase Firestore Real-Time Listener (ISOLATED per activeCalId)
   React.useEffect(() => {
-    if (!firebaseDb || !activeCalId) return;
+    if (!firebaseDb || !activeCalId) {
+      setIsInitialDataLoading(false);
+      return;
+    }
     let isMounted = true;
+    setIsInitialDataLoading(true);
 
     const unsubscribe = firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).onSnapshot(doc => {
+      if (isMounted) setIsInitialDataLoading(false);
+      if (!doc.exists && isMounted) {
+        showToast('Firebase에서 캘린더 데이터를 찾지 못했습니다.', 'error', 5000);
+        return;
+      }
       if (doc.exists && isMounted && !isSavingRef.current) {
         const data = doc.data();
         if (data && data.calendar && data.calendar.id === activeCalId) {
@@ -2807,6 +2854,7 @@ function App() {
         }
       }
     }, err => {
+      if (isMounted) setIsInitialDataLoading(false);
       console.warn(`Firestore realtime sync notice for cal_${activeCalId}:`, err);
     });
     return () => {
@@ -3129,6 +3177,7 @@ function App() {
     }
   }), /*#__PURE__*/React.createElement("span", null, p.name)))))), /*#__PURE__*/React.createElement(CalendarGrid, {
     calendar: activeCal,
+    isLoading: isInitialDataLoading,
     monthDate: currentMonthDate,
     onPrevMonth: () => setCurrentMonthDate(new Date(currentMonthDate.getFullYear(), currentMonthDate.getMonth() - 1, 1)),
     onNextMonth: () => setCurrentMonthDate(new Date(currentMonthDate.getFullYear(), currentMonthDate.getMonth() + 1, 1)),
@@ -3193,6 +3242,7 @@ function App() {
 // Calendar Grid Component
 function CalendarGrid({
   calendar,
+  isLoading = false,
   monthDate,
   onPrevMonth,
   onNextMonth,
@@ -3270,7 +3320,16 @@ function CalendarGrid({
     style: {
       position: 'relative'
     }
+  }, isLoading && /*#__PURE__*/React.createElement("div", {
+    className: "calendar-loading-overlay",
+    role: "status",
+    "aria-live": "polite"
   }, /*#__PURE__*/React.createElement("div", {
+    className: "calendar-loading-pill"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "calendar-spinner",
+    "aria-hidden": "true"
+  }), /*#__PURE__*/React.createElement("span", null, "Firebase에서 캘린더 데이터를 불러오는 중입니다."))), /*#__PURE__*/React.createElement("div", {
     className: "calendar-nav"
   }, /*#__PURE__*/React.createElement("div", {
     className: "month-display",
