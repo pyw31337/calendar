@@ -517,32 +517,56 @@
       }
     ];
 
-    // Returns { calendars, lastModified } or null
-    async function fetchMasterCloudCalendars() {
-      try {
-        const res = await fetch(CLOUD_API_URL);
-        if (res.ok) {
-          const json = await res.json();
-          if (json && Array.isArray(json.calendars) && json.calendars.length > 0) {
-            return { calendars: json.calendars, lastModified: json.lastModified || 0 };
+    // Returns { calendars, lastModified } or null with AbortController timeout & retries
+    async function fetchMasterCloudCalendars(retryCount = 2) {
+      for (let attempt = 0; attempt <= retryCount; attempt++) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 6000);
+        try {
+          const res = await fetch(CLOUD_API_URL, { signal: controller.signal });
+          clearTimeout(timeoutId);
+          if (res.ok) {
+            const json = await res.json();
+            if (json && Array.isArray(json.calendars) && json.calendars.length > 0) {
+              return { calendars: json.calendars, lastModified: json.lastModified || 0 };
+            }
           }
+        } catch (e) {
+          clearTimeout(timeoutId);
+          console.warn(`Master Cloud DB fetch attempt ${attempt + 1} failed:`, e.name || e);
         }
-      } catch (e) {
-        console.warn('Master Cloud DB fetch error:', e);
+        if (attempt < retryCount) {
+          await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+        }
       }
       return null;
     }
 
-    async function pushMasterCloudCalendars(calendarsData, lastModified) {
-      try {
-        await fetch(CLOUD_API_URL, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ calendars: calendarsData, lastModified })
-        });
-      } catch (e) {
-        console.warn('Master Cloud DB push error:', e);
+    // Pushes calendar data with AbortController timeout and retries. Returns boolean success.
+    async function pushMasterCloudCalendars(calendarsData, lastModified, retryCount = 2) {
+      for (let attempt = 0; attempt <= retryCount; attempt++) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 7000);
+        try {
+          const res = await fetch(CLOUD_API_URL, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ calendars: calendarsData, lastModified }),
+            signal: controller.signal
+          });
+          clearTimeout(timeoutId);
+          if (res.ok) {
+            return true;
+          }
+        } catch (e) {
+          clearTimeout(timeoutId);
+          console.warn(`Master Cloud DB push attempt ${attempt + 1} failed:`, e.name || e);
+        }
+        if (attempt < retryCount) {
+          await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+        }
       }
+      return false;
     }
 
     function loadLocalMeta() {
@@ -579,17 +603,33 @@
     function App() {
       const [calendars, setCalendarsState] = React.useState(() => loadLocalCache());
       const [isSyncing, setIsSyncing] = React.useState(false);
+      const [toast, setToast] = React.useState(null);
+
+      const showToast = (message, type = 'info', duration = 3500) => {
+        setToast({ message, type });
+        setTimeout(() => {
+          setToast(t => t?.message === message ? null : t);
+        }, duration);
+      };
+
       // Ref to block cloud sync from overwriting very recent local saves
       const lastLocalSaveRef = React.useRef(0);
       const LOCAL_SAVE_GUARD_MS = 15000; // 15s guard window after local save
 
-      const updateCalendars = (nextCalendars) => {
+      const updateCalendars = async (nextCalendars) => {
         const now = Date.now();
         lastLocalSaveRef.current = now;
         saveLocalMeta({ lastModified: now }); // stamp local save time
         setCalendarsState(nextCalendars);
         saveLocalCache(nextCalendars);
-        pushMasterCloudCalendars(nextCalendars, now); // send timestamp to cloud
+
+        // Try pushing to cloud asynchronously with user feedback
+        const success = await pushMasterCloudCalendars(nextCalendars, now);
+        if (success) {
+          showToast('일정이 정상적으로 저장되었습니다.', 'success', 2500);
+        } else {
+          showToast('로컬에 안전하게 저장되었습니다 (클라우드 서버 연결 지연 중)', 'info', 4500);
+        }
       };
 
       const [activeCalId, setActiveCalId] = React.useState(() => {
@@ -836,6 +876,32 @@
               }}
               onClose={() => setIsShareOpen(false)}
             />
+          )}
+          {/* Toast Notification */}
+          {toast && (
+            <div
+              style={{
+                position: 'fixed',
+                bottom: '24px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                zIndex: 9999,
+                backgroundColor: toast.type === 'error' ? '#EF4444' : toast.type === 'success' ? '#10B981' : '#3B82F6',
+                color: '#FFFFFF',
+                padding: '10px 20px',
+                borderRadius: '30px',
+                boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
+                fontSize: '0.9rem',
+                fontWeight: '700',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                pointerEvents: 'none',
+                animation: 'fadeInUp 0.25s ease-out'
+              }}
+            >
+              <span>{toast.message}</span>
+            </div>
           )}
         </div>
       );
