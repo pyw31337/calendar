@@ -94,6 +94,10 @@ runAppScript(productionContext, `
   if (!isAllowedCalendarId('kkot') || !isAllowedCalendarId('cw') || isAllowedCalendarId('trip')) {
     throw new Error('production calendar allowlist failed');
   }
+  const registeredText = formatRegisteredAt(new Date(2026, 7, 4, 4, 39, 12).getTime());
+  if (registeredText !== '26.08.04 (화) 04:39:12') {
+    throw new Error('registered timestamp formatter failed');
+  }
 `);
 
 const concurrencyContext = createContext('https://pyw31337.github.io/calendar/?id=kkot');

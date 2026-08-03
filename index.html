@@ -332,6 +332,21 @@
       display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: var(--radius-full);
       font-size: 0.72rem; font-weight: 700; line-height: 1.2; box-shadow: 0 1px 3px rgba(0,0,0,0.12);
     }
+    .registered-participant-main {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 6px;
+      min-width: 0;
+      padding-right: 8px;
+    }
+    .registered-at-text {
+      color: #A7B0BF;
+      font-size: 0.68rem;
+      font-weight: 700;
+      line-height: 1.25;
+      white-space: nowrap;
+    }
     @media (max-width: 640px) {
       .days-grid .participant-badge {
         padding: 0;
@@ -750,6 +765,21 @@ function getRawCalendarIdFromURL() {
 function getCalendarShareUrl(calendarId) {
   const basePath = window.location.pathname.replace(/\/share\/[^/]+\/?$/, '/').replace(/\/(?:index\.html)?$/, '/');
   return `${window.location.origin}${basePath}?id=${encodeURIComponent(calendarId)}`;
+}
+
+function formatRegisteredAt(timestamp) {
+  const value = Number(timestamp || 0);
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+  const year = String(date.getFullYear()).slice(2);
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const seconds = String(date.getSeconds()).padStart(2, '0');
+  return `${year}.${month}.${day} (${dayNames[date.getDay()]}) ${hours}:${minutes}:${seconds}`;
 }
 
 function cloneParticipant(participant) {
@@ -3682,6 +3712,7 @@ function DateModal({
   }, "\uD604\uC7AC \uB4F1\uB85D\uB41C \uCC38\uC5EC\uC790:"), dateEntries.map(e => {
     const p = activeParticipants.find(part => part.id === e.participantId);
     if (!p) return null;
+    const registeredAt = formatRegisteredAt(e.updatedAt);
     return /*#__PURE__*/React.createElement("div", {
       key: p.id,
       style: {
@@ -3690,6 +3721,8 @@ function DateModal({
         alignItems: 'center',
         marginBottom: '6px'
       }
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "registered-participant-main"
     }, /*#__PURE__*/React.createElement("span", {
       className: "participant-badge",
       style: {
@@ -3704,7 +3737,9 @@ function DateModal({
         setNote(e.note || '');
       },
       title: "\uD074\uB9AD \uC2DC \uC774 \uCC38\uC5EC\uC790\uB85C \uC790\uB3D9 \uC120\uD0DD \uBC0F \uBA54\uBAA8 \uBD88\uB7EC\uC624\uAE30"
-    }, p.name, " ", e.note && `("${e.note}")`), /*#__PURE__*/React.createElement("button", {
+    }, p.name, " ", e.note && `("${e.note}")`), registeredAt && /*#__PURE__*/React.createElement("span", {
+      className: "registered-at-text"
+    }, registeredAt)), /*#__PURE__*/React.createElement("button", {
       type: "button",
       className: "btn btn-danger",
       style: {
