@@ -436,8 +436,10 @@ const CALENDAR_CLOUD_BLOB_IDS = {
   kkot: '019fc674-b7bc-7ae2-b53d-4ffee349d114',
   cw: '019fc674-b957-71c2-b464-0c4683dbe321'
 };
-const ENABLE_FIRESTORE_SYNC = true; // Firestore is the only production source of truth
-const ENABLE_FIRESTORE_WRITES = false; // EMERGENCY READ-ONLY MODE during recovery
+const URL_PARAMS = new URLSearchParams(window.location.search);
+const FORCE_LOCAL_STORAGE = URL_PARAMS.get('storage') === 'local';
+const ENABLE_FIRESTORE_SYNC = !FORCE_LOCAL_STORAGE; // Firestore is the only production source of truth
+const ENABLE_FIRESTORE_WRITES = !FORCE_LOCAL_STORAGE;
 function getContrastTextColor(hexColor) {
   if (!hexColor) return '#FFFFFF';
   const hex = hexColor.replace('#', '');
@@ -505,6 +507,13 @@ function isTombstone(item) {
   return Boolean(item && (item.deletedAt || item.removedAt));
 }
 
+function normalizeParticipantName(calendarId, name) {
+  const trimmed = (name || '').trim();
+  if (calendarId === 'kkot' && trimmed === '김료진') return '김효진';
+  if (calendarId === 'kkot' && trimmed === '박수진') return '신수진';
+  return trimmed;
+}
+
 function getActiveParticipants(calendar) {
   return Array.isArray(calendar?.participants) ? calendar.participants.filter(p => !isTombstone(p)) : [];
 }
@@ -538,6 +547,7 @@ function normalizeCalendarForSave(calendar) {
     if (nameKey) activeByName.set(nameKey, participant);
     normalizedParticipants.push({
       ...participant,
+      name: normalizeParticipantName(cloned.id, participant.name),
       updatedAt: participant.updatedAt || now
     });
   });
@@ -565,7 +575,6 @@ function normalizeCalendarForSave(calendar) {
 function stampParticipantSettings(participants, now) {
   return (participants || []).map((participant) => ({
     ...participant,
-    name: (participant.name || '').trim(),
     updatedAt: now
   }));
 }
@@ -573,23 +582,6 @@ function stampParticipantSettings(participants, now) {
 function assertCalendarLinks(calendar) {
   const participantIds = new Set(getActiveParticipants(calendar).map((participant) => participant.id));
   return getActiveAvailabilities(calendar).every((availability) => participantIds.has(availability.participantId));
-}
-
-function pruneAvailabilitiesForParticipantSettings(calendar, now = Date.now()) {
-  const activeParticipantIds = new Set(getActiveParticipants(calendar).map((participant) => participant.id));
-  return {
-    ...calendar,
-    availabilities: (calendar.availabilities || []).map((availability) => {
-      if (!availability?.participantId || activeParticipantIds.has(availability.participantId) || isTombstone(availability)) {
-        return availability;
-      }
-      return {
-        ...availability,
-        deletedAt: now,
-        updatedAt: now
-      };
-    })
-  };
 }
 
 function mergeParticipantRecord(existing, incoming) {
@@ -720,23 +712,44 @@ function mergeCalendarAvailabilityDelta(serverCalendar, incomingCalendar, change
 }
 
 function replaceCalendarSettings(serverCalendar, incomingCalendar) {
+  return mergeCalendarSettingsDelta(serverCalendar, incomingCalendar);
+}
+
+function mergeCalendarSettingsDelta(serverCalendar, incomingCalendar) {
+  const server = cloneCalendar(serverCalendar) || {};
   const incoming = cloneCalendar(incomingCalendar) || {};
-  const participantIds = new Set(getActiveParticipants(incoming).map(participant => participant.id));
-  const baseAvailabilities = Array.isArray(incoming.availabilities) ? incoming.availabilities : [];
+  if (server.id && incoming.id && server.id !== incoming.id) {
+    throw new Error(`Calendar ID mismatch: ${server.id} cannot be saved as ${incoming.id}`);
+  }
+  const calendarId = incoming.id || server.id;
+  const serverActiveCount = getActiveParticipants(server).length;
+  const incomingActiveCount = getActiveParticipants(incoming).length;
+  if (serverActiveCount > 0 && incomingActiveCount === 0) {
+    throw new Error(`Refusing to replace ${calendarId} participants with an empty settings payload`);
+  }
+
+  const participantMap = new Map();
+  (server.participants || []).forEach((participant) => {
+    if (participant?.id) participantMap.set(participant.id, participant);
+  });
+  (incoming.participants || []).forEach((participant) => {
+    if (!participant?.id) return;
+    const normalizedParticipant = {
+      ...participant,
+      name: normalizeParticipantName(calendarId, participant.name)
+    };
+    participantMap.set(
+      normalizedParticipant.id,
+      mergeParticipantRecord(participantMap.get(normalizedParticipant.id), normalizedParticipant)
+    );
+  });
+
   return {
-    ...cloneCalendar(serverCalendar),
+    ...server,
     ...incoming,
-    participants: incoming.participants || [],
-    availabilities: baseAvailabilities.map((availability) => {
-      if (!availability?.participantId || participantIds.has(availability.participantId) || isTombstone(availability)) {
-        return availability;
-      }
-      return {
-        ...availability,
-        deletedAt: incoming.updatedAt || Date.now(),
-        updatedAt: incoming.updatedAt || Date.now()
-      };
-    })
+    id: calendarId,
+    participants: Array.from(participantMap.values()),
+    availabilities: server.availabilities || []
   };
 }
 
@@ -1396,6 +1409,7 @@ function loadLocalCache() {
 }
 
 function saveLocalCache(data) {
+  if (firebaseDb && !FORCE_LOCAL_STORAGE) return;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   } catch (e) {
@@ -1527,6 +1541,7 @@ async function pushMasterCloudCalendars(nextCalendars, lastModified, retryCount 
 async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 3, allCalendars = null, saveMode = 'availability') {
   const normalizedCal = normalizeCalendarForSave(targetCal);
   if (!normalizedCal || !normalizedCal.id) return false;
+  if (FORCE_LOCAL_STORAGE) return true;
   if (!ENABLE_FIRESTORE_WRITES) {
     console.warn(`Blocked Firestore write for ${normalizedCal.id}: recovery read-only mode`);
     return false;
@@ -1540,10 +1555,12 @@ async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 3, 
 	          const snap = await tx.get(ref);
 	          const serverCalendar = snap.exists && snap.data() ? snap.data().calendar : null;
 	          let nextCalendar;
-	          if (!serverCalendar || saveMode === 'replace') {
+	          if (!serverCalendar) {
 	            nextCalendar = normalizedCal;
+	          } else if (saveMode === 'replace') {
+	            nextCalendar = mergeCalendarRecord(serverCalendar, normalizedCal);
 	          } else if (saveMode === 'settings') {
-	            nextCalendar = replaceCalendarSettings(serverCalendar, normalizedCal);
+	            nextCalendar = mergeCalendarSettingsDelta(serverCalendar, normalizedCal);
 	          } else {
 	            nextCalendar = mergeCalendarAvailabilityDelta(serverCalendar, normalizedCal, lastModified);
 	          }
@@ -1577,9 +1594,30 @@ function loadLocalMeta() {
   };
 }
 function saveLocalMeta(meta) {
+  if (firebaseDb && !FORCE_LOCAL_STORAGE) return;
   try {
     localStorage.setItem(STORAGE_META_KEY, JSON.stringify(meta));
   } catch (e) {}
+}
+
+function getMetaLastModified(meta, calendarId) {
+  if (!meta) return 0;
+  if (calendarId && meta.byCalendar && typeof meta.byCalendar[calendarId] === 'number') {
+    return meta.byCalendar[calendarId];
+  }
+  return typeof meta.lastModified === 'number' ? meta.lastModified : 0;
+}
+
+function updateMetaLastModified(meta, calendarId, lastModified) {
+  const next = {
+    ...(meta || {}),
+    lastModified: Math.max(getMetaLastModified(meta), lastModified || 0),
+    byCalendar: {
+      ...((meta && meta.byCalendar) || {})
+    }
+  };
+  if (calendarId) next.byCalendar[calendarId] = lastModified || 0;
+  return next;
 }
 
 function isPlaceholderRemotePayload(payload) {
@@ -1907,15 +1945,17 @@ function App() {
   };
 
   const isSavingRef = React.useRef(false);
-  const serverRevisionRef = React.useRef(loadLocalMeta().lastModified || 0);
+  const serverRevisionRef = React.useRef(firebaseDb && !FORCE_LOCAL_STORAGE ? { lastModified: 0, byCalendar: {} } : loadLocalMeta());
 
   const applyServerCalendars = (serverCalendars, lastModified = Date.now()) => {
     const normalized = cloneCalendarList(serverCalendars).map(normalizeCalendarForSave);
     if (normalized.length === 0) return;
-    serverRevisionRef.current = lastModified;
+    normalized.forEach((calendar) => {
+      serverRevisionRef.current = updateMetaLastModified(serverRevisionRef.current, calendar.id, lastModified);
+    });
     setCalendarsState(normalized);
     saveLocalCache(normalized);
-    saveLocalMeta({ lastModified });
+    saveLocalMeta(serverRevisionRef.current);
   };
 
   const updateCalendars = async (nextCalendars, toastMsg = '일정이 저장되었습니다.', toastType = 'success', targetCalId = activeCalId, saveMode = 'availability') => {
@@ -1942,9 +1982,9 @@ function App() {
         return false;
       }
 
-      serverRevisionRef.current = now;
+      serverRevisionRef.current = updateMetaLastModified(serverRevisionRef.current, currentCal.id, now);
       saveLocalCache(normalizedCalendars);
-      saveLocalMeta({ lastModified: now });
+      saveLocalMeta(serverRevisionRef.current);
       showToast(toastMsg, toastType, 3000);
       return true;
     } catch (err) {
@@ -1987,12 +2027,12 @@ function App() {
         if (data && data.calendar && data.calendar.id === activeCalId) {
           const cloudCal = data.calendar;
           const cloudLastMod = data.lastModified || 0;
-          if (cloudLastMod < serverRevisionRef.current) return;
+          if (cloudLastMod < getMetaLastModified(serverRevisionRef.current, activeCalId)) return;
           setCalendarsState(prevCals => {
             const nextCals = prevCals.map(c => c.id === activeCalId ? cloneCalendar(cloudCal) : c);
             saveLocalCache(nextCals);
-            saveLocalMeta({ lastModified: cloudLastMod });
-            serverRevisionRef.current = cloudLastMod;
+            serverRevisionRef.current = updateMetaLastModified(serverRevisionRef.current, activeCalId, cloudLastMod);
+            saveLocalMeta(serverRevisionRef.current);
             return nextCals;
           });
         }
@@ -2015,7 +2055,7 @@ function App() {
       const result = await fetchMasterCloudCalendars();
       if (!result || !isMounted) return;
 
-      if (result.lastModified < serverRevisionRef.current) return;
+      if (result.calendars.every((calendar) => (result.lastModified || 0) < getMetaLastModified(serverRevisionRef.current, calendar.id))) return;
 
       applyServerCalendars(result.calendars, result.lastModified || Date.now());
     };
@@ -2142,12 +2182,12 @@ function App() {
       return updateCalendars(nextCalendars, '새 캘린더가 생성되었습니다. ✅', 'success', newCalCreated.id, 'replace');
     } else {
       const now = Date.now();
-      const stampedCal = pruneAvailabilitiesForParticipantSettings({
+      const stampedCal = {
         ...updatedCal,
         updatedAt: now,
         revision: (updatedCal.revision || 0) + 1,
         participants: stampParticipantSettings(updatedCal.participants, now)
-      }, now);
+      };
       if (!assertCalendarLinks(stampedCal)) {
         showToast('참여자와 일정 연결을 확인해 주세요.', 'error');
         return false;
