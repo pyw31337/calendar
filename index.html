@@ -788,6 +788,7 @@
             onPrevMonth={() => setCurrentMonthDate(new Date(currentMonthDate.getFullYear(), currentMonthDate.getMonth() - 1, 1))}
             onNextMonth={() => setCurrentMonthDate(new Date(currentMonthDate.getFullYear(), currentMonthDate.getMonth() + 1, 1))}
             onToday={() => setCurrentMonthDate(new Date())}
+            onJumpToMonth={(y, m) => setCurrentMonthDate(new Date(y, m, 1))}
             onSelectDate={(d) => { setSelectedDate(d); setIsModalOpen(true); }}
           />
 
@@ -841,9 +842,25 @@
     }
 
     // Calendar Grid Component
-    function CalendarGrid({ calendar, monthDate, onPrevMonth, onNextMonth, onToday, onSelectDate }) {
+    function CalendarGrid({ calendar, monthDate, onPrevMonth, onNextMonth, onToday, onJumpToMonth, onSelectDate }) {
       const year = monthDate.getFullYear();
       const month = monthDate.getMonth();
+      const [isPickerOpen, setIsPickerOpen] = React.useState(false);
+      const [pickerYear, setPickerYear] = React.useState(year);
+      const [pickerMonth, setPickerMonth] = React.useState(month);
+
+      // Sync picker values when month navigates externally
+      React.useEffect(() => {
+        setPickerYear(year);
+        setPickerMonth(month);
+      }, [year, month]);
+
+      const handlePickerApply = () => {
+        onJumpToMonth(pickerYear, pickerMonth);
+        setIsPickerOpen(false);
+      };
+
+      const MONTH_NAMES = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
 
       const firstDay = new Date(year, month, 1).getDay();
       const lastDate = new Date(year, month + 1, 0).getDate();
@@ -888,15 +905,94 @@
       const totalPartCount = calendar?.participants?.length || 0;
 
       return (
-        <div className="calendar-card">
+        <div className="calendar-card" style={{ position: 'relative' }}>
           <div className="calendar-nav">
-            <div className="month-display">{year}년 {month + 1}월</div>
+            {/* Clickable month display — opens year/month picker */}
+            <div
+              className="month-display"
+              style={{ cursor: 'pointer', userSelect: 'none', display: 'flex', alignItems: 'center', gap: '6px' }}
+              onClick={() => setIsPickerOpen(v => !v)}
+              title="클릭하여 년월 이동"
+            >
+              {year}년 {month + 1}월
+              <span style={{ fontSize: '0.7rem', color: '#94A3B8' }}>▾</span>
+            </div>
             <div style={{ display: 'flex', gap: '6px' }}>
               <button className="btn btn-secondary" onClick={onPrevMonth}>◀ 이전달</button>
               <button className="btn btn-secondary" onClick={onToday}>오늘</button>
               <button className="btn btn-secondary" onClick={onNextMonth}>다음달 ▶</button>
             </div>
           </div>
+
+          {/* Year / Month Picker Popup */}
+          {isPickerOpen && (
+            <div
+              style={{
+                position: 'absolute', top: '60px', left: '0', zIndex: 200,
+                background: '#FFFFFF', border: '1px solid var(--border-subtle)',
+                borderRadius: '16px', boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
+                padding: '20px', minWidth: '280px'
+              }}
+              onClick={e => e.stopPropagation()}
+            >
+              {/* Dismiss overlay */}
+              <div
+                style={{ position: 'fixed', inset: 0, zIndex: -1 }}
+                onClick={() => setIsPickerOpen(false)}
+              />
+
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748B', display: 'block', marginBottom: '8px' }}>년도</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    style={{ padding: '4px 10px', fontSize: '0.85rem' }}
+                    onClick={() => setPickerYear(y => y - 1)}
+                  >◀</button>
+                  <span style={{ fontWeight: 800, fontSize: '1.1rem', minWidth: '60px', textAlign: 'center' }}>{pickerYear}년</span>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    style={{ padding: '4px 10px', fontSize: '0.85rem' }}
+                    onClick={() => setPickerYear(y => y + 1)}
+                  >▶</button>
+                </div>
+              </div>
+
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748B', display: 'block', marginBottom: '8px' }}>월</label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
+                  {MONTH_NAMES.map((name, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => setPickerMonth(idx)}
+                      style={{
+                        padding: '6px 4px',
+                        borderRadius: '8px',
+                        border: pickerMonth === idx ? '2px solid var(--accent-primary)' : '1px solid var(--border-subtle)',
+                        background: pickerMonth === idx ? '#EEF2FF' : '#FFFFFF',
+                        color: pickerMonth === idx ? 'var(--accent-primary)' : 'var(--text-main)',
+                        fontWeight: pickerMonth === idx ? 800 : 500,
+                        fontSize: '0.82rem',
+                        cursor: 'pointer'
+                      }}
+                    >{name}</button>
+                  ))}
+                </div>
+              </div>
+
+              <button
+                type="button"
+                className="btn btn-primary"
+                style={{ width: '100%' }}
+                onClick={handlePickerApply}
+              >
+                {pickerYear}년 {pickerMonth + 1}월로 이동
+              </button>
+            </div>
+          )}
 
           <div className="weekday-grid">
             <div className="weekday-label sun">일</div>
