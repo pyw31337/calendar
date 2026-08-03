@@ -1,127 +1,115 @@
 import React, { useState } from 'react';
-import { X, Save, Plus, Trash2, Settings, User } from 'lucide-react';
-import { PRESET_COLORS, getRandomColor, getContrastTextColor } from '../utils/colors';
+import { X, Plus, Trash2, CalendarPlus, Palette } from 'lucide-react';
+import { PRESET_COLORS } from '../utils/colors';
 
-export default function AdminPanel({
-  calendar,
-  onSaveCalendar,
-  onDeleteCalendar,
-  onClose
-}) {
-  const [title, setTitle] = useState(calendar?.title || '새 모임 달력');
-  const [description, setDescription] = useState(calendar?.description || '');
-  const [participants, setParticipants] = useState(() => calendar?.participants || []);
-
-  const [newParticipantName, setNewParticipantName] = useState('');
-  const [newParticipantColor, setNewParticipantColor] = useState(getRandomColor());
+export default function AdminPanel({ calendar, allCalendars, onSelectCalendar, onSave, onClose }) {
+  const [title, setTitle] = useState(calendar ? calendar.title : '');
+  const [description, setDescription] = useState(calendar ? (calendar.description || '') : '');
+  const [participants, setParticipants] = useState(calendar ? calendar.participants : []);
+  const [newName, setNewName] = useState('');
 
   const handleAddParticipant = (e) => {
     if (e) {
       e.preventDefault();
       e.stopPropagation();
     }
-    if (!newParticipantName || !newParticipantName.trim()) {
+    if (!newName || !newName.trim()) {
       alert('참여자 이름을 입력해 주세요.');
       return;
     }
-
-    const newP = {
+    const newParticipant = {
       id: 'p_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
-      name: newParticipantName.trim(),
-      color: newParticipantColor
+      name: newName.trim(),
+      color: PRESET_COLORS[participants.length % PRESET_COLORS.length]
+    };
+    setParticipants(prev => [...prev, newParticipant]);
+    setNewName('');
+  };
+
+  const handleCreateNewCalInAdmin = () => {
+    const id = prompt('새 모임 달력의 영문/한글 ID를 입력하세요 (예: kkot, cw, trip):', 'cal_' + Date.now().toString().slice(-4));
+    if (!id) return;
+    const calTitle = prompt('달력 제목을 입력해 주세요:', `${id} 모임 달력`);
+    if (!calTitle) return;
+
+    const newCal = {
+      id: id.trim(),
+      title: calTitle.trim(),
+      description: `${calTitle.trim()} 참여자들의 일정 조율`,
+      participants: [
+        { id: 'p1', name: '참여자 1', color: '#EF4444' },
+        { id: 'p2', name: '참여자 2', color: '#3B82F6' }
+      ],
+      availabilities: []
     };
 
-    setParticipants(prev => [...prev, newP]);
-    setNewParticipantName('');
-    setNewParticipantColor(getRandomColor());
-  };
-
-  const handleUpdateParticipantName = (id, newName) => {
-    setParticipants(participants.map(p => p.id === id ? { ...p, name: newName } : p));
-  };
-
-  const handleUpdateParticipantColor = (id, color) => {
-    setParticipants(participants.map(p => p.id === id ? { ...p, color } : p));
-  };
-
-  const handleRemoveParticipant = (id) => {
-    if (participants.length <= 1) {
-      alert('최소 1명 이상의 참여자가 있어야 합니다.');
-      return;
-    }
-    setParticipants(participants.filter(p => p.id !== id));
+    onSave(calendar, newCal);
+    onClose();
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!title.trim()) {
-      alert('달력 제목을 입력해 주세요.');
-      return;
-    }
-    if (participants.length === 0) {
-      alert('참여자를 최소 1명 이상 등록해 주세요.');
-      return;
-    }
-
-    onSaveCalendar({
+    onSave({
       ...calendar,
       title: title.trim(),
       description: description.trim(),
-      participants,
-      updatedAt: new Date().toISOString()
-    });
-
+      participants
+    }, null);
     onClose();
   };
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-container" style={{ maxWidth: '580px' }} onClick={(e) => e.stopPropagation()}>
+      <div className="modal-container" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
-          <div className="modal-title">
-            <Settings size={20} style={{ color: 'var(--accent-primary)' }} />
-            <span>어드민: 달력 및 참여자 설정</span>
-          </div>
-          <button id="btn-admin-close" className="modal-close-btn" onClick={onClose}>
-            <X size={20} />
-          </button>
+          <h3 style={{ fontSize: '1.1rem', fontWeight: 800 }}>어드민: 달력 & 참여자 설정</h3>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer' }}>✕</button>
         </div>
-
         <form onSubmit={handleSubmit}>
-          <div className="modal-body" style={{ maxHeight: '75vh', overflowY: 'auto' }}>
-            <div className="form-group">
-              <label htmlFor="calendar-title-input" className="form-label">
-                달력명 (상단 표기)
-              </label>
-              <input
-                id="calendar-title-input"
-                type="text"
-                className="form-input"
-                placeholder="예: 8월 정기 사모임 일자 조율"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                required
-              />
+          <div className="modal-body">
+            {/* Calendar Switcher & Create New Calendar Button */}
+            <div style={{ background: '#F8FAFC', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#64748B', marginBottom: '6px' }}>달력 선택 및 관리</label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <select
+                  className="form-select"
+                  style={{ flex: 1, fontWeight: '700' }}
+                  value={calendar.id}
+                  onChange={(e) => { onSelectCalendar(e.target.value); onClose(); }}
+                >
+                  {allCalendars.map(c => (
+                    <option key={c.id} value={c.id}>{c.title} (?id={c.id})</option>
+                  ))}
+                </select>
+                <button type="button" className="btn btn-secondary" onClick={handleCreateNewCalInAdmin}>
+                  + 새 달력 생성
+                </button>
+              </div>
             </div>
 
-            {/* Participants Management */}
-            <div className="form-group" style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '16px' }}>
-              <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <User size={16} />
-                <span>참여자 설정 ({participants.length}명)</span>
-              </label>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px', color: '#64748B' }}>달력명 (상단 큰 제목)</label>
+              <input type="text" className="form-input" style={{ width: '100%' }} value={title} onChange={e => setTitle(e.target.value)} required />
+            </div>
 
-              {/* Add New Participant Row */}
-              <div style={{ display: 'flex', gap: '8px', marginTop: '8px', marginBottom: '12px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px', color: '#64748B' }}>달력 설명 (상단 서브 텍스트)</label>
+              <input type="text" className="form-input" style={{ width: '100%' }} placeholder="예: cw 동창 모임 참여자들의 일정 조율" value={description} onChange={e => setDescription(e.target.value)} />
+            </div>
+
+            <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '12px' }}>
+              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px', color: '#64748B' }}>참여자 설정 ({participants.length}명)</label>
+              
+              {/* Participant Input & Add Button */}
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
                 <input
-                  id="new-participant-name-input"
                   type="text"
                   className="form-input"
-                  placeholder="새 참여자 이름"
                   style={{ flex: 1 }}
-                  value={newParticipantName}
-                  onChange={(e) => setNewParticipantName(e.target.value)}
-                  onKeyDown={(e) => {
+                  placeholder="새 참여자 이름"
+                  value={newName}
+                  onChange={e => setNewName(e.target.value)}
+                  onKeyDown={e => {
                     if (e.key === 'Enter') {
                       e.preventDefault();
                       handleAddParticipant(e);
@@ -130,64 +118,26 @@ export default function AdminPanel({
                 />
                 <button
                   type="button"
-                  id="btn-add-participant"
                   className="btn btn-secondary"
                   onClick={handleAddParticipant}
                 >
-                  <Plus size={16} />
-                  <span>추가</span>
+                  추가
                 </button>
               </div>
 
-              {/* List of Existing Participants */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {participants.map((p) => (
-                  <div key={p.id} className="participant-edit-row">
-                    <input
-                      type="color"
-                      value={p.color}
-                      onChange={(e) => handleUpdateParticipantColor(p.id, e.target.value)}
-                      style={{ width: '32px', height: '32px', border: 'none', background: 'transparent', cursor: 'pointer' }}
-                    />
-                    <input
-                      type="text"
-                      className="form-input"
-                      style={{ flex: 1 }}
-                      value={p.name}
-                      onChange={(e) => handleUpdateParticipantName(p.id, e.target.value)}
-                    />
-                    <span
-                      className="participant-badge"
-                      style={{
-                        backgroundColor: p.color,
-                        color: getContrastTextColor(p.color),
-                        padding: '6px 12px'
-                      }}
-                    >
-                      {p.name}
-                    </span>
-                    <button
-                      type="button"
-                      className="btn btn-danger"
-                      style={{ padding: '6px 10px' }}
-                      onClick={() => handleRemoveParticipant(p.id)}
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                ))}
-              </div>
+              {/* List of Participants */}
+              {participants.map(p => (
+                <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                  <input type="color" value={p.color} onChange={e => setParticipants(participants.map(item => item.id === p.id ? { ...item, color: e.target.value } : item))} style={{ width: '28px', height: '28px', border: 'none', background: 'none', cursor: 'pointer' }} />
+                  <input type="text" className="form-input" style={{ flex: 1, padding: '4px 8px' }} value={p.name} onChange={e => setParticipants(participants.map(item => item.id === p.id ? { ...item, name: e.target.value } : item))} />
+                  <button type="button" className="btn btn-danger" style={{ padding: '4px 8px' }} onClick={() => setParticipants(participants.filter(item => item.id !== p.id))}>✕</button>
+                </div>
+              ))}
             </div>
           </div>
-
           <div className="modal-footer">
-            <button type="button" className="btn btn-secondary" onClick={onClose}>
-              취소
-            </button>
-            <button type="submit" id="btn-save-admin" className="btn btn-primary">
-              <Save size={16} />
-              <span>설정 저장</span>
-            </button>
+            <button type="button" className="btn btn-secondary" onClick={onClose}>취소</button>
+            <button type="submit" className="btn btn-primary">설정 저장</button>
           </div>
         </form>
       </div>

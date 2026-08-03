@@ -761,9 +761,10 @@
       );
     }
 
-    // Admin Modal
+    // Admin Modal - Editable Calendar Title AND Subtitle Description
     function AdminModal({ calendar, allCalendars, onSelectCalendar, onSave, onClose }) {
       const [title, setTitle] = React.useState(calendar.title);
+      const [description, setDescription] = React.useState(calendar.description || '');
       const [participants, setParticipants] = React.useState(calendar.participants);
       const [newName, setNewName] = React.useState('');
 
@@ -796,7 +797,7 @@
         const newCal = {
           id: id.trim(),
           title: calTitle.trim(),
-          description: '참석 가능 일자를 선택해주세요',
+          description: `${calTitle.trim()} 참여자들의 일정 조율`,
           participants: [
             { id: 'p1', name: '참여자 1', color: '#EF4444' },
             { id: 'p2', name: '참여자 2', color: '#3B82F6' }
@@ -810,7 +811,12 @@
 
       const handleSubmit = (e) => {
         e.preventDefault();
-        onSave({ ...calendar, title: title.trim(), participants }, null);
+        onSave({
+          ...calendar,
+          title: title.trim(),
+          description: description.trim(),
+          participants
+        }, null);
         onClose();
       };
 
@@ -844,8 +850,13 @@
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px', color: '#64748B' }}>달력명 (상단 표기)</label>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px', color: '#64748B' }}>달력명 (상단 큰 제목)</label>
                   <input type="text" className="form-input" style={{ width: '100%' }} value={title} onChange={e => setTitle(e.target.value)} required />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px', color: '#64748B' }}>달력 설명 (상단 서브 텍스트)</label>
+                  <input type="text" className="form-input" style={{ width: '100%' }} placeholder="예: cw 동창 모임 참여자들의 일정 조율" value={description} onChange={e => setDescription(e.target.value)} />
                 </div>
 
                 <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '12px' }}>
@@ -917,7 +928,7 @@
       );
     }
 
-    // Summary List - Displays ONLY the memo content inside the capsule badge
+    // Summary List
     function SummaryList({ calendar, onSelectDate }) {
       const totalCount = calendar?.participants?.length || 0;
       const availabilities = calendar?.availabilities || [];
@@ -951,7 +962,6 @@
               {fullDates.map(d => {
                 const dateEntries = dateMap[d] || [];
                 const formattedDateStr = formatDateWithDayName(d);
-                // Filter only entries where a non-empty note was typed
                 const memoEntries = dateEntries.filter(e => e.note && e.note.trim().length > 0);
 
                 return (
@@ -961,7 +971,6 @@
                         {formattedDateStr}
                       </span>
 
-                      {/* Render Capsule Memo Badges with ONLY memo text (Personal Color identifies the participant) */}
                       {memoEntries.length > 0 && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                           {memoEntries.map(e => {
