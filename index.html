@@ -429,15 +429,9 @@
 const PRESET_COLORS = ['#EF4444', '#F97316', '#F59E0B', '#10B981', '#06B6D4', '#3B82F6', '#6366F1', '#8B5CF6', '#EC4899', '#14B8A6'];
 const STORAGE_KEY = 'gather_calendars_permanent_v21';
 const STORAGE_META_KEY = 'gather_calendars_meta_v5'; // tracks lastModified timestamp
-// Unlimited Zero-Rate-Limit Cloud DB endpoint powered by JSONBlob
-const MASTER_CLOUD_BLOB_ID = '019fc673-395c-7433-ad9d-c9343b94883a';
-const CLOUD_API_URL = `https://jsonblob.com/api/jsonBlob/${MASTER_CLOUD_BLOB_ID}`;
-const CALENDAR_CLOUD_BLOB_IDS = {
-  kkot: '019fc674-b7bc-7ae2-b53d-4ffee349d114',
-  cw: '019fc674-b957-71c2-b464-0c4683dbe321'
-};
 const URL_PARAMS = new URLSearchParams(window.location.search);
-const FORCE_LOCAL_STORAGE = URL_PARAMS.get('storage') === 'local';
+const IS_LOCALHOST = ['localhost', '127.0.0.1', '0.0.0.0'].includes(window.location.hostname);
+const FORCE_LOCAL_STORAGE = IS_LOCALHOST && URL_PARAMS.get('storage') === 'local';
 const ENABLE_FIRESTORE_SYNC = !FORCE_LOCAL_STORAGE; // Firestore is the only production source of truth
 const ENABLE_FIRESTORE_WRITES = !FORCE_LOCAL_STORAGE;
 function getContrastTextColor(hexColor) {
@@ -466,19 +460,18 @@ function formatDateWithDayName(dateStr) {
   }
   return dateStr;
 }
+function isValidCalendarId(id) {
+  return typeof id === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(id);
+}
+
 function getCalendarIdFromURL() {
   const href = window.location.href;
   const urlParams = new URLSearchParams(window.location.search);
-  if (urlParams.get('id')) return urlParams.get('id');
-  if (urlParams.get('cal')) return urlParams.get('cal');
+  if (isValidCalendarId(urlParams.get('id'))) return urlParams.get('id');
+  if (isValidCalendarId(urlParams.get('cal'))) return urlParams.get('cal');
   const match = href.match(/[?&#/]id=([a-zA-Z0-9_-]+)/);
-  if (match && match[1]) return match[1];
+  if (match && isValidCalendarId(match[1])) return match[1];
   return null;
-}
-
-function getCalendarCloudUrl(calId) {
-  const blobId = CALENDAR_CLOUD_BLOB_IDS[calId];
-  return blobId ? `https://jsonblob.com/api/jsonBlob/${blobId}` : null;
 }
 
 function getCalendarShareUrl(calendarId) {
@@ -635,7 +628,9 @@ function mergeCalendarRecord(existing, incoming) {
   const next = cloneCalendar(incoming) || {};
   if (!base.id) return next;
   if (!next.id) return base;
-  if (base.id !== next.id) return next;
+  if (base.id !== next.id) {
+    throw new Error(`Calendar ID mismatch: ${base.id} cannot merge with ${next.id}`);
+  }
 
   const participantMap = new Map();
   (base.participants || []).forEach((participant) => {
@@ -709,10 +704,6 @@ function mergeCalendarAvailabilityDelta(serverCalendar, incomingCalendar, change
     updatedAt: Math.max(base.updatedAt || 0, incoming.updatedAt || 0, changedAt || 0),
     revision: Math.max(base.revision || 0, incoming.revision || 0)
   };
-}
-
-function replaceCalendarSettings(serverCalendar, incomingCalendar) {
-  return mergeCalendarSettingsDelta(serverCalendar, incomingCalendar);
 }
 
 function mergeCalendarSettingsDelta(serverCalendar, incomingCalendar) {
@@ -1392,7 +1383,7 @@ function loadSavedLocalCalendars() {
 }
 
 function loadLocalCache() {
-  if (firebaseDb) {
+  if (!FORCE_LOCAL_STORAGE) {
     return cloneCalendarList(INITIAL_CALENDARS);
   }
   try {
@@ -1409,7 +1400,7 @@ function loadLocalCache() {
 }
 
 function saveLocalCache(data) {
-  if (firebaseDb && !FORCE_LOCAL_STORAGE) return;
+  if (!FORCE_LOCAL_STORAGE) return;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   } catch (e) {
@@ -1462,85 +1453,14 @@ async function fetchSingleCloudCalendar(calId, retryCount = 2) {
     }
     return null;
   }
-  for (let attempt = 0; attempt <= retryCount; attempt++) {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 6000);
-    try {
-      const cloudUrl = getCalendarCloudUrl(calId) || CLOUD_API_URL;
-      const res = await fetch(cloudUrl, {
-        signal: controller.signal
-      });
-      clearTimeout(timeoutId);
-      if (res.ok) {
-        const json = await res.json();
-        if (json && json.calendar && json.calendar.id === calId) {
-          return {
-            calendar: json.calendar,
-            lastModified: json.lastModified || 0
-          };
-        }
-        if (json && Array.isArray(json.calendars)) {
-          const matched = json.calendars.find(c => c.id === calId);
-          if (matched) return {
-            calendar: matched,
-            lastModified: json.lastModified || 0
-          };
-        }
-      }
-    } catch (e) {
-      clearTimeout(timeoutId);
-    }
-    if (attempt < retryCount) {
-      await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
-    }
-  }
   return null;
-}
-
-async function pushMasterCloudCalendars(nextCalendars, lastModified, retryCount = 4) {
-  const normalizedCalendars = cloneCalendarList(nextCalendars).map(normalizeCalendarForSave);
-  if (!normalizedCalendars.length) return false;
-
-  const saveOne = async (calendar) => {
-    const cloudUrl = getCalendarCloudUrl(calendar.id);
-    if (!cloudUrl) return Boolean(firebaseDb);
-    for (let attempt = 0; attempt <= retryCount; attempt++) {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 7000);
-      try {
-        const res = await fetch(cloudUrl, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            calendar,
-            lastModified
-          }),
-          signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-        if (res.ok) return true;
-        if (res.status !== 429 && res.status < 500) return false;
-      } catch (e) {
-        clearTimeout(timeoutId);
-        console.warn(`Calendar cloud push notice for ${calendar.id}:`, e);
-      }
-      if (attempt < retryCount) {
-        await new Promise(r => setTimeout(r, 1200 * (attempt + 1)));
-      }
-    }
-    return false;
-  };
-
-  const results = await Promise.all(normalizedCalendars.map(saveOne));
-  return results.every(Boolean);
 }
 
 // Pushes isolated calendar data to the durable master store and Firestore when available.
 async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 3, allCalendars = null, saveMode = 'availability') {
   const normalizedCal = normalizeCalendarForSave(targetCal);
   if (!normalizedCal || !normalizedCal.id) return false;
+  if (!isValidCalendarId(normalizedCal.id)) return false;
   if (FORCE_LOCAL_STORAGE) return true;
   if (!ENABLE_FIRESTORE_WRITES) {
     console.warn(`Blocked Firestore write for ${normalizedCal.id}: recovery read-only mode`);
@@ -1558,7 +1478,7 @@ async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 3, 
 	          if (!serverCalendar) {
 	            nextCalendar = normalizedCal;
 	          } else if (saveMode === 'replace') {
-	            nextCalendar = mergeCalendarRecord(serverCalendar, normalizedCal);
+	            throw new Error(`Refusing to replace existing calendar ${normalizedCal.id}`);
 	          } else if (saveMode === 'settings') {
 	            nextCalendar = mergeCalendarSettingsDelta(serverCalendar, normalizedCal);
 	          } else {
@@ -1578,13 +1498,10 @@ async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 3, 
       console.warn(`Firestore push notice for cal_${normalizedCal.id}:`, e);
     }
   }
-  const baseCalendars = Array.isArray(allCalendars) && allCalendars.length > 0 ? allCalendars : mergeCalendarCollections(loadLocalCache(), [normalizedCal], {
-    replaceMatchingId: true
-  });
-  const masterSaved = await pushMasterCloudCalendars(baseCalendars, lastModified, retryCount);
-  return masterSaved;
+  return false;
 }
 function loadLocalMeta() {
+  if (!FORCE_LOCAL_STORAGE) return { lastModified: 0, byCalendar: {} };
   try {
     const raw = localStorage.getItem(STORAGE_META_KEY);
     if (raw) return JSON.parse(raw);
@@ -1594,7 +1511,7 @@ function loadLocalMeta() {
   };
 }
 function saveLocalMeta(meta) {
-  if (firebaseDb && !FORCE_LOCAL_STORAGE) return;
+  if (!FORCE_LOCAL_STORAGE) return;
   try {
     localStorage.setItem(STORAGE_META_KEY, JSON.stringify(meta));
   } catch (e) {}
@@ -1618,48 +1535,6 @@ function updateMetaLastModified(meta, calendarId, lastModified) {
   };
   if (calendarId) next.byCalendar[calendarId] = lastModified || 0;
   return next;
-}
-
-function isPlaceholderRemotePayload(payload) {
-  if (!payload || !Array.isArray(payload.calendars)) return false;
-  if (payload.calendars.length !== 1) return false;
-  const [cal] = payload.calendars;
-  if (!cal || cal.id !== 'test') return false;
-  return (cal.title || '') === 't' && (!cal.participants || cal.participants.length === 0) && (!cal.availabilities || cal.availabilities.length === 0);
-}
-
-async function fetchMasterCloudCalendars(retryCount = 2) {
-  const isolatedResults = await Promise.all(
-    Object.keys(CALENDAR_CLOUD_BLOB_IDS).map((calId) => fetchSingleCloudCalendar(calId, 0))
-  );
-  const isolatedCalendars = isolatedResults.map(result => result?.calendar).filter(Boolean);
-  if (isolatedCalendars.length > 0) {
-    return {
-      calendars: isolatedCalendars,
-      lastModified: isolatedResults.reduce((max, result) => Math.max(max, result?.lastModified || 0), 0)
-    };
-  }
-
-  for (let attempt = 0; attempt <= retryCount; attempt++) {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 6000);
-    try {
-      const res = await fetch(CLOUD_API_URL, { signal: controller.signal });
-      clearTimeout(timeoutId);
-      if (res.ok) {
-        const json = await res.json();
-        if (json && Array.isArray(json.calendars) && json.calendars.length > 0 && !isPlaceholderRemotePayload(json)) {
-          return { calendars: json.calendars, lastModified: json.lastModified || 0 };
-        }
-      }
-    } catch (e) {
-      clearTimeout(timeoutId);
-    }
-    if (attempt < retryCount) {
-      await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
-    }
-  }
-  return null;
 }
 
 function isAdminDashboardRoute() {
@@ -1709,7 +1584,7 @@ async function fetchAllServerCalendars() {
     });
     return { calendars, lastModified };
   }
-  return fetchMasterCloudCalendars();
+  throw new Error('Firebase 연결이 없어 캘린더 데이터를 불러올 수 없습니다.');
 }
 
 function AdminDashboard({ initialCalendars }) {
@@ -1749,19 +1624,9 @@ function AdminDashboard({ initialCalendars }) {
       };
     }
 
-    const load = async () => {
-      try {
-        const result = await fetchAllServerCalendars();
-        applyResult(result?.calendars || []);
-      } catch (err) {
-        if (isMounted) setError(err.message || '대시보드 데이터를 불러오지 못했습니다.');
-      }
-    };
-    load();
-    const intervalId = setInterval(load, 7000);
+    setError('Firebase 연결이 없어 대시보드 데이터를 불러올 수 없습니다.');
     return () => {
       isMounted = false;
-      clearInterval(intervalId);
     };
   }, []);
 
@@ -2047,25 +1912,8 @@ function App() {
   }, [activeCalId]);
 
   React.useEffect(() => {
-    if (firebaseDb) return;
-    let isMounted = true;
-
-    const syncFromMaster = async () => {
-      if (isSavingRef.current) return;
-      const result = await fetchMasterCloudCalendars();
-      if (!result || !isMounted) return;
-
-      if (result.calendars.every((calendar) => (result.lastModified || 0) < getMetaLastModified(serverRevisionRef.current, calendar.id))) return;
-
-      applyServerCalendars(result.calendars, result.lastModified || Date.now());
-    };
-
-    syncFromMaster();
-    const intervalId = setInterval(syncFromMaster, 7000);
-    return () => {
-      isMounted = false;
-      clearInterval(intervalId);
-    };
+    if (firebaseDb || FORCE_LOCAL_STORAGE) return;
+    showToast('Firebase 연결을 확인해 주세요. 데이터는 Firebase에서만 불러옵니다.', 'error', 5000);
   }, []);
   const activeCal = calendars.find(c => c.id === activeCalId) || calendars[0];
   React.useEffect(() => {
@@ -2096,6 +1944,10 @@ function App() {
             replaceMatchingId: true
           }), existing.lastModified || Date.now());
           setActiveCalId(requestedId);
+          return;
+        }
+        if (!FORCE_LOCAL_STORAGE) {
+          showToast('Firebase에서 해당 캘린더를 찾지 못했습니다.', 'error');
           return;
         }
         const newCal = createDefaultCalendar(requestedId);
@@ -3294,12 +3146,16 @@ function ShareModal({
 }) {
   const shareUrl = getCalendarShareUrl(calendar.id);
   const handleCreateNewCalClick = () => {
-    const id = prompt('새 모임 캘린더의 영문/한글 ID를 입력하세요 (예: kkot, cw, trip):', 'cal_' + Date.now().toString().slice(-4));
+    const id = (prompt('새 모임 캘린더의 영문/한글 ID를 입력하세요 (예: kkot, cw, trip):', 'cal_' + Date.now().toString().slice(-4)) || '').trim();
     if (!id) return;
+    if (!isValidCalendarId(id)) {
+      alert('캘린더 ID는 영문, 숫자, -, _ 조합으로 입력해 주세요.');
+      return;
+    }
     const calTitle = prompt('캘린더 제목을 입력해 주세요:', `${id} 모임 캘린더`);
     if (!calTitle) return;
     const newCal = {
-      ...createDefaultCalendar(id.trim()),
+      ...createDefaultCalendar(id),
       title: calTitle.trim(),
       description: `${calTitle.trim()} 참여자들의 일정 조율`
     };
