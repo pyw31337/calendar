@@ -959,22 +959,11 @@
               <div className="modal-body">
                 <div>
                   <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px', color: '#64748B' }}>참여자 선택</label>
-                  {/* Desktop Only Select */}
-                  <select
-                    className="form-select desktop-only"
-                    style={{ width: '100%' }}
-                    value={participantId}
-                    onChange={e => setParticipantId(e.target.value)}
-                  >
-                    {calendar.participants.map(p => (
-                      <option key={p.id} value={p.id}>{p.name}</option>
-                    ))}
-                  </select>
 
-                  {/* Mobile Only Custom Button Trigger */}
+                  {/* Custom Selector (all screen sizes) */}
                   <button
                     type="button"
-                    className="form-select mobile-only"
+                    className="form-select"
                     style={{
                       width: '100%',
                       display: 'flex',
