@@ -468,36 +468,57 @@ function getCalendarIdFromURL() {
   return null;
 }
 
-// Safety function: Strictly merge calendars by ID without bleeding participant data across different calendars
-function mergeCalendarCollections(sourceList, targetList) {
-  if (!Array.isArray(sourceList)) return targetList || [];
-  if (!Array.isArray(targetList)) return sourceList || [];
+function cloneParticipant(participant) {
+  return participant ? { ...participant } : participant;
+}
+
+function cloneAvailability(availability) {
+  return availability ? { ...availability } : availability;
+}
+
+function cloneCalendar(calendar) {
+  if (!calendar) return calendar;
+  return {
+    ...calendar,
+    participants: Array.isArray(calendar.participants) ? calendar.participants.map(cloneParticipant) : [],
+    availabilities: Array.isArray(calendar.availabilities) ? calendar.availabilities.map(cloneAvailability) : []
+  };
+}
+
+function cloneCalendarList(list) {
+  return Array.isArray(list) ? list.map(cloneCalendar).filter(Boolean) : [];
+}
+
+// Safety function: Strictly merge calendars by ID without bleeding participant data across different calendars.
+// All objects are cloned so the static seed data never gets mutated by live updates.
+function mergeCalendarCollections(sourceList, targetList, options = {}) {
+  const { replaceMatchingId = false } = options;
+  if (!Array.isArray(sourceList)) return cloneCalendarList(targetList || []);
+  if (!Array.isArray(targetList)) return cloneCalendarList(sourceList || []);
   const map = new Map();
-  sourceList.forEach(c => map.set(c.id, {
-    ...c,
-    participants: [...(c.participants || [])],
-    availabilities: [...(c.availabilities || [])]
-  }));
+  cloneCalendarList(sourceList).forEach(c => map.set(c.id, c));
   targetList.forEach(tc => {
-    if (!map.has(tc.id)) {
-      map.set(tc.id, {
-        ...tc,
-        participants: [...(tc.participants || [])],
-        availabilities: [...(tc.availabilities || [])]
-      });
+    const nextCalendar = cloneCalendar(tc);
+    if (!nextCalendar || !nextCalendar.id) return;
+    if (!map.has(nextCalendar.id)) {
+      map.set(nextCalendar.id, nextCalendar);
     } else {
-      const existing = map.get(tc.id);
+      const existing = map.get(nextCalendar.id);
+      if (replaceMatchingId) {
+        map.set(nextCalendar.id, nextCalendar);
+        return;
+      }
       // Merge participants strictly within THIS calendar only
       const partMap = new Map();
       existing.participants.forEach(p => partMap.set(p.id, p));
-      (tc.participants || []).forEach(p => {
+      (nextCalendar.participants || []).forEach(p => {
         if (!partMap.has(p.id)) partMap.set(p.id, p);
       });
 
       // Merge availabilities strictly within THIS calendar only
       const availMap = new Map();
       existing.availabilities.forEach(a => availMap.set(`${a.date}_${a.participantId}`, a));
-      (tc.availabilities || []).forEach(a => {
+      (nextCalendar.availabilities || []).forEach(a => {
         const key = `${a.date}_${a.participantId}`;
         if (!availMap.has(key)) {
           availMap.set(key, a);
@@ -514,8 +535,8 @@ function mergeCalendarCollections(sourceList, targetList) {
       });
       existing.participants = Array.from(partMap.values());
       existing.availabilities = Array.from(availMap.values());
-      if (tc.title) existing.title = tc.title;
-      if (tc.description) existing.description = tc.description;
+      if (nextCalendar.title) existing.title = nextCalendar.title;
+      if (nextCalendar.description) existing.description = nextCalendar.description;
     }
   });
   return Array.from(map.values());
@@ -1070,16 +1091,24 @@ function parseCalendarPayload(raw) {
 
 function loadSavedLocalCalendars() {
   try {
+    const savedCollections = [];
+    const canonical = parseCalendarPayload(localStorage.getItem(STORAGE_KEY));
+    if (Array.isArray(canonical) && canonical.length > 0) {
+      savedCollections.push(canonical);
+    }
+
     const legacyKeys = [
-      STORAGE_KEY,
       'gather_calendars_cache_v7',
       'gather_calendars_cache_v6',
       'gather_calendars_persistent_v5',
       'gather_calendars_persistent_v4'
     ];
-    const savedCollections = legacyKeys
-      .map((key) => parseCalendarPayload(localStorage.getItem(key)))
-      .filter((calendars) => Array.isArray(calendars) && calendars.length > 0);
+    legacyKeys.forEach((key) => {
+      const payload = parseCalendarPayload(localStorage.getItem(key));
+      if (Array.isArray(payload) && payload.length > 0) {
+        savedCollections.push(payload);
+      }
+    });
 
     if (savedCollections.length > 0) {
       return savedCollections.reduce(
@@ -1096,11 +1125,15 @@ function loadSavedLocalCalendars() {
 function loadLocalCache() {
   try {
     const saved = loadSavedLocalCalendars();
-    if (saved) return mergeCalendarCollections(INITIAL_CALENDARS, saved);
+    if (saved && saved.length > 0) {
+      const savedIds = new Set(saved.map((calendar) => calendar.id));
+      const missingDefaults = INITIAL_CALENDARS.filter((calendar) => !savedIds.has(calendar.id));
+      return [...cloneCalendarList(saved), ...cloneCalendarList(missingDefaults)];
+    }
   } catch (e) {
     console.warn('Failed to resolve local calendar cache:', e);
   }
-  return INITIAL_CALENDARS;
+  return cloneCalendarList(INITIAL_CALENDARS);
 }
 
 function saveLocalCache(data) {
@@ -1207,7 +1240,9 @@ async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 2) 
     try {
       const remote = await fetchMasterCloudCalendars(1);
       const baseCalendars = remote?.calendars?.length ? remote.calendars : loadLocalCache();
-      const nextCalendars = mergeCalendarCollections(baseCalendars, [targetCal]);
+      const nextCalendars = mergeCalendarCollections(baseCalendars, [targetCal], {
+        replaceMatchingId: true
+      });
       const res = await fetch(CLOUD_API_URL, {
         method: 'PUT',
         headers: {
@@ -1302,7 +1337,7 @@ function App() {
   const lastLocalSaveRef = React.useRef(loadLocalMeta().lastModified || 0);
   const LOCAL_SAVE_GUARD_MS = 10000; // 10s guard window after local save
 
-  const updateCalendars = async (nextCalendars, toastMsg = '일정이 저장되었습니다.', toastType = 'success') => {
+  const updateCalendars = async (nextCalendars, toastMsg = '일정이 저장되었습니다.', toastType = 'success', targetCalId = activeCalId) => {
     try {
       const now = Date.now();
       lastLocalSaveRef.current = now;
@@ -1313,14 +1348,18 @@ function App() {
       saveLocalCache(nextCalendars);
 
       // Find active calendar and push to its isolated Firestore document
-      const currentCal = nextCalendars.find(c => c.id === activeCalId) || nextCalendars[0] || null;
-      if (currentCal) {
-        const saved = await pushSingleCloudCalendar(currentCal, now);
-        if (!saved) {
-          console.warn('Cloud save failed for calendar:', currentCal.id);
-          showToast('저장에 실패했습니다. 다시 시도해 주세요.', 'error');
-          return false;
-        }
+      const currentCal = nextCalendars.find(c => c.id === targetCalId) || null;
+      if (!currentCal) {
+        console.warn('Active calendar not found during save:', targetCalId);
+        showToast('활성 캘린더를 찾을 수 없어 저장하지 못했습니다.', 'error');
+        return false;
+      }
+
+      const saved = await pushSingleCloudCalendar(currentCal, now);
+      if (!saved) {
+        console.warn('Cloud save failed for calendar:', currentCal.id);
+        showToast('저장에 실패했습니다. 다시 시도해 주세요.', 'error');
+        return false;
       }
 
       showToast(toastMsg, toastType, 3000);
@@ -1362,7 +1401,7 @@ function App() {
           const cloudLastMod = data.lastModified || 0;
           if (cloudLastMod > localMeta.lastModified) {
             setCalendarsState(prevCals => {
-              const nextCals = prevCals.map(c => c.id === activeCalId ? cloudCal : c);
+              const nextCals = prevCals.map(c => c.id === activeCalId ? cloneCalendar(cloudCal) : c);
               saveLocalCache(nextCals);
               saveLocalMeta({
                 lastModified: cloudLastMod
@@ -1382,6 +1421,7 @@ function App() {
   }, [activeCalId]);
 
   React.useEffect(() => {
+    if (firebaseDb) return;
     let isMounted = true;
 
     const syncFromMaster = async () => {
@@ -1393,7 +1433,9 @@ function App() {
       if (result.lastModified <= localMeta.lastModified) return;
 
       const currentLocal = loadLocalCache();
-      const merged = mergeCalendarCollections(currentLocal, result.calendars);
+      const merged = mergeCalendarCollections(currentLocal, result.calendars, {
+        replaceMatchingId: true
+      });
       if (merged.length > 0) {
         setCalendarsState(merged);
         saveLocalCache(merged);
@@ -1477,7 +1519,7 @@ function App() {
       availabilities: nextAvail
     };
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-    return updateCalendars(nextCalendars, '일정이 등록되었습니다.', 'success');
+    return updateCalendars(nextCalendars, '일정이 등록되었습니다.', 'success', updatedCal.id);
   };
   const handleDeleteAvailability = (dateStr, participantId) => {
     const nextAvail = (activeCal.availabilities || []).filter(e => !(e.date === dateStr && e.participantId === participantId));
@@ -1486,7 +1528,7 @@ function App() {
       availabilities: nextAvail
     };
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-    updateCalendars(nextCalendars, '참여자 일정이 삭제되었습니다. 🗑️', 'delete');
+    updateCalendars(nextCalendars, '참여자 일정이 삭제되었습니다. 🗑️', 'delete', updatedCal.id);
   };
   const handleDeleteAllForDate = dateStr => {
     const nextAvail = (activeCal.availabilities || []).filter(e => e.date !== dateStr);
@@ -1495,16 +1537,16 @@ function App() {
       availabilities: nextAvail
     };
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-    updateCalendars(nextCalendars, '해당 날짜의 모든 일정이 삭제되었습니다. 🗑️', 'delete');
+    updateCalendars(nextCalendars, '해당 날짜의 모든 일정이 삭제되었습니다. 🗑️', 'delete', updatedCal.id);
   };
   const handleSaveAdmin = (updatedCal, newCalCreated) => {
     if (newCalCreated) {
       const nextCalendars = [newCalCreated, ...calendars];
-      updateCalendars(nextCalendars, '새 캘린더가 생성되었습니다. ✅', 'success');
+      updateCalendars(nextCalendars, '새 캘린더가 생성되었습니다. ✅', 'success', newCalCreated.id);
       handleSelectCalendar(newCalCreated.id);
     } else {
       const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-      updateCalendars(nextCalendars, '캘린더 설정이 저장되었습니다. ✅', 'success');
+      updateCalendars(nextCalendars, '캘린더 설정이 저장되었습니다. ✅', 'success', updatedCal.id);
     }
   };
   return /*#__PURE__*/React.createElement("div", {
@@ -1670,7 +1712,7 @@ function App() {
     onSave: handleSaveAdmin,
     onCreateNewCal: newCal => {
       const nextCalendars = [newCal, ...calendars];
-      updateCalendars(nextCalendars);
+      updateCalendars(nextCalendars, '새 캘린더가 생성되었습니다. ✅', 'success', newCal.id);
       handleSelectCalendar(newCal.id);
       setIsAdminOpen(false);
     },
@@ -1679,12 +1721,13 @@ function App() {
     calendar: activeCal,
     onCreateNewCal: newCal => {
       const nextCalendars = [newCal, ...calendars];
-      updateCalendars(nextCalendars);
+      updateCalendars(nextCalendars, '새 캘린더가 생성되었습니다. ✅', 'success', newCal.id);
       handleSelectCalendar(newCal.id);
       setIsShareOpen(false);
     },
     onClose: () => setIsShareOpen(false)
   }), toast && /*#__PURE__*/React.createElement("div", {
+    className: "toast",
     style: {
       position: 'fixed',
       bottom: '32px',
@@ -2012,6 +2055,11 @@ function DateModal({
   const [note, setNote] = React.useState('');
   const [isSheetOpen, setIsSheetOpen] = React.useState(false);
   const dateEntries = (calendar?.availabilities || []).filter(e => e.date === dateStr);
+  React.useEffect(() => {
+    setParticipantId(calendar?.participants[0]?.id || '');
+    setNote('');
+    setIsSheetOpen(false);
+  }, [calendar?.id, dateStr]);
   const handleSubmit = async e => {
     e.preventDefault();
     if (!participantId) return;
@@ -2275,6 +2323,12 @@ function AdminModal({
   const [description, setDescription] = React.useState(calendar.description || '');
   const [participants, setParticipants] = React.useState(calendar.participants);
   const [newName, setNewName] = React.useState('');
+  React.useEffect(() => {
+    setTitle(calendar.title);
+    setDescription(calendar.description || '');
+    setParticipants(calendar.participants || []);
+    setNewName('');
+  }, [calendar?.id]);
   const handleCreateNewCalClick = () => {
     const id = prompt('새 모임 캘린더의 영문/한글 ID를 입력하세요 (예: kkot, cw, trip):', 'cal_' + Date.now().toString().slice(-4));
     if (!id) return;
@@ -2313,14 +2367,15 @@ function AdminModal({
     setParticipants(prev => [...prev, newParticipant]);
     setNewName('');
   };
-  const handleSubmit = e => {
+  const handleSubmit = async e => {
     e.preventDefault();
-    onSave({
+    const saved = await Promise.resolve(onSave({
       ...calendar,
       title: title.trim(),
       description: description.trim(),
       participants
-    }, null);
+    }, null));
+    if (saved === false) return;
     onClose();
   };
   return /*#__PURE__*/React.createElement("div", {
