@@ -1974,6 +1974,11 @@ function isAdminDashboardRoute() {
   return params.get('admin') === '1' || params.get('mode') === 'admin';
 }
 
+function isAdminRestoreRoute() {
+  const params = new URLSearchParams(window.location.search);
+  return isAdminDashboardRoute() && params.get('restore') === '1';
+}
+
 function createDefaultCalendar(id) {
   const now = Date.now();
   return {
@@ -2260,6 +2265,7 @@ function AdminDashboard({ initialCalendars }) {
   const [error, setError] = React.useState('');
   const [toast, setToast] = React.useState(null);
   const importInputRef = React.useRef(null);
+  const isRestoreMode = isAdminRestoreRoute();
 
   const showAdminToast = (message, type = 'success', duration = 3000) => {
     setToast({ message, type });
@@ -2281,6 +2287,15 @@ function AdminDashboard({ initialCalendars }) {
   const handleImportClick = () => {
     if (!firebaseDb || !ENABLE_FIRESTORE_WRITES) {
       showAdminToast('Firebase 쓰기 연결이 없어 복구할 수 없습니다.', 'error');
+      return;
+    }
+    if (!isRestoreMode) {
+      showAdminToast('복구는 관리자 주소에 restore=1을 붙인 복구 모드에서만 실행할 수 있습니다.', 'error', 6000);
+      return;
+    }
+    const phrase = window.prompt('백업 JSON 복구는 현재 운영 데이터를 교체합니다. 계속하려면 "운영 데이터 복구"를 정확히 입력하세요.');
+    if (phrase !== '운영 데이터 복구') {
+      showAdminToast('확인 문구가 일치하지 않아 복구를 취소했습니다.', 'error');
       return;
     }
     importInputRef.current?.click();
@@ -2561,9 +2576,9 @@ function AdminDashboard({ initialCalendars }) {
     className: "btn btn-secondary",
     onClick: () => handleDownloadBackup('')
   }, "전체 백업"), /*#__PURE__*/React.createElement("button", {
-    className: "btn btn-danger",
+    className: isRestoreMode ? "btn btn-danger" : "btn btn-secondary",
     onClick: handleImportClick
-  }, "데이터 불러오기"))), /*#__PURE__*/React.createElement("input", {
+  }, isRestoreMode ? "데이터 불러오기" : "복구 모드 필요"))), /*#__PURE__*/React.createElement("input", {
     ref: importInputRef,
     type: "file",
     accept: "application/json,.json",
@@ -2583,7 +2598,7 @@ function AdminDashboard({ initialCalendars }) {
     onClick: () => handleDownloadBackup(stat.calendar.id)
   }, stat.calendar.id, " JSON 다운로드")))), /*#__PURE__*/React.createElement("div", {
     style: { marginTop: '12px', color: 'var(--text-muted)', fontSize: '0.82rem', fontWeight: 700, lineHeight: 1.55 }
-  }, "백업 파일에는 참여자, 일정, 메모가 포함됩니다. 데이터 불러오기는 kkot/cw 백업만 허용하며 확인 후 Firestore 운영 데이터를 해당 백업으로 복구합니다.")), /*#__PURE__*/React.createElement("section", {
+  }, "백업 파일에는 참여자, 일정, 메모가 포함됩니다. 데이터 불러오기는 kkot/cw 백업만 허용하며 관리자 주소에 restore=1을 붙이고 확인 문구를 입력한 뒤 실행됩니다.")), /*#__PURE__*/React.createElement("section", {
     className: "summary-card",
     style: { marginTop: '20px' }
   }, /*#__PURE__*/React.createElement("div", {
