@@ -1,0 +1,226 @@
+import fs from 'node:fs';
+import vm from 'node:vm';
+
+function assert(condition, message) {
+  if (!condition) throw new Error(message);
+}
+
+const html = fs.readFileSync('index.html', 'utf8');
+const script = html.match(/<script>([\s\S]*)<\/script>\s*<\/body>/)?.[1];
+assert(script, 'index.html app script block not found');
+
+function createContext(url) {
+  const parsed = new URL(url);
+  return {
+    console,
+    setTimeout,
+    clearTimeout,
+    URL,
+    URLSearchParams,
+    alert() {},
+    window: {
+      location: {
+        hostname: parsed.hostname,
+        search: parsed.search,
+        href: parsed.href,
+        origin: parsed.origin,
+        pathname: parsed.pathname
+      },
+      history: {
+        replaced: '',
+        replaceState(_state, _title, nextUrl) {
+          this.replaced = nextUrl;
+        }
+      }
+    },
+    document: {
+      getElementById() {
+        return null;
+      }
+    },
+    localStorage: {
+      getItem() {
+        throw new Error('production localStorage read');
+      },
+      setItem() {
+        throw new Error('production localStorage write');
+      },
+      removeItem() {},
+      key() {
+        return null;
+      },
+      length: 0
+    },
+    firebase: undefined,
+    React: {
+      createElement() {
+        return {};
+      },
+      useState(value) {
+        return [typeof value === 'function' ? value() : value, () => {}];
+      },
+      useEffect(callback) {
+        callback();
+      },
+      useRef(value) {
+        return { current: value };
+      },
+      useMemo(callback) {
+        return callback();
+      }
+    },
+    ReactDOM: {
+      createRoot() {
+        return { render() {} };
+      }
+    }
+  };
+}
+
+function runAppScript(context, extraSource) {
+  vm.createContext(context);
+  vm.runInContext(`${script}\n${extraSource}`, context);
+}
+
+const productionContext = createContext('https://pyw31337.github.io/calendar/share/kkot/?storage=local');
+runAppScript(productionContext, `
+  if (FORCE_LOCAL_STORAGE) throw new Error('production enabled local storage mode');
+  if (getCalendarIdFromURL() !== 'kkot') throw new Error('share path id parse failed');
+  if (getCalendarShareUrl('cw') !== 'https://pyw31337.github.io/calendar/?id=cw') throw new Error('canonical share URL failed');
+  if (!isValidCalendarId('kkot') || isValidCalendarId('../bad') || isValidCalendarId('bad!')) {
+    throw new Error('calendar id validation failed');
+  }
+`);
+
+const concurrencyContext = createContext('https://pyw31337.github.io/calendar/?id=kkot');
+runAppScript(concurrencyContext, `
+  const participants = Array.from({ length: 8 }, (_, index) => ({
+    id: 'kkot_p' + (index + 1),
+    name: 'P' + (index + 1),
+    color: '#EF4444',
+    updatedAt: index + 1
+  }));
+  let kkot = { id: 'kkot', title: 'K', participants, availabilities: [], updatedAt: 1, revision: 1 };
+  for (const participant of participants) {
+    const incoming = {
+      ...kkot,
+      availabilities: [{
+        date: '2026-08-29',
+        participantId: participant.id,
+        note: '<script>alert(1)</script> '.repeat(20),
+        updatedAt: Date.now() + Number(participant.id.replace('kkot_p', ''))
+      }]
+    };
+    kkot = mergeCalendarAvailabilityDelta(kkot, incoming, Date.now());
+  }
+  const active = getActiveAvailabilities(kkot);
+  if (active.length !== 8) throw new Error('8 concurrent participant saves did not merge');
+  const controlPattern = new RegExp('[\\\\u0000-\\\\u001F\\\\u007F]');
+  if (active.some((item) => item.note.length > 120 || controlPattern.test(item.note))) {
+    throw new Error('note sanitization failed');
+  }
+  const withNewParticipant = {
+    ...kkot,
+    participants: [...kkot.participants, { id: 'kkot_p9', name: 'P9', color: '#000000', updatedAt: 9999 }]
+  };
+  const staleSettings = {
+    id: 'kkot',
+    title: 'Stale title',
+    participants: participants.map((participant) => ({ ...participant, updatedAt: participant.updatedAt })),
+    availabilities: []
+  };
+  const settingsMerged = mergeCalendarSettingsDelta(withNewParticipant, staleSettings);
+  if (!settingsMerged.participants.some((participant) => participant.id === 'kkot_p9')) {
+    throw new Error('stale settings removed newer participant');
+  }
+  let crossCalendarRefused = false;
+  try {
+    mergeCalendarRecord({ id: 'kkot' }, { id: 'cw' });
+  } catch (error) {
+    crossCalendarRefused = true;
+  }
+  if (!crossCalendarRefused) throw new Error('cross-calendar merge was not refused');
+  if (validateCalendarShape(settingsMerged)) throw new Error('merged settings did not validate');
+`);
+
+const invalidContext = createContext('https://pyw31337.github.io/calendar/?id=cw');
+runAppScript(invalidContext, `
+  const valid = {
+    id: 'cw',
+    title: 'CW',
+    participants: [{ id: 'cw_p1', name: '박영우', color: '#EF4444', updatedAt: 1 }],
+    availabilities: [{ date: '2026-08-29', participantId: 'cw_p1', note: 'ok', updatedAt: 1 }]
+  };
+  if (validateCalendarShape(valid)) throw new Error('valid calendar rejected');
+  if (!validateCalendarShape({ ...valid, id: 'cw!' })) throw new Error('bad id accepted');
+  if (!validateCalendarShape({ ...valid, availabilities: [{ date: '2026-02-30', participantId: 'cw_p1' }] })) {
+    throw new Error('bad date accepted');
+  }
+  if (!validateCalendarShape({ ...valid, availabilities: [{ date: '2026-08-29', participantId: 'missing' }] })) {
+    throw new Error('missing participant accepted');
+  }
+`);
+
+const restContext = createContext('https://pyw31337.github.io/calendar/?id=cw');
+const restCalls = [];
+restContext.fetch = async (url, options = {}) => {
+  restCalls.push({ url: String(url), options });
+  if (String(url).includes('/documents/calendars/cal_cw')) {
+    return {
+      ok: true,
+      json: async () => ({
+        name: 'projects/metro-live-2918e/databases/(default)/documents/calendars/cal_cw',
+        updateTime: '2026-08-03T00:00:00.000000Z',
+        fields: {
+          calendar: {
+            mapValue: {
+              fields: {
+                id: { stringValue: 'cw' },
+                title: { stringValue: 'CW' },
+                participants: {
+                  arrayValue: {
+                    values: [{ mapValue: { fields: {
+                      id: { stringValue: 'cw_p1' },
+                      name: { stringValue: '박영우' },
+                      color: { stringValue: '#EF4444' },
+                      updatedAt: { integerValue: '1' }
+                    } } }]
+                  }
+                },
+                availabilities: { arrayValue: {} },
+                updatedAt: { integerValue: '1' },
+                revision: { integerValue: '1' }
+              }
+            }
+          },
+          lastModified: { integerValue: '1' },
+          revision: { integerValue: '1' }
+        }
+      })
+    };
+  }
+  if (String(url).endsWith('/documents:commit')) {
+    return { ok: true, json: async () => ({ commitTime: '2026-08-03T00:00:01.000000Z' }) };
+  }
+  throw new Error(`unexpected fetch ${url}`);
+};
+runAppScript(restContext, `
+  globalThis.__restPromise = pushSingleCalendarWithRest({
+    id: 'cw',
+    title: 'CW',
+    participants: [{ id: 'cw_p1', name: '박영우', color: '#EF4444', updatedAt: 1 }],
+    availabilities: [{ date: '2026-08-08', participantId: 'cw_p1', note: '<b>10시</b>', updatedAt: 2 }],
+    updatedAt: 2,
+    revision: 1
+  }, 2, 'availability', 0);
+`);
+assert(await restContext.__restPromise === true, 'REST fallback did not report success');
+const commitCall = restCalls.find((call) => call.url.endsWith('/documents:commit'));
+assert(commitCall, 'REST fallback did not call Firestore commit');
+const commitBody = JSON.parse(commitCall.options.body);
+assert(commitBody.writes[0].update.name.endsWith('/calendars/cal_cw'), 'REST fallback wrote wrong document');
+assert(commitBody.writes[0].currentDocument.updateTime, 'REST fallback missing update precondition');
+assert(commitBody.writes[0].update.fields.calendar.mapValue.fields.id.stringValue === 'cw', 'REST fallback changed calendar id');
+assert(commitBody.writes[0].update.fields.revision.integerValue === '2', 'REST fallback did not advance doc revision');
+
+console.log('Firebase-only calendar safety tests passed');

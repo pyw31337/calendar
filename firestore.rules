@@ -2,16 +2,44 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /calendars/{calendarDocId} {
-      allow get: if calendarDocId.matches('^cal_[A-Za-z0-9_-]{1,64}$');
-      allow list: if true;
-      allow create, update: if calendarDocId.matches('^cal_[A-Za-z0-9_-]{1,64}$')
-        && request.resource.data.keys().hasOnly(['calendar', 'lastModified', 'revision'])
+    function isCalendarId(id) {
+      return id is string && id.matches('^[A-Za-z0-9_-]{1,64}$');
+    }
+
+    function isCalendarDoc(calendarDocId) {
+      return calendarDocId.matches('^cal_[A-Za-z0-9_-]{1,64}$');
+    }
+
+    function hasValidCalendarShell(calendarDocId) {
+      return request.resource.data.keys().hasOnly(['calendar', 'lastModified', 'revision'])
         && request.resource.data.calendar is map
-        && request.resource.data.calendar.id is string
+        && isCalendarId(request.resource.data.calendar.id)
         && calendarDocId == 'cal_' + request.resource.data.calendar.id
+        && request.resource.data.calendar.title is string
+        && request.resource.data.calendar.title.size() > 0
+        && request.resource.data.calendar.title.size() <= 80
+        && (!('description' in request.resource.data.calendar) || request.resource.data.calendar.description is string)
+        && (!('description' in request.resource.data.calendar) || request.resource.data.calendar.description.size() <= 160)
+        && request.resource.data.calendar.participants is list
+        && request.resource.data.calendar.participants.size() <= 80
+        && request.resource.data.calendar.availabilities is list
+        && request.resource.data.calendar.availabilities.size() <= 5000
         && request.resource.data.lastModified is number
         && request.resource.data.revision is number;
+    }
+
+    function hasValidRevision(calendarDocId) {
+      return !exists(/databases/$(database)/documents/calendars/$(calendarDocId))
+        ? request.resource.data.revision == 1
+        : request.resource.data.revision == resource.data.revision + 1;
+    }
+
+    match /calendars/{calendarDocId} {
+      allow get: if isCalendarDoc(calendarDocId);
+      allow list: if true;
+      allow create, update: if isCalendarDoc(calendarDocId)
+        && hasValidCalendarShell(calendarDocId)
+        && hasValidRevision(calendarDocId);
       allow delete: if false;
     }
 

@@ -542,6 +542,35 @@ function getActiveAvailabilities(calendar) {
   return Array.isArray(calendar?.availabilities) ? calendar.availabilities.filter(a => !isTombstone(a)) : [];
 }
 
+function validateCalendarShape(calendar) {
+  if (!calendar || !isValidCalendarId(calendar.id)) return '캘린더 ID가 올바르지 않습니다.';
+  if (sanitizeText(calendar.title, 80).length === 0) return '캘린더명이 비어 있습니다.';
+  const participants = Array.isArray(calendar.participants) ? calendar.participants : [];
+  const availabilities = Array.isArray(calendar.availabilities) ? calendar.availabilities : [];
+  if (participants.length > 80) return '참여자가 너무 많습니다.';
+  if (availabilities.length > 5000) return '일정 데이터가 너무 많습니다.';
+  const participantIds = new Set();
+  const activeNames = new Set();
+  for (const participant of participants) {
+    if (!participant?.id || participant.id.length > 96) return '참여자 ID가 올바르지 않습니다.';
+    if (participantIds.has(participant.id)) return '참여자 ID가 중복되었습니다.';
+    participantIds.add(participant.id);
+    if (!isTombstone(participant)) {
+      const name = normalizeParticipantName(calendar.id, participant.name);
+      if (!name) return '참여자 이름이 비어 있습니다.';
+      const nameKey = name.toLowerCase();
+      if (activeNames.has(nameKey)) return '참여자 이름이 중복되었습니다.';
+      activeNames.add(nameKey);
+    }
+  }
+  for (const availability of availabilities) {
+    if (!availability?.date || !isValidDateString(availability.date)) return '일정 날짜가 올바르지 않습니다.';
+    if (!participantIds.has(availability.participantId)) return '일정의 참여자 연결이 올바르지 않습니다.';
+    if (sanitizeText(availability.note, 120).length > 120) return '메모가 너무 깁니다.';
+  }
+  return '';
+}
+
 function normalizeCalendarForSave(calendar) {
   const cloned = cloneCalendar(calendar);
   if (!cloned) return cloned;
@@ -1494,6 +1523,104 @@ async function fetchSingleCloudCalendar(calId, retryCount = 2) {
   return null;
 }
 
+function firestoreValueToJs(value) {
+  if (!value || typeof value !== 'object') return undefined;
+  if ('stringValue' in value) return value.stringValue;
+  if ('integerValue' in value) return Number(value.integerValue);
+  if ('doubleValue' in value) return Number(value.doubleValue);
+  if ('booleanValue' in value) return value.booleanValue;
+  if ('nullValue' in value) return null;
+  if ('mapValue' in value) {
+    const fields = value.mapValue.fields || {};
+    return Object.fromEntries(Object.entries(fields).map(([key, nested]) => [key, firestoreValueToJs(nested)]));
+  }
+  if ('arrayValue' in value) return (value.arrayValue.values || []).map(firestoreValueToJs);
+  return undefined;
+}
+
+function jsToFirestoreValue(value) {
+  if (value === null || value === undefined) return { nullValue: null };
+  if (typeof value === 'string') return { stringValue: value };
+  if (typeof value === 'boolean') return { booleanValue: value };
+  if (typeof value === 'number') {
+    return Number.isInteger(value) ? { integerValue: String(value) } : { doubleValue: value };
+  }
+  if (Array.isArray(value)) {
+    return { arrayValue: value.length ? { values: value.map(jsToFirestoreValue) } : {} };
+  }
+  if (typeof value === 'object') {
+    return {
+      mapValue: {
+        fields: Object.fromEntries(Object.entries(value).map(([key, nested]) => [key, jsToFirestoreValue(nested)]))
+      }
+    };
+  }
+  return { stringValue: String(value) };
+}
+
+function firestoreDocumentToJs(doc) {
+  const fields = doc?.fields || {};
+  return Object.fromEntries(Object.entries(fields).map(([key, value]) => [key, firestoreValueToJs(value)]));
+}
+
+async function pushSingleCalendarWithRest(normalizedCal, lastModified, saveMode, retryCount = 3) {
+  const docPath = `projects/metro-live-2918e/databases/(default)/documents/calendars/cal_${normalizedCal.id}`;
+  const docUrl = `https://firestore.googleapis.com/v1/${docPath}`;
+  for (let attempt = 0; attempt <= retryCount; attempt += 1) {
+    try {
+      const getRes = await fetch(docUrl);
+      const currentDoc = getRes.ok ? await getRes.json() : null;
+      const currentData = currentDoc ? firestoreDocumentToJs(currentDoc) : null;
+      const serverCalendar = currentData?.calendar || null;
+      let nextCalendar;
+      if (!serverCalendar) {
+        nextCalendar = normalizedCal;
+      } else if (saveMode === 'replace') {
+        throw new Error(`Refusing to replace existing calendar ${normalizedCal.id}`);
+      } else if (saveMode === 'settings') {
+        nextCalendar = mergeCalendarSettingsDelta(serverCalendar, normalizedCal);
+      } else {
+        nextCalendar = mergeCalendarAvailabilityDelta(serverCalendar, normalizedCal, lastModified);
+      }
+      const mergedCalendar = normalizeCalendarForSave(nextCalendar);
+      const validationError = validateCalendarShape(mergedCalendar);
+      if (validationError) throw new Error(validationError);
+      mergedCalendar.revision = Math.max(serverCalendar?.revision || 0, normalizedCal.revision || 0) + 1;
+      mergedCalendar.updatedAt = Math.max(mergedCalendar.updatedAt || 0, lastModified || 0);
+      const nextDocRevision = (currentData?.revision || 0) + 1;
+      const commitRes = await fetch('https://firestore.googleapis.com/v1/projects/metro-live-2918e/databases/(default)/documents:commit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          writes: [{
+            update: {
+              name: docPath,
+              fields: {
+                calendar: jsToFirestoreValue(mergedCalendar),
+                lastModified: jsToFirestoreValue(lastModified),
+                revision: jsToFirestoreValue(nextDocRevision)
+              }
+            },
+            ...(currentDoc?.updateTime ? { currentDocument: { updateTime: currentDoc.updateTime } } : { currentDocument: { exists: false } })
+          }]
+        })
+      });
+      if (commitRes.ok) return true;
+      const errorText = await commitRes.text();
+      if (!/ABORTED|FAILED_PRECONDITION|409|400/.test(errorText) || attempt === retryCount) {
+        throw new Error(errorText.slice(0, 500));
+      }
+    } catch (error) {
+      if (attempt === retryCount) {
+        console.warn(`Firestore REST fallback failed for cal_${normalizedCal.id}:`, error);
+        return false;
+      }
+      await new Promise(resolve => setTimeout(resolve, 400 * (attempt + 1)));
+    }
+  }
+  return false;
+}
+
 // Pushes isolated calendar data to the durable master store and Firestore when available.
 async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 3, allCalendars = null, saveMode = 'availability') {
   const normalizedCal = normalizeCalendarForSave(targetCal);
@@ -1511,7 +1638,8 @@ async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 3, 
       await Promise.race([
 	        firebaseDb.runTransaction(async tx => {
 	          const snap = await tx.get(ref);
-	          const serverCalendar = snap.exists && snap.data() ? snap.data().calendar : null;
+	          const currentData = snap.exists && snap.data() ? snap.data() : null;
+	          const serverCalendar = currentData ? currentData.calendar : null;
 	          let nextCalendar;
 	          if (!serverCalendar) {
 	            nextCalendar = normalizedCal;
@@ -1523,10 +1651,15 @@ async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 3, 
 	            nextCalendar = mergeCalendarAvailabilityDelta(serverCalendar, normalizedCal, lastModified);
 	          }
 	          const mergedCalendar = normalizeCalendarForSave(nextCalendar);
+	          const validationError = validateCalendarShape(mergedCalendar);
+	          if (validationError) throw new Error(validationError);
+	          const nextDocRevision = (currentData?.revision || 0) + 1;
+	          mergedCalendar.revision = Math.max(serverCalendar?.revision || 0, normalizedCal.revision || 0) + 1;
+	          mergedCalendar.updatedAt = Math.max(mergedCalendar.updatedAt || 0, lastModified || 0);
 	          tx.set(ref, {
 	            calendar: mergedCalendar,
 	            lastModified,
-	            revision: (mergedCalendar?.revision || 0) + 1
+	            revision: nextDocRevision
 	          });
 	        }),
 	        new Promise((_, reject) => setTimeout(() => reject(new Error('Firestore push timeout')), 8000))
@@ -1536,7 +1669,7 @@ async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 3, 
       console.warn(`Firestore push notice for cal_${normalizedCal.id}:`, e);
     }
   }
-  return false;
+  return pushSingleCalendarWithRest(normalizedCal, lastModified, saveMode, retryCount);
 }
 function loadLocalMeta() {
   if (!FORCE_LOCAL_STORAGE) return { lastModified: 0, byCalendar: {} };

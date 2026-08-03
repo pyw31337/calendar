@@ -9,7 +9,8 @@
     "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
     "og:generate": "node scripts/generate-og-pages.mjs",
-    "regression:test": "node scripts/regression-check.mjs"
+    "regression:test": "node scripts/regression-check.mjs",
+    "safety:test": "node scripts/firebase-safety-tests.mjs"
   },
   "dependencies": {
     "canvas-confetti": "^1.9.2",
