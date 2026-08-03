@@ -2112,7 +2112,7 @@ function App() {
       availabilities: nextAvail
     };
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-    return updateCalendars(nextCalendars, '참여자 일정이 삭제되었습니다. 🗑️', 'delete', updatedCal.id);
+    return updateCalendars(nextCalendars, '삭제 되었습니다.', 'delete', updatedCal.id);
   };
   const handleDeleteAllForDate = dateStr => {
     const now = Date.now();
@@ -2128,7 +2128,7 @@ function App() {
       availabilities: nextAvail
     };
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-    return updateCalendars(nextCalendars, '해당 날짜의 모든 일정이 삭제되었습니다. 🗑️', 'delete', updatedCal.id);
+    return updateCalendars(nextCalendars, '삭제 되었습니다.', 'delete', updatedCal.id);
   };
   const handleSaveAdmin = (updatedCal, newCalCreated) => {
     if (newCalCreated) {
@@ -2762,8 +2762,7 @@ function DateModal({
       whiteSpace: 'nowrap'
     },
     onClick: () => {
-      const titleText = getShortTitle(dateStr).replace(' 일정', '');
-      if (!isSubmitting && window.confirm(`${titleText}에 등록된 모든 일정을 삭제하시겠습니까?`)) {
+      if (!isSubmitting && window.confirm('진짜 삭제하시겠습니까?')) {
         setIsSubmitting(true);
         Promise.resolve(onDeleteDate(dateStr)).then(saved => {
           if (saved === false) {
@@ -2900,7 +2899,9 @@ function DateModal({
       },
       disabled: isSubmitting,
       onClick: () => {
-        if (!isSubmitting) onDelete(dateStr, p.id);
+        if (!isSubmitting && window.confirm('진짜 삭제하시겠습니까?')) {
+          onDelete(dateStr, p.id);
+        }
       }
     }, "\uC0AD\uC81C"));
   }))), /*#__PURE__*/React.createElement("div", {

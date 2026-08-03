@@ -274,6 +274,18 @@ async function openDateModal(browser, sessionId, dayNumber) {
   assert(open, 'Date modal did not open');
 }
 
+async function acceptNextDialog(browser, sessionId, expectedMessage = '') {
+  const dialogPromise = browser.once('Page.javascriptDialogOpening', sessionId);
+  const dialog = await dialogPromise;
+  if (expectedMessage) {
+    assert(
+      (dialog.message || '').includes(expectedMessage),
+      `Unexpected dialog message: ${dialog.message || ''}`
+    );
+  }
+  await browser.send('Page.handleJavaScriptDialog', { accept: true }, sessionId);
+}
+
 async function readLocalCalendars(browser, sessionId) {
   return evalInPage(
     browser,
@@ -597,7 +609,10 @@ async function exerciseCalendar(browser, sessionId, otherSessionId, calendarId, 
   );
 
   await openDateModal(browser, sessionId, targetDay);
+  const confirmDeletePromise = acceptNextDialog(browser, sessionId, '진짜 삭제하시겠습니까?');
   await clickButtonExactText(browser, sessionId, '삭제', '.modal-container');
+  await confirmDeletePromise;
+  await waitForToast(browser, sessionId, '삭제 되었습니다.');
   assert(
     await waitForLocalCalendar(
       browser,
