@@ -234,7 +234,7 @@
     }
     
     .day-cell:hover { background: #F8FAFC; border-color: var(--accent-primary); transform: translateY(-2px); box-shadow: var(--shadow-md); }
-    .day-cell.other-month { opacity: 0.3; background: #F8FAFC; }
+    .day-cell.other-month { opacity: 0.5; }
     .day-cell.today { border-color: var(--accent-primary); background: #EEF2FF; }
     
     .day-cell.all-available {
@@ -800,10 +800,32 @@
 
       const firstDay = new Date(year, month, 1).getDay();
       const lastDate = new Date(year, month + 1, 0).getDate();
+      const prevLastDate = new Date(year, month, 0).getDate();
 
       const days = [];
-      for (let i = 0; i < firstDay; i++) days.push(null);
-      for (let i = 1; i <= lastDate; i++) days.push(i);
+
+      // Fill previous month days
+      for (let i = firstDay - 1; i >= 0; i--) {
+        const d = prevLastDate - i;
+        const prevMonthDate = new Date(year, month - 1, d);
+        const dateStr = `${prevMonthDate.getFullYear()}-${String(prevMonthDate.getMonth() + 1).padStart(2, '0')}-${String(prevMonthDate.getDate()).padStart(2, '0')}`;
+        days.push({ dayNum: d, dateStr, isCurrentMonth: false });
+      }
+
+      // Fill current month days
+      for (let i = 1; i <= lastDate; i++) {
+        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+        days.push({ dayNum: i, dateStr, isCurrentMonth: true });
+      }
+
+      // Fill next month days to complete the 7-column grid
+      const totalCells = Math.ceil(days.length / 7) * 7;
+      const nextDaysNeeded = totalCells - days.length;
+      for (let i = 1; i <= nextDaysNeeded; i++) {
+        const nextMonthDate = new Date(year, month + 1, i);
+        const dateStr = `${nextMonthDate.getFullYear()}-${String(nextMonthDate.getMonth() + 1).padStart(2, '0')}-${String(nextMonthDate.getDate()).padStart(2, '0')}`;
+        days.push({ dayNum: i, dateStr, isCurrentMonth: false });
+      }
 
       const availMap = (calendar?.availabilities || []).reduce((acc, entry) => {
         if (!acc[entry.date]) acc[entry.date] = [];
@@ -840,13 +862,10 @@
           </div>
 
           <div className="days-grid">
-            {days.map((dayNum, idx) => {
-              if (!dayNum) return <div key={idx} className="day-cell other-month" />;
-
-              const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
+            {days.map(({ dayNum, dateStr, isCurrentMonth }, idx) => {
               const today = new Date();
               const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-              const isToday = dateStr === todayStr;
+              const isToday = isCurrentMonth && (dateStr === todayStr);
 
               const entries = availMap[dateStr] || [];
               const isAllAvailable = totalPartCount > 0 && entries.length === totalPartCount;
@@ -854,7 +873,7 @@
               return (
                 <div
                   key={idx}
-                  className={`day-cell ${isAllAvailable ? 'all-available' : ''}`}
+                  className={`day-cell ${isCurrentMonth ? '' : 'other-month'} ${isAllAvailable ? 'all-available' : ''}`}
                   onClick={() => onSelectDate(dateStr)}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -885,7 +904,7 @@
                           title={e.note ? `${p.name}: ${e.note}` : p.name}
                         >
                           <span className="badge-dot" style={{ backgroundColor: getContrastTextColor(p.color) }} />
-                          {p.name}
+                          <span className="badge-name">{p.name}</span>
                         </span>
                       );
                     })}
