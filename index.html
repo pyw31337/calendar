@@ -2356,10 +2356,28 @@ function CalendarGrid({
     title: "\uD074\uB9AD\uD558\uC5EC \uB144\uC6D4 \uC774\uB3D9"
   }, year, "\uB144 ", month + 1, "\uC6D4", /*#__PURE__*/React.createElement("span", {
     style: {
-      fontSize: '0.7rem',
-      color: '#94A3B8'
+      color: '#94A3B8',
+      display: 'inline-flex',
+      alignItems: 'center'
     }
-  }, "\u25BE")), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: "24",
+    height: "24",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    "stroke-width": "2",
+    "stroke-linecap": "round",
+    "stroke-linejoin": "round",
+    className: "icon icon-tabler icons-tabler-outline icon-tabler-chevron-down"
+  }, /*#__PURE__*/React.createElement("path", {
+    stroke: "none",
+    d: "M0 0h24v24H0z",
+    fill: "none"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M6 9l6 6l6 -6"
+  })))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       gap: '6px'
