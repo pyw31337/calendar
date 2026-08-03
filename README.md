@@ -1,20 +1,28 @@
-# Naver Booking & Megamart Price Monitor
+# Gather Calendar
 
-이 저장소는 네이버 예약 및 메가마트 가격 감시 모니터링 시스템을 위한 자동화 저장소입니다.
+모임별 참석 가능 일정을 실시간으로 조율하는 캘린더 서비스입니다.
 
----
+## 서비스 URL
 
-## 🥩 메가마트 한우 등심 100g 가격 실시간 추이
-* **설정 가격 기준**: 100g 당 **7,000원 이하**일 때 이메일 알림 발송
+- 캘린더: https://pyw31337.github.io/calendar/?id=kkot
+- 관리자 대시보드: https://pyw31337.github.io/calendar/?admin=1
 
-### 📌 최근 수집된 가격
-- **한우 등심 1+등급 구이용 (국내산) 100g**: 100g당 7,900원 (현재 판매가: 7,900원/100g) (업데이트: 2026-08-03)
+## 주요 기능
 
-### 📈 가격 추이 그래프
-![한우 등심 가격 추이](history/price_trend.png)
+- URL의 `id` 값 기준으로 캘린더 데이터를 분리합니다.
+- Firebase Firestore를 기본 저장소로 사용합니다.
+- 여러 사용자가 동시에 접속해도 Firestore 실시간 구독으로 변경사항을 동기화합니다.
+- 캘린더 설정에서 참여자 이름과 퍼스널 컬러를 변경하면 일정 뱃지에 함께 반영됩니다.
+- 관리자 대시보드에서 전체 캘린더 현황을 확인하고 새 캘린더를 생성할 수 있습니다.
 
----
+## 로컬 검증
 
-## 📅 네이버 예약 모니터링 (애슐리퀸즈 여의도한강공원점)
-* **대상 일자**: 2026년 8월 15일 광복절
-* **동작 방식**: 예약이 열리는 즉시 이메일 발송 후 감시가 자동으로 종료됩니다.
+```bash
+npm install
+npm run build
+LOCAL_BASE_URL=http://127.0.0.1:4174/index.html npm run regression:test
+```
+
+## GitHub Actions
+
+이 레포는 GitHub Pages 배포용 캘린더 전용 레포입니다. Megamart, Ashley, Naver Booking 같은 모니터링 워크플로는 이 레포에서 운영하지 않습니다.
