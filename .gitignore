@@ -14,6 +14,7 @@ dist/
 booking_checker.log
 screenshots/
 screenshots_test/
+ops-backups/
 *.png
 !history/*.png
 cron.log

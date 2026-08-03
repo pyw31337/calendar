@@ -13,7 +13,7 @@
 - Firebase Firestore를 기본 저장소로 사용합니다.
 - 여러 사용자가 동시에 접속해도 Firestore 실시간 구독으로 변경사항을 동기화합니다.
 - 캘린더 설정에서 참여자 이름과 퍼스널 컬러를 변경하면 일정 뱃지에 함께 반영됩니다.
-- 관리자 대시보드에서 전체 캘린더 현황을 확인하고 새 캘린더를 생성할 수 있습니다.
+- 관리자 대시보드에서 전체 캘린더 현황과 데이터 품질 지표를 확인할 수 있습니다.
 
 ## 로컬 검증
 
@@ -27,11 +27,13 @@ npm run safety:test
 
 ```bash
 npm run ops:audit
+npm run ops:export
 npm run ops:clean-stress
 ```
 
 - 운영 캘린더 ID는 `kkot`, `cw`만 허용합니다.
 - `ops:audit`는 Firestore의 운영 문서 크기, 참여자 수, 일정 수, 테스트 문서 잔여 여부를 점검합니다.
+- `ops:export`는 운영 문서 `cal_kkot`, `cal_cw`를 `ops-backups/`에 JSON으로 백업합니다. 이 폴더는 Git에 커밋하지 않습니다.
 - `ops:clean-stress`는 `cal_stress_*`, `cal_test_*` 문서 삭제를 시도합니다. Firestore 규칙상 익명 삭제가 막히면 Firebase Console 또는 인증된 Firebase CLI/Admin SDK로 삭제해야 합니다.
 - `npm run stress:firebase`는 실제 Firestore에 테스트 문서를 생성하는 부하 테스트입니다. 운영 점검 목적이 아니라 저장 충돌 재현이 필요할 때만 실행하세요.
 
