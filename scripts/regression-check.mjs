@@ -609,7 +609,7 @@ async function exerciseCalendar(browser, sessionId, otherSessionId, calendarId, 
   );
 
   await openDateModal(browser, sessionId, targetDay);
-  const confirmDeletePromise = acceptNextDialog(browser, sessionId, '진짜 삭제하시겠습니까?');
+  const confirmDeletePromise = acceptNextDialog(browser, sessionId, '참여자를 삭제하시겠습니까?');
   await clickButtonExactText(browser, sessionId, '삭제', '.modal-container');
   await confirmDeletePromise;
   await waitForToast(browser, sessionId, '삭제 되었습니다.');

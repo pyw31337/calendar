@@ -87,7 +87,7 @@ const productionContext = createContext('https://pyw31337.github.io/calendar/sha
 runAppScript(productionContext, `
   if (FORCE_LOCAL_STORAGE) throw new Error('production enabled local storage mode');
   if (getCalendarIdFromURL() !== 'kkot') throw new Error('share path id parse failed');
-  if (getCalendarShareUrl('cw') !== 'https://pyw31337.github.io/calendar/?id=cw') throw new Error('canonical share URL failed');
+  if (getCalendarShareUrl('cw') !== 'https://pyw31337.github.io/calendar/share/cw/') throw new Error('canonical share URL failed');
   if (!isValidCalendarId('kkot') || isValidCalendarId('../bad') || isValidCalendarId('bad!')) {
     throw new Error('calendar id validation failed');
   }

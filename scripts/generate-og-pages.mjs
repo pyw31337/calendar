@@ -61,7 +61,7 @@ function createShareHtml(calendar) {
   const title = `${calendar.title} - 모여라 캘린더`;
   const description = calendar.description || FALLBACK_DESCRIPTION;
   const calendarUrl = `${BASE_URL}/?id=${encodeURIComponent(calendar.id)}`;
-  const shareUrl = calendarUrl;
+  const shareUrl = `${BASE_URL}/share/${encodeURIComponent(calendar.id)}/`;
   const escapedTitle = escapeHtml(title);
   const escapedDescription = escapeHtml(description);
   const escapedShareUrl = escapeHtml(shareUrl);
