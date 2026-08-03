@@ -13,13 +13,16 @@ export default function AdminPanel({ calendar, allCalendars, onSelectCalendar, o
       e.preventDefault();
       e.stopPropagation();
     }
-    if (!newName || !newName.trim()) {
+    if (e && e.nativeEvent && e.nativeEvent.isComposing) return;
+
+    const trimmed = (newName || '').trim();
+    if (!trimmed) {
       alert('참여자 이름을 입력해 주세요.');
       return;
     }
     const newParticipant = {
       id: 'p_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
-      name: newName.trim(),
+      name: trimmed,
       color: PRESET_COLORS[participants.length % PRESET_COLORS.length]
     };
     setParticipants(prev => [...prev, newParticipant]);
@@ -112,6 +115,7 @@ export default function AdminPanel({ calendar, allCalendars, onSelectCalendar, o
                   onKeyDown={e => {
                     if (e.key === 'Enter') {
                       e.preventDefault();
+                      if (e.nativeEvent && e.nativeEvent.isComposing) return;
                       handleAddParticipant(e);
                     }
                   }}
