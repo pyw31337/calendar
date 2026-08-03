@@ -3567,6 +3567,7 @@ function DateModal({
     const shortYear = year.slice(2);
     return `${shortYear}.${month}.${day}(${dayOfWeek}) 일정`;
   };
+  const getDeleteDateLabel = dateStr => getShortTitle(dateStr).replace(/ 일정$/, '');
   return /*#__PURE__*/React.createElement("div", {
     className: "modal-overlay",
     onClick: () => {
@@ -3606,7 +3607,7 @@ function DateModal({
       whiteSpace: 'nowrap'
     },
     onClick: () => {
-      if (!isSubmitting && window.confirm('진짜 삭제하시겠습니까?')) {
+      if (!isSubmitting && window.confirm(`${getDeleteDateLabel(dateStr)} 일정 전체를 삭제하시겠습니까?`)) {
         setIsSubmitting(true);
         Promise.resolve(onDeleteDate(dateStr)).then(saved => {
           if (saved === false) {
@@ -3747,9 +3748,9 @@ function DateModal({
         padding: '2px 8px',
         fontSize: '0.75rem'
       },
-    disabled: isSubmitting,
-    onClick: () => {
-      if (!isSubmitting && window.confirm(`${p.name} 참여자를 삭제하시겠습니까?`)) {
+      disabled: isSubmitting,
+      onClick: () => {
+        if (!isSubmitting && window.confirm(`${p.name} 참여자를 삭제하시겠습니까?`)) {
           setIsSubmitting(true);
           Promise.resolve(onDelete(dateStr, p.id)).then(saved => {
             if (saved === false) {
