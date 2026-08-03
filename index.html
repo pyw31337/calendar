@@ -1157,7 +1157,7 @@
             <div>
               <div className="summary-title" style={{ color: '#2563EB', marginBottom: '12px' }}>
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style={{ marginRight: '4px' }}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                {thresholdN}명 이상 참석 가능 날짜 리스트 ({sortedPartialDates.length}일)
+                {thresholdN}명 이상 참석 가능 ({sortedPartialDates.length}일)
               </div>
               {sortedPartialDates.length === 0 ? (
                 <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', padding: '10px 0' }}>해당하는 날짜가 아직 없습니다.</div>
@@ -1244,7 +1244,7 @@
           <div>
             <div className="summary-title" style={{ color: '#10B981', marginBottom: '12px' }}>
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style={{ marginRight: '4px' }}><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m9 12 2 2 4-4"/></svg>
-              전원 참석 가능 날짜 리스트 ({sortedAllDates.length}일)
+              전원 참석 가능 ({sortedAllDates.length}일)
             </div>
             {sortedAllDates.length === 0 ? (
               <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', padding: '10px 0' }}>아직 참여자 전원이 가능한 날짜가 없습니다. 달력에서 날짜를 선택하여 가능 여부를 표기해보세요!</div>
