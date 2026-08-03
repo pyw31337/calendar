@@ -14,30 +14,42 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Patch persistence safety
+      - name: Patch persistence safety deterministically
         run: |
           python - <<'PY'
           from pathlib import Path
-          import re
 
           path = Path('index.html')
           text = path.read_text(encoding='utf-8')
 
-          text = re.sub(
-              r"const ENABLE_FIRESTORE_SYNC = true;[^\n]*\nconst ENABLE_FIRESTORE_WRITES = false;[^\n]*",
+          def replace_between(source, start_marker, end_marker, replacement, label):
+              start = source.find(start_marker)
+              if start < 0:
+                  raise SystemExit(f'{label}: start marker not found')
+              end = source.find(end_marker, start)
+              if end < 0:
+                  raise SystemExit(f'{label}: end marker not found')
+              print(f'{label}: replacing bytes {start}..{end}')
+              return source[:start] + replacement + source[end:]
+
+          old_flags = (
+              "const ENABLE_FIRESTORE_SYNC = true; // Firestore is the only production source of truth\n"
+              "const ENABLE_FIRESTORE_WRITES = false; // EMERGENCY READ-ONLY MODE during recovery"
+          )
+          new_flags = (
               "const IS_LOCAL_TEST_MODE = new URLSearchParams(window.location.search).get('storage') === 'local';\n"
               "const ENABLE_FIRESTORE_SYNC = !IS_LOCAL_TEST_MODE; // Firestore is the only production source of truth\n"
-              "const ENABLE_FIRESTORE_WRITES = !IS_LOCAL_TEST_MODE;",
-              text,
-              count=1,
+              "const ENABLE_FIRESTORE_WRITES = !IS_LOCAL_TEST_MODE;"
           )
+          if old_flags not in text:
+              raise SystemExit('mode flags: exact current block not found')
+          text = text.replace(old_flags, new_flags, 1)
+          print('mode flags: patched')
 
-          settings_pattern = re.compile(
-              r"function replaceCalendarSettings\(serverCalendar, incomingCalendar\) \{.*?\n\}\n\nfunction cloneCalendar\(",
-              re.S,
-          )
-          settings_replacement = r'''function replaceCalendarSettings(serverCalendar, incomingCalendar) {
+          settings_fn = '''function replaceCalendarSettings(serverCalendar, incomingCalendar) {
   const server = cloneCalendar(serverCalendar) || {};
   const incoming = cloneCalendar(incomingCalendar) || {};
   if (!server.id || !incoming.id || server.id !== incoming.id) {
@@ -61,16 +73,21 @@ jobs:
     title: incoming.title || server.title,
     description: incoming.description ?? server.description,
     participants: Array.from(participantMap.values()),
+    // Settings never delete or rewrite schedule records.
     availabilities: (server.availabilities || []).map(cloneAvailability),
     updatedAt: Math.max(server.updatedAt || 0, incoming.updatedAt || 0),
     revision: Math.max(server.revision || 0, incoming.revision || 0) + 1
   };
 }
 
-function cloneCalendar('''
-          text, count = settings_pattern.subn(settings_replacement, text, count=1)
-          if count != 1:
-              raise SystemExit('replaceCalendarSettings patch failed')
+'''
+          text = replace_between(
+              text,
+              'function replaceCalendarSettings(serverCalendar, incomingCalendar) {',
+              'function cloneCalendar(calendar) {',
+              settings_fn,
+              'replaceCalendarSettings'
+          )
 
           old_admin = '''      const stampedCal = pruneAvailabilitiesForParticipantSettings({
         ...updatedCal,
@@ -83,20 +100,18 @@ function cloneCalendar('''
         updatedAt: now,
         revision: (updatedCal.revision || 0) + 1,
         participants: stampParticipantSettings(updatedCal.participants, now),
+        // Preserve schedules exactly as loaded from the active calendar.
         availabilities: (activeCal.availabilities || []).map(cloneAvailability)
       };'''
           if old_admin not in text:
-              raise SystemExit('Admin save patch target not found')
+              raise SystemExit('admin save: exact current block not found')
           text = text.replace(old_admin, new_admin, 1)
+          print('admin save: patched')
 
-          writer_pattern = re.compile(
-              r"async function pushSingleCloudCalendar\(targetCal, lastModified, retryCount = 3, allCalendars = null, saveMode = 'availability'\) \{.*?\n\}\nfunction loadLocalMeta\(",
-              re.S,
-          )
-          writer_replacement = r'''async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 3, allCalendars = null, saveMode = 'availability') {
+          writer_fn = '''async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 3, allCalendars = null, saveMode = 'availability') {
   const normalizedCal = normalizeCalendarForSave(targetCal);
   if (!normalizedCal || !normalizedCal.id) return false;
-  if (!ENABLE_FIRESTORE_SYNC) return true;
+  if (!ENABLE_FIRESTORE_SYNC) return true; // local regression-test mode only
   if (!ENABLE_FIRESTORE_WRITES || !firebaseDb) return false;
 
   try {
@@ -110,14 +125,16 @@ function cloneCalendar('''
         const snap = await tx.get(ref);
         const currentData = snap.exists && snap.data() ? snap.data() : null;
         const serverCalendar = currentData?.calendar || null;
+
         if (serverCalendar?.id && serverCalendar.id !== normalizedCal.id) {
           throw new Error('Refused cross-calendar write');
         }
 
         let nextCalendar;
-        if (!serverCalendar || saveMode === 'replace') {
-          if (serverCalendar) throw new Error('Refused replacement of an existing calendar');
+        if (!serverCalendar) {
           nextCalendar = normalizedCal;
+        } else if (saveMode === 'replace') {
+          throw new Error('Refused replacement of an existing calendar');
         } else if (saveMode === 'settings') {
           nextCalendar = replaceCalendarSettings(serverCalendar, normalizedCal);
         } else {
@@ -153,22 +170,47 @@ function cloneCalendar('''
     return false;
   }
 }
-function loadLocalMeta('''
-          text, count = writer_pattern.subn(writer_replacement, text, count=1)
-          if count != 1:
-              raise SystemExit('pushSingleCloudCalendar patch failed')
+'''
+          text = replace_between(
+              text,
+              "async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 3, allCalendars = null, saveMode = 'availability') {",
+              'function loadLocalMeta() {',
+              writer_fn,
+              'pushSingleCloudCalendar'
+          )
 
-          save_cache_pattern = re.compile(r"function saveLocalCache\(data\) \{.*?\n\}", re.S)
-          save_cache_replacement = '''function saveLocalCache(data) {
+          cache_fn = '''function saveLocalCache(data) {
+  // Calendar data is never persisted locally in production.
   if (IS_LOCAL_TEST_MODE) {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch (e) {}
   }
-}'''
-          text, count = save_cache_pattern.subn(save_cache_replacement, text, count=1)
-          if count != 1:
-              raise SystemExit('saveLocalCache patch failed')
+}
+
+'''
+          text = replace_between(
+              text,
+              'function saveLocalCache(data) {',
+              '// Firebase Config for Realtime Multi-User Cloud Sync',
+              cache_fn,
+              'saveLocalCache'
+          )
+
+          # Prevent production fallback writes to JSONBlob. Firestore is the sole source of truth.
+          master_start = text.find('async function pushMasterCloudCalendars(')
+          master_end = text.find('// Pushes isolated calendar data', master_start)
+          if master_start < 0 or master_end < 0:
+              raise SystemExit('pushMasterCloudCalendars markers not found')
+          master_fn = '''async function pushMasterCloudCalendars(nextCalendars, lastModified, retryCount = 4) {
+  if (!IS_LOCAL_TEST_MODE) return false;
+  return false;
+}
+
+'''
+          text = text[:master_start] + master_fn + text[master_end:]
+          print('JSONBlob production writer: disabled')
 
           path.write_text(text, encoding='utf-8')
+          print('index.html written')
           PY
 
       - name: Validate repaired source
@@ -176,19 +218,29 @@ function loadLocalMeta('''
           python - <<'PY'
           from pathlib import Path
           text = Path('index.html').read_text(encoding='utf-8')
-          assert 'Refused cross-calendar write' in text
-          assert "collection('calendar_history')" in text
+          required = [
+            'Refused cross-calendar write',
+            "collection('calendar_history')",
+            'Settings never delete or rewrite schedule records.',
+            'Calendar data is never persisted locally in production.',
+            'Refused replacement of an existing calendar',
+          ]
+          for item in required:
+            assert item in text, item
           assert 'const stampedCal = pruneAvailabilitiesForParticipantSettings' not in text
-          assert 'availabilities: (server.availabilities || []).map(cloneAvailability)' in text
-          assert 'if (IS_LOCAL_TEST_MODE)' in text
+          assert 'const ENABLE_FIRESTORE_WRITES = false' not in text
           print('Emergency persistence checks passed')
           PY
 
       - name: Commit repaired application
         run: |
-          if git diff --quiet; then exit 0; fi
+          git status --short
+          if git diff --quiet; then
+            echo 'No changes to commit'
+            exit 0
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add index.html
           git commit -m "Repair isolated Firestore persistence and add history backups"
-          git push
+          git push origin HEAD:main
