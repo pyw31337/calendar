@@ -266,7 +266,7 @@
       font-size: 0.72rem; font-weight: 700; line-height: 1.2; box-shadow: 0 1px 3px rgba(0,0,0,0.12);
     }
     @media (max-width: 640px) {
-      .participant-badge {
+      .days-grid .participant-badge {
         padding: 0;
         width: 8px;
         height: 8px;
@@ -274,7 +274,7 @@
         border-radius: 50%;
         box-shadow: none;
       }
-      .badge-name, .badge-dot {
+      .days-grid .badge-name, .days-grid .badge-dot {
         display: none;
       }
     }
@@ -350,6 +350,47 @@
         font-size: 0.75rem;
         align-self: center;
       }
+    }
+
+    .bottom-sheet-overlay {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px);
+      z-index: 2000; display: flex; align-items: flex-end; justify-content: center;
+    }
+    .bottom-sheet {
+      background: #FFFFFF; width: 100%; max-width: 480px;
+      border-radius: 20px 20px 0 0; box-shadow: 0 -8px 30px rgba(0,0,0,0.15);
+      animation: sheet-slide-up 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      display: flex; flex-direction: column; max-height: 70vh;
+      color: var(--text-main);
+    }
+    @keyframes sheet-slide-up {
+      from { transform: translateY(100%); }
+      to { transform: translateY(0); }
+    }
+    .bottom-sheet-header {
+      padding: 16px 20px; border-bottom: 1px solid var(--border-subtle);
+      display: flex; align-items: center; justify-content: space-between;
+      background: #F8FAFC;
+      border-radius: 20px 20px 0 0;
+    }
+    .bottom-sheet-header h4 { font-size: 1rem; font-weight: 800; margin: 0; }
+    .bottom-sheet-body {
+      padding: 12px 20px 24px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;
+    }
+    .bottom-sheet-item {
+      width: 100%; display: flex; align-items: center; gap: 12px; padding: 14px 16px;
+      background: #F8FAFC; border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
+      cursor: pointer; text-align: left; transition: all 0.2s ease; font-family: inherit; font-size: 0.95rem;
+      color: var(--text-main);
+    }
+    .bottom-sheet-item:hover { background: #EEF2FF; border-color: var(--accent-primary); }
+
+    .desktop-only { display: block; }
+    .mobile-only { display: none; }
+    @media (max-width: 640px) {
+      .desktop-only { display: none; }
+      .mobile-only { display: block; }
     }
 
     /* Modal Overlay & Card */
@@ -861,6 +902,7 @@
     function DateModal({ dateStr, calendar, onSave, onDelete, onClose }) {
       const [participantId, setParticipantId] = React.useState(calendar?.participants[0]?.id || '');
       const [note, setNote] = React.useState('');
+      const [isSheetOpen, setIsSheetOpen] = React.useState(false);
 
       const dateEntries = (calendar?.availabilities || []).filter(e => e.date === dateStr);
 
@@ -872,19 +914,29 @@
         onClose();
       };
 
+      const getShortTitle = (dateStr) => {
+        if (!dateStr) return '';
+        const [year, month, day] = dateStr.split('-');
+        const dateObj = new Date(year, month - 1, day);
+        const dayOfWeek = ['일', '월', '화', '수', '목', '금', '토'][dateObj.getDay()];
+        const shortYear = year.slice(2);
+        return `${shortYear}.${month}.${day}(${dayOfWeek}) 일정`;
+      };
+
       return (
         <div className="modal-overlay" onClick={onClose}>
           <div className="modal-container" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 800 }}>{formatDateWithDayName(dateStr)} 모임 일정 등록</h3>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 800 }}>{getShortTitle(dateStr)}</h3>
               <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer' }}>✕</button>
             </div>
             <form onSubmit={handleSubmit}>
               <div className="modal-body">
                 <div>
                   <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px', color: '#64748B' }}>참여자 선택</label>
+                  {/* Desktop Only Select */}
                   <select
-                    className="form-select"
+                    className="form-select desktop-only"
                     style={{ width: '100%' }}
                     value={participantId}
                     onChange={e => setParticipantId(e.target.value)}
@@ -893,6 +945,28 @@
                       <option key={p.id} value={p.id}>{p.name}</option>
                     ))}
                   </select>
+
+                  {/* Mobile Only Custom Button Trigger */}
+                  <button
+                    type="button"
+                    className="form-select mobile-only"
+                    style={{
+                      width: '100%',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      textAlign: 'left',
+                      background: '#FFFFFF',
+                      cursor: 'pointer'
+                    }}
+                    onClick={() => setIsSheetOpen(true)}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span className="color-dot" style={{ backgroundColor: calendar.participants.find(p => p.id === participantId)?.color || '#CCC' }} />
+                      <span>{calendar.participants.find(p => p.id === participantId)?.name || '선택하세요'}</span>
+                    </div>
+                    <span style={{ color: '#64748B', fontSize: '0.8rem' }}>▼</span>
+                  </button>
                 </div>
 
                 <div>
@@ -943,6 +1017,43 @@
               </div>
             </form>
           </div>
+
+          {/* Bottom Sheet for mobile */}
+          {isSheetOpen && (
+            <div className="bottom-sheet-overlay" onClick={() => setIsSheetOpen(false)}>
+              <div className="bottom-sheet" onClick={e => e.stopPropagation()}>
+                <div className="bottom-sheet-header">
+                  <h4>참여자 선택</h4>
+                  <button
+                    type="button"
+                    style={{ background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer' }}
+                    onClick={() => setIsSheetOpen(false)}
+                  >
+                    ✕
+                  </button>
+                </div>
+                <div className="bottom-sheet-body">
+                  {calendar.participants.map(p => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      className="bottom-sheet-item"
+                      onClick={() => {
+                        setParticipantId(p.id);
+                        const existingEntry = dateEntries.find(entry => entry.participantId === p.id);
+                        setNote(existingEntry ? existingEntry.note || '' : '');
+                        setIsSheetOpen(false);
+                      }}
+                    >
+                      <span className="color-dot" style={{ backgroundColor: p.color, width: '12px', height: '12px' }} />
+                      <span style={{ fontWeight: 700 }}>{p.name}</span>
+                      {participantId === p.id && <span style={{ marginLeft: 'auto', color: 'var(--accent-primary)', fontWeight: 800 }}>✓</span>}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       );
     }
