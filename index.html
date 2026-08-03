@@ -556,6 +556,19 @@ function normalizeCalendarForSave(calendar) {
   };
 }
 
+function stampParticipantSettings(participants, now) {
+  return (participants || []).map((participant) => ({
+    ...participant,
+    name: (participant.name || '').trim(),
+    updatedAt: now
+  }));
+}
+
+function assertCalendarLinks(calendar) {
+  const participantIds = new Set(getActiveParticipants(calendar).map((participant) => participant.id));
+  return getActiveAvailabilities(calendar).every((availability) => participantIds.has(availability.participantId));
+}
+
 function mergeParticipantRecord(existing, incoming) {
   const existingClone = cloneParticipant(existing);
   const incomingClone = cloneParticipant(incoming);
@@ -1746,11 +1759,12 @@ function App() {
         ...updatedCal,
         updatedAt: now,
         revision: (updatedCal.revision || 0) + 1,
-        participants: (updatedCal.participants || []).map(p => ({
-          ...p,
-          updatedAt: p.updatedAt || now
-        }))
+        participants: stampParticipantSettings(updatedCal.participants, now)
       };
+      if (!assertCalendarLinks(stampedCal)) {
+        showToast('참여자와 일정 연결을 확인해 주세요.', 'error');
+        return false;
+      }
       const nextCalendars = calendars.map(c => c.id === stampedCal.id ? stampedCal : c);
       return updateCalendars(nextCalendars, '캘린더 설정이 저장되었습니다. ✅', 'success', stampedCal.id);
     }
@@ -2581,6 +2595,14 @@ function AdminModal({
     setParticipants(prev => [...prev, newParticipant]);
     setNewName('');
   };
+  const updateParticipant = (participantId, patch) => {
+    const now = Date.now();
+    setParticipants(prev => prev.map(item => item.id === participantId ? {
+      ...item,
+      ...patch,
+      updatedAt: now
+    } : item));
+  };
   const handleSubmit = async e => {
     e.preventDefault();
     const now = Date.now();
@@ -2590,10 +2612,7 @@ function AdminModal({
       description: description.trim(),
       updatedAt: now,
       revision: (calendar.revision || 0) + 1,
-      participants: participants.map(p => ({
-        ...p,
-        updatedAt: p.updatedAt || now
-      }))
+      participants: stampParticipantSettings(participants, now)
     }, null));
     if (saved === false) return;
     onClose();
@@ -2734,11 +2753,8 @@ function AdminModal({
   }, /*#__PURE__*/React.createElement("input", {
     type: "color",
     value: p.color,
-    onChange: e => setParticipants(participants.map(item => item.id === p.id ? {
-      ...item,
-      color: e.target.value,
-      updatedAt: Date.now()
-    } : item)),
+    onInput: e => updateParticipant(p.id, { color: e.target.value }),
+    onChange: e => updateParticipant(p.id, { color: e.target.value }),
     style: {
       width: '28px',
       height: '28px',
@@ -2754,22 +2770,15 @@ function AdminModal({
       padding: '4px 8px'
     },
     value: p.name,
-    onChange: e => setParticipants(participants.map(item => item.id === p.id ? {
-      ...item,
-      name: e.target.value,
-      updatedAt: Date.now()
-    } : item))
+    onInput: e => updateParticipant(p.id, { name: e.target.value }),
+    onChange: e => updateParticipant(p.id, { name: e.target.value })
   }), /*#__PURE__*/React.createElement("button", {
     type: "button",
     className: "btn btn-danger",
     style: {
       padding: '4px 8px'
     },
-    onClick: () => setParticipants(participants.map(item => item.id === p.id ? {
-      ...item,
-      removedAt: Date.now(),
-      updatedAt: Date.now()
-    } : item))
+    onClick: () => updateParticipant(p.id, { removedAt: Date.now() })
   }, "\u2715"))))), /*#__PURE__*/React.createElement("div", {
     className: "modal-footer"
   }, /*#__PURE__*/React.createElement("button", {
