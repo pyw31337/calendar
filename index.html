@@ -112,7 +112,10 @@
     }
     @media (max-width: 480px) {
       .header-actions { justify-content: space-between; }
-      .header-actions > .btn { flex: 1; padding: 8px 6px; font-size: 0.78rem; gap: 4px; justify-content: center; }
+      .header-actions > .btn { padding: 8px 6px; font-size: 0.78rem; gap: 4px; justify-content: center; }
+      .header-actions > .btn:nth-child(1) { flex: 1; min-width: 0; white-space: nowrap; }
+      .header-actions > .btn:nth-child(2),
+      .header-actions > .btn:nth-child(3) { width: 50px; flex: 0 0 50px; }
       .header-actions > .btn svg { width: 18px; height: 18px; }
     }
 
