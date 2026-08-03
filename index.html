@@ -281,6 +281,11 @@
     
     .badge-dot { width: 5px; height: 5px; border-radius: 50%; }
 
+    /* Hide '전원' label inside calendar grid on mobile */
+    @media (max-width: 639px) {
+      .days-grid .all-available-label { display: none; }
+    }
+
     /* Summary Card */
     .summary-card {
       background: var(--bg-card); border: 1px solid var(--border-subtle);
@@ -890,7 +895,7 @@
                     >
                       {dayNum}
                     </span>
-                    {isAllAvailable && <span style={{ fontSize: '0.65rem', color: '#10B981', fontWeight: 800 }}>전원</span>}
+                    {isAllAvailable && <span className="all-available-label" style={{ fontSize: '0.65rem', color: '#10B981', fontWeight: 800 }}>전원</span>}
                   </div>
 
                   <div className="badges-container">
@@ -1400,53 +1405,61 @@
                       style={isPast ? {
                         opacity: 0.7,
                         backgroundColor: '#F8FAFC',
-                        borderColor: '#E2E8F0'
-                      } : {}}
+                        borderColor: '#E2E8F0',
+                        flexDirection: 'column',
+                        alignItems: 'flex-start'
+                      } : {
+                        flexDirection: 'column',
+                        alignItems: 'flex-start'
+                      }}
                     >
-                      <div className="date-item-left">
+                      {/* Top row: date + badge on same line */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', gap: '8px' }}>
                         <span style={{
                           fontWeight: 800,
                           color: isPast ? '#94A3B8' : '#10B981',
-                          fontSize: '0.95rem'
+                          fontSize: '0.95rem',
+                          flexShrink: 0
                         }}>
                           {formattedDateStr}
                         </span>
-
-                        {memoEntries.length > 0 && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                            {memoEntries.map(e => {
-                              const p = participantsMap[e.participantId];
-                              if (!p) return null;
-                              const memoText = e.note.trim();
-                              return (
-                                <span
-                                  key={e.participantId || p.id}
-                                  className="memo-capsule-badge"
-                                  style={isPast ? {
-                                    backgroundColor: '#F1F5F9',
-                                    color: '#64748B',
-                                    border: `1px solid ${p.color}`,
-                                    boxShadow: 'none'
-                                  } : {
-                                    backgroundColor: p.color,
-                                    color: getContrastTextColor(p.color)
-                                  }}
-                                  title={`${p.name}: ${memoText}`}
-                                >
-                                  {memoText}
-                                </span>
-                              );
-                            })}
-                          </div>
-                        )}
+                        <span className="date-item-badge" style={{
+                          background: isPast ? '#E2E8F0' : '#10B981',
+                          color: isPast ? '#64748B' : '#FFF',
+                          flexShrink: 0
+                        }}>
+                          {isPast ? '지나간 모임' : '전원 가능'}
+                        </span>
                       </div>
 
-                      <span className="date-item-badge" style={{
-                        background: isPast ? '#E2E8F0' : '#10B981',
-                        color: isPast ? '#64748B' : '#FFF'
-                      }}>
-                        {isPast ? '지나간 모임' : `전원 가능 (${totalCount}/${totalCount}명)`}
-                      </span>
+                      {/* Memo badges below */}
+                      {memoEntries.length > 0 && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                          {memoEntries.map(e => {
+                            const p = participantsMap[e.participantId];
+                            if (!p) return null;
+                            const memoText = e.note.trim();
+                            return (
+                              <span
+                                key={e.participantId || p.id}
+                                className="memo-capsule-badge"
+                                style={isPast ? {
+                                  backgroundColor: '#F1F5F9',
+                                  color: '#64748B',
+                                  border: `1px solid ${p.color}`,
+                                  boxShadow: 'none'
+                                } : {
+                                  backgroundColor: p.color,
+                                  color: getContrastTextColor(p.color)
+                                }}
+                                title={`${p.name}: ${memoText}`}
+                              >
+                                {memoText}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      )}
                     </button>
                   );
                 })}
