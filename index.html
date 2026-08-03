@@ -738,7 +738,7 @@
         e.preventDefault();
         if (!participantId) return;
         onSave(dateStr, participantId, note);
-        onClose();
+        setNote('');
       };
 
       return (
@@ -766,14 +766,17 @@
 
                 <div>
                   <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px', color: '#64748B' }}>메모 입력 (선택)</label>
-                  <input
-                    type="text"
-                    className="form-input"
-                    style={{ width: '100%' }}
-                    placeholder="예: 1시 이후 가능, 예당호 착한농촌체험세상"
-                    value={note}
-                    onChange={e => setNote(e.target.value)}
-                  />
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <input
+                      type="text"
+                      className="form-input"
+                      style={{ flex: 1 }}
+                      placeholder="예: 1시 이후 가능, 예당호 착한농촌체험세상"
+                      value={note}
+                      onChange={e => setNote(e.target.value)}
+                    />
+                    <button type="submit" className="btn btn-primary" style={{ padding: '10px 16px', whiteSpace: 'nowrap' }}>등록</button>
+                  </div>
                 </div>
 
                 {dateEntries.length > 0 && (
@@ -795,8 +798,7 @@
                 )}
               </div>
               <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={onClose}>취소</button>
-                <button type="submit" className="btn btn-primary">저장하기</button>
+                <button type="button" className="btn btn-secondary" style={{ width: '100%' }} onClick={onClose}>닫기</button>
               </div>
             </form>
           </div>
