@@ -62,7 +62,7 @@ export default function AdminPanel({ calendar, allCalendars, onSelectCalendar, o
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-container" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
-          <h3 style={{ fontSize: '1.1rem', fontWeight: 800 }}>어드민: 달력 & 참여자 설정</h3>
+          <h3 style={{ fontSize: '1.1rem', fontWeight: 800 }}>캘린더 설정</h3>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer' }}>✕</button>
         </div>
         <form onSubmit={handleSubmit}>
