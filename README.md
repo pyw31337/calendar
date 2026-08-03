@@ -41,7 +41,7 @@ npm run ops:clean-stress
 - `ops:clean-stress`는 `cal_stress_*`, `cal_test_*` 문서 삭제를 시도합니다. Firestore 규칙상 익명 삭제가 막히면 Firebase Console 또는 인증된 Firebase CLI/Admin SDK로 삭제해야 합니다.
 - `npm run stress:firebase`는 실제 Firestore에 테스트 문서를 생성하는 부하 테스트입니다. 운영 점검 목적이 아니라 저장 충돌 재현이 필요할 때만 실행하세요.
 - 데이터베이스가 비었거나 손상되면 관리자 대시보드의 `데이터 불러오기`에서 미리 받아둔 백업 JSON을 선택해 복구합니다. 복구는 운영 캘린더 `kkot`, `cw`만 허용합니다.
-- 안전을 위해 공개 GitHub Pages에서는 백업 JSON 복구가 비활성화되어 있고, 로컬호스트에서 `?admin=1&restore=1`로 실행할 때만 복구 UI가 열립니다.
+- 백업 JSON 복구는 관리자 주소에 `restore=1`을 붙이고 확인 문구를 정확히 입력한 뒤 실행합니다. 복구는 운영 캘린더 `kkot`, `cw` 백업만 허용합니다.
 
 ## GitHub Actions
 

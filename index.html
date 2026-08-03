@@ -2007,7 +2007,7 @@ function isAdminDashboardRoute() {
 
 function isAdminRestoreRoute() {
   const params = new URLSearchParams(window.location.search);
-  return IS_LOCALHOST && isAdminDashboardRoute() && params.get('restore') === '1';
+  return isAdminDashboardRoute() && params.get('restore') === '1';
 }
 
 function createDefaultCalendar(id) {

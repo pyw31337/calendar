@@ -100,6 +100,12 @@ runAppScript(productionContext, `
   }
 `);
 
+const restoreContext = createContext('https://pyw31337.github.io/calendar/?admin=1&restore=1');
+runAppScript(restoreContext, `
+  if (!isAdminDashboardRoute()) throw new Error('admin route detection failed');
+  if (!isAdminRestoreRoute()) throw new Error('restore route detection failed');
+`);
+
 const concurrencyContext = createContext('https://pyw31337.github.io/calendar/?id=kkot');
 runAppScript(concurrencyContext, `
   const participants = Array.from({ length: 8 }, (_, index) => ({
