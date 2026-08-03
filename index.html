@@ -103,20 +103,39 @@
     .calendar-title { font-size: 1.35rem; font-weight: 800; color: var(--text-main); letter-spacing: -0.02em; }
     .calendar-desc { font-size: 0.875rem; color: var(--text-muted); margin-top: 2px; }
 
-    .header-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .header-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; position: relative; }
 
-    /* Cloud Sync Pill Indicator */
-    .cloud-sync-status {
-      display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px;
-      border-radius: var(--radius-full); background: #ECFDF5; border: 1px solid #A7F3D0;
-      color: #047857; font-size: 0.75rem; font-weight: 700;
+    /* Participants Popover Speech Bubble */
+    .participants-popover {
+      position: absolute;
+      top: calc(100% + 10px);
+      right: 90px;
+      background: #FFFFFF;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 12px 16px;
+      box-shadow: var(--shadow-lg);
+      z-index: 100;
+      min-width: 170px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
     }
-    .sync-dot { width: 6px; height: 6px; border-radius: 50%; background: #10B981; animation: pulse 2s infinite; }
-
-    @keyframes pulse {
-      0% { opacity: 0.4; }
-      50% { opacity: 1; }
-      100% { opacity: 0.4; }
+    .participants-popover::before {
+      content: '';
+      position: absolute;
+      bottom: 100%;
+      right: 50px;
+      border: 8px solid transparent;
+      border-bottom-color: var(--border-subtle);
+    }
+    .participants-popover::after {
+      content: '';
+      position: absolute;
+      bottom: 100%;
+      right: 51px;
+      border: 7px solid transparent;
+      border-bottom-color: #FFFFFF;
     }
 
     /* Buttons */
@@ -141,18 +160,6 @@
     }
     .form-select:focus, .form-input:focus, .form-textarea:focus { border-color: var(--accent-primary); box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15); }
 
-    /* Participants Chip Bar */
-    .participants-bar {
-      background: var(--bg-card); border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-lg); padding: 16px 20px; margin-bottom: 24px;
-      display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
-      box-shadow: var(--shadow-sm);
-    }
-    .participant-chip {
-      display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px;
-      border-radius: var(--radius-full); background: #F8FAFC;
-      border: 1px solid var(--border-subtle); font-size: 0.85rem; font-weight: 700; color: var(--text-main);
-    }
     .color-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
 
     /* Calendar Card */
@@ -400,6 +407,7 @@
       const [isModalOpen, setIsModalOpen] = React.useState(false);
       const [isAdminOpen, setIsAdminOpen] = React.useState(false);
       const [isShareOpen, setIsShareOpen] = React.useState(false);
+      const [isParticipantsOpen, setIsParticipantsOpen] = React.useState(false);
 
       React.useEffect(() => {
         let isMounted = true;
@@ -521,39 +529,45 @@
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <span className="calendar-title">{activeCal?.title}</span>
-                  <span className="cloud-sync-status" title="전세계 모든 디바이스 간 실시간 클라우드 DB 연동 완료">
-                    <span className="sync-dot" />
-                    클라우드 DB 실시간 동기화중
-                  </span>
                 </div>
                 {activeCal?.description && <div className="calendar-desc">{activeCal.description}</div>}
               </div>
             </div>
 
             <div className="header-actions">
+              {/* Toggle Participants Button with Users SVG Icon */}
+              <button
+                className="btn btn-secondary"
+                onClick={() => setIsParticipantsOpen(!isParticipantsOpen)}
+                style={{ gap: '6px' }}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" className="icon icon-tabler icons-tabler-outline icon-tabler-users"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M5 7a4 4 0 1 0 8 0a4 4 0 1 0 -8 0" /><path d="M3 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /><path d="M21 21v-2a4 4 0 0 0 -3 -3.85" /></svg>
+                <span>참여자 ({activeCal?.participants?.length || 0}명)</span>
+              </button>
+
               <button className="btn btn-secondary" onClick={() => setIsShareOpen(true)} title="공유" style={{ padding: '10px' }}>
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" className="icon icon-tabler icons-tabler-outline icon-tabler-share"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M3 12a3 3 0 1 0 6 0a3 3 0 1 0 -6 0" /><path d="M15 6a3 3 0 1 0 6 0a3 3 0 1 0 -6 0" /><path d="M15 18a3 3 0 1 0 6 0a3 3 0 1 0 -6 0" /><path d="M8.7 10.7l6.6 -3.4" /><path d="M8.7 13.3l6.6 3.4" /></svg>
               </button>
               <button className="btn btn-secondary" onClick={() => setIsAdminOpen(true)} title="설정" style={{ padding: '10px' }}>
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" className="icon icon-tabler icons-tabler-outline icon-tabler-settings"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065" /><path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0" /></svg>
               </button>
+
+              {/* Toggle speech bubble popover for participants list */}
+              {isParticipantsOpen && (
+                <div className="participants-popover">
+                  <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-muted)', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '6px', marginBottom: '4px' }}>
+                    참여자 목록
+                  </div>
+                  {activeCal?.participants?.map(p => (
+                    <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', fontWeight: '700' }}>
+                      <span className="color-dot" style={{ backgroundColor: p.color, width: '10px', height: '10px' }} />
+                      <span>{p.name}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </header>
-
-          {/* Participants Bar */}
-          <div className="participants-bar">
-            <span style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-muted)' }}>
-              참여자 ({activeCal?.participants?.length || 0}명):
-            </span>
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              {activeCal?.participants?.map(p => (
-                <div key={p.id} className="participant-chip">
-                  <span className="color-dot" style={{ backgroundColor: p.color }} />
-                  <span>{p.name}</span>
-                </div>
-              ))}
-            </div>
-          </div>
 
           {/* Monthly Calendar View */}
           <CalendarGrid
@@ -775,7 +789,7 @@
       );
     }
 
-    // Admin Modal - Removed Switcher Area
+    // Admin Modal
     function AdminModal({ calendar, allCalendars, onSelectCalendar, onSave, onClose }) {
       const [title, setTitle] = React.useState(calendar.title);
       const [description, setDescription] = React.useState(calendar.description || '');
@@ -880,7 +894,7 @@
       );
     }
 
-    // Share Modal - Added '+ 새 달력 생성' button in Header to the left of Close button
+    // Share Modal
     function ShareModal({ calendar, onCreateNewCal, onClose }) {
       const baseUrl = `${window.location.origin}${window.location.pathname}`;
       const shareUrl = `${baseUrl}?id=${calendar.id}`;
