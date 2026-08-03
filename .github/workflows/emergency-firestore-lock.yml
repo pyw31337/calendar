@@ -1,4 +1,4 @@
-name: Repair Isolated Firestore Persistence
+name: Apply Emergency Firestore Repair
 
 on:
   push:
@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Patch persistence and recovery logic
+      - name: Patch persistence safety
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -24,7 +24,7 @@ jobs:
           path = Path('index.html')
           text = path.read_text(encoding='utf-8')
 
-          text, count = re.subn(
+          text = re.sub(
               r"const ENABLE_FIRESTORE_SYNC = true;[^\n]*\nconst ENABLE_FIRESTORE_WRITES = false;[^\n]*",
               "const IS_LOCAL_TEST_MODE = new URLSearchParams(window.location.search).get('storage') === 'local';\n"
               "const ENABLE_FIRESTORE_SYNC = !IS_LOCAL_TEST_MODE; // Firestore is the only production source of truth\n"
@@ -32,27 +32,30 @@ jobs:
               text,
               count=1,
           )
-          if count != 1 and 'const IS_LOCAL_TEST_MODE' not in text:
-              raise SystemExit('Firestore mode patch failed')
 
           settings_pattern = re.compile(
               r"function replaceCalendarSettings\(serverCalendar, incomingCalendar\) \{.*?\n\}\n\nfunction cloneCalendar\(",
               re.S,
           )
-          settings_replacement = '''function replaceCalendarSettings(serverCalendar, incomingCalendar) {
+          settings_replacement = r'''function replaceCalendarSettings(serverCalendar, incomingCalendar) {
   const server = cloneCalendar(serverCalendar) || {};
   const incoming = cloneCalendar(incomingCalendar) || {};
   if (!server.id || !incoming.id || server.id !== incoming.id) {
     throw new Error('Calendar ID mismatch during settings save');
   }
+
   const participantMap = new Map();
   (server.participants || []).forEach(participant => {
     if (participant?.id) participantMap.set(participant.id, cloneParticipant(participant));
   });
   (incoming.participants || []).forEach(participant => {
     if (!participant?.id) return;
-    participantMap.set(participant.id, mergeParticipantRecord(participantMap.get(participant.id), participant));
+    participantMap.set(
+      participant.id,
+      mergeParticipantRecord(participantMap.get(participant.id), participant)
+    );
   });
+
   return {
     ...server,
     title: incoming.title || server.title,
@@ -65,8 +68,8 @@ jobs:
 }
 
 function cloneCalendar('''
-          text, count = settings_pattern.subn(lambda _: settings_replacement, text, count=1)
-          if count != 1 and 'Calendar ID mismatch during settings save' not in text:
+          text, count = settings_pattern.subn(settings_replacement, text, count=1)
+          if count != 1:
               raise SystemExit('replaceCalendarSettings patch failed')
 
           old_admin = '''      const stampedCal = pruneAvailabilitiesForParticipantSettings({
@@ -82,41 +85,50 @@ function cloneCalendar('''
         participants: stampParticipantSettings(updatedCal.participants, now),
         availabilities: (activeCal.availabilities || []).map(cloneAvailability)
       };'''
-          if old_admin in text:
-              text = text.replace(old_admin, new_admin, 1)
-          elif 'availabilities: (activeCal.availabilities || []).map(cloneAvailability)' not in text:
-              raise SystemExit('Admin save patch failed')
+          if old_admin not in text:
+              raise SystemExit('Admin save patch target not found')
+          text = text.replace(old_admin, new_admin, 1)
 
           writer_pattern = re.compile(
               r"async function pushSingleCloudCalendar\(targetCal, lastModified, retryCount = 3, allCalendars = null, saveMode = 'availability'\) \{.*?\n\}\nfunction loadLocalMeta\(",
               re.S,
           )
-          writer_replacement = '''async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 3, allCalendars = null, saveMode = 'availability') {
+          writer_replacement = r'''async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 3, allCalendars = null, saveMode = 'availability') {
   const normalizedCal = normalizeCalendarForSave(targetCal);
   if (!normalizedCal || !normalizedCal.id) return false;
   if (!ENABLE_FIRESTORE_SYNC) return true;
   if (!ENABLE_FIRESTORE_WRITES || !firebaseDb) return false;
+
   try {
     const ref = firebaseDb.collection('calendars').doc(`cal_${normalizedCal.id}`);
-    const historyRef = firebaseDb.collection('calendar_history').doc(`${normalizedCal.id}_${lastModified}_${Math.random().toString(36).slice(2, 8)}`);
+    const historyRef = firebaseDb.collection('calendar_history').doc(
+      `${normalizedCal.id}_${lastModified}_${Math.random().toString(36).slice(2, 8)}`
+    );
+
     await Promise.race([
       firebaseDb.runTransaction(async tx => {
         const snap = await tx.get(ref);
         const currentData = snap.exists && snap.data() ? snap.data() : null;
         const serverCalendar = currentData?.calendar || null;
-        if (serverCalendar?.id && serverCalendar.id !== normalizedCal.id) throw new Error('Refused cross-calendar write');
+        if (serverCalendar?.id && serverCalendar.id !== normalizedCal.id) {
+          throw new Error('Refused cross-calendar write');
+        }
+
         let nextCalendar;
-        if (!serverCalendar) {
+        if (!serverCalendar || saveMode === 'replace') {
+          if (serverCalendar) throw new Error('Refused replacement of an existing calendar');
           nextCalendar = normalizedCal;
-        } else if (saveMode === 'replace') {
-          throw new Error('Refused replacement of an existing calendar');
         } else if (saveMode === 'settings') {
           nextCalendar = replaceCalendarSettings(serverCalendar, normalizedCal);
         } else {
           nextCalendar = mergeCalendarAvailabilityDelta(serverCalendar, normalizedCal, lastModified);
         }
+
         const mergedCalendar = normalizeCalendarForSave(nextCalendar);
-        if (!mergedCalendar || mergedCalendar.id !== normalizedCal.id) throw new Error('Calendar identity validation failed');
+        if (!mergedCalendar || mergedCalendar.id !== normalizedCal.id) {
+          throw new Error('Calendar identity validation failed');
+        }
+
         if (serverCalendar) {
           tx.set(historyRef, {
             calendarId: normalizedCal.id,
@@ -126,6 +138,7 @@ function cloneCalendar('''
             previousRevision: currentData?.revision || serverCalendar.revision || 0
           });
         }
+
         tx.set(ref, {
           calendar: mergedCalendar,
           lastModified,
@@ -141,9 +154,9 @@ function cloneCalendar('''
   }
 }
 function loadLocalMeta('''
-          text, count = writer_pattern.subn(lambda _: writer_replacement, text, count=1)
-          if count != 1 and 'Refused cross-calendar write' not in text:
-              raise SystemExit('Writer patch failed')
+          text, count = writer_pattern.subn(writer_replacement, text, count=1)
+          if count != 1:
+              raise SystemExit('pushSingleCloudCalendar patch failed')
 
           save_cache_pattern = re.compile(r"function saveLocalCache\(data\) \{.*?\n\}", re.S)
           save_cache_replacement = '''function saveLocalCache(data) {
@@ -151,69 +164,24 @@ function loadLocalMeta('''
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch (e) {}
   }
 }'''
-          text, count = save_cache_pattern.subn(lambda _: save_cache_replacement, text, count=1)
-          if count != 1 and 'if (IS_LOCAL_TEST_MODE)' not in text:
-              raise SystemExit('Local cache patch failed')
-
-          anchor = "// Returns { calendar, lastModified } or null with AbortController timeout & retries"
-          if 'async function applySafeParticipantNameCorrections()' not in text:
-              migration = '''async function applySafeParticipantNameCorrections() {
-  if (!firebaseDb || !ENABLE_FIRESTORE_WRITES) return;
-  const ref = firebaseDb.collection('calendars').doc('cal_kkot');
-  try {
-    await firebaseDb.runTransaction(async tx => {
-      const snap = await tx.get(ref);
-      if (!snap.exists) return;
-      const data = snap.data() || {};
-      const calendar = cloneCalendar(data.calendar);
-      if (!calendar || calendar.id !== 'kkot') return;
-      let changed = false;
-      calendar.participants = (calendar.participants || []).map(participant => {
-        if (participant?.name === '김료진') { changed = true; return { ...participant, name: '김효진', updatedAt: Date.now() }; }
-        if (participant?.name === '박수진') { changed = true; return { ...participant, name: '신수진', updatedAt: Date.now() }; }
-        return participant;
-      });
-      if (!changed) return;
-      const now = Date.now();
-      tx.set(firebaseDb.collection('calendar_history').doc(`kkot_namefix_${now}`), {
-        calendarId: 'kkot', calendar: cloneCalendar(data.calendar), savedAt: now, saveMode: 'safe-name-correction'
-      });
-      tx.set(ref, {
-        ...data,
-        calendar,
-        lastModified: now,
-        revision: Math.max(data.revision || 0, calendar.revision || 0) + 1
-      });
-    });
-  } catch (error) {
-    console.error('Safe participant-name correction failed:', error);
-  }
-}
-
-'''
-              if anchor not in text: raise SystemExit('Migration anchor missing')
-              text = text.replace(anchor, migration + 'applySafeParticipantNameCorrections();\n\n' + anchor, 1)
+          text, count = save_cache_pattern.subn(save_cache_replacement, text, count=1)
+          if count != 1:
+              raise SystemExit('saveLocalCache patch failed')
 
           path.write_text(text, encoding='utf-8')
           PY
 
-      - name: Verify safety invariants
+      - name: Validate repaired source
         run: |
           python - <<'PY'
           from pathlib import Path
           text = Path('index.html').read_text(encoding='utf-8')
-          required = [
-            'const IS_LOCAL_TEST_MODE',
-            'Refused cross-calendar write',
-            "collection('calendar_history')",
-            'Calendar ID mismatch during settings save',
-            'availabilities: (activeCal.availabilities || []).map(cloneAvailability)',
-            "name: '김효진'",
-            "name: '신수진'",
-          ]
-          for item in required: assert item in text, item
+          assert 'Refused cross-calendar write' in text
+          assert "collection('calendar_history')" in text
           assert 'const stampedCal = pruneAvailabilitiesForParticipantSettings' not in text
-          print('Safety invariants verified')
+          assert 'availabilities: (server.availabilities || []).map(cloneAvailability)' in text
+          assert 'if (IS_LOCAL_TEST_MODE)' in text
+          print('Emergency persistence checks passed')
           PY
 
       - name: Commit repaired application
@@ -222,5 +190,5 @@ function loadLocalMeta('''
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add index.html
-          git commit -m "Repair isolated Firestore persistence and backups"
+          git commit -m "Repair isolated Firestore persistence and add history backups"
           git push
