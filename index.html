@@ -425,8 +425,8 @@
       '#3B82F6', '#6366F1', '#8B5CF6', '#EC4899', '#14B8A6'
     ];
 
-    const STORAGE_KEY = 'gather_calendars_clean_v15';
-    const STORAGE_META_KEY = 'gather_calendars_meta_v3'; // tracks lastModified timestamp
+    const STORAGE_KEY = 'gather_calendars_permanent_v20';
+    const STORAGE_META_KEY = 'gather_calendars_meta_v4'; // tracks lastModified timestamp
     // Unlimited Zero-Rate-Limit Cloud DB endpoint powered by JSONBlob
     const MASTER_CLOUD_BLOB_ID = '019fc4ff-8b04-74ab-af71-bdd91c03ea11';
     const CLOUD_API_URL = `https://jsonblob.com/api/jsonBlob/${MASTER_CLOUD_BLOB_ID}`;
@@ -680,6 +680,39 @@
       }
     ];
 
+    function loadLocalMeta() {
+      try {
+        const raw = localStorage.getItem(STORAGE_META_KEY);
+        if (raw) return JSON.parse(raw);
+      } catch(e) {}
+      return { lastModified: 0 };
+    }
+
+    function saveLocalMeta(meta) {
+      try {
+        localStorage.setItem(STORAGE_META_KEY, JSON.stringify(meta));
+      } catch(e) {}
+    }
+
+    function loadLocalCache() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return parsed; // Return user's exact state as is! Do NOT resurrect deleted entries with INITIAL_CALENDARS
+          }
+        }
+      } catch (e) {}
+      return INITIAL_CALENDARS;
+    }
+
+    function saveLocalCache(data) {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      } catch (e) {}
+    }
+
     // Firebase Config for Realtime Multi-User Cloud Sync
     const firebaseConfig = {
       apiKey: "AIzaSyD-GatherCalendarAppLiveKey2026",
@@ -796,24 +829,7 @@
       } catch(e) {}
     }
 
-    function loadLocalCache() {
-      try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            return mergeCalendarCollections(INITIAL_CALENDARS, parsed);
-          }
-        }
-      } catch (e) {}
-      return INITIAL_CALENDARS;
-    }
 
-    function saveLocalCache(data) {
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-      } catch (e) {}
-    }
 
     function App() {
       const [calendars, setCalendarsState] = React.useState(() => loadLocalCache());
