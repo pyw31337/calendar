@@ -960,7 +960,7 @@
       );
     }
 
-    // Summary List
+    // Summary List - Sorts future dates first, past dates to the bottom, and grays out past dates
     function SummaryList({ calendar, onSelectDate }) {
       const totalCount = calendar?.participants?.length || 0;
       const availabilities = calendar?.availabilities || [];
@@ -976,30 +976,50 @@
         return acc;
       }, {});
 
-      const fullDates = Object.keys(dateMap).filter(d => {
+      const allDates = Object.keys(dateMap).filter(d => {
         const entries = dateMap[d];
         const uniqueParticipants = new Set(entries.map(e => e.participantId));
         return totalCount > 0 && uniqueParticipants.size === totalCount;
       });
 
-      fullDates.sort();
+      const today = new Date();
+      const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+      // Future/Today dates sorted ascending; past dates sorted ascending placed at the bottom
+      const futureDates = allDates.filter(d => d >= todayStr).sort();
+      const pastDates = allDates.filter(d => d < todayStr).sort();
+      const sortedDates = [...futureDates, ...pastDates];
 
       return (
         <div className="summary-card">
-          <div className="summary-title">전원 참석 가능 날짜 리스트 ({fullDates.length}일)</div>
-          {fullDates.length === 0 ? (
+          <div className="summary-title">전원 참석 가능 날짜 리스트 ({sortedDates.length}일)</div>
+          {sortedDates.length === 0 ? (
             <div style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>아직 참여자 전원이 가능한 날짜가 없습니다. 달력에서 날짜를 선택하여 가능 여부를 표기해보세요!</div>
           ) : (
             <div>
-              {fullDates.map(d => {
+              {sortedDates.map(d => {
                 const dateEntries = dateMap[d] || [];
                 const formattedDateStr = formatDateWithDayName(d);
                 const memoEntries = dateEntries.filter(e => e.note && e.note.trim().length > 0);
+                const isPast = d < todayStr;
 
                 return (
-                  <button key={d} className="date-item-btn" onClick={() => onSelectDate(d)}>
+                  <button
+                    key={d}
+                    className="date-item-btn"
+                    onClick={() => onSelectDate(d)}
+                    style={isPast ? {
+                      opacity: 0.7,
+                      backgroundColor: '#F8FAFC',
+                      borderColor: '#E2E8F0'
+                    } : {}}
+                  >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-                      <span style={{ fontWeight: 800, color: '#10B981', fontSize: '0.95rem' }}>
+                      <span style={{
+                        fontWeight: 800,
+                        color: isPast ? '#94A3B8' : '#10B981',
+                        fontSize: '0.95rem'
+                      }}>
                         {formattedDateStr}
                       </span>
 
@@ -1013,7 +1033,11 @@
                               <span
                                 key={e.participantId || p.id}
                                 className="memo-capsule-badge"
-                                style={{
+                                style={isPast ? {
+                                  backgroundColor: '#E2E8F0',
+                                  color: '#64748B',
+                                  boxShadow: 'none'
+                                } : {
                                   backgroundColor: p.color,
                                   color: getContrastTextColor(p.color)
                                 }}
@@ -1029,14 +1053,14 @@
 
                     <span style={{
                       fontSize: '0.75rem',
-                      background: '#10B981',
-                      color: '#FFF',
+                      background: isPast ? '#E2E8F0' : '#10B981',
+                      color: isPast ? '#64748B' : '#FFF',
                       padding: '4px 10px',
                       borderRadius: '9999px',
                       fontWeight: 700,
                       whiteSpace: 'nowrap'
                     }}>
-                      전원 가능 ({totalCount}/{totalCount}명)
+                      {isPast ? '지나간 모임' : `전원 가능 (${totalCount}/{totalCount}명)`}
                     </span>
                   </button>
                 );
