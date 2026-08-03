@@ -960,7 +960,7 @@
       );
     }
 
-    // Summary List - Sorts future dates first, past dates to the bottom, and grays out past dates
+    // Summary List - Displays both "Partial Availability" (N+ members) and "Full Availability" lists
     function SummaryList({ calendar, onSelectDate }) {
       const totalCount = calendar?.participants?.length || 0;
       const availabilities = calendar?.availabilities || [];
@@ -976,97 +976,213 @@
         return acc;
       }, {});
 
-      const allDates = Object.keys(dateMap).filter(d => {
+      const today = new Date();
+      const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+      // Calculate threshold N for partial availability: total - 2 (only for calendars with 3 or more members)
+      const thresholdN = totalCount >= 3 ? totalCount - 2 : 0;
+
+      // 1. All-available dates (availCount === totalCount)
+      const allAvailableDates = Object.keys(dateMap).filter(d => {
         const entries = dateMap[d];
         const uniqueParticipants = new Set(entries.map(e => e.participantId));
         return totalCount > 0 && uniqueParticipants.size === totalCount;
       });
 
-      const today = new Date();
-      const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+      // 2. Partial-available dates (thresholdN <= availCount < totalCount)
+      const partialAvailableDates = thresholdN > 0 ? Object.keys(dateMap).filter(d => {
+        const entries = dateMap[d];
+        const uniqueParticipants = new Set(entries.map(e => e.participantId));
+        const cnt = uniqueParticipants.size;
+        return cnt >= thresholdN && cnt < totalCount;
+      }) : [];
 
-      // Future/Today dates sorted ascending; past dates sorted ascending placed at the bottom
-      const futureDates = allDates.filter(d => d >= todayStr).sort();
-      const pastDates = allDates.filter(d => d < todayStr).sort();
-      const sortedDates = [...futureDates, ...pastDates];
+      const getSortedDates = (datesList) => {
+        const future = datesList.filter(d => d >= todayStr).sort();
+        const past = datesList.filter(d => d < todayStr).sort();
+        return [...future, ...past];
+      };
+
+      const sortedAllDates = getSortedDates(allAvailableDates);
+      const sortedPartialDates = getSortedDates(partialAvailableDates);
 
       return (
-        <div className="summary-card">
-          <div className="summary-title">전원 참석 가능 날짜 리스트 ({sortedDates.length}일)</div>
-          {sortedDates.length === 0 ? (
-            <div style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>아직 참여자 전원이 가능한 날짜가 없습니다. 달력에서 날짜를 선택하여 가능 여부를 표기해보세요!</div>
-          ) : (
+        <div className="summary-card" style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+          
+          {/* 1. Partial Availability List (only if thresholdN > 0) */}
+          {thresholdN > 0 && (
             <div>
-              {sortedDates.map(d => {
-                const dateEntries = dateMap[d] || [];
-                const formattedDateStr = formatDateWithDayName(d);
-                const memoEntries = dateEntries.filter(e => e.note && e.note.trim().length > 0);
-                const isPast = d < todayStr;
+              <div className="summary-title" style={{ color: '#2563EB', marginBottom: '12px' }}>
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style={{ marginRight: '4px' }}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                {thresholdN}명 이상 참석 가능 날짜 리스트 ({sortedPartialDates.length}일)
+              </div>
+              {sortedPartialDates.length === 0 ? (
+                <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', padding: '10px 0' }}>해당하는 날짜가 아직 없습니다.</div>
+              ) : (
+                <div>
+                  {sortedPartialDates.map(d => {
+                    const dateEntries = dateMap[d] || [];
+                    const formattedDateStr = formatDateWithDayName(d);
+                    const memoEntries = dateEntries.filter(e => e.note && e.note.trim().length > 0);
+                    const isPast = d < todayStr;
+                    const availCount = new Set(dateEntries.map(e => e.participantId)).size;
 
-                return (
-                  <button
-                    key={d}
-                    className="date-item-btn"
-                    onClick={() => onSelectDate(d)}
-                    style={isPast ? {
-                      opacity: 0.7,
-                      backgroundColor: '#F8FAFC',
-                      borderColor: '#E2E8F0'
-                    } : {}}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-                      <span style={{
-                        fontWeight: 800,
-                        color: isPast ? '#94A3B8' : '#10B981',
-                        fontSize: '0.95rem'
-                      }}>
-                        {formattedDateStr}
-                      </span>
+                    return (
+                      <button
+                        key={d}
+                        className="date-item-btn"
+                        onClick={() => onSelectDate(d)}
+                        style={isPast ? {
+                          opacity: 0.7,
+                          backgroundColor: '#F8FAFC',
+                          borderColor: '#E2E8F0'
+                        } : {
+                          borderColor: '#DBEAFE',
+                          backgroundColor: '#F8FAFC'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                          <span style={{
+                            fontWeight: 800,
+                            color: isPast ? '#94A3B8' : '#2563EB',
+                            fontSize: '0.95rem'
+                          }}>
+                            {formattedDateStr}
+                          </span>
 
-                      {memoEntries.length > 0 && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                          {memoEntries.map(e => {
-                            const p = participantsMap[e.participantId];
-                            if (!p) return null;
-                            const memoText = e.note.trim();
-                            return (
-                              <span
-                                key={e.participantId || p.id}
-                                className="memo-capsule-badge"
-                                style={isPast ? {
-                                  backgroundColor: '#E2E8F0',
-                                  color: '#64748B',
-                                  boxShadow: 'none'
-                                } : {
-                                  backgroundColor: p.color,
-                                  color: getContrastTextColor(p.color)
-                                }}
-                                title={`${p.name}: ${memoText}`}
-                              >
-                                {memoText}
-                              </span>
-                            );
-                          })}
+                          {memoEntries.length > 0 && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                              {memoEntries.map(e => {
+                                const p = participantsMap[e.participantId];
+                                if (!p) return null;
+                                const memoText = e.note.trim();
+                                return (
+                                  <span
+                                    key={e.participantId || p.id}
+                                    className="memo-capsule-badge"
+                                    style={isPast ? {
+                                      backgroundColor: '#E2E8F0',
+                                      color: '#64748B',
+                                      boxShadow: 'none'
+                                    } : {
+                                      backgroundColor: p.color,
+                                      color: getContrastTextColor(p.color)
+                                    }}
+                                    title={`${p.name}: ${memoText}`}
+                                  >
+                                    {memoText}
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
 
-                    <span style={{
-                      fontSize: '0.75rem',
-                      background: isPast ? '#E2E8F0' : '#10B981',
-                      color: isPast ? '#64748B' : '#FFF',
-                      padding: '4px 10px',
-                      borderRadius: '9999px',
-                      fontWeight: 700,
-                      whiteSpace: 'nowrap'
-                    }}>
-                      {isPast ? '지나간 모임' : `전원 가능 (${totalCount}/{totalCount}명)`}
-                    </span>
-                  </button>
-                );
-              })}
+                        <span style={{
+                          fontSize: '0.75rem',
+                          background: isPast ? '#E2E8F0' : '#DBEAFE',
+                          color: isPast ? '#64748B' : '#1D4ED8',
+                          padding: '4px 10px',
+                          borderRadius: '9999px',
+                          fontWeight: 700,
+                          whiteSpace: 'nowrap',
+                          border: isPast ? 'none' : '1px solid #BFDBFE'
+                        }}>
+                          {isPast ? '지나간 모임' : `${availCount}명 가능 (${availCount}/${totalCount}명)`}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
+
+          {/* Divider line (only if thresholdN > 0) */}
+          {thresholdN > 0 && <div style={{ borderTop: '1px solid var(--border-subtle)', margin: '4px 0' }} />}
+
+          {/* 2. Full Availability List */}
+          <div>
+            <div className="summary-title" style={{ color: '#10B981', marginBottom: '12px' }}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style={{ marginRight: '4px' }}><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m9 12 2 2 4-4"/></svg>
+              전원 참석 가능 날짜 리스트 ({sortedAllDates.length}일)
+            </div>
+            {sortedAllDates.length === 0 ? (
+              <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', padding: '10px 0' }}>아직 참여자 전원이 가능한 날짜가 없습니다. 달력에서 날짜를 선택하여 가능 여부를 표기해보세요!</div>
+            ) : (
+              <div>
+                {sortedAllDates.map(d => {
+                  const dateEntries = dateMap[d] || [];
+                  const formattedDateStr = formatDateWithDayName(d);
+                  const memoEntries = dateEntries.filter(e => e.note && e.note.trim().length > 0);
+                  const isPast = d < todayStr;
+
+                  return (
+                    <button
+                      key={d}
+                      className="date-item-btn"
+                      onClick={() => onSelectDate(d)}
+                      style={isPast ? {
+                        opacity: 0.7,
+                        backgroundColor: '#F8FAFC',
+                        borderColor: '#E2E8F0'
+                      } : {}}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                        <span style={{
+                          fontWeight: 800,
+                          color: isPast ? '#94A3B8' : '#10B981',
+                          fontSize: '0.95rem'
+                        }}>
+                          {formattedDateStr}
+                        </span>
+
+                        {memoEntries.length > 0 && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                            {memoEntries.map(e => {
+                              const p = participantsMap[e.participantId];
+                              if (!p) return null;
+                              const memoText = e.note.trim();
+                              return (
+                                <span
+                                  key={e.participantId || p.id}
+                                  className="memo-capsule-badge"
+                                  style={isPast ? {
+                                    backgroundColor: '#E2E8F0',
+                                    color: '#64748B',
+                                    boxShadow: 'none'
+                                  } : {
+                                    backgroundColor: p.color,
+                                    color: getContrastTextColor(p.color)
+                                  }}
+                                  title={`${p.name}: ${memoText}`}
+                                >
+                                  {memoText}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+
+                      <span style={{
+                        fontSize: '0.75rem',
+                        background: isPast ? '#E2E8F0' : '#10B981',
+                        color: isPast ? '#64748B' : '#FFF',
+                        padding: '4px 10px',
+                        borderRadius: '9999px',
+                        fontWeight: 700,
+                        whiteSpace: 'nowrap'
+                      }}>
+                        {isPast ? '지나간 모임' : `전원 가능 (${totalCount}/${totalCount}명)`}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
         </div>
       );
     }
