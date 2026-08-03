@@ -735,12 +735,13 @@
       console.warn('Firebase init notice:', e);
     }
 
-    // Returns { calendars, lastModified } or null with AbortController timeout & retries
-    async function fetchMasterCloudCalendars(retryCount = 2) {
+    // Returns { calendar, lastModified } or null with AbortController timeout & retries
+    async function fetchSingleCloudCalendar(calId, retryCount = 2) {
+      if (!calId) return null;
       if (firebaseDb) {
         try {
-          // 1. Fetch master collection doc
-          const doc = await firebaseDb.collection('calendars').doc('master').get();
+          // 1. Fetch isolated calendar doc
+          const doc = await firebaseDb.collection('calendars').doc(`cal_${calId}`).get();
           if (doc.exists) {
             const data = doc.data();
             if (data && data.calendar) {
