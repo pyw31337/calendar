@@ -187,6 +187,24 @@ runAppScript(adminMetricsContext, `
   if (dashboard.calendarStats[0].fullDates.length !== 1) throw new Error('admin full-date metric failed');
   if (dashboard.calendarStats[0].deletedCount !== 1) throw new Error('admin deleted history metric failed');
   if (dashboard.calendarStats[0].memoCount !== 1) throw new Error('admin memo metric failed');
+  if (!dashboard.serviceUsage || dashboard.serviceUsage.length < 4) throw new Error('admin service usage metrics missing');
+  const backup = createCalendarBackupPayload([{
+    id: 'kkot',
+    title: 'KKOT',
+    participants: [{ id: 'kkot_p1', name: 'A', color: '#EF4444', updatedAt: 1 }],
+    availabilities: [{ date: '2026-08-10', participantId: 'kkot_p1', note: 'memo', updatedAt: 1 }],
+    updatedAt: 2,
+    revision: 1
+  }], 'kkot');
+  if (backup.calendars.length !== 1 || backup.calendars[0].data.calendar.id !== 'kkot') {
+    throw new Error('admin backup payload failed');
+  }
+  const restored = validateBackupCalendars(extractCalendarsFromBackup(backup));
+  if (restored.error || restored.calendars.length !== 1) throw new Error('admin backup import validation failed');
+  const rejected = validateBackupCalendars(extractCalendarsFromBackup({
+    calendars: [{ id: 'bad', title: 'Bad', participants: [], availabilities: [] }]
+  }));
+  if (!rejected.error) throw new Error('admin backup import accepted disallowed calendar');
 `);
 
 const restContext = createContext('https://pyw31337.github.io/calendar/?id=cw');

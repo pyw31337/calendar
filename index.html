@@ -366,6 +366,141 @@
     @media (min-width: 640px) {
       .summary-title { font-size: 1.15rem; margin-bottom: 16px; }
     }
+
+    .admin-section-header {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+    .admin-section-header .summary-title { margin-bottom: 0; }
+    .admin-calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 12px;
+    }
+    .admin-calendar-card {
+      display: grid;
+      grid-template-columns: minmax(0, 1.15fr) minmax(140px, 0.85fr);
+      gap: 14px;
+      align-items: start;
+      padding: 16px;
+      background: #FFFFFF;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      color: var(--text-main);
+      text-decoration: none;
+      transition: all 0.2s ease;
+    }
+    .admin-calendar-card:hover {
+      background: #F8FAFC;
+      border-color: var(--accent-primary);
+      transform: translateY(-1px);
+    }
+    .admin-calendar-title {
+      font-size: 1rem;
+      font-weight: 900;
+      margin-bottom: 8px;
+      overflow-wrap: anywhere;
+    }
+    .admin-calendar-desc {
+      color: var(--text-muted);
+      font-size: 0.84rem;
+      line-height: 1.55;
+      margin-bottom: 10px;
+    }
+    .admin-metric-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .admin-metric-chip {
+      display: inline-flex;
+      align-items: center;
+      min-height: 26px;
+      padding: 4px 9px;
+      border-radius: var(--radius-full);
+      background: #F1F5F9;
+      color: var(--text-main);
+      font-size: 0.76rem;
+      font-weight: 850;
+      white-space: nowrap;
+    }
+    .admin-participant-cloud {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      justify-content: flex-end;
+      align-content: flex-start;
+    }
+    .admin-progress {
+      width: 100%;
+      height: 8px;
+      border-radius: var(--radius-full);
+      background: #E2E8F0;
+      overflow: hidden;
+      margin-top: 12px;
+    }
+    .admin-progress-fill {
+      height: 100%;
+      border-radius: inherit;
+      background: #10B981;
+    }
+    .admin-quota-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 12px;
+    }
+    .admin-quota-card {
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 14px;
+      background: #F8FAFC;
+    }
+    .admin-quota-label {
+      color: var(--text-muted);
+      font-size: 0.78rem;
+      font-weight: 850;
+      margin-bottom: 5px;
+    }
+    .admin-quota-value {
+      color: var(--text-main);
+      font-size: 1.1rem;
+      font-weight: 950;
+      line-height: 1.35;
+    }
+    .admin-quota-note {
+      color: var(--text-muted);
+      font-size: 0.76rem;
+      font-weight: 700;
+      margin-top: 6px;
+      line-height: 1.45;
+    }
+    .admin-backup-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 12px;
+    }
+    .admin-backup-card {
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 14px;
+      background: #F8FAFC;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .admin-backup-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    @media (max-width: 760px) {
+      .admin-calendar-card {
+        grid-template-columns: 1fr;
+      }
+      .admin-participant-cloud {
+        justify-content: flex-start;
+      }
+    }
     
     .date-item-btn {
       width: 100%; display: flex; flex-direction: column; align-items: flex-start; padding: 12px 14px;
@@ -522,6 +657,19 @@ const FORCE_LOCAL_STORAGE = IS_LOCALHOST && URL_PARAMS.get('storage') === 'local
 const ENABLE_FIRESTORE_SYNC = !FORCE_LOCAL_STORAGE; // Firestore is the only production source of truth
 const ENABLE_FIRESTORE_WRITES = !FORCE_LOCAL_STORAGE;
 const PUBLIC_CALENDAR_IDS = ['kkot', 'cw'];
+const FIRESTORE_FREE_LIMITS = {
+  storageBytes: 1024 * 1024 * 1024,
+  documentBytes: 1024 * 1024,
+  readsPerDay: 50000,
+  writesPerDay: 20000,
+  deletesPerDay: 20000,
+  outboundBytesPerMonth: 10 * 1024 * 1024 * 1024
+};
+const GITHUB_PAGES_FREE_LIMITS = {
+  siteBytes: 1024 * 1024 * 1024,
+  bandwidthBytesPerMonth: 100 * 1024 * 1024 * 1024,
+  buildsPerHour: 10
+};
 function getContrastTextColor(hexColor) {
   if (!hexColor) return '#FFFFFF';
   const hex = hexColor.replace('#', '');
@@ -1683,6 +1831,8 @@ async function pushSingleCalendarWithRest(normalizedCal, lastModified, saveMode,
       let nextCalendar;
       if (!serverCalendar) {
         nextCalendar = normalizedCal;
+      } else if (saveMode === 'restore') {
+        nextCalendar = normalizedCal;
       } else if (saveMode === 'replace') {
         throw new Error(`Refusing to replace existing calendar ${normalizedCal.id}`);
       } else if (saveMode === 'settings') {
@@ -1751,6 +1901,8 @@ async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 18,
 	          const serverCalendar = currentData ? currentData.calendar : null;
 	          let nextCalendar;
 	          if (!serverCalendar) {
+	            nextCalendar = normalizedCal;
+	          } else if (saveMode === 'restore') {
 	            nextCalendar = normalizedCal;
 	          } else if (saveMode === 'replace') {
 	            throw new Error(`Refusing to replace existing calendar ${normalizedCal.id}`);
@@ -1879,6 +2031,134 @@ function estimateFirestoreDocumentSize(calendar) {
   })]).size;
 }
 
+function formatBytes(bytes) {
+  const value = Number(bytes) || 0;
+  if (value >= 1024 * 1024 * 1024) return `${(value / 1024 / 1024 / 1024).toFixed(2)}GB`;
+  if (value >= 1024 * 1024) return `${(value / 1024 / 1024).toFixed(2)}MB`;
+  if (value >= 1024) return `${(value / 1024).toFixed(1)}KB`;
+  return `${value}B`;
+}
+
+function formatPercent(value) {
+  return `${Math.max(0, Math.min(100, Number(value) || 0)).toFixed(2).replace(/\.?0+$/, '')}%`;
+}
+
+function estimateMonthlyOutboundBytes(calendarStats) {
+  const totalDocBytes = calendarStats.reduce((sum, stat) => sum + stat.sizeBytes, 0);
+  // 현재 앱은 접속 시 해당 캘린더 문서 1개와 관리자 화면의 전체 문서를 읽습니다.
+  // 여유 산정을 위해 하루 60회 전체 로드 + 동시 편집 동기화 여유분을 더한 보수적 추정치입니다.
+  return Math.round(totalDocBytes * 60 * 30 * 1.5);
+}
+
+function buildServiceUsageMetrics(calendarStats) {
+  const totalStorageBytes = calendarStats.reduce((sum, stat) => sum + stat.sizeBytes, 0);
+  const totalWritesPerFullRound = calendarStats.reduce((sum, stat) => sum + stat.schedules.length, 0);
+  const monthlyOutboundBytes = estimateMonthlyOutboundBytes(calendarStats);
+  return [{
+    label: 'Firestore 저장공간',
+    used: formatBytes(totalStorageBytes),
+    limit: formatBytes(FIRESTORE_FREE_LIMITS.storageBytes),
+    remaining: formatBytes(Math.max(0, FIRESTORE_FREE_LIMITS.storageBytes - totalStorageBytes)),
+    percent: totalStorageBytes / FIRESTORE_FREE_LIMITS.storageBytes * 100,
+    note: '운영 캘린더 문서 2개의 현재 JSON 크기 기준'
+  }, {
+    label: '단일 문서 최대치',
+    used: `${Math.max(0, ...calendarStats.map(stat => stat.sizePercent)).toFixed(1)}%`,
+    limit: formatBytes(FIRESTORE_FREE_LIMITS.documentBytes),
+    remaining: '75% 이상부터 경고',
+    percent: Math.max(0, ...calendarStats.map(stat => stat.sizePercent)),
+    note: '캘린더 1개 문서가 커질수록 저장 실패 위험 증가'
+  }, {
+    label: 'Firestore 읽기',
+    used: '접속당 1~2회',
+    limit: `${FIRESTORE_FREE_LIMITS.readsPerDay.toLocaleString('ko-KR')}회/일`,
+    remaining: '현재 규모 여유',
+    percent: 0.2,
+    note: '관리자 화면은 전체 캘린더 문서를 한 번에 읽음'
+  }, {
+    label: 'Firestore 쓰기',
+    used: '저장당 1회',
+    limit: `${FIRESTORE_FREE_LIMITS.writesPerDay.toLocaleString('ko-KR')}회/일`,
+    remaining: '현재 규모 여유',
+    percent: Math.min(100, totalWritesPerFullRound / FIRESTORE_FREE_LIMITS.writesPerDay * 100),
+    note: '참여자 8명이 자주 입력해도 일 2만 회까지는 큰 여유'
+  }, {
+    label: 'Firestore 전송량',
+    used: formatBytes(monthlyOutboundBytes),
+    limit: `${formatBytes(FIRESTORE_FREE_LIMITS.outboundBytesPerMonth)}/월`,
+    remaining: formatBytes(Math.max(0, FIRESTORE_FREE_LIMITS.outboundBytesPerMonth - monthlyOutboundBytes)),
+    percent: monthlyOutboundBytes / FIRESTORE_FREE_LIMITS.outboundBytesPerMonth * 100,
+    note: '보수적 월간 사용 추정치'
+  }, {
+    label: 'GitHub Pages',
+    used: '정적 파일 배포',
+    limit: `${formatBytes(GITHUB_PAGES_FREE_LIMITS.bandwidthBytesPerMonth)}/월`,
+    remaining: '현재 규모 여유',
+    percent: 0.1,
+    note: `사이트 1GB, 기본 빌드 ${GITHUB_PAGES_FREE_LIMITS.buildsPerHour}회/시간 제한 기준`
+  }];
+}
+
+function createCalendarBackupPayload(calendarsList, targetCalendarId = '') {
+  const selected = targetCalendarId
+    ? calendarsList.filter(calendar => calendar.id === targetCalendarId)
+    : calendarsList.filter(calendar => PUBLIC_CALENDAR_IDS.includes(calendar.id));
+  return {
+    type: 'gather-calendar-backup',
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    projectId: firebaseConfig.projectId,
+    calendarIds: selected.map(calendar => calendar.id),
+    calendars: selected.map(calendar => ({
+      docId: `cal_${calendar.id}`,
+      data: {
+        calendar: normalizeCalendarForSave(calendar),
+        lastModified: calendar.updatedAt || Date.now(),
+        revision: calendar.revision || 0
+      }
+    }))
+  };
+}
+
+function downloadJsonFile(filename, payload) {
+  const blob = new Blob([`${JSON.stringify(payload, null, 2)}\n`], { type: 'application/json;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function extractCalendarsFromBackup(payload) {
+  if (!payload) return [];
+  if (Array.isArray(payload)) return payload;
+  if (payload.calendar) return [payload.calendar];
+  if (payload.data?.calendar) return [payload.data.calendar];
+  if (Array.isArray(payload.calendars)) {
+    return payload.calendars.map(item => item?.data?.calendar || item?.calendar || item).filter(Boolean);
+  }
+  return [];
+}
+
+function validateBackupCalendars(calendarsList) {
+  const normalized = calendarsList
+    .map(normalizeCalendarForSave)
+    .filter(calendar => calendar && PUBLIC_CALENDAR_IDS.includes(calendar.id));
+  const uniqueById = new Map();
+  normalized.forEach(calendar => uniqueById.set(calendar.id, calendar));
+  const result = Array.from(uniqueById.values());
+  if (result.length === 0) return { calendars: [], error: '복구 가능한 kkot 또는 cw 캘린더 데이터가 없습니다.' };
+  for (const calendar of result) {
+    const validationError = validateCalendarShape(calendar);
+    if (validationError) return { calendars: [], error: `${calendar.id}: ${validationError}` };
+    if (!assertCalendarLinks(calendar)) return { calendars: [], error: `${calendar.id}: 참여자와 일정 연결이 올바르지 않습니다.` };
+  }
+  return { calendars: result, error: '' };
+}
+
 function buildAdminDashboardMetrics(calendarsList) {
   const todayStr = new Date().toISOString().slice(0, 10);
   const calendarStats = calendarsList.map(cal => {
@@ -1969,7 +2249,8 @@ function buildAdminDashboardMetrics(calendarsList) {
     memoCount,
     maxSchedules,
     maxMonthCount,
-    qualityWarnings
+    qualityWarnings,
+    serviceUsage: buildServiceUsageMetrics(calendarStats)
   };
 }
 
@@ -1978,10 +2259,69 @@ function AdminDashboard({ initialCalendars }) {
   const [loadedAt, setLoadedAt] = React.useState(null);
   const [error, setError] = React.useState('');
   const [toast, setToast] = React.useState(null);
+  const importInputRef = React.useRef(null);
 
   const showAdminToast = (message, type = 'success', duration = 3000) => {
     setToast({ message, type });
     setTimeout(() => setToast(null), duration);
+  };
+
+  const handleDownloadBackup = (calendarId = '') => {
+    const payload = createCalendarBackupPayload(calendarsList, calendarId);
+    if (!payload.calendars.length) {
+      showAdminToast('백업할 캘린더 데이터가 없습니다.', 'error');
+      return;
+    }
+    const suffix = calendarId || 'all';
+    const timestamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+    downloadJsonFile(`calendar-backup-${suffix}-${timestamp}.json`, payload);
+    showAdminToast(`${suffix} 백업 JSON을 다운로드했습니다.`);
+  };
+
+  const handleImportClick = () => {
+    if (!firebaseDb || !ENABLE_FIRESTORE_WRITES) {
+      showAdminToast('Firebase 쓰기 연결이 없어 복구할 수 없습니다.', 'error');
+      return;
+    }
+    importInputRef.current?.click();
+  };
+
+  const handleImportBackup = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    try {
+      const raw = await file.text();
+      const parsed = JSON.parse(raw);
+      const { calendars, error: validationError } = validateBackupCalendars(extractCalendarsFromBackup(parsed));
+      if (validationError) {
+        showAdminToast(validationError, 'error', 6000);
+        return;
+      }
+      const message = `${calendars.map(calendar => calendar.id).join(', ')} 데이터를 백업 파일 내용으로 복구합니다. 현재 Firestore 데이터가 해당 백업으로 교체됩니다. 계속할까요?`;
+      if (!window.confirm(message)) return;
+      const now = Date.now();
+      const results = [];
+      for (const calendar of calendars) {
+        const restoredCalendar = {
+          ...calendar,
+          updatedAt: now,
+          revision: (calendar.revision || 0) + 1
+        };
+        const saved = await pushSingleCloudCalendar(restoredCalendar, now, 18, null, 'restore');
+        results.push({ id: calendar.id, saved, calendar: restoredCalendar });
+      }
+      const failed = results.filter(result => !result.saved);
+      if (failed.length) {
+        showAdminToast(`${failed.map(result => result.id).join(', ')} 복구에 실패했습니다.`, 'error', 6000);
+        return;
+      }
+      setServerCalendars(prev => mergeCalendarCollections(prev, results.map(result => result.calendar), { replaceMatchingId: true }));
+      showAdminToast('백업 JSON에서 데이터를 복구했습니다.');
+    } catch (err) {
+      console.error('Calendar backup import failed:', err);
+      showAdminToast('백업 JSON을 읽거나 복구하지 못했습니다.', 'error', 6000);
+    }
   };
 
   React.useEffect(() => {
@@ -2083,41 +2423,59 @@ function AdminDashboard({ initialCalendars }) {
   }, card.value))))), /*#__PURE__*/React.createElement("section", {
     className: "summary-card"
   }, /*#__PURE__*/React.createElement("div", {
+    className: "admin-section-header"
+  }, /*#__PURE__*/React.createElement("div", {
     className: "summary-title"
-  }, "캘린더별 현황"), dashboard.calendarStats.length === 0 ? /*#__PURE__*/React.createElement("div", {
+  }, "캘린더별 현황"), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-secondary",
+    onClick: () => handleDownloadBackup('')
+  }, "전체 JSON 백업")), dashboard.calendarStats.length === 0 ? /*#__PURE__*/React.createElement("div", {
     style: { color: 'var(--text-muted)', fontSize: '0.9rem' }
-  }, "아직 표시할 캘린더가 없습니다.") : dashboard.calendarStats.map(stat => {
+  }, "아직 표시할 캘린더가 없습니다.") : /*#__PURE__*/React.createElement("div", {
+    className: "admin-calendar-grid"
+  }, dashboard.calendarStats.map(stat => {
     const cal = stat.calendar;
     const width = `${Math.max(4, Math.round(stat.schedules.length / dashboard.maxSchedules * 100))}%`;
     const calendarUrl = `${window.location.pathname}?id=${encodeURIComponent(cal.id)}`;
     return /*#__PURE__*/React.createElement("a", {
       key: cal.id,
       href: calendarUrl,
-      className: "date-item-btn",
-      style: { textDecoration: 'none' }
+      className: "admin-calendar-card"
     }, /*#__PURE__*/React.createElement("div", {
-      className: "date-item-left",
-      style: { width: '100%' }
+      className: "admin-calendar-main"
     }, /*#__PURE__*/React.createElement("div", {
-      style: { display: 'flex', justifyContent: 'space-between', gap: '10px', width: '100%', flexWrap: 'wrap' }
-    }, /*#__PURE__*/React.createElement("strong", null, cal.title || cal.id), /*#__PURE__*/React.createElement("span", {
-      className: "date-item-badge"
-    }, stat.participants.length, "명 · ", stat.schedules.length, "건 · ", stat.dateCount, "일")), /*#__PURE__*/React.createElement("div", {
-      style: { color: 'var(--text-muted)', fontSize: '0.84rem' }
+      className: "admin-calendar-title"
+    }, cal.title || cal.id), /*#__PURE__*/React.createElement("div", {
+      className: "admin-calendar-desc"
     }, cal.description || cal.id), /*#__PURE__*/React.createElement("div", {
-      style: { color: 'var(--text-muted)', fontSize: '0.8rem', fontWeight: 700 }
-    }, "예정 ", stat.upcomingCount, "건 · 지난 일정 ", stat.pastCount, "건 · 메모 ", stat.memoCount, "건 · 문서 ", stat.sizePercent, "%"), /*#__PURE__*/React.createElement("div", {
-      style: { width: '100%', height: '8px', borderRadius: '999px', background: '#E2E8F0', overflow: 'hidden' }
+      className: "admin-metric-chips"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "admin-metric-chip"
+    }, stat.participants.length, "명"), /*#__PURE__*/React.createElement("span", {
+      className: "admin-metric-chip"
+    }, stat.schedules.length, "건"), /*#__PURE__*/React.createElement("span", {
+      className: "admin-metric-chip"
+    }, stat.dateCount, "일"), /*#__PURE__*/React.createElement("span", {
+      className: "admin-metric-chip"
+    }, "예정 ", stat.upcomingCount, "건"), /*#__PURE__*/React.createElement("span", {
+      className: "admin-metric-chip"
+    }, "지난 ", stat.pastCount, "건"), /*#__PURE__*/React.createElement("span", {
+      className: "admin-metric-chip"
+    }, "메모 ", stat.memoCount, "건"), /*#__PURE__*/React.createElement("span", {
+      className: "admin-metric-chip"
+    }, "문서 ", stat.sizePercent, "%")), /*#__PURE__*/React.createElement("div", {
+      className: "admin-progress"
     }, /*#__PURE__*/React.createElement("div", {
-      style: { width, height: '100%', background: '#10B981' }
-    })), /*#__PURE__*/React.createElement("div", {
-      style: { display: 'flex', gap: '5px', flexWrap: 'wrap' }
+      className: "admin-progress-fill",
+      style: { width }
+    }))), /*#__PURE__*/React.createElement("div", {
+      className: "admin-participant-cloud"
     }, stat.participants.slice(0, 12).map(p => /*#__PURE__*/React.createElement("span", {
       key: p.id,
       className: "participant-badge",
       style: { backgroundColor: p.color, color: getContrastTextColor(p.color) }
-    }, p.name)))));
-  })), /*#__PURE__*/React.createElement("section", {
+    }, p.name))));
+  }))), /*#__PURE__*/React.createElement("section", {
     className: "summary-card",
     style: { marginTop: '20px' }
   }, /*#__PURE__*/React.createElement("div", {
@@ -2194,23 +2552,66 @@ function AdminDashboard({ initialCalendars }) {
     className: "summary-card",
     style: { marginTop: '20px' }
   }, /*#__PURE__*/React.createElement("div", {
+    className: "admin-section-header"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "summary-title"
+  }, "JSON 백업 및 데이터 불러오기"), /*#__PURE__*/React.createElement("div", {
+    className: "admin-backup-actions"
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-secondary",
+    onClick: () => handleDownloadBackup('')
+  }, "전체 백업"), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-danger",
+    onClick: handleImportClick
+  }, "데이터 불러오기"))), /*#__PURE__*/React.createElement("input", {
+    ref: importInputRef,
+    type: "file",
+    accept: "application/json,.json",
+    onChange: handleImportBackup,
+    style: { display: 'none' }
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "admin-backup-grid"
+  }, dashboard.calendarStats.map(stat => /*#__PURE__*/React.createElement("div", {
+    key: `${stat.calendar.id}_backup`,
+    className: "admin-backup-card"
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { fontWeight: 900, color: 'var(--text-main)' }
+  }, stat.calendar.id, " 백업"), /*#__PURE__*/React.createElement("div", {
+    style: { color: 'var(--text-muted)', fontSize: '0.82rem', lineHeight: 1.55 }
+  }, stat.participants.length, "명 · 활성 일정 ", stat.schedules.length, "건 · 저장 레코드 ", stat.storedAvailabilities, "건"), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-secondary",
+    onClick: () => handleDownloadBackup(stat.calendar.id)
+  }, stat.calendar.id, " JSON 다운로드")))), /*#__PURE__*/React.createElement("div", {
+    style: { marginTop: '12px', color: 'var(--text-muted)', fontSize: '0.82rem', fontWeight: 700, lineHeight: 1.55 }
+  }, "백업 파일에는 참여자, 일정, 메모가 포함됩니다. 데이터 불러오기는 kkot/cw 백업만 허용하며 확인 후 Firestore 운영 데이터를 해당 백업으로 복구합니다.")), /*#__PURE__*/React.createElement("section", {
+    className: "summary-card",
+    style: { marginTop: '20px' }
+  }, /*#__PURE__*/React.createElement("div", {
     className: "summary-title"
   }, "데이터 품질 및 운영 규칙"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-      gap: '12px'
-    }
+    className: "admin-quota-grid"
+  }, dashboard.serviceUsage.map(item => /*#__PURE__*/React.createElement("div", {
+    key: item.label,
+    className: "admin-quota-card"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "admin-quota-label"
+  }, item.label), /*#__PURE__*/React.createElement("div", {
+    className: "admin-quota-value"
+  }, item.used, " / ", item.limit), /*#__PURE__*/React.createElement("div", {
+    className: "admin-progress"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "admin-progress-fill",
+    style: { width: `${Math.max(2, Math.min(100, item.percent))}%`, background: item.percent >= 75 ? '#F59E0B' : '#10B981' }
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "admin-quota-note"
+  }, "잔여: ", item.remaining, /*#__PURE__*/React.createElement("br", null), item.note)))), /*#__PURE__*/React.createElement("div", {
+    className: "admin-quota-grid",
+    style: { marginTop: '12px' }
   }, dashboard.calendarStats.map(stat => /*#__PURE__*/React.createElement("div", {
     key: `${stat.calendar.id}_quality`,
-    style: {
-      border: '1px solid var(--border-subtle)',
-      borderRadius: '8px',
-      padding: '14px',
-      background: '#F8FAFC'
-    }
+    className: "admin-quota-card"
   }, /*#__PURE__*/React.createElement("div", {
-    style: { fontWeight: 900, marginBottom: '8px' }
+    style: { fontWeight: 900, marginBottom: '8px', color: 'var(--text-main)' }
   }, stat.calendar.id), /*#__PURE__*/React.createElement("div", {
     style: { color: 'var(--text-muted)', fontSize: '0.84rem', lineHeight: 1.7 }
   }, "Firestore 문서 크기: ", stat.sizePercent, "%", /*#__PURE__*/React.createElement("br", null), "저장 레코드: ", stat.storedAvailabilities, "건", /*#__PURE__*/React.createElement("br", null), "삭제 이력: ", stat.deletedCount, "건", /*#__PURE__*/React.createElement("br", null), "Revision: ", stat.calendar.revision || 0)))), /*#__PURE__*/React.createElement("div", {
