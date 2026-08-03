@@ -175,6 +175,12 @@
     
     .btn-danger { background: #FEF2F2; border-color: #FCA5A5; color: #DC2626; }
     .btn-danger:hover { background: #FEE2E2; }
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
 
     .form-select, .form-input, .form-textarea {
       padding: 10px 14px; background: #FFFFFF; border: 1px solid var(--border-subtle);
@@ -410,6 +416,35 @@
     .modal-header { padding: 18px 20px; border-bottom: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: space-between; background: #F8FAFC; }
     .modal-body { padding: 20px; display: flex; flex-direction: column; gap: 16px; }
     .modal-footer { padding: 16px 20px; border-top: 1px solid var(--border-subtle); display: flex; justify-content: flex-end; gap: 10px; background: #F8FAFC; }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 24px;
+      transform: translateX(-50%) translateY(16px);
+      background: rgba(15, 23, 42, 0.96);
+      color: #FFFFFF;
+      padding: 12px 16px;
+      border-radius: 9999px;
+      box-shadow: 0 12px 30px rgba(15, 23, 42, 0.22);
+      font-size: 0.9rem;
+      font-weight: 700;
+      z-index: 3000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease, transform 0.2s ease;
+      white-space: nowrap;
+    }
+    .toast.visible {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+    .toast.success {
+      background: rgba(16, 185, 129, 0.96);
+    }
+    .toast.error {
+      background: rgba(220, 38, 38, 0.96);
+    }
   </style>
 </head>
 <body>
@@ -520,7 +555,7 @@
     // Returns { calendars, lastModified } or null
     async function fetchMasterCloudCalendars() {
       try {
-        const res = await fetch(CLOUD_API_URL);
+        const res = await fetch(CLOUD_API_URL, { cache: 'no-store' });
         if (res.ok) {
           const json = await res.json();
           if (json && Array.isArray(json.calendars) && json.calendars.length > 0) {
@@ -535,13 +570,18 @@
 
     async function pushMasterCloudCalendars(calendarsData, lastModified) {
       try {
-        await fetch(CLOUD_API_URL, {
+        const res = await fetch(CLOUD_API_URL, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ calendars: calendarsData, lastModified })
         });
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+        return true;
       } catch (e) {
         console.warn('Master Cloud DB push error:', e);
+        return false;
       }
     }
 
@@ -559,13 +599,21 @@
       } catch(e) {}
     }
 
-    function loadLocalCache() {
+    function loadSavedLocalCalendars() {
       try {
         const raw = localStorage.getItem(STORAGE_KEY);
         if (raw) {
           const parsed = JSON.parse(raw);
           if (Array.isArray(parsed) && parsed.length > 0) return parsed;
         }
+      } catch (e) {}
+      return null;
+    }
+
+    function loadLocalCache() {
+      try {
+        const saved = loadSavedLocalCalendars();
+        if (saved) return saved;
       } catch (e) {}
       return INITIAL_CALENDARS;
     }
@@ -583,15 +631,6 @@
       const lastLocalSaveRef = React.useRef(0);
       const LOCAL_SAVE_GUARD_MS = 15000; // 15s guard window after local save
 
-      const updateCalendars = (nextCalendars) => {
-        const now = Date.now();
-        lastLocalSaveRef.current = now;
-        saveLocalMeta({ lastModified: now }); // stamp local save time
-        setCalendarsState(nextCalendars);
-        saveLocalCache(nextCalendars);
-        pushMasterCloudCalendars(nextCalendars, now); // send timestamp to cloud
-      };
-
       const [activeCalId, setActiveCalId] = React.useState(() => {
         const requestedId = getCalendarIdFromURL();
         if (requestedId && calendars.some(c => c.id === requestedId)) {
@@ -606,6 +645,65 @@
       const [isAdminOpen, setIsAdminOpen] = React.useState(false);
       const [isShareOpen, setIsShareOpen] = React.useState(false);
       const [isParticipantsOpen, setIsParticipantsOpen] = React.useState(false);
+      const [toast, setToast] = React.useState(null);
+      const toastTimerRef = React.useRef(null);
+
+      const showToast = (message, kind = 'success') => {
+        if (toastTimerRef.current) {
+          clearTimeout(toastTimerRef.current);
+        }
+        setToast({ message, kind });
+        toastTimerRef.current = window.setTimeout(() => {
+          setToast(null);
+          toastTimerRef.current = null;
+        }, 3000);
+      };
+
+      React.useEffect(() => {
+        return () => {
+          if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+        };
+      }, []);
+
+      const persistCalendarChange = async (updatedCalendar, nextCalendars, successMessage) => {
+        const now = Date.now();
+        lastLocalSaveRef.current = now;
+        saveLocalMeta({ lastModified: now }); // stamp local save time
+        setCalendarsState(nextCalendars);
+        saveLocalCache(nextCalendars);
+
+        const result = await fetchMasterCloudCalendars();
+        const cloudCalendars = Array.isArray(result?.calendars) ? result.calendars : null;
+        const mergedCalendars = (cloudCalendars && cloudCalendars.length > 0)
+          ? (() => {
+              const merged = [...cloudCalendars];
+              nextCalendars.forEach((cal) => {
+                const idx = merged.findIndex(c => c.id === cal.id);
+                if (idx >= 0) {
+                  if (cal.id === updatedCalendar.id) {
+                    merged[idx] = cal;
+                  }
+                } else {
+                  merged.push(cal);
+                }
+              });
+              return merged;
+            })()
+          : nextCalendars;
+
+        setCalendarsState(mergedCalendars);
+        saveLocalCache(mergedCalendars);
+
+        const saved = await pushMasterCloudCalendars(mergedCalendars, now);
+        if (saved) {
+          saveLocalMeta({ lastModified: now });
+          if (successMessage) showToast(successMessage, 'success');
+          return true;
+        }
+
+        showToast('저장에 실패했습니다. 다시 시도해 주세요.', 'error');
+        return false;
+      };
 
       React.useEffect(() => {
         let isMounted = true;
@@ -624,8 +722,20 @@
             if (result.lastModified > localMeta.lastModified) {
               // Guard 3: re-check that no local save happened during the async fetch
               if (Date.now() - lastLocalSaveRef.current >= LOCAL_SAVE_GUARD_MS) {
-                setCalendarsState(result.calendars);
-                saveLocalCache(result.calendars);
+                const savedLocalCalendars = loadSavedLocalCalendars();
+                const mergedCalendars = savedLocalCalendars && savedLocalCalendars.length > 0
+                  ? (() => {
+                      const merged = [...result.calendars];
+                      savedLocalCalendars.forEach((cal) => {
+                        if (!merged.some(item => item.id === cal.id)) {
+                          merged.push(cal);
+                        }
+                      });
+                      return merged;
+                    })()
+                  : result.calendars;
+                setCalendarsState(mergedCalendars);
+                saveLocalCache(mergedCalendars);
                 saveLocalMeta({ lastModified: result.lastModified });
               }
             }
@@ -681,7 +791,7 @@
             ],
             availabilities: []
           };
-          updateCalendars([newCal, ...calendars]);
+          void persistCalendarChange(newCal, [newCal, ...calendars]);
           setActiveCalId(requestedId);
         }
       }, []);
@@ -693,7 +803,7 @@
         window.history.replaceState({}, '', url.toString());
       };
 
-      const handleSaveAvailability = (dateStr, participantId, note) => {
+      const handleSaveAvailability = async (dateStr, participantId, note) => {
         const existing = activeCal.availabilities || [];
         const index = existing.findIndex(e => e.date === dateStr && e.participantId === participantId);
         let nextAvail = [...existing];
@@ -705,12 +815,14 @@
 
         const updatedCal = { ...activeCal, availabilities: nextAvail };
         const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-        updateCalendars(nextCalendars);
+        const saved = await persistCalendarChange(updatedCal, nextCalendars, '일정이 등록되었습니다.');
+        if (!saved) return false;
 
         const dateCount = nextAvail.filter(e => e.date === dateStr).length;
         if (dateCount === activeCal.participants.length && typeof confetti === 'function') {
           confetti({ particleCount: 75, spread: 65, origin: { y: 0.6 } });
         }
+        return true;
       };
 
       const handleDeleteAvailability = (dateStr, participantId) => {
@@ -719,17 +831,17 @@
         );
         const updatedCal = { ...activeCal, availabilities: nextAvail };
         const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-        updateCalendars(nextCalendars);
+        void persistCalendarChange(updatedCal, nextCalendars);
       };
 
       const handleSaveAdmin = (updatedCal, newCalCreated) => {
         if (newCalCreated) {
           const nextCalendars = [newCalCreated, ...calendars];
-          updateCalendars(nextCalendars);
+          void persistCalendarChange(newCalCreated, nextCalendars);
           handleSelectCalendar(newCalCreated.id);
         } else {
           const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-          updateCalendars(nextCalendars);
+          void persistCalendarChange(updatedCal, nextCalendars);
         }
       };
 
@@ -817,7 +929,7 @@
               onSave={handleSaveAdmin}
               onCreateNewCal={(newCal) => {
                 const nextCalendars = [newCal, ...calendars];
-                updateCalendars(nextCalendars);
+                void persistCalendarChange(newCal, nextCalendars);
                 handleSelectCalendar(newCal.id);
                 setIsAdminOpen(false);
               }}
@@ -830,12 +942,18 @@
               calendar={activeCal}
               onCreateNewCal={(newCal) => {
                 const nextCalendars = [newCal, ...calendars];
-                updateCalendars(nextCalendars);
+                void persistCalendarChange(newCal, nextCalendars);
                 handleSelectCalendar(newCal.id);
                 setIsShareOpen(false);
               }}
               onClose={() => setIsShareOpen(false)}
             />
+          )}
+
+          {toast && (
+            <div className={`toast visible ${toast.kind || 'success'}`}>
+              {toast.message}
+            </div>
           )}
         </div>
       );
@@ -1066,15 +1184,23 @@
       const [participantId, setParticipantId] = React.useState(calendar?.participants[0]?.id || '');
       const [note, setNote] = React.useState('');
       const [isSheetOpen, setIsSheetOpen] = React.useState(false);
+      const [isSaving, setIsSaving] = React.useState(false);
 
       const dateEntries = (calendar?.availabilities || []).filter(e => e.date === dateStr);
 
-      const handleSubmit = (e) => {
+      const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!participantId) return;
-        onSave(dateStr, participantId, note);
-        setNote('');
-        onClose();
+        if (!participantId || isSaving) return;
+        setIsSaving(true);
+        try {
+          const saved = await onSave(dateStr, participantId, note);
+          if (saved !== false) {
+            setNote('');
+            onClose();
+          }
+        } finally {
+          setIsSaving(false);
+        }
       };
 
       const getShortTitle = (dateStr) => {
@@ -1087,11 +1213,17 @@
       };
 
       return (
-        <div className="modal-overlay" onClick={onClose}>
+        <div className="modal-overlay" onClick={() => { if (!isSaving) onClose(); }}>
           <div className="modal-container" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <h3 style={{ fontSize: '1.1rem', fontWeight: 800 }}>{getShortTitle(dateStr)}</h3>
-              <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer' }}>✕</button>
+              <button
+                onClick={onClose}
+                disabled={isSaving}
+                style={{ background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: isSaving ? 'not-allowed' : 'pointer' }}
+              >
+                ✕
+              </button>
             </div>
             <form onSubmit={handleSubmit}>
               <div className="modal-body">
@@ -1165,7 +1297,9 @@
                 )}
               </div>
               <div className="modal-footer">
-                <button type="submit" className="btn btn-primary" style={{ width: '100%' }}>등록/저장</button>
+                <button type="submit" className="btn btn-primary" style={{ width: '100%' }} disabled={isSaving}>
+                  {isSaving ? '저장 중...' : '등록/저장'}
+                </button>
               </div>
             </form>
           </div>
