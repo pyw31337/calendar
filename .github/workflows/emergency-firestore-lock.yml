@@ -1,4 +1,4 @@
-name: Emergency Firestore Write Lock
+name: Emergency Firestore Read-Only Mode
 
 on:
   push:
@@ -10,27 +10,60 @@ permissions:
   contents: write
 
 jobs:
-  lock-writes:
+  readonly-firestore:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Disable all production Firestore writes
+      - name: Enable Firestore reads and block every write
         run: |
           python - <<'PY'
           from pathlib import Path
+
           path = Path('index.html')
           text = path.read_text(encoding='utf-8')
-          old = "const ENABLE_FIRESTORE_SYNC = new URLSearchParams(window.location.search).get('storage') !== 'local';"
-          new = "const ENABLE_FIRESTORE_SYNC = false; // EMERGENCY LOCK: prevent any Firestore read/write until recovery is complete"
-          if old not in text and new not in text:
-              raise SystemExit('Expected Firestore switch not found')
-          path.write_text(text.replace(old, new), encoding='utf-8')
+
+          sync_variants = [
+              "const ENABLE_FIRESTORE_SYNC = false; // EMERGENCY LOCK: prevent any Firestore read/write until recovery is complete",
+              "const ENABLE_FIRESTORE_SYNC = new URLSearchParams(window.location.search).get('storage') !== 'local';",
+          ]
+          sync_replacement = (
+              "const ENABLE_FIRESTORE_SYNC = true; // Firestore is the only production source of truth\n"
+              "const ENABLE_FIRESTORE_WRITES = false; // EMERGENCY READ-ONLY MODE during recovery"
+          )
+
+          replaced = False
+          for variant in sync_variants:
+              if variant in text:
+                  text = text.replace(variant, sync_replacement, 1)
+                  replaced = True
+                  break
+          if not replaced and "const ENABLE_FIRESTORE_WRITES = false;" not in text:
+              raise SystemExit('Firestore mode switch not found')
+
+          write_guard_old = (
+              "  if (!normalizedCal || !normalizedCal.id) return false;\n"
+              "  if (!ENABLE_FIRESTORE_SYNC) return true;"
+          )
+          write_guard_new = (
+              "  if (!normalizedCal || !normalizedCal.id) return false;\n"
+              "  if (!ENABLE_FIRESTORE_WRITES) {\n"
+              "    console.warn(`Blocked Firestore write for ${normalizedCal.id}: recovery read-only mode`);\n"
+              "    return false;\n"
+              "  }\n"
+              "  if (!ENABLE_FIRESTORE_SYNC) return false;"
+          )
+          if write_guard_old in text:
+              text = text.replace(write_guard_old, write_guard_new, 1)
+          elif "Blocked Firestore write for" not in text:
+              raise SystemExit('Firestore write guard not found')
+
+          path.write_text(text, encoding='utf-8')
           PY
-      - name: Commit emergency lock
+      - name: Commit read-only recovery mode
         run: |
           if git diff --quiet; then exit 0; fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add index.html
-          git commit -m "Emergency lock Firestore writes"
+          git commit -m "Enable Firestore reads in recovery read-only mode"
           git push
