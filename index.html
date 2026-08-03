@@ -1258,6 +1258,32 @@ const INITIAL_CALENDARS = [{
   }]
 }];
 
+const CW_DEFAULT_CALENDAR = INITIAL_CALENDARS.find(calendar => calendar.id === 'cw');
+if (CW_DEFAULT_CALENDAR) {
+  Object.assign(CW_DEFAULT_CALENDAR, {
+    title: '🛝 모아엘가 공동육아',
+    description: '모아엘가 공동육아 일정 조율 캘린더',
+    participants: [{
+      id: 'p_1785743775499_irg2',
+      name: '박영우',
+      color: '#EF4444'
+    }, {
+      id: 'p_1785743776469_osl1',
+      name: '김유리',
+      color: '#F97316'
+    }, {
+      id: 'p_1785743780845_1prj',
+      name: '김만식',
+      color: '#A3F50A'
+    }, {
+      id: 'p_1785743782594_9mwp',
+      name: '송은혜',
+      color: '#45E7F2'
+    }],
+    availabilities: []
+  });
+}
+
 function parseCalendarPayload(raw) {
   if (!raw) return null;
   try {
@@ -2868,7 +2894,7 @@ function AdminModal({
     const trimmed = (newName || '').trim();
     if (!trimmed) return;
     const newParticipant = {
-      id: 'p_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+      id: `${calendar.id}_p_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
       name: trimmed,
       color: PRESET_COLORS[participants.filter(p => !isTombstone(p)).length % PRESET_COLORS.length],
       updatedAt: Date.now()
