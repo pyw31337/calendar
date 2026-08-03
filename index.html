@@ -469,6 +469,50 @@
       return null;
     }
 
+    // Safety function: Union merge calendar data so NO entries are ever lost or deleted by cloud sync
+    function mergeCalendarCollections(sourceList, targetList) {
+      if (!Array.isArray(sourceList)) return targetList || [];
+      if (!Array.isArray(targetList)) return sourceList || [];
+
+      const map = new Map();
+      sourceList.forEach(c => map.set(c.id, { ...c, participants: [...(c.participants || [])], availabilities: [...(c.availabilities || [])] }));
+
+      targetList.forEach(tc => {
+        if (!map.has(tc.id)) {
+          map.set(tc.id, { ...tc, participants: [...(tc.participants || [])], availabilities: [...(tc.availabilities || [])] });
+        } else {
+          const existing = map.get(tc.id);
+          // Merge participants by ID
+          const partMap = new Map();
+          existing.participants.forEach(p => partMap.set(p.id, p));
+          (tc.participants || []).forEach(p => { if (!partMap.has(p.id)) partMap.set(p.id, p); });
+
+          // Merge availabilities by (date + participantId)
+          const availMap = new Map();
+          existing.availabilities.forEach(a => availMap.set(`${a.date}_${a.participantId}`, a));
+          (tc.availabilities || []).forEach(a => {
+            const key = `${a.date}_${a.participantId}`;
+            if (!availMap.has(key)) {
+              availMap.set(key, a);
+            } else {
+              // Prefer non-empty note
+              const prev = availMap.get(key);
+              if (a.note && a.note.trim() && !prev.note) {
+                availMap.set(key, a);
+              }
+            }
+          });
+
+          existing.participants = Array.from(partMap.values());
+          existing.availabilities = Array.from(availMap.values());
+          if (tc.title) existing.title = tc.title;
+          if (tc.description) existing.description = tc.description;
+        }
+      });
+
+      return Array.from(map.values());
+    }
+
     const INITIAL_CALENDARS = [
       {
         id: 'kkot',
@@ -496,23 +540,144 @@
       },
       {
         id: 'cw',
-        title: 'cw 동창회 사모임 달력',
-        description: 'cw 동창 모임 참여자들의 일정 조율',
+        title: '꽃잎반 모임 (cw)',
+        description: '꽃잎반 모임 일정 조율 캘린더',
         participants: [
-          { id: 'p1', name: '박영우', color: '#F97316' },
-          { id: 'p2', name: '김유리', color: '#F59E0B' },
-          { id: 'p3', name: '김만식', color: '#3B82F6' },
-          { id: 'p4', name: '송은혜', color: '#06B6D4' }
+          { id: 'p1', name: '박영우', color: '#EF4444' },
+          { id: 'p2', name: '김유리', color: '#B91C1C' },
+          { id: 'p3', name: '유장용', color: '#22C55E' },
+          { id: 'p4', name: '윤희정', color: '#15803D' },
+          { id: 'p5', name: '김현석', color: '#2563EB' },
+          { id: 'p6', name: '김효진', color: '#1D4ED8' },
+          { id: 'p7', name: '조경식', color: '#EAB308' },
+          { id: 'p8', name: '신수진', color: '#84CC16' }
         ],
         availabilities: [
+          // 2026
           { date: '2026-09-19', participantId: 'p1', note: '예당호 착한농촌체험세상' },
           { date: '2026-09-19', participantId: 'p2', note: '' },
           { date: '2026-09-19', participantId: 'p3', note: '' },
           { date: '2026-09-19', participantId: 'p4', note: '' },
-          { date: '2026-09-20', participantId: 'p1', note: '' },
+          { date: '2026-09-19', participantId: 'p5', note: '' },
+          { date: '2026-09-19', participantId: 'p6', note: '' },
+          { date: '2026-09-19', participantId: 'p7', note: '' },
+          { date: '2026-09-19', participantId: 'p8', note: '' },
+
+          { date: '2026-09-20', participantId: 'p1', note: '예당호 착한농촌체험세상' },
           { date: '2026-09-20', participantId: 'p2', note: '' },
           { date: '2026-09-20', participantId: 'p3', note: '' },
-          { date: '2026-09-20', participantId: 'p4', note: '' }
+          { date: '2026-09-20', participantId: 'p4', note: '' },
+
+          { date: '2026-08-08', participantId: 'p1', note: '10시 천왕물놀이터' },
+          { date: '2026-08-08', participantId: 'p2', note: '' },
+          { date: '2026-08-08', participantId: 'p3', note: '' },
+          { date: '2026-08-08', participantId: 'p4', note: '' },
+
+          { date: '2026-06-21', participantId: 'p1', note: '10시 핀앤핀캠프' },
+          { date: '2026-06-21', participantId: 'p2', note: '' },
+          { date: '2026-06-21', participantId: 'p3', note: '' },
+          { date: '2026-06-21', participantId: 'p4', note: '' },
+          { date: '2026-06-21', participantId: 'p5', note: '' },
+          { date: '2026-06-21', participantId: 'p6', note: '' },
+          { date: '2026-06-21', participantId: 'p7', note: '' },
+          { date: '2026-06-21', participantId: 'p8', note: '' },
+
+          { date: '2026-05-02', participantId: 'p1', note: '12시 임진각' },
+          { date: '2026-05-02', participantId: 'p2', note: '' },
+          { date: '2026-05-02', participantId: 'p3', note: '' },
+          { date: '2026-05-02', participantId: 'p4', note: '' },
+          { date: '2026-05-02', participantId: 'p5', note: '' },
+          { date: '2026-05-02', participantId: 'p6', note: '' },
+          { date: '2026-05-02', participantId: 'p7', note: '' },
+          { date: '2026-05-02', participantId: 'p8', note: '' },
+
+          { date: '2026-03-28', participantId: 'p1', note: '16시 서준네 서울집 집들이' },
+          { date: '2026-03-28', participantId: 'p2', note: '' },
+          { date: '2026-03-28', participantId: 'p3', note: '' },
+          { date: '2026-03-28', participantId: 'p4', note: '' },
+          { date: '2026-03-28', participantId: 'p5', note: '' },
+          { date: '2026-03-28', participantId: 'p6', note: '' },
+          { date: '2026-03-28', participantId: 'p7', note: '' },
+          { date: '2026-03-28', participantId: 'p8', note: '' },
+
+          // 2025
+          { date: '2025-12-21', participantId: 'p1', note: '16시30분 서준네 모임' },
+          { date: '2025-12-21', participantId: 'p2', note: '지호 동생 / 지호 아빠 물잠' },
+          { date: '2025-12-21', participantId: 'p3', note: '' },
+          { date: '2025-12-21', participantId: 'p4', note: '' },
+          { date: '2025-12-21', participantId: 'p5', note: '' },
+
+          { date: '2025-12-20', participantId: 'p1', note: '16시 리아네 집들이' },
+          { date: '2025-12-20', participantId: 'p2', note: '' },
+          { date: '2025-12-20', participantId: 'p3', note: '' },
+          { date: '2025-12-20', participantId: 'p4', note: '' },
+          { date: '2025-12-20', participantId: 'p5', note: '' },
+          { date: '2025-12-20', participantId: 'p6', note: '' },
+          { date: '2025-12-20', participantId: 'p7', note: '' },
+          { date: '2025-12-20', participantId: 'p8', note: '' },
+
+          { date: '2025-11-02', participantId: 'p1', note: '14시 베이킹체험' },
+          { date: '2025-11-02', participantId: 'p2', note: '' },
+          { date: '2025-11-02', participantId: 'p3', note: '' },
+          { date: '2025-11-02', participantId: 'p4', note: '' },
+          { date: '2025-11-02', participantId: 'p5', note: '' },
+          { date: '2025-11-02', participantId: 'p6', note: '' },
+          { date: '2025-11-02', participantId: 'p7', note: '' },
+          { date: '2025-11-02', participantId: 'p8', note: '' },
+
+          { date: '2025-10-09', participantId: 'p1', note: '13시 / 한글날 / 임진각' },
+          { date: '2025-10-09', participantId: 'p2', note: '' },
+          { date: '2025-10-09', participantId: 'p3', note: '' },
+          { date: '2025-10-09', participantId: 'p4', note: '' },
+          { date: '2025-10-09', participantId: 'p5', note: '' },
+          { date: '2025-10-09', participantId: 'p6', note: '' },
+          { date: '2025-10-09', participantId: 'p7', note: '' },
+          { date: '2025-10-09', participantId: 'p8', note: '' },
+
+          { date: '2025-09-28', participantId: 'p1', note: '13시 서준네 모임' },
+          { date: '2025-09-28', participantId: 'p2', note: '' },
+          { date: '2025-09-28', participantId: 'p3', note: '' },
+          { date: '2025-09-28', participantId: 'p4', note: '' },
+          { date: '2025-09-28', participantId: 'p5', note: '' },
+          { date: '2025-09-28', participantId: 'p6', note: '' },
+          { date: '2025-09-28', participantId: 'p7', note: '' },
+          { date: '2025-09-28', participantId: 'p8', note: '' },
+
+          { date: '2025-09-12', participantId: 'p1', note: '19시 서준네 모임' },
+          { date: '2025-09-12', participantId: 'p2', note: '' },
+          { date: '2025-09-12', participantId: 'p3', note: '' },
+          { date: '2025-09-12', participantId: 'p4', note: '' },
+          { date: '2025-09-12', participantId: 'p5', note: '' },
+          { date: '2025-09-12', participantId: 'p6', note: '' },
+          { date: '2025-09-12', participantId: 'p7', note: '' },
+          { date: '2025-09-12', participantId: 'p8', note: '' },
+
+          { date: '2025-08-17', participantId: 'p1', note: '10시 핀앤핀캠프' },
+          { date: '2025-08-17', participantId: 'p2', note: '' },
+          { date: '2025-08-17', participantId: 'p3', note: '' },
+          { date: '2025-08-17', participantId: 'p4', note: '' },
+          { date: '2025-08-17', participantId: 'p5', note: '' },
+
+          { date: '2025-07-27', participantId: 'p1', note: '11시 핀앤핀캠프 / 서준 동행 / 영우 불참' },
+          { date: '2025-07-27', participantId: 'p2', note: '지키 지아 동행 / 한석 불참' },
+          { date: '2025-07-27', participantId: 'p3', note: '지후 동생 / 한석 불참' },
+          { date: '2025-07-27', participantId: 'p4', note: '마음 동행 / 영석 불참' },
+
+          { date: '2025-07-12', participantId: 'p1', note: '19시 한마음' },
+          { date: '2025-07-12', participantId: 'p2', note: '' },
+          { date: '2025-07-12', participantId: 'p3', note: '' },
+          { date: '2025-07-12', participantId: 'p4', note: '' },
+          { date: '2025-07-12', participantId: 'p5', note: '' },
+          { date: '2025-07-12', participantId: 'p6', note: '' },
+          { date: '2025-07-12', participantId: 'p7', note: '' },
+
+          { date: '2025-07-05', participantId: 'p1', note: '18시30분 윤스킨 / 영웅 생일' },
+          { date: '2025-07-05', participantId: 'p2', note: '' },
+          { date: '2025-07-05', participantId: 'p3', note: '' },
+          { date: '2025-07-05', participantId: 'p4', note: '' },
+          { date: '2025-07-05', participantId: 'p5', note: '' },
+
+          { date: '2025-06-26', participantId: 'p1', note: '꽃잎반 다성여행' }
         ]
       }
     ];
@@ -588,7 +753,10 @@
         const raw = localStorage.getItem(STORAGE_KEY);
         if (raw) {
           const parsed = JSON.parse(raw);
-          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            // Always Union-Merge local cache with INITIAL_CALENDARS so no historical restored data is lost
+            return mergeCalendarCollections(INITIAL_CALENDARS, parsed);
+          }
         }
       } catch (e) {}
       return INITIAL_CALENDARS;
@@ -660,12 +828,14 @@
           if (result && isMounted) {
             const localMeta = loadLocalMeta();
             // Guard 2: only apply cloud data if it is provably NEWER than local data
-            // This prevents stale GETs from overwriting fresh local saves
             if (result.lastModified > localMeta.lastModified) {
               // Guard 3: re-check that no local save happened during the async fetch
               if (Date.now() - lastLocalSaveRef.current >= LOCAL_SAVE_GUARD_MS) {
-                setCalendarsState(result.calendars);
-                saveLocalCache(result.calendars);
+                // Safety: ALWAYS Union Merge cloud data with current local data so NO entries are ever deleted!
+                const currentLocal = loadLocalCache();
+                const merged = mergeCalendarCollections(currentLocal, result.calendars);
+                setCalendarsState(merged);
+                saveLocalCache(merged);
                 saveLocalMeta({ lastModified: result.lastModified });
               }
             }
