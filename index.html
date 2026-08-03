@@ -436,7 +436,8 @@ const CALENDAR_CLOUD_BLOB_IDS = {
   kkot: '019fc674-b7bc-7ae2-b53d-4ffee349d114',
   cw: '019fc674-b957-71c2-b464-0c4683dbe321'
 };
-const ENABLE_FIRESTORE_SYNC = false; // EMERGENCY LOCK: prevent any Firestore read/write until recovery is complete
+const ENABLE_FIRESTORE_SYNC = true; // Firestore is the only production source of truth
+const ENABLE_FIRESTORE_WRITES = false; // EMERGENCY READ-ONLY MODE during recovery
 function getContrastTextColor(hexColor) {
   if (!hexColor) return '#FFFFFF';
   const hex = hexColor.replace('#', '');
@@ -1526,7 +1527,11 @@ async function pushMasterCloudCalendars(nextCalendars, lastModified, retryCount 
 async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 3, allCalendars = null, saveMode = 'availability') {
   const normalizedCal = normalizeCalendarForSave(targetCal);
   if (!normalizedCal || !normalizedCal.id) return false;
-  if (!ENABLE_FIRESTORE_SYNC) return true;
+  if (!ENABLE_FIRESTORE_WRITES) {
+    console.warn(`Blocked Firestore write for ${normalizedCal.id}: recovery read-only mode`);
+    return false;
+  }
+  if (!ENABLE_FIRESTORE_SYNC) return false;
   if (firebaseDb) {
     try {
       const ref = firebaseDb.collection('calendars').doc(`cal_${normalizedCal.id}`);
