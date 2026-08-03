@@ -6,6 +6,22 @@
   <title>모여라 달력 - 사모임 일정 조율 & 가능 날짜 달력</title>
   <meta name="description" content="사모임 참여자들의 가능 날짜를 달력에 표기하고 전원 모임 가능한 날짜를 클라우드 DB로 실시간 공유해주는 웹 프로그램입니다.">
   
+  <!-- OpenGraph Metadata for KakaoTalk & Social Sharing -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="모여라 달력">
+  <meta property="og:title" id="og-title" content="모여라 달력 - 사모임 일정 조율 & 가능 날짜 달력">
+  <meta property="og:description" id="og-desc" content="사모임 참여자들의 가능 날짜를 달력에 표기하고 전원 모임 가능한 날짜를 한눈에 파악해보세요.">
+  <meta property="og:image" content="https://pyw31337.github.io/calendar/og-thumb.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:url" id="og-url" content="https://pyw31337.github.io/calendar/">
+  
+  <!-- Twitter Cards -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" id="tw-title" content="모여라 달력">
+  <meta name="twitter:description" content="사모임 일정 조율 플랫폼">
+  <meta name="twitter:image" content="https://pyw31337.github.io/calendar/og-thumb.jpg">
+
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -216,7 +232,6 @@
     ];
 
     const STORAGE_KEY = 'gather_calendars_cache_v6';
-    // Master Cloud DB Object ID shared by all devices and users
     const MASTER_CLOUD_OBJECT_ID = 'ff8081819f7e10ae019fc4f5703f64aa';
     const CLOUD_API_URL = `https://api.restful-api.dev/objects/${MASTER_CLOUD_OBJECT_ID}`;
 
@@ -227,6 +242,24 @@
       const g = parseInt(hex.substring(2, 4), 16) || 0;
       const b = parseInt(hex.substring(4, 6), 16) || 0;
       return (r * 299 + g * 587 + b * 114) / 1000 >= 128 ? '#0F172A' : '#FFFFFF';
+    }
+
+    // Standard Formatter for Korean Date Display: 2026.09.19 (토)
+    function formatDateWithDayName(dateStr) {
+      if (!dateStr) return '';
+      const parts = dateStr.split('-');
+      if (parts.length === 3) {
+        const y = parts[0];
+        const m = parts[1];
+        const d = parts[2];
+        const dateObj = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
+        if (!isNaN(dateObj.getTime())) {
+          const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+          const dayName = dayNames[dateObj.getDay()];
+          return `${y}.${m}.${d} (${dayName})`;
+        }
+      }
+      return dateStr;
     }
 
     function getCalendarIdFromURL() {
@@ -281,7 +314,6 @@
       }
     ];
 
-    // Master Cloud DB Operations
     async function fetchMasterCloudCalendars() {
       try {
         const res = await fetch(CLOUD_API_URL);
@@ -333,7 +365,6 @@
       const [calendars, setCalendarsState] = React.useState(() => loadLocalCache());
       const [isSyncing, setIsSyncing] = React.useState(false);
 
-      // Central updater: Updates React State, saves Local Cache, and immediately pushes to Master Cloud DB
       const updateCalendars = (nextCalendars) => {
         setCalendarsState(nextCalendars);
         saveLocalCache(nextCalendars);
@@ -368,10 +399,7 @@
           if (isMounted) setIsSyncing(false);
         };
 
-        // Initial sync on mount
         syncWithCloud();
-
-        // 3-second realtime loop
         const interval = setInterval(syncWithCloud, 3000);
 
         return () => {
@@ -380,7 +408,32 @@
         };
       }, []);
 
-      // Auto-initialize calendar ID requested via URL parameter if missing
+      const activeCal = calendars.find(c => c.id === activeCalId) || calendars[0];
+
+      // Dynamic Title & KakaoTalk OpenGraph Metadata Sync
+      React.useEffect(() => {
+        if (activeCal) {
+          const calTitle = `${activeCal.title} - 모여라 달력`;
+          const calDesc = activeCal.description || `${activeCal.title} 사모임 멤버들의 참석 가능 날짜 조율 달력입니다.`;
+          const currentShareUrl = `${window.location.origin}${window.location.pathname}?id=${activeCal.id}`;
+
+          document.title = calTitle;
+
+          const ogTitle = document.getElementById('og-title');
+          if (ogTitle) ogTitle.setAttribute('content', calTitle);
+
+          const ogDesc = document.getElementById('og-desc');
+          if (ogDesc) ogDesc.setAttribute('content', calDesc);
+
+          const ogUrl = document.getElementById('og-url');
+          if (ogUrl) ogUrl.setAttribute('content', currentShareUrl);
+
+          const twTitle = document.getElementById('tw-title');
+          if (twTitle) twTitle.setAttribute('content', calTitle);
+        }
+      }, [activeCal]);
+
+      // URL ID auto-initialization
       React.useEffect(() => {
         const requestedId = getCalendarIdFromURL();
         if (requestedId && !calendars.some(c => c.id === requestedId)) {
@@ -399,8 +452,6 @@
           setActiveCalId(requestedId);
         }
       }, []);
-
-      const activeCal = calendars.find(c => c.id === activeCalId) || calendars[0];
 
       const handleSelectCalendar = (id) => {
         setActiveCalId(id);
@@ -642,7 +693,7 @@
         <div className="modal-overlay" onClick={onClose}>
           <div className="modal-container" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 800 }}>{dateStr} 모임 일정 등록</h3>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 800 }}>{formatDateWithDayName(dateStr)} 모임 일정 등록</h3>
               <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer' }}>✕</button>
             </div>
             <form onSubmit={handleSubmit}>
@@ -701,7 +752,7 @@
       );
     }
 
-    // Admin Modal with Calendar Switching & New Calendar Creation capability
+    // Admin Modal
     function AdminModal({ calendar, allCalendars, onSelectCalendar, onSave, onClose }) {
       const [title, setTitle] = React.useState(calendar.title);
       const [participants, setParticipants] = React.useState(calendar.participants);
@@ -867,6 +918,7 @@
       }, {});
 
       const fullDates = Object.keys(dateMap).filter(d => dateMap[d].length === totalCount);
+      fullDates.sort();
 
       return (
         <div className="summary-card">
@@ -877,7 +929,7 @@
             <div>
               {fullDates.map(d => (
                 <button key={d} className="date-item-btn" onClick={() => onSelectDate(d)}>
-                  <span style={{ fontWeight: 800, color: '#10B981' }}>{d}</span>
+                  <span style={{ fontWeight: 800, color: '#10B981' }}>{formatDateWithDayName(d)}</span>
                   <span style={{ fontSize: '0.75rem', background: '#10B981', color: '#FFF', padding: '3px 10px', borderRadius: '9999px', fontWeight: 700 }}>전원 가능 ({totalCount}/{totalCount}명)</span>
                 </button>
               ))}
