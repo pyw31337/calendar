@@ -197,11 +197,19 @@
     }
     .summary-title { font-size: 1.15rem; font-weight: 800; color: var(--text-main); margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
     .date-item-btn {
-      width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 12px 14px;
+      width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 12px 16px;
       background: #FFFFFF; border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
-      color: var(--text-main); cursor: pointer; transition: all 0.2s ease; margin-bottom: 8px; text-align: left;
+      color: var(--text-main); cursor: pointer; transition: all 0.2s ease; margin-bottom: 10px; text-align: left;
+      gap: 12px;
     }
     .date-item-btn:hover { background: #EEF2FF; border-color: var(--accent-primary); transform: translateX(4px); }
+
+    /* Capsule Memo Badge */
+    .memo-capsule-badge {
+      display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px;
+      border-radius: var(--radius-full); font-size: 0.8rem; font-weight: 700;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1); line-height: 1.3;
+    }
 
     /* Modal Overlay & Card */
     .modal-overlay {
@@ -307,9 +315,9 @@
           { id: 'p3', name: '송중기', color: '#6366F1' }
         ],
         availabilities: [
-          { date: '2026-08-15', participantId: 'p1', note: '공휴일 가능' },
-          { date: '2026-08-15', participantId: 'p2', note: '가능' },
-          { date: '2026-08-15', participantId: 'p3', note: '가능' }
+          { date: '2026-08-15', participantId: 'p1', note: '예당호 착한농촌체험세상' },
+          { date: '2026-08-15', participantId: 'p2', note: '주말 가능' },
+          { date: '2026-08-15', participantId: 'p3', note: '참석 가능' }
         ]
       }
     ];
@@ -385,7 +393,6 @@
       const [isAdminOpen, setIsAdminOpen] = React.useState(false);
       const [isShareOpen, setIsShareOpen] = React.useState(false);
 
-      // Realtime Cloud DB initial load & auto-polling loop every 3 seconds for all users & devices
       React.useEffect(() => {
         let isMounted = true;
 
@@ -410,7 +417,6 @@
 
       const activeCal = calendars.find(c => c.id === activeCalId) || calendars[0];
 
-      // Dynamic Title & KakaoTalk OpenGraph Metadata Sync
       React.useEffect(() => {
         if (activeCal) {
           const calTitle = `${activeCal.title} - 모여라 달력`;
@@ -433,7 +439,6 @@
         }
       }, [activeCal]);
 
-      // URL ID auto-initialization
       React.useEffect(() => {
         const requestedId = getCalendarIdFromURL();
         if (requestedId && !calendars.some(c => c.id === requestedId)) {
@@ -718,7 +723,7 @@
                     type="text"
                     className="form-input"
                     style={{ width: '100%' }}
-                    placeholder="예: 1시 이후 가능, 차 준비됨"
+                    placeholder="예: 1시 이후 가능, 예당호 착한농촌체험세상"
                     value={note}
                     onChange={e => setNote(e.target.value)}
                   />
@@ -908,16 +913,28 @@
       );
     }
 
-    // Summary List
+    // Summary List with Date format 2026.09.19 (토) & Capsule Memo Pills with Personal Color Background
     function SummaryList({ calendar, onSelectDate }) {
       const totalCount = calendar?.participants?.length || 0;
-      const dateMap = (calendar?.availabilities || []).reduce((acc, e) => {
+      const availabilities = calendar?.availabilities || [];
+
+      const participantsMap = (calendar?.participants || []).reduce((acc, p) => {
+        acc[p.id] = p;
+        return acc;
+      }, {});
+
+      const dateMap = availabilities.reduce((acc, e) => {
         if (!acc[e.date]) acc[e.date] = [];
         acc[e.date].push(e);
         return acc;
       }, {});
 
-      const fullDates = Object.keys(dateMap).filter(d => dateMap[d].length === totalCount);
+      const fullDates = Object.keys(dateMap).filter(d => {
+        const entries = dateMap[d];
+        const uniqueParticipants = new Set(entries.map(e => e.participantId));
+        return totalCount > 0 && uniqueParticipants.size === totalCount;
+      });
+
       fullDates.sort();
 
       return (
@@ -927,12 +944,54 @@
             <div style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>아직 참여자 전원이 가능한 날짜가 없습니다. 달력에서 날짜를 선택하여 가능 여부를 표기해보세요!</div>
           ) : (
             <div>
-              {fullDates.map(d => (
-                <button key={d} className="date-item-btn" onClick={() => onSelectDate(d)}>
-                  <span style={{ fontWeight: 800, color: '#10B981' }}>{formatDateWithDayName(d)}</span>
-                  <span style={{ fontSize: '0.75rem', background: '#10B981', color: '#FFF', padding: '3px 10px', borderRadius: '9999px', fontWeight: 700 }}>전원 가능 ({totalCount}/{totalCount}명)</span>
-                </button>
-              ))}
+              {fullDates.map(d => {
+                const dateEntries = dateMap[d] || [];
+                const formattedDateStr = formatDateWithDayName(d);
+
+                return (
+                  <button key={d} className="date-item-btn" onClick={() => onSelectDate(d)}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                      <span style={{ fontWeight: 800, color: '#10B981', fontSize: '0.95rem' }}>
+                        {formattedDateStr}
+                      </span>
+
+                      {/* Capsule Memo Badges for participants */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                        {dateEntries.map(e => {
+                          const p = participantsMap[e.participantId];
+                          if (!p) return null;
+                          const hasNote = e.note && e.note.trim().length > 0;
+                          return (
+                            <span
+                              key={e.participantId || p.id}
+                              className="memo-capsule-badge"
+                              style={{
+                                backgroundColor: p.color,
+                                color: getContrastTextColor(p.color)
+                              }}
+                              title={`${p.name}${hasNote ? `: ${e.note}` : ''}`}
+                            >
+                              {p.name}{hasNote ? `: ${e.note.trim()}` : ''}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <span style={{
+                      fontSize: '0.75rem',
+                      background: '#10B981',
+                      color: '#FFF',
+                      padding: '4px 10px',
+                      borderRadius: '9999px',
+                      fontWeight: 700,
+                      whiteSpace: 'nowrap'
+                    }}>
+                      전원 가능 ({totalCount}/{totalCount}명)
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>
