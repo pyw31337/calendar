@@ -1270,10 +1270,9 @@
         return cnt >= thresholdN && cnt < totalCount;
       }) : [];
 
+      // Sort descending: newest at top, oldest at bottom
       const getSortedDates = (datesList) => {
-        const future = datesList.filter(d => d >= todayStr).sort();
-        const past = datesList.filter(d => d < todayStr).sort();
-        return [...future, ...past];
+        return [...datesList].sort((a, b) => b.localeCompare(a));
       };
 
       const sortedAllDates = getSortedDates(allAvailableDates);
