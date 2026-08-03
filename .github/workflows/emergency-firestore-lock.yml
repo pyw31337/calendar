@@ -1,4 +1,4 @@
-name: Emergency Firestore Read-Only Mode
+name: Repair Isolated Firestore Persistence
 
 on:
   push:
@@ -10,60 +10,274 @@ permissions:
   contents: write
 
 jobs:
-  readonly-firestore:
+  repair:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Enable Firestore reads and block every write
+
+      - name: Patch persistence and recovery logic
         run: |
           python - <<'PY'
           from pathlib import Path
+          import re
 
           path = Path('index.html')
           text = path.read_text(encoding='utf-8')
 
-          sync_variants = [
-              "const ENABLE_FIRESTORE_SYNC = false; // EMERGENCY LOCK: prevent any Firestore read/write until recovery is complete",
-              "const ENABLE_FIRESTORE_SYNC = new URLSearchParams(window.location.search).get('storage') !== 'local';",
-          ]
-          sync_replacement = (
-              "const ENABLE_FIRESTORE_SYNC = true; // Firestore is the only production source of truth\n"
-              "const ENABLE_FIRESTORE_WRITES = false; // EMERGENCY READ-ONLY MODE during recovery"
+          # Production uses Firestore only. Local mode remains available solely for regression tests.
+          text = re.sub(
+              r"const ENABLE_FIRESTORE_SYNC = true;[^\n]*\nconst ENABLE_FIRESTORE_WRITES = false;[^\n]*",
+              "const IS_LOCAL_TEST_MODE = new URLSearchParams(window.location.search).get('storage') === 'local';\n"
+              "const ENABLE_FIRESTORE_SYNC = !IS_LOCAL_TEST_MODE; // Firestore is the only production source of truth\n"
+              "const ENABLE_FIRESTORE_WRITES = !IS_LOCAL_TEST_MODE;",
+              text,
+              count=1,
           )
 
-          replaced = False
-          for variant in sync_variants:
-              if variant in text:
-                  text = text.replace(variant, sync_replacement, 1)
-                  replaced = True
-                  break
-          if not replaced and "const ENABLE_FIRESTORE_WRITES = false;" not in text:
-              raise SystemExit('Firestore mode switch not found')
+          # Settings are merged by participant ID. A stale screen can never delete a server participant.
+          settings_pattern = re.compile(
+              r"function replaceCalendarSettings\(serverCalendar, incomingCalendar\) \{.*?\n\}\n\nfunction cloneCalendar\(",
+              re.S,
+          )
+          settings_replacement = r'''function replaceCalendarSettings(serverCalendar, incomingCalendar) {
+  const server = cloneCalendar(serverCalendar) || {};
+  const incoming = cloneCalendar(incomingCalendar) || {};
+  if (!server.id || !incoming.id || server.id !== incoming.id) {
+    throw new Error('Calendar ID mismatch during settings save');
+  }
 
-          write_guard_old = (
-              "  if (!normalizedCal || !normalizedCal.id) return false;\n"
-              "  if (!ENABLE_FIRESTORE_SYNC) return true;"
+  const participantMap = new Map();
+  (server.participants || []).forEach(participant => {
+    if (participant?.id) participantMap.set(participant.id, cloneParticipant(participant));
+  });
+  (incoming.participants || []).forEach(participant => {
+    if (!participant?.id) return;
+    participantMap.set(
+      participant.id,
+      mergeParticipantRecord(participantMap.get(participant.id), participant)
+    );
+  });
+
+  return {
+    ...server,
+    title: incoming.title || server.title,
+    description: incoming.description ?? server.description,
+    participants: Array.from(participantMap.values()),
+    // Settings changes never delete or rewrite schedule records.
+    availabilities: (server.availabilities || []).map(cloneAvailability),
+    updatedAt: Math.max(server.updatedAt || 0, incoming.updatedAt || 0),
+    revision: Math.max(server.revision || 0, incoming.revision || 0) + 1
+  };
+}
+
+function cloneCalendar('''
+          text, count = settings_pattern.subn(settings_replacement, text, count=1)
+          if count != 1:
+              raise SystemExit('replaceCalendarSettings patch failed')
+
+          # Do not prune schedules merely because a participant is absent from a form snapshot.
+          old_admin = '''      const stampedCal = pruneAvailabilitiesForParticipantSettings({
+        ...updatedCal,
+        updatedAt: now,
+        revision: (updatedCal.revision || 0) + 1,
+        participants: stampParticipantSettings(updatedCal.participants, now)
+      }, now);'''
+          new_admin = '''      const stampedCal = {
+        ...updatedCal,
+        updatedAt: now,
+        revision: (updatedCal.revision || 0) + 1,
+        participants: stampParticipantSettings(updatedCal.participants, now),
+        // Preserve every schedule. Participant removal is reversible and never destroys history.
+        availabilities: (activeCal.availabilities || []).map(cloneAvailability)
+      };'''
+          if old_admin not in text:
+              raise SystemExit('Admin save patch target not found')
+          text = text.replace(old_admin, new_admin, 1)
+
+          # Replace the cloud writer: one calendar document only, strict ID checks, history snapshot first.
+          writer_pattern = re.compile(
+              r"async function pushSingleCloudCalendar\(targetCal, lastModified, retryCount = 3, allCalendars = null, saveMode = 'availability'\) \{.*?\n\}\nfunction loadLocalMeta\(",
+              re.S,
           )
-          write_guard_new = (
-              "  if (!normalizedCal || !normalizedCal.id) return false;\n"
-              "  if (!ENABLE_FIRESTORE_WRITES) {\n"
-              "    console.warn(`Blocked Firestore write for ${normalizedCal.id}: recovery read-only mode`);\n"
-              "    return false;\n"
-              "  }\n"
-              "  if (!ENABLE_FIRESTORE_SYNC) return false;"
+          writer_replacement = r'''async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 3, allCalendars = null, saveMode = 'availability') {
+  const normalizedCal = normalizeCalendarForSave(targetCal);
+  if (!normalizedCal || !normalizedCal.id) return false;
+  if (!ENABLE_FIRESTORE_SYNC) return true; // regression-test mode only
+  if (!ENABLE_FIRESTORE_WRITES || !firebaseDb) return false;
+
+  try {
+    const ref = firebaseDb.collection('calendars').doc(`cal_${normalizedCal.id}`);
+    const historyRef = firebaseDb.collection('calendar_history').doc(
+      `${normalizedCal.id}_${lastModified}_${Math.random().toString(36).slice(2, 8)}`
+    );
+
+    await Promise.race([
+      firebaseDb.runTransaction(async tx => {
+        const snap = await tx.get(ref);
+        const currentData = snap.exists && snap.data() ? snap.data() : null;
+        const serverCalendar = currentData?.calendar || null;
+        if (serverCalendar?.id && serverCalendar.id !== normalizedCal.id) {
+          throw new Error('Refused cross-calendar write');
+        }
+
+        let nextCalendar;
+        if (!serverCalendar || saveMode === 'replace') {
+          // Replacement is only valid for a genuinely new document.
+          if (serverCalendar) throw new Error('Refused replacement of an existing calendar');
+          nextCalendar = normalizedCal;
+        } else if (saveMode === 'settings') {
+          nextCalendar = replaceCalendarSettings(serverCalendar, normalizedCal);
+        } else {
+          nextCalendar = mergeCalendarAvailabilityDelta(serverCalendar, normalizedCal, lastModified);
+        }
+
+        const mergedCalendar = normalizeCalendarForSave(nextCalendar);
+        if (!mergedCalendar || mergedCalendar.id !== normalizedCal.id) {
+          throw new Error('Calendar identity validation failed');
+        }
+
+        if (serverCalendar) {
+          tx.set(historyRef, {
+            calendarId: normalizedCal.id,
+            calendar: cloneCalendar(serverCalendar),
+            savedAt: lastModified,
+            saveMode,
+            previousRevision: currentData?.revision || serverCalendar.revision || 0
+          });
+        }
+
+        tx.set(ref, {
+          calendar: mergedCalendar,
+          lastModified,
+          revision: Math.max(
+            currentData?.revision || 0,
+            mergedCalendar.revision || 0
+          ) + 1
+        });
+      }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Firestore push timeout')), 8000))
+    ]);
+    return true;
+  } catch (e) {
+    console.error(`Firestore save failed for cal_${normalizedCal.id}:`, e);
+    return false;
+  }
+}
+function loadLocalMeta('''
+          text, count = writer_pattern.subn(writer_replacement, text, count=1)
+          if count != 1:
+              raise SystemExit('pushSingleCloudCalendar patch failed')
+
+          # Calendar data is never persisted to localStorage in production.
+          save_cache_pattern = re.compile(
+              r"function saveLocalCache\(data\) \{.*?\n\}",
+              re.S,
           )
-          if write_guard_old in text:
-              text = text.replace(write_guard_old, write_guard_new, 1)
-          elif "Blocked Firestore write for" not in text:
-              raise SystemExit('Firestore write guard not found')
+          save_cache_replacement = '''function saveLocalCache(data) {
+  if (IS_LOCAL_TEST_MODE) {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch (e) {}
+  }
+}'''
+          text, count = save_cache_pattern.subn(save_cache_replacement, text, count=1)
+          if count != 1:
+              raise SystemExit('saveLocalCache patch failed')
+
+          # Safe, targeted typo correction. IDs and schedules are untouched.
+          migration_anchor = "// Returns { calendar, lastModified } or null with AbortController timeout & retries"
+          migration_code = r'''async function applySafeParticipantNameCorrections() {
+  if (!firebaseDb || !ENABLE_FIRESTORE_WRITES) return;
+  const ref = firebaseDb.collection('calendars').doc('cal_kkot');
+  try {
+    await firebaseDb.runTransaction(async tx => {
+      const snap = await tx.get(ref);
+      if (!snap.exists) return;
+      const data = snap.data() || {};
+      const calendar = cloneCalendar(data.calendar);
+      if (!calendar || calendar.id !== 'kkot') return;
+      let changed = false;
+      calendar.participants = (calendar.participants || []).map(participant => {
+        if (participant?.name === '김료진') {
+          changed = true;
+          return { ...participant, name: '김효진', updatedAt: Date.now() };
+        }
+        if (participant?.name === '박수진') {
+          changed = true;
+          return { ...participant, name: '신수진', updatedAt: Date.now() };
+        }
+        return participant;
+      });
+      if (!changed) return;
+      const now = Date.now();
+      const historyRef = firebaseDb.collection('calendar_history').doc(`kkot_namefix_${now}`);
+      tx.set(historyRef, {
+        calendarId: 'kkot',
+        calendar: cloneCalendar(data.calendar),
+        savedAt: now,
+        saveMode: 'safe-name-correction'
+      });
+      tx.set(ref, {
+        ...data,
+        calendar,
+        lastModified: now,
+        revision: Math.max(data.revision || 0, calendar.revision || 0) + 1
+      });
+    });
+  } catch (error) {
+    console.error('Safe participant-name correction failed:', error);
+  }
+}
+
+'''
+          if 'async function applySafeParticipantNameCorrections()' not in text:
+              if migration_anchor not in text:
+                  raise SystemExit('Migration insertion anchor not found')
+              text = text.replace(migration_anchor, migration_code + migration_anchor, 1)
+
+          # Run correction once after Firebase initialization. It is idempotent.
+          init_anchor = "// Returns { calendar, lastModified } or null with AbortController timeout & retries"
+          if "applySafeParticipantNameCorrections();\n\n// Returns" not in text:
+              text = text.replace(
+                  init_anchor,
+                  "applySafeParticipantNameCorrections();\n\n" + init_anchor,
+                  1,
+              )
 
           path.write_text(text, encoding='utf-8')
           PY
-      - name: Commit read-only recovery mode
+
+      - name: Static safety assertions
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          text = Path('index.html').read_text(encoding='utf-8')
+          checks = {
+            'Firestore production source': 'Firestore is the only production source of truth',
+            'strict cross-calendar guard': 'Refused cross-calendar write',
+            'automatic history': "collection('calendar_history')",
+            'safe settings merge': 'Settings changes never delete or rewrite schedule records.',
+            'no settings prune': 'const stampedCal = pruneAvailabilitiesForParticipantSettings' ,
+            'name correction 김효진': "name: '김효진'",
+            'name correction 신수진': "name: '신수진'",
+          }
+          for label, needle in checks.items():
+            if label == 'no settings prune':
+              assert needle not in text, label
+            else:
+              assert needle in text, label
+          print('Static persistence safety checks passed')
+          PY
+
+      - name: Install regression dependencies
+        run: npm ci
+
+      - name: Run regression suite
+        run: npm run regression:test
+
+      - name: Commit repaired application
         run: |
           if git diff --quiet; then exit 0; fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add index.html
-          git commit -m "Enable Firestore reads in recovery read-only mode"
+          git commit -m "Repair isolated Firestore persistence and backups"
           git push
