@@ -1178,7 +1178,7 @@
                           backgroundColor: '#F8FAFC'
                         }}
                       >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                        <div className="date-item-left">
                           <span style={{
                             fontWeight: 800,
                             color: isPast ? '#94A3B8' : '#2563EB',
@@ -1198,8 +1198,9 @@
                                     key={e.participantId || p.id}
                                     className="memo-capsule-badge"
                                     style={isPast ? {
-                                      backgroundColor: '#E2E8F0',
+                                      backgroundColor: '#F1F5F9',
                                       color: '#64748B',
+                                      border: `1px solid ${p.color}`,
                                       boxShadow: 'none'
                                     } : {
                                       backgroundColor: p.color,
@@ -1215,14 +1216,9 @@
                           )}
                         </div>
 
-                        <span style={{
-                          fontSize: '0.75rem',
+                        <span className="date-item-badge" style={{
                           background: isPast ? '#E2E8F0' : '#DBEAFE',
                           color: isPast ? '#64748B' : '#1D4ED8',
-                          padding: '4px 10px',
-                          borderRadius: '9999px',
-                          fontWeight: 700,
-                          whiteSpace: 'nowrap',
                           border: isPast ? 'none' : '1px solid #BFDBFE'
                         }}>
                           {isPast ? '지나간 모임' : `${availCount}명 가능 (${availCount}/${totalCount}명)`}
@@ -1265,7 +1261,7 @@
                         borderColor: '#E2E8F0'
                       } : {}}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                      <div className="date-item-left">
                         <span style={{
                           fontWeight: 800,
                           color: isPast ? '#94A3B8' : '#10B981',
@@ -1285,8 +1281,9 @@
                                   key={e.participantId || p.id}
                                   className="memo-capsule-badge"
                                   style={isPast ? {
-                                    backgroundColor: '#E2E8F0',
+                                    backgroundColor: '#F1F5F9',
                                     color: '#64748B',
+                                    border: `1px solid ${p.color}`,
                                     boxShadow: 'none'
                                   } : {
                                     backgroundColor: p.color,
@@ -1302,14 +1299,9 @@
                         )}
                       </div>
 
-                      <span style={{
-                        fontSize: '0.75rem',
+                      <span className="date-item-badge" style={{
                         background: isPast ? '#E2E8F0' : '#10B981',
-                        color: isPast ? '#64748B' : '#FFF',
-                        padding: '4px 10px',
-                        borderRadius: '9999px',
-                        fontWeight: 700,
-                        whiteSpace: 'nowrap'
+                        color: isPast ? '#64748B' : '#FFF'
                       }}>
                         {isPast ? '지나간 모임' : `전원 가능 (${totalCount}/${totalCount}명)`}
                       </span>
