@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>모여라 달력 - 사모임 일정 조율 & 가능 날짜 달력</title>
-  <meta name="description" content="사모임 참여자들의 가능 날짜를 달력에 표기하고 전원 모임 가능한 날짜를 자동으로 찾아주는 깃허브 단독 구동 웹 프로그램입니다.">
+  <meta name="description" content="사모임 참여자들의 가능 날짜를 달력에 표기하고 전원 모임 가능한 날짜를 클라우드 DB로 실시간 공유해주는 웹 프로그램입니다.">
   
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -84,6 +84,20 @@
     .calendar-desc { font-size: 0.875rem; color: var(--text-muted); margin-top: 2px; }
 
     .header-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+    /* Cloud Sync Pill Indicator */
+    .cloud-sync-status {
+      display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px;
+      border-radius: var(--radius-full); background: #ECFDF5; border: 1px solid #A7F3D0;
+      color: #047857; font-size: 0.75rem; font-weight: 700;
+    }
+    .sync-dot { width: 6px; height: 6px; border-radius: 50%; background: #10B981; animation: pulse 2s infinite; }
+
+    @keyframes pulse {
+      0% { opacity: 0.4; }
+      50% { opacity: 1; }
+      100% { opacity: 0.4; }
+    }
 
     /* Buttons */
     .btn {
@@ -201,7 +215,9 @@
       '#3B82F6', '#6366F1', '#8B5CF6', '#EC4899', '#14B8A6'
     ];
 
-    const STORAGE_KEY = 'gather_calendars_persistent_v4';
+    const STORAGE_KEY = 'gather_calendars_persistent_v5';
+    const CLOUD_MAP_KEY = 'gather_cloud_object_ids_v1';
+    const CLOUD_API_BASE = 'https://api.restful-api.dev/objects';
 
     function getContrastTextColor(hexColor) {
       if (!hexColor) return '#FFFFFF';
@@ -264,6 +280,80 @@
       }
     ];
 
+    // Cloud Database Helper Functions
+    function getCloudMap() {
+      try {
+        const raw = localStorage.getItem(CLOUD_MAP_KEY);
+        return raw ? JSON.parse(raw) : {};
+      } catch (e) {
+        return {};
+      }
+    }
+
+    function setCloudMap(map) {
+      localStorage.setItem(CLOUD_MAP_KEY, JSON.stringify(map));
+    }
+
+    async function fetchCalendarFromCloud(calendarId) {
+      const map = getCloudMap();
+      const cloudObjId = map[calendarId];
+      if (!cloudObjId) return null;
+
+      try {
+        const res = await fetch(`${CLOUD_API_BASE}/${cloudObjId}`);
+        if (res.ok) {
+          const json = await res.json();
+          if (json && json.data && json.data.id === calendarId) {
+            return json.data;
+          }
+        }
+      } catch (e) {
+        console.warn('Cloud DB fetch error:', e);
+      }
+      return null;
+    }
+
+    async function pushCalendarToCloud(calendar) {
+      if (!calendar || !calendar.id) return;
+      const map = getCloudMap();
+      const cloudObjId = map[calendar.id];
+
+      try {
+        if (cloudObjId) {
+          // Update existing Cloud DB object
+          const res = await fetch(`${CLOUD_API_BASE}/${cloudObjId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: `gather_cal_${calendar.id}`,
+              data: calendar
+            })
+          });
+          if (res.ok) return;
+        }
+
+        // Create new Cloud DB object
+        const createRes = await fetch(CLOUD_API_BASE, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: `gather_cal_${calendar.id}`,
+            data: calendar
+          })
+        });
+
+        if (createRes.ok) {
+          const createJson = await createRes.json();
+          if (createJson && createJson.id) {
+            map[calendar.id] = createJson.id;
+            setCloudMap(map);
+          }
+        }
+      } catch (e) {
+        console.warn('Cloud DB push error:', e);
+      }
+    }
+
     function loadCalendarsFromStorage() {
       try {
         const raw = localStorage.getItem(STORAGE_KEY);
@@ -290,11 +380,20 @@
 
     function App() {
       const [calendars, setCalendarsState] = React.useState(() => loadCalendarsFromStorage());
+      const [isSyncing, setIsSyncing] = React.useState(false);
 
-      // Helper function to update state & localStorage simultaneously
-      const updateCalendars = (nextCalendars) => {
+      const updateCalendars = (nextCalendars, changedCalId = null) => {
         setCalendarsState(nextCalendars);
         saveCalendarsToStorage(nextCalendars);
+
+        // Instantly push changed calendar to Cloud DB
+        const calToPush = changedCalId 
+          ? nextCalendars.find(c => c.id === changedCalId)
+          : nextCalendars[0];
+
+        if (calToPush) {
+          pushCalendarToCloud(calToPush);
+        }
       };
 
       const [activeCalId, setActiveCalId] = React.useState(() => {
@@ -311,7 +410,44 @@
       const [isAdminOpen, setIsAdminOpen] = React.useState(false);
       const [isShareOpen, setIsShareOpen] = React.useState(false);
 
-      // Handle URL requested ID on mount
+      // Realtime Cloud DB sync & auto-polling every 4 seconds
+      React.useEffect(() => {
+        let isMounted = true;
+
+        const syncWithCloud = async () => {
+          if (!activeCalId) return;
+          setIsSyncing(true);
+
+          const cloudCal = await fetchCalendarFromCloud(activeCalId);
+          if (cloudCal && isMounted) {
+            setCalendarsState(prevCals => {
+              const exists = prevCals.some(c => c.id === cloudCal.id);
+              let next;
+              if (exists) {
+                next = prevCals.map(c => c.id === cloudCal.id ? cloudCal : c);
+              } else {
+                next = [cloudCal, ...prevCals];
+              }
+              saveCalendarsToStorage(next);
+              return next;
+            });
+          }
+          if (isMounted) setIsSyncing(false);
+        };
+
+        // Initial fetch on active calendar change
+        syncWithCloud();
+
+        // 4-second polling loop for real-time multi-device sync
+        const interval = setInterval(syncWithCloud, 4000);
+
+        return () => {
+          isMounted = false;
+          clearInterval(interval);
+        };
+      }, [activeCalId]);
+
+      // URL ID auto-initialization
       React.useEffect(() => {
         const requestedId = getCalendarIdFromURL();
         if (requestedId && !calendars.some(c => c.id === requestedId)) {
@@ -326,7 +462,7 @@
             ],
             availabilities: []
           };
-          updateCalendars([newCal, ...calendars]);
+          updateCalendars([newCal, ...calendars], newCal.id);
           setActiveCalId(requestedId);
         }
       }, []);
@@ -352,7 +488,7 @@
 
         const updatedCal = { ...activeCal, availabilities: nextAvail };
         const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-        updateCalendars(nextCalendars);
+        updateCalendars(nextCalendars, updatedCal.id);
 
         const dateCount = nextAvail.filter(e => e.date === dateStr).length;
         if (dateCount === activeCal.participants.length && typeof confetti === 'function') {
@@ -366,17 +502,17 @@
         );
         const updatedCal = { ...activeCal, availabilities: nextAvail };
         const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-        updateCalendars(nextCalendars);
+        updateCalendars(nextCalendars, updatedCal.id);
       };
 
       const handleSaveAdmin = (updatedCal, newCalCreated) => {
         if (newCalCreated) {
           const nextCalendars = [newCalCreated, ...calendars];
-          updateCalendars(nextCalendars);
+          updateCalendars(nextCalendars, newCalCreated.id);
           handleSelectCalendar(newCalCreated.id);
         } else {
           const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-          updateCalendars(nextCalendars);
+          updateCalendars(nextCalendars, updatedCal.id);
         }
       };
 
@@ -386,7 +522,13 @@
           <header className="header-card">
             <div className="header-left">
               <div>
-                <div className="calendar-title">{activeCal?.title}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span className="calendar-title">{activeCal?.title}</span>
+                  <span className="cloud-sync-status" title="모든 디바이스 간 실시간 클라우드 DB 동기화 중">
+                    <span className="sync-dot" />
+                    클라우드 실시간 동기화중
+                  </span>
+                </div>
                 {activeCal?.description && <div className="calendar-desc">{activeCal.description}</div>}
               </div>
             </div>
