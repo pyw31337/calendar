@@ -215,9 +215,10 @@
       '#3B82F6', '#6366F1', '#8B5CF6', '#EC4899', '#14B8A6'
     ];
 
-    const STORAGE_KEY = 'gather_calendars_persistent_v5';
-    const CLOUD_MAP_KEY = 'gather_cloud_object_ids_v1';
-    const CLOUD_API_BASE = 'https://api.restful-api.dev/objects';
+    const STORAGE_KEY = 'gather_calendars_cache_v6';
+    // Master Cloud DB Object ID shared by all devices and users
+    const MASTER_CLOUD_OBJECT_ID = 'ff8081819f7e10ae019fc4f5703f64aa';
+    const CLOUD_API_URL = `https://api.restful-api.dev/objects/${MASTER_CLOUD_OBJECT_ID}`;
 
     function getContrastTextColor(hexColor) {
       if (!hexColor) return '#FFFFFF';
@@ -280,120 +281,63 @@
       }
     ];
 
-    // Cloud Database Helper Functions
-    function getCloudMap() {
+    // Master Cloud DB Operations
+    async function fetchMasterCloudCalendars() {
       try {
-        const raw = localStorage.getItem(CLOUD_MAP_KEY);
-        return raw ? JSON.parse(raw) : {};
-      } catch (e) {
-        return {};
-      }
-    }
-
-    function setCloudMap(map) {
-      localStorage.setItem(CLOUD_MAP_KEY, JSON.stringify(map));
-    }
-
-    async function fetchCalendarFromCloud(calendarId) {
-      const map = getCloudMap();
-      const cloudObjId = map[calendarId];
-      if (!cloudObjId) return null;
-
-      try {
-        const res = await fetch(`${CLOUD_API_BASE}/${cloudObjId}`);
+        const res = await fetch(CLOUD_API_URL);
         if (res.ok) {
           const json = await res.json();
-          if (json && json.data && json.data.id === calendarId) {
-            return json.data;
+          if (json && json.data && Array.isArray(json.data.calendars) && json.data.calendars.length > 0) {
+            return json.data.calendars;
           }
         }
       } catch (e) {
-        console.warn('Cloud DB fetch error:', e);
+        console.warn('Master Cloud DB fetch error:', e);
       }
       return null;
     }
 
-    async function pushCalendarToCloud(calendar) {
-      if (!calendar || !calendar.id) return;
-      const map = getCloudMap();
-      const cloudObjId = map[calendar.id];
-
+    async function pushMasterCloudCalendars(calendarsData) {
       try {
-        if (cloudObjId) {
-          // Update existing Cloud DB object
-          const res = await fetch(`${CLOUD_API_BASE}/${cloudObjId}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              name: `gather_cal_${calendar.id}`,
-              data: calendar
-            })
-          });
-          if (res.ok) return;
-        }
-
-        // Create new Cloud DB object
-        const createRes = await fetch(CLOUD_API_BASE, {
-          method: 'POST',
+        await fetch(CLOUD_API_URL, {
+          method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            name: `gather_cal_${calendar.id}`,
-            data: calendar
+            name: 'gather_calendars_master_store',
+            data: { calendars: calendarsData }
           })
         });
-
-        if (createRes.ok) {
-          const createJson = await createRes.json();
-          if (createJson && createJson.id) {
-            map[calendar.id] = createJson.id;
-            setCloudMap(map);
-          }
-        }
       } catch (e) {
-        console.warn('Cloud DB push error:', e);
+        console.warn('Master Cloud DB push error:', e);
       }
     }
 
-    function loadCalendarsFromStorage() {
+    function loadLocalCache() {
       try {
         const raw = localStorage.getItem(STORAGE_KEY);
         if (raw) {
           const parsed = JSON.parse(raw);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            return parsed;
-          }
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
         }
-      } catch (err) {
-        console.error('Failed to parse saved calendars:', err);
-      }
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_CALENDARS));
+      } catch (e) {}
       return INITIAL_CALENDARS;
     }
 
-    function saveCalendarsToStorage(calendarsData) {
+    function saveLocalCache(data) {
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(calendarsData));
-      } catch (err) {
-        console.error('Failed to save calendars:', err);
-      }
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      } catch (e) {}
     }
 
     function App() {
-      const [calendars, setCalendarsState] = React.useState(() => loadCalendarsFromStorage());
+      const [calendars, setCalendarsState] = React.useState(() => loadLocalCache());
       const [isSyncing, setIsSyncing] = React.useState(false);
 
-      const updateCalendars = (nextCalendars, changedCalId = null) => {
+      // Central updater: Updates React State, saves Local Cache, and immediately pushes to Master Cloud DB
+      const updateCalendars = (nextCalendars) => {
         setCalendarsState(nextCalendars);
-        saveCalendarsToStorage(nextCalendars);
-
-        // Instantly push changed calendar to Cloud DB
-        const calToPush = changedCalId 
-          ? nextCalendars.find(c => c.id === changedCalId)
-          : nextCalendars[0];
-
-        if (calToPush) {
-          pushCalendarToCloud(calToPush);
-        }
+        saveLocalCache(nextCalendars);
+        pushMasterCloudCalendars(nextCalendars);
       };
 
       const [activeCalId, setActiveCalId] = React.useState(() => {
@@ -401,7 +345,7 @@
         if (requestedId && calendars.some(c => c.id === requestedId)) {
           return requestedId;
         }
-        return calendars[0]?.id || 'kkot';
+        return calendars[0]?.id || 'cw';
       });
 
       const [currentMonthDate, setCurrentMonthDate] = React.useState(new Date());
@@ -410,51 +354,40 @@
       const [isAdminOpen, setIsAdminOpen] = React.useState(false);
       const [isShareOpen, setIsShareOpen] = React.useState(false);
 
-      // Realtime Cloud DB sync & auto-polling every 4 seconds
+      // Realtime Cloud DB initial load & auto-polling loop every 3 seconds for all users & devices
       React.useEffect(() => {
         let isMounted = true;
 
         const syncWithCloud = async () => {
-          if (!activeCalId) return;
           setIsSyncing(true);
-
-          const cloudCal = await fetchCalendarFromCloud(activeCalId);
-          if (cloudCal && isMounted) {
-            setCalendarsState(prevCals => {
-              const exists = prevCals.some(c => c.id === cloudCal.id);
-              let next;
-              if (exists) {
-                next = prevCals.map(c => c.id === cloudCal.id ? cloudCal : c);
-              } else {
-                next = [cloudCal, ...prevCals];
-              }
-              saveCalendarsToStorage(next);
-              return next;
-            });
+          const cloudCalendars = await fetchMasterCloudCalendars();
+          if (cloudCalendars && isMounted) {
+            setCalendarsState(cloudCalendars);
+            saveLocalCache(cloudCalendars);
           }
           if (isMounted) setIsSyncing(false);
         };
 
-        // Initial fetch on active calendar change
+        // Initial sync on mount
         syncWithCloud();
 
-        // 4-second polling loop for real-time multi-device sync
-        const interval = setInterval(syncWithCloud, 4000);
+        // 3-second realtime loop
+        const interval = setInterval(syncWithCloud, 3000);
 
         return () => {
           isMounted = false;
           clearInterval(interval);
         };
-      }, [activeCalId]);
+      }, []);
 
-      // URL ID auto-initialization
+      // Auto-initialize calendar ID requested via URL parameter if missing
       React.useEffect(() => {
         const requestedId = getCalendarIdFromURL();
         if (requestedId && !calendars.some(c => c.id === requestedId)) {
           const newCal = {
             id: requestedId,
-            title: `${requestedId} 모임 달력`,
-            description: `${requestedId} 사모임 멤버들의 참석 가능 일자를 표기해 주세요`,
+            title: `${requestedId} 사모임 달력`,
+            description: `${requestedId} 멤버들의 참석 가능 일자를 표기해 주세요`,
             participants: [
               { id: 'p1', name: '참여자 1', color: '#EF4444' },
               { id: 'p2', name: '참여자 2', color: '#3B82F6' },
@@ -462,7 +395,7 @@
             ],
             availabilities: []
           };
-          updateCalendars([newCal, ...calendars], newCal.id);
+          updateCalendars([newCal, ...calendars]);
           setActiveCalId(requestedId);
         }
       }, []);
@@ -488,7 +421,7 @@
 
         const updatedCal = { ...activeCal, availabilities: nextAvail };
         const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-        updateCalendars(nextCalendars, updatedCal.id);
+        updateCalendars(nextCalendars);
 
         const dateCount = nextAvail.filter(e => e.date === dateStr).length;
         if (dateCount === activeCal.participants.length && typeof confetti === 'function') {
@@ -502,17 +435,17 @@
         );
         const updatedCal = { ...activeCal, availabilities: nextAvail };
         const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-        updateCalendars(nextCalendars, updatedCal.id);
+        updateCalendars(nextCalendars);
       };
 
       const handleSaveAdmin = (updatedCal, newCalCreated) => {
         if (newCalCreated) {
           const nextCalendars = [newCalCreated, ...calendars];
-          updateCalendars(nextCalendars, newCalCreated.id);
+          updateCalendars(nextCalendars);
           handleSelectCalendar(newCalCreated.id);
         } else {
           const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-          updateCalendars(nextCalendars, updatedCal.id);
+          updateCalendars(nextCalendars);
         }
       };
 
@@ -524,9 +457,9 @@
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <span className="calendar-title">{activeCal?.title}</span>
-                  <span className="cloud-sync-status" title="모든 디바이스 간 실시간 클라우드 DB 동기화 중">
+                  <span className="cloud-sync-status" title="전세계 모든 디바이스 간 실시간 클라우드 DB 연동 완료">
                     <span className="sync-dot" />
-                    클라우드 실시간 동기화중
+                    클라우드 DB 실시간 동기화중
                   </span>
                 </div>
                 {activeCal?.description && <div className="calendar-desc">{activeCal.description}</div>}
