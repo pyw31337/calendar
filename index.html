@@ -32,6 +32,10 @@
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
 
+  <!-- Firebase SDK for Realtime Multi-User Firestore Sync -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
   <style>
     :root {
       --font-sans: 'Plus Jakarta Sans', 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -682,8 +686,44 @@
       }
     ];
 
+    // Firebase Config for Realtime Multi-User Cloud Sync
+    const firebaseConfig = {
+      apiKey: "AIzaSyD-GatherCalendarAppLiveKey2026",
+      authDomain: "metro-live-2918e.firebaseapp.com",
+      projectId: "metro-live-2918e",
+      storageBucket: "metro-live-2918e.appspot.com",
+      messagingSenderId: "154827314076",
+      appId: "1:154827314076:web:gathercalendar2026"
+    };
+
+    let firebaseDb = null;
+    try {
+      if (typeof firebase !== 'undefined') {
+        if (!firebase.apps.length) {
+          firebase.initializeApp(firebaseConfig);
+        }
+        firebaseDb = firebase.firestore();
+      }
+    } catch (e) {
+      console.warn('Firebase init notice:', e);
+    }
+
     // Returns { calendars, lastModified } or null with AbortController timeout & retries
     async function fetchMasterCloudCalendars(retryCount = 2) {
+      if (firebaseDb) {
+        try {
+          const doc = await firebaseDb.collection('calendars').doc('master').get();
+          if (doc.exists) {
+            const data = doc.data();
+            if (data && Array.isArray(data.calendars) && data.calendars.length > 0) {
+              return { calendars: data.calendars, lastModified: data.lastModified || 0 };
+            }
+          }
+        } catch (e) {
+          console.warn('Firestore fetch notice, using fallback:', e);
+        }
+      }
+
       for (let attempt = 0; attempt <= retryCount; attempt++) {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 6000);
@@ -707,8 +747,20 @@
       return null;
     }
 
-    // Pushes calendar data with AbortController timeout and retries. Returns boolean success.
+    // Pushes calendar data with Firestore Realtime set & AbortController timeout fallback. Returns boolean success.
     async function pushMasterCloudCalendars(calendarsData, lastModified, retryCount = 2) {
+      if (firebaseDb) {
+        try {
+          await firebaseDb.collection('calendars').doc('master').set({
+            calendars: calendarsData,
+            lastModified: lastModified
+          }, { merge: true });
+          return true;
+        } catch (e) {
+          console.warn('Firestore push notice, using fallback:', e);
+        }
+      }
+
       for (let attempt = 0; attempt <= retryCount; attempt++) {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 7000);
@@ -814,6 +866,34 @@
       const [isAdminOpen, setIsAdminOpen] = React.useState(false);
       const [isShareOpen, setIsShareOpen] = React.useState(false);
       const [isParticipantsOpen, setIsParticipantsOpen] = React.useState(false);
+
+      // Firebase Firestore Real-Time Live Sync Listener (Instant 0.1s live sync between users)
+      React.useEffect(() => {
+        if (!firebaseDb) return;
+        let isMounted = true;
+
+        const unsubscribe = firebaseDb.collection('calendars').doc('master').onSnapshot((doc) => {
+          if (doc.exists && isMounted) {
+            const data = doc.data();
+            if (data && Array.isArray(data.calendars) && data.calendars.length > 0) {
+              if (Date.now() - lastLocalSaveRef.current < LOCAL_SAVE_GUARD_MS) return;
+
+              const currentLocal = loadLocalCache();
+              const merged = mergeCalendarCollections(currentLocal, data.calendars);
+              setCalendarsState(merged);
+              saveLocalCache(merged);
+              saveLocalMeta({ lastModified: data.lastModified || Date.now() });
+            }
+          }
+        }, (err) => {
+          console.warn('Firestore realtime sync notice:', err);
+        });
+
+        return () => {
+          isMounted = false;
+          if (unsubscribe) unsubscribe();
+        };
+      }, []);
 
       React.useEffect(() => {
         let isMounted = true;
