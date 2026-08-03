@@ -201,6 +201,8 @@
       '#3B82F6', '#6366F1', '#8B5CF6', '#EC4899', '#14B8A6'
     ];
 
+    const STORAGE_KEY = 'gather_calendars_persistent_v4';
+
     function getContrastTextColor(hexColor) {
       if (!hexColor) return '#FFFFFF';
       const hex = hexColor.replace('#', '');
@@ -262,15 +264,44 @@
       }
     ];
 
+    function loadCalendarsFromStorage() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return parsed;
+          }
+        }
+      } catch (err) {
+        console.error('Failed to parse saved calendars:', err);
+      }
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_CALENDARS));
+      return INITIAL_CALENDARS;
+    }
+
+    function saveCalendarsToStorage(calendarsData) {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(calendarsData));
+      } catch (err) {
+        console.error('Failed to save calendars:', err);
+      }
+    }
+
     function App() {
-      const [calendars, setCalendars] = React.useState(() => {
-        const raw = localStorage.getItem('gather_calendars_data_v3');
-        return raw ? JSON.parse(raw) : INITIAL_CALENDARS;
-      });
+      const [calendars, setCalendarsState] = React.useState(() => loadCalendarsFromStorage());
+
+      // Helper function to update state & localStorage simultaneously
+      const updateCalendars = (nextCalendars) => {
+        setCalendarsState(nextCalendars);
+        saveCalendarsToStorage(nextCalendars);
+      };
 
       const [activeCalId, setActiveCalId] = React.useState(() => {
         const requestedId = getCalendarIdFromURL();
-        if (requestedId) return requestedId;
+        if (requestedId && calendars.some(c => c.id === requestedId)) {
+          return requestedId;
+        }
         return calendars[0]?.id || 'kkot';
       });
 
@@ -280,6 +311,7 @@
       const [isAdminOpen, setIsAdminOpen] = React.useState(false);
       const [isShareOpen, setIsShareOpen] = React.useState(false);
 
+      // Handle URL requested ID on mount
       React.useEffect(() => {
         const requestedId = getCalendarIdFromURL();
         if (requestedId && !calendars.some(c => c.id === requestedId)) {
@@ -294,14 +326,10 @@
             ],
             availabilities: []
           };
-          setCalendars([newCal, ...calendars]);
+          updateCalendars([newCal, ...calendars]);
           setActiveCalId(requestedId);
         }
       }, []);
-
-      React.useEffect(() => {
-        localStorage.setItem('gather_calendars_data_v3', JSON.stringify(calendars));
-      }, [calendars]);
 
       const activeCal = calendars.find(c => c.id === activeCalId) || calendars[0];
 
@@ -323,7 +351,8 @@
         }
 
         const updatedCal = { ...activeCal, availabilities: nextAvail };
-        setCalendars(calendars.map(c => c.id === updatedCal.id ? updatedCal : c));
+        const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
+        updateCalendars(nextCalendars);
 
         const dateCount = nextAvail.filter(e => e.date === dateStr).length;
         if (dateCount === activeCal.participants.length && typeof confetti === 'function') {
@@ -336,15 +365,18 @@
           e => !(e.date === dateStr && e.participantId === participantId)
         );
         const updatedCal = { ...activeCal, availabilities: nextAvail };
-        setCalendars(calendars.map(c => c.id === updatedCal.id ? updatedCal : c));
+        const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
+        updateCalendars(nextCalendars);
       };
 
       const handleSaveAdmin = (updatedCal, newCalCreated) => {
         if (newCalCreated) {
-          setCalendars([newCalCreated, ...calendars]);
+          const nextCalendars = [newCalCreated, ...calendars];
+          updateCalendars(nextCalendars);
           handleSelectCalendar(newCalCreated.id);
         } else {
-          setCalendars(calendars.map(c => c.id === updatedCal.id ? updatedCal : c));
+          const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
+          updateCalendars(nextCalendars);
         }
       };
 
@@ -594,7 +626,7 @@
       );
     }
 
-    // Admin Modal with robust Participant Add handler
+    // Admin Modal with Calendar Switching & New Calendar Creation capability
     function AdminModal({ calendar, allCalendars, onSelectCalendar, onSave, onClose }) {
       const [title, setTitle] = React.useState(calendar.title);
       const [participants, setParticipants] = React.useState(calendar.participants);
@@ -643,7 +675,7 @@
 
       const handleSubmit = (e) => {
         e.preventDefault();
-        onSave({ ...calendar, title, participants }, null);
+        onSave({ ...calendar, title: title.trim(), participants }, null);
         onClose();
       };
 
