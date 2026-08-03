@@ -478,6 +478,11 @@ function getCalendarCloudUrl(calId) {
   return blobId ? `https://jsonblob.com/api/jsonBlob/${blobId}` : null;
 }
 
+function getCalendarShareUrl(calendarId) {
+  const basePath = window.location.pathname.replace(/\/(?:index\.html)?$/, '/');
+  return `${window.location.origin}${basePath}share/${encodeURIComponent(calendarId)}/`;
+}
+
 function cloneParticipant(participant) {
   return participant ? { ...participant } : participant;
 }
@@ -2022,7 +2027,7 @@ function App() {
     if (activeCal) {
       const calTitle = `${activeCal.title} - 모여라 캘린더`;
       const calDesc = activeCal.description || `${activeCal.title} 사모임 멤버들의 참석 가능 날짜 조율 캘린더입니다.`;
-      const currentShareUrl = `${window.location.origin}${window.location.pathname}?id=${activeCal.id}`;
+      const currentShareUrl = getCalendarShareUrl(activeCal.id);
       document.title = calTitle;
       const ogTitle = document.getElementById('og-title');
       if (ogTitle) ogTitle.setAttribute('content', calTitle);
@@ -3241,8 +3246,7 @@ function ShareModal({
   onCreateNewCal,
   onClose
 }) {
-  const baseUrl = `${window.location.origin}${window.location.pathname}`;
-  const shareUrl = `${baseUrl}?id=${calendar.id}`;
+  const shareUrl = getCalendarShareUrl(calendar.id);
   const handleCreateNewCalClick = () => {
     const id = prompt('새 모임 캘린더의 영문/한글 ID를 입력하세요 (예: kkot, cw, trip):', 'cal_' + Date.now().toString().slice(-4));
     if (!id) return;
