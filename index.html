@@ -673,6 +673,10 @@
               if (!dayNum) return <div key={idx} className="day-cell other-month" />;
 
               const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
+              const today = new Date();
+              const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+              const isToday = dateStr === todayStr;
+
               const entries = availMap[dateStr] || [];
               const isAllAvailable = totalPartCount > 0 && entries.length === totalPartCount;
 
@@ -683,7 +687,18 @@
                   onClick={() => onSelectDate(dateStr)}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span className="day-number">{dayNum}</span>
+                    <span
+                      className="day-number"
+                      style={isToday ? {
+                        backgroundColor: '#3B82F6',
+                        color: '#FFFFFF',
+                        borderRadius: '50%',
+                        fontWeight: '800',
+                        boxShadow: '0 2px 4px rgba(59, 130, 246, 0.4)'
+                      } : {}}
+                    >
+                      {dayNum}
+                    </span>
                     {isAllAvailable && <span style={{ fontSize: '0.65rem', color: '#10B981', fontWeight: 800 }}>전원</span>}
                   </div>
 
