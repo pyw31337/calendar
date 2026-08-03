@@ -294,6 +294,25 @@ async function readLocalMeta(browser, sessionId) {
   );
 }
 
+async function waitForLocalCalendar(browser, sessionId, calendarId, predicateSource, timeoutMs = 5000) {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    const matched = await evalInPage(
+      browser,
+      sessionId,
+      `(() => {
+        const calendars = JSON.parse(localStorage.getItem(${JSON.stringify(STORAGE_KEY)}) || '[]');
+        const calendar = calendars.find((item) => item && item.id === ${JSON.stringify(calendarId)});
+        if (!calendar) return false;
+        return (${predicateSource})(calendar);
+      })()`
+    );
+    if (matched) return true;
+    await sleep(100);
+  }
+  return false;
+}
+
 async function restoreLocalState(browser, sessionId, snapshot) {
   await evalInPage(
     browser,
@@ -309,10 +328,12 @@ async function restoreLocalState(browser, sessionId, snapshot) {
 
 async function captureSeedSnapshot(browser) {
   const targets = await browser.send('Target.getTargets');
+  const localUrl = new URL(LOCAL_BASE_URL);
+  const localPagePrefix = `${localUrl.origin}${localUrl.pathname}`;
   const target = (targets.targetInfos || []).find(
     (info) =>
       info.type === 'page' &&
-      /127\.0\.0\.1:4173/.test(info.url) &&
+      info.url.startsWith(localPagePrefix) &&
       /[?&]id=(kkot|cw)\b/.test(info.url)
   );
   if (!target) return null;
@@ -347,6 +368,10 @@ function activeParticipants(calendar) {
 
 function activeAvailabilities(calendar) {
   return (calendar?.availabilities || []).filter((availability) => !availability?.deletedAt);
+}
+
+function normalizeColor(color) {
+  return (color || '').trim().toLowerCase();
 }
 
 async function exerciseCalendar(browser, sessionId, otherSessionId, calendarId, snapshot) {
@@ -429,6 +454,15 @@ async function exerciseCalendar(browser, sessionId, otherSessionId, calendarId, 
 
   await clickByText(browser, sessionId, '설정 저장', '.modal-container');
   await waitForToast(browser, sessionId, '캘린더 설정이 저장되었습니다. ✅');
+  assert(
+    await waitForLocalCalendar(
+      browser,
+      sessionId,
+      calendarId,
+      `(calendar) => calendar.title === ${JSON.stringify(titleQa)} && calendar.description === ${JSON.stringify(descriptionQa)}`
+    ),
+    `${calendarId} settings save did not settle`
+  );
 
   const afterSettingsSave = await readLocalCalendars(browser, sessionId);
   const updated = getCalendarById(afterSettingsSave, calendarId);
@@ -469,13 +503,22 @@ async function exerciseCalendar(browser, sessionId, otherSessionId, calendarId, 
   );
   await clickByText(browser, sessionId, '설정 저장', '.modal-container');
   await waitForToast(browser, sessionId, '캘린더 설정이 저장되었습니다. ✅');
+  assert(
+    await waitForLocalCalendar(
+      browser,
+      sessionId,
+      calendarId,
+      `(calendar) => calendar.title === ${JSON.stringify(originalTitle)} && (calendar.description || '') === ${JSON.stringify(originalDescription)}`
+    ),
+    `${calendarId} settings restore did not settle`
+  );
 
   const restoredState = await readLocalCalendars(browser, sessionId);
   const restored = getCalendarById(restoredState, calendarId);
   assert(restored.title === originalTitle, `${calendarId} title was not restored`);
   assert((restored.description || '') === originalDescription, `${calendarId} description was not restored`);
   assert(activeParticipants(restored)[0].name === originalParticipants[0].name, `${calendarId} first participant name was not restored`);
-  assert(activeParticipants(restored)[0].color === originalParticipants[0].color, `${calendarId} first participant color was not restored`);
+  assert(normalizeColor(activeParticipants(restored)[0].color) === normalizeColor(originalParticipants[0].color), `${calendarId} first participant color was not restored`);
 
   // Availability create / edit / delete test
   const tempNote = `${calendarId}-note-${Date.now().toString().slice(-6)}`;
@@ -486,6 +529,15 @@ async function exerciseCalendar(browser, sessionId, otherSessionId, calendarId, 
   await setInputValue(browser, sessionId, '.modal-container input[type="text"]', tempNote);
   await clickButtonExactText(browser, sessionId, '등록/저장', '.modal-container');
   await waitForToast(browser, sessionId, '일정이 등록되었습니다.');
+  assert(
+    await waitForLocalCalendar(
+      browser,
+      sessionId,
+      calendarId,
+      `(calendar) => (calendar.availabilities || []).some((availability) => !availability.deletedAt && (availability.note || '') === ${JSON.stringify(tempNote)})`
+    ),
+    `${calendarId} note save did not settle`
+  );
 
   let afterNoteSave = await readLocalCalendars(browser, sessionId);
   let afterNoteCal = getCalendarById(afterNoteSave, calendarId);
@@ -504,6 +556,15 @@ async function exerciseCalendar(browser, sessionId, otherSessionId, calendarId, 
   await setInputValueByIndex(browser, sessionId, 0, tempNoteEdited);
   await clickButtonExactText(browser, sessionId, '등록/저장', '.modal-container');
   await waitForToast(browser, sessionId, '일정이 등록되었습니다.');
+  assert(
+    await waitForLocalCalendar(
+      browser,
+      sessionId,
+      calendarId,
+      `(calendar) => (calendar.availabilities || []).some((availability) => !availability.deletedAt && (availability.note || '') === ${JSON.stringify(tempNoteEdited)})`
+    ),
+    `${calendarId} note edit did not settle`
+  );
 
   afterNoteSave = await readLocalCalendars(browser, sessionId);
   afterNoteCal = getCalendarById(afterNoteSave, calendarId);
@@ -514,7 +575,15 @@ async function exerciseCalendar(browser, sessionId, otherSessionId, calendarId, 
 
   await openDateModal(browser, sessionId, targetDay);
   await clickButtonExactText(browser, sessionId, '삭제', '.modal-container');
-  await sleep(150);
+  assert(
+    await waitForLocalCalendar(
+      browser,
+      sessionId,
+      calendarId,
+      `(calendar) => !(calendar.availabilities || []).some((availability) => !availability.deletedAt && (availability.note || '') === ${JSON.stringify(tempNoteEdited)})`
+    ),
+    `${calendarId} note delete did not settle`
+  );
 
   afterNoteSave = await readLocalCalendars(browser, sessionId);
   afterNoteCal = getCalendarById(afterNoteSave, calendarId);

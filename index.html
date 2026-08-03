@@ -576,7 +576,14 @@ function mergeParticipantRecord(existing, incoming) {
   if (!incomingClone) return existingClone;
   const existingStamp = getItemStamp(existingClone);
   const incomingStamp = getItemStamp(incomingClone);
-  if (incomingStamp > existingStamp) return { ...existingClone, ...incomingClone };
+  if (incomingStamp > existingStamp) {
+    return {
+      ...existingClone,
+      ...incomingClone,
+      removedAt: incomingClone.removedAt || null,
+      deletedAt: incomingClone.deletedAt || null
+    };
+  }
   if (existingStamp > incomingStamp) return existingClone;
   return {
     ...existingClone,
@@ -593,7 +600,13 @@ function mergeAvailabilityRecord(existing, incoming) {
   if (!incomingClone) return existingClone;
   const existingStamp = getItemStamp(existingClone);
   const incomingStamp = getItemStamp(incomingClone);
-  if (incomingStamp > existingStamp) return { ...existingClone, ...incomingClone };
+  if (incomingStamp > existingStamp) {
+    return {
+      ...existingClone,
+      ...incomingClone,
+      deletedAt: incomingClone.deletedAt || null
+    };
+  }
   if (existingStamp > incomingStamp) return existingClone;
   return {
     ...existingClone,
@@ -1503,6 +1516,207 @@ async function fetchMasterCloudCalendars(retryCount = 2) {
   }
   return null;
 }
+
+function isAdminDashboardRoute() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get('admin') === '1' || params.get('mode') === 'admin';
+}
+
+function createDefaultCalendar(id) {
+  const now = Date.now();
+  return {
+    id,
+    title: `${id} 사모임 캘린더`,
+    description: `${id} 멤버들의 참석 가능 일자를 표기해 주세요`,
+    updatedAt: now,
+    revision: 1,
+    participants: [{
+      id: `${id}_p1`,
+      name: '참여자 1',
+      color: '#EF4444',
+      updatedAt: now
+    }, {
+      id: `${id}_p2`,
+      name: '참여자 2',
+      color: '#3B82F6',
+      updatedAt: now
+    }, {
+      id: `${id}_p3`,
+      name: '참여자 3',
+      color: '#10B981',
+      updatedAt: now
+    }],
+    availabilities: []
+  };
+}
+
+async function fetchAllServerCalendars() {
+  if (firebaseDb) {
+    const snap = await firebaseDb.collection('calendars').get();
+    const calendars = [];
+    let lastModified = 0;
+    snap.forEach(doc => {
+      const data = doc.data();
+      if (data?.calendar?.id) {
+        calendars.push(data.calendar);
+        lastModified = Math.max(lastModified, data.lastModified || 0);
+      }
+    });
+    return { calendars, lastModified };
+  }
+  return fetchMasterCloudCalendars();
+}
+
+function AdminDashboard({ initialCalendars }) {
+  const [serverCalendars, setServerCalendars] = React.useState(cloneCalendarList(initialCalendars || []));
+  const [loadedAt, setLoadedAt] = React.useState(null);
+  const [error, setError] = React.useState('');
+
+  React.useEffect(() => {
+    let isMounted = true;
+    const applyResult = (calendars) => {
+      if (!isMounted) return;
+      setServerCalendars(cloneCalendarList(calendars || []).map(normalizeCalendarForSave));
+      setLoadedAt(new Date());
+      setError('');
+    };
+
+    if (firebaseDb) {
+      const unsubscribe = firebaseDb.collection('calendars').onSnapshot(snapshot => {
+        const calendars = [];
+        snapshot.forEach(doc => {
+          const data = doc.data();
+          if (data?.calendar?.id) calendars.push(data.calendar);
+        });
+        applyResult(calendars);
+      }, err => {
+        if (isMounted) setError(err.message || '대시보드 데이터를 불러오지 못했습니다.');
+      });
+      return () => {
+        isMounted = false;
+        unsubscribe();
+      };
+    }
+
+    const load = async () => {
+      try {
+        const result = await fetchAllServerCalendars();
+        applyResult(result?.calendars || []);
+      } catch (err) {
+        if (isMounted) setError(err.message || '대시보드 데이터를 불러오지 못했습니다.');
+      }
+    };
+    load();
+    const intervalId = setInterval(load, 7000);
+    return () => {
+      isMounted = false;
+      clearInterval(intervalId);
+    };
+  }, []);
+
+  const calendarsList = serverCalendars.filter(Boolean).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+  const totalParticipants = calendarsList.reduce((sum, cal) => sum + getActiveParticipants(cal).length, 0);
+  const activeAvailabilities = calendarsList.flatMap(cal => getActiveAvailabilities(cal).map(item => ({ ...item, calendarId: cal.id })));
+  const totalSchedules = activeAvailabilities.length;
+  const uniqueDateCount = new Set(activeAvailabilities.map(item => `${item.calendarId}_${item.date}`)).size;
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const upcomingCount = activeAvailabilities.filter(item => item.date >= todayStr).length;
+  const maxSchedules = Math.max(1, ...calendarsList.map(cal => getActiveAvailabilities(cal).length));
+  const adminUpdatedText = loadedAt ? loadedAt.toLocaleString('ko-KR') : '불러오는 중';
+
+  return /*#__PURE__*/React.createElement("div", {
+    className: "app-container"
+  }, /*#__PURE__*/React.createElement("header", {
+    className: "header-card"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "calendar-title"
+  }, "캘린더 관리자 대시보드"), /*#__PURE__*/React.createElement("div", {
+    className: "calendar-desc"
+  }, "Firestore 기준 전체 캘린더 현황 · ", adminUpdatedText)), /*#__PURE__*/React.createElement("div", {
+    className: "header-actions"
+  }, /*#__PURE__*/React.createElement("a", {
+    className: "btn btn-secondary",
+    href: `${window.location.pathname}?id=kkot`
+  }, "kkot 열기"), /*#__PURE__*/React.createElement("a", {
+    className: "btn btn-secondary",
+    href: `${window.location.pathname}?id=cw`
+  }, "cw 열기"))), error && /*#__PURE__*/React.createElement("div", {
+    className: "summary-card",
+    style: { color: '#DC2626', marginBottom: '18px' }
+  }, error), /*#__PURE__*/React.createElement("section", {
+    className: "summary-card",
+    style: { marginBottom: '20px' }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+      gap: '12px'
+    }
+  }, [{
+    label: '총 캘린더',
+    value: calendarsList.length
+  }, {
+    label: '총 참여자',
+    value: totalParticipants
+  }, {
+    label: '총 일정',
+    value: totalSchedules
+  }, {
+    label: '등록 날짜',
+    value: uniqueDateCount
+  }, {
+    label: '예정 일정',
+    value: upcomingCount
+  }].map(card => /*#__PURE__*/React.createElement("div", {
+    key: card.label,
+    style: {
+      border: '1px solid var(--border-subtle)',
+      borderRadius: '8px',
+      padding: '14px',
+      background: '#F8FAFC'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { fontSize: '0.82rem', color: 'var(--text-muted)', fontWeight: 800, marginBottom: '6px' }
+  }, card.label), /*#__PURE__*/React.createElement("div", {
+    style: { fontSize: '1.55rem', fontWeight: 900, color: 'var(--text-main)' }
+  }, card.value))))), /*#__PURE__*/React.createElement("section", {
+    className: "summary-card"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "summary-title"
+  }, "캘린더별 현황"), calendarsList.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    style: { color: 'var(--text-muted)', fontSize: '0.9rem' }
+  }, "아직 표시할 캘린더가 없습니다.") : calendarsList.map(cal => {
+    const participants = getActiveParticipants(cal);
+    const schedules = getActiveAvailabilities(cal);
+    const width = `${Math.max(4, Math.round(schedules.length / maxSchedules * 100))}%`;
+    const calendarUrl = `${window.location.pathname}?id=${encodeURIComponent(cal.id)}`;
+    return /*#__PURE__*/React.createElement("a", {
+      key: cal.id,
+      href: calendarUrl,
+      className: "date-item-btn",
+      style: { textDecoration: 'none' }
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "date-item-left",
+      style: { width: '100%' }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: { display: 'flex', justifyContent: 'space-between', gap: '10px', width: '100%', flexWrap: 'wrap' }
+    }, /*#__PURE__*/React.createElement("strong", null, cal.title || cal.id), /*#__PURE__*/React.createElement("span", {
+      className: "date-item-badge"
+    }, participants.length, "명 · ", schedules.length, "건")), /*#__PURE__*/React.createElement("div", {
+      style: { color: 'var(--text-muted)', fontSize: '0.84rem' }
+    }, cal.description || cal.id), /*#__PURE__*/React.createElement("div", {
+      style: { width: '100%', height: '8px', borderRadius: '999px', background: '#E2E8F0', overflow: 'hidden' }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: { width, height: '100%', background: '#10B981' }
+    })), /*#__PURE__*/React.createElement("div", {
+      style: { display: 'flex', gap: '5px', flexWrap: 'wrap' }
+    }, participants.slice(0, 12).map(p => /*#__PURE__*/React.createElement("span", {
+      key: p.id,
+      className: "participant-badge",
+      style: { backgroundColor: p.color, color: getContrastTextColor(p.color) }
+    }, p.name)))));
+  })));
+}
 function App() {
   const [calendars, setCalendarsState] = React.useState(() => loadLocalCache());
   const [toast, setToast] = React.useState(null);
@@ -1590,6 +1804,12 @@ function App() {
   const [isShareOpen, setIsShareOpen] = React.useState(false);
   const [isParticipantsOpen, setIsParticipantsOpen] = React.useState(false);
 
+  if (isAdminDashboardRoute()) {
+    return /*#__PURE__*/React.createElement(AdminDashboard, {
+      initialCalendars: calendars
+    });
+  }
+
   // Firebase Firestore Real-Time Listener (ISOLATED per activeCalId)
   React.useEffect(() => {
     if (!firebaseDb || !activeCalId) return;
@@ -1659,30 +1879,28 @@ function App() {
     }
   }, [activeCal]);
   React.useEffect(() => {
+    let cancelled = false;
     const requestedId = getCalendarIdFromURL();
     if (requestedId && !calendars.some(c => c.id === requestedId)) {
-      const newCal = {
-        id: requestedId,
-        title: `${requestedId} 사모임 캘린더`,
-        description: `${requestedId} 멤버들의 참석 가능 일자를 표기해 주세요`,
-        participants: [{
-          id: 'p1',
-          name: '참여자 1',
-          color: '#EF4444'
-        }, {
-          id: 'p2',
-          name: '참여자 2',
-          color: '#3B82F6'
-        }, {
-          id: 'p3',
-          name: '참여자 3',
-          color: '#10B981'
-        }],
-        availabilities: []
+      const resolveRequestedCalendar = async () => {
+        const existing = await fetchSingleCloudCalendar(requestedId, 1);
+        if (cancelled) return;
+        if (existing?.calendar) {
+          applyServerCalendars(mergeCalendarCollections(calendars, [existing.calendar], {
+            replaceMatchingId: true
+          }), existing.lastModified || Date.now());
+          setActiveCalId(requestedId);
+          return;
+        }
+        const newCal = createDefaultCalendar(requestedId);
+        const saved = await updateCalendars([newCal, ...calendars], '새 캘린더가 생성되었습니다. ✅', 'success', requestedId);
+        if (!cancelled && saved !== false) setActiveCalId(requestedId);
       };
-      updateCalendars([newCal, ...calendars]);
-      setActiveCalId(requestedId);
+      resolveRequestedCalendar();
     }
+    return () => {
+      cancelled = true;
+    };
   }, []);
   const handleSelectCalendar = id => {
     setActiveCalId(id);
@@ -2561,23 +2779,9 @@ function AdminModal({
     const calTitle = prompt('캘린더 제목을 입력해 주세요:', `${id} 모임 캘린더`);
     if (!calTitle) return;
     const newCal = {
-      id: id.trim(),
+      ...createDefaultCalendar(id.trim()),
       title: calTitle.trim(),
-      description: `${calTitle.trim()} 참여자들의 일정 조율`,
-      updatedAt: Date.now(),
-      revision: 1,
-      participants: [{
-        id: 'p1',
-        name: '참여자 1',
-        color: '#EF4444',
-        updatedAt: Date.now()
-      }, {
-        id: 'p2',
-        name: '참여자 2',
-        color: '#3B82F6',
-        updatedAt: Date.now()
-      }],
-      availabilities: []
+      description: `${calTitle.trim()} 참여자들의 일정 조율`
     };
     if (onCreateNewCal) onCreateNewCal(newCal);
   };
@@ -2808,23 +3012,9 @@ function ShareModal({
     const calTitle = prompt('캘린더 제목을 입력해 주세요:', `${id} 모임 캘린더`);
     if (!calTitle) return;
     const newCal = {
-      id: id.trim(),
+      ...createDefaultCalendar(id.trim()),
       title: calTitle.trim(),
-      description: `${calTitle.trim()} 참여자들의 일정 조율`,
-      updatedAt: Date.now(),
-      revision: 1,
-      participants: [{
-        id: 'p1',
-        name: '참여자 1',
-        color: '#EF4444',
-        updatedAt: Date.now()
-      }, {
-        id: 'p2',
-        name: '참여자 2',
-        color: '#3B82F6',
-        updatedAt: Date.now()
-      }],
-      availabilities: []
+      description: `${calTitle.trim()} 참여자들의 일정 조율`
     };
     onCreateNewCal(newCal);
   };

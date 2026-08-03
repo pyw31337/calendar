@@ -5,6 +5,10 @@ env/
 __pycache__/
 *.pyc
 
+# Node / build artifacts
+node_modules/
+dist/
+
 # Local files
 .env
 booking_checker.log
