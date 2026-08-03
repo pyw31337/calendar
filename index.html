@@ -1563,7 +1563,17 @@ function firestoreDocumentToJs(doc) {
   return Object.fromEntries(Object.entries(fields).map(([key, value]) => [key, firestoreValueToJs(value)]));
 }
 
-async function pushSingleCalendarWithRest(normalizedCal, lastModified, saveMode, retryCount = 3) {
+function isRetryableFirestoreConflict(errorText) {
+  return /ABORTED|FAILED_PRECONDITION|409|stored version|base version/i.test(String(errorText || ''));
+}
+
+function getFirestoreRetryDelay(attempt) {
+  const baseDelay = Math.min(3000, 180 * Math.pow(1.55, attempt));
+  const jitter = Math.floor(Math.random() * 180);
+  return baseDelay + jitter;
+}
+
+async function pushSingleCalendarWithRest(normalizedCal, lastModified, saveMode, retryCount = 18) {
   const docPath = `projects/metro-live-2918e/databases/(default)/documents/calendars/cal_${normalizedCal.id}`;
   const docUrl = `https://firestore.googleapis.com/v1/${docPath}`;
   for (let attempt = 0; attempt <= retryCount; attempt += 1) {
@@ -1607,22 +1617,23 @@ async function pushSingleCalendarWithRest(normalizedCal, lastModified, saveMode,
       });
       if (commitRes.ok) return true;
       const errorText = await commitRes.text();
-      if (!/ABORTED|FAILED_PRECONDITION|409|400/.test(errorText) || attempt === retryCount) {
+      if (!isRetryableFirestoreConflict(errorText) || attempt === retryCount) {
         throw new Error(errorText.slice(0, 500));
       }
+      await new Promise(resolve => setTimeout(resolve, getFirestoreRetryDelay(attempt)));
     } catch (error) {
       if (attempt === retryCount) {
         console.warn(`Firestore REST fallback failed for cal_${normalizedCal.id}:`, error);
         return false;
       }
-      await new Promise(resolve => setTimeout(resolve, 400 * (attempt + 1)));
+      await new Promise(resolve => setTimeout(resolve, getFirestoreRetryDelay(attempt)));
     }
   }
   return false;
 }
 
 // Pushes isolated calendar data to the durable master store and Firestore when available.
-async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 3, allCalendars = null, saveMode = 'availability') {
+async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 18, allCalendars = null, saveMode = 'availability') {
   const normalizedCal = normalizeCalendarForSave(targetCal);
   if (!normalizedCal || !normalizedCal.id) return false;
   if (!isValidCalendarId(normalizedCal.id)) return false;
@@ -1713,6 +1724,10 @@ function isAdminDashboardRoute() {
   return params.get('admin') === '1' || params.get('mode') === 'admin';
 }
 
+function isInternalTestCalendarId(id) {
+  return typeof id === 'string' && /^(stress_|test_)/.test(id);
+}
+
 function createDefaultCalendar(id) {
   const now = Date.now();
   return {
@@ -1801,7 +1816,9 @@ function AdminDashboard({ initialCalendars }) {
     };
   }, []);
 
-  const calendarsList = serverCalendars.filter(Boolean).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+  const calendarsList = serverCalendars
+    .filter(cal => cal && !isInternalTestCalendarId(cal.id))
+    .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
   const totalParticipants = calendarsList.reduce((sum, cal) => sum + getActiveParticipants(cal).length, 0);
   const activeAvailabilities = calendarsList.flatMap(cal => getActiveAvailabilities(cal).map(item => ({ ...item, calendarId: cal.id })));
   const totalSchedules = activeAvailabilities.length;
@@ -1835,7 +1852,7 @@ function AdminDashboard({ initialCalendars }) {
     };
     const nextCalendars = [newCal, ...calendarsList];
     setError('');
-    const saved = await pushSingleCloudCalendar(newCal, now, 3, nextCalendars, 'replace');
+    const saved = await pushSingleCloudCalendar(newCal, now, 18, nextCalendars, 'replace');
     if (!saved) {
       showAdminToast('새 캘린더 생성에 실패했습니다. 다시 시도해 주세요.', 'error');
       return;
@@ -2019,7 +2036,7 @@ function App() {
       isSavingRef.current = true;
       previousCalendars = calendars;
       setCalendarsState(normalizedCalendars);
-      const saved = await pushSingleCloudCalendar(currentCal, now, 4, normalizedCalendars, saveMode);
+      const saved = await pushSingleCloudCalendar(currentCal, now, 18, normalizedCalendars, saveMode);
       if (!saved) {
         console.warn('Cloud save failed for calendar:', currentCal.id);
         if (previousCalendars) setCalendarsState(previousCalendars);
