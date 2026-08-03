@@ -20,7 +20,20 @@
 ```bash
 npm install
 npm run build
+npm run safety:test
 ```
+
+## 운영 점검
+
+```bash
+npm run ops:audit
+npm run ops:clean-stress
+```
+
+- 운영 캘린더 ID는 `kkot`, `cw`만 허용합니다.
+- `ops:audit`는 Firestore의 운영 문서 크기, 참여자 수, 일정 수, 테스트 문서 잔여 여부를 점검합니다.
+- `ops:clean-stress`는 `cal_stress_*`, `cal_test_*` 문서 삭제를 시도합니다. Firestore 규칙상 익명 삭제가 막히면 Firebase Console 또는 인증된 Firebase CLI/Admin SDK로 삭제해야 합니다.
+- `npm run stress:firebase`는 실제 Firestore에 테스트 문서를 생성하는 부하 테스트입니다. 운영 점검 목적이 아니라 저장 충돌 재현이 필요할 때만 실행하세요.
 
 ## GitHub Actions
 

@@ -100,6 +100,7 @@ const testCalendars = [
 
 async function runCalendarStress(target) {
   const context = createContext(`https://pyw31337.github.io/calendar/?id=${target.id}`);
+  context.window.__ALLOW_INTERNAL_TEST_CALENDARS__ = true;
   runAppScript(context, `
     const colors = ['#EF4444', '#3B82F6', '#10B981', '#EC4899', '#8B5CF6', '#F59E0B', '#14B8A6', '#64748B'];
     const participants = Array.from({ length: 8 }, (_, index) => ({
@@ -191,6 +192,7 @@ await Promise.all(testCalendars.map(runCalendarStress));
 
 for (const target of testCalendars) {
   const context = createContext(`https://pyw31337.github.io/calendar/?id=${target.id}`);
+  context.window.__ALLOW_INTERNAL_TEST_CALENDARS__ = true;
   runAppScript(context, `
     globalThis.__decode = (doc) => firestoreDocumentToJs(doc);
     globalThis.__activeParticipants = (calendar) => getActiveParticipants(calendar);

@@ -90,6 +90,9 @@ runAppScript(productionContext, `
   if (!isValidCalendarId('kkot') || isValidCalendarId('../bad') || isValidCalendarId('bad!')) {
     throw new Error('calendar id validation failed');
   }
+  if (!isAllowedCalendarId('kkot') || !isAllowedCalendarId('cw') || isAllowedCalendarId('trip')) {
+    throw new Error('production calendar allowlist failed');
+  }
 `);
 
 const concurrencyContext = createContext('https://pyw31337.github.io/calendar/?id=kkot');

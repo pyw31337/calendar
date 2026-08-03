@@ -11,7 +11,9 @@
     "og:generate": "node scripts/generate-og-pages.mjs",
     "regression:test": "node scripts/regression-check.mjs",
     "safety:test": "node scripts/firebase-safety-tests.mjs",
-    "stress:firebase": "node scripts/firebase-live-stress-tests.mjs"
+    "stress:firebase": "node scripts/firebase-live-stress-tests.mjs",
+    "ops:audit": "node scripts/firebase-ops-audit.mjs",
+    "ops:clean-stress": "node scripts/firebase-clean-stress-docs.mjs"
   },
   "dependencies": {
     "canvas-confetti": "^1.9.2",
