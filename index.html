@@ -710,12 +710,12 @@
           const doc = await firebaseDb.collection('calendars').doc('master').get();
           if (doc.exists) {
             const data = doc.data();
-            if (data && Array.isArray(data.calendars) && data.calendars.length > 0) {
-              return { calendars: data.calendars, lastModified: data.lastModified || 0 };
+            if (data && data.calendar) {
+              return { calendar: data.calendar, lastModified: data.lastModified || 0 };
             }
           }
         } catch (e) {
-          console.warn('Firestore fetch notice, using fallback:', e);
+          console.warn(`Firestore fetch notice for cal_${calId}:`, e);
         }
       }
 
@@ -727,13 +727,13 @@
           clearTimeout(timeoutId);
           if (res.ok) {
             const json = await res.json();
-            if (json && Array.isArray(json.calendars) && json.calendars.length > 0) {
-              return { calendars: json.calendars, lastModified: json.lastModified || 0 };
+            if (json && Array.isArray(json.calendars)) {
+              const matched = json.calendars.find(c => c.id === calId);
+              if (matched) return { calendar: matched, lastModified: json.lastModified || 0 };
             }
           }
         } catch (e) {
           clearTimeout(timeoutId);
-          console.warn(`Master Cloud DB fetch attempt ${attempt + 1} failed:`, e.name || e);
         }
         if (attempt < retryCount) {
           await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
@@ -742,33 +742,19 @@
       return null;
     }
 
-    // Pushes calendar data with Firestore Realtime set & AbortController timeout fallback. Returns boolean success.
-    async function pushMasterCloudCalendars(calendarsData, lastModified, retryCount = 2) {
+    // Pushes isolated calendar data to Firestore (cal_{id}) and master fallback. Returns boolean success.
+    async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 2) {
+      if (!targetCal || !targetCal.id) return false;
       if (firebaseDb) {
         try {
-          // Push both master collection doc and individual calendar docs for scalable storage
-          const batchPromises = [
-            firebaseDb.collection('calendars').doc('master').set({
-              calendars: calendarsData,
-              lastModified: lastModified
-            }, { merge: true })
-          ];
-
-          calendarsData.forEach(cal => {
-            if (cal && cal.id) {
-              batchPromises.push(
-                firebaseDb.collection('calendars').doc(`cal_${cal.id}`).set({
-                  calendar: cal,
-                  lastModified: lastModified
-                }, { merge: true })
-              );
-            }
+          // Store directly into its isolated calendar document (Replaces whole state so deletions are exact)
+          await firebaseDb.collection('calendars').doc(`cal_${targetCal.id}`).set({
+            calendar: targetCal,
+            lastModified: lastModified
           });
-
-          await Promise.all(batchPromises);
           return true;
         } catch (e) {
-          console.warn('Firestore push notice, using fallback:', e);
+          console.warn(`Firestore push notice for cal_${targetCal.id}:`, e);
         }
       }
 
@@ -776,19 +762,18 @@
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 7000);
         try {
+          const currentLocal = loadLocalCache();
+          const nextCalendars = currentLocal.map(c => c.id === targetCal.id ? targetCal : c);
           const res = await fetch(CLOUD_API_URL, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ calendars: calendarsData, lastModified }),
+            body: JSON.stringify({ calendars: nextCalendars, lastModified }),
             signal: controller.signal
           });
           clearTimeout(timeoutId);
-          if (res.ok) {
-            return true;
-          }
+          if (res.ok) return true;
         } catch (e) {
           clearTimeout(timeoutId);
-          console.warn(`Master Cloud DB push attempt ${attempt + 1} failed:`, e.name || e);
         }
         if (attempt < retryCount) {
           await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
@@ -817,7 +802,6 @@
         if (raw) {
           const parsed = JSON.parse(raw);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            // Always Union-Merge local cache with INITIAL_CALENDARS so no historical restored data is lost
             return mergeCalendarCollections(INITIAL_CALENDARS, parsed);
           }
         }
@@ -836,7 +820,7 @@
       const [isSyncing, setIsSyncing] = React.useState(false);
       const [toast, setToast] = React.useState(null);
 
-      const showToast = (message, type = 'info', duration = 3500) => {
+      const showToast = (message, type = 'info', duration = 3000) => {
         setToast({ message, type });
         setTimeout(() => {
           setToast(t => t?.message === message ? null : t);
@@ -845,21 +829,21 @@
 
       // Ref to block cloud sync from overwriting very recent local saves
       const lastLocalSaveRef = React.useRef(0);
-      const LOCAL_SAVE_GUARD_MS = 15000; // 15s guard window after local save
+      const LOCAL_SAVE_GUARD_MS = 10000; // 10s guard window after local save
 
-      const updateCalendars = async (nextCalendars) => {
+      const updateCalendars = async (nextCalendars, toastMsg = '일정이 저장되었습니다.', toastType = 'success') => {
         const now = Date.now();
         lastLocalSaveRef.current = now;
         saveLocalMeta({ lastModified: now }); // stamp local save time
         setCalendarsState(nextCalendars);
         saveLocalCache(nextCalendars);
 
-        // Try pushing to cloud asynchronously with user feedback
-        const success = await pushMasterCloudCalendars(nextCalendars, now);
-        if (success) {
-          showToast('일정이 정상적으로 저장되었습니다.', 'success', 2500);
-        } else {
-          showToast('로컬에 안전하게 저장되었습니다 (클라우드 서버 연결 지연 중)', 'info', 4500);
+        // Find active calendar and push to its isolated Firestore document
+        const currentCal = nextCalendars.find(c => c.id === activeCalId) || nextCalendars[0];
+        showToast(toastMsg, toastType, 2500);
+
+        if (currentCal) {
+          pushSingleCloudCalendar(currentCal, now);
         }
       };
 
@@ -878,7 +862,43 @@
       const [isShareOpen, setIsShareOpen] = React.useState(false);
       const [isParticipantsOpen, setIsParticipantsOpen] = React.useState(false);
 
-      // Firebase Firestore Real-Time Live Sync Listener (Instant 0.1s live sync between users)
+      // Firebase Firestore Real-Time Listener (ISOLATED per activeCalId)
+      React.useEffect(() => {
+        if (!firebaseDb || !activeCalId) return;
+        let isMounted = true;
+
+        // Listen ONLY to this active calendar document (cal_{id}) for 100% strict isolation!
+        const unsubscribe = firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).onSnapshot((doc) => {
+          if (doc.exists && isMounted) {
+            const data = doc.data();
+            if (data && data.calendar && data.calendar.id === activeCalId) {
+              // Guard: skip cloud update if we recently saved locally
+              if (Date.now() - lastLocalSaveRef.current < LOCAL_SAVE_GUARD_MS) return;
+
+              const cloudCal = data.calendar;
+              const localMeta = loadLocalMeta();
+              const cloudLastMod = data.lastModified || 0;
+
+              if (cloudLastMod > localMeta.lastModified) {
+                setCalendarsState(prevCals => {
+                  const nextCals = prevCals.map(c => c.id === activeCalId ? cloudCal : c);
+                  saveLocalCache(nextCals);
+                  saveLocalMeta({ lastModified: cloudLastMod });
+                  return nextCals;
+                });
+              }
+            }
+          }
+        }, (err) => {
+          console.warn(`Firestore realtime sync notice for cal_${activeCalId}:`, err);
+        });
+
+        return () => {
+          isMounted = false;
+          if (unsubscribe) unsubscribe();
+        };
+      }, [activeCalId]);
+
       React.useEffect(() => {
         if (!firebaseDb) return;
         let isMounted = true;
@@ -1006,7 +1026,7 @@
 
         const updatedCal = { ...activeCal, availabilities: nextAvail };
         const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-        updateCalendars(nextCalendars);
+        updateCalendars(nextCalendars, '일정이 정상적으로 저장되었습니다. ✅', 'success');
 
         const dateCount = nextAvail.filter(e => e.date === dateStr).length;
         if (dateCount === activeCal.participants.length && typeof confetti === 'function') {
@@ -1020,14 +1040,14 @@
         );
         const updatedCal = { ...activeCal, availabilities: nextAvail };
         const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-        updateCalendars(nextCalendars);
+        updateCalendars(nextCalendars, '참여자 일정이 삭제되었습니다. 🗑️', 'delete');
       };
 
       const handleDeleteAllForDate = (dateStr) => {
         const nextAvail = (activeCal.availabilities || []).filter(e => e.date !== dateStr);
         const updatedCal = { ...activeCal, availabilities: nextAvail };
         const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-        updateCalendars(nextCalendars);
+        updateCalendars(nextCalendars, '해당 날짜의 모든 일정이 삭제되었습니다. 🗑️', 'delete');
       };
 
       const handleSaveAdmin = (updatedCal, newCalCreated) => {
@@ -1151,22 +1171,21 @@
             <div
               style={{
                 position: 'fixed',
-                bottom: '24px',
+                bottom: '32px',
                 left: '50%',
                 transform: 'translateX(-50%)',
-                zIndex: 9999,
-                backgroundColor: toast.type === 'error' ? '#EF4444' : toast.type === 'success' ? '#10B981' : '#3B82F6',
+                zIndex: 99999,
+                backgroundColor: toast.type === 'delete' ? '#EF4444' : toast.type === 'success' ? '#10B981' : '#3B82F6',
                 color: '#FFFFFF',
-                padding: '10px 20px',
+                padding: '12px 24px',
                 borderRadius: '30px',
-                boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
-                fontSize: '0.9rem',
-                fontWeight: '700',
+                boxShadow: '0 12px 32px rgba(0,0,0,0.25)',
+                fontSize: '0.95rem',
+                fontWeight: '800',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
-                pointerEvents: 'none',
-                animation: 'fadeInUp 0.25s ease-out'
+                pointerEvents: 'none'
               }}
             >
               <span>{toast.message}</span>
