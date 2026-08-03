@@ -15,7 +15,7 @@
   <meta property="og:site_name" content="모여라 캘린더">
   <meta property="og:title" id="og-title" content="모여라 캘린더 - 사모임 일정 조율 & 가능 날짜 캘린더">
   <meta property="og:description" id="og-desc" content="사모임 참여자들의 가능 날짜를 캘린더에 표기하고 전원 모임 가능한 날짜를 한눈에 파악해보세요.">
-  <meta property="og:image" content="https://pyw31337.github.io/calendar/og-thumb.jpg?v=20260803">
+  <meta property="og:image" content="https://pyw31337.github.io/calendar/og-thumb.jpg?v=20260804">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta property="og:url" id="og-url" content="https://pyw31337.github.io/calendar/">
@@ -24,7 +24,7 @@
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" id="tw-title" content="모여라 캘린더">
   <meta name="twitter:description" content="사모임 일정 조율 플랫폼">
-  <meta name="twitter:image" content="https://pyw31337.github.io/calendar/og-thumb.jpg?v=20260803">
+  <meta name="twitter:image" content="https://pyw31337.github.io/calendar/og-thumb.jpg?v=20260804">
 
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -2306,7 +2306,7 @@ function buildAdminDashboardMetrics(calendarsList) {
   const qualityWarnings = calendarStats.flatMap(stat => {
     const warnings = [];
     if (stat.sizePercent >= 75) warnings.push(`${stat.calendar.id}: Firestore 문서 크기 ${stat.sizePercent}%`);
-    if (stat.deletedCount > 200) warnings.push(`${stat.calendar.id}: 삭제 이력 ${stat.deletedCount}건 정리 검토`);
+    if (stat.deletedCount > 200) warnings.push(`${stat.calendar.id}: 삭제 이력 ${stat.deletedCount}건 보존 중`);
     if (stat.participants.length === 0) warnings.push(`${stat.calendar.id}: 활성 참여자 없음`);
     if (stat.schedules.some(item => !stat.participants.some(participant => participant.id === item.participantId))) {
       warnings.push(`${stat.calendar.id}: 참여자와 연결되지 않은 일정 존재`);

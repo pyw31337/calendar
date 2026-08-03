@@ -14,7 +14,8 @@
     "stress:firebase": "node scripts/firebase-live-stress-tests.mjs",
     "ops:audit": "node scripts/firebase-ops-audit.mjs",
     "ops:export": "node scripts/firebase-export-prod.mjs",
-    "ops:clean-stress": "node scripts/firebase-clean-stress-docs.mjs"
+    "ops:clean-stress": "node scripts/firebase-clean-stress-docs.mjs",
+    "restore:rehearsal": "node scripts/restore-rehearsal.mjs"
   },
   "dependencies": {
     "canvas-confetti": "^1.9.2",

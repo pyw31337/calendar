@@ -638,8 +638,9 @@ async function exerciseCalendar(browser, sessionId, otherSessionId, calendarId, 
 
   return {
     calendarId,
+    scenario: 'local browser mutation isolation',
     restoredTitle: restored.title,
-    participantCount: activeParticipants(restored).length
+    localScenarioParticipantCount: activeParticipants(restored).length
   };
 }
 

@@ -3,7 +3,7 @@ import path from 'node:path';
 
 const PROJECT_ID = 'metro-live-2918e';
 const BASE_URL = 'https://pyw31337.github.io/calendar';
-const OG_IMAGE_URL = `${BASE_URL}/og-thumb.jpg?v=20260803`;
+const OG_IMAGE_URL = `${BASE_URL}/og-thumb.jpg?v=20260804`;
 const OUT_DIR = path.resolve('share');
 const FALLBACK_TITLE = '모여라 캘린더';
 const FALLBACK_DESCRIPTION = '사모임 참여자들의 가능 날짜를 캘린더에 표기하고 전원 모임 가능한 날짜를 한눈에 파악해보세요.';
