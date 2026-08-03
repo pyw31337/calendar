@@ -1436,15 +1436,14 @@ function App() {
         showToast('활성 캘린더를 찾을 수 없어 저장하지 못했습니다.', 'error');
         return false;
       }
-
-      const saved = await pushSingleCloudCalendar(currentCal, now);
-      if (!saved) {
-        console.warn('Cloud save failed for calendar:', currentCal.id);
-        showToast('저장에 실패했습니다. 다시 시도해 주세요.', 'error');
-        return false;
-      }
-
       showToast(toastMsg, toastType, 3000);
+      void pushSingleCloudCalendar(currentCal, now).then(saved => {
+        if (!saved) {
+          console.warn('Cloud save failed for calendar:', currentCal.id);
+        }
+      }).catch(err => {
+        console.warn('Cloud save error for calendar:', currentCal.id, err);
+      });
       return true;
     } catch (err) {
       console.error('updateCalendars failed:', err);
