@@ -421,1635 +421,2394 @@
     </div>
   </div>
 
-  <!-- Ultra-Fast Cloudflare cdnjs CDN for React 18, ReactDOM 18 & Babel -->
+  <!-- Ultra-Fast Cloudflare cdnjs CDN for React 18 & ReactDOM 18 -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js" crossorigin></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js" crossorigin></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.24.0/babel.min.js" crossorigin></script>
 
-  <script type="text/babel">
-    const PRESET_COLORS = [
-      '#EF4444', '#F97316', '#F59E0B', '#10B981', '#06B6D4',
-      '#3B82F6', '#6366F1', '#8B5CF6', '#EC4899', '#14B8A6'
-    ];
+  <script>
+const PRESET_COLORS = ['#EF4444', '#F97316', '#F59E0B', '#10B981', '#06B6D4', '#3B82F6', '#6366F1', '#8B5CF6', '#EC4899', '#14B8A6'];
+const STORAGE_KEY = 'gather_calendars_permanent_v20';
+const STORAGE_META_KEY = 'gather_calendars_meta_v4'; // tracks lastModified timestamp
+// Unlimited Zero-Rate-Limit Cloud DB endpoint powered by JSONBlob
+const MASTER_CLOUD_BLOB_ID = '019fc4ff-8b04-74ab-af71-bdd91c03ea11';
+const CLOUD_API_URL = `https://jsonblob.com/api/jsonBlob/${MASTER_CLOUD_BLOB_ID}`;
+function getContrastTextColor(hexColor) {
+  if (!hexColor) return '#FFFFFF';
+  const hex = hexColor.replace('#', '');
+  const r = parseInt(hex.substring(0, 2), 16) || 0;
+  const g = parseInt(hex.substring(2, 4), 16) || 0;
+  const b = parseInt(hex.substring(4, 6), 16) || 0;
+  return (r * 299 + g * 587 + b * 114) / 1000 >= 128 ? '#0F172A' : '#FFFFFF';
+}
 
-    const STORAGE_KEY = 'gather_calendars_permanent_v20';
-    const STORAGE_META_KEY = 'gather_calendars_meta_v4'; // tracks lastModified timestamp
-    // Unlimited Zero-Rate-Limit Cloud DB endpoint powered by JSONBlob
-    const MASTER_CLOUD_BLOB_ID = '019fc4ff-8b04-74ab-af71-bdd91c03ea11';
-    const CLOUD_API_URL = `https://jsonblob.com/api/jsonBlob/${MASTER_CLOUD_BLOB_ID}`;
-
-    function getContrastTextColor(hexColor) {
-      if (!hexColor) return '#FFFFFF';
-      const hex = hexColor.replace('#', '');
-      const r = parseInt(hex.substring(0, 2), 16) || 0;
-      const g = parseInt(hex.substring(2, 4), 16) || 0;
-      const b = parseInt(hex.substring(4, 6), 16) || 0;
-      return (r * 299 + g * 587 + b * 114) / 1000 >= 128 ? '#0F172A' : '#FFFFFF';
+// Standard Formatter for Korean Date Display: 2026.09.19 (토)
+function formatDateWithDayName(dateStr) {
+  if (!dateStr) return '';
+  const parts = dateStr.split('-');
+  if (parts.length === 3) {
+    const y = parts[0];
+    const m = parts[1];
+    const d = parts[2];
+    const dateObj = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
+    if (!isNaN(dateObj.getTime())) {
+      const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+      const dayName = dayNames[dateObj.getDay()];
+      return `${y}.${m}.${d} (${dayName})`;
     }
+  }
+  return dateStr;
+}
+function getCalendarIdFromURL() {
+  const href = window.location.href;
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('id')) return urlParams.get('id');
+  if (urlParams.get('cal')) return urlParams.get('cal');
+  const match = href.match(/[?&#/]id=([a-zA-Z0-9_-]+)/);
+  if (match && match[1]) return match[1];
+  return null;
+}
 
-    // Standard Formatter for Korean Date Display: 2026.09.19 (토)
-    function formatDateWithDayName(dateStr) {
-      if (!dateStr) return '';
-      const parts = dateStr.split('-');
-      if (parts.length === 3) {
-        const y = parts[0];
-        const m = parts[1];
-        const d = parts[2];
-        const dateObj = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
-        if (!isNaN(dateObj.getTime())) {
-          const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
-          const dayName = dayNames[dateObj.getDay()];
-          return `${y}.${m}.${d} (${dayName})`;
-        }
-      }
-      return dateStr;
-    }
+// Safety function: Strictly merge calendars by ID without bleeding participant data across different calendars
+function mergeCalendarCollections(sourceList, targetList) {
+  if (!Array.isArray(sourceList)) return targetList || [];
+  if (!Array.isArray(targetList)) return sourceList || [];
+  const map = new Map();
+  sourceList.forEach(c => map.set(c.id, {
+    ...c,
+    participants: [...(c.participants || [])],
+    availabilities: [...(c.availabilities || [])]
+  }));
+  targetList.forEach(tc => {
+    if (!map.has(tc.id)) {
+      map.set(tc.id, {
+        ...tc,
+        participants: [...(tc.participants || [])],
+        availabilities: [...(tc.availabilities || [])]
+      });
+    } else {
+      const existing = map.get(tc.id);
+      // Merge participants strictly within THIS calendar only
+      const partMap = new Map();
+      existing.participants.forEach(p => partMap.set(p.id, p));
+      (tc.participants || []).forEach(p => {
+        if (!partMap.has(p.id)) partMap.set(p.id, p);
+      });
 
-    function getCalendarIdFromURL() {
-      const href = window.location.href;
-      const urlParams = new URLSearchParams(window.location.search);
-      if (urlParams.get('id')) return urlParams.get('id');
-      if (urlParams.get('cal')) return urlParams.get('cal');
-      const match = href.match(/[?&#/]id=([a-zA-Z0-9_-]+)/);
-      if (match && match[1]) return match[1];
-      return null;
-    }
-
-    // Safety function: Strictly merge calendars by ID without bleeding participant data across different calendars
-    function mergeCalendarCollections(sourceList, targetList) {
-      if (!Array.isArray(sourceList)) return targetList || [];
-      if (!Array.isArray(targetList)) return sourceList || [];
-
-      const map = new Map();
-      sourceList.forEach(c => map.set(c.id, { ...c, participants: [...(c.participants || [])], availabilities: [...(c.availabilities || [])] }));
-
-      targetList.forEach(tc => {
-        if (!map.has(tc.id)) {
-          map.set(tc.id, { ...tc, participants: [...(tc.participants || [])], availabilities: [...(tc.availabilities || [])] });
+      // Merge availabilities strictly within THIS calendar only
+      const availMap = new Map();
+      existing.availabilities.forEach(a => availMap.set(`${a.date}_${a.participantId}`, a));
+      (tc.availabilities || []).forEach(a => {
+        const key = `${a.date}_${a.participantId}`;
+        if (!availMap.has(key)) {
+          availMap.set(key, a);
         } else {
-          const existing = map.get(tc.id);
-          // Merge participants strictly within THIS calendar only
-          const partMap = new Map();
-          existing.participants.forEach(p => partMap.set(p.id, p));
-          (tc.participants || []).forEach(p => { if (!partMap.has(p.id)) partMap.set(p.id, p); });
-
-          // Merge availabilities strictly within THIS calendar only
-          const availMap = new Map();
-          existing.availabilities.forEach(a => availMap.set(`${a.date}_${a.participantId}`, a));
-          (tc.availabilities || []).forEach(a => {
-            const key = `${a.date}_${a.participantId}`;
-            if (!availMap.has(key)) {
-              availMap.set(key, a);
-            } else {
-              const prev = availMap.get(key);
-              if (a.note && a.note.trim() && !prev.note) {
-                availMap.set(key, a);
-              }
-            }
-          });
-
-          existing.participants = Array.from(partMap.values());
-          existing.availabilities = Array.from(availMap.values());
-          if (tc.title) existing.title = tc.title;
-          if (tc.description) existing.description = tc.description;
-        }
-      });
-
-      return Array.from(map.values());
-    }
-
-    const INITIAL_CALENDARS = [
-      {
-        id: 'kkot',
-        title: '8월 여름휴가 친목 모임',
-        description: '친구들과 함께 떠나는 여름 휴가 및 계곡 사모임 일정 조율',
-        participants: [
-          { id: 'kkot_p1', name: '김민준', color: '#EF4444' },
-          { id: 'kkot_p2', name: '이서연', color: '#3B82F6' },
-          { id: 'kkot_p3', name: '박도현', color: '#10B981' },
-          { id: 'kkot_p4', name: '최지아', color: '#EC4899' },
-          { id: 'kkot_p5', name: '정현우', color: '#8B5CF6' }
-        ],
-        availabilities: [
-          { date: '2026-08-08', participantId: 'kkot_p1', note: '주말 전일 가능' },
-          { date: '2026-08-08', participantId: 'kkot_p2', note: '차량 운전 가능' },
-          { date: '2026-08-08', participantId: 'kkot_p3', note: '오후 1시 이후' },
-          { date: '2026-08-08', participantId: 'kkot_p4', note: '참석 가능' },
-          { date: '2026-08-08', participantId: 'kkot_p5', note: '참석 가능' },
-          { date: '2026-08-15', participantId: 'kkot_p1', note: '공휴일 가능' },
-          { date: '2026-08-15', participantId: 'kkot_p2', note: '펜션 예약 담당' },
-          { date: '2026-08-15', participantId: 'kkot_p3', note: '좋습니다' },
-          { date: '2026-08-15', participantId: 'kkot_p4', note: '참석' },
-          { date: '2026-08-15', participantId: 'kkot_p5', note: '무조건 참석' }
-        ]
-      },
-      {
-        id: 'cw',
-        title: '꽃잎반 모임 (cw)',
-        description: '꽃잎반 모임 일정 조율 캘린더',
-        participants: [
-          { id: 'cw_p1', name: '박영우', color: '#EF4444' },
-          { id: 'cw_p2', name: '김유리', color: '#B91C1C' },
-          { id: 'cw_p3', name: '유장용', color: '#22C55E' },
-          { id: 'cw_p4', name: '윤희정', color: '#15803D' },
-          { id: 'cw_p5', name: '김현석', color: '#2563EB' },
-          { id: 'cw_p6', name: '김효진', color: '#1D4ED8' },
-          { id: 'cw_p7', name: '조경식', color: '#EAB308' },
-          { id: 'cw_p8', name: '신수진', color: '#84CC16' }
-        ],
-        availabilities: [
-          // 2026
-          { date: '2026-09-19', participantId: 'cw_p1', note: '예당호 착한농촌체험세상' },
-          { date: '2026-09-19', participantId: 'cw_p2', note: '' },
-          { date: '2026-09-19', participantId: 'cw_p3', note: '' },
-          { date: '2026-09-19', participantId: 'cw_p4', note: '' },
-          { date: '2026-09-19', participantId: 'cw_p5', note: '' },
-          { date: '2026-09-19', participantId: 'cw_p6', note: '' },
-          { date: '2026-09-19', participantId: 'cw_p7', note: '' },
-          { date: '2026-09-19', participantId: 'cw_p8', note: '' },
-
-          { date: '2026-09-20', participantId: 'cw_p1', note: '예당호 착한농촌체험세상' },
-          { date: '2026-09-20', participantId: 'cw_p2', note: '' },
-          { date: '2026-09-20', participantId: 'cw_p3', note: '' },
-          { date: '2026-09-20', participantId: 'cw_p4', note: '' },
-
-          { date: '2026-08-08', participantId: 'cw_p1', note: '10시 천왕물놀이터' },
-          { date: '2026-08-08', participantId: 'cw_p2', note: '' },
-          { date: '2026-08-08', participantId: 'cw_p3', note: '' },
-          { date: '2026-08-08', participantId: 'cw_p4', note: '' },
-
-          { date: '2026-06-21', participantId: 'cw_p1', note: '10시 핀앤핀캠프' },
-          { date: '2026-06-21', participantId: 'cw_p2', note: '' },
-          { date: '2026-06-21', participantId: 'cw_p3', note: '' },
-          { date: '2026-06-21', participantId: 'cw_p4', note: '' },
-          { date: '2026-06-21', participantId: 'cw_p5', note: '' },
-          { date: '2026-06-21', participantId: 'cw_p6', note: '' },
-          { date: '2026-06-21', participantId: 'cw_p7', note: '' },
-          { date: '2026-06-21', participantId: 'cw_p8', note: '' },
-
-          { date: '2026-05-02', participantId: 'cw_p1', note: '12시 임진각' },
-          { date: '2026-05-02', participantId: 'cw_p2', note: '' },
-          { date: '2026-05-02', participantId: 'cw_p3', note: '' },
-          { date: '2026-05-02', participantId: 'cw_p4', note: '' },
-          { date: '2026-05-02', participantId: 'cw_p5', note: '' },
-          { date: '2026-05-02', participantId: 'cw_p6', note: '' },
-          { date: '2026-05-02', participantId: 'cw_p7', note: '' },
-          { date: '2026-05-02', participantId: 'cw_p8', note: '' },
-
-          { date: '2026-03-28', participantId: 'cw_p1', note: '16시 서준네 서울집 집들이' },
-          { date: '2026-03-28', participantId: 'cw_p2', note: '' },
-          { date: '2026-03-28', participantId: 'cw_p3', note: '' },
-          { date: '2026-03-28', participantId: 'cw_p4', note: '' },
-          { date: '2026-03-28', participantId: 'cw_p5', note: '' },
-          { date: '2026-03-28', participantId: 'cw_p6', note: '' },
-          { date: '2026-03-28', participantId: 'cw_p7', note: '' },
-          { date: '2026-03-28', participantId: 'cw_p8', note: '' },
-
-          // 2025
-          { date: '2025-12-21', participantId: 'cw_p1', note: '16시30분 서준네 모임' },
-          { date: '2025-12-21', participantId: 'cw_p2', note: '지호 동생 / 지호 아빠 물잠' },
-          { date: '2025-12-21', participantId: 'cw_p3', note: '' },
-          { date: '2025-12-21', participantId: 'cw_p4', note: '' },
-          { date: '2025-12-21', participantId: 'cw_p5', note: '' },
-
-          { date: '2025-12-20', participantId: 'cw_p1', note: '16시 리아네 집들이' },
-          { date: '2025-12-20', participantId: 'cw_p2', note: '' },
-          { date: '2025-12-20', participantId: 'cw_p3', note: '' },
-          { date: '2025-12-20', participantId: 'cw_p4', note: '' },
-          { date: '2025-12-20', participantId: 'cw_p5', note: '' },
-          { date: '2025-12-20', participantId: 'cw_p6', note: '' },
-          { date: '2025-12-20', participantId: 'cw_p7', note: '' },
-          { date: '2025-12-20', participantId: 'cw_p8', note: '' },
-
-          { date: '2025-11-02', participantId: 'cw_p1', note: '14시 베이킹체험' },
-          { date: '2025-11-02', participantId: 'cw_p2', note: '' },
-          { date: '2025-11-02', participantId: 'cw_p3', note: '' },
-          { date: '2025-11-02', participantId: 'cw_p4', note: '' },
-          { date: '2025-11-02', participantId: 'cw_p5', note: '' },
-          { date: '2025-11-02', participantId: 'cw_p6', note: '' },
-          { date: '2025-11-02', participantId: 'cw_p7', note: '' },
-          { date: '2025-11-02', participantId: 'cw_p8', note: '' },
-
-          { date: '2025-10-09', participantId: 'cw_p1', note: '13시 / 한글날 / 임진각' },
-          { date: '2025-10-09', participantId: 'cw_p2', note: '' },
-          { date: '2025-10-09', participantId: 'cw_p3', note: '' },
-          { date: '2025-10-09', participantId: 'cw_p4', note: '' },
-          { date: '2025-10-09', participantId: 'cw_p5', note: '' },
-          { date: '2025-10-09', participantId: 'cw_p6', note: '' },
-          { date: '2025-10-09', participantId: 'cw_p7', note: '' },
-          { date: '2025-10-09', participantId: 'cw_p8', note: '' },
-
-          { date: '2025-09-28', participantId: 'cw_p1', note: '13시 서준네 모임' },
-          { date: '2025-09-28', participantId: 'cw_p2', note: '' },
-          { date: '2025-09-28', participantId: 'cw_p3', note: '' },
-          { date: '2025-09-28', participantId: 'cw_p4', note: '' },
-          { date: '2025-09-28', participantId: 'cw_p5', note: '' },
-          { date: '2025-09-28', participantId: 'cw_p6', note: '' },
-          { date: '2025-09-28', participantId: 'cw_p7', note: '' },
-          { date: '2025-09-28', participantId: 'cw_p8', note: '' },
-
-          { date: '2025-09-12', participantId: 'cw_p1', note: '19시 서준네 모임' },
-          { date: '2025-09-12', participantId: 'cw_p2', note: '' },
-          { date: '2025-09-12', participantId: 'cw_p3', note: '' },
-          { date: '2025-09-12', participantId: 'cw_p4', note: '' },
-          { date: '2025-09-12', participantId: 'cw_p5', note: '' },
-          { date: '2025-09-12', participantId: 'cw_p6', note: '' },
-          { date: '2025-09-12', participantId: 'cw_p7', note: '' },
-          { date: '2025-09-12', participantId: 'cw_p8', note: '' },
-
-          { date: '2025-08-17', participantId: 'cw_p1', note: '10시 핀앤핀캠프' },
-          { date: '2025-08-17', participantId: 'cw_p2', note: '' },
-          { date: '2025-08-17', participantId: 'cw_p3', note: '' },
-          { date: '2025-08-17', participantId: 'cw_p4', note: '' },
-          { date: '2025-08-17', participantId: 'cw_p5', note: '' },
-
-          { date: '2025-07-27', participantId: 'cw_p1', note: '11시 핀앤핀캠프 / 서준 동행 / 영우 불참' },
-          { date: '2025-07-27', participantId: 'cw_p2', note: '지키 지아 동행 / 한석 불참' },
-          { date: '2025-07-27', participantId: 'cw_p3', note: '지후 동생 / 한석 불참' },
-          { date: '2025-07-27', participantId: 'cw_p4', note: '마음 동행 / 영석 불참' },
-
-          { date: '2025-07-12', participantId: 'cw_p1', note: '19시 한마음' },
-          { date: '2025-07-12', participantId: 'cw_p2', note: '' },
-          { date: '2025-07-12', participantId: 'cw_p3', note: '' },
-          { date: '2025-07-12', participantId: 'cw_p4', note: '' },
-          { date: '2025-07-12', participantId: 'cw_p5', note: '' },
-          { date: '2025-07-12', participantId: 'cw_p6', note: '' },
-          { date: '2025-07-12', participantId: 'cw_p7', note: '' },
-
-          { date: '2025-07-05', participantId: 'cw_p1', note: '18시30분 윤스킨 / 영웅 생일' },
-          { date: '2025-07-05', participantId: 'cw_p2', note: '' },
-          { date: '2025-07-05', participantId: 'cw_p3', note: '' },
-          { date: '2025-07-05', participantId: 'cw_p4', note: '' },
-          { date: '2025-07-05', participantId: 'cw_p5', note: '' },
-
-          { date: '2025-06-26', participantId: 'cw_p1', note: '꽃잎반 다성여행' }
-        ]
-      }
-    ];
-
-    function loadLocalMeta() {
-      try {
-        const raw = localStorage.getItem(STORAGE_META_KEY);
-        if (raw) return JSON.parse(raw);
-      } catch(e) {}
-      return { lastModified: 0 };
-    }
-
-    function saveLocalMeta(meta) {
-      try {
-        localStorage.setItem(STORAGE_META_KEY, JSON.stringify(meta));
-      } catch(e) {}
-    }
-
-    function loadLocalCache() {
-      try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            return parsed; // Return user's exact state as is! Do NOT resurrect deleted entries with INITIAL_CALENDARS
+          const prev = availMap.get(key);
+          if (a.note && a.note.trim() && !prev.note) {
+            availMap.set(key, a);
           }
         }
-      } catch (e) {}
-      return INITIAL_CALENDARS;
+      });
+      existing.participants = Array.from(partMap.values());
+      existing.availabilities = Array.from(availMap.values());
+      if (tc.title) existing.title = tc.title;
+      if (tc.description) existing.description = tc.description;
     }
+  });
+  return Array.from(map.values());
+}
+const INITIAL_CALENDARS = [{
+  id: 'kkot',
+  title: '8월 여름휴가 친목 모임',
+  description: '친구들과 함께 떠나는 여름 휴가 및 계곡 사모임 일정 조율',
+  participants: [{
+    id: 'kkot_p1',
+    name: '김민준',
+    color: '#EF4444'
+  }, {
+    id: 'kkot_p2',
+    name: '이서연',
+    color: '#3B82F6'
+  }, {
+    id: 'kkot_p3',
+    name: '박도현',
+    color: '#10B981'
+  }, {
+    id: 'kkot_p4',
+    name: '최지아',
+    color: '#EC4899'
+  }, {
+    id: 'kkot_p5',
+    name: '정현우',
+    color: '#8B5CF6'
+  }],
+  availabilities: [{
+    date: '2026-08-08',
+    participantId: 'kkot_p1',
+    note: '주말 전일 가능'
+  }, {
+    date: '2026-08-08',
+    participantId: 'kkot_p2',
+    note: '차량 운전 가능'
+  }, {
+    date: '2026-08-08',
+    participantId: 'kkot_p3',
+    note: '오후 1시 이후'
+  }, {
+    date: '2026-08-08',
+    participantId: 'kkot_p4',
+    note: '참석 가능'
+  }, {
+    date: '2026-08-08',
+    participantId: 'kkot_p5',
+    note: '참석 가능'
+  }, {
+    date: '2026-08-15',
+    participantId: 'kkot_p1',
+    note: '공휴일 가능'
+  }, {
+    date: '2026-08-15',
+    participantId: 'kkot_p2',
+    note: '펜션 예약 담당'
+  }, {
+    date: '2026-08-15',
+    participantId: 'kkot_p3',
+    note: '좋습니다'
+  }, {
+    date: '2026-08-15',
+    participantId: 'kkot_p4',
+    note: '참석'
+  }, {
+    date: '2026-08-15',
+    participantId: 'kkot_p5',
+    note: '무조건 참석'
+  }]
+}, {
+  id: 'cw',
+  title: '꽃잎반 모임 (cw)',
+  description: '꽃잎반 모임 일정 조율 캘린더',
+  participants: [{
+    id: 'cw_p1',
+    name: '박영우',
+    color: '#EF4444'
+  }, {
+    id: 'cw_p2',
+    name: '김유리',
+    color: '#B91C1C'
+  }, {
+    id: 'cw_p3',
+    name: '유장용',
+    color: '#22C55E'
+  }, {
+    id: 'cw_p4',
+    name: '윤희정',
+    color: '#15803D'
+  }, {
+    id: 'cw_p5',
+    name: '김현석',
+    color: '#2563EB'
+  }, {
+    id: 'cw_p6',
+    name: '김효진',
+    color: '#1D4ED8'
+  }, {
+    id: 'cw_p7',
+    name: '조경식',
+    color: '#EAB308'
+  }, {
+    id: 'cw_p8',
+    name: '신수진',
+    color: '#84CC16'
+  }],
+  availabilities: [
+  // 2026
+  {
+    date: '2026-09-19',
+    participantId: 'cw_p1',
+    note: '예당호 착한농촌체험세상'
+  }, {
+    date: '2026-09-19',
+    participantId: 'cw_p2',
+    note: ''
+  }, {
+    date: '2026-09-19',
+    participantId: 'cw_p3',
+    note: ''
+  }, {
+    date: '2026-09-19',
+    participantId: 'cw_p4',
+    note: ''
+  }, {
+    date: '2026-09-19',
+    participantId: 'cw_p5',
+    note: ''
+  }, {
+    date: '2026-09-19',
+    participantId: 'cw_p6',
+    note: ''
+  }, {
+    date: '2026-09-19',
+    participantId: 'cw_p7',
+    note: ''
+  }, {
+    date: '2026-09-19',
+    participantId: 'cw_p8',
+    note: ''
+  }, {
+    date: '2026-09-20',
+    participantId: 'cw_p1',
+    note: '예당호 착한농촌체험세상'
+  }, {
+    date: '2026-09-20',
+    participantId: 'cw_p2',
+    note: ''
+  }, {
+    date: '2026-09-20',
+    participantId: 'cw_p3',
+    note: ''
+  }, {
+    date: '2026-09-20',
+    participantId: 'cw_p4',
+    note: ''
+  }, {
+    date: '2026-08-08',
+    participantId: 'cw_p1',
+    note: '10시 천왕물놀이터'
+  }, {
+    date: '2026-08-08',
+    participantId: 'cw_p2',
+    note: ''
+  }, {
+    date: '2026-08-08',
+    participantId: 'cw_p3',
+    note: ''
+  }, {
+    date: '2026-08-08',
+    participantId: 'cw_p4',
+    note: ''
+  }, {
+    date: '2026-06-21',
+    participantId: 'cw_p1',
+    note: '10시 핀앤핀캠프'
+  }, {
+    date: '2026-06-21',
+    participantId: 'cw_p2',
+    note: ''
+  }, {
+    date: '2026-06-21',
+    participantId: 'cw_p3',
+    note: ''
+  }, {
+    date: '2026-06-21',
+    participantId: 'cw_p4',
+    note: ''
+  }, {
+    date: '2026-06-21',
+    participantId: 'cw_p5',
+    note: ''
+  }, {
+    date: '2026-06-21',
+    participantId: 'cw_p6',
+    note: ''
+  }, {
+    date: '2026-06-21',
+    participantId: 'cw_p7',
+    note: ''
+  }, {
+    date: '2026-06-21',
+    participantId: 'cw_p8',
+    note: ''
+  }, {
+    date: '2026-05-02',
+    participantId: 'cw_p1',
+    note: '12시 임진각'
+  }, {
+    date: '2026-05-02',
+    participantId: 'cw_p2',
+    note: ''
+  }, {
+    date: '2026-05-02',
+    participantId: 'cw_p3',
+    note: ''
+  }, {
+    date: '2026-05-02',
+    participantId: 'cw_p4',
+    note: ''
+  }, {
+    date: '2026-05-02',
+    participantId: 'cw_p5',
+    note: ''
+  }, {
+    date: '2026-05-02',
+    participantId: 'cw_p6',
+    note: ''
+  }, {
+    date: '2026-05-02',
+    participantId: 'cw_p7',
+    note: ''
+  }, {
+    date: '2026-05-02',
+    participantId: 'cw_p8',
+    note: ''
+  }, {
+    date: '2026-03-28',
+    participantId: 'cw_p1',
+    note: '16시 서준네 서울집 집들이'
+  }, {
+    date: '2026-03-28',
+    participantId: 'cw_p2',
+    note: ''
+  }, {
+    date: '2026-03-28',
+    participantId: 'cw_p3',
+    note: ''
+  }, {
+    date: '2026-03-28',
+    participantId: 'cw_p4',
+    note: ''
+  }, {
+    date: '2026-03-28',
+    participantId: 'cw_p5',
+    note: ''
+  }, {
+    date: '2026-03-28',
+    participantId: 'cw_p6',
+    note: ''
+  }, {
+    date: '2026-03-28',
+    participantId: 'cw_p7',
+    note: ''
+  }, {
+    date: '2026-03-28',
+    participantId: 'cw_p8',
+    note: ''
+  },
+  // 2025
+  {
+    date: '2025-12-21',
+    participantId: 'cw_p1',
+    note: '16시30분 서준네 모임'
+  }, {
+    date: '2025-12-21',
+    participantId: 'cw_p2',
+    note: '지호 동생 / 지호 아빠 물잠'
+  }, {
+    date: '2025-12-21',
+    participantId: 'cw_p3',
+    note: ''
+  }, {
+    date: '2025-12-21',
+    participantId: 'cw_p4',
+    note: ''
+  }, {
+    date: '2025-12-21',
+    participantId: 'cw_p5',
+    note: ''
+  }, {
+    date: '2025-12-20',
+    participantId: 'cw_p1',
+    note: '16시 리아네 집들이'
+  }, {
+    date: '2025-12-20',
+    participantId: 'cw_p2',
+    note: ''
+  }, {
+    date: '2025-12-20',
+    participantId: 'cw_p3',
+    note: ''
+  }, {
+    date: '2025-12-20',
+    participantId: 'cw_p4',
+    note: ''
+  }, {
+    date: '2025-12-20',
+    participantId: 'cw_p5',
+    note: ''
+  }, {
+    date: '2025-12-20',
+    participantId: 'cw_p6',
+    note: ''
+  }, {
+    date: '2025-12-20',
+    participantId: 'cw_p7',
+    note: ''
+  }, {
+    date: '2025-12-20',
+    participantId: 'cw_p8',
+    note: ''
+  }, {
+    date: '2025-11-02',
+    participantId: 'cw_p1',
+    note: '14시 베이킹체험'
+  }, {
+    date: '2025-11-02',
+    participantId: 'cw_p2',
+    note: ''
+  }, {
+    date: '2025-11-02',
+    participantId: 'cw_p3',
+    note: ''
+  }, {
+    date: '2025-11-02',
+    participantId: 'cw_p4',
+    note: ''
+  }, {
+    date: '2025-11-02',
+    participantId: 'cw_p5',
+    note: ''
+  }, {
+    date: '2025-11-02',
+    participantId: 'cw_p6',
+    note: ''
+  }, {
+    date: '2025-11-02',
+    participantId: 'cw_p7',
+    note: ''
+  }, {
+    date: '2025-11-02',
+    participantId: 'cw_p8',
+    note: ''
+  }, {
+    date: '2025-10-09',
+    participantId: 'cw_p1',
+    note: '13시 / 한글날 / 임진각'
+  }, {
+    date: '2025-10-09',
+    participantId: 'cw_p2',
+    note: ''
+  }, {
+    date: '2025-10-09',
+    participantId: 'cw_p3',
+    note: ''
+  }, {
+    date: '2025-10-09',
+    participantId: 'cw_p4',
+    note: ''
+  }, {
+    date: '2025-10-09',
+    participantId: 'cw_p5',
+    note: ''
+  }, {
+    date: '2025-10-09',
+    participantId: 'cw_p6',
+    note: ''
+  }, {
+    date: '2025-10-09',
+    participantId: 'cw_p7',
+    note: ''
+  }, {
+    date: '2025-10-09',
+    participantId: 'cw_p8',
+    note: ''
+  }, {
+    date: '2025-09-28',
+    participantId: 'cw_p1',
+    note: '13시 서준네 모임'
+  }, {
+    date: '2025-09-28',
+    participantId: 'cw_p2',
+    note: ''
+  }, {
+    date: '2025-09-28',
+    participantId: 'cw_p3',
+    note: ''
+  }, {
+    date: '2025-09-28',
+    participantId: 'cw_p4',
+    note: ''
+  }, {
+    date: '2025-09-28',
+    participantId: 'cw_p5',
+    note: ''
+  }, {
+    date: '2025-09-28',
+    participantId: 'cw_p6',
+    note: ''
+  }, {
+    date: '2025-09-28',
+    participantId: 'cw_p7',
+    note: ''
+  }, {
+    date: '2025-09-28',
+    participantId: 'cw_p8',
+    note: ''
+  }, {
+    date: '2025-09-12',
+    participantId: 'cw_p1',
+    note: '19시 서준네 모임'
+  }, {
+    date: '2025-09-12',
+    participantId: 'cw_p2',
+    note: ''
+  }, {
+    date: '2025-09-12',
+    participantId: 'cw_p3',
+    note: ''
+  }, {
+    date: '2025-09-12',
+    participantId: 'cw_p4',
+    note: ''
+  }, {
+    date: '2025-09-12',
+    participantId: 'cw_p5',
+    note: ''
+  }, {
+    date: '2025-09-12',
+    participantId: 'cw_p6',
+    note: ''
+  }, {
+    date: '2025-09-12',
+    participantId: 'cw_p7',
+    note: ''
+  }, {
+    date: '2025-09-12',
+    participantId: 'cw_p8',
+    note: ''
+  }, {
+    date: '2025-08-17',
+    participantId: 'cw_p1',
+    note: '10시 핀앤핀캠프'
+  }, {
+    date: '2025-08-17',
+    participantId: 'cw_p2',
+    note: ''
+  }, {
+    date: '2025-08-17',
+    participantId: 'cw_p3',
+    note: ''
+  }, {
+    date: '2025-08-17',
+    participantId: 'cw_p4',
+    note: ''
+  }, {
+    date: '2025-08-17',
+    participantId: 'cw_p5',
+    note: ''
+  }, {
+    date: '2025-07-27',
+    participantId: 'cw_p1',
+    note: '11시 핀앤핀캠프 / 서준 동행 / 영우 불참'
+  }, {
+    date: '2025-07-27',
+    participantId: 'cw_p2',
+    note: '지키 지아 동행 / 한석 불참'
+  }, {
+    date: '2025-07-27',
+    participantId: 'cw_p3',
+    note: '지후 동생 / 한석 불참'
+  }, {
+    date: '2025-07-27',
+    participantId: 'cw_p4',
+    note: '마음 동행 / 영석 불참'
+  }, {
+    date: '2025-07-12',
+    participantId: 'cw_p1',
+    note: '19시 한마음'
+  }, {
+    date: '2025-07-12',
+    participantId: 'cw_p2',
+    note: ''
+  }, {
+    date: '2025-07-12',
+    participantId: 'cw_p3',
+    note: ''
+  }, {
+    date: '2025-07-12',
+    participantId: 'cw_p4',
+    note: ''
+  }, {
+    date: '2025-07-12',
+    participantId: 'cw_p5',
+    note: ''
+  }, {
+    date: '2025-07-12',
+    participantId: 'cw_p6',
+    note: ''
+  }, {
+    date: '2025-07-12',
+    participantId: 'cw_p7',
+    note: ''
+  }, {
+    date: '2025-07-05',
+    participantId: 'cw_p1',
+    note: '18시30분 윤스킨 / 영웅 생일'
+  }, {
+    date: '2025-07-05',
+    participantId: 'cw_p2',
+    note: ''
+  }, {
+    date: '2025-07-05',
+    participantId: 'cw_p3',
+    note: ''
+  }, {
+    date: '2025-07-05',
+    participantId: 'cw_p4',
+    note: ''
+  }, {
+    date: '2025-07-05',
+    participantId: 'cw_p5',
+    note: ''
+  }, {
+    date: '2025-06-26',
+    participantId: 'cw_p1',
+    note: '꽃잎반 다성여행'
+  }]
+}];
 
-    function saveLocalCache(data) {
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-      } catch (e) {}
+// Duplicate storage functions removed
+
+// Firebase Config for Realtime Multi-User Cloud Sync
+const firebaseConfig = {
+  apiKey: "AIzaSyD-GatherCalendarAppLiveKey2026",
+  authDomain: "metro-live-2918e.firebaseapp.com",
+  projectId: "metro-live-2918e",
+  storageBucket: "metro-live-2918e.appspot.com",
+  messagingSenderId: "154827314076",
+  appId: "1:154827314076:web:gathercalendar2026"
+};
+let firebaseDb = null;
+try {
+  if (typeof firebase !== 'undefined') {
+    if (!firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
     }
+    firebaseDb = firebase.firestore();
+  }
+} catch (e) {
+  console.warn('Firebase init notice:', e);
+}
 
-    // Firebase Config for Realtime Multi-User Cloud Sync
-    const firebaseConfig = {
-      apiKey: "AIzaSyD-GatherCalendarAppLiveKey2026",
-      authDomain: "metro-live-2918e.firebaseapp.com",
-      projectId: "metro-live-2918e",
-      storageBucket: "metro-live-2918e.appspot.com",
-      messagingSenderId: "154827314076",
-      appId: "1:154827314076:web:gathercalendar2026"
-    };
-
-    let firebaseDb = null;
+// Returns { calendar, lastModified } or null with AbortController timeout & retries
+async function fetchSingleCloudCalendar(calId, retryCount = 2) {
+  if (!calId) return null;
+  if (firebaseDb) {
     try {
-      if (typeof firebase !== 'undefined') {
-        if (!firebase.apps.length) {
-          firebase.initializeApp(firebaseConfig);
-        }
-        firebaseDb = firebase.firestore();
-      }
-    } catch (e) {
-      console.warn('Firebase init notice:', e);
-    }
-
-    // Returns { calendar, lastModified } or null with AbortController timeout & retries
-    async function fetchSingleCloudCalendar(calId, retryCount = 2) {
-      if (!calId) return null;
-      if (firebaseDb) {
-        try {
-          // 1. Fetch isolated calendar doc
-          const doc = await firebaseDb.collection('calendars').doc(`cal_${calId}`).get();
-          if (doc.exists) {
-            const data = doc.data();
-            if (data && data.calendar) {
-              return { calendar: data.calendar, lastModified: data.lastModified || 0 };
-            }
-          }
-        } catch (e) {
-          console.warn(`Firestore fetch notice for cal_${calId}:`, e);
-        }
-      }
-
-      for (let attempt = 0; attempt <= retryCount; attempt++) {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 6000);
-        try {
-          const res = await fetch(CLOUD_API_URL, { signal: controller.signal });
-          clearTimeout(timeoutId);
-          if (res.ok) {
-            const json = await res.json();
-            if (json && Array.isArray(json.calendars)) {
-              const matched = json.calendars.find(c => c.id === calId);
-              if (matched) return { calendar: matched, lastModified: json.lastModified || 0 };
-            }
-          }
-        } catch (e) {
-          clearTimeout(timeoutId);
-        }
-        if (attempt < retryCount) {
-          await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
-        }
-      }
-      return null;
-    }
-
-    // Pushes isolated calendar data to Firestore (cal_{id}) and master fallback. Returns boolean success.
-    async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 2) {
-      if (!targetCal || !targetCal.id) return false;
-      if (firebaseDb) {
-        try {
-          // Store directly into its isolated calendar document (Replaces whole state so deletions are exact)
-          await firebaseDb.collection('calendars').doc(`cal_${targetCal.id}`).set({
-            calendar: targetCal,
-            lastModified: lastModified
-          });
-          return true;
-        } catch (e) {
-          console.warn(`Firestore push notice for cal_${targetCal.id}:`, e);
-        }
-      }
-
-      for (let attempt = 0; attempt <= retryCount; attempt++) {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 7000);
-        try {
-          const currentLocal = loadLocalCache();
-          const nextCalendars = currentLocal.map(c => c.id === targetCal.id ? targetCal : c);
-          const res = await fetch(CLOUD_API_URL, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ calendars: nextCalendars, lastModified }),
-            signal: controller.signal
-          });
-          clearTimeout(timeoutId);
-          if (res.ok) return true;
-        } catch (e) {
-          clearTimeout(timeoutId);
-        }
-        if (attempt < retryCount) {
-          await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
-        }
-      }
-      return false;
-    }
-
-    function loadLocalMeta() {
-      try {
-        const raw = localStorage.getItem(STORAGE_META_KEY);
-        if (raw) return JSON.parse(raw);
-      } catch(e) {}
-      return { lastModified: 0 };
-    }
-
-    function saveLocalMeta(meta) {
-      try {
-        localStorage.setItem(STORAGE_META_KEY, JSON.stringify(meta));
-      } catch(e) {}
-    }
-
-
-
-    function App() {
-      const [calendars, setCalendarsState] = React.useState(() => loadLocalCache());
-      const toastTimeoutRef = React.useRef(null);
-      const showToast = (message, type = 'info', duration = 3500) => {
-        if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
-        setToast({ message, type });
-        toastTimeoutRef.current = setTimeout(() => {
-          setToast(t => t?.message === message ? null : t);
-        }, duration);
-      };
-
-      // Initialize with persisted lastLocalSave timestamp so refresh never bypasses the guard!
-      const lastLocalSaveRef = React.useRef(loadLocalMeta().lastModified || 0);
-      const LOCAL_SAVE_GUARD_MS = 10000; // 10s guard window after local save
-
-      const updateCalendars = async (nextCalendars, toastMsg = '일정이 저장되었습니다.', toastType = 'success') => {
-        const now = Date.now();
-        lastLocalSaveRef.current = now;
-        saveLocalMeta({ lastModified: now }); // stamp local save time
-        setCalendarsState(nextCalendars);
-        saveLocalCache(nextCalendars);
-
-        // Find active calendar and push to its isolated Firestore document
-        const currentCal = nextCalendars.find(c => c.id === activeCalId) || nextCalendars[0];
-        showToast(toastMsg, toastType, 3500);
-
-        if (currentCal) {
-          pushSingleCloudCalendar(currentCal, now);
-        }
-      };
-
-      const [activeCalId, setActiveCalId] = React.useState(() => {
-        const requestedId = getCalendarIdFromURL();
-        if (requestedId && calendars.some(c => c.id === requestedId)) {
-          return requestedId;
-        }
-        return calendars[0]?.id || 'cw';
-      });
-
-      const [currentMonthDate, setCurrentMonthDate] = React.useState(new Date());
-      const [selectedDate, setSelectedDate] = React.useState(null);
-      const [isModalOpen, setIsModalOpen] = React.useState(false);
-      const [isAdminOpen, setIsAdminOpen] = React.useState(false);
-      const [isShareOpen, setIsShareOpen] = React.useState(false);
-      const [isParticipantsOpen, setIsParticipantsOpen] = React.useState(false);
-
-      // Firebase Firestore Real-Time Listener (ISOLATED per activeCalId)
-      React.useEffect(() => {
-        if (!firebaseDb || !activeCalId) return;
-        let isMounted = true;
-
-        // Listen ONLY to this active calendar document (cal_{id}) for 100% strict isolation!
-        const unsubscribe = firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).onSnapshot((doc) => {
-          if (doc.exists && isMounted) {
-            const data = doc.data();
-            if (data && data.calendar && data.calendar.id === activeCalId) {
-              // Guard: skip cloud update if we recently saved locally or if local state is newer
-              if (Date.now() - lastLocalSaveRef.current < LOCAL_SAVE_GUARD_MS) return;
-
-              const cloudCal = data.calendar;
-              const localMeta = loadLocalMeta();
-              const cloudLastMod = data.lastModified || 0;
-
-              if (cloudLastMod > localMeta.lastModified) {
-                setCalendarsState(prevCals => {
-                  const nextCals = prevCals.map(c => c.id === activeCalId ? cloudCal : c);
-                  saveLocalCache(nextCals);
-                  saveLocalMeta({ lastModified: cloudLastMod });
-                  return nextCals;
-                });
-              }
-            }
-          }
-        }, (err) => {
-          console.warn(`Firestore realtime sync notice for cal_${activeCalId}:`, err);
-        });
-
-        return () => {
-          isMounted = false;
-          if (unsubscribe) unsubscribe();
-        };
-      }, [activeCalId]);
-
-      const activeCal = calendars.find(c => c.id === activeCalId) || calendars[0];
-
-      React.useEffect(() => {
-        if (activeCal) {
-          const calTitle = `${activeCal.title} - 모여라 캘린더`;
-          const calDesc = activeCal.description || `${activeCal.title} 사모임 멤버들의 참석 가능 날짜 조율 캘린더입니다.`;
-          const currentShareUrl = `${window.location.origin}${window.location.pathname}?id=${activeCal.id}`;
-
-          document.title = calTitle;
-
-          const ogTitle = document.getElementById('og-title');
-          if (ogTitle) ogTitle.setAttribute('content', calTitle);
-
-          const ogDesc = document.getElementById('og-desc');
-          if (ogDesc) ogDesc.setAttribute('content', calDesc);
-
-          const ogUrl = document.getElementById('og-url');
-          if (ogUrl) ogUrl.setAttribute('content', currentShareUrl);
-
-          const twTitle = document.getElementById('tw-title');
-          if (twTitle) twTitle.setAttribute('content', calTitle);
-        }
-      }, [activeCal]);
-
-      React.useEffect(() => {
-        const requestedId = getCalendarIdFromURL();
-        if (requestedId && !calendars.some(c => c.id === requestedId)) {
-          const newCal = {
-            id: requestedId,
-            title: `${requestedId} 사모임 캘린더`,
-            description: `${requestedId} 멤버들의 참석 가능 일자를 표기해 주세요`,
-            participants: [
-              { id: 'p1', name: '참여자 1', color: '#EF4444' },
-              { id: 'p2', name: '참여자 2', color: '#3B82F6' },
-              { id: 'p3', name: '참여자 3', color: '#10B981' }
-            ],
-            availabilities: []
+      // 1. Fetch isolated calendar doc
+      const doc = await firebaseDb.collection('calendars').doc(`cal_${calId}`).get();
+      if (doc.exists) {
+        const data = doc.data();
+        if (data && data.calendar) {
+          return {
+            calendar: data.calendar,
+            lastModified: data.lastModified || 0
           };
-          updateCalendars([newCal, ...calendars]);
-          setActiveCalId(requestedId);
         }
-      }, []);
-
-      const handleSelectCalendar = (id) => {
-        setActiveCalId(id);
-        const url = new URL(window.location.href);
-        url.searchParams.set('id', id);
-        window.history.replaceState({}, '', url.toString());
-      };
-
-      const handleSaveAvailability = (dateStr, participantId, note) => {
-        const existing = activeCal.availabilities || [];
-        const index = existing.findIndex(e => e.date === dateStr && e.participantId === participantId);
-        let nextAvail = [...existing];
-        if (index >= 0) {
-          nextAvail[index] = { date: dateStr, participantId, note };
-        } else {
-          nextAvail.push({ date: dateStr, participantId, note });
-        }
-
-        const updatedCal = { ...activeCal, availabilities: nextAvail };
-        const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-        updateCalendars(nextCalendars, '일정이 정상적으로 저장되었습니다. ✅', 'success');
-
-        const dateCount = nextAvail.filter(e => e.date === dateStr).length;
-        if (dateCount === activeCal.participants.length && typeof confetti === 'function') {
-          confetti({ particleCount: 75, spread: 65, origin: { y: 0.6 } });
-        }
-      };
-
-      const handleDeleteAvailability = (dateStr, participantId) => {
-        const nextAvail = (activeCal.availabilities || []).filter(
-          e => !(e.date === dateStr && e.participantId === participantId)
-        );
-        const updatedCal = { ...activeCal, availabilities: nextAvail };
-        const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-        updateCalendars(nextCalendars, '참여자 일정이 삭제되었습니다. 🗑️', 'delete');
-      };
-
-      const handleDeleteAllForDate = (dateStr) => {
-        const nextAvail = (activeCal.availabilities || []).filter(e => e.date !== dateStr);
-        const updatedCal = { ...activeCal, availabilities: nextAvail };
-        const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-        updateCalendars(nextCalendars, '해당 날짜의 모든 일정이 삭제되었습니다. 🗑️', 'delete');
-      };
-
-      const handleSaveAdmin = (updatedCal, newCalCreated) => {
-        if (newCalCreated) {
-          const nextCalendars = [newCalCreated, ...calendars];
-          updateCalendars(nextCalendars, '새 캘린더가 생성되었습니다. ✅', 'success');
-          handleSelectCalendar(newCalCreated.id);
-        } else {
-          const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-          updateCalendars(nextCalendars, '캘린더 설정이 저장되었습니다. ✅', 'success');
-        }
-      };
-
-      return (
-        <div className="app-container">
-          {/* Header */}
-          <header className="header-card">
-            <div className="header-left">
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <span className="calendar-title">{activeCal?.title}</span>
-                </div>
-                {activeCal?.description && <div className="calendar-desc">{activeCal.description}</div>}
-              </div>
-            </div>
-
-            <div className="header-actions">
-              {/* Toggle Participants Button with Users SVG Icon */}
-              <button
-                className="btn btn-secondary"
-                onClick={() => setIsParticipantsOpen(!isParticipantsOpen)}
-                style={{ gap: '6px' }}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" className="icon icon-tabler icons-tabler-outline icon-tabler-users"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M5 7a4 4 0 1 0 8 0a4 4 0 1 0 -8 0" /><path d="M3 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /><path d="M21 21v-2a4 4 0 0 0 -3 -3.85" /></svg>
-                <span>참여자 ({activeCal?.participants?.length || 0}명)</span>
-              </button>
-
-              <button className="btn btn-secondary" onClick={() => setIsShareOpen(true)} title="공유" style={{ padding: '10px' }}>
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" className="icon icon-tabler icons-tabler-outline icon-tabler-share"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M3 12a3 3 0 1 0 6 0a3 3 0 1 0 -6 0" /><path d="M15 6a3 3 0 1 0 6 0a3 3 0 1 0 -6 0" /><path d="M15 18a3 3 0 1 0 6 0a3 3 0 1 0 -6 0" /><path d="M8.7 10.7l6.6 -3.4" /><path d="M8.7 13.3l6.6 3.4" /></svg>
-              </button>
-              <button className="btn btn-secondary" onClick={() => setIsAdminOpen(true)} title="설정" style={{ padding: '10px' }}>
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" className="icon icon-tabler icons-tabler-outline icon-tabler-settings"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065" /><path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0" /></svg>
-              </button>
-
-              {/* Toggle speech bubble popover for participants list */}
-              {isParticipantsOpen && (
-                <div className="participants-popover">
-                  <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-muted)', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '6px', marginBottom: '4px' }}>
-                    참여자 목록
-                  </div>
-                  {activeCal?.participants?.map(p => (
-                    <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', fontWeight: '700' }}>
-                      <span className="color-dot" style={{ backgroundColor: p.color, width: '10px', height: '10px' }} />
-                      <span>{p.name}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </header>
-
-          {/* Monthly Calendar View */}
-          <CalendarGrid
-            calendar={activeCal}
-            monthDate={currentMonthDate}
-            onPrevMonth={() => setCurrentMonthDate(new Date(currentMonthDate.getFullYear(), currentMonthDate.getMonth() - 1, 1))}
-            onNextMonth={() => setCurrentMonthDate(new Date(currentMonthDate.getFullYear(), currentMonthDate.getMonth() + 1, 1))}
-            onToday={() => setCurrentMonthDate(new Date())}
-            onJumpToMonth={(y, m) => setCurrentMonthDate(new Date(y, m, 1))}
-            onSelectDate={(d) => { setSelectedDate(d); setIsModalOpen(true); }}
-          />
-
-          {/* Bottom Summary List */}
-          <SummaryList
-            calendar={activeCal}
-            onSelectDate={(d) => { setSelectedDate(d); setIsModalOpen(true); }}
-          />
-
-          {/* Modals */}
-          {isModalOpen && (
-            <DateModal
-              dateStr={selectedDate}
-              calendar={activeCal}
-              onSave={handleSaveAvailability}
-              onDelete={handleDeleteAvailability}
-              onDeleteDate={handleDeleteAllForDate}
-              onClose={() => setIsModalOpen(false)}
-            />
-          )}
-
-          {isAdminOpen && (
-            <AdminModal
-              calendar={activeCal}
-              allCalendars={calendars}
-              onSelectCalendar={handleSelectCalendar}
-              onSave={handleSaveAdmin}
-              onCreateNewCal={(newCal) => {
-                const nextCalendars = [newCal, ...calendars];
-                updateCalendars(nextCalendars);
-                handleSelectCalendar(newCal.id);
-                setIsAdminOpen(false);
-              }}
-              onClose={() => setIsAdminOpen(false)}
-            />
-          )}
-
-          {isShareOpen && (
-            <ShareModal
-              calendar={activeCal}
-              onCreateNewCal={(newCal) => {
-                const nextCalendars = [newCal, ...calendars];
-                updateCalendars(nextCalendars);
-                handleSelectCalendar(newCal.id);
-                setIsShareOpen(false);
-              }}
-              onClose={() => setIsShareOpen(false)}
-            />
-          )}
-          {/* Toast Notification */}
-          {toast && (
-            <div
-              style={{
-                position: 'fixed',
-                bottom: '32px',
-                left: '50%',
-                transform: 'translateX(-50%)',
-                zIndex: 99999,
-                backgroundColor: toast.type === 'delete' ? '#EF4444' : toast.type === 'success' ? '#10B981' : '#3B82F6',
-                color: '#FFFFFF',
-                padding: '12px 24px',
-                borderRadius: '30px',
-                boxShadow: '0 12px 32px rgba(0,0,0,0.25)',
-                fontSize: '0.95rem',
-                fontWeight: '800',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                pointerEvents: 'none'
-              }}
-            >
-              <span>{toast.message}</span>
-            </div>
-          )}
-        </div>
-      );
-    }
-
-    // Calendar Grid Component
-    function CalendarGrid({ calendar, monthDate, onPrevMonth, onNextMonth, onToday, onJumpToMonth, onSelectDate }) {
-      const year = monthDate.getFullYear();
-      const month = monthDate.getMonth();
-      const [isPickerOpen, setIsPickerOpen] = React.useState(false);
-      const [pickerYear, setPickerYear] = React.useState(year);
-      const [pickerMonth, setPickerMonth] = React.useState(month);
-
-      // Sync picker values when month navigates externally
-      React.useEffect(() => {
-        setPickerYear(year);
-        setPickerMonth(month);
-      }, [year, month]);
-
-      const handlePickerApply = () => {
-        onJumpToMonth(pickerYear, pickerMonth);
-        setIsPickerOpen(false);
-      };
-
-      const MONTH_NAMES = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
-
-      const firstDay = new Date(year, month, 1).getDay();
-      const lastDate = new Date(year, month + 1, 0).getDate();
-      const prevLastDate = new Date(year, month, 0).getDate();
-
-      const days = [];
-
-      // Fill previous month days
-      for (let i = firstDay - 1; i >= 0; i--) {
-        const d = prevLastDate - i;
-        const prevMonthDate = new Date(year, month - 1, d);
-        const dateStr = `${prevMonthDate.getFullYear()}-${String(prevMonthDate.getMonth() + 1).padStart(2, '0')}-${String(prevMonthDate.getDate()).padStart(2, '0')}`;
-        days.push({ dayNum: d, dateStr, isCurrentMonth: false });
-      }
-
-      // Fill current month days
-      for (let i = 1; i <= lastDate; i++) {
-        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
-        days.push({ dayNum: i, dateStr, isCurrentMonth: true });
-      }
-
-      // Fill next month days to complete the 7-column grid
-      const totalCells = Math.ceil(days.length / 7) * 7;
-      const nextDaysNeeded = totalCells - days.length;
-      for (let i = 1; i <= nextDaysNeeded; i++) {
-        const nextMonthDate = new Date(year, month + 1, i);
-        const dateStr = `${nextMonthDate.getFullYear()}-${String(nextMonthDate.getMonth() + 1).padStart(2, '0')}-${String(nextMonthDate.getDate()).padStart(2, '0')}`;
-        days.push({ dayNum: i, dateStr, isCurrentMonth: false });
-      }
-
-      const availMap = (calendar?.availabilities || []).reduce((acc, entry) => {
-        if (!acc[entry.date]) acc[entry.date] = [];
-        acc[entry.date].push(entry);
-        return acc;
-      }, {});
-
-      const participantsMap = (calendar?.participants || []).reduce((acc, p) => {
-        acc[p.id] = p;
-        return acc;
-      }, {});
-
-      const totalPartCount = calendar?.participants?.length || 0;
-
-      return (
-        <div className="calendar-card" style={{ position: 'relative' }}>
-          <div className="calendar-nav">
-            {/* Clickable month display — opens year/month picker */}
-            <div
-              className="month-display"
-              style={{ cursor: 'pointer', userSelect: 'none', display: 'flex', alignItems: 'center', gap: '6px' }}
-              onClick={() => setIsPickerOpen(v => !v)}
-              title="클릭하여 년월 이동"
-            >
-              {year}년 {month + 1}월
-              <span style={{ fontSize: '0.7rem', color: '#94A3B8' }}>▾</span>
-            </div>
-            <div style={{ display: 'flex', gap: '6px' }}>
-              <button className="btn btn-secondary" onClick={onPrevMonth}>◀ 이전달</button>
-              <button className="btn btn-secondary" onClick={onToday}>오늘</button>
-              <button className="btn btn-secondary" onClick={onNextMonth}>다음달 ▶</button>
-            </div>
-          </div>
-
-          {/* Year / Month Picker Popup */}
-          {isPickerOpen && (
-            <div
-              style={{
-                position: 'absolute', top: '60px', left: '0', zIndex: 200,
-                background: '#FFFFFF', border: '1px solid var(--border-subtle)',
-                borderRadius: '16px', boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
-                padding: '20px', minWidth: '280px'
-              }}
-              onClick={e => e.stopPropagation()}
-            >
-              {/* Dismiss overlay */}
-              <div
-                style={{ position: 'fixed', inset: 0, zIndex: -1 }}
-                onClick={() => setIsPickerOpen(false)}
-              />
-
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748B', display: 'block', marginBottom: '8px' }}>년도</label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    style={{ padding: '4px 10px', fontSize: '0.85rem' }}
-                    onClick={() => setPickerYear(y => y - 1)}
-                  >◀</button>
-                  <span style={{ fontWeight: 800, fontSize: '1.1rem', minWidth: '60px', textAlign: 'center' }}>{pickerYear}년</span>
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    style={{ padding: '4px 10px', fontSize: '0.85rem' }}
-                    onClick={() => setPickerYear(y => y + 1)}
-                  >▶</button>
-                </div>
-              </div>
-
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748B', display: 'block', marginBottom: '8px' }}>월</label>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
-                  {MONTH_NAMES.map((name, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => setPickerMonth(idx)}
-                      style={{
-                        padding: '6px 4px',
-                        borderRadius: '8px',
-                        border: pickerMonth === idx ? '2px solid var(--accent-primary)' : '1px solid var(--border-subtle)',
-                        background: pickerMonth === idx ? '#EEF2FF' : '#FFFFFF',
-                        color: pickerMonth === idx ? 'var(--accent-primary)' : 'var(--text-main)',
-                        fontWeight: pickerMonth === idx ? 800 : 500,
-                        fontSize: '0.82rem',
-                        cursor: 'pointer'
-                      }}
-                    >{name}</button>
-                  ))}
-                </div>
-              </div>
-
-              <button
-                type="button"
-                className="btn btn-primary"
-                style={{ width: '100%' }}
-                onClick={handlePickerApply}
-              >
-                {pickerYear}년 {pickerMonth + 1}월로 이동
-              </button>
-            </div>
-          )}
-
-          <div className="weekday-grid">
-            <div className="weekday-label sun">일</div>
-            <div className="weekday-label">월</div>
-            <div className="weekday-label">화</div>
-            <div className="weekday-label">수</div>
-            <div className="weekday-label">목</div>
-            <div className="weekday-label">금</div>
-            <div className="weekday-label sat">토</div>
-          </div>
-
-          <div className="days-grid">
-            {days.map(({ dayNum, dateStr, isCurrentMonth }, idx) => {
-              const today = new Date();
-              const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-              const isToday = isCurrentMonth && (dateStr === todayStr);
-
-              const entries = (availMap[dateStr] || []).filter(e => participantsMap[e.participantId]);
-              const uniqueActiveParts = new Set(entries.map(e => e.participantId));
-              const isAllAvailable = totalPartCount > 0 && uniqueActiveParts.size === totalPartCount;
-
-              return (
-                <div
-                  key={idx}
-                  className={`day-cell ${isCurrentMonth ? '' : 'other-month'} ${isAllAvailable ? 'all-available' : ''}`}
-                  onClick={() => onSelectDate(dateStr)}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span
-                      className="day-number"
-                      style={isToday ? {
-                        backgroundColor: '#3B82F6',
-                        color: '#FFFFFF',
-                        borderRadius: '50%',
-                        fontWeight: '800',
-                        boxShadow: '0 2px 4px rgba(59, 130, 246, 0.4)'
-                      } : {}}
-                    >
-                      {dayNum}
-                    </span>
-                    {isAllAvailable && <span className="all-available-label" style={{ fontSize: '0.65rem', color: '#10B981', fontWeight: 800 }}>전원</span>}
-                  </div>
-
-                  <div className="badges-container">
-                    {entries.map(e => {
-                      const p = participantsMap[e.participantId];
-                      if (!p) return null;
-                      return (
-                        <span
-                          key={p.id}
-                          className="participant-badge"
-                          style={{ backgroundColor: p.color, color: getContrastTextColor(p.color) }}
-                          title={e.note ? `${p.name}: ${e.note}` : p.name}
-                        >
-                          <span className="badge-dot" style={{ backgroundColor: getContrastTextColor(p.color) }} />
-                          <span className="badge-name">{p.name}</span>
-                        </span>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      );
-    }
-
-    // Date Layer Popup Modal
-    function DateModal({ dateStr, calendar, onSave, onDelete, onDeleteDate, onClose }) {
-      const [participantId, setParticipantId] = React.useState(calendar?.participants[0]?.id || '');
-      const [note, setNote] = React.useState('');
-      const [isSheetOpen, setIsSheetOpen] = React.useState(false);
-
-      const dateEntries = (calendar?.availabilities || []).filter(e => e.date === dateStr);
-
-      const handleSubmit = (e) => {
-        e.preventDefault();
-        if (!participantId) return;
-        onSave(dateStr, participantId, note);
-        setNote('');
-        onClose();
-      };
-
-      const getShortTitle = (dateStr) => {
-        if (!dateStr) return '';
-        const [year, month, day] = dateStr.split('-');
-        const dateObj = new Date(year, month - 1, day);
-        const dayOfWeek = ['일', '월', '화', '수', '목', '금', '토'][dateObj.getDay()];
-        const shortYear = year.slice(2);
-        return `${shortYear}.${month}.${day}(${dayOfWeek}) 일정`;
-      };
-
-      return (
-        <div className="modal-overlay" onClick={onClose}>
-          <div className="modal-container" onClick={e => e.stopPropagation()}>
-            <div className="modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 800 }}>{getShortTitle(dateStr)}</h3>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  style={{
-                    padding: '4px 10px',
-                    fontSize: '0.78rem',
-                    fontWeight: 800,
-                    color: '#EF4444',
-                    borderColor: '#FCA5A5',
-                    backgroundColor: '#FEF2F2',
-                    whiteSpace: 'nowrap'
-                  }}
-                  onClick={() => {
-                    const titleText = getShortTitle(dateStr).replace(' 일정', '');
-                    if (window.confirm(`${titleText}에 등록된 모든 일정을 삭제하시겠습니까?`)) {
-                      onDeleteDate(dateStr);
-                      onClose();
-                    }
-                  }}
-                  title="해당 날짜의 모든 참여자 일정 삭제"
-                >
-                  일정 삭제
-                </button>
-                <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>✕</button>
-              </div>
-            </div>
-            <form onSubmit={handleSubmit}>
-              <div className="modal-body">
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px', color: '#64748B' }}>참여자 선택</label>
-
-                  {/* Custom Selector (all screen sizes) */}
-                  <button
-                    type="button"
-                    className="form-select"
-                    style={{
-                      width: '100%',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      textAlign: 'left',
-                      background: '#FFFFFF',
-                      cursor: 'pointer'
-                    }}
-                    onClick={() => setIsSheetOpen(true)}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span className="color-dot" style={{ backgroundColor: calendar.participants.find(p => p.id === participantId)?.color || '#CCC' }} />
-                      <span>{calendar.participants.find(p => p.id === participantId)?.name || '선택하세요'}</span>
-                    </div>
-                    <span style={{ color: '#64748B', fontSize: '0.8rem' }}>▼</span>
-                  </button>
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px', color: '#64748B' }}>메모 입력 (선택)</label>
-                  <input
-                    type="text"
-                    className="form-input"
-                    style={{ width: '100%' }}
-                    placeholder="예: 1시 이후 가능, 예당호 착한농촌체험세상"
-                    value={note}
-                    onChange={e => setNote(e.target.value)}
-                  />
-                </div>
-
-                {dateEntries.length > 0 && (
-                  <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '12px' }}>
-                    <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '8px' }}>현재 등록된 참여자:</div>
-                    {dateEntries.map(e => {
-                      const p = calendar.participants.find(part => part.id === e.participantId);
-                      if (!p) return null;
-                      return (
-                        <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                          <span
-                            className="participant-badge"
-                            style={{
-                              backgroundColor: p.color,
-                              color: getContrastTextColor(p.color),
-                              cursor: 'pointer',
-                              userSelect: 'none'
-                            }}
-                            onClick={() => {
-                              setParticipantId(p.id);
-                              setNote(e.note || '');
-                            }}
-                            title="클릭 시 이 참여자로 자동 선택 및 메모 불러오기"
-                          >
-                            {p.name} {e.note && `("${e.note}")`}
-                          </span>
-                          <button type="button" className="btn btn-danger" style={{ padding: '2px 8px', fontSize: '0.75rem' }} onClick={() => onDelete(dateStr, p.id)}>삭제</button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-              <div className="modal-footer">
-                <button type="submit" className="btn btn-primary" style={{ width: '100%' }}>등록/저장</button>
-              </div>
-            </form>
-          </div>
-
-          {/* Bottom Sheet for mobile */}
-          {isSheetOpen && (
-            <div className="bottom-sheet-overlay" onClick={() => setIsSheetOpen(false)}>
-              <div className="bottom-sheet" onClick={e => e.stopPropagation()}>
-                <div className="bottom-sheet-header">
-                  <h4>참여자 선택</h4>
-                  <button
-                    type="button"
-                    style={{ background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer' }}
-                    onClick={() => setIsSheetOpen(false)}
-                  >
-                    ✕
-                  </button>
-                </div>
-                <div className="bottom-sheet-body">
-                  {calendar.participants.map(p => (
-                    <button
-                      key={p.id}
-                      type="button"
-                      className="bottom-sheet-item"
-                      onClick={() => {
-                        setParticipantId(p.id);
-                        const existingEntry = dateEntries.find(entry => entry.participantId === p.id);
-                        setNote(existingEntry ? existingEntry.note || '' : '');
-                        setIsSheetOpen(false);
-                      }}
-                    >
-                      <span className="color-dot" style={{ backgroundColor: p.color, width: '12px', height: '12px' }} />
-                      <span style={{ fontWeight: 700 }}>{p.name}</span>
-                      {participantId === p.id && <span style={{ marginLeft: 'auto', color: 'var(--accent-primary)', fontWeight: 800 }}>✓</span>}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      );
-    }
-
-    // Admin Modal
-    function AdminModal({ calendar, allCalendars, onSelectCalendar, onSave, onCreateNewCal, onClose }) {
-      const [title, setTitle] = React.useState(calendar.title);
-      const [description, setDescription] = React.useState(calendar.description || '');
-      const [participants, setParticipants] = React.useState(calendar.participants);
-      const [newName, setNewName] = React.useState('');
-
-      const handleCreateNewCalClick = () => {
-        const id = prompt('새 모임 캘린더의 영문/한글 ID를 입력하세요 (예: kkot, cw, trip):', 'cal_' + Date.now().toString().slice(-4));
-        if (!id) return;
-        const calTitle = prompt('캘린더 제목을 입력해 주세요:', `${id} 모임 캘린더`);
-        if (!calTitle) return;
-        const newCal = {
-          id: id.trim(),
-          title: calTitle.trim(),
-          description: `${calTitle.trim()} 참여자들의 일정 조율`,
-          participants: [
-            { id: 'p1', name: '참여자 1', color: '#EF4444' },
-            { id: 'p2', name: '참여자 2', color: '#3B82F6' }
-          ],
-          availabilities: []
-        };
-        if (onCreateNewCal) onCreateNewCal(newCal);
-      };
-
-      const handleAddParticipant = (e) => {
-        if (e) {
-          e.preventDefault();
-          e.stopPropagation();
-        }
-        if (e && e.nativeEvent && e.nativeEvent.isComposing) return;
-
-        const trimmed = (newName || '').trim();
-        if (!trimmed) return;
-        
-        const newParticipant = {
-          id: 'p_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
-          name: trimmed,
-          color: PRESET_COLORS[participants.length % PRESET_COLORS.length]
-        };
-
-        setParticipants(prev => [...prev, newParticipant]);
-        setNewName('');
-      };
-
-      const handleSubmit = (e) => {
-        e.preventDefault();
-        onSave({
-          ...calendar,
-          title: title.trim(),
-          description: description.trim(),
-          participants
-        }, null);
-        onClose();
-      };
-
-      return (
-        <div className="modal-overlay" onClick={onClose}>
-          <div className="modal-container" onClick={e => e.stopPropagation()}>
-            <div className="modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 800 }}>캘린더 설정</h3>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  style={{ padding: '5px 10px', fontSize: '0.78rem', fontWeight: 800, whiteSpace: 'nowrap' }}
-                  onClick={handleCreateNewCalClick}
-                >
-                  + 새 캘린더
-                </button>
-                <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer' }}>✕</button>
-              </div>
-            </div>
-            <form onSubmit={handleSubmit}>
-              <div className="modal-body">
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px', color: '#64748B' }}>캘린더명</label>
-                  <input type="text" className="form-input" style={{ width: '100%' }} value={title} onChange={e => setTitle(e.target.value)} required />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px', color: '#64748B' }}>캘린더 설명</label>
-                  <input type="text" className="form-input" style={{ width: '100%' }} placeholder="예: cw 동창 모임 참여자들의 일정 조율" value={description} onChange={e => setDescription(e.target.value)} />
-                </div>
-
-                <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '12px' }}>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px', color: '#64748B' }}>참여자 설정 ({participants.length}명)</label>
-                  
-                  {/* Participant Input & Add Button */}
-                  <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-                    <input
-                      type="text"
-                      className="form-input"
-                      style={{ flex: 1 }}
-                      placeholder="새 참여자 이름"
-                      value={newName}
-                      onChange={e => setNewName(e.target.value)}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          if (e.nativeEvent && e.nativeEvent.isComposing) return;
-                          handleAddParticipant(e);
-                        }
-                      }}
-                    />
-                    <button
-                      type="button"
-                      className="btn btn-secondary"
-                      style={{ whiteSpace: 'nowrap', minWidth: '52px', flexShrink: 0 }}
-                      onClick={handleAddParticipant}
-                    >
-                      추가
-                    </button>
-                  </div>
-
-                  {/* List of Participants */}
-                  {participants.map(p => (
-                    <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                      <input type="color" value={p.color} onChange={e => setParticipants(participants.map(item => item.id === p.id ? { ...item, color: e.target.value } : item))} style={{ width: '28px', height: '28px', border: 'none', background: 'none', cursor: 'pointer' }} />
-                      <input type="text" className="form-input" style={{ flex: 1, padding: '4px 8px' }} value={p.name} onChange={e => setParticipants(participants.map(item => item.id === p.id ? { ...item, name: e.target.value } : item))} />
-                      <button type="button" className="btn btn-danger" style={{ padding: '4px 8px' }} onClick={() => setParticipants(participants.filter(item => item.id !== p.id))}>✕</button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={onClose}>취소</button>
-                <button type="submit" className="btn btn-primary">설정 저장</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      );
-    }
-
-    // Share Modal
-    function ShareModal({ calendar, onCreateNewCal, onClose }) {
-      const baseUrl = `${window.location.origin}${window.location.pathname}`;
-      const shareUrl = `${baseUrl}?id=${calendar.id}`;
-
-      const handleCreateNewCalClick = () => {
-        const id = prompt('새 모임 캘린더의 영문/한글 ID를 입력하세요 (예: kkot, cw, trip):', 'cal_' + Date.now().toString().slice(-4));
-        if (!id) return;
-        const calTitle = prompt('캘린더 제목을 입력해 주세요:', `${id} 모임 캘린더`);
-        if (!calTitle) return;
-
-        const newCal = {
-          id: id.trim(),
-          title: calTitle.trim(),
-          description: `${calTitle.trim()} 참여자들의 일정 조율`,
-          participants: [
-            { id: 'p1', name: '참여자 1', color: '#EF4444' },
-            { id: 'p2', name: '참여자 2', color: '#3B82F6' }
-          ],
-          availabilities: []
-        };
-        onCreateNewCal(newCal);
-      };
-
-      return (
-        <div className="modal-overlay" onClick={onClose}>
-          <div className="modal-container" onClick={e => e.stopPropagation()}>
-            <div className="modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 800 }}>캘린더 공유 URL</h3>
-              <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>✕</button>
-            </div>
-            <div className="modal-body">
-              <label style={{ fontSize: '0.85rem', fontWeight: 700, color: '#64748B' }}>현재 캘린더 ({calendar.id}) 전용 공유 URL</label>
-              <input type="text" className="form-input" style={{ width: '100%' }} value={shareUrl} readOnly />
-              <button className="btn btn-primary" onClick={() => { navigator.clipboard.writeText(shareUrl); alert('URL이 복사되었습니다!'); }}>URL 복사하기</button>
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    // Summary List - Displays both "Partial Availability" (N+ members) and "Full Availability" lists
-    function SummaryList({ calendar, onSelectDate }) {
-      const totalCount = calendar?.participants?.length || 0;
-      const availabilities = calendar?.availabilities || [];
-
-      const participantsMap = (calendar?.participants || []).reduce((acc, p) => {
-        acc[p.id] = p;
-        return acc;
-      }, {});
-
-      const dateMap = availabilities.reduce((acc, e) => {
-        if (!acc[e.date]) acc[e.date] = [];
-        acc[e.date].push(e);
-        return acc;
-      }, {});
-
-      const today = new Date();
-      const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-
-      // Threshold = totalCount - 2, only show partial section when totalCount >= 6
-      // 4명 → 전원만 | 6명 → 4명 이상 + 전원 | 8명 → 6명 이상 + 전원
-      const thresholdN = totalCount >= 6 ? totalCount - 2 : 0;
-
-      // 1. All-available dates: only count active participants (those still in participantsMap)
-      const allAvailableDates = Object.keys(dateMap).filter(d => {
-        const entries = dateMap[d].filter(e => participantsMap[e.participantId]);
-        const uniqueParticipants = new Set(entries.map(e => e.participantId));
-        return totalCount > 0 && uniqueParticipants.size === totalCount;
-      });
-
-      const allAvailableSet = new Set(allAvailableDates);
-
-      // 2. Partial-available dates (MIN_THRESHOLD <= availCount < totalCount), excluding all-available
-      const partialAvailableDates = thresholdN > 0 ? Object.keys(dateMap).filter(d => {
-        if (allAvailableSet.has(d)) return false;
-        const entries = dateMap[d].filter(e => participantsMap[e.participantId]);
-        const uniqueParticipants = new Set(entries.map(e => e.participantId));
-        const cnt = uniqueParticipants.size;
-        return cnt >= thresholdN && cnt < totalCount;
-      }) : [];
-
-      // Sort descending: newest at top, oldest at bottom
-      const getSortedDates = (datesList) => {
-        return [...datesList].sort((a, b) => b.localeCompare(a));
-      };
-
-      // Future only — past dates moved to '과거 모임' section
-      const sortedAllDates = getSortedDates(allAvailableDates.filter(d => d >= todayStr));
-      const sortedPartialDates = getSortedDates(partialAvailableDates.filter(d => d >= todayStr));
-
-      // 3. Past meeting dates: all past dates with at least 1 active participant registered
-      const pastMeetingDates = getSortedDates(
-        Object.keys(dateMap).filter(d => {
-          if (d >= todayStr) return false; // future dates excluded
-          const entries = dateMap[d].filter(e => participantsMap[e.participantId]);
-          return entries.length > 0;
-        })
-      );
-
-      return (
-        <div className="summary-card" style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
-          
-          {/* 1. Partial Availability List (only if thresholdN > 0, meaning totalCount >= 6) */}
-          {thresholdN > 0 && (
-            <div>
-              <div className="summary-title" style={{ color: '#2563EB', marginBottom: '12px' }}>
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style={{ marginRight: '4px' }}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                {thresholdN}명 이상 참석 가능 ({sortedPartialDates.length}일)
-              </div>
-              {sortedPartialDates.length === 0 ? (
-                <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', padding: '10px 0' }}>해당하는 날짜가 아직 없습니다.</div>
-              ) : (
-                <div>
-                  {sortedPartialDates.map(d => {
-                    const dateEntries = dateMap[d] || [];
-                    const formattedDateStr = formatDateWithDayName(d);
-                    const memoEntries = dateEntries.filter(e => e.note && e.note.trim().length > 0);
-                    const isPast = d < todayStr;
-                    const availCount = new Set(dateEntries.map(e => e.participantId)).size;
-
-                    return (
-                      <button
-                        key={d}
-                        className="date-item-btn"
-                        onClick={() => onSelectDate(d)}
-                        style={isPast ? {
-                          opacity: 0.7,
-                          backgroundColor: '#F8FAFC',
-                          borderColor: '#E2E8F0'
-                        } : {
-                          borderColor: '#DBEAFE',
-                          backgroundColor: '#F8FAFC'
-                        }}
-                      >
-                        <div className="date-item-left">
-                          <span style={{
-                            fontWeight: 800,
-                            color: isPast ? '#94A3B8' : '#2563EB',
-                            fontSize: '0.95rem'
-                          }}>
-                            {formattedDateStr}
-                          </span>
-
-                          {memoEntries.length > 0 && (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                              {memoEntries.map(e => {
-                                const p = participantsMap[e.participantId];
-                                if (!p) return null;
-                                const memoText = e.note.trim();
-                                return (
-                                  <span
-                                    key={e.participantId || p.id}
-                                    className="memo-capsule-badge"
-                                    style={isPast ? {
-                                      backgroundColor: '#F1F5F9',
-                                      color: '#64748B',
-                                      border: `1px solid ${p.color}`,
-                                      boxShadow: 'none'
-                                    } : {
-                                      backgroundColor: p.color,
-                                      color: getContrastTextColor(p.color)
-                                    }}
-                                    title={`${p.name}: ${memoText}`}
-                                  >
-                                    {memoText}
-                                  </span>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </div>
-
-                        <span className="date-item-badge" style={{
-                          background: isPast ? '#E2E8F0' : '#DBEAFE',
-                          color: isPast ? '#64748B' : '#1D4ED8',
-                          border: isPast ? 'none' : '1px solid #BFDBFE'
-                        }}>
-                          {isPast ? '지나간 모임' : `${availCount}명 가능 (${availCount}/${totalCount}명)`}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Divider line (only if thresholdN > 0) */}
-          {thresholdN > 0 && <div style={{ borderTop: '1px solid var(--border-subtle)', margin: '4px 0' }} />}
-
-          {/* 2. Full Availability List */}
-          <div>
-            <div className="summary-title" style={{ color: '#10B981', marginBottom: '12px' }}>
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style={{ marginRight: '4px' }}><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m9 12 2 2 4-4"/></svg>
-              전원 참석 가능 ({sortedAllDates.length}일)
-            </div>
-            {sortedAllDates.length === 0 ? (
-              <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', padding: '10px 0' }}>아직 참여자 전원이 가능한 날짜가 없습니다. 캘린더에서 날짜를 선택하여 가능 여부를 표기해보세요!</div>
-            ) : (
-              <div>
-                {sortedAllDates.map(d => {
-                  const dateEntries = dateMap[d] || [];
-                  const formattedDateStr = formatDateWithDayName(d);
-                  const memoEntries = dateEntries.filter(e => e.note && e.note.trim().length > 0);
-                  const isPast = d < todayStr;
-
-                  return (
-                    <button
-                      key={d}
-                      className="date-item-btn"
-                      onClick={() => onSelectDate(d)}
-                      style={isPast ? {
-                        opacity: 0.7,
-                        backgroundColor: '#F8FAFC',
-                        borderColor: '#E2E8F0',
-                        flexDirection: 'column',
-                        alignItems: 'flex-start'
-                      } : {
-                        flexDirection: 'column',
-                        alignItems: 'flex-start'
-                      }}
-                    >
-                      {/* Top row: date + badge on same line */}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', gap: '8px' }}>
-                        <span style={{
-                          fontWeight: 800,
-                          color: isPast ? '#94A3B8' : '#10B981',
-                          fontSize: '0.95rem',
-                          flexShrink: 0
-                        }}>
-                          {formattedDateStr}
-                        </span>
-                        <span className="date-item-badge" style={{
-                          background: isPast ? '#E2E8F0' : '#10B981',
-                          color: isPast ? '#64748B' : '#FFF',
-                          flexShrink: 0
-                        }}>
-                          {isPast ? '지나간 모임' : '전원 가능'}
-                        </span>
-                      </div>
-
-                      {/* Memo badges below */}
-                      {memoEntries.length > 0 && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                          {memoEntries.map(e => {
-                            const p = participantsMap[e.participantId];
-                            if (!p) return null;
-                            const memoText = e.note.trim();
-                            return (
-                              <span
-                                key={e.participantId || p.id}
-                                className="memo-capsule-badge"
-                                style={isPast ? {
-                                  backgroundColor: '#F1F5F9',
-                                  color: '#64748B',
-                                  border: `1px solid ${p.color}`,
-                                  boxShadow: 'none'
-                                } : {
-                                  backgroundColor: p.color,
-                                  color: getContrastTextColor(p.color)
-                                }}
-                                title={`${p.name}: ${memoText}`}
-                              >
-                                {memoText}
-                              </span>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* 3. Past Meetings List */}
-          {pastMeetingDates.length > 0 && (
-            <div>
-              <div style={{ borderTop: '1px solid var(--border-subtle)', margin: '4px 0 20px' }} />
-              <div className="summary-title" style={{ color: '#64748B', marginBottom: '12px' }}>
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '4px' }}><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                과거 모임 ({pastMeetingDates.length}일)
-              </div>
-              <div>
-                {pastMeetingDates.map(d => {
-                  const dateEntries = dateMap[d].filter(e => participantsMap[e.participantId]);
-                  const formattedDateStr = formatDateWithDayName(d);
-                  const memoEntries = dateEntries.filter(e => e.note && e.note.trim().length > 0);
-                  const uniqueCount = new Set(dateEntries.map(e => e.participantId)).size;
-
-                  return (
-                    <button
-                      key={d}
-                      className="date-item-btn"
-                      onClick={() => onSelectDate(d)}
-                      style={{
-                        opacity: 0.75,
-                        backgroundColor: '#F8FAFC',
-                        borderColor: '#E2E8F0',
-                        flexDirection: 'column',
-                        alignItems: 'flex-start'
-                      }}
-                    >
-                      {/* Top row: date + count badge */}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', gap: '8px' }}>
-                        <span style={{
-                          fontWeight: 800,
-                          color: '#94A3B8',
-                          fontSize: '0.95rem',
-                          flexShrink: 0
-                        }}>
-                          {formattedDateStr}
-                        </span>
-                        <span className="date-item-badge" style={{
-                          background: '#E2E8F0',
-                          color: '#64748B',
-                          flexShrink: 0
-                        }}>
-                          {uniqueCount}/{totalCount}명
-                        </span>
-                      </div>
-
-                      {/* Memo badges */}
-                      {memoEntries.length > 0 && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                          {memoEntries.map(e => {
-                            const p = participantsMap[e.participantId];
-                            if (!p) return null;
-                            return (
-                              <span
-                                key={e.participantId}
-                                className="memo-capsule-badge"
-                                style={{
-                                  backgroundColor: '#F1F5F9',
-                                  color: '#64748B',
-                                  border: `1px solid ${p.color}`,
-                                  boxShadow: 'none'
-                                }}
-                                title={`${p.name}: ${e.note.trim()}`}
-                              >
-                                {e.note.trim()}
-                              </span>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-        </div>
-      );
-    }
-
-    try {
-      const rootElement = document.getElementById('root');
-      if (rootElement) {
-        const root = ReactDOM.createRoot(rootElement);
-        root.render(<App />);
       }
     } catch (e) {
-      console.error('App render error:', e);
+      console.warn(`Firestore fetch notice for cal_${calId}:`, e);
     }
-  </script>
+  }
+  for (let attempt = 0; attempt <= retryCount; attempt++) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 6000);
+    try {
+      const res = await fetch(CLOUD_API_URL, {
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      if (res.ok) {
+        const json = await res.json();
+        if (json && Array.isArray(json.calendars)) {
+          const matched = json.calendars.find(c => c.id === calId);
+          if (matched) return {
+            calendar: matched,
+            lastModified: json.lastModified || 0
+          };
+        }
+      }
+    } catch (e) {
+      clearTimeout(timeoutId);
+    }
+    if (attempt < retryCount) {
+      await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+    }
+  }
+  return null;
+}
+
+// Pushes isolated calendar data to Firestore (cal_{id}) and master fallback. Returns boolean success.
+async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 2) {
+  if (!targetCal || !targetCal.id) return false;
+  if (firebaseDb) {
+    try {
+      // Store directly into its isolated calendar document (Replaces whole state so deletions are exact)
+      await firebaseDb.collection('calendars').doc(`cal_${targetCal.id}`).set({
+        calendar: targetCal,
+        lastModified: lastModified
+      });
+      return true;
+    } catch (e) {
+      console.warn(`Firestore push notice for cal_${targetCal.id}:`, e);
+    }
+  }
+  for (let attempt = 0; attempt <= retryCount; attempt++) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 7000);
+    try {
+      const currentLocal = loadLocalCache();
+      const nextCalendars = currentLocal.map(c => c.id === targetCal.id ? targetCal : c);
+      const res = await fetch(CLOUD_API_URL, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          calendars: nextCalendars,
+          lastModified
+        }),
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      if (res.ok) return true;
+    } catch (e) {
+      clearTimeout(timeoutId);
+    }
+    if (attempt < retryCount) {
+      await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+    }
+  }
+  return false;
+}
+function loadLocalMeta() {
+  try {
+    const raw = localStorage.getItem(STORAGE_META_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch (e) {}
+  return {
+    lastModified: 0
+  };
+}
+function saveLocalMeta(meta) {
+  try {
+    localStorage.setItem(STORAGE_META_KEY, JSON.stringify(meta));
+  } catch (e) {}
+}
+function App() {
+  const [calendars, setCalendarsState] = React.useState(() => loadLocalCache());
+  const toastTimeoutRef = React.useRef(null);
+  const showToast = (message, type = 'info', duration = 3500) => {
+    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+    setToast({
+      message,
+      type
+    });
+    toastTimeoutRef.current = setTimeout(() => {
+      setToast(t => t?.message === message ? null : t);
+    }, duration);
+  };
+
+  // Initialize with persisted lastLocalSave timestamp so refresh never bypasses the guard!
+  const lastLocalSaveRef = React.useRef(loadLocalMeta().lastModified || 0);
+  const LOCAL_SAVE_GUARD_MS = 10000; // 10s guard window after local save
+
+  const updateCalendars = async (nextCalendars, toastMsg = '일정이 저장되었습니다.', toastType = 'success') => {
+    const now = Date.now();
+    lastLocalSaveRef.current = now;
+    saveLocalMeta({
+      lastModified: now
+    }); // stamp local save time
+    setCalendarsState(nextCalendars);
+    saveLocalCache(nextCalendars);
+
+    // Find active calendar and push to its isolated Firestore document
+    const currentCal = nextCalendars.find(c => c.id === activeCalId) || nextCalendars[0];
+    showToast(toastMsg, toastType, 3500);
+    if (currentCal) {
+      pushSingleCloudCalendar(currentCal, now);
+    }
+  };
+  const [activeCalId, setActiveCalId] = React.useState(() => {
+    const requestedId = getCalendarIdFromURL();
+    if (requestedId && calendars.some(c => c.id === requestedId)) {
+      return requestedId;
+    }
+    return calendars[0]?.id || 'cw';
+  });
+  const [currentMonthDate, setCurrentMonthDate] = React.useState(new Date());
+  const [selectedDate, setSelectedDate] = React.useState(null);
+  const [isModalOpen, setIsModalOpen] = React.useState(false);
+  const [isAdminOpen, setIsAdminOpen] = React.useState(false);
+  const [isShareOpen, setIsShareOpen] = React.useState(false);
+  const [isParticipantsOpen, setIsParticipantsOpen] = React.useState(false);
+
+  // Firebase Firestore Real-Time Listener (ISOLATED per activeCalId)
+  React.useEffect(() => {
+    if (!firebaseDb || !activeCalId) return;
+    let isMounted = true;
+
+    // Listen ONLY to this active calendar document (cal_{id}) for 100% strict isolation!
+    const unsubscribe = firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).onSnapshot(doc => {
+      if (doc.exists && isMounted) {
+        const data = doc.data();
+        if (data && data.calendar && data.calendar.id === activeCalId) {
+          // Guard: skip cloud update if we recently saved locally or if local state is newer
+          if (Date.now() - lastLocalSaveRef.current < LOCAL_SAVE_GUARD_MS) return;
+          const cloudCal = data.calendar;
+          const localMeta = loadLocalMeta();
+          const cloudLastMod = data.lastModified || 0;
+          if (cloudLastMod > localMeta.lastModified) {
+            setCalendarsState(prevCals => {
+              const nextCals = prevCals.map(c => c.id === activeCalId ? cloudCal : c);
+              saveLocalCache(nextCals);
+              saveLocalMeta({
+                lastModified: cloudLastMod
+              });
+              return nextCals;
+            });
+          }
+        }
+      }
+    }, err => {
+      console.warn(`Firestore realtime sync notice for cal_${activeCalId}:`, err);
+    });
+    return () => {
+      isMounted = false;
+      if (unsubscribe) unsubscribe();
+    };
+  }, [activeCalId]);
+  const activeCal = calendars.find(c => c.id === activeCalId) || calendars[0];
+  React.useEffect(() => {
+    if (activeCal) {
+      const calTitle = `${activeCal.title} - 모여라 캘린더`;
+      const calDesc = activeCal.description || `${activeCal.title} 사모임 멤버들의 참석 가능 날짜 조율 캘린더입니다.`;
+      const currentShareUrl = `${window.location.origin}${window.location.pathname}?id=${activeCal.id}`;
+      document.title = calTitle;
+      const ogTitle = document.getElementById('og-title');
+      if (ogTitle) ogTitle.setAttribute('content', calTitle);
+      const ogDesc = document.getElementById('og-desc');
+      if (ogDesc) ogDesc.setAttribute('content', calDesc);
+      const ogUrl = document.getElementById('og-url');
+      if (ogUrl) ogUrl.setAttribute('content', currentShareUrl);
+      const twTitle = document.getElementById('tw-title');
+      if (twTitle) twTitle.setAttribute('content', calTitle);
+    }
+  }, [activeCal]);
+  React.useEffect(() => {
+    const requestedId = getCalendarIdFromURL();
+    if (requestedId && !calendars.some(c => c.id === requestedId)) {
+      const newCal = {
+        id: requestedId,
+        title: `${requestedId} 사모임 캘린더`,
+        description: `${requestedId} 멤버들의 참석 가능 일자를 표기해 주세요`,
+        participants: [{
+          id: 'p1',
+          name: '참여자 1',
+          color: '#EF4444'
+        }, {
+          id: 'p2',
+          name: '참여자 2',
+          color: '#3B82F6'
+        }, {
+          id: 'p3',
+          name: '참여자 3',
+          color: '#10B981'
+        }],
+        availabilities: []
+      };
+      updateCalendars([newCal, ...calendars]);
+      setActiveCalId(requestedId);
+    }
+  }, []);
+  const handleSelectCalendar = id => {
+    setActiveCalId(id);
+    const url = new URL(window.location.href);
+    url.searchParams.set('id', id);
+    window.history.replaceState({}, '', url.toString());
+  };
+  const handleSaveAvailability = (dateStr, participantId, note) => {
+    const existing = activeCal.availabilities || [];
+    const index = existing.findIndex(e => e.date === dateStr && e.participantId === participantId);
+    let nextAvail = [...existing];
+    if (index >= 0) {
+      nextAvail[index] = {
+        date: dateStr,
+        participantId,
+        note
+      };
+    } else {
+      nextAvail.push({
+        date: dateStr,
+        participantId,
+        note
+      });
+    }
+    const updatedCal = {
+      ...activeCal,
+      availabilities: nextAvail
+    };
+    const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
+    updateCalendars(nextCalendars, '일정이 정상적으로 저장되었습니다. ✅', 'success');
+    const dateCount = nextAvail.filter(e => e.date === dateStr).length;
+    if (dateCount === activeCal.participants.length && typeof confetti === 'function') {
+      confetti({
+        particleCount: 75,
+        spread: 65,
+        origin: {
+          y: 0.6
+        }
+      });
+    }
+  };
+  const handleDeleteAvailability = (dateStr, participantId) => {
+    const nextAvail = (activeCal.availabilities || []).filter(e => !(e.date === dateStr && e.participantId === participantId));
+    const updatedCal = {
+      ...activeCal,
+      availabilities: nextAvail
+    };
+    const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
+    updateCalendars(nextCalendars, '참여자 일정이 삭제되었습니다. 🗑️', 'delete');
+  };
+  const handleDeleteAllForDate = dateStr => {
+    const nextAvail = (activeCal.availabilities || []).filter(e => e.date !== dateStr);
+    const updatedCal = {
+      ...activeCal,
+      availabilities: nextAvail
+    };
+    const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
+    updateCalendars(nextCalendars, '해당 날짜의 모든 일정이 삭제되었습니다. 🗑️', 'delete');
+  };
+  const handleSaveAdmin = (updatedCal, newCalCreated) => {
+    if (newCalCreated) {
+      const nextCalendars = [newCalCreated, ...calendars];
+      updateCalendars(nextCalendars, '새 캘린더가 생성되었습니다. ✅', 'success');
+      handleSelectCalendar(newCalCreated.id);
+    } else {
+      const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
+      updateCalendars(nextCalendars, '캘린더 설정이 저장되었습니다. ✅', 'success');
+    }
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    className: "app-container"
+  }, /*#__PURE__*/React.createElement("header", {
+    className: "header-card"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "header-left"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '10px'
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "calendar-title"
+  }, activeCal?.title)), activeCal?.description && /*#__PURE__*/React.createElement("div", {
+    className: "calendar-desc"
+  }, activeCal.description))), /*#__PURE__*/React.createElement("div", {
+    className: "header-actions"
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-secondary",
+    onClick: () => setIsParticipantsOpen(!isParticipantsOpen),
+    style: {
+      gap: '6px'
+    }
+  }, /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: "24",
+    height: "24",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    "stroke-width": "2",
+    "stroke-linecap": "round",
+    "stroke-linejoin": "round",
+    className: "icon icon-tabler icons-tabler-outline icon-tabler-users"
+  }, /*#__PURE__*/React.createElement("path", {
+    stroke: "none",
+    d: "M0 0h24v24H0z",
+    fill: "none"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M5 7a4 4 0 1 0 8 0a4 4 0 1 0 -8 0"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M3 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M16 3.13a4 4 0 0 1 0 7.75"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M21 21v-2a4 4 0 0 0 -3 -3.85"
+  })), /*#__PURE__*/React.createElement("span", null, "\uCC38\uC5EC\uC790 (", activeCal?.participants?.length || 0, "\uBA85)")), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-secondary",
+    onClick: () => setIsShareOpen(true),
+    title: "\uACF5\uC720",
+    style: {
+      padding: '10px'
+    }
+  }, /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: "24",
+    height: "24",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    "stroke-width": "2",
+    "stroke-linecap": "round",
+    "stroke-linejoin": "round",
+    className: "icon icon-tabler icons-tabler-outline icon-tabler-share"
+  }, /*#__PURE__*/React.createElement("path", {
+    stroke: "none",
+    d: "M0 0h24v24H0z",
+    fill: "none"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M3 12a3 3 0 1 0 6 0a3 3 0 1 0 -6 0"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M15 6a3 3 0 1 0 6 0a3 3 0 1 0 -6 0"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M15 18a3 3 0 1 0 6 0a3 3 0 1 0 -6 0"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M8.7 10.7l6.6 -3.4"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M8.7 13.3l6.6 3.4"
+  }))), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-secondary",
+    onClick: () => setIsAdminOpen(true),
+    title: "\uC124\uC815",
+    style: {
+      padding: '10px'
+    }
+  }, /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: "24",
+    height: "24",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    "stroke-width": "2",
+    "stroke-linecap": "round",
+    "stroke-linejoin": "round",
+    className: "icon icon-tabler icons-tabler-outline icon-tabler-settings"
+  }, /*#__PURE__*/React.createElement("path", {
+    stroke: "none",
+    d: "M0 0h24v24H0z",
+    fill: "none"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0"
+  }))), isParticipantsOpen && /*#__PURE__*/React.createElement("div", {
+    className: "participants-popover"
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '0.8rem',
+      fontWeight: 800,
+      color: 'var(--text-muted)',
+      borderBottom: '1px solid var(--border-subtle)',
+      paddingBottom: '6px',
+      marginBottom: '4px'
+    }
+  }, "\uCC38\uC5EC\uC790 \uBAA9\uB85D"), activeCal?.participants?.map(p => /*#__PURE__*/React.createElement("div", {
+    key: p.id,
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      fontSize: '0.85rem',
+      fontWeight: '700'
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "color-dot",
+    style: {
+      backgroundColor: p.color,
+      width: '10px',
+      height: '10px'
+    }
+  }), /*#__PURE__*/React.createElement("span", null, p.name)))))), /*#__PURE__*/React.createElement(CalendarGrid, {
+    calendar: activeCal,
+    monthDate: currentMonthDate,
+    onPrevMonth: () => setCurrentMonthDate(new Date(currentMonthDate.getFullYear(), currentMonthDate.getMonth() - 1, 1)),
+    onNextMonth: () => setCurrentMonthDate(new Date(currentMonthDate.getFullYear(), currentMonthDate.getMonth() + 1, 1)),
+    onToday: () => setCurrentMonthDate(new Date()),
+    onJumpToMonth: (y, m) => setCurrentMonthDate(new Date(y, m, 1)),
+    onSelectDate: d => {
+      setSelectedDate(d);
+      setIsModalOpen(true);
+    }
+  }), /*#__PURE__*/React.createElement(SummaryList, {
+    calendar: activeCal,
+    onSelectDate: d => {
+      setSelectedDate(d);
+      setIsModalOpen(true);
+    }
+  }), isModalOpen && /*#__PURE__*/React.createElement(DateModal, {
+    dateStr: selectedDate,
+    calendar: activeCal,
+    onSave: handleSaveAvailability,
+    onDelete: handleDeleteAvailability,
+    onDeleteDate: handleDeleteAllForDate,
+    onClose: () => setIsModalOpen(false)
+  }), isAdminOpen && /*#__PURE__*/React.createElement(AdminModal, {
+    calendar: activeCal,
+    allCalendars: calendars,
+    onSelectCalendar: handleSelectCalendar,
+    onSave: handleSaveAdmin,
+    onCreateNewCal: newCal => {
+      const nextCalendars = [newCal, ...calendars];
+      updateCalendars(nextCalendars);
+      handleSelectCalendar(newCal.id);
+      setIsAdminOpen(false);
+    },
+    onClose: () => setIsAdminOpen(false)
+  }), isShareOpen && /*#__PURE__*/React.createElement(ShareModal, {
+    calendar: activeCal,
+    onCreateNewCal: newCal => {
+      const nextCalendars = [newCal, ...calendars];
+      updateCalendars(nextCalendars);
+      handleSelectCalendar(newCal.id);
+      setIsShareOpen(false);
+    },
+    onClose: () => setIsShareOpen(false)
+  }), toast && /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: 'fixed',
+      bottom: '32px',
+      left: '50%',
+      transform: 'translateX(-50%)',
+      zIndex: 99999,
+      backgroundColor: toast.type === 'delete' ? '#EF4444' : toast.type === 'success' ? '#10B981' : '#3B82F6',
+      color: '#FFFFFF',
+      padding: '12px 24px',
+      borderRadius: '30px',
+      boxShadow: '0 12px 32px rgba(0,0,0,0.25)',
+      fontSize: '0.95rem',
+      fontWeight: '800',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      pointerEvents: 'none'
+    }
+  }, /*#__PURE__*/React.createElement("span", null, toast.message)));
+}
+
+// Calendar Grid Component
+function CalendarGrid({
+  calendar,
+  monthDate,
+  onPrevMonth,
+  onNextMonth,
+  onToday,
+  onJumpToMonth,
+  onSelectDate
+}) {
+  const year = monthDate.getFullYear();
+  const month = monthDate.getMonth();
+  const [isPickerOpen, setIsPickerOpen] = React.useState(false);
+  const [pickerYear, setPickerYear] = React.useState(year);
+  const [pickerMonth, setPickerMonth] = React.useState(month);
+
+  // Sync picker values when month navigates externally
+  React.useEffect(() => {
+    setPickerYear(year);
+    setPickerMonth(month);
+  }, [year, month]);
+  const handlePickerApply = () => {
+    onJumpToMonth(pickerYear, pickerMonth);
+    setIsPickerOpen(false);
+  };
+  const MONTH_NAMES = ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월'];
+  const firstDay = new Date(year, month, 1).getDay();
+  const lastDate = new Date(year, month + 1, 0).getDate();
+  const prevLastDate = new Date(year, month, 0).getDate();
+  const days = [];
+
+  // Fill previous month days
+  for (let i = firstDay - 1; i >= 0; i--) {
+    const d = prevLastDate - i;
+    const prevMonthDate = new Date(year, month - 1, d);
+    const dateStr = `${prevMonthDate.getFullYear()}-${String(prevMonthDate.getMonth() + 1).padStart(2, '0')}-${String(prevMonthDate.getDate()).padStart(2, '0')}`;
+    days.push({
+      dayNum: d,
+      dateStr,
+      isCurrentMonth: false
+    });
+  }
+
+  // Fill current month days
+  for (let i = 1; i <= lastDate; i++) {
+    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+    days.push({
+      dayNum: i,
+      dateStr,
+      isCurrentMonth: true
+    });
+  }
+
+  // Fill next month days to complete the 7-column grid
+  const totalCells = Math.ceil(days.length / 7) * 7;
+  const nextDaysNeeded = totalCells - days.length;
+  for (let i = 1; i <= nextDaysNeeded; i++) {
+    const nextMonthDate = new Date(year, month + 1, i);
+    const dateStr = `${nextMonthDate.getFullYear()}-${String(nextMonthDate.getMonth() + 1).padStart(2, '0')}-${String(nextMonthDate.getDate()).padStart(2, '0')}`;
+    days.push({
+      dayNum: i,
+      dateStr,
+      isCurrentMonth: false
+    });
+  }
+  const availMap = (calendar?.availabilities || []).reduce((acc, entry) => {
+    if (!acc[entry.date]) acc[entry.date] = [];
+    acc[entry.date].push(entry);
+    return acc;
+  }, {});
+  const participantsMap = (calendar?.participants || []).reduce((acc, p) => {
+    acc[p.id] = p;
+    return acc;
+  }, {});
+  const totalPartCount = calendar?.participants?.length || 0;
+  return /*#__PURE__*/React.createElement("div", {
+    className: "calendar-card",
+    style: {
+      position: 'relative'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "calendar-nav"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "month-display",
+    style: {
+      cursor: 'pointer',
+      userSelect: 'none',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '6px'
+    },
+    onClick: () => setIsPickerOpen(v => !v),
+    title: "\uD074\uB9AD\uD558\uC5EC \uB144\uC6D4 \uC774\uB3D9"
+  }, year, "\uB144 ", month + 1, "\uC6D4", /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: '0.7rem',
+      color: '#94A3B8'
+    }
+  }, "\u25BE")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: '6px'
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-secondary",
+    onClick: onPrevMonth
+  }, "\u25C0 \uC774\uC804\uB2EC"), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-secondary",
+    onClick: onToday
+  }, "\uC624\uB298"), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-secondary",
+    onClick: onNextMonth
+  }, "\uB2E4\uC74C\uB2EC \u25B6"))), isPickerOpen && /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: 'absolute',
+      top: '60px',
+      left: '0',
+      zIndex: 200,
+      background: '#FFFFFF',
+      border: '1px solid var(--border-subtle)',
+      borderRadius: '16px',
+      boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
+      padding: '20px',
+      minWidth: '280px'
+    },
+    onClick: e => e.stopPropagation()
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: 'fixed',
+      inset: 0,
+      zIndex: -1
+    },
+    onClick: () => setIsPickerOpen(false)
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: '16px'
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: '0.8rem',
+      fontWeight: 700,
+      color: '#64748B',
+      display: 'block',
+      marginBottom: '8px'
+    }
+  }, "\uB144\uB3C4"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '10px'
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "btn btn-secondary",
+    style: {
+      padding: '4px 10px',
+      fontSize: '0.85rem'
+    },
+    onClick: () => setPickerYear(y => y - 1)
+  }, "\u25C0"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontWeight: 800,
+      fontSize: '1.1rem',
+      minWidth: '60px',
+      textAlign: 'center'
+    }
+  }, pickerYear, "\uB144"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "btn btn-secondary",
+    style: {
+      padding: '4px 10px',
+      fontSize: '0.85rem'
+    },
+    onClick: () => setPickerYear(y => y + 1)
+  }, "\u25B6"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: '16px'
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: '0.8rem',
+      fontWeight: 700,
+      color: '#64748B',
+      display: 'block',
+      marginBottom: '8px'
+    }
+  }, "\uC6D4"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(4, 1fr)',
+      gap: '6px'
+    }
+  }, MONTH_NAMES.map((name, idx) => /*#__PURE__*/React.createElement("button", {
+    key: idx,
+    type: "button",
+    onClick: () => setPickerMonth(idx),
+    style: {
+      padding: '6px 4px',
+      borderRadius: '8px',
+      border: pickerMonth === idx ? '2px solid var(--accent-primary)' : '1px solid var(--border-subtle)',
+      background: pickerMonth === idx ? '#EEF2FF' : '#FFFFFF',
+      color: pickerMonth === idx ? 'var(--accent-primary)' : 'var(--text-main)',
+      fontWeight: pickerMonth === idx ? 800 : 500,
+      fontSize: '0.82rem',
+      cursor: 'pointer'
+    }
+  }, name)))), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "btn btn-primary",
+    style: {
+      width: '100%'
+    },
+    onClick: handlePickerApply
+  }, pickerYear, "\uB144 ", pickerMonth + 1, "\uC6D4\uB85C \uC774\uB3D9")), /*#__PURE__*/React.createElement("div", {
+    className: "weekday-grid"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "weekday-label sun"
+  }, "\uC77C"), /*#__PURE__*/React.createElement("div", {
+    className: "weekday-label"
+  }, "\uC6D4"), /*#__PURE__*/React.createElement("div", {
+    className: "weekday-label"
+  }, "\uD654"), /*#__PURE__*/React.createElement("div", {
+    className: "weekday-label"
+  }, "\uC218"), /*#__PURE__*/React.createElement("div", {
+    className: "weekday-label"
+  }, "\uBAA9"), /*#__PURE__*/React.createElement("div", {
+    className: "weekday-label"
+  }, "\uAE08"), /*#__PURE__*/React.createElement("div", {
+    className: "weekday-label sat"
+  }, "\uD1A0")), /*#__PURE__*/React.createElement("div", {
+    className: "days-grid"
+  }, days.map(({
+    dayNum,
+    dateStr,
+    isCurrentMonth
+  }, idx) => {
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const isToday = isCurrentMonth && dateStr === todayStr;
+    const entries = (availMap[dateStr] || []).filter(e => participantsMap[e.participantId]);
+    const uniqueActiveParts = new Set(entries.map(e => e.participantId));
+    const isAllAvailable = totalPartCount > 0 && uniqueActiveParts.size === totalPartCount;
+    return /*#__PURE__*/React.createElement("div", {
+      key: idx,
+      className: `day-cell ${isCurrentMonth ? '' : 'other-month'} ${isAllAvailable ? 'all-available' : ''}`,
+      onClick: () => onSelectDate(dateStr)
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center'
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "day-number",
+      style: isToday ? {
+        backgroundColor: '#3B82F6',
+        color: '#FFFFFF',
+        borderRadius: '50%',
+        fontWeight: '800',
+        boxShadow: '0 2px 4px rgba(59, 130, 246, 0.4)'
+      } : {}
+    }, dayNum), isAllAvailable && /*#__PURE__*/React.createElement("span", {
+      className: "all-available-label",
+      style: {
+        fontSize: '0.65rem',
+        color: '#10B981',
+        fontWeight: 800
+      }
+    }, "\uC804\uC6D0")), /*#__PURE__*/React.createElement("div", {
+      className: "badges-container"
+    }, entries.map(e => {
+      const p = participantsMap[e.participantId];
+      if (!p) return null;
+      return /*#__PURE__*/React.createElement("span", {
+        key: p.id,
+        className: "participant-badge",
+        style: {
+          backgroundColor: p.color,
+          color: getContrastTextColor(p.color)
+        },
+        title: e.note ? `${p.name}: ${e.note}` : p.name
+      }, /*#__PURE__*/React.createElement("span", {
+        className: "badge-dot",
+        style: {
+          backgroundColor: getContrastTextColor(p.color)
+        }
+      }), /*#__PURE__*/React.createElement("span", {
+        className: "badge-name"
+      }, p.name));
+    })));
+  })));
+}
+
+// Date Layer Popup Modal
+function DateModal({
+  dateStr,
+  calendar,
+  onSave,
+  onDelete,
+  onDeleteDate,
+  onClose
+}) {
+  const [participantId, setParticipantId] = React.useState(calendar?.participants[0]?.id || '');
+  const [note, setNote] = React.useState('');
+  const [isSheetOpen, setIsSheetOpen] = React.useState(false);
+  const dateEntries = (calendar?.availabilities || []).filter(e => e.date === dateStr);
+  const handleSubmit = e => {
+    e.preventDefault();
+    if (!participantId) return;
+    onSave(dateStr, participantId, note);
+    setNote('');
+    onClose();
+  };
+  const getShortTitle = dateStr => {
+    if (!dateStr) return '';
+    const [year, month, day] = dateStr.split('-');
+    const dateObj = new Date(year, month - 1, day);
+    const dayOfWeek = ['일', '월', '화', '수', '목', '금', '토'][dateObj.getDay()];
+    const shortYear = year.slice(2);
+    return `${shortYear}.${month}.${day}(${dayOfWeek}) 일정`;
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    className: "modal-overlay",
+    onClick: onClose
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "modal-container",
+    onClick: e => e.stopPropagation()
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "modal-header",
+    style: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center'
+    }
+  }, /*#__PURE__*/React.createElement("h3", {
+    style: {
+      fontSize: '1.1rem',
+      fontWeight: 800
+    }
+  }, getShortTitle(dateStr)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px'
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "btn btn-secondary",
+    style: {
+      padding: '4px 10px',
+      fontSize: '0.78rem',
+      fontWeight: 800,
+      color: '#EF4444',
+      borderColor: '#FCA5A5',
+      backgroundColor: '#FEF2F2',
+      whiteSpace: 'nowrap'
+    },
+    onClick: () => {
+      const titleText = getShortTitle(dateStr).replace(' 일정', '');
+      if (window.confirm(`${titleText}에 등록된 모든 일정을 삭제하시겠습니까?`)) {
+        onDeleteDate(dateStr);
+        onClose();
+      }
+    },
+    title: "\uD574\uB2F9 \uB0A0\uC9DC\uC758 \uBAA8\uB4E0 \uCC38\uC5EC\uC790 \uC77C\uC815 \uC0AD\uC81C"
+  }, "\uC77C\uC815 \uC0AD\uC81C"), /*#__PURE__*/React.createElement("button", {
+    onClick: onClose,
+    style: {
+      background: 'none',
+      border: 'none',
+      color: '#64748B',
+      fontSize: '1.2rem',
+      cursor: 'pointer',
+      display: 'flex',
+      alignItems: 'center'
+    }
+  }, "\u2715"))), /*#__PURE__*/React.createElement("form", {
+    onSubmit: handleSubmit
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "modal-body"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: {
+      display: 'block',
+      fontSize: '0.85rem',
+      fontWeight: 700,
+      marginBottom: '6px',
+      color: '#64748B'
+    }
+  }, "\uCC38\uC5EC\uC790 \uC120\uD0DD"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "form-select",
+    style: {
+      width: '100%',
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      textAlign: 'left',
+      background: '#FFFFFF',
+      cursor: 'pointer'
+    },
+    onClick: () => setIsSheetOpen(true)
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px'
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "color-dot",
+    style: {
+      backgroundColor: calendar.participants.find(p => p.id === participantId)?.color || '#CCC'
+    }
+  }), /*#__PURE__*/React.createElement("span", null, calendar.participants.find(p => p.id === participantId)?.name || '선택하세요')), /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: '#64748B',
+      fontSize: '0.8rem'
+    }
+  }, "\u25BC"))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: {
+      display: 'block',
+      fontSize: '0.85rem',
+      fontWeight: 700,
+      marginBottom: '6px',
+      color: '#64748B'
+    }
+  }, "\uBA54\uBAA8 \uC785\uB825 (\uC120\uD0DD)"), /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    className: "form-input",
+    style: {
+      width: '100%'
+    },
+    placeholder: "\uC608: 1\uC2DC \uC774\uD6C4 \uAC00\uB2A5, \uC608\uB2F9\uD638 \uCC29\uD55C\uB18D\uCD0C\uCCB4\uD5D8\uC138\uC0C1",
+    value: note,
+    onChange: e => setNote(e.target.value)
+  })), dateEntries.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      borderTop: '1px solid var(--border-subtle)',
+      paddingTop: '12px'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '0.8rem',
+      fontWeight: 700,
+      color: 'var(--text-muted)',
+      marginBottom: '8px'
+    }
+  }, "\uD604\uC7AC \uB4F1\uB85D\uB41C \uCC38\uC5EC\uC790:"), dateEntries.map(e => {
+    const p = calendar.participants.find(part => part.id === e.participantId);
+    if (!p) return null;
+    return /*#__PURE__*/React.createElement("div", {
+      key: p.id,
+      style: {
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: '6px'
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "participant-badge",
+      style: {
+        backgroundColor: p.color,
+        color: getContrastTextColor(p.color),
+        cursor: 'pointer',
+        userSelect: 'none'
+      },
+      onClick: () => {
+        setParticipantId(p.id);
+        setNote(e.note || '');
+      },
+      title: "\uD074\uB9AD \uC2DC \uC774 \uCC38\uC5EC\uC790\uB85C \uC790\uB3D9 \uC120\uD0DD \uBC0F \uBA54\uBAA8 \uBD88\uB7EC\uC624\uAE30"
+    }, p.name, " ", e.note && `("${e.note}")`), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      className: "btn btn-danger",
+      style: {
+        padding: '2px 8px',
+        fontSize: '0.75rem'
+      },
+      onClick: () => onDelete(dateStr, p.id)
+    }, "\uC0AD\uC81C"));
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: "modal-footer"
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "submit",
+    className: "btn btn-primary",
+    style: {
+      width: '100%'
+    }
+  }, "\uB4F1\uB85D/\uC800\uC7A5")))), isSheetOpen && /*#__PURE__*/React.createElement("div", {
+    className: "bottom-sheet-overlay",
+    onClick: () => setIsSheetOpen(false)
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bottom-sheet",
+    onClick: e => e.stopPropagation()
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bottom-sheet-header"
+  }, /*#__PURE__*/React.createElement("h4", null, "\uCC38\uC5EC\uC790 \uC120\uD0DD"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    style: {
+      background: 'none',
+      border: 'none',
+      color: '#64748B',
+      fontSize: '1.2rem',
+      cursor: 'pointer'
+    },
+    onClick: () => setIsSheetOpen(false)
+  }, "\u2715")), /*#__PURE__*/React.createElement("div", {
+    className: "bottom-sheet-body"
+  }, calendar.participants.map(p => /*#__PURE__*/React.createElement("button", {
+    key: p.id,
+    type: "button",
+    className: "bottom-sheet-item",
+    onClick: () => {
+      setParticipantId(p.id);
+      const existingEntry = dateEntries.find(entry => entry.participantId === p.id);
+      setNote(existingEntry ? existingEntry.note || '' : '');
+      setIsSheetOpen(false);
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "color-dot",
+    style: {
+      backgroundColor: p.color,
+      width: '12px',
+      height: '12px'
+    }
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontWeight: 700
+    }
+  }, p.name), participantId === p.id && /*#__PURE__*/React.createElement("span", {
+    style: {
+      marginLeft: 'auto',
+      color: 'var(--accent-primary)',
+      fontWeight: 800
+    }
+  }, "\u2713")))))));
+}
+
+// Admin Modal
+function AdminModal({
+  calendar,
+  allCalendars,
+  onSelectCalendar,
+  onSave,
+  onCreateNewCal,
+  onClose
+}) {
+  const [title, setTitle] = React.useState(calendar.title);
+  const [description, setDescription] = React.useState(calendar.description || '');
+  const [participants, setParticipants] = React.useState(calendar.participants);
+  const [newName, setNewName] = React.useState('');
+  const handleCreateNewCalClick = () => {
+    const id = prompt('새 모임 캘린더의 영문/한글 ID를 입력하세요 (예: kkot, cw, trip):', 'cal_' + Date.now().toString().slice(-4));
+    if (!id) return;
+    const calTitle = prompt('캘린더 제목을 입력해 주세요:', `${id} 모임 캘린더`);
+    if (!calTitle) return;
+    const newCal = {
+      id: id.trim(),
+      title: calTitle.trim(),
+      description: `${calTitle.trim()} 참여자들의 일정 조율`,
+      participants: [{
+        id: 'p1',
+        name: '참여자 1',
+        color: '#EF4444'
+      }, {
+        id: 'p2',
+        name: '참여자 2',
+        color: '#3B82F6'
+      }],
+      availabilities: []
+    };
+    if (onCreateNewCal) onCreateNewCal(newCal);
+  };
+  const handleAddParticipant = e => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    if (e && e.nativeEvent && e.nativeEvent.isComposing) return;
+    const trimmed = (newName || '').trim();
+    if (!trimmed) return;
+    const newParticipant = {
+      id: 'p_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+      name: trimmed,
+      color: PRESET_COLORS[participants.length % PRESET_COLORS.length]
+    };
+    setParticipants(prev => [...prev, newParticipant]);
+    setNewName('');
+  };
+  const handleSubmit = e => {
+    e.preventDefault();
+    onSave({
+      ...calendar,
+      title: title.trim(),
+      description: description.trim(),
+      participants
+    }, null);
+    onClose();
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    className: "modal-overlay",
+    onClick: onClose
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "modal-container",
+    onClick: e => e.stopPropagation()
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "modal-header",
+    style: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center'
+    }
+  }, /*#__PURE__*/React.createElement("h3", {
+    style: {
+      fontSize: '1.1rem',
+      fontWeight: 800
+    }
+  }, "\uCE98\uB9B0\uB354 \uC124\uC815"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px'
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "btn btn-secondary",
+    style: {
+      padding: '5px 10px',
+      fontSize: '0.78rem',
+      fontWeight: 800,
+      whiteSpace: 'nowrap'
+    },
+    onClick: handleCreateNewCalClick
+  }, "+ \uC0C8 \uCE98\uB9B0\uB354"), /*#__PURE__*/React.createElement("button", {
+    onClick: onClose,
+    style: {
+      background: 'none',
+      border: 'none',
+      color: '#64748B',
+      fontSize: '1.2rem',
+      cursor: 'pointer'
+    }
+  }, "\u2715"))), /*#__PURE__*/React.createElement("form", {
+    onSubmit: handleSubmit
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "modal-body"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: {
+      display: 'block',
+      fontSize: '0.85rem',
+      fontWeight: 700,
+      marginBottom: '6px',
+      color: '#64748B'
+    }
+  }, "\uCE98\uB9B0\uB354\uBA85"), /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    className: "form-input",
+    style: {
+      width: '100%'
+    },
+    value: title,
+    onChange: e => setTitle(e.target.value),
+    required: true
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: {
+      display: 'block',
+      fontSize: '0.85rem',
+      fontWeight: 700,
+      marginBottom: '6px',
+      color: '#64748B'
+    }
+  }, "\uCE98\uB9B0\uB354 \uC124\uBA85"), /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    className: "form-input",
+    style: {
+      width: '100%'
+    },
+    placeholder: "\uC608: cw \uB3D9\uCC3D \uBAA8\uC784 \uCC38\uC5EC\uC790\uB4E4\uC758 \uC77C\uC815 \uC870\uC728",
+    value: description,
+    onChange: e => setDescription(e.target.value)
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      borderTop: '1px solid var(--border-subtle)',
+      paddingTop: '12px'
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: {
+      display: 'block',
+      fontSize: '0.85rem',
+      fontWeight: 700,
+      marginBottom: '6px',
+      color: '#64748B'
+    }
+  }, "\uCC38\uC5EC\uC790 \uC124\uC815 (", participants.length, "\uBA85)"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: '8px',
+      marginBottom: '12px'
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    className: "form-input",
+    style: {
+      flex: 1
+    },
+    placeholder: "\uC0C8 \uCC38\uC5EC\uC790 \uC774\uB984",
+    value: newName,
+    onChange: e => setNewName(e.target.value),
+    onKeyDown: e => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        if (e.nativeEvent && e.nativeEvent.isComposing) return;
+        handleAddParticipant(e);
+      }
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "btn btn-secondary",
+    style: {
+      whiteSpace: 'nowrap',
+      minWidth: '52px',
+      flexShrink: 0
+    },
+    onClick: handleAddParticipant
+  }, "\uCD94\uAC00")), participants.map(p => /*#__PURE__*/React.createElement("div", {
+    key: p.id,
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      marginBottom: '6px'
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "color",
+    value: p.color,
+    onChange: e => setParticipants(participants.map(item => item.id === p.id ? {
+      ...item,
+      color: e.target.value
+    } : item)),
+    style: {
+      width: '28px',
+      height: '28px',
+      border: 'none',
+      background: 'none',
+      cursor: 'pointer'
+    }
+  }), /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    className: "form-input",
+    style: {
+      flex: 1,
+      padding: '4px 8px'
+    },
+    value: p.name,
+    onChange: e => setParticipants(participants.map(item => item.id === p.id ? {
+      ...item,
+      name: e.target.value
+    } : item))
+  }), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "btn btn-danger",
+    style: {
+      padding: '4px 8px'
+    },
+    onClick: () => setParticipants(participants.filter(item => item.id !== p.id))
+  }, "\u2715"))))), /*#__PURE__*/React.createElement("div", {
+    className: "modal-footer"
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "btn btn-secondary",
+    onClick: onClose
+  }, "\uCDE8\uC18C"), /*#__PURE__*/React.createElement("button", {
+    type: "submit",
+    className: "btn btn-primary"
+  }, "\uC124\uC815 \uC800\uC7A5")))));
+}
+
+// Share Modal
+function ShareModal({
+  calendar,
+  onCreateNewCal,
+  onClose
+}) {
+  const baseUrl = `${window.location.origin}${window.location.pathname}`;
+  const shareUrl = `${baseUrl}?id=${calendar.id}`;
+  const handleCreateNewCalClick = () => {
+    const id = prompt('새 모임 캘린더의 영문/한글 ID를 입력하세요 (예: kkot, cw, trip):', 'cal_' + Date.now().toString().slice(-4));
+    if (!id) return;
+    const calTitle = prompt('캘린더 제목을 입력해 주세요:', `${id} 모임 캘린더`);
+    if (!calTitle) return;
+    const newCal = {
+      id: id.trim(),
+      title: calTitle.trim(),
+      description: `${calTitle.trim()} 참여자들의 일정 조율`,
+      participants: [{
+        id: 'p1',
+        name: '참여자 1',
+        color: '#EF4444'
+      }, {
+        id: 'p2',
+        name: '참여자 2',
+        color: '#3B82F6'
+      }],
+      availabilities: []
+    };
+    onCreateNewCal(newCal);
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    className: "modal-overlay",
+    onClick: onClose
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "modal-container",
+    onClick: e => e.stopPropagation()
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "modal-header",
+    style: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center'
+    }
+  }, /*#__PURE__*/React.createElement("h3", {
+    style: {
+      fontSize: '1.1rem',
+      fontWeight: 800
+    }
+  }, "\uCE98\uB9B0\uB354 \uACF5\uC720 URL"), /*#__PURE__*/React.createElement("button", {
+    onClick: onClose,
+    style: {
+      background: 'none',
+      border: 'none',
+      color: '#64748B',
+      fontSize: '1.2rem',
+      cursor: 'pointer',
+      display: 'flex',
+      alignItems: 'center'
+    }
+  }, "\u2715")), /*#__PURE__*/React.createElement("div", {
+    className: "modal-body"
+  }, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: '0.85rem',
+      fontWeight: 700,
+      color: '#64748B'
+    }
+  }, "\uD604\uC7AC \uCE98\uB9B0\uB354 (", calendar.id, ") \uC804\uC6A9 \uACF5\uC720 URL"), /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    className: "form-input",
+    style: {
+      width: '100%'
+    },
+    value: shareUrl,
+    readOnly: true
+  }), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-primary",
+    onClick: () => {
+      navigator.clipboard.writeText(shareUrl);
+      alert('URL이 복사되었습니다!');
+    }
+  }, "URL \uBCF5\uC0AC\uD558\uAE30"))));
+}
+
+// Summary List - Displays both "Partial Availability" (N+ members) and "Full Availability" lists
+function SummaryList({
+  calendar,
+  onSelectDate
+}) {
+  const totalCount = calendar?.participants?.length || 0;
+  const availabilities = calendar?.availabilities || [];
+  const participantsMap = (calendar?.participants || []).reduce((acc, p) => {
+    acc[p.id] = p;
+    return acc;
+  }, {});
+  const dateMap = availabilities.reduce((acc, e) => {
+    if (!acc[e.date]) acc[e.date] = [];
+    acc[e.date].push(e);
+    return acc;
+  }, {});
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+  // Threshold = totalCount - 2, only show partial section when totalCount >= 6
+  // 4명 → 전원만 | 6명 → 4명 이상 + 전원 | 8명 → 6명 이상 + 전원
+  const thresholdN = totalCount >= 6 ? totalCount - 2 : 0;
+
+  // 1. All-available dates: only count active participants (those still in participantsMap)
+  const allAvailableDates = Object.keys(dateMap).filter(d => {
+    const entries = dateMap[d].filter(e => participantsMap[e.participantId]);
+    const uniqueParticipants = new Set(entries.map(e => e.participantId));
+    return totalCount > 0 && uniqueParticipants.size === totalCount;
+  });
+  const allAvailableSet = new Set(allAvailableDates);
+
+  // 2. Partial-available dates (MIN_THRESHOLD <= availCount < totalCount), excluding all-available
+  const partialAvailableDates = thresholdN > 0 ? Object.keys(dateMap).filter(d => {
+    if (allAvailableSet.has(d)) return false;
+    const entries = dateMap[d].filter(e => participantsMap[e.participantId]);
+    const uniqueParticipants = new Set(entries.map(e => e.participantId));
+    const cnt = uniqueParticipants.size;
+    return cnt >= thresholdN && cnt < totalCount;
+  }) : [];
+
+  // Sort descending: newest at top, oldest at bottom
+  const getSortedDates = datesList => {
+    return [...datesList].sort((a, b) => b.localeCompare(a));
+  };
+
+  // Future only — past dates moved to '과거 모임' section
+  const sortedAllDates = getSortedDates(allAvailableDates.filter(d => d >= todayStr));
+  const sortedPartialDates = getSortedDates(partialAvailableDates.filter(d => d >= todayStr));
+
+  // 3. Past meeting dates: all past dates with at least 1 active participant registered
+  const pastMeetingDates = getSortedDates(Object.keys(dateMap).filter(d => {
+    if (d >= todayStr) return false; // future dates excluded
+    const entries = dateMap[d].filter(e => participantsMap[e.participantId]);
+    return entries.length > 0;
+  }));
+  return /*#__PURE__*/React.createElement("div", {
+    className: "summary-card",
+    style: {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '28px'
+    }
+  }, thresholdN > 0 && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "summary-title",
+    style: {
+      color: '#2563EB',
+      marginBottom: '12px'
+    }
+  }, /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: "20",
+    height: "20",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    "stroke-width": "2.5",
+    "stroke-linecap": "round",
+    "stroke-linejoin": "round",
+    style: {
+      marginRight: '4px'
+    }
+  }, /*#__PURE__*/React.createElement("path", {
+    d: "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "9",
+    cy: "7",
+    r: "4"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M22 21v-2a4 4 0 0 0-3-3.87"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M16 3.13a4 4 0 0 1 0 7.75"
+  })), thresholdN, "\uBA85 \uC774\uC0C1 \uCC38\uC11D \uAC00\uB2A5 (", sortedPartialDates.length, "\uC77C)"), sortedPartialDates.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: 'var(--text-muted)',
+      fontSize: '0.85rem',
+      padding: '10px 0'
+    }
+  }, "\uD574\uB2F9\uD558\uB294 \uB0A0\uC9DC\uAC00 \uC544\uC9C1 \uC5C6\uC2B5\uB2C8\uB2E4.") : /*#__PURE__*/React.createElement("div", null, sortedPartialDates.map(d => {
+    const dateEntries = dateMap[d] || [];
+    const formattedDateStr = formatDateWithDayName(d);
+    const memoEntries = dateEntries.filter(e => e.note && e.note.trim().length > 0);
+    const isPast = d < todayStr;
+    const availCount = new Set(dateEntries.map(e => e.participantId)).size;
+    return /*#__PURE__*/React.createElement("button", {
+      key: d,
+      className: "date-item-btn",
+      onClick: () => onSelectDate(d),
+      style: isPast ? {
+        opacity: 0.7,
+        backgroundColor: '#F8FAFC',
+        borderColor: '#E2E8F0'
+      } : {
+        borderColor: '#DBEAFE',
+        backgroundColor: '#F8FAFC'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "date-item-left"
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontWeight: 800,
+        color: isPast ? '#94A3B8' : '#2563EB',
+        fontSize: '0.95rem'
+      }
+    }, formattedDateStr), memoEntries.length > 0 && /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '6px',
+        flexWrap: 'wrap'
+      }
+    }, memoEntries.map(e => {
+      const p = participantsMap[e.participantId];
+      if (!p) return null;
+      const memoText = e.note.trim();
+      return /*#__PURE__*/React.createElement("span", {
+        key: e.participantId || p.id,
+        className: "memo-capsule-badge",
+        style: isPast ? {
+          backgroundColor: '#F1F5F9',
+          color: '#64748B',
+          border: `1px solid ${p.color}`,
+          boxShadow: 'none'
+        } : {
+          backgroundColor: p.color,
+          color: getContrastTextColor(p.color)
+        },
+        title: `${p.name}: ${memoText}`
+      }, memoText);
+    }))), /*#__PURE__*/React.createElement("span", {
+      className: "date-item-badge",
+      style: {
+        background: isPast ? '#E2E8F0' : '#DBEAFE',
+        color: isPast ? '#64748B' : '#1D4ED8',
+        border: isPast ? 'none' : '1px solid #BFDBFE'
+      }
+    }, isPast ? '지나간 모임' : `${availCount}명 가능 (${availCount}/${totalCount}명)`));
+  }))), thresholdN > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      borderTop: '1px solid var(--border-subtle)',
+      margin: '4px 0'
+    }
+  }), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "summary-title",
+    style: {
+      color: '#10B981',
+      marginBottom: '12px'
+    }
+  }, /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: "20",
+    height: "20",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    "stroke-width": "2.5",
+    "stroke-linecap": "round",
+    "stroke-linejoin": "round",
+    style: {
+      marginRight: '4px'
+    }
+  }, /*#__PURE__*/React.createElement("path", {
+    d: "M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "m9 12 2 2 4-4"
+  })), "\uC804\uC6D0 \uCC38\uC11D \uAC00\uB2A5 (", sortedAllDates.length, "\uC77C)"), sortedAllDates.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: 'var(--text-muted)',
+      fontSize: '0.85rem',
+      padding: '10px 0'
+    }
+  }, "\uC544\uC9C1 \uCC38\uC5EC\uC790 \uC804\uC6D0\uC774 \uAC00\uB2A5\uD55C \uB0A0\uC9DC\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4. \uCE98\uB9B0\uB354\uC5D0\uC11C \uB0A0\uC9DC\uB97C \uC120\uD0DD\uD558\uC5EC \uAC00\uB2A5 \uC5EC\uBD80\uB97C \uD45C\uAE30\uD574\uBCF4\uC138\uC694!") : /*#__PURE__*/React.createElement("div", null, sortedAllDates.map(d => {
+    const dateEntries = dateMap[d] || [];
+    const formattedDateStr = formatDateWithDayName(d);
+    const memoEntries = dateEntries.filter(e => e.note && e.note.trim().length > 0);
+    const isPast = d < todayStr;
+    return /*#__PURE__*/React.createElement("button", {
+      key: d,
+      className: "date-item-btn",
+      onClick: () => onSelectDate(d),
+      style: isPast ? {
+        opacity: 0.7,
+        backgroundColor: '#F8FAFC',
+        borderColor: '#E2E8F0',
+        flexDirection: 'column',
+        alignItems: 'flex-start'
+      } : {
+        flexDirection: 'column',
+        alignItems: 'flex-start'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        width: '100%',
+        gap: '8px'
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontWeight: 800,
+        color: isPast ? '#94A3B8' : '#10B981',
+        fontSize: '0.95rem',
+        flexShrink: 0
+      }
+    }, formattedDateStr), /*#__PURE__*/React.createElement("span", {
+      className: "date-item-badge",
+      style: {
+        background: isPast ? '#E2E8F0' : '#10B981',
+        color: isPast ? '#64748B' : '#FFF',
+        flexShrink: 0
+      }
+    }, isPast ? '지나간 모임' : '전원 가능')), memoEntries.length > 0 && /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '6px',
+        flexWrap: 'wrap'
+      }
+    }, memoEntries.map(e => {
+      const p = participantsMap[e.participantId];
+      if (!p) return null;
+      const memoText = e.note.trim();
+      return /*#__PURE__*/React.createElement("span", {
+        key: e.participantId || p.id,
+        className: "memo-capsule-badge",
+        style: isPast ? {
+          backgroundColor: '#F1F5F9',
+          color: '#64748B',
+          border: `1px solid ${p.color}`,
+          boxShadow: 'none'
+        } : {
+          backgroundColor: p.color,
+          color: getContrastTextColor(p.color)
+        },
+        title: `${p.name}: ${memoText}`
+      }, memoText);
+    })));
+  }))), pastMeetingDates.length > 0 && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      borderTop: '1px solid var(--border-subtle)',
+      margin: '4px 0 20px'
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "summary-title",
+    style: {
+      color: '#64748B',
+      marginBottom: '12px'
+    }
+  }, /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: "20",
+    height: "20",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: "2.5",
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+    style: {
+      marginRight: '4px'
+    }
+  }, /*#__PURE__*/React.createElement("rect", {
+    x: "3",
+    y: "4",
+    width: "18",
+    height: "18",
+    rx: "2",
+    ry: "2"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "16",
+    y1: "2",
+    x2: "16",
+    y2: "6"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "8",
+    y1: "2",
+    x2: "8",
+    y2: "6"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "3",
+    y1: "10",
+    x2: "21",
+    y2: "10"
+  })), "\uACFC\uAC70 \uBAA8\uC784 (", pastMeetingDates.length, "\uC77C)"), /*#__PURE__*/React.createElement("div", null, pastMeetingDates.map(d => {
+    const dateEntries = dateMap[d].filter(e => participantsMap[e.participantId]);
+    const formattedDateStr = formatDateWithDayName(d);
+    const memoEntries = dateEntries.filter(e => e.note && e.note.trim().length > 0);
+    const uniqueCount = new Set(dateEntries.map(e => e.participantId)).size;
+    return /*#__PURE__*/React.createElement("button", {
+      key: d,
+      className: "date-item-btn",
+      onClick: () => onSelectDate(d),
+      style: {
+        opacity: 0.75,
+        backgroundColor: '#F8FAFC',
+        borderColor: '#E2E8F0',
+        flexDirection: 'column',
+        alignItems: 'flex-start'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        width: '100%',
+        gap: '8px'
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontWeight: 800,
+        color: '#94A3B8',
+        fontSize: '0.95rem',
+        flexShrink: 0
+      }
+    }, formattedDateStr), /*#__PURE__*/React.createElement("span", {
+      className: "date-item-badge",
+      style: {
+        background: '#E2E8F0',
+        color: '#64748B',
+        flexShrink: 0
+      }
+    }, uniqueCount, "/", totalCount, "\uBA85")), memoEntries.length > 0 && /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '6px',
+        flexWrap: 'wrap'
+      }
+    }, memoEntries.map(e => {
+      const p = participantsMap[e.participantId];
+      if (!p) return null;
+      return /*#__PURE__*/React.createElement("span", {
+        key: e.participantId,
+        className: "memo-capsule-badge",
+        style: {
+          backgroundColor: '#F1F5F9',
+          color: '#64748B',
+          border: `1px solid ${p.color}`,
+          boxShadow: 'none'
+        },
+        title: `${p.name}: ${e.note.trim()}`
+      }, e.note.trim());
+    })));
+  }))));
+}
+try {
+  const rootElement = document.getElementById('root');
+  if (rootElement) {
+    const root = ReactDOM.createRoot(rootElement);
+    root.render(/*#__PURE__*/React.createElement(App, null));
+  }
+} catch (e) {
+  console.error('App render error:', e);
+}
+</script>
 </body>
 </html>
