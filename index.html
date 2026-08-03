@@ -436,7 +436,7 @@ const CALENDAR_CLOUD_BLOB_IDS = {
   kkot: '019fc674-b7bc-7ae2-b53d-4ffee349d114',
   cw: '019fc674-b957-71c2-b464-0c4683dbe321'
 };
-const ENABLE_FIRESTORE_SYNC = true;
+const ENABLE_FIRESTORE_SYNC = new URLSearchParams(window.location.search).get('storage') !== 'local';
 function getContrastTextColor(hexColor) {
   if (!hexColor) return '#FFFFFF';
   const hex = hexColor.replace('#', '');
@@ -698,7 +698,6 @@ function mergeCalendarAvailabilityDelta(serverCalendar, incomingCalendar, change
   (incoming.availabilities || []).forEach((availability) => {
     if (!availability?.date || !availability?.participantId) return;
     if (participantIds.size > 0 && !participantIds.has(availability.participantId)) return;
-    if (changedAt && getItemStamp(availability) < changedAt) return;
     const key = `${availability.date}_${availability.participantId}`;
     availabilityMap.set(key, mergeAvailabilityRecord(availabilityMap.get(key), availability));
   });
@@ -1522,6 +1521,7 @@ async function pushMasterCloudCalendars(nextCalendars, lastModified, retryCount 
 async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 3, allCalendars = null, saveMode = 'availability') {
   const normalizedCal = normalizeCalendarForSave(targetCal);
   if (!normalizedCal || !normalizedCal.id) return false;
+  if (!ENABLE_FIRESTORE_SYNC) return true;
   if (firebaseDb) {
     try {
       const ref = firebaseDb.collection('calendars').doc(`cal_${normalizedCal.id}`);
@@ -1544,7 +1544,7 @@ async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 3, 
 	            revision: (mergedCalendar?.revision || 0) + 1
 	          });
 	        }),
-	        new Promise((_, reject) => setTimeout(() => reject(new Error('Firestore push timeout')), 1800))
+	        new Promise((_, reject) => setTimeout(() => reject(new Error('Firestore push timeout')), 8000))
 	      ]);
 	      return true;
     } catch (e) {
@@ -2664,18 +2664,31 @@ function DateModal({
   const [participantId, setParticipantId] = React.useState(getActiveParticipants(calendar)[0]?.id || '');
   const [note, setNote] = React.useState('');
   const [isSheetOpen, setIsSheetOpen] = React.useState(false);
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const noteInputRef = React.useRef(null);
   const activeParticipants = getActiveParticipants(calendar);
   const dateEntries = getActiveAvailabilities(calendar).filter(e => e.date === dateStr);
   React.useEffect(() => {
     setParticipantId(getActiveParticipants(calendar)[0]?.id || '');
     setNote('');
     setIsSheetOpen(false);
+    setIsSubmitting(false);
   }, [calendar?.id, dateStr]);
   const handleSubmit = async e => {
     e.preventDefault();
-    if (!participantId) return;
-    const saved = await Promise.resolve(onSave(dateStr, participantId, note));
-    if (saved === false) return;
+    if (!participantId || isSubmitting) return;
+    setIsSubmitting(true);
+    const latestNote = noteInputRef.current ? noteInputRef.current.value : note;
+    let saved = false;
+    try {
+      saved = await Promise.resolve(onSave(dateStr, participantId, latestNote));
+    } catch (err) {
+      console.error('Availability save failed:', err);
+    }
+    if (saved === false) {
+      setIsSubmitting(false);
+      return;
+    }
 
     const existingOtherIds = new Set(
       dateEntries.filter(entry => entry.participantId !== participantId).map(entry => entry.participantId)
@@ -2707,7 +2720,9 @@ function DateModal({
   };
   return /*#__PURE__*/React.createElement("div", {
     className: "modal-overlay",
-    onClick: onClose
+    onClick: () => {
+      if (!isSubmitting) onClose();
+    }
   }, /*#__PURE__*/React.createElement("div", {
     className: "modal-container",
     onClick: e => e.stopPropagation()
@@ -2743,14 +2758,25 @@ function DateModal({
     },
     onClick: () => {
       const titleText = getShortTitle(dateStr).replace(' 일정', '');
-      if (window.confirm(`${titleText}에 등록된 모든 일정을 삭제하시겠습니까?`)) {
-        onDeleteDate(dateStr);
-        onClose();
+      if (!isSubmitting && window.confirm(`${titleText}에 등록된 모든 일정을 삭제하시겠습니까?`)) {
+        setIsSubmitting(true);
+        Promise.resolve(onDeleteDate(dateStr)).then(saved => {
+          if (saved === false) {
+            setIsSubmitting(false);
+            return;
+          }
+          onClose();
+        }).catch(err => {
+          console.error('Date delete failed:', err);
+          setIsSubmitting(false);
+        });
       }
     },
     title: "\uD574\uB2F9 \uB0A0\uC9DC\uC758 \uBAA8\uB4E0 \uCC38\uC5EC\uC790 \uC77C\uC815 \uC0AD\uC81C"
   }, "\uC77C\uC815 \uC0AD\uC81C"), /*#__PURE__*/React.createElement("button", {
-    onClick: onClose,
+    onClick: () => {
+      if (!isSubmitting) onClose();
+    },
     style: {
       background: 'none',
       border: 'none',
@@ -2784,7 +2810,10 @@ function DateModal({
       background: '#FFFFFF',
       cursor: 'pointer'
     },
-    onClick: () => setIsSheetOpen(true)
+    disabled: isSubmitting,
+    onClick: () => {
+      if (!isSubmitting) setIsSheetOpen(true);
+    }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
@@ -2817,6 +2846,8 @@ function DateModal({
     },
     placeholder: "\uC608: 1\uC2DC \uC774\uD6C4 \uAC00\uB2A5, \uC608\uB2F9\uD638 \uCC29\uD55C\uB18D\uCD0C\uCCB4\uD5D8\uC138\uC0C1",
     value: note,
+    disabled: isSubmitting,
+    ref: noteInputRef,
     onChange: e => setNote(e.target.value)
   })), dateEntries.length > 0 && /*#__PURE__*/React.createElement("div", {
     style: {
@@ -2850,6 +2881,7 @@ function DateModal({
         userSelect: 'none'
       },
       onClick: () => {
+        if (isSubmitting) return;
         setParticipantId(p.id);
         setNote(e.note || '');
       },
@@ -2861,19 +2893,27 @@ function DateModal({
         padding: '2px 8px',
         fontSize: '0.75rem'
       },
-      onClick: () => onDelete(dateStr, p.id)
+      disabled: isSubmitting,
+      onClick: () => {
+        if (!isSubmitting) onDelete(dateStr, p.id);
+      }
     }, "\uC0AD\uC81C"));
   }))), /*#__PURE__*/React.createElement("div", {
     className: "modal-footer"
   }, /*#__PURE__*/React.createElement("button", {
     type: "submit",
     className: "btn btn-primary",
+    disabled: isSubmitting,
     style: {
-      width: '100%'
+      width: '100%',
+      opacity: isSubmitting ? 0.75 : 1,
+      cursor: isSubmitting ? 'wait' : 'pointer'
     }
-  }, "\uB4F1\uB85D/\uC800\uC7A5")))), isSheetOpen && /*#__PURE__*/React.createElement("div", {
+  }, isSubmitting ? "\uC800\uC7A5 \uC911..." : "\uB4F1\uB85D/\uC800\uC7A5")))), isSheetOpen && /*#__PURE__*/React.createElement("div", {
     className: "bottom-sheet-overlay",
-    onClick: () => setIsSheetOpen(false)
+    onClick: () => {
+      if (!isSubmitting) setIsSheetOpen(false);
+    }
   }, /*#__PURE__*/React.createElement("div", {
     className: "bottom-sheet",
     onClick: e => e.stopPropagation()
@@ -2888,14 +2928,18 @@ function DateModal({
       fontSize: '1.2rem',
       cursor: 'pointer'
     },
-    onClick: () => setIsSheetOpen(false)
+    onClick: () => {
+      if (!isSubmitting) setIsSheetOpen(false);
+    }
   }, "\u2715")), /*#__PURE__*/React.createElement("div", {
     className: "bottom-sheet-body"
   }, activeParticipants.map(p => /*#__PURE__*/React.createElement("button", {
     key: p.id,
     type: "button",
     className: "bottom-sheet-item",
+    disabled: isSubmitting,
     onClick: () => {
+      if (isSubmitting) return;
       setParticipantId(p.id);
       const existingEntry = dateEntries.find(entry => entry.participantId === p.id);
       setNote(existingEntry ? existingEntry.note || '' : '');
@@ -2933,19 +2977,24 @@ function AdminModal({
   const [description, setDescription] = React.useState(calendar.description || '');
   const [participants, setParticipants] = React.useState(getActiveParticipants(calendar));
   const [newName, setNewName] = React.useState('');
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const newNameInputRef = React.useRef(null);
   React.useEffect(() => {
     setTitle(calendar.title);
     setDescription(calendar.description || '');
     setParticipants(getActiveParticipants(calendar));
     setNewName('');
+    setIsSubmitting(false);
   }, [calendar?.id]);
   const handleAddParticipant = e => {
     if (e) {
       e.preventDefault();
       e.stopPropagation();
     }
+    if (isSubmitting) return;
     if (e && e.nativeEvent && e.nativeEvent.isComposing) return;
-    const trimmed = (newName || '').trim();
+    const latestName = newNameInputRef.current ? newNameInputRef.current.value : newName;
+    const trimmed = (latestName || '').trim();
     if (!trimmed) return;
     const newParticipant = {
       id: `${calendar.id}_p_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
@@ -2955,8 +3004,10 @@ function AdminModal({
     };
     setParticipants(prev => [...prev, newParticipant]);
     setNewName('');
+    if (newNameInputRef.current) newNameInputRef.current.value = '';
   };
   const updateParticipant = (participantId, patch) => {
+    if (isSubmitting) return;
     const now = Date.now();
     setParticipants(prev => prev.map(item => item.id === participantId ? {
       ...item,
@@ -2966,21 +3017,51 @@ function AdminModal({
   };
   const handleSubmit = async e => {
     e.preventDefault();
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     const now = Date.now();
-    const saved = await Promise.resolve(onSave({
-      ...calendar,
-      title: title.trim(),
-      description: description.trim(),
-      updatedAt: now,
-      revision: (calendar.revision || 0) + 1,
-      participants: stampParticipantSettings(participants, now)
-    }, null));
-    if (saved === false) return;
+    const form = e.currentTarget;
+    const textInputs = [...form.querySelectorAll('input[type="text"]')];
+    const colorInputs = [...form.querySelectorAll('input[type="color"]')];
+    const latestTitle = (textInputs[0]?.value || title).trim();
+    const latestDescription = (textInputs[1]?.value || description).trim();
+    let activeIndex = 0;
+    const latestParticipants = participants.map(participant => {
+      if (isTombstone(participant)) return participant;
+      const nameInput = textInputs[3 + activeIndex];
+      const colorInput = colorInputs[activeIndex];
+      activeIndex += 1;
+      return {
+        ...participant,
+        name: (nameInput?.value || participant.name || '').trim(),
+        color: colorInput?.value || participant.color,
+        updatedAt: now
+      };
+    }).filter(participant => isTombstone(participant) || participant.name);
+    let saved = false;
+    try {
+      saved = await Promise.resolve(onSave({
+        ...calendar,
+        title: latestTitle,
+        description: latestDescription,
+        updatedAt: now,
+        revision: (calendar.revision || 0) + 1,
+        participants: stampParticipantSettings(latestParticipants, now)
+      }, null));
+    } catch (err) {
+      console.error('Calendar settings save failed:', err);
+    }
+    if (saved === false) {
+      setIsSubmitting(false);
+      return;
+    }
     onClose();
   };
   return /*#__PURE__*/React.createElement("div", {
     className: "modal-overlay",
-    onClick: onClose
+    onClick: () => {
+      if (!isSubmitting) onClose();
+    }
   }, /*#__PURE__*/React.createElement("div", {
     className: "modal-container",
     onClick: e => e.stopPropagation()
@@ -2997,7 +3078,9 @@ function AdminModal({
       fontWeight: 800
     }
   }, "\uCE98\uB9B0\uB354 \uC124\uC815"), /*#__PURE__*/React.createElement("button", {
-    onClick: onClose,
+    onClick: () => {
+      if (!isSubmitting) onClose();
+    },
     style: {
       background: 'none',
       border: 'none',
@@ -3024,6 +3107,7 @@ function AdminModal({
       width: '100%'
     },
     value: title,
+    disabled: isSubmitting,
     onChange: e => setTitle(e.target.value),
     required: true
   })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
@@ -3042,6 +3126,7 @@ function AdminModal({
     },
     placeholder: "\uC608: cw \uB3D9\uCC3D \uBAA8\uC784 \uCC38\uC5EC\uC790\uB4E4\uC758 \uC77C\uC815 \uC870\uC728",
     value: description,
+    disabled: isSubmitting,
     onChange: e => setDescription(e.target.value)
   })), /*#__PURE__*/React.createElement("div", {
     style: {
@@ -3070,6 +3155,8 @@ function AdminModal({
     },
     placeholder: "\uC0C8 \uCC38\uC5EC\uC790 \uC774\uB984",
     value: newName,
+    disabled: isSubmitting,
+    ref: newNameInputRef,
     onChange: e => setNewName(e.target.value),
     onKeyDown: e => {
       if (e.key === 'Enter') {
@@ -3081,6 +3168,7 @@ function AdminModal({
   }), /*#__PURE__*/React.createElement("button", {
     type: "button",
     className: "btn btn-secondary",
+    disabled: isSubmitting,
     style: {
       whiteSpace: 'nowrap',
       minWidth: '52px',
@@ -3098,6 +3186,7 @@ function AdminModal({
   }, /*#__PURE__*/React.createElement("input", {
     type: "color",
     value: p.color,
+    disabled: isSubmitting,
     onInput: e => updateParticipant(p.id, { color: e.target.value }),
     onChange: e => updateParticipant(p.id, { color: e.target.value }),
     style: {
@@ -3115,11 +3204,13 @@ function AdminModal({
       padding: '4px 8px'
     },
     value: p.name,
+    disabled: isSubmitting,
     onInput: e => updateParticipant(p.id, { name: e.target.value }),
     onChange: e => updateParticipant(p.id, { name: e.target.value })
   }), /*#__PURE__*/React.createElement("button", {
     type: "button",
     className: "btn btn-danger",
+    disabled: isSubmitting,
     style: {
       padding: '4px 8px'
     },
@@ -3129,11 +3220,19 @@ function AdminModal({
   }, /*#__PURE__*/React.createElement("button", {
     type: "button",
     className: "btn btn-secondary",
-    onClick: onClose
+    disabled: isSubmitting,
+    onClick: () => {
+      if (!isSubmitting) onClose();
+    }
   }, "\uCDE8\uC18C"), /*#__PURE__*/React.createElement("button", {
     type: "submit",
-    className: "btn btn-primary"
-  }, "\uC124\uC815 \uC800\uC7A5")))));
+    className: "btn btn-primary",
+    disabled: isSubmitting,
+    style: {
+      opacity: isSubmitting ? 0.75 : 1,
+      cursor: isSubmitting ? 'wait' : 'pointer'
+    }
+  }, isSubmitting ? "\uC800\uC7A5 \uC911..." : "\uC124\uC815 \uC800\uC7A5")))));
 }
 
 // Share Modal

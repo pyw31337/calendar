@@ -1,7 +1,7 @@
 const LOCAL_BASE_URL = process.env.LOCAL_BASE_URL || 'http://127.0.0.1:4173/index.html';
 const CALENDAR_IDS = ['kkot', 'cw'];
-const STORAGE_KEY = 'gather_calendars_permanent_v20';
-const META_KEY = 'gather_calendars_meta_v4';
+const STORAGE_KEY = 'gather_calendars_permanent_v21';
+const META_KEY = 'gather_calendars_meta_v5';
 const ACTIVE_KEY = 'gather_active_calendar_id';
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -376,12 +376,24 @@ function normalizeColor(color) {
 
 async function exerciseCalendar(browser, sessionId, otherSessionId, calendarId, snapshot) {
   const original = await readLocalCalendars(browser, sessionId);
-  const current = getCalendarById(original, calendarId);
+  let current = getCalendarById(original, calendarId);
   const otherId = CALENDAR_IDS.find((id) => id !== calendarId);
   const otherCalendarBefore = getCalendarById(original, otherId);
 
   assert(current, `Missing calendar snapshot for ${calendarId}`);
   assert(otherCalendarBefore, `Missing other calendar snapshot for ${otherId}`);
+
+  if (activeParticipants(current).length === 0) {
+    await openSettings(browser, sessionId);
+    await setInputValueByIndex(browser, sessionId, 2, `${calendarId}-base-participant`);
+    await clickByText(browser, sessionId, '추가', '.modal-container');
+    await sleep(150);
+    await clickByText(browser, sessionId, '설정 저장', '.modal-container');
+    await waitForToast(browser, sessionId, '캘린더 설정이 저장되었습니다. ✅');
+    const seeded = await readLocalCalendars(browser, sessionId);
+    current = getCalendarById(seeded, calendarId);
+    assert(activeParticipants(current).length > 0, `Expected seeded participant for ${calendarId}`);
+  }
 
   const originalTitle = current.title;
   const originalDescription = current.description || '';
@@ -552,7 +564,18 @@ async function exerciseCalendar(browser, sessionId, otherSessionId, calendarId, 
   );
 
   await openDateModal(browser, sessionId, targetDay);
-  await clickByText(browser, sessionId, originalParticipants[0].name, '.modal-container');
+  await evalInPage(
+    browser,
+    sessionId,
+    `(() => {
+      const root = document.querySelector('.modal-container');
+      if (!root) throw new Error('Modal not found');
+      const badge = [...root.querySelectorAll('.participant-badge')]
+        .find((el) => (el.textContent || '').includes(${JSON.stringify(originalParticipants[0].name)}));
+      if (badge) badge.click();
+      return true;
+    })()`
+  );
   await setInputValueByIndex(browser, sessionId, 0, tempNoteEdited);
   await clickButtonExactText(browser, sessionId, '등록/저장', '.modal-container');
   await waitForToast(browser, sessionId, '일정이 등록되었습니다.');
@@ -616,7 +639,7 @@ async function main() {
 
   try {
     for (const id of CALENDAR_IDS) {
-      pages[id] = await createPage(browser, `${LOCAL_BASE_URL}?id=${id}`);
+      pages[id] = await createPage(browser, `${LOCAL_BASE_URL}?id=${id}&storage=local`);
       await waitForPageReady(browser, pages[id].sessionId);
       try {
         await waitForCalendarCache(browser, pages[id].sessionId, id);
