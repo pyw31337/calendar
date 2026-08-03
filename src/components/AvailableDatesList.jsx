@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sparkles, CalendarCheck, ChevronRight } from 'lucide-react';
+import { CalendarCheck } from 'lucide-react';
 import { getContrastTextColor } from '../utils/colors';
 
 function formatDateWithDayName(dateStr) {
@@ -66,6 +66,8 @@ export default function AvailableDatesList({ calendar, onSelectDate }) {
         <div>
           {fullMatchDates.map(({ dateStr, entries, count }) => {
             const formatted = formatDateWithDayName(dateStr);
+            const memoEntries = entries.filter(e => e.note && e.note.trim().length > 0);
+
             return (
               <button
                 key={dateStr}
@@ -77,30 +79,32 @@ export default function AvailableDatesList({ calendar, onSelectDate }) {
                     {formatted}
                   </span>
 
-                  {/* Capsule Memo Badges */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                    {entries.map((e) => {
-                      const p = participantsMap[e.participantId];
-                      if (!p) return null;
-                      const hasNote = e.note && e.note.trim().length > 0;
-                      return (
-                        <span
-                          key={e.participantId || p.id}
-                          className="memo-capsule-badge"
-                          style={{
-                            backgroundColor: p.color,
-                            color: getContrastTextColor(p.color),
-                            padding: '4px 12px',
-                            fontSize: '0.8rem',
-                            borderRadius: '9999px',
-                            fontWeight: '700'
-                          }}
-                        >
-                          {p.name}{hasNote ? `: ${e.note.trim()}` : ''}
-                        </span>
-                      );
-                    })}
-                  </div>
+                  {/* Render Capsule Memo Badges ONLY for participants who typed a note */}
+                  {memoEntries.length > 0 && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                      {memoEntries.map((e) => {
+                        const p = participantsMap[e.participantId];
+                        if (!p) return null;
+                        const memoText = e.note.trim();
+                        return (
+                          <span
+                            key={e.participantId || p.id}
+                            className="memo-capsule-badge"
+                            style={{
+                              backgroundColor: p.color,
+                              color: getContrastTextColor(p.color),
+                              padding: '4px 12px',
+                              fontSize: '0.8rem',
+                              borderRadius: '9999px',
+                              fontWeight: '700'
+                            }}
+                          >
+                            {p.name}: {memoText}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
 
                 <span style={{
