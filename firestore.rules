@@ -1,0 +1,21 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /calendars/{calendarDocId} {
+      allow read: if calendarDocId.matches('^cal_[A-Za-z0-9_-]{1,64}$');
+      allow create, update: if calendarDocId.matches('^cal_[A-Za-z0-9_-]{1,64}$')
+        && request.resource.data.keys().hasOnly(['calendar', 'lastModified', 'revision'])
+        && request.resource.data.calendar is map
+        && request.resource.data.calendar.id is string
+        && calendarDocId == 'cal_' + request.resource.data.calendar.id
+        && request.resource.data.lastModified is number
+        && request.resource.data.revision is number;
+      allow delete: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

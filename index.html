@@ -436,7 +436,7 @@ const CALENDAR_CLOUD_BLOB_IDS = {
   kkot: '019fc674-b7bc-7ae2-b53d-4ffee349d114',
   cw: '019fc674-b957-71c2-b464-0c4683dbe321'
 };
-const ENABLE_FIRESTORE_SYNC = false;
+const ENABLE_FIRESTORE_SYNC = true;
 function getContrastTextColor(hexColor) {
   if (!hexColor) return '#FFFFFF';
   const hex = hexColor.replace('#', '');
@@ -1416,10 +1416,6 @@ async function pushMasterCloudCalendars(nextCalendars, lastModified, retryCount 
 async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 3, allCalendars = null) {
   const normalizedCal = normalizeCalendarForSave(targetCal);
   if (!normalizedCal || !normalizedCal.id) return false;
-  const baseCalendars = Array.isArray(allCalendars) && allCalendars.length > 0 ? allCalendars : mergeCalendarCollections(loadLocalCache(), [normalizedCal], {
-    replaceMatchingId: true
-  });
-  const masterSaved = await pushMasterCloudCalendars(baseCalendars, lastModified, retryCount);
   if (firebaseDb) {
     try {
       const ref = firebaseDb.collection('calendars').doc(`cal_${normalizedCal.id}`);
@@ -1436,11 +1432,19 @@ async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 3, 
         }),
         new Promise((_, reject) => setTimeout(() => reject(new Error('Firestore push timeout')), 1800))
       ]);
+      const backupCalendars = Array.isArray(allCalendars) && allCalendars.length > 0 ? allCalendars : mergeCalendarCollections(loadLocalCache(), [normalizedCal], {
+        replaceMatchingId: true
+      });
+      void pushMasterCloudCalendars(backupCalendars, lastModified, 1);
       return true;
     } catch (e) {
       console.warn(`Firestore push notice for cal_${normalizedCal.id}:`, e);
     }
   }
+  const baseCalendars = Array.isArray(allCalendars) && allCalendars.length > 0 ? allCalendars : mergeCalendarCollections(loadLocalCache(), [normalizedCal], {
+    replaceMatchingId: true
+  });
+  const masterSaved = await pushMasterCloudCalendars(baseCalendars, lastModified, retryCount);
   return masterSaved;
 }
 function loadLocalMeta() {
