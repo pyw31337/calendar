@@ -464,19 +464,46 @@ function isValidCalendarId(id) {
   return typeof id === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(id);
 }
 
+function sanitizeText(value, maxLength = 120) {
+  return String(value ?? '')
+    .replace(/[\u0000-\u001F\u007F]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, maxLength);
+}
+
+function normalizeColorValue(value, fallback = '#64748B') {
+  const color = String(value || '').trim();
+  return /^#[0-9A-Fa-f]{6}$/.test(color) ? color : fallback;
+}
+
+function isValidDateString(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(value || ''))) return false;
+  const [year, month, day] = value.split('-').map(Number);
+  const date = new Date(year, month - 1, day);
+  return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
+}
+
 function getCalendarIdFromURL() {
   const href = window.location.href;
   const urlParams = new URLSearchParams(window.location.search);
   if (isValidCalendarId(urlParams.get('id'))) return urlParams.get('id');
   if (isValidCalendarId(urlParams.get('cal'))) return urlParams.get('cal');
+  const shareMatch = window.location.pathname.match(/\/share\/([A-Za-z0-9_-]+)\/?$/);
+  if (shareMatch && isValidCalendarId(shareMatch[1])) return shareMatch[1];
   const match = href.match(/[?&#/]id=([a-zA-Z0-9_-]+)/);
   if (match && isValidCalendarId(match[1])) return match[1];
   return null;
 }
 
+function getRawCalendarIdFromURL() {
+  const urlParams = new URLSearchParams(window.location.search);
+  return urlParams.get('id') || urlParams.get('cal') || '';
+}
+
 function getCalendarShareUrl(calendarId) {
-  const basePath = window.location.pathname.replace(/\/(?:index\.html)?$/, '/');
-  return `${window.location.origin}${basePath}share/${encodeURIComponent(calendarId)}/`;
+  const basePath = window.location.pathname.replace(/\/share\/[^/]+\/?$/, '/').replace(/\/(?:index\.html)?$/, '/');
+  return `${window.location.origin}${basePath}?id=${encodeURIComponent(calendarId)}`;
 }
 
 function cloneParticipant(participant) {
@@ -501,7 +528,7 @@ function isTombstone(item) {
 }
 
 function normalizeParticipantName(calendarId, name) {
-  const trimmed = (name || '').trim();
+  const trimmed = sanitizeText(name, 40);
   if (calendarId === 'kkot' && trimmed === '김료진') return '김효진';
   if (calendarId === 'kkot' && trimmed === '박수진') return '신수진';
   return trimmed;
@@ -541,6 +568,7 @@ function normalizeCalendarForSave(calendar) {
     normalizedParticipants.push({
       ...participant,
       name: normalizeParticipantName(cloned.id, participant.name),
+      color: normalizeColorValue(participant.color, PRESET_COLORS[normalizedParticipants.length % PRESET_COLORS.length]),
       updatedAt: participant.updatedAt || now
     });
   });
@@ -548,11 +576,14 @@ function normalizeCalendarForSave(calendar) {
   const availabilityMap = new Map();
   (cloned.availabilities || []).forEach((availability) => {
     if (!availability?.date || !availability?.participantId) return;
+    if (!isValidDateString(availability.date)) return;
     const participantId = idRedirects.get(availability.participantId) || availability.participantId;
     if (!participantById.has(participantId)) return;
     const normalizedAvailability = {
       ...availability,
-      participantId
+      date: availability.date,
+      participantId,
+      note: sanitizeText(availability.note, 120)
     };
     const key = `${normalizedAvailability.date}_${normalizedAvailability.participantId}`;
     availabilityMap.set(key, mergeAvailabilityRecord(availabilityMap.get(key), normalizedAvailability));
@@ -604,6 +635,9 @@ function mergeParticipantRecord(existing, incoming) {
 function mergeAvailabilityRecord(existing, incoming) {
   const existingClone = cloneAvailability(existing);
   const incomingClone = cloneAvailability(incoming);
+  if (incomingClone) {
+    incomingClone.note = sanitizeText(incomingClone.note, 120);
+  }
   if (!existingClone) return incomingClone;
   if (!incomingClone) return existingClone;
   const existingStamp = getItemStamp(existingClone);
@@ -679,17 +713,21 @@ function mergeCalendarRecord(existing, incoming) {
 function mergeCalendarAvailabilityDelta(serverCalendar, incomingCalendar, changedAt = 0) {
   const base = cloneCalendar(serverCalendar) || cloneCalendar(incomingCalendar) || {};
   const incoming = cloneCalendar(incomingCalendar) || {};
-  const participantIds = new Set((base.participants || []).map(participant => participant.id));
+  if (base.id && incoming.id && base.id !== incoming.id) {
+    throw new Error(`Calendar ID mismatch: ${base.id} cannot receive ${incoming.id} availability`);
+  }
+  const participantIds = new Set(getActiveParticipants(base).map(participant => participant.id));
   const availabilityMap = new Map();
 
   (base.availabilities || []).forEach((availability) => {
-    if (availability?.date && availability?.participantId) {
+    if (availability?.date && availability?.participantId && isValidDateString(availability.date)) {
       availabilityMap.set(`${availability.date}_${availability.participantId}`, availability);
     }
   });
 
   (incoming.availabilities || []).forEach((availability) => {
     if (!availability?.date || !availability?.participantId) return;
+    if (!isValidDateString(availability.date)) return;
     if (participantIds.size > 0 && !participantIds.has(availability.participantId)) return;
     const key = `${availability.date}_${availability.participantId}`;
     availabilityMap.set(key, mergeAvailabilityRecord(availabilityMap.get(key), availability));
@@ -1826,6 +1864,15 @@ function App() {
   const updateCalendars = async (nextCalendars, toastMsg = '일정이 저장되었습니다.', toastType = 'success', targetCalId = activeCalId, saveMode = 'availability') => {
     let previousCalendars = null;
     try {
+      if (!isValidCalendarId(targetCalId)) {
+        showToast('캘린더 ID가 올바르지 않아 저장하지 않았습니다.', 'error');
+        return false;
+      }
+      const requestedId = getCalendarIdFromURL();
+      if (requestedId && requestedId !== targetCalId) {
+        showToast('현재 URL의 캘린더와 저장 대상이 달라 저장하지 않았습니다.', 'error');
+        return false;
+      }
       const now = Date.now();
       const normalizedCalendars = cloneCalendarList(nextCalendars).map(normalizeCalendarForSave);
 
@@ -1930,8 +1977,19 @@ function App() {
       if (ogUrl) ogUrl.setAttribute('content', currentShareUrl);
       const twTitle = document.getElementById('tw-title');
       if (twTitle) twTitle.setAttribute('content', calTitle);
+      if (window.location.pathname.includes('/share/')) {
+        window.history.replaceState({}, '', currentShareUrl);
+      }
     }
   }, [activeCal]);
+  React.useEffect(() => {
+    const rawId = getRawCalendarIdFromURL();
+    if (rawId && !isValidCalendarId(rawId)) {
+      const safeUrl = getCalendarShareUrl(activeCal?.id || activeCalId);
+      window.history.replaceState({}, '', safeUrl);
+      showToast('잘못된 캘린더 ID라 현재 캘린더 주소로 정리했습니다.', 'error', 5000);
+    }
+  }, []);
   React.useEffect(() => {
     let cancelled = false;
     const requestedId = getCalendarIdFromURL();
@@ -1961,28 +2019,46 @@ function App() {
     };
   }, []);
   const handleSelectCalendar = id => {
+    if (!isValidCalendarId(id)) {
+      showToast('캘린더 ID가 올바르지 않습니다.', 'error');
+      return;
+    }
     setActiveCalId(id);
-    const url = new URL(window.location.href);
-    url.searchParams.set('id', id);
-    window.history.replaceState({}, '', url.toString());
+    window.history.replaceState({}, '', getCalendarShareUrl(id));
   };
   const handleSaveAvailability = (dateStr, participantId, note) => {
+    if (!activeCal || !isValidCalendarId(activeCal.id) || activeCal.id !== activeCalId) {
+      showToast('현재 캘린더 상태를 확인할 수 없어 저장하지 않았습니다.', 'error');
+      return false;
+    }
+    if (!isValidDateString(dateStr)) {
+      showToast('날짜 형식이 올바르지 않아 저장하지 않았습니다.', 'error');
+      return false;
+    }
+    const activeParticipantIds = new Set(getActiveParticipants(activeCal).map(participant => participant.id));
+    if (!activeParticipantIds.has(participantId)) {
+      showToast('참여자 정보를 다시 선택해 주세요.', 'error');
+      return false;
+    }
     const now = Date.now();
+    const cleanNote = sanitizeText(note, 120);
     const existing = activeCal.availabilities || [];
     const index = existing.findIndex(e => e.date === dateStr && e.participantId === participantId);
     let nextAvail = [...existing];
     if (index >= 0) {
       nextAvail[index] = {
+        ...nextAvail[index],
         date: dateStr,
         participantId,
-        note,
-        updatedAt: now
+        note: cleanNote,
+        updatedAt: now,
+        deletedAt: null
       };
     } else {
       nextAvail.push({
         date: dateStr,
         participantId,
-        note,
+        note: cleanNote,
         updatedAt: now
       });
     }
@@ -1996,6 +2072,9 @@ function App() {
     return updateCalendars(nextCalendars, '일정이 등록되었습니다.', 'success', updatedCal.id);
   };
   const handleDeleteAvailability = (dateStr, participantId) => {
+    if (!activeCal || !isValidDateString(dateStr)) return false;
+    const activeParticipantIds = new Set(getActiveParticipants(activeCal).map(participant => participant.id));
+    if (!activeParticipantIds.has(participantId)) return false;
     const now = Date.now();
     const nextAvail = (activeCal.availabilities || []).map(e => e.date === dateStr && e.participantId === participantId ? {
       ...e,
@@ -2012,6 +2091,7 @@ function App() {
     return updateCalendars(nextCalendars, '삭제 되었습니다.', 'delete', updatedCal.id);
   };
   const handleDeleteAllForDate = dateStr => {
+    if (!activeCal || !isValidDateString(dateStr)) return false;
     const now = Date.now();
     const nextAvail = (activeCal.availabilities || []).map(e => e.date === dateStr ? {
       ...e,
@@ -2038,7 +2118,9 @@ function App() {
         ...updatedCal,
         updatedAt: now,
         revision: (updatedCal.revision || 0) + 1,
-        participants: stampParticipantSettings(updatedCal.participants, now)
+        title: sanitizeText(updatedCal.title, 80),
+        description: sanitizeText(updatedCal.description, 160),
+        participants: updatedCal.participants
       };
       if (!assertCalendarLinks(stampedCal)) {
         showToast('참여자와 일정 연결을 확인해 주세요.', 'error');
@@ -2748,6 +2830,7 @@ function DateModal({
     placeholder: "\uC608: 1\uC2DC \uC774\uD6C4 \uAC00\uB2A5, \uC608\uB2F9\uD638 \uCC29\uD55C\uB18D\uCD0C\uCCB4\uD5D8\uC138\uC0C1",
     value: note,
     disabled: isSubmitting,
+    maxLength: 120,
     ref: noteInputRef,
     onChange: e => setNote(e.target.value)
   })), dateEntries.length > 0 && /*#__PURE__*/React.createElement("div", {
@@ -2795,9 +2878,19 @@ function DateModal({
         fontSize: '0.75rem'
       },
       disabled: isSubmitting,
-      onClick: () => {
-        if (!isSubmitting && window.confirm('진짜 삭제하시겠습니까?')) {
-          onDelete(dateStr, p.id);
+    onClick: () => {
+      if (!isSubmitting && window.confirm('진짜 삭제하시겠습니까?')) {
+          setIsSubmitting(true);
+          Promise.resolve(onDelete(dateStr, p.id)).then(saved => {
+            if (saved === false) {
+              setIsSubmitting(false);
+              return;
+            }
+            onClose();
+          }).catch(err => {
+            console.error('Availability delete failed:', err);
+            setIsSubmitting(false);
+          });
         }
       }
     }, "\uC0AD\uC81C"));
@@ -2897,12 +2990,12 @@ function AdminModal({
     if (isSubmitting) return;
     if (e && e.nativeEvent && e.nativeEvent.isComposing) return;
     const latestName = newNameInputRef.current ? newNameInputRef.current.value : newName;
-    const trimmed = (latestName || '').trim();
+    const trimmed = sanitizeText(latestName, 40);
     if (!trimmed) return;
     const newParticipant = {
       id: `${calendar.id}_p_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
       name: trimmed,
-      color: PRESET_COLORS[participants.filter(p => !isTombstone(p)).length % PRESET_COLORS.length],
+      color: normalizeColorValue(PRESET_COLORS[participants.filter(p => !isTombstone(p)).length % PRESET_COLORS.length]),
       updatedAt: Date.now()
     };
     setParticipants(prev => [...prev, newParticipant]);
@@ -2912,9 +3005,18 @@ function AdminModal({
   const updateParticipant = (participantId, patch) => {
     if (isSubmitting) return;
     const now = Date.now();
+    const cleanPatch = {
+      ...patch
+    };
+    if (Object.prototype.hasOwnProperty.call(cleanPatch, 'name')) {
+      cleanPatch.name = sanitizeText(cleanPatch.name, 40);
+    }
+    if (Object.prototype.hasOwnProperty.call(cleanPatch, 'color')) {
+      cleanPatch.color = normalizeColorValue(cleanPatch.color);
+    }
     setParticipants(prev => prev.map(item => item.id === participantId ? {
       ...item,
-      ...patch,
+      ...cleanPatch,
       updatedAt: now
     } : item));
   };
@@ -2926,21 +3028,32 @@ function AdminModal({
     const form = e.currentTarget;
     const textInputs = [...form.querySelectorAll('input[type="text"]')];
     const colorInputs = [...form.querySelectorAll('input[type="color"]')];
-    const latestTitle = (textInputs[0]?.value || title).trim();
-    const latestDescription = (textInputs[1]?.value || description).trim();
+    const latestTitle = sanitizeText(textInputs[0]?.value || title, 80);
+    const latestDescription = sanitizeText(textInputs[1]?.value || description, 160);
+    const originalParticipants = new Map(getActiveParticipants(calendar).map(participant => [participant.id, participant]));
     let activeIndex = 0;
     const latestParticipants = participants.map(participant => {
       if (isTombstone(participant)) return participant;
       const nameInput = textInputs[3 + activeIndex];
       const colorInput = colorInputs[activeIndex];
       activeIndex += 1;
+      const cleanName = normalizeParticipantName(calendar.id, nameInput?.value || participant.name || '');
+      const cleanColor = normalizeColorValue(colorInput?.value || participant.color);
+      const original = originalParticipants.get(participant.id);
+      const changed = !original || original.name !== cleanName || normalizeColorValue(original.color) !== cleanColor;
       return {
         ...participant,
-        name: (nameInput?.value || participant.name || '').trim(),
-        color: colorInput?.value || participant.color,
-        updatedAt: now
+        name: cleanName,
+        color: cleanColor,
+        updatedAt: changed ? now : (original?.updatedAt || participant.updatedAt)
       };
     }).filter(participant => isTombstone(participant) || participant.name);
+    const activeNames = latestParticipants.filter(participant => !isTombstone(participant)).map(participant => participant.name.trim().toLowerCase());
+    if (!latestTitle || new Set(activeNames).size !== activeNames.length) {
+      alert('캘린더명과 참여자 이름을 확인해 주세요. 참여자 이름은 중복될 수 없습니다.');
+      setIsSubmitting(false);
+      return;
+    }
     let saved = false;
     try {
       saved = await Promise.resolve(onSave({
@@ -2949,7 +3062,7 @@ function AdminModal({
         description: latestDescription,
         updatedAt: now,
         revision: (calendar.revision || 0) + 1,
-        participants: stampParticipantSettings(latestParticipants, now)
+        participants: latestParticipants
       }, null));
     } catch (err) {
       console.error('Calendar settings save failed:', err);
@@ -3011,6 +3124,7 @@ function AdminModal({
     },
     value: title,
     disabled: isSubmitting,
+    maxLength: 80,
     onChange: e => setTitle(e.target.value),
     required: true
   })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
@@ -3030,6 +3144,7 @@ function AdminModal({
     placeholder: "\uC608: cw \uB3D9\uCC3D \uBAA8\uC784 \uCC38\uC5EC\uC790\uB4E4\uC758 \uC77C\uC815 \uC870\uC728",
     value: description,
     disabled: isSubmitting,
+    maxLength: 160,
     onChange: e => setDescription(e.target.value)
   })), /*#__PURE__*/React.createElement("div", {
     style: {
@@ -3059,6 +3174,7 @@ function AdminModal({
     placeholder: "\uC0C8 \uCC38\uC5EC\uC790 \uC774\uB984",
     value: newName,
     disabled: isSubmitting,
+    maxLength: 40,
     ref: newNameInputRef,
     onChange: e => setNewName(e.target.value),
     onKeyDown: e => {
@@ -3108,6 +3224,7 @@ function AdminModal({
     },
     value: p.name,
     disabled: isSubmitting,
+    maxLength: 40,
     onInput: e => updateParticipant(p.id, { name: e.target.value }),
     onChange: e => updateParticipant(p.id, { name: e.target.value })
   }), /*#__PURE__*/React.createElement("button", {
