@@ -436,7 +436,7 @@ const CALENDAR_CLOUD_BLOB_IDS = {
   kkot: '019fc674-b7bc-7ae2-b53d-4ffee349d114',
   cw: '019fc674-b957-71c2-b464-0c4683dbe321'
 };
-const ENABLE_FIRESTORE_SYNC = new URLSearchParams(window.location.search).get('storage') !== 'local';
+const ENABLE_FIRESTORE_SYNC = false; // EMERGENCY LOCK: prevent any Firestore read/write until recovery is complete
 function getContrastTextColor(hexColor) {
   if (!hexColor) return '#FFFFFF';
   const hex = hexColor.replace('#', '');
