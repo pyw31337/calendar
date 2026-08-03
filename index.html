@@ -595,6 +595,12 @@
           {isShareOpen && (
             <ShareModal
               calendar={activeCal}
+              onCreateNewCal={(newCal) => {
+                const nextCalendars = [newCal, ...calendars];
+                updateCalendars(nextCalendars);
+                handleSelectCalendar(newCal.id);
+                setIsShareOpen(false);
+              }}
               onClose={() => setIsShareOpen(false)}
             />
           )}
@@ -769,7 +775,7 @@
       );
     }
 
-    // Admin Modal - Editable Calendar Title AND Subtitle Description
+    // Admin Modal - Removed Switcher Area
     function AdminModal({ calendar, allCalendars, onSelectCalendar, onSave, onClose }) {
       const [title, setTitle] = React.useState(calendar.title);
       const [description, setDescription] = React.useState(calendar.description || '');
@@ -796,27 +802,6 @@
         setNewName('');
       };
 
-      const handleCreateNewCalInAdmin = () => {
-        const id = prompt('새 모임 달력의 영문/한글 ID를 입력하세요 (예: kkot, cw, trip):', 'cal_' + Date.now().toString().slice(-4));
-        if (!id) return;
-        const calTitle = prompt('달력 제목을 입력해 주세요:', `${id} 모임 달력`);
-        if (!calTitle) return;
-
-        const newCal = {
-          id: id.trim(),
-          title: calTitle.trim(),
-          description: `${calTitle.trim()} 참여자들의 일정 조율`,
-          participants: [
-            { id: 'p1', name: '참여자 1', color: '#EF4444' },
-            { id: 'p2', name: '참여자 2', color: '#3B82F6' }
-          ],
-          availabilities: []
-        };
-
-        onSave(calendar, newCal);
-        onClose();
-      };
-
       const handleSubmit = (e) => {
         e.preventDefault();
         onSave({
@@ -837,26 +822,6 @@
             </div>
             <form onSubmit={handleSubmit}>
               <div className="modal-body">
-                {/* Calendar Switcher & Create New Calendar Button */}
-                <div style={{ background: '#F8FAFC', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#64748B', marginBottom: '6px' }}>달력 선택 및 관리</label>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <select
-                      className="form-select"
-                      style={{ flex: 1, fontWeight: '700' }}
-                      value={calendar.id}
-                      onChange={(e) => { onSelectCalendar(e.target.value); onClose(); }}
-                    >
-                      {allCalendars.map(c => (
-                        <option key={c.id} value={c.id}>{c.title} (?id={c.id})</option>
-                      ))}
-                    </select>
-                    <button type="button" className="btn btn-secondary" onClick={handleCreateNewCalInAdmin}>
-                      + 새 달력 생성
-                    </button>
-                  </div>
-                </div>
-
                 <div>
                   <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px', color: '#64748B' }}>달력명 (상단 큰 제목)</label>
                   <input type="text" className="form-input" style={{ width: '100%' }} value={title} onChange={e => setTitle(e.target.value)} required />
@@ -915,16 +880,46 @@
       );
     }
 
-    // Share Modal
-    function ShareModal({ calendar, onClose }) {
+    // Share Modal - Added '+ 새 달력 생성' button in Header to the left of Close button
+    function ShareModal({ calendar, onCreateNewCal, onClose }) {
       const baseUrl = `${window.location.origin}${window.location.pathname}`;
       const shareUrl = `${baseUrl}?id=${calendar.id}`;
+
+      const handleCreateNewCalClick = () => {
+        const id = prompt('새 모임 달력의 영문/한글 ID를 입력하세요 (예: kkot, cw, trip):', 'cal_' + Date.now().toString().slice(-4));
+        if (!id) return;
+        const calTitle = prompt('달력 제목을 입력해 주세요:', `${id} 모임 달력`);
+        if (!calTitle) return;
+
+        const newCal = {
+          id: id.trim(),
+          title: calTitle.trim(),
+          description: `${calTitle.trim()} 참여자들의 일정 조율`,
+          participants: [
+            { id: 'p1', name: '참여자 1', color: '#EF4444' },
+            { id: 'p2', name: '참여자 2', color: '#3B82F6' }
+          ],
+          availabilities: []
+        };
+        onCreateNewCal(newCal);
+      };
+
       return (
         <div className="modal-overlay" onClick={onClose}>
           <div className="modal-container" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
+            <div className="modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 style={{ fontSize: '1.1rem', fontWeight: 800 }}>달력 공유 URL</h3>
-              <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer' }}>✕</button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <button 
+                  type="button" 
+                  className="btn btn-secondary" 
+                  style={{ padding: '6px 12px', fontSize: '0.8rem', fontWeight: '800' }}
+                  onClick={handleCreateNewCalClick}
+                >
+                  + 새 달력 생성
+                </button>
+                <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>✕</button>
+              </div>
             </div>
             <div className="modal-body">
               <label style={{ fontSize: '0.85rem', fontWeight: 700, color: '#64748B' }}>현재 달력 ({calendar.id}) 전용 공유 URL</label>
