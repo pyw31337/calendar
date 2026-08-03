@@ -430,8 +430,12 @@ const PRESET_COLORS = ['#EF4444', '#F97316', '#F59E0B', '#10B981', '#06B6D4', '#
 const STORAGE_KEY = 'gather_calendars_permanent_v20';
 const STORAGE_META_KEY = 'gather_calendars_meta_v4'; // tracks lastModified timestamp
 // Unlimited Zero-Rate-Limit Cloud DB endpoint powered by JSONBlob
-const MASTER_CLOUD_BLOB_ID = '019fc4ff-8b04-74ab-af71-bdd91c03ea11';
+const MASTER_CLOUD_BLOB_ID = '019fc673-395c-7433-ad9d-c9343b94883a';
 const CLOUD_API_URL = `https://jsonblob.com/api/jsonBlob/${MASTER_CLOUD_BLOB_ID}`;
+const CALENDAR_CLOUD_BLOB_IDS = {
+  kkot: '019fc674-b7bc-7ae2-b53d-4ffee349d114',
+  cw: '019fc674-b957-71c2-b464-0c4683dbe321'
+};
 const ENABLE_FIRESTORE_SYNC = false;
 function getContrastTextColor(hexColor) {
   if (!hexColor) return '#FFFFFF';
@@ -467,6 +471,11 @@ function getCalendarIdFromURL() {
   const match = href.match(/[?&#/]id=([a-zA-Z0-9_-]+)/);
   if (match && match[1]) return match[1];
   return null;
+}
+
+function getCalendarCloudUrl(calId) {
+  const blobId = CALENDAR_CLOUD_BLOB_IDS[calId];
+  return blobId ? `https://jsonblob.com/api/jsonBlob/${blobId}` : null;
 }
 
 function cloneParticipant(participant) {
@@ -1319,12 +1328,19 @@ async function fetchSingleCloudCalendar(calId, retryCount = 2) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 6000);
     try {
-      const res = await fetch(CLOUD_API_URL, {
+      const cloudUrl = getCalendarCloudUrl(calId) || CLOUD_API_URL;
+      const res = await fetch(cloudUrl, {
         signal: controller.signal
       });
       clearTimeout(timeoutId);
       if (res.ok) {
         const json = await res.json();
+        if (json && json.calendar && json.calendar.id === calId) {
+          return {
+            calendar: json.calendar,
+            lastModified: json.lastModified || 0
+          };
+        }
         if (json && Array.isArray(json.calendars)) {
           const matched = json.calendars.find(c => c.id === calId);
           if (matched) return {
@@ -1346,33 +1362,41 @@ async function fetchSingleCloudCalendar(calId, retryCount = 2) {
 async function pushMasterCloudCalendars(nextCalendars, lastModified, retryCount = 4) {
   const normalizedCalendars = cloneCalendarList(nextCalendars).map(normalizeCalendarForSave);
   if (!normalizedCalendars.length) return false;
-  for (let attempt = 0; attempt <= retryCount; attempt++) {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 7000);
-    try {
-      const res = await fetch(CLOUD_API_URL, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          calendars: normalizedCalendars,
-          lastModified
-        }),
-        signal: controller.signal
-      });
-      clearTimeout(timeoutId);
-      if (res.ok) return true;
-      if (res.status !== 429 && res.status < 500) return false;
-    } catch (e) {
-      clearTimeout(timeoutId);
-      console.warn('Master cloud push notice:', e);
+
+  const saveOne = async (calendar) => {
+    const cloudUrl = getCalendarCloudUrl(calendar.id);
+    if (!cloudUrl) return true;
+    for (let attempt = 0; attempt <= retryCount; attempt++) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 7000);
+      try {
+        const res = await fetch(cloudUrl, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            calendar,
+            lastModified
+          }),
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        if (res.ok) return true;
+        if (res.status !== 429 && res.status < 500) return false;
+      } catch (e) {
+        clearTimeout(timeoutId);
+        console.warn(`Calendar cloud push notice for ${calendar.id}:`, e);
+      }
+      if (attempt < retryCount) {
+        await new Promise(r => setTimeout(r, 1200 * (attempt + 1)));
+      }
     }
-    if (attempt < retryCount) {
-      await new Promise(r => setTimeout(r, 1200 * (attempt + 1)));
-    }
-  }
-  return false;
+    return false;
+  };
+
+  const results = await Promise.all(normalizedCalendars.map(saveOne));
+  return results.every(Boolean);
 }
 
 // Pushes isolated calendar data to the durable master store and Firestore when available.
@@ -1430,6 +1454,17 @@ function isPlaceholderRemotePayload(payload) {
 }
 
 async function fetchMasterCloudCalendars(retryCount = 2) {
+  const isolatedResults = await Promise.all(
+    Object.keys(CALENDAR_CLOUD_BLOB_IDS).map((calId) => fetchSingleCloudCalendar(calId, 0))
+  );
+  const isolatedCalendars = isolatedResults.map(result => result?.calendar).filter(Boolean);
+  if (isolatedCalendars.length > 0) {
+    return {
+      calendars: isolatedCalendars,
+      lastModified: isolatedResults.reduce((max, result) => Math.max(max, result?.lastModified || 0), 0)
+    };
+  }
+
   for (let attempt = 0; attempt <= retryCount; attempt++) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 6000);
