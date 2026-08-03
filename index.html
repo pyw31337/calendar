@@ -909,7 +909,20 @@
                       if (!p) return null;
                       return (
                         <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                          <span className="participant-badge" style={{ backgroundColor: p.color, color: getContrastTextColor(p.color) }}>
+                          <span
+                            className="participant-badge"
+                            style={{
+                              backgroundColor: p.color,
+                              color: getContrastTextColor(p.color),
+                              cursor: 'pointer',
+                              userSelect: 'none'
+                            }}
+                            onClick={() => {
+                              setParticipantId(p.id);
+                              setNote(e.note || '');
+                            }}
+                            title="클릭 시 이 참여자로 자동 선택 및 메모 불러오기"
+                          >
                             {p.name} {e.note && `("${e.note}")`}
                           </span>
                           <button type="button" className="btn btn-danger" style={{ padding: '2px 8px', fontSize: '0.75rem' }} onClick={() => onDelete(dateStr, p.id)}>삭제</button>
