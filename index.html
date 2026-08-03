@@ -1378,7 +1378,7 @@ async function pushMasterCloudCalendars(nextCalendars, lastModified, retryCount 
 
   const saveOne = async (calendar) => {
     const cloudUrl = getCalendarCloudUrl(calendar.id);
-    if (!cloudUrl) return true;
+    if (!cloudUrl) return Boolean(firebaseDb);
     for (let attempt = 0; attempt <= retryCount; attempt++) {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 7000);
@@ -1522,22 +1522,24 @@ function App() {
     }, duration);
   };
 
-  // Initialize with persisted lastLocalSave timestamp so refresh never bypasses the guard!
-  const lastLocalSaveRef = React.useRef(loadLocalMeta().lastModified || 0);
-  const LOCAL_SAVE_GUARD_MS = 10000; // 10s guard window after local save
+  const isSavingRef = React.useRef(false);
+  const serverRevisionRef = React.useRef(loadLocalMeta().lastModified || 0);
+
+  const applyServerCalendars = (serverCalendars, lastModified = Date.now()) => {
+    const normalized = cloneCalendarList(serverCalendars).map(normalizeCalendarForSave);
+    if (normalized.length === 0) return;
+    serverRevisionRef.current = lastModified;
+    setCalendarsState(normalized);
+    saveLocalCache(normalized);
+    saveLocalMeta({ lastModified });
+  };
 
   const updateCalendars = async (nextCalendars, toastMsg = '일정이 저장되었습니다.', toastType = 'success', targetCalId = activeCalId) => {
+    let previousCalendars = null;
     try {
       const now = Date.now();
       const normalizedCalendars = cloneCalendarList(nextCalendars).map(normalizeCalendarForSave);
-      lastLocalSaveRef.current = now;
-      saveLocalMeta({
-        lastModified: now
-      }); // stamp local save time
-      setCalendarsState(normalizedCalendars);
-      saveLocalCache(normalizedCalendars);
 
-      // Find active calendar and push to its isolated Firestore document
       const currentCal = normalizedCalendars.find(c => c.id === targetCalId) || null;
       if (!currentCal) {
         console.warn('Active calendar not found during save:', targetCalId);
@@ -1545,19 +1547,29 @@ function App() {
         return false;
       }
 
+      isSavingRef.current = true;
+      previousCalendars = calendars;
+      setCalendarsState(normalizedCalendars);
       const saved = await pushSingleCloudCalendar(currentCal, now, 4, normalizedCalendars);
       if (!saved) {
         console.warn('Cloud save failed for calendar:', currentCal.id);
+        if (previousCalendars) setCalendarsState(previousCalendars);
         showToast('저장에 실패했습니다. 다시 시도해 주세요.', 'error');
         return false;
       }
 
+      serverRevisionRef.current = now;
+      saveLocalCache(normalizedCalendars);
+      saveLocalMeta({ lastModified: now });
       showToast(toastMsg, toastType, 3000);
       return true;
     } catch (err) {
       console.error('updateCalendars failed:', err);
+      if (previousCalendars) setCalendarsState(previousCalendars);
       showToast('저장에 실패했습니다. 다시 시도해 주세요.', 'error');
       return false;
+    } finally {
+      isSavingRef.current = false;
     }
   };
   const [activeCalId, setActiveCalId] = React.useState(() => {
@@ -1579,26 +1591,20 @@ function App() {
     if (!firebaseDb || !activeCalId) return;
     let isMounted = true;
 
-    // Listen ONLY to this active calendar document (cal_{id}) for 100% strict isolation!
     const unsubscribe = firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).onSnapshot(doc => {
-      if (doc.exists && isMounted) {
+      if (doc.exists && isMounted && !isSavingRef.current) {
         const data = doc.data();
         if (data && data.calendar && data.calendar.id === activeCalId) {
-          // Guard: skip cloud update if we recently saved locally or if local state is newer
-          if (Date.now() - lastLocalSaveRef.current < LOCAL_SAVE_GUARD_MS) return;
           const cloudCal = data.calendar;
-          const localMeta = loadLocalMeta();
           const cloudLastMod = data.lastModified || 0;
-          if (cloudLastMod > localMeta.lastModified) {
-            setCalendarsState(prevCals => {
-              const nextCals = prevCals.map(c => c.id === activeCalId ? cloneCalendar(cloudCal) : c);
-              saveLocalCache(nextCals);
-              saveLocalMeta({
-                lastModified: cloudLastMod
-              });
-              return nextCals;
-            });
-          }
+          if (cloudLastMod < serverRevisionRef.current) return;
+          setCalendarsState(prevCals => {
+            const nextCals = prevCals.map(c => c.id === activeCalId ? cloneCalendar(cloudCal) : c);
+            saveLocalCache(nextCals);
+            saveLocalMeta({ lastModified: cloudLastMod });
+            serverRevisionRef.current = cloudLastMod;
+            return nextCals;
+          });
         }
       }
     }, err => {
@@ -1615,27 +1621,20 @@ function App() {
     let isMounted = true;
 
     const syncFromMaster = async () => {
-      if (Date.now() - lastLocalSaveRef.current < LOCAL_SAVE_GUARD_MS) return;
+      if (isSavingRef.current) return;
       const result = await fetchMasterCloudCalendars();
       if (!result || !isMounted) return;
 
-      const localMeta = loadLocalMeta();
-      if (result.lastModified <= localMeta.lastModified) return;
+      if (result.lastModified < serverRevisionRef.current) return;
 
-      const currentLocal = loadLocalCache();
-      const merged = mergeCalendarCollections(currentLocal, result.calendars, {
-        replaceMatchingId: true
-      });
-      if (merged.length > 0) {
-        setCalendarsState(merged);
-        saveLocalCache(merged);
-        saveLocalMeta({ lastModified: result.lastModified });
-      }
+      applyServerCalendars(result.calendars, result.lastModified || Date.now());
     };
 
     syncFromMaster();
+    const intervalId = setInterval(syncFromMaster, 7000);
     return () => {
       isMounted = false;
+      clearInterval(intervalId);
     };
   }, []);
   const activeCal = calendars.find(c => c.id === activeCalId) || calendars[0];
