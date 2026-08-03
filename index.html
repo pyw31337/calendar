@@ -563,8 +563,12 @@
     function App() {
       const [calendars, setCalendarsState] = React.useState(() => loadLocalCache());
       const [isSyncing, setIsSyncing] = React.useState(false);
+      // Track the timestamp of the last local save to prevent cloud sync from overwriting it
+      const lastLocalSaveRef = React.useRef(0);
+      const LOCAL_SAVE_GUARD_MS = 8000; // Wait 8s after a local save before allowing cloud sync to overwrite
 
       const updateCalendars = (nextCalendars) => {
+        lastLocalSaveRef.current = Date.now(); // mark that we just saved locally
         setCalendarsState(nextCalendars);
         saveLocalCache(nextCalendars);
         pushMasterCloudCalendars(nextCalendars);
@@ -589,17 +593,24 @@
         let isMounted = true;
 
         const syncWithCloud = async () => {
+          // Skip overwriting state if a local save happened within the guard window
+          if (Date.now() - lastLocalSaveRef.current < LOCAL_SAVE_GUARD_MS) {
+            return;
+          }
           setIsSyncing(true);
           const cloudCalendars = await fetchMasterCloudCalendars();
           if (cloudCalendars && isMounted) {
-            setCalendarsState(cloudCalendars);
-            saveLocalCache(cloudCalendars);
+            // Double-check the guard after the async fetch completes
+            if (Date.now() - lastLocalSaveRef.current >= LOCAL_SAVE_GUARD_MS) {
+              setCalendarsState(cloudCalendars);
+              saveLocalCache(cloudCalendars);
+            }
           }
           if (isMounted) setIsSyncing(false);
         };
 
         syncWithCloud();
-        const interval = setInterval(syncWithCloud, 3000);
+        const interval = setInterval(syncWithCloud, 10000); // 10s interval to reduce contention
 
         return () => {
           isMounted = false;
