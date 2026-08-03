@@ -427,6 +427,7 @@
     ];
 
     const STORAGE_KEY = 'gather_calendars_cache_v7';
+    const STORAGE_META_KEY = 'gather_calendars_meta_v1'; // tracks lastModified timestamp
     // Unlimited Zero-Rate-Limit Cloud DB endpoint powered by JSONBlob
     const MASTER_CLOUD_BLOB_ID = '019fc4ff-8b04-74ab-af71-bdd91c03ea11';
     const CLOUD_API_URL = `https://jsonblob.com/api/jsonBlob/${MASTER_CLOUD_BLOB_ID}`;
@@ -516,13 +517,14 @@
       }
     ];
 
+    // Returns { calendars, lastModified } or null
     async function fetchMasterCloudCalendars() {
       try {
         const res = await fetch(CLOUD_API_URL);
         if (res.ok) {
           const json = await res.json();
           if (json && Array.isArray(json.calendars) && json.calendars.length > 0) {
-            return json.calendars;
+            return { calendars: json.calendars, lastModified: json.lastModified || 0 };
           }
         }
       } catch (e) {
@@ -531,16 +533,30 @@
       return null;
     }
 
-    async function pushMasterCloudCalendars(calendarsData) {
+    async function pushMasterCloudCalendars(calendarsData, lastModified) {
       try {
         await fetch(CLOUD_API_URL, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ calendars: calendarsData })
+          body: JSON.stringify({ calendars: calendarsData, lastModified })
         });
       } catch (e) {
         console.warn('Master Cloud DB push error:', e);
       }
+    }
+
+    function loadLocalMeta() {
+      try {
+        const raw = localStorage.getItem(STORAGE_META_KEY);
+        if (raw) return JSON.parse(raw);
+      } catch(e) {}
+      return { lastModified: 0 };
+    }
+
+    function saveLocalMeta(meta) {
+      try {
+        localStorage.setItem(STORAGE_META_KEY, JSON.stringify(meta));
+      } catch(e) {}
     }
 
     function loadLocalCache() {
@@ -563,15 +579,17 @@
     function App() {
       const [calendars, setCalendarsState] = React.useState(() => loadLocalCache());
       const [isSyncing, setIsSyncing] = React.useState(false);
-      // Track the timestamp of the last local save to prevent cloud sync from overwriting it
+      // Ref to block cloud sync from overwriting very recent local saves
       const lastLocalSaveRef = React.useRef(0);
-      const LOCAL_SAVE_GUARD_MS = 8000; // Wait 8s after a local save before allowing cloud sync to overwrite
+      const LOCAL_SAVE_GUARD_MS = 15000; // 15s guard window after local save
 
       const updateCalendars = (nextCalendars) => {
-        lastLocalSaveRef.current = Date.now(); // mark that we just saved locally
+        const now = Date.now();
+        lastLocalSaveRef.current = now;
+        saveLocalMeta({ lastModified: now }); // stamp local save time
         setCalendarsState(nextCalendars);
         saveLocalCache(nextCalendars);
-        pushMasterCloudCalendars(nextCalendars);
+        pushMasterCloudCalendars(nextCalendars, now); // send timestamp to cloud
       };
 
       const [activeCalId, setActiveCalId] = React.useState(() => {
@@ -593,24 +611,31 @@
         let isMounted = true;
 
         const syncWithCloud = async () => {
-          // Skip overwriting state if a local save happened within the guard window
-          if (Date.now() - lastLocalSaveRef.current < LOCAL_SAVE_GUARD_MS) {
-            return;
-          }
+          // Guard 1: skip entirely if we saved locally within the guard window
+          if (Date.now() - lastLocalSaveRef.current < LOCAL_SAVE_GUARD_MS) return;
+
           setIsSyncing(true);
-          const cloudCalendars = await fetchMasterCloudCalendars();
-          if (cloudCalendars && isMounted) {
-            // Double-check the guard after the async fetch completes
-            if (Date.now() - lastLocalSaveRef.current >= LOCAL_SAVE_GUARD_MS) {
-              setCalendarsState(cloudCalendars);
-              saveLocalCache(cloudCalendars);
+          const result = await fetchMasterCloudCalendars();
+
+          if (result && isMounted) {
+            const localMeta = loadLocalMeta();
+            // Guard 2: only apply cloud data if it is provably NEWER than local data
+            // This prevents stale GETs from overwriting fresh local saves
+            if (result.lastModified > localMeta.lastModified) {
+              // Guard 3: re-check that no local save happened during the async fetch
+              if (Date.now() - lastLocalSaveRef.current >= LOCAL_SAVE_GUARD_MS) {
+                setCalendarsState(result.calendars);
+                saveLocalCache(result.calendars);
+                saveLocalMeta({ lastModified: result.lastModified });
+              }
             }
           }
+
           if (isMounted) setIsSyncing(false);
         };
 
         syncWithCloud();
-        const interval = setInterval(syncWithCloud, 10000); // 10s interval to reduce contention
+        const interval = setInterval(syncWithCloud, 15000); // 15s interval
 
         return () => {
           isMounted = false;
