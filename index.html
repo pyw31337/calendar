@@ -503,7 +503,11 @@ function mergeCalendarCollections(sourceList, targetList) {
           availMap.set(key, a);
         } else {
           const prev = availMap.get(key);
-          if (a.note && a.note.trim() && !prev.note) {
+          const prevTs = prev?.updatedAt ? new Date(prev.updatedAt).getTime() : 0;
+          const nextTs = a?.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+          if (nextTs > prevTs) {
+            availMap.set(key, a);
+          } else if (a.note && a.note.trim() && !prev.note) {
             availMap.set(key, a);
           }
         }
@@ -1201,8 +1205,9 @@ async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 2) 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 7000);
     try {
-      const currentLocal = loadLocalCache();
-      const nextCalendars = currentLocal.map(c => c.id === targetCal.id ? targetCal : c);
+      const remote = await fetchMasterCloudCalendars(1);
+      const baseCalendars = remote?.calendars?.length ? remote.calendars : loadLocalCache();
+      const nextCalendars = mergeCalendarCollections(baseCalendars, [targetCal]);
       const res = await fetch(CLOUD_API_URL, {
         method: 'PUT',
         headers: {
