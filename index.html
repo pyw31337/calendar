@@ -189,6 +189,74 @@
 
     .color-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
 
+    .participant-add-row,
+    .participant-edit-row {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .participant-add-input,
+    .participant-name-input {
+      min-width: 0;
+    }
+
+    .participant-action-btn {
+      width: 62px;
+      min-width: 62px;
+      flex: 0 0 62px;
+    }
+
+    .participant-remove-btn {
+      width: 44px;
+      min-width: 44px;
+      height: 44px;
+      flex: 0 0 44px;
+      border-radius: 14px;
+      padding: 0 !important;
+      font-size: 1.05rem;
+    }
+
+    .participant-color-input {
+      width: 32px !important;
+      min-width: 32px;
+      height: 32px !important;
+      flex: 0 0 32px;
+      padding: 0;
+      border: 1px solid var(--border-subtle) !important;
+      border-radius: 50%;
+      background: #FFFFFF !important;
+      overflow: hidden;
+      appearance: none;
+      -webkit-appearance: none;
+    }
+    .participant-color-input::-webkit-color-swatch-wrapper { padding: 0; }
+    .participant-color-input::-webkit-color-swatch { border: 0; border-radius: 50%; }
+
+    @media (max-width: 480px) {
+      .participant-add-row { gap: 8px; }
+      .participant-action-btn {
+        width: 58px;
+        min-width: 58px;
+        flex-basis: 58px;
+        padding-left: 0;
+        padding-right: 0;
+      }
+      .participant-edit-row { gap: 8px; }
+      .participant-color-input {
+        width: 34px !important;
+        min-width: 34px;
+        height: 34px !important;
+        flex-basis: 34px;
+      }
+      .participant-remove-btn {
+        width: 44px;
+        min-width: 44px;
+        flex-basis: 44px;
+      }
+    }
+
     /* Calendar Card */
     .calendar-card {
       background: var(--bg-card); border: 1px solid var(--border-subtle);
@@ -3491,6 +3559,7 @@ function AdminModal({
       color: '#64748B'
     }
   }, "\uCC38\uC5EC\uC790 \uC124\uC815 (", participants.filter(p => !isTombstone(p)).length, "\uBA85)"), /*#__PURE__*/React.createElement("div", {
+    className: "participant-add-row",
     style: {
       display: 'flex',
       gap: '8px',
@@ -3498,7 +3567,7 @@ function AdminModal({
     }
   }, /*#__PURE__*/React.createElement("input", {
     type: "text",
-    className: "form-input",
+    className: "form-input participant-add-input",
     style: {
       flex: 1
     },
@@ -3517,7 +3586,7 @@ function AdminModal({
     }
   }), /*#__PURE__*/React.createElement("button", {
     type: "button",
-    className: "btn btn-secondary",
+    className: "btn btn-secondary participant-action-btn",
     disabled: isSubmitting,
     style: {
       whiteSpace: 'nowrap',
@@ -3527,6 +3596,7 @@ function AdminModal({
     onClick: handleAddParticipant
   }, "\uCD94\uAC00")), participants.map(p => isTombstone(p) ? null : /*#__PURE__*/React.createElement("div", {
     key: p.id,
+    className: "participant-edit-row",
     style: {
       display: 'flex',
       alignItems: 'center',
@@ -3535,6 +3605,7 @@ function AdminModal({
     }
   }, /*#__PURE__*/React.createElement("input", {
     type: "color",
+    className: "participant-color-input",
     value: p.color,
     disabled: isSubmitting,
     onInput: e => updateParticipant(p.id, { color: e.target.value }),
@@ -3548,7 +3619,7 @@ function AdminModal({
     }
   }), /*#__PURE__*/React.createElement("input", {
     type: "text",
-    className: "form-input",
+    className: "form-input participant-name-input",
     style: {
       flex: 1,
       padding: '4px 8px'
@@ -3560,7 +3631,7 @@ function AdminModal({
     onChange: e => updateParticipant(p.id, { name: e.target.value })
   }), /*#__PURE__*/React.createElement("button", {
     type: "button",
-    className: "btn btn-danger",
+    className: "btn btn-danger participant-remove-btn",
     disabled: isSubmitting,
     style: {
       padding: '4px 8px'
