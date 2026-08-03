@@ -63,7 +63,7 @@ export default function CreateCalendarModal({ onCreateCalendar, onClose }) {
           <div className="modal-body" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
             <div className="form-group">
               <label htmlFor="new-cal-title-input" className="form-label">
-                달력 제목 (상단 표기명)
+                달력 제목
               </label>
               <input
                 id="new-cal-title-input"

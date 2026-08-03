@@ -88,12 +88,12 @@ export default function AdminPanel({ calendar, allCalendars, onSelectCalendar, o
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px', color: '#64748B' }}>달력명 (상단 큰 제목)</label>
+              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px', color: '#64748B' }}>달력명</label>
               <input type="text" className="form-input" style={{ width: '100%' }} value={title} onChange={e => setTitle(e.target.value)} required />
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px', color: '#64748B' }}>달력 설명 (상단 서브 텍스트)</label>
+              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px', color: '#64748B' }}>달력 설명</label>
               <input type="text" className="form-input" style={{ width: '100%' }} placeholder="예: cw 동창 모임 참여자들의 일정 조율" value={description} onChange={e => setDescription(e.target.value)} />
             </div>
 
