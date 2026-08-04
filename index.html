@@ -173,6 +173,18 @@
     }
     .btn-primary { background: var(--accent-gradient); color: #ffffff; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25); }
     .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(79, 70, 229, 0.35); }
+    .btn-poll-create {
+      background: #0F172A;
+      color: #FFFFFF;
+      border-color: #0F172A;
+      box-shadow: 0 8px 18px rgba(15, 23, 42, 0.18);
+    }
+    .btn-poll-create:hover {
+      background: #020617;
+      border-color: #020617;
+      transform: translateY(-1px);
+      box-shadow: 0 10px 22px rgba(15, 23, 42, 0.24);
+    }
     
     .btn-secondary { background: #F1F5F9; border-color: var(--border-subtle); color: var(--text-main); }
     .btn-secondary:hover { background: #E2E8F0; border-color: var(--border-hover); }
@@ -430,6 +442,18 @@
       flex-direction: column;
       gap: 8px;
     }
+    .polls-panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+    }
+    .polls-panel-header .summary-title {
+      flex: 1 1 auto;
+      min-width: 180px;
+    }
     .poll-option-row {
       display: grid;
       grid-template-columns: minmax(0, 1.2fr) minmax(90px, 1fr) auto auto;
@@ -439,6 +463,37 @@
       border: 1px solid var(--border-subtle);
       border-radius: var(--radius-md);
       background: #F8FAFC;
+    }
+    .poll-sortable-row {
+      border: 1px solid transparent;
+      border-radius: var(--radius-md);
+      background: #FFFFFF;
+      transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease, background 0.16s ease, opacity 0.16s ease;
+      position: relative;
+    }
+    .poll-sortable-row.is-dragging {
+      transform: rotate(-0.7deg) scale(1.025);
+      border-color: rgba(37, 99, 235, 0.38);
+      background: #FFFFFF;
+      box-shadow: 0 18px 35px rgba(15, 23, 42, 0.22);
+      z-index: 5;
+      opacity: 0.9;
+    }
+    .poll-sortable-row.is-drop-target {
+      border-color: #2563EB;
+      background: #EFF6FF;
+      box-shadow: inset 0 0 0 2px rgba(37, 99, 235, 0.16);
+    }
+    .poll-sortable-row.is-drop-target::before {
+      content: "";
+      position: absolute;
+      left: 8px;
+      right: 8px;
+      top: -5px;
+      height: 3px;
+      border-radius: var(--radius-full);
+      background: #2563EB;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
     }
     .poll-option-main {
       min-width: 0;
@@ -3830,17 +3885,9 @@ function App() {
       padding: '16px',
       marginTop: '-12px'
     }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      textAlign: 'center',
-      marginBottom: '16px'
-    }
-  }, /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    className: "btn btn-primary",
-    onClick: handleOpenPollCreate
-  }, "+ \uD22C\uD45C \uC0DD\uC131")), /*#__PURE__*/React.createElement(PollList, {
+  }, /*#__PURE__*/React.createElement(PollList, {
     calendar: activeCal,
+    onCreatePoll: handleOpenPollCreate,
     onEditPoll: handleOpenPollEdit,
     onVotePoll: handleVotePoll
   })), /*#__PURE__*/React.createElement(SummaryList, {
@@ -5012,15 +5059,21 @@ function LineHeightIcon() {
   }));
 }
 
-function PollList({ calendar, onEditPoll, onVotePoll }) {
+function PollList({ calendar, onCreatePoll, onEditPoll, onVotePoll }) {
   const polls = getCalendarPolls(calendar);
   return /*#__PURE__*/React.createElement("section", {
     className: "polls-panel",
-    style: { textAlign: 'left', borderTop: '1px solid var(--border-subtle)', paddingTop: '16px' }
+    style: { textAlign: 'left' }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "polls-panel-header"
   }, /*#__PURE__*/React.createElement("div", {
     className: "summary-title",
-    style: { color: '#2563EB', marginBottom: '14px' }
-  }, /*#__PURE__*/React.createElement(PollSectionIcon, null), "\uC9C4\uD589\uC911\uC778 \uD22C\uD45C (", polls.length, "\uAC74)"), polls.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    style: { color: '#2563EB', marginBottom: 0 }
+  }, /*#__PURE__*/React.createElement(PollSectionIcon, null), "\uC9C4\uD589\uC911\uC778 \uD22C\uD45C (", polls.length, "\uAC74)"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "btn btn-poll-create",
+    onClick: onCreatePoll
+  }, "+ \uD22C\uD45C \uC0DD\uC131")), polls.length === 0 ? /*#__PURE__*/React.createElement("div", {
     style: { color: 'var(--text-muted)', fontSize: '0.85rem', padding: '10px 0' }
   }, "\uC544\uC9C1 \uC0DD\uC131\uB41C \uD22C\uD45C\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.") : /*#__PURE__*/React.createElement("div", {
     className: "polls-section"
@@ -5084,6 +5137,7 @@ function PollModal({ calendar, poll, onSave, onClose }) {
   const [options, setOptions] = React.useState(getActivePollOptions(poll).map(option => ({ ...option })));
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [draggingOptionId, setDraggingOptionId] = React.useState('');
+  const [dragOverOptionId, setDragOverOptionId] = React.useState('');
   const newOptionInputRef = React.useRef(null);
   const handleAddOption = e => {
     if (e) {
@@ -5232,19 +5286,31 @@ function PollModal({ calendar, poll, onSave, onClose }) {
     onClick: handleAddOption
   }, "\uCD94\uAC00")), options.map(option => isTombstone(option) ? null : /*#__PURE__*/React.createElement("div", {
     key: option.id,
-    className: "participant-edit-row",
+    className: `participant-edit-row poll-sortable-row${draggingOptionId === option.id ? ' is-dragging' : ''}${dragOverOptionId === option.id ? ' is-drop-target' : ''}`,
     onDragOver: event => {
       event.preventDefault();
       event.dataTransfer.dropEffect = 'move';
+      if (draggingOptionId && draggingOptionId !== option.id) setDragOverOptionId(option.id);
+    },
+    onDragEnter: event => {
+      event.preventDefault();
+      if (draggingOptionId && draggingOptionId !== option.id) setDragOverOptionId(option.id);
+    },
+    onDragLeave: event => {
+      if (!event.currentTarget.contains(event.relatedTarget)) setDragOverOptionId('');
     },
     onDrop: event => {
       event.preventDefault();
       const sourceId = event.dataTransfer.getData('text/plain') || draggingOptionId;
       moveOption(sourceId, option.id);
       setDraggingOptionId('');
+      setDragOverOptionId('');
     },
-    onDragEnd: () => setDraggingOptionId(''),
-    style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px', opacity: draggingOptionId === option.id ? 0.55 : 1 }
+    onDragEnd: () => {
+      setDraggingOptionId('');
+      setDragOverOptionId('');
+    },
+    style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }
   }, /*#__PURE__*/React.createElement("button", {
     type: "button",
     className: "poll-drag-handle",
@@ -5256,8 +5322,16 @@ function PollModal({ calendar, poll, onSave, onClose }) {
       setDraggingOptionId(option.id);
       event.dataTransfer.effectAllowed = 'move';
       event.dataTransfer.setData('text/plain', option.id);
+      const row = event.currentTarget.closest('.poll-sortable-row');
+      if (row && event.dataTransfer.setDragImage) {
+        const rect = row.getBoundingClientRect();
+        event.dataTransfer.setDragImage(row, Math.min(rect.width - 12, Math.max(24, event.clientX - rect.left)), Math.max(16, event.clientY - rect.top));
+      }
     },
-    onDragEnd: () => setDraggingOptionId('')
+    onDragEnd: () => {
+      setDraggingOptionId('');
+      setDragOverOptionId('');
+    }
   }, /*#__PURE__*/React.createElement(LineHeightIcon, null)), /*#__PURE__*/React.createElement("input", {
     type: "text",
     className: "form-input participant-name-input",
