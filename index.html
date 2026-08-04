@@ -1310,16 +1310,26 @@ function getActivityLogStamp(log) {
   return Number(log?.timestamp || log?.updatedAt || 0) || 0;
 }
 
+const SCHEDULE_ACTIVITY_ACTIONS = ['create', 'update', 'delete'];
+const POLL_ACTIVITY_ACTIONS = ['poll_create', 'poll_vote', 'poll_cancel'];
+const ACTIVITY_ACTIONS = [...SCHEDULE_ACTIVITY_ACTIONS, ...POLL_ACTIVITY_ACTIONS];
+
 function normalizeActivityLog(calendarId, log, participantIds = null, idRedirects = new Map()) {
   if (!log || typeof log !== 'object') return null;
   if (log.calendarId && log.calendarId !== calendarId) return null;
-  const participantId = idRedirects.get(log.participantId) || log.participantId;
-  const action = ['create', 'update', 'delete'].includes(log.action) ? log.action : '';
-  const date = log.date;
+  const participantId = sanitizeText(idRedirects.get(log.participantId) || log.participantId || '', 120);
+  const action = ACTIVITY_ACTIONS.includes(log.action) ? log.action : '';
+  const isPollAction = POLL_ACTIVITY_ACTIONS.includes(action);
+  const date = sanitizeText(log.date || '', 20);
   const timestamp = Number(log.timestamp || log.updatedAt || 0) || 0;
-  if (!action || !participantId || !date || !isValidDateString(date) || !timestamp) return null;
-  if (participantIds && !participantIds.has(participantId)) return null;
-  const id = sanitizeText(log.id || `${calendarId}_${date}_${participantId}_${action}_${timestamp}`, 160);
+  if (!action || !timestamp) return null;
+  if (!isPollAction && (!participantId || !date || !isValidDateString(date))) return null;
+  if (isPollAction && date && !isValidDateString(date)) return null;
+  if (participantIds && participantId && !participantIds.has(participantId)) return null;
+  if (participantIds && !isPollAction && !participantIds.has(participantId)) return null;
+  const idDatePart = date || 'poll';
+  const idParticipantPart = participantId || 'system';
+  const id = sanitizeText(log.id || `${calendarId}_${idDatePart}_${idParticipantPart}_${action}_${timestamp}`, 160);
   const note = sanitizeText(log.note || '', 120);
   return {
     id,
@@ -1351,6 +1361,19 @@ function createActivityLog(calendarId, action, dateStr, participantId, timestamp
     calendarId,
     participantId,
     date: dateStr,
+    action,
+    note,
+    timestamp
+  });
+}
+
+function createPollActivityLog(calendarId, action, participantId = '', timestamp = Date.now(), note = '') {
+  if (!POLL_ACTIVITY_ACTIONS.includes(action)) return null;
+  const participantPart = sanitizeText(participantId || 'system', 120);
+  return normalizeActivityLog(calendarId, {
+    id: `${calendarId}_poll_${participantPart}_${action}_${timestamp}_${Math.random().toString(36).slice(2, 8)}`,
+    calendarId,
+    participantId: sanitizeText(participantId || '', 120),
     action,
     note,
     timestamp
@@ -1835,9 +1858,12 @@ function mergeCalendarPollsDelta(serverCalendar, incomingCalendar, changedAt = 0
     throw new Error(`Calendar ID mismatch: ${base.id} cannot receive ${incoming.id} polls`);
   }
   const participantIds = new Set(getActiveParticipants(base).map(participant => participant.id));
+  const calendarId = base.id || incoming.id;
   return {
     ...base,
-    polls: mergePolls(base.polls || [], incoming.polls || [], base.id || incoming.id, participantIds),
+    polls: mergePolls(base.polls || [], incoming.polls || [], calendarId, participantIds),
+    activityLogs: mergeActivityLogs(base.activityLogs || [], incoming.activityLogs || [], calendarId, participantIds),
+    deletedActivityLogIds: mergeDeletedActivityLogIds(base.deletedActivityLogIds || [], incoming.deletedActivityLogIds || []),
     updatedAt: Math.max(base.updatedAt || 0, incoming.updatedAt || 0, changedAt || 0),
     revision: Math.max(base.revision || 0, incoming.revision || 0)
   };
@@ -3832,6 +3858,7 @@ function App() {
     if (!guardLoadedCalendar('Firebase 데이터를 불러온 뒤 투표를 저장해 주세요.')) return false;
     const now = Date.now();
     const participantIds = new Set(getActiveParticipants(activeCal).map(participant => participant.id));
+    const existingPoll = getCalendarPolls(activeCal).find(item => item.id === poll?.id);
     const normalizedPoll = normalizePoll(activeCal.id, {
       ...poll,
       calendarId: activeCal.id,
@@ -3842,11 +3869,15 @@ function App() {
       showToast('투표명과 선택옵션을 확인해 주세요.', 'error');
       return false;
     }
+    const activityLog = !existingPoll
+      ? createPollActivityLog(activeCal.id, 'poll_create', '', now, normalizedPoll.title)
+      : null;
     const updatedCal = {
       ...activeCal,
       updatedAt: now,
       revision: (activeCal.revision || 0) + 1,
-      polls: mergePolls(getCalendarPolls(activeCal), [normalizedPoll], activeCal.id, participantIds)
+      polls: mergePolls(getCalendarPolls(activeCal), [normalizedPoll], activeCal.id, participantIds),
+      activityLogs: activityLog ? [...getCalendarActivityLogs(activeCal), activityLog] : getCalendarActivityLogs(activeCal)
     };
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
     return updateCalendars(nextCalendars, '투표가 저장되었습니다.', 'success', updatedCal.id, 'polls');
@@ -3878,17 +3909,22 @@ function App() {
     const now = Date.now();
     const optionIds = new Set(getActivePollOptions(poll).map(item => item.id));
     const votes = normalizePollVotes(poll.votes || {}, optionIds, participantIds);
+    const alreadyVoted = (votes[option.id] || []).includes(participantId);
     votes[option.id] = Array.from(new Set([...(votes[option.id] || []), participantId]));
     const nextPoll = {
       ...poll,
       votes,
       updatedAt: now
     };
+    const activityLog = !alreadyVoted
+      ? createPollActivityLog(activeCal.id, 'poll_vote', participantId, now, `${poll.title} / ${option.text}`)
+      : null;
     const updatedCal = {
       ...activeCal,
       updatedAt: now,
       revision: (activeCal.revision || 0) + 1,
-      polls: mergePolls(getCalendarPolls(activeCal), [nextPoll], activeCal.id, participantIds)
+      polls: mergePolls(getCalendarPolls(activeCal), [nextPoll], activeCal.id, participantIds),
+      activityLogs: activityLog ? [...getCalendarActivityLogs(activeCal), activityLog] : getCalendarActivityLogs(activeCal)
     };
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
     setVoteTarget(null);
@@ -3900,6 +3936,7 @@ function App() {
     const participantIds = new Set(activeParticipants.map(participant => participant.id));
     const optionIds = new Set(getActivePollOptions(poll).map(item => item.id));
     const votes = normalizePollVotes(poll.votes || {}, optionIds, participantIds);
+    const hadVote = (votes[option.id] || []).includes(participantId);
     votes[option.id] = (votes[option.id] || []).filter(id => id !== participantId);
     const now = Date.now();
     const nextPoll = {
@@ -3907,11 +3944,15 @@ function App() {
       votes,
       updatedAt: now
     };
+    const activityLog = hadVote
+      ? createPollActivityLog(activeCal.id, 'poll_cancel', participantId, now, `${poll.title} / ${option.text}`)
+      : null;
     const updatedCal = {
       ...activeCal,
       updatedAt: now,
       revision: (activeCal.revision || 0) + 1,
-      polls: mergePolls(getCalendarPolls(activeCal), [nextPoll], activeCal.id, participantIds)
+      polls: mergePolls(getCalendarPolls(activeCal), [nextPoll], activeCal.id, participantIds),
+      activityLogs: activityLog ? [...getCalendarActivityLogs(activeCal), activityLog] : getCalendarActivityLogs(activeCal)
     };
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
     return updateCalendars(nextCalendars, '투표 취소 완료', 'delete', updatedCal.id, 'polls');
@@ -5788,12 +5829,18 @@ function RecentActivityLog({
   const actionLabels = {
     create: '등록',
     update: '수정',
-    delete: '삭제'
+    delete: '삭제',
+    poll_create: '투표 생성',
+    poll_vote: '투표',
+    poll_cancel: '투표 취소'
   };
   const actionColors = {
     create: '#2563EB',
     update: '#7C3AED',
-    delete: '#DC2626'
+    delete: '#DC2626',
+    poll_create: '#0F172A',
+    poll_vote: '#2563EB',
+    poll_cancel: '#DC2626'
   };
   const [isCollapsed, setIsCollapsed] = React.useState(false);
   return /*#__PURE__*/React.createElement("section", {
@@ -5840,14 +5887,15 @@ function RecentActivityLog({
     className: "recent-log-list"
   }, visibleLogs.map((log) => {
     const participant = participantsMap[log.participantId] || {
-      name: '알 수 없음',
-      color: '#94A3B8'
+      name: POLL_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '투표' : '알 수 없음',
+      color: POLL_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '#0F172A' : '#94A3B8'
     };
     const actionLabel = actionLabels[log.action] || '기록';
     const actionColor = actionColors[log.action] || '#64748B';
     const noteText = sanitizeText(log.note || '', 120);
-    const logDateText = formatShortDateWithDayName(log.date);
-    const confirmText = `${participant.name} [${actionLabel}] ${logDateText} 로그 데이터를 삭제하시겠습니까?`;
+    const logDateText = log.date ? formatShortDateWithDayName(log.date) : '';
+    const logTitleText = [participant.name, `[${actionLabel}]`, logDateText].filter(Boolean).join(' ');
+    const confirmText = `${logTitleText} 로그 데이터를 삭제하시겠습니까?`;
     return /*#__PURE__*/React.createElement("div", {
       key: log.id,
       className: "recent-log-row"
@@ -5866,7 +5914,7 @@ function RecentActivityLog({
       }
     }, "[", actionLabel, "]"), /*#__PURE__*/React.createElement("span", {
       className: "recent-log-date"
-    }, formatShortDateWithDayName(log.date)), noteText && /*#__PURE__*/React.createElement("span", {
+    }, logDateText || null), noteText && /*#__PURE__*/React.createElement("span", {
       className: "recent-log-note"
     }, "\"", noteText, "\"")), /*#__PURE__*/React.createElement("div", {
       className: "recent-log-right"
@@ -5876,7 +5924,7 @@ function RecentActivityLog({
       type: "button",
       className: "btn btn-danger recent-log-delete-btn",
       title: "\uB85C\uADF8 \uC0AD\uC81C",
-      "aria-label": `${participant.name} ${actionLabel} ${logDateText} 로그 삭제`,
+      "aria-label": `${logTitleText} 로그 삭제`,
       onClick: () => {
         if (typeof onDeleteLog !== 'function') return;
         if (window.confirm(confirmText)) {

@@ -158,9 +158,10 @@ runAppScript(concurrencyContext, `
   if (!crossCalendarRefused) throw new Error('cross-calendar merge was not refused');
   if (validateCalendarShape(settingsMerged)) throw new Error('merged settings did not validate');
   const activityLog = createActivityLog('kkot', 'update', '2026-08-29', 'kkot_p1', 1800000000000, '10시 천왕물놀이터');
+  const pollActivityLog = createPollActivityLog('kkot', 'poll_vote', 'kkot_p1', 1800000000001, '장소 투표 / 천왕역모아엘가');
   const loggedCalendar = normalizeCalendarForSave({
     ...settingsMerged,
-    activityLogs: [activityLog, {
+    activityLogs: [activityLog, pollActivityLog, {
       id: 'bad-cross-calendar-log',
       calendarId: 'cw',
       action: 'create',
@@ -169,9 +170,12 @@ runAppScript(concurrencyContext, `
       timestamp: 1800000000001
     }]
   });
-  if (loggedCalendar.activityLogs.length !== 1) throw new Error('activity log isolation failed');
-  if (loggedCalendar.activityLogs[0].calendarId !== 'kkot') throw new Error('activity log calendar id changed');
-  if (loggedCalendar.activityLogs[0].note !== '10시 천왕물놀이터') throw new Error('activity log note snapshot failed');
+  if (loggedCalendar.activityLogs.length !== 2) throw new Error('activity log isolation failed');
+  if (loggedCalendar.activityLogs.some((log) => log.calendarId !== 'kkot')) throw new Error('activity log calendar id changed');
+  if (!loggedCalendar.activityLogs.some((log) => log.note === '10시 천왕물놀이터')) throw new Error('activity log note snapshot failed');
+  if (!loggedCalendar.activityLogs.some((log) => log.action === 'poll_vote' && log.note === '장소 투표 / 천왕역모아엘가')) {
+    throw new Error('poll activity log was not normalized');
+  }
   const displayLogs = buildActivityLogsFromAvailabilities(loggedCalendar);
   if (!displayLogs.some((log) => log.action === 'update' && log.participantId === 'kkot_p1')) {
     throw new Error('activity log display builder failed');
@@ -211,6 +215,19 @@ runAppScript(concurrencyContext, `
   if (!pollCalendar.polls[0].votes.kkot_poll_1_opt_1.includes('kkot_p1')) throw new Error('valid poll vote was lost');
   if (pollCalendar.polls[0].votes.kkot_poll_1_opt_1.includes('missing')) throw new Error('invalid poll voter was kept');
   if (validateCalendarShape(pollCalendar)) throw new Error('valid poll calendar rejected');
+  const pollDeltaLog = createPollActivityLog('kkot', 'poll_cancel', 'kkot_p1', 1800000000002, '장소 투표 / 천왕역모아엘가');
+  const mergedPollDelta = mergeCalendarPollsDelta({
+    ...settingsMerged,
+    polls: [],
+    activityLogs: []
+  }, {
+    ...settingsMerged,
+    polls: pollCalendar.polls,
+    activityLogs: [pollDeltaLog]
+  }, 1800000000002);
+  if (!mergedPollDelta.activityLogs.some((log) => log.action === 'poll_cancel')) {
+    throw new Error('poll delta did not preserve activity logs');
+  }
 `);
 
 const invalidContext = createContext('https://pyw31337.github.io/calendar/?id=cw');
@@ -226,6 +243,10 @@ runAppScript(invalidContext, `
     ...valid,
     activityLogs: [{ id: 'cw_log_1', calendarId: 'cw', action: 'create', date: '2026-08-29', participantId: 'cw_p1', note: 'ok', timestamp: 1 }]
   })) throw new Error('valid activity log rejected');
+  if (validateCalendarShape({
+    ...valid,
+    activityLogs: [{ id: 'cw_poll_log_1', calendarId: 'cw', action: 'poll_create', note: '장소 투표', timestamp: 1 }]
+  })) throw new Error('valid poll activity log rejected');
   if (!validateCalendarShape({
     ...valid,
     activityLogs: [{ id: 'cw_log_bad', calendarId: 'cw', action: 'create', date: '2026-08-29', participantId: 'missing', timestamp: 1 }]
