@@ -42,6 +42,8 @@ const summaries = docs.map((doc) => {
   const calendar = decoded.calendar || {};
   const participants = Array.isArray(calendar.participants) ? calendar.participants : [];
   const availabilities = Array.isArray(calendar.availabilities) ? calendar.availabilities : [];
+  const activityLogs = Array.isArray(calendar.activityLogs) ? calendar.activityLogs : [];
+  const deletedActivityLogIds = Array.isArray(calendar.deletedActivityLogIds) ? calendar.deletedActivityLogIds : [];
   const sizeBytes = Buffer.byteLength(JSON.stringify(doc));
   return {
     docId: doc.name.split('/').pop(),
@@ -51,6 +53,8 @@ const summaries = docs.map((doc) => {
     participants: participants.filter((item) => !isDeleted(item)).length,
     activeAvailabilities: availabilities.filter((item) => !isDeleted(item)).length,
     storedAvailabilities: availabilities.length,
+    activityLogs: activityLogs.length,
+    hiddenActivityLogs: deletedActivityLogIds.length,
     revision: decoded.revision || 0,
     updateTime: doc.updateTime || ''
   };
@@ -64,6 +68,9 @@ const warnings = [];
 for (const item of production) {
   if (item.sizeBytes > DOCUMENT_LIMIT_BYTES * WARNING_RATIO) {
     warnings.push(`${item.docId} is ${item.sizePercentOfLimit}% of Firestore's 1MiB document limit.`);
+  }
+  if (item.activityLogs > 3000 || item.hiddenActivityLogs > 3000) {
+    warnings.push(`${item.docId} activity log volume is high: ${item.activityLogs} logs, ${item.hiddenActivityLogs} hidden logs.`);
   }
 }
 if (stressDocs.length > 0) {
