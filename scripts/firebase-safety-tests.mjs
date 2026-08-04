@@ -174,6 +174,13 @@ runAppScript(concurrencyContext, `
   if (!displayLogs.some((log) => log.action === 'update' && log.participantId === 'kkot_p1')) {
     throw new Error('activity log display builder failed');
   }
+  const hiddenLogCalendar = normalizeCalendarForSave({
+    ...loggedCalendar,
+    deletedActivityLogIds: [loggedCalendar.activityLogs[0].id]
+  });
+  if (buildActivityLogsFromAvailabilities(hiddenLogCalendar).some((log) => log.id === loggedCalendar.activityLogs[0].id)) {
+    throw new Error('deleted activity log was still displayed');
+  }
 `);
 
 const invalidContext = createContext('https://pyw31337.github.io/calendar/?id=cw');

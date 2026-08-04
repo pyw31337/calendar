@@ -663,6 +663,32 @@ async function exerciseCalendar(browser, sessionId, otherSessionId, calendarId, 
       return text.includes('[등록]') && text.includes('[수정]') && text.includes('[삭제]') && !!noteEl;
     })()`
   );
+  const confirmLogDeletePromise = acceptNextDialog(browser, sessionId, '로그 데이터를 삭제하시겠습니까?');
+  await evalInPage(
+    browser,
+    sessionId,
+    `(() => {
+      const note = ${JSON.stringify(`"${tempNoteRecreated}"`)};
+      const noteEl = [...document.querySelectorAll('.recent-log-note')].find((el) => (el.textContent || '') === note);
+      if (!noteEl) throw new Error('Recent log note not found before delete');
+      const row = noteEl.closest('.recent-log-row');
+      const button = row && row.querySelector('.recent-log-delete-btn');
+      if (!button) throw new Error('Recent log delete button not found');
+      button.click();
+      return true;
+    })()`
+  );
+  await confirmLogDeletePromise;
+  await waitForToast(browser, sessionId, '로그가 삭제되었습니다.');
+  assert(
+    await waitForLocalCalendar(
+      browser,
+      sessionId,
+      calendarId,
+      `(calendar) => Array.isArray(calendar.deletedActivityLogIds) && calendar.deletedActivityLogIds.length > 0`
+    ),
+    `${calendarId} deleted activity log id was not saved`
+  );
 
   const otherAfterDelete = getCalendarById(afterNoteSave, otherId);
   assert(

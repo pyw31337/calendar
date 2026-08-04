@@ -657,13 +657,32 @@
       flex: 0 0 auto;
       text-align: right;
     }
+    .recent-log-right {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-left: auto;
+      flex: 0 0 auto;
+    }
+    .recent-log-delete-btn {
+      width: 32px;
+      min-width: 32px;
+      height: 32px;
+      padding: 0 !important;
+      border-radius: 11px;
+      flex: 0 0 32px;
+    }
+    .recent-log-delete-btn svg {
+      width: 18px;
+      height: 18px;
+    }
     @media (max-width: 640px) {
       .recent-log-row {
         align-items: flex-start;
         flex-direction: column;
         gap: 6px;
       }
-      .recent-log-time {
+      .recent-log-right {
         margin-left: 0;
         align-self: flex-end;
       }
@@ -927,6 +946,19 @@ function getCalendarActivityLogs(calendar) {
   return Array.isArray(calendar?.activityLogs) ? calendar.activityLogs.filter(Boolean) : [];
 }
 
+function normalizeDeletedActivityLogIds(ids) {
+  if (!Array.isArray(ids)) return [];
+  return Array.from(new Set(ids.map(id => sanitizeText(id, 160)).filter(Boolean))).slice(0, 5000);
+}
+
+function getDeletedActivityLogIds(calendar) {
+  return normalizeDeletedActivityLogIds(calendar?.deletedActivityLogIds || []);
+}
+
+function mergeDeletedActivityLogIds(...lists) {
+  return normalizeDeletedActivityLogIds(lists.flat());
+}
+
 function getActivityLogStamp(log) {
   return Number(log?.timestamp || log?.updatedAt || 0) || 0;
 }
@@ -980,6 +1012,7 @@ function createActivityLog(calendarId, action, dateStr, participantId, timestamp
 
 function buildActivityLogsFromAvailabilities(calendar) {
   const explicitLogs = getCalendarActivityLogs(calendar);
+  const deletedLogIds = new Set(getDeletedActivityLogIds(calendar));
   const explicitKeys = new Set(explicitLogs.map(log => `${log.date}_${log.participantId}_${log.action}_${getActivityLogStamp(log)}`));
   const fallbackLogs = (Array.isArray(calendar?.availabilities) ? calendar.availabilities : []).map((availability) => {
     const action = availability.deletedAt ? 'delete' : 'create';
@@ -994,7 +1027,7 @@ function buildActivityLogsFromAvailabilities(calendar) {
       timestamp
     });
   }).filter(Boolean).filter(log => !explicitKeys.has(`${log.date}_${log.participantId}_${log.action}_${getActivityLogStamp(log)}`));
-  return mergeActivityLogs(explicitLogs, fallbackLogs, calendar?.id || '');
+  return mergeActivityLogs(explicitLogs, fallbackLogs, calendar?.id || '').filter(log => !deletedLogIds.has(log.id));
 }
 
 function validateCalendarShape(calendar) {
@@ -1003,9 +1036,11 @@ function validateCalendarShape(calendar) {
   const participants = Array.isArray(calendar.participants) ? calendar.participants : [];
   const availabilities = Array.isArray(calendar.availabilities) ? calendar.availabilities : [];
   const activityLogs = Array.isArray(calendar.activityLogs) ? calendar.activityLogs : [];
+  const deletedActivityLogIds = normalizeDeletedActivityLogIds(calendar.deletedActivityLogIds || []);
   if (participants.length > 80) return '참여자가 너무 많습니다.';
   if (availabilities.length > 5000) return '일정 데이터가 너무 많습니다.';
   if (activityLogs.length > 5000) return '활동 로그가 너무 많습니다.';
+  if (deletedActivityLogIds.length > 5000) return '삭제된 활동 로그 이력이 너무 많습니다.';
   const participantIds = new Set();
   const activeNames = new Set();
   for (const participant of participants) {
@@ -1079,12 +1114,14 @@ function normalizeCalendarForSave(calendar) {
   });
   const participantIds = new Set(normalizedParticipants.map(participant => participant.id));
   const normalizedActivityLogs = mergeActivityLogs([], cloned.activityLogs || [], cloned.id, participantIds, idRedirects);
+  const deletedActivityLogIds = getDeletedActivityLogIds(cloned);
 
   return {
     ...cloned,
     participants: normalizedParticipants,
     availabilities: Array.from(availabilityMap.values()),
-    activityLogs: normalizedActivityLogs
+    activityLogs: normalizedActivityLogs,
+    deletedActivityLogIds
   };
 }
 
@@ -1199,6 +1236,7 @@ function mergeCalendarRecord(existing, incoming) {
     participants: Array.from(participantMap.values()),
     availabilities: Array.from(availabilityMap.values()),
     activityLogs: mergeActivityLogs(base.activityLogs || [], next.activityLogs || [], base.id || next.id, participantIds),
+    deletedActivityLogIds: mergeDeletedActivityLogIds(base.deletedActivityLogIds || [], next.deletedActivityLogIds || []),
     updatedAt: mergedUpdatedAt || next.updatedAt || base.updatedAt || null,
     revision: mergedRevision
   };
@@ -1234,6 +1272,7 @@ function mergeCalendarAvailabilityDelta(serverCalendar, incomingCalendar, change
     participants: base.participants || [],
     availabilities: Array.from(availabilityMap.values()),
     activityLogs: mergeActivityLogs(base.activityLogs || [], incoming.activityLogs || [], base.id || incoming.id, participantIds),
+    deletedActivityLogIds: mergeDeletedActivityLogIds(base.deletedActivityLogIds || [], incoming.deletedActivityLogIds || []),
     updatedAt: Math.max(base.updatedAt || 0, incoming.updatedAt || 0, changedAt || 0),
     revision: Math.max(base.revision || 0, incoming.revision || 0)
   };
@@ -1274,7 +1313,8 @@ function mergeCalendarSettingsDelta(serverCalendar, incomingCalendar) {
     id: calendarId,
     participants: Array.from(participantMap.values()),
     availabilities: server.availabilities || [],
-    activityLogs: mergeActivityLogs(server.activityLogs || [], incoming.activityLogs || [], calendarId, new Set(Array.from(participantMap.values()).map(participant => participant.id)))
+    activityLogs: mergeActivityLogs(server.activityLogs || [], incoming.activityLogs || [], calendarId, new Set(Array.from(participantMap.values()).map(participant => participant.id))),
+    deletedActivityLogIds: mergeDeletedActivityLogIds(server.deletedActivityLogIds || [], incoming.deletedActivityLogIds || [])
   };
 }
 
@@ -1284,7 +1324,8 @@ function cloneCalendar(calendar) {
     ...calendar,
     participants: Array.isArray(calendar.participants) ? calendar.participants.map(cloneParticipant) : [],
     availabilities: Array.isArray(calendar.availabilities) ? calendar.availabilities.map(cloneAvailability) : [],
-    activityLogs: Array.isArray(calendar.activityLogs) ? calendar.activityLogs.map(cloneActivityLog) : []
+    activityLogs: Array.isArray(calendar.activityLogs) ? calendar.activityLogs.map(cloneActivityLog) : [],
+    deletedActivityLogIds: getDeletedActivityLogIds(calendar)
   };
 }
 
@@ -2226,7 +2267,8 @@ function createDefaultCalendar(id) {
       updatedAt: now
     }],
     availabilities: [],
-    activityLogs: []
+    activityLogs: [],
+    deletedActivityLogIds: []
   };
 }
 
@@ -3189,6 +3231,21 @@ function App() {
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
     return updateCalendars(nextCalendars, '삭제 되었습니다.', 'delete', updatedCal.id);
   };
+  const handleDeleteActivityLog = log => {
+    if (!activeCal || !log?.id) return false;
+    const logId = sanitizeText(log.id, 160);
+    if (!logId) return false;
+    const now = Date.now();
+    const updatedCal = {
+      ...activeCal,
+      updatedAt: now,
+      revision: (activeCal.revision || 0) + 1,
+      activityLogs: getCalendarActivityLogs(activeCal),
+      deletedActivityLogIds: mergeDeletedActivityLogIds(activeCal.deletedActivityLogIds || [], [logId])
+    };
+    const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
+    return updateCalendars(nextCalendars, '로그가 삭제되었습니다.', 'delete', updatedCal.id);
+  };
   const handleSaveAdmin = (updatedCal, newCalCreated) => {
     if (newCalCreated) {
       if (!isAllowedCalendarId(newCalCreated.id)) {
@@ -3369,7 +3426,8 @@ function App() {
   }), /*#__PURE__*/React.createElement(RecentActivityLog, {
     calendar: activeCal,
     expanded: isActivityLogExpanded,
-    onToggle: () => setIsActivityLogExpanded(value => !value)
+    onToggle: () => setIsActivityLogExpanded(value => !value),
+    onDeleteLog: handleDeleteActivityLog
   }), isModalOpen && /*#__PURE__*/React.createElement(DateModal, {
     dateStr: selectedDate,
     calendar: activeCal,
@@ -4445,7 +4503,8 @@ function ShareModal({
 function RecentActivityLog({
   calendar,
   expanded,
-  onToggle
+  onToggle,
+  onDeleteLog
 }) {
   const participantsMap = (Array.isArray(calendar?.participants) ? calendar.participants : []).reduce((acc, participant) => {
     if (participant?.id) acc[participant.id] = participant;
@@ -4509,6 +4568,8 @@ function RecentActivityLog({
     const actionLabel = actionLabels[log.action] || '기록';
     const actionColor = actionColors[log.action] || '#64748B';
     const noteText = sanitizeText(log.note || '', 120);
+    const logDateText = formatShortDateWithDayName(log.date);
+    const confirmText = `${participant.name} [${actionLabel}] ${logDateText} 로그 데이터를 삭제하시겠습니까?`;
     return /*#__PURE__*/React.createElement("div", {
       key: log.id,
       className: "recent-log-row"
@@ -4529,9 +4590,41 @@ function RecentActivityLog({
       className: "recent-log-date"
     }, formatShortDateWithDayName(log.date)), noteText && /*#__PURE__*/React.createElement("span", {
       className: "recent-log-note"
-    }, "\"", noteText, "\"")), /*#__PURE__*/React.createElement("span", {
+    }, "\"", noteText, "\"")), /*#__PURE__*/React.createElement("div", {
+      className: "recent-log-right"
+    }, /*#__PURE__*/React.createElement("span", {
       className: "registered-at-text recent-log-time"
-    }, formatRegisteredAt(log.timestamp)));
+    }, formatRegisteredAt(log.timestamp)), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      className: "btn btn-danger recent-log-delete-btn",
+      title: "\uB85C\uADF8 \uC0AD\uC81C",
+      "aria-label": `${participant.name} ${actionLabel} ${logDateText} 로그 삭제`,
+      onClick: () => {
+        if (typeof onDeleteLog !== 'function') return;
+        if (window.confirm(confirmText)) {
+          onDeleteLog(log);
+        }
+      }
+    }, /*#__PURE__*/React.createElement("svg", {
+      xmlns: "http://www.w3.org/2000/svg",
+      width: "24",
+      height: "24",
+      viewBox: "0 0 24 24",
+      fill: "none",
+      stroke: "currentColor",
+      strokeWidth: "2",
+      strokeLinecap: "round",
+      strokeLinejoin: "round",
+      className: "icon icon-tabler icons-tabler-outline icon-tabler-x"
+    }, /*#__PURE__*/React.createElement("path", {
+      stroke: "none",
+      d: "M0 0h24v24H0z",
+      fill: "none"
+    }), /*#__PURE__*/React.createElement("path", {
+      d: "M18 6l-12 12"
+    }), /*#__PURE__*/React.createElement("path", {
+      d: "M6 6l12 12"
+    })))));
   })), logs.length > 10 && /*#__PURE__*/React.createElement("button", {
     type: "button",
     className: "btn btn-secondary",
