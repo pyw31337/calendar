@@ -403,7 +403,6 @@
       border: 1px solid var(--border-subtle);
       border-radius: var(--radius-lg);
       padding: 16px;
-      box-shadow: var(--shadow-md);
     }
     @media (min-width: 640px) {
       .poll-card { padding: 22px; }
@@ -433,7 +432,7 @@
     }
     .poll-option-row {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) auto auto;
+      grid-template-columns: minmax(0, 1.2fr) minmax(90px, 1fr) auto auto;
       align-items: center;
       gap: 10px;
       padding: 10px 12px;
@@ -474,6 +473,40 @@
       color: var(--text-muted);
       font-weight: 900;
       text-align: center;
+    }
+    .poll-drag-handle {
+      width: 28px;
+      min-width: 28px;
+      height: 28px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-muted);
+      cursor: grab;
+      touch-action: none;
+      border: 0;
+      background: transparent;
+      padding: 0;
+    }
+    .poll-drag-handle:active { cursor: grabbing; }
+    .poll-drag-handle:disabled {
+      cursor: wait;
+      opacity: 0.55;
+    }
+    .poll-progress {
+      width: 100%;
+      min-width: 90px;
+      height: 10px;
+      border-radius: var(--radius-full);
+      overflow: hidden;
+      background: #E2E8F0;
+      box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.08);
+    }
+    .poll-progress-fill {
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, #2563EB, #10B981);
+      transition: width 0.25s ease;
     }
     @media (max-width: 640px) {
       .poll-option-row {
@@ -1200,12 +1233,25 @@ function mergePollRecord(existing, incoming) {
     const current = optionMap.get(option.id);
     optionMap.set(option.id, !current || getItemStamp(option) >= getItemStamp(current) ? option : current);
   });
+  const orderSource = incomingStamp >= existingStamp ? incomingClone : existingClone;
+  const orderedOptions = [];
+  const usedOptionIds = new Set();
+  (orderSource.options || []).forEach(option => {
+    const mergedOption = optionMap.get(option?.id);
+    if (!mergedOption || usedOptionIds.has(mergedOption.id)) return;
+    orderedOptions.push(mergedOption);
+    usedOptionIds.add(mergedOption.id);
+  });
+  optionMap.forEach(option => {
+    if (!option?.id || usedOptionIds.has(option.id)) return;
+    orderedOptions.push(option);
+  });
   return {
     ...existingClone,
     ...incomingClone,
     title: scalarSource.title || incomingClone.title || existingClone.title,
     description: scalarSource.description || incomingClone.description || existingClone.description || '',
-    options: Array.from(optionMap.values()),
+    options: orderedOptions,
     votes: {
       ...(existingClone.votes || {}),
       ...(incomingClone.votes || {})
@@ -3781,25 +3827,29 @@ function App() {
   }), /*#__PURE__*/React.createElement("div", {
     className: "calendar-card",
     style: {
-      padding: '14px',
-      marginTop: '-12px',
-      textAlign: 'center'
+      padding: '16px',
+      marginTop: '-12px'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: 'center',
+      marginBottom: '16px'
     }
   }, /*#__PURE__*/React.createElement("button", {
     type: "button",
     className: "btn btn-primary",
     onClick: handleOpenPollCreate
-  }, "+ \uD22C\uD45C \uC0DD\uC131")), /*#__PURE__*/React.createElement(SummaryList, {
+  }, "+ \uD22C\uD45C \uC0DD\uC131")), /*#__PURE__*/React.createElement(PollList, {
+    calendar: activeCal,
+    onEditPoll: handleOpenPollEdit,
+    onVotePoll: handleVotePoll
+  })), /*#__PURE__*/React.createElement(SummaryList, {
     calendar: activeCal,
     onSelectDate: d => {
       if (!guardLoadedCalendar()) return;
       setSelectedDate(d);
       setIsModalOpen(true);
     }
-  }), /*#__PURE__*/React.createElement(PollList, {
-    calendar: activeCal,
-    onEditPoll: handleOpenPollEdit,
-    onVotePoll: handleVotePoll
   }), /*#__PURE__*/React.createElement(RecentActivityLog, {
     calendar: activeCal,
     expanded: isActivityLogExpanded,
@@ -4908,13 +4958,75 @@ function SettingsIcon() {
   }));
 }
 
+function PollSectionIcon() {
+  return /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: "20",
+    height: "20",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    "stroke-width": "2",
+    "stroke-linecap": "round",
+    "stroke-linejoin": "round",
+    className: "icon icon-tabler icons-tabler-outline icon-tabler-checkbox"
+  }, /*#__PURE__*/React.createElement("path", {
+    stroke: "none",
+    d: "M0 0h24v24H0z",
+    fill: "none"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M9 11l3 3l8 -8"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M20 12v6a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h9"
+  }));
+}
+
+function LineHeightIcon() {
+  return /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: "22",
+    height: "22",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    "stroke-width": "2",
+    "stroke-linecap": "round",
+    "stroke-linejoin": "round",
+    className: "icon icon-tabler icons-tabler-outline icon-tabler-line-height"
+  }, /*#__PURE__*/React.createElement("path", {
+    stroke: "none",
+    d: "M0 0h24v24H0z",
+    fill: "none"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M3 8l3 -3l3 3"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M3 16l3 3l3 -3"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M6 5l0 14"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M13 6l7 0"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M13 12l7 0"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M13 18l7 0"
+  }));
+}
+
 function PollList({ calendar, onEditPoll, onVotePoll }) {
   const polls = getCalendarPolls(calendar);
-  if (polls.length === 0) return null;
-  return /*#__PURE__*/React.createElement("div", {
+  return /*#__PURE__*/React.createElement("section", {
+    className: "polls-panel",
+    style: { textAlign: 'left', borderTop: '1px solid var(--border-subtle)', paddingTop: '16px' }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "summary-title",
+    style: { color: '#2563EB', marginBottom: '14px' }
+  }, /*#__PURE__*/React.createElement(PollSectionIcon, null), "\uC9C4\uD589\uC911\uC778 \uD22C\uD45C (", polls.length, "\uAC74)"), polls.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    style: { color: 'var(--text-muted)', fontSize: '0.85rem', padding: '10px 0' }
+  }, "\uC544\uC9C1 \uC0DD\uC131\uB41C \uD22C\uD45C\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.") : /*#__PURE__*/React.createElement("div", {
     className: "polls-section"
   }, polls.map(poll => {
     const voteValues = Object.values(poll.votes || {});
+    const totalVotes = voteValues.length;
     return /*#__PURE__*/React.createElement("section", {
       key: poll.id,
       className: "poll-card"
@@ -4934,21 +5046,26 @@ function PollList({ calendar, onEditPoll, onVotePoll }) {
       className: "poll-option-list"
     }, getActivePollOptions(poll).map((option, index) => {
       const voteCount = voteValues.filter(optionId => optionId === option.id).length;
+      const percent = totalVotes > 0 ? Math.round(voteCount / totalVotes * 100) : 0;
       return /*#__PURE__*/React.createElement("div", {
         key: option.id,
         className: "poll-option-row"
       }, /*#__PURE__*/React.createElement("div", {
         className: "poll-option-main"
-      }, /*#__PURE__*/React.createElement("span", {
-        style: { fontWeight: 900 }
-      }, index + 1, "."), /*#__PURE__*/React.createElement("span", null, option.text), option.url && /*#__PURE__*/React.createElement("span", {
+      }, /*#__PURE__*/React.createElement("span", null, option.text), option.url && /*#__PURE__*/React.createElement("span", {
         className: "poll-option-link",
         onClick: event => {
           event.stopPropagation();
           window.open(option.url, '_blank', 'noopener,noreferrer');
         },
         title: "\uC0C8\uCC3D\uC73C\uB85C \uB9C1\uD06C \uC5F4\uAE30"
-      }, option.url)), /*#__PURE__*/React.createElement("span", {
+      }, option.url)), /*#__PURE__*/React.createElement("div", {
+        className: "poll-progress",
+        title: `${percent}%`
+      }, /*#__PURE__*/React.createElement("div", {
+        className: "poll-progress-fill",
+        style: { width: `${percent}%` }
+      })), /*#__PURE__*/React.createElement("span", {
         className: "poll-vote-count"
       }, voteCount, "\uD45C"), /*#__PURE__*/React.createElement("button", {
         type: "button",
@@ -4956,7 +5073,7 @@ function PollList({ calendar, onEditPoll, onVotePoll }) {
         onClick: () => onVotePoll(poll, option)
       }, "\uD22C\uD45C\uD558\uAE30"));
     })));
-  }));
+  })));
 }
 
 function PollModal({ calendar, poll, onSave, onClose }) {
@@ -4966,6 +5083,7 @@ function PollModal({ calendar, poll, onSave, onClose }) {
   const [newOption, setNewOption] = React.useState('');
   const [options, setOptions] = React.useState(getActivePollOptions(poll).map(option => ({ ...option })));
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [draggingOptionId, setDraggingOptionId] = React.useState('');
   const newOptionInputRef = React.useRef(null);
   const handleAddOption = e => {
     if (e) {
@@ -4993,6 +5111,18 @@ function PollModal({ calendar, poll, onSave, onClose }) {
       url: parsed.url,
       updatedAt: Date.now()
     } : option));
+  };
+  const moveOption = (sourceId, targetId) => {
+    if (!sourceId || !targetId || sourceId === targetId || isSubmitting) return;
+    setOptions(prev => {
+      const fromIndex = prev.findIndex(option => option.id === sourceId);
+      const toIndex = prev.findIndex(option => option.id === targetId);
+      if (fromIndex < 0 || toIndex < 0) return prev;
+      const next = [...prev];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, { ...moved, updatedAt: Date.now() });
+      return next;
+    });
   };
   const handleSubmit = async e => {
     e.preventDefault();
@@ -5100,13 +5230,35 @@ function PollModal({ calendar, poll, onSave, onClose }) {
     disabled: isSubmitting,
     style: { whiteSpace: 'nowrap', minWidth: '52px', flexShrink: 0 },
     onClick: handleAddOption
-  }, "\uCD94\uAC00")), options.map((option, index) => isTombstone(option) ? null : /*#__PURE__*/React.createElement("div", {
+  }, "\uCD94\uAC00")), options.map(option => isTombstone(option) ? null : /*#__PURE__*/React.createElement("div", {
     key: option.id,
     className: "participant-edit-row",
-    style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "poll-option-number"
-  }, index + 1, "."), /*#__PURE__*/React.createElement("input", {
+    onDragOver: event => {
+      event.preventDefault();
+      event.dataTransfer.dropEffect = 'move';
+    },
+    onDrop: event => {
+      event.preventDefault();
+      const sourceId = event.dataTransfer.getData('text/plain') || draggingOptionId;
+      moveOption(sourceId, option.id);
+      setDraggingOptionId('');
+    },
+    onDragEnd: () => setDraggingOptionId(''),
+    style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px', opacity: draggingOptionId === option.id ? 0.55 : 1 }
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "poll-drag-handle",
+    disabled: isSubmitting,
+    draggable: !isSubmitting,
+    title: "\uB4DC\uB798\uADF8\uD558\uC5EC \uC21C\uC11C \uBCC0\uACBD",
+    onDragStart: event => {
+      if (isSubmitting) return;
+      setDraggingOptionId(option.id);
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('text/plain', option.id);
+    },
+    onDragEnd: () => setDraggingOptionId('')
+  }, /*#__PURE__*/React.createElement(LineHeightIcon, null)), /*#__PURE__*/React.createElement("input", {
     type: "text",
     className: "form-input participant-name-input",
     style: { flex: 1, padding: '4px 8px' },
