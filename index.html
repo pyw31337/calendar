@@ -79,6 +79,12 @@
       min-height: 100vh;
       line-height: 1.5;
       padding: 24px 16px 60px;
+      word-break: keep-all;
+      overflow-wrap: break-word;
+    }
+
+    button, input, textarea, select {
+      word-break: keep-all;
     }
 
     .app-container {
@@ -198,6 +204,7 @@
       padding: 10px 14px; background: #FFFFFF; border: 1px solid var(--border-subtle);
       border-radius: var(--radius-md); color: var(--text-main); font-size: 0.9rem; font-family: inherit; outline: none;
       transition: border-color 0.2s ease;
+      word-break: keep-all;
     }
     .form-select:focus, .form-input:focus, .form-textarea:focus { border-color: var(--accent-primary); box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15); }
 
@@ -513,7 +520,8 @@
       font-weight: 400;
       letter-spacing: -0.02em;
       line-height: 1.25;
-      white-space: nowrap;
+      word-break: break-word;
+      overflow-wrap: anywhere;
       cursor: pointer;
     }
     .poll-option-link:hover {
@@ -755,6 +763,7 @@
       font-size: 1rem;
       font-weight: 900;
       margin-bottom: 8px;
+      word-break: break-word;
       overflow-wrap: anywhere;
     }
     .admin-calendar-desc {
@@ -953,6 +962,7 @@
       color: rgb(100, 116, 139);
       font-size: 0.84rem;
       font-weight: 400;
+      word-break: break-word;
       overflow-wrap: anywhere;
     }
     .recent-log-time {
