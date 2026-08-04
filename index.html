@@ -1357,8 +1357,8 @@ function mergeCalendarCollections(sourceList, targetList, options = {}) {
 }
 const INITIAL_CALENDARS = [{
   id: 'kkot',
-  title: '8월 여름휴가 친목 모임',
-  description: '친구들과 함께 떠나는 여름 휴가 및 계곡 사모임 일정 조율',
+  title: '🌸 꽃잎반 모여라 캘린더',
+  description: 'Firebase에서 실시간 캘린더 데이터를 불러오는 중입니다.',
   participants: [{
     id: 'kkot_p1',
     name: '김민준',
@@ -1423,8 +1423,8 @@ const INITIAL_CALENDARS = [{
   }]
 }, {
   id: 'cw',
-  title: '꽃잎반 모임 (cw)',
-  description: '꽃잎반 모임 일정 조율 캘린더',
+  title: '🛝 모아엘가 모여라 캘린더',
+  description: 'Firebase에서 실시간 캘린더 데이터를 불러오는 중입니다.',
   participants: [{
     id: 'cw_p1',
     name: '박영우',
@@ -1896,8 +1896,8 @@ const INITIAL_CALENDARS = [{
 const CW_DEFAULT_CALENDAR = INITIAL_CALENDARS.find(calendar => calendar.id === 'cw');
 if (CW_DEFAULT_CALENDAR) {
   Object.assign(CW_DEFAULT_CALENDAR, {
-    title: '🛝 모아엘가 공동육아',
-    description: '모아엘가 공동육아 일정 조율 캘린더',
+    title: '🛝 모아엘가 모여라 캘린더',
+    description: 'Firebase에서 실시간 캘린더 데이터를 불러오는 중입니다.',
     participants: [],
     availabilities: []
   });
@@ -1906,20 +1906,40 @@ if (CW_DEFAULT_CALENDAR) {
 const KKOT_DEFAULT_CALENDAR = INITIAL_CALENDARS.find(calendar => calendar.id === 'kkot');
 if (KKOT_DEFAULT_CALENDAR) {
   Object.assign(KKOT_DEFAULT_CALENDAR, {
-    title: '🌸 꽃잎반 모임',
-    description: '꽃잎반 모임 일정 조율 캘린더',
+    title: '🌸 꽃잎반 모여라 캘린더',
+    description: 'Firebase에서 실시간 캘린더 데이터를 불러오는 중입니다.',
     participants: [],
     availabilities: []
   });
 }
 
 function loadLocalCache() {
-  // Keep only a harmless in-memory shell while Firestore is loading.
-  // Browser-persisted calendar data is intentionally not read anymore.
-  return cloneCalendarList(INITIAL_CALENDARS);
+  // Firestore is the only source of truth. Start empty so seed/demo data can never flash on screen.
+  return [];
 }
 
 function saveLocalCache() {}
+
+function getLoadingCalendarTitle(calendarId) {
+  if (calendarId === 'kkot') return '🌸 꽃잎반 모여라 캘린더';
+  if (calendarId === 'cw') return '🛝 모아엘가 모여라 캘린더';
+  return '모여라 캘린더';
+}
+
+function createLoadingCalendarShell(calendarId) {
+  const id = isAllowedCalendarId(calendarId) ? calendarId : 'kkot';
+  return {
+    id,
+    title: getLoadingCalendarTitle(id),
+    description: 'Firebase에서 실시간 캘린더 데이터를 불러오는 중입니다.',
+    participants: [],
+    availabilities: [],
+    activityLogs: [],
+    deletedActivityLogIds: [],
+    revision: 0,
+    updatedAt: 0
+  };
+}
 
 // Firebase Config for Realtime Multi-User Cloud Sync
 const firebaseConfig = {
@@ -2993,10 +3013,7 @@ function App() {
   };
   const [activeCalId, setActiveCalId] = React.useState(() => {
     const requestedId = getCalendarIdFromURL();
-    if (requestedId && isAllowedCalendarId(requestedId) && calendars.some(c => c.id === requestedId)) {
-      return requestedId;
-    }
-    return calendars[0]?.id || 'cw';
+    return requestedId && isAllowedCalendarId(requestedId) ? requestedId : 'kkot';
   });
   const [currentMonthDate, setCurrentMonthDate] = React.useState(new Date());
   const [selectedDate, setSelectedDate] = React.useState(null);
@@ -3079,7 +3096,8 @@ function App() {
     if (firebaseDb) return;
     showToast('Firebase 연결을 확인해 주세요. 데이터는 Firebase에서만 불러옵니다.', 'error', 5000);
   }, []);
-  const activeCal = calendars.find(c => c.id === activeCalId) || calendars[0];
+  const activeCalLoaded = calendars.some(c => c.id === activeCalId);
+  const activeCal = calendars.find(c => c.id === activeCalId) || createLoadingCalendarShell(activeCalId);
   React.useEffect(() => {
     setIsActivityLogExpanded(false);
   }, [activeCalId]);
@@ -3144,7 +3162,16 @@ function App() {
     setActiveCalId(id);
     window.history.replaceState({}, '', getCalendarShareUrl(id));
   };
+  const guardLoadedCalendar = (message = 'Firebase 데이터를 불러온 뒤 다시 시도해 주세요.') => {
+    if (activeCalLoaded) return true;
+    showToast(message, 'error');
+    return false;
+  };
   const handleSaveAvailability = (dateStr, participantId, note) => {
+    if (!activeCalLoaded) {
+      showToast('Firebase 데이터를 불러온 뒤 다시 시도해 주세요.', 'error');
+      return false;
+    }
     if (!activeCal || !isValidCalendarId(activeCal.id) || activeCal.id !== activeCalId) {
       showToast('현재 캘린더 상태를 확인할 수 없어 저장하지 않았습니다.', 'error');
       return false;
@@ -3255,6 +3282,10 @@ function App() {
     return updateCalendars(nextCalendars, '로그가 삭제되었습니다.', 'delete', updatedCal.id);
   };
   const handleSaveAdmin = (updatedCal, newCalCreated) => {
+    if (!activeCalLoaded && !newCalCreated) {
+      showToast('Firebase 데이터를 불러온 뒤 설정을 수정해 주세요.', 'error');
+      return false;
+    }
     if (newCalCreated) {
       if (!isAllowedCalendarId(newCalCreated.id)) {
         showToast('운영 캘린더는 kkot, cw만 사용할 수 있습니다.', 'error');
@@ -3330,7 +3361,9 @@ function App() {
     d: "M21 21v-2a4 4 0 0 0 -3 -3.85"
   })), /*#__PURE__*/React.createElement("span", null, "\uCC38\uC5EC\uC790 (", getActiveParticipants(activeCal)?.length || 0, "\uBA85)")), /*#__PURE__*/React.createElement("button", {
     className: "btn btn-secondary",
-    onClick: () => setIsShareOpen(true),
+    onClick: () => {
+      if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 공유 정보를 확인해 주세요.')) setIsShareOpen(true);
+    },
     title: "\uACF5\uC720",
     style: {
       padding: '10px'
@@ -3362,7 +3395,9 @@ function App() {
     d: "M8.7 13.3l6.6 3.4"
   }))), /*#__PURE__*/React.createElement("button", {
     className: "btn btn-secondary",
-    onClick: () => setIsAdminOpen(true),
+    onClick: () => {
+      if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 설정을 수정해 주세요.')) setIsAdminOpen(true);
+    },
     title: "\uC124\uC815",
     style: {
       padding: '10px'
@@ -3422,12 +3457,14 @@ function App() {
     onToday: () => setCurrentMonthDate(new Date()),
     onJumpToMonth: (y, m) => setCurrentMonthDate(new Date(y, m, 1)),
     onSelectDate: d => {
+      if (!guardLoadedCalendar()) return;
       setSelectedDate(d);
       setIsModalOpen(true);
     }
   }), /*#__PURE__*/React.createElement(SummaryList, {
     calendar: activeCal,
     onSelectDate: d => {
+      if (!guardLoadedCalendar()) return;
       setSelectedDate(d);
       setIsModalOpen(true);
     }
