@@ -3009,7 +3009,39 @@ function buildAdminDashboardMetrics(calendarsList) {
   const todayStr = new Date().toISOString().slice(0, 10);
   const calendarStats = calendarsList.map(cal => {
     const participants = getActiveParticipants(cal);
+    const participantIds = new Set(participants.map(participant => participant.id));
     const schedules = getActiveAvailabilities(cal);
+    const polls = getCalendarPolls(cal);
+    const pollStats = polls.map(poll => {
+      const options = getActivePollOptions(poll);
+      const optionIds = new Set(options.map(option => option.id));
+      const votes = normalizePollVotes(poll.votes || {}, optionIds, participantIds);
+      const optionStats = options.map(option => {
+        const voterIds = votes[option.id] || [];
+        return {
+          option,
+          voterIds,
+          voteCount: voterIds.length
+        };
+      });
+      const totalVotes = optionStats.reduce((sum, item) => sum + item.voteCount, 0);
+      const uniqueVoterCount = new Set(optionStats.flatMap(item => item.voterIds)).size;
+      const topOption = optionStats
+        .slice()
+        .sort((a, b) => b.voteCount - a.voteCount || a.option.text.localeCompare(b.option.text))[0] || null;
+      return {
+        poll,
+        options,
+        optionStats,
+        totalVotes,
+        uniqueVoterCount,
+        participationPercent: participants.length ? uniqueVoterCount / participants.length * 100 : 0,
+        topOption
+      };
+    });
+    const pollOptionCount = pollStats.reduce((sum, stat) => sum + stat.options.length, 0);
+    const pollVoteCount = pollStats.reduce((sum, stat) => sum + stat.totalVotes, 0);
+    const pollUniqueVoterCount = new Set(pollStats.flatMap(stat => stat.optionStats.flatMap(item => item.voterIds))).size;
     const dateBuckets = new Map();
     const monthBuckets = new Map();
     const participantBuckets = new Map(participants.map(participant => [participant.id, {
@@ -3054,6 +3086,13 @@ function buildAdminDashboardMetrics(calendarsList) {
       calendar: cal,
       participants,
       schedules,
+      polls,
+      pollStats,
+      pollCount: polls.length,
+      pollOptionCount,
+      pollVoteCount,
+      pollUniqueVoterCount,
+      pollParticipationPercent: participants.length ? pollUniqueVoterCount / participants.length * 100 : 0,
       dateCount: dateBuckets.size,
       upcomingCount: schedules.filter(item => item.date >= todayStr).length,
       pastCount: schedules.filter(item => item.date < todayStr).length,
@@ -3071,11 +3110,16 @@ function buildAdminDashboardMetrics(calendarsList) {
   const allSchedules = calendarStats.flatMap(stat => stat.schedules.map(item => ({ ...item, calendarId: stat.calendar.id })));
   const totalParticipants = calendarStats.reduce((sum, stat) => sum + stat.participants.length, 0);
   const totalSchedules = allSchedules.length;
+  const totalPolls = calendarStats.reduce((sum, stat) => sum + stat.pollCount, 0);
+  const totalPollOptions = calendarStats.reduce((sum, stat) => sum + stat.pollOptionCount, 0);
+  const totalPollVotes = calendarStats.reduce((sum, stat) => sum + stat.pollVoteCount, 0);
+  const totalPollUniqueVoters = calendarStats.reduce((sum, stat) => sum + stat.pollUniqueVoterCount, 0);
   const uniqueDateCount = new Set(allSchedules.map(item => `${item.calendarId}_${item.date}`)).size;
   const upcomingCount = allSchedules.filter(item => item.date >= todayStr).length;
   const memoCount = allSchedules.filter(item => item.note).length;
   const maxSchedules = Math.max(1, ...calendarStats.map(stat => stat.schedules.length));
   const maxMonthCount = Math.max(1, ...calendarStats.flatMap(stat => stat.monthStats.map(item => item.count)));
+  const maxPollVotes = Math.max(1, ...calendarStats.flatMap(stat => stat.pollStats.map(item => item.totalVotes)));
   const qualityWarnings = calendarStats.flatMap(stat => {
     const warnings = [];
     if (stat.sizePercent >= 75) warnings.push(`${stat.calendar.id}: Firestore 문서 크기 ${stat.sizePercent}%`);
@@ -3090,11 +3134,16 @@ function buildAdminDashboardMetrics(calendarsList) {
     calendarStats,
     totalParticipants,
     totalSchedules,
+    totalPolls,
+    totalPollOptions,
+    totalPollVotes,
+    totalPollUniqueVoters,
     uniqueDateCount,
     upcomingCount,
     memoCount,
     maxSchedules,
     maxMonthCount,
+    maxPollVotes,
     qualityWarnings,
     serviceUsage: buildServiceUsageMetrics(calendarStats)
   };
@@ -3264,6 +3313,15 @@ function AdminDashboard({ initialCalendars }) {
   }, {
     label: '메모 일정',
     value: dashboard.memoCount
+  }, {
+    label: '총 투표',
+    value: dashboard.totalPolls
+  }, {
+    label: '투표 옵션',
+    value: dashboard.totalPollOptions
+  }, {
+    label: '총 투표수',
+    value: dashboard.totalPollVotes
   }].map(card => /*#__PURE__*/React.createElement("div", {
     key: card.label,
     style: {
@@ -3319,6 +3377,10 @@ function AdminDashboard({ initialCalendars }) {
       className: "admin-metric-chip"
     }, "메모 ", stat.memoCount, "건"), /*#__PURE__*/React.createElement("span", {
       className: "admin-metric-chip"
+    }, "투표 ", stat.pollCount, "건"), /*#__PURE__*/React.createElement("span", {
+      className: "admin-metric-chip"
+    }, "표 ", stat.pollVoteCount, "개"), /*#__PURE__*/React.createElement("span", {
+      className: "admin-metric-chip"
     }, "문서 ", stat.sizePercent, "%")), /*#__PURE__*/React.createElement("div", {
       className: "admin-progress"
     }, /*#__PURE__*/React.createElement("div", {
@@ -3360,7 +3422,7 @@ function AdminDashboard({ initialCalendars }) {
     }, /*#__PURE__*/React.createElement("div", {
       style: { width, height: '100%', background: participant.color || '#64748B' }
     })));
-  })))), /*#__PURE__*/React.createElement("section", {
+  }))))), /*#__PURE__*/React.createElement("section", {
     className: "summary-card",
     style: { marginTop: '20px' }
   }, /*#__PURE__*/React.createElement("div", {
@@ -3380,10 +3442,77 @@ function AdminDashboard({ initialCalendars }) {
     className: "date-item-left"
   }, /*#__PURE__*/React.createElement("strong", null, formatDateWithDayName(item.date)), /*#__PURE__*/React.createElement("span", null, item.count, "/", stat.participants.length, "명 가능")), item.count >= stat.participants.length ? /*#__PURE__*/React.createElement("span", {
     className: "date-item-badge",
-    style: { background: '#DCFCE7', color: '#166534' }
+      style: { background: '#DCFCE7', color: '#166534' }
   }, "전원") : /*#__PURE__*/React.createElement("span", {
     className: "date-item-badge"
   }, item.count, "명"))))), /*#__PURE__*/React.createElement("section", {
+    className: "summary-card",
+    style: { marginTop: '20px' }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "summary-title"
+  }, "투표 현황"), dashboard.totalPolls === 0 ? /*#__PURE__*/React.createElement("div", {
+    style: { color: 'var(--text-muted)', fontSize: '0.9rem' }
+  }, "생성된 투표가 없습니다.") : dashboard.calendarStats.map(stat => /*#__PURE__*/React.createElement("div", {
+    key: `${stat.calendar.id}_polls_admin`,
+    style: { marginBottom: '20px' }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { fontWeight: 900, color: 'var(--text-main)' }
+  }, stat.calendar.id, " · ", stat.calendar.title), /*#__PURE__*/React.createElement("div", {
+    className: "admin-metric-chips"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "admin-metric-chip"
+  }, "투표 ", stat.pollCount, "건"), /*#__PURE__*/React.createElement("span", {
+    className: "admin-metric-chip"
+  }, "옵션 ", stat.pollOptionCount, "개"), /*#__PURE__*/React.createElement("span", {
+    className: "admin-metric-chip"
+  }, "총 ", stat.pollVoteCount, "표"), /*#__PURE__*/React.createElement("span", {
+    className: "admin-metric-chip"
+  }, "투표자 ", stat.pollUniqueVoterCount, "명"))), stat.pollStats.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    style: { color: 'var(--text-muted)', fontSize: '0.9rem' }
+  }, "이 캘린더에는 투표가 없습니다.") : /*#__PURE__*/React.createElement("div", {
+    style: { display: 'grid', gap: '10px' }
+  }, stat.pollStats.map(pollStat => {
+    const poll = pollStat.poll;
+    return /*#__PURE__*/React.createElement("div", {
+      key: poll.id,
+      style: { border: '1px solid var(--border-subtle)', borderRadius: '12px', padding: '14px', background: '#F8FAFC' }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', marginBottom: '10px' }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: { minWidth: 0 }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: { fontWeight: 900, color: 'var(--text-main)' }
+    }, poll.title), poll.description && /*#__PURE__*/React.createElement("div", {
+      style: { color: 'var(--text-muted)', fontSize: '0.84rem', marginTop: '3px' }
+    }, poll.description)), /*#__PURE__*/React.createElement("div", {
+      style: { color: 'var(--text-muted)', fontSize: '0.78rem', fontWeight: 800, whiteSpace: 'nowrap', textAlign: 'right' }
+    }, pollStat.totalVotes, "표 · ", pollStat.uniqueVoterCount, "/", stat.participants.length, "명")), /*#__PURE__*/React.createElement("div", {
+      style: { display: 'grid', gap: '8px' }
+    }, pollStat.optionStats.map(optionStat => {
+      const share = pollStat.totalVotes ? optionStat.voteCount / pollStat.totalVotes * 100 : 0;
+      return /*#__PURE__*/React.createElement("div", {
+        key: optionStat.option.id
+      }, /*#__PURE__*/React.createElement("div", {
+        style: { display: 'flex', justifyContent: 'space-between', gap: '8px', fontSize: '0.84rem', fontWeight: 800 }
+      }, /*#__PURE__*/React.createElement("span", {
+        style: { minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
+      }, optionStat.option.text), /*#__PURE__*/React.createElement("span", {
+        style: { color: 'var(--text-muted)', flexShrink: 0 }
+      }, optionStat.voteCount, "표 · ", formatPercent(share))), /*#__PURE__*/React.createElement("div", {
+        style: { width: '100%', height: '8px', borderRadius: '999px', background: '#E2E8F0', overflow: 'hidden', marginTop: '4px' }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          width: `${Math.max(optionStat.voteCount ? 4 : 0, Math.round(share))}%`,
+          height: '100%',
+          background: optionStat === pollStat.topOption ? '#10B981' : '#3B82F6'
+        }
+      })));
+    })), pollStat.topOption && /*#__PURE__*/React.createElement("div", {
+      style: { marginTop: '10px', color: '#047857', fontSize: '0.82rem', fontWeight: 800 }
+    }, "인기 옵션: ", pollStat.topOption.option.text, " · ", pollStat.topOption.voteCount, "표"));
+  })))), /*#__PURE__*/React.createElement("section", {
     className: "summary-card",
     style: { marginTop: '20px' }
   }, /*#__PURE__*/React.createElement("div", {
@@ -3439,7 +3568,7 @@ function AdminDashboard({ initialCalendars }) {
     onClick: () => handleDownloadBackup(stat.calendar.id)
   }, stat.calendar.id, " JSON 다운로드")))), /*#__PURE__*/React.createElement("div", {
     style: { marginTop: '12px', color: 'var(--text-muted)', fontSize: '0.82rem', fontWeight: 700, lineHeight: 1.55 }
-  }, "백업 파일에는 참여자, 일정, 메모가 포함됩니다. 데이터 불러오기는 kkot/cw 백업만 허용하며 관리자 주소에 restore=1을 붙이고 확인 문구를 입력한 뒤 실행됩니다.")), /*#__PURE__*/React.createElement("section", {
+  }, "백업 파일에는 참여자, 일정, 메모, 투표가 포함됩니다. 데이터 불러오기는 kkot/cw 백업만 허용하며 관리자 주소에 restore=1을 붙이고 확인 문구를 입력한 뒤 실행됩니다.")), /*#__PURE__*/React.createElement("section", {
     className: "summary-card",
     style: { marginTop: '20px' }
   }, /*#__PURE__*/React.createElement("div", {

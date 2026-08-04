@@ -275,6 +275,20 @@ runAppScript(adminMetricsContext, `
       { date: '2026-08-10', participantId: 'kkot_p2', note: '', updatedAt: 2 },
       { date: '2026-08-11', participantId: 'kkot_p1', note: '', deletedAt: 3, updatedAt: 3 }
     ],
+    polls: [{
+      id: 'kkot_poll_admin_1',
+      calendarId: 'kkot',
+      title: '장소 투표',
+      options: [
+        { id: 'kkot_poll_admin_1_opt_1', text: '천왕역', updatedAt: 1 },
+        { id: 'kkot_poll_admin_1_opt_2', text: '오류역', updatedAt: 1 }
+      ],
+      votes: {
+        kkot_poll_admin_1_opt_1: ['kkot_p1', 'kkot_p2'],
+        kkot_poll_admin_1_opt_2: ['kkot_p2', 'missing']
+      },
+      updatedAt: 2
+    }],
     updatedAt: 2,
     revision: 1
   }]);
@@ -283,6 +297,11 @@ runAppScript(adminMetricsContext, `
   if (dashboard.calendarStats[0].fullDates.length !== 1) throw new Error('admin full-date metric failed');
   if (dashboard.calendarStats[0].deletedCount !== 1) throw new Error('admin deleted history metric failed');
   if (dashboard.calendarStats[0].memoCount !== 1) throw new Error('admin memo metric failed');
+  if (dashboard.totalPolls !== 1) throw new Error('admin poll count metric failed');
+  if (dashboard.totalPollOptions !== 2) throw new Error('admin poll option metric failed');
+  if (dashboard.totalPollVotes !== 3) throw new Error('admin poll vote metric failed');
+  if (dashboard.calendarStats[0].pollStats[0].uniqueVoterCount !== 2) throw new Error('admin poll voter metric failed');
+  if (dashboard.calendarStats[0].pollStats[0].topOption.option.text !== '천왕역') throw new Error('admin poll top option metric failed');
   if (!dashboard.serviceUsage || dashboard.serviceUsage.length < 4) throw new Error('admin service usage metrics missing');
   const backup = createCalendarBackupPayload([{
     id: 'kkot',
