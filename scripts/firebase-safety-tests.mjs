@@ -207,8 +207,9 @@ runAppScript(concurrencyContext, `
     }]
   });
   if (pollCalendar.polls.length !== 1) throw new Error('poll calendar isolation failed');
-  if (pollCalendar.polls[0].votes.kkot_p1 !== 'kkot_poll_1_opt_1') throw new Error('valid poll vote was lost');
-  if (pollCalendar.polls[0].votes.missing) throw new Error('invalid poll voter was kept');
+  if (!Array.isArray(pollCalendar.polls[0].votes.kkot_poll_1_opt_1)) throw new Error('poll votes were not normalized by option');
+  if (!pollCalendar.polls[0].votes.kkot_poll_1_opt_1.includes('kkot_p1')) throw new Error('valid poll vote was lost');
+  if (pollCalendar.polls[0].votes.kkot_poll_1_opt_1.includes('missing')) throw new Error('invalid poll voter was kept');
   if (validateCalendarShape(pollCalendar)) throw new Error('valid poll calendar rejected');
 `);
 
