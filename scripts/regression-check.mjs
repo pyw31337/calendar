@@ -649,12 +649,18 @@ async function exerciseCalendar(browser, sessionId, otherSessionId, calendarId, 
     ['create', 'update', 'delete'].every((action) => activityLogs.some((log) => log.action === action && log.date.endsWith(`-${String(targetDay).padStart(2, '0')}`))),
     `${calendarId} activity logs did not record create/update/delete`
   );
+  assert(
+    activityLogs.some((log) => (log.note || '') === tempNoteRecreated),
+    `${calendarId} activity log did not preserve note text`
+  );
   await waitForPageCondition(
     browser,
     sessionId,
     `(() => {
       const text = [...document.querySelectorAll('.recent-log-row')].map((row) => row.textContent || '').join(' ');
-      return text.includes('[등록]') && text.includes('[수정]') && text.includes('[삭제]');
+      const note = ${JSON.stringify(`"${tempNoteRecreated}"`)};
+      const noteEl = [...document.querySelectorAll('.recent-log-note')].find((el) => (el.textContent || '') === note);
+      return text.includes('[등록]') && text.includes('[수정]') && text.includes('[삭제]') && !!noteEl;
     })()`
   );
 

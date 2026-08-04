@@ -637,14 +637,20 @@
     }
     .recent-log-action {
       font-size: 0.76rem;
-      font-weight: 900;
+      font-weight: 500;
       white-space: nowrap;
     }
     .recent-log-date {
       color: var(--text-main);
       font-size: 0.84rem;
-      font-weight: 850;
+      font-weight: 500;
       white-space: nowrap;
+    }
+    .recent-log-note {
+      color: rgb(100, 116, 139);
+      font-size: 0.84rem;
+      font-weight: 400;
+      overflow-wrap: anywhere;
     }
     .recent-log-time {
       margin-left: auto;
@@ -935,12 +941,14 @@ function normalizeActivityLog(calendarId, log, participantIds = null, idRedirect
   if (!action || !participantId || !date || !isValidDateString(date) || !timestamp) return null;
   if (participantIds && !participantIds.has(participantId)) return null;
   const id = sanitizeText(log.id || `${calendarId}_${date}_${participantId}_${action}_${timestamp}`, 160);
+  const note = sanitizeText(log.note || '', 120);
   return {
     id,
     calendarId,
     participantId,
     date,
     action,
+    note,
     timestamp
   };
 }
@@ -958,13 +966,14 @@ function mergeActivityLogs(existingLogs = [], incomingLogs = [], calendarId = ''
   return Array.from(map.values()).sort((a, b) => getActivityLogStamp(b) - getActivityLogStamp(a));
 }
 
-function createActivityLog(calendarId, action, dateStr, participantId, timestamp = Date.now()) {
+function createActivityLog(calendarId, action, dateStr, participantId, timestamp = Date.now(), note = '') {
   return normalizeActivityLog(calendarId, {
     id: `${calendarId}_${dateStr}_${participantId}_${action}_${timestamp}_${Math.random().toString(36).slice(2, 8)}`,
     calendarId,
     participantId,
     date: dateStr,
     action,
+    note,
     timestamp
   });
 }
@@ -981,6 +990,7 @@ function buildActivityLogsFromAvailabilities(calendar) {
       participantId: availability.participantId,
       date: availability.date,
       action,
+      note: availability.note || '',
       timestamp
     });
   }).filter(Boolean).filter(log => !explicitKeys.has(`${log.date}_${log.participantId}_${log.action}_${getActivityLogStamp(log)}`));
@@ -3122,7 +3132,7 @@ function App() {
         updatedAt: now
       });
     }
-    const activityLog = createActivityLog(activeCal.id, action, dateStr, participantId, now);
+    const activityLog = createActivityLog(activeCal.id, action, dateStr, participantId, now, cleanNote);
     const updatedCal = {
       ...activeCal,
       updatedAt: now,
@@ -3145,7 +3155,7 @@ function App() {
       deletedAt: now,
       updatedAt: now
     } : e);
-    const activityLog = createActivityLog(activeCal.id, 'delete', dateStr, participantId, now);
+    const activityLog = createActivityLog(activeCal.id, 'delete', dateStr, participantId, now, targetEntry.note || '');
     const updatedCal = {
       ...activeCal,
       updatedAt: now,
@@ -3167,7 +3177,7 @@ function App() {
       updatedAt: now
     } : e);
     const activityLogs = activeEntries.map((entry, index) =>
-      createActivityLog(activeCal.id, 'delete', dateStr, entry.participantId, now + index)
+      createActivityLog(activeCal.id, 'delete', dateStr, entry.participantId, now + index, entry.note || '')
     ).filter(Boolean);
     const updatedCal = {
       ...activeCal,
@@ -4502,6 +4512,7 @@ function RecentActivityLog({
     };
     const actionLabel = actionLabels[log.action] || '기록';
     const actionColor = actionColors[log.action] || '#64748B';
+    const noteText = sanitizeText(log.note || '', 120);
     return /*#__PURE__*/React.createElement("div", {
       key: log.id,
       className: "recent-log-row"
@@ -4520,7 +4531,9 @@ function RecentActivityLog({
       }
     }, "[", actionLabel, "]"), /*#__PURE__*/React.createElement("span", {
       className: "recent-log-date"
-    }, formatShortDateWithDayName(log.date))), /*#__PURE__*/React.createElement("span", {
+    }, formatShortDateWithDayName(log.date)), noteText && /*#__PURE__*/React.createElement("span", {
+      className: "recent-log-note"
+    }, "\"", noteText, "\"")), /*#__PURE__*/React.createElement("span", {
       className: "registered-at-text recent-log-time"
     }, formatRegisteredAt(log.timestamp)));
   })), logs.length > 10 && /*#__PURE__*/React.createElement("button", {
