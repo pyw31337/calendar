@@ -778,13 +778,9 @@
 
   <script>
 const PRESET_COLORS = ['#EF4444', '#F97316', '#F59E0B', '#10B981', '#06B6D4', '#3B82F6', '#6366F1', '#8B5CF6', '#EC4899', '#14B8A6'];
-const STORAGE_KEY = 'gather_calendars_permanent_v21';
-const STORAGE_META_KEY = 'gather_calendars_meta_v5'; // tracks lastModified timestamp
 const URL_PARAMS = new URLSearchParams(window.location.search);
-const IS_LOCALHOST = ['localhost', '127.0.0.1', '0.0.0.0'].includes(window.location.hostname);
-const FORCE_LOCAL_STORAGE = IS_LOCALHOST && URL_PARAMS.get('storage') === 'local';
-const ENABLE_FIRESTORE_SYNC = !FORCE_LOCAL_STORAGE; // Firestore is the only production source of truth
-const ENABLE_FIRESTORE_WRITES = !FORCE_LOCAL_STORAGE;
+const ENABLE_FIRESTORE_SYNC = true; // Firestore is the only production source of truth.
+const ENABLE_FIRESTORE_WRITES = true;
 const PUBLIC_CALENDAR_IDS = ['kkot', 'cw'];
 const FIREBASE_LOAD_TIMEOUT_MS = 10000;
 const FIREBASE_LOAD_MAX_ATTEMPTS = 3;
@@ -1917,75 +1913,13 @@ if (KKOT_DEFAULT_CALENDAR) {
   });
 }
 
-function parseCalendarPayload(raw) {
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-    if (parsed && Array.isArray(parsed.calendars) && parsed.calendars.length > 0) return parsed.calendars;
-  } catch (e) {}
-  return null;
-}
-
-function loadSavedLocalCalendars() {
-  try {
-    const savedCollections = [];
-    const canonical = parseCalendarPayload(localStorage.getItem(STORAGE_KEY));
-    if (Array.isArray(canonical) && canonical.length > 0) {
-      savedCollections.push(canonical);
-    }
-
-    const legacyKeys = [
-      'gather_calendars_cache_v7',
-      'gather_calendars_cache_v6',
-      'gather_calendars_persistent_v5',
-      'gather_calendars_persistent_v4'
-    ];
-    legacyKeys.forEach((key) => {
-      const payload = parseCalendarPayload(localStorage.getItem(key));
-      if (Array.isArray(payload) && payload.length > 0) {
-        savedCollections.push(payload);
-      }
-    });
-
-    if (savedCollections.length > 0) {
-      return savedCollections.reduce(
-        (merged, calendars) => mergeCalendarCollections(merged, calendars),
-        []
-      );
-    }
-  } catch (e) {
-    console.warn('Failed to load saved calendar cache:', e);
-  }
-  return null;
-}
-
 function loadLocalCache() {
-  try {
-    const saved = loadSavedLocalCalendars();
-    if (saved && saved.length > 0) {
-      const safeSaved = cloneCalendarList(saved)
-        .map(normalizeCalendarForSave)
-        .filter(calendar => isAllowedCalendarId(calendar?.id) && !validateCalendarShape(calendar));
-      if (safeSaved.length > 0) {
-        const savedIds = new Set(safeSaved.map((calendar) => calendar.id));
-        const missingDefaults = INITIAL_CALENDARS.filter((calendar) => !savedIds.has(calendar.id));
-        return [...safeSaved, ...cloneCalendarList(missingDefaults)];
-      }
-    }
-  } catch (e) {
-    console.warn('Failed to resolve local calendar cache:', e);
-  }
+  // Keep only a harmless in-memory shell while Firestore is loading.
+  // Browser-persisted calendar data is intentionally not read anymore.
   return cloneCalendarList(INITIAL_CALENDARS);
 }
 
-function saveLocalCache(data) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  } catch (e) {
-    console.warn('Failed to save calendars to localStorage:', e);
-  }
-}
+function saveLocalCache() {}
 
 // Firebase Config for Realtime Multi-User Cloud Sync
 const firebaseConfig = {
@@ -2076,11 +2010,7 @@ function isUsableCloudCalendarPayload(data, expectedCalendarId) {
 }
 
 function getCachedCalendar(calendarId) {
-  const saved = loadLocalCache();
-  if (!Array.isArray(saved)) return null;
-  const calendar = saved.find(item => item?.id === calendarId) || null;
-  if (!calendar || validateCalendarShape(calendar)) return null;
-  return calendar;
+  return null;
 }
 
 function getCalendarParticipantCount(calendar) {
@@ -2223,7 +2153,6 @@ async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 18,
   const normalizedCal = normalizeCalendarForSave(targetCal);
   if (!normalizedCal || !normalizedCal.id) return false;
   if (!isAllowedCalendarId(normalizedCal.id)) return false;
-  if (FORCE_LOCAL_STORAGE) return true;
   if (!ENABLE_FIRESTORE_WRITES) {
     console.warn(`Blocked Firestore write for ${normalizedCal.id}: recovery read-only mode`);
     return false;
@@ -2271,21 +2200,9 @@ async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 18,
   return pushSingleCalendarWithRest(normalizedCal, lastModified, saveMode, retryCount);
 }
 function loadLocalMeta() {
-  if (!FORCE_LOCAL_STORAGE) return { lastModified: 0, byCalendar: {} };
-  try {
-    const raw = localStorage.getItem(STORAGE_META_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch (e) {}
-  return {
-    lastModified: 0
-  };
+  return { lastModified: 0, byCalendar: {} };
 }
-function saveLocalMeta(meta) {
-  if (!FORCE_LOCAL_STORAGE) return;
-  try {
-    localStorage.setItem(STORAGE_META_KEY, JSON.stringify(meta));
-  } catch (e) {}
-}
+function saveLocalMeta() {}
 
 function getMetaLastModified(meta, calendarId) {
   if (!meta) return 0;
@@ -3014,7 +2931,7 @@ function App() {
   };
 
   const isSavingRef = React.useRef(false);
-  const serverRevisionRef = React.useRef(firebaseDb && !FORCE_LOCAL_STORAGE ? { lastModified: 0, byCalendar: {} } : loadLocalMeta());
+  const serverRevisionRef = React.useRef(loadLocalMeta());
 
   const applyServerCalendars = (serverCalendars, lastModified = Date.now()) => {
     const normalized = cloneCalendarList(serverCalendars).map(normalizeCalendarForSave);
@@ -3088,7 +3005,7 @@ function App() {
   const [isShareOpen, setIsShareOpen] = React.useState(false);
   const [isParticipantsOpen, setIsParticipantsOpen] = React.useState(false);
   const [isActivityLogExpanded, setIsActivityLogExpanded] = React.useState(false);
-  const [isInitialDataLoading, setIsInitialDataLoading] = React.useState(() => Boolean(firebaseDb && !FORCE_LOCAL_STORAGE));
+  const [isInitialDataLoading, setIsInitialDataLoading] = React.useState(() => Boolean(firebaseDb));
 
   if (isAdminDashboardRoute()) {
     return /*#__PURE__*/React.createElement(AdminDashboard, {
@@ -3138,12 +3055,6 @@ function App() {
       }
       if (isMounted && !hasLoadedCloudCalendar) {
         setIsInitialDataLoading(false);
-        const cached = getCachedCalendar(activeCalId);
-        if (cached && !isLikelySeedCalendar(cached)) {
-          applyLoadedCalendar(cached, getMetaLastModified(serverRevisionRef.current, activeCalId) || cached.updatedAt || Date.now());
-          showToast('Firebase 응답이 지연되어 마지막 캐시를 보여줍니다. 새로고침하면 다시 동기화합니다.', 'error', 6000);
-          return;
-        }
         showToast('Firebase에서 캘린더 데이터를 불러오지 못했습니다. 네트워크를 확인한 뒤 새로고침해 주세요.', 'error', 7000);
       }
     };
@@ -3165,7 +3076,7 @@ function App() {
   }, [activeCalId]);
 
   React.useEffect(() => {
-    if (firebaseDb || FORCE_LOCAL_STORAGE) return;
+    if (firebaseDb) return;
     showToast('Firebase 연결을 확인해 주세요. 데이터는 Firebase에서만 불러옵니다.', 'error', 5000);
   }, []);
   const activeCal = calendars.find(c => c.id === activeCalId) || calendars[0];
@@ -3217,13 +3128,7 @@ function App() {
           setActiveCalId(requestedId);
           return;
         }
-        if (!FORCE_LOCAL_STORAGE) {
-          showToast('Firebase에서 해당 캘린더를 찾지 못했습니다.', 'error');
-          return;
-        }
-        const newCal = createDefaultCalendar(requestedId);
-        const saved = await updateCalendars([newCal, ...calendars], '새 캘린더가 생성되었습니다. ✅', 'success', requestedId, 'replace');
-        if (!cancelled && saved !== false) setActiveCalId(requestedId);
+        showToast('Firebase에서 해당 캘린더를 찾지 못했습니다.', 'error');
       };
       resolveRequestedCalendar();
     }

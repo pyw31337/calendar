@@ -8,6 +8,7 @@ function assert(condition, message) {
 const html = fs.readFileSync('index.html', 'utf8');
 const script = html.match(/<script>([\s\S]*)<\/script>\s*<\/body>/)?.[1];
 assert(script, 'index.html app script block not found');
+assert(!/JSONBlob|jsonblob|localStorage|gather_calendars|FORCE_LOCAL_STORAGE/.test(script), 'app script must not use legacy browser or JSONBlob storage');
 
 function createContext(url) {
   const parsed = new URL(url);
@@ -83,9 +84,9 @@ function runAppScript(context, extraSource) {
   vm.runInContext(`${script}\n${extraSource}`, context);
 }
 
-const productionContext = createContext('https://pyw31337.github.io/calendar/share/kkot/?storage=local');
+const productionContext = createContext('https://pyw31337.github.io/calendar/share/kkot/');
 runAppScript(productionContext, `
-  if (FORCE_LOCAL_STORAGE) throw new Error('production enabled local storage mode');
+  if (!ENABLE_FIRESTORE_SYNC || !ENABLE_FIRESTORE_WRITES) throw new Error('production disabled Firestore-only mode');
   if (getCalendarIdFromURL() !== 'kkot') throw new Error('share path id parse failed');
   if (getCalendarShareUrl('cw') !== 'https://pyw31337.github.io/calendar/share/cw/') throw new Error('canonical share URL failed');
   if (!isValidCalendarId('kkot') || isValidCalendarId('../bad') || isValidCalendarId('bad!')) {
