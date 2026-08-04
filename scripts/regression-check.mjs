@@ -623,11 +623,39 @@ async function exerciseCalendar(browser, sessionId, otherSessionId, calendarId, 
     `${calendarId} note delete did not settle`
   );
 
+  const tempNoteRecreated = `${tempNote}-recreate`;
+  await openDateModal(browser, sessionId, targetDay);
+  await setInputValue(browser, sessionId, '.modal-container input[type="text"]', tempNoteRecreated);
+  await clickButtonExactText(browser, sessionId, '등록/저장', '.modal-container');
+  await waitForToast(browser, sessionId, '일정이 등록되었습니다.');
+  assert(
+    await waitForLocalCalendar(
+      browser,
+      sessionId,
+      calendarId,
+      `(calendar) => (calendar.availabilities || []).some((availability) => !availability.deletedAt && (availability.note || '') === ${JSON.stringify(tempNoteRecreated)})`
+    ),
+    `${calendarId} recreated note save did not settle`
+  );
+
   afterNoteSave = await readLocalCalendars(browser, sessionId);
   afterNoteCal = getCalendarById(afterNoteSave, calendarId);
   assert(
-    !activeAvailabilities(afterNoteCal).some((availability) => (availability.note || '') === tempNoteEdited),
-    `${calendarId} note was not deleted`
+    activeAvailabilities(afterNoteCal).some((availability) => (availability.note || '') === tempNoteRecreated),
+    `${calendarId} note was not recreated after delete`
+  );
+  const activityLogs = Array.isArray(afterNoteCal.activityLogs) ? afterNoteCal.activityLogs : [];
+  assert(
+    ['create', 'update', 'delete'].every((action) => activityLogs.some((log) => log.action === action && log.date.endsWith(`-${String(targetDay).padStart(2, '0')}`))),
+    `${calendarId} activity logs did not record create/update/delete`
+  );
+  await waitForPageCondition(
+    browser,
+    sessionId,
+    `(() => {
+      const text = [...document.querySelectorAll('.recent-log-row')].map((row) => row.textContent || '').join(' ');
+      return text.includes('[등록]') && text.includes('[수정]') && text.includes('[삭제]');
+    })()`
   );
 
   const otherAfterDelete = getCalendarById(afterNoteSave, otherId);

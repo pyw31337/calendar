@@ -29,6 +29,8 @@ service cloud.firestore {
         && request.resource.data.calendar.participants.size() <= 80
         && request.resource.data.calendar.availabilities is list
         && request.resource.data.calendar.availabilities.size() <= 5000
+        && (!('activityLogs' in request.resource.data.calendar) || request.resource.data.calendar.activityLogs is list)
+        && (!('activityLogs' in request.resource.data.calendar) || request.resource.data.calendar.activityLogs.size() <= 5000)
         && request.resource.data.lastModified is number
         && request.resource.data.revision is number;
     }

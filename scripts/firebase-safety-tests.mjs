@@ -155,6 +155,24 @@ runAppScript(concurrencyContext, `
   }
   if (!crossCalendarRefused) throw new Error('cross-calendar merge was not refused');
   if (validateCalendarShape(settingsMerged)) throw new Error('merged settings did not validate');
+  const activityLog = createActivityLog('kkot', 'update', '2026-08-29', 'kkot_p1', 1800000000000);
+  const loggedCalendar = normalizeCalendarForSave({
+    ...settingsMerged,
+    activityLogs: [activityLog, {
+      id: 'bad-cross-calendar-log',
+      calendarId: 'cw',
+      action: 'create',
+      date: '2026-08-29',
+      participantId: 'cw_p1',
+      timestamp: 1800000000001
+    }]
+  });
+  if (loggedCalendar.activityLogs.length !== 1) throw new Error('activity log isolation failed');
+  if (loggedCalendar.activityLogs[0].calendarId !== 'kkot') throw new Error('activity log calendar id changed');
+  const displayLogs = buildActivityLogsFromAvailabilities(loggedCalendar);
+  if (!displayLogs.some((log) => log.action === 'update' && log.participantId === 'kkot_p1')) {
+    throw new Error('activity log display builder failed');
+  }
 `);
 
 const invalidContext = createContext('https://pyw31337.github.io/calendar/?id=cw');
@@ -166,6 +184,14 @@ runAppScript(invalidContext, `
     availabilities: [{ date: '2026-08-29', participantId: 'cw_p1', note: 'ok', updatedAt: 1 }]
   };
   if (validateCalendarShape(valid)) throw new Error('valid calendar rejected');
+  if (validateCalendarShape({
+    ...valid,
+    activityLogs: [{ id: 'cw_log_1', calendarId: 'cw', action: 'create', date: '2026-08-29', participantId: 'cw_p1', timestamp: 1 }]
+  })) throw new Error('valid activity log rejected');
+  if (!validateCalendarShape({
+    ...valid,
+    activityLogs: [{ id: 'cw_log_bad', calendarId: 'cw', action: 'create', date: '2026-08-29', participantId: 'missing', timestamp: 1 }]
+  })) throw new Error('missing participant activity log accepted');
   if (!validateCalendarShape({ ...valid, id: 'cw!' })) throw new Error('bad id accepted');
   if (!validateCalendarShape({ ...valid, availabilities: [{ date: '2026-02-30', participantId: 'cw_p1' }] })) {
     throw new Error('bad date accepted');
