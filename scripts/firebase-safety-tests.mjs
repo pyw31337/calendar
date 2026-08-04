@@ -198,7 +198,7 @@ runAppScript(concurrencyContext, `
       calendarId: 'kkot',
       title: '장소 투표',
       description: '모임 장소를 골라주세요',
-      options: [{ id: 'kkot_poll_1_opt_1', text: '천왕역모아엘가', url: 'https://naver.me/54LbfTLU', updatedAt: 1 }],
+      options: [{ id: 'kkot_poll_1_opt_1', text: '천왕역모아엘가', url: 'https://naver.me/54LbfTLU', inputValue: '천왕역모아엘가 https://naver.me/54LbfTLU', updatedAt: 1 }],
       votes: { kkot_p1: 'kkot_poll_1_opt_1', missing: 'kkot_poll_1_opt_1' },
       updatedAt: 1
     }, {
@@ -214,6 +214,7 @@ runAppScript(concurrencyContext, `
   if (!Array.isArray(pollCalendar.polls[0].votes.kkot_poll_1_opt_1)) throw new Error('poll votes were not normalized by option');
   if (!pollCalendar.polls[0].votes.kkot_poll_1_opt_1.includes('kkot_p1')) throw new Error('valid poll vote was lost');
   if (pollCalendar.polls[0].votes.kkot_poll_1_opt_1.includes('missing')) throw new Error('invalid poll voter was kept');
+  if ('inputValue' in pollCalendar.polls[0].options[0]) throw new Error('transient poll input value was stored');
   if (validateCalendarShape(pollCalendar)) throw new Error('valid poll calendar rejected');
   const pollDeltaLog = createPollActivityLog('kkot', 'poll_cancel', 'kkot_p1', 1800000000002, '장소 투표 / 천왕역모아엘가');
   const mergedPollDelta = mergeCalendarPollsDelta({

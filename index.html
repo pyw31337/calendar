@@ -1458,8 +1458,9 @@ function normalizePoll(calendarId, poll, participantIds = null) {
     const optionId = sanitizeText(option?.id || `${id}_opt_${index + 1}_${Date.now()}`, 140);
     if (!optionId || !optionText || optionIds.has(optionId)) return null;
     optionIds.add(optionId);
+    const { inputValue, ...storedOption } = option || {};
     return {
-      ...option,
+      ...storedOption,
       id: optionId,
       text: optionText,
       url: optionUrl,
@@ -5523,7 +5524,10 @@ function PollModal({ calendar, poll, onSave, onClose }) {
   const [title, setTitle] = React.useState(poll?.title || '');
   const [description, setDescription] = React.useState(poll?.description || '');
   const [newOption, setNewOption] = React.useState('');
-  const [options, setOptions] = React.useState(getActivePollOptions(poll).map(option => ({ ...option })));
+  const [options, setOptions] = React.useState(getActivePollOptions(poll).map(option => ({
+    ...option,
+    inputValue: `${option.text}${option.url ? ' ' + option.url : ''}`
+  })));
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [draggingOptionId, setDraggingOptionId] = React.useState('');
   const [dragOverOptionId, setDragOverOptionId] = React.useState('');
@@ -5542,6 +5546,7 @@ function PollModal({ calendar, poll, onSave, onClose }) {
       id: `${poll?.id || calendar.id + '_poll'}_opt_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
       text: parsed.text,
       url: parsed.url,
+      inputValue: latest,
       updatedAt: Date.now()
     }]);
     setNewOption('');
@@ -5551,7 +5556,8 @@ function PollModal({ calendar, poll, onSave, onClose }) {
     const parsed = normalizePollOptionInput(value);
     setOptions(prev => prev.map(option => option.id === optionId ? {
       ...option,
-      text: parsed.text,
+      inputValue: value,
+      text: parsed.text || value,
       url: parsed.url,
       updatedAt: Date.now()
     } : option));
@@ -5624,7 +5630,16 @@ function PollModal({ calendar, poll, onSave, onClose }) {
     if (isSubmitting) return;
     const cleanTitle = sanitizeText(title, 80);
     const cleanDescription = sanitizeText(description, 160);
-    const activeOptions = options.filter(option => !isTombstone(option) && sanitizeText(option.text, 120));
+    const activeOptions = options.map(option => {
+      if (isTombstone(option)) return option;
+      const inputValue = option.inputValue ?? `${option.text}${option.url ? ' ' + option.url : ''}`;
+      const parsed = normalizePollOptionInput(inputValue);
+      return {
+        ...option,
+        text: parsed.text,
+        url: parsed.url
+      };
+    }).filter(option => !isTombstone(option) && sanitizeText(option.text, 120));
     if (!cleanTitle || activeOptions.length === 0) {
       alert('투표명과 선택옵션을 입력해 주세요.');
       return;
@@ -5787,9 +5802,10 @@ function PollModal({ calendar, poll, onSave, onClose }) {
     type: "text",
     className: "form-input participant-name-input",
     style: { flex: 1 },
-    value: `${option.text}${option.url ? ' ' + option.url : ''}`,
+    value: option.inputValue ?? `${option.text}${option.url ? ' ' + option.url : ''}`,
     disabled: isSubmitting,
     maxLength: 220,
+    onKeyDown: e => e.stopPropagation(),
     onInput: e => updateOption(option.id, e.target.value),
     onChange: e => updateOption(option.id, e.target.value)
   }), /*#__PURE__*/React.createElement("button", {
