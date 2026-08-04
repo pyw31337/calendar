@@ -178,6 +178,8 @@
       color: #FFFFFF;
       border-color: #0F172A;
       box-shadow: 0 8px 18px rgba(15, 23, 42, 0.18);
+      padding: 9px 13px;
+      white-space: nowrap;
     }
     .btn-poll-create:hover {
       background: #020617;
@@ -446,13 +448,14 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 12px;
+      gap: 8px;
       margin-bottom: 14px;
-      flex-wrap: wrap;
+      flex-wrap: nowrap;
     }
     .polls-panel-header .summary-title {
       flex: 1 1 auto;
-      min-width: 180px;
+      min-width: 0;
+      white-space: nowrap;
     }
     .poll-option-row {
       display: flex;
@@ -3861,7 +3864,7 @@ function App() {
       polls: mergePolls(getCalendarPolls(activeCal), [nextPoll], activeCal.id, participantIds)
     };
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-    return updateCalendars(nextCalendars, '투표가 취소되었습니다.', 'delete', updatedCal.id, 'polls');
+    return updateCalendars(nextCalendars, '투표 취소 완료', 'delete', updatedCal.id, 'polls');
   };
   const handleSaveAdmin = (updatedCal, newCalCreated) => {
     if (!activeCalLoaded && !newCalCreated) {
@@ -4122,7 +4125,11 @@ function App() {
       display: 'flex',
       alignItems: 'center',
       gap: '8px',
-      pointerEvents: 'none'
+      pointerEvents: 'none',
+      maxWidth: 'min(92vw, 520px)',
+      minWidth: 'min(80vw, 360px)',
+      whiteSpace: 'nowrap',
+      justifyContent: 'center'
     }
   }, /*#__PURE__*/React.createElement("span", null, toast.message)));
 }
@@ -5268,11 +5275,11 @@ function PollList({ calendar, onCreatePoll, onEditPoll, onVotePoll, onCancelVote
   }, /*#__PURE__*/React.createElement("div", {
     className: "summary-title",
     style: { color: '#2563EB', marginBottom: 0 }
-  }, /*#__PURE__*/React.createElement(PollSectionIcon, null), "\uC9C4\uD589\uC911\uC778 \uD22C\uD45C (", polls.length, "\uAC74)"), /*#__PURE__*/React.createElement("button", {
+  }, /*#__PURE__*/React.createElement(PollSectionIcon, null), "\uC9C4\uD589\uC911 \uD22C\uD45C (", polls.length, "\uAC74)"), /*#__PURE__*/React.createElement("button", {
     type: "button",
     className: "btn btn-poll-create",
     onClick: onCreatePoll
-  }, "+ \uD22C\uD45C \uC0DD\uC131")), polls.length === 0 ? /*#__PURE__*/React.createElement("div", {
+  }, "+ \uC0DD\uC131")), polls.length === 0 ? /*#__PURE__*/React.createElement("div", {
     style: { color: 'var(--text-muted)', fontSize: '0.85rem', padding: '10px 0' }
   }, "\uC544\uC9C1 \uC0DD\uC131\uB41C \uD22C\uD45C\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.") : /*#__PURE__*/React.createElement("div", {
     className: "polls-section"
@@ -5345,6 +5352,7 @@ function PollList({ calendar, onCreatePoll, onEditPoll, onVotePoll, onCancelVote
           title: `${participant.name} \uD22C\uD45C \uCDE8\uC18C`,
           onClick: event => {
             event.stopPropagation();
+            if (!window.confirm(`${participant.name}\uB2D8 \uD22C\uD45C\uB97C \uCDE8\uC18C\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?`)) return;
             onCancelVote(poll, option, participant.id);
           }
         }, /*#__PURE__*/React.createElement(SmallXIcon, null)));
