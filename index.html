@@ -385,6 +385,103 @@
       line-height: 1.25;
       white-space: nowrap;
     }
+    .calendar-action-row {
+      display: flex;
+      justify-content: center;
+      padding-top: 16px;
+      margin-top: 16px;
+      border-top: 1px solid var(--border-subtle);
+    }
+    .polls-section {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      margin-bottom: 20px;
+    }
+    .poll-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 16px;
+      box-shadow: var(--shadow-md);
+    }
+    @media (min-width: 640px) {
+      .poll-card { padding: 22px; }
+    }
+    .poll-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .poll-title {
+      font-size: 1.05rem;
+      font-weight: 800;
+      color: var(--text-main);
+      letter-spacing: -0.02em;
+    }
+    .poll-desc {
+      color: var(--text-muted);
+      font-size: 0.86rem;
+      margin-top: 4px;
+    }
+    .poll-option-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .poll-option-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      background: #F8FAFC;
+    }
+    .poll-option-main {
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      font-size: 0.9rem;
+      font-weight: 700;
+    }
+    .poll-option-link {
+      color: rgb(100, 116, 139);
+      font-size: 0.5rem;
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      line-height: 1.25;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+    .poll-option-link:hover {
+      text-decoration: underline;
+    }
+    .poll-vote-count {
+      font-size: 0.86rem;
+      font-weight: 800;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+    .poll-option-number {
+      width: 28px;
+      min-width: 28px;
+      color: var(--text-muted);
+      font-weight: 900;
+      text-align: center;
+    }
+    @media (max-width: 640px) {
+      .poll-option-row {
+        grid-template-columns: 1fr;
+        align-items: stretch;
+      }
+      .poll-vote-count { justify-self: start; }
+    }
     @media (max-width: 640px) {
       .days-grid .participant-badge {
         padding: 0;
@@ -912,6 +1009,15 @@ function cloneActivityLog(log) {
   return log ? { ...log } : log;
 }
 
+function clonePoll(poll) {
+  if (!poll) return poll;
+  return {
+    ...poll,
+    options: Array.isArray(poll.options) ? poll.options.map(option => ({ ...option })) : [],
+    votes: poll.votes && typeof poll.votes === 'object' ? { ...poll.votes } : {}
+  };
+}
+
 function getItemStamp(item) {
   if (!item) return 0;
   const values = [item.updatedAt, item.deletedAt, item.removedAt];
@@ -942,6 +1048,14 @@ function getActiveAvailabilities(calendar) {
 
 function getCalendarActivityLogs(calendar) {
   return Array.isArray(calendar?.activityLogs) ? calendar.activityLogs.filter(Boolean) : [];
+}
+
+function getCalendarPolls(calendar) {
+  return Array.isArray(calendar?.polls) ? calendar.polls.filter(poll => poll && !isTombstone(poll)) : [];
+}
+
+function getActivePollOptions(poll) {
+  return Array.isArray(poll?.options) ? poll.options.filter(option => option && !isTombstone(option)) : [];
 }
 
 function normalizeDeletedActivityLogIds(ids) {
@@ -1008,6 +1122,109 @@ function createActivityLog(calendarId, action, dateStr, participantId, timestamp
   });
 }
 
+function extractFirstUrl(value = '') {
+  const match = String(value || '').match(/https?:\/\/[^\s]+/i);
+  return match ? match[0] : '';
+}
+
+function normalizePollOptionInput(value = '') {
+  const source = sanitizeText(value, 220);
+  const url = extractFirstUrl(source);
+  const text = sanitizeText(url ? source.replace(url, '').trim() : source, 120);
+  return {
+    text: text || source,
+    url
+  };
+}
+
+function normalizePoll(calendarId, poll, participantIds = null) {
+  if (!poll || typeof poll !== 'object') return null;
+  if (poll.calendarId && poll.calendarId !== calendarId) return null;
+  const id = sanitizeText(poll.id || `${calendarId}_poll_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`, 120);
+  const title = sanitizeText(poll.title, 80);
+  const description = sanitizeText(poll.description || '', 160);
+  const updatedAt = Number(poll.updatedAt || poll.createdAt || Date.now()) || Date.now();
+  if (!id || !title) return null;
+  const optionIds = new Set();
+  const options = (Array.isArray(poll.options) ? poll.options : []).map((option, index) => {
+    const normalizedInput = normalizePollOptionInput(option?.text || '');
+    const optionUrl = sanitizeText(option?.url || normalizedInput.url || '', 220);
+    const optionText = sanitizeText(normalizedInput.text || option?.text || '', 120);
+    const optionId = sanitizeText(option?.id || `${id}_opt_${index + 1}_${Date.now()}`, 140);
+    if (!optionId || !optionText || optionIds.has(optionId)) return null;
+    optionIds.add(optionId);
+    return {
+      ...option,
+      id: optionId,
+      text: optionText,
+      url: optionUrl,
+      updatedAt: Number(option?.updatedAt || updatedAt) || updatedAt
+    };
+  }).filter(Boolean).slice(0, 30);
+  if (options.length === 0) return null;
+  const votes = {};
+  if (poll.votes && typeof poll.votes === 'object') {
+    Object.entries(poll.votes).forEach(([participantId, optionId]) => {
+      if (participantIds && !participantIds.has(participantId)) return;
+      if (!optionIds.has(optionId)) return;
+      votes[participantId] = optionId;
+    });
+  }
+  return {
+    ...poll,
+    id,
+    calendarId,
+    title,
+    description,
+    options,
+    votes,
+    createdAt: Number(poll.createdAt || updatedAt) || updatedAt,
+    updatedAt
+  };
+}
+
+function mergePollRecord(existing, incoming) {
+  const existingClone = clonePoll(existing);
+  const incomingClone = clonePoll(incoming);
+  if (!existingClone) return incomingClone;
+  if (!incomingClone) return existingClone;
+  const existingStamp = getItemStamp(existingClone);
+  const incomingStamp = getItemStamp(incomingClone);
+  const scalarSource = incomingStamp >= existingStamp ? incomingClone : existingClone;
+  const optionMap = new Map();
+  (existingClone.options || []).forEach(option => {
+    if (option?.id) optionMap.set(option.id, option);
+  });
+  (incomingClone.options || []).forEach(option => {
+    if (!option?.id) return;
+    const current = optionMap.get(option.id);
+    optionMap.set(option.id, !current || getItemStamp(option) >= getItemStamp(current) ? option : current);
+  });
+  return {
+    ...existingClone,
+    ...incomingClone,
+    title: scalarSource.title || incomingClone.title || existingClone.title,
+    description: scalarSource.description || incomingClone.description || existingClone.description || '',
+    options: Array.from(optionMap.values()),
+    votes: {
+      ...(existingClone.votes || {}),
+      ...(incomingClone.votes || {})
+    },
+    updatedAt: Math.max(existingClone.updatedAt || 0, incomingClone.updatedAt || 0),
+    deletedAt: incomingClone.deletedAt || existingClone.deletedAt || null
+  };
+}
+
+function mergePolls(existingPolls = [], incomingPolls = [], calendarId = '', participantIds = null) {
+  const map = new Map();
+  [...existingPolls, ...incomingPolls].forEach((poll) => {
+    const normalized = normalizePoll(calendarId || poll?.calendarId || '', poll, participantIds);
+    if (!normalized) return;
+    map.set(normalized.id, mergePollRecord(map.get(normalized.id), normalized));
+  });
+  return Array.from(map.values()).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+}
+
 function buildActivityLogsFromAvailabilities(calendar) {
   const explicitLogs = getCalendarActivityLogs(calendar);
   const deletedLogIds = new Set(getDeletedActivityLogIds(calendar));
@@ -1034,10 +1251,12 @@ function validateCalendarShape(calendar) {
   const participants = Array.isArray(calendar.participants) ? calendar.participants : [];
   const availabilities = Array.isArray(calendar.availabilities) ? calendar.availabilities : [];
   const activityLogs = Array.isArray(calendar.activityLogs) ? calendar.activityLogs : [];
+  const polls = Array.isArray(calendar.polls) ? calendar.polls : [];
   const deletedActivityLogIds = normalizeDeletedActivityLogIds(calendar.deletedActivityLogIds || []);
   if (participants.length > 80) return '참여자가 너무 많습니다.';
   if (availabilities.length > 5000) return '일정 데이터가 너무 많습니다.';
   if (activityLogs.length > 5000) return '활동 로그가 너무 많습니다.';
+  if (polls.length > 100) return '투표 데이터가 너무 많습니다.';
   if (deletedActivityLogIds.length > 5000) return '삭제된 활동 로그 이력이 너무 많습니다.';
   const participantIds = new Set();
   const activeNames = new Set();
@@ -1060,6 +1279,9 @@ function validateCalendarShape(calendar) {
   }
   for (const log of activityLogs) {
     if (!normalizeActivityLog(calendar.id, log, participantIds)) return '활동 로그 형식이 올바르지 않습니다.';
+  }
+  for (const poll of polls) {
+    if (!normalizePoll(calendar.id, poll, participantIds)) return '투표 형식이 올바르지 않습니다.';
   }
   return '';
 }
@@ -1112,6 +1334,7 @@ function normalizeCalendarForSave(calendar) {
   });
   const participantIds = new Set(normalizedParticipants.map(participant => participant.id));
   const normalizedActivityLogs = mergeActivityLogs([], cloned.activityLogs || [], cloned.id, participantIds, idRedirects);
+  const normalizedPolls = mergePolls([], cloned.polls || [], cloned.id, participantIds);
   const deletedActivityLogIds = getDeletedActivityLogIds(cloned);
 
   return {
@@ -1119,6 +1342,7 @@ function normalizeCalendarForSave(calendar) {
     participants: normalizedParticipants,
     availabilities: Array.from(availabilityMap.values()),
     activityLogs: normalizedActivityLogs,
+    polls: normalizedPolls,
     deletedActivityLogIds
   };
 }
@@ -1234,6 +1458,7 @@ function mergeCalendarRecord(existing, incoming) {
     participants: Array.from(participantMap.values()),
     availabilities: Array.from(availabilityMap.values()),
     activityLogs: mergeActivityLogs(base.activityLogs || [], next.activityLogs || [], base.id || next.id, participantIds),
+    polls: mergePolls(base.polls || [], next.polls || [], base.id || next.id, participantIds),
     deletedActivityLogIds: mergeDeletedActivityLogIds(base.deletedActivityLogIds || [], next.deletedActivityLogIds || []),
     updatedAt: mergedUpdatedAt || next.updatedAt || base.updatedAt || null,
     revision: mergedRevision
@@ -1270,6 +1495,7 @@ function mergeCalendarAvailabilityDelta(serverCalendar, incomingCalendar, change
     participants: base.participants || [],
     availabilities: Array.from(availabilityMap.values()),
     activityLogs: mergeActivityLogs(base.activityLogs || [], incoming.activityLogs || [], base.id || incoming.id, participantIds),
+    polls: base.polls || [],
     deletedActivityLogIds: mergeDeletedActivityLogIds(base.deletedActivityLogIds || [], incoming.deletedActivityLogIds || []),
     updatedAt: Math.max(base.updatedAt || 0, incoming.updatedAt || 0, changedAt || 0),
     revision: Math.max(base.revision || 0, incoming.revision || 0)
@@ -1312,7 +1538,23 @@ function mergeCalendarSettingsDelta(serverCalendar, incomingCalendar) {
     participants: Array.from(participantMap.values()),
     availabilities: server.availabilities || [],
     activityLogs: mergeActivityLogs(server.activityLogs || [], incoming.activityLogs || [], calendarId, new Set(Array.from(participantMap.values()).map(participant => participant.id))),
+    polls: server.polls || [],
     deletedActivityLogIds: mergeDeletedActivityLogIds(server.deletedActivityLogIds || [], incoming.deletedActivityLogIds || [])
+  };
+}
+
+function mergeCalendarPollsDelta(serverCalendar, incomingCalendar, changedAt = 0) {
+  const base = cloneCalendar(serverCalendar) || cloneCalendar(incomingCalendar) || {};
+  const incoming = cloneCalendar(incomingCalendar) || {};
+  if (base.id && incoming.id && base.id !== incoming.id) {
+    throw new Error(`Calendar ID mismatch: ${base.id} cannot receive ${incoming.id} polls`);
+  }
+  const participantIds = new Set(getActiveParticipants(base).map(participant => participant.id));
+  return {
+    ...base,
+    polls: mergePolls(base.polls || [], incoming.polls || [], base.id || incoming.id, participantIds),
+    updatedAt: Math.max(base.updatedAt || 0, incoming.updatedAt || 0, changedAt || 0),
+    revision: Math.max(base.revision || 0, incoming.revision || 0)
   };
 }
 
@@ -1323,6 +1565,7 @@ function cloneCalendar(calendar) {
     participants: Array.isArray(calendar.participants) ? calendar.participants.map(cloneParticipant) : [],
     availabilities: Array.isArray(calendar.availabilities) ? calendar.availabilities.map(cloneAvailability) : [],
     activityLogs: Array.isArray(calendar.activityLogs) ? calendar.activityLogs.map(cloneActivityLog) : [],
+    polls: Array.isArray(calendar.polls) ? calendar.polls.map(clonePoll) : [],
     deletedActivityLogIds: getDeletedActivityLogIds(calendar)
   };
 }
@@ -1935,6 +2178,7 @@ function createLoadingCalendarShell(calendarId) {
     participants: [],
     availabilities: [],
     activityLogs: [],
+    polls: [],
     deletedActivityLogIds: [],
     revision: 0,
     updatedAt: 0
@@ -2125,6 +2369,8 @@ async function pushSingleCalendarWithRest(normalizedCal, lastModified, saveMode,
         throw new Error(`Refusing to replace existing calendar ${normalizedCal.id}`);
       } else if (saveMode === 'settings') {
         nextCalendar = mergeCalendarSettingsDelta(serverCalendar, normalizedCal);
+      } else if (saveMode === 'polls') {
+        nextCalendar = mergeCalendarPollsDelta(serverCalendar, normalizedCal, lastModified);
       } else {
         nextCalendar = mergeCalendarAvailabilityDelta(serverCalendar, normalizedCal, lastModified);
       }
@@ -2195,6 +2441,8 @@ async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 18,
 	            throw new Error(`Refusing to replace existing calendar ${normalizedCal.id}`);
 	          } else if (saveMode === 'settings') {
 	            nextCalendar = mergeCalendarSettingsDelta(serverCalendar, normalizedCal);
+	          } else if (saveMode === 'polls') {
+	            nextCalendar = mergeCalendarPollsDelta(serverCalendar, normalizedCal, lastModified);
 	          } else {
 	            nextCalendar = mergeCalendarAvailabilityDelta(serverCalendar, normalizedCal, lastModified);
 	          }
@@ -2280,6 +2528,7 @@ function createDefaultCalendar(id) {
     }],
     availabilities: [],
     activityLogs: [],
+    polls: [],
     deletedActivityLogIds: []
   };
 }
@@ -3022,6 +3271,8 @@ function App() {
   const [isShareOpen, setIsShareOpen] = React.useState(false);
   const [isParticipantsOpen, setIsParticipantsOpen] = React.useState(false);
   const [isActivityLogExpanded, setIsActivityLogExpanded] = React.useState(false);
+  const [isPollModalOpen, setIsPollModalOpen] = React.useState(false);
+  const [editingPoll, setEditingPoll] = React.useState(null);
   const [isInitialDataLoading, setIsInitialDataLoading] = React.useState(() => Boolean(firebaseDb));
 
   if (isAdminDashboardRoute()) {
@@ -3281,6 +3532,72 @@ function App() {
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
     return updateCalendars(nextCalendars, '로그가 삭제되었습니다.', 'delete', updatedCal.id);
   };
+  const handleOpenPollCreate = () => {
+    if (!guardLoadedCalendar('Firebase 데이터를 불러온 뒤 투표를 생성해 주세요.')) return;
+    setEditingPoll(null);
+    setIsPollModalOpen(true);
+  };
+  const handleOpenPollEdit = poll => {
+    if (!guardLoadedCalendar('Firebase 데이터를 불러온 뒤 투표를 수정해 주세요.')) return;
+    setEditingPoll(poll);
+    setIsPollModalOpen(true);
+  };
+  const handleSavePoll = poll => {
+    if (!guardLoadedCalendar('Firebase 데이터를 불러온 뒤 투표를 저장해 주세요.')) return false;
+    const now = Date.now();
+    const participantIds = new Set(getActiveParticipants(activeCal).map(participant => participant.id));
+    const normalizedPoll = normalizePoll(activeCal.id, {
+      ...poll,
+      calendarId: activeCal.id,
+      updatedAt: now,
+      createdAt: poll.createdAt || now
+    }, participantIds);
+    if (!normalizedPoll) {
+      showToast('투표명과 선택옵션을 확인해 주세요.', 'error');
+      return false;
+    }
+    const updatedCal = {
+      ...activeCal,
+      updatedAt: now,
+      revision: (activeCal.revision || 0) + 1,
+      polls: mergePolls(getCalendarPolls(activeCal), [normalizedPoll], activeCal.id, participantIds)
+    };
+    const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
+    return updateCalendars(nextCalendars, '투표가 저장되었습니다.', 'success', updatedCal.id, 'polls');
+  };
+  const handleVotePoll = (poll, option) => {
+    if (!guardLoadedCalendar('Firebase 데이터를 불러온 뒤 투표해 주세요.')) return false;
+    const activeParticipants = getActiveParticipants(activeCal);
+    if (activeParticipants.length === 0) {
+      showToast('참여자 설정 후 투표할 수 있습니다.', 'error');
+      return false;
+    }
+    const voterName = window.prompt('투표자 이름을 입력해 주세요.', activeParticipants[0]?.name || '');
+    const cleanName = sanitizeText(voterName, 40).trim().toLowerCase();
+    const voter = activeParticipants.find(participant => participant.name.trim().toLowerCase() === cleanName);
+    if (!voter) {
+      showToast('참여자 이름을 확인해 주세요.', 'error');
+      return false;
+    }
+    const now = Date.now();
+    const participantIds = new Set(activeParticipants.map(participant => participant.id));
+    const nextPoll = {
+      ...poll,
+      votes: {
+        ...(poll.votes || {}),
+        [voter.id]: option.id
+      },
+      updatedAt: now
+    };
+    const updatedCal = {
+      ...activeCal,
+      updatedAt: now,
+      revision: (activeCal.revision || 0) + 1,
+      polls: mergePolls(getCalendarPolls(activeCal), [nextPoll], activeCal.id, participantIds)
+    };
+    const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
+    return updateCalendars(nextCalendars, '투표가 반영되었습니다.', 'success', updatedCal.id, 'polls');
+  };
   const handleSaveAdmin = (updatedCal, newCalCreated) => {
     if (!activeCalLoaded && !newCalCreated) {
       showToast('Firebase 데이터를 불러온 뒤 설정을 수정해 주세요.', 'error');
@@ -3461,13 +3778,28 @@ function App() {
       setSelectedDate(d);
       setIsModalOpen(true);
     }
-  }), /*#__PURE__*/React.createElement(SummaryList, {
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "calendar-card",
+    style: {
+      padding: '14px',
+      marginTop: '-12px',
+      textAlign: 'center'
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "btn btn-primary",
+    onClick: handleOpenPollCreate
+  }, "+ \uD22C\uD45C \uC0DD\uC131")), /*#__PURE__*/React.createElement(SummaryList, {
     calendar: activeCal,
     onSelectDate: d => {
       if (!guardLoadedCalendar()) return;
       setSelectedDate(d);
       setIsModalOpen(true);
     }
+  }), /*#__PURE__*/React.createElement(PollList, {
+    calendar: activeCal,
+    onEditPoll: handleOpenPollEdit,
+    onVotePoll: handleVotePoll
   }), /*#__PURE__*/React.createElement(RecentActivityLog, {
     calendar: activeCal,
     expanded: isActivityLogExpanded,
@@ -3496,6 +3828,14 @@ function App() {
       setIsShareOpen(false);
     },
     onClose: () => setIsShareOpen(false)
+  }), isPollModalOpen && /*#__PURE__*/React.createElement(PollModal, {
+    calendar: activeCal,
+    poll: editingPoll,
+    onSave: handleSavePoll,
+    onClose: () => {
+      setIsPollModalOpen(false);
+      setEditingPoll(null);
+    }
   }), toast && /*#__PURE__*/React.createElement("div", {
     className: "toast",
     style: {
@@ -4543,6 +4883,259 @@ function ShareModal({
       alert('URL이 복사되었습니다!');
     }
   }, "URL \uBCF5\uC0AC\uD558\uAE30"))));
+}
+
+function SettingsIcon() {
+  return /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: "20",
+    height: "20",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    "stroke-width": "2",
+    "stroke-linecap": "round",
+    "stroke-linejoin": "round",
+    className: "icon icon-tabler icons-tabler-outline icon-tabler-settings"
+  }, /*#__PURE__*/React.createElement("path", {
+    stroke: "none",
+    d: "M0 0h24v24H0z",
+    fill: "none"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0"
+  }));
+}
+
+function PollList({ calendar, onEditPoll, onVotePoll }) {
+  const polls = getCalendarPolls(calendar);
+  if (polls.length === 0) return null;
+  return /*#__PURE__*/React.createElement("div", {
+    className: "polls-section"
+  }, polls.map(poll => {
+    const voteValues = Object.values(poll.votes || {});
+    return /*#__PURE__*/React.createElement("section", {
+      key: poll.id,
+      className: "poll-card"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "poll-header"
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      className: "poll-title"
+    }, poll.title), poll.description && /*#__PURE__*/React.createElement("div", {
+      className: "poll-desc"
+    }, poll.description)), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      className: "btn btn-secondary",
+      title: "\uD22C\uD45C \uC124\uC815",
+      style: { padding: '8px' },
+      onClick: () => onEditPoll(poll)
+    }, /*#__PURE__*/React.createElement(SettingsIcon, null))), /*#__PURE__*/React.createElement("div", {
+      className: "poll-option-list"
+    }, getActivePollOptions(poll).map((option, index) => {
+      const voteCount = voteValues.filter(optionId => optionId === option.id).length;
+      return /*#__PURE__*/React.createElement("div", {
+        key: option.id,
+        className: "poll-option-row"
+      }, /*#__PURE__*/React.createElement("div", {
+        className: "poll-option-main"
+      }, /*#__PURE__*/React.createElement("span", {
+        style: { fontWeight: 900 }
+      }, index + 1, "."), /*#__PURE__*/React.createElement("span", null, option.text), option.url && /*#__PURE__*/React.createElement("span", {
+        className: "poll-option-link",
+        onClick: event => {
+          event.stopPropagation();
+          window.open(option.url, '_blank', 'noopener,noreferrer');
+        },
+        title: "\uC0C8\uCC3D\uC73C\uB85C \uB9C1\uD06C \uC5F4\uAE30"
+      }, option.url)), /*#__PURE__*/React.createElement("span", {
+        className: "poll-vote-count"
+      }, voteCount, "\uD45C"), /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "btn btn-secondary",
+        onClick: () => onVotePoll(poll, option)
+      }, "\uD22C\uD45C\uD558\uAE30"));
+    })));
+  }));
+}
+
+function PollModal({ calendar, poll, onSave, onClose }) {
+  const now = Date.now();
+  const [title, setTitle] = React.useState(poll?.title || '');
+  const [description, setDescription] = React.useState(poll?.description || '');
+  const [newOption, setNewOption] = React.useState('');
+  const [options, setOptions] = React.useState(getActivePollOptions(poll).map(option => ({ ...option })));
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const newOptionInputRef = React.useRef(null);
+  const handleAddOption = e => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    if (isSubmitting) return;
+    const latest = newOptionInputRef.current ? newOptionInputRef.current.value : newOption;
+    const parsed = normalizePollOptionInput(latest);
+    if (!parsed.text) return;
+    setOptions(prev => [...prev, {
+      id: `${poll?.id || calendar.id + '_poll'}_opt_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      text: parsed.text,
+      url: parsed.url,
+      updatedAt: Date.now()
+    }]);
+    setNewOption('');
+    if (newOptionInputRef.current) newOptionInputRef.current.value = '';
+  };
+  const updateOption = (optionId, value) => {
+    const parsed = normalizePollOptionInput(value);
+    setOptions(prev => prev.map(option => option.id === optionId ? {
+      ...option,
+      text: parsed.text,
+      url: parsed.url,
+      updatedAt: Date.now()
+    } : option));
+  };
+  const handleSubmit = async e => {
+    e.preventDefault();
+    if (isSubmitting) return;
+    const cleanTitle = sanitizeText(title, 80);
+    const cleanDescription = sanitizeText(description, 160);
+    const activeOptions = options.filter(option => !isTombstone(option) && sanitizeText(option.text, 120));
+    if (!cleanTitle || activeOptions.length === 0) {
+      alert('투표명과 선택옵션을 입력해 주세요.');
+      return;
+    }
+    setIsSubmitting(true);
+    let saved = false;
+    try {
+      saved = await Promise.resolve(onSave({
+        ...(poll || {}),
+        id: poll?.id || `${calendar.id}_poll_${now}_${Math.random().toString(36).slice(2, 7)}`,
+        calendarId: calendar.id,
+        title: cleanTitle,
+        description: cleanDescription,
+        options: activeOptions,
+        votes: poll?.votes || {},
+        createdAt: poll?.createdAt || now,
+        updatedAt: Date.now()
+      }));
+    } catch (err) {
+      console.error('Poll save failed:', err);
+    }
+    if (saved === false) {
+      setIsSubmitting(false);
+      return;
+    }
+    onClose();
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    className: "modal-overlay",
+    onClick: () => {
+      if (!isSubmitting) onClose();
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "modal-container",
+    onClick: e => e.stopPropagation()
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "modal-header",
+    style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' }
+  }, /*#__PURE__*/React.createElement("h3", {
+    style: { fontSize: '1.1rem', fontWeight: 800 }
+  }, "\uD22C\uD45C \uC0DD\uC131"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      if (!isSubmitting) onClose();
+    },
+    style: { background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer' }
+  }, "\u2715")), /*#__PURE__*/React.createElement("form", {
+    onSubmit: handleSubmit
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "modal-body"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: { display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px', color: '#64748B' }
+  }, "\uD22C\uD45C\uBA85"), /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    className: "form-input",
+    style: { width: '100%' },
+    value: title,
+    disabled: isSubmitting,
+    maxLength: 80,
+    onChange: e => setTitle(e.target.value),
+    required: true
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: { display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px', color: '#64748B' }
+  }, "\uD22C\uD45C \uC124\uBA85"), /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    className: "form-input",
+    style: { width: '100%' },
+    value: description,
+    disabled: isSubmitting,
+    maxLength: 160,
+    onChange: e => setDescription(e.target.value)
+  })), /*#__PURE__*/React.createElement("div", {
+    style: { borderTop: '1px solid var(--border-subtle)', paddingTop: '12px' }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: { display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px', color: '#64748B' }
+  }, "\uD22C\uD45C \uC124\uC815"), /*#__PURE__*/React.createElement("div", {
+    className: "participant-add-row",
+    style: { display: 'flex', gap: '8px', marginBottom: '12px' }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    className: "form-input participant-add-input",
+    style: { flex: 1 },
+    placeholder: "\uC608: \uCC9C\uC655\uC5ED\uBAA8\uC544\uC5D8\uAC00 https://naver.me/54LbfTLU",
+    value: newOption,
+    disabled: isSubmitting,
+    maxLength: 220,
+    ref: newOptionInputRef,
+    onChange: e => setNewOption(e.target.value),
+    onKeyDown: e => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        if (e.nativeEvent && e.nativeEvent.isComposing) return;
+        handleAddOption(e);
+      }
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "btn btn-secondary participant-action-btn",
+    disabled: isSubmitting,
+    style: { whiteSpace: 'nowrap', minWidth: '52px', flexShrink: 0 },
+    onClick: handleAddOption
+  }, "\uCD94\uAC00")), options.map((option, index) => isTombstone(option) ? null : /*#__PURE__*/React.createElement("div", {
+    key: option.id,
+    className: "participant-edit-row",
+    style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "poll-option-number"
+  }, index + 1, "."), /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    className: "form-input participant-name-input",
+    style: { flex: 1, padding: '4px 8px' },
+    value: `${option.text}${option.url ? ' ' + option.url : ''}`,
+    disabled: isSubmitting,
+    maxLength: 220,
+    onInput: e => updateOption(option.id, e.target.value),
+    onChange: e => updateOption(option.id, e.target.value)
+  }), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "btn btn-danger participant-remove-btn",
+    disabled: isSubmitting,
+    style: { padding: '4px 8px' },
+    onClick: () => setOptions(prev => prev.map(item => item.id === option.id ? { ...item, removedAt: Date.now(), updatedAt: Date.now() } : item))
+  }, "\u2715"))))), /*#__PURE__*/React.createElement("div", {
+    className: "modal-footer"
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "btn btn-secondary",
+    disabled: isSubmitting,
+    onClick: () => {
+      if (!isSubmitting) onClose();
+    }
+  }, "\uCDE8\uC18C"), /*#__PURE__*/React.createElement("button", {
+    type: "submit",
+    className: "btn btn-primary",
+    disabled: isSubmitting,
+    style: { opacity: isSubmitting ? 0.75 : 1, cursor: isSubmitting ? 'wait' : 'pointer' }
+  }, isSubmitting ? "\uC800\uC7A5 \uC911..." : "\uD22C\uD45C \uC800\uC7A5")))));
 }
 
 function RecentActivityLog({

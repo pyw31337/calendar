@@ -183,6 +183,33 @@ runAppScript(concurrencyContext, `
   if (buildActivityLogsFromAvailabilities(hiddenLogCalendar).some((log) => log.id === loggedCalendar.activityLogs[0].id)) {
     throw new Error('deleted activity log was still displayed');
   }
+  const pollInput = normalizePollOptionInput('천왕역모아엘가 https://naver.me/54LbfTLU');
+  if (pollInput.text !== '천왕역모아엘가' || pollInput.url !== 'https://naver.me/54LbfTLU') {
+    throw new Error('poll option URL parsing failed');
+  }
+  const pollCalendar = normalizeCalendarForSave({
+    ...settingsMerged,
+    polls: [{
+      id: 'kkot_poll_1',
+      calendarId: 'kkot',
+      title: '장소 투표',
+      description: '모임 장소를 골라주세요',
+      options: [{ id: 'kkot_poll_1_opt_1', text: '천왕역모아엘가', url: 'https://naver.me/54LbfTLU', updatedAt: 1 }],
+      votes: { kkot_p1: 'kkot_poll_1_opt_1', missing: 'kkot_poll_1_opt_1' },
+      updatedAt: 1
+    }, {
+      id: 'cw_poll_bad',
+      calendarId: 'cw',
+      title: '잘못된 투표',
+      options: [{ id: 'cw_opt_1', text: 'X', updatedAt: 1 }],
+      votes: {},
+      updatedAt: 1
+    }]
+  });
+  if (pollCalendar.polls.length !== 1) throw new Error('poll calendar isolation failed');
+  if (pollCalendar.polls[0].votes.kkot_p1 !== 'kkot_poll_1_opt_1') throw new Error('valid poll vote was lost');
+  if (pollCalendar.polls[0].votes.missing) throw new Error('invalid poll voter was kept');
+  if (validateCalendarShape(pollCalendar)) throw new Error('valid poll calendar rejected');
 `);
 
 const invalidContext = createContext('https://pyw31337.github.io/calendar/?id=cw');

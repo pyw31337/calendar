@@ -44,6 +44,10 @@ const summaries = docs.map((doc) => {
   const availabilities = Array.isArray(calendar.availabilities) ? calendar.availabilities : [];
   const activityLogs = Array.isArray(calendar.activityLogs) ? calendar.activityLogs : [];
   const deletedActivityLogIds = Array.isArray(calendar.deletedActivityLogIds) ? calendar.deletedActivityLogIds : [];
+  const polls = Array.isArray(calendar.polls) ? calendar.polls : [];
+  const activePolls = polls.filter((item) => !isDeleted(item));
+  const pollOptions = activePolls.reduce((sum, poll) => sum + (Array.isArray(poll.options) ? poll.options.filter((item) => !isDeleted(item)).length : 0), 0);
+  const pollVotes = activePolls.reduce((sum, poll) => sum + (poll.votes && typeof poll.votes === 'object' ? Object.keys(poll.votes).length : 0), 0);
   const sizeBytes = Buffer.byteLength(JSON.stringify(doc));
   return {
     docId: doc.name.split('/').pop(),
@@ -55,6 +59,9 @@ const summaries = docs.map((doc) => {
     storedAvailabilities: availabilities.length,
     activityLogs: activityLogs.length,
     hiddenActivityLogs: deletedActivityLogIds.length,
+    polls: activePolls.length,
+    pollOptions,
+    pollVotes,
     revision: decoded.revision || 0,
     updateTime: doc.updateTime || ''
   };
