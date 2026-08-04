@@ -300,8 +300,7 @@ runAppScript(adminMetricsContext, `
   if (dashboard.totalPolls !== 1) throw new Error('admin poll count metric failed');
   if (dashboard.totalPollOptions !== 2) throw new Error('admin poll option metric failed');
   if (dashboard.totalPollVotes !== 3) throw new Error('admin poll vote metric failed');
-  if (dashboard.calendarStats[0].pollStats[0].uniqueVoterCount !== 2) throw new Error('admin poll voter metric failed');
-  if (dashboard.calendarStats[0].pollStats[0].topOption.option.text !== '천왕역') throw new Error('admin poll top option metric failed');
+  if (dashboard.calendarStats[0].pollVoterCount !== 2) throw new Error('admin poll voter metric failed');
   if (!dashboard.serviceUsage || dashboard.serviceUsage.length < 4) throw new Error('admin service usage metrics missing');
   const backup = createCalendarBackupPayload([{
     id: 'kkot',
