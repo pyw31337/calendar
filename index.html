@@ -786,6 +786,8 @@ const FORCE_LOCAL_STORAGE = IS_LOCALHOST && URL_PARAMS.get('storage') === 'local
 const ENABLE_FIRESTORE_SYNC = !FORCE_LOCAL_STORAGE; // Firestore is the only production source of truth
 const ENABLE_FIRESTORE_WRITES = !FORCE_LOCAL_STORAGE;
 const PUBLIC_CALENDAR_IDS = ['kkot', 'cw'];
+const FIREBASE_LOAD_TIMEOUT_MS = 10000;
+const FIREBASE_LOAD_MAX_ATTEMPTS = 3;
 const FIRESTORE_FREE_LIMITS = {
   storageBytes: 1024 * 1024 * 1024,
   documentBytes: 1024 * 1024,
@@ -1959,15 +1961,17 @@ function loadSavedLocalCalendars() {
 }
 
 function loadLocalCache() {
-  if (!FORCE_LOCAL_STORAGE) {
-    return cloneCalendarList(INITIAL_CALENDARS);
-  }
   try {
     const saved = loadSavedLocalCalendars();
     if (saved && saved.length > 0) {
-      const savedIds = new Set(saved.map((calendar) => calendar.id));
-      const missingDefaults = INITIAL_CALENDARS.filter((calendar) => !savedIds.has(calendar.id));
-      return [...cloneCalendarList(saved), ...cloneCalendarList(missingDefaults)];
+      const safeSaved = cloneCalendarList(saved)
+        .map(normalizeCalendarForSave)
+        .filter(calendar => isAllowedCalendarId(calendar?.id) && !validateCalendarShape(calendar));
+      if (safeSaved.length > 0) {
+        const savedIds = new Set(safeSaved.map((calendar) => calendar.id));
+        const missingDefaults = INITIAL_CALENDARS.filter((calendar) => !savedIds.has(calendar.id));
+        return [...safeSaved, ...cloneCalendarList(missingDefaults)];
+      }
     }
   } catch (e) {
     console.warn('Failed to resolve local calendar cache:', e);
@@ -1976,7 +1980,6 @@ function loadLocalCache() {
 }
 
 function saveLocalCache(data) {
-  if (!FORCE_LOCAL_STORAGE) return;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   } catch (e) {
@@ -2005,31 +2008,103 @@ try {
   console.warn('Firebase init notice:', e);
 }
 
-// Returns { calendar, lastModified } or null with AbortController timeout & retries
-async function fetchSingleCloudCalendar(calId, retryCount = 2) {
+async function fetchSingleCalendarWithRest(calId, timeoutMs = FIREBASE_LOAD_TIMEOUT_MS) {
   if (!isAllowedCalendarId(calId)) return null;
-  if (firebaseDb) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const docUrl = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/calendars/cal_${calId}`;
+    const response = await fetch(docUrl, { signal: controller.signal });
+    if (!response.ok) return null;
+    const decoded = firestoreDocumentToJs(await response.json());
+    if (decoded?.calendar?.id !== calId) return null;
+    return {
+      calendar: decoded.calendar,
+      lastModified: decoded.lastModified || decoded.calendar.updatedAt || 0
+    };
+  } catch (error) {
+    console.warn(`Firestore REST fetch notice for cal_${calId}:`, error);
+    return null;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+function waitForTimeout(ms, message = 'timeout') {
+  return new Promise((_, reject) => {
+    setTimeout(() => reject(new Error(message)), ms);
+  });
+}
+
+// Returns { calendar, lastModified } or null with 10s timeout, retries, and REST fallback.
+async function fetchSingleCloudCalendar(calId, retryCount = FIREBASE_LOAD_MAX_ATTEMPTS, timeoutMs = FIREBASE_LOAD_TIMEOUT_MS) {
+  if (!isAllowedCalendarId(calId)) return null;
+  const attempts = Math.max(1, retryCount);
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
     try {
-      // 1. Fetch isolated calendar doc, but never let Firestore block the app indefinitely.
-      const doc = await Promise.race([
-        firebaseDb.collection('calendars').doc(`cal_${calId}`).get(),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Firestore fetch timeout')), 1800))
-      ]);
-      if (doc.exists) {
-        const data = doc.data();
-        if (data && data.calendar) {
-          return {
-            calendar: data.calendar,
-            lastModified: data.lastModified || 0
-          };
+      if (firebaseDb) {
+        const doc = await Promise.race([
+          firebaseDb.collection('calendars').doc(`cal_${calId}`).get(),
+          waitForTimeout(timeoutMs, `Firestore fetch timeout after ${timeoutMs}ms`)
+        ]);
+        if (doc.exists) {
+          const data = doc.data();
+          if (data && data.calendar && data.calendar.id === calId) {
+            return {
+              calendar: data.calendar,
+              lastModified: data.lastModified || data.calendar.updatedAt || 0
+            };
+          }
         }
       }
+      const restResult = await fetchSingleCalendarWithRest(calId, timeoutMs);
+      if (restResult) return restResult;
     } catch (e) {
-      console.warn(`Firestore fetch notice for cal_${calId}:`, e);
+      console.warn(`Firestore fetch notice for cal_${calId}, attempt ${attempt}/${attempts}:`, e);
+      const restResult = await fetchSingleCalendarWithRest(calId, timeoutMs);
+      if (restResult) return restResult;
     }
-    return null;
+    if (attempt < attempts) {
+      await new Promise(resolve => setTimeout(resolve, 350 * attempt));
+    }
   }
   return null;
+}
+
+function isUsableCloudCalendarPayload(data, expectedCalendarId) {
+  return Boolean(data && data.calendar && data.calendar.id === expectedCalendarId);
+}
+
+function getCachedCalendar(calendarId) {
+  const saved = loadLocalCache();
+  if (!Array.isArray(saved)) return null;
+  const calendar = saved.find(item => item?.id === calendarId) || null;
+  if (!calendar || validateCalendarShape(calendar)) return null;
+  return calendar;
+}
+
+function getCalendarParticipantCount(calendar) {
+  return getActiveParticipants(calendar).length;
+}
+
+function isLikelySeedCalendar(calendar) {
+  if (!calendar) return true;
+  const seed = INITIAL_CALENDARS.find(item => item.id === calendar.id);
+  if (!seed) return false;
+  return calendar.title === seed.title
+    && getCalendarParticipantCount(calendar) === getCalendarParticipantCount(seed)
+    && getActiveAvailabilities(calendar).length === getActiveAvailabilities(seed).length
+    && getCalendarActivityLogs(calendar).length === getCalendarActivityLogs(seed).length;
+}
+
+function getCloudDocCalendar(doc, expectedCalendarId) {
+  if (!doc?.exists) return null;
+  const data = doc.data();
+  if (!isUsableCloudCalendarPayload(data, expectedCalendarId)) return null;
+  return {
+    calendar: data.calendar,
+    lastModified: data.lastModified || data.calendar.updatedAt || 0
+  };
 }
 
 function firestoreValueToJs(value) {
@@ -3028,33 +3103,61 @@ function App() {
       return;
     }
     let isMounted = true;
+    let hasLoadedCloudCalendar = false;
+    let unsubscribe = null;
     setIsInitialDataLoading(true);
 
-    const unsubscribe = firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).onSnapshot(doc => {
-      if (isMounted) setIsInitialDataLoading(false);
-      if (!doc.exists && isMounted) {
-        showToast('Firebase에서 캘린더 데이터를 찾지 못했습니다.', 'error', 5000);
-        return;
-      }
-      if (doc.exists && isMounted && !isSavingRef.current) {
-        const data = doc.data();
-        if (data && data.calendar && data.calendar.id === activeCalId) {
-          const cloudCal = data.calendar;
-          const cloudLastMod = data.lastModified || 0;
-          if (cloudLastMod < getMetaLastModified(serverRevisionRef.current, activeCalId)) return;
-          setCalendarsState(prevCals => {
-            const nextCals = prevCals.map(c => c.id === activeCalId ? cloneCalendar(cloudCal) : c);
-            saveLocalCache(nextCals);
-            serverRevisionRef.current = updateMetaLastModified(serverRevisionRef.current, activeCalId, cloudLastMod);
-            saveLocalMeta(serverRevisionRef.current);
-            return nextCals;
-          });
+    const applyLoadedCalendar = (cloudCal, cloudLastMod = Date.now()) => {
+      if (!isMounted || !cloudCal || cloudCal.id !== activeCalId) return false;
+      if (cloudLastMod < getMetaLastModified(serverRevisionRef.current, activeCalId)) return false;
+      hasLoadedCloudCalendar = true;
+      setIsInitialDataLoading(false);
+      setCalendarsState(prevCals => {
+        const hasExisting = prevCals.some(c => c.id === activeCalId);
+        const nextCals = hasExisting
+          ? prevCals.map(c => c.id === activeCalId ? cloneCalendar(cloudCal) : c)
+          : [cloneCalendar(cloudCal), ...prevCals];
+        saveLocalCache(nextCals);
+        serverRevisionRef.current = updateMetaLastModified(serverRevisionRef.current, activeCalId, cloudLastMod);
+        saveLocalMeta(serverRevisionRef.current);
+        return nextCals;
+      });
+      return true;
+    };
+
+    const runInitialLoad = async () => {
+      for (let attempt = 1; attempt <= FIREBASE_LOAD_MAX_ATTEMPTS && isMounted && !hasLoadedCloudCalendar; attempt += 1) {
+        const result = await fetchSingleCloudCalendar(activeCalId, 1, FIREBASE_LOAD_TIMEOUT_MS);
+        if (result?.calendar && applyLoadedCalendar(result.calendar, result.lastModified || Date.now())) {
+          if (attempt > 1) showToast('Firebase 데이터를 다시 불러왔습니다.', 'success', 3000);
+          return;
+        }
+        if (attempt < FIREBASE_LOAD_MAX_ATTEMPTS && isMounted && !hasLoadedCloudCalendar) {
+          showToast(`Firebase 응답이 지연되어 ${attempt + 1}차 로딩을 시도합니다.`, 'info', 3000);
         }
       }
+      if (isMounted && !hasLoadedCloudCalendar) {
+        setIsInitialDataLoading(false);
+        const cached = getCachedCalendar(activeCalId);
+        if (cached && !isLikelySeedCalendar(cached)) {
+          applyLoadedCalendar(cached, getMetaLastModified(serverRevisionRef.current, activeCalId) || cached.updatedAt || Date.now());
+          showToast('Firebase 응답이 지연되어 마지막 캐시를 보여줍니다. 새로고침하면 다시 동기화합니다.', 'error', 6000);
+          return;
+        }
+        showToast('Firebase에서 캘린더 데이터를 불러오지 못했습니다. 네트워크를 확인한 뒤 새로고침해 주세요.', 'error', 7000);
+      }
+    };
+
+    unsubscribe = firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).onSnapshot(doc => {
+      const result = getCloudDocCalendar(doc, activeCalId);
+      if (result && !isSavingRef.current) {
+        applyLoadedCalendar(result.calendar, result.lastModified || Date.now());
+      }
     }, err => {
-      if (isMounted) setIsInitialDataLoading(false);
       console.warn(`Firestore realtime sync notice for cal_${activeCalId}:`, err);
     });
+
+    runInitialLoad();
     return () => {
       isMounted = false;
       if (unsubscribe) unsubscribe();
