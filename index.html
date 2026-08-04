@@ -3759,6 +3759,18 @@ function DateModal({
     setIsSheetOpen(false);
     setIsSubmitting(false);
   }, [calendar?.id, dateStr]);
+  const celebrateAvailabilitySave = () => {
+    if (typeof confetti !== 'function') return;
+    try {
+      confetti({
+        particleCount: 80,
+        spread: 70,
+        origin: { y: 0.6 }
+      });
+    } catch (err) {
+      console.log('Confetti error', err);
+    }
+  };
   const handleSubmit = async e => {
     e.preventDefault();
     if (!participantId || isSubmitting) return;
@@ -3775,23 +3787,7 @@ function DateModal({
       return;
     }
 
-    const existingOtherIds = new Set(
-      dateEntries.filter(entry => entry.participantId !== participantId).map(entry => entry.participantId)
-    );
-    existingOtherIds.add(participantId);
-
-    if (activeParticipants.length > 0 && existingOtherIds.size === activeParticipants.length && typeof confetti === 'function') {
-      try {
-        confetti({
-          particleCount: 80,
-          spread: 70,
-          origin: { y: 0.6 }
-        });
-      } catch (err) {
-        console.log('Confetti error', err);
-      }
-    }
-
+    celebrateAvailabilitySave();
     setNote('');
     onClose();
   };
