@@ -704,6 +704,10 @@
     @media (min-width: 640px) {
       .summary-title { font-size: 1.15rem; margin-bottom: 16px; }
     }
+    .summary-title.is-toggleable {
+      cursor: pointer;
+      user-select: none;
+    }
     .section-toggle-btn {
       margin-left: auto;
       width: 28px;
@@ -5856,14 +5860,25 @@ function RecentActivityLog({
     poll_vote: '#2563EB',
     poll_cancel: '#DC2626'
   };
-  const [isCollapsed, setIsCollapsed] = React.useState(false);
+  const [isCollapsed, setIsCollapsed] = React.useState(true);
+  const toggleRecentLogs = () => setIsCollapsed(value => !value);
+  const handleRecentLogsTitleKeyDown = event => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    toggleRecentLogs();
+  };
   return /*#__PURE__*/React.createElement("section", {
     className: "summary-card",
     style: {
       marginTop: '20px'
     }
   }, /*#__PURE__*/React.createElement("div", {
-    className: `summary-title${isCollapsed ? ' is-collapsed' : ''}`,
+    className: `summary-title is-toggleable${isCollapsed ? ' is-collapsed' : ''}`,
+    role: "button",
+    tabIndex: 0,
+    "aria-expanded": !isCollapsed,
+    onClick: toggleRecentLogs,
+    onKeyDown: handleRecentLogsTitleKeyDown,
     style: {
       color: '#334155',
       marginBottom: '12px'
@@ -5889,7 +5904,7 @@ function RecentActivityLog({
     d: "M3 7v4h4"
   })), "\uCD5C\uADFC \uB85C\uADF8", /*#__PURE__*/React.createElement(SectionToggleButton, {
     collapsed: isCollapsed,
-    onToggle: () => setIsCollapsed(value => !value),
+    onToggle: toggleRecentLogs,
     label: isCollapsed ? "\uCD5C\uADFC \uB85C\uADF8 \uD3BC\uCE58\uAE30" : "\uCD5C\uADFC \uB85C\uADF8 \uC811\uAE30"
   })), !isCollapsed && (logs.length === 0 ? /*#__PURE__*/React.createElement("div", {
     style: {
@@ -5983,14 +5998,19 @@ function SummaryList({
 }) {
   const [collapsedSections, setCollapsedSections] = React.useState({
     partial: false,
-    all: false,
-    past: false
+    all: true,
+    past: true
   });
   const toggleSection = sectionKey => {
     setCollapsedSections(prev => ({
       ...prev,
       [sectionKey]: !prev[sectionKey]
     }));
+  };
+  const handleSectionTitleKeyDown = (event, sectionKey) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    toggleSection(sectionKey);
   };
   const totalCount = getActiveParticipants(calendar).length || 0;
   const availabilities = getActiveAvailabilities(calendar);
@@ -6050,7 +6070,12 @@ function SummaryList({
       gap: '20px'
     }
   }, thresholdN > 0 && sortedPartialDates.length > 0 && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    className: `summary-title${collapsedSections.partial ? ' is-collapsed' : ''}`,
+    className: `summary-title is-toggleable${collapsedSections.partial ? ' is-collapsed' : ''}`,
+    role: "button",
+    tabIndex: 0,
+    "aria-expanded": !collapsedSections.partial,
+    onClick: () => toggleSection('partial'),
+    onKeyDown: event => handleSectionTitleKeyDown(event, 'partial'),
     style: {
       color: '#2563EB',
       marginBottom: '12px'
@@ -6144,7 +6169,12 @@ function SummaryList({
   }))), thresholdN > 0 && sortedPartialDates.length > 0 && /*#__PURE__*/React.createElement("div", {
     className: `summary-section-divider${collapsedSections.partial ? ' is-after-collapsed' : ''}`
   }), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    className: `summary-title${collapsedSections.all ? ' is-collapsed' : ''}`,
+    className: `summary-title is-toggleable${collapsedSections.all ? ' is-collapsed' : ''}`,
+    role: "button",
+    tabIndex: 0,
+    "aria-expanded": !collapsedSections.all,
+    onClick: () => toggleSection('all'),
+    onKeyDown: event => handleSectionTitleKeyDown(event, 'all'),
     style: {
       color: '#10B981',
       marginBottom: '12px'
@@ -6246,7 +6276,12 @@ function SummaryList({
   })))), pastMeetingDates.length > 0 && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     className: `summary-section-divider${collapsedSections.all ? ' is-after-collapsed' : ''}`
   }), /*#__PURE__*/React.createElement("div", {
-    className: `summary-title${collapsedSections.past ? ' is-collapsed' : ''}`,
+    className: `summary-title is-toggleable${collapsedSections.past ? ' is-collapsed' : ''}`,
+    role: "button",
+    tabIndex: 0,
+    "aria-expanded": !collapsedSections.past,
+    onClick: () => toggleSection('past'),
+    onKeyDown: event => handleSectionTitleKeyDown(event, 'past'),
     style: {
       color: '#64748B',
       marginBottom: '12px'
