@@ -695,6 +695,33 @@
     @media (min-width: 640px) {
       .summary-title { font-size: 1.15rem; margin-bottom: 16px; }
     }
+    .section-toggle-btn {
+      margin-left: auto;
+      width: 28px;
+      height: 28px;
+      border: 0;
+      background: transparent;
+      color: #94A3B8;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      border-radius: 50%;
+      cursor: pointer;
+      transition: background-color 0.16s ease, color 0.16s ease;
+    }
+    .section-toggle-btn:hover {
+      background: #F1F5F9;
+      color: #334155;
+    }
+    .section-toggle-btn svg {
+      width: 24px;
+      height: 24px;
+      transition: transform 0.18s ease;
+    }
+    .section-toggle-btn.is-collapsed svg {
+      transform: rotate(180deg);
+    }
 
     .admin-section-header {
       display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
@@ -5260,6 +5287,36 @@ function SmallXIcon() {
   }));
 }
 
+function SectionToggleButton({ collapsed, onToggle, label }) {
+  return /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: `section-toggle-btn${collapsed ? ' is-collapsed' : ''}`,
+    "aria-label": label,
+    "aria-expanded": !collapsed,
+    onClick: event => {
+      event.stopPropagation();
+      onToggle();
+    }
+  }, /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: "24",
+    height: "24",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    "stroke-width": "2",
+    "stroke-linecap": "round",
+    "stroke-linejoin": "round",
+    className: "icon icon-tabler icons-tabler-outline icon-tabler-chevron-down"
+  }, /*#__PURE__*/React.createElement("path", {
+    stroke: "none",
+    d: "M0 0h24v24H0z",
+    fill: "none"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M6 9l6 6l6 -6"
+  })));
+}
+
 function PollList({ calendar, onCreatePoll, onEditPoll, onVotePoll, onCancelVote }) {
   const polls = getCalendarPolls(calendar);
   const participants = getActiveParticipants(calendar);
@@ -5663,6 +5720,7 @@ function RecentActivityLog({
     update: '#7C3AED',
     delete: '#DC2626'
   };
+  const [isCollapsed, setIsCollapsed] = React.useState(false);
   return /*#__PURE__*/React.createElement("section", {
     className: "summary-card",
     style: {
@@ -5693,7 +5751,11 @@ function RecentActivityLog({
     d: "M3.05 11a9 9 0 1 1 .5 4"
   }), /*#__PURE__*/React.createElement("path", {
     d: "M3 7v4h4"
-  })), "\uCD5C\uADFC \uB85C\uADF8"), logs.length === 0 ? /*#__PURE__*/React.createElement("div", {
+  })), "\uCD5C\uADFC \uB85C\uADF8", /*#__PURE__*/React.createElement(SectionToggleButton, {
+    collapsed: isCollapsed,
+    onToggle: () => setIsCollapsed(value => !value),
+    label: isCollapsed ? "\uCD5C\uADFC \uB85C\uADF8 \uD3BC\uCE58\uAE30" : "\uCD5C\uADFC \uB85C\uADF8 \uC811\uAE30"
+  })), !isCollapsed && (logs.length === 0 ? /*#__PURE__*/React.createElement("div", {
     style: {
       color: 'var(--text-muted)',
       fontSize: '0.85rem',
@@ -5774,7 +5836,7 @@ function RecentActivityLog({
       marginTop: '14px',
       width: '100%'
     }
-  }, expanded ? "\uC811\uAE30" : "\uB354\uBCF4\uAE30")));
+  }, expanded ? "\uC811\uAE30" : "\uB354\uBCF4\uAE30"))));
 }
 
 // Summary List - Displays both "Partial Availability" (N+ members) and "Full Availability" lists
@@ -5782,6 +5844,17 @@ function SummaryList({
   calendar,
   onSelectDate
 }) {
+  const [collapsedSections, setCollapsedSections] = React.useState({
+    partial: false,
+    all: false,
+    past: false
+  });
+  const toggleSection = sectionKey => {
+    setCollapsedSections(prev => ({
+      ...prev,
+      [sectionKey]: !prev[sectionKey]
+    }));
+  };
   const totalCount = getActiveParticipants(calendar).length || 0;
   const availabilities = getActiveAvailabilities(calendar);
   const participantsMap = getActiveParticipants(calendar).reduce((acc, p) => {
@@ -5868,7 +5941,11 @@ function SummaryList({
     d: "M22 21v-2a4 4 0 0 0-3-3.87"
   }), /*#__PURE__*/React.createElement("path", {
     d: "M16 3.13a4 4 0 0 1 0 7.75"
-  })), thresholdN, "\uBA85 \uC774\uC0C1 \uCC38\uC11D \uAC00\uB2A5 (", sortedPartialDates.length, "\uC77C)"), sortedPartialDates.length === 0 ? /*#__PURE__*/React.createElement("div", {
+  })), thresholdN, "\uBA85 \uC774\uC0C1 \uCC38\uC11D \uAC00\uB2A5 (", sortedPartialDates.length, "\uC77C)", /*#__PURE__*/React.createElement(SectionToggleButton, {
+    collapsed: collapsedSections.partial,
+    onToggle: () => toggleSection('partial'),
+    label: collapsedSections.partial ? `${thresholdN}\uBA85 \uC774\uC0C1 \uCC38\uC11D \uAC00\uB2A5 \uD3BC\uCE58\uAE30` : `${thresholdN}\uBA85 \uC774\uC0C1 \uCC38\uC11D \uAC00\uB2A5 \uC811\uAE30`
+  })), !collapsedSections.partial && (sortedPartialDates.length === 0 ? /*#__PURE__*/React.createElement("div", {
     style: {
       color: 'var(--text-muted)',
       fontSize: '0.85rem',
@@ -5933,7 +6010,7 @@ function SummaryList({
         border: isPast ? 'none' : '1px solid #BFDBFE'
       }
     }, isPast ? '지나간 모임' : `${availCount}명 가능 (${availCount}/${totalCount}명)`));
-  }))), thresholdN > 0 && /*#__PURE__*/React.createElement("div", {
+  })))), thresholdN > 0 && /*#__PURE__*/React.createElement("div", {
     style: {
       borderTop: '1px solid var(--border-subtle)',
       margin: '4px 0'
@@ -5961,7 +6038,11 @@ function SummaryList({
     d: "M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"
   }), /*#__PURE__*/React.createElement("path", {
     d: "m9 12 2 2 4-4"
-  })), "\uC804\uC6D0 \uCC38\uC11D \uAC00\uB2A5 (", sortedAllDates.length, "\uC77C)"), sortedAllDates.length === 0 ? /*#__PURE__*/React.createElement("div", {
+  })), "\uC804\uC6D0 \uCC38\uC11D \uAC00\uB2A5 (", sortedAllDates.length, "\uC77C)", /*#__PURE__*/React.createElement(SectionToggleButton, {
+    collapsed: collapsedSections.all,
+    onToggle: () => toggleSection('all'),
+    label: collapsedSections.all ? "\uC804\uC6D0 \uCC38\uC11D \uAC00\uB2A5 \uD3BC\uCE58\uAE30" : "\uC804\uC6D0 \uCC38\uC11D \uAC00\uB2A5 \uC811\uAE30"
+  })), !collapsedSections.all && (sortedAllDates.length === 0 ? /*#__PURE__*/React.createElement("div", {
     style: {
       color: 'var(--text-muted)',
       fontSize: '0.85rem',
@@ -6034,7 +6115,7 @@ function SummaryList({
         title: `${p.name}: ${memoText}`
       }, memoText);
     })));
-  }))), pastMeetingDates.length > 0 && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+  })))), pastMeetingDates.length > 0 && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: {
       borderTop: '1px solid var(--border-subtle)',
       margin: '4px 0 20px'
@@ -6080,7 +6161,11 @@ function SummaryList({
     y1: "10",
     x2: "21",
     y2: "10"
-  })), "\uACFC\uAC70 \uBAA8\uC784 (", pastMeetingDates.length, "\uC77C)"), /*#__PURE__*/React.createElement("div", null, pastMeetingDates.map(d => {
+  })), "\uACFC\uAC70 \uBAA8\uC784 (", pastMeetingDates.length, "\uC77C)", /*#__PURE__*/React.createElement(SectionToggleButton, {
+    collapsed: collapsedSections.past,
+    onToggle: () => toggleSection('past'),
+    label: collapsedSections.past ? "\uACFC\uAC70 \uBAA8\uC784 \uD3BC\uCE58\uAE30" : "\uACFC\uAC70 \uBAA8\uC784 \uC811\uAE30"
+  })), !collapsedSections.past && /*#__PURE__*/React.createElement("div", null, pastMeetingDates.map(d => {
     const dateEntries = dateMap[d].filter(e => participantsMap[e.participantId] && !isTombstone(e));
     const formattedDateStr = formatDateWithDayName(d);
     const memoEntries = dateEntries.filter(e => e.note && e.note.trim().length > 0);
