@@ -205,6 +205,7 @@
       border-radius: var(--radius-md); color: var(--text-main); font-size: 0.9rem; font-family: inherit; outline: none;
       transition: border-color 0.2s ease;
       word-break: keep-all;
+      min-height: 44px;
     }
     .form-select:focus, .form-input:focus, .form-textarea:focus { border-color: var(--accent-primary); box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15); }
 
@@ -227,6 +228,8 @@
       width: 62px;
       min-width: 62px;
       flex: 0 0 62px;
+      height: 44px;
+      min-height: 44px;
     }
 
     .participant-remove-btn {
@@ -516,7 +519,7 @@
     }
     .poll-option-link {
       color: rgb(100, 116, 139);
-      font-size: 0.5rem;
+      font-size: 0.6rem;
       font-weight: 400;
       letter-spacing: -0.02em;
       line-height: 1.25;
@@ -5080,8 +5083,7 @@ function AdminModal({
     type: "text",
     className: "form-input participant-name-input",
     style: {
-      flex: 1,
-      padding: '4px 8px'
+      flex: 1
     },
     value: p.name,
     disabled: isSubmitting,
@@ -5092,9 +5094,6 @@ function AdminModal({
     type: "button",
     className: "btn btn-danger participant-remove-btn",
     disabled: isSubmitting,
-    style: {
-      padding: '4px 8px'
-    },
     onClick: () => updateParticipant(p.id, { removedAt: Date.now() })
   }, "\u2715"))))), /*#__PURE__*/React.createElement("div", {
     className: "modal-footer"
@@ -5679,7 +5678,7 @@ function PollModal({ calendar, poll, onSave, onClose }) {
   }, /*#__PURE__*/React.createElement(LineHeightIcon, null)), /*#__PURE__*/React.createElement("input", {
     type: "text",
     className: "form-input participant-name-input",
-    style: { flex: 1, padding: '4px 8px' },
+    style: { flex: 1 },
     value: `${option.text}${option.url ? ' ' + option.url : ''}`,
     disabled: isSubmitting,
     maxLength: 220,
@@ -5689,7 +5688,6 @@ function PollModal({ calendar, poll, onSave, onClose }) {
     type: "button",
     className: "btn btn-danger participant-remove-btn",
     disabled: isSubmitting,
-    style: { padding: '4px 8px' },
     onClick: () => setOptions(prev => prev.map(item => item.id === option.id ? { ...item, removedAt: Date.now(), updatedAt: Date.now() } : item))
   }, "\u2715"))))), /*#__PURE__*/React.createElement("div", {
     className: "modal-footer"
