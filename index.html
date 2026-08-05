@@ -4761,6 +4761,11 @@ function App() {
     onDeleteDate: handleDeleteAllForDate,
     onRequestConfirm: showConfirmDialog,
     onClose: () => setIsModalOpen(false)
+  }), confirmDialog && /*#__PURE__*/React.createElement(ConfirmDialog, {
+    title: confirmDialog.title,
+    message: confirmDialog.message,
+    onConfirm: () => { const fn = confirmDialog.onConfirm; setConfirmDialog(null); fn(); },
+    onCancel: () => setConfirmDialog(null)
   }), deletingMessage && /*#__PURE__*/React.createElement(DeleteConfirmModal, {
     message: deletingMessage,
     calendar: activeCal,
