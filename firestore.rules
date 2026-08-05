@@ -50,6 +50,11 @@ service cloud.firestore {
         && hasValidCalendarShell(calendarDocId)
         && hasValidRevision(calendarDocId);
       allow delete: if false;
+
+      match /messages/{messageId} {
+        allow read, create: if isCalendarDoc(calendarDocId);
+        allow update, delete: if false;
+      }
     }
 
     match /{document=**} {

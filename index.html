@@ -2543,6 +2543,62 @@ async function fetchSingleCalendarWithRest(calId, timeoutMs = FIREBASE_LOAD_TIME
   }
 }
 
+async function fetchRecentMessagesRest(calId) {
+  try {
+    const url = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/calendars/cal_${calId}/messages?orderBy=timestamp%20desc&pageSize=5`;
+    const res = await fetch(url);
+    if (!res.ok) return [];
+    const data = await res.json();
+    const docs = data.documents || [];
+    return docs.map(doc => ({
+      id: doc.name.split('/').pop(),
+      ...firestoreDocumentToJs(doc)
+    }));
+  } catch (err) {
+    console.warn('fetchRecentMessagesRest error:', err);
+    return [];
+  }
+}
+
+async function fetchChatMessagesRest(calId) {
+  try {
+    const url = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/calendars/cal_${calId}/messages?orderBy=timestamp%20asc`;
+    const res = await fetch(url);
+    if (!res.ok) return [];
+    const data = await res.json();
+    const docs = data.documents || [];
+    return docs.map(doc => ({
+      id: doc.name.split('/').pop(),
+      ...firestoreDocumentToJs(doc)
+    }));
+  } catch (err) {
+    console.warn('fetchChatMessagesRest error:', err);
+    return [];
+  }
+}
+
+async function sendChatMessageRest(calId, message) {
+  try {
+    const url = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/calendars/cal_${calId}/messages`;
+    const payload = {
+      fields: {
+        participantId: jsToFirestoreValue(message.participantId),
+        text: jsToFirestoreValue(message.text),
+        timestamp: jsToFirestoreValue(message.timestamp)
+      }
+    };
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    return res.ok;
+  } catch (err) {
+    console.warn('sendChatMessageRest error:', err);
+    return false;
+  }
+}
+
 function waitForTimeout(ms, message = 'timeout') {
   return new Promise((_, reject) => {
     setTimeout(() => reject(new Error(message)), ms);
@@ -3630,6 +3686,41 @@ function App() {
     left: '0',
     transform: 'none'
   });
+
+  // Chat-related states
+  const [recentMessages, setRecentMessages] = React.useState([]);
+  const [chatMessages, setChatMessages] = React.useState([]);
+  const [chatInput, setChatInput] = React.useState('');
+  const [chatParticipantId, setChatParticipantId] = React.useState('');
+  const [isChatSheetOpen, setIsChatSheetOpen] = React.useState(false);
+  const [isChatSubmitting, setIsChatSubmitting] = React.useState(false);
+  const chatTextareaRef = React.useRef(null);
+
+  const getActiveViewFromURL = () => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('view') || 'calendar';
+  };
+  const [activeView, setActiveView] = React.useState(getActiveViewFromURL);
+
+  React.useEffect(() => {
+    const handleUrlChange = () => {
+      setActiveView(getActiveViewFromURL());
+    };
+    window.addEventListener('popstate', handleUrlChange);
+    return () => window.removeEventListener('popstate', handleUrlChange);
+  }, []);
+
+  const changeView = (view) => {
+    setActiveView(view);
+    const params = new URLSearchParams(window.location.search);
+    if (view === 'chat') {
+      params.set('view', 'chat');
+    } else {
+      params.delete('view');
+    }
+    const newUrl = `${window.location.pathname}?${params.toString()}`;
+    window.history.pushState({}, '', newUrl);
+  };
   React.useEffect(() => {
     if (isGuideOpen && titleRef.current) {
       const titleWidth = titleRef.current.offsetWidth;
@@ -3748,6 +3839,133 @@ function App() {
       }
     }
   }, [activeCal]);
+
+  // Synchronize chatParticipantId when activeCal changes (loads cached participant or defaults to first active)
+  React.useEffect(() => {
+    if (activeCal) {
+      const cachedId = localStorage.getItem('gather_active_participant_id_v20');
+      const activeIds = getActiveParticipants(activeCal).map(p => p.id);
+      if (cachedId && activeIds.includes(cachedId)) {
+        setChatParticipantId(cachedId);
+      } else {
+        setChatParticipantId(activeIds[0] || '');
+      }
+    }
+  }, [activeCalId, calendars]);
+
+  // Real-time messages listener
+  React.useEffect(() => {
+    if (!firebaseDb || !activeCalId) {
+      setRecentMessages([]);
+      setChatMessages([]);
+      return;
+    }
+    let isMounted = true;
+    
+    // 1. Subscribe to recent 5 messages (descending for comments block)
+    const unsubscribeRecent = firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages')
+      .orderBy('timestamp', 'desc')
+      .limit(5)
+      .onSnapshot(snapshot => {
+        if (!isMounted) return;
+        const list = [];
+        snapshot.forEach(doc => {
+          list.push({ id: doc.id, ...doc.data() });
+        });
+        setRecentMessages(list);
+      }, err => {
+        console.warn(`Firestore messages subscription error for cal_${activeCalId}:`, err);
+        fetchRecentMessagesRest(activeCalId).then(list => {
+          if (isMounted) setRecentMessages(list);
+        });
+      });
+
+    // 2. Subscribe to chat room history (ascending for chat window)
+    const unsubscribeChat = firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages')
+      .orderBy('timestamp', 'asc')
+      .limit(100)
+      .onSnapshot(snapshot => {
+        if (!isMounted) return;
+        const list = [];
+        snapshot.forEach(doc => {
+          list.push({ id: doc.id, ...doc.data() });
+        });
+        setChatMessages(list);
+      }, err => {
+        console.warn(`Firestore chat history subscription error:`, err);
+        fetchChatMessagesRest(activeCalId).then(list => {
+          if (isMounted) setChatMessages(list);
+        });
+      });
+
+    return () => {
+      isMounted = false;
+      if (unsubscribeRecent) unsubscribeRecent();
+      if (unsubscribeChat) unsubscribeChat();
+    };
+  }, [activeCalId]);
+
+  // Scroll to bottom of chat container
+  const chatMessagesContainerRef = React.useRef(null);
+  React.useEffect(() => {
+    if (activeView === 'chat' && chatMessagesContainerRef.current) {
+      const container = chatMessagesContainerRef.current;
+      container.scrollTop = container.scrollHeight;
+      const t = setTimeout(() => {
+        container.scrollTop = container.scrollHeight;
+      }, 50);
+      return () => clearTimeout(t);
+    }
+  }, [activeView, chatMessages.length]);
+
+  const [isHeaderVisible, setIsHeaderVisible] = React.useState(true);
+  const lastScrollTopRef = React.useRef(0);
+
+  const handleChatScroll = (e) => {
+    const scrollTop = e.target.scrollTop;
+    const lastScrollTop = lastScrollTopRef.current;
+    if (scrollTop < 10) {
+      setIsHeaderVisible(true);
+    } else if (scrollTop > lastScrollTop && scrollTop > 56) {
+      setIsHeaderVisible(false);
+    } else if (scrollTop < lastScrollTop) {
+      setIsHeaderVisible(true);
+    }
+    lastScrollTopRef.current = scrollTop;
+  };
+
+  const handleSendChatMessage = async () => {
+    if (!chatInput.trim() || !chatParticipantId) return;
+    setIsChatSubmitting(true);
+    const messageData = {
+      participantId: chatParticipantId,
+      text: chatInput.trim(),
+      timestamp: Date.now()
+    };
+    try {
+      let ok = false;
+      if (firebaseDb) {
+        await firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages').add(messageData);
+        ok = true;
+      } else {
+        ok = await sendChatMessageRest(activeCalId, messageData);
+      }
+      if (ok) {
+        setChatInput('');
+        if (chatTextareaRef.current) {
+          chatTextareaRef.current.style.height = '34px';
+        }
+        showToast('의견이 등록되었습니다.', 'success', 3000);
+      } else {
+        showToast('의견 등록에 실패했습니다.', 'error', 3000);
+      }
+    } catch (err) {
+      console.error('handleSendChatMessage failed:', err);
+      showToast('의견 등록에 실패했습니다.', 'error', 3000);
+    } finally {
+      setIsChatSubmitting(false);
+    }
+  };
   React.useEffect(() => {
     const rawId = getRawCalendarIdFromURL();
     if (rawId && !isAllowedCalendarId(rawId)) {
@@ -4053,6 +4271,53 @@ function App() {
       return updateCalendars(nextCalendars, '캘린더 설정이 저장되었습니다. ✅', 'success', stampedCal.id, 'settings');
     }
   };
+  if (activeView === 'chat') {
+    return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(ChatRoomView, {
+      calendar: activeCal,
+      chatMessages: chatMessages,
+      chatInput: chatInput,
+      setChatInput: setChatInput,
+      chatParticipantId: chatParticipantId,
+      setChatParticipantId: setChatParticipantId,
+      isChatSheetOpen: isChatSheetOpen,
+      setIsChatSheetOpen: setIsChatSheetOpen,
+      isChatSubmitting: isChatSubmitting,
+      chatTextareaRef: chatTextareaRef,
+      onSend: handleSendChatMessage,
+      onBack: () => changeView('calendar'),
+      isHeaderVisible: isHeaderVisible,
+      handleChatScroll: handleChatScroll,
+      chatMessagesContainerRef: chatMessagesContainerRef
+    }), isChatSheetOpen && /*#__PURE__*/React.createElement(ChatParticipantSheet, {
+      calendar: activeCal,
+      selectedId: chatParticipantId,
+      onSelect: id => {
+        setChatParticipantId(id);
+        localStorage.setItem('gather_active_participant_id_v20', id);
+      },
+      onClose: () => setIsChatSheetOpen(false)
+    }), toast && /*#__PURE__*/React.createElement("div", {
+      className: "toast",
+      style: {
+        position: 'fixed',
+        bottom: '32px',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        zIndex: 99999,
+        backgroundColor: toast.type === 'delete' ? '#EF4444' : toast.type === 'success' ? '#10B981' : '#3B82F6',
+        color: '#FFFFFF',
+        padding: '12px 24px',
+        borderRadius: '30px',
+        boxShadow: '0 12px 32px rgba(0,0,0,0.25)',
+        fontSize: '0.95rem',
+        fontWeight: '800',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px'
+      }
+    }, toast.message));
+  }
+
   return /*#__PURE__*/React.createElement("div", {
     className: "app-container"
   }, /*#__PURE__*/React.createElement("header", {
@@ -4297,6 +4562,25 @@ function App() {
     onEditPoll: handleOpenPollEdit,
     onVotePoll: handleOpenVoteSheet,
     onCancelVote: handleCancelVote
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "calendar-card",
+    style: {
+      padding: '16px',
+      marginTop: '-12px'
+    }
+  }, /*#__PURE__*/React.createElement(CommentsSection, {
+    calendar: activeCal,
+    recentMessages: recentMessages,
+    chatInput: chatInput,
+    setChatInput: setChatInput,
+    chatParticipantId: chatParticipantId,
+    setChatParticipantId: setChatParticipantId,
+    isChatSheetOpen: isChatSheetOpen,
+    setIsChatSheetOpen: setIsChatSheetOpen,
+    isChatSubmitting: isChatSubmitting,
+    chatTextareaRef: chatTextareaRef,
+    onSend: handleSendChatMessage,
+    onMore: () => changeView('chat')
   })), /*#__PURE__*/React.createElement(SummaryList, {
     calendar: activeCal,
     onSelectDate: d => {
@@ -4346,6 +4630,14 @@ function App() {
     optionId: voteTarget.optionId,
     onSelect: participantId => handleVotePoll(voteTarget.pollId, voteTarget.optionId, participantId),
     onClose: () => setVoteTarget(null)
+  }), isChatSheetOpen && /*#__PURE__*/React.createElement(ChatParticipantSheet, {
+    calendar: activeCal,
+    selectedId: chatParticipantId,
+    onSelect: id => {
+      setChatParticipantId(id);
+      localStorage.setItem('gather_active_participant_id_v20', id);
+    },
+    onClose: () => setIsChatSheetOpen(false)
   }), toast && /*#__PURE__*/React.createElement("div", {
     className: "toast",
     style: {
@@ -4694,6 +4986,559 @@ function CalendarGrid({
   })));
 }
 
+// Comments / Chat Icons & Utilities
+function ChatSectionIcon() {
+  return /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: "20",
+    height: "20",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: "2.5",
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+    style: { marginRight: '6px' }
+  }, /*#__PURE__*/React.createElement("path", {
+    d: "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"
+  }));
+}
+
+function parseTextWithLinks(text) {
+  if (!text) return '';
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  const parts = text.split(urlRegex);
+  return parts.map((part, i) => {
+    if (urlRegex.test(part)) {
+      return /*#__PURE__*/React.createElement("a", {
+        key: i,
+        href: part,
+        target: "_blank",
+        rel: "noopener noreferrer",
+        style: {
+          color: '#2563EB',
+          textDecoration: 'underline',
+          cursor: 'pointer',
+          wordBreak: 'break-all'
+        }
+      }, part);
+    }
+    return part;
+  });
+}
+
+function formatCommentDate(timestamp) {
+  const date = new Date(timestamp);
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const seconds = String(date.getSeconds()).padStart(2, '0');
+  const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+  const dayName = dayNames[date.getDay()];
+  return {
+    dateStr: `${month}.${day}(${dayName})`,
+    timeStr: `${hours}:${minutes}:${seconds}`
+  };
+}
+
+function formatChatTime(timestamp) {
+  const date = new Date(timestamp);
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return `${hours}:${minutes}`;
+}
+
+function formatChatDividerDate(timestamp) {
+  const date = new Date(timestamp);
+  const year = String(date.getFullYear()).slice(-2);
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+  const dayName = dayNames[date.getDay()];
+  return `${year}.${month}.${day} (${dayName})`;
+}
+
+// Comments Section Card Component on Main Screen
+function CommentsSection({
+  calendar,
+  recentMessages,
+  chatInput,
+  setChatInput,
+  chatParticipantId,
+  setChatParticipantId,
+  isChatSheetOpen,
+  setIsChatSheetOpen,
+  isChatSubmitting,
+  chatTextareaRef,
+  onSend,
+  onMore
+}) {
+  const participants = getActiveParticipants(calendar);
+  const participantsMap = participants.reduce((acc, p) => {
+    acc[p.id] = p;
+    return acc;
+  }, {});
+
+  const selectedParticipant = participants.find(p => p.id === chatParticipantId);
+
+  return /*#__PURE__*/React.createElement("section", {
+    style: { textAlign: 'left' }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: '14px'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "summary-title",
+    style: { color: '#2563EB', marginBottom: 0 }
+  }, /*#__PURE__*/React.createElement(ChatSectionIcon, null), "\uC758\uACAC \uB0A8\uAE30\uAE30"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "btn btn-poll-create",
+    onClick: onMore,
+    style: { padding: '4px 10px', fontSize: '0.8rem' }
+  }, "\uB354\uBC34\uAE30 \u2192")), recentMessages.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    style: { color: 'var(--text-muted)', fontSize: '0.85rem', padding: '12px 0', textAlign: 'center' }
+  }, "\uB4F1\uB85D\uB41C \uC758\uACAC\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.") : /*#__PURE__*/React.createElement("div", {
+    style: { display: 'flex', flexDirection: 'column', gap: '8px' }
+  }, recentMessages.map(msg => {
+    const p = participantsMap[msg.participantId];
+    const dateInfo = formatCommentDate(msg.timestamp);
+    return /*#__PURE__*/React.createElement("div", {
+      key: msg.id,
+      style: {
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: '8px'
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        backgroundColor: p?.color || '#94A3B8',
+        color: '#FFFFFF',
+        padding: '3px 8px',
+        borderRadius: '10px',
+        fontSize: '0.75rem',
+        fontWeight: 'bold',
+        flexShrink: 0,
+        whiteSpace: 'nowrap'
+      }
+    }, p?.name || '\uC54C\uC218\uC5C6\uC74C'), /*#__PURE__*/React.createElement("div", {
+      style: {
+        backgroundColor: '#FFFFFF',
+        border: '1px solid #E2E8F0',
+        borderRadius: '10px',
+        padding: '6px 10px',
+        fontSize: '0.85rem',
+        lineHeight: '1.4',
+        color: '#334155',
+        flex: 1,
+        wordBreak: 'break-all',
+        whiteSpace: 'pre-wrap',
+        boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+      }
+    }, parseTextWithLinks(msg.text)), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        fontSize: '0.68rem',
+        color: '#94A3B8',
+        lineHeight: '1.25',
+        textAlign: 'right',
+        flexShrink: 0,
+        minWidth: '58px',
+        alignSelf: 'stretch'
+      }
+    }, /*#__PURE__*/React.createElement("span", null, dateInfo.dateStr), /*#__PURE__*/React.createElement("span", null, dateInfo.timeStr)));
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'flex-end',
+      gap: '8px',
+      marginTop: '12px',
+      borderTop: '1px solid #F1F5F9',
+      paddingTop: '12px'
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => setIsChatSheetOpen(true),
+    style: {
+      backgroundColor: selectedParticipant?.color || '#94A3B8',
+      color: '#FFFFFF',
+      border: 'none',
+      borderRadius: '14px',
+      padding: '6px 10px',
+      fontSize: '0.8rem',
+      fontWeight: 'bold',
+      cursor: 'pointer',
+      whiteSpace: 'nowrap',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '4px',
+      height: '34px'
+    }
+  }, selectedParticipant?.name || '\uC120\uD0DD', /*#__PURE__*/React.createElement("span", {
+    style: { fontSize: '0.6rem' }
+  }, "\u25BC")), /*#__PURE__*/React.createElement("textarea", {
+    ref: chatTextareaRef,
+    placeholder: "\uC758\uACAC\uC744 \uC785\uB825\uD558\uC138\uC694...",
+    value: chatInput,
+    onChange: e => {
+      setChatInput(e.target.value);
+      e.target.style.height = 'auto';
+      e.target.style.height = `${Math.min(100, e.target.scrollHeight)}px`;
+    },
+    style: {
+      flex: 1,
+      height: '34px',
+      minHeight: '34px',
+      maxHeight: '100px',
+      resize: 'none',
+      border: '1px solid #E2E8F0',
+      borderRadius: '14px',
+      padding: '6px 12px',
+      fontSize: '0.85rem',
+      lineHeight: '1.4',
+      fontFamily: 'inherit',
+      outline: 'none',
+      boxSizing: 'border-box',
+      overflowY: 'auto'
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "btn btn-poll-create",
+    disabled: isChatSubmitting || !chatInput.trim(),
+    onClick: onSend,
+    style: {
+      height: '34px',
+      padding: '0 12px',
+      fontSize: '0.8rem',
+      whiteSpace: 'nowrap',
+      opacity: !chatInput.trim() || isChatSubmitting ? 0.6 : 1
+    }
+  }, isChatSubmitting ? '...' : '\uC804\uC1A1')));
+}
+
+function ChatParticipantSheet({ calendar, selectedId, onSelect, onClose }) {
+  const participants = getActiveParticipants(calendar);
+  return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    className: "bottom-sheet-overlay",
+    onClick: onClose,
+    style: { zIndex: 1050 }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bottom-sheet",
+    onClick: e => e.stopPropagation()
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bottom-sheet-header"
+  }, /*#__PURE__*/React.createElement("h4", null, "\uCC38\uC5EC\uC790 \uC120\uD0DD"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    style: {
+      background: 'none',
+      border: 'none',
+      color: '#64748B',
+      fontSize: '1.2rem',
+      cursor: 'pointer'
+    },
+    onClick: onClose
+  }, "\u2715")), /*#__PURE__*/React.createElement("div", {
+    className: "bottom-sheet-body"
+  }, participants.map(p => /*#__PURE__*/React.createElement("button", {
+    key: p.id,
+    type: "button",
+    className: "bottom-sheet-item",
+    onClick: () => {
+      onSelect(p.id);
+      onClose();
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "color-dot",
+    style: {
+      backgroundColor: p.color,
+      width: '12px',
+      height: '12px'
+    }
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontWeight: 700
+    }
+  }, p.name), selectedId === p.id && /*#__PURE__*/React.createElement("span", {
+    style: {
+      marginLeft: 'auto',
+      color: '#2563EB',
+      fontWeight: 'bold'
+    }
+  }, "\u2713")))))));
+}
+
+function ChatRoomView({
+  calendar,
+  chatMessages,
+  chatInput,
+  setChatInput,
+  chatParticipantId,
+  setChatParticipantId,
+  isChatSheetOpen,
+  setIsChatSheetOpen,
+  isChatSubmitting,
+  chatTextareaRef,
+  onSend,
+  onBack,
+  isHeaderVisible,
+  handleChatScroll,
+  chatMessagesContainerRef
+}) {
+  const participants = getActiveParticipants(calendar);
+  const participantsMap = participants.reduce((acc, p) => {
+    acc[p.id] = p;
+    return acc;
+  }, {});
+  const selectedParticipant = participants.find(p => p.id === chatParticipantId);
+  let lastDateStr = '';
+  const renderedMessages = [];
+  chatMessages.forEach((msg, idx) => {
+    const date = new Date(msg.timestamp);
+    const dateStr = `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
+    if (dateStr !== lastDateStr) {
+      renderedMessages.push(/*#__PURE__*/React.createElement("div", {
+        key: `divider-${msg.timestamp}-${idx}`,
+        style: {
+          display: 'flex',
+          justifyContent: 'center',
+          margin: '20px 0 10px',
+          fontSize: '0.75rem',
+          color: '#64748B',
+          fontWeight: 'bold',
+          textAlign: 'center'
+        }
+      }, `------ ${formatChatDividerDate(msg.timestamp)} ------`));
+      lastDateStr = dateStr;
+    }
+    const p = participantsMap[msg.participantId];
+    const isMe = msg.participantId === chatParticipantId;
+    const timeStr = formatChatTime(msg.timestamp);
+    renderedMessages.push(/*#__PURE__*/React.createElement("div", {
+      key: msg.id || `msg-${idx}`,
+      style: {
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: '8px',
+        marginBottom: '12px',
+        justifyContent: isMe ? 'flex-end' : 'flex-start'
+      }
+    }, !isMe && /*#__PURE__*/React.createElement("span", {
+      style: {
+        backgroundColor: p?.color || '#94A3B8',
+        color: '#FFFFFF',
+        padding: '3px 8px',
+        borderRadius: '10px',
+        fontSize: '0.78rem',
+        fontWeight: 'bold',
+        flexShrink: 0
+      }
+    }, p?.name || '\uC54C\uC218\uC5C6\uC74C'), isMe ? [/*#__PURE__*/React.createElement("span", {
+      key: "time",
+      style: {
+        fontSize: '0.68rem',
+        color: '#94A3B8',
+        alignSelf: 'flex-end',
+        marginRight: '4px'
+      }
+    }, timeStr), /*#__PURE__*/React.createElement("div", {
+      key: "bubble",
+      style: {
+        backgroundColor: '#FFFFFF',
+        border: '1px solid #E2E8F0',
+        borderRadius: '12px',
+        borderTopRightRadius: '2px',
+        padding: '8px 12px',
+        fontSize: '0.9rem',
+        lineHeight: '1.4',
+        color: '#1E293B',
+        maxWidth: '65%',
+        wordBreak: 'break-all',
+        whiteSpace: 'pre-wrap',
+        boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+      }
+    }, parseTextWithLinks(msg.text))] : [/*#__PURE__*/React.createElement("div", {
+      key: "bubble",
+      style: {
+        backgroundColor: '#FFFFFF',
+        border: '1px solid #E2E8F0',
+        borderRadius: '12px',
+        borderTopLeftRadius: '2px',
+        padding: '8px 12px',
+        fontSize: '0.9rem',
+        lineHeight: '1.4',
+        color: '#1E293B',
+        maxWidth: '65%',
+        wordBreak: 'break-all',
+        whiteSpace: 'pre-wrap',
+        boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+      }
+    }, parseTextWithLinks(msg.text)), /*#__PURE__*/React.createElement("span", {
+      key: "time",
+      style: {
+        fontSize: '0.68rem',
+        color: '#94A3B8',
+        alignSelf: 'flex-end',
+        marginLeft: '4px'
+      }
+    }, timeStr)]));
+  });
+  return /*#__PURE__*/React.createElement("div", {
+    className: "chat-room-container",
+    style: {
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: '#F1F5F9',
+      display: 'flex',
+      flexDirection: 'column',
+      zIndex: 1005
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "chat-room-header",
+    style: {
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      height: '56px',
+      backgroundColor: '#FFFFFF',
+      borderBottom: '1px solid #E2E8F0',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      padding: '0 16px',
+      zIndex: 1010,
+      transition: 'transform 0.3s ease',
+      transform: isHeaderVisible ? 'translateY(0)' : 'translateY(-100%)'
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: onBack,
+    style: {
+      background: 'none',
+      border: 'none',
+      cursor: 'pointer',
+      fontSize: '1.5rem',
+      color: '#64748B',
+      padding: '4px 8px',
+      display: 'flex',
+      alignItems: 'center'
+    }
+  }, "\u2039"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: 'absolute',
+      left: '50%',
+      transform: 'translateX(-50%)',
+      fontWeight: 800,
+      fontSize: '0.95rem',
+      color: '#0F172A',
+      whiteSpace: 'nowrap'
+    }
+  }, `${calendar?.title || ''} \uCE98\uB9B0\uB354`), /*#__PURE__*/React.createElement("div", {
+    style: { width: '32px' }
+  })), /*#__PURE__*/React.createElement("div", {
+    ref: chatMessagesContainerRef,
+    onScroll: handleChatScroll,
+    style: {
+      flex: 1,
+      overflowY: 'auto',
+      padding: '16px',
+      paddingTop: '72px',
+      paddingBottom: '80px'
+    }
+  }, renderedMessages.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: 'center',
+      color: '#94A3B8',
+      fontSize: '0.85rem',
+      marginTop: '40px'
+    }
+  }, "\uC544\uC9C1 \uB4F1\uB85D\uB41C \uB300\uD654\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.") : renderedMessages), /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: 'fixed',
+      bottom: 0,
+      left: 0,
+      right: 0,
+      backgroundColor: '#FFFFFF',
+      borderTop: '1px solid #E2E8F0',
+      padding: '10px 16px',
+      display: 'flex',
+      alignItems: 'flex-end',
+      gap: '10px',
+      zIndex: 1000
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => setIsChatSheetOpen(true),
+    style: {
+      backgroundColor: selectedParticipant?.color || '#94A3B8',
+      color: '#FFFFFF',
+      border: 'none',
+      borderRadius: '16px',
+      padding: '8px 12px',
+      fontSize: '0.8rem',
+      fontWeight: 'bold',
+      cursor: 'pointer',
+      whiteSpace: 'nowrap',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '4px',
+      height: '36px'
+    }
+  }, selectedParticipant?.name || '\uC120\uD0DD', /*#__PURE__*/React.createElement("span", {
+    style: { fontSize: '0.65rem' }
+  }, "\u25BC")), /*#__PURE__*/React.createElement("textarea", {
+    ref: chatTextareaRef,
+    placeholder: "\uBA54\uC2DC\uC9C0\uB97C \uC785\uB825\uD558\uC138\uC694...",
+    value: chatInput,
+    onChange: e => {
+      setChatInput(e.target.value);
+      e.target.style.height = 'auto';
+      e.target.style.height = `${Math.min(120, e.target.scrollHeight)}px`;
+    },
+    style: {
+      flex: 1,
+      height: '36px',
+      minHeight: '36px',
+      maxHeight: '120px',
+      resize: 'none',
+      border: '1px solid #E2E8F0',
+      borderRadius: '18px',
+      padding: '8px 14px',
+      fontSize: '0.88rem',
+      lineHeight: '1.4',
+      fontFamily: 'inherit',
+      outline: 'none',
+      boxSizing: 'border-box',
+      overflowY: 'auto'
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    disabled: isChatSubmitting || !chatInput.trim(),
+    onClick: onSend,
+    style: {
+      height: '36px',
+      backgroundColor: '#2563EB',
+      color: '#FFFFFF',
+      border: 'none',
+      borderRadius: '18px',
+      padding: '0 16px',
+      fontSize: '0.85rem',
+      fontWeight: 'bold',
+      cursor: 'pointer',
+      opacity: !chatInput.trim() || isChatSubmitting ? 0.6 : 1,
+      whiteSpace: 'nowrap'
+    }
+  }, isChatSubmitting ? '...' : '\uC804\uC1A1')));
+}
+
 // Date Layer Popup Modal
 function DateModal({
   dateStr,
@@ -4703,7 +5548,15 @@ function DateModal({
   onDeleteDate,
   onClose
 }) {
-  const [participantId, setParticipantId] = React.useState(getActiveParticipants(calendar)[0]?.id || '');
+  const getCachedParticipantId = () => {
+    const cachedId = localStorage.getItem('gather_active_participant_id_v20');
+    const activeIds = getActiveParticipants(calendar).map(p => p.id);
+    if (cachedId && activeIds.includes(cachedId)) {
+      return cachedId;
+    }
+    return activeIds[0] || '';
+  };
+  const [participantId, setParticipantId] = React.useState(getCachedParticipantId);
   const [note, setNote] = React.useState('');
   const [isSheetOpen, setIsSheetOpen] = React.useState(false);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
@@ -4711,7 +5564,7 @@ function DateModal({
   const activeParticipants = getActiveParticipants(calendar);
   const dateEntries = getActiveAvailabilities(calendar).filter(e => e.date === dateStr);
   React.useEffect(() => {
-    setParticipantId(getActiveParticipants(calendar)[0]?.id || '');
+    setParticipantId(getCachedParticipantId());
     setNote('');
     setIsSheetOpen(false);
     setIsSubmitting(false);
@@ -4997,6 +5850,7 @@ function DateModal({
     onClick: () => {
       if (isSubmitting) return;
       setParticipantId(p.id);
+      localStorage.setItem('gather_active_participant_id_v20', p.id);
       const existingEntry = dateEntries.find(entry => entry.participantId === p.id);
       setNote(existingEntry ? existingEntry.note || '' : '');
       setIsSheetOpen(false);
@@ -5653,7 +6507,10 @@ function PollVoterSheet({ calendar, pollId, optionId, onSelect, onClose }) {
     key: participant.id,
     type: "button",
     className: "poll-voter-option",
-    onClick: () => onSelect(participant.id)
+    onClick: () => {
+      localStorage.setItem('gather_active_participant_id_v20', participant.id);
+      onSelect(participant.id);
+    }
   }, /*#__PURE__*/React.createElement("span", {
     style: { display: 'inline-flex', alignItems: 'center', gap: '10px' }
   }, /*#__PURE__*/React.createElement("span", {
