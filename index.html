@@ -3622,6 +3622,7 @@ function App() {
   const [isPollModalOpen, setIsPollModalOpen] = React.useState(false);
   const [editingPoll, setEditingPoll] = React.useState(null);
   const [voteTarget, setVoteTarget] = React.useState(null);
+  const [isGuideOpen, setIsGuideOpen] = React.useState(false);
   const [isInitialDataLoading, setIsInitialDataLoading] = React.useState(() => Boolean(firebaseDb));
 
   if (isAdminDashboardRoute()) {
@@ -4031,7 +4032,9 @@ function App() {
     className: "header-card"
   }, /*#__PURE__*/React.createElement("div", {
     className: "header-left"
-  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { position: 'relative' }
+  }, /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       alignItems: 'center',
@@ -4039,7 +4042,76 @@ function App() {
     }
   }, /*#__PURE__*/React.createElement("span", {
     className: "calendar-title"
-  }, activeCal?.title)), activeCal?.description && /*#__PURE__*/React.createElement("div", {
+  }, activeCal?.title), /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: "20",
+    height: "20",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    "stroke-width": "2",
+    "stroke-linecap": "round",
+    "stroke-linejoin": "round",
+    className: "lucide lucide-message-circle-question-mark-icon lucide-message-circle-question-mark",
+    style: {
+      cursor: 'pointer',
+      color: isGuideOpen ? 'var(--accent-primary, #4F46E5)' : 'var(--text-muted, #64748B)',
+      display: 'inline-block',
+      verticalAlign: 'middle',
+      transition: 'color 0.2s, transform 0.2s',
+      transform: isGuideOpen ? 'scale(1.1)' : 'scale(1)',
+      flexShrink: 0
+    },
+    onClick: () => setIsGuideOpen(!isGuideOpen)
+  }, /*#__PURE__*/React.createElement("path", {
+    d: "M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M12 17h.01"
+  })), isGuideOpen && /*#__PURE__*/React.createElement("div", {
+    className: "guide-bubble",
+    style: {
+      position: 'absolute',
+      top: 'calc(100% + 8px)',
+      left: '0',
+      width: '320px',
+      maxWidth: 'calc(100vw - 32px)',
+      backgroundColor: '#FFFFFF',
+      border: '1px solid #E2E8F0',
+      borderRadius: '12px',
+      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+      padding: '16px',
+      zIndex: 1000,
+      fontSize: '0.85rem',
+      lineHeight: '1.6',
+      color: '#334155',
+      whiteSpace: 'pre-wrap',
+      fontFamily: 'inherit',
+      textAlign: 'left'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: 'absolute',
+      top: '-6px',
+      left: '24px',
+      width: '10px',
+      height: '10px',
+      backgroundColor: '#FFFFFF',
+      borderLeft: '1px solid #E2E8F0',
+      borderTop: '1px solid #E2E8F0',
+      transform: 'rotate(45deg)',
+      zIndex: 1001
+    }
+  }), `모여라 일정조율 캘린더
+<사용법>
+1. 모임이 가능한 일자를 선택 
+2. 일자 선택후 참여자(본인)을 선택후 저장
+3. 추후 참여자가 많은 일자를 '모임 날짜'로 약속
+
+<팁>
+모임 가능한 여러 일자를 선택해서 등록 해놓아야,
+공통모임 일자를 뽑기가 수월해짐.`)), activeCal?.description && /*#__PURE__*/React.createElement("div", {
     className: "calendar-desc"
   }, activeCal.description))), /*#__PURE__*/React.createElement("div", {
     className: "header-actions"
