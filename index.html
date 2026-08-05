@@ -5307,6 +5307,7 @@ function CommentsSection({
   return /*#__PURE__*/React.createElement("section", {
     style: { textAlign: 'left' }
   },
+  /* Header */
   /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
@@ -5316,13 +5317,27 @@ function CommentsSection({
     }
   }, /*#__PURE__*/React.createElement("div", {
     className: "summary-title",
-    style: { color: '#2563EB', marginBottom: 0 }
-  }, /*#__PURE__*/React.createElement(ChatSectionIcon, null), "\uC758\uACAC \uB0A8\uAE30\uAE30"), /*#__PURE__*/React.createElement("button", {
+    style: { color: '#2563EB', marginBottom: 0, display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold' }
+  }, /*#__PURE__*/React.createElement(ChatSectionIcon, null), "의견 남기기"), /*#__PURE__*/React.createElement("button", {
     type: "button",
-    className: "btn btn-secondary",
     onClick: onMore,
-    style: { height: '32px', padding: '0 12px', fontSize: '0.8rem', whiteSpace: 'nowrap' }
-  }, "\uB354\uBCF4\uAE30")),
+    style: {
+      height: '30px',
+      padding: '0 12px',
+      fontSize: '0.82rem',
+      fontWeight: 'bold',
+      color: '#334155',
+      backgroundColor: '#F1F5F9',
+      border: 'none',
+      borderRadius: '6px',
+      cursor: 'pointer',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      whiteSpace: 'nowrap'
+    }
+  }, "더보기")),
+  /* List Background Panel */
   /*#__PURE__*/React.createElement("div", {
     style: {
       backgroundColor: '#F1F5F9',
@@ -5332,15 +5347,17 @@ function CommentsSection({
     }
   }, recentMessages.length === 0 ? /*#__PURE__*/React.createElement("div", {
     style: { color: 'var(--text-muted)', fontSize: '0.85rem', padding: '8px 0', textAlign: 'center' }
-  }, "\uB4F1\uB85D\uB41C \uC758\uACAC\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.") : /*#__PURE__*/React.createElement("div", {
-    style: { display: 'flex', flexDirection: 'column', gap: '8px' }
+  }, "등록된 의견이 없습니다.") : /*#__PURE__*/React.createElement("div", {
+    style: { display: 'flex', flexDirection: 'column', gap: '10px' }
   }, recentMessages.map(msg => {
     const p = participantsMap[msg.participantId];
     const dateInfo = formatCommentDate(msg.timestamp);
     return /*#__PURE__*/React.createElement("div", {
       key: msg.id,
       style: { display: 'flex', alignItems: 'flex-start', gap: '8px' }
-    }, /*#__PURE__*/React.createElement("span", {
+    },
+    /* Participant Badge (Left) */
+    /*#__PURE__*/React.createElement("span", {
       style: {
         backgroundColor: p?.color || '#94A3B8',
         color: '#FFFFFF',
@@ -5351,12 +5368,14 @@ function CommentsSection({
         flexShrink: 0,
         whiteSpace: 'nowrap',
         alignSelf: 'flex-start',
-        marginTop: '2px'
+        marginTop: '6px'
       }
-    }, p?.name || '\uC54C\uC218\uC5C6\uC74C'),
+    }, p?.name || '알수없음'),
+    /* Bubble wrapper & Tail (Middle) */
     /*#__PURE__*/React.createElement("div", {
       style: { position: 'relative', flex: 1 }
     },
+    /* Bubble container */
     /*#__PURE__*/React.createElement("div", {
       style: {
         position: 'relative',
@@ -5364,7 +5383,7 @@ function CommentsSection({
         backgroundColor: '#FFFFFF',
         border: '1px solid #E2E8F0',
         borderRadius: '10px',
-        padding: '6px 10px',
+        padding: '10px 14px',
         fontSize: '0.85rem',
         lineHeight: '1.4',
         color: '#334155',
@@ -5372,20 +5391,24 @@ function CommentsSection({
         whiteSpace: 'pre-wrap',
         boxShadow: '0 2px 6px rgba(0,0,0,0.06)'
       }
-    }, msg.thumbUrl ? /*#__PURE__*/React.createElement("img", {
+    },
+    msg.thumbUrl ? /*#__PURE__*/React.createElement("div", {
+      style: { marginBottom: '8px' }
+    }, /*#__PURE__*/React.createElement("img", {
       src: msg.thumbUrl,
-      alt: "\uCCA8\uBD80\uC774\uBBF8\uC9C0",
+      alt: "첨부이미지",
       onClick: () => setActiveLightboxUrl && setActiveLightboxUrl(msg.imageUrl || msg.thumbUrl),
       style: {
         display: 'block',
         maxWidth: '120px',
         maxHeight: '90px',
         borderRadius: '6px',
-        marginBottom: msg.text ? '6px' : '0',
         cursor: 'pointer',
         objectFit: 'cover'
       }
-    }) : null, msg.text ? parseTextWithLinks(msg.text) : null),
+    })) : null,
+    msg.text ? parseTextWithLinks(msg.text) : null),
+    /* Tail pointing left */
     /*#__PURE__*/React.createElement("div", {
       style: {
         position: 'absolute',
@@ -5400,38 +5423,42 @@ function CommentsSection({
         zIndex: 2
       }
     })),
+    /* Meta Column (Right) */
     /*#__PURE__*/React.createElement("div", {
       style: {
         display: 'flex',
         flexDirection: 'column',
-        alignItems: 'flex-end',
-        justifyContent: 'flex-end',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        alignSelf: 'stretch',
         flexShrink: 0,
-        gap: '4px'
+        minWidth: '50px',
+        gap: '6px'
       }
     },
+    /* Edit/Delete row (Top-right) */
     /*#__PURE__*/React.createElement("div", {
-      style: { display: 'flex', gap: '4px', alignItems: 'center' }
+      style: { display: 'flex', gap: '6px', alignItems: 'center' }
     },
+    /* Edit */
     /*#__PURE__*/React.createElement("button", {
       type: "button",
-      className: "btn btn-secondary",
-      title: "\uD3B8\uC9D1",
       onClick: () => onEditMessage && onEditMessage(msg),
+      title: "편집",
       style: {
-        width: '24px',
-        height: '24px',
+        border: 'none',
+        background: 'none',
         padding: 0,
+        cursor: 'pointer',
+        color: '#94A3B8',
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'center',
-        borderRadius: '6px',
-        flexShrink: 0
+        justifyContent: 'center'
       }
     }, /*#__PURE__*/React.createElement("svg", {
       xmlns: "http://www.w3.org/2000/svg",
-      width: "13",
-      height: "13",
+      width: "14",
+      height: "14",
       viewBox: "0 0 24 24",
       fill: "none",
       stroke: "currentColor",
@@ -5439,57 +5466,190 @@ function CommentsSection({
       strokeLinecap: "round",
       strokeLinejoin: "round"
     }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), /*#__PURE__*/React.createElement("path", { d: "M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" }), /*#__PURE__*/React.createElement("path", { d: "M13.5 6.5l4 4" }))),
+    /* Delete */
     /*#__PURE__*/React.createElement("button", {
       type: "button",
-      title: "\uC0AD\uC81C",
       onClick: () => onDeleteMessage && onDeleteMessage(msg),
+      title: "삭제",
       style: {
-        width: '24px',
-        height: '24px',
-        padding: 0,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'none',
         border: 'none',
+        background: 'none',
+        padding: 0,
         cursor: 'pointer',
         color: '#94A3B8',
-        flexShrink: 0
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
       }
     }, /*#__PURE__*/React.createElement("svg", {
       xmlns: "http://www.w3.org/2000/svg",
-      width: "13",
-      height: "13",
+      width: "14",
+      height: "14",
       viewBox: "0 0 24 24",
       fill: "none",
       stroke: "currentColor",
       strokeWidth: "2",
       strokeLinecap: "round",
       strokeLinejoin: "round"
-    }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), /*#__PURE__*/React.createElement("path", { d: "M18 6l-12 12" }), /*#__PURE__*/React.createElement("path", { d: "M6 6l12 12" })))),
+    }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), /*#__PURE__*/React.createElement("line", { x1: "18", y1: "6", x2: "6", y2: "18" }), /*#__PURE__*/React.createElement("line", { x1: "6", y1: "6", x2: "18", y2: "18" })))
+    ),
+    /* Date/Time (Bottom-right) */
     /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: '0.68rem',
         color: '#94A3B8',
-        lineHeight: '1.25',
-        textAlign: 'right'
+        lineHeight: '1.3',
+        textAlign: 'center'
       }
-    }, /*#__PURE__*/React.createElement("div", null, dateInfo.dateStr), /*#__PURE__*/React.createElement("div", null, dateInfo.timeStr))));
-  }))),
+    },
+    /*#__PURE__*/React.createElement("div", null, dateInfo.dateStr),
+    /*#__PURE__*/React.createElement("div", null, dateInfo.timeStr)
+    )));
+  }),
+  /* Full Width "이전 채팅 더보기" Button at bottom of list */
+  recentMessages.length > 0 && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: onMore,
+    style: {
+      width: '100%',
+      backgroundColor: '#E2E8F0',
+      border: '1px solid #CBD5E1',
+      borderRadius: '8px',
+      padding: '8px 0',
+      fontSize: '0.85rem',
+      fontWeight: 'bold',
+      color: '#1E293B',
+      cursor: 'pointer',
+      textAlign: 'center',
+      marginTop: '10px'
+    }
+  }, "이전 채팅 더보기")
+  )),
+  /* Input row */
   /*#__PURE__*/React.createElement("div", {
     style: {
       backgroundColor: '#FFFFFF',
       borderRadius: '10px',
-      padding: '10px',
+      padding: '10px 0 0 0',
       marginTop: '8px',
-      border: '1px solid #E2E8F0'
+      display: 'flex',
+      alignItems: 'flex-end',
+      gap: '8px'
     }
   },
+  /* Active Participant Select Button */
+  /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => setIsChatSheetOpen(true),
+    style: {
+      backgroundColor: selectedParticipant?.color || '#94A3B8',
+      color: '#FFFFFF',
+      border: 'none',
+      borderRadius: '14px',
+      padding: '6px 10px',
+      fontSize: '0.8rem',
+      fontWeight: 'bold',
+      cursor: 'pointer',
+      whiteSpace: 'nowrap',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '4px',
+      height: '34px',
+      flexShrink: 0
+    }
+  }, selectedParticipant?.name || '선택', /*#__PURE__*/React.createElement("span", {
+    style: { fontSize: '0.6rem' }
+  }, "▼")),
+  /* Textarea */
+  /*#__PURE__*/React.createElement("textarea", {
+    ref: chatTextareaRef,
+    placeholder: "의견을 입력하세요...",
+    value: chatInput,
+    onChange: e => {
+      setChatInput(e.target.value);
+      e.target.style.height = 'auto';
+      e.target.style.height = `${Math.min(100, e.target.scrollHeight)}px`;
+    },
+    style: {
+      flex: 1,
+      height: '34px',
+      minHeight: '34px',
+      maxHeight: '100px',
+      resize: 'none',
+      border: '1px solid #E2E8F0',
+      borderRadius: '17px',
+      padding: '6px 14px',
+      fontSize: '0.85rem',
+      lineHeight: '1.4',
+      fontFamily: 'inherit',
+      outline: 'none',
+      boxSizing: 'border-box',
+      overflowY: 'auto'
+    }
+  }),
+  /* Hidden File Input */
+  /*#__PURE__*/React.createElement("input", {
+    ref: fileInputRef,
+    type: "file",
+    accept: "image/*",
+    style: { position: 'absolute', width: '1px', height: '1px', padding: 0, margin: '-1px', overflow: 'hidden', clip: 'rect(0,0,0,0)', border: 0 },
+    onChange: handleFileChange
+  }),
+  /* Camera Button */
+  /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => fileInputRef.current && fileInputRef.current.click(),
+    title: "사진 첨부",
+    style: {
+      width: '34px',
+      height: '34px',
+      borderRadius: '50%',
+      border: '1px solid #E2E8F0',
+      backgroundColor: '#F8FAFC',
+      cursor: 'pointer',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexShrink: 0,
+      padding: 0,
+      color: '#64748B'
+    }
+  }, /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: "18",
+    height: "18",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: "2",
+    strokeLinecap: "round",
+    strokeLinejoin: "round"
+  }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), /*#__PURE__*/React.createElement("path", { d: "M15 8h.01" }), /*#__PURE__*/React.createElement("path", { d: "M12.5 21h-6.5a3 3 0 0 1 -3 -3v-12a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v6.5" }), /*#__PURE__*/React.createElement("path", { d: "M3 16l5 -5c.928 -.893 2.072 -.893 3 0l4 4" }), /*#__PURE__*/React.createElement("path", { d: "M14 14l1 -1c.67 -.644 1.45 -.824 2.182 -.54" }), /*#__PURE__*/React.createElement("path", { d: "M16 19h6" }), /*#__PURE__*/React.createElement("path", { d: "M19 16v6" }))),
+  /* Send Button */
+  /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    disabled: isChatSubmitting || (!chatInput.trim() && !chatImage),
+    onClick: onSend,
+    style: {
+      height: '34px',
+      padding: '0 16px',
+      fontSize: '0.85rem',
+      fontWeight: 'bold',
+      backgroundColor: '#4A5568',
+      color: '#FFFFFF',
+      border: 'none',
+      borderRadius: '17px',
+      cursor: 'pointer',
+      whiteSpace: 'nowrap',
+      opacity: (chatInput.trim() || chatImage) && !isChatSubmitting ? 1 : 0.6
+    }
+  }, isChatSubmitting ? '...' : '전송')),
+  /* Lightbox / Preview */
   chatImage ? /*#__PURE__*/React.createElement("div", {
-    style: { marginBottom: '8px', position: 'relative', display: 'inline-block' }
+    style: { marginTop: '8px', position: 'relative', display: 'inline-block' }
   }, /*#__PURE__*/React.createElement("img", {
     src: chatImage.thumbnail,
-    alt: "\uCCA8\uBD80 \uBBF8\uB9AC\uBCF4\uAE30",
+    alt: "첨부 미리보기",
     style: {
       width: '60px',
       height: '60px',
@@ -5526,101 +5686,6 @@ function CommentsSection({
     strokeLinecap: "round",
     strokeLinejoin: "round"
   }, /*#__PURE__*/React.createElement("line", { x1: "18", y1: "6", x2: "6", y2: "18" }), /*#__PURE__*/React.createElement("line", { x1: "6", y1: "6", x2: "18", y2: "18" })))) : null,
-  /*#__PURE__*/React.createElement("div", {
-    style: { display: 'flex', alignItems: 'flex-end', gap: '8px' }
-  }, /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    onClick: () => setIsChatSheetOpen(true),
-    style: {
-      backgroundColor: selectedParticipant?.color || '#94A3B8',
-      color: '#FFFFFF',
-      border: 'none',
-      borderRadius: '14px',
-      padding: '6px 10px',
-      fontSize: '0.8rem',
-      fontWeight: 'bold',
-      cursor: 'pointer',
-      whiteSpace: 'nowrap',
-      display: 'flex',
-      alignItems: 'center',
-      gap: '4px',
-      height: '34px',
-      flexShrink: 0
-    }
-  }, selectedParticipant?.name || '\uC120\uD0DD', /*#__PURE__*/React.createElement("span", {
-    style: { fontSize: '0.6rem' }
-  }, "\u25BC")), /*#__PURE__*/React.createElement("textarea", {
-    ref: chatTextareaRef,
-    placeholder: "\uC758\uACAC\uC744 \uC785\uB825\uD558\uC138\uC694...",
-    value: chatInput,
-    onChange: e => {
-      setChatInput(e.target.value);
-      e.target.style.height = 'auto';
-      e.target.style.height = `${Math.min(100, e.target.scrollHeight)}px`;
-    },
-    style: {
-      flex: 1,
-      height: '34px',
-      minHeight: '34px',
-      maxHeight: '100px',
-      resize: 'none',
-      border: '1px solid #E2E8F0',
-      borderRadius: '14px',
-      padding: '6px 12px',
-      fontSize: '0.85rem',
-      lineHeight: '1.4',
-      fontFamily: 'inherit',
-      outline: 'none',
-      boxSizing: 'border-box',
-      overflowY: 'auto'
-    }
-  }), /*#__PURE__*/React.createElement("input", {
-    ref: fileInputRef,
-    type: "file",
-    accept: "image/*",
-    style: { position: 'absolute', width: '1px', height: '1px', padding: 0, margin: '-1px', overflow: 'hidden', clip: 'rect(0,0,0,0)', border: 0 },
-    onChange: handleFileChange
-  }), /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    onClick: () => fileInputRef.current && fileInputRef.current.click(),
-    title: "\uC0AC\uC9C4 \uCCA8\uBD80",
-    style: {
-      width: '34px',
-      height: '34px',
-      borderRadius: '50%',
-      border: '1px solid #E2E8F0',
-      backgroundColor: '#F8FAFC',
-      cursor: 'pointer',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      flexShrink: 0,
-      padding: 0,
-      color: '#64748B'
-    }
-  }, /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg",
-    width: "18",
-    height: "18",
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    strokeWidth: "2",
-    strokeLinecap: "round",
-    strokeLinejoin: "round"
-  }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), /*#__PURE__*/React.createElement("path", { d: "M15 8h.01" }), /*#__PURE__*/React.createElement("path", { d: "M12.5 21h-6.5a3 3 0 0 1 -3 -3v-12a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v6.5" }), /*#__PURE__*/React.createElement("path", { d: "M3 16l5 -5c.928 -.893 2.072 -.893 3 0l4 4" }), /*#__PURE__*/React.createElement("path", { d: "M14 14l1 -1c.67 -.644 1.45 -.824 2.182 -.54" }), /*#__PURE__*/React.createElement("path", { d: "M16 19h6" }), /*#__PURE__*/React.createElement("path", { d: "M19 16v6" }))), /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    className: "btn btn-poll-create",
-    disabled: isChatSubmitting || (!chatInput.trim() && !chatImage),
-    onClick: onSend,
-    style: {
-      height: '34px',
-      padding: '0 12px',
-      fontSize: '0.8rem',
-      whiteSpace: 'nowrap',
-      opacity: (chatInput.trim() || chatImage) && !isChatSubmitting ? 1 : 0.6
-    }
-  }, isChatSubmitting ? '...' : '\uC804\uC1A1'))),
   activeLightboxUrl ? /*#__PURE__*/React.createElement("div", {
     onClick: () => setActiveLightboxUrl(null),
     style: {
@@ -5667,7 +5732,7 @@ function CommentsSection({
     strokeLinejoin: "round"
   }, /*#__PURE__*/React.createElement("line", { x1: "18", y1: "6", x2: "6", y2: "18" }), /*#__PURE__*/React.createElement("line", { x1: "6", y1: "6", x2: "18", y2: "18" }))), /*#__PURE__*/React.createElement("img", {
     src: activeLightboxUrl,
-    alt: "\uC6D0\uBCF8 \uC774\uBBF8\uC9C0",
+    alt: "원본 이미지",
     onClick: e => e.stopPropagation(),
     style: {
       maxWidth: '92vw',
@@ -5677,57 +5742,6 @@ function CommentsSection({
       boxShadow: '0 24px 80px rgba(0,0,0,0.6)'
     }
   })) : null);
-}
-
-function ChatParticipantSheet({ calendar, selectedId, onSelect, onClose }) {
-  const participants = getActiveParticipants(calendar);
-  return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
-    className: "bottom-sheet-overlay",
-    onClick: onClose,
-    style: { zIndex: 1050 }
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "bottom-sheet",
-    onClick: e => e.stopPropagation()
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "bottom-sheet-header"
-  }, /*#__PURE__*/React.createElement("h4", null, "\uCC38\uC5EC\uC790 \uC120\uD0DD"), /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    style: {
-      background: 'none',
-      border: 'none',
-      color: '#64748B',
-      fontSize: '1.2rem',
-      cursor: 'pointer'
-    },
-    onClick: onClose
-  }, "\u2715")), /*#__PURE__*/React.createElement("div", {
-    className: "bottom-sheet-body"
-  }, participants.map(p => /*#__PURE__*/React.createElement("button", {
-    key: p.id,
-    type: "button",
-    className: "bottom-sheet-item",
-    onClick: () => {
-      onSelect(p.id);
-      onClose();
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "color-dot",
-    style: {
-      backgroundColor: p.color,
-      width: '12px',
-      height: '12px'
-    }
-  }), /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontWeight: 700
-    }
-  }, p.name), selectedId === p.id && /*#__PURE__*/React.createElement("span", {
-    style: {
-      marginLeft: 'auto',
-      color: '#2563EB',
-      fontWeight: 'bold'
-    }
-  }, "\u2713")))))));
 }
 
 function ChatRoomView({
