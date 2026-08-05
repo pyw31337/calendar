@@ -3891,9 +3891,15 @@ function App() {
 
   // Real-time messages listener
   React.useEffect(() => {
-    if (!firebaseDb || !activeCalId) {
+    if (!activeCalId) {
       setRecentMessages([]);
       setChatMessages([]);
+      return;
+    }
+    if (!firebaseDb) {
+      // REST fallback: load messages once
+      fetchRecentMessagesRest(activeCalId).then(list => setRecentMessages(list));
+      fetchChatMessagesRest(activeCalId).then(list => setChatMessages(list));
       return;
     }
     let isMounted = true;
@@ -3996,6 +4002,10 @@ function App() {
         if (chatTextareaRef.current) {
           chatTextareaRef.current.style.height = '34px';
         }
+        if (!firebaseDb) {
+          fetchRecentMessagesRest(activeCalId).then(list => setRecentMessages(list));
+          fetchChatMessagesRest(activeCalId).then(list => setChatMessages(list));
+        }
         showToast('의견이 등록되었습니다.', 'success', 3000);
       } else {
         showToast('의견 등록에 실패했습니다.', 'error', 3000);
@@ -4024,6 +4034,10 @@ function App() {
         ok = await deleteMessageRest(calId, id);
       }
       if (ok) {
+        if (!firebaseDb) {
+          fetchRecentMessagesRest(calId).then(list => setRecentMessages(list));
+          fetchChatMessagesRest(calId).then(list => setChatMessages(list));
+        }
         showToast('의견이 삭제되었습니다.', 'success', 3000);
       } else {
         showToast('삭제에 실패했습니다.', 'error', 3000);
@@ -4061,6 +4075,10 @@ function App() {
         ok = await updateMessageRest(calId, id, data);
       }
       if (ok) {
+        if (!firebaseDb) {
+          fetchRecentMessagesRest(calId).then(list => setRecentMessages(list));
+          fetchChatMessagesRest(calId).then(list => setChatMessages(list));
+        }
         showToast('의견이 수정되었습니다.', 'success', 3000);
       } else {
         showToast('수정에 실패했습니다.', 'error', 3000);
@@ -5285,6 +5303,12 @@ function CommentsSection({
   }, {});
   const selectedParticipant = participants.find(p => p.id === chatParticipantId);
   const fileInputRef = React.useRef(null);
+  const [isMobile, setIsMobile] = React.useState(() => window.innerWidth < 768);
+  React.useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   const handleFileChange = async (e) => {
     const file = e.target.files?.[0];
@@ -5348,168 +5372,128 @@ function CommentsSection({
     const p = participantsMap[msg.participantId];
     const dateInfo = formatCommentDate(msg.timestamp);
     const isMsgMe = msg.participantId === chatParticipantId;
-    return /*#__PURE__*/React.createElement("div", {
+    const badgeColor = p?.color || '#94A3B8';
+    const badgeName = p?.name || '알수없음';
+
+    const bubbleContent = /*#__PURE__*/React.createElement(React.Fragment, null,
+      msg.thumbUrl ? /*#__PURE__*/React.createElement('div', { style: { marginBottom: '8px' } },
+        /*#__PURE__*/React.createElement('img', {
+          src: msg.thumbUrl,
+          alt: '첨부이미지',
+          onClick: () => setActiveLightboxUrl && setActiveLightboxUrl(msg.imageUrl || msg.thumbUrl),
+          style: { display: 'block', maxWidth: '120px', maxHeight: '90px', borderRadius: '6px', cursor: 'pointer', objectFit: 'cover' }
+        })
+      ) : null,
+      msg.text ? parseTextWithLinks(msg.text) : null
+    );
+
+    const editSvg = /*#__PURE__*/React.createElement('svg', { xmlns: 'http://www.w3.org/2000/svg', width: '12', height: '12', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '2.5', strokeLinecap: 'round', strokeLinejoin: 'round' },
+      /*#__PURE__*/React.createElement('path', { stroke: 'none', d: 'M0 0h24v24H0z', fill: 'none' }),
+      /*#__PURE__*/React.createElement('path', { d: 'M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4' }),
+      /*#__PURE__*/React.createElement('path', { d: 'M13.5 6.5l4 4' })
+    );
+    const deleteSvg = /*#__PURE__*/React.createElement('svg', { xmlns: 'http://www.w3.org/2000/svg', width: '14', height: '14', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '2', strokeLinecap: 'round', strokeLinejoin: 'round' },
+      /*#__PURE__*/React.createElement('path', { stroke: 'none', d: 'M0 0h24v24H0z', fill: 'none' }),
+      /*#__PURE__*/React.createElement('line', { x1: '18', y1: '6', x2: '6', y2: '18' }),
+      /*#__PURE__*/React.createElement('line', { x1: '6', y1: '6', x2: '18', y2: '18' })
+    );
+
+    if (isMobile) {
+      /* === MOBILE CARD LAYOUT === */
+      return /*#__PURE__*/React.createElement('div', {
+        key: msg.id,
+        style: { display: 'flex', flexDirection: 'column', gap: '4px' }
+      },
+        /* Top Row: Badge (left) + Edit/Delete buttons (right) */
+        /*#__PURE__*/React.createElement('div', {
+          style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }
+        },
+          /*#__PURE__*/React.createElement('span', {
+            style: { backgroundColor: badgeColor, color: '#FFFFFF', padding: '3px 10px', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 'bold', whiteSpace: 'nowrap' }
+          }, badgeName),
+          isMsgMe ? /*#__PURE__*/React.createElement('div', {
+            style: { display: 'flex', alignItems: 'center', gap: '4px' }
+          },
+            /*#__PURE__*/React.createElement('button', {
+              type: 'button', onClick: () => onEditMessage && onEditMessage(msg), title: '편집',
+              style: { width: '26px', height: '26px', border: '1px solid #E2E8F0', backgroundColor: '#EFF3F8', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0, color: '#64748B' }
+            }, editSvg),
+            /*#__PURE__*/React.createElement('button', {
+              type: 'button', onClick: () => onDeleteMessage && onDeleteMessage(msg), title: '삭제',
+              style: { width: '26px', height: '26px', border: 'none', background: 'none', padding: 0, cursor: 'pointer', color: '#94A3B8', display: 'flex', alignItems: 'center', justifyContent: 'center' }
+            }, deleteSvg)
+          ) : null
+        ),
+        /* Middle Row: Full-width bubble with top double-tail */
+        /*#__PURE__*/React.createElement('div', { style: { position: 'relative', marginTop: '7px' } },
+          /* Outer tail (border color, pointing up) */
+          /*#__PURE__*/React.createElement('div', {
+            style: { position: 'absolute', top: '-7px', left: '18px', width: 0, height: 0, borderLeft: '7px solid transparent', borderRight: '7px solid transparent', borderBottom: '7px solid #E2E8F0', zIndex: 2 }
+          }),
+          /* Inner tail (white fill, pointing up) */
+          /*#__PURE__*/React.createElement('div', {
+            style: { position: 'absolute', top: '-6px', left: '19px', width: 0, height: 0, borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderBottom: '6px solid #FFFFFF', zIndex: 3 }
+          }),
+          /* Bubble */
+          /*#__PURE__*/React.createElement('div', {
+            style: { backgroundColor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '10px 14px', fontSize: '0.85rem', lineHeight: '1.4', color: '#334155', wordBreak: 'break-all', whiteSpace: 'pre-wrap', boxShadow: '0 2px 6px rgba(0,0,0,0.06)', position: 'relative', zIndex: 1 }
+          }, bubbleContent)
+        ),
+        /* Bottom Row: Timestamp right-aligned */
+        /*#__PURE__*/React.createElement('div', {
+          style: { fontSize: '0.68rem', color: '#94A3B8', lineHeight: '1.3', textAlign: 'right' }
+        },
+          `${dateInfo.dateStr} ${dateInfo.timeStr}`
+        )
+      );
+    }
+
+    /* === DESKTOP LAYOUT (double-tail) === */
+    return /*#__PURE__*/React.createElement('div', {
       key: msg.id,
       style: { display: 'flex', alignItems: 'flex-start', gap: '8px' }
     },
-    /* Participant Badge (Left) */
-    /*#__PURE__*/React.createElement("span", {
-      style: {
-        backgroundColor: p?.color || '#94A3B8',
-        color: '#FFFFFF',
-        padding: '3px 8px',
-        borderRadius: '9999px',
-        fontSize: '0.75rem',
-        fontWeight: 'bold',
-        flexShrink: 0,
-        whiteSpace: 'nowrap',
-        alignSelf: 'flex-start',
-        marginTop: '6px'
-      }
-    }, p?.name || '알수없음'),
-    /* Bubble wrapper & Tail (Middle) */
-    /*#__PURE__*/React.createElement("div", {
-      style: { position: 'relative', flex: 1, zIndex: 1 }
-    },
-    /* Bubble container */
-    /*#__PURE__*/React.createElement("div", {
-      style: {
-        position: 'relative',
-        zIndex: 1,
-        backgroundColor: '#FFFFFF',
-        border: '1px solid #E2E8F0',
-        borderRadius: '10px',
-        padding: '10px 14px',
-        fontSize: '0.85rem',
-        lineHeight: '1.4',
-        color: '#334155',
-        wordBreak: 'break-all',
-        whiteSpace: 'pre-wrap',
-        boxShadow: '0 2px 6px rgba(0,0,0,0.06)'
-      }
-    },
-    msg.thumbUrl ? /*#__PURE__*/React.createElement("div", {
-      style: { marginBottom: '8px' }
-    }, /*#__PURE__*/React.createElement("img", {
-      src: msg.thumbUrl,
-      alt: "첨부이미지",
-      onClick: () => setActiveLightboxUrl && setActiveLightboxUrl(msg.imageUrl || msg.thumbUrl),
-      style: {
-        display: 'block',
-        maxWidth: '120px',
-        maxHeight: '90px',
-        borderRadius: '6px',
-        cursor: 'pointer',
-        objectFit: 'cover'
-      }
-    })) : null,
-    msg.text ? parseTextWithLinks(msg.text) : null),
-    /* Tail pointing left */
-    /*#__PURE__*/React.createElement("div", {
-      style: {
-        position: 'absolute',
-        left: '-4px',
-        top: '12px',
-        width: 0,
-        height: 0,
-        borderTop: '6px solid transparent',
-        borderBottom: '6px solid transparent',
-        borderRight: '6px solid #FFFFFF',
-        filter: 'drop-shadow(-1px 0px 1px rgba(0,0,0,0.06))',
-        zIndex: 2
-      }
-    })),
-    /* Meta Column (Right) */
-    /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: isMsgMe ? 'space-between' : 'flex-end',
-        alignItems: 'flex-start',
-        alignSelf: 'stretch',
-        flexShrink: 0,
-        minWidth: '50px',
-        gap: '6px',
-        padding: '2px 0'
-      }
-    },
-    /* Top: Delete button (only if isMsgMe) */
-    isMsgMe ? /*#__PURE__*/React.createElement("button", {
-      type: "button",
-      onClick: () => onDeleteMessage && onDeleteMessage(msg),
-      title: "삭제",
-      style: {
-        width: '24px',
-        height: '24px',
-        border: 'none',
-        background: 'none',
-        padding: 0,
-        cursor: 'pointer',
-        color: '#94A3B8',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'flex-start'
-      }
-    }, /*#__PURE__*/React.createElement("svg", {
-      xmlns: "http://www.w3.org/2000/svg",
-      width: "14",
-      height: "14",
-      viewBox: "0 0 24 24",
-      fill: "none",
-      stroke: "currentColor",
-      strokeWidth: "2",
-      strokeLinecap: "round",
-      strokeLinejoin: "round"
-    }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), /*#__PURE__*/React.createElement("line", { x1: "18", y1: "6", x2: "6", y2: "18" }), /*#__PURE__*/React.createElement("line", { x1: "6", y1: "6", x2: "18", y2: "18" }))) : null,
-    /* Bottom: Edit button (only if isMsgMe) + Timestamp */
-    /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'flex-start',
-        gap: '4px'
-      }
-    },
-    isMsgMe ? /*#__PURE__*/React.createElement("button", {
-      type: "button",
-      onClick: () => onEditMessage && onEditMessage(msg),
-      title: "편집",
-      style: {
-        width: '24px',
-        height: '24px',
-        border: '1px solid #E2E8F0',
-        backgroundColor: '#EFF3F8',
-        borderRadius: '6px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        cursor: 'pointer',
-        padding: 0,
-        color: '#64748B'
-      }
-    }, /*#__PURE__*/React.createElement("svg", {
-      xmlns: "http://www.w3.org/2000/svg",
-      width: "12",
-      height: "12",
-      viewBox: "0 0 24 24",
-      fill: "none",
-      stroke: "currentColor",
-      strokeWidth: "2.5",
-      strokeLinecap: "round",
-      strokeLinejoin: "round"
-    }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), /*#__PURE__*/React.createElement("path", { d: "M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" }), /*#__PURE__*/React.createElement("path", { d: "M13.5 6.5l4 4" }))) : null,
-    /* Date/Time Text */
-    /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: '0.68rem',
-        color: '#94A3B8',
-        lineHeight: '1.3',
-        textAlign: 'left'
-      }
-    },
-    /*#__PURE__*/React.createElement("div", null, dateInfo.dateStr),
-    /*#__PURE__*/React.createElement("div", null, dateInfo.timeStr)
-    ))));
+      /* Participant Badge (Left) */
+      /*#__PURE__*/React.createElement('span', {
+        style: { backgroundColor: badgeColor, color: '#FFFFFF', padding: '3px 8px', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 'bold', flexShrink: 0, whiteSpace: 'nowrap', alignSelf: 'flex-start', marginTop: '6px' }
+      }, badgeName),
+      /* Bubble wrapper with double-tail left (Middle) */
+      /*#__PURE__*/React.createElement('div', {
+        style: { position: 'relative', flex: 1, zIndex: 1 }
+      },
+        /* Bubble */
+        /*#__PURE__*/React.createElement('div', {
+          style: { position: 'relative', zIndex: 1, backgroundColor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '10px 14px', fontSize: '0.85rem', lineHeight: '1.4', color: '#334155', wordBreak: 'break-all', whiteSpace: 'pre-wrap', boxShadow: '0 2px 6px rgba(0,0,0,0.06)' }
+        }, bubbleContent),
+        /* Outer tail (border color) */
+        /*#__PURE__*/React.createElement('div', {
+          style: { position: 'absolute', left: '-7px', top: '10px', width: 0, height: 0, borderTop: '7px solid transparent', borderBottom: '7px solid transparent', borderRight: '7px solid #E2E8F0', zIndex: 2 }
+        }),
+        /* Inner tail (white fill) */
+        /*#__PURE__*/React.createElement('div', {
+          style: { position: 'absolute', left: '-6px', top: '11px', width: 0, height: 0, borderTop: '6px solid transparent', borderBottom: '6px solid transparent', borderRight: '6px solid #FFFFFF', zIndex: 3 }
+        })
+      ),
+      /* Meta Column (Right) */
+      /*#__PURE__*/React.createElement('div', {
+        style: { display: 'flex', flexDirection: 'column', justifyContent: isMsgMe ? 'space-between' : 'flex-end', alignItems: 'flex-start', alignSelf: 'stretch', flexShrink: 0, minWidth: '50px', gap: '6px', padding: '2px 0' }
+      },
+        isMsgMe ? /*#__PURE__*/React.createElement('button', {
+          type: 'button', onClick: () => onDeleteMessage && onDeleteMessage(msg), title: '삭제',
+          style: { width: '24px', height: '24px', border: 'none', background: 'none', padding: 0, cursor: 'pointer', color: '#94A3B8', display: 'flex', alignItems: 'center', justifyContent: 'flex-start' }
+        }, deleteSvg) : null,
+        /*#__PURE__*/React.createElement('div', { style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '4px' } },
+          isMsgMe ? /*#__PURE__*/React.createElement('button', {
+            type: 'button', onClick: () => onEditMessage && onEditMessage(msg), title: '편집',
+            style: { width: '24px', height: '24px', border: '1px solid #E2E8F0', backgroundColor: '#EFF3F8', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0, color: '#64748B' }
+          }, editSvg) : null,
+          /*#__PURE__*/React.createElement('div', { style: { fontSize: '0.68rem', color: '#94A3B8', lineHeight: '1.3', textAlign: 'left' } },
+            /*#__PURE__*/React.createElement('div', null, dateInfo.dateStr),
+            /*#__PURE__*/React.createElement('div', null, dateInfo.timeStr)
+          )
+        )
+      )
+    );
   }),
   /* Full Width "이전 채팅 더보기" Button at bottom of list */
   recentMessages.length > 0 && /*#__PURE__*/React.createElement("button", {
@@ -5983,15 +5967,26 @@ function ChatRoomView({
     }) : null, msg.text ? parseTextWithLinks(msg.text) : null), /*#__PURE__*/React.createElement("div", {
       style: {
         position: 'absolute',
-        right: '-4px',
-        top: '12px',
+        right: '-7px',
+        top: '10px',
+        width: 0,
+        height: 0,
+        borderTop: '7px solid transparent',
+        borderBottom: '7px solid transparent',
+        borderLeft: '7px solid #E2E8F0',
+        zIndex: 2
+      }
+    }), /*#__PURE__*/React.createElement("div", {
+      style: {
+        position: 'absolute',
+        right: '-6px',
+        top: '11px',
         width: 0,
         height: 0,
         borderTop: '6px solid transparent',
         borderBottom: '6px solid transparent',
         borderLeft: '6px solid #FFFFFF',
-        filter: 'drop-shadow(1px 0px 1px rgba(0,0,0,0.06))',
-        zIndex: 2
+        zIndex: 3
       }
     }))] : [/*#__PURE__*/React.createElement("div", {
       key: "bubble-wrapper",
@@ -6027,15 +6022,26 @@ function ChatRoomView({
     }) : null, msg.text ? parseTextWithLinks(msg.text) : null), /*#__PURE__*/React.createElement("div", {
       style: {
         position: 'absolute',
-        left: '-4px',
-        top: '12px',
+        left: '-7px',
+        top: '10px',
+        width: 0,
+        height: 0,
+        borderTop: '7px solid transparent',
+        borderBottom: '7px solid transparent',
+        borderRight: '7px solid #E2E8F0',
+        zIndex: 2
+      }
+    }), /*#__PURE__*/React.createElement("div", {
+      style: {
+        position: 'absolute',
+        left: '-6px',
+        top: '11px',
         width: 0,
         height: 0,
         borderTop: '6px solid transparent',
         borderBottom: '6px solid transparent',
         borderRight: '6px solid #FFFFFF',
-        filter: 'drop-shadow(-1px 0px 1px rgba(0,0,0,0.06))',
-        zIndex: 2
+        zIndex: 3
       }
     })), /*#__PURE__*/React.createElement("div", {
       key: "meta",
