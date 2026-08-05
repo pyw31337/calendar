@@ -6478,50 +6478,49 @@ function ConfirmDialog({ title, message, onConfirm, onCancel }) {
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
   }, []);
-  return /*#__PURE__*/React.createElement('div', {
-    style: {
-      position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.35)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 99999
-    },
-    onClick: onCancel
-  }, /*#__PURE__*/React.createElement('div', {
+  return /*#__PURE__*/React.createElement("div", {
+    className: "modal-overlay",
+    onClick: onCancel,
+    style: { zIndex: 10000 }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "modal-container",
     onClick: e => e.stopPropagation(),
-    style: {
-      background: '#FFFFFF', borderRadius: '14px', padding: '24px 28px',
-      minWidth: '280px', maxWidth: '360px', width: '90vw',
-      boxShadow: '0 20px 60px rgba(0,0,0,0.18), 0 4px 16px rgba(0,0,0,0.08)',
-      textAlign: 'center'
-    }
-  },
-    title ? /*#__PURE__*/React.createElement('h3', {
-      style: { fontSize: '1.05rem', fontWeight: 800, marginBottom: '10px', color: '#0F172A' }
+    style: { maxWidth: '320px', padding: '20px', borderRadius: '12px' }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { textAlign: 'center', marginBottom: '20px' }
+  }, 
+    title ? /*#__PURE__*/React.createElement("h3", {
+      style: { fontSize: '1.05rem', fontWeight: 800, marginBottom: '8px', color: '#0F172A' }
     }, title) : null,
-    /*#__PURE__*/React.createElement('p', {
-      style: { fontSize: '0.88rem', color: '#475569', lineHeight: '1.6', marginBottom: '20px', wordBreak: 'keep-all' }
-    }, message),
-    /*#__PURE__*/React.createElement('div', {
-      style: { display: 'flex', gap: '8px', justifyContent: 'center' }
-    },
-      /*#__PURE__*/React.createElement('button', {
-        type: 'button',
-        onClick: onCancel,
-        style: {
-          flex: 1, height: '38px', fontSize: '0.88rem', fontWeight: 600,
-          border: '1px solid #E2E8F0', borderRadius: '8px', background: '#F8FAFC',
-          color: '#475569', cursor: 'pointer'
-        }
-      }, '취소'),
-      /*#__PURE__*/React.createElement('button', {
-        type: 'button',
-        onClick: onConfirm,
-        style: {
-          flex: 1, height: '38px', fontSize: '0.88rem', fontWeight: 700,
-          border: 'none', borderRadius: '8px', background: '#EF4444',
-          color: '#FFFFFF', cursor: 'pointer'
-        }
-      }, '확인')
-    )
-  ));
+    /*#__PURE__*/React.createElement("p", {
+      style: { fontSize: '0.88rem', color: '#475569', lineHeight: '1.5', wordBreak: 'keep-all' }
+    }, message)
+  ), /*#__PURE__*/React.createElement("div", {
+    style: { display: 'flex', gap: '8px', justifyContent: 'center' }
+  }, 
+    /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      className: "btn btn-secondary",
+      onClick: onCancel,
+      style: { flex: 1, height: '36px', fontSize: '0.85rem' }
+    }, "취소"), 
+    /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      className: "btn btn-danger",
+      onClick: onConfirm,
+      style: {
+        flex: 1,
+        height: '36px',
+        fontSize: '0.85rem',
+        backgroundColor: '#EF4444',
+        color: '#FFFFFF',
+        border: 'none',
+        borderRadius: '6px',
+        fontWeight: 'bold',
+        cursor: 'pointer'
+      }
+    }, "확인")
+  )));
 }
 
 function DeleteConfirmModal({
