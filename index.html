@@ -2600,6 +2600,37 @@ async function sendChatMessageRest(calId, message) {
   }
 }
 
+async function deleteMessageRest(calId, messageId) {
+  try {
+    const url = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/calendars/cal_${calId}/messages/${messageId}`;
+    const res = await fetch(url, { method: 'DELETE' });
+    return res.ok;
+  } catch (err) {
+    console.warn('deleteMessageRest error:', err);
+    return false;
+  }
+}
+
+async function updateMessageRest(calId, messageId, data) {
+  try {
+    const fields = {};
+    if (data.text !== undefined) fields.text = jsToFirestoreValue(data.text);
+    if (data.imageUrl !== undefined) fields.imageUrl = jsToFirestoreValue(data.imageUrl);
+    if (data.thumbUrl !== undefined) fields.thumbUrl = jsToFirestoreValue(data.thumbUrl);
+    const updateMask = Object.keys(fields).map(k => `updateMask.fieldPaths=${k}`).join('&');
+    const url = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/calendars/cal_${calId}/messages/${messageId}?${updateMask}`;
+    const res = await fetch(url, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fields })
+    });
+    return res.ok;
+  } catch (err) {
+    console.warn('updateMessageRest error:', err);
+    return false;
+  }
+}
+
 function waitForTimeout(ms, message = 'timeout') {
   return new Promise((_, reject) => {
     setTimeout(() => reject(new Error(message)), ms);
@@ -3698,6 +3729,8 @@ function App() {
   const chatTextareaRef = React.useRef(null);
   const [chatImage, setChatImage] = React.useState(null);
   const [activeLightboxUrl, setActiveLightboxUrl] = React.useState(null);
+  const [deletingMessage, setDeletingMessage] = React.useState(null); // {id, participantId, text, calId}
+  const [editingMessage, setEditingMessage] = React.useState(null); // {id, participantId, text, imageUrl, thumbUrl, calId}
 
   const getActiveViewFromURL = () => {
     const params = new URLSearchParams(window.location.search);
@@ -3974,6 +4007,72 @@ function App() {
       setIsChatSubmitting(false);
     }
   };
+
+  const handleDeleteMessage = (msg) => {
+    setDeletingMessage({ ...msg, calId: activeCalId });
+  };
+
+  const handleConfirmDeleteMessage = async () => {
+    if (!deletingMessage) return;
+    const { id, calId } = deletingMessage;
+    try {
+      let ok = false;
+      if (firebaseDb) {
+        await firebaseDb.collection('calendars').doc(`cal_${calId}`).collection('messages').doc(id).delete();
+        ok = true;
+      } else {
+        ok = await deleteMessageRest(calId, id);
+      }
+      if (ok) {
+        showToast('의견이 삭제되었습니다.', 'success', 3000);
+      } else {
+        showToast('삭제에 실패했습니다.', 'error', 3000);
+      }
+    } catch (err) {
+      console.error('handleConfirmDeleteMessage failed:', err);
+      showToast('삭제에 실패했습니다.', 'error', 3000);
+    } finally {
+      setDeletingMessage(null);
+    }
+  };
+
+  const handleEditMessage = (msg) => {
+    setEditingMessage({ ...msg, calId: activeCalId });
+  };
+
+  const handleSaveEditMessage = async (newText, newImage) => {
+    if (!editingMessage) return;
+    const { id, calId } = editingMessage;
+    try {
+      const data = { text: newText };
+      if (newImage) {
+        data.imageUrl = newImage.original;
+        data.thumbUrl = newImage.thumbnail;
+      } else if (newImage === null) {
+        // image explicitly cleared
+        data.imageUrl = '';
+        data.thumbUrl = '';
+      }
+      let ok = false;
+      if (firebaseDb) {
+        await firebaseDb.collection('calendars').doc(`cal_${calId}`).collection('messages').doc(id).update(data);
+        ok = true;
+      } else {
+        ok = await updateMessageRest(calId, id, data);
+      }
+      if (ok) {
+        showToast('의견이 수정되었습니다.', 'success', 3000);
+      } else {
+        showToast('수정에 실패했습니다.', 'error', 3000);
+      }
+    } catch (err) {
+      console.error('handleSaveEditMessage failed:', err);
+      showToast('수정에 실패했습니다.', 'error', 3000);
+    } finally {
+      setEditingMessage(null);
+    }
+  };
+
   React.useEffect(() => {
     const rawId = getRawCalendarIdFromURL();
     if (rawId && !isAllowedCalendarId(rawId)) {
@@ -4296,6 +4395,8 @@ function App() {
       activeLightboxUrl: activeLightboxUrl,
       setActiveLightboxUrl: setActiveLightboxUrl,
       onSend: handleSendChatMessage,
+      onDeleteMessage: handleDeleteMessage,
+      onEditMessage: handleEditMessage,
       onBack: () => changeView('calendar'),
       isHeaderVisible: isHeaderVisible,
       handleChatScroll: handleChatScroll,
@@ -4308,6 +4409,16 @@ function App() {
         getLocalStorage().setItem('gather_active_participant_id_v20', id);
       },
       onClose: () => setIsChatSheetOpen(false)
+    }), deletingMessage && /*#__PURE__*/React.createElement(DeleteConfirmModal, {
+      message: deletingMessage,
+      calendar: activeCal,
+      onConfirm: handleConfirmDeleteMessage,
+      onCancel: () => setDeletingMessage(null)
+    }), editingMessage && /*#__PURE__*/React.createElement(EditMessageModal, {
+      message: editingMessage,
+      calendar: activeCal,
+      onSave: handleSaveEditMessage,
+      onClose: () => setEditingMessage(null)
     }), toast && /*#__PURE__*/React.createElement("div", {
       className: "toast",
       style: {
@@ -4596,6 +4707,8 @@ function App() {
     activeLightboxUrl: activeLightboxUrl,
     setActiveLightboxUrl: setActiveLightboxUrl,
     onSend: handleSendChatMessage,
+    onDeleteMessage: handleDeleteMessage,
+    onEditMessage: handleEditMessage,
     onMore: () => changeView('chat')
   })), /*#__PURE__*/React.createElement(SummaryList, {
     calendar: activeCal,
@@ -4616,6 +4729,16 @@ function App() {
     onDelete: handleDeleteAvailability,
     onDeleteDate: handleDeleteAllForDate,
     onClose: () => setIsModalOpen(false)
+  }), deletingMessage && /*#__PURE__*/React.createElement(DeleteConfirmModal, {
+    message: deletingMessage,
+    calendar: activeCal,
+    onConfirm: handleConfirmDeleteMessage,
+    onCancel: () => setDeletingMessage(null)
+  }), editingMessage && /*#__PURE__*/React.createElement(EditMessageModal, {
+    message: editingMessage,
+    calendar: activeCal,
+    onSave: handleSaveEditMessage,
+    onClose: () => setEditingMessage(null)
   }), isAdminOpen && /*#__PURE__*/React.createElement(AdminModal, {
     calendar: activeCal,
     allCalendars: calendars,
@@ -5152,6 +5275,8 @@ function CommentsSection({
   activeLightboxUrl,
   setActiveLightboxUrl,
   onSend,
+  onDeleteMessage,
+  onEditMessage,
   onMore
 }) {
   const participants = getActiveParticipants(calendar);
@@ -5219,9 +5344,28 @@ function CommentsSection({
         fontSize: '0.75rem',
         fontWeight: 'bold',
         flexShrink: 0,
-        whiteSpace: 'nowrap'
+        whiteSpace: 'nowrap',
+        alignSelf: 'flex-start',
+        marginTop: '2px'
       }
-    }, p?.name || '\uC54C\uC218\uC5C6\uC74C'), /*#__PURE__*/React.createElement("div", {
+    }, p?.name || '\uC54C\uC218\uC5C6\uC74C'),
+    /*#__PURE__*/React.createElement("div", {
+      style: { position: 'relative', flex: 1 }
+    },
+    /*#__PURE__*/React.createElement("div", {
+      style: {
+        position: 'absolute',
+        left: '-7px',
+        top: '12px',
+        width: 0,
+        height: 0,
+        borderTop: '6px solid transparent',
+        borderBottom: '6px solid transparent',
+        borderRight: '7px solid #FFFFFF',
+        filter: 'drop-shadow(-1px 0px 1px rgba(0,0,0,0.06))'
+      }
+    }),
+    /*#__PURE__*/React.createElement("div", {
       style: {
         backgroundColor: '#FFFFFF',
         border: '1px solid #E2E8F0',
@@ -5230,10 +5374,9 @@ function CommentsSection({
         fontSize: '0.85rem',
         lineHeight: '1.4',
         color: '#334155',
-        flex: 1,
         wordBreak: 'break-all',
         whiteSpace: 'pre-wrap',
-        boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+        boxShadow: '0 2px 6px rgba(0,0,0,0.06)'
       }
     }, msg.thumbUrl ? /*#__PURE__*/React.createElement("img", {
       src: msg.thumbUrl,
@@ -5248,20 +5391,82 @@ function CommentsSection({
         cursor: 'pointer',
         objectFit: 'cover'
       }
-    }) : null, msg.text ? parseTextWithLinks(msg.text) : null), /*#__PURE__*/React.createElement("div", {
+    }) : null, msg.text ? parseTextWithLinks(msg.text) : null)),
+    /*#__PURE__*/React.createElement("div", {
       style: {
         display: 'flex',
         flexDirection: 'column',
+        alignItems: 'flex-end',
+        justifyContent: 'flex-end',
+        flexShrink: 0,
+        gap: '4px'
+      }
+    },
+    /*#__PURE__*/React.createElement("div", {
+      style: { display: 'flex', gap: '4px', alignItems: 'center' }
+    },
+    /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      className: "btn btn-secondary",
+      title: "\uD3B8\uC9D1",
+      onClick: () => onEditMessage && onEditMessage(msg),
+      style: {
+        width: '24px',
+        height: '24px',
+        padding: 0,
+        display: 'flex',
+        alignItems: 'center',
         justifyContent: 'center',
+        borderRadius: '6px',
+        flexShrink: 0
+      }
+    }, /*#__PURE__*/React.createElement("svg", {
+      xmlns: "http://www.w3.org/2000/svg",
+      width: "13",
+      height: "13",
+      viewBox: "0 0 24 24",
+      fill: "none",
+      stroke: "currentColor",
+      strokeWidth: "2",
+      strokeLinecap: "round",
+      strokeLinejoin: "round"
+    }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), /*#__PURE__*/React.createElement("path", { d: "M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" }), /*#__PURE__*/React.createElement("path", { d: "M13.5 6.5l4 4" }))),
+    /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      title: "\uC0AD\uC81C",
+      onClick: () => onDeleteMessage && onDeleteMessage(msg),
+      style: {
+        width: '24px',
+        height: '24px',
+        padding: 0,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'none',
+        border: 'none',
+        cursor: 'pointer',
+        color: '#94A3B8',
+        flexShrink: 0
+      }
+    }, /*#__PURE__*/React.createElement("svg", {
+      xmlns: "http://www.w3.org/2000/svg",
+      width: "13",
+      height: "13",
+      viewBox: "0 0 24 24",
+      fill: "none",
+      stroke: "currentColor",
+      strokeWidth: "2",
+      strokeLinecap: "round",
+      strokeLinejoin: "round"
+    }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), /*#__PURE__*/React.createElement("path", { d: "M18 6l-12 12" }), /*#__PURE__*/React.createElement("path", { d: "M6 6l12 12" })))),
+    /*#__PURE__*/React.createElement("div", {
+      style: {
         fontSize: '0.68rem',
         color: '#94A3B8',
         lineHeight: '1.25',
-        textAlign: 'right',
-        flexShrink: 0,
-        minWidth: '58px',
-        alignSelf: 'stretch'
+        textAlign: 'right'
       }
-    }, /*#__PURE__*/React.createElement("span", null, dateInfo.dateStr), /*#__PURE__*/React.createElement("span", null, dateInfo.timeStr)));
+    }, /*#__PURE__*/React.createElement("div", null, dateInfo.dateStr), /*#__PURE__*/React.createElement("div", null, dateInfo.timeStr))));
   }))),
   /*#__PURE__*/React.createElement("div", {
     style: {
@@ -5533,6 +5738,8 @@ function ChatRoomView({
   activeLightboxUrl,
   setActiveLightboxUrl,
   onSend,
+  onDeleteMessage,
+  onEditMessage,
   onBack,
   isHeaderVisible,
   handleChatScroll,
@@ -5596,23 +5803,89 @@ function ChatRoomView({
         borderRadius: '10px',
         fontSize: '0.78rem',
         fontWeight: 'bold',
+        flexShrink: 0,
+        alignSelf: 'flex-start',
+        marginTop: '2px'
+      }
+    }, p?.name || '\uC54C\uC218\uC5C6\uC74C'), isMe ? [/*#__PURE__*/React.createElement("div", {
+      key: "meta",
+      style: {
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'flex-end',
+        justifyContent: 'flex-end',
+        alignSelf: 'stretch',
+        marginRight: '6px',
+        gap: '4px'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: { display: 'flex', gap: '4px', alignItems: 'center' }
+    }, /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      className: "btn btn-secondary",
+      title: "\uD3B8\uC9D1",
+      onClick: () => onEditMessage && onEditMessage(msg),
+      style: {
+        width: '24px',
+        height: '24px',
+        padding: 0,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: '6px',
         flexShrink: 0
       }
-    }, p?.name || '\uC54C\uC218\uC5C6\uC74C'), isMe ? [/*#__PURE__*/React.createElement("span", {
-      key: "time",
+    }, /*#__PURE__*/React.createElement("svg", {
+      xmlns: "http://www.w3.org/2000/svg",
+      width: "13",
+      height: "13",
+      viewBox: "0 0 24 24",
+      fill: "none",
+      stroke: "currentColor",
+      strokeWidth: "2",
+      strokeLinecap: "round",
+      strokeLinejoin: "round"
+    }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), /*#__PURE__*/React.createElement("path", { d: "M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" }), /*#__PURE__*/React.createElement("path", { d: "M13.5 6.5l4 4" }))), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      title: "\uC0AD\uC81C",
+      onClick: () => onDeleteMessage && onDeleteMessage(msg),
+      style: {
+        width: '24px',
+        height: '24px',
+        padding: 0,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'none',
+        border: 'none',
+        cursor: 'pointer',
+        color: '#94A3B8',
+        flexShrink: 0
+      }
+    }, /*#__PURE__*/React.createElement("svg", {
+      xmlns: "http://www.w3.org/2000/svg",
+      width: "13",
+      height: "13",
+      viewBox: "0 0 24 24",
+      fill: "none",
+      stroke: "currentColor",
+      strokeWidth: "2",
+      strokeLinecap: "round",
+      strokeLinejoin: "round"
+    }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), /*#__PURE__*/React.createElement("path", { d: "M18 6l-12 12" }), /*#__PURE__*/React.createElement("path", { d: "M6 6l12 12" })))), /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: '0.68rem',
         color: '#94A3B8',
-        alignSelf: 'flex-end',
-        marginRight: '4px'
+        lineHeight: '1.25',
+        textAlign: 'right'
       }
-    }, timeStr), /*#__PURE__*/React.createElement("div", {
+    }, timeStr)), /*#__PURE__*/React.createElement("div", {
       key: "bubble",
       style: {
+        position: 'relative',
         backgroundColor: '#FFFFFF',
         border: '1px solid #E2E8F0',
         borderRadius: '12px',
-        borderTopRightRadius: '2px',
         padding: '8px 12px',
         fontSize: '0.9rem',
         lineHeight: '1.4',
@@ -5620,9 +5893,21 @@ function ChatRoomView({
         maxWidth: '65%',
         wordBreak: 'break-all',
         whiteSpace: 'pre-wrap',
-        boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+        boxShadow: '0 2px 6px rgba(0,0,0,0.06)'
       }
-    }, msg.thumbUrl ? /*#__PURE__*/React.createElement("img", {
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        position: 'absolute',
+        right: '-7px',
+        top: '12px',
+        width: 0,
+        height: 0,
+        borderTop: '6px solid transparent',
+        borderBottom: '6px solid transparent',
+        borderLeft: '7px solid #FFFFFF',
+        filter: 'drop-shadow(1px 0px 1px rgba(0,0,0,0.06))'
+      }
+    }), msg.thumbUrl ? /*#__PURE__*/React.createElement("img", {
       src: msg.thumbUrl,
       alt: "\uCCA8\uBD80\uC774\uBBF8\uC9C0",
       onClick: () => setActiveLightboxUrl && setActiveLightboxUrl(msg.imageUrl || msg.thumbUrl),
@@ -5638,10 +5923,10 @@ function ChatRoomView({
     }) : null, msg.text ? parseTextWithLinks(msg.text) : null)] : [/*#__PURE__*/React.createElement("div", {
       key: "bubble",
       style: {
+        position: 'relative',
         backgroundColor: '#FFFFFF',
         border: '1px solid #E2E8F0',
         borderRadius: '12px',
-        borderTopLeftRadius: '2px',
         padding: '8px 12px',
         fontSize: '0.9rem',
         lineHeight: '1.4',
@@ -5649,9 +5934,21 @@ function ChatRoomView({
         maxWidth: '65%',
         wordBreak: 'break-all',
         whiteSpace: 'pre-wrap',
-        boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+        boxShadow: '0 2px 6px rgba(0,0,0,0.06)'
       }
-    }, msg.thumbUrl ? /*#__PURE__*/React.createElement("img", {
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        position: 'absolute',
+        left: '-7px',
+        top: '12px',
+        width: 0,
+        height: 0,
+        borderTop: '6px solid transparent',
+        borderBottom: '6px solid transparent',
+        borderRight: '7px solid #FFFFFF',
+        filter: 'drop-shadow(-1px 0px 1px rgba(0,0,0,0.06))'
+      }
+    }), msg.thumbUrl ? /*#__PURE__*/React.createElement("img", {
       src: msg.thumbUrl,
       alt: "\uCCA8\uBD80\uC774\uBBF8\uC9C0",
       onClick: () => setActiveLightboxUrl && setActiveLightboxUrl(msg.imageUrl || msg.thumbUrl),
@@ -5664,15 +5961,79 @@ function ChatRoomView({
         cursor: 'pointer',
         objectFit: 'cover'
       }
-    }) : null, msg.text ? parseTextWithLinks(msg.text) : null), /*#__PURE__*/React.createElement("span", {
-      key: "time",
+    }) : null, msg.text ? parseTextWithLinks(msg.text) : null), /*#__PURE__*/React.createElement("div", {
+      key: "meta",
+      style: {
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'flex-start',
+        justifyContent: 'flex-end',
+        alignSelf: 'stretch',
+        marginLeft: '6px',
+        gap: '4px'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: { display: 'flex', gap: '4px', alignItems: 'center' }
+    }, /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      className: "btn btn-secondary",
+      title: "\uD3B8\uC9D1",
+      onClick: () => onEditMessage && onEditMessage(msg),
+      style: {
+        width: '24px',
+        height: '24px',
+        padding: 0,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: '6px',
+        flexShrink: 0
+      }
+    }, /*#__PURE__*/React.createElement("svg", {
+      xmlns: "http://www.w3.org/2000/svg",
+      width: "13",
+      height: "13",
+      viewBox: "0 0 24 24",
+      fill: "none",
+      stroke: "currentColor",
+      strokeWidth: "2",
+      strokeLinecap: "round",
+      strokeLinejoin: "round"
+    }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), /*#__PURE__*/React.createElement("path", { d: "M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" }), /*#__PURE__*/React.createElement("path", { d: "M13.5 6.5l4 4" }))), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      title: "\uC0AD\uC81C",
+      onClick: () => onDeleteMessage && onDeleteMessage(msg),
+      style: {
+        width: '24px',
+        height: '24px',
+        padding: 0,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'none',
+        border: 'none',
+        cursor: 'pointer',
+        color: '#94A3B8',
+        flexShrink: 0
+      }
+    }, /*#__PURE__*/React.createElement("svg", {
+      xmlns: "http://www.w3.org/2000/svg",
+      width: "13",
+      height: "13",
+      viewBox: "0 0 24 24",
+      fill: "none",
+      stroke: "currentColor",
+      strokeWidth: "2",
+      strokeLinecap: "round",
+      strokeLinejoin: "round"
+    }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), /*#__PURE__*/React.createElement("path", { d: "M18 6l-12 12" }), /*#__PURE__*/React.createElement("path", { d: "M6 6l12 12" })))), /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: '0.68rem',
         color: '#94A3B8',
-        alignSelf: 'flex-end',
-        marginLeft: '4px'
+        lineHeight: '1.25',
+        textAlign: 'left'
       }
-    }, timeStr)]));
+    }, timeStr))]));
   });
   return /*#__PURE__*/React.createElement("div", {
     className: "chat-room-container",
@@ -5728,7 +6089,7 @@ function ChatRoomView({
       color: '#0F172A',
       whiteSpace: 'nowrap'
     }
-  }, `${calendar?.title || ''} \uCE98\uB9B0\uB354`), /*#__PURE__*/React.createElement("div", {
+  }, calendar?.title || ''), /*#__PURE__*/React.createElement("div", {
     style: { width: '32px' }
   })), /*#__PURE__*/React.createElement("div", {
     ref: chatMessagesContainerRef,
@@ -5761,7 +6122,57 @@ function ChatRoomView({
       gap: '10px',
       zIndex: 1000
     }
-  }, /*#__PURE__*/React.createElement("button", {
+  },
+  chatImage ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: 'absolute',
+      bottom: '64px',
+      left: '16px',
+      right: '16px',
+      backgroundColor: '#FFFFFF'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { position: 'relative', display: 'inline-block' }
+  }, /*#__PURE__*/React.createElement("img", {
+    src: chatImage.thumbnail,
+    alt: "\uCCA8\uBD80 \uBBF8\uB9AC\uBCF4\uAE30",
+    style: {
+      width: '60px',
+      height: '60px',
+      objectFit: 'cover',
+      borderRadius: '8px',
+      display: 'block'
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => setChatImage(null),
+    style: {
+      position: 'absolute',
+      top: '-6px',
+      right: '-6px',
+      width: '18px',
+      height: '18px',
+      borderRadius: '50%',
+      backgroundColor: '#475569',
+      border: 'none',
+      cursor: 'pointer',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 0
+    }
+  }, /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: "10",
+    height: "10",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "#FFFFFF",
+    strokeWidth: "3",
+    strokeLinecap: "round",
+    strokeLinejoin: "round"
+  }, /*#__PURE__*/React.createElement("line", { x1: "18", y1: "6", x2: "6", y2: "18" }), /*#__PURE__*/React.createElement("line", { x1: "6", y1: "6", x2: "18", y2: "18" }))))) : null,
+  /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: () => setIsChatSheetOpen(true),
     style: {
@@ -5806,9 +6217,43 @@ function ChatRoomView({
       boxSizing: 'border-box',
       overflowY: 'auto'
     }
+  }), /*#__PURE__*/React.createElement("input", {
+    ref: fileInputRefChat,
+    type: "file",
+    accept: "image/*",
+    style: { display: 'none' },
+    onChange: handleFileChangeChat
   }), /*#__PURE__*/React.createElement("button", {
     type: "button",
-    disabled: isChatSubmitting || !chatInput.trim(),
+    onClick: () => fileInputRefChat.current && fileInputRefChat.current.click(),
+    title: "\uC0AC\uC9C4 \uCCA8\uBD80",
+    style: {
+      width: '36px',
+      height: '36px',
+      borderRadius: '50%',
+      border: '1px solid #E2E8F0',
+      backgroundColor: '#F8FAFC',
+      cursor: 'pointer',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexShrink: 0,
+      padding: 0,
+      color: '#64748B'
+    }
+  }, /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: "18",
+    height: "18",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: "2",
+    strokeLinecap: "round",
+    strokeLinejoin: "round"
+  }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), /*#__PURE__*/React.createElement("path", { d: "M15 8h.01" }), /*#__PURE__*/React.createElement("path", { d: "M12.5 21h-6.5a3 3 0 0 1 -3 -3v-12a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v6.5" }), /*#__PURE__*/React.createElement("path", { d: "M3 16l5 -5c.928 -.893 2.072 -.893 3 0l4 4" }), /*#__PURE__*/React.createElement("path", { d: "M14 14l1 -1c.67 -.644 1.45 -.824 2.182 -.54" }), /*#__PURE__*/React.createElement("path", { d: "M16 19h6" }), /*#__PURE__*/React.createElement("path", { d: "M19 16v6" }))), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    disabled: isChatSubmitting || (!chatInput.trim() && !chatImage),
     onClick: onSend,
     style: {
       height: '36px',
@@ -5820,13 +6265,303 @@ function ChatRoomView({
       fontSize: '0.85rem',
       fontWeight: 'bold',
       cursor: 'pointer',
-      opacity: !chatInput.trim() || isChatSubmitting ? 0.6 : 1,
+      opacity: (chatInput.trim() || chatImage) && !isChatSubmitting ? 1 : 0.6,
       whiteSpace: 'nowrap'
     }
-  }, isChatSubmitting ? '...' : '\uC804\uC1A1')));
+  }, isChatSubmitting ? '...' : '\uC804\uC1A1')),
+  activeLightboxUrl ? /*#__PURE__*/React.createElement("div", {
+    onClick: () => setActiveLightboxUrl(null),
+    style: {
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(15, 23, 42, 0.92)',
+      backdropFilter: 'blur(8px)',
+      zIndex: 9000,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center'
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: e => { e.stopPropagation(); setActiveLightboxUrl(null); },
+    style: {
+      position: 'absolute',
+      top: '16px',
+      right: '16px',
+      background: 'rgba(255,255,255,0.12)',
+      border: '1px solid rgba(255,255,255,0.25)',
+      borderRadius: '50%',
+      width: '36px',
+      height: '36px',
+      cursor: 'pointer',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      color: '#FFFFFF',
+      zIndex: 9001
+    }
+  }, /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: "18",
+    height: "18",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: "2.5",
+    strokeLinecap: "round",
+    strokeLinejoin: "round"
+  }, /*#__PURE__*/React.createElement("line", { x1: "18", y1: "6", x2: "6", y2: "18" }), /*#__PURE__*/React.createElement("line", { x1: "6", y1: "6", x2: "18", y2: "18" }))), /*#__PURE__*/React.createElement("img", {
+    src: activeLightboxUrl,
+    alt: "\uC6D0\uBCF8 \uC774\uBBF8\uC9C0",
+    onClick: e => e.stopPropagation(),
+    style: {
+      maxWidth: '92vw',
+      maxHeight: '88vh',
+      borderRadius: '12px',
+      objectFit: 'contain',
+      boxShadow: '0 24px 80px rgba(0,0,0,0.6)'
+    }
+  })) : null);
 }
 
-// Date Layer Popup Modal
+
+function DeleteConfirmModal({
+  message,
+  calendar,
+  onConfirm,
+  onCancel
+}) {
+  const participants = getActiveParticipants(calendar);
+  const p = participants.find(part => part.id === message.participantId);
+  const name = p?.name || '알수없음';
+  
+  let contentText = message.text || '';
+  if (contentText.length > 20) {
+    contentText = contentText.substring(0, 20) + '...';
+  } else if (!contentText && message.imageUrl) {
+    contentText = '사진';
+  }
+
+  return /*#__PURE__*/React.createElement("div", {
+    className: "modal-overlay",
+    onClick: onCancel,
+    style: { zIndex: 10000 }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "modal-container",
+    onClick: e => e.stopPropagation(),
+    style: { maxWidth: '320px', padding: '20px', borderRadius: '12px' }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { textAlign: 'center', marginBottom: '20px' }
+  }, /*#__PURE__*/React.createElement("h3", {
+    style: { fontSize: '1.05rem', fontWeight: 800, marginBottom: '8px', color: '#0F172A' }
+  }, "의견 삭제"), /*#__PURE__*/React.createElement("p", {
+    style: { fontSize: '0.88rem', color: '#475569', lineHeight: '1.5' }
+  }, `${name}님의 "${contentText}" 내용을 삭제하시겠습니까?`)), /*#__PURE__*/React.createElement("div", {
+    style: { display: 'flex', gap: '8px', justifyContent: 'center' }
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "btn btn-secondary",
+    onClick: onCancel,
+    style: { flex: 1, height: '36px', fontSize: '0.85rem' }
+  }, "취소"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "btn btn-danger",
+    onClick: onConfirm,
+    style: { flex: 1, height: '36px', fontSize: '0.85rem', backgroundColor: '#EF4444', color: '#FFFFFF', border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' }
+  }, "확인"))));
+}
+
+function EditMessageModal({
+  message,
+  calendar,
+  onSave,
+  onClose
+}) {
+  const [text, setText] = React.useState(message.text || '');
+  const [image, setImage] = React.useState(
+    message.imageUrl ? { original: message.imageUrl, thumbnail: message.thumbUrl || message.imageUrl } : null
+  );
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const fileInputRefEdit = React.useRef(null);
+
+  const handleFileChangeEdit = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const compressed = await compressImageToDataUrls(file);
+      setImage(compressed);
+    } catch (err) {
+      console.error('Image compress error:', err);
+    }
+    e.target.value = '';
+  };
+
+  const handleSave = async () => {
+    if ((!text.trim() && !image) || isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      await onSave(text.trim(), image);
+      onClose();
+    } catch (err) {
+      console.error('EditMessageModal save error:', err);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return /*#__PURE__*/React.createElement("div", {
+    className: "modal-overlay",
+    onClick: () => { if (!isSubmitting) onClose(); },
+    style: { zIndex: 9999 }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "modal-container",
+    onClick: e => e.stopPropagation(),
+    style: { width: '90%', maxWidth: '400px', padding: '16px', borderRadius: '12px' }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: '14px',
+      borderBottom: '1px solid #F1F5F9',
+      paddingBottom: '8px'
+    }
+  }, /*#__PURE__*/React.createElement("h3", {
+    style: { fontSize: '1rem', fontWeight: 800, color: '#0F172A', margin: 0 }
+  }, "의견 수정"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => { if (!isSubmitting) onClose(); },
+    style: { background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer' }
+  }, "\u2715")), /*#__PURE__*/React.createElement("div", {
+    style: { display: 'flex', flexDirection: 'column', gap: '12px' }
+  },
+  image ? /*#__PURE__*/React.createElement("div", {
+    style: { position: 'relative', display: 'inline-block', alignSelf: 'flex-start' }
+  }, /*#__PURE__*/React.createElement("img", {
+    src: image.thumbnail,
+    alt: "수정 이미지 미리보기",
+    style: {
+      width: '80px',
+      height: '80px',
+      objectFit: 'cover',
+      borderRadius: '8px',
+      display: 'block',
+      border: '1px solid #E2E8F0'
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => setImage(null),
+    style: {
+      position: 'absolute',
+      top: '-6px',
+      right: '-6px',
+      width: '20px',
+      height: '20px',
+      borderRadius: '50%',
+      backgroundColor: '#EF4444',
+      border: 'none',
+      cursor: 'pointer',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 0
+    }
+  }, /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: "12",
+    height: "12",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "#FFFFFF",
+    strokeWidth: "3",
+    strokeLinecap: "round",
+    strokeLinejoin: "round"
+  }, /*#__PURE__*/React.createElement("line", { x1: "18", y1: "6", x2: "6", y2: "18" }), /*#__PURE__*/React.createElement("line", { x1: "6", y1: "6", x2: "18", y2: "18" })))) : null,
+  /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'flex-end',
+      gap: '8px',
+      backgroundColor: '#F8FAFC',
+      border: '1px solid #E2E8F0',
+      borderRadius: '12px',
+      padding: '8px'
+    }
+  }, /*#__PURE__*/React.createElement("textarea", {
+    placeholder: "수정할 의견을 입력하세요...",
+    value: text,
+    onChange: e => setText(e.target.value),
+    style: {
+      flex: 1,
+      height: '60px',
+      minHeight: '60px',
+      maxHeight: '120px',
+      resize: 'none',
+      border: 'none',
+      backgroundColor: 'transparent',
+      fontSize: '0.88rem',
+      lineHeight: '1.4',
+      fontFamily: 'inherit',
+      outline: 'none',
+      boxSizing: 'border-box',
+      overflowY: 'auto'
+    }
+  }), /*#__PURE__*/React.createElement("input", {
+    ref: fileInputRefEdit,
+    type: "file",
+    accept: "image/*",
+    style: { display: 'none' },
+    onChange: handleFileChangeEdit
+  }), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => fileInputRefEdit.current && fileInputRefEdit.current.click(),
+    title: "사진 첨부",
+    style: {
+      width: '32px',
+      height: '32px',
+      borderRadius: '50%',
+      border: '1px solid #E2E8F0',
+      backgroundColor: '#FFFFFF',
+      cursor: 'pointer',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexShrink: 0,
+      padding: 0,
+      color: '#64748B'
+    }
+  }, /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: "16",
+    height: "16",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: "2",
+    strokeLinecap: "round",
+    strokeLinejoin: "round"
+  }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), /*#__PURE__*/React.createElement("path", { d: "M15 8h.01" }), /*#__PURE__*/React.createElement("path", { d: "M12.5 21h-6.5a3 3 0 0 1 -3 -3v-12a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v6.5" }), /*#__PURE__*/React.createElement("path", { d: "M3 16l5 -5c.928 -.893 2.072 -.893 3 0l4 4" }), /*#__PURE__*/React.createElement("path", { d: "M14 14l1 -1c.67 -.644 1.45 -.824 2.182 -.54" }), /*#__PURE__*/React.createElement("path", { d: "M16 19h6" }), /*#__PURE__*/React.createElement("path", { d: "M19 16v6" })))), /*#_PURE_*/React.createElement("div", {
+    style: { display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '8px' }
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "btn btn-secondary",
+    disabled: isSubmitting,
+    onClick: onClose,
+    style: { height: '34px', fontSize: '0.85rem', padding: '0 14px' }
+  }, "취소"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "btn btn-poll-create",
+    disabled: isSubmitting || (!text.trim() && !image),
+    onClick: handleSave,
+    style: { height: '34px', fontSize: '0.85rem', padding: '0 16px', opacity: (text.trim() || image) && !isSubmitting ? 1 : 0.6 }
+  }, isSubmitting ? '...' : "수정")))));
+}
+
+
+
 function DateModal({
   dateStr,
   calendar,
