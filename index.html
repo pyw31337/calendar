@@ -3626,9 +3626,29 @@ function App() {
   const [isInitialDataLoading, setIsInitialDataLoading] = React.useState(() => Boolean(firebaseDb));
   const titleRef = React.useRef(null);
   const [arrowLeft, setArrowLeft] = React.useState(200);
+  const [bubbleStyle, setBubbleStyle] = React.useState({
+    left: '0',
+    transform: 'none'
+  });
   React.useEffect(() => {
     if (isGuideOpen && titleRef.current) {
-      setArrowLeft(titleRef.current.offsetWidth + 20);
+      const titleWidth = titleRef.current.offsetWidth;
+      const isMobile = window.innerWidth < 768;
+      if (isMobile) {
+        setBubbleStyle({
+          left: '50%',
+          transform: 'translateX(-50%)'
+        });
+        const parentWidth = titleRef.current.parentElement.parentElement.offsetWidth;
+        const arrowPos = (titleWidth + 20) - (parentWidth - 290) / 2;
+        setArrowLeft(Math.max(20, Math.min(270, arrowPos)));
+      } else {
+        setBubbleStyle({
+          left: '0',
+          transform: 'none'
+        });
+        setArrowLeft(titleWidth + 20);
+      }
     }
   }, [isGuideOpen, activeCalId, calendars]);
 
@@ -4082,7 +4102,8 @@ function App() {
     style: {
       position: 'absolute',
       top: 'calc(100% + 8px)',
-      left: '0',
+      left: bubbleStyle.left,
+      transform: bubbleStyle.transform,
       width: '290px',
       maxWidth: 'calc(100vw - 40px)',
       backgroundColor: '#FFFFFF',
@@ -4127,8 +4148,9 @@ function App() {
       color: '#0F172A'
     }
   }, "<팁>"), `
-모임 가능한 여러 일자를 선택해서 등록 해놓아야,
-공통모임 일자를 뽑기가 수월해짐.`))), activeCal?.description && /*#__PURE__*/React.createElement("div", {
+모임 가능한 여러 일자를 선택해서
+등록해 놓아야, 공통모임 일자를
+뽑기가 수월해짐.`))), activeCal?.description && /*#__PURE__*/React.createElement("div", {
     className: "calendar-desc"
   }, activeCal.description))), /*#__PURE__*/React.createElement("div", {
     className: "header-actions"
