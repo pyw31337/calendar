@@ -52,8 +52,7 @@ service cloud.firestore {
       allow delete: if false;
 
       match /messages/{messageId} {
-        allow read, create: if isCalendarDoc(calendarDocId);
-        allow update, delete: if false;
+        allow read, write: if isCalendarDoc(calendarDocId);
       }
     }
 
