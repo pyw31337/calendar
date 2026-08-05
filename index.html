@@ -5260,7 +5260,7 @@ function formatChatDividerDate(timestamp) {
   const day = String(date.getDate()).padStart(2, '0');
   const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
   const dayName = dayNames[date.getDay()];
-  return `${year}.${month}.${day} (${dayName})`;
+  return `${year}.${month}.${day}(${dayName})`;
 }
 
 function CommentsSection({
@@ -5352,6 +5352,7 @@ function CommentsSection({
   }, recentMessages.map(msg => {
     const p = participantsMap[msg.participantId];
     const dateInfo = formatCommentDate(msg.timestamp);
+    const isMsgMe = msg.participantId === chatParticipantId;
     return /*#__PURE__*/React.createElement("div", {
       key: msg.id,
       style: { display: 'flex', alignItems: 'flex-start', gap: '8px' }
@@ -5362,7 +5363,7 @@ function CommentsSection({
         backgroundColor: p?.color || '#94A3B8',
         color: '#FFFFFF',
         padding: '3px 8px',
-        borderRadius: '10px',
+        borderRadius: '9999px',
         fontSize: '0.75rem',
         fontWeight: 'bold',
         flexShrink: 0,
@@ -5373,7 +5374,7 @@ function CommentsSection({
     }, p?.name || '알수없음'),
     /* Bubble wrapper & Tail (Middle) */
     /*#__PURE__*/React.createElement("div", {
-      style: { position: 'relative', flex: 1 }
+      style: { position: 'relative', flex: 1, zIndex: 1 }
     },
     /* Bubble container */
     /*#__PURE__*/React.createElement("div", {
@@ -5428,49 +5429,17 @@ function CommentsSection({
       style: {
         display: 'flex',
         flexDirection: 'column',
+        justifyContent: isMsgMe ? 'space-between' : 'flex-end',
         alignItems: 'center',
-        justifyContent: 'space-between',
         alignSelf: 'stretch',
         flexShrink: 0,
         minWidth: '50px',
-        gap: '6px'
+        gap: '6px',
+        padding: '2px 0'
       }
     },
-    /* Edit/Delete row (Top-right) */
-    /*#__PURE__*/React.createElement("div", {
-      style: { display: 'flex', gap: '6px', alignItems: 'center' }
-    },
-    /* Edit */
-    /*#__PURE__*/React.createElement("button", {
-      type: "button",
-      onClick: () => onEditMessage && onEditMessage(msg),
-      title: "편집",
-      style: {
-        width: '24px',
-        height: '24px',
-        border: '1px solid #E2E8F0',
-        backgroundColor: '#FFFFFF',
-        borderRadius: '6px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        cursor: 'pointer',
-        padding: 0,
-        color: '#64748B'
-      }
-    }, /*#__PURE__*/React.createElement("svg", {
-      xmlns: "http://www.w3.org/2000/svg",
-      width: "12",
-      height: "12",
-      viewBox: "0 0 24 24",
-      fill: "none",
-      stroke: "currentColor",
-      strokeWidth: "2.5",
-      strokeLinecap: "round",
-      strokeLinejoin: "round"
-    }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), /*#__PURE__*/React.createElement("path", { d: "M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" }), /*#__PURE__*/React.createElement("path", { d: "M13.5 6.5l4 4" }))),
-    /* Delete */
-    /*#__PURE__*/React.createElement("button", {
+    /* Top: Delete button (only if isMsgMe) */
+    isMsgMe ? /*#__PURE__*/React.createElement("button", {
       type: "button",
       onClick: () => onDeleteMessage && onDeleteMessage(msg),
       title: "삭제",
@@ -5496,9 +5465,45 @@ function CommentsSection({
       strokeWidth: "2",
       strokeLinecap: "round",
       strokeLinejoin: "round"
-    }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), /*#__PURE__*/React.createElement("line", { x1: "18", y1: "6", x2: "6", y2: "18" }), /*#__PURE__*/React.createElement("line", { x1: "6", y1: "6", x2: "18", y2: "18" })))
-    ),
-    /* Date/Time (Bottom-right) */
+    }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), /*#__PURE__*/React.createElement("line", { x1: "18", y1: "6", x2: "6", y2: "18" }), /*#__PURE__*/React.createElement("line", { x1: "6", y1: "6", x2: "18", y2: "18" }))) : null,
+    /* Bottom: Edit button (only if isMsgMe) + Timestamp */
+    /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: '4px'
+      }
+    },
+    isMsgMe ? /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => onEditMessage && onEditMessage(msg),
+      title: "편집",
+      style: {
+        width: '24px',
+        height: '24px',
+        border: '1px solid #E2E8F0',
+        backgroundColor: '#EFF3F8',
+        borderRadius: '6px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        cursor: 'pointer',
+        padding: 0,
+        color: '#64748B'
+      }
+    }, /*#__PURE__*/React.createElement("svg", {
+      xmlns: "http://www.w3.org/2000/svg",
+      width: "12",
+      height: "12",
+      viewBox: "0 0 24 24",
+      fill: "none",
+      stroke: "currentColor",
+      strokeWidth: "2.5",
+      strokeLinecap: "round",
+      strokeLinejoin: "round"
+    }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), /*#__PURE__*/React.createElement("path", { d: "M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" }), /*#__PURE__*/React.createElement("path", { d: "M13.5 6.5l4 4" }))) : null,
+    /* Date/Time Text */
     /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: '0.68rem',
@@ -5509,7 +5514,7 @@ function CommentsSection({
     },
     /*#__PURE__*/React.createElement("div", null, dateInfo.dateStr),
     /*#__PURE__*/React.createElement("div", null, dateInfo.timeStr)
-    )));
+    ))));
   }),
   /* Full Width "이전 채팅 더보기" Button at bottom of list */
   recentMessages.length > 0 && /*#__PURE__*/React.createElement("button", {
@@ -5550,7 +5555,7 @@ function CommentsSection({
       backgroundColor: selectedParticipant?.color || '#94A3B8',
       color: '#FFFFFF',
       border: 'none',
-      borderRadius: '14px',
+      borderRadius: '9999px',
       padding: '6px 10px',
       fontSize: '0.8rem',
       fontWeight: 'bold',
@@ -5800,15 +5805,39 @@ function ChatRoomView({
       renderedMessages.push(/*#__PURE__*/React.createElement("div", {
         key: `divider-${msg.timestamp}-${idx}`,
         style: {
+          position: 'relative',
           display: 'flex',
           justifyContent: 'center',
-          margin: '20px 0 10px',
-          fontSize: '0.75rem',
-          color: '#64748B',
-          fontWeight: 'bold',
-          textAlign: 'center'
+          alignItems: 'center',
+          margin: '24px 0 16px'
         }
-      }, `------ ${formatChatDividerDate(msg.timestamp)} ------`));
+      },
+        /* Line */
+        /*#__PURE__*/React.createElement("div", {
+          style: {
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            height: '1px',
+            backgroundColor: '#E2E8F0',
+            zIndex: 1
+          }
+        }),
+        /* Date Badge */
+        /*#__PURE__*/React.createElement("span", {
+          style: {
+            position: 'relative',
+            zIndex: 2,
+            backgroundColor: '#FFFFFF',
+            border: '1px solid #E2E8F0',
+            borderRadius: '12px',
+            padding: '3px 12px',
+            fontSize: '0.72rem',
+            color: '#64748B',
+            fontWeight: 'bold'
+          }
+        }, formatChatDividerDate(msg.timestamp))
+      ));
       lastDateStr = dateStr;
     }
     const p = participantsMap[msg.participantId];
@@ -6213,7 +6242,7 @@ function ChatRoomView({
       backgroundColor: selectedParticipant?.color || '#94A3B8',
       color: '#FFFFFF',
       border: 'none',
-      borderRadius: '16px',
+      borderRadius: '9999px',
       padding: '8px 12px',
       fontSize: '0.8rem',
       fontWeight: 'bold',
@@ -6818,7 +6847,8 @@ function DateModal({
       alignItems: 'center',
       textAlign: 'left',
       background: '#FFFFFF',
-      cursor: 'pointer'
+      cursor: 'pointer',
+      borderRadius: '9999px'
     },
     disabled: isSubmitting,
     onClick: () => {
