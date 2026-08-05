@@ -5132,58 +5132,62 @@ const getLocalStorage = () => {
 
 function compressImageToDataUrls(file) {
   return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const img = new Image();
-      img.onload = () => {
-        const maxOrig = 720;
-        let wOrig = img.width;
-        let hOrig = img.height;
-        if (wOrig > maxOrig || hOrig > maxOrig) {
-          if (wOrig > hOrig) {
-            hOrig = Math.round(hOrig * maxOrig / wOrig);
-            wOrig = maxOrig;
-          } else {
-            wOrig = Math.round(wOrig * maxOrig / hOrig);
-            hOrig = maxOrig;
-          }
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+    
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      
+      const maxOrig = 720;
+      let wOrig = img.width;
+      let hOrig = img.height;
+      if (wOrig > maxOrig || hOrig > maxOrig) {
+        if (wOrig > hOrig) {
+          hOrig = Math.round(hOrig * maxOrig / wOrig);
+          wOrig = maxOrig;
+        } else {
+          wOrig = Math.round(wOrig * maxOrig / hOrig);
+          hOrig = maxOrig;
         }
-        const canvasOrig = document.createElement('canvas');
-        canvasOrig.width = wOrig;
-        canvasOrig.height = hOrig;
-        const ctxOrig = canvasOrig.getContext('2d');
-        ctxOrig.drawImage(img, 0, 0, wOrig, hOrig);
-        const originalBase64 = canvasOrig.toDataURL('image/jpeg', 0.6);
+      }
+      const canvasOrig = document.createElement('canvas');
+      canvasOrig.width = wOrig;
+      canvasOrig.height = hOrig;
+      const ctxOrig = canvasOrig.getContext('2d');
+      ctxOrig.drawImage(img, 0, 0, wOrig, hOrig);
+      const originalBase64 = canvasOrig.toDataURL('image/jpeg', 0.6);
 
-        const maxThumb = 120;
-        let wThumb = img.width;
-        let hThumb = img.height;
-        if (wThumb > maxThumb || hThumb > maxThumb) {
-          if (wThumb > hThumb) {
-            hThumb = Math.round(hThumb * maxThumb / wThumb);
-            wThumb = maxThumb;
-          } else {
-            wThumb = Math.round(wThumb * maxThumb / hThumb);
-            hThumb = maxThumb;
-          }
+      const maxThumb = 120;
+      let wThumb = img.width;
+      let hThumb = img.height;
+      if (wThumb > maxThumb || hThumb > maxThumb) {
+        if (wThumb > hThumb) {
+          hThumb = Math.round(hThumb * maxThumb / wThumb);
+          wThumb = maxThumb;
+        } else {
+          wThumb = Math.round(wThumb * maxThumb / hThumb);
+          hThumb = maxThumb;
         }
-        const canvasThumb = document.createElement('canvas');
-        canvasThumb.width = wThumb;
-        canvasThumb.height = hThumb;
-        const ctxThumb = canvasThumb.getContext('2d');
-        ctxThumb.drawImage(img, 0, 0, wThumb, hThumb);
-        const thumbnailBase64 = canvasThumb.toDataURL('image/jpeg', 0.5);
+      }
+      const canvasThumb = document.createElement('canvas');
+      canvasThumb.width = wThumb;
+      canvasThumb.height = hThumb;
+      const ctxThumb = canvasThumb.getContext('2d');
+      ctxThumb.drawImage(img, 0, 0, wThumb, hThumb);
+      const thumbnailBase64 = canvasThumb.toDataURL('image/jpeg', 0.5);
 
-        resolve({
-          original: originalBase64,
-          thumbnail: thumbnailBase64
-        });
-      };
-      img.onerror = reject;
-      img.src = e.target.result;
+      resolve({
+        original: originalBase64,
+        thumbnail: thumbnailBase64
+      });
     };
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
+    
+    img.onerror = (err) => {
+      URL.revokeObjectURL(objectUrl);
+      reject(err);
+    };
+    
+    img.src = objectUrl;
   });
 }
 
@@ -5295,6 +5299,7 @@ function CommentsSection({
       setChatImage(compressed);
     } catch (err) {
       console.error('Image compress error:', err);
+      alert('이미지 처리 중 오류가 발생했습니다. 다른 이미지를 선택해 주세요.');
     }
     e.target.value = '';
   };
@@ -5354,19 +5359,8 @@ function CommentsSection({
     },
     /*#__PURE__*/React.createElement("div", {
       style: {
-        position: 'absolute',
-        left: '-7px',
-        top: '12px',
-        width: 0,
-        height: 0,
-        borderTop: '6px solid transparent',
-        borderBottom: '6px solid transparent',
-        borderRight: '7px solid #FFFFFF',
-        filter: 'drop-shadow(-1px 0px 1px rgba(0,0,0,0.06))'
-      }
-    }),
-    /*#__PURE__*/React.createElement("div", {
-      style: {
+        position: 'relative',
+        zIndex: 1,
         backgroundColor: '#FFFFFF',
         border: '1px solid #E2E8F0',
         borderRadius: '10px',
@@ -5391,7 +5385,21 @@ function CommentsSection({
         cursor: 'pointer',
         objectFit: 'cover'
       }
-    }) : null, msg.text ? parseTextWithLinks(msg.text) : null)),
+    }) : null, msg.text ? parseTextWithLinks(msg.text) : null),
+    /*#__PURE__*/React.createElement("div", {
+      style: {
+        position: 'absolute',
+        left: '-6px',
+        top: '12px',
+        width: 0,
+        height: 0,
+        borderTop: '6px solid transparent',
+        borderBottom: '6px solid transparent',
+        borderRight: '6px solid #FFFFFF',
+        filter: 'drop-shadow(-1px 0px 1px rgba(0,0,0,0.06))',
+        zIndex: 2
+      }
+    })),
     /*#__PURE__*/React.createElement("div", {
       style: {
         display: 'flex',
@@ -5570,7 +5578,7 @@ function CommentsSection({
     ref: fileInputRef,
     type: "file",
     accept: "image/*",
-    style: { display: 'none' },
+    style: { position: 'absolute', width: '1px', height: '1px', padding: 0, margin: '-1px', overflow: 'hidden', clip: 'rect(0,0,0,0)', border: 0 },
     onChange: handleFileChange
   }), /*#__PURE__*/React.createElement("button", {
     type: "button",
@@ -5754,6 +5762,7 @@ function ChatRoomView({
       setChatImage(compressed);
     } catch (err) {
       console.error('Image compress error:', err);
+      alert('이미지 처리 중 오류가 발생했습니다. 다른 이미지를 선택해 주세요.');
     }
     e.target.value = '';
   };
@@ -5880,9 +5889,12 @@ function ChatRoomView({
         textAlign: 'right'
       }
     }, timeStr)), /*#__PURE__*/React.createElement("div", {
-      key: "bubble",
+      key: "bubble-wrapper",
+      style: { position: 'relative', maxWidth: '65%' }
+    }, /*#__PURE__*/React.createElement("div", {
       style: {
         position: 'relative',
+        zIndex: 1,
         backgroundColor: '#FFFFFF',
         border: '1px solid #E2E8F0',
         borderRadius: '12px',
@@ -5890,65 +5902,11 @@ function ChatRoomView({
         fontSize: '0.9rem',
         lineHeight: '1.4',
         color: '#1E293B',
-        maxWidth: '65%',
         wordBreak: 'break-all',
         whiteSpace: 'pre-wrap',
         boxShadow: '0 2px 6px rgba(0,0,0,0.06)'
       }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        position: 'absolute',
-        right: '-7px',
-        top: '12px',
-        width: 0,
-        height: 0,
-        borderTop: '6px solid transparent',
-        borderBottom: '6px solid transparent',
-        borderLeft: '7px solid #FFFFFF',
-        filter: 'drop-shadow(1px 0px 1px rgba(0,0,0,0.06))'
-      }
-    }), msg.thumbUrl ? /*#__PURE__*/React.createElement("img", {
-      src: msg.thumbUrl,
-      alt: "\uCCA8\uBD80\uC774\uBBF8\uC9C0",
-      onClick: () => setActiveLightboxUrl && setActiveLightboxUrl(msg.imageUrl || msg.thumbUrl),
-      style: {
-        display: 'block',
-        maxWidth: '200px',
-        maxHeight: '150px',
-        borderRadius: '8px',
-        marginBottom: msg.text ? '6px' : '0',
-        cursor: 'pointer',
-        objectFit: 'cover'
-      }
-    }) : null, msg.text ? parseTextWithLinks(msg.text) : null)] : [/*#__PURE__*/React.createElement("div", {
-      key: "bubble",
-      style: {
-        position: 'relative',
-        backgroundColor: '#FFFFFF',
-        border: '1px solid #E2E8F0',
-        borderRadius: '12px',
-        padding: '8px 12px',
-        fontSize: '0.9rem',
-        lineHeight: '1.4',
-        color: '#1E293B',
-        maxWidth: '65%',
-        wordBreak: 'break-all',
-        whiteSpace: 'pre-wrap',
-        boxShadow: '0 2px 6px rgba(0,0,0,0.06)'
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        position: 'absolute',
-        left: '-7px',
-        top: '12px',
-        width: 0,
-        height: 0,
-        borderTop: '6px solid transparent',
-        borderBottom: '6px solid transparent',
-        borderRight: '7px solid #FFFFFF',
-        filter: 'drop-shadow(-1px 0px 1px rgba(0,0,0,0.06))'
-      }
-    }), msg.thumbUrl ? /*#__PURE__*/React.createElement("img", {
+    }, msg.thumbUrl ? /*#__PURE__*/React.createElement("img", {
       src: msg.thumbUrl,
       alt: "\uCCA8\uBD80\uC774\uBBF8\uC9C0",
       onClick: () => setActiveLightboxUrl && setActiveLightboxUrl(msg.imageUrl || msg.thumbUrl),
@@ -5962,6 +5920,63 @@ function ChatRoomView({
         objectFit: 'cover'
       }
     }) : null, msg.text ? parseTextWithLinks(msg.text) : null), /*#__PURE__*/React.createElement("div", {
+      style: {
+        position: 'absolute',
+        right: '-6px',
+        top: '12px',
+        width: 0,
+        height: 0,
+        borderTop: '6px solid transparent',
+        borderBottom: '6px solid transparent',
+        borderLeft: '6px solid #FFFFFF',
+        filter: 'drop-shadow(1px 0px 1px rgba(0,0,0,0.06))',
+        zIndex: 2
+      }
+    }))] : [/*#__PURE__*/React.createElement("div", {
+      key: "bubble-wrapper",
+      style: { position: 'relative', maxWidth: '65%' }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        position: 'relative',
+        zIndex: 1,
+        backgroundColor: '#FFFFFF',
+        border: '1px solid #E2E8F0',
+        borderRadius: '12px',
+        padding: '8px 12px',
+        fontSize: '0.9rem',
+        lineHeight: '1.4',
+        color: '#1E293B',
+        wordBreak: 'break-all',
+        whiteSpace: 'pre-wrap',
+        boxShadow: '0 2px 6px rgba(0,0,0,0.06)'
+      }
+    }, msg.thumbUrl ? /*#__PURE__*/React.createElement("img", {
+      src: msg.thumbUrl,
+      alt: "\uCCA8\uBD80\uC774\uBBF8\uC9C0",
+      onClick: () => setActiveLightboxUrl && setActiveLightboxUrl(msg.imageUrl || msg.thumbUrl),
+      style: {
+        display: 'block',
+        maxWidth: '200px',
+        maxHeight: '150px',
+        borderRadius: '8px',
+        marginBottom: msg.text ? '6px' : '0',
+        cursor: 'pointer',
+        objectFit: 'cover'
+      }
+    }) : null, msg.text ? parseTextWithLinks(msg.text) : null), /*#__PURE__*/React.createElement("div", {
+      style: {
+        position: 'absolute',
+        left: '-6px',
+        top: '12px',
+        width: 0,
+        height: 0,
+        borderTop: '6px solid transparent',
+        borderBottom: '6px solid transparent',
+        borderRight: '6px solid #FFFFFF',
+        filter: 'drop-shadow(-1px 0px 1px rgba(0,0,0,0.06))',
+        zIndex: 2
+      }
+    })), /*#__PURE__*/React.createElement("div", {
       key: "meta",
       style: {
         display: 'flex',
@@ -6221,7 +6236,7 @@ function ChatRoomView({
     ref: fileInputRefChat,
     type: "file",
     accept: "image/*",
-    style: { display: 'none' },
+    style: { position: 'absolute', width: '1px', height: '1px', padding: 0, margin: '-1px', overflow: 'hidden', clip: 'rect(0,0,0,0)', border: 0 },
     onChange: handleFileChangeChat
   }), /*#__PURE__*/React.createElement("button", {
     type: "button",
@@ -6395,6 +6410,7 @@ function EditMessageModal({
       setImage(compressed);
     } catch (err) {
       console.error('Image compress error:', err);
+      alert('이미지 처리 중 오류가 발생했습니다. 다른 이미지를 선택해 주세요.');
     }
     e.target.value = '';
   };
@@ -6513,7 +6529,7 @@ function EditMessageModal({
     ref: fileInputRefEdit,
     type: "file",
     accept: "image/*",
-    style: { display: 'none' },
+    style: { position: 'absolute', width: '1px', height: '1px', padding: 0, margin: '-1px', overflow: 'hidden', clip: 'rect(0,0,0,0)', border: 0 },
     onChange: handleFileChangeEdit
   }), /*#__PURE__*/React.createElement("button", {
     type: "button",
