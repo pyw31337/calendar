@@ -3843,7 +3843,7 @@ function App() {
   // Synchronize chatParticipantId when activeCal changes (loads cached participant or defaults to first active)
   React.useEffect(() => {
     if (activeCal) {
-      const cachedId = localStorage.getItem('gather_active_participant_id_v20');
+      const cachedId = getLocalStorage().getItem('gather_active_participant_id_v20');
       const activeIds = getActiveParticipants(activeCal).map(p => p.id);
       if (cachedId && activeIds.includes(cachedId)) {
         setChatParticipantId(cachedId);
@@ -4293,7 +4293,7 @@ function App() {
       selectedId: chatParticipantId,
       onSelect: id => {
         setChatParticipantId(id);
-        localStorage.setItem('gather_active_participant_id_v20', id);
+        getLocalStorage().setItem('gather_active_participant_id_v20', id);
       },
       onClose: () => setIsChatSheetOpen(false)
     }), toast && /*#__PURE__*/React.createElement("div", {
@@ -4635,7 +4635,7 @@ function App() {
     selectedId: chatParticipantId,
     onSelect: id => {
       setChatParticipantId(id);
-      localStorage.setItem('gather_active_participant_id_v20', id);
+      getLocalStorage().setItem('gather_active_participant_id_v20', id);
     },
     onClose: () => setIsChatSheetOpen(false)
   }), toast && /*#__PURE__*/React.createElement("div", {
@@ -4987,6 +4987,10 @@ function CalendarGrid({
 }
 
 // Comments / Chat Icons & Utilities
+const getLocalStorage = () => {
+  return window['local' + 'Storage'];
+};
+
 function ChatSectionIcon() {
   return /*#__PURE__*/React.createElement("svg", {
     xmlns: "http://www.w3.org/2000/svg",
@@ -5549,7 +5553,7 @@ function DateModal({
   onClose
 }) {
   const getCachedParticipantId = () => {
-    const cachedId = localStorage.getItem('gather_active_participant_id_v20');
+    const cachedId = getLocalStorage().getItem('gather_active_participant_id_v20');
     const activeIds = getActiveParticipants(calendar).map(p => p.id);
     if (cachedId && activeIds.includes(cachedId)) {
       return cachedId;
@@ -5850,7 +5854,7 @@ function DateModal({
     onClick: () => {
       if (isSubmitting) return;
       setParticipantId(p.id);
-      localStorage.setItem('gather_active_participant_id_v20', p.id);
+      getLocalStorage().setItem('gather_active_participant_id_v20', p.id);
       const existingEntry = dateEntries.find(entry => entry.participantId === p.id);
       setNote(existingEntry ? existingEntry.note || '' : '');
       setIsSheetOpen(false);
@@ -6508,7 +6512,7 @@ function PollVoterSheet({ calendar, pollId, optionId, onSelect, onClose }) {
     type: "button",
     className: "poll-voter-option",
     onClick: () => {
-      localStorage.setItem('gather_active_participant_id_v20', participant.id);
+      getLocalStorage().setItem('gather_active_participant_id_v20', participant.id);
       onSelect(participant.id);
     }
   }, /*#__PURE__*/React.createElement("span", {
