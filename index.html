@@ -2580,13 +2580,14 @@ async function fetchChatMessagesRest(calId) {
 async function sendChatMessageRest(calId, message) {
   try {
     const url = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/calendars/cal_${calId}/messages`;
-    const payload = {
-      fields: {
-        participantId: jsToFirestoreValue(message.participantId),
-        text: jsToFirestoreValue(message.text),
-        timestamp: jsToFirestoreValue(message.timestamp)
-      }
+    const fields = {
+      participantId: jsToFirestoreValue(message.participantId),
+      text: jsToFirestoreValue(message.text),
+      timestamp: jsToFirestoreValue(message.timestamp)
     };
+    if (message.imageUrl) fields.imageUrl = jsToFirestoreValue(message.imageUrl);
+    if (message.thumbUrl) fields.thumbUrl = jsToFirestoreValue(message.thumbUrl);
+    const payload = { fields };
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -3695,6 +3696,8 @@ function App() {
   const [isChatSheetOpen, setIsChatSheetOpen] = React.useState(false);
   const [isChatSubmitting, setIsChatSubmitting] = React.useState(false);
   const chatTextareaRef = React.useRef(null);
+  const [chatImage, setChatImage] = React.useState(null);
+  const [activeLightboxUrl, setActiveLightboxUrl] = React.useState(null);
 
   const getActiveViewFromURL = () => {
     const params = new URLSearchParams(window.location.search);
@@ -3935,13 +3938,17 @@ function App() {
   };
 
   const handleSendChatMessage = async () => {
-    if (!chatInput.trim() || !chatParticipantId) return;
+    if ((!chatInput.trim() && !chatImage) || !chatParticipantId) return;
     setIsChatSubmitting(true);
     const messageData = {
       participantId: chatParticipantId,
       text: chatInput.trim(),
       timestamp: Date.now()
     };
+    if (chatImage) {
+      messageData.imageUrl = chatImage.original;
+      messageData.thumbUrl = chatImage.thumbnail;
+    }
     try {
       let ok = false;
       if (firebaseDb) {
@@ -3952,6 +3959,7 @@ function App() {
       }
       if (ok) {
         setChatInput('');
+        setChatImage(null);
         if (chatTextareaRef.current) {
           chatTextareaRef.current.style.height = '34px';
         }
@@ -4283,6 +4291,10 @@ function App() {
       setIsChatSheetOpen: setIsChatSheetOpen,
       isChatSubmitting: isChatSubmitting,
       chatTextareaRef: chatTextareaRef,
+      chatImage: chatImage,
+      setChatImage: setChatImage,
+      activeLightboxUrl: activeLightboxUrl,
+      setActiveLightboxUrl: setActiveLightboxUrl,
       onSend: handleSendChatMessage,
       onBack: () => changeView('calendar'),
       isHeaderVisible: isHeaderVisible,
@@ -4579,6 +4591,10 @@ function App() {
     setIsChatSheetOpen: setIsChatSheetOpen,
     isChatSubmitting: isChatSubmitting,
     chatTextareaRef: chatTextareaRef,
+    chatImage: chatImage,
+    setChatImage: setChatImage,
+    activeLightboxUrl: activeLightboxUrl,
+    setActiveLightboxUrl: setActiveLightboxUrl,
     onSend: handleSendChatMessage,
     onMore: () => changeView('chat')
   })), /*#__PURE__*/React.createElement(SummaryList, {
@@ -4991,6 +5007,63 @@ const getLocalStorage = () => {
   return window['local' + 'Storage'];
 };
 
+function compressImageToDataUrls(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const maxOrig = 720;
+        let wOrig = img.width;
+        let hOrig = img.height;
+        if (wOrig > maxOrig || hOrig > maxOrig) {
+          if (wOrig > hOrig) {
+            hOrig = Math.round(hOrig * maxOrig / wOrig);
+            wOrig = maxOrig;
+          } else {
+            wOrig = Math.round(wOrig * maxOrig / hOrig);
+            hOrig = maxOrig;
+          }
+        }
+        const canvasOrig = document.createElement('canvas');
+        canvasOrig.width = wOrig;
+        canvasOrig.height = hOrig;
+        const ctxOrig = canvasOrig.getContext('2d');
+        ctxOrig.drawImage(img, 0, 0, wOrig, hOrig);
+        const originalBase64 = canvasOrig.toDataURL('image/jpeg', 0.6);
+
+        const maxThumb = 120;
+        let wThumb = img.width;
+        let hThumb = img.height;
+        if (wThumb > maxThumb || hThumb > maxThumb) {
+          if (wThumb > hThumb) {
+            hThumb = Math.round(hThumb * maxThumb / wThumb);
+            wThumb = maxThumb;
+          } else {
+            wThumb = Math.round(wThumb * maxThumb / hThumb);
+            hThumb = maxThumb;
+          }
+        }
+        const canvasThumb = document.createElement('canvas');
+        canvasThumb.width = wThumb;
+        canvasThumb.height = hThumb;
+        const ctxThumb = canvasThumb.getContext('2d');
+        ctxThumb.drawImage(img, 0, 0, wThumb, hThumb);
+        const thumbnailBase64 = canvasThumb.toDataURL('image/jpeg', 0.5);
+
+        resolve({
+          original: originalBase64,
+          thumbnail: thumbnailBase64
+        });
+      };
+      img.onerror = reject;
+      img.src = e.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 function ChatSectionIcon() {
   return /*#__PURE__*/React.createElement("svg", {
     xmlns: "http://www.w3.org/2000/svg",
@@ -5063,7 +5136,6 @@ function formatChatDividerDate(timestamp) {
   return `${year}.${month}.${day} (${dayName})`;
 }
 
-// Comments Section Card Component on Main Screen
 function CommentsSection({
   calendar,
   recentMessages,
@@ -5075,6 +5147,10 @@ function CommentsSection({
   setIsChatSheetOpen,
   isChatSubmitting,
   chatTextareaRef,
+  chatImage,
+  setChatImage,
+  activeLightboxUrl,
+  setActiveLightboxUrl,
   onSend,
   onMore
 }) {
@@ -5083,28 +5159,49 @@ function CommentsSection({
     acc[p.id] = p;
     return acc;
   }, {});
-
   const selectedParticipant = participants.find(p => p.id === chatParticipantId);
+  const fileInputRef = React.useRef(null);
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const compressed = await compressImageToDataUrls(file);
+      setChatImage(compressed);
+    } catch (err) {
+      console.error('Image compress error:', err);
+    }
+    e.target.value = '';
+  };
 
   return /*#__PURE__*/React.createElement("section", {
     style: { textAlign: 'left' }
-  }, /*#__PURE__*/React.createElement("div", {
+  },
+  /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       justifyContent: 'space-between',
       alignItems: 'center',
-      marginBottom: '14px'
+      marginBottom: '10px'
     }
   }, /*#__PURE__*/React.createElement("div", {
     className: "summary-title",
     style: { color: '#2563EB', marginBottom: 0 }
   }, /*#__PURE__*/React.createElement(ChatSectionIcon, null), "\uC758\uACAC \uB0A8\uAE30\uAE30"), /*#__PURE__*/React.createElement("button", {
     type: "button",
-    className: "btn btn-poll-create",
+    className: "btn btn-secondary",
     onClick: onMore,
-    style: { padding: '4px 10px', fontSize: '0.8rem' }
-  }, "\uB354\uBC34\uAE30 \u2192")), recentMessages.length === 0 ? /*#__PURE__*/React.createElement("div", {
-    style: { color: 'var(--text-muted)', fontSize: '0.85rem', padding: '12px 0', textAlign: 'center' }
+    style: { height: '32px', padding: '0 12px', fontSize: '0.8rem', whiteSpace: 'nowrap' }
+  }, "\uB354\uBCF4\uAE30")),
+  /*#__PURE__*/React.createElement("div", {
+    style: {
+      backgroundColor: '#F1F5F9',
+      borderRadius: '10px',
+      padding: '10px',
+      minHeight: '48px'
+    }
+  }, recentMessages.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    style: { color: 'var(--text-muted)', fontSize: '0.85rem', padding: '8px 0', textAlign: 'center' }
   }, "\uB4F1\uB85D\uB41C \uC758\uACAC\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.") : /*#__PURE__*/React.createElement("div", {
     style: { display: 'flex', flexDirection: 'column', gap: '8px' }
   }, recentMessages.map(msg => {
@@ -5112,11 +5209,7 @@ function CommentsSection({
     const dateInfo = formatCommentDate(msg.timestamp);
     return /*#__PURE__*/React.createElement("div", {
       key: msg.id,
-      style: {
-        display: 'flex',
-        alignItems: 'flex-start',
-        gap: '8px'
-      }
+      style: { display: 'flex', alignItems: 'flex-start', gap: '8px' }
     }, /*#__PURE__*/React.createElement("span", {
       style: {
         backgroundColor: p?.color || '#94A3B8',
@@ -5142,7 +5235,20 @@ function CommentsSection({
         whiteSpace: 'pre-wrap',
         boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
       }
-    }, parseTextWithLinks(msg.text)), /*#__PURE__*/React.createElement("div", {
+    }, msg.thumbUrl ? /*#__PURE__*/React.createElement("img", {
+      src: msg.thumbUrl,
+      alt: "\uCCA8\uBD80\uC774\uBBF8\uC9C0",
+      onClick: () => setActiveLightboxUrl && setActiveLightboxUrl(msg.imageUrl || msg.thumbUrl),
+      style: {
+        display: 'block',
+        maxWidth: '120px',
+        maxHeight: '90px',
+        borderRadius: '6px',
+        marginBottom: msg.text ? '6px' : '0',
+        cursor: 'pointer',
+        objectFit: 'cover'
+      }
+    }) : null, msg.text ? parseTextWithLinks(msg.text) : null), /*#__PURE__*/React.createElement("div", {
       style: {
         display: 'flex',
         flexDirection: 'column',
@@ -5156,15 +5262,59 @@ function CommentsSection({
         alignSelf: 'stretch'
       }
     }, /*#__PURE__*/React.createElement("span", null, dateInfo.dateStr), /*#__PURE__*/React.createElement("span", null, dateInfo.timeStr)));
-  })), /*#__PURE__*/React.createElement("div", {
+  }))),
+  /*#__PURE__*/React.createElement("div", {
     style: {
-      display: 'flex',
-      alignItems: 'flex-end',
-      gap: '8px',
-      marginTop: '12px',
-      borderTop: '1px solid #F1F5F9',
-      paddingTop: '12px'
+      backgroundColor: '#FFFFFF',
+      borderRadius: '10px',
+      padding: '10px',
+      marginTop: '8px',
+      border: '1px solid #E2E8F0'
     }
+  },
+  chatImage ? /*#__PURE__*/React.createElement("div", {
+    style: { marginBottom: '8px', position: 'relative', display: 'inline-block' }
+  }, /*#__PURE__*/React.createElement("img", {
+    src: chatImage.thumbnail,
+    alt: "\uCCA8\uBD80 \uBBF8\uB9AC\uBCF4\uAE30",
+    style: {
+      width: '60px',
+      height: '60px',
+      objectFit: 'cover',
+      borderRadius: '8px',
+      display: 'block'
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => setChatImage(null),
+    style: {
+      position: 'absolute',
+      top: '-6px',
+      right: '-6px',
+      width: '18px',
+      height: '18px',
+      borderRadius: '50%',
+      backgroundColor: '#475569',
+      border: 'none',
+      cursor: 'pointer',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 0
+    }
+  }, /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: "10",
+    height: "10",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "#FFFFFF",
+    strokeWidth: "3",
+    strokeLinecap: "round",
+    strokeLinejoin: "round"
+  }, /*#__PURE__*/React.createElement("line", { x1: "18", y1: "6", x2: "6", y2: "18" }), /*#__PURE__*/React.createElement("line", { x1: "6", y1: "6", x2: "18", y2: "18" })))) : null,
+  /*#__PURE__*/React.createElement("div", {
+    style: { display: 'flex', alignItems: 'flex-end', gap: '8px' }
   }, /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: () => setIsChatSheetOpen(true),
@@ -5181,7 +5331,8 @@ function CommentsSection({
       display: 'flex',
       alignItems: 'center',
       gap: '4px',
-      height: '34px'
+      height: '34px',
+      flexShrink: 0
     }
   }, selectedParticipant?.name || '\uC120\uD0DD', /*#__PURE__*/React.createElement("span", {
     style: { fontSize: '0.6rem' }
@@ -5210,19 +5361,109 @@ function CommentsSection({
       boxSizing: 'border-box',
       overflowY: 'auto'
     }
+  }), /*#__PURE__*/React.createElement("input", {
+    ref: fileInputRef,
+    type: "file",
+    accept: "image/*",
+    style: { display: 'none' },
+    onChange: handleFileChange
   }), /*#__PURE__*/React.createElement("button", {
     type: "button",
+    onClick: () => fileInputRef.current && fileInputRef.current.click(),
+    title: "\uC0AC\uC9C4 \uCCA8\uBD80",
+    style: {
+      width: '34px',
+      height: '34px',
+      borderRadius: '50%',
+      border: '1px solid #E2E8F0',
+      backgroundColor: '#F8FAFC',
+      cursor: 'pointer',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexShrink: 0,
+      padding: 0,
+      color: '#64748B'
+    }
+  }, /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: "18",
+    height: "18",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: "2",
+    strokeLinecap: "round",
+    strokeLinejoin: "round"
+  }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), /*#__PURE__*/React.createElement("path", { d: "M15 8h.01" }), /*#__PURE__*/React.createElement("path", { d: "M12.5 21h-6.5a3 3 0 0 1 -3 -3v-12a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v6.5" }), /*#__PURE__*/React.createElement("path", { d: "M3 16l5 -5c.928 -.893 2.072 -.893 3 0l4 4" }), /*#__PURE__*/React.createElement("path", { d: "M14 14l1 -1c.67 -.644 1.45 -.824 2.182 -.54" }), /*#__PURE__*/React.createElement("path", { d: "M16 19h6" }), /*#__PURE__*/React.createElement("path", { d: "M19 16v6" }))), /*#__PURE__*/React.createElement("button", {
+    type: "button",
     className: "btn btn-poll-create",
-    disabled: isChatSubmitting || !chatInput.trim(),
+    disabled: isChatSubmitting || (!chatInput.trim() && !chatImage),
     onClick: onSend,
     style: {
       height: '34px',
       padding: '0 12px',
       fontSize: '0.8rem',
       whiteSpace: 'nowrap',
-      opacity: !chatInput.trim() || isChatSubmitting ? 0.6 : 1
+      opacity: (chatInput.trim() || chatImage) && !isChatSubmitting ? 1 : 0.6
     }
-  }, isChatSubmitting ? '...' : '\uC804\uC1A1')));
+  }, isChatSubmitting ? '...' : '\uC804\uC1A1'))),
+  activeLightboxUrl ? /*#__PURE__*/React.createElement("div", {
+    onClick: () => setActiveLightboxUrl(null),
+    style: {
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(15, 23, 42, 0.92)',
+      backdropFilter: 'blur(8px)',
+      zIndex: 9000,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center'
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: e => { e.stopPropagation(); setActiveLightboxUrl(null); },
+    style: {
+      position: 'absolute',
+      top: '16px',
+      right: '16px',
+      background: 'rgba(255,255,255,0.12)',
+      border: '1px solid rgba(255,255,255,0.25)',
+      borderRadius: '50%',
+      width: '36px',
+      height: '36px',
+      cursor: 'pointer',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      color: '#FFFFFF',
+      zIndex: 9001
+    }
+  }, /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: "18",
+    height: "18",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: "2.5",
+    strokeLinecap: "round",
+    strokeLinejoin: "round"
+  }, /*#__PURE__*/React.createElement("line", { x1: "18", y1: "6", x2: "6", y2: "18" }), /*#__PURE__*/React.createElement("line", { x1: "6", y1: "6", x2: "18", y2: "18" }))), /*#__PURE__*/React.createElement("img", {
+    src: activeLightboxUrl,
+    alt: "\uC6D0\uBCF8 \uC774\uBBF8\uC9C0",
+    onClick: e => e.stopPropagation(),
+    style: {
+      maxWidth: '92vw',
+      maxHeight: '88vh',
+      borderRadius: '12px',
+      objectFit: 'contain',
+      boxShadow: '0 24px 80px rgba(0,0,0,0.6)'
+    }
+  })) : null);
 }
 
 function ChatParticipantSheet({ calendar, selectedId, onSelect, onClose }) {
@@ -5287,12 +5528,28 @@ function ChatRoomView({
   setIsChatSheetOpen,
   isChatSubmitting,
   chatTextareaRef,
+  chatImage,
+  setChatImage,
+  activeLightboxUrl,
+  setActiveLightboxUrl,
   onSend,
   onBack,
   isHeaderVisible,
   handleChatScroll,
   chatMessagesContainerRef
 }) {
+  const fileInputRefChat = React.useRef(null);
+  const handleFileChangeChat = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const compressed = await compressImageToDataUrls(file);
+      setChatImage(compressed);
+    } catch (err) {
+      console.error('Image compress error:', err);
+    }
+    e.target.value = '';
+  };
   const participants = getActiveParticipants(calendar);
   const participantsMap = participants.reduce((acc, p) => {
     acc[p.id] = p;
@@ -5365,7 +5622,20 @@ function ChatRoomView({
         whiteSpace: 'pre-wrap',
         boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
       }
-    }, parseTextWithLinks(msg.text))] : [/*#__PURE__*/React.createElement("div", {
+    }, msg.thumbUrl ? /*#__PURE__*/React.createElement("img", {
+      src: msg.thumbUrl,
+      alt: "\uCCA8\uBD80\uC774\uBBF8\uC9C0",
+      onClick: () => setActiveLightboxUrl && setActiveLightboxUrl(msg.imageUrl || msg.thumbUrl),
+      style: {
+        display: 'block',
+        maxWidth: '200px',
+        maxHeight: '150px',
+        borderRadius: '8px',
+        marginBottom: msg.text ? '6px' : '0',
+        cursor: 'pointer',
+        objectFit: 'cover'
+      }
+    }) : null, msg.text ? parseTextWithLinks(msg.text) : null)] : [/*#__PURE__*/React.createElement("div", {
       key: "bubble",
       style: {
         backgroundColor: '#FFFFFF',
@@ -5381,7 +5651,20 @@ function ChatRoomView({
         whiteSpace: 'pre-wrap',
         boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
       }
-    }, parseTextWithLinks(msg.text)), /*#__PURE__*/React.createElement("span", {
+    }, msg.thumbUrl ? /*#__PURE__*/React.createElement("img", {
+      src: msg.thumbUrl,
+      alt: "\uCCA8\uBD80\uC774\uBBF8\uC9C0",
+      onClick: () => setActiveLightboxUrl && setActiveLightboxUrl(msg.imageUrl || msg.thumbUrl),
+      style: {
+        display: 'block',
+        maxWidth: '200px',
+        maxHeight: '150px',
+        borderRadius: '8px',
+        marginBottom: msg.text ? '6px' : '0',
+        cursor: 'pointer',
+        objectFit: 'cover'
+      }
+    }) : null, msg.text ? parseTextWithLinks(msg.text) : null), /*#__PURE__*/React.createElement("span", {
       key: "time",
       style: {
         fontSize: '0.68rem',
