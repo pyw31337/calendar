@@ -4781,6 +4781,10 @@ function App() {
     allCalendars: calendars,
     onSelectCalendar: handleSelectCalendar,
     onSave: handleSaveAdmin,
+    recentMessages: recentMessages,
+    chatMessages: chatMessages,
+    onDeleteMessage: handleDeleteMessage,
+    onRequestConfirm: showConfirmDialog,
     onClose: () => setIsAdminOpen(false)
   }), isShareOpen && /*#__PURE__*/React.createElement(ShareModal, {
     calendar: activeCal,
@@ -7126,20 +7130,114 @@ function DateModal({
   }, "\u2713")))))));
 }
 
+// Reconstruct calendar to a specific log timestamp (PITR)
+const rebuildCalendarToTimestamp = (calendar, T) => {
+  const now = Date.now();
+  const logs = calendar.activityLogs || [];
+  
+  // Sort chronologically
+  const sortedLogs = [...logs].sort((a, b) => a.timestamp - b.timestamp);
+  
+  // 1. Rebuild participants (only kept if created before T, un-removed if deleted after T)
+  const rebuiltParticipants = (calendar.participants || [])
+    .filter(p => (p.updatedAt || 0) <= T)
+    .map(p => {
+      if (p.removedAt && p.removedAt > T) {
+        const { removedAt, ...rest } = p;
+        return rest;
+      }
+      return p;
+    });
+
+  const participantIds = new Set(rebuiltParticipants.map(p => p.id));
+
+  // 2. Rebuild availabilities
+  const rebuiltAvailabilities = new Map();
+  for (const log of sortedLogs) {
+    if (log.timestamp > T) continue;
+    if (POLL_ACTIVITY_ACTIONS.includes(log.action)) continue;
+    if (log.participantId && !participantIds.has(log.participantId)) continue;
+    
+    const key = `${log.date}_${log.participantId}`;
+    if (log.action === 'create' || log.action === 'update') {
+      rebuiltAvailabilities.set(key, {
+        date: log.date,
+        participantId: log.participantId,
+        note: log.note || '',
+        updatedAt: log.timestamp
+      });
+    } else if (log.action === 'delete') {
+      rebuiltAvailabilities.delete(key);
+    }
+  }
+
+  // 3. Rebuild Polls and Votes
+  const rebuiltPolls = (calendar.polls || [])
+    .filter(poll => (poll.createdAt || 0) <= T)
+    .map(poll => {
+      const votes = {};
+      const optionMap = (poll.options || []).reduce((acc, opt) => {
+        acc[opt.text] = opt.id;
+        return acc;
+      }, {});
+      
+      for (const log of sortedLogs) {
+        if (log.timestamp > T) continue;
+        if (!participantIds.has(log.participantId)) continue;
+        
+        if (log.action === 'poll_vote' && log.note.startsWith(`${poll.title} / `)) {
+          const optText = log.note.substring(poll.title.length + 3);
+          const optId = optionMap[optText];
+          if (optId) votes[log.participantId] = optId;
+        } else if (log.action === 'poll_cancel' && log.note.startsWith(`${poll.title} / `)) {
+          delete votes[log.participantId];
+        }
+      }
+      return { ...poll, votes, updatedAt: T };
+    });
+
+  const rebuiltLogs = logs.filter(log => log.timestamp <= T);
+
+  return {
+    ...calendar,
+    participants: rebuiltParticipants,
+    availabilities: Array.from(rebuiltAvailabilities.values()),
+    polls: rebuiltPolls,
+    activityLogs: rebuiltLogs,
+    updatedAt: now,
+    revision: (calendar.revision || 0) + 1
+  };
+};
+
 // Admin Modal
 function AdminModal({
   calendar,
   allCalendars,
   onSelectCalendar,
   onSave,
+  recentMessages = [],
+  chatMessages = [],
+  onDeleteMessage,
+  onRequestConfirm,
   onClose
 }) {
+  const [activeTab, setActiveTab] = React.useState('metrics'); // 'metrics', 'settings', 'recovery'
+  
+  // Settings tab states
   const [title, setTitle] = React.useState(calendar.title);
   const [description, setDescription] = React.useState(calendar.description || '');
   const [participants, setParticipants] = React.useState(getActiveParticipants(calendar));
   const [newName, setNewName] = React.useState('');
-  const [isSubmitting, setIsSubmitting] = React.useState(false);
   const newNameInputRef = React.useRef(null);
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+
+  // Poll sub-modal states inside AdminModal
+  const [editingPoll, setEditingPoll] = React.useState(null);
+  const [isPollModalOpen, setIsPollModalOpen] = React.useState(false);
+
+  // Search state for chat/comments log
+  const [logSearchQuery, setLogSearchQuery] = React.useState('');
+
   React.useEffect(() => {
     setTitle(calendar.title);
     setDescription(calendar.description || '');
@@ -7147,11 +7245,9 @@ function AdminModal({
     setNewName('');
     setIsSubmitting(false);
   }, [calendar?.id]);
+
   const handleAddParticipant = e => {
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
+    if (e) { e.preventDefault(); e.stopPropagation(); }
     if (isSubmitting) return;
     if (e && e.nativeEvent && e.nativeEvent.isComposing) return;
     const latestName = newNameInputRef.current ? newNameInputRef.current.value : newName;
@@ -7167,12 +7263,11 @@ function AdminModal({
     setNewName('');
     if (newNameInputRef.current) newNameInputRef.current.value = '';
   };
+
   const updateParticipant = (participantId, patch) => {
     if (isSubmitting) return;
     const now = Date.now();
-    const cleanPatch = {
-      ...patch
-    };
+    const cleanPatch = { ...patch };
     if (Object.prototype.hasOwnProperty.call(cleanPatch, 'name')) {
       cleanPatch.name = sanitizeText(cleanPatch.name, 40);
     }
@@ -7185,241 +7280,586 @@ function AdminModal({
       updatedAt: now
     } : item));
   };
-  const handleSubmit = async e => {
-    e.preventDefault();
+
+  const handleSubmitSettings = async e => {
+    if (e) e.preventDefault();
     if (isSubmitting) return;
     setIsSubmitting(true);
     const now = Date.now();
-    const form = e.currentTarget;
-    const textInputs = [...form.querySelectorAll('input[type="text"]')];
-    const colorInputs = [...form.querySelectorAll('input[type="color"]')];
-    const latestTitle = sanitizeText(textInputs[0]?.value || title, 80);
-    const latestDescription = sanitizeText(textInputs[1]?.value || description, 160);
-    const originalParticipants = new Map(getActiveParticipants(calendar).map(participant => [participant.id, participant]));
-    let activeIndex = 0;
-    const latestParticipants = participants.map(participant => {
-      if (isTombstone(participant)) return participant;
-      const nameInput = textInputs[3 + activeIndex];
-      const colorInput = colorInputs[activeIndex];
-      activeIndex += 1;
-      const cleanName = normalizeParticipantName(calendar.id, nameInput?.value || participant.name || '');
-      const cleanColor = normalizeColorValue(colorInput?.value || participant.color);
-      const original = originalParticipants.get(participant.id);
-      const changed = !original || original.name !== cleanName || normalizeColorValue(original.color) !== cleanColor;
-      return {
-        ...participant,
-        name: cleanName,
-        color: cleanColor,
-        updatedAt: changed ? now : (original?.updatedAt || participant.updatedAt)
-      };
-    }).filter(participant => isTombstone(participant) || participant.name);
-    const activeNames = latestParticipants.filter(participant => !isTombstone(participant)).map(participant => participant.name.trim().toLowerCase());
-    if (!latestTitle || new Set(activeNames).size !== activeNames.length) {
-      alert('캘린더명과 참여자 이름을 확인해 주세요. 참여자 이름은 중복될 수 없습니다.');
+    
+    // Validate titles & names
+    if (!title.trim()) {
+      alert('캘린더명을 입력해 주세요.');
       setIsSubmitting(false);
       return;
     }
+
+    const activeParticipantsList = participants.filter(p => !isTombstone(p));
+    const activeNames = activeParticipantsList.map(p => p.name.trim().toLowerCase());
+    if (new Set(activeNames).size !== activeNames.length) {
+      alert('참여자 이름은 중복될 수 없습니다.');
+      setIsSubmitting(false);
+      return;
+    }
+
+    const stampedCal = {
+      ...calendar,
+      title: title.trim(),
+      description: description.trim(),
+      updatedAt: now,
+      revision: (calendar.revision || 0) + 1,
+      participants: participants
+    };
+
     let saved = false;
     try {
-      saved = await Promise.resolve(onSave({
-        ...calendar,
-        title: latestTitle,
-        description: latestDescription,
-        updatedAt: now,
-        revision: (calendar.revision || 0) + 1,
-        participants: latestParticipants
-      }, null));
+      saved = await Promise.resolve(onSave(stampedCal, null));
     } catch (err) {
       console.error('Calendar settings save failed:', err);
     }
-    if (saved === false) {
-      setIsSubmitting(false);
-      return;
+    setIsSubmitting(false);
+    if (saved !== false) {
+      onClose();
     }
-    onClose();
   };
+
+  // Poll operations from Admin Dashboard
+  const handleSavePollFromAdmin = async (updatedPoll) => {
+    const now = Date.now();
+    let nextPolls = [...(calendar.polls || [])];
+    const index = nextPolls.findIndex(p => p.id === updatedPoll.id);
+    if (index >= 0) {
+      nextPolls[index] = updatedPoll;
+    } else {
+      nextPolls.push(updatedPoll);
+    }
+    
+    const log = createPollActivityLog(
+      calendar.id,
+      'poll_create',
+      '',
+      now,
+      updatedPoll.title
+    );
+    
+    const updatedCal = {
+      ...calendar,
+      polls: nextPolls,
+      activityLogs: log ? [...getCalendarActivityLogs(calendar), log] : getCalendarActivityLogs(calendar),
+      updatedAt: now,
+      revision: (calendar.revision || 0) + 1
+    };
+    
+    const saved = await onSave(updatedCal, null);
+    if (saved !== false) {
+      setIsPollModalOpen(false);
+      setEditingPoll(null);
+    }
+  };
+
+  const handleDeletePollFromAdmin = (poll) => {
+    onRequestConfirm('투표 삭제', `"${poll.title}" 투표를 삭제하시겠습니까?`, async () => {
+      const now = Date.now();
+      const nextPolls = (calendar.polls || []).filter(p => p.id !== poll.id);
+      const updatedCal = {
+        ...calendar,
+        polls: nextPolls,
+        updatedAt: now,
+        revision: (calendar.revision || 0) + 1
+      };
+      await onSave(updatedCal, null);
+    });
+  };
+
+  // Log rollback operation
+  const handleRestoreToLog = (log) => {
+    const dateStr = log.date ? formatShortDateWithDayName(log.date) : '';
+    onRequestConfirm(
+      '시점 복구',
+      `[${formatRegisteredAt(log.timestamp)}] 시점으로 복구하시겠습니까? 복구 후에는 이 시점 이후 등록된 모든 일정/투표 내역이 복구/롤백 처리됩니다.`,
+      async () => {
+        const restoredCal = rebuildCalendarToTimestamp(calendar, log.timestamp);
+        const saved = await onSave(restoredCal, null);
+        if (saved !== false) {
+          alert('지정된 시점의 데이터로 복구되었습니다.');
+          onClose();
+        }
+      }
+    );
+  };
+
+  // Re-build map of participants for info
+  const participantsMap = (calendar.participants || []).reduce((acc, p) => {
+    acc[p.id] = p;
+    return acc;
+  }, {});
+
+  // Metrics
+  const activeParticipantsCount = participants.filter(p => !isTombstone(p)).length;
+  const totalSchedulesCount = (calendar.availabilities || []).filter(e => !isTombstone(e)).length;
+  const activePollsCount = getCalendarPolls(calendar).length;
+  const totalMessagesCount = recentMessages.length + chatMessages.length;
+
+  // Process unified chat room + comments logs
+  const allMessages = [
+    ...recentMessages.map(m => ({ ...m, type: '의견' })),
+    ...chatMessages.map(m => ({ ...m, type: '채팅' }))
+  ].sort((a, b) => b.timestamp - a.timestamp);
+
+  const filteredMessages = allMessages.filter(msg => {
+    const p = participantsMap[msg.participantId];
+    const name = p?.name || '알수없음';
+    const query = logSearchQuery.toLowerCase();
+    return name.toLowerCase().includes(query) || (msg.text || '').toLowerCase().includes(query);
+  });
+
+  const activityLogsSorted = [...getCalendarActivityLogs(calendar)].sort((a, b) => b.timestamp - a.timestamp);
+
   return /*#__PURE__*/React.createElement("div", {
     className: "modal-overlay",
-    onClick: () => {
-      if (!isSubmitting) onClose();
-    }
+    onClick: () => { if (!isSubmitting) onClose(); },
+    style: { zIndex: 9999 }
   }, /*#__PURE__*/React.createElement("div", {
     className: "modal-container",
-    onClick: e => e.stopPropagation()
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "modal-header",
-    style: {
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center'
-    }
-  }, /*#__PURE__*/React.createElement("h3", {
-    style: {
-      fontSize: '1.1rem',
-      fontWeight: 800
-    }
-  }, "\uCE98\uB9B0\uB354 \uC124\uC815"), /*#__PURE__*/React.createElement("button", {
-    onClick: () => {
-      if (!isSubmitting) onClose();
+    onClick: e => e.stopPropagation(),
+    style: { maxWidth: '760px', width: '95vw', display: 'flex', flexDirection: 'column', height: '90vh', maxHeight: '780px', borderRadius: '16px' }
+  },
+    /* Header */
+    /*#__PURE__*/React.createElement("div", {
+      className: "modal-header",
+      style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0, padding: '16px 20px', borderBottom: '1px solid #E2E8F0' }
     },
-    style: {
-      background: 'none',
-      border: 'none',
-      color: '#64748B',
-      fontSize: '1.2rem',
-      cursor: 'pointer'
-    }
-  }, "\u2715")), /*#__PURE__*/React.createElement("form", {
-    onSubmit: handleSubmit
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "modal-body"
-  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
-    style: {
-      display: 'block',
-      fontSize: '0.85rem',
-      fontWeight: 700,
-      marginBottom: '6px',
-      color: '#64748B'
-    }
-  }, "\uCE98\uB9B0\uB354\uBA85"), /*#__PURE__*/React.createElement("input", {
-    type: "text",
-    className: "form-input",
-    style: {
-      width: '100%'
-    },
-    value: title,
-    disabled: isSubmitting,
-    maxLength: 80,
-    onChange: e => setTitle(e.target.value),
-    required: true
-  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
-    style: {
-      display: 'block',
-      fontSize: '0.85rem',
-      fontWeight: 700,
-      marginBottom: '6px',
-      color: '#64748B'
-    }
-  }, "\uCE98\uB9B0\uB354 \uC124\uBA85"), /*#__PURE__*/React.createElement("input", {
-    type: "text",
-    className: "form-input",
-    style: {
-      width: '100%'
-    },
-    placeholder: "\uC608: cw \uB3D9\uCC3D \uBAA8\uC784 \uCC38\uC5EC\uC790\uB4E4\uC758 \uC77C\uC815 \uC870\uC728",
-    value: description,
-    disabled: isSubmitting,
-    maxLength: 160,
-    onChange: e => setDescription(e.target.value)
-  })), /*#__PURE__*/React.createElement("div", {
-    style: {
-      borderTop: '1px solid var(--border-subtle)',
-      paddingTop: '12px'
-    }
-  }, /*#__PURE__*/React.createElement("label", {
-    style: {
-      display: 'block',
-      fontSize: '0.85rem',
-      fontWeight: 700,
-      marginBottom: '6px',
-      color: '#64748B'
-    }
-  }, "\uCC38\uC5EC\uC790 \uC124\uC815 (", participants.filter(p => !isTombstone(p)).length, "\uBA85)"), /*#__PURE__*/React.createElement("div", {
-    className: "participant-add-row",
-    style: {
-      display: 'flex',
-      gap: '8px',
-      marginBottom: '12px'
-    }
-  }, /*#__PURE__*/React.createElement("input", {
-    type: "text",
-    className: "form-input participant-add-input",
-    style: {
-      flex: 1
-    },
-    placeholder: "\uC0C8 \uCC38\uC5EC\uC790 \uC774\uB984",
-    value: newName,
-    disabled: isSubmitting,
-    maxLength: 40,
-    ref: newNameInputRef,
-    onChange: e => setNewName(e.target.value),
-    onKeyDown: e => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        if (e.nativeEvent && e.nativeEvent.isComposing) return;
-        handleAddParticipant(e);
-      }
-    }
-  }), /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    className: "btn btn-secondary participant-action-btn",
-    disabled: isSubmitting,
-    style: {
-      whiteSpace: 'nowrap',
-      minWidth: '52px',
-      flexShrink: 0
-    },
-    onClick: handleAddParticipant
-  }, "\uCD94\uAC00")), participants.map(p => isTombstone(p) ? null : /*#__PURE__*/React.createElement("div", {
-    key: p.id,
-    className: "participant-edit-row",
-    style: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: '8px',
-      marginBottom: '6px'
-    }
-  }, /*#__PURE__*/React.createElement("input", {
-    type: "color",
-    className: "participant-color-input",
-    value: p.color,
-    disabled: isSubmitting,
-    onInput: e => updateParticipant(p.id, { color: e.target.value }),
-    onChange: e => updateParticipant(p.id, { color: e.target.value }),
-    style: {
-      width: '28px',
-      height: '28px',
-      border: 'none',
-      background: 'none',
-      cursor: 'pointer'
-    }
-  }), /*#__PURE__*/React.createElement("input", {
-    type: "text",
-    className: "form-input participant-name-input",
-    style: {
-      flex: 1
-    },
-    value: p.name,
-    disabled: isSubmitting,
-    maxLength: 40,
-    onInput: e => updateParticipant(p.id, { name: e.target.value }),
-    onChange: e => updateParticipant(p.id, { name: e.target.value })
-  }), /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    className: "btn btn-danger participant-remove-btn",
-    disabled: isSubmitting,
-    onClick: () => updateParticipant(p.id, { removedAt: Date.now() })
-  }, "\u2715"))))), /*#__PURE__*/React.createElement("div", {
-    className: "modal-footer"
-  }, /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    className: "btn btn-secondary",
-    disabled: isSubmitting,
-    onClick: () => {
-      if (!isSubmitting) onClose();
-    }
-  }, "\uCDE8\uC18C"), /*#__PURE__*/React.createElement("button", {
-    type: "submit",
-    className: "btn btn-primary",
-    disabled: isSubmitting,
-    style: {
-      opacity: isSubmitting ? 0.75 : 1,
-      cursor: isSubmitting ? 'wait' : 'pointer'
-    }
-  }, isSubmitting ? "\uC800\uC7A5 \uC911..." : "\uC124\uC815 \uC800\uC7A5")))));
-}
+      /*#__PURE__*/React.createElement("h3", { style: { fontSize: '1.1rem', fontWeight: 800, color: '#0F172A', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' } },
+        "🛠️ 관리자 대시보드",
+        /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.8rem', fontWeight: 500, color: '#64748B', backgroundColor: '#F1F5F9', padding: '2px 8px', borderRadius: '4px' } }, calendar.title)
+      ),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: () => { if (!isSubmitting) onClose(); },
+        style: { background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer', display: 'flex', alignItems: 'center' }
+      }, "✕")
+    ),
 
-// Share Modal
+    /* Tab Menu Bar */
+    /*#__PURE__*/React.createElement("div", {
+      style: { display: 'flex', gap: '4px', borderBottom: '1px solid #E2E8F0', padding: '0 20px', backgroundColor: '#F8FAFC', flexShrink: 0 }
+    },
+      /* Tab 1: Operational Metrics */
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: () => setActiveTab('metrics'),
+        style: {
+          padding: '12px 16px', fontSize: '0.88rem', fontWeight: 'bold',
+          color: activeTab === 'metrics' ? '#2563EB' : '#64748B',
+          border: 'none', background: 'none',
+          borderBottom: activeTab === 'metrics' ? '3px solid #2563EB' : '3px solid transparent',
+          cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px'
+        }
+      }, "📊 운영 현황"),
+      /* Tab 2: Calendar & Poll settings */
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: () => setActiveTab('settings'),
+        style: {
+          padding: '12px 16px', fontSize: '0.88rem', fontWeight: 'bold',
+          color: activeTab === 'settings' ? '#2563EB' : '#64748B',
+          border: 'none', background: 'none',
+          borderBottom: activeTab === 'settings' ? '3px solid #2563EB' : '3px solid transparent',
+          cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px'
+        }
+      }, "⚙️ 캘린더 & 투표 설정"),
+      /* Tab 3: Log-based recovery */
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: () => setActiveTab('recovery'),
+        style: {
+          padding: '12px 16px', fontSize: '0.88rem', fontWeight: 'bold',
+          color: activeTab === 'recovery' ? '#2563EB' : '#64748B',
+          border: 'none', background: 'none',
+          borderBottom: activeTab === 'recovery' ? '3px solid #2563EB' : '3px solid transparent',
+          cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px'
+        }
+      }, "⏳ 데이터 시점 복구")
+    ),
+
+    /* Modal Scrollable Body */
+    /*#__PURE__*/React.createElement("div", {
+      className: "modal-body",
+      style: { flex: 1, overflowY: 'auto', padding: '20px', display: 'flex', flexDirection: 'column', gap: '20px' }
+    },
+      /* ========================================== */
+      /* TAB 1: OPERATIONAL METRICS & CHAT LOGS     */
+      /* ========================================== */
+      activeTab === 'metrics' && /*#__PURE__*/React.createElement(React.Fragment, null,
+        /* Metrics Grid */
+        /*#__PURE__*/React.createElement("div", {
+          style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px' }
+        },
+          /* Card 1 */
+          /*#__PURE__*/React.createElement("div", { style: { padding: '14px', border: '1px solid #E2E8F0', borderRadius: '10px', backgroundColor: '#FFFFFF', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' } },
+            /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.75rem', fontWeight: '700', color: '#64748B' } }, "총 참여자"),
+            /*#__PURE__*/React.createElement("div", { style: { fontSize: '1.5rem', fontWeight: '800', color: '#1E293B', marginTop: '6px' } }, `${activeParticipantsCount}명`)
+          ),
+          /* Card 2 */
+          /*#__PURE__*/React.createElement("div", { style: { padding: '14px', border: '1px solid #E2E8F0', borderRadius: '10px', backgroundColor: '#FFFFFF', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' } },
+            /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.75rem', fontWeight: '700', color: '#64748B' } }, "등록된 일정 수"),
+            /*#__PURE__*/React.createElement("div", { style: { fontSize: '1.5rem', fontWeight: '800', color: '#1E293B', marginTop: '6px' } }, `${totalSchedulesCount}건`)
+          ),
+          /* Card 3 */
+          /*#__PURE__*/React.createElement("div", { style: { padding: '14px', border: '1px solid #E2E8F0', borderRadius: '10px', backgroundColor: '#FFFFFF', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' } },
+            /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.75rem', fontWeight: '700', color: '#64748B' } }, "진행 중 투표"),
+            /*#__PURE__*/React.createElement("div", { style: { fontSize: '1.5rem', fontWeight: '800', color: '#1E293B', marginTop: '6px' } }, `${activePollsCount}건`)
+          ),
+          /* Card 4 */
+          /*#__PURE__*/React.createElement("div", { style: { padding: '14px', border: '1px solid #E2E8F0', borderRadius: '10px', backgroundColor: '#FFFFFF', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' } },
+            /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.75rem', fontWeight: '700', color: '#64748B' } }, "의견/대화 총 수"),
+            /*#__PURE__*/React.createElement("div", { style: { fontSize: '1.5rem', fontWeight: '800', color: '#1E293B', marginTop: '6px' } }, `${totalMessagesCount}건`)
+          )
+        ),
+
+        /* Chat / Comments Logs Section */
+        /*#__PURE__*/React.createElement("div", {
+          style: { border: '1px solid #E2E8F0', borderRadius: '12px', padding: '16px', backgroundColor: '#FFFFFF' }
+        },
+          /* Header */
+          /*#__PURE__*/React.createElement("div", {
+            style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }
+          },
+            /*#__PURE__*/React.createElement("h4", { style: { fontSize: '0.92rem', fontWeight: 800, color: '#1E293B', margin: 0 } }, "💬 서비스 대화 & 의견 로그 한눈에 보기"),
+            /*#__PURE__*/React.createElement("input", {
+              type: "text",
+              placeholder: "참여자 또는 내용 검색...",
+              value: logSearchQuery,
+              onChange: e => setLogSearchQuery(e.target.value),
+              style: { padding: '5px 10px', fontSize: '0.8rem', border: '1px solid #CBD5E1', borderRadius: '6px', outline: 'none', width: '100%', maxWidth: '200px' }
+            })
+          ),
+
+          /* Message list container */
+          /*#__PURE__*/React.createElement("div", {
+            style: { maxHeight: '240px', overflowY: 'auto', border: '1px solid #F1F5F9', borderRadius: '8px', backgroundColor: '#F8FAFC', padding: '8px' }
+          },
+            filteredMessages.length === 0 ? /*#__PURE__*/React.createElement("div", { style: { padding: '20px', color: '#94A3B8', fontSize: '0.8rem', textAlign: 'center' } }, "검색 결과가 없거나 대화 내역이 비어 있습니다.") :
+            filteredMessages.map(msg => {
+              const p = participantsMap[msg.participantId] || { name: '알수없음', color: '#94A3B8' };
+              const dateObj = new Date(msg.timestamp);
+              const dateFormatted = `${dateObj.getMonth() + 1}.${dateObj.getDate()} ${String(dateObj.getHours()).padStart(2, '0')}:${String(dateObj.getMinutes()).padStart(2, '0')}`;
+              
+              return /*#__PURE__*/React.createElement("div", {
+                key: msg.id,
+                style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #F1F5F9', padding: '8px 4px', gap: '8px' }
+              },
+                /* Left details */
+                /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 } },
+                  /* Type Badge */
+                  /*#__PURE__*/React.createElement("span", {
+                    style: {
+                      fontSize: '0.68rem', fontWeight: 'bold', padding: '2px 6px', borderRadius: '4px',
+                      backgroundColor: msg.type === '의견' ? '#EFF6FF' : '#ECFDF5',
+                      color: msg.type === '의견' ? '#2563EB' : '#10B981',
+                      border: msg.type === '의견' ? '1px solid #BFDBFE' : '1px solid #A7F3D0',
+                      whiteSpace: 'nowrap'
+                    }
+                  }, msg.type),
+                  /* User Badge */
+                  /*#__PURE__*/React.createElement("span", {
+                    style: { backgroundColor: p.color, color: getContrastTextColor(p.color), padding: '2px 8px', borderRadius: '9999px', fontSize: '0.72rem', fontWeight: 'bold', whiteSpace: 'nowrap' }
+                  }, p.name),
+                  /* Content text */
+                  /*#__PURE__*/React.createElement("span", {
+                    style: { fontSize: '0.8rem', color: '#334155', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', flex: 1 },
+                    title: msg.text || ''
+                  }, msg.text || (msg.imageUrl ? '[첨부된 사진]' : ''))
+                ),
+
+                /* Right actions */
+                /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 } },
+                  /* Time */
+                  /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.7rem', color: '#94A3B8' } }, dateFormatted),
+                  /* Delete Button */
+                  /*#__PURE__*/React.createElement("button", {
+                    type: "button",
+                    onClick: () => onDeleteMessage && onDeleteMessage(msg),
+                    style: { padding: '2px 6px', border: 'none', background: 'none', color: '#EF4444', fontSize: '0.72rem', cursor: 'pointer', fontWeight: 'bold' }
+                  }, "삭제")
+                )
+              );
+            })
+          )
+        )
+      ),
+
+      /* ========================================== */
+      /* TAB 2: CALENDAR & POLLS SETTINGS           */
+      /* ========================================== */
+      activeTab === 'settings' && /*#__PURE__*/React.createElement(React.Fragment, null,
+        /* Grid split: Left is Calendar settings, Right is Poll management */
+        /*#__PURE__*/React.createElement("div", {
+          style: { display: 'flex', gap: '20px', flexDirection: 'column' }
+        },
+          /* Section 1: Calendar Profile & Participants */
+          /*#__PURE__*/React.createElement("div", {
+            style: { border: '1px solid #E2E8F0', borderRadius: '12px', padding: '16px', backgroundColor: '#FFFFFF' }
+          },
+            /*#__PURE__*/React.createElement("h4", { style: { fontSize: '0.92rem', fontWeight: 800, color: '#1E293B', margin: '0 0 14px 0', borderBottom: '1px solid #F1F5F9', paddingBottom: '6px' } }, "⚙️ 캘린더 프로필 및 참여자 설정"),
+            
+            /* Input: Title */
+            /*#__PURE__*/React.createElement("div", { style: { marginBottom: '10px' } },
+              /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#64748B', marginBottom: '4px' } }, "캘린더명"),
+              /*#__PURE__*/React.createElement("input", {
+                type: "text", className: "form-input", style: { width: '100%' },
+                value: title, disabled: isSubmitting, maxLength: 80,
+                onChange: e => setTitle(e.target.value)
+              })
+            ),
+            
+            /* Input: Description */
+            /*#__PURE__*/React.createElement("div", { style: { marginBottom: '14px' } },
+              /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#64748B', marginBottom: '4px' } }, "캘린더 설명"),
+              /*#__PURE__*/React.createElement("input", {
+                type: "text", className: "form-input", style: { width: '100%' },
+                value: description, disabled: isSubmitting, maxLength: 160,
+                onChange: e => setDescription(e.target.value)
+              })
+            ),
+
+            /* Participant Management */
+            /*#__PURE__*/React.createElement("div", {
+              style: { borderTop: '1px solid #F1F5F9', paddingTop: '12px' }
+            },
+              /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#64748B', marginBottom: '6px' } }, `참여자 설정 (${participants.filter(p => !isTombstone(p)).length}명)`),
+              
+              /* Add Row */
+              /*#__PURE__*/React.createElement("div", {
+                style: { display: 'flex', gap: '8px', marginBottom: '12px' }
+              },
+                /*#__PURE__*/React.createElement("input", {
+                  type: "text", className: "form-input", style: { flex: 1 },
+                  placeholder: "새 참여자 이름", value: newName, disabled: isSubmitting, maxLength: 40,
+                  ref: newNameInputRef, onChange: e => setNewName(e.target.value),
+                  onKeyDown: e => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      if (e.nativeEvent && e.nativeEvent.isComposing) return;
+                      handleAddParticipant(e);
+                    }
+                  }
+                }),
+                /*#__PURE__*/React.createElement("button", {
+                  type: "button", className: "btn btn-secondary", disabled: isSubmitting,
+                  style: { whiteSpace: 'nowrap', height: '34px' },
+                  onClick: handleAddParticipant
+                }, "추가")
+              ),
+
+              /* List Row */
+              /*#__PURE__*/React.createElement("div", {
+                style: { maxHeight: '160px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '6px' }
+              },
+                participants.map(p => isTombstone(p) ? null : /*#__PURE__*/React.createElement("div", {
+                  key: p.id,
+                  style: { display: 'flex', alignItems: 'center', gap: '8px' }
+                },
+                  /* Color */
+                  /*#__PURE__*/React.createElement("input", {
+                    type: "color", className: "participant-color-input", value: p.color, disabled: isSubmitting,
+                    onInput: e => updateParticipant(p.id, { color: e.target.value }),
+                    onChange: e => updateParticipant(p.id, { color: e.target.value }),
+                    style: { width: '28px', height: '28px', border: 'none', background: 'none', cursor: 'pointer' }
+                  }),
+                  /* Name input */
+                  /*#__PURE__*/React.createElement("input", {
+                    type: "text", className: "form-input", style: { flex: 1, height: '30px', fontSize: '0.82rem' },
+                    value: p.name, disabled: isSubmitting, maxLength: 40,
+                    onInput: e => updateParticipant(p.id, { name: e.target.value }),
+                    onChange: e => updateParticipant(p.id, { name: e.target.value })
+                  }),
+                  /* Remove button */
+                  /*#__PURE__*/React.createElement("button", {
+                    type: "button", className: "btn btn-danger", disabled: isSubmitting,
+                    style: { padding: '4px 10px', height: '30px' },
+                    onClick: () => updateParticipant(p.id, { removedAt: Date.now() })
+                  }, "✕")
+                ))
+              )
+            ),
+
+            /* Save Button for Settings */
+            /*#__PURE__*/React.createElement("button", {
+              type: "button", className: "btn btn-primary", disabled: isSubmitting,
+              onClick: handleSubmitSettings,
+              style: { marginTop: '16px', width: '100%', height: '38px', fontWeight: 'bold' }
+            }, isSubmitting ? "저장 중..." : "캘린더 프로필 및 참여자 설정 저장")
+          ),
+
+          /* Section 2: Polls Creation & List */
+          /*#__PURE__*/React.createElement("div", {
+            style: { border: '1px solid #E2E8F0', borderRadius: '12px', padding: '16px', backgroundColor: '#FFFFFF' }
+          },
+            /* Header */
+            /*#__PURE__*/React.createElement("div", {
+              style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', borderBottom: '1px solid #F1F5F9', paddingBottom: '6px' }
+            },
+              /*#__PURE__*/React.createElement("h4", { style: { fontSize: '0.92rem', fontWeight: 800, color: '#1E293B', margin: 0 } }, "🗳️ 캘린더 투표 리스트 관리"),
+              /*#__PURE__*/React.createElement("button", {
+                type: "button",
+                onClick: () => { setEditingPoll(null); setIsPollModalOpen(true); },
+                style: {
+                  backgroundColor: '#2563EB', color: '#FFFFFF', border: 'none', borderRadius: '6px',
+                  padding: '6px 12px', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer'
+                }
+              }, "+ 새 투표 생성")
+            ),
+
+            /* Poll list container */
+            /*#__PURE__*/React.createElement("div", {
+              style: { display: 'flex', flexDirection: 'column', gap: '8px' }
+            },
+              getCalendarPolls(calendar).length === 0 ? /*#__PURE__*/React.createElement("div", { style: { padding: '16px', color: '#94A3B8', fontSize: '0.8rem', textAlign: 'center' } }, "현재 등록된 투표가 없습니다. 새 투표를 생성해 주세요.") :
+              getCalendarPolls(calendar).map(poll => /*#__PURE__*/React.createElement("div", {
+                key: poll.id,
+                style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: '1px solid #F1F5F9', borderRadius: '8px', padding: '10px 12px', backgroundColor: '#F8FAFC' }
+              },
+                /* Left info */
+                /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 } },
+                  /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.85rem', fontWeight: 'bold', color: '#1E293B', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' } }, poll.title),
+                  /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.72rem', color: '#64748B' } }, `${getActivePollOptions(poll).length}개 옵션 · 총 ${getPollTotalVoteCount(poll)}표`)
+                ),
+                /* Right actions */
+                /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '6px' } },
+                  /* Edit button */
+                  /*#__PURE__*/React.createElement("button", {
+                    type: "button",
+                    onClick: () => { setEditingPoll(poll); setIsPollModalOpen(true); },
+                    style: {
+                      backgroundColor: '#FFFFFF', border: '1px solid #CBD5E1', borderRadius: '6px',
+                      padding: '4px 10px', fontSize: '0.75rem', cursor: 'pointer', color: '#334155'
+                    }
+                  }, "수정"),
+                  /* Delete button */
+                  /*#__PURE__*/React.createElement("button", {
+                    type: "button",
+                    onClick: () => handleDeletePollFromAdmin(poll),
+                    style: {
+                      backgroundColor: '#FEF2F2', border: '1px solid #FCA5A5', borderRadius: '6px',
+                      padding: '4px 10px', fontSize: '0.75rem', cursor: 'pointer', color: '#EF4444'
+                    }
+                  }, "삭제")
+                )
+              ))
+            )
+          )
+        )
+      ),
+
+      /* ========================================== */
+      /* TAB 3: POINT-IN-TIME LOG RECOVERY         */
+      /* ========================================== */
+      activeTab === 'recovery' && /*#__PURE__*/React.createElement(React.Fragment, null,
+        /* Info alert */
+        /*#__PURE__*/React.createElement("div", {
+          style: { backgroundColor: '#FEF3C7', border: '1px solid #FDE68A', borderRadius: '8px', padding: '12px 14px', color: '#92400E', fontSize: '0.8rem', lineHeight: '1.5' }
+        },
+          /*#__PURE__*/React.createElement("span", { style: { fontWeight: 'bold' } }, "⚠️ 데이터 유실 방지 경고: "),
+          "특정 시점으로 데이터를 복구(롤백)하면, 그 시점 이후에 수행된 모든 일정 등록 및 변경 사항과 투표 기록이 되돌아갑니다. 복구하기 전 현재 상태의 백업이 필요하다면 백업 저장 기능을 이용해 주세요."
+        ),
+
+        /* Log Timeline */
+        /*#__PURE__*/React.createElement("div", {
+          style: { border: '1px solid #E2E8F0', borderRadius: '12px', padding: '16px', backgroundColor: '#FFFFFF' }
+        },
+          /*#__PURE__*/React.createElement("h4", { style: { fontSize: '0.92rem', fontWeight: 800, color: '#1E293B', margin: '0 0 12px 0' } }, "⏳ 활동 타임라인을 기반으로 시점 복구"),
+          
+          /* Timeline scroll container */
+          /*#__PURE__*/React.createElement("div", {
+            style: { display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '360px', overflowY: 'auto', paddingRight: '4px' }
+          },
+            activityLogsSorted.length === 0 ? /*#__PURE__*/React.createElement("div", { style: { padding: '30px', color: '#94A3B8', fontSize: '0.82rem', textAlign: 'center' } }, "기록된 활동 로그가 없어 복구 기능을 이용할 수 없습니다.") :
+            activityLogsSorted.map(log => {
+              const p = participantsMap[log.participantId] || { name: POLL_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '투표' : '알수없음', color: '#94A3B8' };
+              const actionLabel = {
+                create: '일정 추가', update: '일정 변경', delete: '일정 삭제',
+                poll_create: '투표 생성', poll_vote: '투표 진행', poll_cancel: '투표 취소'
+              }[log.action] || '활동';
+              
+              const actionBadgeBg = {
+                create: '#ECFDF5', update: '#EFF6FF', delete: '#FEF2F2',
+                poll_create: '#F5F3FF', poll_vote: '#FDF2F8', poll_cancel: '#FFF7ED'
+              }[log.action] || '#F8FAFC';
+
+              const actionBadgeColor = {
+                create: '#10B981', update: '#2563EB', delete: '#EF4444',
+                poll_create: '#8B5CF6', poll_vote: '#EC4899', poll_cancel: '#F97316'
+              }[log.action] || '#64748B';
+
+              return /*#__PURE__*/React.createElement("div", {
+                key: log.id,
+                style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: '1px solid #F1F5F9', borderRadius: '8px', padding: '10px', backgroundColor: '#FFFFFF', gap: '8px' }
+              },
+                /* Left details */
+                /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 } },
+                  /* Action Badge */
+                  /*#__PURE__*/React.createElement("span", {
+                    style: {
+                      fontSize: '0.68rem', fontWeight: 'bold', padding: '2px 6px', borderRadius: '4px',
+                      backgroundColor: actionBadgeBg, color: actionBadgeColor, border: `1px solid ${actionBadgeColor}30`,
+                      whiteSpace: 'nowrap'
+                    }
+                  }, actionLabel),
+                  /* User */
+                  /*#__PURE__*/React.createElement("span", {
+                    style: { backgroundColor: p.color, color: getContrastTextColor(p.color), padding: '2px 8px', borderRadius: '9999px', fontSize: '0.7rem', fontWeight: 'bold', whiteSpace: 'nowrap' }
+                  }, p.name),
+                  /* Description Text */
+                  /*#__PURE__*/React.createElement("span", {
+                    style: { fontSize: '0.78rem', color: '#475569', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', flex: 1 }
+                  }, log.note || (log.date ? formatShortDateWithDayName(log.date) : ''))
+                ),
+
+                /* Right actions */
+                /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 } },
+                  /* Time */
+                  /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.72rem', color: '#94A3B8', fontWeight: '500' } }, formatRegisteredAt(log.timestamp)),
+                  /* Rollback button */
+                  /*#__PURE__*/React.createElement("button", {
+                    type: "button",
+                    onClick: () => handleRestoreToLog(log),
+                    style: {
+                      backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '6px',
+                      padding: '4px 8px', fontSize: '0.72rem', fontWeight: 'bold', cursor: 'pointer', color: '#2563EB'
+                    }
+                  }, "이 시점으로 복구")
+                )
+              );
+            })
+          )
+        )
+      )
+    ),
+
+    /* Footer (only close) */
+    /*#__PURE__*/React.createElement("div", {
+      className: "modal-footer",
+      style: { flexShrink: 0, padding: '14px 20px', borderTop: '1px solid #E2E8F0', display: 'flex', justifyContent: 'flex-end', backgroundColor: '#F8FAFC' }
+    },
+      /*#__PURE__*/React.createElement("button", {
+        type: "button", className: "btn btn-secondary", disabled: isSubmitting,
+        onClick: () => { if (!isSubmitting) onClose(); }
+      }, "대시보드 닫기")
+    ),
+
+    /* Inner PollModal to Edit/Create Polls */
+    isPollModalOpen && /*#__PURE__*/React.createElement(PollModal, {
+      calendar: calendar,
+      poll: editingPoll,
+      onSave: handleSavePollFromAdmin,
+      onClose: () => {
+        setIsPollModalOpen(false);
+        setEditingPoll(null);
+      }
+    })
+  ));
+}// Share Modal
 function ShareModal({
   calendar,
   onCreateNewCal,
@@ -7645,11 +8085,7 @@ function PollList({ calendar, onCreatePoll, onEditPoll, onVotePoll, onCancelVote
   }, /*#__PURE__*/React.createElement("div", {
     className: "summary-title",
     style: { color: '#2563EB', marginBottom: 0 }
-  }, /*#__PURE__*/React.createElement(PollSectionIcon, null), "\uC9C4\uD589\uC911 \uD22C\uD45C (", polls.length, "\uAC74)"), /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    className: "btn btn-poll-create",
-    onClick: onCreatePoll
-  }, "+ \uC0DD\uC131")), polls.length === 0 ? /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(PollSectionIcon, null), "\uC9C4\uD589\uC911 \uD22C\uD45C (", polls.length, "\uAC74)")), polls.length === 0 ? /*#__PURE__*/React.createElement("div", {
     style: { color: 'var(--text-muted)', fontSize: '0.85rem', padding: '10px 0' }
   }, "\uC544\uC9C1 \uC0DD\uC131\uB41C \uD22C\uD45C\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.") : /*#__PURE__*/React.createElement("div", {
     className: "polls-section"
