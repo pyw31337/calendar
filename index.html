@@ -6201,11 +6201,11 @@ function SummaryList({
   const sortedAllDates = getSortedDates(allAvailableDates.filter(d => d >= todayStr));
   const sortedPartialDates = getSortedDates(partialAvailableDates.filter(d => d >= todayStr));
 
-  // 3. Past meeting dates: all past dates with at least 1 active participant registered
+  // 3. Past meeting dates: all past dates with at least 1 active participant registered and at least 1 memo exists
   const pastMeetingDates = getSortedDates(Object.keys(dateMap).filter(d => {
     if (d >= todayStr) return false; // future dates excluded
     const entries = dateMap[d].filter(e => participantsMap[e.participantId]);
-    return entries.length > 0;
+    return entries.length > 0 && entries.some(e => e.note && e.note.trim().length > 0);
   }));
   return /*#__PURE__*/React.createElement("div", {
     className: "summary-card",
