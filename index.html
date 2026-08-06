@@ -698,11 +698,6 @@
     
     .badge-dot { width: 5px; height: 5px; border-radius: 50%; }
 
-    /* Hide '전원' label inside calendar grid on mobile */
-    @media (max-width: 639px) {
-      .days-grid .all-available-label { display: none; }
-    }
-
     /* Summary Card */
     .summary-card {
       background: var(--bg-card);
@@ -4025,7 +4020,7 @@ function AdminDashboard({ initialCalendars }) {
                       log.action === 'poll_vote' ? '투표 진행' :
                       log.action === 'poll_cancel' ? '투표 취소' : '활동';
 
-    const msg = `[${calId}] 시점 데이터 전체 복구 (타겟 로그: [${timeLabel}] [${typeLabel}]) — 이 시점으로 데이터를 복구하시겠습니까? 이 시점 이후 등록된 모든 일정/투표 롤백과 동시에, 이 시간 이후 전송된 모든 채팅/의견 메시지도 서버에서 영구적으로 삭제됩니다.`;
+    const msg = `[${calId}] 시점 데이터 전체 복구 (타겟 로그: [${timeLabel}] [${typeLabel}]) — 이 시점으로 데이터를 복구하시겠습니까? 이 시점 이후 등록된 모든 일정/투표 롤백과 동시에, 이 시간 이후 전송된 모든 채팅 메시지도 서버에서 영구적으로 삭제됩니다.`;
     requestConfirm('시점 데이터 복구', msg, async () => {
       closeConfirmDialog();
       try {
@@ -4083,7 +4078,7 @@ function AdminDashboard({ initialCalendars }) {
       }
       if (ok) {
         deleteAllChatImagesFromStorage(msg);
-        showAdminToast('의견이 삭제되었습니다.', 'success');
+        showAdminToast('채팅이 삭제되었습니다.', 'success');
         setMessagesMap(prev => ({
           ...prev,
           [calId]: (prev[calId] || []).filter(m => m.id !== msg.id)
@@ -4098,8 +4093,8 @@ function AdminDashboard({ initialCalendars }) {
   };
 
   const handleDeleteMessageDirect = (calId, msg) => {
-    const txt = `[${calId}] 다음 의견/채팅을 삭제하시겠습니까? "${msg.text || '[사진]'}"`;
-    requestConfirm('의견/채팅 삭제', txt, () => performDeleteMessage(calId, msg));
+    const txt = `[${calId}] 다음 채팅을 삭제하시겠습니까? "${msg.text || '[사진]'}"`;
+    requestConfirm('채팅 삭제', txt, () => performDeleteMessage(calId, msg));
   };
 
   // Calculations for Tab 1
@@ -4383,8 +4378,8 @@ function AdminDashboard({ initialCalendars }) {
         /* Header & Search */
         /*#__PURE__*/React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' } },
           /*#__PURE__*/React.createElement("div", null,
-            /*#__PURE__*/React.createElement("h4", { style: { fontSize: '0.96rem', fontWeight: '900', color: '#0F172A', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(ChatSectionIcon, null), "서비스 통합 대화/의견 로그 한눈에 보기"),
-            /*#__PURE__*/React.createElement("p", { style: { fontSize: '0.75rem', color: '#64748B', margin: '2px 0 0 0' } }, "각 캘린더별 의견남기기 및 대화방 메시지 내역을 실시간 모니터링하고 어드민 권한으로 삭제할 수 있습니다.")
+            /*#__PURE__*/React.createElement("h4", { style: { fontSize: '0.96rem', fontWeight: '900', color: '#0F172A', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(ChatSectionIcon, null), "서비스 통합 채팅 로그 한눈에 보기"),
+            /*#__PURE__*/React.createElement("p", { style: { fontSize: '0.75rem', color: '#64748B', margin: '2px 0 0 0' } }, "각 캘린더별 채팅 메시지 내역을 실시간 모니터링하고 어드민 권한으로 삭제할 수 있습니다.")
           ),
           /*#__PURE__*/React.createElement("input", {
             type: "text", className: "form-input", placeholder: "캘린더ID, 이름, 메시지 검색...", value: chatSearchQuery,
@@ -4397,7 +4392,7 @@ function AdminDashboard({ initialCalendars }) {
         /*#__PURE__*/React.createElement("div", {
           style: { maxHeight: '280px', overflowY: 'auto', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '8px', backgroundColor: '#F8FAFC' }
         },
-          filteredMessages.length === 0 ? /*#__PURE__*/React.createElement("div", { style: { padding: '30px', color: '#64748B', fontSize: '0.82rem', textAlign: 'center' } }, "표시할 의견/대화 내역이 없습니다.") :
+          filteredMessages.length === 0 ? /*#__PURE__*/React.createElement("div", { style: { padding: '30px', color: '#64748B', fontSize: '0.82rem', textAlign: 'center' } }, "표시할 채팅 내역이 없습니다.") :
           filteredMessages.map(msg => {
             const cal = serverCalendars.find(c => c.id === msg.calId);
             const pMap = (cal?.participants || []).reduce((acc, p) => { acc[p.id] = p; return acc; }, {});
@@ -4696,7 +4691,7 @@ function AdminDashboard({ initialCalendars }) {
             style: { backgroundColor: '#FEF2F2', border: '1px solid #FCA5A5', borderRadius: '8px', padding: '12px 14px', color: '#B91C1C', fontSize: '0.8rem', lineHeight: '1.5', marginBottom: '16px' }
           },
             /*#__PURE__*/React.createElement("span", { style: { fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '4px', verticalAlign: 'middle' } }, /*#__PURE__*/React.createElement(AlertTriangleIcon, null), "통합 시점 복구 경고: "),
-            "캘린더의 일정, 투표 기록 뿐만 아니라 해당 캘린더에 전송된 의견/채팅 로그를 포함하는 복구 타임라인입니다. 복구 지점 이후 변경된 데이터 롤백 및 시간 외 전송 메시지는 DB에서 실시간 삭제 처리됩니다."
+            "캘린더의 일정, 투표 기록 뿐만 아니라 해당 캘린더에 전송된 채팅 로그를 포함하는 복구 타임라인입니다. 복구 지점 이후 변경된 데이터 롤백 및 시간 외 전송 메시지는 DB에서 실시간 삭제 처리됩니다."
           ),
 
           /* Title */
@@ -5558,13 +5553,13 @@ function App() {
           fetchRecentMessagesRest(activeCalId).then(list => setRecentMessages(list));
           fetchChatMessagesRest(activeCalId).then(list => setChatMessages(list));
         }
-        showToast('의견이 등록되었습니다.', 'success', 3000);
+        showToast('채팅이 등록되었습니다.', 'success', 3000);
       } else {
-        showToast('의견 등록에 실패했습니다.', 'error', 3000);
+        showToast('채팅 등록에 실패했습니다.', 'error', 3000);
       }
     } catch (err) {
       console.error('handleSendChatMessage failed:', err);
-      showToast('의견 등록에 실패했습니다.', 'error', 3000);
+      showToast('채팅 등록에 실패했습니다.', 'error', 3000);
     } finally {
       setIsChatSubmitting(false);
     }
@@ -5591,7 +5586,7 @@ function App() {
           fetchRecentMessagesRest(calId).then(list => setRecentMessages(list));
           fetchChatMessagesRest(calId).then(list => setChatMessages(list));
         }
-        showToast('의견이 삭제되었습니다.', 'success', 3000);
+        showToast('채팅이 삭제되었습니다.', 'success', 3000);
       } else {
         showToast('삭제에 실패했습니다.', 'error', 3000);
       }
@@ -5649,7 +5644,7 @@ function App() {
           fetchRecentMessagesRest(calId).then(list => setRecentMessages(list));
           fetchChatMessagesRest(calId).then(list => setChatMessages(list));
         }
-        showToast('의견이 수정되었습니다.', 'success', 3000);
+        showToast('채팅이 수정되었습니다.', 'success', 3000);
       } else {
         showToast('수정에 실패했습니다.', 'error', 3000);
       }
@@ -6951,7 +6946,13 @@ function CalendarGrid({
     const holidayNames = holidayMap[dateStr];
     const isHoliday = !!holidayNames && holidayNames.length > 0;
     const lunarLabel = lunarLabelMap[dateStr];
-    const solarTermName = !isHoliday ? solarTermMap[dateStr] : null;
+    const solarTermName = !isHoliday && !isAllAvailable ? solarTermMap[dateStr] : null;
+    // Only one badge shows next to the date number: holiday name takes priority (it's
+    // tied to the red date styling), then '전원' if everyone's available that day
+    // (replacing a solar term that would otherwise be shown), then the solar term.
+    const cornerText = isHoliday ? holidayNames.join('·') : isAllAvailable ? '전원' : solarTermName;
+    const cornerColor = isHoliday ? '#EF4444' : isAllAvailable ? '#10B981' : '#94A3B8';
+    const cornerTitle = isHoliday ? (lunarLabel ? `${holidayNames.join(', ')} (${lunarLabel})` : holidayNames.join(', ')) : undefined;
     const columnDow = idx % 7; // 0=Sun .. 6=Sat, since each week row starts on Sunday
     const isSunday = columnDow === 0;
     return /*#__PURE__*/React.createElement("div", {
@@ -6962,7 +6963,8 @@ function CalendarGrid({
       style: {
         display: 'flex',
         justifyContent: 'space-between',
-        alignItems: 'center'
+        alignItems: 'center',
+        gap: '4px'
       }
     }, /*#__PURE__*/React.createElement("span", {
       className: "day-number",
@@ -6971,39 +6973,28 @@ function CalendarGrid({
         color: '#FFFFFF',
         borderRadius: '50%',
         fontWeight: '800',
-        boxShadow: '0 2px 4px rgba(59, 130, 246, 0.4)'
+        boxShadow: '0 2px 4px rgba(59, 130, 246, 0.4)',
+        flexShrink: 0
       } : isHoliday || isSunday ? {
         color: '#EF4444',
-        fontWeight: '800'
-      } : {}
-    }, dayNum), isAllAvailable && /*#__PURE__*/React.createElement("span", {
-      className: "all-available-label",
+        fontWeight: '800',
+        flexShrink: 0
+      } : { flexShrink: 0 }
+    }, dayNum), cornerText && /*#__PURE__*/React.createElement("span", {
+      className: "day-corner-label",
+      title: cornerTitle,
       style: {
-        fontSize: '0.65rem',
-        color: '#10B981',
-        fontWeight: 800
-      }
-    }, "\uC804\uC6D0")), isHoliday && /*#__PURE__*/React.createElement("div", {
-      className: "holiday-label",
-      title: lunarLabel ? `${holidayNames.join(', ')} (${lunarLabel})` : holidayNames.join(', '),
-      style: {
-        fontSize: '0.6rem',
-        fontWeight: 700,
-        color: '#EF4444',
+        fontSize: '0.62rem',
+        fontWeight: isHoliday || isAllAvailable ? 800 : 600,
+        color: cornerColor,
         lineHeight: 1.2,
+        minWidth: 0,
         overflow: 'hidden',
         textOverflow: 'ellipsis',
-        whiteSpace: 'nowrap'
+        whiteSpace: 'nowrap',
+        textAlign: 'right'
       }
-    }, holidayNames.join('\u00B7') + (lunarLabel ? ` (${lunarLabel})` : '')), !isHoliday && solarTermName && /*#__PURE__*/React.createElement("div", {
-      className: "solar-term-label",
-      style: {
-        fontSize: '0.6rem',
-        fontWeight: 600,
-        color: '#94A3B8',
-        lineHeight: 1.2
-      }
-    }, solarTermName), /*#__PURE__*/React.createElement("div", {
+    }, cornerText)), /*#__PURE__*/React.createElement("div", {
       className: "badges-container"
     }, entries.map(e => {
       const p = participantsMap[e.participantId];
@@ -7315,15 +7306,8 @@ function CommentsSection({
   }, {});
   const selectedParticipant = participants.find(p => p.id === chatParticipantId);
   const fileInputRef = React.useRef(null);
-  const [isMobile, setIsMobile] = React.useState(() => window.innerWidth < 768);
   const [isCollapsed, setIsCollapsed] = React.useState(true); // default closed
   const revealedMsgId = useTapRevealedMsgId();
-
-  React.useEffect(() => {
-    const onResize = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, []);
 
   const handleFileChange = async (e) => {
     const files = e.target.files;
@@ -7381,11 +7365,11 @@ function CommentsSection({
   }, /*#__PURE__*/React.createElement("div", {
     className: "summary-title",
     style: { color: '#2563EB', marginBottom: 0, display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold' }
-  }, /*#__PURE__*/React.createElement(ChatSectionIcon, null), "의견 남기기"),
+  }, /*#__PURE__*/React.createElement(ChatSectionIcon, null), "채팅"),
   /*#__PURE__*/React.createElement(SectionToggleButton, {
     collapsed: isCollapsed,
     onToggle: toggleCommentsSection,
-    label: isCollapsed ? "의견 남기기 펼치기" : "의견 남기기 접기"
+    label: isCollapsed ? "채팅 펼치기" : "채팅 접기"
   })),
   /* List Background Panel */
   /*#__PURE__*/React.createElement("div", {
@@ -7398,7 +7382,7 @@ function CommentsSection({
     }
   }, recentMessages.length === 0 ? /*#__PURE__*/React.createElement("div", {
     style: { color: 'var(--text-muted)', fontSize: '0.85rem', padding: '8px 0', textAlign: 'center' }
-  }, "등록된 의견이 없습니다.") : /*#__PURE__*/React.createElement("div", {
+  }, "등록된 채팅이 없습니다.") : /*#__PURE__*/React.createElement("div", {
     style: { display: 'flex', flexDirection: 'column', gap: '10px' }
   }, messagesToShow.map(msg => {
     const p = participantsMap[msg.participantId];
@@ -7425,135 +7409,64 @@ function CommentsSection({
       /*#__PURE__*/React.createElement('line', { x1: '6', y1: '6', x2: '18', y2: '18' })
     );
 
-    if (isMobile) {
-      /* === MOBILE CARD LAYOUT === */
-      return /*#__PURE__*/React.createElement('div', {
-        key: msg.id,
-        className: `msg-row-hover ${revealedMsgId === msg.id ? 'msg-actions-revealed' : ''}`,
-        'data-msg-row-id': msg.id,
-        style: {
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '8px',
-          backgroundColor: '#F8FAFC',
-          borderRadius: '12px',
-          padding: '12px',
-          border: '1px solid #F1F5F9'
-        }
-      },
-        /* Top Row: Badge (left) + Edit/Delete buttons (right) */
-        /*#__PURE__*/React.createElement('div', {
-          style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }
-        },
-          /* Name Badge */
-          /*#__PURE__*/React.createElement('span', {
-            style: { backgroundColor: badgeColor, color: '#FFFFFF', padding: '3px 10px', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 'bold', whiteSpace: 'nowrap' }
-          }, badgeName),
-          isMsgMe ? /*#__PURE__*/React.createElement('div', {
-            className: 'msg-actions-group',
-            style: { display: 'flex', alignItems: 'center', gap: '6px' }
-          },
-            /* Edit Button */
-            /*#__PURE__*/React.createElement('button', {
-              type: 'button', onClick: () => onEditMessage && onEditMessage(msg), title: '편집',
-              style: { width: '24px', height: '24px', border: '1px solid #E2E8F0', backgroundColor: '#FFFFFF', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0, color: '#64748B' }
-            }, editSvg),
-            /* Delete Button */
-            /*#__PURE__*/React.createElement('button', {
-              type: 'button', onClick: () => onDeleteMessage && onDeleteMessage(msg), title: '삭제',
-              style: { width: '24px', height: '24px', border: 'none', background: 'none', padding: 0, cursor: 'pointer', color: '#94A3B8', display: 'flex', alignItems: 'center', justifyContent: 'center' }
-            }, deleteSvg)
-          ) : null
-        ),
-        /* Middle Row: Full-width bubble with top tail pointing to name badge */
-        /*#__PURE__*/React.createElement('div', { style: { position: 'relative', marginTop: '6px' } },
-          /* Outer tail (border color) */
-          /*#__PURE__*/React.createElement('div', {
-            style: { position: 'absolute', top: '-7px', left: '18px', width: 0, height: 0, borderLeft: '7px solid transparent', borderRight: '7px solid transparent', borderBottom: '7px solid #E2E8F0', zIndex: 2 }
-          }),
-          /* Inner tail (white fill) */
-          /*#__PURE__*/React.createElement('div', {
-            style: { position: 'absolute', top: '-5px', left: '19px', width: 0, height: 0, borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderBottom: '6px solid #FFFFFF', zIndex: 3 }
-          }),
-          /* Bubble container */
-          /*#__PURE__*/React.createElement('div', {
-            style: { backgroundColor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '10px 12px', fontSize: '0.85rem', lineHeight: '1.4', color: '#1E293B', wordBreak: 'break-all', whiteSpace: 'pre-wrap', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', position: 'relative', zIndex: 1 }
-          }, bubbleContent)
-        ),
-        /* Bottom Row: Timestamp right-aligned */
-        /*#__PURE__*/React.createElement('div', {
-          style: { fontSize: '0.72rem', color: '#94A3B8', lineHeight: '1.3', textAlign: 'right' }
-        },
-          `${dateInfo.dateStr.replace('(', ' (')} ${dateInfo.timeStr}`
-        )
-      );
-    }
-
-    /* === DESKTOP LAYOUT (double-tail card-style) === */
+    /* === UNIFIED CARD LAYOUT (badge top-left, full-width bubble, bottom-right
+       meta row: edit/delete hidden until hover/tap, then push the timestamp aside) === */
     return /*#__PURE__*/React.createElement('div', {
       key: msg.id,
       className: `msg-row-hover ${revealedMsgId === msg.id ? 'msg-actions-revealed' : ''}`,
       'data-msg-row-id': msg.id,
       style: {
         display: 'flex',
-        alignItems: 'flex-start',
-        gap: '12px',
+        flexDirection: 'column',
+        gap: '6px',
         backgroundColor: '#F8FAFC',
         borderRadius: '12px',
         padding: '12px',
         border: '1px solid #F1F5F9'
       }
     },
-      /* Participant Badge (Left) */
+      /* Name Badge */
       /*#__PURE__*/React.createElement('span', {
-        style: { backgroundColor: badgeColor, color: '#FFFFFF', padding: '3px 8px', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 'bold', flexShrink: 0, whiteSpace: 'nowrap', alignSelf: 'flex-start', marginTop: '6px' }
+        style: { alignSelf: 'flex-start', backgroundColor: badgeColor, color: '#FFFFFF', padding: '3px 10px', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 'bold', whiteSpace: 'nowrap' }
       }, badgeName),
-      /* Bubble wrapper with double-tail left (Middle) */
-      /*#__PURE__*/React.createElement('div', {
-        style: { position: 'relative', flex: 1, zIndex: 1 }
-      },
-        /* Bubble */
-        /*#__PURE__*/React.createElement('div', {
-          style: { position: 'relative', zIndex: 1, backgroundColor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '10px 12px', fontSize: '0.85rem', lineHeight: '1.4', color: '#1E293B', wordBreak: 'break-all', whiteSpace: 'pre-wrap', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }
-        }, bubbleContent),
+      /* Full-width bubble with top tail pointing to name badge */
+      /*#__PURE__*/React.createElement('div', { style: { position: 'relative', marginTop: '2px' } },
         /* Outer tail (border color) */
         /*#__PURE__*/React.createElement('div', {
-          style: { position: 'absolute', left: '-7px', top: '10px', width: 0, height: 0, borderTop: '7px solid transparent', borderBottom: '7px solid transparent', borderRight: '7px solid #E2E8F0', zIndex: 2 }
+          style: { position: 'absolute', top: '-7px', left: '18px', width: 0, height: 0, borderLeft: '7px solid transparent', borderRight: '7px solid transparent', borderBottom: '7px solid #E2E8F0', zIndex: 2 }
         }),
         /* Inner tail (white fill) */
         /*#__PURE__*/React.createElement('div', {
-          style: { position: 'absolute', left: '-5px', top: '11px', width: 0, height: 0, borderTop: '6px solid transparent', borderBottom: '6px solid transparent', borderRight: '6px solid #FFFFFF', zIndex: 3 }
-        })
+          style: { position: 'absolute', top: '-5px', left: '19px', width: 0, height: 0, borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderBottom: '6px solid #FFFFFF', zIndex: 3 }
+        }),
+        /* Bubble container */
+        /*#__PURE__*/React.createElement('div', {
+          style: { backgroundColor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '10px 12px', fontSize: '0.85rem', lineHeight: '1.4', color: '#1E293B', wordBreak: 'break-all', whiteSpace: 'pre-wrap', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', position: 'relative', zIndex: 1 }
+        }, bubbleContent)
       ),
-      /* Meta Column (Right) */
+      /* Bottom-right meta row: hidden edit/delete (revealed on hover/tap) pushes the timestamp aside */
       /*#__PURE__*/React.createElement('div', {
-        style: {
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: isMsgMe ? 'space-between' : 'flex-end',
-          alignItems: 'flex-start',
-          alignSelf: 'stretch',
-          flexShrink: 0,
-          minWidth: '50px',
-          gap: '6px',
-          padding: '2px 0'
-        }
+        style: { display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '6px' }
       },
-        isMsgMe ? /*#__PURE__*/React.createElement('button', {
-          type: 'button', className: 'msg-actions-group', onClick: () => onDeleteMessage && onDeleteMessage(msg), title: '삭제',
-          style: { width: '24px', height: '24px', border: 'none', background: 'none', padding: 0, cursor: 'pointer', color: '#94A3B8', display: 'flex', alignItems: 'center', justifyContent: 'flex-start' }
-        }, deleteSvg) : null,
-        /* Bottom: Edit button + Timestamp */
-        /*#__PURE__*/React.createElement('div', { style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '4px' } },
-          isMsgMe ? /*#__PURE__*/React.createElement('button', {
-            type: 'button', className: 'msg-actions-group', onClick: () => onEditMessage && onEditMessage(msg), title: '편집',
-            style: { width: '24px', height: '24px', border: '1px solid #E2E8F0', backgroundColor: '#FFFFFF', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0, color: '#64748B' }
-          }, editSvg) : null,
-          /* Date/Time Text */
-          /*#__PURE__*/React.createElement('div', { style: { fontSize: '0.72rem', color: '#94A3B8', lineHeight: '1.3', textAlign: 'left' } },
-            /*#__PURE__*/React.createElement('div', null, dateInfo.dateStr.replace('(', ' (')),
-            /*#__PURE__*/React.createElement('div', null, dateInfo.timeStr)
-          )
+        isMsgMe ? /*#__PURE__*/React.createElement('div', {
+          className: 'msg-actions-group',
+          style: { display: 'flex', alignItems: 'center', gap: '4px' }
+        },
+          /* Edit Button */
+          /*#__PURE__*/React.createElement('button', {
+            type: 'button', onClick: () => onEditMessage && onEditMessage(msg), title: '편집',
+            style: { width: '22px', height: '22px', border: '1px solid #E2E8F0', backgroundColor: '#FFFFFF', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0, color: '#64748B' }
+          }, editSvg),
+          /* Delete Button */
+          /*#__PURE__*/React.createElement('button', {
+            type: 'button', onClick: () => onDeleteMessage && onDeleteMessage(msg), title: '삭제',
+            style: { width: '22px', height: '22px', border: 'none', background: 'none', padding: 0, cursor: 'pointer', color: '#94A3B8', display: 'flex', alignItems: 'center', justifyContent: 'center' }
+          }, deleteSvg)
+        ) : null,
+        /* Date/Time Text */
+        /*#__PURE__*/React.createElement('div', { style: { fontSize: '0.72rem', color: '#94A3B8', lineHeight: '1.3', textAlign: 'right' } },
+          /*#__PURE__*/React.createElement('div', null, dateInfo.dateStr.replace('(', ' (')),
+          /*#__PURE__*/React.createElement('div', null, dateInfo.timeStr)
         )
       )
     );
@@ -7594,7 +7507,7 @@ function CommentsSection({
     /* Textarea at top */
     /*#__PURE__*/React.createElement("textarea", {
       ref: chatTextareaRef,
-      placeholder: "의견을 입력하세요...",
+      placeholder: "채팅을 입력하세요...",
       value: chatInput,
       maxLength: 5000,
       onChange: e => {
@@ -8744,7 +8657,7 @@ function DeleteConfirmModal({
     style: { textAlign: 'center', marginBottom: '20px' }
   }, /*#__PURE__*/React.createElement("h3", {
     style: { fontSize: '1.05rem', fontWeight: 800, marginBottom: '8px', color: '#0F172A' }
-  }, "의견 삭제"), /*#__PURE__*/React.createElement("p", {
+  }, "채팅 삭제"), /*#__PURE__*/React.createElement("p", {
     style: { fontSize: '0.88rem', color: '#475569', lineHeight: '1.5' }
   }, `${name}님의 "${contentText}" 내용을 삭제하시겠습니까?`)), /*#__PURE__*/React.createElement("div", {
     style: { display: 'flex', gap: '8px', justifyContent: 'center' }
@@ -8847,7 +8760,7 @@ function EditMessageModal({
     }
   }, /*#__PURE__*/React.createElement("h3", {
     style: { fontSize: '1rem', fontWeight: 800, color: '#0F172A', margin: 0 }
-  }, "의견 수정"), /*#__PURE__*/React.createElement("button", {
+  }, "채팅 수정"), /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: () => { if (!isSubmitting) onClose(); },
     style: { background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer', display: 'flex', alignItems: 'center' }
@@ -8910,7 +8823,7 @@ function EditMessageModal({
       padding: '8px'
     }
   }, /*#__PURE__*/React.createElement("textarea", {
-    placeholder: "수정할 의견을 입력하세요...",
+    placeholder: "수정할 채팅을 입력하세요...",
     value: text,
     onChange: e => setText(e.target.value),
     style: {
@@ -9581,13 +9494,11 @@ function AdminModal({
   const activeParticipantsCount = participants.filter(p => !isTombstone(p)).length;
   const totalSchedulesCount = (calendar.availabilities || []).filter(e => !isTombstone(e)).length;
   const activePollsCount = getCalendarPolls(calendar).length;
-  const totalMessagesCount = recentMessages.length + chatMessages.length;
-
-  // Process unified chat room + comments logs
-  const allMessages = [
-    ...recentMessages.map(m => ({ ...m, type: '의견' })),
-    ...chatMessages.map(m => ({ ...m, type: '채팅' }))
-  ].sort((a, b) => b.timestamp - a.timestamp);
+  // recentMessages is just a bounded (last-5) preview of the same collection chatMessages
+  // already fetches in full -- source the log from chatMessages alone so each message is
+  // counted and listed once instead of once per query it happens to appear in.
+  const totalMessagesCount = chatMessages.length;
+  const allMessages = [...chatMessages].sort((a, b) => b.timestamp - a.timestamp);
 
   const filteredMessages = allMessages.filter(msg => {
     const p = participantsMap[msg.participantId];
@@ -9695,7 +9606,7 @@ function AdminModal({
           ),
           /* Card 4 */
           /*#__PURE__*/React.createElement("div", { style: { padding: '14px', border: '1px solid #E2E8F0', borderRadius: '10px', backgroundColor: '#FFFFFF', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' } },
-            /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.75rem', fontWeight: '700', color: '#64748B' } }, "의견/대화 총 수"),
+            /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.75rem', fontWeight: '700', color: '#64748B' } }, "채팅 총 수"),
             /*#__PURE__*/React.createElement("div", { style: { fontSize: '1.5rem', fontWeight: '800', color: '#1E293B', marginTop: '6px' } }, `${totalMessagesCount}건`)
           )
         ),
@@ -9708,7 +9619,7 @@ function AdminModal({
           /*#__PURE__*/React.createElement("div", {
             style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }
           },
-            /*#__PURE__*/React.createElement("h4", { style: { fontSize: '0.92rem', fontWeight: 800, color: '#1E293B', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(ChatSectionIcon, null), "서비스 대화 & 의견 로그 한눈에 보기"),
+            /*#__PURE__*/React.createElement("h4", { style: { fontSize: '0.92rem', fontWeight: 800, color: '#1E293B', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(ChatSectionIcon, null), "서비스 채팅 로그 한눈에 보기"),
             /*#__PURE__*/React.createElement("input", {
               type: "text",
               placeholder: "참여자 또는 내용 검색...",
@@ -9722,7 +9633,7 @@ function AdminModal({
           /*#__PURE__*/React.createElement("div", {
             style: { flex: 1, minHeight: '240px', overflowY: 'auto', border: '1px solid #F1F5F9', borderRadius: '8px', backgroundColor: '#F8FAFC', padding: '8px' }
           },
-            filteredMessages.length === 0 ? /*#__PURE__*/React.createElement("div", { style: { padding: '20px', color: '#94A3B8', fontSize: '0.8rem', textAlign: 'center' } }, "검색 결과가 없거나 대화 내역이 비어 있습니다.") :
+            filteredMessages.length === 0 ? /*#__PURE__*/React.createElement("div", { style: { padding: '20px', color: '#94A3B8', fontSize: '0.8rem', textAlign: 'center' } }, "검색 결과가 없거나 채팅 내역이 비어 있습니다.") :
             filteredMessages.map(msg => {
               const p = participantsMap[msg.participantId] || { name: '알수없음', color: '#94A3B8' };
               const dateObj = new Date(msg.timestamp);
@@ -9734,16 +9645,6 @@ function AdminModal({
               },
                 /* Left details */
                 /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 } },
-                  /* Type Badge */
-                  /*#__PURE__*/React.createElement("span", {
-                    style: {
-                      fontSize: '0.68rem', fontWeight: 'bold', padding: '2px 6px', borderRadius: '4px',
-                      backgroundColor: msg.type === '의견' ? '#EFF6FF' : '#ECFDF5',
-                      color: msg.type === '의견' ? '#2563EB' : '#10B981',
-                      border: msg.type === '의견' ? '1px solid #BFDBFE' : '1px solid #A7F3D0',
-                      whiteSpace: 'nowrap'
-                    }
-                  }, msg.type),
                   /* User Badge */
                   /*#__PURE__*/React.createElement("span", {
                     style: { backgroundColor: p.color, color: getContrastTextColor(p.color), padding: '2px 8px', borderRadius: '9999px', fontSize: '0.72rem', fontWeight: 'bold', whiteSpace: 'nowrap' }
