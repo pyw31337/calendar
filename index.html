@@ -124,17 +124,28 @@
     @media (max-width: 480px) {
       .header-actions { justify-content: space-between; }
       .header-actions > .btn { padding: 8px 6px; font-size: 0.78rem; gap: 4px; justify-content: center; }
-      .header-actions > .btn:nth-child(1) { flex: 1; min-width: 0; white-space: nowrap; }
+      .header-actions > .participants-anchor { flex: 1; min-width: 0; }
+      .header-actions > .participants-anchor > .btn { width: 100%; white-space: nowrap; }
       .header-actions > .btn:nth-child(2),
       .header-actions > .btn:nth-child(3) { width: 50px; flex: 0 0 50px; }
-      .header-actions > .btn svg { width: 18px; height: 18px; }
+      .header-actions .btn svg { width: 18px; height: 18px; }
     }
 
-    /* Participants Popover Speech Bubble */
+    /* Participants Popover Speech Bubble -- anchored to just the participants button (not the
+       whole header-actions row) so it stays centered under the button regardless of how many
+       sibling buttons sit next to it or how wide the row is. The bubble and its arrow both use
+       left: 50% + translateX(-50%) on the SAME anchor, so the arrow always points at the exact
+       horizontal center of the button, in every browser (translateX(-50%) is standard CSS
+       Transforms Level 1, uniformly supported since Safari 9 / Firefox 16 / Chrome 36). */
+    .participants-anchor { position: relative; display: inline-flex; }
+    @media (max-width: 480px) {
+      .participants-anchor { display: flex; }
+    }
     .participants-popover {
       position: absolute;
       top: calc(100% + 10px);
-      right: 0;
+      left: 50%;
+      transform: translateX(-50%);
       background: #FFFFFF;
       border: 1px solid var(--border-subtle);
       border-radius: var(--radius-md);
@@ -142,6 +153,7 @@
       box-shadow: var(--shadow-lg);
       z-index: 100;
       min-width: 170px;
+      max-width: calc(100vw - 24px);
       display: flex;
       flex-direction: column;
       gap: 8px;
@@ -150,7 +162,8 @@
       content: '';
       position: absolute;
       bottom: 100%;
-      right: 24px;
+      left: 50%;
+      transform: translateX(-50%);
       border: 8px solid transparent;
       border-bottom-color: var(--border-subtle);
     }
@@ -158,18 +171,10 @@
       content: '';
       position: absolute;
       bottom: 100%;
-      right: 25px;
+      left: 50%;
+      transform: translateX(-50%);
       border: 7px solid transparent;
       border-bottom-color: #FFFFFF;
-    }
-    @media (max-width: 480px) {
-      .participants-popover {
-        left: 0;
-        right: 0;
-        min-width: unset;
-        width: 100%;
-      }
-      .participants-popover::before, .participants-popover::after { display: none; }
     }
 
     /* Buttons */
@@ -6127,6 +6132,8 @@ function App() {
     className: "calendar-desc"
   }, activeCal.description))), /*#__PURE__*/React.createElement("div", {
     className: "header-actions"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "participants-anchor"
   }, /*#__PURE__*/React.createElement("button", {
     className: "btn btn-secondary",
     onClick: () => setIsParticipantsOpen(!isParticipantsOpen),
@@ -6156,7 +6163,34 @@ function App() {
     d: "M16 3.13a4 4 0 0 1 0 7.75"
   }), /*#__PURE__*/React.createElement("path", {
     d: "M21 21v-2a4 4 0 0 0 -3 -3.85"
-  })), /*#__PURE__*/React.createElement("span", null, "\uCC38\uC5EC\uC790 (", getActiveParticipants(activeCal)?.length || 0, "\uBA85)")), /*#__PURE__*/React.createElement("button", {
+  })), /*#__PURE__*/React.createElement("span", null, "\uCC38\uC5EC\uC790 (", getActiveParticipants(activeCal)?.length || 0, "\uBA85)")), isParticipantsOpen && /*#__PURE__*/React.createElement("div", {
+    className: "participants-popover"
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '0.8rem',
+      fontWeight: 800,
+      color: 'var(--text-muted)',
+      borderBottom: '1px solid var(--border-subtle)',
+      paddingBottom: '6px',
+      marginBottom: '4px'
+    }
+  }, "\uCC38\uC5EC\uC790 \uBAA9\uB85D"), getActiveParticipants(activeCal).map(p => /*#__PURE__*/React.createElement("div", {
+    key: p.id,
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      fontSize: '0.85rem',
+      fontWeight: '700'
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "color-dot",
+    style: {
+      backgroundColor: p.color,
+      width: '10px',
+      height: '10px'
+    }
+  }), /*#__PURE__*/React.createElement("span", null, p.name))))), /*#__PURE__*/React.createElement("button", {
     className: "btn btn-secondary",
     onClick: () => {
       if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 공유 정보를 확인해 주세요.')) setIsShareOpen(true);
@@ -6218,34 +6252,7 @@ function App() {
     d: "M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065"
   }), /*#__PURE__*/React.createElement("path", {
     d: "M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0"
-  }))), isParticipantsOpen && /*#__PURE__*/React.createElement("div", {
-    className: "participants-popover"
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: '0.8rem',
-      fontWeight: 800,
-      color: 'var(--text-muted)',
-      borderBottom: '1px solid var(--border-subtle)',
-      paddingBottom: '6px',
-      marginBottom: '4px'
-    }
-  }, "\uCC38\uC5EC\uC790 \uBAA9\uB85D"), getActiveParticipants(activeCal).map(p => /*#__PURE__*/React.createElement("div", {
-    key: p.id,
-    style: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: '8px',
-      fontSize: '0.85rem',
-      fontWeight: '700'
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "color-dot",
-    style: {
-      backgroundColor: p.color,
-      width: '10px',
-      height: '10px'
-    }
-  }), /*#__PURE__*/React.createElement("span", null, p.name)))))), /*#__PURE__*/React.createElement(CalendarGrid, {
+  }))))), /*#__PURE__*/React.createElement(CalendarGrid, {
     calendar: activeCal,
     isLoading: isInitialDataLoading,
     monthDate: currentMonthDate,
@@ -9231,7 +9238,7 @@ function AdminModal({
   }, /*#__PURE__*/React.createElement("div", {
     className: "modal-container",
     onClick: e => e.stopPropagation(),
-    style: { maxWidth: '760px', width: '95vw', display: 'flex', flexDirection: 'column', height: '90vh', maxHeight: '780px', borderRadius: '16px' }
+    style: { maxWidth: '760px', width: '95vw', display: 'flex', flexDirection: 'column', height: '90vh', maxHeight: '700px', borderRadius: '16px' }
   },
     /* Header */
     /*#__PURE__*/React.createElement("div", {
@@ -9644,17 +9651,6 @@ function AdminModal({
           )
         )
       )
-    ),
-
-    /* Footer (only close) */
-    /*#__PURE__*/React.createElement("div", {
-      className: "modal-footer",
-      style: { flexShrink: 0, padding: '14px 20px', borderTop: '1px solid #E2E8F0', display: 'flex', justifyContent: 'flex-end', backgroundColor: '#F8FAFC' }
-    },
-      /*#__PURE__*/React.createElement("button", {
-        type: "button", className: "btn btn-secondary", disabled: isSubmitting,
-        onClick: () => { if (!isSubmitting) onClose(); }
-      }, "대시보드 닫기")
     ),
 
     /* Inner PollModal to Edit/Create Polls */
