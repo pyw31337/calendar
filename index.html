@@ -299,6 +299,7 @@
       padding-top: 82px;
       border-radius: var(--radius-lg);
       background: rgba(248, 250, 252, 0.78);
+      -webkit-backdrop-filter: blur(3px);
       backdrop-filter: blur(3px);
       pointer-events: none;
     }
@@ -1026,7 +1027,7 @@
 
     .bottom-sheet-overlay {
       position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px);
+      background: rgba(15, 23, 42, 0.6); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px);
       z-index: 2000; display: flex; align-items: flex-end; justify-content: center;
     }
     .bottom-sheet {
@@ -1068,7 +1069,7 @@
     /* Modal Overlay & Card */
     .modal-overlay {
       position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.6);
-      backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 16px;
+      -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 16px;
     }
     .modal-container {
       background: #FFFFFF; border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
@@ -1243,6 +1244,34 @@ async function setAdminPasswordHash(newHash) {
     })
   });
   return res.ok;
+}
+
+// Copies text to the clipboard, falling back to the legacy execCommand approach when the
+// async Clipboard API isn't available (non-secure context, older Safari/Firefox, some
+// embedded webviews). Returns whether the copy actually succeeded.
+async function copyTextToClipboard(text) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch (e) {
+      // fall through to the legacy fallback below
+    }
+  }
+  try {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+    const ok = document.execCommand('copy');
+    document.body.removeChild(textarea);
+    return ok;
+  } catch (e) {
+    return false;
+  }
 }
 
 function getContrastTextColor(hexColor) {
@@ -10010,9 +10039,9 @@ function ShareModal({
     readOnly: true
   }), /*#__PURE__*/React.createElement("button", {
     className: "btn btn-primary",
-    onClick: () => {
-      navigator.clipboard.writeText(shareUrl);
-      alert('URL이 복사되었습니다!');
+    onClick: async () => {
+      const ok = await copyTextToClipboard(shareUrl);
+      alert(ok ? 'URL이 복사되었습니다!' : '복사에 실패했습니다. URL을 직접 선택해 복사해 주세요.');
     }
   }, "URL \uBCF5\uC0AC\uD558\uAE30"))));
 }
