@@ -35,6 +35,7 @@
   <!-- Firebase SDK for Realtime Multi-User Firestore Sync -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
 
   <style>
     :root {
@@ -2613,6 +2614,7 @@ const firebaseConfig = {
   appId: "1:154827314076:web:gathercalendar2026"
 };
 let firebaseDb = null;
+let firebaseStorage = null;
 try {
   if (ENABLE_FIRESTORE_SYNC && typeof firebase !== 'undefined') {
     if (!firebase.apps.length) {
@@ -2622,6 +2624,17 @@ try {
   }
 } catch (e) {
   console.warn('Firebase init notice:', e);
+}
+try {
+  // Chat images are uploaded here when available (see uploadChatImageAssets); every call site
+  // falls back to embedding a compressed base64 image directly in the message document if this
+  // is unavailable (bucket not provisioned on this project/plan, offline, etc.), so a Storage
+  // outage degrades image quality/cost rather than breaking the chat feature outright.
+  if (ENABLE_FIRESTORE_SYNC && typeof firebase !== 'undefined' && firebase.apps.length) {
+    firebaseStorage = firebase.storage();
+  }
+} catch (e) {
+  console.warn('Firebase Storage init notice (falling back to inline base64 images):', e);
 }
 
 async function fetchSingleCalendarWithRest(calId, timeoutMs = FIREBASE_LOAD_TIMEOUT_MS) {
@@ -2859,6 +2872,104 @@ function estimateCalendarDocWireBytes(calendar) {
   }
 }
 
+// --- Activity log subcollection (calendars/cal_{id}/activityLogs/{logId}) ---
+// activityLogs used to be an embedded array on the calendar document, growing forever with
+// zero de-duplication (unlike availabilities, which de-dupes by date+participant). That made
+// it the single biggest long-term threat to the calendar document's 1MiB size limit. It now
+// lives in its own subcollection, one document per log entry (same pattern as `messages`),
+// which has no per-document array-size ceiling to worry about.
+
+// Strips the legacy embedded activityLogs array from a calendar payload right before it is
+// written to Firestore. deletedActivityLogIds is NOT touched here -- it's a short list of
+// hidden log IDs added one at a time by a manual user action, not an auto-growing log, so it
+// stays embedded on the calendar document as before.
+function stripEmbeddedActivityLogsField(calendar) {
+  if (!calendar || typeof calendar !== 'object') return calendar;
+  const { activityLogs, ...rest } = calendar;
+  return rest;
+}
+
+// Writes a batch of activity log entries as individual documents, keyed by each log's own
+// `id` so retries/re-copies of the same entry are idempotent no-ops rather than duplicates.
+async function writeActivityLogsToFirestore(calendarId, logs) {
+  const validLogs = Array.isArray(logs) ? logs.filter(log => log && typeof log.id === 'string' && log.id) : [];
+  if (!validLogs.length) return true;
+  if (firebaseDb) {
+    try {
+      const colRef = firebaseDb.collection('calendars').doc(`cal_${calendarId}`).collection('activityLogs');
+      const batch = firebaseDb.batch();
+      validLogs.forEach(log => batch.set(colRef.doc(log.id), log));
+      await batch.commit();
+      return true;
+    } catch (e) {
+      console.warn(`Failed to write activity logs for ${calendarId} via SDK, trying REST:`, e);
+    }
+  }
+  try {
+    const writes = validLogs.map(log => ({
+      update: {
+        name: `projects/metro-live-2918e/databases/(default)/documents/calendars/cal_${calendarId}/activityLogs/${log.id}`,
+        fields: Object.fromEntries(Object.entries(log).map(([key, value]) => [key, jsToFirestoreValue(value)]))
+      }
+    }));
+    const res = await fetch('https://firestore.googleapis.com/v1/projects/metro-live-2918e/databases/(default)/documents:commit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ writes })
+    });
+    if (!res.ok) console.warn(`Activity log REST write failed for ${calendarId}:`, await res.text());
+    return res.ok;
+  } catch (e) {
+    console.warn(`Failed to write activity logs for ${calendarId} via REST:`, e);
+    return false;
+  }
+}
+
+// Fetches activity log documents for a calendar. Pass `recentLimit` for a display feed
+// (ordered newest-first); omit it to fetch the full history (unordered), which point-in-time
+// recovery needs to correctly replay every action up to a cutoff timestamp.
+async function fetchActivityLogsFromFirestore(calendarId, recentLimit = null) {
+  const basePath = `calendars/cal_${calendarId}/activityLogs`;
+  try {
+    if (firebaseDb) {
+      let query = firebaseDb.collection('calendars').doc(`cal_${calendarId}`).collection('activityLogs');
+      if (recentLimit) query = query.orderBy('timestamp', 'desc').limit(recentLimit);
+      const snap = await query.get();
+      return snap.docs.map(doc => doc.data());
+    }
+  } catch (e) {
+    console.warn(`Failed to fetch activity logs for ${calendarId} via SDK, trying REST:`, e);
+  }
+  try {
+    const orderPart = recentLimit ? '?orderBy=timestamp%20desc&pageSize=' + recentLimit : '?pageSize=1000';
+    const res = await fetch(`https://firestore.googleapis.com/v1/projects/metro-live-2918e/databases/(default)/documents/${basePath}${orderPart}`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    const docs = data.documents || [];
+    return docs.map(doc => firestoreDocumentToJs(doc));
+  } catch (e) {
+    console.warn(`Failed to fetch activity logs for ${calendarId} via REST:`, e);
+    return [];
+  }
+}
+
+// Deletes activity log documents strictly after a cutoff timestamp, used by point-in-time
+// recovery to match the "future" chat messages it already deletes on restore.
+async function deleteActivityLogsAfterTimestamp(calendarId, logs, cutoffTimestamp) {
+  const toDelete = (logs || []).filter(log => getActivityLogStamp(log) > cutoffTimestamp && log.id);
+  for (const log of toDelete) {
+    try {
+      if (firebaseDb) {
+        await firebaseDb.collection('calendars').doc(`cal_${calendarId}`).collection('activityLogs').doc(log.id).delete();
+      } else {
+        await fetch(`https://firestore.googleapis.com/v1/projects/metro-live-2918e/databases/(default)/documents/calendars/cal_${calendarId}/activityLogs/${log.id}`, { method: 'DELETE' });
+      }
+    } catch (e) {
+      console.warn(`Failed to delete activity log ${log.id} for ${calendarId}:`, e);
+    }
+  }
+}
+
 function isRetryableFirestoreConflict(errorText) {
   return /ABORTED|FAILED_PRECONDITION|409|stored version|base version/i.test(String(errorText || ''));
 }
@@ -2869,7 +2980,7 @@ function getFirestoreRetryDelay(attempt) {
   return baseDelay + jitter;
 }
 
-async function pushSingleCalendarWithRest(normalizedCal, lastModified, saveMode, retryCount = 18) {
+async function pushSingleCalendarWithRest(normalizedCal, lastModified, saveMode, retryCount = 18, newActivityLogs = []) {
   const docPath = `projects/metro-live-2918e/databases/(default)/documents/calendars/cal_${normalizedCal.id}`;
   const docUrl = `https://firestore.googleapis.com/v1/${docPath}`;
   for (let attempt = 0; attempt <= retryCount; attempt += 1) {
@@ -2895,20 +3006,32 @@ async function pushSingleCalendarWithRest(normalizedCal, lastModified, saveMode,
         nextCalendar = mergeCalendarAvailabilityDelta(serverCalendar, normalizedCal, lastModified);
       }
       const mergedCalendar = normalizeCalendarForSave(nextCalendar);
-      const validationError = validateCalendarShape(mergedCalendar);
+      mergedCalendar.revision = Math.max(serverCalendar?.revision || 0, normalizedCal.revision || 0) + 1;
+      mergedCalendar.updatedAt = Math.max(mergedCalendar.updatedAt || 0, lastModified || 0);
+      const nextDocRevision = (currentData?.revision || 0) + 1;
+      // activityLogs lives in its own subcollection now (see writeActivityLogsToFirestore) and
+      // is never part of the calendar document itself. Any still-present legacy embedded
+      // entries (from before this migration) are copied over the first time this calendar is
+      // saved, self-healing without needing a separate one-off migration script. Validation and
+      // the size guard below run against docCalendar (the actual write payload), not
+      // mergedCalendar, so a large legacy activityLogs array being migrated away doesn't count
+      // against the size limit it's no longer part of.
+      const legacyActivityLogs = [
+        ...(Array.isArray(serverCalendar?.activityLogs) ? serverCalendar.activityLogs : []),
+        ...(Array.isArray(normalizedCal?.activityLogs) ? normalizedCal.activityLogs : [])
+      ];
+      const docCalendar = stripEmbeddedActivityLogsField(mergedCalendar);
+      const validationError = validateCalendarShape(docCalendar);
       if (validationError) {
         const err = new Error(validationError);
         err.nonRetryable = true;
         throw err;
       }
-      if (estimateCalendarDocWireBytes(mergedCalendar) > CALENDAR_DOC_SAFE_BYTE_LIMIT) {
+      if (estimateCalendarDocWireBytes(docCalendar) > CALENDAR_DOC_SAFE_BYTE_LIMIT) {
         const err = new Error('캘린더 데이터가 너무 커져 더 이상 저장할 수 없습니다. 관리자에게 문의해 주세요.');
         err.nonRetryable = true;
         throw err;
       }
-      mergedCalendar.revision = Math.max(serverCalendar?.revision || 0, normalizedCal.revision || 0) + 1;
-      mergedCalendar.updatedAt = Math.max(mergedCalendar.updatedAt || 0, lastModified || 0);
-      const nextDocRevision = (currentData?.revision || 0) + 1;
       const commitRes = await fetch('https://firestore.googleapis.com/v1/projects/metro-live-2918e/databases/(default)/documents:commit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -2917,7 +3040,7 @@ async function pushSingleCalendarWithRest(normalizedCal, lastModified, saveMode,
             update: {
               name: docPath,
               fields: {
-                calendar: jsToFirestoreValue(mergedCalendar),
+                calendar: jsToFirestoreValue(docCalendar),
                 lastModified: jsToFirestoreValue(lastModified),
                 revision: jsToFirestoreValue(nextDocRevision)
               }
@@ -2926,7 +3049,13 @@ async function pushSingleCalendarWithRest(normalizedCal, lastModified, saveMode,
           }]
         })
       });
-      if (commitRes.ok) return true;
+      if (commitRes.ok) {
+        const logsToPersist = [...legacyActivityLogs, ...(Array.isArray(newActivityLogs) ? newActivityLogs : [])];
+        if (logsToPersist.length) {
+          writeActivityLogsToFirestore(normalizedCal.id, logsToPersist).catch(e => console.warn('Activity log persist failed:', e));
+        }
+        return true;
+      }
       const errorText = await commitRes.text();
       if (!isRetryableFirestoreConflict(errorText) || attempt === retryCount) {
         throw new Error(errorText.slice(0, 500));
@@ -2944,7 +3073,7 @@ async function pushSingleCalendarWithRest(normalizedCal, lastModified, saveMode,
 }
 
 // Pushes isolated calendar data to the durable master store and Firestore when available.
-async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 18, allCalendars = null, saveMode = 'availability') {
+async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 18, allCalendars = null, saveMode = 'availability', newActivityLogs = []) {
   const normalizedCal = normalizeCalendarForSave(targetCal);
   if (!normalizedCal || !normalizedCal.id) return false;
   if (!isAllowedCalendarId(normalizedCal.id)) return false;
@@ -2954,6 +3083,7 @@ async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 18,
   }
   if (!ENABLE_FIRESTORE_SYNC) return false;
   if (firebaseDb) {
+    let legacyActivityLogs = [];
     try {
       const ref = firebaseDb.collection('calendars').doc(`cal_${normalizedCal.id}`);
       await Promise.race([
@@ -2976,28 +3106,43 @@ async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 18,
 	            nextCalendar = mergeCalendarAvailabilityDelta(serverCalendar, normalizedCal, lastModified);
 	          }
 	          const mergedCalendar = normalizeCalendarForSave(nextCalendar);
-	          const validationError = validateCalendarShape(mergedCalendar);
-	          if (validationError) throw new Error(validationError);
-	          if (estimateCalendarDocWireBytes(mergedCalendar) > CALENDAR_DOC_SAFE_BYTE_LIMIT) {
-	            throw new Error('캘린더 데이터가 너무 커져 더 이상 저장할 수 없습니다. 관리자에게 문의해 주세요.');
-	          }
 	          const nextDocRevision = (currentData?.revision || 0) + 1;
 	          mergedCalendar.revision = Math.max(serverCalendar?.revision || 0, normalizedCal.revision || 0) + 1;
 	          mergedCalendar.updatedAt = Math.max(mergedCalendar.updatedAt || 0, lastModified || 0);
+	          // activityLogs lives in its own subcollection now -- see writeActivityLogsToFirestore
+	          // below. Capture any still-present legacy embedded entries so they get copied over
+	          // (self-healing migration) instead of silently disappearing on this overwrite.
+	          // Validation and the size guard run against the stripped payload (the actual write),
+	          // not mergedCalendar, so a legacy activityLogs array being migrated away doesn't
+	          // count against a size limit it's no longer part of.
+	          legacyActivityLogs = [
+	            ...(Array.isArray(serverCalendar?.activityLogs) ? serverCalendar.activityLogs : []),
+	            ...(Array.isArray(normalizedCal?.activityLogs) ? normalizedCal.activityLogs : [])
+	          ];
+	          const docCalendar = stripEmbeddedActivityLogsField(mergedCalendar);
+	          const validationError = validateCalendarShape(docCalendar);
+	          if (validationError) throw new Error(validationError);
+	          if (estimateCalendarDocWireBytes(docCalendar) > CALENDAR_DOC_SAFE_BYTE_LIMIT) {
+	            throw new Error('캘린더 데이터가 너무 커져 더 이상 저장할 수 없습니다. 관리자에게 문의해 주세요.');
+	          }
 	          tx.set(ref, {
-	            calendar: mergedCalendar,
+	            calendar: docCalendar,
 	            lastModified,
 	            revision: nextDocRevision
 	          });
 	        }),
 	        new Promise((_, reject) => setTimeout(() => reject(new Error('Firestore push timeout')), 8000))
 	      ]);
+	      const logsToPersist = [...legacyActivityLogs, ...(Array.isArray(newActivityLogs) ? newActivityLogs : [])];
+	      if (logsToPersist.length) {
+	        writeActivityLogsToFirestore(normalizedCal.id, logsToPersist).catch(e => console.warn('Activity log persist failed:', e));
+	      }
 	      return true;
     } catch (e) {
       console.warn(`Firestore push notice for cal_${normalizedCal.id}:`, e);
     }
   }
-  return pushSingleCalendarWithRest(normalizedCal, lastModified, saveMode, retryCount);
+  return pushSingleCalendarWithRest(normalizedCal, lastModified, saveMode, retryCount, newActivityLogs);
 }
 function loadLocalMeta() {
   return { lastModified: 0, byCalendar: {} };
@@ -3369,6 +3514,10 @@ function AdminDashboard({ initialCalendars }) {
   // Unified chat log states
   const [messagesMap, setMessagesMap] = React.useState({});
   const [chatSearchQuery, setChatSearchQuery] = React.useState('');
+  // Full activity log history for the calendar selected in Tab 2/3, sourced from the
+  // activityLogs subcollection. Fetched in full (no limit) since point-in-time recovery needs
+  // every entry, not just a recent window, to correctly replay state up to a cutoff.
+  const [selectedCalActivityLogs, setSelectedCalActivityLogs] = React.useState([]);
 
   const lastSyncedRef = React.useRef(null);
 
@@ -3564,6 +3713,21 @@ function AdminDashboard({ initialCalendars }) {
       });
     }
   }, [calendarsList.map(c => c.id).join(','), firebaseDb]);
+
+  // Full activity log history for the selected calendar (Tab 2 timeline, Tab 3 PITR replay)
+  React.useEffect(() => {
+    if (!selectedCalId) {
+      setSelectedCalActivityLogs([]);
+      return;
+    }
+    let isMounted = true;
+    fetchActivityLogsFromFirestore(selectedCalId).then(list => {
+      if (isMounted) setSelectedCalActivityLogs(list);
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedCalId]);
 
   // Sync Tab 2 form values when selectedCalId changes or serverCalendars list updates (avoiding wiping edits)
   React.useEffect(() => {
@@ -3790,7 +3954,8 @@ function AdminDashboard({ initialCalendars }) {
     requestConfirm('시점 데이터 복구', msg, async () => {
       closeConfirmDialog();
       try {
-        const restoredCal = rebuildCalendarToTimestamp(cal, log.timestamp);
+        const fullLogs = calId === selectedCalId ? selectedCalAllActivityLogs : await fetchActivityLogsFromFirestore(calId);
+        const restoredCal = rebuildCalendarToTimestamp(cal, log.timestamp, fullLogs);
         const now = Date.now();
 
         // Save rolled-back calendar
@@ -3811,12 +3976,16 @@ function AdminDashboard({ initialCalendars }) {
           }
         }
 
+        // Delete activity log entries recorded after log.timestamp, matching the message cleanup above
+        await deleteActivityLogsAfterTimestamp(calId, fullLogs, log.timestamp);
+
         // Sync local state
         setServerCalendars(prev => prev.map(c => c.id === calId ? restoredCal : c));
         setMessagesMap(prev => ({
           ...prev,
           [calId]: (prev[calId] || []).filter(m => m.timestamp <= log.timestamp)
         }));
+        setSelectedCalActivityLogs(prev => prev.filter(l => getActivityLogStamp(l) <= log.timestamp));
 
         showAdminToast('일정, 투표 및 채팅 로그가 해당 시점으로 복구되었습니다.', 'success');
       } catch (err) {
@@ -3838,6 +4007,8 @@ function AdminDashboard({ initialCalendars }) {
         ok = await deleteMessageRest(calId, msg.id);
       }
       if (ok) {
+        deleteChatImageFromStorage(msg.imageUrl);
+        deleteChatImageFromStorage(msg.thumbUrl);
         showAdminToast('의견이 삭제되었습니다.', 'success');
         setMessagesMap(prev => ({
           ...prev,
@@ -3877,12 +4048,21 @@ function AdminDashboard({ initialCalendars }) {
 
   const selectedCal = serverCalendars.find(c => c.id === selectedCalId);
 
+  // Union of the activityLogs subcollection (source of truth going forward) with any legacy
+  // embedded calendar.activityLogs still present for calendars that haven't self-healed yet.
+  const selectedCalAllActivityLogs = React.useMemo(() => {
+    const byId = new Map();
+    getCalendarActivityLogs(selectedCal).forEach(log => { if (log?.id) byId.set(log.id, log); });
+    (selectedCalActivityLogs || []).forEach(log => { if (log?.id) byId.set(log.id, log); });
+    return Array.from(byId.values());
+  }, [selectedCal, selectedCalActivityLogs]);
+
   // Build Unified chronological timeline logs for Tab 3 (Recovery)
   const unifiedTimeline = React.useMemo(() => {
     if (!selectedCal) return [];
-    
+
     // 1. Calendar / Poll Activity Logs
-    const calLogs = [...getCalendarActivityLogs(selectedCal)].map(l => ({
+    const calLogs = [...selectedCalAllActivityLogs].map(l => ({
       id: l.id,
       type: 'activity',
       action: l.action,
@@ -3905,7 +4085,7 @@ function AdminDashboard({ initialCalendars }) {
 
     // Sort chronologically descending
     return [...calLogs, ...chatLogs].sort((a, b) => b.timestamp - a.timestamp);
-  }, [selectedCal, messagesMap[selectedCalId]]);
+  }, [selectedCal, selectedCalAllActivityLogs, messagesMap[selectedCalId]]);
 
   // =====================================================================
   // Supabase Design System Palette (Light)
@@ -4570,7 +4750,7 @@ function AdminDashboard({ initialCalendars }) {
           revision: (targetCal.revision || 0) + 1
         };
         
-        const saved = await pushSingleCloudCalendar(updatedCal, now, 18, null, 'polls');
+        const saved = await pushSingleCloudCalendar(updatedCal, now, 18, null, 'polls', log ? [log] : []);
         if (saved) {
           setServerCalendars(prev => prev.map(c => c.id === targetCal.id ? updatedCal : c));
           showAdminToast('투표가 저장되었습니다.', 'success');
@@ -4824,7 +5004,7 @@ function App() {
     saveLocalMeta(serverRevisionRef.current);
   };
 
-  const updateCalendars = async (nextCalendars, toastMsg = '일정이 저장되었습니다.', toastType = 'success', targetCalId = activeCalId, saveMode = 'availability') => {
+  const updateCalendars = async (nextCalendars, toastMsg = '일정이 저장되었습니다.', toastType = 'success', targetCalId = activeCalId, saveMode = 'availability', newActivityLogs = []) => {
     let previousCalendars = null;
     try {
       if (!isAllowedCalendarId(targetCalId)) {
@@ -4849,7 +5029,7 @@ function App() {
       isSavingRef.current = true;
       previousCalendars = calendars;
       setCalendarsState(normalizedCalendars);
-      const saved = await pushSingleCloudCalendar(currentCal, now, 18, normalizedCalendars, saveMode);
+      const saved = await pushSingleCloudCalendar(currentCal, now, 18, normalizedCalendars, saveMode, newActivityLogs);
       if (!saved) {
         console.warn('Cloud save failed for calendar:', currentCal.id);
         if (previousCalendars) setCalendarsState(previousCalendars);
@@ -4879,6 +5059,7 @@ function App() {
   const [selectedDate, setSelectedDate] = React.useState(null);
   const [isModalOpen, setIsModalOpen] = React.useState(false);
   const [isAdminOpen, setIsAdminOpen] = React.useState(false);
+  const [adminActivityLogs, setAdminActivityLogs] = React.useState([]);
   const [isShareOpen, setIsShareOpen] = React.useState(false);
   const [isChatShareOpen, setIsChatShareOpen] = React.useState(false);
   const [isParticipantsOpen, setIsParticipantsOpen] = React.useState(false);
@@ -4898,6 +5079,7 @@ function App() {
   // Chat-related states
   const [recentMessages, setRecentMessages] = React.useState([]);
   const [chatMessages, setChatMessages] = React.useState([]);
+  const [activityLogsFeed, setActivityLogsFeed] = React.useState([]);
   const [chatInput, setChatInput] = React.useState('');
   const [chatParticipantId, setChatParticipantId] = React.useState('');
   const [isChatSheetOpen, setIsChatSheetOpen] = React.useState(false);
@@ -5141,6 +5323,48 @@ function App() {
     };
   }, [activeCalId]);
 
+  // Recent activity log feed (its own subcollection now, see writeActivityLogsToFirestore)
+  React.useEffect(() => {
+    if (!activeCalId) {
+      setActivityLogsFeed([]);
+      return;
+    }
+    if (!firebaseDb) {
+      fetchActivityLogsFromFirestore(activeCalId, 200).then(list => setActivityLogsFeed(list));
+      return;
+    }
+    let isMounted = true;
+    const unsubscribeLogs = firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('activityLogs')
+      .orderBy('timestamp', 'desc')
+      .limit(200)
+      .onSnapshot(snapshot => {
+        if (!isMounted) return;
+        setActivityLogsFeed(snapshot.docs.map(doc => doc.data()));
+      }, err => {
+        console.warn(`Firestore activity log subscription error for cal_${activeCalId}:`, err);
+        fetchActivityLogsFromFirestore(activeCalId, 200).then(list => {
+          if (isMounted) setActivityLogsFeed(list);
+        });
+      });
+    return () => {
+      isMounted = false;
+      if (unsubscribeLogs) unsubscribeLogs();
+    };
+  }, [activeCalId]);
+
+  // Full (unbounded) activity log history for the settings modal's PITR tab -- fetched lazily,
+  // only while that modal is actually open, since it needs full history rather than a capped feed.
+  React.useEffect(() => {
+    if (!isAdminOpen || !activeCalId) return;
+    let isMounted = true;
+    fetchActivityLogsFromFirestore(activeCalId).then(list => {
+      if (isMounted) setAdminActivityLogs(list);
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, [isAdminOpen, activeCalId]);
+
   // Scroll to bottom of chat container
   const chatMessagesContainerRef = React.useRef(null);
   React.useEffect(() => {
@@ -5192,11 +5416,12 @@ function App() {
         }
       } else {
         // Send first image with optional text
+        const firstImageUrls = await resolveChatImageUrls(activeCalId, chatImages[0]);
         const firstMessage = {
           participantId: chatParticipantId,
           text: chatInput.trim(),
-          imageUrl: chatImages[0].original,
-          thumbUrl: chatImages[0].thumbnail,
+          imageUrl: firstImageUrls.imageUrl,
+          thumbUrl: firstImageUrls.thumbUrl,
           timestamp: Date.now()
         };
         if (firebaseDb) {
@@ -5205,15 +5430,16 @@ function App() {
         } else {
           ok = await sendChatMessageRest(activeCalId, firstMessage);
         }
-        
+
         // Send subsequent images sequentially
         if (ok && imageCount > 1) {
           for (let i = 1; i < imageCount; i++) {
+            const extraImageUrls = await resolveChatImageUrls(activeCalId, chatImages[i]);
             const extraMessage = {
               participantId: chatParticipantId,
               text: '',
-              imageUrl: chatImages[i].original,
-              thumbUrl: chatImages[i].thumbnail,
+              imageUrl: extraImageUrls.imageUrl,
+              thumbUrl: extraImageUrls.thumbUrl,
               timestamp: Date.now() + i
             };
             if (firebaseDb) {
@@ -5253,7 +5479,7 @@ function App() {
 
   const handleConfirmDeleteMessage = async () => {
     if (!deletingMessage) return;
-    const { id, calId } = deletingMessage;
+    const { id, calId, imageUrl, thumbUrl } = deletingMessage;
     try {
       let ok = false;
       if (firebaseDb) {
@@ -5263,6 +5489,8 @@ function App() {
         ok = await deleteMessageRest(calId, id);
       }
       if (ok) {
+        deleteChatImageFromStorage(imageUrl);
+        deleteChatImageFromStorage(thumbUrl);
         if (!firebaseDb) {
           fetchRecentMessagesRest(calId).then(list => setRecentMessages(list));
           fetchChatMessagesRest(calId).then(list => setChatMessages(list));
@@ -5285,16 +5513,20 @@ function App() {
 
   const handleSaveEditMessage = async (newText, newImage) => {
     if (!editingMessage) return;
-    const { id, calId } = editingMessage;
+    const { id, calId, imageUrl: previousImageUrl, thumbUrl: previousThumbUrl } = editingMessage;
     try {
       const data = { text: newText };
+      let replacedImage = false;
       if (newImage) {
-        data.imageUrl = newImage.original;
-        data.thumbUrl = newImage.thumbnail;
+        const resolved = await resolveChatImageUrls(calId, newImage);
+        data.imageUrl = resolved.imageUrl;
+        data.thumbUrl = resolved.thumbUrl;
+        replacedImage = true;
       } else if (newImage === null) {
         // image explicitly cleared
         data.imageUrl = '';
         data.thumbUrl = '';
+        replacedImage = true;
       }
       let ok = false;
       if (firebaseDb) {
@@ -5304,6 +5536,10 @@ function App() {
         ok = await updateMessageRest(calId, id, data);
       }
       if (ok) {
+        if (replacedImage) {
+          deleteChatImageFromStorage(previousImageUrl);
+          deleteChatImageFromStorage(previousThumbUrl);
+        }
         if (!firebaseDb) {
           fetchRecentMessagesRest(calId).then(list => setRecentMessages(list));
           fetchChatMessagesRest(calId).then(list => setChatMessages(list));
@@ -5418,7 +5654,7 @@ function App() {
       activityLogs: activityLog ? [...getCalendarActivityLogs(activeCal), activityLog] : getCalendarActivityLogs(activeCal)
     };
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-    return updateCalendars(nextCalendars, '일정이 등록되었습니다.', 'success', updatedCal.id);
+    return updateCalendars(nextCalendars, '일정이 등록되었습니다.', 'success', updatedCal.id, 'availability', activityLog ? [activityLog] : []);
   };
   const handleDeleteAvailability = (dateStr, participantId) => {
     if (!activeCal || !isValidDateString(dateStr)) return false;
@@ -5441,7 +5677,7 @@ function App() {
       activityLogs: activityLog ? [...getCalendarActivityLogs(activeCal), activityLog] : getCalendarActivityLogs(activeCal)
     };
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-    return updateCalendars(nextCalendars, '삭제 되었습니다.', 'delete', updatedCal.id);
+    return updateCalendars(nextCalendars, '삭제 되었습니다.', 'delete', updatedCal.id, 'availability', activityLog ? [activityLog] : []);
   };
   const handleDeleteAllForDate = dateStr => {
     if (!activeCal || !isValidDateString(dateStr)) return false;
@@ -5464,7 +5700,7 @@ function App() {
       activityLogs: [...getCalendarActivityLogs(activeCal), ...activityLogs]
     };
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-    return updateCalendars(nextCalendars, '삭제 되었습니다.', 'delete', updatedCal.id);
+    return updateCalendars(nextCalendars, '삭제 되었습니다.', 'delete', updatedCal.id, 'availability', activityLogs);
   };
   const handleDeleteActivityLog = log => {
     if (!activeCal || !log?.id) return false;
@@ -5517,7 +5753,7 @@ function App() {
       activityLogs: activityLog ? [...getCalendarActivityLogs(activeCal), activityLog] : getCalendarActivityLogs(activeCal)
     };
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-    return updateCalendars(nextCalendars, '투표가 저장되었습니다.', 'success', updatedCal.id, 'polls');
+    return updateCalendars(nextCalendars, '투표가 저장되었습니다.', 'success', updatedCal.id, 'polls', activityLog ? [activityLog] : []);
   };
   const handleOpenVoteSheet = (poll, option) => {
     if (!guardLoadedCalendar('Firebase 데이터를 불러온 뒤 투표해 주세요.')) return false;
@@ -5565,7 +5801,7 @@ function App() {
     };
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
     setVoteTarget(null);
-    return updateCalendars(nextCalendars, '투표가 반영되었습니다.', 'success', updatedCal.id, 'polls');
+    return updateCalendars(nextCalendars, '투표가 반영되었습니다.', 'success', updatedCal.id, 'polls', activityLog ? [activityLog] : []);
   };
   const handleCancelVote = (poll, option, participantId) => {
     if (!guardLoadedCalendar('Firebase 데이터를 불러온 뒤 투표를 취소해 주세요.')) return false;
@@ -5592,7 +5828,7 @@ function App() {
       activityLogs: activityLog ? [...getCalendarActivityLogs(activeCal), activityLog] : getCalendarActivityLogs(activeCal)
     };
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-    return updateCalendars(nextCalendars, '투표 취소 완료', 'delete', updatedCal.id, 'polls');
+    return updateCalendars(nextCalendars, '투표 취소 완료', 'delete', updatedCal.id, 'polls', activityLog ? [activityLog] : []);
   };
   const handleSaveAdmin = (updatedCal, newCalCreated) => {
     if (!activeCalLoaded && !newCalCreated) {
@@ -5978,7 +6214,7 @@ function App() {
       setIsModalOpen(true);
     }
   }), /*#__PURE__*/React.createElement(RecentActivityLog, {
-    calendar: activeCal,
+    calendar: { ...activeCal, activityLogs: activityLogsFeed },
     expanded: isActivityLogExpanded,
     onToggle: () => setIsActivityLogExpanded(value => !value),
     onDeleteLog: handleDeleteActivityLog,
@@ -6007,7 +6243,7 @@ function App() {
     onSave: handleSaveEditMessage,
     onClose: () => setEditingMessage(null)
   }), isAdminOpen && /*#__PURE__*/React.createElement(AdminModal, {
-    calendar: activeCal,
+    calendar: { ...activeCal, activityLogs: adminActivityLogs },
     allCalendars: calendars,
     onSelectCalendar: handleSelectCalendar,
     onSave: handleSaveAdmin,
@@ -6018,13 +6254,6 @@ function App() {
     onClose: () => setIsAdminOpen(false)
   }), isShareOpen && /*#__PURE__*/React.createElement(ShareModal, {
     calendar: activeCal,
-    onCreateNewCal: async newCal => {
-      const nextCalendars = [newCal, ...calendars];
-      const saved = await updateCalendars(nextCalendars, '새 캘린더가 생성되었습니다. ✅', 'success', newCal.id, 'replace');
-      if (saved === false) return;
-      handleSelectCalendar(newCal.id);
-      setIsShareOpen(false);
-    },
     onClose: () => setIsShareOpen(false)
   }), isChatShareOpen && /*#__PURE__*/React.createElement(ShareModal, {
     calendar: activeCal,
@@ -6426,12 +6655,14 @@ function compressImageToDataUrls(file) {
       const ctxOrig = canvasOrig.getContext('2d');
       ctxOrig.drawImage(img, 0, 0, wOrig, hOrig);
       // Start at high quality (0.85), but step down for busy/detailed photos that would
-      // otherwise produce an oversized base64 payload -- every image is its own Firestore
-      // document with no server-side compression, so this is the only place that bounds it.
-      let originalBase64 = canvasOrig.toDataURL('image/jpeg', 0.85);
+      // otherwise produce an oversized base64 payload -- this is only used as a fallback if
+      // the Firebase Storage upload below fails, but keep it bounded regardless.
+      let originalQuality = 0.85;
+      let originalBase64 = canvasOrig.toDataURL('image/jpeg', originalQuality);
       for (const quality of [0.75, 0.65, 0.55, 0.45]) {
         if (originalBase64.length <= MAX_CHAT_IMAGE_BASE64_LENGTH) break;
-        originalBase64 = canvasOrig.toDataURL('image/jpeg', quality);
+        originalQuality = quality;
+        originalBase64 = canvasOrig.toDataURL('image/jpeg', originalQuality);
       }
 
       const maxThumb = 120;
@@ -6453,19 +6684,77 @@ function compressImageToDataUrls(file) {
       ctxThumb.drawImage(img, 0, 0, wThumb, hThumb);
       const thumbnailBase64 = canvasThumb.toDataURL('image/jpeg', 0.5);
 
-      resolve({
-        original: originalBase64,
-        thumbnail: thumbnailBase64
-      });
+      // Also produce Blobs at the same quality level, used to upload to Firebase Storage at
+      // send time (see uploadChatImageAssets) instead of embedding base64 in the message
+      // document. The base64 strings above are kept as the fallback if that upload fails.
+      canvasOrig.toBlob(originalBlob => {
+        canvasThumb.toBlob(thumbnailBlob => {
+          resolve({
+            original: originalBase64,
+            thumbnail: thumbnailBase64,
+            originalBlob,
+            thumbnailBlob
+          });
+        }, 'image/jpeg', 0.5);
+      }, 'image/jpeg', originalQuality);
     };
-    
+
     img.onerror = (err) => {
       URL.revokeObjectURL(objectUrl);
       reject(err);
     };
-    
+
     img.src = objectUrl;
   });
+}
+
+// Uploads a compressed chat image pair to Firebase Storage and returns download URLs, or null
+// if Storage isn't available/the upload fails -- callers should fall back to the base64 data
+// URLs already produced by compressImageToDataUrls in that case.
+async function uploadChatImageAssets(calendarId, compressed) {
+  if (!firebaseStorage || !compressed?.originalBlob || !compressed?.thumbnailBlob) return null;
+  try {
+    const stamp = Date.now();
+    const rand = Math.random().toString(36).slice(2, 8);
+    const basePath = `chatImages/${calendarId}/${stamp}_${rand}`;
+    const originalRef = firebaseStorage.ref(`${basePath}_original.jpg`);
+    const thumbRef = firebaseStorage.ref(`${basePath}_thumb.jpg`);
+    const [originalSnap, thumbSnap] = await Promise.all([
+      originalRef.put(compressed.originalBlob, { contentType: 'image/jpeg' }),
+      thumbRef.put(compressed.thumbnailBlob, { contentType: 'image/jpeg' })
+    ]);
+    const [imageUrl, thumbUrl] = await Promise.all([
+      originalSnap.ref.getDownloadURL(),
+      thumbSnap.ref.getDownloadURL()
+    ]);
+    return { imageUrl, thumbUrl };
+  } catch (e) {
+    console.warn('Chat image Storage upload failed, falling back to inline base64:', e);
+    return null;
+  }
+}
+
+// Resolves the {imageUrl, thumbUrl} pair a chat message should store: uploaded Storage
+// download URLs when possible, the original compressed base64 data URLs otherwise.
+async function resolveChatImageUrls(calendarId, compressed) {
+  const uploaded = await uploadChatImageAssets(calendarId, compressed);
+  if (uploaded) return uploaded;
+  return { imageUrl: compressed.original, thumbUrl: compressed.thumbnail };
+}
+
+// A Storage download URL looks like https://firebasestorage.googleapis.com/...; a fallback
+// image is an embedded data: URL. Only the former needs cleanup when a message is deleted.
+function isStorageDownloadUrl(url) {
+  return typeof url === 'string' && /^https:\/\//.test(url);
+}
+
+async function deleteChatImageFromStorage(url) {
+  if (!firebaseStorage || !isStorageDownloadUrl(url)) return;
+  try {
+    await firebaseStorage.refFromURL(url).delete();
+  } catch (e) {
+    console.warn('Failed to delete chat image from Storage:', e);
+  }
 }
 
 function ChatSectionIcon() {
@@ -8554,10 +8843,9 @@ function DateModal({
 }
 
 // Reconstruct calendar to a specific log timestamp (PITR)
-const rebuildCalendarToTimestamp = (calendar, T) => {
+const rebuildCalendarToTimestamp = (calendar, T, logs = []) => {
   const now = Date.now();
-  const logs = calendar.activityLogs || [];
-  
+
   // Sort chronologically
   const sortedLogs = [...logs].sort((a, b) => a.timestamp - b.timestamp);
   
@@ -8801,10 +9089,11 @@ function AdminModal({
       '시점 복구',
       `[${formatRegisteredAt(log.timestamp)}] 시점으로 복구하시겠습니까? 복구 후에는 이 시점 이후 등록된 모든 일정/투표 내역이 복구/롤백 처리됩니다.`,
       async () => {
-        const restoredCal = rebuildCalendarToTimestamp(calendar, log.timestamp);
+        const fullLogs = getCalendarActivityLogs(calendar);
+        const restoredCal = rebuildCalendarToTimestamp(calendar, log.timestamp, fullLogs);
         const saved = await onSave(restoredCal, null);
         if (saved !== false) {
-          alert('지정된 시점의 데이터로 복구되었습니다.');
+          await deleteActivityLogsAfterTimestamp(calendar.id, fullLogs, log.timestamp);
           onClose();
         }
       }
@@ -9285,33 +9574,12 @@ function AdminModal({
 }// Share Modal
 function ShareModal({
   calendar,
-  onCreateNewCal,
   onClose,
   shareType = 'calendar'
 }) {
   const shareUrl = shareType === 'chat'
     ? `${getCalendarShareUrl(calendar.id)}?view=chat`
     : getCalendarShareUrl(calendar.id);
-  const handleCreateNewCalClick = () => {
-    const id = (prompt('새 모임 캘린더의 영문/한글 ID를 입력하세요 (예: kkot, cw, trip):', 'cal_' + Date.now().toString().slice(-4)) || '').trim();
-    if (!id) return;
-    if (!isValidCalendarId(id)) {
-      alert('캘린더 ID는 영문, 숫자, -, _ 조합으로 입력해 주세요.');
-      return;
-    }
-    if (!isAllowedCalendarId(id)) {
-      alert('운영 캘린더는 kkot, cw만 사용할 수 있습니다.');
-      return;
-    }
-    const calTitle = prompt('캘린더 제목을 입력해 주세요:', `${id} 모임 캘린더`);
-    if (!calTitle) return;
-    const newCal = {
-      ...createDefaultCalendar(id),
-      title: calTitle.trim(),
-      description: `${calTitle.trim()} 참여자들의 일정 조율`
-    };
-    onCreateNewCal(newCal);
-  };
   return /*#__PURE__*/React.createElement("div", {
     className: "modal-overlay",
     onClick: onClose,

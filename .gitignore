@@ -5,6 +5,9 @@ env/
 __pycache__/
 *.pyc
 
+# macOS
+.DS_Store
+
 # Node / build artifacts
 node_modules/
 dist/
