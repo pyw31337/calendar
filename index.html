@@ -5790,7 +5790,7 @@ function App() {
   const [isChatSheetOpen, setIsChatSheetOpen] = React.useState(false);
   const [isChatSubmitting, setIsChatSubmitting] = React.useState(false);
   const chatTextareaRef = React.useRef(null);
-  const [chatImage, setChatImage] = React.useState(null);
+  const [chatImages, setChatImages] = React.useState([]);
   const [activeLightboxUrl, setActiveLightboxUrl] = React.useState(null);
   const [deletingMessage, setDeletingMessage] = React.useState(null); // {id, participantId, text, calId}
   const [editingMessage, setEditingMessage] = React.useState(null); // {id, participantId, text, imageUrl, thumbUrl, calId}
@@ -6056,28 +6056,63 @@ function App() {
   };
 
   const handleSendChatMessage = async () => {
-    if ((!chatInput.trim() && !chatImage) || !chatParticipantId) return;
+    const hasText = !!chatInput.trim();
+    const imageCount = chatImages.length;
+    if ((!hasText && imageCount === 0) || !chatParticipantId) return;
     setIsChatSubmitting(true);
-    const messageData = {
-      participantId: chatParticipantId,
-      text: chatInput.trim(),
-      timestamp: Date.now()
-    };
-    if (chatImage) {
-      messageData.imageUrl = chatImage.original;
-      messageData.thumbUrl = chatImage.thumbnail;
-    }
+    
     try {
       let ok = false;
-      if (firebaseDb) {
-        await firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages').add(messageData);
-        ok = true;
+      if (imageCount === 0) {
+        const messageData = {
+          participantId: chatParticipantId,
+          text: chatInput.trim(),
+          timestamp: Date.now()
+        };
+        if (firebaseDb) {
+          await firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages').add(messageData);
+          ok = true;
+        } else {
+          ok = await sendChatMessageRest(activeCalId, messageData);
+        }
       } else {
-        ok = await sendChatMessageRest(activeCalId, messageData);
+        // Send first image with optional text
+        const firstMessage = {
+          participantId: chatParticipantId,
+          text: chatInput.trim(),
+          imageUrl: chatImages[0].original,
+          thumbUrl: chatImages[0].thumbnail,
+          timestamp: Date.now()
+        };
+        if (firebaseDb) {
+          await firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages').add(firstMessage);
+          ok = true;
+        } else {
+          ok = await sendChatMessageRest(activeCalId, firstMessage);
+        }
+        
+        // Send subsequent images sequentially
+        if (ok && imageCount > 1) {
+          for (let i = 1; i < imageCount; i++) {
+            const extraMessage = {
+              participantId: chatParticipantId,
+              text: '',
+              imageUrl: chatImages[i].original,
+              thumbUrl: chatImages[i].thumbnail,
+              timestamp: Date.now() + i
+            };
+            if (firebaseDb) {
+              await firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages').add(extraMessage);
+            } else {
+              await sendChatMessageRest(activeCalId, extraMessage);
+            }
+          }
+        }
       }
+      
       if (ok) {
         setChatInput('');
-        setChatImage(null);
+        setChatImages([]);
         if (chatTextareaRef.current) {
           chatTextareaRef.current.style.height = '34px';
         }
@@ -6487,8 +6522,8 @@ function App() {
       setIsChatSheetOpen: setIsChatSheetOpen,
       isChatSubmitting: isChatSubmitting,
       chatTextareaRef: chatTextareaRef,
-      chatImage: chatImage,
-      setChatImage: setChatImage,
+      chatImage: chatImages,
+      setChatImage: setChatImages,
       activeLightboxUrl: activeLightboxUrl,
       setActiveLightboxUrl: setActiveLightboxUrl,
       onSend: handleSendChatMessage,
@@ -6811,8 +6846,8 @@ function App() {
     setIsChatSheetOpen: setIsChatSheetOpen,
     isChatSubmitting: isChatSubmitting,
     chatTextareaRef: chatTextareaRef,
-    chatImage: chatImage,
-    setChatImage: setChatImage,
+    chatImage: chatImages,
+    setChatImage: setChatImages,
     activeLightboxUrl: activeLightboxUrl,
     setActiveLightboxUrl: setActiveLightboxUrl,
     onSend: handleSendChatMessage,
@@ -7394,8 +7429,8 @@ function CommentsSection({
   setIsChatSheetOpen,
   isChatSubmitting,
   chatTextareaRef,
-  chatImage,
-  setChatImage,
+  chatImage: chatImages,
+  setChatImage: setChatImages,
   activeLightboxUrl,
   setActiveLightboxUrl,
   onSend,
@@ -7424,39 +7459,31 @@ function CommentsSection({
     const files = e.target.files;
     if (!files || files.length === 0) return;
     
-    if (files.length === 1) {
-      try {
-        const compressed = await compressImageToDataUrls(files[0]);
-        setChatImage(compressed);
-      } catch (err) {
-        console.error('Image compress error:', err);
-        if (showToast) showToast('이미지 처리 중 오류가 발생했습니다.', 'error');
-        else alert('이미지 처리 중 오류가 발생했습니다.');
+    const count = files.length;
+    const remainingSlots = 50 - chatImages.length;
+    if (remainingSlots <= 0) {
+      if (showToast) showToast('사진은 최대 50개까지 첨부할 수 있습니다.', 'error');
+      e.target.value = '';
+      return;
+    }
+    
+    const filesToProcess = Array.from(files).slice(0, remainingSlots);
+    if (files.length > remainingSlots && showToast) {
+      showToast(`최대 50장 제한으로 인해 ${remainingSlots}장의 사진만 추가됩니다.`, 'info');
+    }
+    
+    if (showToast) showToast(`${filesToProcess.length}장의 사진을 처리 중입니다...`, 'info', 10000);
+    try {
+      const compressedList = [];
+      for (const file of filesToProcess) {
+        const compressed = await compressImageToDataUrls(file);
+        compressedList.push(compressed);
       }
-    } else {
-      const count = Math.min(files.length, 50);
-      if (showToast) showToast(`사진 ${count}장을 전송하는 중입니다...`, 'info', 10000);
-      try {
-        for (let i = 0; i < count; i++) {
-          const compressed = await compressImageToDataUrls(files[i]);
-          const messageData = {
-            participantId: chatParticipantId,
-            text: '',
-            imageUrl: compressed.original,
-            thumbUrl: compressed.thumbnail,
-            timestamp: Date.now()
-          };
-          if (firebaseDb) {
-            await firebaseDb.collection('calendars').doc(`cal_${calendar.id}`).collection('messages').add(messageData);
-          } else {
-            await sendChatMessageRest(calendar.id, messageData);
-          }
-        }
-        if (showToast) showToast(`사진 ${count}장 전송이 완료되었습니다. ✅`, 'success', 3000);
-      } catch (err) {
-        console.error(err);
-        if (showToast) showToast('일부 사진 업로드에 실패했습니다.', 'error');
-      }
+      setChatImages(prev => [...prev, ...compressedList]);
+      if (showToast) showToast(`${filesToProcess.length}장의 사진이 첨부되었습니다.`, 'success', 3000);
+    } catch (err) {
+      console.error('Image compression failed:', err);
+      if (showToast) showToast('이미지 처리 중 일부 오류가 발생했습니다.', 'error');
     }
     e.target.value = '';
   };
@@ -7723,12 +7750,15 @@ function CommentsSection({
       }
     }),
     
-    /* Attached Image Preview (between Textarea and Action Row) */
-    chatImage ? /*#__PURE__*/React.createElement("div", {
-      style: { position: 'relative', display: 'inline-block', alignSelf: 'flex-start', marginTop: '4px' }
+    /* Attached Images Preview (between Textarea and Action Row) */
+    chatImages.length > 0 ? /*#__PURE__*/React.createElement("div", {
+      style: { display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '4px', alignSelf: 'flex-start' }
+    }, chatImages.map((img, index) => /*#__PURE__*/React.createElement("div", {
+      key: index,
+      style: { position: 'relative', display: 'inline-block' }
     }, /*#__PURE__*/React.createElement("img", {
-      src: chatImage.thumbnail,
-      alt: "첨부 미리보기",
+      src: img.thumbnail,
+      alt: `첨부 미리보기 ${index + 1}`,
       style: {
         width: '60px',
         height: '60px',
@@ -7738,7 +7768,7 @@ function CommentsSection({
       }
     }), /*#__PURE__*/React.createElement("button", {
       type: "button",
-      onClick: () => setChatImage(null),
+      onClick: () => setChatImages(prev => prev.filter((_, idx) => idx !== index)),
       style: {
         position: 'absolute',
         top: '-6px',
@@ -7752,7 +7782,8 @@ function CommentsSection({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: 0
+        padding: 0,
+        color: '#FFFFFF'
       }
     }, /*#__PURE__*/React.createElement("svg", {
       xmlns: "http://www.w3.org/2000/svg",
@@ -7764,7 +7795,7 @@ function CommentsSection({
       strokeWidth: "3",
       strokeLinecap: "round",
       strokeLinejoin: "round"
-    }, /*#__PURE__*/React.createElement("line", { x1: "18", y1: "6", x2: "6", y2: "18" }), /*#__PURE__*/React.createElement("line", { x1: "6", y1: "6", x2: "18", y2: "18" })))) : null,
+    }, /*#__PURE__*/React.createElement("line", { x1: "18", y1: "6", x2: "6", y2: "18" }), /*#__PURE__*/React.createElement("line", { x1: "6", y1: "6", x2: "18", y2: "18" })))))) : null,
 
     /* Hidden File Input */
     /*#__PURE__*/React.createElement("input", {
@@ -7858,7 +7889,7 @@ function CommentsSection({
         /* Send Button */
         /*#__PURE__*/React.createElement("button", {
           type: "button",
-          disabled: isChatSubmitting || (!chatInput.trim() && !chatImage),
+          disabled: isChatSubmitting || (!chatInput.trim() && chatImages.length === 0),
           onClick: onSend,
           style: {
             height: '32px',
@@ -7871,7 +7902,7 @@ function CommentsSection({
             borderRadius: '16px',
             cursor: 'pointer',
             whiteSpace: 'nowrap',
-            opacity: (chatInput.trim() || chatImage) && !isChatSubmitting ? 1 : 0.6
+            opacity: (chatInput.trim() || chatImages.length > 0) && !isChatSubmitting ? 1 : 0.6
           }
         }, isChatSubmitting ? '...' : '전송')
       )
@@ -7946,8 +7977,8 @@ function ChatRoomView({
   setIsChatSheetOpen,
   isChatSubmitting,
   chatTextareaRef,
-  chatImage,
-  setChatImage,
+  chatImage: chatImages,
+  setChatImage: setChatImages,
   activeLightboxUrl,
   setActiveLightboxUrl,
   onSend,
@@ -7995,39 +8026,31 @@ function ChatRoomView({
     const files = e.target.files;
     if (!files || files.length === 0) return;
     
-    if (files.length === 1) {
-      try {
-        const compressed = await compressImageToDataUrls(files[0]);
-        setChatImage(compressed);
-      } catch (err) {
-        console.error('Image compress error:', err);
-        if (showToast) showToast('이미지 처리 중 오류가 발생했습니다.', 'error');
-        else alert('이미지 처리 중 오류가 발생했습니다.');
+    const count = files.length;
+    const remainingSlots = 50 - chatImages.length;
+    if (remainingSlots <= 0) {
+      if (showToast) showToast('사진은 최대 50개까지 첨부할 수 있습니다.', 'error');
+      e.target.value = '';
+      return;
+    }
+    
+    const filesToProcess = Array.from(files).slice(0, remainingSlots);
+    if (files.length > remainingSlots && showToast) {
+      showToast(`최대 50장 제한으로 인해 ${remainingSlots}장의 사진만 추가됩니다.`, 'info');
+    }
+    
+    if (showToast) showToast(`${filesToProcess.length}장의 사진을 처리 중입니다...`, 'info', 10000);
+    try {
+      const compressedList = [];
+      for (const file of filesToProcess) {
+        const compressed = await compressImageToDataUrls(file);
+        compressedList.push(compressed);
       }
-    } else {
-      const count = Math.min(files.length, 50);
-      if (showToast) showToast(`사진 ${count}장을 전송하는 중입니다...`, 'info', 10000);
-      try {
-        for (let i = 0; i < count; i++) {
-          const compressed = await compressImageToDataUrls(files[i]);
-          const messageData = {
-            participantId: chatParticipantId,
-            text: '',
-            imageUrl: compressed.original,
-            thumbUrl: compressed.thumbnail,
-            timestamp: Date.now()
-          };
-          if (firebaseDb) {
-            await firebaseDb.collection('calendars').doc(`cal_${calendar.id}`).collection('messages').add(messageData);
-          } else {
-            await sendChatMessageRest(calendar.id, messageData);
-          }
-        }
-        if (showToast) showToast(`사진 ${count}장 전송이 완료되었습니다. ✅`, 'success', 3000);
-      } catch (err) {
-        console.error(err);
-        if (showToast) showToast('일부 사진 업로드에 실패했습니다.', 'error');
-      }
+      setChatImages(prev => [...prev, ...compressedList]);
+      if (showToast) showToast(`${filesToProcess.length}장의 사진이 첨부되었습니다.`, 'success', 3000);
+    } catch (err) {
+      console.error('Image compression failed:', err);
+      if (showToast) showToast('이미지 처리 중 일부 오류가 발생했습니다.', 'error');
     }
     e.target.value = '';
   };
@@ -8508,12 +8531,15 @@ function ChatRoomView({
         }
       }),
 
-      /* Attached Image Preview (between Textarea and Action Row) */
-      chatImage ? /*#__PURE__*/React.createElement("div", {
-        style: { position: 'relative', display: 'inline-block', alignSelf: 'flex-start', marginTop: '4px' }
+      /* Attached Images Preview (between Textarea and Action Row) */
+      chatImages.length > 0 ? /*#__PURE__*/React.createElement("div", {
+        style: { display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '4px', alignSelf: 'flex-start' }
+      }, chatImages.map((img, index) => /*#__PURE__*/React.createElement("div", {
+        key: index,
+        style: { position: 'relative', display: 'inline-block' }
       }, /*#__PURE__*/React.createElement("img", {
-        src: chatImage.thumbnail,
-        alt: "첨부 미리보기",
+        src: img.thumbnail,
+        alt: `첨부 미리보기 ${index + 1}`,
         style: {
           width: '60px',
           height: '60px',
@@ -8523,7 +8549,7 @@ function ChatRoomView({
         }
       }), /*#__PURE__*/React.createElement("button", {
         type: "button",
-        onClick: () => setChatImage(null),
+        onClick: () => setChatImages(prev => prev.filter((_, idx) => idx !== index)),
         style: {
           position: 'absolute',
           top: '-6px',
@@ -8537,7 +8563,8 @@ function ChatRoomView({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          padding: 0
+          padding: 0,
+          color: '#FFFFFF'
         }
       }, /*#__PURE__*/React.createElement("svg", {
         xmlns: "http://www.w3.org/2000/svg",
@@ -8549,7 +8576,7 @@ function ChatRoomView({
         strokeWidth: "3",
         strokeLinecap: "round",
         strokeLinejoin: "round"
-      }, /*#__PURE__*/React.createElement("line", { x1: "18", y1: "6", x2: "6", y2: "18" }), /*#__PURE__*/React.createElement("line", { x1: "6", y1: "6", x2: "18", y2: "18" })))) : null,
+      }, /*#__PURE__*/React.createElement("line", { x1: "18", y1: "6", x2: "6", y2: "18" }), /*#__PURE__*/React.createElement("line", { x1: "6", y1: "6", x2: "18", y2: "18" })))))) : null,
 
       /* Hidden File Input */
       /*#__PURE__*/React.createElement("input", {
@@ -8643,7 +8670,7 @@ function ChatRoomView({
           /* Send Button */
           /*#__PURE__*/React.createElement("button", {
             type: "button",
-            disabled: isChatSubmitting || (!chatInput.trim() && !chatImage),
+            disabled: isChatSubmitting || (!chatInput.trim() && chatImages.length === 0),
             onClick: onSend,
             style: {
               height: '32px',
@@ -8656,7 +8683,7 @@ function ChatRoomView({
               borderRadius: '16px',
               cursor: 'pointer',
               whiteSpace: 'nowrap',
-              opacity: (chatInput.trim() || chatImage) && !isChatSubmitting ? 1 : 0.6
+              opacity: (chatInput.trim() || chatImages.length > 0) && !isChatSubmitting ? 1 : 0.6
             }
           }, isChatSubmitting ? '...' : '전송')
         )
