@@ -1644,8 +1644,15 @@ function mergePolls(existingPolls = [], incomingPolls = [], calendarId = '', par
 function buildActivityLogsFromAvailabilities(calendar) {
   const explicitLogs = getCalendarActivityLogs(calendar);
   const deletedLogIds = new Set(getDeletedActivityLogIds(calendar));
-  const explicitKeys = new Set(explicitLogs.map(log => `${log.date}_${log.participantId}_${log.action}_${getActivityLogStamp(log)}`));
+  // Fallback synthesis only exists to backfill legacy availabilities that predate explicit
+  // per-action logging (no create/update/delete log was ever written for them). Once a
+  // date+participant pair has ANY explicit log, trust that history completely -- matching on
+  // date+participant+action+timestamp let a later edit's updatedAt slip through as a brand
+  // new synthesized "create" entry (this function has no concept of "update"), producing a
+  // phantom duplicate registration log every time an already-tracked entry was edited.
+  const explicitPairs = new Set(explicitLogs.map(log => `${log.date}_${log.participantId}`));
   const fallbackLogs = (Array.isArray(calendar?.availabilities) ? calendar.availabilities : []).map((availability) => {
+    if (explicitPairs.has(`${availability.date}_${availability.participantId}`)) return null;
     const action = availability.deletedAt ? 'delete' : 'create';
     const timestamp = Number(availability.deletedAt || availability.updatedAt || 0) || 0;
     return normalizeActivityLog(calendar.id, {
@@ -1657,7 +1664,7 @@ function buildActivityLogsFromAvailabilities(calendar) {
       note: availability.note || '',
       timestamp
     });
-  }).filter(Boolean).filter(log => !explicitKeys.has(`${log.date}_${log.participantId}_${log.action}_${getActivityLogStamp(log)}`));
+  }).filter(Boolean);
   return mergeActivityLogs(explicitLogs, fallbackLogs, calendar?.id || '').filter(log => !deletedLogIds.has(log.id));
 }
 
