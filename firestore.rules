@@ -79,6 +79,30 @@ service cloud.firestore {
           && hasValidMessageImages(request.resource.data);
         allow delete: if isCalendarDoc(calendarDocId);
       }
+
+      // Activity log audit trail. Used to embed as a growing array on the calendar document
+      // itself, which had no de-duplication and was the single biggest long-term threat to the
+      // document's 1MiB size limit -- moved to its own subcollection (one document per entry,
+      // same pattern as messages above) so it has no per-document size ceiling to fight. Entries
+      // are immutable once written (create + point-in-time-recovery delete only, no update).
+      match /activityLogs/{logId} {
+        allow get, list: if isCalendarDoc(calendarDocId);
+        allow create: if isCalendarDoc(calendarDocId)
+          && request.resource.data.keys().hasOnly(['id', 'calendarId', 'participantId', 'date', 'action', 'note', 'timestamp'])
+          && request.resource.data.id is string
+          && request.resource.data.id.size() <= 200
+          && request.resource.data.calendarId is string
+          && request.resource.data.participantId is string
+          && request.resource.data.participantId.size() <= 160
+          && request.resource.data.date is string
+          && request.resource.data.date.size() <= 20
+          && request.resource.data.action is string
+          && request.resource.data.note is string
+          && request.resource.data.note.size() <= 200
+          && request.resource.data.timestamp is number;
+        allow update: if false;
+        allow delete: if isCalendarDoc(calendarDocId);
+      }
     }
 
     // Stores the hashed admin-dashboard password (see index.html AdminLoginGate).
