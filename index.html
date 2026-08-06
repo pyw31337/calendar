@@ -7366,10 +7366,11 @@ function CommentsSection({
     onToggle: toggleCommentsSection,
     label: isCollapsed ? "채팅 펼치기" : "채팅 접기"
   })),
-  /* List Background Panel */
+  /* List Background Panel -- one continuous gray canvas the individual white message
+     bubbles float on, instead of each message having its own separate gray card */
   /*#__PURE__*/React.createElement("div", {
     style: {
-      backgroundColor: '#FFFFFF',
+      backgroundColor: '#F8FAFC',
       border: '1px solid #E2E8F0',
       borderRadius: '12px',
       padding: '12px',
@@ -7413,11 +7414,7 @@ function CommentsSection({
       style: {
         display: 'flex',
         flexDirection: 'column',
-        gap: '6px',
-        backgroundColor: '#F8FAFC',
-        borderRadius: '12px',
-        padding: '12px',
-        border: '1px solid #F1F5F9'
+        gap: '6px'
       }
     },
       /* Name Badge */
