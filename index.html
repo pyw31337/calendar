@@ -4819,7 +4819,8 @@ function AdminDashboard({ initialCalendars }) {
         setIsPollModalOpen(false);
         setEditingPoll(null);
         setEditingPollCalId(null);
-      }
+      },
+      showToast: showAdminToast
     }),
 
     /* Generic layer-popup confirm dialog (replaces window.confirm) */
@@ -6345,7 +6346,8 @@ function App() {
     chatMessages: chatMessages,
     onDeleteMessage: handleDeleteMessage,
     onRequestConfirm: showConfirmDialog,
-    onClose: () => setIsAdminOpen(false)
+    onClose: () => setIsAdminOpen(false),
+    showToast: showToast
   }), isShareOpen && /*#__PURE__*/React.createElement(ShareModal, {
     calendar: activeCal,
     onClose: () => setIsShareOpen(false)
@@ -6360,7 +6362,8 @@ function App() {
     onClose: () => {
       setIsPollModalOpen(false);
       setEditingPoll(null);
-    }
+    },
+    showToast: showToast
   }), voteTarget && /*#__PURE__*/React.createElement(PollVoterSheet, {
     calendar: activeCal,
     pollId: voteTarget.pollId,
@@ -9307,7 +9310,8 @@ function AdminModal({
   chatMessages = [],
   onDeleteMessage,
   onRequestConfirm,
-  onClose
+  onClose,
+  showToast
 }) {
   const [activeTab, setActiveTab] = React.useState('metrics'); // 'metrics', 'settings', 'recovery'
   
@@ -9377,7 +9381,7 @@ function AdminModal({
     
     // Validate titles & names
     if (!title.trim()) {
-      alert('캘린더명을 입력해 주세요.');
+      if (showToast) showToast('캘린더명을 입력해 주세요.', 'error'); else alert('캘린더명을 입력해 주세요.');
       setIsSubmitting(false);
       return;
     }
@@ -9385,7 +9389,7 @@ function AdminModal({
     const activeParticipantsList = participants.filter(p => !isTombstone(p));
     const activeNames = activeParticipantsList.map(p => p.name.trim().toLowerCase());
     if (new Set(activeNames).size !== activeNames.length) {
-      alert('참여자 이름은 중복될 수 없습니다.');
+      if (showToast) showToast('참여자 이름은 중복될 수 없습니다.', 'error'); else alert('참여자 이름은 중복될 수 없습니다.');
       setIsSubmitting(false);
       return;
     }
@@ -9925,7 +9929,8 @@ function AdminModal({
       onClose: () => {
         setIsPollModalOpen(false);
         setEditingPoll(null);
-      }
+      },
+      showToast: showToast
     })
   ));
 }// Share Modal
@@ -10442,7 +10447,7 @@ function PollVoterSheet({ calendar, pollId, optionId, onSelect, onClose }) {
   }, "\u2713"))))));
 }
 
-function PollModal({ calendar, poll, onSave, onClose }) {
+function PollModal({ calendar, poll, onSave, onClose, showToast }) {
   const now = Date.now();
   const isEditing = Boolean(poll?.id);
   const createdAtText = isEditing ? formatRegisteredAt(poll?.createdAt) : '';
@@ -10566,7 +10571,7 @@ function PollModal({ calendar, poll, onSave, onClose }) {
       };
     }).filter(option => !isTombstone(option) && sanitizeText(option.text, 120));
     if (!cleanTitle || activeOptions.length === 0) {
-      alert('투표명과 선택옵션을 입력해 주세요.');
+      if (showToast) showToast('투표명과 선택옵션을 입력해 주세요.', 'error'); else alert('투표명과 선택옵션을 입력해 주세요.');
       return;
     }
     setIsSubmitting(true);
