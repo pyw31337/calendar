@@ -4214,9 +4214,9 @@ function AdminDashboard({ initialCalendars }) {
         ),
 
         /* Participant entry details */
-        /*#__PURE__*/React.createElement("section", { style: styles.card },
+        /*#__PURE__*/React.createElement("section", { style: { ...styles.card, display: 'flex', flexDirection: 'column' } },
           /*#__PURE__*/React.createElement("div", { style: styles.cardTitle }, "참여자별 일정 등록 수"),
-          /*#__PURE__*/React.createElement("div", { style: { maxHeight: '200px', overflowY: 'auto' } },
+          /*#__PURE__*/React.createElement("div", { style: { flex: '1 1 auto', minHeight: 0, maxHeight: '420px', overflowY: 'auto' } },
             dashboard.calendarStats.map(stat => /*#__PURE__*/React.createElement("div", { key: `${stat.calendar.id}_parts_list`, style: { marginBottom: '14px' } },
               /*#__PURE__*/React.createElement("div", { style: { fontWeight: 950, marginBottom: '6px', color: '#0F172A', fontSize: '0.86rem' } }, stat.calendar.id),
               stat.participantStats.map(participant => {
