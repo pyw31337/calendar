@@ -5767,6 +5767,7 @@ function App() {
   const [isModalOpen, setIsModalOpen] = React.useState(false);
   const [isAdminOpen, setIsAdminOpen] = React.useState(false);
   const [isShareOpen, setIsShareOpen] = React.useState(false);
+  const [isChatShareOpen, setIsChatShareOpen] = React.useState(false);
   const [isParticipantsOpen, setIsParticipantsOpen] = React.useState(false);
   const [isActivityLogExpanded, setIsActivityLogExpanded] = React.useState(false);
   const [isPollModalOpen, setIsPollModalOpen] = React.useState(false);
@@ -6480,7 +6481,9 @@ function App() {
       onBack: () => changeView('calendar'),
       isHeaderVisible: isHeaderVisible,
       handleChatScroll: handleChatScroll,
-      chatMessagesContainerRef: chatMessagesContainerRef
+      chatMessagesContainerRef: chatMessagesContainerRef,
+      showToast: showToast,
+      onShare: () => setIsChatShareOpen(true)
     }), isChatSheetOpen && /*#__PURE__*/React.createElement(ChatParticipantSheet, {
       calendar: activeCal,
       selectedId: chatParticipantId,
@@ -6795,7 +6798,8 @@ function App() {
     onSend: handleSendChatMessage,
     onDeleteMessage: handleDeleteMessage,
     onEditMessage: handleEditMessage,
-    onMore: () => changeView('chat')
+    onMore: () => changeView('chat'),
+    showToast: showToast
   })), /*#__PURE__*/React.createElement(SummaryList, {
     calendar: activeCal,
     onSelectDate: d => {
@@ -6852,6 +6856,10 @@ function App() {
       setIsShareOpen(false);
     },
     onClose: () => setIsShareOpen(false)
+  }), isChatShareOpen && /*#__PURE__*/React.createElement(ShareModal, {
+    calendar: activeCal,
+    shareType: "chat",
+    onClose: () => setIsChatShareOpen(false)
   }), isPollModalOpen && /*#__PURE__*/React.createElement(PollModal, {
     calendar: activeCal,
     poll: editingPoll,
@@ -7230,7 +7238,7 @@ function compressImageToDataUrls(file) {
     img.onload = () => {
       URL.revokeObjectURL(objectUrl);
       
-      const maxOrig = 720;
+      const maxOrig = 1200; // High resolution spec (1200px instead of 720px)
       let wOrig = img.width;
       let hOrig = img.height;
       if (wOrig > maxOrig || hOrig > maxOrig) {
@@ -7247,7 +7255,7 @@ function compressImageToDataUrls(file) {
       canvasOrig.height = hOrig;
       const ctxOrig = canvasOrig.getContext('2d');
       ctxOrig.drawImage(img, 0, 0, wOrig, hOrig);
-      const originalBase64 = canvasOrig.toDataURL('image/jpeg', 0.6);
+      const originalBase64 = canvasOrig.toDataURL('image/jpeg', 0.85); // High quality spec (0.85 instead of 0.6)
 
       const maxThumb = 120;
       let wThumb = img.width;
@@ -7373,7 +7381,8 @@ function CommentsSection({
   onSend,
   onDeleteMessage,
   onEditMessage,
-  onMore
+  onMore,
+  showToast
 }) {
   const participants = getActiveParticipants(calendar);
   const participantsMap = participants.reduce((acc, p) => {
@@ -7392,14 +7401,42 @@ function CommentsSection({
   }, []);
 
   const handleFileChange = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    try {
-      const compressed = await compressImageToDataUrls(file);
-      setChatImage(compressed);
-    } catch (err) {
-      console.error('Image compress error:', err);
-      alert('이미지 처리 중 오류가 발생했습니다. 다른 이미지를 선택해 주세요.');
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    
+    if (files.length === 1) {
+      try {
+        const compressed = await compressImageToDataUrls(files[0]);
+        setChatImage(compressed);
+      } catch (err) {
+        console.error('Image compress error:', err);
+        if (showToast) showToast('이미지 처리 중 오류가 발생했습니다.', 'error');
+        else alert('이미지 처리 중 오류가 발생했습니다.');
+      }
+    } else {
+      const count = Math.min(files.length, 50);
+      if (showToast) showToast(`사진 ${count}장을 전송하는 중입니다...`, 'info', 10000);
+      try {
+        for (let i = 0; i < count; i++) {
+          const compressed = await compressImageToDataUrls(files[i]);
+          const messageData = {
+            participantId: chatParticipantId,
+            text: '',
+            imageUrl: compressed.original,
+            thumbUrl: compressed.thumbnail,
+            timestamp: Date.now()
+          };
+          if (firebaseDb) {
+            await firebaseDb.collection('calendars').doc(`cal_${calendar.id}`).collection('messages').add(messageData);
+          } else {
+            await sendChatMessageRest(calendar.id, messageData);
+          }
+        }
+        if (showToast) showToast(`사진 ${count}장 전송이 완료되었습니다. ✅`, 'success', 3000);
+      } catch (err) {
+        console.error(err);
+        if (showToast) showToast('일부 사진 업로드에 실패했습니다.', 'error');
+      }
     }
     e.target.value = '';
   };
@@ -7714,6 +7751,7 @@ function CommentsSection({
       ref: fileInputRef,
       type: "file",
       accept: "image/*",
+      multiple: true,
       style: { position: 'absolute', width: '1px', height: '1px', padding: 0, margin: '-1px', overflow: 'hidden', clip: 'rect(0,0,0,0)', border: 0 },
       onChange: handleFileChange
     }),
@@ -7898,18 +7936,48 @@ function ChatRoomView({
   onBack,
   isHeaderVisible,
   handleChatScroll,
-  chatMessagesContainerRef
+  chatMessagesContainerRef,
+  showToast,
+  onShare
 }) {
   const fileInputRefChat = React.useRef(null);
   const handleFileChangeChat = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    try {
-      const compressed = await compressImageToDataUrls(file);
-      setChatImage(compressed);
-    } catch (err) {
-      console.error('Image compress error:', err);
-      alert('이미지 처리 중 오류가 발생했습니다. 다른 이미지를 선택해 주세요.');
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    
+    if (files.length === 1) {
+      try {
+        const compressed = await compressImageToDataUrls(files[0]);
+        setChatImage(compressed);
+      } catch (err) {
+        console.error('Image compress error:', err);
+        if (showToast) showToast('이미지 처리 중 오류가 발생했습니다.', 'error');
+        else alert('이미지 처리 중 오류가 발생했습니다.');
+      }
+    } else {
+      const count = Math.min(files.length, 50);
+      if (showToast) showToast(`사진 ${count}장을 전송하는 중입니다...`, 'info', 10000);
+      try {
+        for (let i = 0; i < count; i++) {
+          const compressed = await compressImageToDataUrls(files[i]);
+          const messageData = {
+            participantId: chatParticipantId,
+            text: '',
+            imageUrl: compressed.original,
+            thumbUrl: compressed.thumbnail,
+            timestamp: Date.now()
+          };
+          if (firebaseDb) {
+            await firebaseDb.collection('calendars').doc(`cal_${calendar.id}`).collection('messages').add(messageData);
+          } else {
+            await sendChatMessageRest(calendar.id, messageData);
+          }
+        }
+        if (showToast) showToast(`사진 ${count}장 전송이 완료되었습니다. ✅`, 'success', 3000);
+      } catch (err) {
+        console.error(err);
+        if (showToast) showToast('일부 사진 업로드에 실패했습니다.', 'error');
+      }
     }
     e.target.value = '';
   };
@@ -8249,13 +8317,30 @@ function ChatRoomView({
       background: 'none',
       border: 'none',
       cursor: 'pointer',
-      fontSize: '1.5rem',
-      color: '#64748B',
       padding: '4px 8px',
       display: 'flex',
-      alignItems: 'center'
+      alignItems: 'center',
+      color: '#64748B'
     }
-  }, "\u2039"), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: "24",
+    height: "24",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    "stroke-width": "2",
+    "stroke-linecap": "round",
+    "stroke-linejoin": "round",
+    className: "icon icon-tabler icons-tabler-outline icon-tabler-chevron-down",
+    style: { transform: 'rotate(90deg)', display: 'inline-block' }
+  }, /*#__PURE__*/React.createElement("path", {
+    stroke: "none",
+    d: "M0 0h24v24H0z",
+    fill: "none"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M6 9l6 6l6 -6"
+  }))), /*#__PURE__*/React.createElement("div", {
     style: {
       position: 'absolute',
       left: '50%',
@@ -8265,9 +8350,45 @@ function ChatRoomView({
       color: '#0F172A',
       whiteSpace: 'nowrap'
     }
-  }, calendar?.title || ''), /*#__PURE__*/React.createElement("div", {
-    style: { width: '32px' }
-  })), /*#__PURE__*/React.createElement("div", {
+  }, calendar?.title || ''), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: onShare,
+    title: "\uACF5\uC720",
+    style: {
+      background: 'none',
+      border: 'none',
+      cursor: 'pointer',
+      padding: '4px',
+      color: '#64748B',
+      display: 'flex',
+      alignItems: 'center'
+    }
+  }, /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: "24",
+    height: "24",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    "stroke-width": "2",
+    "stroke-linecap": "round",
+    "stroke-linejoin": "round",
+    className: "icon icon-tabler icons-tabler-outline icon-tabler-share"
+  }, /*#__PURE__*/React.createElement("path", {
+    stroke: "none",
+    d: "M0 0h24v24H0z",
+    fill: "none"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M3 12a3 3 0 1 0 6 0a3 3 0 1 0 -6 0"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M15 6a3 3 0 1 0 6 0a3 3 0 1 0 -6 0"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M15 18a3 3 0 1 0 6 0a3 3 0 1 0 -6 0"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M8.7 10.7l6.6 -3.4"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M8.7 13.3l6.6 3.4"
+  })))), /*#__PURE__*/React.createElement("div", {
     ref: chatMessagesContainerRef,
     onScroll: handleChatScroll,
     style: {
@@ -8386,6 +8507,7 @@ function ChatRoomView({
         ref: fileInputRefChat,
         type: "file",
         accept: "image/*",
+        multiple: true,
         style: { position: 'absolute', width: '1px', height: '1px', padding: 0, margin: '-1px', overflow: 'hidden', clip: 'rect(0,0,0,0)', border: 0 },
         onChange: handleFileChangeChat
       }),
@@ -9963,9 +10085,12 @@ function AdminModal({
 function ShareModal({
   calendar,
   onCreateNewCal,
-  onClose
+  onClose,
+  shareType = 'calendar'
 }) {
-  const shareUrl = getCalendarShareUrl(calendar.id);
+  const shareUrl = shareType === 'chat'
+    ? `${getCalendarShareUrl(calendar.id)}?view=chat`
+    : getCalendarShareUrl(calendar.id);
   const handleCreateNewCalClick = () => {
     const id = (prompt('새 모임 캘린더의 영문/한글 ID를 입력하세요 (예: kkot, cw, trip):', 'cal_' + Date.now().toString().slice(-4)) || '').trim();
     if (!id) return;
@@ -10004,7 +10129,7 @@ function ShareModal({
       fontSize: '1.1rem',
       fontWeight: 800
     }
-  }, "\uCE98\uB9B0\uB354 \uACF5\uC720 URL"), /*#__PURE__*/React.createElement("button", {
+  }, shareType === 'chat' ? "채팅방 공유 URL" : "캘린더 공유 URL"), /*#__PURE__*/React.createElement("button", {
     onClick: onClose,
     style: {
       background: 'none',
@@ -10023,7 +10148,7 @@ function ShareModal({
       fontWeight: 700,
       color: '#64748B'
     }
-  }, "\uD604\uC7AC \uCE98\uB9B0\uB354 (", calendar.id, ") \uC804\uC6A9 \uACF5\uC720 URL"), /*#__PURE__*/React.createElement("input", {
+  }, shareType === 'chat' ? `현재 채팅방 (${calendar.id}) 전용 공유 URL` : `현재 캘린더 (${calendar.id}) 전용 공유 URL`), /*#__PURE__*/React.createElement("input", {
     type: "text",
     className: "form-input",
     style: {
