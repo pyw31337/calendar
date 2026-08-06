@@ -396,6 +396,13 @@
       display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: var(--radius-full);
       font-size: 0.72rem; font-weight: 700; line-height: 1.2; box-shadow: 0 1px 3px rgba(0,0,0,0.12);
     }
+
+    /* Own-message edit/delete controls: hidden by default, revealed on hover (desktop) or
+       tap (mobile, via the .msg-actions-revealed class toggled in JS). Tapping elsewhere
+       clears the revealed state so the buttons hide again. */
+    .msg-actions-group { opacity: 0; pointer-events: none; transition: opacity 0.15s ease; }
+    .msg-row-hover:hover .msg-actions-group,
+    .msg-row-hover.msg-actions-revealed .msg-actions-group { opacity: 1; pointer-events: auto; }
     .registered-participant-main {
       display: flex;
       align-items: center;
@@ -5600,30 +5607,24 @@ function App() {
     setEditingMessage({ ...msg, calId: activeCalId });
   };
 
-  const handleSaveEditMessage = async (newText, newImage) => {
+  const handleSaveEditMessage = async (newText, newImages) => {
     if (!editingMessage) return;
     const { id, calId } = editingMessage;
-    const hadImageArray = Array.isArray(editingMessage.imageUrls) && editingMessage.imageUrls.length > 0;
     try {
-      const data = { text: newText };
-      let replacedImage = false;
-      if (newImage) {
-        const resolved = await resolveChatImageUrls(calId, newImage);
-        data.imageUrl = resolved.imageUrl;
-        data.thumbUrl = resolved.thumbUrl;
-        replacedImage = true;
-      } else if (newImage === null) {
-        // image explicitly cleared
-        data.imageUrl = '';
-        data.thumbUrl = '';
-        replacedImage = true;
-      }
-      // Editing only ever produces a single replacement image; drop any stale multi-image
-      // array so rendering doesn't keep showing the old photo grid over the new single image.
-      if (replacedImage && hadImageArray) {
-        data.imageUrls = [];
-        data.thumbUrls = [];
-      }
+      // Images already on the message (isExisting) are passed through as-is; freshly
+      // picked ones get uploaded via resolveChatImageUrls, matching the compose flow.
+      const resolvedImages = await Promise.all((newImages || []).map(img =>
+        img.isExisting
+          ? Promise.resolve({ imageUrl: img.original, thumbUrl: img.thumbnail })
+          : resolveChatImageUrls(calId, img)
+      ));
+      const data = {
+        text: newText,
+        imageUrl: resolvedImages[0]?.imageUrl || '',
+        thumbUrl: resolvedImages[0]?.thumbUrl || '',
+        imageUrls: resolvedImages.map(r => r.imageUrl),
+        thumbUrls: resolvedImages.map(r => r.thumbUrl)
+      };
       let ok = false;
       if (firebaseDb) {
         await firebaseDb.collection('calendars').doc(`cal_${calId}`).collection('messages').doc(id).update(data);
@@ -5632,8 +5633,17 @@ function App() {
         ok = await updateMessageRest(calId, id, data);
       }
       if (ok) {
-        if (replacedImage) {
-          deleteAllChatImagesFromStorage(editingMessage);
+        // Clean up Storage only for images the user actually removed, not ones kept.
+        const originalEntries = Array.isArray(editingMessage.imageUrls) && editingMessage.imageUrls.length > 0
+          ? editingMessage.imageUrls.map((url, idx) => ({ original: url, thumbnail: (editingMessage.thumbUrls || [])[idx] || url }))
+          : (editingMessage.imageUrl ? [{ original: editingMessage.imageUrl, thumbnail: editingMessage.thumbUrl || editingMessage.imageUrl }] : []);
+        const keptOriginals = new Set((newImages || []).filter(img => img.isExisting).map(img => img.original));
+        const removedEntries = originalEntries.filter(entry => !keptOriginals.has(entry.original));
+        if (removedEntries.length > 0) {
+          deleteAllChatImagesFromStorage({
+            imageUrls: removedEntries.map(e => e.original),
+            thumbUrls: removedEntries.map(e => e.thumbnail)
+          });
         }
         if (!firebaseDb) {
           fetchRecentMessagesRest(calId).then(list => setRecentMessages(list));
@@ -6007,7 +6017,8 @@ function App() {
       message: editingMessage,
       calendar: activeCal,
       onSave: handleSaveEditMessage,
-      onClose: () => setEditingMessage(null)
+      onClose: () => setEditingMessage(null),
+      showToast: showToast
     }), toast && /*#__PURE__*/React.createElement("div", {
       className: "toast",
       style: {
@@ -6338,7 +6349,8 @@ function App() {
     message: editingMessage,
     calendar: activeCal,
     onSave: handleSaveEditMessage,
-    onClose: () => setEditingMessage(null)
+    onClose: () => setEditingMessage(null),
+    showToast: showToast
   }), isAdminOpen && /*#__PURE__*/React.createElement(AdminModal, {
     calendar: { ...activeCal, activityLogs: unionActivityLogs(activeCal, adminActivityLogs) },
     allCalendars: calendars,
@@ -7255,6 +7267,26 @@ function renderChatMessageImages(msg, setActiveLightboxUrl, singleImageStyle = {
   })));
 }
 
+// Tracks which message row's edit/delete controls should be revealed: desktop hover is
+// handled purely in CSS (see .msg-row-hover:hover), this only drives the mobile tap case --
+// tapping a row reveals its controls, tapping anywhere else (including another row) hides them.
+function useTapRevealedMsgId() {
+  const [revealedId, setRevealedId] = React.useState(null);
+  React.useEffect(() => {
+    const handler = e => {
+      const target = e.target.closest ? e.target.closest('[data-msg-row-id]') : null;
+      setRevealedId(target ? target.getAttribute('data-msg-row-id') : null);
+    };
+    document.addEventListener('touchstart', handler, { passive: true });
+    document.addEventListener('mousedown', handler);
+    return () => {
+      document.removeEventListener('touchstart', handler);
+      document.removeEventListener('mousedown', handler);
+    };
+  }, []);
+  return revealedId;
+}
+
 function CommentsSection({
   calendar,
   recentMessages,
@@ -7285,6 +7317,7 @@ function CommentsSection({
   const fileInputRef = React.useRef(null);
   const [isMobile, setIsMobile] = React.useState(() => window.innerWidth < 768);
   const [isCollapsed, setIsCollapsed] = React.useState(true); // default closed
+  const revealedMsgId = useTapRevealedMsgId();
 
   React.useEffect(() => {
     const onResize = () => setIsMobile(window.innerWidth < 768);
@@ -7396,6 +7429,8 @@ function CommentsSection({
       /* === MOBILE CARD LAYOUT === */
       return /*#__PURE__*/React.createElement('div', {
         key: msg.id,
+        className: `msg-row-hover ${revealedMsgId === msg.id ? 'msg-actions-revealed' : ''}`,
+        'data-msg-row-id': msg.id,
         style: {
           display: 'flex',
           flexDirection: 'column',
@@ -7415,6 +7450,7 @@ function CommentsSection({
             style: { backgroundColor: badgeColor, color: '#FFFFFF', padding: '3px 10px', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 'bold', whiteSpace: 'nowrap' }
           }, badgeName),
           isMsgMe ? /*#__PURE__*/React.createElement('div', {
+            className: 'msg-actions-group',
             style: { display: 'flex', alignItems: 'center', gap: '6px' }
           },
             /* Edit Button */
@@ -7456,6 +7492,8 @@ function CommentsSection({
     /* === DESKTOP LAYOUT (double-tail card-style) === */
     return /*#__PURE__*/React.createElement('div', {
       key: msg.id,
+      className: `msg-row-hover ${revealedMsgId === msg.id ? 'msg-actions-revealed' : ''}`,
+      'data-msg-row-id': msg.id,
       style: {
         display: 'flex',
         alignItems: 'flex-start',
@@ -7502,13 +7540,13 @@ function CommentsSection({
         }
       },
         isMsgMe ? /*#__PURE__*/React.createElement('button', {
-          type: 'button', onClick: () => onDeleteMessage && onDeleteMessage(msg), title: '삭제',
+          type: 'button', className: 'msg-actions-group', onClick: () => onDeleteMessage && onDeleteMessage(msg), title: '삭제',
           style: { width: '24px', height: '24px', border: 'none', background: 'none', padding: 0, cursor: 'pointer', color: '#94A3B8', display: 'flex', alignItems: 'center', justifyContent: 'flex-start' }
         }, deleteSvg) : null,
         /* Bottom: Edit button + Timestamp */
         /*#__PURE__*/React.createElement('div', { style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '4px' } },
           isMsgMe ? /*#__PURE__*/React.createElement('button', {
-            type: 'button', onClick: () => onEditMessage && onEditMessage(msg), title: '편집',
+            type: 'button', className: 'msg-actions-group', onClick: () => onEditMessage && onEditMessage(msg), title: '편집',
             style: { width: '24px', height: '24px', border: '1px solid #E2E8F0', backgroundColor: '#FFFFFF', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0, color: '#64748B' }
           }, editSvg) : null,
           /* Date/Time Text */
@@ -7824,6 +7862,7 @@ function ChatRoomView({
   onShare
 }) {
   const [viewportBottom, setViewportBottom] = React.useState(0);
+  const revealedMsgId = useTapRevealedMsgId();
 
   // Monitor visualViewport to shift layout above virtual keyboard on mobile devices
   React.useEffect(() => {
@@ -7939,8 +7978,11 @@ function ChatRoomView({
     const p = participantsMap[msg.participantId];
     const isMe = msg.participantId === chatParticipantId;
     const timeStr = formatChatTime(msg.timestamp);
+    const rowId = msg.id || `msg-${idx}`;
     renderedMessages.push(/*#__PURE__*/React.createElement("div", {
-      key: msg.id || `msg-${idx}`,
+      key: rowId,
+      className: `msg-row-hover ${revealedMsgId === rowId ? 'msg-actions-revealed' : ''}`,
+      'data-msg-row-id': rowId,
       style: {
         display: 'flex',
         alignItems: 'flex-start',
@@ -7977,6 +8019,7 @@ function ChatRoomView({
       /* Top: Delete button */
       /*#__PURE__*/React.createElement("button", {
         type: "button",
+        className: "msg-actions-group",
         onClick: () => onDeleteMessage && onDeleteMessage(msg),
         title: "삭제",
         style: {
@@ -8014,6 +8057,7 @@ function ChatRoomView({
         /* Edit button */
         /*#__PURE__*/React.createElement("button", {
           type: "button",
+          className: "msg-actions-group",
           onClick: () => onEditMessage && onEditMessage(msg),
           title: "편집",
           style: {
@@ -8721,33 +8765,61 @@ function EditMessageModal({
   message,
   calendar,
   onSave,
-  onClose
+  onClose,
+  showToast
 }) {
   const [text, setText] = React.useState(message.text || '');
-  const [image, setImage] = React.useState(
-    message.imageUrl ? { original: message.imageUrl, thumbnail: message.thumbUrl || message.imageUrl } : null
-  );
+  const [images, setImages] = React.useState(() => {
+    const urls = Array.isArray(message.imageUrls) && message.imageUrls.length > 0
+      ? message.imageUrls
+      : (message.imageUrl ? [message.imageUrl] : []);
+    const thumbs = Array.isArray(message.thumbUrls) && message.thumbUrls.length > 0
+      ? message.thumbUrls
+      : (message.thumbUrl ? [message.thumbUrl] : []);
+    return urls.map((url, idx) => ({ original: url, thumbnail: thumbs[idx] || url, isExisting: true }));
+  });
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const fileInputRefEdit = React.useRef(null);
 
   const handleFileChangeEdit = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const remainingSlots = 50 - images.length;
+    if (remainingSlots <= 0) {
+      if (showToast) showToast('사진은 최대 50개까지 첨부할 수 있습니다.', 'error');
+      e.target.value = '';
+      return;
+    }
+
+    const filesToProcess = Array.from(files).slice(0, remainingSlots);
+    if (files.length > remainingSlots && showToast) {
+      showToast(`최대 50장 제한으로 인해 ${remainingSlots}장의 사진만 추가됩니다.`, 'info');
+    }
+
     try {
-      const compressed = await compressImageToDataUrls(file);
-      setImage(compressed);
+      const compressedList = [];
+      for (const file of filesToProcess) {
+        const compressed = await compressImageToDataUrls(file);
+        compressedList.push(compressed);
+      }
+      setImages(prev => [...prev, ...compressedList]);
     } catch (err) {
       console.error('Image compress error:', err);
-      alert('이미지 처리 중 오류가 발생했습니다. 다른 이미지를 선택해 주세요.');
+      if (showToast) {
+        showToast('이미지 처리 중 오류가 발생했습니다. 다른 이미지를 선택해 주세요.', 'error');
+      } else {
+        alert('이미지 처리 중 오류가 발생했습니다. 다른 이미지를 선택해 주세요.');
+      }
     }
     e.target.value = '';
   };
 
   const handleSave = async () => {
-    if ((!text.trim() && !image) || isSubmitting) return;
+    if ((!text.trim() && images.length === 0) || isSubmitting) return;
     setIsSubmitting(true);
     try {
-      await onSave(text.trim(), image);
+      await onSave(text.trim(), images);
       onClose();
     } catch (err) {
       console.error('EditMessageModal save error:', err);
@@ -8782,11 +8854,14 @@ function EditMessageModal({
   }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }))), /*#__PURE__*/React.createElement("div", {
     style: { display: 'flex', flexDirection: 'column', gap: '12px' }
   },
-  image ? /*#__PURE__*/React.createElement("div", {
-    style: { position: 'relative', display: 'inline-block', alignSelf: 'flex-start' }
+  images.length > 0 ? /*#__PURE__*/React.createElement("div", {
+    style: { display: 'flex', flexWrap: 'wrap', gap: '8px', alignSelf: 'flex-start' }
+  }, images.map((img, index) => /*#__PURE__*/React.createElement("div", {
+    key: index,
+    style: { position: 'relative', display: 'inline-block' }
   }, /*#__PURE__*/React.createElement("img", {
-    src: image.thumbnail,
-    alt: "수정 이미지 미리보기",
+    src: img.thumbnail,
+    alt: `수정 이미지 미리보기 ${index + 1}`,
     style: {
       width: '80px',
       height: '80px',
@@ -8797,7 +8872,7 @@ function EditMessageModal({
     }
   }), /*#__PURE__*/React.createElement("button", {
     type: "button",
-    onClick: () => setImage(null),
+    onClick: () => setImages(prev => prev.filter((_, idx) => idx !== index)),
     style: {
       position: 'absolute',
       top: '-6px',
@@ -8823,7 +8898,7 @@ function EditMessageModal({
     strokeWidth: "3",
     strokeLinecap: "round",
     strokeLinejoin: "round"
-  }, /*#__PURE__*/React.createElement("line", { x1: "18", y1: "6", x2: "6", y2: "18" }), /*#__PURE__*/React.createElement("line", { x1: "6", y1: "6", x2: "18", y2: "18" })))) : null,
+  }, /*#__PURE__*/React.createElement("line", { x1: "18", y1: "6", x2: "6", y2: "18" }), /*#__PURE__*/React.createElement("line", { x1: "6", y1: "6", x2: "18", y2: "18" })))))) : null,
   /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
@@ -8857,6 +8932,7 @@ function EditMessageModal({
     ref: fileInputRefEdit,
     type: "file",
     accept: "image/*",
+    multiple: true,
     style: { position: 'absolute', width: '1px', height: '1px', padding: 0, margin: '-1px', overflow: 'hidden', clip: 'rect(0,0,0,0)', border: 0 },
     onChange: handleFileChangeEdit
   }), /*#__PURE__*/React.createElement("button", {
@@ -8898,9 +8974,9 @@ function EditMessageModal({
   }, "취소"), /*#__PURE__*/React.createElement("button", {
     type: "button",
     className: "btn btn-poll-create",
-    disabled: isSubmitting || (!text.trim() && !image),
+    disabled: isSubmitting || (!text.trim() && images.length === 0),
     onClick: handleSave,
-    style: { height: '34px', fontSize: '0.85rem', padding: '0 16px', opacity: (text.trim() || image) && !isSubmitting ? 1 : 0.6 }
+    style: { height: '34px', fontSize: '0.85rem', padding: '0 16px', opacity: (text.trim() || images.length > 0) && !isSubmitting ? 1 : 0.6 }
   }, isSubmitting ? '...' : "수정")))));
 }
 
