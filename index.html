@@ -96,7 +96,6 @@
     /* Header Card */
     .header-card {
       background: var(--bg-card);
-      border: 1px solid var(--border-subtle);
       border-radius: var(--radius-lg);
       padding: 16px;
       margin-bottom: 20px;
@@ -287,7 +286,7 @@
 
     /* Calendar Card */
     .calendar-card {
-      background: var(--bg-card); border: 1px solid var(--border-subtle);
+      background: var(--bg-card);
       border-radius: var(--radius-lg); padding: 16px; margin-bottom: 20px; box-shadow: var(--shadow-lg);
     }
     .calendar-loading-overlay {
@@ -699,7 +698,7 @@
 
     /* Summary Card */
     .summary-card {
-      background: var(--bg-card); border: 1px solid var(--border-subtle);
+      background: var(--bg-card);
       border-radius: var(--radius-lg); padding: 16px; box-shadow: var(--shadow-md);
     }
     @media (min-width: 640px) {
@@ -9335,7 +9334,7 @@ function AdminModal({
 
         /* Chat / Comments Logs Section */
         /*#__PURE__*/React.createElement("div", {
-          style: { border: '1px solid #E2E8F0', borderRadius: '12px', padding: '16px', backgroundColor: '#FFFFFF' }
+          style: { border: '1px solid #E2E8F0', borderRadius: '12px', padding: '16px', backgroundColor: '#FFFFFF', flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }
         },
           /* Header */
           /*#__PURE__*/React.createElement("div", {
@@ -9353,7 +9352,7 @@ function AdminModal({
 
           /* Message list container */
           /*#__PURE__*/React.createElement("div", {
-            style: { maxHeight: '240px', overflowY: 'auto', border: '1px solid #F1F5F9', borderRadius: '8px', backgroundColor: '#F8FAFC', padding: '8px' }
+            style: { flex: 1, minHeight: '240px', overflowY: 'auto', border: '1px solid #F1F5F9', borderRadius: '8px', backgroundColor: '#F8FAFC', padding: '8px' }
           },
             filteredMessages.length === 0 ? /*#__PURE__*/React.createElement("div", { style: { padding: '20px', color: '#94A3B8', fontSize: '0.8rem', textAlign: 'center' } }, "검색 결과가 없거나 대화 내역이 비어 있습니다.") :
             filteredMessages.map(msg => {
@@ -9582,13 +9581,13 @@ function AdminModal({
 
         /* Log Timeline */
         /*#__PURE__*/React.createElement("div", {
-          style: { border: '1px solid #E2E8F0', borderRadius: '12px', padding: '16px', backgroundColor: '#FFFFFF' }
+          style: { border: '1px solid #E2E8F0', borderRadius: '12px', padding: '16px', backgroundColor: '#FFFFFF', flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }
         },
           /*#__PURE__*/React.createElement("h4", { style: { fontSize: '0.92rem', fontWeight: 800, color: '#1E293B', margin: '0 0 12px 0' } }, "⏳ 활동 타임라인을 기반으로 시점 복구"),
-          
+
           /* Timeline scroll container */
           /*#__PURE__*/React.createElement("div", {
-            style: { display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '360px', overflowY: 'auto', paddingRight: '4px' }
+            style: { display: 'flex', flexDirection: 'column', gap: '8px', flex: 1, minHeight: '360px', overflowY: 'auto', paddingRight: '4px' }
           },
             activityLogsSorted.length === 0 ? /*#__PURE__*/React.createElement("div", { style: { padding: '30px', color: '#94A3B8', fontSize: '0.82rem', textAlign: 'center' } }, "기록된 활동 로그가 없어 복구 기능을 이용할 수 없습니다.") :
             activityLogsSorted.map(log => {
