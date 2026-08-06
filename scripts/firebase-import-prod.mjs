@@ -24,15 +24,33 @@ function jsToFirestoreValue(value) {
   return { stringValue: String(value) };
 }
 
+async function fetchCurrentDoc(docId) {
+  const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/${DATABASE}/documents/calendars/${docId}`;
+  const response = await fetch(url);
+  if (response.status === 404) return null;
+  if (!response.ok) {
+    throw new Error(`Failed to read current ${docId} before restore: ${response.status} ${await response.text()}`);
+  }
+  return response.json();
+}
+
 async function restoreCalendar(calData) {
   const docId = calData.docId; // cal_kkot or cal_cw
   const docPath = `projects/${PROJECT_ID}/databases/${DATABASE}/documents/calendars/${docId}`;
-  
+
   const calendarData = calData.data.calendar;
   const lastModified = calData.data.lastModified;
-  const revision = calData.data.revision;
 
-  console.log(`Restoring ${docId} to revision ${revision}, lastModified: ${lastModified}...`);
+  // The Firestore rules require revision to be exactly (current server revision + 1).
+  // Writing the backup's own revision verbatim only works if nothing has touched the
+  // document since the backup was taken, so re-derive it from the live document instead.
+  const currentDoc = await fetchCurrentDoc(docId);
+  const currentRevision = currentDoc?.fields?.revision?.integerValue
+    ? Number(currentDoc.fields.revision.integerValue)
+    : 0;
+  const revision = currentRevision + 1;
+
+  console.log(`Restoring ${docId} to revision ${revision} (current server revision: ${currentRevision}), lastModified: ${lastModified}...`);
 
   const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/${DATABASE}/documents:commit`;
   const response = await fetch(url, {
@@ -47,7 +65,8 @@ async function restoreCalendar(calData) {
             lastModified: jsToFirestoreValue(lastModified),
             revision: jsToFirestoreValue(revision)
           }
-        }
+        },
+        ...(currentDoc?.updateTime ? { currentDocument: { updateTime: currentDoc.updateTime } } : { currentDocument: { exists: false } })
       }]
     })
   });

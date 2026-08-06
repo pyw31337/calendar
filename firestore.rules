@@ -56,6 +56,19 @@ service cloud.firestore {
       }
     }
 
+    // Stores the hashed admin-dashboard password (see index.html AdminLoginGate).
+    // This is a UI-level deterrent, not real auth: like every other write in this
+    // project, it is only validated by shape, not by who the caller is.
+    match /appConfig/adminAuth {
+      allow get: if true;
+      allow list: if false;
+      allow create, update: if request.resource.data.keys().hasOnly(['passwordHash', 'updatedAt'])
+        && request.resource.data.passwordHash is string
+        && request.resource.data.passwordHash.matches('^[a-f0-9]{64}$')
+        && request.resource.data.updatedAt is number;
+      allow delete: if false;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }
