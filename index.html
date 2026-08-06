@@ -6283,6 +6283,7 @@ function App() {
   }, /*#__PURE__*/React.createElement(CommentsSection, {
     calendar: activeCal,
     recentMessages: recentMessages,
+    chatMessages: chatMessages,
     chatInput: chatInput,
     setChatInput: setChatInput,
     chatParticipantId: chatParticipantId,
@@ -7014,6 +7015,135 @@ const getLocalStorage = () => {
   return window['local' + 'Storage'];
 };
 
+// Per-calendar "last read" chat timestamp, stored locally per browser/device (no server
+// concept of read state). Used to color the chat count badge gray (all read) vs red
+// (unread messages newer than the last time this section was expanded).
+const CHAT_LAST_READ_KEY_PREFIX = 'gather_chat_last_read_v1_';
+function getChatLastReadTimestamp(calendarId) {
+  try {
+    const raw = getLocalStorage().getItem(CHAT_LAST_READ_KEY_PREFIX + calendarId);
+    return raw ? Number(raw) || 0 : 0;
+  } catch (e) {
+    return 0;
+  }
+}
+function setChatLastReadTimestamp(calendarId, timestamp) {
+  try {
+    getLocalStorage().setItem(CHAT_LAST_READ_KEY_PREFIX + calendarId, String(timestamp));
+  } catch (e) {
+    // ignore (private browsing / storage disabled)
+  }
+}
+
+// Link preview (OpenGraph via microlink.io's free public API -- no key, client-side fetch
+// since this is a static site with no backend to crawl links server-side). Cached at module
+// scope (by URL) so re-renders and repeated occurrences of the same link don't refetch, and
+// in-flight requests are deduped across simultaneously-mounting message bubbles.
+const linkPreviewCache = new Map();
+const linkPreviewInflight = new Map();
+async function fetchLinkPreview(url) {
+  if (linkPreviewCache.has(url)) return linkPreviewCache.get(url);
+  if (linkPreviewInflight.has(url)) return linkPreviewInflight.get(url);
+  const promise = (async () => {
+    try {
+      const res = await fetch(`https://api.microlink.com/?url=${encodeURIComponent(url)}&meta=false`);
+      if (!res.ok) throw new Error('microlink request failed');
+      const json = await res.json();
+      if (json.status !== 'success' || !json.data) throw new Error('no preview data');
+      const d = json.data;
+      let siteName = d.publisher || '';
+      if (!siteName) {
+        try { siteName = new URL(url).hostname; } catch (e) { siteName = ''; }
+      }
+      const result = {
+        status: (d.title || d.image?.url) ? 'success' : 'empty',
+        data: {
+          title: d.title || '',
+          description: d.description || '',
+          image: d.image?.url || d.logo?.url || '',
+          siteName
+        }
+      };
+      linkPreviewCache.set(url, result);
+      return result;
+    } catch (e) {
+      const result = { status: 'error' };
+      linkPreviewCache.set(url, result);
+      return result;
+    } finally {
+      linkPreviewInflight.delete(url);
+    }
+  })();
+  linkPreviewInflight.set(url, promise);
+  return promise;
+}
+function useLinkPreview(url) {
+  const [state, setState] = React.useState(() => (url ? linkPreviewCache.get(url) : null) || null);
+  React.useEffect(() => {
+    if (!url) return;
+    const cached = linkPreviewCache.get(url);
+    if (cached) {
+      setState(cached);
+      return;
+    }
+    let cancelled = false;
+    setState({ status: 'loading' });
+    fetchLinkPreview(url).then(result => {
+      if (!cancelled) setState(result);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [url]);
+  return state;
+}
+function extractFirstUrl(text) {
+  if (!text) return null;
+  const m = text.match(/https?:\/\/[^\s]+/);
+  return m ? m[0] : null;
+}
+function LinkPreviewCard({ url }) {
+  const preview = useLinkPreview(url);
+  if (!preview || preview.status === 'loading' || preview.status === 'error' || preview.status === 'empty') return null;
+  const { title, description, image, siteName } = preview.data;
+  return /*#__PURE__*/React.createElement('a', {
+    href: url,
+    target: '_blank',
+    rel: 'noopener noreferrer',
+    onClick: e => e.stopPropagation(),
+    style: {
+      display: 'flex',
+      gap: '8px',
+      marginTop: '6px',
+      border: '1px solid #E2E8F0',
+      borderRadius: '8px',
+      overflow: 'hidden',
+      textDecoration: 'none',
+      color: 'inherit',
+      backgroundColor: '#FFFFFF'
+    }
+  },
+    image && /*#__PURE__*/React.createElement('img', {
+      src: image,
+      alt: '',
+      style: { width: '72px', height: '72px', objectFit: 'cover', flexShrink: 0, backgroundColor: '#F1F5F9' }
+    }),
+    /*#__PURE__*/React.createElement('div', {
+      style: { padding: '6px 8px', minWidth: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '2px' }
+    },
+      title && /*#__PURE__*/React.createElement('div', {
+        style: { fontSize: '0.78rem', fontWeight: 700, color: '#0F172A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
+      }, title),
+      description && /*#__PURE__*/React.createElement('div', {
+        style: { fontSize: '0.7rem', color: '#64748B', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }
+      }, description),
+      siteName && /*#__PURE__*/React.createElement('div', {
+        style: { fontSize: '0.65rem', color: '#94A3B8' }
+      }, siteName)
+    )
+  );
+}
+
 function compressImageToDataUrls(file) {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -7276,6 +7406,7 @@ function useTapRevealedMsgId() {
 function CommentsSection({
   calendar,
   recentMessages,
+  chatMessages = [],
   chatInput,
   setChatInput,
   chatParticipantId,
@@ -7303,6 +7434,27 @@ function CommentsSection({
   const fileInputRef = React.useRef(null);
   const [isCollapsed, setIsCollapsed] = React.useState(true); // default closed
   const revealedMsgId = useTapRevealedMsgId();
+
+  // Total chat count + read/unread badge, tracked locally per calendar (no server-side
+  // read state). chatMessages holds the most recent up to 100 messages, so its length is
+  // an accurate total as long as a calendar hasn't exceeded that many messages ever sent.
+  const totalChatCount = chatMessages.length;
+  const latestChatTimestamp = totalChatCount > 0 ? chatMessages[totalChatCount - 1].timestamp : 0;
+  const [lastReadTimestamp, setLastReadTimestamp] = React.useState(() => getChatLastReadTimestamp(calendar.id));
+  React.useEffect(() => {
+    setLastReadTimestamp(getChatLastReadTimestamp(calendar.id));
+  }, [calendar.id]);
+  const hasUnreadChat = latestChatTimestamp > lastReadTimestamp;
+  const toggleCommentsSection = () => {
+    setIsCollapsed(prev => {
+      const next = !prev;
+      if (next === false && latestChatTimestamp > 0) {
+        setChatLastReadTimestamp(calendar.id, latestChatTimestamp);
+        setLastReadTimestamp(latestChatTimestamp);
+      }
+      return next;
+    });
+  };
 
   const handleFileChange = async (e) => {
     const files = e.target.files;
@@ -7337,8 +7489,6 @@ function CommentsSection({
     e.target.value = '';
   };
 
-  const toggleCommentsSection = () => setIsCollapsed(prev => !prev);
-
   const reversed = [...recentMessages].reverse();
   const messagesToShow = isCollapsed 
     ? (reversed.length > 0 ? [reversed[reversed.length - 1]] : [])
@@ -7360,7 +7510,22 @@ function CommentsSection({
   }, /*#__PURE__*/React.createElement("div", {
     className: "summary-title",
     style: { color: '#2563EB', marginBottom: 0, display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold' }
-  }, /*#__PURE__*/React.createElement(ChatSectionIcon, null), "채팅"),
+  }, /*#__PURE__*/React.createElement(ChatSectionIcon, null), "채팅", totalChatCount > 0 && /*#__PURE__*/React.createElement("span", {
+    title: hasUnreadChat ? '읽지 않은 채팅이 있습니다' : '모두 읽었습니다',
+    style: {
+      display: 'inline-flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      minWidth: '20px',
+      height: '20px',
+      padding: '0 6px',
+      borderRadius: '9999px',
+      fontSize: '0.7rem',
+      fontWeight: 800,
+      backgroundColor: hasUnreadChat ? '#EF4444' : '#E2E8F0',
+      color: hasUnreadChat ? '#FFFFFF' : '#64748B'
+    }
+  }, totalChatCount)),
   /*#__PURE__*/React.createElement(SectionToggleButton, {
     collapsed: isCollapsed,
     onToggle: toggleCommentsSection,
@@ -7389,9 +7554,11 @@ function CommentsSection({
 
     /* === SHARED ELEMENTS === */
     const msgImages = renderChatMessageImages(msg, setActiveLightboxUrl, { maxWidth: '120px', maxHeight: '90px' });
+    const msgFirstUrl = extractFirstUrl(msg.text);
     const bubbleContent = /*#__PURE__*/React.createElement(React.Fragment, null,
       msgImages ? /*#__PURE__*/React.createElement('div', { style: { marginBottom: '8px' } }, msgImages) : null,
-      msg.text ? parseTextWithLinks(msg.text) : null
+      msg.text ? parseTextWithLinks(msg.text) : null,
+      msgFirstUrl && /*#__PURE__*/React.createElement(LinkPreviewCard, { url: msgFirstUrl })
     );
 
     const editSvg = /*#__PURE__*/React.createElement('svg', { xmlns: 'http://www.w3.org/2000/svg', width: '12', height: '12', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '2.5', strokeLinecap: 'round', strokeLinejoin: 'round' },
@@ -8017,7 +8184,7 @@ function ChatRoomView({
         whiteSpace: 'pre-wrap',
         boxShadow: '0 2px 6px rgba(0,0,0,0.06)'
       }
-    }, renderChatMessageImages(msg, setActiveLightboxUrl, { maxWidth: '200px', maxHeight: '150px', marginBottom: msg.text ? '6px' : '0' }), msg.text ? parseTextWithLinks(msg.text) : null), /*#__PURE__*/React.createElement("div", {
+    }, renderChatMessageImages(msg, setActiveLightboxUrl, { maxWidth: '200px', maxHeight: '150px', marginBottom: msg.text ? '6px' : '0' }), msg.text ? parseTextWithLinks(msg.text) : null, extractFirstUrl(msg.text) && /*#__PURE__*/React.createElement(LinkPreviewCard, { url: extractFirstUrl(msg.text) })), /*#__PURE__*/React.createElement("div", {
       style: {
         position: 'absolute',
         right: '-7px',
@@ -8059,7 +8226,7 @@ function ChatRoomView({
         whiteSpace: 'pre-wrap',
         boxShadow: '0 2px 6px rgba(0,0,0,0.06)'
       }
-    }, renderChatMessageImages(msg, setActiveLightboxUrl, { maxWidth: '200px', maxHeight: '150px', marginBottom: msg.text ? '6px' : '0' }), msg.text ? parseTextWithLinks(msg.text) : null), /*#__PURE__*/React.createElement("div", {
+    }, renderChatMessageImages(msg, setActiveLightboxUrl, { maxWidth: '200px', maxHeight: '150px', marginBottom: msg.text ? '6px' : '0' }), msg.text ? parseTextWithLinks(msg.text) : null, extractFirstUrl(msg.text) && /*#__PURE__*/React.createElement(LinkPreviewCard, { url: extractFirstUrl(msg.text) })), /*#__PURE__*/React.createElement("div", {
       style: {
         position: 'absolute',
         left: '-7px',
