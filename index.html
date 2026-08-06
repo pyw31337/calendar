@@ -7040,8 +7040,8 @@ function setChatLastReadTimestamp(calendarId, timestamp) {
 // re-renders and repeated occurrences of the same link don't refetch, and in-flight requests
 // are deduped across simultaneously-mounting message bubbles.
 // The anonymous (no-key) tier shares a global 25 req/min quota across every microlink.io caller
-// on the internet, so previews can silently fail to load under real traffic. Sign up for a free
-// API key at https://microlink.io/dashboard and set it here to move onto a per-account quota.
+// on the internet, so previews can silently fail to load under real traffic. API keys require a
+// paid Pro plan (https://microlink.io/pricing) -- set one here if that's ever purchased.
 const MICROLINK_API_KEY = '';
 const linkPreviewCache = new Map();
 const linkPreviewInflight = new Map();
@@ -7536,7 +7536,6 @@ function CommentsSection({
   /*#__PURE__*/React.createElement("div", {
     style: {
       backgroundColor: '#F8FAFC',
-      border: '1px solid #E2E8F0',
       borderRadius: '12px',
       padding: '12px',
       minHeight: '48px'
@@ -7572,8 +7571,8 @@ function CommentsSection({
       /*#__PURE__*/React.createElement('line', { x1: '6', y1: '6', x2: '18', y2: '18' })
     );
 
-    /* === UNIFIED CARD LAYOUT (badge top-left, full-width bubble, bottom-right
-       meta row: edit/delete hidden until hover/tap, then push the timestamp aside) === */
+    /* === UNIFIED CARD LAYOUT (badge + edit/delete on one header row, full-width bubble
+       below, single-line timestamp bottom-right) === */
     return /*#__PURE__*/React.createElement('div', {
       key: msg.id,
       className: `msg-row-hover ${revealedMsgId === msg.id ? 'msg-actions-revealed' : ''}`,
@@ -7584,29 +7583,13 @@ function CommentsSection({
         gap: '6px'
       }
     },
-      /* Name Badge */
-      /*#__PURE__*/React.createElement('span', {
-        style: { alignSelf: 'flex-start', backgroundColor: badgeColor, color: '#FFFFFF', padding: '3px 10px', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 'bold', whiteSpace: 'nowrap' }
-      }, badgeName),
-      /* Full-width bubble with top tail pointing to name badge */
-      /*#__PURE__*/React.createElement('div', { style: { position: 'relative', marginTop: '2px' } },
-        /* Outer tail (border color) */
-        /*#__PURE__*/React.createElement('div', {
-          style: { position: 'absolute', top: '-7px', left: '18px', width: 0, height: 0, borderLeft: '7px solid transparent', borderRight: '7px solid transparent', borderBottom: '7px solid #E2E8F0', zIndex: 2 }
-        }),
-        /* Inner tail (white fill) */
-        /*#__PURE__*/React.createElement('div', {
-          style: { position: 'absolute', top: '-5px', left: '19px', width: 0, height: 0, borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderBottom: '6px solid #FFFFFF', zIndex: 3 }
-        }),
-        /* Bubble container */
-        /*#__PURE__*/React.createElement('div', {
-          style: { backgroundColor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '10px 12px', fontSize: '0.85rem', lineHeight: '1.4', color: '#1E293B', wordBreak: 'break-all', whiteSpace: 'pre-wrap', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', position: 'relative', zIndex: 1 }
-        }, bubbleContent)
-      ),
-      /* Bottom-right meta row: hidden edit/delete (revealed on hover/tap) pushes the timestamp aside */
+      /* Header row: name badge left, edit/delete (hidden until hover/tap) top-right */
       /*#__PURE__*/React.createElement('div', {
-        style: { display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '6px' }
+        style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }
       },
+        /*#__PURE__*/React.createElement('span', {
+          style: { backgroundColor: badgeColor, color: '#FFFFFF', padding: '3px 10px', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 'bold', whiteSpace: 'nowrap' }
+        }, badgeName),
         isMsgMe ? /*#__PURE__*/React.createElement('div', {
           className: 'msg-actions-group',
           style: { display: 'flex', alignItems: 'center', gap: '4px' }
@@ -7621,13 +7604,27 @@ function CommentsSection({
             type: 'button', onClick: () => onDeleteMessage && onDeleteMessage(msg), title: '삭제',
             style: { width: '22px', height: '22px', border: 'none', background: 'none', padding: 0, cursor: 'pointer', color: '#94A3B8', display: 'flex', alignItems: 'center', justifyContent: 'center' }
           }, deleteSvg)
-        ) : null,
-        /* Date/Time Text */
-        /*#__PURE__*/React.createElement('div', { style: { fontSize: '0.72rem', color: '#94A3B8', lineHeight: '1.3', textAlign: 'right' } },
-          /*#__PURE__*/React.createElement('div', null, dateInfo.dateStr.replace('(', ' (')),
-          /*#__PURE__*/React.createElement('div', null, dateInfo.timeStr)
-        )
-      )
+        ) : null
+      ),
+      /* Full-width bubble with top tail pointing to name badge */
+      /*#__PURE__*/React.createElement('div', { style: { position: 'relative', marginTop: '2px' } },
+        /* Outer tail (border color) */
+        /*#__PURE__*/React.createElement('div', {
+          style: { position: 'absolute', top: '-7px', left: '18px', width: 0, height: 0, borderLeft: '7px solid transparent', borderRight: '7px solid transparent', borderBottom: '7px solid #E2E8F0', zIndex: 2 }
+        }),
+        /* Inner tail (white fill) */
+        /*#__PURE__*/React.createElement('div', {
+          style: { position: 'absolute', top: '-5px', left: '19px', width: 0, height: 0, borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderBottom: '6px solid #FFFFFF', zIndex: 3 }
+        }),
+        /* Bubble container */
+        /*#__PURE__*/React.createElement('div', {
+          style: { backgroundColor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '10px 12px', fontSize: '0.85rem', lineHeight: '1.4', color: '#1E293B', wordBreak: 'keep-all', overflowWrap: 'break-word', whiteSpace: 'pre-wrap', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', position: 'relative', zIndex: 1 }
+        }, bubbleContent)
+      ),
+      /* Bottom-right timestamp, single line */
+      /*#__PURE__*/React.createElement('div', {
+        style: { fontSize: '0.72rem', color: '#94A3B8', textAlign: 'right' }
+      }, `${dateInfo.dateStr.replace('(', ' (')} ${dateInfo.timeStr}`)
     );
   }),
   /* Full Width "이전 채팅 더보기" Button at bottom of list */
@@ -8180,7 +8177,8 @@ function ChatRoomView({
         fontSize: '0.9rem',
         lineHeight: '1.4',
         color: '#1E293B',
-        wordBreak: 'break-all',
+        wordBreak: 'keep-all',
+        overflowWrap: 'break-word',
         whiteSpace: 'pre-wrap',
         boxShadow: '0 2px 6px rgba(0,0,0,0.06)'
       }
@@ -8222,7 +8220,8 @@ function ChatRoomView({
         fontSize: '0.9rem',
         lineHeight: '1.4',
         color: '#1E293B',
-        wordBreak: 'break-all',
+        wordBreak: 'keep-all',
+        overflowWrap: 'break-word',
         whiteSpace: 'pre-wrap',
         boxShadow: '0 2px 6px rgba(0,0,0,0.06)'
       }
