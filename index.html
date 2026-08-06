@@ -1126,6 +1126,18 @@ const GITHUB_PAGES_FREE_LIMITS = {
   bandwidthBytesPerMonth: 100 * 1024 * 1024 * 1024,
   buildsPerHour: 10
 };
+// Chat images are stored as base64 directly on their own Firestore message document (no
+// Firebase Storage). Each is still far under the 1MiB/doc limit, but an uncapped photo can
+// balloon well past this on a busy/detailed source image, so cap it and step down JPEG
+// quality instead (see compressImageToDataUrls).
+const MAX_CHAT_IMAGE_BASE64_LENGTH = 350000; // ~350KB
+// A calendar document must stay under Firestore's 1MiB/doc hard limit. Refuse a save before
+// it gets there instead of surfacing Firestore's opaque rejection at the boundary. Compared
+// against the actual Firestore wire-format size (see estimateCalendarDocWireBytes), not a
+// plain JSON.stringify length -- Firestore's typed-value wire format runs ~1.7-1.9x larger
+// than plain JSON for this shape (measured against live production data), so comparing a
+// plain JSON length against the raw 1,048,576 byte limit would under-count by a wide margin.
+const CALENDAR_DOC_SAFE_BYTE_LIMIT = 900000; // ~900KB of estimated wire size, ~150KB headroom
 
 // Admin dashboard password gate. This is a lightweight deterrent, not real
 // server-side auth: the site is static and Firestore writes are already open
@@ -2835,6 +2847,18 @@ function firestoreDocumentToJs(doc) {
   return Object.fromEntries(Object.entries(fields).map(([key, value]) => [key, firestoreValueToJs(value)]));
 }
 
+// Estimates the actual Firestore wire-format byte size of a calendar payload (the same
+// typed-value shape jsToFirestoreValue produces for the REST commit body), so a save can be
+// refused with a clear message before it gets anywhere near Firestore's real 1MiB/doc limit.
+function estimateCalendarDocWireBytes(calendar) {
+  try {
+    const wireValue = jsToFirestoreValue(calendar);
+    return new TextEncoder().encode(JSON.stringify(wireValue)).length;
+  } catch (e) {
+    return 0;
+  }
+}
+
 function isRetryableFirestoreConflict(errorText) {
   return /ABORTED|FAILED_PRECONDITION|409|stored version|base version/i.test(String(errorText || ''));
 }
@@ -2860,7 +2884,9 @@ async function pushSingleCalendarWithRest(normalizedCal, lastModified, saveMode,
       } else if (saveMode === 'restore') {
         nextCalendar = normalizedCal;
       } else if (saveMode === 'replace') {
-        throw new Error(`Refusing to replace existing calendar ${normalizedCal.id}`);
+        const err = new Error(`Refusing to replace existing calendar ${normalizedCal.id}`);
+        err.nonRetryable = true;
+        throw err;
       } else if (saveMode === 'settings') {
         nextCalendar = mergeCalendarSettingsDelta(serverCalendar, normalizedCal);
       } else if (saveMode === 'polls') {
@@ -2870,7 +2896,16 @@ async function pushSingleCalendarWithRest(normalizedCal, lastModified, saveMode,
       }
       const mergedCalendar = normalizeCalendarForSave(nextCalendar);
       const validationError = validateCalendarShape(mergedCalendar);
-      if (validationError) throw new Error(validationError);
+      if (validationError) {
+        const err = new Error(validationError);
+        err.nonRetryable = true;
+        throw err;
+      }
+      if (estimateCalendarDocWireBytes(mergedCalendar) > CALENDAR_DOC_SAFE_BYTE_LIMIT) {
+        const err = new Error('캘린더 데이터가 너무 커져 더 이상 저장할 수 없습니다. 관리자에게 문의해 주세요.');
+        err.nonRetryable = true;
+        throw err;
+      }
       mergedCalendar.revision = Math.max(serverCalendar?.revision || 0, normalizedCal.revision || 0) + 1;
       mergedCalendar.updatedAt = Math.max(mergedCalendar.updatedAt || 0, lastModified || 0);
       const nextDocRevision = (currentData?.revision || 0) + 1;
@@ -2898,7 +2933,7 @@ async function pushSingleCalendarWithRest(normalizedCal, lastModified, saveMode,
       }
       await new Promise(resolve => setTimeout(resolve, getFirestoreRetryDelay(attempt)));
     } catch (error) {
-      if (attempt === retryCount) {
+      if (error?.nonRetryable || attempt === retryCount) {
         console.warn(`Firestore REST fallback failed for cal_${normalizedCal.id}:`, error);
         return false;
       }
@@ -2943,6 +2978,9 @@ async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 18,
 	          const mergedCalendar = normalizeCalendarForSave(nextCalendar);
 	          const validationError = validateCalendarShape(mergedCalendar);
 	          if (validationError) throw new Error(validationError);
+	          if (estimateCalendarDocWireBytes(mergedCalendar) > CALENDAR_DOC_SAFE_BYTE_LIMIT) {
+	            throw new Error('캘린더 데이터가 너무 커져 더 이상 저장할 수 없습니다. 관리자에게 문의해 주세요.');
+	          }
 	          const nextDocRevision = (currentData?.revision || 0) + 1;
 	          mergedCalendar.revision = Math.max(serverCalendar?.revision || 0, normalizedCal.revision || 0) + 1;
 	          mergedCalendar.updatedAt = Math.max(mergedCalendar.updatedAt || 0, lastModified || 0);
@@ -6387,7 +6425,14 @@ function compressImageToDataUrls(file) {
       canvasOrig.height = hOrig;
       const ctxOrig = canvasOrig.getContext('2d');
       ctxOrig.drawImage(img, 0, 0, wOrig, hOrig);
-      const originalBase64 = canvasOrig.toDataURL('image/jpeg', 0.85); // High quality spec (0.85 instead of 0.6)
+      // Start at high quality (0.85), but step down for busy/detailed photos that would
+      // otherwise produce an oversized base64 payload -- every image is its own Firestore
+      // document with no server-side compression, so this is the only place that bounds it.
+      let originalBase64 = canvasOrig.toDataURL('image/jpeg', 0.85);
+      for (const quality of [0.75, 0.65, 0.55, 0.45]) {
+        if (originalBase64.length <= MAX_CHAT_IMAGE_BASE64_LENGTH) break;
+        originalBase64 = canvasOrig.toDataURL('image/jpeg', quality);
+      }
 
       const maxThumb = 120;
       let wThumb = img.width;
@@ -6805,6 +6850,7 @@ function CommentsSection({
       ref: chatTextareaRef,
       placeholder: "의견을 입력하세요...",
       value: chatInput,
+      maxLength: 5000,
       onChange: e => {
         setChatInput(e.target.value);
         e.target.style.height = 'auto';
@@ -7586,6 +7632,7 @@ function ChatRoomView({
         ref: chatTextareaRef,
         placeholder: "메시지를 입력하세요...",
         value: chatInput,
+        maxLength: 5000,
         onChange: e => {
           setChatInput(e.target.value);
           e.target.style.height = 'auto';
