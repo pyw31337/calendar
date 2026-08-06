@@ -1664,8 +1664,48 @@ function buildActivityLogsFromAvailabilities(calendar) {
   // new synthesized "create" entry (this function has no concept of "update"), producing a
   // phantom duplicate registration log every time an already-tracked entry was edited.
   const explicitPairs = new Set(explicitLogs.map(log => `${log.date}_${log.participantId}`));
-  const fallbackLogs = (Array.isArray(calendar?.availabilities) ? calendar.availabilities : []).map((availability) => {
-    if (explicitPairs.has(`${availability.date}_${availability.participantId}`)) return null;
+  const explicitCreatePairs = new Set(explicitLogs.filter(l => l.action === 'create').map(log => `${log.date}_${log.participantId}`));
+  const availabilities = Array.isArray(calendar?.availabilities) ? calendar.availabilities : [];
+
+  // Some tracked pairs have update/delete logs but no create log: their real registration
+  // predates activity logging entirely and was never captured. There's no way to recover the
+  // true timestamp, but participants who registered in the same batch (the common case --
+  // several people added within seconds of each other) give a reasonable estimate. Use the
+  // earliest reliable timestamp found for the same date, from either a real create log or an
+  // untouched (never-edited) availability, whose own updatedAt is trustworthy as its true
+  // creation time.
+  const earliestReliableByDate = new Map();
+  availabilities.forEach((availability) => {
+    if (isTombstone(availability)) return;
+    const pairKey = `${availability.date}_${availability.participantId}`;
+    let candidate = null;
+    if (explicitCreatePairs.has(pairKey)) {
+      const createLog = explicitLogs.find(l => l.action === 'create' && l.date === availability.date && l.participantId === availability.participantId);
+      candidate = createLog ? getActivityLogStamp(createLog) : null;
+    } else if (!explicitPairs.has(pairKey)) {
+      candidate = Number(availability.updatedAt) || null;
+    }
+    if (!candidate) return;
+    const current = earliestReliableByDate.get(availability.date);
+    if (current === undefined || candidate < current) earliestReliableByDate.set(availability.date, candidate);
+  });
+
+  const fallbackLogs = availabilities.map((availability) => {
+    const pairKey = `${availability.date}_${availability.participantId}`;
+    if (explicitPairs.has(pairKey)) {
+      if (explicitCreatePairs.has(pairKey)) return null;
+      const estimatedTimestamp = earliestReliableByDate.get(availability.date);
+      if (!estimatedTimestamp) return null;
+      return normalizeActivityLog(calendar.id, {
+        id: `${calendar.id}_${availability.date}_${availability.participantId}_create_${estimatedTimestamp}_estimated`,
+        calendarId: calendar.id,
+        participantId: availability.participantId,
+        date: availability.date,
+        action: 'create',
+        note: '(등록 시점 추정)',
+        timestamp: estimatedTimestamp
+      });
+    }
     const action = availability.deletedAt ? 'delete' : 'create';
     const timestamp = Number(availability.deletedAt || availability.updatedAt || 0) || 0;
     return normalizeActivityLog(calendar.id, {
