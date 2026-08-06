@@ -6932,6 +6932,9 @@ function CalendarGrid({
     const isHoliday = !!holidayNames && holidayNames.length > 0;
     const lunarLabel = lunarLabelMap[dateStr];
     const solarTermName = !isHoliday ? solarTermMap[dateStr] : null;
+    const columnDow = idx % 7; // 0=Sun .. 6=Sat, since each week row starts on Sunday
+    const isSunday = columnDow === 0;
+    const isSaturday = columnDow === 6;
     return /*#__PURE__*/React.createElement("div", {
       key: idx,
       className: `day-cell ${isCurrentMonth ? '' : 'other-month'} ${isAllAvailable ? 'all-available' : ''}`,
@@ -6950,8 +6953,11 @@ function CalendarGrid({
         borderRadius: '50%',
         fontWeight: '800',
         boxShadow: '0 2px 4px rgba(59, 130, 246, 0.4)'
-      } : isHoliday ? {
+      } : isHoliday || isSunday ? {
         color: '#EF4444',
+        fontWeight: '800'
+      } : isSaturday ? {
+        color: '#2563EB',
         fontWeight: '800'
       } : {}
     }, dayNum), isAllAvailable && /*#__PURE__*/React.createElement("span", {
