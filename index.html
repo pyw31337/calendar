@@ -6492,6 +6492,10 @@ function App() {
         getLocalStorage().setItem('gather_active_participant_id_v20', id);
       },
       onClose: () => setIsChatSheetOpen(false)
+    }), isChatShareOpen && /*#__PURE__*/React.createElement(ShareModal, {
+      calendar: activeCal,
+      shareType: "chat",
+      onClose: () => setIsChatShareOpen(false)
     }), deletingMessage && /*#__PURE__*/React.createElement(DeleteConfirmModal, {
       message: deletingMessage,
       calendar: activeCal,
