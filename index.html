@@ -3339,6 +3339,48 @@ function AdminDashboard({ initialCalendars }) {
     setTimeout(() => setToast(null), duration);
   };
 
+  // Calendar picker, shown as radio pills (few enough options that a dropdown adds an extra click).
+  const renderCalendarRadioGroup = (label, groupName) => (
+    /*#__PURE__*/React.createElement(React.Fragment, null,
+      /*#__PURE__*/React.createElement("span", { style: { fontWeight: '800', fontSize: '0.88rem', color: '#64748B' } }, label),
+      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } },
+        calendarsList.map(cal => {
+          const isActive = selectedCalId === cal.id;
+          return /*#__PURE__*/React.createElement("label", {
+            key: cal.id,
+            style: {
+              display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 14px',
+              borderRadius: '9999px', border: `1px solid ${isActive ? '#4F46E5' : '#E2E8F0'}`,
+              backgroundColor: isActive ? '#EEF2FF' : '#FFFFFF',
+              color: isActive ? '#4F46E5' : '#0F172A',
+              fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', transition: 'all 0.15s ease'
+            }
+          },
+            /*#__PURE__*/React.createElement("input", {
+              type: "radio", name: groupName, value: cal.id, checked: isActive,
+              onChange: () => setSelectedCalId(cal.id),
+              style: { accentColor: '#4F46E5', width: '14px', height: '14px', cursor: 'pointer' }
+            }),
+            `${cal.title} (${cal.id})`
+          );
+        })
+      )
+    )
+  );
+
+  // Generic layer-popup confirm dialog (replaces window.confirm across this page)
+  const [confirmDialog, setConfirmDialog] = React.useState(null);
+  const requestConfirm = (title, message, onConfirm) => {
+    setConfirmDialog({ title, message, onConfirm });
+  };
+  const closeConfirmDialog = () => setConfirmDialog(null);
+
+  // New calendar creation modal (replaces window.prompt across this page)
+  const [isCreateCalModalOpen, setIsCreateCalModalOpen] = React.useState(false);
+
+  // Restore-mode confirmation phrase modal (replaces window.prompt)
+  const [isRestorePhraseModalOpen, setIsRestorePhraseModalOpen] = React.useState(false);
+
   // Admin password change
   const [isChangePwOpen, setIsChangePwOpen] = React.useState(false);
   const [currentPwInput, setCurrentPwInput] = React.useState('');
@@ -3500,32 +3542,25 @@ function AdminDashboard({ initialCalendars }) {
     }
   }, [selectedCalId, serverCalendars]);
 
-  // Create new calendar from dashboard
-  const handleCreateNewCalendarFromAdmin = async () => {
-    const id = (prompt('새 모임 캘린더의 ID를 입력하세요 (예: kkot, cw, trip):', 'cal_' + Date.now().toString().slice(-4)) || '').trim();
-    if (!id) return;
-    if (!isValidCalendarId(id)) {
-      alert('캘린더 ID는 영문, 숫자, -, _ 조합으로 입력해 주세요.');
-      return;
-    }
-    if (!isAllowedCalendarId(id)) {
-      alert('운영 캘린더는 kkot, cw만 사용할 수 있습니다.');
-      return;
-    }
-    
-    if (serverCalendars.some(c => c.id === id)) {
-      alert('이미 존재하는 캘린더 ID입니다.');
-      return;
-    }
+  // Create new calendar from dashboard (via isCreateCalModalOpen modal, not window.prompt)
+  const handleCreateNewCalendarFromAdmin = () => {
+    setIsCreateCalModalOpen(true);
+  };
 
-    const titleVal = prompt('새 캘린더 제목을 입력해 주세요:', `${id} 모임 캘린더`);
-    if (!titleVal) return;
-    
+  const submitCreateCalendar = async (rawId, rawTitle) => {
+    const id = (rawId || '').trim();
+    const titleVal = (rawTitle || '').trim();
+    if (!id) return '캘린더 ID를 입력해 주세요.';
+    if (!isValidCalendarId(id)) return '캘린더 ID는 영문, 숫자, -, _ 조합으로 입력해 주세요.';
+    if (!isAllowedCalendarId(id)) return '운영 캘린더는 kkot, cw만 사용할 수 있습니다.';
+    if (serverCalendars.some(c => c.id === id)) return '이미 존재하는 캘린더 ID입니다.';
+    if (!titleVal) return '캘린더 제목을 입력해 주세요.';
+
     const now = Date.now();
     const newCal = {
       ...createDefaultCalendar(id),
-      title: titleVal.trim(),
-      description: `${titleVal.trim()} 참여자들의 일정 조율`,
+      title: titleVal,
+      description: `${titleVal} 참여자들의 일정 조율`,
       updatedAt: now,
       revision: 1
     };
@@ -3534,10 +3569,11 @@ function AdminDashboard({ initialCalendars }) {
     if (saved) {
       setServerCalendars(prev => [newCal, ...prev]);
       setSelectedCalId(newCal.id);
+      setIsCreateCalModalOpen(false);
       showAdminToast('새 캘린더가 생성되었습니다. ✅', 'success');
-    } else {
-      showAdminToast('캘린더 생성에 실패했습니다.', 'error');
+      return '';
     }
+    return '캘린더 생성에 실패했습니다.';
   };
 
   // Backup operations
@@ -3562,12 +3598,38 @@ function AdminDashboard({ initialCalendars }) {
       showAdminToast('복구는 관리자 주소에 restore=1을 붙인 복구 모드에서만 실행할 수 있습니다.', 'error', 6000);
       return;
     }
-    const phrase = window.prompt('백업 JSON 복구는 현재 운영 데이터를 교체합니다. 계속하려면 "운영 데이터 복구"를 정확히 입력하세요.');
+    setIsRestorePhraseModalOpen(true);
+  };
+
+  const submitRestorePhrase = (phrase) => {
     if (phrase !== '운영 데이터 복구') {
-      showAdminToast('확인 문구가 일치하지 않아 복구를 취소했습니다.', 'error');
+      return '확인 문구가 일치하지 않습니다. "운영 데이터 복구"를 정확히 입력해 주세요.';
+    }
+    setIsRestorePhraseModalOpen(false);
+    importInputRef.current?.click();
+    return '';
+  };
+
+  const performBackupRestore = async (calendars) => {
+    closeConfirmDialog();
+    const now = Date.now();
+    const results = [];
+    for (const calendar of calendars) {
+      const restoredCalendar = {
+        ...calendar,
+        updatedAt: now,
+        revision: (calendar.revision || 0) + 1
+      };
+      const saved = await pushSingleCloudCalendar(restoredCalendar, now, 18, null, 'restore');
+      results.push({ id: calendar.id, saved, calendar: restoredCalendar });
+    }
+    const failed = results.filter(result => !result.saved);
+    if (failed.length) {
+      showAdminToast(`${failed.map(result => result.id).join(', ')} 복구에 실패했습니다.`, 'error', 6000);
       return;
     }
-    importInputRef.current?.click();
+    setServerCalendars(prev => mergeCalendarCollections(prev, results.map(result => result.calendar), { replaceMatchingId: true }));
+    showAdminToast('백업 JSON에서 데이터를 복구했습니다.');
   };
 
   const handleImportBackup = async (event) => {
@@ -3583,26 +3645,7 @@ function AdminDashboard({ initialCalendars }) {
         return;
       }
       const message = `${calendars.map(calendar => calendar.id).join(', ')} 데이터를 백업 파일 내용으로 복구합니다. 현재 Firestore 데이터가 해당 백업으로 교체됩니다. 계속할까요?`;
-      if (!window.confirm(message)) return;
-      
-      const now = Date.now();
-      const results = [];
-      for (const calendar of calendars) {
-        const restoredCalendar = {
-          ...calendar,
-          updatedAt: now,
-          revision: (calendar.revision || 0) + 1
-        };
-        const saved = await pushSingleCloudCalendar(restoredCalendar, now, 18, null, 'restore');
-        results.push({ id: calendar.id, saved, calendar: restoredCalendar });
-      }
-      const failed = results.filter(result => !result.saved);
-      if (failed.length) {
-        showAdminToast(`${failed.map(result => result.id).join(', ')} 복구에 실패했습니다.`, 'error', 6000);
-        return;
-      }
-      setServerCalendars(prev => mergeCalendarCollections(prev, results.map(result => result.calendar), { replaceMatchingId: true }));
-      showAdminToast('백업 JSON에서 데이터를 복구했습니다.');
+      requestConfirm('데이터 복구 확인', message, () => performBackupRestore(calendars));
     } catch (err) {
       console.error('Calendar backup import failed:', err);
       showAdminToast('백업 JSON을 읽거나 복구하지 못했습니다.', 'error', 6000);
@@ -3615,14 +3658,14 @@ function AdminDashboard({ initialCalendars }) {
     if (!cal) return;
 
     if (!calTitle.trim()) {
-      alert('캘린더명을 입력해 주세요.');
+      showAdminToast('캘린더명을 입력해 주세요.', 'error');
       return;
     }
 
     const activeParts = calParticipants.filter(p => !isTombstone(p));
     const activeNames = activeParts.map(p => p.name.trim().toLowerCase());
     if (new Set(activeNames).size !== activeNames.length) {
-      alert('참여자 이름은 중복될 수 없습니다.');
+      showAdminToast('참여자 이름은 중복될 수 없습니다.', 'error');
       return;
     }
 
@@ -3666,36 +3709,38 @@ function AdminDashboard({ initialCalendars }) {
 
   // Delete Poll from Admin Page
   const handleDeletePollFromAdminPage = (calId, poll) => {
-    if (!window.confirm(`"${poll.title}" 투표를 삭제하시겠습니까?`)) return;
-    const targetCal = serverCalendars.find(c => c.id === calId);
-    if (!targetCal) return;
+    requestConfirm('투표 삭제', `"${poll.title}" 투표를 삭제하시겠습니까?`, () => {
+      closeConfirmDialog();
+      const targetCal = serverCalendars.find(c => c.id === calId);
+      if (!targetCal) return;
 
-    const now = Date.now();
-    const nextPolls = (targetCal.polls || []).filter(p => p.id !== poll.id);
-    const updatedCal = {
-      ...targetCal,
-      polls: nextPolls,
-      updatedAt: now,
-      revision: (targetCal.revision || 0) + 1
-    };
+      const now = Date.now();
+      const nextPolls = (targetCal.polls || []).filter(p => p.id !== poll.id);
+      const updatedCal = {
+        ...targetCal,
+        polls: nextPolls,
+        updatedAt: now,
+        revision: (targetCal.revision || 0) + 1
+      };
 
-    pushSingleCloudCalendar(updatedCal, now, 18, null, 'polls').then(saved => {
-      if (saved) {
-        setServerCalendars(prev => prev.map(c => c.id === calId ? updatedCal : c));
-        showAdminToast('투표가 삭제되었습니다.', 'success');
-      } else {
-        showAdminToast('투표 삭제에 실패했습니다.', 'error');
-      }
+      pushSingleCloudCalendar(updatedCal, now, 18, null, 'polls').then(saved => {
+        if (saved) {
+          setServerCalendars(prev => prev.map(c => c.id === calId ? updatedCal : c));
+          showAdminToast('투표가 삭제되었습니다.', 'success');
+        } else {
+          showAdminToast('투표 삭제에 실패했습니다.', 'error');
+        }
+      });
     });
   };
 
   // Point-in-time Recovery implementation (includes schedule, polls AND chat messages)
-  const handleRestoreToLogTimestamp = async (calId, log) => {
+  const handleRestoreToLogTimestamp = (calId, log) => {
     const cal = serverCalendars.find(c => c.id === calId);
     if (!cal) return;
 
     const timeLabel = formatRegisteredAt(log.timestamp);
-    const typeLabel = log.type === 'chat' ? '채팅 발송' : 
+    const typeLabel = log.type === 'chat' ? '채팅 발송' :
                       log.action === 'create' ? '일정 등록' :
                       log.action === 'update' ? '일정 변경' :
                       log.action === 'delete' ? '일정 삭제' :
@@ -3703,50 +3748,49 @@ function AdminDashboard({ initialCalendars }) {
                       log.action === 'poll_vote' ? '투표 진행' :
                       log.action === 'poll_cancel' ? '투표 취소' : '활동';
 
-    const msg = `[${calId}] 시점 데이터 전체 복구\n\n타겟 로그: [${timeLabel}] [${typeLabel}]\n\n이 시점으로 데이터를 복구하시겠습니까? 이 시점 이후 등록된 모든 일정/투표 롤백과 동시에, 이 시간 이후 전송된 모든 채팅/의견 메시지도 서버에서 영구적으로 삭제됩니다.`;
-    if (!window.confirm(msg)) return;
+    const msg = `[${calId}] 시점 데이터 전체 복구 (타겟 로그: [${timeLabel}] [${typeLabel}]) — 이 시점으로 데이터를 복구하시겠습니까? 이 시점 이후 등록된 모든 일정/투표 롤백과 동시에, 이 시간 이후 전송된 모든 채팅/의견 메시지도 서버에서 영구적으로 삭제됩니다.`;
+    requestConfirm('시점 데이터 복구', msg, async () => {
+      closeConfirmDialog();
+      try {
+        const restoredCal = rebuildCalendarToTimestamp(cal, log.timestamp);
+        const now = Date.now();
 
-    try {
-      const restoredCal = rebuildCalendarToTimestamp(cal, log.timestamp);
-      const now = Date.now();
-      
-      // Save rolled-back calendar
-      const calSaved = await pushSingleCloudCalendar(restoredCal, now, 18, null, 'restore');
-      if (!calSaved) {
-        showAdminToast('캘린더 데이터 복구에 실패했습니다.', 'error');
-        return;
-      }
-
-      // Delete messages sent after log.timestamp
-      const messages = messagesMap[calId] || [];
-      const messagesToDelete = messages.filter(m => m.timestamp > log.timestamp);
-      for (const mToDelete of messagesToDelete) {
-        if (firebaseDb) {
-          await firebaseDb.collection('calendars').doc(`cal_${calId}`).collection('messages').doc(mToDelete.id).delete();
-        } else {
-          await deleteMessageRest(calId, mToDelete.id);
+        // Save rolled-back calendar
+        const calSaved = await pushSingleCloudCalendar(restoredCal, now, 18, null, 'restore');
+        if (!calSaved) {
+          showAdminToast('캘린더 데이터 복구에 실패했습니다.', 'error');
+          return;
         }
+
+        // Delete messages sent after log.timestamp
+        const messages = messagesMap[calId] || [];
+        const messagesToDelete = messages.filter(m => m.timestamp > log.timestamp);
+        for (const mToDelete of messagesToDelete) {
+          if (firebaseDb) {
+            await firebaseDb.collection('calendars').doc(`cal_${calId}`).collection('messages').doc(mToDelete.id).delete();
+          } else {
+            await deleteMessageRest(calId, mToDelete.id);
+          }
+        }
+
+        // Sync local state
+        setServerCalendars(prev => prev.map(c => c.id === calId ? restoredCal : c));
+        setMessagesMap(prev => ({
+          ...prev,
+          [calId]: (prev[calId] || []).filter(m => m.timestamp <= log.timestamp)
+        }));
+
+        showAdminToast('일정, 투표 및 채팅 로그가 해당 시점으로 복구되었습니다.', 'success');
+      } catch (err) {
+        console.error('Unified PITR failed:', err);
+        showAdminToast('복구 중 오류가 발생했습니다.', 'error');
       }
-
-      // Sync local state
-      setServerCalendars(prev => prev.map(c => c.id === calId ? restoredCal : c));
-      setMessagesMap(prev => ({
-        ...prev,
-        [calId]: (prev[calId] || []).filter(m => m.timestamp <= log.timestamp)
-      }));
-
-      showAdminToast('일정, 투표 및 채팅 로그가 해당 시점으로 복구되었습니다.', 'success');
-    } catch (err) {
-      console.error('Unified PITR failed:', err);
-      showAdminToast('복구 중 오류가 발생했습니다.', 'error');
-    }
+    });
   };
 
   // Message deletion from Admin Page
-  const handleDeleteMessageDirect = async (calId, msg) => {
-    const txt = `[${calId}] 다음 의견/채팅을 삭제하시겠습니까?\n"${msg.text || '[사진]'}"`;
-    if (!window.confirm(txt)) return;
-
+  const performDeleteMessage = async (calId, msg) => {
+    closeConfirmDialog();
     try {
       let ok = false;
       if (firebaseDb) {
@@ -3768,6 +3812,11 @@ function AdminDashboard({ initialCalendars }) {
       console.error(e);
       showAdminToast('삭제에 실패했습니다.', 'error');
     }
+  };
+
+  const handleDeleteMessageDirect = (calId, msg) => {
+    const txt = `[${calId}] 다음 의견/채팅을 삭제하시겠습니까? "${msg.text || '[사진]'}"`;
+    requestConfirm('의견/채팅 삭제', txt, () => performDeleteMessage(calId, msg));
   };
 
   // Calculations for Tab 1
@@ -3902,64 +3951,6 @@ function AdminDashboard({ initialCalendars }) {
       borderBottom: '1px solid #E2E8F0',
       paddingBottom: '10px'
     },
-    input: {
-      backgroundColor: '#F8FAFC',
-      border: '1px solid #E2E8F0',
-      borderRadius: '6px',
-      color: '#0F172A',
-      padding: '8px 12px',
-      fontSize: '0.88rem',
-      width: '100%',
-      outline: 'none',
-      transition: 'border-color 0.2s ease'
-    },
-    select: {
-      backgroundColor: '#FFFFFF',
-      border: '1px solid #E2E8F0',
-      borderRadius: '6px',
-      color: '#0F172A',
-      padding: '8px 14px',
-      fontSize: '0.88rem',
-      fontWeight: 'bold',
-      outline: 'none',
-      cursor: 'pointer'
-    },
-    btnPrimary: {
-      backgroundColor: '#3ECF8E',
-      color: '#053B26',
-      border: 'none',
-      borderRadius: '6px',
-      padding: '8px 16px',
-      fontSize: '0.88rem',
-      fontWeight: 'bold',
-      cursor: 'pointer',
-      transition: 'background-color 0.2s ease',
-      display: 'flex',
-      alignItems: 'center',
-      gap: '6px'
-    },
-    btnSecondary: {
-      backgroundColor: '#F1F5F9',
-      color: '#0F172A',
-      border: '1px solid #CBD5E1',
-      borderRadius: '6px',
-      padding: '8px 16px',
-      fontSize: '0.88rem',
-      fontWeight: 'bold',
-      cursor: 'pointer',
-      transition: 'all 0.2s ease'
-    },
-    btnDanger: {
-      backgroundColor: '#EF4444',
-      color: '#FFFFFF',
-      border: 'none',
-      borderRadius: '6px',
-      padding: '8px 16px',
-      fontSize: '0.88rem',
-      fontWeight: 'bold',
-      cursor: 'pointer',
-      transition: 'background-color 0.2s ease'
-    },
     metricValue: {
       fontSize: '1.6rem',
       fontWeight: '900',
@@ -3993,15 +3984,15 @@ function AdminDashboard({ initialCalendars }) {
           "캘린더 운영 현황을 실시간으로 확인하고, 지난 시점으로 데이터를 복구할 수 있습니다."
         )
       ),
-      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px' } },
-        /*#__PURE__*/React.createElement("a", { className: "btn", href: `${window.location.pathname}?id=kkot`, style: { ...styles.btnSecondary, textDecoration: 'none', display: 'flex', alignItems: 'center' } }, "kkot 달력"),
-        /*#__PURE__*/React.createElement("a", { className: "btn", href: `${window.location.pathname}?id=cw`, style: { ...styles.btnSecondary, textDecoration: 'none', display: 'flex', alignItems: 'center' } }, "cw 달력"),
+      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } },
+        /*#__PURE__*/React.createElement("a", { className: "btn btn-secondary", href: `${window.location.pathname}?id=kkot`, style: { textDecoration: 'none', display: 'flex', alignItems: 'center' } }, "kkot 달력"),
+        /*#__PURE__*/React.createElement("a", { className: "btn btn-secondary", href: `${window.location.pathname}?id=cw`, style: { textDecoration: 'none', display: 'flex', alignItems: 'center' } }, "cw 달력"),
         /*#__PURE__*/React.createElement("button", {
-          type: "button", className: "btn", style: styles.btnSecondary,
+          type: "button", className: "btn btn-secondary",
           onClick: () => { resetChangePwForm(); setIsChangePwOpen(true); }
         }, "🔒 비밀번호 변경"),
         /*#__PURE__*/React.createElement("button", {
-          type: "button", className: "btn", style: styles.btnSecondary,
+          type: "button", className: "btn btn-secondary",
           onClick: handleLogoutAdmin
         }, "로그아웃")
       )
@@ -4009,46 +4000,36 @@ function AdminDashboard({ initialCalendars }) {
 
     /* Admin password change modal */
     isChangePwOpen && /*#__PURE__*/React.createElement("div", {
-      style: {
-        position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 100000,
-        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px'
-      },
+      className: "modal-overlay",
       onClick: () => { setIsChangePwOpen(false); resetChangePwForm(); }
     },
       /*#__PURE__*/React.createElement("form", {
         onSubmit: handleChangePassword,
         onClick: e => e.stopPropagation(),
-        style: {
-          width: '100%', maxWidth: '340px', backgroundColor: '#FFFFFF', border: '1px solid #E2E8F0',
-          borderRadius: '16px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '12px',
-          boxShadow: '0 20px 40px -8px rgba(15,23,42,0.25)'
-        }
+        className: "modal-container",
+        style: { maxWidth: '340px', padding: '20px', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '12px' }
       },
-        /*#__PURE__*/React.createElement("div", { style: { fontSize: '1.05rem', fontWeight: 800, color: '#0F172A' } }, "🔒 관리자 비밀번호 변경"),
+        /*#__PURE__*/React.createElement("h3", { style: { fontSize: '1.05rem', fontWeight: 800, color: '#0F172A' } }, "🔒 관리자 비밀번호 변경"),
         /*#__PURE__*/React.createElement("input", {
-          type: "password", autoFocus: true, placeholder: "현재 비밀번호",
-          value: currentPwInput, onChange: e => setCurrentPwInput(e.target.value),
-          style: { padding: '11px 13px', borderRadius: '10px', border: '1px solid #E2E8F0', backgroundColor: '#F8FAFC', color: '#0F172A', fontSize: '0.9rem' }
+          type: "password", className: "form-input", style: { width: '100%' }, autoFocus: true, placeholder: "현재 비밀번호",
+          value: currentPwInput, onChange: e => setCurrentPwInput(e.target.value)
         }),
         /*#__PURE__*/React.createElement("input", {
-          type: "password", placeholder: "새 비밀번호 (4자 이상)",
-          value: newPwInput, onChange: e => setNewPwInput(e.target.value),
-          style: { padding: '11px 13px', borderRadius: '10px', border: '1px solid #E2E8F0', backgroundColor: '#F8FAFC', color: '#0F172A', fontSize: '0.9rem' }
+          type: "password", className: "form-input", style: { width: '100%' }, placeholder: "새 비밀번호 (4자 이상)",
+          value: newPwInput, onChange: e => setNewPwInput(e.target.value)
         }),
         /*#__PURE__*/React.createElement("input", {
-          type: "password", placeholder: "새 비밀번호 확인",
-          value: confirmPwInput, onChange: e => setConfirmPwInput(e.target.value),
-          style: { padding: '11px 13px', borderRadius: '10px', border: '1px solid #E2E8F0', backgroundColor: '#F8FAFC', color: '#0F172A', fontSize: '0.9rem' }
+          type: "password", className: "form-input", style: { width: '100%' }, placeholder: "새 비밀번호 확인",
+          value: confirmPwInput, onChange: e => setConfirmPwInput(e.target.value)
         }),
         pwError && /*#__PURE__*/React.createElement("div", { style: { color: '#DC2626', fontSize: '0.8rem' } }, pwError),
         /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px', marginTop: '4px' } },
           /*#__PURE__*/React.createElement("button", {
-            type: "button", style: { ...styles.btnSecondary, flex: 1 },
+            type: "button", className: "btn btn-secondary", style: { flex: 1 },
             onClick: () => { setIsChangePwOpen(false); resetChangePwForm(); }
           }, "취소"),
           /*#__PURE__*/React.createElement("button", {
-            type: "submit", disabled: isPwSubmitting,
-            style: { flex: 1, padding: '11px', borderRadius: '10px', border: 'none', backgroundColor: '#3ECF8E', color: '#053B26', fontWeight: 700, cursor: isPwSubmitting ? 'default' : 'pointer', opacity: isPwSubmitting ? 0.6 : 1 }
+            type: "submit", className: "btn btn-primary", style: { flex: 1 }, disabled: isPwSubmitting
           }, isPwSubmitting ? '변경 중...' : '변경하기')
         )
       )
@@ -4114,9 +4095,9 @@ function AdminDashboard({ initialCalendars }) {
             /*#__PURE__*/React.createElement("p", { style: { fontSize: '0.75rem', color: '#64748B', margin: '2px 0 0 0' } }, "각 캘린더별 의견남기기 및 대화방 메시지 내역을 실시간 모니터링하고 어드민 권한으로 삭제할 수 있습니다.")
           ),
           /*#__PURE__*/React.createElement("input", {
-            type: "text", placeholder: "캘린더ID, 이름, 메시지 검색...", value: chatSearchQuery,
+            type: "text", className: "form-input", placeholder: "캘린더ID, 이름, 메시지 검색...", value: chatSearchQuery,
             onChange: e => setChatSearchQuery(e.target.value),
-            style: { ...styles.input, maxWidth: '240px' }
+            style: { maxWidth: '240px' }
           })
         ),
 
@@ -4277,17 +4258,11 @@ function AdminDashboard({ initialCalendars }) {
     activeTab === 'settings' && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '20px' } },
       /* Calendar selector row */
       /*#__PURE__*/React.createElement("section", { style: { ...styles.card, padding: '16px 20px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' } },
-        /*#__PURE__*/React.createElement("span", { style: { fontWeight: '800', fontSize: '0.88rem', color: '#64748B' } }, "관리 대상 캘린더 선택:"),
-        /*#__PURE__*/React.createElement("select", {
-          value: selectedCalId, onChange: e => setSelectedCalId(e.target.value),
-          style: styles.select
-        },
-          calendarsList.map(cal => /*#__PURE__*/React.createElement("option", { key: cal.id, value: cal.id }, `${cal.title} (${cal.id})`))
-        ),
+        renderCalendarRadioGroup('관리 대상 캘린더 선택:', 'admin-settings-cal'),
 
         /* New Calendar creation button */
         /*#__PURE__*/React.createElement("button", {
-          type: "button", style: { ...styles.btnPrimary, marginLeft: 'auto', backgroundColor: '#10B981', color: '#FFFFFF' },
+          type: "button", className: "btn btn-primary", style: { marginLeft: 'auto' },
           onClick: handleCreateNewCalendarFromAdmin
         }, "+ 새 캘린더 생성")
       ),
@@ -4301,7 +4276,7 @@ function AdminDashboard({ initialCalendars }) {
           /*#__PURE__*/React.createElement("div", { style: { marginBottom: '12px' } },
             /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#64748B', marginBottom: '4px' } }, "캘린더 제목"),
             /*#__PURE__*/React.createElement("input", {
-              type: "text", className: "form-input", style: styles.input, value: calTitle,
+              type: "text", className: "form-input", style: { width: '100%' }, value: calTitle,
               onChange: e => setCalTitle(e.target.value), placeholder: "캘린더 제목"
             })
           ),
@@ -4310,7 +4285,7 @@ function AdminDashboard({ initialCalendars }) {
           /*#__PURE__*/React.createElement("div", { style: { marginBottom: '16px' } },
             /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#64748B', marginBottom: '4px' } }, "캘린더 설명"),
             /*#__PURE__*/React.createElement("input", {
-              type: "text", className: "form-input", style: styles.input, value: calDesc,
+              type: "text", className: "form-input", style: { width: '100%' }, value: calDesc,
               onChange: e => setCalDesc(e.target.value), placeholder: "캘린더 설명"
             })
           ),
@@ -4322,7 +4297,7 @@ function AdminDashboard({ initialCalendars }) {
             /* Add Row */
             /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px', marginBottom: '12px' } },
               /*#__PURE__*/React.createElement("input", {
-                type: "text", className: "form-input", style: styles.input, placeholder: "추가할 참여자 이름", value: newPartName,
+                type: "text", className: "form-input", style: { flex: 1 }, placeholder: "추가할 참여자 이름", value: newPartName,
                 ref: newPartNameRef, onChange: e => setNewPartName(e.target.value),
                 onKeyDown: e => {
                   if (e.key === 'Enter') {
@@ -4333,7 +4308,7 @@ function AdminDashboard({ initialCalendars }) {
                 }
               }),
               /*#__PURE__*/React.createElement("button", {
-                type: "button", className: "btn btn-secondary", style: { ...styles.btnSecondary, height: '34px', whiteSpace: 'nowrap' }, onClick: handleAddPart
+                type: "button", className: "btn btn-poll-create", style: { height: '44px', whiteSpace: 'nowrap' }, onClick: handleAddPart
               }, "추가")
             ),
 
@@ -4341,21 +4316,22 @@ function AdminDashboard({ initialCalendars }) {
             /*#__PURE__*/React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '8px', maxHeight: '200px', overflowY: 'auto', paddingRight: '4px' } },
               calParticipants.map(p => isTombstone(p) ? null : /*#__PURE__*/React.createElement("div", {
                 key: p.id,
-                style: { display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid #E2E8F0', padding: '6px 8px', borderRadius: '6px', backgroundColor: '#F8FAFC' }
+                style: { display: 'flex', alignItems: 'center', gap: '8px' }
               },
                 /* Color picker */
                 /*#__PURE__*/React.createElement("input", {
-                  type: "color", value: p.color, onChange: e => handleUpdatePart(p.id, { color: e.target.value }),
-                  style: { width: '26px', height: '26px', border: 'none', background: 'none', cursor: 'pointer', flexShrink: 0 }
+                  type: "color", className: "participant-color-input", value: p.color,
+                  onChange: e => handleUpdatePart(p.id, { color: e.target.value }),
+                  style: { width: '28px', height: '28px', border: 'none', background: 'none', cursor: 'pointer' }
                 }),
                 /* Name input */
                 /*#__PURE__*/React.createElement("input", {
-                  type: "text", className: "form-input", style: { ...styles.input, flex: 1, height: '26px', fontSize: '0.8rem', padding: '2px 6px' }, value: p.name,
+                  type: "text", className: "form-input", style: { flex: 1, height: '30px', fontSize: '0.82rem' }, value: p.name,
                   onChange: e => handleUpdatePart(p.id, { name: e.target.value })
                 }),
                 /* Remove trigger */
                 /*#__PURE__*/React.createElement("button", {
-                  type: "button", className: "btn btn-danger", style: { ...styles.btnDanger, padding: '2px 8px', height: '26px', fontSize: '0.75rem' },
+                  type: "button", className: "btn btn-danger", style: { padding: '4px 10px', height: '30px' },
                   onClick: () => handleUpdatePart(p.id, { removedAt: Date.now() })
                 }, "✕")
               ))
@@ -4364,7 +4340,7 @@ function AdminDashboard({ initialCalendars }) {
 
           /* Submit settings button */
           /*#__PURE__*/React.createElement("button", {
-            type: "button", className: "btn btn-primary", style: { ...styles.btnPrimary, width: '100%', height: '38px', justifyContent: 'center', marginTop: '20px' },
+            type: "button", className: "btn btn-primary", style: { width: '100%', height: '38px', justifyContent: 'center', marginTop: '20px' },
             onClick: handleSaveCalendarSettings
           }, "캘린더 프로필 및 참여자 설정 저장")
         ),
@@ -4375,7 +4351,7 @@ function AdminDashboard({ initialCalendars }) {
           /*#__PURE__*/React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', borderBottom: '1px solid #E2E8F0', paddingBottom: '8px' } },
             /*#__PURE__*/React.createElement("h4", { style: { fontSize: '0.96rem', fontWeight: '900', color: '#0F172A', margin: 0 } }, `🗳️ [${selectedCalId}] 투표 설정 및 어드민 전용 생성`),
             /*#__PURE__*/React.createElement("button", {
-              type: "button", style: styles.btnPrimary,
+              type: "button", className: "btn btn-primary",
               onClick: () => { setEditingPoll(null); setEditingPollCalId(selectedCalId); setIsPollModalOpen(true); }
             }, "+ 새 투표 생성")
           ),
@@ -4396,12 +4372,12 @@ function AdminDashboard({ initialCalendars }) {
               /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '6px' } },
                 /* Edit */
                 /*#__PURE__*/React.createElement("button", {
-                  type: "button", className: "btn btn-secondary", style: { ...styles.btnSecondary, padding: '4px 10px', fontSize: '0.75rem' },
+                  type: "button", className: "btn btn-secondary", style: { padding: '4px 10px', fontSize: '0.75rem' },
                   onClick: () => { setEditingPoll(poll); setEditingPollCalId(selectedCalId); setIsPollModalOpen(true); }
                 }, "수정"),
                 /* Delete */
                 /*#__PURE__*/React.createElement("button", {
-                  type: "button", className: "btn btn-danger", style: { ...styles.btnDanger, padding: '4px 10px', fontSize: '0.75rem' },
+                  type: "button", className: "btn btn-danger", style: { padding: '4px 10px', fontSize: '0.75rem' },
                   onClick: () => handleDeletePollFromAdminPage(selectedCalId, poll)
                 }, "삭제")
               )
@@ -4417,13 +4393,7 @@ function AdminDashboard({ initialCalendars }) {
     activeTab === 'recovery' && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '20px' } },
       /* Calendar selector row */
       /*#__PURE__*/React.createElement("section", { style: { ...styles.card, padding: '16px 20px', display: 'flex', alignItems: 'center', gap: '12px' } },
-        /*#__PURE__*/React.createElement("span", { style: { fontWeight: '800', fontSize: '0.88rem', color: '#64748B' } }, "복구할 캘린더 선택:"),
-        /*#__PURE__*/React.createElement("select", {
-          value: selectedCalId, onChange: e => setSelectedCalId(e.target.value),
-          style: styles.select
-        },
-          calendarsList.map(cal => /*#__PURE__*/React.createElement("option", { key: cal.id, value: cal.id }, `${cal.title} (${cal.id})`))
-        )
+        renderCalendarRadioGroup('복구할 캘린더 선택:', 'admin-recovery-cal')
       ),
 
       selectedCal ? /*#__PURE__*/React.createElement(React.Fragment, null,
@@ -4496,7 +4466,7 @@ function AdminDashboard({ initialCalendars }) {
                   /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.72rem', color: '#64748B', fontWeight: '500' } }, formatRegisteredAt(log.timestamp)),
                   /* Recovery trigger */
                   /*#__PURE__*/React.createElement("button", {
-                    type: "button", className: "btn", style: { ...styles.btnSecondary, padding: '4px 8px', fontSize: '0.72rem', color: '#059669', borderColor: '#E2E8F0' },
+                    type: "button", className: "btn btn-secondary", style: { padding: '4px 8px', fontSize: '0.72rem' },
                     onClick: () => handleRestoreToLogTimestamp(selectedCalId, log)
                   }, "이 시점으로 복구")
                 )
@@ -4511,8 +4481,8 @@ function AdminDashboard({ initialCalendars }) {
         /*#__PURE__*/React.createElement("div", { className: "admin-section-header" },
           /*#__PURE__*/React.createElement("div", { className: "summary-title" }, "JSON 백업 파일 관리"),
           /*#__PURE__*/React.createElement("div", { className: "admin-backup-actions" },
-            /*#__PURE__*/React.createElement("button", { className: "btn btn-secondary", style: styles.btnSecondary, onClick: () => handleDownloadBackup('') }, "전체 백업 다운로드"),
-            /*#__PURE__*/React.createElement("button", { className: "btn", style: isRestoreMode ? styles.btnDanger : styles.btnSecondary, onClick: handleImportClick },
+            /*#__PURE__*/React.createElement("button", { className: "btn btn-secondary", onClick: () => handleDownloadBackup('') }, "전체 백업 다운로드"),
+            /*#__PURE__*/React.createElement("button", { className: isRestoreMode ? "btn btn-danger" : "btn btn-secondary", onClick: handleImportClick },
               isRestoreMode ? "JSON 파일 불러오기" : "데이터 복구 모드 필요"
             )
           )
@@ -4529,7 +4499,7 @@ function AdminDashboard({ initialCalendars }) {
               `${stat.participants.length}명 참여자 · 활성일정 ${stat.schedules.length}건 · 투표 ${stat.pollCount}개`
             ),
             /*#__PURE__*/React.createElement("button", {
-              className: "btn", style: { ...styles.btnSecondary, fontSize: '0.76rem', padding: '4px 10px' },
+              className: "btn btn-secondary", style: { fontSize: '0.76rem', padding: '4px 10px' },
               onClick: () => handleDownloadBackup(stat.calendar.id)
             }, `${stat.calendar.id} JSON 다운로드`)
           ))
@@ -4578,7 +4548,129 @@ function AdminDashboard({ initialCalendars }) {
         setEditingPoll(null);
         setEditingPollCalId(null);
       }
+    }),
+
+    /* Generic layer-popup confirm dialog (replaces window.confirm) */
+    confirmDialog && /*#__PURE__*/React.createElement(ConfirmDialog, {
+      title: confirmDialog.title,
+      message: confirmDialog.message,
+      onConfirm: confirmDialog.onConfirm,
+      onCancel: closeConfirmDialog
+    }),
+
+    /* New calendar creation modal (replaces window.prompt) */
+    isCreateCalModalOpen && /*#__PURE__*/React.createElement(AdminCreateCalendarModal, {
+      onCreate: submitCreateCalendar,
+      onClose: () => setIsCreateCalModalOpen(false)
+    }),
+
+    /* Restore-mode confirmation phrase modal (replaces window.prompt) */
+    isRestorePhraseModalOpen && /*#__PURE__*/React.createElement(AdminRestorePhraseModal, {
+      onConfirm: submitRestorePhrase,
+      onClose: () => setIsRestorePhraseModalOpen(false)
     })
+  );
+}
+
+function AdminCreateCalendarModal({ onCreate, onClose }) {
+  const [id, setId] = React.useState('cal_' + Date.now().toString().slice(-4));
+  const [title, setTitle] = React.useState('');
+  const [error, setError] = React.useState('');
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    setError('');
+    try {
+      const result = await onCreate(id, title);
+      if (result) setError(result);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return /*#__PURE__*/React.createElement("div", {
+    className: "modal-overlay",
+    onClick: onClose,
+    style: { zIndex: 10000 }
+  },
+    /*#__PURE__*/React.createElement("form", {
+      onSubmit: handleSubmit,
+      onClick: e => e.stopPropagation(),
+      className: "modal-container",
+      style: { maxWidth: '360px', padding: '20px', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '12px' }
+    },
+      /*#__PURE__*/React.createElement("h3", { style: { fontSize: '1.05rem', fontWeight: 800, color: '#0F172A' } }, "+ 새 캘린더 생성"),
+      /*#__PURE__*/React.createElement("div", null,
+        /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#64748B', marginBottom: '4px' } }, "캘린더 ID (예: kkot, cw, trip)"),
+        /*#__PURE__*/React.createElement("input", {
+          type: "text", className: "form-input", style: { width: '100%' }, autoFocus: true,
+          value: id, onChange: e => setId(e.target.value), disabled: isSubmitting
+        })
+      ),
+      /*#__PURE__*/React.createElement("div", null,
+        /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#64748B', marginBottom: '4px' } }, "캘린더 제목"),
+        /*#__PURE__*/React.createElement("input", {
+          type: "text", className: "form-input", style: { width: '100%' }, placeholder: `${id} 모임 캘린더`,
+          value: title, onChange: e => setTitle(e.target.value), disabled: isSubmitting
+        })
+      ),
+      error && /*#__PURE__*/React.createElement("div", { style: { color: '#DC2626', fontSize: '0.82rem' } }, error),
+      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px', marginTop: '4px' } },
+        /*#__PURE__*/React.createElement("button", {
+          type: "button", className: "btn btn-secondary", style: { flex: 1, height: '38px' },
+          onClick: onClose, disabled: isSubmitting
+        }, "취소"),
+        /*#__PURE__*/React.createElement("button", {
+          type: "submit", className: "btn btn-primary", style: { flex: 1, height: '38px' },
+          disabled: isSubmitting
+        }, isSubmitting ? '생성 중...' : '생성')
+      )
+    )
+  );
+}
+
+function AdminRestorePhraseModal({ onConfirm, onClose }) {
+  const [phrase, setPhrase] = React.useState('');
+  const [error, setError] = React.useState('');
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const result = onConfirm(phrase);
+    if (result) setError(result);
+  };
+
+  return /*#__PURE__*/React.createElement("div", {
+    className: "modal-overlay",
+    onClick: onClose,
+    style: { zIndex: 10000 }
+  },
+    /*#__PURE__*/React.createElement("form", {
+      onSubmit: handleSubmit,
+      onClick: e => e.stopPropagation(),
+      className: "modal-container",
+      style: { maxWidth: '380px', padding: '20px', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '12px' }
+    },
+      /*#__PURE__*/React.createElement("h3", { style: { fontSize: '1.05rem', fontWeight: 800, color: '#0F172A' } }, "운영 데이터 복구 확인"),
+      /*#__PURE__*/React.createElement("p", { style: { fontSize: '0.85rem', color: '#475569', lineHeight: '1.5' } },
+        '백업 JSON 복구는 현재 운영 데이터를 교체합니다. 계속하려면 아래에 "운영 데이터 복구"를 정확히 입력하세요.'
+      ),
+      /*#__PURE__*/React.createElement("input", {
+        type: "text", className: "form-input", style: { width: '100%' }, autoFocus: true,
+        value: phrase, onChange: e => setPhrase(e.target.value), placeholder: "운영 데이터 복구"
+      }),
+      error && /*#__PURE__*/React.createElement("div", { style: { color: '#DC2626', fontSize: '0.82rem' } }, error),
+      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px', marginTop: '4px' } },
+        /*#__PURE__*/React.createElement("button", {
+          type: "button", className: "btn btn-secondary", style: { flex: 1, height: '38px' }, onClick: onClose
+        }, "취소"),
+        /*#__PURE__*/React.createElement("button", {
+          type: "submit", className: "btn btn-danger", style: { flex: 1, height: '38px' }
+        }, "복구 진행")
+      )
+    )
   );
 }
 
@@ -4626,34 +4718,26 @@ function AdminLoginGate({ children }) {
   },
     /*#__PURE__*/React.createElement("form", {
       onSubmit: handleSubmit,
-      style: {
-        width: '100%', maxWidth: '320px', backgroundColor: '#FFFFFF', border: '1px solid #E2E8F0',
-        borderRadius: '16px', padding: '28px', display: 'flex', flexDirection: 'column', gap: '14px',
-        boxShadow: '0 4px 6px -1px rgba(15,23,42,0.05), 0 2px 4px -1px rgba(15,23,42,0.03)'
-      }
+      className: "modal-container",
+      style: { maxWidth: '320px', padding: '28px', borderRadius: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }
     },
       /*#__PURE__*/React.createElement("div", { style: { fontSize: '1.1rem', fontWeight: 800, color: '#0F172A' } }, "🔒 관리자 인증"),
       /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.82rem', color: '#64748B' } }, "비밀번호를 입력해 주세요."),
       /*#__PURE__*/React.createElement("input", {
         type: "password",
+        className: "form-input",
+        style: { width: '100%' },
         autoFocus: true,
         value: passwordInput,
         onChange: e => setPasswordInput(e.target.value),
-        placeholder: "비밀번호",
-        style: {
-          padding: '12px 14px', borderRadius: '10px', border: '1px solid #E2E8F0',
-          backgroundColor: '#F8FAFC', color: '#0F172A', fontSize: '0.95rem'
-        }
+        placeholder: "비밀번호"
       }),
       error && /*#__PURE__*/React.createElement("div", { style: { color: '#DC2626', fontSize: '0.82rem' } }, error),
       /*#__PURE__*/React.createElement("button", {
         type: "submit",
+        className: "btn btn-primary",
         disabled: isSubmitting || !passwordInput.trim(),
-        style: {
-          padding: '12px', borderRadius: '10px', border: 'none', backgroundColor: '#3ECF8E',
-          color: '#053B26', fontWeight: 700, cursor: isSubmitting ? 'default' : 'pointer',
-          opacity: isSubmitting || !passwordInput.trim() ? 0.6 : 1
-        }
+        style: { opacity: isSubmitting || !passwordInput.trim() ? 0.6 : 1 }
       }, isSubmitting ? '확인 중...' : '입장')
     )
   );
