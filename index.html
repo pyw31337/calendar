@@ -760,66 +760,6 @@
       margin-bottom: 14px;
     }
     .admin-section-header .summary-title { margin-bottom: 0; }
-    .admin-calendar-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 12px;
-    }
-    .admin-calendar-card {
-      display: grid;
-      grid-template-columns: minmax(0, 1.15fr) minmax(140px, 0.85fr);
-      gap: 14px;
-      align-items: start;
-      padding: 16px;
-      background: #FFFFFF;
-      border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-md);
-      color: var(--text-main);
-      text-decoration: none;
-      transition: all 0.2s ease;
-    }
-    .admin-calendar-card:hover {
-      background: #F8FAFC;
-      border-color: var(--accent-primary);
-      transform: translateY(-1px);
-    }
-    .admin-calendar-title {
-      font-size: 1rem;
-      font-weight: 900;
-      margin-bottom: 8px;
-      word-break: break-word;
-      overflow-wrap: anywhere;
-    }
-    .admin-calendar-desc {
-      color: var(--text-muted);
-      font-size: 0.84rem;
-      line-height: 1.55;
-      margin-bottom: 10px;
-    }
-    .admin-metric-chips {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-    }
-    .admin-metric-chip {
-      display: inline-flex;
-      align-items: center;
-      min-height: 26px;
-      padding: 4px 9px;
-      border-radius: var(--radius-full);
-      background: #F1F5F9;
-      color: var(--text-main);
-      font-size: 0.76rem;
-      font-weight: 850;
-      white-space: nowrap;
-    }
-    .admin-participant-cloud {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      justify-content: flex-end;
-      align-content: flex-start;
-    }
     .admin-progress {
       width: 100%;
       height: 8px;
@@ -882,15 +822,7 @@
       flex-wrap: wrap;
       gap: 8px;
     }
-    @media (max-width: 760px) {
-      .admin-calendar-card {
-        grid-template-columns: 1fr;
-      }
-      .admin-participant-cloud {
-        justify-content: flex-start;
-      }
-    }
-    
+
     .date-item-btn {
       width: 100%; display: flex; flex-direction: column; align-items: flex-start; padding: 12px 14px;
       background: #FFFFFF; border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
@@ -2782,7 +2714,11 @@ async function fetchRecentMessagesRest(calId) {
 
 async function fetchChatMessagesRest(calId) {
   try {
-    const url = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/calendars/cal_${calId}/messages?orderBy=timestamp%20asc`;
+    // Queried newest-first + explicit pageSize (mirroring the live onSnapshot query) so this
+    // always captures the most recent messages rather than relying on the Firestore REST
+    // List Documents endpoint's undocumented default page size, which could otherwise cap
+    // an unordered/ascending fetch at the OLDEST messages once a calendar grows large.
+    const url = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/calendars/cal_${calId}/messages?orderBy=timestamp%20desc&pageSize=100`;
     const res = await fetch(url);
     if (!res.ok) return [];
     const data = await res.json();
@@ -2790,7 +2726,7 @@ async function fetchChatMessagesRest(calId) {
     return docs.map(doc => ({
       id: doc.name.split('/').pop(),
       ...firestoreDocumentToJs(doc)
-    }));
+    })).reverse();
   } catch (err) {
     console.warn('fetchChatMessagesRest error:', err);
     return [];
@@ -5411,9 +5347,13 @@ function App() {
         });
       });
 
-    // 2. Subscribe to chat room history (ascending for chat window)
+    // 2. Subscribe to chat room history. Queried newest-first + limit so the window
+    // tracks the most recent 100 messages as new ones arrive, then reversed back to
+    // ascending order for rendering -- querying oldest-first + limit would instead pin
+    // the window to the first 100 messages ever sent, silently hiding anything newer
+    // once a calendar passes that many total messages.
     const unsubscribeChat = firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages')
-      .orderBy('timestamp', 'asc')
+      .orderBy('timestamp', 'desc')
       .limit(100)
       .onSnapshot(snapshot => {
         if (!isMounted) return;
@@ -5421,6 +5361,7 @@ function App() {
         snapshot.forEach(doc => {
           list.push({ id: doc.id, ...doc.data() });
         });
+        list.reverse();
         setChatMessages(list);
       }, err => {
         console.warn(`Firestore chat history subscription error:`, err);
