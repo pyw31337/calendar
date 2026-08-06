@@ -7035,10 +7035,13 @@ function setChatLastReadTimestamp(calendarId, timestamp) {
   }
 }
 
-// Link preview (OpenGraph via microlink.io's free public API -- no key, client-side fetch
-// since this is a static site with no backend to crawl links server-side). Cached at module
-// scope (by URL) so re-renders and repeated occurrences of the same link don't refetch, and
-// in-flight requests are deduped across simultaneously-mounting message bubbles.
+// Link preview (OpenGraph via peekalink.io's API, client-side fetch since this is a static
+// site with no backend to crawl links server-side). Cached at module scope (by URL) so
+// re-renders and repeated occurrences of the same link don't refetch, and in-flight requests
+// are deduped across simultaneously-mounting message bubbles.
+// Uses a per-account free-tier API key (dedicated quota, not shared globally like an
+// anonymous/no-key API) -- see https://peekalink.io.
+const PEEKALINK_API_KEY = 'sk_w8czszf1m50xm1pbuknazw60recwmc2q';
 const linkPreviewCache = new Map();
 const linkPreviewInflight = new Map();
 async function fetchLinkPreview(url) {
@@ -7046,22 +7049,24 @@ async function fetchLinkPreview(url) {
   if (linkPreviewInflight.has(url)) return linkPreviewInflight.get(url);
   const promise = (async () => {
     try {
-      const res = await fetch(`https://api.microlink.com/?url=${encodeURIComponent(url)}&meta=false`);
-      if (!res.ok) throw new Error('microlink request failed');
+      const res = await fetch('https://api.peekalink.io/', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${PEEKALINK_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ link: url })
+      });
       const json = await res.json();
-      if (json.status !== 'success' || !json.data) throw new Error('no preview data');
-      const d = json.data;
-      let siteName = d.publisher || '';
-      if (!siteName) {
-        try { siteName = new URL(url).hostname; } catch (e) { siteName = ''; }
-      }
+      if (!json.ok) throw new Error(json.message || 'peekalink request failed');
+      const image = json.image?.medium?.url || json.image?.large?.url || json.image?.thumbnail?.url || json.icon?.url || '';
       const result = {
-        status: (d.title || d.image?.url) ? 'success' : 'empty',
+        status: (json.title || image) ? 'success' : 'empty',
         data: {
-          title: d.title || '',
-          description: d.description || '',
-          image: d.image?.url || d.logo?.url || '',
-          siteName
+          title: json.title || '',
+          description: json.description || '',
+          image,
+          siteName: json.domain || ''
         }
       };
       linkPreviewCache.set(url, result);
@@ -7096,11 +7101,6 @@ function useLinkPreview(url) {
     };
   }, [url]);
   return state;
-}
-function extractFirstUrl(text) {
-  if (!text) return null;
-  const m = text.match(/https?:\/\/[^\s]+/);
-  return m ? m[0] : null;
 }
 function LinkPreviewCard({ url }) {
   const preview = useLinkPreview(url);
@@ -7536,7 +7536,6 @@ function CommentsSection({
   /*#__PURE__*/React.createElement("div", {
     style: {
       backgroundColor: '#F8FAFC',
-      border: '1px solid #E2E8F0',
       borderRadius: '12px',
       padding: '12px',
       minHeight: '48px'
@@ -7572,8 +7571,8 @@ function CommentsSection({
       /*#__PURE__*/React.createElement('line', { x1: '6', y1: '6', x2: '18', y2: '18' })
     );
 
-    /* === UNIFIED CARD LAYOUT (badge top-left, full-width bubble, bottom-right
-       meta row: edit/delete hidden until hover/tap, then push the timestamp aside) === */
+    /* === UNIFIED CARD LAYOUT (badge + edit/delete on one header row, full-width bubble
+       below, single-line timestamp bottom-right) === */
     return /*#__PURE__*/React.createElement('div', {
       key: msg.id,
       className: `msg-row-hover ${revealedMsgId === msg.id ? 'msg-actions-revealed' : ''}`,
@@ -7584,29 +7583,13 @@ function CommentsSection({
         gap: '6px'
       }
     },
-      /* Name Badge */
-      /*#__PURE__*/React.createElement('span', {
-        style: { alignSelf: 'flex-start', backgroundColor: badgeColor, color: '#FFFFFF', padding: '3px 10px', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 'bold', whiteSpace: 'nowrap' }
-      }, badgeName),
-      /* Full-width bubble with top tail pointing to name badge */
-      /*#__PURE__*/React.createElement('div', { style: { position: 'relative', marginTop: '2px' } },
-        /* Outer tail (border color) */
-        /*#__PURE__*/React.createElement('div', {
-          style: { position: 'absolute', top: '-7px', left: '18px', width: 0, height: 0, borderLeft: '7px solid transparent', borderRight: '7px solid transparent', borderBottom: '7px solid #E2E8F0', zIndex: 2 }
-        }),
-        /* Inner tail (white fill) */
-        /*#__PURE__*/React.createElement('div', {
-          style: { position: 'absolute', top: '-5px', left: '19px', width: 0, height: 0, borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderBottom: '6px solid #FFFFFF', zIndex: 3 }
-        }),
-        /* Bubble container */
-        /*#__PURE__*/React.createElement('div', {
-          style: { backgroundColor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '10px 12px', fontSize: '0.85rem', lineHeight: '1.4', color: '#1E293B', wordBreak: 'break-all', whiteSpace: 'pre-wrap', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', position: 'relative', zIndex: 1 }
-        }, bubbleContent)
-      ),
-      /* Bottom-right meta row: hidden edit/delete (revealed on hover/tap) pushes the timestamp aside */
+      /* Header row: name badge left, edit/delete (hidden until hover/tap) top-right */
       /*#__PURE__*/React.createElement('div', {
-        style: { display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '6px' }
+        style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }
       },
+        /*#__PURE__*/React.createElement('span', {
+          style: { backgroundColor: badgeColor, color: '#FFFFFF', padding: '3px 10px', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 'bold', whiteSpace: 'nowrap' }
+        }, badgeName),
         isMsgMe ? /*#__PURE__*/React.createElement('div', {
           className: 'msg-actions-group',
           style: { display: 'flex', alignItems: 'center', gap: '4px' }
@@ -7621,13 +7604,27 @@ function CommentsSection({
             type: 'button', onClick: () => onDeleteMessage && onDeleteMessage(msg), title: '삭제',
             style: { width: '22px', height: '22px', border: 'none', background: 'none', padding: 0, cursor: 'pointer', color: '#94A3B8', display: 'flex', alignItems: 'center', justifyContent: 'center' }
           }, deleteSvg)
-        ) : null,
-        /* Date/Time Text */
-        /*#__PURE__*/React.createElement('div', { style: { fontSize: '0.72rem', color: '#94A3B8', lineHeight: '1.3', textAlign: 'right' } },
-          /*#__PURE__*/React.createElement('div', null, dateInfo.dateStr.replace('(', ' (')),
-          /*#__PURE__*/React.createElement('div', null, dateInfo.timeStr)
-        )
-      )
+        ) : null
+      ),
+      /* Full-width bubble with top tail pointing to name badge */
+      /*#__PURE__*/React.createElement('div', { style: { position: 'relative', marginTop: '2px' } },
+        /* Outer tail (border color) */
+        /*#__PURE__*/React.createElement('div', {
+          style: { position: 'absolute', top: '-7px', left: '18px', width: 0, height: 0, borderLeft: '7px solid transparent', borderRight: '7px solid transparent', borderBottom: '7px solid #E2E8F0', zIndex: 2 }
+        }),
+        /* Inner tail (white fill) */
+        /*#__PURE__*/React.createElement('div', {
+          style: { position: 'absolute', top: '-5px', left: '19px', width: 0, height: 0, borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderBottom: '6px solid #FFFFFF', zIndex: 3 }
+        }),
+        /* Bubble container */
+        /*#__PURE__*/React.createElement('div', {
+          style: { backgroundColor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '10px 12px', fontSize: '0.85rem', lineHeight: '1.4', color: '#1E293B', wordBreak: 'keep-all', overflowWrap: 'break-word', whiteSpace: 'pre-wrap', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', position: 'relative', zIndex: 1 }
+        }, bubbleContent)
+      ),
+      /* Bottom-right timestamp, single line */
+      /*#__PURE__*/React.createElement('div', {
+        style: { fontSize: '0.72rem', color: '#94A3B8', textAlign: 'right' }
+      }, `${dateInfo.dateStr.replace('(', ' (')} ${dateInfo.timeStr}`)
     );
   }),
   /* Full Width "이전 채팅 더보기" Button at bottom of list */
@@ -8180,7 +8177,8 @@ function ChatRoomView({
         fontSize: '0.9rem',
         lineHeight: '1.4',
         color: '#1E293B',
-        wordBreak: 'break-all',
+        wordBreak: 'keep-all',
+        overflowWrap: 'break-word',
         whiteSpace: 'pre-wrap',
         boxShadow: '0 2px 6px rgba(0,0,0,0.06)'
       }
@@ -8222,7 +8220,8 @@ function ChatRoomView({
         fontSize: '0.9rem',
         lineHeight: '1.4',
         color: '#1E293B',
-        wordBreak: 'break-all',
+        wordBreak: 'keep-all',
+        overflowWrap: 'break-word',
         whiteSpace: 'pre-wrap',
         boxShadow: '0 2px 6px rgba(0,0,0,0.06)'
       }
