@@ -7035,14 +7035,13 @@ function setChatLastReadTimestamp(calendarId, timestamp) {
   }
 }
 
-// Link preview (OpenGraph via microlink.io's public API, client-side fetch since this is a
-// static site with no backend to crawl links server-side). Cached at module scope (by URL) so
+// Link preview (OpenGraph via peekalink.io's API, client-side fetch since this is a static
+// site with no backend to crawl links server-side). Cached at module scope (by URL) so
 // re-renders and repeated occurrences of the same link don't refetch, and in-flight requests
 // are deduped across simultaneously-mounting message bubbles.
-// The anonymous (no-key) tier shares a global 25 req/min quota across every microlink.io caller
-// on the internet, so previews can silently fail to load under real traffic. API keys require a
-// paid Pro plan (https://microlink.io/pricing) -- set one here if that's ever purchased.
-const MICROLINK_API_KEY = '';
+// Uses a per-account free-tier API key (dedicated quota, not shared globally like an
+// anonymous/no-key API) -- see https://peekalink.io.
+const PEEKALINK_API_KEY = 'sk_w8czszf1m50xm1pbuknazw60recwmc2q';
 const linkPreviewCache = new Map();
 const linkPreviewInflight = new Map();
 async function fetchLinkPreview(url) {
@@ -7050,23 +7049,24 @@ async function fetchLinkPreview(url) {
   if (linkPreviewInflight.has(url)) return linkPreviewInflight.get(url);
   const promise = (async () => {
     try {
-      const keyParam = MICROLINK_API_KEY ? `&apiKey=${encodeURIComponent(MICROLINK_API_KEY)}` : '';
-      const res = await fetch(`https://api.microlink.com/?url=${encodeURIComponent(url)}&meta=false${keyParam}`);
-      if (!res.ok) throw new Error('microlink request failed');
+      const res = await fetch('https://api.peekalink.io/', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${PEEKALINK_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ link: url })
+      });
       const json = await res.json();
-      if (json.status !== 'success' || !json.data) throw new Error('no preview data');
-      const d = json.data;
-      let siteName = d.publisher || '';
-      if (!siteName) {
-        try { siteName = new URL(url).hostname; } catch (e) { siteName = ''; }
-      }
+      if (!json.ok) throw new Error(json.message || 'peekalink request failed');
+      const image = json.image?.medium?.url || json.image?.large?.url || json.image?.thumbnail?.url || json.icon?.url || '';
       const result = {
-        status: (d.title || d.image?.url) ? 'success' : 'empty',
+        status: (json.title || image) ? 'success' : 'empty',
         data: {
-          title: d.title || '',
-          description: d.description || '',
-          image: d.image?.url || d.logo?.url || '',
-          siteName
+          title: json.title || '',
+          description: json.description || '',
+          image,
+          siteName: json.domain || ''
         }
       };
       linkPreviewCache.set(url, result);
