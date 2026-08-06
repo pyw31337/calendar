@@ -2703,6 +2703,8 @@ async function sendChatMessageRest(calId, message) {
     };
     if (message.imageUrl) fields.imageUrl = jsToFirestoreValue(message.imageUrl);
     if (message.thumbUrl) fields.thumbUrl = jsToFirestoreValue(message.thumbUrl);
+    if (Array.isArray(message.imageUrls) && message.imageUrls.length > 0) fields.imageUrls = jsToFirestoreValue(message.imageUrls);
+    if (Array.isArray(message.thumbUrls) && message.thumbUrls.length > 0) fields.thumbUrls = jsToFirestoreValue(message.thumbUrls);
     const payload = { fields };
     const res = await fetch(url, {
       method: 'POST',
@@ -2733,6 +2735,8 @@ async function updateMessageRest(calId, messageId, data) {
     if (data.text !== undefined) fields.text = jsToFirestoreValue(data.text);
     if (data.imageUrl !== undefined) fields.imageUrl = jsToFirestoreValue(data.imageUrl);
     if (data.thumbUrl !== undefined) fields.thumbUrl = jsToFirestoreValue(data.thumbUrl);
+    if (data.imageUrls !== undefined) fields.imageUrls = jsToFirestoreValue(data.imageUrls);
+    if (data.thumbUrls !== undefined) fields.thumbUrls = jsToFirestoreValue(data.thumbUrls);
     const updateMask = Object.keys(fields).map(k => `updateMask.fieldPaths=${k}`).join('&');
     const url = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/calendars/cal_${calId}/messages/${messageId}?${updateMask}`;
     const res = await fetch(url, {
@@ -4007,8 +4011,7 @@ function AdminDashboard({ initialCalendars }) {
         ok = await deleteMessageRest(calId, msg.id);
       }
       if (ok) {
-        deleteChatImageFromStorage(msg.imageUrl);
-        deleteChatImageFromStorage(msg.thumbUrl);
+        deleteAllChatImagesFromStorage(msg);
         showAdminToast('의견이 삭제되었습니다.', 'success');
         setMessagesMap(prev => ({
           ...prev,
@@ -5415,37 +5418,60 @@ function App() {
           ok = await sendChatMessageRest(activeCalId, messageData);
         }
       } else {
-        // Send first image with optional text
-        const firstImageUrls = await resolveChatImageUrls(activeCalId, chatImages[0]);
-        const firstMessage = {
-          participantId: chatParticipantId,
-          text: chatInput.trim(),
-          imageUrl: firstImageUrls.imageUrl,
-          thumbUrl: firstImageUrls.thumbUrl,
-          timestamp: Date.now()
-        };
-        if (firebaseDb) {
-          await firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages').add(firstMessage);
-          ok = true;
-        } else {
-          ok = await sendChatMessageRest(activeCalId, firstMessage);
-        }
+        const resolvedImages = await Promise.all(chatImages.map(img => resolveChatImageUrls(activeCalId, img)));
+        // Only bundle images into one multi-thumbnail message when every one of them made it
+        // to Storage (short download URLs). If Storage is unavailable and any image fell back
+        // to an embedded base64 data URL, keep the legacy one-message-per-image behavior so a
+        // single message document never has to carry dozens of base64 images at once.
+        const allStorageBacked = resolvedImages.every(r => isStorageDownloadUrl(r.imageUrl));
 
-        // Send subsequent images sequentially
-        if (ok && imageCount > 1) {
-          for (let i = 1; i < imageCount; i++) {
-            const extraImageUrls = await resolveChatImageUrls(activeCalId, chatImages[i]);
-            const extraMessage = {
-              participantId: chatParticipantId,
-              text: '',
-              imageUrl: extraImageUrls.imageUrl,
-              thumbUrl: extraImageUrls.thumbUrl,
-              timestamp: Date.now() + i
-            };
-            if (firebaseDb) {
-              await firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages').add(extraMessage);
-            } else {
-              await sendChatMessageRest(activeCalId, extraMessage);
+        if (allStorageBacked && resolvedImages.length > 1) {
+          const messageData = {
+            participantId: chatParticipantId,
+            text: chatInput.trim(),
+            imageUrl: resolvedImages[0].imageUrl,
+            thumbUrl: resolvedImages[0].thumbUrl,
+            imageUrls: resolvedImages.map(r => r.imageUrl),
+            thumbUrls: resolvedImages.map(r => r.thumbUrl),
+            timestamp: Date.now()
+          };
+          if (firebaseDb) {
+            await firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages').add(messageData);
+            ok = true;
+          } else {
+            ok = await sendChatMessageRest(activeCalId, messageData);
+          }
+        } else {
+          // Send first image with optional text
+          const firstMessage = {
+            participantId: chatParticipantId,
+            text: chatInput.trim(),
+            imageUrl: resolvedImages[0].imageUrl,
+            thumbUrl: resolvedImages[0].thumbUrl,
+            timestamp: Date.now()
+          };
+          if (firebaseDb) {
+            await firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages').add(firstMessage);
+            ok = true;
+          } else {
+            ok = await sendChatMessageRest(activeCalId, firstMessage);
+          }
+
+          // Send subsequent images sequentially
+          if (ok && resolvedImages.length > 1) {
+            for (let i = 1; i < resolvedImages.length; i++) {
+              const extraMessage = {
+                participantId: chatParticipantId,
+                text: '',
+                imageUrl: resolvedImages[i].imageUrl,
+                thumbUrl: resolvedImages[i].thumbUrl,
+                timestamp: Date.now() + i
+              };
+              if (firebaseDb) {
+                await firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages').add(extraMessage);
+              } else {
+                await sendChatMessageRest(activeCalId, extraMessage);
+              }
             }
           }
         }
@@ -5479,7 +5505,7 @@ function App() {
 
   const handleConfirmDeleteMessage = async () => {
     if (!deletingMessage) return;
-    const { id, calId, imageUrl, thumbUrl } = deletingMessage;
+    const { id, calId } = deletingMessage;
     try {
       let ok = false;
       if (firebaseDb) {
@@ -5489,8 +5515,7 @@ function App() {
         ok = await deleteMessageRest(calId, id);
       }
       if (ok) {
-        deleteChatImageFromStorage(imageUrl);
-        deleteChatImageFromStorage(thumbUrl);
+        deleteAllChatImagesFromStorage(deletingMessage);
         if (!firebaseDb) {
           fetchRecentMessagesRest(calId).then(list => setRecentMessages(list));
           fetchChatMessagesRest(calId).then(list => setChatMessages(list));
@@ -5513,7 +5538,8 @@ function App() {
 
   const handleSaveEditMessage = async (newText, newImage) => {
     if (!editingMessage) return;
-    const { id, calId, imageUrl: previousImageUrl, thumbUrl: previousThumbUrl } = editingMessage;
+    const { id, calId } = editingMessage;
+    const hadImageArray = Array.isArray(editingMessage.imageUrls) && editingMessage.imageUrls.length > 0;
     try {
       const data = { text: newText };
       let replacedImage = false;
@@ -5528,6 +5554,12 @@ function App() {
         data.thumbUrl = '';
         replacedImage = true;
       }
+      // Editing only ever produces a single replacement image; drop any stale multi-image
+      // array so rendering doesn't keep showing the old photo grid over the new single image.
+      if (replacedImage && hadImageArray) {
+        data.imageUrls = [];
+        data.thumbUrls = [];
+      }
       let ok = false;
       if (firebaseDb) {
         await firebaseDb.collection('calendars').doc(`cal_${calId}`).collection('messages').doc(id).update(data);
@@ -5537,8 +5569,7 @@ function App() {
       }
       if (ok) {
         if (replacedImage) {
-          deleteChatImageFromStorage(previousImageUrl);
-          deleteChatImageFromStorage(previousThumbUrl);
+          deleteAllChatImagesFromStorage(editingMessage);
         }
         if (!firebaseDb) {
           fetchRecentMessagesRest(calId).then(list => setRecentMessages(list));
@@ -6757,6 +6788,18 @@ async function deleteChatImageFromStorage(url) {
   }
 }
 
+// Cleans up every Storage object attached to a message being deleted, covering both the
+// legacy single-image fields and the imageUrls/thumbUrls arrays used by multi-image messages.
+function deleteAllChatImagesFromStorage(msg) {
+  if (!msg) return;
+  const urls = new Set();
+  if (msg.imageUrl) urls.add(msg.imageUrl);
+  if (msg.thumbUrl) urls.add(msg.thumbUrl);
+  if (Array.isArray(msg.imageUrls)) msg.imageUrls.forEach(u => u && urls.add(u));
+  if (Array.isArray(msg.thumbUrls)) msg.thumbUrls.forEach(u => u && urls.add(u));
+  urls.forEach(url => deleteChatImageFromStorage(url));
+}
+
 function ChatSectionIcon() {
   return /*#__PURE__*/React.createElement("svg", {
     xmlns: "http://www.w3.org/2000/svg",
@@ -6828,6 +6871,32 @@ function formatChatDividerDate(timestamp) {
   const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
   const dayName = dayNames[date.getDay()];
   return `${year}.${month}.${day}(${dayName})`;
+}
+
+// Renders a chat message's attached image(s): a single thumbnail for legacy/one-image
+// messages, or a wrapping grid of thumbnails for messages sent with multiple images
+// (msg.imageUrls/msg.thumbUrls). Returns null when the message has no image at all.
+function renderChatMessageImages(msg, setActiveLightboxUrl, singleImageStyle = {}) {
+  const urls = Array.isArray(msg.imageUrls) && msg.imageUrls.length > 0 ? msg.imageUrls : (msg.imageUrl ? [msg.imageUrl] : []);
+  const thumbs = Array.isArray(msg.thumbUrls) && msg.thumbUrls.length > 0 ? msg.thumbUrls : (msg.thumbUrl ? [msg.thumbUrl] : []);
+  if (thumbs.length === 0) return null;
+  if (thumbs.length === 1) {
+    return /*#__PURE__*/React.createElement('img', {
+      src: thumbs[0],
+      alt: '첨부이미지',
+      onClick: () => setActiveLightboxUrl && setActiveLightboxUrl(urls[0] || thumbs[0]),
+      style: { display: 'block', borderRadius: '8px', cursor: 'pointer', objectFit: 'cover', ...singleImageStyle }
+    });
+  }
+  return /*#__PURE__*/React.createElement('div', {
+    style: { display: 'flex', flexWrap: 'wrap', gap: '4px', maxWidth: singleImageStyle.maxWidth || '200px' }
+  }, thumbs.map((thumb, idx) => /*#__PURE__*/React.createElement('img', {
+    key: idx,
+    src: thumb,
+    alt: `첨부이미지 ${idx + 1}`,
+    onClick: () => setActiveLightboxUrl && setActiveLightboxUrl(urls[idx] || thumb),
+    style: { display: 'block', width: '56px', height: '56px', borderRadius: '6px', cursor: 'pointer', objectFit: 'cover' }
+  })));
 }
 
 function CommentsSection({
@@ -6950,15 +7019,9 @@ function CommentsSection({
     const badgeName = p?.name || '알수없음';
 
     /* === SHARED ELEMENTS === */
+    const msgImages = renderChatMessageImages(msg, setActiveLightboxUrl, { maxWidth: '120px', maxHeight: '90px' });
     const bubbleContent = /*#__PURE__*/React.createElement(React.Fragment, null,
-      msg.thumbUrl ? /*#__PURE__*/React.createElement('div', { style: { marginBottom: '8px' } },
-        /*#__PURE__*/React.createElement('img', {
-          src: msg.thumbUrl,
-          alt: '첨부이미지',
-          onClick: () => setActiveLightboxUrl && setActiveLightboxUrl(msg.imageUrl || msg.thumbUrl),
-          style: { display: 'block', maxWidth: '120px', maxHeight: '90px', borderRadius: '6px', cursor: 'pointer', objectFit: 'cover' }
-        })
-      ) : null,
+      msgImages ? /*#__PURE__*/React.createElement('div', { style: { marginBottom: '8px' } }, msgImages) : null,
       msg.text ? parseTextWithLinks(msg.text) : null
     );
 
@@ -7649,20 +7712,7 @@ function ChatRoomView({
         whiteSpace: 'pre-wrap',
         boxShadow: '0 2px 6px rgba(0,0,0,0.06)'
       }
-    }, msg.thumbUrl ? /*#__PURE__*/React.createElement("img", {
-      src: msg.thumbUrl,
-      alt: "첨부이미지",
-      onClick: () => setActiveLightboxUrl && setActiveLightboxUrl(msg.imageUrl || msg.thumbUrl),
-      style: {
-        display: 'block',
-        maxWidth: '200px',
-        maxHeight: '150px',
-        borderRadius: '8px',
-        marginBottom: msg.text ? '6px' : '0',
-        cursor: 'pointer',
-        objectFit: 'cover'
-      }
-    }) : null, msg.text ? parseTextWithLinks(msg.text) : null), /*#__PURE__*/React.createElement("div", {
+    }, renderChatMessageImages(msg, setActiveLightboxUrl, { maxWidth: '200px', maxHeight: '150px', marginBottom: msg.text ? '6px' : '0' }), msg.text ? parseTextWithLinks(msg.text) : null), /*#__PURE__*/React.createElement("div", {
       style: {
         position: 'absolute',
         right: '-7px',
@@ -7704,20 +7754,7 @@ function ChatRoomView({
         whiteSpace: 'pre-wrap',
         boxShadow: '0 2px 6px rgba(0,0,0,0.06)'
       }
-    }, msg.thumbUrl ? /*#__PURE__*/React.createElement("img", {
-      src: msg.thumbUrl,
-      alt: "첨부이미지",
-      onClick: () => setActiveLightboxUrl && setActiveLightboxUrl(msg.imageUrl || msg.thumbUrl),
-      style: {
-        display: 'block',
-        maxWidth: '200px',
-        maxHeight: '150px',
-        borderRadius: '8px',
-        marginBottom: msg.text ? '6px' : '0',
-        cursor: 'pointer',
-        objectFit: 'cover'
-      }
-    }) : null, msg.text ? parseTextWithLinks(msg.text) : null), /*#__PURE__*/React.createElement("div", {
+    }, renderChatMessageImages(msg, setActiveLightboxUrl, { maxWidth: '200px', maxHeight: '150px', marginBottom: msg.text ? '6px' : '0' }), msg.text ? parseTextWithLinks(msg.text) : null), /*#__PURE__*/React.createElement("div", {
       style: {
         position: 'absolute',
         left: '-7px',
