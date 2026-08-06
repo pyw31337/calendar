@@ -7035,10 +7035,14 @@ function setChatLastReadTimestamp(calendarId, timestamp) {
   }
 }
 
-// Link preview (OpenGraph via microlink.io's free public API -- no key, client-side fetch
-// since this is a static site with no backend to crawl links server-side). Cached at module
-// scope (by URL) so re-renders and repeated occurrences of the same link don't refetch, and
-// in-flight requests are deduped across simultaneously-mounting message bubbles.
+// Link preview (OpenGraph via microlink.io's public API, client-side fetch since this is a
+// static site with no backend to crawl links server-side). Cached at module scope (by URL) so
+// re-renders and repeated occurrences of the same link don't refetch, and in-flight requests
+// are deduped across simultaneously-mounting message bubbles.
+// The anonymous (no-key) tier shares a global 25 req/min quota across every microlink.io caller
+// on the internet, so previews can silently fail to load under real traffic. Sign up for a free
+// API key at https://microlink.io/dashboard and set it here to move onto a per-account quota.
+const MICROLINK_API_KEY = '';
 const linkPreviewCache = new Map();
 const linkPreviewInflight = new Map();
 async function fetchLinkPreview(url) {
@@ -7046,7 +7050,8 @@ async function fetchLinkPreview(url) {
   if (linkPreviewInflight.has(url)) return linkPreviewInflight.get(url);
   const promise = (async () => {
     try {
-      const res = await fetch(`https://api.microlink.com/?url=${encodeURIComponent(url)}&meta=false`);
+      const keyParam = MICROLINK_API_KEY ? `&apiKey=${encodeURIComponent(MICROLINK_API_KEY)}` : '';
+      const res = await fetch(`https://api.microlink.com/?url=${encodeURIComponent(url)}&meta=false${keyParam}`);
       if (!res.ok) throw new Error('microlink request failed');
       const json = await res.json();
       if (json.status !== 'success' || !json.data) throw new Error('no preview data');
@@ -7096,11 +7101,6 @@ function useLinkPreview(url) {
     };
   }, [url]);
   return state;
-}
-function extractFirstUrl(text) {
-  if (!text) return null;
-  const m = text.match(/https?:\/\/[^\s]+/);
-  return m ? m[0] : null;
 }
 function LinkPreviewCard({ url }) {
   const preview = useLinkPreview(url);
