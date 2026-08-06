@@ -8352,7 +8352,8 @@ function ChatRoomView({
       fontWeight: 800,
       fontSize: '0.95rem',
       color: '#0F172A',
-      whiteSpace: 'nowrap'
+      whiteSpace: 'nowrap',
+      pointerEvents: 'none'
     }
   }, calendar?.title || ''), /*#__PURE__*/React.createElement("button", {
     type: "button",
@@ -10117,7 +10118,8 @@ function ShareModal({
   };
   return /*#__PURE__*/React.createElement("div", {
     className: "modal-overlay",
-    onClick: onClose
+    onClick: onClose,
+    style: { zIndex: 10000 }
   }, /*#__PURE__*/React.createElement("div", {
     className: "modal-container",
     onClick: e => e.stopPropagation()
