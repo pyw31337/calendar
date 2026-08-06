@@ -1392,6 +1392,19 @@ function getCalendarActivityLogs(calendar) {
   return Array.isArray(calendar?.activityLogs) ? calendar.activityLogs.filter(Boolean) : [];
 }
 
+// Unions the calendar document's own embedded activityLogs (legacy entries, and anything not
+// yet backfilled into the subcollection) with logs fetched from the activityLogs subcollection.
+// A calendar object built as { ...calendar, activityLogs: subcollectionLogs } would otherwise
+// silently discard all pre-migration history the first time it's rendered, making every one of
+// those untracked entries fall through to buildActivityLogsFromAvailabilities' legacy fallback
+// synthesis (which has no concept of "update" and mislabels edits as fresh registrations).
+function unionActivityLogs(calendar, subcollectionLogs) {
+  const byId = new Map();
+  getCalendarActivityLogs(calendar).forEach(log => { if (log?.id) byId.set(log.id, log); });
+  (Array.isArray(subcollectionLogs) ? subcollectionLogs : []).forEach(log => { if (log?.id) byId.set(log.id, log); });
+  return Array.from(byId.values());
+}
+
 function getCalendarPolls(calendar) {
   return Array.isArray(calendar?.polls) ? calendar.polls.filter(poll => poll && !isTombstone(poll)) : [];
 }
@@ -6252,7 +6265,7 @@ function App() {
       setIsModalOpen(true);
     }
   }), /*#__PURE__*/React.createElement(RecentActivityLog, {
-    calendar: { ...activeCal, activityLogs: activityLogsFeed },
+    calendar: { ...activeCal, activityLogs: unionActivityLogs(activeCal, activityLogsFeed) },
     expanded: isActivityLogExpanded,
     onToggle: () => setIsActivityLogExpanded(value => !value),
     onDeleteLog: handleDeleteActivityLog,
@@ -6281,7 +6294,7 @@ function App() {
     onSave: handleSaveEditMessage,
     onClose: () => setEditingMessage(null)
   }), isAdminOpen && /*#__PURE__*/React.createElement(AdminModal, {
-    calendar: { ...activeCal, activityLogs: adminActivityLogs },
+    calendar: { ...activeCal, activityLogs: unionActivityLogs(activeCal, adminActivityLogs) },
     allCalendars: calendars,
     onSelectCalendar: handleSelectCalendar,
     onSave: handleSaveAdmin,
