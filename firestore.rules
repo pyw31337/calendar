@@ -51,8 +51,33 @@ service cloud.firestore {
         && hasValidRevision(calendarDocId);
       allow delete: if false;
 
+      // Chat/opinion messages. Unlike the calendar document above, this collection has no
+      // per-calendar document-count cap (Firestore doesn't support one in rules), so the
+      // per-field size caps below are the only thing standing between this collection and
+      // unbounded storage/quota growth -- keep them in sync with MAX_CHAT_IMAGE_BASE64_LENGTH
+      // in index.html if that constant changes.
+      function hasValidMessageText(data) {
+        return data.text is string && data.text.size() <= 5000;
+      }
+      function hasValidMessageImages(data) {
+        return (!('imageUrl' in data) || (data.imageUrl is string && data.imageUrl.size() <= 400000))
+          && (!('thumbUrl' in data) || (data.thumbUrl is string && data.thumbUrl.size() <= 50000));
+      }
+
       match /messages/{messageId} {
-        allow read, write: if isCalendarDoc(calendarDocId);
+        allow get, list: if isCalendarDoc(calendarDocId);
+        allow create: if isCalendarDoc(calendarDocId)
+          && request.resource.data.keys().hasOnly(['participantId', 'text', 'timestamp', 'imageUrl', 'thumbUrl'])
+          && request.resource.data.participantId is string
+          && request.resource.data.participantId.size() <= 160
+          && request.resource.data.timestamp is number
+          && hasValidMessageText(request.resource.data)
+          && hasValidMessageImages(request.resource.data);
+        allow update: if isCalendarDoc(calendarDocId)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['text', 'imageUrl', 'thumbUrl'])
+          && hasValidMessageText(request.resource.data)
+          && hasValidMessageImages(request.resource.data);
+        allow delete: if isCalendarDoc(calendarDocId);
       }
     }
 
