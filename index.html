@@ -1126,6 +1126,97 @@ const GITHUB_PAGES_FREE_LIMITS = {
   bandwidthBytesPerMonth: 100 * 1024 * 1024 * 1024,
   buildsPerHour: 10
 };
+
+// Admin dashboard password gate. This is a lightweight deterrent, not real
+// server-side auth: the site is static and Firestore writes are already open
+// to anyone matching the schema, so a determined visitor can still bypass it.
+const ADMIN_SESSION_STORAGE_KEY = 'gather_admin_session_v1';
+const ADMIN_SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000; // Re-authenticate at least once a day.
+const DEFAULT_ADMIN_PASSWORD_HASH = '32625be384ed05129315617a65f0b070e7b35a4257bdd11e0d98185c6f0cecfe'; // sha256("0602")
+
+async function sha256Hex(text) {
+  const encoded = new TextEncoder().encode(text);
+  const digest = await crypto.subtle.digest('SHA-256', encoded);
+  return Array.from(new Uint8Array(digest)).map(byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+function getAdminSession() {
+  try {
+    const raw = sessionStorage.getItem(ADMIN_SESSION_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed.authenticatedAt !== 'number') return null;
+    if (Date.now() - parsed.authenticatedAt > ADMIN_SESSION_MAX_AGE_MS) return null;
+    return parsed;
+  } catch (e) {
+    return null;
+  }
+}
+
+function setAdminSession() {
+  try {
+    sessionStorage.setItem(ADMIN_SESSION_STORAGE_KEY, JSON.stringify({ authenticatedAt: Date.now() }));
+  } catch (e) {
+    console.warn('Unable to persist admin session:', e);
+  }
+}
+
+function clearAdminSession() {
+  try {
+    sessionStorage.removeItem(ADMIN_SESSION_STORAGE_KEY);
+  } catch (e) {
+    console.warn('Unable to clear admin session:', e);
+  }
+}
+
+// Reads the current admin password hash from Firestore, falling back to the
+// hardcoded default when no custom password has been set yet (or the
+// document/rules haven't been deployed yet).
+async function fetchAdminPasswordHash() {
+  try {
+    if (firebaseDb) {
+      const snap = await firebaseDb.collection('appConfig').doc('adminAuth').get();
+      const hash = snap.exists ? snap.data()?.passwordHash : null;
+      if (hash) return hash;
+      return DEFAULT_ADMIN_PASSWORD_HASH;
+    }
+  } catch (e) {
+    console.warn('Admin password fetch (SDK) failed, trying REST:', e);
+  }
+  try {
+    const res = await fetch(`https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/appConfig/adminAuth`);
+    if (res.ok) {
+      const doc = await res.json();
+      const hash = doc?.fields?.passwordHash?.stringValue;
+      if (hash) return hash;
+    }
+  } catch (e) {
+    console.warn('Admin password fetch (REST) failed:', e);
+  }
+  return DEFAULT_ADMIN_PASSWORD_HASH;
+}
+
+async function setAdminPasswordHash(newHash) {
+  if (firebaseDb) {
+    await firebaseDb.collection('appConfig').doc('adminAuth').set({
+      passwordHash: newHash,
+      updatedAt: Date.now()
+    });
+    return true;
+  }
+  const res = await fetch(`https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/appConfig/adminAuth`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      fields: {
+        passwordHash: { stringValue: newHash },
+        updatedAt: { integerValue: String(Date.now()) }
+      }
+    })
+  });
+  return res.ok;
+}
+
 function getContrastTextColor(hexColor) {
   if (!hexColor) return '#FFFFFF';
   const hex = hexColor.replace('#', '');
@@ -3240,12 +3331,69 @@ function AdminDashboard({ initialCalendars }) {
   // Unified chat log states
   const [messagesMap, setMessagesMap] = React.useState({});
   const [chatSearchQuery, setChatSearchQuery] = React.useState('');
-  
+
   const lastSyncedRef = React.useRef(null);
 
   const showAdminToast = (message, type = 'success', duration = 3000) => {
     setToast({ message, type });
     setTimeout(() => setToast(null), duration);
+  };
+
+  // Admin password change
+  const [isChangePwOpen, setIsChangePwOpen] = React.useState(false);
+  const [currentPwInput, setCurrentPwInput] = React.useState('');
+  const [newPwInput, setNewPwInput] = React.useState('');
+  const [confirmPwInput, setConfirmPwInput] = React.useState('');
+  const [pwError, setPwError] = React.useState('');
+  const [isPwSubmitting, setIsPwSubmitting] = React.useState(false);
+
+  const handleLogoutAdmin = () => {
+    clearAdminSession();
+    window.location.reload();
+  };
+
+  const resetChangePwForm = () => {
+    setCurrentPwInput('');
+    setNewPwInput('');
+    setConfirmPwInput('');
+    setPwError('');
+  };
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    if (isPwSubmitting) return;
+    setPwError('');
+    if (newPwInput.length < 4) {
+      setPwError('새 비밀번호는 4자 이상이어야 합니다.');
+      return;
+    }
+    if (newPwInput !== confirmPwInput) {
+      setPwError('새 비밀번호가 서로 일치하지 않습니다.');
+      return;
+    }
+    setIsPwSubmitting(true);
+    try {
+      const [currentHash, storedHash] = await Promise.all([sha256Hex(currentPwInput.trim()), fetchAdminPasswordHash()]);
+      if (currentHash !== storedHash) {
+        setPwError('현재 비밀번호가 올바르지 않습니다.');
+        return;
+      }
+      const newHash = await sha256Hex(newPwInput.trim());
+      const ok = await setAdminPasswordHash(newHash);
+      if (!ok) {
+        setPwError('비밀번호 저장에 실패했습니다. firestore.rules가 배포되었는지 확인해 주세요.');
+        return;
+      }
+      setAdminSession();
+      setIsChangePwOpen(false);
+      resetChangePwForm();
+      showAdminToast('관리자 비밀번호가 변경되었습니다.', 'success');
+    } catch (err) {
+      console.warn('Admin password change failed:', err);
+      setPwError('비밀번호 변경 중 오류가 발생했습니다. firestore.rules 배포 여부를 확인해 주세요.');
+    } finally {
+      setIsPwSubmitting(false);
+    }
   };
 
   // 1. Live Snapshot Listener for serverCalendars (Firestore)
@@ -3847,7 +3995,61 @@ function AdminDashboard({ initialCalendars }) {
       ),
       /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px' } },
         /*#__PURE__*/React.createElement("a", { className: "btn", href: `${window.location.pathname}?id=kkot`, style: { ...styles.btnSecondary, textDecoration: 'none', display: 'flex', alignItems: 'center' } }, "kkot 달력"),
-        /*#__PURE__*/React.createElement("a", { className: "btn", href: `${window.location.pathname}?id=cw`, style: { ...styles.btnSecondary, textDecoration: 'none', display: 'flex', alignItems: 'center' } }, "cw 달력")
+        /*#__PURE__*/React.createElement("a", { className: "btn", href: `${window.location.pathname}?id=cw`, style: { ...styles.btnSecondary, textDecoration: 'none', display: 'flex', alignItems: 'center' } }, "cw 달력"),
+        /*#__PURE__*/React.createElement("button", {
+          type: "button", className: "btn", style: styles.btnSecondary,
+          onClick: () => { resetChangePwForm(); setIsChangePwOpen(true); }
+        }, "🔒 비밀번호 변경"),
+        /*#__PURE__*/React.createElement("button", {
+          type: "button", className: "btn", style: styles.btnSecondary,
+          onClick: handleLogoutAdmin
+        }, "로그아웃")
+      )
+    ),
+
+    /* Admin password change modal */
+    isChangePwOpen && /*#__PURE__*/React.createElement("div", {
+      style: {
+        position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 100000,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px'
+      },
+      onClick: () => { setIsChangePwOpen(false); resetChangePwForm(); }
+    },
+      /*#__PURE__*/React.createElement("form", {
+        onSubmit: handleChangePassword,
+        onClick: e => e.stopPropagation(),
+        style: {
+          width: '100%', maxWidth: '340px', backgroundColor: '#18181B', border: '1px solid #27272A',
+          borderRadius: '16px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '12px'
+        }
+      },
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: '1.05rem', fontWeight: 800, color: '#EDEDED' } }, "🔒 관리자 비밀번호 변경"),
+        /*#__PURE__*/React.createElement("input", {
+          type: "password", autoFocus: true, placeholder: "현재 비밀번호",
+          value: currentPwInput, onChange: e => setCurrentPwInput(e.target.value),
+          style: { padding: '11px 13px', borderRadius: '10px', border: '1px solid #27272A', backgroundColor: '#0B0B0F', color: '#EDEDED', fontSize: '0.9rem' }
+        }),
+        /*#__PURE__*/React.createElement("input", {
+          type: "password", placeholder: "새 비밀번호 (4자 이상)",
+          value: newPwInput, onChange: e => setNewPwInput(e.target.value),
+          style: { padding: '11px 13px', borderRadius: '10px', border: '1px solid #27272A', backgroundColor: '#0B0B0F', color: '#EDEDED', fontSize: '0.9rem' }
+        }),
+        /*#__PURE__*/React.createElement("input", {
+          type: "password", placeholder: "새 비밀번호 확인",
+          value: confirmPwInput, onChange: e => setConfirmPwInput(e.target.value),
+          style: { padding: '11px 13px', borderRadius: '10px', border: '1px solid #27272A', backgroundColor: '#0B0B0F', color: '#EDEDED', fontSize: '0.9rem' }
+        }),
+        pwError && /*#__PURE__*/React.createElement("div", { style: { color: '#F87171', fontSize: '0.8rem' } }, pwError),
+        /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px', marginTop: '4px' } },
+          /*#__PURE__*/React.createElement("button", {
+            type: "button", style: { ...styles.btnSecondary, flex: 1 },
+            onClick: () => { setIsChangePwOpen(false); resetChangePwForm(); }
+          }, "취소"),
+          /*#__PURE__*/React.createElement("button", {
+            type: "submit", disabled: isPwSubmitting,
+            style: { flex: 1, padding: '11px', borderRadius: '10px', border: 'none', backgroundColor: '#3ECF8E', color: '#0B0B0F', fontWeight: 700, cursor: isPwSubmitting ? 'default' : 'pointer', opacity: isPwSubmitting ? 0.6 : 1 }
+          }, isPwSubmitting ? '변경 중...' : '변경하기')
+        )
       )
     ),
 
@@ -4379,6 +4581,82 @@ function AdminDashboard({ initialCalendars }) {
   );
 }
 
+function AdminLoginGate({ children }) {
+  const [status, setStatus] = React.useState('checking'); // 'checking' | 'locked' | 'unlocked'
+  const [passwordInput, setPasswordInput] = React.useState('');
+  const [error, setError] = React.useState('');
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+
+  React.useEffect(() => {
+    setStatus(getAdminSession() ? 'unlocked' : 'locked');
+  }, []);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const trimmed = passwordInput.trim();
+    if (!trimmed || isSubmitting) return;
+    setIsSubmitting(true);
+    setError('');
+    try {
+      const [inputHash, storedHash] = await Promise.all([sha256Hex(trimmed), fetchAdminPasswordHash()]);
+      if (inputHash === storedHash) {
+        setAdminSession();
+        setPasswordInput('');
+        setStatus('unlocked');
+      } else {
+        setError('비밀번호가 올바르지 않습니다.');
+      }
+    } catch (err) {
+      console.warn('Admin auth check failed:', err);
+      setError('인증 확인 중 오류가 발생했습니다. 다시 시도해 주세요.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (status === 'checking') return null;
+  if (status === 'unlocked') return children;
+
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      backgroundColor: '#0B0B0F', padding: '20px'
+    }
+  },
+    /*#__PURE__*/React.createElement("form", {
+      onSubmit: handleSubmit,
+      style: {
+        width: '100%', maxWidth: '320px', backgroundColor: '#18181B', border: '1px solid #27272A',
+        borderRadius: '16px', padding: '28px', display: 'flex', flexDirection: 'column', gap: '14px'
+      }
+    },
+      /*#__PURE__*/React.createElement("div", { style: { fontSize: '1.1rem', fontWeight: 800, color: '#EDEDED' } }, "🔒 관리자 인증"),
+      /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.82rem', color: '#A1A1AA' } }, "비밀번호를 입력해 주세요."),
+      /*#__PURE__*/React.createElement("input", {
+        type: "password",
+        autoFocus: true,
+        value: passwordInput,
+        onChange: e => setPasswordInput(e.target.value),
+        placeholder: "비밀번호",
+        style: {
+          padding: '12px 14px', borderRadius: '10px', border: '1px solid #27272A',
+          backgroundColor: '#0B0B0F', color: '#EDEDED', fontSize: '0.95rem'
+        }
+      }),
+      error && /*#__PURE__*/React.createElement("div", { style: { color: '#F87171', fontSize: '0.82rem' } }, error),
+      /*#__PURE__*/React.createElement("button", {
+        type: "submit",
+        disabled: isSubmitting || !passwordInput.trim(),
+        style: {
+          padding: '12px', borderRadius: '10px', border: 'none', backgroundColor: '#3ECF8E',
+          color: '#0B0B0F', fontWeight: 700, cursor: isSubmitting ? 'default' : 'pointer',
+          opacity: isSubmitting || !passwordInput.trim() ? 0.6 : 1
+        }
+      }, isSubmitting ? '확인 중...' : '입장')
+    )
+  );
+}
+
 function App() {
   const [calendars, setCalendarsState] = React.useState(() => loadLocalCache());
   const [toast, setToast] = React.useState(null);
@@ -4570,9 +4848,11 @@ function App() {
   }, [isGuideOpen, activeCalId, calendars]);
 
   if (isAdminDashboardRoute()) {
-    return /*#__PURE__*/React.createElement(AdminDashboard, {
-      initialCalendars: calendars
-    });
+    return /*#__PURE__*/React.createElement(AdminLoginGate, null,
+      /*#__PURE__*/React.createElement(AdminDashboard, {
+        initialCalendars: calendars
+      })
+    );
   }
 
   // Firebase Firestore Real-Time Listener (ISOLATED per activeCalId)
