@@ -136,7 +136,7 @@
       display: flex;
       align-items: stretch;
       margin: 0 -16px;
-      padding: 8px 16px 0;
+      padding: 8px 2px 0;
       border-top: 1px solid var(--border-subtle);
       gap: 0;
       /* No overflow-x:auto here: setting it forces overflow-y to compute as 'auto' too (per the
@@ -148,6 +148,17 @@
     }
     @media (min-width: 768px) {
       .main-menu-bar { margin: 0 -24px; padding: 8px 24px 0; }
+    }
+    /* Mobile: icon-less, shortened menu labels (더 넓은 배지/텍스트 공간 확보) -- desktop shows the
+       full icon + label. Both label spans always render; CSS picks which one is visible so no
+       JS branching is needed. */
+    .main-menu-icon { display: none; }
+    .main-menu-label-full { display: none; }
+    .main-menu-label-short { display: inline; }
+    @media (min-width: 768px) {
+      .main-menu-icon { display: inline-flex; }
+      .main-menu-label-full { display: inline; }
+      .main-menu-label-short { display: none; }
     }
     .main-menu-item {
       flex: 1;
@@ -426,7 +437,14 @@
 
     .days-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
     @media (min-width: 640px) { .days-grid { gap: 8px; } }
-    
+
+    /* Holiday name label (e.g. "광복절") next to the date number gets clipped/unreadable at
+       narrow mobile cell widths -- hide it there (the date number still turns red), but keep it
+       on desktop's roomier cells where it reads fine. */
+    @media (max-width: 639px) {
+      .day-corner-label.is-holiday { display: none; }
+    }
+
     .day-cell {
       min-height: 58px; background: #FFFFFF; border: 1px solid var(--border-subtle);
       border-radius: var(--radius-sm); padding: 4px; cursor: pointer; transition: all 0.2s ease;
@@ -6010,6 +6028,22 @@ function App() {
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
     return updateCalendars(nextCalendars, '삭제완료', 'delete', updatedCal.id, 'availability', activityLogs);
   };
+  const handleConfirmMeeting = (dateStr, note) => {
+    if (!activeCal || !isValidDateString(dateStr)) return false;
+    const now = Date.now();
+    const updatedCal = {
+      ...activeCal,
+      confirmedMeeting: {
+        date: dateStr,
+        note: sanitizeText(note, 120),
+        confirmedAt: now
+      },
+      updatedAt: now,
+      revision: (activeCal.revision || 0) + 1
+    };
+    const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
+    return updateCalendars(nextCalendars, '모임 확정', 'success', updatedCal.id, 'settings', []);
+  };
   const handleDeleteActivityLog = log => {
     if (!activeCal || !log?.id) return false;
     const logId = sanitizeText(log.id, 160);
@@ -6389,17 +6423,17 @@ function App() {
     type: "button",
     className: "main-menu-item",
     onClick: () => scrollToSection(calendarSectionRef)
-  }, /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M4 7a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12z", "M16 3v4", "M8 3v4", "M4 11h16"] }), "일정잡기"), /*#__PURE__*/React.createElement("div", { className: "main-menu-sep" }), /*#__PURE__*/React.createElement("button", {
+  }, /*#__PURE__*/React.createElement("span", { className: "main-menu-icon" }, /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M4 7a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12z", "M16 3v4", "M8 3v4", "M4 11h16"] })), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-full" }, "일정잡기"), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-short" }, "일정")), /*#__PURE__*/React.createElement("div", { className: "main-menu-sep" }), /*#__PURE__*/React.createElement("button", {
     type: "button",
     className: "main-menu-item",
     onClick: () => scrollToSection(pollsSectionRef)
-  }, /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M9 11l3 3l8 -8", "M20 12v6a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h9"] }), "투표하기", mainMenuPollCount > 0 && /*#__PURE__*/React.createElement("span", {
+  }, /*#__PURE__*/React.createElement("span", { className: "main-menu-icon" }, /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M9 11l3 3l8 -8", "M20 12v6a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h9"] })), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-full" }, "투표하기"), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-short" }, "투표"), mainMenuPollCount > 0 && /*#__PURE__*/React.createElement("span", {
     className: "main-menu-badge"
   }, mainMenuPollCount)), /*#__PURE__*/React.createElement("div", { className: "main-menu-sep" }), /*#__PURE__*/React.createElement("button", {
     type: "button",
     className: "main-menu-item",
     onClick: () => changeView('chat')
-  }, /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"] }), "채팅하기", mainMenuChatCount > 0 && /*#__PURE__*/React.createElement("span", {
+  }, /*#__PURE__*/React.createElement("span", { className: "main-menu-icon" }, /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"] })), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-full" }, "채팅하기"), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-short" }, "채팅"), mainMenuChatCount > 0 && /*#__PURE__*/React.createElement("span", {
     className: "main-menu-badge",
     style: {
       backgroundColor: mainMenuChatHasUnread ? '#EF4444' : '#E2E8F0',
@@ -6411,12 +6445,12 @@ function App() {
     onClick: () => {
       if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 공유 정보를 확인해 주세요.')) setIsShareOpen(true);
     }
-  }, /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M3 12a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M15 6a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M15 18a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M8.7 10.7l6.6 -3.4", "M8.7 13.3l6.6 3.4"] }), "공유하기"), /*#__PURE__*/React.createElement("div", { className: "main-menu-sep" }), /*#__PURE__*/React.createElement("button", {
+  }, /*#__PURE__*/React.createElement("span", { className: "main-menu-icon" }, /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M3 12a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M15 6a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M15 18a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M8.7 10.7l6.6 -3.4", "M8.7 13.3l6.6 3.4"] })), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-full" }, "공유하기"), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-short" }, "공유")), /*#__PURE__*/React.createElement("div", { className: "main-menu-sep" }), /*#__PURE__*/React.createElement("button", {
     type: "button",
     className: "main-menu-item",
     style: { position: 'relative' },
     onClick: () => setIsParticipantsOpen(!isParticipantsOpen)
-  }, /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M5 7a4 4 0 1 0 8 0a4 4 0 1 0 -8 0", "M3 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2", "M16 3.13a4 4 0 0 1 0 7.75", "M21 21v-2a4 4 0 0 0 -3 -3.85"] }), "참여자 (", getActiveParticipants(activeCal)?.length || 0, "명)", isParticipantsOpen && /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("span", { className: "main-menu-icon" }, /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M5 7a4 4 0 1 0 8 0a4 4 0 1 0 -8 0", "M3 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2", "M16 3.13a4 4 0 0 1 0 7.75", "M21 21v-2a4 4 0 0 0 -3 -3.85"] })), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-full" }, "참여자 (", getActiveParticipants(activeCal)?.length || 0, "명)"), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-short" }, "참여"), isParticipantsOpen && /*#__PURE__*/React.createElement("div", {
     className: "participants-popover",
     onClick: e => e.stopPropagation()
   }, /*#__PURE__*/React.createElement("div", {
@@ -6446,7 +6480,20 @@ function App() {
     }
   }), /*#__PURE__*/React.createElement("span", null, p.name)))))))), /*#__PURE__*/React.createElement("div", {
     ref: calendarSectionRef
-  }, /*#__PURE__*/React.createElement(CalendarGrid, {
+  }, activeCal?.confirmedMeeting && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: 'var(--accent-gradient)',
+      color: '#FFFFFF',
+      borderRadius: 'var(--radius-md)',
+      padding: '10px 16px',
+      marginBottom: '12px',
+      fontSize: '0.88rem',
+      fontWeight: 800,
+      whiteSpace: 'nowrap',
+      overflow: 'hidden',
+      textOverflow: 'ellipsis'
+    }
+  }, `모임 확정 ${activeCal.confirmedMeeting.date.slice(2).replace(/-/g, '.')}${activeCal.confirmedMeeting.note ? ` (${activeCal.confirmedMeeting.note})` : ''}`), /*#__PURE__*/React.createElement(CalendarGrid, {
 
     calendar: activeCal,
     isLoading: isInitialDataLoading,
@@ -6520,6 +6567,7 @@ function App() {
     onSave: handleSaveAvailability,
     onDelete: handleDeleteAvailability,
     onDeleteDate: handleDeleteAllForDate,
+    onConfirmMeeting: handleConfirmMeeting,
     onRequestConfirm: showConfirmDialog,
     onClose: () => setIsModalOpen(false)
   }), confirmDialog && /*#__PURE__*/React.createElement(ConfirmDialog, {
@@ -6546,6 +6594,8 @@ function App() {
     recentMessages: recentMessages,
     chatMessages: chatMessages,
     onDeleteMessage: handleDeleteMessage,
+    onDeleteAvailability: handleDeleteAvailability,
+    onDeleteAllForDate: handleDeleteAllForDate,
     onRequestConfirm: showConfirmDialog,
     onClose: () => setIsAdminOpen(false),
     showToast: showToast
@@ -6731,6 +6781,16 @@ function computeKoreanHolidaysForYear(year) {
   });
 
   return entries.concat(substitutes);
+}
+
+// Single-date holiday name lookup (e.g. for DateModal's header) -- CalendarGrid's own
+// holidayMap is memoized per rendered month range, which isn't available outside that
+// component, so this recomputes just the one year a given date falls in.
+function getHolidayNamesForDate(dateStr) {
+  if (!dateStr) return [];
+  const year = parseInt(dateStr.slice(0, 4), 10);
+  if (!year) return [];
+  return computeKoreanHolidaysForYear(year).filter(e => e.date === dateStr).map(e => e.name);
 }
 
 // 24 solar terms (24절기) via the standard low-precision solar-longitude formula
@@ -7177,7 +7237,7 @@ function CalendarGrid({
         flexShrink: 0
       } : { flexShrink: 0 }
     }, dayNum), cornerText && /*#__PURE__*/React.createElement("span", {
-      className: "day-corner-label",
+      className: `day-corner-label${isHoliday ? ' is-holiday' : ''}`,
       title: cornerTitle,
       style: {
         fontSize: '0.62rem',
@@ -9845,8 +9905,10 @@ function DateModal({
   onSave,
   onDelete,
   onDeleteDate,
+  onConfirmMeeting,
   onRequestConfirm,
-  onClose
+  onClose,
+  adminMode = false
 }) {
   const getCachedParticipantId = () => {
     const cachedId = getLocalStorage().getItem('gather_active_participant_id_v20');
@@ -9907,9 +9969,23 @@ function DateModal({
     const dateObj = new Date(year, month - 1, day);
     const dayOfWeek = ['일', '월', '화', '수', '목', '금', '토'][dateObj.getDay()];
     const shortYear = year.slice(2);
-    return `${shortYear}.${month}.${day}(${dayOfWeek}) 일정`;
+    return `${shortYear}.${month}.${day}(${dayOfWeek})`;
   };
-  const getDeleteDateLabel = dateStr => getShortTitle(dateStr).replace(/ 일정$/, '');
+  const getDeleteDateLabel = dateStr => getShortTitle(dateStr);
+  const holidayNames = React.useMemo(() => getHolidayNamesForDate(dateStr), [dateStr]);
+  const handleConfirmMeeting = async () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    const latestNote = noteInputRef.current ? noteInputRef.current.value : note;
+    let saved = false;
+    try {
+      saved = await Promise.resolve(onConfirmMeeting(dateStr, latestNote));
+    } catch (err) {
+      console.error('Confirm meeting failed:', err);
+    }
+    setIsSubmitting(false);
+    if (saved !== false) onClose();
+  };
   return /*#__PURE__*/React.createElement("div", {
     className: "modal-overlay",
     onClick: () => {
@@ -9936,7 +10012,7 @@ function DateModal({
       alignItems: 'center',
       gap: '8px'
     }
-  }, /*#__PURE__*/React.createElement("button", {
+  }, adminMode ? /*#__PURE__*/React.createElement("button", {
     type: "button",
     className: "btn btn-secondary",
     style: {
@@ -9960,7 +10036,14 @@ function DateModal({
       }
     },
     title: "\uD574\uB2F9 \uB0A0\uC9DC\uC758 \uBAA8\uB4E0 \uCC38\uC5EC\uC790 \uC77C\uC815 \uC0AD\uC81C"
-  }, "\uC77C\uC815 \uC0AD\uC81C"), /*#__PURE__*/React.createElement("button", {
+  }, "\uC77C\uC815 \uC0AD\uC81C") : holidayNames.length > 0 && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: '0.78rem',
+      fontWeight: 800,
+      color: '#EF4444',
+      whiteSpace: 'nowrap'
+    }
+  }, holidayNames.join('·')), /*#__PURE__*/React.createElement("button", {
     onClick: () => {
       if (!isSubmitting) onClose();
     },
@@ -9977,7 +10060,7 @@ function DateModal({
     onSubmit: handleSubmit
   }, /*#__PURE__*/React.createElement("div", {
     className: "modal-body"
-  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+  }, !adminMode && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
     style: {
       display: 'block',
       fontSize: '0.85rem',
@@ -10018,7 +10101,7 @@ function DateModal({
       color: '#64748B',
       fontSize: '0.8rem'
     }
-  }, "\u25BC"))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+  }, "\u25BC"))), !adminMode && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
     style: {
       display: 'block',
       fontSize: '0.85rem',
@@ -10100,18 +10183,33 @@ function DateModal({
         }
       }
     }, "\uC0AD\uC81C"));
-  }))), /*#__PURE__*/React.createElement("div", {
-    className: "modal-footer"
+  }))), !adminMode && /*#__PURE__*/React.createElement("div", {
+    className: "modal-footer",
+    style: { display: 'flex', justifyContent: 'flex-end', gap: '8px' }
   }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "btn btn-secondary",
+    disabled: isSubmitting,
+    onClick: handleConfirmMeeting,
+    style: {
+      color: '#4F46E5',
+      borderColor: '#C7D2FE',
+      backgroundColor: '#EEF2FF',
+      whiteSpace: 'nowrap',
+      opacity: isSubmitting ? 0.75 : 1,
+      cursor: isSubmitting ? 'wait' : 'pointer'
+    }
+  }, "모임확정"), /*#__PURE__*/React.createElement("button", {
     type: "submit",
     className: "btn btn-primary",
     disabled: isSubmitting,
     style: {
-      width: '100%',
+      padding: '10px 28px',
+      whiteSpace: 'nowrap',
       opacity: isSubmitting ? 0.75 : 1,
       cursor: isSubmitting ? 'wait' : 'pointer'
     }
-  }, isSubmitting ? "\uC800\uC7A5 \uC911..." : "\uB4F1\uB85D/\uC800\uC7A5")))), isSheetOpen && /*#__PURE__*/React.createElement("div", {
+  }, isSubmitting ? "\uC800\uC7A5 \uC911..." : "\uB4F1\uB85D")))), isSheetOpen && /*#__PURE__*/React.createElement("div", {
     className: "bottom-sheet-overlay",
     onClick: () => {
       if (!isSubmitting) setIsSheetOpen(false);
@@ -10257,12 +10355,21 @@ function AdminModal({
   recentMessages = [],
   chatMessages = [],
   onDeleteMessage,
+  onDeleteAvailability,
+  onDeleteAllForDate,
   onRequestConfirm,
   onClose,
   showToast
 }) {
-  const [activeTab, setActiveTab] = React.useState('metrics'); // 'metrics', 'settings', 'recovery'
-  
+  const [activeTab, setActiveTab] = React.useState('metrics'); // 'metrics', 'settings', 'recovery', 'calendar'
+
+  // Calendar tab: browse dates and delete schedules -- reuses DateModal in adminMode, which
+  // hides the normal registration UI and shows only the registered-participant list + delete
+  // controls (per-participant and whole-date), same as the 일정 삭제 flow used to live in the
+  // regular user-facing modal before it moved here.
+  const [adminCalMonthDate, setAdminCalMonthDate] = React.useState(new Date());
+  const [adminSelectedDate, setAdminSelectedDate] = React.useState(null);
+
   // Settings tab states
   const [title, setTitle] = React.useState(calendar.title);
   const [description, setDescription] = React.useState(calendar.description || '');
@@ -10518,7 +10625,19 @@ function AdminModal({
           borderBottom: activeTab === 'recovery' ? '3px solid #2563EB' : '3px solid transparent',
           cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px'
         }
-      }, /*#__PURE__*/React.createElement(HourglassIcon, null), "데이터 시점 복구")
+      }, /*#__PURE__*/React.createElement(HourglassIcon, null), "데이터 시점 복구"),
+      /* Tab 4: Calendar-based schedule deletion */
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: () => setActiveTab('calendar'),
+        style: {
+          padding: '12px 16px', fontSize: '0.88rem', fontWeight: 'bold', whiteSpace: 'nowrap', flexShrink: 0,
+          color: activeTab === 'calendar' ? '#2563EB' : '#64748B',
+          border: 'none', background: 'none',
+          borderBottom: activeTab === 'calendar' ? '3px solid #2563EB' : '3px solid transparent',
+          cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px'
+        }
+      }, /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M4 7a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12z", "M16 3v4", "M8 3v4", "M4 11h16"] }), "캘린더")
     ),
 
     /* Modal Scrollable Body */
@@ -10867,6 +10986,36 @@ function AdminModal({
           )
         )
       )
+    ),
+
+    /* ========================================== */
+    /* TAB 4: CALENDAR-BASED SCHEDULE DELETION     */
+    /* ========================================== */
+    activeTab === 'calendar' && /*#__PURE__*/React.createElement(React.Fragment, null,
+      /*#__PURE__*/React.createElement("div", {
+        style: { fontSize: '0.82rem', color: '#64748B', marginBottom: '8px' }
+      }, "날짜를 선택하면 해당 날짜에 등록된 참여자 일정을 확인하고 삭제할 수 있습니다."),
+      /*#__PURE__*/React.createElement(CalendarGrid, {
+        calendar: calendar,
+        isLoading: false,
+        monthDate: adminCalMonthDate,
+        onPrevMonth: () => setAdminCalMonthDate(new Date(adminCalMonthDate.getFullYear(), adminCalMonthDate.getMonth() - 1, 1)),
+        onNextMonth: () => setAdminCalMonthDate(new Date(adminCalMonthDate.getFullYear(), adminCalMonthDate.getMonth() + 1, 1)),
+        onToday: () => setAdminCalMonthDate(new Date()),
+        onJumpToMonth: (y, m) => setAdminCalMonthDate(new Date(y, m, 1)),
+        onSelectDate: d => setAdminSelectedDate(d)
+      }),
+      adminSelectedDate && /*#__PURE__*/React.createElement(DateModal, {
+        dateStr: adminSelectedDate,
+        calendar: calendar,
+        adminMode: true,
+        onSave: () => false,
+        onConfirmMeeting: () => false,
+        onDelete: onDeleteAvailability,
+        onDeleteDate: onDeleteAllForDate,
+        onRequestConfirm: onRequestConfirm,
+        onClose: () => setAdminSelectedDate(null)
+      })
     ),
 
     /* Inner PollModal to Edit/Create Polls */
