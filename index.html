@@ -2014,13 +2014,6 @@ function normalizeCalendarForSave(calendar) {
   };
 }
 
-function stampParticipantSettings(participants, now) {
-  return (participants || []).map((participant) => ({
-    ...participant,
-    updatedAt: now
-  }));
-}
-
 function assertCalendarLinks(calendar) {
   const participantIds = new Set(getActiveParticipants(calendar).map((participant) => participant.id));
   return getActiveAvailabilities(calendar).every((availability) => participantIds.has(availability.participantId));
@@ -3068,24 +3061,6 @@ function isUsableCloudCalendarPayload(data, expectedCalendarId) {
   return Boolean(data && data.calendar && data.calendar.id === expectedCalendarId);
 }
 
-function getCachedCalendar(calendarId) {
-  return null;
-}
-
-function getCalendarParticipantCount(calendar) {
-  return getActiveParticipants(calendar).length;
-}
-
-function isLikelySeedCalendar(calendar) {
-  if (!calendar) return true;
-  const seed = INITIAL_CALENDARS.find(item => item.id === calendar.id);
-  if (!seed) return false;
-  return calendar.title === seed.title
-    && getCalendarParticipantCount(calendar) === getCalendarParticipantCount(seed)
-    && getActiveAvailabilities(calendar).length === getActiveAvailabilities(seed).length
-    && getCalendarActivityLogs(calendar).length === getCalendarActivityLogs(seed).length;
-}
-
 function getCloudDocCalendar(doc, expectedCalendarId) {
   if (!doc?.exists) return null;
   const data = doc.data();
@@ -3521,10 +3496,6 @@ function formatBytes(bytes) {
   if (value >= 1024 * 1024) return `${(value / 1024 / 1024).toFixed(2)}MB`;
   if (value >= 1024) return `${(value / 1024).toFixed(1)}KB`;
   return `${value}B`;
-}
-
-function formatPercent(value) {
-  return `${Math.max(0, Math.min(100, Number(value) || 0)).toFixed(2).replace(/\.?0+$/, '')}%`;
 }
 
 function estimateMonthlyOutboundBytes(calendarStats) {
@@ -3974,9 +3945,9 @@ function AdminDashboard({ initialCalendars }) {
     };
   }, []);
 
-  const calendarsList = serverCalendars
+  const calendarsList = React.useMemo(() => serverCalendars
     .filter(cal => cal && !isInternalTestCalendarId(cal.id))
-    .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)), [serverCalendars]);
 
   // Auto-select first calendar if selectedCalId is not valid/present in lists (fixes blank tab bug)
   React.useEffect(() => {
@@ -4344,7 +4315,7 @@ function AdminDashboard({ initialCalendars }) {
   };
 
   // Calculations for Tab 1
-  const dashboard = buildAdminDashboardMetrics(calendarsList);
+  const dashboard = React.useMemo(() => buildAdminDashboardMetrics(calendarsList), [calendarsList]);
   const adminUpdatedText = loadedAt ? loadedAt.toLocaleString('ko-KR') : '불러오는 중';
 
   // Merge messages across all calendars for Tab 1 feed
@@ -5429,7 +5400,6 @@ function App() {
   const [adminActivityLogs, setAdminActivityLogs] = React.useState([]);
   const [isShareOpen, setIsShareOpen] = React.useState(false);
   const [isChatShareOpen, setIsChatShareOpen] = React.useState(false);
-  const [isActivityLogExpanded, setIsActivityLogExpanded] = React.useState(false);
   const [isPollModalOpen, setIsPollModalOpen] = React.useState(false);
   const [editingPoll, setEditingPoll] = React.useState(null);
   const [voteTarget, setVoteTarget] = React.useState(null);
@@ -5490,7 +5460,6 @@ function App() {
   // Chat-related states
   const [recentMessages, setRecentMessages] = React.useState([]);
   const [chatMessages, setChatMessages] = React.useState([]);
-  const [activityLogsFeed, setActivityLogsFeed] = React.useState([]);
   const [chatInput, setChatInput] = React.useState('');
   const [chatParticipantId, setChatParticipantId] = React.useState('');
   const chatParticipantIdRef = React.useRef(chatParticipantId);
@@ -5644,9 +5613,6 @@ function App() {
   const activeCalLoaded = calendars.some(c => c.id === activeCalId);
   const activeCal = calendars.find(c => c.id === activeCalId) || createLoadingCalendarShell(activeCalId);
   React.useEffect(() => {
-    setIsActivityLogExpanded(false);
-  }, [activeCalId]);
-  React.useEffect(() => {
     if (activeCal) {
       const calTitle = `${activeCal.title} - 모여라 캘린더`;
       const calDesc = activeCal.description || `${activeCal.title} 사모임 멤버들의 참석 가능 날짜 조율 캘린더입니다.`;
@@ -5753,35 +5719,6 @@ function App() {
       isMounted = false;
       if (unsubscribeRecent) unsubscribeRecent();
       if (unsubscribeChat) unsubscribeChat();
-    };
-  }, [activeCalId]);
-
-  // Recent activity log feed (its own subcollection now, see writeActivityLogsToFirestore)
-  React.useEffect(() => {
-    if (!activeCalId) {
-      setActivityLogsFeed([]);
-      return;
-    }
-    if (!firebaseDb) {
-      fetchActivityLogsFromFirestore(activeCalId, 200).then(list => setActivityLogsFeed(list));
-      return;
-    }
-    let isMounted = true;
-    const unsubscribeLogs = firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('activityLogs')
-      .orderBy('timestamp', 'desc')
-      .limit(200)
-      .onSnapshot(snapshot => {
-        if (!isMounted) return;
-        setActivityLogsFeed(snapshot.docs.map(doc => doc.data()));
-      }, err => {
-        console.warn(`Firestore activity log subscription error for cal_${activeCalId}:`, err);
-        fetchActivityLogsFromFirestore(activeCalId, 200).then(list => {
-          if (isMounted) setActivityLogsFeed(list);
-        });
-      });
-    return () => {
-      isMounted = false;
-      if (unsubscribeLogs) unsubscribeLogs();
     };
   }, [activeCalId]);
 
@@ -10668,7 +10605,7 @@ function AdminModal({
   showToast,
   onDeleteLog
 }) {
-  const [activeTab, setActiveTab] = React.useState('settings'); // 'settings', 'recovery', 'calendar'
+  const [activeTab, setActiveTab] = React.useState('settings'); // 'settings', 'calendar', 'recovery', 'logs'
 
   // Calendar tab: browse dates and delete schedules -- reuses DateModal in adminMode, which
   // hides the normal registration UI and shows only the registered-participant list + delete
@@ -10688,9 +10625,6 @@ function AdminModal({
   // Poll sub-modal states inside AdminModal
   const [editingPoll, setEditingPoll] = React.useState(null);
   const [isPollModalOpen, setIsPollModalOpen] = React.useState(false);
-
-  // Search state for chat/comments log
-  const [logSearchQuery, setLogSearchQuery] = React.useState('');
 
   React.useEffect(() => {
     setTitle(calendar.title);
@@ -10849,23 +10783,6 @@ function AdminModal({
     return acc;
   }, {});
 
-  // Metrics
-  const activeParticipantsCount = participants.filter(p => !isTombstone(p)).length;
-  const totalSchedulesCount = (calendar.availabilities || []).filter(e => !isTombstone(e)).length;
-  const activePollsCount = getCalendarPolls(calendar).length;
-  // recentMessages is just a bounded (last-5) preview of the same collection chatMessages
-  // already fetches in full -- source the log from chatMessages alone so each message is
-  // counted and listed once instead of once per query it happens to appear in.
-  const totalMessagesCount = chatMessages.length;
-  const allMessages = [...chatMessages].sort((a, b) => b.timestamp - a.timestamp);
-
-  const filteredMessages = allMessages.filter(msg => {
-    const p = participantsMap[msg.participantId];
-    const name = p?.name || '알수없음';
-    const query = logSearchQuery.toLowerCase();
-    return name.toLowerCase().includes(query) || (msg.text || '').toLowerCase().includes(query);
-  });
-
   const activityLogsSorted = [...getCalendarActivityLogs(calendar)].sort((a, b) => b.timestamp - a.timestamp);
 
   return /*#__PURE__*/React.createElement("div", {
@@ -10951,99 +10868,6 @@ function AdminModal({
       className: "modal-body",
       style: { flex: (activeTab === 'calendar' || activeTab === 'logs') ? '0 0 auto' : 1, overflowY: 'auto', padding: (activeTab === 'calendar' || activeTab === 'logs') ? '0px' : '20px', display: 'flex', flexDirection: 'column', gap: '20px' }
     },
-      /* ========================================== */
-      /* TAB 1: OPERATIONAL METRICS & CHAT LOGS     */
-      /* ========================================== */
-      activeTab === 'metrics' && /*#__PURE__*/React.createElement(React.Fragment, null,
-        /* Metrics Grid */
-        /*#__PURE__*/React.createElement("div", {
-          style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px' }
-        },
-          /* Card 1 */
-          /*#__PURE__*/React.createElement("div", { style: { padding: '14px', border: '1px solid #E2E8F0', borderRadius: '10px', backgroundColor: '#FFFFFF', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' } },
-            /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.75rem', fontWeight: '700', color: '#64748B' } }, "총 참여자"),
-            /*#__PURE__*/React.createElement("div", { style: { fontSize: '1.5rem', fontWeight: '800', color: '#1E293B', marginTop: '6px' } }, `${activeParticipantsCount}명`)
-          ),
-          /* Card 2 */
-          /*#__PURE__*/React.createElement("div", { style: { padding: '14px', border: '1px solid #E2E8F0', borderRadius: '10px', backgroundColor: '#FFFFFF', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' } },
-            /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.75rem', fontWeight: '700', color: '#64748B' } }, "등록된 일정 수"),
-            /*#__PURE__*/React.createElement("div", { style: { fontSize: '1.5rem', fontWeight: '800', color: '#1E293B', marginTop: '6px' } }, `${totalSchedulesCount}건`)
-          ),
-          /* Card 3 */
-          /*#__PURE__*/React.createElement("div", { style: { padding: '14px', border: '1px solid #E2E8F0', borderRadius: '10px', backgroundColor: '#FFFFFF', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' } },
-            /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.75rem', fontWeight: '700', color: '#64748B' } }, "진행 중 투표"),
-            /*#__PURE__*/React.createElement("div", { style: { fontSize: '1.5rem', fontWeight: '800', color: '#1E293B', marginTop: '6px' } }, `${activePollsCount}건`)
-          ),
-          /* Card 4 */
-          /*#__PURE__*/React.createElement("div", { style: { padding: '14px', border: '1px solid #E2E8F0', borderRadius: '10px', backgroundColor: '#FFFFFF', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' } },
-            /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.75rem', fontWeight: '700', color: '#64748B' } }, "채팅 총 수"),
-            /*#__PURE__*/React.createElement("div", { style: { fontSize: '1.5rem', fontWeight: '800', color: '#1E293B', marginTop: '6px' } }, `${totalMessagesCount}건`)
-          )
-        ),
-
-        /* Chat / Comments Logs Section */
-        /*#__PURE__*/React.createElement("div", {
-          style: { border: '1px solid #E2E8F0', borderRadius: '12px', padding: '16px', backgroundColor: '#FFFFFF', flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }
-        },
-          /* Header */
-          /*#__PURE__*/React.createElement("div", {
-            style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }
-          },
-            /*#__PURE__*/React.createElement("h4", { style: { fontSize: '0.92rem', fontWeight: 800, color: '#1E293B', margin: 0, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px' } }, /*#__PURE__*/React.createElement(ChatSectionIcon, null), "서비스 채팅 로그 한눈에 보기"),
-            /*#__PURE__*/React.createElement("input", {
-              type: "text",
-              placeholder: "참여자 또는 내용 검색...",
-              value: logSearchQuery,
-              onChange: e => setLogSearchQuery(e.target.value),
-              style: { padding: '5px 10px', fontSize: '0.8rem', border: '1px solid #CBD5E1', borderRadius: '6px', outline: 'none', width: '100%', maxWidth: '200px', minWidth: 0, flex: '1 1 140px' }
-            })
-          ),
-
-          /* Message list container */
-          /*#__PURE__*/React.createElement("div", {
-            style: { flex: 1, minHeight: '240px', overflowY: 'auto', border: '1px solid #F1F5F9', borderRadius: '8px', backgroundColor: '#F8FAFC', padding: '8px' }
-          },
-            filteredMessages.length === 0 ? /*#__PURE__*/React.createElement("div", { style: { padding: '20px', color: '#94A3B8', fontSize: '0.8rem', textAlign: 'center' } }, "검색 결과가 없거나 채팅 내역이 비어 있습니다.") :
-            filteredMessages.map(msg => {
-              const p = participantsMap[msg.participantId] || { name: '알수없음', color: '#94A3B8' };
-              const dateObj = new Date(msg.timestamp);
-              const dateFormatted = `${dateObj.getMonth() + 1}.${dateObj.getDate()} ${String(dateObj.getHours()).padStart(2, '0')}:${String(dateObj.getMinutes()).padStart(2, '0')}`;
-              
-              return /*#__PURE__*/React.createElement("div", {
-                key: msg.id,
-                className: 'admin-log-row',
-                style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', borderBottom: '1px solid #F1F5F9', padding: '8px 4px', gap: '6px 8px' }
-              },
-                /* Left details */
-                /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 } },
-                  /* User Badge */
-                  /*#__PURE__*/React.createElement("span", {
-                    style: { backgroundColor: p.color, color: getContrastTextColor(p.color), padding: '2px 8px', borderRadius: '9999px', fontSize: '0.72rem', fontWeight: 'bold', whiteSpace: 'nowrap' }
-                  }, p.name),
-                  /* Content text */
-                  /*#__PURE__*/React.createElement("span", {
-                    style: { fontSize: '0.8rem', color: '#334155', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', flex: 1 },
-                    title: msg.text || ''
-                  }, msg.text || (msg.imageUrl ? '[첨부된 사진]' : ''))
-                ),
-
-                /* Right actions */
-                /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 } },
-                  /* Time */
-                  /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.7rem', color: '#94A3B8' } }, dateFormatted),
-                  /* Delete Button */
-                  /*#__PURE__*/React.createElement("button", {
-                    type: "button",
-                    onClick: () => onDeleteMessage && onDeleteMessage(msg),
-                    style: { padding: '2px 6px', border: 'none', background: 'none', color: '#EF4444', fontSize: '0.72rem', cursor: 'pointer', fontWeight: 'bold' }
-                  }, "삭제")
-                )
-              );
-            })
-          )
-        )
-      ),
-
       /* ========================================== */
       /* TAB 2: CALENDAR & POLLS SETTINGS           */
       /* ========================================== */
@@ -11295,7 +11119,7 @@ function AdminModal({
     ),
 
     /* ========================================== */
-    /* TAB 4: CALENDAR-BASED SCHEDULE DELETION     */
+    /* TAB 4: CHAT/SCHEDULE ACTIVITY LOG LIST       */
     /* ========================================== */
     activeTab === 'logs' && /*#__PURE__*/React.createElement("div", {
       style: { flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', padding: '16px' }
@@ -11392,6 +11216,10 @@ function AdminModal({
         })()
       )
     ),
+
+    /* ========================================== */
+    /* TAB 5: CALENDAR-BASED SCHEDULE DELETION      */
+    /* ========================================== */
     activeTab === 'calendar' && /*#__PURE__*/React.createElement("div", {
       style: { flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', padding: '0 20px 20px' }
     },
@@ -12339,164 +12167,6 @@ function PollModal({ calendar, poll, onSave, onClose, showToast }) {
   }, isSubmitting ? "\uC800\uC7A5 \uC911..." : "\uD22C\uD45C \uC800\uC7A5")))));
 }
 
-function RecentActivityLog({
-  calendar,
-  expanded,
-  onToggle,
-  onDeleteLog,
-  onRequestConfirm
-}) {
-  const participantsMap = (Array.isArray(calendar?.participants) ? calendar.participants : []).reduce((acc, participant) => {
-    if (participant?.id) acc[participant.id] = participant;
-    return acc;
-  }, {});
-  const logs = buildActivityLogsFromAvailabilities(calendar || {});
-  const visibleLogs = expanded ? logs : logs.slice(0, 10);
-  const actionLabels = {
-    create: '등록',
-    update: '수정',
-    delete: '삭제',
-    poll_create: '투표 생성',
-    poll_vote: '투표',
-    poll_cancel: '투표 취소'
-  };
-  const actionColors = {
-    create: '#2563EB',
-    update: '#7C3AED',
-    delete: '#DC2626',
-    poll_create: '#0F172A',
-    poll_vote: '#2563EB',
-    poll_cancel: '#DC2626'
-  };
-  const [isCollapsed, setIsCollapsed] = React.useState(true);
-  const toggleRecentLogs = () => setIsCollapsed(value => !value);
-  const handleRecentLogsTitleKeyDown = event => {
-    if (event.key !== 'Enter' && event.key !== ' ') return;
-    event.preventDefault();
-    toggleRecentLogs();
-  };
-  return /*#__PURE__*/React.createElement("section", {
-    className: "summary-card",
-    style: {
-      marginTop: '20px'
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    className: `summary-title is-toggleable${isCollapsed ? ' is-collapsed' : ''}`,
-    role: "button",
-    tabIndex: 0,
-    "aria-expanded": !isCollapsed,
-    onClick: toggleRecentLogs,
-    onKeyDown: handleRecentLogsTitleKeyDown,
-    style: {
-      color: '#334155',
-      marginBottom: '12px'
-    }
-  }, /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg",
-    width: "20",
-    height: "20",
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    strokeWidth: "2.5",
-    strokeLinecap: "round",
-    strokeLinejoin: "round",
-    style: {
-      marginRight: '4px'
-    }
-  }, /*#__PURE__*/React.createElement("path", {
-    d: "M12 8v4l3 3"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M3.05 11a9 9 0 1 1 .5 4"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M3 7v4h4"
-  })), "\uCD5C\uADFC \uB85C\uADF8", /*#__PURE__*/React.createElement(SectionToggleButton, {
-    collapsed: isCollapsed,
-    onToggle: toggleRecentLogs,
-    label: isCollapsed ? "\uCD5C\uADFC \uB85C\uADF8 \uD3BC\uCE58\uAE30" : "\uCD5C\uADFC \uB85C\uADF8 \uC811\uAE30"
-  })), !isCollapsed && (logs.length === 0 ? /*#__PURE__*/React.createElement("div", {
-    style: {
-      color: 'var(--text-muted)',
-      fontSize: '0.85rem',
-      padding: '10px 0'
-    }
-  }, "\uC544\uC9C1 \uB4F1\uB85D\uB41C \uC77C\uC815 \uB85C\uADF8\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.") : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
-    className: "recent-log-list"
-  }, visibleLogs.map((log) => {
-    const participant = participantsMap[log.participantId] || {
-      name: POLL_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '투표' : '알 수 없음',
-      color: POLL_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '#0F172A' : '#94A3B8'
-    };
-    const actionLabel = actionLabels[log.action] || '기록';
-    const actionColor = actionColors[log.action] || '#64748B';
-    const noteText = sanitizeText(log.note || '', 120);
-    const logDateText = log.date ? formatShortDateWithDayName(log.date) : '';
-    const logTitleText = [participant.name, `[${actionLabel}]`, logDateText].filter(Boolean).join(' ');
-    const confirmText = `${logTitleText} 로그 데이터를 삭제하시겠습니까?`;
-    return /*#__PURE__*/React.createElement("div", {
-      key: log.id,
-      className: "recent-log-row"
-    }, /*#__PURE__*/React.createElement("div", {
-      className: "recent-log-left"
-    }, /*#__PURE__*/React.createElement("span", {
-      className: "participant-badge",
-      style: {
-        backgroundColor: participant.color,
-        color: getContrastTextColor(participant.color)
-      }
-    }, participant.name), /*#__PURE__*/React.createElement("span", {
-      className: "recent-log-action",
-      style: {
-        color: actionColor
-      }
-    }, "[", actionLabel, "]"), /*#__PURE__*/React.createElement("span", {
-      className: "recent-log-date"
-    }, logDateText || null), noteText && /*#__PURE__*/React.createElement("span", {
-      className: "recent-log-note"
-    }, "\"", noteText, "\"")), /*#__PURE__*/React.createElement("div", {
-      className: "recent-log-right"
-    }, /*#__PURE__*/React.createElement("span", {
-      className: "registered-at-text recent-log-time"
-    }, formatRegisteredAt(log.timestamp)), /*#__PURE__*/React.createElement("button", {
-      type: "button",
-      className: "btn btn-danger recent-log-delete-btn",
-      title: "\uB85C\uADF8 \uC0AD\uC81C",
-      "aria-label": `${logTitleText} 로그 삭제`,
-      onClick: () => {
-        if (typeof onDeleteLog !== 'function') return;
-        onRequestConfirm('로그 삭제', confirmText, () => onDeleteLog(log));
-      }
-    }, /*#__PURE__*/React.createElement("svg", {
-      xmlns: "http://www.w3.org/2000/svg",
-      width: "24",
-      height: "24",
-      viewBox: "0 0 24 24",
-      fill: "none",
-      stroke: "currentColor",
-      strokeWidth: "2",
-      strokeLinecap: "round",
-      strokeLinejoin: "round",
-      className: "icon icon-tabler icons-tabler-outline icon-tabler-x"
-    }, /*#__PURE__*/React.createElement("path", {
-      stroke: "none",
-      d: "M0 0h24v24H0z",
-      fill: "none"
-    }), /*#__PURE__*/React.createElement("path", {
-      d: "M18 6l-12 12"
-    }), /*#__PURE__*/React.createElement("path", {
-      d: "M6 6l12 12"
-    })))));
-  })), logs.length > 10 && /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    className: "btn btn-secondary",
-    onClick: onToggle,
-    style: {
-      marginTop: '14px',
-      width: '100%'
-    }
-  }, expanded ? "\uC811\uAE30" : "\uB354\uBCF4\uAE30"))));
-}
-
 // Summary List - Displays both "Partial Availability" (N+ members) and "Full Availability" lists
 function SummaryList({
   calendar,
@@ -12519,9 +12189,10 @@ function SummaryList({
     event.preventDefault();
     toggleSection(sectionKey);
   };
-  const totalCount = getActiveParticipants(calendar).length || 0;
+  const activeParticipants = getActiveParticipants(calendar);
+  const totalCount = activeParticipants.length || 0;
   const availabilities = getActiveAvailabilities(calendar);
-  const participantsMap = getActiveParticipants(calendar).reduce((acc, p) => {
+  const participantsMap = activeParticipants.reduce((acc, p) => {
     acc[p.id] = p;
     return acc;
   }, {});
