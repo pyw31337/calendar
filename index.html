@@ -483,6 +483,12 @@
     .msg-actions-group { opacity: 0; pointer-events: none; transition: opacity 0.15s ease; }
     .msg-row-hover:hover .msg-actions-group,
     .msg-row-hover.msg-actions-revealed .msg-actions-group { opacity: 1; pointer-events: auto; }
+    /* Same reveal behavior, but also collapses its own width to 0 while hidden (instead of
+       just fading) so it doesn't reserve empty space next to the timestamp -- used where the
+       actions sit inline in a header row (CommentsSection) rather than in their own column. */
+    .msg-actions-group-inline { max-width: 0; opacity: 0; overflow: hidden; pointer-events: none; transition: max-width 0.15s ease, opacity 0.15s ease; }
+    .msg-row-hover:hover .msg-actions-group-inline,
+    .msg-row-hover.msg-actions-revealed .msg-actions-group-inline { max-width: 50px; opacity: 1; pointer-events: auto; }
     .registered-participant-main {
       display: flex;
       align-items: center;
@@ -1412,6 +1418,20 @@ function formatConfirmedMeetingLabel(dateStr) {
   const dateObj = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
   const dayName = ['일', '월', '화', '수', '목', '금', '토'][dateObj.getDay()];
   return `[모임확정] ${y.slice(2)}.${m}.${d} (${dayName})`;
+}
+
+// calendar.confirmedMeeting supports multiple confirmed dates as an array of
+// {date, note, confirmedAt}, but earlier data (and any calendar saved before this
+// change) may still carry a single {date, note, confirmedAt} object -- normalize
+// both shapes to an array everywhere the field is read.
+function getConfirmedMeetings(calendar) {
+  const cm = calendar?.confirmedMeeting;
+  if (!cm) return [];
+  return (Array.isArray(cm) ? cm : [cm]).filter(m => m && m.date);
+}
+
+function isDateConfirmedMeeting(calendar, dateStr) {
+  return getConfirmedMeetings(calendar).some(m => m.date === dateStr);
 }
 
 // The chat room header is cramped for space (back button + title + bell + share icons all
@@ -5829,14 +5849,14 @@ function App() {
   const handleConfirmMeeting = (dateStr, note) => {
     if (!activeCal || !isValidDateString(dateStr)) return false;
     const now = Date.now();
-    const isAlreadyConfirmed = activeCal.confirmedMeeting?.date === dateStr;
+    const existingMeetings = getConfirmedMeetings(activeCal);
+    const isAlreadyConfirmed = existingMeetings.some(m => m.date === dateStr);
+    const nextConfirmedMeetings = isAlreadyConfirmed
+      ? existingMeetings.filter(m => m.date !== dateStr)
+      : [...existingMeetings, { date: dateStr, note: sanitizeText(note, 120), confirmedAt: now }];
     const updatedCal = {
       ...activeCal,
-      confirmedMeeting: isAlreadyConfirmed ? null : {
-        date: dateStr,
-        note: sanitizeText(note, 120),
-        confirmedAt: now
-      },
+      confirmedMeeting: nextConfirmedMeetings,
       updatedAt: now,
       revision: (activeCal.revision || 0) + 1
     };
@@ -6082,16 +6102,15 @@ function App() {
   const mainMenuChatLatestTimestamp = mainMenuChatCount > 0 ? chatMessages[mainMenuChatCount - 1].timestamp : 0;
   const mainMenuChatHasUnread = mainMenuChatLatestTimestamp > getChatLastReadTimestamp(activeCalId);
 
-  // Confirmed-meeting banner stays up through the day of the meeting itself, then disappears
-  // once that date is in the past -- only today-or-future confirmations show on the calendar.
+  // Each confirmed meeting gets its own banner bubble on the calendar, and stays up through
+  // the day of the meeting itself -- only today-or-future confirmations show.
   const todayDateStrForBanner = (() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   })();
-  const showConfirmedMeetingBanner = !!activeCal?.confirmedMeeting && activeCal.confirmedMeeting.date >= todayDateStrForBanner;
-  const confirmedMeetingMemoEntries = showConfirmedMeetingBanner
-    ? getActiveAvailabilities(activeCal).filter(e => e.date === activeCal.confirmedMeeting.date && e.note && e.note.trim())
-    : [];
+  const visibleConfirmedMeetings = getConfirmedMeetings(activeCal)
+    .filter(m => m.date >= todayDateStrForBanner)
+    .sort((a, b) => a.date.localeCompare(b.date));
 
   return /*#__PURE__*/React.createElement("div", {
     className: "app-container",
@@ -6257,38 +6276,43 @@ function App() {
     }
   }, /*#__PURE__*/React.createElement("span", { className: "main-menu-icon" }, /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M3 12a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M15 6a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M15 18a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M8.7 10.7l6.6 -3.4", "M8.7 13.3l6.6 3.4"] })), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-full" }, "공유하기"), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-short" }, "공유"))))), /*#__PURE__*/React.createElement("div", {
     ref: calendarSectionRef
-  }, showConfirmedMeetingBanner && /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: 'linear-gradient(#fff, #fff) padding-box, var(--accent-gradient) border-box',
-      border: '2px solid transparent',
-      borderRadius: 'var(--radius-md)',
-      padding: '10px 16px',
-      marginBottom: '12px',
-      display: 'flex',
-      alignItems: 'center',
-      flexWrap: 'wrap',
-      gap: '8px'
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: '0.88rem',
-      fontWeight: 800,
-      whiteSpace: 'nowrap',
-      background: 'var(--accent-gradient)',
-      WebkitBackgroundClip: 'text',
-      WebkitTextFillColor: 'transparent',
-      backgroundClip: 'text',
-      color: 'transparent'
-    }
-  }, formatConfirmedMeetingLabel(activeCal.confirmedMeeting.date)), confirmedMeetingMemoEntries.map(entry => {
-    const p = getActiveParticipants(activeCal).find(part => part.id === entry.participantId);
-    if (!p) return null;
-    return /*#__PURE__*/React.createElement("span", {
-      key: entry.participantId,
-      className: "memo-capsule-badge",
-      style: { backgroundColor: p.color, color: getContrastTextColor(p.color) },
-      title: `${p.name}: ${entry.note.trim()}`
-    }, entry.note.trim());
+  }, visibleConfirmedMeetings.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: { display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }
+  }, visibleConfirmedMeetings.map(meeting => {
+    const memoEntries = getActiveAvailabilities(activeCal).filter(e => e.date === meeting.date && e.note && e.note.trim());
+    return /*#__PURE__*/React.createElement("div", {
+      key: meeting.date,
+      style: {
+        background: 'linear-gradient(#fff, #fff) padding-box, var(--accent-gradient) border-box',
+        border: '2px solid transparent',
+        borderRadius: 'var(--radius-md)',
+        padding: '10px 16px',
+        display: 'flex',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: '8px'
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: '0.88rem',
+        fontWeight: 800,
+        whiteSpace: 'nowrap',
+        background: 'var(--accent-gradient)',
+        WebkitBackgroundClip: 'text',
+        WebkitTextFillColor: 'transparent',
+        backgroundClip: 'text',
+        color: 'transparent'
+      }
+    }, formatConfirmedMeetingLabel(meeting.date)), memoEntries.map(entry => {
+      const p = getActiveParticipants(activeCal).find(part => part.id === entry.participantId);
+      if (!p) return null;
+      return /*#__PURE__*/React.createElement("span", {
+        key: entry.participantId,
+        className: "memo-capsule-badge",
+        style: { backgroundColor: p.color, color: getContrastTextColor(p.color) },
+        title: `${p.name}: ${entry.note.trim()}`
+      }, entry.note.trim());
+    }));
   })), /*#__PURE__*/React.createElement(CalendarGrid, {
 
     calendar: activeCal,
@@ -6993,16 +7017,17 @@ function CalendarGrid({
     const holidayNames = holidayMap[dateStr];
     const isHoliday = !!holidayNames && holidayNames.length > 0;
     const lunarLabel = lunarLabelMap[dateStr];
+    const isConfirmed = isDateConfirmedMeeting(calendar, dateStr);
     const solarTermName = !isHoliday && !isAllAvailable ? solarTermMap[dateStr] : null;
     // Only one badge shows next to the date number: holiday name takes priority (it's
-    // tied to the red date styling), then '전원' if everyone's available that day
-    // (replacing a solar term that would otherwise be shown), then the solar term.
-    const cornerText = isHoliday ? holidayNames.join('·') : isAllAvailable ? '전원' : solarTermName;
-    const cornerColor = isHoliday ? '#EF4444' : isAllAvailable ? '#10B981' : '#94A3B8';
+    // tied to the red date styling), then '확정' if this date has been promoted to a
+    // confirmed meeting, then '전원' if everyone's available that day (replacing a solar
+    // term that would otherwise be shown), then the solar term.
+    const cornerText = isHoliday ? holidayNames.join('·') : isConfirmed ? '확정' : isAllAvailable ? '전원' : solarTermName;
+    const cornerColor = isHoliday ? '#EF4444' : isConfirmed ? '#7C3AED' : isAllAvailable ? '#10B981' : '#94A3B8';
     const cornerTitle = isHoliday ? (lunarLabel ? `${holidayNames.join(', ')} (${lunarLabel})` : holidayNames.join(', ')) : undefined;
     const columnDow = idx % 7; // 0=Sun .. 6=Sat, since each week row starts on Sunday
     const isSunday = columnDow === 0;
-    const isConfirmed = calendar?.confirmedMeeting?.date === dateStr;
     return /*#__PURE__*/React.createElement("div", {
       key: idx,
       className: `day-cell ${isCurrentMonth ? '' : 'other-month'} ${isConfirmed ? 'confirmed-meeting' : isAllAvailable ? 'all-available' : ''}`,
@@ -8156,7 +8181,7 @@ function CommentsSection({
             style: { fontSize: '0.72rem', color: '#94A3B8', whiteSpace: 'nowrap' }
           }, `${dateInfo.dateStr.replace('(', ' (')} ${dateInfo.timeStr}`),
           isMsgMe ? /*#__PURE__*/React.createElement('div', {
-            className: 'msg-actions-group',
+            className: 'msg-actions-group-inline',
             style: { display: 'flex', alignItems: 'center', gap: '4px' }
           },
             /* Edit Button */
@@ -9854,7 +9879,7 @@ function DateModal({
   const totalPartCount = activeParticipants.length || 0;
   const uniqueActiveParts = new Set(dateEntries.map(e => e.participantId));
   const isAllAvailable = totalPartCount > 0 && uniqueActiveParts.size === totalPartCount;
-  const isConfirmed = calendar?.confirmedMeeting?.date === dateStr;
+  const isConfirmed = isDateConfirmedMeeting(calendar, dateStr);
 
   const handleConfirmMeeting = async () => {
     if (isSubmitting) return;
@@ -10096,13 +10121,14 @@ function DateModal({
     const p = activeParticipants.find(part => part.id === entry.participantId);
     if (!p) return null;
     const entryUrl = extractFirstUrl(entry.note);
-    return /*#__PURE__*/React.createElement(React.Fragment, {
-      key: entry.id || p.id
-    }, /*#__PURE__*/React.createElement("div", {
+    const entryTextOnly = entryUrl ? (entry.note || '').replace(entryUrl, '').trim() : (entry.note || '').trim();
+    const registeredAtText = formatRegisteredAt(entry.updatedAt);
+    return /*#__PURE__*/React.createElement("div", {
+      key: entry.id || p.id,
       style: {
         display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
+        flexDirection: 'column',
+        gap: '6px',
         padding: '10px 14px',
         backgroundColor: '#F8FAFC',
         borderRadius: '12px',
@@ -10111,10 +10137,9 @@ function DateModal({
     }, /*#__PURE__*/React.createElement("div", {
       style: {
         display: 'flex',
-        alignItems: 'center',
-        gap: '8px',
-        minWidth: 0,
-        flex: 1
+        alignItems: 'flex-start',
+        justifyContent: 'space-between',
+        gap: '8px'
       }
     }, /*#__PURE__*/React.createElement("span", {
       className: "participant-badge",
@@ -10122,10 +10147,7 @@ function DateModal({
         backgroundColor: p.color,
         color: getContrastTextColor(p.color),
         cursor: 'pointer',
-        userSelect: 'none',
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
-        whiteSpace: 'nowrap'
+        userSelect: 'none'
       },
       title: "클릭 시 이 참여자로 자동 선택 및 메모 불러오기",
       onClick: () => {
@@ -10133,10 +10155,7 @@ function DateModal({
         setParticipantId(p.id);
         setNote(entry.note || '');
       }
-    }, p.name, entry.note && entry.note.trim() && ` (${entry.note.trim()})`), formatRegisteredAt(entry.updatedAt) && /*#__PURE__*/React.createElement("span", {
-      className: "registered-at-text",
-      style: { flexShrink: 0 }
-    }, formatRegisteredAt(entry.updatedAt))), /*#__PURE__*/React.createElement("button", {
+    }, p.name, entryTextOnly && ` (${entryTextOnly})`), /*#__PURE__*/React.createElement("button", {
       type: "button",
       className: "btn btn-danger",
       style: {
@@ -10156,7 +10175,25 @@ function DateModal({
           });
         });
       }
-    }, "삭제")), entryUrl && /*#__PURE__*/React.createElement(LinkPreviewCard, { url: entryUrl }));
+    }, "삭제")), entryUrl && /*#__PURE__*/React.createElement("span", {
+      style: {
+        alignSelf: 'flex-start',
+        display: 'inline-flex',
+        alignItems: 'center',
+        padding: '3px 10px',
+        borderRadius: 'var(--radius-full)',
+        fontSize: '0.72rem',
+        fontWeight: 600,
+        backgroundColor: '#E2E8F0',
+        color: '#475569',
+        cursor: 'pointer',
+        wordBreak: 'break-all'
+      },
+      title: entryUrl,
+      onClick: () => window.open(entryUrl, '_blank', 'noopener,noreferrer')
+    }, entryUrl), registeredAtText && /*#__PURE__*/React.createElement("span", {
+      className: "registered-at-text"
+    }, registeredAtText));
   })))), !adminMode && /*#__PURE__*/React.createElement("div", {
     className: "modal-footer",
     style: {
@@ -12211,8 +12248,10 @@ function SummaryList({
     return [...datesList].sort((a, b) => b.localeCompare(a));
   };
 
-  // Future only — past dates moved to '과거 모임' section
-  const sortedAllDates = getSortedDates(allAvailableDates.filter(d => d >= todayStr));
+  // Future only — past dates moved to '과거 모임' section. Confirmed meetings are excluded
+  // from '전원 참석 가능' entirely -- once a date is confirmed it lives on the calendar's
+  // own banner bubble instead, so it shouldn't linger here as merely "possible".
+  const sortedAllDates = getSortedDates(allAvailableDates.filter(d => d >= todayStr && !isDateConfirmedMeeting(calendar, d)));
   const sortedPartialDates = getSortedDates(partialAvailableDates.filter(d => d >= todayStr));
 
   // 3. Past meeting dates: all past dates with at least 1 active participant registered and at least 1 memo exists
@@ -12272,7 +12311,7 @@ function SummaryList({
     const memoEntries = dateEntries.filter(e => e.note && e.note.trim().length > 0);
     const isPast = d < todayStr;
     const availCount = new Set(dateEntries.map(e => e.participantId)).size;
-    const isConfirmed = calendar?.confirmedMeeting?.date === d;
+    const isConfirmed = isDateConfirmedMeeting(calendar, d);
     return /*#__PURE__*/React.createElement("button", {
       key: d,
       className: "date-item-btn",
@@ -12374,7 +12413,6 @@ function SummaryList({
     const formattedDateStr = formatDateWithDayName(d);
     const memoEntries = dateEntries.filter(e => e.note && e.note.trim().length > 0);
     const isPast = d < todayStr;
-    const isConfirmed = calendar?.confirmedMeeting?.date === d;
     return /*#__PURE__*/React.createElement("button", {
       key: d,
       className: "date-item-btn",
@@ -12383,11 +12421,6 @@ function SummaryList({
         opacity: 0.7,
         backgroundColor: '#F8FAFC',
         borderColor: '#E2E8F0',
-        flexDirection: 'column',
-        alignItems: 'flex-start'
-      } : isConfirmed ? {
-        borderColor: '#E9D5FF',
-        backgroundColor: '#FAF5FF',
         flexDirection: 'column',
         alignItems: 'flex-start'
       } : {
@@ -12412,12 +12445,12 @@ function SummaryList({
     }, formattedDateStr), /*#__PURE__*/React.createElement("span", {
       className: "date-item-badge",
       style: {
-        background: isPast ? '#E2E8F0' : isConfirmed ? '#F3E8FF' : '#10B981',
-        color: isPast ? '#64748B' : isConfirmed ? '#7C3AED' : '#FFF',
-        border: isConfirmed ? '1px solid #E9D5FF' : 'none',
+        background: isPast ? '#E2E8F0' : '#10B981',
+        color: isPast ? '#64748B' : '#FFF',
+        border: 'none',
         flexShrink: 0
       }
-    }, isPast ? '지나간 모임' : isConfirmed ? '확정모임' : '전원 가능')), memoEntries.length > 0 && /*#__PURE__*/React.createElement("div", {
+    }, isPast ? '지나간 모임' : '전원 가능')), memoEntries.length > 0 && /*#__PURE__*/React.createElement("div", {
       style: {
         display: 'flex',
         alignItems: 'center',
