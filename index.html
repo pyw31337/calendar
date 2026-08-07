@@ -6285,33 +6285,49 @@ function App() {
       style: {
         background: 'linear-gradient(#fff, #fff) padding-box, var(--accent-gradient) border-box',
         border: '2px solid transparent',
-        borderRadius: 'var(--radius-md)',
-        padding: '10px 16px',
+        borderRadius: 'var(--radius-full)',
         display: 'flex',
-        alignItems: 'center',
-        flexWrap: 'wrap',
-        gap: '8px'
+        alignItems: 'stretch',
+        overflowX: 'auto',
+        overflowY: 'hidden',
+        cursor: 'pointer'
+      },
+      onClick: () => {
+        if (!guardLoadedCalendar()) return;
+        setSelectedDate(meeting.date);
+        setIsModalOpen(true);
       }
     }, /*#__PURE__*/React.createElement("span", {
       style: {
-        fontSize: '0.88rem',
+        padding: '6px 16px',
+        fontSize: '0.85rem',
         fontWeight: 800,
         whiteSpace: 'nowrap',
-        background: 'var(--accent-gradient)',
-        WebkitBackgroundClip: 'text',
-        WebkitTextFillColor: 'transparent',
-        backgroundClip: 'text',
-        color: 'transparent'
+        color: '#4F46E5',
+        backgroundColor: '#FFFFFF',
+        display: 'flex',
+        alignItems: 'center'
       }
     }, formatConfirmedMeetingLabel(meeting.date)), memoEntries.map(entry => {
       const p = getActiveParticipants(activeCal).find(part => part.id === entry.participantId);
       if (!p) return null;
+      const entryUrl = extractFirstUrl(entry.note);
+      const noteTextOnly = entryUrl ? entry.note.replace(entryUrl, '').trim() : entry.note.trim();
+      if (!noteTextOnly) return null;
       return /*#__PURE__*/React.createElement("span", {
         key: entry.participantId,
-        className: "memo-capsule-badge",
-        style: { backgroundColor: p.color, color: getContrastTextColor(p.color) },
-        title: `${p.name}: ${entry.note.trim()}`
-      }, entry.note.trim());
+        style: {
+          padding: '6px 16px',
+          fontSize: '0.85rem',
+          fontWeight: 800,
+          whiteSpace: 'nowrap',
+          backgroundColor: p.color,
+          color: getContrastTextColor(p.color),
+          display: 'flex',
+          alignItems: 'center'
+        },
+        title: `${p.name}: ${noteTextOnly}`
+      }, noteTextOnly);
     }));
   })), /*#__PURE__*/React.createElement(CalendarGrid, {
 
