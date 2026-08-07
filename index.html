@@ -117,24 +117,32 @@
     .main-header-inner {
       max-width: 1100px;
       margin: 0 auto;
-      padding: 14px 16px;
+      padding: 14px 16px 8px;
       display: flex;
       flex-direction: column;
       gap: 10px;
     }
     @media (min-width: 768px) {
-      .main-header-inner { padding: 18px 24px; }
+      .main-header-inner { padding: 18px 24px 8px; }
     }
 
     .main-header-top-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 
+    /* Menu bar's divider line spans the FULL header width (edge to edge of the header bar, not
+       just the inner content's padded box) -- achieved by pulling the bar out past
+       .main-header-inner's own left/right padding with negative margins, then re-adding that
+       same amount as the bar's own padding so its content still lines up with the title above. */
     .main-menu-bar {
       display: flex;
       align-items: stretch;
+      margin: 0 -16px;
+      padding: 8px 16px 0;
       border-top: 1px solid var(--border-subtle);
-      padding-top: 8px;
-      gap: 2px;
+      gap: 0;
       overflow-x: auto;
+    }
+    @media (min-width: 768px) {
+      .main-menu-bar { margin: 0 -24px; padding: 8px 24px 0; }
     }
     .main-menu-item {
       flex: 1;
@@ -142,10 +150,10 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 5px;
+      gap: 4px;
       background: none;
       border: none;
-      padding: 8px 4px;
+      padding: 6px 4px;
       font-size: 0.82rem;
       font-weight: 700;
       color: var(--text-muted);
@@ -154,6 +162,7 @@
       border-radius: var(--radius-sm);
     }
     .main-menu-item:hover { background: var(--bg-primary); color: var(--text-main); }
+    .main-menu-sep { flex: 0 0 auto; align-self: center; width: 1px; height: 16px; margin: 0 2px; background: var(--border-subtle); }
     .main-menu-badge {
       display: inline-flex;
       align-items: center;
@@ -168,7 +177,8 @@
       color: var(--text-muted);
     }
     @media (max-width: 480px) {
-      .main-menu-item { font-size: 0.74rem; padding: 8px 2px; }
+      .main-menu-item { font-size: 0.74rem; padding: 6px 2px; }
+      .main-menu-sep { margin: 0 1px; }
     }
 
 
@@ -5348,7 +5358,7 @@ function App() {
   const [chatUploadProgress, setChatUploadProgress] = React.useState(null);
   const chatTextareaRef = React.useRef(null);
   const [chatImages, setChatImages] = React.useState([]);
-  const [activeLightboxUrl, setActiveLightboxUrl] = React.useState(null);
+  const [activeLightbox, setActiveLightbox] = React.useState(null); // { urls: string[], index: number } | null
   const [deletingMessage, setDeletingMessage] = React.useState(null); // {id, participantId, text, calId}
   const [editingMessage, setEditingMessage] = React.useState(null); // {id, participantId, text, imageUrl, thumbUrl, calId}
 
@@ -6151,8 +6161,8 @@ function App() {
       chatTextareaRef: chatTextareaRef,
       chatImage: chatImages,
       setChatImage: setChatImages,
-      activeLightboxUrl: activeLightboxUrl,
-      setActiveLightboxUrl: setActiveLightboxUrl,
+      activeLightbox: activeLightbox,
+      setActiveLightbox: setActiveLightbox,
       onSend: handleSendChatMessage,
       onDeleteMessage: handleDeleteMessage,
       onEditMessage: handleEditMessage,
@@ -6357,36 +6367,36 @@ function App() {
     type: "button",
     className: "main-menu-item",
     onClick: () => scrollToSection(calendarSectionRef)
-  }, "일정잡기"), /*#__PURE__*/React.createElement("button", {
+  }, /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M4 7a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12z", "M16 3v4", "M8 3v4", "M4 11h16"] }), "일정잡기"), /*#__PURE__*/React.createElement("div", { className: "main-menu-sep" }), /*#__PURE__*/React.createElement("button", {
     type: "button",
     className: "main-menu-item",
     onClick: () => scrollToSection(pollsSectionRef)
-  }, "투표하기", mainMenuPollCount > 0 && /*#__PURE__*/React.createElement("span", {
+  }, /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M9 11l3 3l8 -8", "M20 12v6a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h9"] }), "투표하기", mainMenuPollCount > 0 && /*#__PURE__*/React.createElement("span", {
     className: "main-menu-badge"
-  }, mainMenuPollCount)), /*#__PURE__*/React.createElement("button", {
+  }, mainMenuPollCount)), /*#__PURE__*/React.createElement("div", { className: "main-menu-sep" }), /*#__PURE__*/React.createElement("button", {
     type: "button",
     className: "main-menu-item",
     onClick: () => changeView('chat')
-  }, "채팅하기", mainMenuChatCount > 0 && /*#__PURE__*/React.createElement("span", {
+  }, /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"] }), "채팅하기", mainMenuChatCount > 0 && /*#__PURE__*/React.createElement("span", {
     className: "main-menu-badge",
     style: {
       backgroundColor: mainMenuChatHasUnread ? '#EF4444' : '#E2E8F0',
       color: mainMenuChatHasUnread ? '#FFFFFF' : '#64748B'
     }
-  }, mainMenuChatCount)), /*#__PURE__*/React.createElement("button", {
+  }, mainMenuChatCount)), /*#__PURE__*/React.createElement("div", { className: "main-menu-sep" }), /*#__PURE__*/React.createElement("button", {
     type: "button",
     className: "main-menu-item",
     onClick: () => {
       if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 공유 정보를 확인해 주세요.')) setIsShareOpen(true);
     }
-  }, "공유하기"), /*#__PURE__*/React.createElement("div", {
-    className: "participants-anchor"
-  }, /*#__PURE__*/React.createElement("button", {
+  }, /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M3 12a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M15 6a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M15 18a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M8.7 10.7l6.6 -3.4", "M8.7 13.3l6.6 3.4"] }), "공유하기"), /*#__PURE__*/React.createElement("div", { className: "main-menu-sep" }), /*#__PURE__*/React.createElement("button", {
     type: "button",
     className: "main-menu-item",
+    style: { position: 'relative' },
     onClick: () => setIsParticipantsOpen(!isParticipantsOpen)
-  }, "참여자 (", getActiveParticipants(activeCal)?.length || 0, "명)"), isParticipantsOpen && /*#__PURE__*/React.createElement("div", {
-    className: "participants-popover"
+  }, /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M5 7a4 4 0 1 0 8 0a4 4 0 1 0 -8 0", "M3 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2", "M16 3.13a4 4 0 0 1 0 7.75", "M21 21v-2a4 4 0 0 0 -3 -3.85"] }), "참여자 (", getActiveParticipants(activeCal)?.length || 0, "명)", isParticipantsOpen && /*#__PURE__*/React.createElement("div", {
+    className: "participants-popover",
+    onClick: e => e.stopPropagation()
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: '0.8rem',
@@ -6462,8 +6472,8 @@ function App() {
     chatTextareaRef: chatTextareaRef,
     chatImage: chatImages,
     setChatImage: setChatImages,
-    activeLightboxUrl: activeLightboxUrl,
-    setActiveLightboxUrl: setActiveLightboxUrl,
+    activeLightbox: activeLightbox,
+    setActiveLightbox: setActiveLightbox,
     onSend: handleSendChatMessage,
     onDeleteMessage: handleDeleteMessage,
     onEditMessage: handleEditMessage,
@@ -7653,6 +7663,23 @@ function deleteAllChatImagesFromStorage(msg) {
   urls.forEach(url => deleteChatImageFromStorage(url));
 }
 
+// Small line-icon for the main header's menu bar (Tabler-style outline icons, matching the
+// existing icon set used elsewhere in the header/popovers).
+function MenuIcon({ paths }) {
+  return /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: "16",
+    height: "16",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: "2",
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+    style: { flexShrink: 0 }
+  }, paths.map((d, i) => /*#__PURE__*/React.createElement("path", { key: i, d })));
+}
+
 function ChatSectionIcon() {
   return /*#__PURE__*/React.createElement("svg", {
     xmlns: "http://www.w3.org/2000/svg",
@@ -7729,27 +7756,129 @@ function formatChatDividerDate(timestamp) {
 // Renders a chat message's attached image(s): a single thumbnail for legacy/one-image
 // messages, or a wrapping grid of thumbnails for messages sent with multiple images
 // (msg.imageUrls/msg.thumbUrls). Returns null when the message has no image at all.
-function renderChatMessageImages(msg, setActiveLightboxUrl, singleImageStyle = {}) {
+function renderChatMessageImages(msg, setActiveLightbox, singleImageStyle = {}) {
   const urls = Array.isArray(msg.imageUrls) && msg.imageUrls.length > 0 ? msg.imageUrls : (msg.imageUrl ? [msg.imageUrl] : []);
   const thumbs = Array.isArray(msg.thumbUrls) && msg.thumbUrls.length > 0 ? msg.thumbUrls : (msg.thumbUrl ? [msg.thumbUrl] : []);
   if (thumbs.length === 0) return null;
+  const displayUrls = thumbs.map((t, i) => urls[i] || t);
   if (thumbs.length === 1) {
     return /*#__PURE__*/React.createElement('img', {
       src: thumbs[0],
       alt: '첨부이미지',
-      onClick: () => setActiveLightboxUrl && setActiveLightboxUrl(urls[0] || thumbs[0]),
+      onClick: () => setActiveLightbox && setActiveLightbox({ urls: displayUrls, index: 0 }),
       style: { display: 'block', borderRadius: '8px', cursor: 'pointer', objectFit: 'cover', ...singleImageStyle }
     });
   }
   return /*#__PURE__*/React.createElement('div', {
-    style: { display: 'flex', flexWrap: 'wrap', gap: '4px', maxWidth: singleImageStyle.maxWidth || '200px' }
+    style: { display: 'flex', flexWrap: 'wrap', gap: '4px', maxWidth: singleImageStyle.maxWidth || '200px', marginBottom: singleImageStyle.marginBottom || '0' }
   }, thumbs.map((thumb, idx) => /*#__PURE__*/React.createElement('img', {
     key: idx,
     src: thumb,
     alt: `첨부이미지 ${idx + 1}`,
-    onClick: () => setActiveLightboxUrl && setActiveLightboxUrl(urls[idx] || thumb),
+    onClick: () => setActiveLightbox && setActiveLightbox({ urls: displayUrls, index: idx }),
     style: { display: 'block', width: '56px', height: '56px', borderRadius: '6px', cursor: 'pointer', objectFit: 'cover' }
   })));
+}
+
+// Full-screen image viewer for a message's photo(s) -- swipeable (touch) with left/right arrow
+// buttons and dot indicators when there's more than one image, matching the KakaoTalk-style
+// multi-photo gallery UX the chat bubbles are modeled after.
+function Lightbox({ urls, index, onClose, onNavigate }) {
+  const touchStartXRef = React.useRef(null);
+  const total = urls.length;
+  const goTo = i => {
+    if (i < 0 || i >= total) return;
+    onNavigate(i);
+  };
+  React.useEffect(() => {
+    const onKeyDown = e => {
+      if (e.key === 'Escape') onClose();
+      else if (e.key === 'ArrowLeft') goTo(index - 1);
+      else if (e.key === 'ArrowRight') goTo(index + 1);
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [index, total]);
+  const handleTouchStart = e => { touchStartXRef.current = e.touches[0].clientX; };
+  const handleTouchEnd = e => {
+    if (touchStartXRef.current == null) return;
+    const deltaX = e.changedTouches[0].clientX - touchStartXRef.current;
+    touchStartXRef.current = null;
+    if (Math.abs(deltaX) < 50) return;
+    if (deltaX < 0) goTo(index + 1); else goTo(index - 1);
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    onClick: onClose,
+    onTouchStart: handleTouchStart,
+    onTouchEnd: handleTouchEnd,
+    style: {
+      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+      backgroundColor: 'rgba(15, 23, 42, 0.92)', backdropFilter: 'blur(8px)', zIndex: 9000,
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: e => { e.stopPropagation(); onClose(); },
+    "aria-label": "닫기",
+    style: {
+      position: 'absolute', top: '16px', right: '16px',
+      background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.25)',
+      borderRadius: '50%', width: '36px', height: '36px', cursor: 'pointer',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#FFFFFF', zIndex: 9001
+    }
+  }, /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg", width: "18", height: "18", viewBox: "0 0 24 24",
+    fill: "none", stroke: "currentColor", strokeWidth: "2.5", strokeLinecap: "round", strokeLinejoin: "round"
+  }, /*#__PURE__*/React.createElement("line", { x1: "18", y1: "6", x2: "6", y2: "18" }), /*#__PURE__*/React.createElement("line", { x1: "6", y1: "6", x2: "18", y2: "18" }))),
+  total > 1 && index > 0 && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: e => { e.stopPropagation(); goTo(index - 1); },
+    "aria-label": "이전 이미지",
+    style: {
+      position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)',
+      background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.25)',
+      borderRadius: '50%', width: '40px', height: '40px', cursor: 'pointer',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#FFFFFF', zIndex: 9001
+    }
+  }, /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg", width: "22", height: "22", viewBox: "0 0 24 24",
+    fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
+  }, /*#__PURE__*/React.createElement("path", { d: "M15 6l-6 6l6 6" }))),
+  total > 1 && index < total - 1 && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: e => { e.stopPropagation(); goTo(index + 1); },
+    "aria-label": "다음 이미지",
+    style: {
+      position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)',
+      background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.25)',
+      borderRadius: '50%', width: '40px', height: '40px', cursor: 'pointer',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#FFFFFF', zIndex: 9001
+    }
+  }, /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg", width: "22", height: "22", viewBox: "0 0 24 24",
+    fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
+  }, /*#__PURE__*/React.createElement("path", { d: "M9 6l6 6l-6 6" }))),
+  /*#__PURE__*/React.createElement("img", {
+    src: urls[index],
+    alt: "원본 이미지",
+    onClick: e => e.stopPropagation(),
+    style: {
+      maxWidth: '92vw', maxHeight: '82vh', borderRadius: '12px', objectFit: 'contain',
+      boxShadow: '0 24px 80px rgba(0,0,0,0.6)'
+    }
+  }),
+  total > 1 && /*#__PURE__*/React.createElement("div", {
+    onClick: e => e.stopPropagation(),
+    style: { display: 'flex', gap: '7px', marginTop: '16px', zIndex: 9001 }
+  }, urls.map((_, i) => /*#__PURE__*/React.createElement("span", {
+    key: i,
+    onClick: () => goTo(i),
+    style: {
+      width: '7px', height: '7px', borderRadius: '50%', cursor: 'pointer',
+      backgroundColor: i === index ? '#FFFFFF' : 'rgba(255,255,255,0.35)',
+      transition: 'background-color 0.15s'
+    }
+  }))));
 }
 
 // Tracks which message row's edit/delete controls should be revealed: desktop hover is
@@ -7786,8 +7915,8 @@ function CommentsSection({
   chatTextareaRef,
   chatImage: chatImages,
   setChatImage: setChatImages,
-  activeLightboxUrl,
-  setActiveLightboxUrl,
+  activeLightbox,
+  setActiveLightbox,
   onSend,
   onDeleteMessage,
   onEditMessage,
@@ -7932,7 +8061,7 @@ function CommentsSection({
     const badgeName = p?.name || '알수없음';
 
     /* === SHARED ELEMENTS === */
-    const msgImages = renderChatMessageImages(msg, setActiveLightboxUrl, { maxWidth: '120px', maxHeight: '90px' });
+    const msgImages = renderChatMessageImages(msg, setActiveLightbox, { maxWidth: '120px', maxHeight: '90px' });
     const msgFirstUrl = extractFirstUrl(msg.text);
     const bubbleContent = /*#__PURE__*/React.createElement(React.Fragment, null,
       msgImages ? /*#__PURE__*/React.createElement('div', { style: { marginBottom: '8px' } }, msgImages) : null,
@@ -8233,62 +8362,12 @@ function CommentsSection({
       )
     )
   ),
-  activeLightboxUrl ? /*#__PURE__*/React.createElement("div", {
-    onClick: () => setActiveLightboxUrl(null),
-    style: {
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundColor: 'rgba(15, 23, 42, 0.92)',
-      backdropFilter: 'blur(8px)',
-      zIndex: 9000,
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center'
-    }
-  }, /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    onClick: e => { e.stopPropagation(); setActiveLightboxUrl(null); },
-    style: {
-      position: 'absolute',
-      top: '16px',
-      right: '16px',
-      background: 'rgba(255,255,255,0.12)',
-      border: '1px solid rgba(255,255,255,0.25)',
-      borderRadius: '50%',
-      width: '36px',
-      height: '36px',
-      cursor: 'pointer',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      color: '#FFFFFF',
-      zIndex: 9001
-    }
-  }, /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg",
-    width: "18",
-    height: "18",
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    strokeWidth: "2.5",
-    strokeLinecap: "round",
-    strokeLinejoin: "round"
-  }, /*#__PURE__*/React.createElement("line", { x1: "18", y1: "6", x2: "6", y2: "18" }), /*#__PURE__*/React.createElement("line", { x1: "6", y1: "6", x2: "18", y2: "18" }))), /*#__PURE__*/React.createElement("img", {
-    src: activeLightboxUrl,
-    alt: "원본 이미지",
-    onClick: e => e.stopPropagation(),
-    style: {
-      maxWidth: '92vw',
-      maxHeight: '88vh',
-      borderRadius: '12px',
-      objectFit: 'contain',
-      boxShadow: '0 24px 80px rgba(0,0,0,0.6)'
-    }
-  })) : null), imageProcessing && /*#__PURE__*/React.createElement(ImageProcessingOverlay, imageProcessing));
+  activeLightbox ? /*#__PURE__*/React.createElement(Lightbox, {
+    urls: activeLightbox.urls,
+    index: activeLightbox.index,
+    onClose: () => setActiveLightbox(null),
+    onNavigate: i => setActiveLightbox(prev => prev ? { ...prev, index: i } : prev)
+  }) : null), imageProcessing && /*#__PURE__*/React.createElement(ImageProcessingOverlay, imageProcessing));
 }
 
 function ChatRoomView({
@@ -8304,8 +8383,8 @@ function ChatRoomView({
   chatTextareaRef,
   chatImage: chatImages,
   setChatImage: setChatImages,
-  activeLightboxUrl,
-  setActiveLightboxUrl,
+  activeLightbox,
+  setActiveLightbox,
   onSend,
   onDeleteMessage,
   onEditMessage,
@@ -8643,7 +8722,7 @@ function ChatRoomView({
         whiteSpace: 'pre-wrap',
         boxShadow: '0 2px 6px rgba(0,0,0,0.06)'
       }
-    }, renderChatMessageImages(msg, setActiveLightboxUrl, { maxWidth: '200px', maxHeight: '150px', marginBottom: msg.text ? '6px' : '0' }), msg.text ? parseTextWithLinks(msg.text) : null, extractFirstUrl(msg.text) && /*#__PURE__*/React.createElement(LinkPreviewCard, { url: extractFirstUrl(msg.text) })), /*#__PURE__*/React.createElement("div", {
+    }, renderChatMessageImages(msg, setActiveLightbox, { maxWidth: '200px', maxHeight: '150px', marginBottom: msg.text ? '10px' : '0' }), msg.text ? parseTextWithLinks(msg.text) : null, extractFirstUrl(msg.text) && /*#__PURE__*/React.createElement(LinkPreviewCard, { url: extractFirstUrl(msg.text) })), /*#__PURE__*/React.createElement("div", {
       style: {
         position: 'absolute',
         right: '-7px',
@@ -8686,7 +8765,7 @@ function ChatRoomView({
         whiteSpace: 'pre-wrap',
         boxShadow: '0 2px 6px rgba(0,0,0,0.06)'
       }
-    }, renderChatMessageImages(msg, setActiveLightboxUrl, { maxWidth: '200px', maxHeight: '150px', marginBottom: msg.text ? '6px' : '0' }), msg.text ? parseTextWithLinks(msg.text) : null, extractFirstUrl(msg.text) && /*#__PURE__*/React.createElement(LinkPreviewCard, { url: extractFirstUrl(msg.text) })), /*#__PURE__*/React.createElement("div", {
+    }, renderChatMessageImages(msg, setActiveLightbox, { maxWidth: '200px', maxHeight: '150px', marginBottom: msg.text ? '10px' : '0' }), msg.text ? parseTextWithLinks(msg.text) : null, extractFirstUrl(msg.text) && /*#__PURE__*/React.createElement(LinkPreviewCard, { url: extractFirstUrl(msg.text) })), /*#__PURE__*/React.createElement("div", {
       style: {
         position: 'absolute',
         left: '-7px',
@@ -9156,62 +9235,12 @@ function ChatRoomView({
         )
       )
     )),
-  activeLightboxUrl ? /*#__PURE__*/React.createElement("div", {
-    onClick: () => setActiveLightboxUrl(null),
-    style: {
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundColor: 'rgba(15, 23, 42, 0.92)',
-      backdropFilter: 'blur(8px)',
-      zIndex: 9000,
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center'
-    }
-  }, /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    onClick: e => { e.stopPropagation(); setActiveLightboxUrl(null); },
-    style: {
-      position: 'absolute',
-      top: '16px',
-      right: '16px',
-      background: 'rgba(255,255,255,0.12)',
-      border: '1px solid rgba(255,255,255,0.25)',
-      borderRadius: '50%',
-      width: '36px',
-      height: '36px',
-      cursor: 'pointer',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      color: '#FFFFFF',
-      zIndex: 9001
-    }
-  }, /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg",
-    width: "18",
-    height: "18",
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    strokeWidth: "2.5",
-    strokeLinecap: "round",
-    strokeLinejoin: "round"
-  }, /*#__PURE__*/React.createElement("line", { x1: "18", y1: "6", x2: "6", y2: "18" }), /*#__PURE__*/React.createElement("line", { x1: "6", y1: "6", x2: "18", y2: "18" }))), /*#__PURE__*/React.createElement("img", {
-    src: activeLightboxUrl,
-    alt: "\uC6D0\uBCF8 \uC774\uBBF8\uC9C0",
-    onClick: e => e.stopPropagation(),
-    style: {
-      maxWidth: '92vw',
-      maxHeight: '88vh',
-      borderRadius: '12px',
-      objectFit: 'contain',
-      boxShadow: '0 24px 80px rgba(0,0,0,0.6)'
-    }
-  })) : null), imageProcessingChat && /*#__PURE__*/React.createElement(ImageProcessingOverlay, imageProcessingChat));
+  activeLightbox ? /*#__PURE__*/React.createElement(Lightbox, {
+    urls: activeLightbox.urls,
+    index: activeLightbox.index,
+    onClose: () => setActiveLightbox(null),
+    onNavigate: i => setActiveLightbox(prev => prev ? { ...prev, index: i } : prev)
+  }) : null), imageProcessingChat && /*#__PURE__*/React.createElement(ImageProcessingOverlay, imageProcessingChat));
 }
 
 
