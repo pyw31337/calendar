@@ -12230,6 +12230,7 @@ function SummaryList({
   const [collapsedSections, setCollapsedSections] = React.useState({
     partial: false,
     all: true,
+    confirmed: false,
     past: true
   });
   const toggleSection = sectionKey => {
@@ -12295,6 +12296,23 @@ function SummaryList({
     const entries = dateMap[d].filter(e => participantsMap[e.participantId]);
     return entries.length > 0 && entries.some(e => e.note && e.note.trim().length > 0);
   }));
+
+  // 4. Confirmed-meeting dates -- every date promoted to 모임확정, past or future.
+  const confirmedDates = getSortedDates(getConfirmedMeetings(calendar).map(m => m.date));
+
+  // '6인 이상 참석 가능' / '전원 참석 가능' / '모임 확정' only ever show when they have at least
+  // one matching date -- an empty one hides its title entirely rather than rendering a
+  // placeholder. '과거 모임' already followed this rule. Track which sections are actually
+  // visible so dividers between them only appear between two sections that both render.
+  const isPartialVisible = thresholdN > 0 && sortedPartialDates.length > 0;
+  const isAllVisible = sortedAllDates.length > 0;
+  const isConfirmedVisible = confirmedDates.length > 0;
+  const anyBeforeAll = isPartialVisible;
+  const anyBeforeConfirmed = isPartialVisible || isAllVisible;
+  const anyBeforePast = isPartialVisible || isAllVisible || isConfirmedVisible;
+  const collapsedBeforeConfirmed = isAllVisible ? collapsedSections.all : collapsedSections.partial;
+  const collapsedBeforePast = isConfirmedVisible ? collapsedSections.confirmed : isAllVisible ? collapsedSections.all : collapsedSections.partial;
+
   return /*#__PURE__*/React.createElement("div", {
     className: "summary-card",
     style: {
@@ -12403,9 +12421,9 @@ function SummaryList({
         border: isPast ? 'none' : isConfirmed ? '1px solid #E9D5FF' : '1px solid #BFDBFE'
       }
     }, isPast ? '지나간 모임' : isConfirmed ? '확정모임' : `${availCount}명 가능 (${availCount}/${totalCount}명)`));
-  }))), thresholdN > 0 && sortedPartialDates.length > 0 && /*#__PURE__*/React.createElement("div", {
+  }))), anyBeforeAll && isAllVisible && /*#__PURE__*/React.createElement("div", {
     className: `summary-section-divider${collapsedSections.partial ? ' is-after-collapsed' : ''}`
-  }), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+  }), isAllVisible && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     className: `summary-title is-toggleable${collapsedSections.all ? ' is-collapsed' : ''}`,
     role: "button",
     tabIndex: 0,
@@ -12511,8 +12529,112 @@ function SummaryList({
         title: `${p.name}: ${memoText}`
       }, memoText);
     })));
-  })))), pastMeetingDates.length > 0 && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    className: `summary-section-divider${collapsedSections.all ? ' is-after-collapsed' : ''}`
+  })))), anyBeforeConfirmed && isConfirmedVisible && /*#__PURE__*/React.createElement("div", {
+    className: `summary-section-divider${collapsedBeforeConfirmed ? ' is-after-collapsed' : ''}`
+  }), isConfirmedVisible && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: `summary-title is-toggleable${collapsedSections.confirmed ? ' is-collapsed' : ''}`,
+    role: "button",
+    tabIndex: 0,
+    "aria-expanded": !collapsedSections.confirmed,
+    onClick: () => toggleSection('confirmed'),
+    onKeyDown: event => handleSectionTitleKeyDown(event, 'confirmed'),
+    style: {
+      color: '#7C3AED',
+      marginBottom: '12px'
+    }
+  }, /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: "20",
+    height: "20",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    "stroke-width": "2.5",
+    "stroke-linecap": "round",
+    "stroke-linejoin": "round",
+    style: {
+      marginRight: '4px'
+    }
+  }, /*#__PURE__*/React.createElement("path", {
+    d: "M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "m9 12 2 2 4-4"
+  })), "모임 확정 (", confirmedDates.length, "일)", /*#__PURE__*/React.createElement(SectionToggleButton, {
+    collapsed: collapsedSections.confirmed,
+    onToggle: () => toggleSection('confirmed'),
+    label: collapsedSections.confirmed ? "모임 확정 펼치기" : "모임 확정 접기"
+  })), !collapsedSections.confirmed && /*#__PURE__*/React.createElement("div", null, confirmedDates.map(d => {
+    const dateEntries = (dateMap[d] || []).filter(e => participantsMap[e.participantId] && !isTombstone(e));
+    const formattedDateStr = formatDateWithDayName(d);
+    const memoEntries = dateEntries.filter(e => e.note && e.note.trim().length > 0);
+    const isPast = d < todayStr;
+    return /*#__PURE__*/React.createElement("button", {
+      key: d,
+      className: "date-item-btn",
+      onClick: () => onSelectDate(d),
+      style: isPast ? {
+        opacity: 0.7,
+        backgroundColor: '#F8FAFC',
+        borderColor: '#E2E8F0',
+        flexDirection: 'column',
+        alignItems: 'flex-start'
+      } : {
+        borderColor: '#E9D5FF',
+        backgroundColor: '#FAF5FF',
+        flexDirection: 'column',
+        alignItems: 'flex-start'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        width: '100%',
+        gap: '8px'
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontWeight: 800,
+        color: isPast ? '#94A3B8' : '#7C3AED',
+        fontSize: '0.95rem',
+        flexShrink: 0
+      }
+    }, formattedDateStr), /*#__PURE__*/React.createElement("span", {
+      className: "date-item-badge",
+      style: {
+        background: isPast ? '#E2E8F0' : '#F3E8FF',
+        color: isPast ? '#64748B' : '#7C3AED',
+        border: isPast ? 'none' : '1px solid #E9D5FF',
+        flexShrink: 0
+      }
+    }, isPast ? '지나간 모임' : '확정')), memoEntries.length > 0 && /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '6px',
+        flexWrap: 'wrap'
+      }
+    }, memoEntries.map(e => {
+      const p = participantsMap[e.participantId];
+      if (!p) return null;
+      const memoText = e.note.trim();
+      return /*#__PURE__*/React.createElement("span", {
+        key: e.participantId || p.id,
+        className: "memo-capsule-badge",
+        style: isPast ? {
+          backgroundColor: '#F1F5F9',
+          color: '#64748B',
+          border: `1px solid ${p.color}`,
+          boxShadow: 'none'
+        } : {
+          backgroundColor: p.color,
+          color: getContrastTextColor(p.color)
+        },
+        title: `${p.name}: ${memoText}`
+      }, memoText);
+    })));
+  }))), pastMeetingDates.length > 0 && /*#__PURE__*/React.createElement("div", null, anyBeforePast && /*#__PURE__*/React.createElement("div", {
+    className: `summary-section-divider${collapsedBeforePast ? ' is-after-collapsed' : ''}`
   }), /*#__PURE__*/React.createElement("div", {
     className: `summary-title is-toggleable${collapsedSections.past ? ' is-collapsed' : ''}`,
     role: "button",
