@@ -20,4 +20,5 @@ screenshots_test/
 ops-backups/
 *.png
 !history/*.png
+!icons/*.png
 cron.log
