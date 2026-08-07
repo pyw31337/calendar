@@ -3402,11 +3402,11 @@ function validateBackupCalendars(calendarsList) {
   const uniqueById = new Map();
   normalized.forEach(calendar => uniqueById.set(calendar.id, calendar));
   const result = Array.from(uniqueById.values());
-  if (result.length === 0) return { calendars: [], error: '복구 가능한 kkot 또는 cw 캘린더 데이터가 없습니다.' };
+  if (result.length === 0) return { calendars: [], error: '복구 가능한 데이터 없음' };
   for (const calendar of result) {
     const validationError = validateCalendarShape(calendar);
     if (validationError) return { calendars: [], error: `${calendar.id}: ${validationError}` };
-    if (!assertCalendarLinks(calendar)) return { calendars: [], error: `${calendar.id}: 참여자와 일정 연결이 올바르지 않습니다.` };
+    if (!assertCalendarLinks(calendar)) return { calendars: [], error: `${calendar.id}: 참여자·일정 연결 오류` };
   }
   return { calendars: result, error: '' };
 }
@@ -3665,7 +3665,7 @@ function AdminDashboard({ initialCalendars }) {
       setAdminSession();
       setIsChangePwOpen(false);
       resetChangePwForm();
-      showAdminToast('관리자 비밀번호가 변경되었습니다.', 'success');
+      showAdminToast('비밀번호 변경완료', 'success');
     } catch (err) {
       console.warn('Admin password change failed:', err);
       setPwError('비밀번호 변경 중 오류가 발생했습니다. firestore.rules 배포 여부를 확인해 주세요.');
@@ -3821,7 +3821,7 @@ function AdminDashboard({ initialCalendars }) {
       setServerCalendars(prev => [newCal, ...prev]);
       setSelectedCalId(newCal.id);
       setIsCreateCalModalOpen(false);
-      showAdminToast('새 캘린더가 생성되었습니다. ✅', 'success');
+      showAdminToast('캘린더 생성완료', 'success');
       return '';
     }
     return '캘린더 생성에 실패했습니다.';
@@ -3831,22 +3831,22 @@ function AdminDashboard({ initialCalendars }) {
   const handleDownloadBackup = (calendarId = '') => {
     const payload = createCalendarBackupPayload(calendarsList, calendarId);
     if (!payload.calendars.length) {
-      showAdminToast('백업할 캘린더 데이터가 없습니다.', 'error');
+      showAdminToast('백업할 데이터 없음', 'error');
       return;
     }
     const suffix = calendarId || 'all';
     const timestamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
     downloadJsonFile(`calendar-backup-${suffix}-${timestamp}.json`, payload);
-    showAdminToast(`${suffix} 백업 JSON을 다운로드했습니다.`);
+    showAdminToast(`${suffix} 백업 다운로드완료`);
   };
 
   const handleImportClick = () => {
     if (!firebaseDb || !ENABLE_FIRESTORE_WRITES) {
-      showAdminToast('Firebase 쓰기 연결이 없어 복구할 수 없습니다.', 'error');
+      showAdminToast('쓰기 연결 없음', 'error');
       return;
     }
     if (!isRestoreMode) {
-      showAdminToast('복구는 관리자 주소에 restore=1을 붙인 복구 모드에서만 실행할 수 있습니다.', 'error', 6000);
+      showAdminToast('복구 모드 필요 (restore=1)', 'error', 6000);
       return;
     }
     setIsRestorePhraseModalOpen(true);
@@ -3876,11 +3876,11 @@ function AdminDashboard({ initialCalendars }) {
     }
     const failed = results.filter(result => !result.saved);
     if (failed.length) {
-      showAdminToast(`${failed.map(result => result.id).join(', ')} 복구에 실패했습니다.`, 'error', 6000);
+      showAdminToast(`${failed.map(result => result.id).join(', ')} 복구 실패`, 'error', 6000);
       return;
     }
     setServerCalendars(prev => mergeCalendarCollections(prev, results.map(result => result.calendar), { replaceMatchingId: true }));
-    showAdminToast('백업 JSON에서 데이터를 복구했습니다.');
+    showAdminToast('데이터 복구완료');
   };
 
   const handleImportBackup = async (event) => {
@@ -3899,7 +3899,7 @@ function AdminDashboard({ initialCalendars }) {
       requestConfirm('데이터 복구 확인', message, () => performBackupRestore(calendars));
     } catch (err) {
       console.error('Calendar backup import failed:', err);
-      showAdminToast('백업 JSON을 읽거나 복구하지 못했습니다.', 'error', 6000);
+      showAdminToast('복구 실패', 'error', 6000);
     }
   };
 
@@ -3909,14 +3909,14 @@ function AdminDashboard({ initialCalendars }) {
     if (!cal) return;
 
     if (!calTitle.trim()) {
-      showAdminToast('캘린더명을 입력해 주세요.', 'error');
+      showAdminToast('캘린더명 필요', 'error');
       return;
     }
 
     const activeParts = calParticipants.filter(p => !isTombstone(p));
     const activeNames = activeParts.map(p => p.name.trim().toLowerCase());
     if (new Set(activeNames).size !== activeNames.length) {
-      showAdminToast('참여자 이름은 중복될 수 없습니다.', 'error');
+      showAdminToast('참여자 이름 중복', 'error');
       return;
     }
 
@@ -3933,9 +3933,9 @@ function AdminDashboard({ initialCalendars }) {
     const saved = await pushSingleCloudCalendar(stampedCal, now, 18, null, 'settings');
     if (saved) {
       setServerCalendars(prev => prev.map(c => c.id === selectedCalId ? stampedCal : c));
-      showAdminToast('캘린더 설정이 저장되었습니다.', 'success');
+      showAdminToast('설정 저장완료', 'success');
     } else {
-      showAdminToast('설정 저장에 실패했습니다.', 'error');
+      showAdminToast('설정 저장 실패', 'error');
     }
   };
 
@@ -3977,9 +3977,9 @@ function AdminDashboard({ initialCalendars }) {
       pushSingleCloudCalendar(updatedCal, now, 18, null, 'polls').then(saved => {
         if (saved) {
           setServerCalendars(prev => prev.map(c => c.id === calId ? updatedCal : c));
-          showAdminToast('투표가 삭제되었습니다.', 'success');
+          showAdminToast('투표 삭제완료', 'success');
         } else {
-          showAdminToast('투표 삭제에 실패했습니다.', 'error');
+          showAdminToast('투표 삭제 실패', 'error');
         }
       });
     });
@@ -4010,7 +4010,7 @@ function AdminDashboard({ initialCalendars }) {
         // Save rolled-back calendar
         const calSaved = await pushSingleCloudCalendar(restoredCal, now, 18, null, 'restore');
         if (!calSaved) {
-          showAdminToast('캘린더 데이터 복구에 실패했습니다.', 'error');
+          showAdminToast('데이터 복구 실패', 'error');
           return;
         }
 
@@ -4036,10 +4036,10 @@ function AdminDashboard({ initialCalendars }) {
         }));
         setSelectedCalActivityLogs(prev => prev.filter(l => getActivityLogStamp(l) <= log.timestamp));
 
-        showAdminToast('일정, 투표 및 채팅 로그가 해당 시점으로 복구되었습니다.', 'success');
+        showAdminToast('시점 복구완료', 'success');
       } catch (err) {
         console.error('Unified PITR failed:', err);
-        showAdminToast('복구 중 오류가 발생했습니다.', 'error');
+        showAdminToast('복구 오류', 'error');
       }
     });
   };
@@ -4057,17 +4057,17 @@ function AdminDashboard({ initialCalendars }) {
       }
       if (ok) {
         deleteAllChatImagesFromStorage(msg);
-        showAdminToast('채팅이 삭제되었습니다.', 'success');
+        showAdminToast('삭제완료', 'success');
         setMessagesMap(prev => ({
           ...prev,
           [calId]: (prev[calId] || []).filter(m => m.id !== msg.id)
         }));
       } else {
-        showAdminToast('삭제에 실패했습니다.', 'error');
+        showAdminToast('삭제 실패', 'error');
       }
     } catch (e) {
       console.error(e);
-      showAdminToast('삭제에 실패했습니다.', 'error');
+      showAdminToast('삭제 실패', 'error');
     }
   };
 
@@ -4807,12 +4807,12 @@ function AdminDashboard({ initialCalendars }) {
         const saved = await pushSingleCloudCalendar(updatedCal, now, 18, null, 'polls', log ? [log] : []);
         if (saved) {
           setServerCalendars(prev => prev.map(c => c.id === targetCal.id ? updatedCal : c));
-          showAdminToast('투표가 저장되었습니다.', 'success');
+          showAdminToast('투표 저장완료', 'success');
           setIsPollModalOpen(false);
           setEditingPoll(null);
           setEditingPollCalId(null);
         } else {
-          showAdminToast('투표 저장에 실패했습니다.', 'error');
+          showAdminToast('투표 저장 실패', 'error');
         }
       },
       onClose: () => {
@@ -5059,16 +5059,16 @@ function App() {
     saveLocalMeta(serverRevisionRef.current);
   };
 
-  const updateCalendars = async (nextCalendars, toastMsg = '일정이 저장되었습니다.', toastType = 'success', targetCalId = activeCalId, saveMode = 'availability', newActivityLogs = []) => {
+  const updateCalendars = async (nextCalendars, toastMsg = '저장완료', toastType = 'success', targetCalId = activeCalId, saveMode = 'availability', newActivityLogs = []) => {
     let previousCalendars = null;
     try {
       if (!isAllowedCalendarId(targetCalId)) {
-        showToast('캘린더 ID가 올바르지 않아 저장하지 않았습니다.', 'error');
+        showToast('캘린더 ID 오류', 'error');
         return false;
       }
       const requestedId = getCalendarIdFromURL();
       if (requestedId && requestedId !== targetCalId) {
-        showToast('현재 URL의 캘린더와 저장 대상이 달라 저장하지 않았습니다.', 'error');
+        showToast('캘린더 불일치', 'error');
         return false;
       }
       const now = Date.now();
@@ -5077,7 +5077,7 @@ function App() {
       const currentCal = normalizedCalendars.find(c => c.id === targetCalId) || null;
       if (!currentCal) {
         console.warn('Active calendar not found during save:', targetCalId);
-        showToast('활성 캘린더를 찾을 수 없어 저장하지 못했습니다.', 'error');
+        showToast('캘린더 없음', 'error');
         return false;
       }
 
@@ -5088,7 +5088,7 @@ function App() {
       if (!saved) {
         console.warn('Cloud save failed for calendar:', currentCal.id);
         if (previousCalendars) setCalendarsState(previousCalendars);
-        showToast('저장에 실패했습니다. 다시 시도해 주세요.', 'error');
+        showToast('저장 실패', 'error');
         return false;
       }
 
@@ -5100,7 +5100,7 @@ function App() {
     } catch (err) {
       console.error('updateCalendars failed:', err);
       if (previousCalendars) setCalendarsState(previousCalendars);
-      showToast('저장에 실패했습니다. 다시 시도해 주세요.', 'error');
+      showToast('저장 실패', 'error');
       return false;
     } finally {
       isSavingRef.current = false;
@@ -5249,16 +5249,16 @@ function App() {
       for (let attempt = 1; attempt <= FIREBASE_LOAD_MAX_ATTEMPTS && isMounted && !hasLoadedCloudCalendar; attempt += 1) {
         const result = await fetchSingleCloudCalendar(activeCalId, 1, FIREBASE_LOAD_TIMEOUT_MS);
         if (result?.calendar && applyLoadedCalendar(result.calendar, result.lastModified || Date.now())) {
-          if (attempt > 1) showToast('Firebase 데이터를 다시 불러왔습니다.', 'success', 3000);
+          if (attempt > 1) showToast('다시 불러옴', 'success', 3000);
           return;
         }
         if (attempt < FIREBASE_LOAD_MAX_ATTEMPTS && isMounted && !hasLoadedCloudCalendar) {
-          showToast(`Firebase 응답이 지연되어 ${attempt + 1}차 로딩을 시도합니다.`, 'info', 3000);
+          showToast(`${attempt + 1}차 재시도 중`, 'info', 3000);
         }
       }
       if (isMounted && !hasLoadedCloudCalendar) {
         setIsInitialDataLoading(false);
-        showToast('Firebase에서 캘린더 데이터를 불러오지 못했습니다. 네트워크를 확인한 뒤 새로고침해 주세요.', 'error', 7000);
+        showToast('데이터 로딩 실패', 'error', 7000);
       }
     };
 
@@ -5280,7 +5280,7 @@ function App() {
 
   React.useEffect(() => {
     if (firebaseDb) return;
-    showToast('Firebase 연결을 확인해 주세요. 데이터는 Firebase에서만 불러옵니다.', 'error', 5000);
+    showToast('연결 오류', 'error', 5000);
   }, []);
   const activeCalLoaded = calendars.some(c => c.id === activeCalId);
   const activeCal = calendars.find(c => c.id === activeCalId) || createLoadingCalendarShell(activeCalId);
@@ -5544,13 +5544,13 @@ function App() {
           fetchRecentMessagesRest(activeCalId).then(list => setRecentMessages(list));
           fetchChatMessagesRest(activeCalId).then(list => setChatMessages(list));
         }
-        showToast('채팅이 등록되었습니다.', 'success', 3000);
+        showToast('등록완료', 'success', 3000);
       } else {
-        showToast('채팅 등록에 실패했습니다.', 'error', 3000);
+        showToast('등록 실패', 'error', 3000);
       }
     } catch (err) {
       console.error('handleSendChatMessage failed:', err);
-      showToast('채팅 등록에 실패했습니다.', 'error', 3000);
+      showToast('등록 실패', 'error', 3000);
     } finally {
       setIsChatSubmitting(false);
     }
@@ -5577,13 +5577,13 @@ function App() {
           fetchRecentMessagesRest(calId).then(list => setRecentMessages(list));
           fetchChatMessagesRest(calId).then(list => setChatMessages(list));
         }
-        showToast('채팅이 삭제되었습니다.', 'success', 3000);
+        showToast('삭제완료', 'success', 3000);
       } else {
-        showToast('삭제에 실패했습니다.', 'error', 3000);
+        showToast('삭제 실패', 'error', 3000);
       }
     } catch (err) {
       console.error('handleConfirmDeleteMessage failed:', err);
-      showToast('삭제에 실패했습니다.', 'error', 3000);
+      showToast('삭제 실패', 'error', 3000);
     } finally {
       setDeletingMessage(null);
     }
@@ -5635,13 +5635,13 @@ function App() {
           fetchRecentMessagesRest(calId).then(list => setRecentMessages(list));
           fetchChatMessagesRest(calId).then(list => setChatMessages(list));
         }
-        showToast('채팅이 수정되었습니다.', 'success', 3000);
+        showToast('수정완료', 'success', 3000);
       } else {
-        showToast('수정에 실패했습니다.', 'error', 3000);
+        showToast('수정 실패', 'error', 3000);
       }
     } catch (err) {
       console.error('handleSaveEditMessage failed:', err);
-      showToast('수정에 실패했습니다.', 'error', 3000);
+      showToast('수정 실패', 'error', 3000);
     } finally {
       setEditingMessage(null);
     }
@@ -5652,14 +5652,14 @@ function App() {
     if (rawId && !isAllowedCalendarId(rawId)) {
       const safeUrl = getCalendarShareUrl(activeCal?.id || activeCalId);
       window.history.replaceState({}, '', safeUrl);
-      showToast('운영 캘린더는 kkot, cw만 사용할 수 있어 현재 주소로 정리했습니다.', 'error', 5000);
+      showToast('캘린더 주소 정리됨', 'error', 5000);
     }
   }, []);
   React.useEffect(() => {
     let cancelled = false;
     const requestedId = getCalendarIdFromURL();
     if (requestedId && !isAllowedCalendarId(requestedId)) {
-      showToast('운영 캘린더는 kkot, cw만 사용할 수 있습니다.', 'error', 5000);
+      showToast('지원하지 않는 캘린더', 'error', 5000);
       return;
     }
     if (requestedId && !calendars.some(c => c.id === requestedId)) {
@@ -5673,7 +5673,7 @@ function App() {
           setActiveCalId(requestedId);
           return;
         }
-        showToast('Firebase에서 해당 캘린더를 찾지 못했습니다.', 'error');
+        showToast('캘린더를 찾을 수 없음', 'error');
       };
       resolveRequestedCalendar();
     }
@@ -5683,7 +5683,7 @@ function App() {
   }, []);
   const handleSelectCalendar = id => {
     if (!isAllowedCalendarId(id)) {
-      showToast('캘린더 ID가 올바르지 않습니다.', 'error');
+      showToast('잘못된 캘린더 ID', 'error');
       return;
     }
     setActiveCalId(id);
@@ -5696,20 +5696,20 @@ function App() {
   };
   const handleSaveAvailability = (dateStr, participantId, note) => {
     if (!activeCalLoaded) {
-      showToast('Firebase 데이터를 불러온 뒤 다시 시도해 주세요.', 'error');
+      showToast('잠시 후 다시 시도', 'error');
       return false;
     }
     if (!activeCal || !isValidCalendarId(activeCal.id) || activeCal.id !== activeCalId) {
-      showToast('현재 캘린더 상태를 확인할 수 없어 저장하지 않았습니다.', 'error');
+      showToast('캘린더 상태 확인 불가', 'error');
       return false;
     }
     if (!isValidDateString(dateStr)) {
-      showToast('날짜 형식이 올바르지 않아 저장하지 않았습니다.', 'error');
+      showToast('날짜 형식 오류', 'error');
       return false;
     }
     const activeParticipantIds = new Set(getActiveParticipants(activeCal).map(participant => participant.id));
     if (!activeParticipantIds.has(participantId)) {
-      showToast('참여자 정보를 다시 선택해 주세요.', 'error');
+      showToast('참여자 재선택 필요', 'error');
       return false;
     }
     const now = Date.now();
@@ -5745,7 +5745,7 @@ function App() {
       activityLogs: activityLog ? [...getCalendarActivityLogs(activeCal), activityLog] : getCalendarActivityLogs(activeCal)
     };
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-    return updateCalendars(nextCalendars, '일정이 등록되었습니다.', 'success', updatedCal.id, 'availability', activityLog ? [activityLog] : []);
+    return updateCalendars(nextCalendars, '등록완료', 'success', updatedCal.id, 'availability', activityLog ? [activityLog] : []);
   };
   const handleDeleteAvailability = (dateStr, participantId) => {
     if (!activeCal || !isValidDateString(dateStr)) return false;
@@ -5768,7 +5768,7 @@ function App() {
       activityLogs: activityLog ? [...getCalendarActivityLogs(activeCal), activityLog] : getCalendarActivityLogs(activeCal)
     };
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-    return updateCalendars(nextCalendars, '삭제 되었습니다.', 'delete', updatedCal.id, 'availability', activityLog ? [activityLog] : []);
+    return updateCalendars(nextCalendars, '삭제완료', 'delete', updatedCal.id, 'availability', activityLog ? [activityLog] : []);
   };
   const handleDeleteAllForDate = dateStr => {
     if (!activeCal || !isValidDateString(dateStr)) return false;
@@ -5791,7 +5791,7 @@ function App() {
       activityLogs: [...getCalendarActivityLogs(activeCal), ...activityLogs]
     };
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-    return updateCalendars(nextCalendars, '삭제 되었습니다.', 'delete', updatedCal.id, 'availability', activityLogs);
+    return updateCalendars(nextCalendars, '삭제완료', 'delete', updatedCal.id, 'availability', activityLogs);
   };
   const handleDeleteActivityLog = log => {
     if (!activeCal || !log?.id) return false;
@@ -5806,7 +5806,7 @@ function App() {
       deletedActivityLogIds: mergeDeletedActivityLogIds(activeCal.deletedActivityLogIds || [], [logId])
     };
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-    return updateCalendars(nextCalendars, '로그가 삭제되었습니다.', 'delete', updatedCal.id);
+    return updateCalendars(nextCalendars, '로그 삭제완료', 'delete', updatedCal.id);
   };
   const handleOpenPollCreate = () => {
     if (!guardLoadedCalendar('Firebase 데이터를 불러온 뒤 투표를 생성해 주세요.')) return;
@@ -5830,7 +5830,7 @@ function App() {
       createdAt: poll.createdAt || now
     }, participantIds);
     if (!normalizedPoll) {
-      showToast('투표명과 선택옵션을 확인해 주세요.', 'error');
+      showToast('투표명·옵션 확인 필요', 'error');
       return false;
     }
     const activityLog = !existingPoll
@@ -5844,13 +5844,13 @@ function App() {
       activityLogs: activityLog ? [...getCalendarActivityLogs(activeCal), activityLog] : getCalendarActivityLogs(activeCal)
     };
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-    return updateCalendars(nextCalendars, '투표가 저장되었습니다.', 'success', updatedCal.id, 'polls', activityLog ? [activityLog] : []);
+    return updateCalendars(nextCalendars, '투표 저장완료', 'success', updatedCal.id, 'polls', activityLog ? [activityLog] : []);
   };
   const handleOpenVoteSheet = (poll, option) => {
     if (!guardLoadedCalendar('Firebase 데이터를 불러온 뒤 투표해 주세요.')) return false;
     const activeParticipants = getActiveParticipants(activeCal);
     if (activeParticipants.length === 0) {
-      showToast('참여자 설정 후 투표할 수 있습니다.', 'error');
+      showToast('참여자 설정 필요', 'error');
       return false;
     }
     setVoteTarget({ pollId: poll.id, optionId: option.id });
@@ -5861,13 +5861,13 @@ function App() {
     const activeParticipants = getActiveParticipants(activeCal);
     const participantIds = new Set(activeParticipants.map(participant => participant.id));
     if (!participantIds.has(participantId)) {
-      showToast('참여자를 다시 선택해 주세요.', 'error');
+      showToast('참여자 재선택 필요', 'error');
       return false;
     }
     const poll = getCalendarPolls(activeCal).find(item => item.id === pollId);
     const option = getActivePollOptions(poll).find(item => item.id === optionId);
     if (!poll || !option) {
-      showToast('투표 정보를 다시 확인해 주세요.', 'error');
+      showToast('투표 정보 확인 필요', 'error');
       return false;
     }
     const now = Date.now();
@@ -5892,7 +5892,7 @@ function App() {
     };
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
     setVoteTarget(null);
-    return updateCalendars(nextCalendars, '투표가 반영되었습니다.', 'success', updatedCal.id, 'polls', activityLog ? [activityLog] : []);
+    return updateCalendars(nextCalendars, '투표 반영완료', 'success', updatedCal.id, 'polls', activityLog ? [activityLog] : []);
   };
   const handleCancelVote = (poll, option, participantId) => {
     if (!guardLoadedCalendar('Firebase 데이터를 불러온 뒤 투표를 취소해 주세요.')) return false;
@@ -5923,17 +5923,17 @@ function App() {
   };
   const handleSaveAdmin = (updatedCal, newCalCreated) => {
     if (!activeCalLoaded && !newCalCreated) {
-      showToast('Firebase 데이터를 불러온 뒤 설정을 수정해 주세요.', 'error');
+      showToast('잠시 후 다시 시도', 'error');
       return false;
     }
     if (newCalCreated) {
       if (!isAllowedCalendarId(newCalCreated.id)) {
-        showToast('운영 캘린더는 kkot, cw만 사용할 수 있습니다.', 'error');
+        showToast('지원하지 않는 캘린더', 'error');
         return false;
       }
       const nextCalendars = [newCalCreated, ...calendars];
       handleSelectCalendar(newCalCreated.id);
-      return updateCalendars(nextCalendars, '새 캘린더가 생성되었습니다. ✅', 'success', newCalCreated.id, 'replace');
+      return updateCalendars(nextCalendars, '캘린더 생성완료', 'success', newCalCreated.id, 'replace');
     } else {
       const now = Date.now();
       const stampedCal = {
@@ -5945,11 +5945,11 @@ function App() {
         participants: updatedCal.participants
       };
       if (!assertCalendarLinks(stampedCal)) {
-        showToast('참여자와 일정 연결을 확인해 주세요.', 'error');
+        showToast('참여자·일정 확인 필요', 'error');
         return false;
       }
       const nextCalendars = calendars.map(c => c.id === stampedCal.id ? stampedCal : c);
-      return updateCalendars(nextCalendars, '캘린더 설정이 저장되었습니다. ✅', 'success', stampedCal.id, 'settings');
+      return updateCalendars(nextCalendars, '설정 저장완료', 'success', stampedCal.id, 'settings');
     }
   };
   if (activeView === 'chat') {
@@ -7321,7 +7321,7 @@ function describeImageProcessingFailures(failed) {
     ? 'HEIC/HEIF 변환 실패'
     : first.error?.code === 'IMAGE_DECODE_TIMEOUT'
     ? '처리 시간 초과'
-    : '지원하지 않는 형식이거나 손상된 파일';
+    : '지원하지 않는 형식';
   if (failed.length === 1) return `${first.fileName} 첨부 실패 (${reason})`;
   return `${failed.length}장 첨부 실패 (${reason} 등)`;
 }
@@ -7583,14 +7583,14 @@ function CommentsSection({
 
     const remainingSlots = 50 - chatImages.length;
     if (remainingSlots <= 0) {
-      if (showToast) showToast('사진은 최대 50개까지 첨부할 수 있습니다.', 'error');
+      if (showToast) showToast('사진 최대 50장', 'error');
       e.target.value = '';
       return;
     }
 
     const filesToProcess = Array.from(files).slice(0, remainingSlots);
     if (files.length > remainingSlots && showToast) {
-      showToast(`최대 50장 제한으로 인해 ${remainingSlots}장의 사진만 추가됩니다.`, 'info');
+      showToast(`${remainingSlots}장만 추가됨 (최대 50장)`, 'info');
     }
 
     setImageProcessing({ current: 0, total: filesToProcess.length });
@@ -7607,7 +7607,7 @@ function CommentsSection({
       console.error('Image compression failed for:', failed.map(f => f.fileName));
       if (showToast) showToast(describeImageProcessingFailures(failed), 'error', 5000);
     } else if (succeeded.length > 0 && showToast) {
-      showToast(`${succeeded.length}장의 사진이 첨부되었습니다.`, 'success', 3000);
+      showToast(`${succeeded.length}장 첨부완료`, 'success', 3000);
     }
     e.target.value = '';
   };
@@ -8092,14 +8092,14 @@ function ChatRoomView({
 
     const remainingSlots = 50 - chatImages.length;
     if (remainingSlots <= 0) {
-      if (showToast) showToast('사진은 최대 50개까지 첨부할 수 있습니다.', 'error');
+      if (showToast) showToast('사진 최대 50장', 'error');
       e.target.value = '';
       return;
     }
 
     const filesToProcess = Array.from(files).slice(0, remainingSlots);
     if (files.length > remainingSlots && showToast) {
-      showToast(`최대 50장 제한으로 인해 ${remainingSlots}장의 사진만 추가됩니다.`, 'info');
+      showToast(`${remainingSlots}장만 추가됨 (최대 50장)`, 'info');
     }
 
     setImageProcessingChat({ current: 0, total: filesToProcess.length });
@@ -8116,7 +8116,7 @@ function ChatRoomView({
       console.error('Image compression failed for:', failed.map(f => f.fileName));
       if (showToast) showToast(describeImageProcessingFailures(failed), 'error', 5000);
     } else if (succeeded.length > 0 && showToast) {
-      showToast(`${succeeded.length}장의 사진이 첨부되었습니다.`, 'success', 3000);
+      showToast(`${succeeded.length}장 첨부완료`, 'success', 3000);
     }
     e.target.value = '';
   };
@@ -8413,7 +8413,46 @@ function ChatRoomView({
       zIndex: 1005,
       transition: 'bottom 0.12s ease-out'
     }
-  }, /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: onBack,
+    "aria-label": "뒤로가기",
+    style: {
+      position: 'fixed',
+      top: '10px',
+      left: '10px',
+      width: '36px',
+      height: '36px',
+      borderRadius: '50%',
+      backgroundColor: 'rgba(255,255,255,0.95)',
+      border: '1px solid #E2E8F0',
+      boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      cursor: 'pointer',
+      color: '#64748B',
+      zIndex: 1020
+    }
+  }, /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: "22",
+    height: "22",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    "stroke-width": "2",
+    "stroke-linecap": "round",
+    "stroke-linejoin": "round",
+    className: "icon icon-tabler icons-tabler-outline icon-tabler-chevron-down",
+    style: { transform: 'rotate(90deg)', display: 'inline-block' }
+  }, /*#__PURE__*/React.createElement("path", {
+    stroke: "none",
+    d: "M0 0h24v24H0z",
+    fill: "none"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M6 9l6 6l6 -6"
+  }))), /*#__PURE__*/React.createElement("div", {
     className: "chat-room-header",
     style: {
       position: 'fixed',
@@ -8431,37 +8470,7 @@ function ChatRoomView({
       transition: 'transform 0.3s ease',
       transform: isHeaderVisible ? 'translateY(0)' : 'translateY(-100%)'
     }
-  }, /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    onClick: onBack,
-    style: {
-      background: 'none',
-      border: 'none',
-      cursor: 'pointer',
-      padding: '4px 8px',
-      display: 'flex',
-      alignItems: 'center',
-      color: '#64748B'
-    }
-  }, /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg",
-    width: "24",
-    height: "24",
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
-    className: "icon icon-tabler icons-tabler-outline icon-tabler-chevron-down",
-    style: { transform: 'rotate(90deg)', display: 'inline-block' }
-  }, /*#__PURE__*/React.createElement("path", {
-    stroke: "none",
-    d: "M0 0h24v24H0z",
-    fill: "none"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M6 9l6 6l6 -6"
-  }))), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("div", { style: { width: '32px', flexShrink: 0 } }), /*#__PURE__*/React.createElement("div", {
     style: {
       position: 'absolute',
       left: '50%',
@@ -8985,14 +8994,14 @@ function EditMessageModal({
 
     const remainingSlots = 50 - images.length;
     if (remainingSlots <= 0) {
-      if (showToast) showToast('사진은 최대 50개까지 첨부할 수 있습니다.', 'error');
+      if (showToast) showToast('사진 최대 50장', 'error');
       e.target.value = '';
       return;
     }
 
     const filesToProcess = Array.from(files).slice(0, remainingSlots);
     if (files.length > remainingSlots && showToast) {
-      showToast(`최대 50장 제한으로 인해 ${remainingSlots}장의 사진만 추가됩니다.`, 'info');
+      showToast(`${remainingSlots}장만 추가됨 (최대 50장)`, 'info');
     }
 
     setImageProcessingEdit({ current: 0, total: filesToProcess.length });
@@ -9672,7 +9681,7 @@ function AdminModal({
     
     // Validate titles & names
     if (!title.trim()) {
-      if (showToast) showToast('캘린더명을 입력해 주세요.', 'error'); else alert('캘린더명을 입력해 주세요.');
+      if (showToast) showToast('캘린더명 필요', 'error'); else alert('캘린더명 필요');
       setIsSubmitting(false);
       return;
     }
@@ -9680,7 +9689,7 @@ function AdminModal({
     const activeParticipantsList = participants.filter(p => !isTombstone(p));
     const activeNames = activeParticipantsList.map(p => p.name.trim().toLowerCase());
     if (new Set(activeNames).size !== activeNames.length) {
-      if (showToast) showToast('참여자 이름은 중복될 수 없습니다.', 'error'); else alert('참여자 이름은 중복될 수 없습니다.');
+      if (showToast) showToast('참여자 이름 중복', 'error'); else alert('참여자 이름 중복');
       setIsSubmitting(false);
       return;
     }
@@ -10862,7 +10871,7 @@ function PollModal({ calendar, poll, onSave, onClose, showToast }) {
       };
     }).filter(option => !isTombstone(option) && sanitizeText(option.text, 120));
     if (!cleanTitle || activeOptions.length === 0) {
-      if (showToast) showToast('투표명과 선택옵션을 입력해 주세요.', 'error'); else alert('투표명과 선택옵션을 입력해 주세요.');
+      if (showToast) showToast('투표명·옵션 필요', 'error'); else alert('투표명·옵션 필요');
       return;
     }
     setIsSubmitting(true);
