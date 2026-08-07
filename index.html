@@ -10243,8 +10243,8 @@ function DateModal({
     onClick: handleConfirmMeeting,
     style: {
       color: isConfirmed ? '#4B5563' : '#4F46E5',
-      borderColor: isConfirmed ? '#E5E7EB' : '#C7D2FE',
-      backgroundColor: isConfirmed ? '#F3F4F6' : '#EEF2FF',
+      border: isConfirmed ? 'none' : '1px solid #C7D2FE',
+      backgroundColor: isConfirmed ? 'transparent' : '#EEF2FF',
       whiteSpace: 'nowrap',
       opacity: isSubmitting ? 0.75 : 1,
       cursor: isSubmitting ? 'wait' : 'pointer'
@@ -10691,7 +10691,7 @@ function AdminModal({
     /* Modal Scrollable Body */
     /*#__PURE__*/React.createElement("div", {
       className: "modal-body",
-      style: { flex: 1, overflowY: 'auto', padding: (activeTab === 'calendar' || activeTab === 'logs') ? '0px 20px 20px 20px' : '20px', display: 'flex', flexDirection: 'column', gap: '20px' }
+      style: { flex: activeTab === 'calendar' ? '0 0 auto' : 1, overflowY: 'auto', padding: activeTab === 'calendar' ? '0px' : activeTab === 'logs' ? '16px' : '20px', display: 'flex', flexDirection: 'column', gap: '20px' }
     },
       /* ========================================== */
       /* TAB 1: OPERATIONAL METRICS & CHAT LOGS     */
@@ -10851,7 +10851,7 @@ function AdminModal({
 
               /* List Row */
               /*#__PURE__*/React.createElement("div", {
-                style: { maxHeight: '160px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '6px' }
+                style: { display: 'flex', flexDirection: 'column', gap: '6px' }
               },
                 participants.map(p => isTombstone(p) ? null : /*#__PURE__*/React.createElement("div", {
                   key: p.id,
@@ -10970,7 +10970,7 @@ function AdminModal({
 
           /* Timeline scroll container */
           /*#__PURE__*/React.createElement("div", {
-            style: { display: 'flex', flexDirection: 'column', gap: '8px', flex: 1, minHeight: '360px', overflowY: 'auto', paddingRight: '4px' }
+            style: { display: 'flex', flexDirection: 'column', gap: '8px', flex: 1, minHeight: '360px', paddingRight: '4px' }
           },
             activityLogsSorted.length === 0 ? /*#__PURE__*/React.createElement("div", { style: { padding: '30px', color: '#94A3B8', fontSize: '0.82rem', textAlign: 'center' } }, "기록된 활동 로그가 없어 복구 기능을 이용할 수 없습니다.") :
             activityLogsSorted.map(log => {
@@ -11120,9 +11120,9 @@ function AdminModal({
               style: { fontSize: '0.7rem', color: '#94A3B8' }
             }, formatRegisteredAt(log.timestamp)), /*#__PURE__*/React.createElement("button", {
               type: "button",
-              className: "btn btn-danger recent-log-delete-btn",
+              className: "btn btn-danger",
               title: "로그 삭제",
-              style: { padding: '2px 6px', fontSize: '0.72rem', height: '24px', display: 'flex', alignItems: 'center' },
+              style: { padding: '10px 16px', fontSize: '0.72rem', display: 'flex', alignItems: 'center' },
               onClick: () => {
                 if (typeof onDeleteLog !== 'function') return;
                 onRequestConfirm('로그 삭제', confirmText, () => onDeleteLog(log));
@@ -11132,8 +11132,9 @@ function AdminModal({
         })()
       )
     ),
-    activeTab === 'calendar' && /*#__PURE__*/React.createElement(React.Fragment, null,
-
+    activeTab === 'calendar' && /*#__PURE__*/React.createElement("div", {
+      style: { flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 20px 20px' }
+    },
       /*#__PURE__*/React.createElement(CalendarGrid, {
         calendar: calendar,
         isLoading: false,
@@ -12310,8 +12311,6 @@ function SummaryList({
   const anyBeforeAll = isPartialVisible;
   const anyBeforeConfirmed = isPartialVisible || isAllVisible;
   const anyBeforePast = isPartialVisible || isAllVisible || isConfirmedVisible;
-  const collapsedBeforeConfirmed = isAllVisible ? collapsedSections.all : collapsedSections.partial;
-  const collapsedBeforePast = isConfirmedVisible ? collapsedSections.confirmed : isAllVisible ? collapsedSections.all : collapsedSections.partial;
 
   return /*#__PURE__*/React.createElement("div", {
     className: "summary-card",
@@ -12422,7 +12421,7 @@ function SummaryList({
       }
     }, isPast ? '지나간 모임' : isConfirmed ? '확정모임' : `${availCount}명 가능 (${availCount}/${totalCount}명)`));
   }))), anyBeforeAll && isAllVisible && /*#__PURE__*/React.createElement("div", {
-    className: `summary-section-divider${collapsedSections.partial ? ' is-after-collapsed' : ''}`
+    className: "summary-section-divider"
   }), isAllVisible && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     className: `summary-title is-toggleable${collapsedSections.all ? ' is-collapsed' : ''}`,
     role: "button",
@@ -12530,7 +12529,7 @@ function SummaryList({
       }, memoText);
     })));
   })))), anyBeforeConfirmed && isConfirmedVisible && /*#__PURE__*/React.createElement("div", {
-    className: `summary-section-divider${collapsedBeforeConfirmed ? ' is-after-collapsed' : ''}`
+    className: "summary-section-divider"
   }), isConfirmedVisible && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     className: `summary-title is-toggleable${collapsedSections.confirmed ? ' is-collapsed' : ''}`,
     role: "button",
@@ -12634,7 +12633,7 @@ function SummaryList({
       }, memoText);
     })));
   }))), pastMeetingDates.length > 0 && /*#__PURE__*/React.createElement("div", null, anyBeforePast && /*#__PURE__*/React.createElement("div", {
-    className: `summary-section-divider${collapsedBeforePast ? ' is-after-collapsed' : ''}`
+    className: "summary-section-divider"
   }), /*#__PURE__*/React.createElement("div", {
     className: `summary-title is-toggleable${collapsedSections.past ? ' is-collapsed' : ''}`,
     role: "button",
