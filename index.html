@@ -230,41 +230,6 @@
     @media (max-width: 480px) {
       .participants-anchor { display: flex; }
     }
-    .participants-popover {
-      position: absolute;
-      top: calc(100% + 10px);
-      left: 50%;
-      transform: translateX(-50%);
-      background: #FFFFFF;
-      border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-md);
-      padding: 12px 16px;
-      box-shadow: var(--shadow-lg);
-      z-index: 100;
-      min-width: 170px;
-      max-width: calc(100vw - 24px);
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-    .participants-popover::before {
-      content: '';
-      position: absolute;
-      bottom: 100%;
-      left: 50%;
-      transform: translateX(-50%);
-      border: 8px solid transparent;
-      border-bottom-color: var(--border-subtle);
-    }
-    .participants-popover::after {
-      content: '';
-      position: absolute;
-      bottom: 100%;
-      left: 50%;
-      transform: translateX(-50%);
-      border: 7px solid transparent;
-      border-bottom-color: #FFFFFF;
-    }
 
     /* Buttons */
     .btn {
@@ -5160,7 +5125,6 @@ function App() {
   const [adminActivityLogs, setAdminActivityLogs] = React.useState([]);
   const [isShareOpen, setIsShareOpen] = React.useState(false);
   const [isChatShareOpen, setIsChatShareOpen] = React.useState(false);
-  const [isParticipantsOpen, setIsParticipantsOpen] = React.useState(false);
   const [isActivityLogExpanded, setIsActivityLogExpanded] = React.useState(false);
   const [isPollModalOpen, setIsPollModalOpen] = React.useState(false);
   const [editingPoll, setEditingPoll] = React.useState(null);
@@ -6291,45 +6255,12 @@ function App() {
     onClick: () => {
       if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 공유 정보를 확인해 주세요.')) setIsShareOpen(true);
     }
-  }, /*#__PURE__*/React.createElement("span", { className: "main-menu-icon" }, /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M3 12a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M15 6a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M15 18a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M8.7 10.7l6.6 -3.4", "M8.7 13.3l6.6 3.4"] })), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-full" }, "공유하기"), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-short" }, "공유")), /*#__PURE__*/React.createElement("div", { className: "main-menu-sep" }), /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    className: "main-menu-item",
-    style: { position: 'relative' },
-    onClick: () => setIsParticipantsOpen(!isParticipantsOpen)
-  }, /*#__PURE__*/React.createElement("span", { className: "main-menu-icon" }, /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M5 7a4 4 0 1 0 8 0a4 4 0 1 0 -8 0", "M3 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2", "M16 3.13a4 4 0 0 1 0 7.75", "M21 21v-2a4 4 0 0 0 -3 -3.85"] })), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-full" }, "참여자 (", getActiveParticipants(activeCal)?.length || 0, "명)"), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-short" }, "참여"), isParticipantsOpen && /*#__PURE__*/React.createElement("div", {
-    className: "participants-popover",
-    onClick: e => e.stopPropagation()
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: '0.8rem',
-      fontWeight: 800,
-      color: 'var(--text-muted)',
-      borderBottom: '1px solid var(--border-subtle)',
-      paddingBottom: '6px',
-      marginBottom: '4px'
-    }
-  }, "참여자 목록"), getActiveParticipants(activeCal).map(p => /*#__PURE__*/React.createElement("div", {
-    key: p.id,
-    style: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: '8px',
-      fontSize: '0.85rem',
-      fontWeight: '700'
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "color-dot",
-    style: {
-      backgroundColor: p.color,
-      width: '10px',
-      height: '10px'
-    }
-  }), /*#__PURE__*/React.createElement("span", null, p.name)))))))), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("span", { className: "main-menu-icon" }, /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M3 12a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M15 6a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M15 18a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M8.7 10.7l6.6 -3.4", "M8.7 13.3l6.6 3.4"] })), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-full" }, "공유하기"), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-short" }, "공유"))))), /*#__PURE__*/React.createElement("div", {
     ref: calendarSectionRef
   }, showConfirmedMeetingBanner && /*#__PURE__*/React.createElement("div", {
     style: {
-      background: 'var(--accent-gradient)',
-      color: '#FFFFFF',
+      background: 'linear-gradient(#fff, #fff) padding-box, var(--accent-gradient) border-box',
+      border: '2px solid transparent',
       borderRadius: 'var(--radius-md)',
       padding: '10px 16px',
       marginBottom: '12px',
@@ -6339,7 +6270,16 @@ function App() {
       gap: '8px'
     }
   }, /*#__PURE__*/React.createElement("span", {
-    style: { fontSize: '0.88rem', fontWeight: 800, whiteSpace: 'nowrap' }
+    style: {
+      fontSize: '0.88rem',
+      fontWeight: 800,
+      whiteSpace: 'nowrap',
+      background: 'var(--accent-gradient)',
+      WebkitBackgroundClip: 'text',
+      WebkitTextFillColor: 'transparent',
+      backgroundClip: 'text',
+      color: 'transparent'
+    }
   }, formatConfirmedMeetingLabel(activeCal.confirmedMeeting.date)), confirmedMeetingMemoEntries.map(entry => {
     const p = getActiveParticipants(activeCal).find(part => part.id === entry.participantId);
     if (!p) return null;
@@ -10177,25 +10117,22 @@ function DateModal({
       style: {
         backgroundColor: p.color,
         color: getContrastTextColor(p.color),
-        flexShrink: 0
-      }
-    }, /*#__PURE__*/React.createElement("span", {
-      className: "badge-dot",
-      style: {
-        backgroundColor: getContrastTextColor(p.color)
-      }
-    }), p.name), entry.note && entry.note.trim() && /*#__PURE__*/React.createElement("span", {
-      className: "memo-capsule-badge",
-      style: {
-        backgroundColor: p.color,
-        color: getContrastTextColor(p.color),
-        marginLeft: '6px',
+        cursor: 'pointer',
+        userSelect: 'none',
         overflow: 'hidden',
         textOverflow: 'ellipsis',
         whiteSpace: 'nowrap'
       },
-      title: `${p.name}: ${entry.note.trim()}`
-    }, entry.note.trim())), /*#__PURE__*/React.createElement("button", {
+      title: "클릭 시 이 참여자로 자동 선택 및 메모 불러오기",
+      onClick: () => {
+        if (isSubmitting) return;
+        setParticipantId(p.id);
+        setNote(entry.note || '');
+      }
+    }, p.name, entry.note && entry.note.trim() && ` (${entry.note.trim()})`), formatRegisteredAt(entry.updatedAt) && /*#__PURE__*/React.createElement("span", {
+      className: "registered-at-text",
+      style: { flexShrink: 0 }
+    }, formatRegisteredAt(entry.updatedAt))), /*#__PURE__*/React.createElement("button", {
       type: "button",
       className: "btn btn-danger",
       style: {
