@@ -10677,7 +10677,7 @@ function AdminModal({
     /* Modal Scrollable Body */
     /*#__PURE__*/React.createElement("div", {
       className: "modal-body",
-      style: { flex: activeTab === 'calendar' ? '0 0 auto' : 1, overflowY: 'auto', padding: activeTab === 'calendar' ? '0px' : activeTab === 'logs' ? '16px' : '20px', display: 'flex', flexDirection: 'column', gap: '20px' }
+      style: { flex: (activeTab === 'calendar' || activeTab === 'logs') ? '0 0 auto' : 1, overflowY: 'auto', padding: (activeTab === 'calendar' || activeTab === 'logs') ? '0px' : '20px', display: 'flex', flexDirection: 'column', gap: '20px' }
     },
       /* ========================================== */
       /* TAB 1: OPERATIONAL METRICS & CHAT LOGS     */
@@ -10950,13 +10950,13 @@ function AdminModal({
 
         /* Log Timeline */
         /*#__PURE__*/React.createElement("div", {
-          style: { border: '1px solid #E2E8F0', borderRadius: '12px', padding: '16px', backgroundColor: '#FFFFFF', flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }
+          style: { border: '1px solid #E2E8F0', borderRadius: '12px', padding: '16px', backgroundColor: '#FFFFFF', display: 'flex', flexDirection: 'column' }
         },
           /*#__PURE__*/React.createElement("h4", { style: { fontSize: '0.92rem', fontWeight: 800, color: '#1E293B', margin: '0 0 12px 0', display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(HourglassIcon, null), "활동 타임라인을 기반으로 시점 복구"),
 
           /* Timeline scroll container */
           /*#__PURE__*/React.createElement("div", {
-            style: { display: 'flex', flexDirection: 'column', gap: '8px', flex: 1, minHeight: '360px', paddingRight: '4px' }
+            style: { display: 'flex', flexDirection: 'column', gap: '8px', minHeight: '360px', paddingRight: '4px' }
           },
             activityLogsSorted.length === 0 ? /*#__PURE__*/React.createElement("div", { style: { padding: '30px', color: '#94A3B8', fontSize: '0.82rem', textAlign: 'center' } }, "기록된 활동 로그가 없어 복구 기능을 이용할 수 없습니다.") :
             activityLogsSorted.map(log => {
@@ -11025,7 +11025,9 @@ function AdminModal({
     /* ========================================== */
     /* TAB 4: CALENDAR-BASED SCHEDULE DELETION     */
     /* ========================================== */
-    activeTab === 'logs' && /*#__PURE__*/React.createElement(React.Fragment, null,
+    activeTab === 'logs' && /*#__PURE__*/React.createElement("div", {
+      style: { flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', padding: '16px' }
+    },
       /*#__PURE__*/React.createElement("div", {
         style: { display: 'flex', flexDirection: 'column', gap: '10px' }
       },
@@ -11119,7 +11121,7 @@ function AdminModal({
       )
     ),
     activeTab === 'calendar' && /*#__PURE__*/React.createElement("div", {
-      style: { flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 20px 20px' }
+      style: { flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', padding: '0 20px 20px' }
     },
       /*#__PURE__*/React.createElement(CalendarGrid, {
         calendar: calendar,
