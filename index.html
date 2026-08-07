@@ -161,19 +161,27 @@
 
     .main-header-top-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 
-    /* Settings gear: no fill/border (icon-only), pinned to the header's true right edge via
-       position: fixed -- .main-header-inner's own max-width: 1100px centering would otherwise
-       cap how far right a normally-positioned child could reach on wide viewports. */
-    .header-settings-btn {
-      background: none;
-      border: none;
+    /* Search + settings: no fill/border (icon-only), pinned to the header's true right edge as
+       one group via position: fixed -- .main-header-inner's own max-width: 1100px centering
+       would otherwise cap how far right a normally-positioned child could reach on wide
+       viewports. Grouped in one fixed wrapper (rather than each button fixed separately) so
+       their spacing is set once, in one place. */
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 4px;
       position: fixed;
       top: 14px;
       right: 16px;
       z-index: 501;
     }
     @media (min-width: 768px) {
-      .header-settings-btn { top: 18px; right: 24px; }
+      .header-actions { top: 18px; right: 24px; }
+    }
+    .header-search-btn,
+    .header-settings-btn {
+      background: none;
+      border: none;
     }
 
     /* Menu bar's divider line spans the full VIEWPORT width (not just the inner content's
@@ -832,10 +840,10 @@
     /* Summary Card */
     .summary-card {
       background: var(--bg-card);
-      border-radius: var(--radius-lg); padding: 16px; box-shadow: var(--shadow-md);
+      border-radius: var(--radius-lg); padding: 16px; margin-bottom: 20px; box-shadow: var(--shadow-md);
     }
     @media (min-width: 640px) {
-      .summary-card { padding: 24px; }
+      .summary-card { padding: 24px; margin-bottom: 28px; }
     }
     
     .summary-title { font-size: 1.05rem; font-weight: 800; color: var(--text-main); margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
@@ -5430,6 +5438,7 @@ function App() {
   const [selectedDate, setSelectedDate] = React.useState(null);
   const [isModalOpen, setIsModalOpen] = React.useState(false);
   const [isAdminOpen, setIsAdminOpen] = React.useState(false);
+  const [isGlobalSearchOpen, setIsGlobalSearchOpen] = React.useState(false);
   const [adminActivityLogs, setAdminActivityLogs] = React.useState([]);
   const [isShareOpen, setIsShareOpen] = React.useState(false);
   const [isChatShareOpen, setIsChatShareOpen] = React.useState(false);
@@ -6473,7 +6482,16 @@ function App() {
 등록해 놓아야, 공통모임 일자를
 뽑기가 수월해짐.`))), activeCal?.description && /*#__PURE__*/React.createElement("div", {
     className: "calendar-desc"
-  }, activeCal.description))), /*#__PURE__*/React.createElement("button", {
+  }, activeCal.description))), /*#__PURE__*/React.createElement("div", {
+    className: "header-actions"
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "btn header-search-btn",
+    onClick: () => setIsGlobalSearchOpen(true),
+    title: "검색",
+    style: {
+      padding: '10px'
+    }
+  }, /*#__PURE__*/React.createElement(SearchIcon, null)), /*#__PURE__*/React.createElement("button", {
     className: "btn header-settings-btn",
     onClick: () => {
       if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 설정을 수정해 주세요.')) setIsAdminOpen(true);
@@ -6501,7 +6519,7 @@ function App() {
     d: "M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065"
   }), /*#__PURE__*/React.createElement("path", {
     d: "M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0"
-  })))), /*#__PURE__*/React.createElement("div", {
+  }))))), /*#__PURE__*/React.createElement("div", {
     className: "main-menu-bar"
   }, /*#__PURE__*/React.createElement("button", {
     type: "button",
@@ -6636,6 +6654,8 @@ function App() {
       setSelectedDate(d);
       setIsModalOpen(true);
     }
+  }), /*#__PURE__*/React.createElement(PhotoGallery, {
+    chatMessages: chatMessages
   }), isModalOpen && /*#__PURE__*/React.createElement(DateModal, {
     dateStr: selectedDate,
     calendar: activeCal,
@@ -6675,6 +6695,15 @@ function App() {
     onClose: () => setIsAdminOpen(false),
     showToast: showToast,
     onDeleteLog: handleDeleteActivityLog
+  }), isGlobalSearchOpen && /*#__PURE__*/React.createElement(GlobalSearchModal, {
+    calendar: activeCal,
+    chatMessages: chatMessages,
+    onClose: () => setIsGlobalSearchOpen(false),
+    onSelectDate: d => {
+      setSelectedDate(d);
+      setIsModalOpen(true);
+    },
+    onOpenChat: () => setIsChatSheetOpen(true)
   }), isShareOpen && /*#__PURE__*/React.createElement(ShareModal, {
     calendar: activeCal,
     showToast: showToast,
@@ -7965,14 +7994,25 @@ function formatChatDividerDate(timestamp) {
   return `${year}.${month}.${day}(${dayName})`;
 }
 
+// Returns paired {full, thumb} entries for a chat message's attached image(s), handling both
+// the legacy single-image fields (imageUrl/thumbUrl) and the imageUrls/thumbUrls arrays used
+// by multi-image messages. Empty array when the message has no image at all. Shared by the
+// chat bubble renderer below and the calendar-wide PhotoGallery so both read images the same way.
+function getMessageImageEntries(msg) {
+  const urls = Array.isArray(msg.imageUrls) && msg.imageUrls.length > 0 ? msg.imageUrls : (msg.imageUrl ? [msg.imageUrl] : []);
+  const thumbs = Array.isArray(msg.thumbUrls) && msg.thumbUrls.length > 0 ? msg.thumbUrls : (msg.thumbUrl ? [msg.thumbUrl] : []);
+  if (thumbs.length === 0) return [];
+  return thumbs.map((thumb, i) => ({ full: urls[i] || thumb, thumb }));
+}
+
 // Renders a chat message's attached image(s): a single thumbnail for legacy/one-image
 // messages, or a wrapping grid of thumbnails for messages sent with multiple images
 // (msg.imageUrls/msg.thumbUrls). Returns null when the message has no image at all.
 function renderChatMessageImages(msg, setActiveLightbox, singleImageStyle = {}) {
-  const urls = Array.isArray(msg.imageUrls) && msg.imageUrls.length > 0 ? msg.imageUrls : (msg.imageUrl ? [msg.imageUrl] : []);
-  const thumbs = Array.isArray(msg.thumbUrls) && msg.thumbUrls.length > 0 ? msg.thumbUrls : (msg.thumbUrl ? [msg.thumbUrl] : []);
-  if (thumbs.length === 0) return null;
-  const displayUrls = thumbs.map((t, i) => urls[i] || t);
+  const entries = getMessageImageEntries(msg);
+  if (entries.length === 0) return null;
+  const thumbs = entries.map(e => e.thumb);
+  const displayUrls = entries.map(e => e.full);
   if (thumbs.length === 1) {
     return /*#__PURE__*/React.createElement('img', {
       src: thumbs[0],
@@ -11292,7 +11332,121 @@ function AdminModal({
       showToast: showToast
     })
   ));
-}// Share Modal
+}
+
+// Global Search Modal -- searches the active calendar's schedule memos, participant names, and
+// chat message text all in one place. Clicking a schedule result opens that date's DateModal;
+// clicking a chat result opens the chat sheet. Kept intentionally simple (substring match, no
+// fuzzy search/indexing) since a single calendar's data is small enough that this is instant.
+function GlobalSearchModal({
+  calendar,
+  chatMessages,
+  onClose,
+  onSelectDate,
+  onOpenChat
+}) {
+  const [query, setQuery] = React.useState('');
+  const inputRef = React.useRef(null);
+  React.useEffect(() => { inputRef.current?.focus(); }, []);
+
+  const participantsMap = React.useMemo(() => (calendar?.participants || []).reduce((acc, p) => {
+    if (p?.id) acc[p.id] = p;
+    return acc;
+  }, {}), [calendar]);
+
+  const q = query.trim().toLowerCase();
+
+  const scheduleResults = React.useMemo(() => {
+    if (!q || !calendar) return [];
+    return getActiveAvailabilities(calendar)
+      .filter(item => (item.note || '').toLowerCase().includes(q) || (participantsMap[item.participantId]?.name || '').toLowerCase().includes(q))
+      .sort((a, b) => b.date.localeCompare(a.date))
+      .slice(0, 30);
+  }, [q, calendar, participantsMap]);
+
+  const chatResults = React.useMemo(() => {
+    if (!q) return [];
+    return (chatMessages || [])
+      .filter(msg => (msg.text || '').toLowerCase().includes(q))
+      .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
+      .slice(0, 30);
+  }, [q, chatMessages]);
+
+  const hasResults = scheduleResults.length > 0 || chatResults.length > 0;
+
+  return /*#__PURE__*/React.createElement("div", {
+    className: "modal-overlay",
+    onClick: onClose
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "modal-container",
+    onClick: e => e.stopPropagation(),
+    style: { maxWidth: '520px' }
+  },
+    /*#__PURE__*/React.createElement("div", { className: "modal-header" },
+      /*#__PURE__*/React.createElement("h3", { style: { fontSize: '1.1rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px' } },
+        /*#__PURE__*/React.createElement(SearchIcon, null), "검색"
+      ),
+      /*#__PURE__*/React.createElement("button", {
+        onClick: onClose,
+        style: { background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer', display: 'flex', alignItems: 'center' }
+      }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }))
+    ),
+    /*#__PURE__*/React.createElement("div", { className: "modal-body" },
+      /*#__PURE__*/React.createElement("input", {
+        ref: inputRef,
+        type: "text",
+        className: "form-input",
+        style: { width: '100%' },
+        placeholder: "일정 메모, 참여자, 채팅 내용 검색...",
+        value: query,
+        onChange: e => setQuery(e.target.value)
+      }),
+      !q && /*#__PURE__*/React.createElement("div", { style: { padding: '30px', color: '#94A3B8', fontSize: '0.85rem', textAlign: 'center' } }, "검색어를 입력해 주세요."),
+      q && !hasResults && /*#__PURE__*/React.createElement("div", { style: { padding: '30px', color: '#94A3B8', fontSize: '0.85rem', textAlign: 'center' } }, "검색 결과가 없습니다."),
+      scheduleResults.length > 0 && /*#__PURE__*/React.createElement("div", null,
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.8rem', fontWeight: 800, color: '#64748B', marginBottom: '8px' } }, `일정 (${scheduleResults.length})`),
+        /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
+          scheduleResults.map(item => {
+            const p = participantsMap[item.participantId] || { name: '알수없음', color: '#94A3B8' };
+            return /*#__PURE__*/React.createElement("button", {
+              key: `${item.date}_${item.participantId}`,
+              type: "button",
+              onClick: () => { onSelectDate(item.date); onClose(); },
+              style: { display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '8px 10px', backgroundColor: '#F8FAFC', cursor: 'pointer', textAlign: 'left', width: '100%' }
+            },
+              /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.78rem', fontWeight: 700, color: '#0F172A', whiteSpace: 'nowrap' } }, formatDateWithDayName(item.date)),
+              /*#__PURE__*/React.createElement("span", {
+                style: { backgroundColor: p.color, color: getContrastTextColor(p.color), padding: '2px 8px', borderRadius: '9999px', fontSize: '0.7rem', fontWeight: 'bold', whiteSpace: 'nowrap' }
+              }, p.name),
+              /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.8rem', color: '#334155', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', flex: 1 } }, item.note || '')
+            );
+          })
+        )
+      ),
+      chatResults.length > 0 && /*#__PURE__*/React.createElement("div", null,
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.8rem', fontWeight: 800, color: '#64748B', margin: '14px 0 8px' } }, `채팅 (${chatResults.length})`),
+        /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
+          chatResults.map(msg => {
+            const p = participantsMap[msg.participantId] || { name: '알수없음', color: '#94A3B8' };
+            return /*#__PURE__*/React.createElement("button", {
+              key: msg.id,
+              type: "button",
+              onClick: () => { onOpenChat(); onClose(); },
+              style: { display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '8px 10px', backgroundColor: '#F8FAFC', cursor: 'pointer', textAlign: 'left', width: '100%' }
+            },
+              /*#__PURE__*/React.createElement("span", {
+                style: { backgroundColor: p.color, color: getContrastTextColor(p.color), padding: '2px 8px', borderRadius: '9999px', fontSize: '0.7rem', fontWeight: 'bold', whiteSpace: 'nowrap' }
+              }, p.name),
+              /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.8rem', color: '#334155', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', flex: 1 } }, msg.text || '')
+            );
+          })
+        )
+      )
+    )
+  ));
+}
+
+// Share Modal
 function ShareModal({
   calendar,
   onClose,
@@ -11361,6 +11515,29 @@ function ShareModal({
     style: { marginTop: '8px' },
     onClick: () => tryCreateShortcut(showToast ? (msg) => showToast(msg, 'info', 5000) : alert)
   }, "\uBC14\uD0D5\uD654\uBA74\uC5D0 \uBC14\uB85C\uAC00\uAE30 \uB9CC\uB4E4\uAE30"))));
+}
+
+function SearchIcon() {
+  return /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: "24",
+    height: "24",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    "stroke-width": "2",
+    "stroke-linecap": "round",
+    "stroke-linejoin": "round",
+    className: "icon icon-tabler icons-tabler-outline icon-tabler-search"
+  }, /*#__PURE__*/React.createElement("path", {
+    stroke: "none",
+    d: "M0 0h24v24H0z",
+    fill: "none"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M10 10m-7 0a7 7 0 1 0 14 0a7 7 0 1 0 -14 0"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M21 21l-6 -6"
+  }));
 }
 
 function SettingsIcon() {
@@ -11597,6 +11774,33 @@ function AlertTriangleIcon() {
     d: "M10.363 3.591l-8.106 13.534a1.914 1.914 0 0 0 1.636 2.871h16.214a1.914 1.914 0 0 0 1.636 -2.87l-8.106 -13.536a1.914 1.914 0 0 0 -3.274 0z"
   }), /*#__PURE__*/React.createElement("path", {
     d: "M12 16h.01"
+  }));
+}
+
+function GalleryIcon() {
+  return /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: "20",
+    height: "20",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    "stroke-width": "2",
+    "stroke-linecap": "round",
+    "stroke-linejoin": "round",
+    className: "icon icon-tabler icons-tabler-outline icon-tabler-photo"
+  }, /*#__PURE__*/React.createElement("path", {
+    stroke: "none",
+    d: "M0 0h24v24H0z",
+    fill: "none"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M15 8h.01"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M3 6a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v12a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3v-12z"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M3 16l5 -5c.928 -.893 2.072 -.893 3 0l5 5"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M14 14l1 -1c.928 -.893 2.072 -.893 3 0l3 3"
   }));
 }
 
@@ -12737,6 +12941,69 @@ function SummaryList({
     })));
   }))));
 }
+
+// Aggregates every image sent in this calendar's chat into a single scrollable grid, newest
+// first. Reuses getMessageImageEntries (the same helper the chat bubbles use to read
+// imageUrl(s)/thumbUrl(s)) so a message's images are read identically in both places, and
+// reuses the shared Lightbox component for the swipeable full-screen viewer -- kept as its own
+// local lightbox state rather than sharing App's chat activeLightbox state, since the gallery
+// and the chat are independent entry points into the same viewer, not one shared session.
+function PhotoGallery({ chatMessages }) {
+  const [collapsed, setCollapsed] = React.useState(false);
+  const [lightbox, setLightbox] = React.useState(null); // { urls: string[], index: number } | null
+
+  const photoEntries = React.useMemo(() => {
+    const sorted = [...(chatMessages || [])].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+    return sorted.flatMap(msg => getMessageImageEntries(msg).map((entry, i) => ({
+      ...entry,
+      key: `${msg.id}_${i}`
+    })));
+  }, [chatMessages]);
+
+  if (photoEntries.length === 0) return null;
+
+  return /*#__PURE__*/React.createElement("section", { className: "summary-card" },
+    /*#__PURE__*/React.createElement("div", {
+      className: `summary-title is-toggleable${collapsed ? ' is-collapsed' : ''}`,
+      role: "button",
+      tabIndex: 0,
+      "aria-expanded": !collapsed,
+      onClick: () => setCollapsed(prev => !prev),
+      onKeyDown: event => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        setCollapsed(prev => !prev);
+      }
+    },
+      /*#__PURE__*/React.createElement(GalleryIcon, null),
+      `사진 갤러리 (${photoEntries.length}장)`,
+      /*#__PURE__*/React.createElement(SectionToggleButton, {
+        collapsed,
+        onToggle: () => setCollapsed(prev => !prev),
+        label: collapsed ? '사진 갤러리 펼치기' : '사진 갤러리 접기'
+      })
+    ),
+    !collapsed && /*#__PURE__*/React.createElement("div", {
+      style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(80px, 100%), 1fr))', gap: '6px' }
+    },
+      photoEntries.map((entry, idx) => /*#__PURE__*/React.createElement("img", {
+        key: entry.key,
+        src: entry.thumb,
+        alt: "채팅에 첨부된 사진",
+        loading: "lazy",
+        onClick: () => setLightbox({ urls: photoEntries.map(e => e.full), index: idx }),
+        style: { width: '100%', aspectRatio: '1 / 1', objectFit: 'cover', borderRadius: 'var(--radius-sm)', cursor: 'pointer' }
+      }))
+    ),
+    lightbox && /*#__PURE__*/React.createElement(Lightbox, {
+      urls: lightbox.urls,
+      index: lightbox.index,
+      onClose: () => setLightbox(null),
+      onNavigate: i => setLightbox(prev => prev ? { ...prev, index: i } : prev)
+    })
+  );
+}
+
 try {
   const rootElement = document.getElementById('root');
   if (rootElement) {
