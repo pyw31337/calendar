@@ -26,6 +26,14 @@
   <meta name="twitter:description" content="사모임 일정 조율 플랫폼">
   <meta name="twitter:image" content="https://pyw31337.github.io/calendar/og-thumb.jpg?v=20260804">
 
+  <!-- Home screen / desktop shortcut icon + PWA manifest -->
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+  <meta name="theme-color" content="#4F46E5">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="모여라 캘린더">
+
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1238,6 +1246,60 @@ function notifyNewChatMessage(calendar, message, participantName) {
   } catch (e) {
     console.warn('Failed to show chat notification:', e);
   }
+}
+
+// Home screen / desktop shortcut creation. Only Chromium-based browsers (Chrome, Edge, and
+// Chromium-based mobile browsers) expose a JS-triggerable native install prompt via
+// beforeinstallprompt -- Safari and Firefox have no such API by design and require the user
+// to go through their own browser UI manually, so those get step-by-step instructions instead.
+let deferredInstallPrompt = null;
+if (typeof window.addEventListener === 'function') {
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+  });
+}
+
+function detectBrowserForShortcutInstructions() {
+  const ua = navigator.userAgent || '';
+  const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const isSafari = /Safari/.test(ua) && !/Chrome|CriOS|EdgiOS|FxiOS/.test(ua);
+  const isFirefox = /Firefox|FxiOS/.test(ua);
+  if (isIOS && isSafari) return 'ios-safari';
+  if (isSafari) return 'macos-safari';
+  if (isFirefox) return 'firefox';
+  return 'other';
+}
+
+function getShortcutInstructions(kind) {
+  switch (kind) {
+    case 'ios-safari':
+      return '하단 공유 버튼( ⬆️ )을 누른 뒤 "홈 화면에 추가"를 선택해 주세요.';
+    case 'macos-safari':
+      return '공유 버튼을 누른 뒤 "Dock에 추가" 또는 "홈 화면에 추가"를 선택해 주세요.';
+    case 'firefox':
+      return '브라우저 메뉴(≡)를 열어 "홈 화면에 추가" 또는 "설치"를 선택해 주세요.';
+    default:
+      return '브라우저 메뉴에서 "홈 화면에 추가" 또는 "앱 설치"를 찾아 선택해 주세요.';
+  }
+}
+
+async function tryCreateShortcut(notify) {
+  if (deferredInstallPrompt) {
+    try {
+      deferredInstallPrompt.prompt();
+      const choice = await deferredInstallPrompt.userChoice;
+      deferredInstallPrompt = null;
+      if (choice?.outcome === 'accepted') {
+        if (notify) notify('바로가기가 생성되었습니다!');
+        return;
+      }
+    } catch (e) {
+      console.warn('Native install prompt failed:', e);
+    }
+  }
+  const instructions = getShortcutInstructions(detectBrowserForShortcutInstructions());
+  if (notify) notify(instructions);
 }
 
 function getContrastTextColor(hexColor) {
@@ -10482,7 +10544,11 @@ function ShareModal({
       const ok = await copyTextToClipboard(shareUrl);
       alert(ok ? 'URL이 복사되었습니다!' : '복사에 실패했습니다. URL을 직접 선택해 복사해 주세요.');
     }
-  }, "URL \uBCF5\uC0AC\uD558\uAE30"))));
+  }, "URL \uBCF5\uC0AC\uD558\uAE30"), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-secondary",
+    style: { marginTop: '8px' },
+    onClick: () => tryCreateShortcut(alert)
+  }, "\uBC14\uD0D5\uD654\uBA74\uC5D0 \uBC14\uB85C\uAC00\uAE30 \uB9CC\uB4E4\uAE30"))));
 }
 
 function SettingsIcon() {
