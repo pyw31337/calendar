@@ -31,8 +31,27 @@
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
   <meta name="theme-color" content="#4F46E5">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="모여라 캘린더">
+  <script id="pwa-manifest-switch">
+    // Point the manifest at a per-calendar variant (start_url baked in) so that installing
+    // the app while viewing ?id=kkot or ?id=cw launches back into that same calendar --
+    // manifest.json's own start_url has no query string, so without this every installed
+    // shortcut would silently open kkot regardless of which calendar was on screen at
+    // install time. Kept as a standalone inline script (not part of the main app bundle)
+    // so it still runs even if the app script itself fails to load.
+    (function () {
+      var params = new URLSearchParams(window.location.search);
+      var id = params.get('id') || params.get('cal');
+      var manifestByCalendar = { kkot: 'manifest-kkot.json', cw: 'manifest-cw.json' };
+      if (id && manifestByCalendar[id]) {
+        var link = document.querySelector('link[rel="manifest"]');
+        if (link) link.setAttribute('href', manifestByCalendar[id]);
+      }
+    })();
+  </script>
 
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -6279,6 +6298,7 @@ function App() {
     }), isChatShareOpen && /*#__PURE__*/React.createElement(ShareModal, {
       calendar: activeCal,
       shareType: "chat",
+      showToast: showToast,
       onClose: () => setIsChatShareOpen(false)
     }), deletingMessage && /*#__PURE__*/React.createElement(DeleteConfirmModal, {
       message: deletingMessage,
@@ -6643,10 +6663,12 @@ function App() {
     onDeleteLog: handleDeleteActivityLog
   }), isShareOpen && /*#__PURE__*/React.createElement(ShareModal, {
     calendar: activeCal,
+    showToast: showToast,
     onClose: () => setIsShareOpen(false)
   }), isChatShareOpen && /*#__PURE__*/React.createElement(ShareModal, {
     calendar: activeCal,
     shareType: "chat",
+    showToast: showToast,
     onClose: () => setIsChatShareOpen(false)
   }), isPollModalOpen && /*#__PURE__*/React.createElement(PollModal, {
     calendar: activeCal,
@@ -11262,7 +11284,8 @@ function AdminModal({
 function ShareModal({
   calendar,
   onClose,
-  shareType = 'calendar'
+  shareType = 'calendar',
+  showToast
 }) {
   const shareUrl = shareType === 'chat'
     ? `${getCalendarShareUrl(calendar.id)}?view=chat`
@@ -11317,12 +11340,14 @@ function ShareModal({
     className: "btn btn-primary",
     onClick: async () => {
       const ok = await copyTextToClipboard(shareUrl);
-      alert(ok ? 'URL이 복사되었습니다!' : '복사에 실패했습니다. URL을 직접 선택해 복사해 주세요.');
+      const message = ok ? 'URL이 복사되었습니다!' : '복사에 실패했습니다. URL을 직접 선택해 복사해 주세요.';
+      if (showToast) showToast(message, ok ? 'success' : 'error');
+      else alert(message);
     }
   }, "URL \uBCF5\uC0AC\uD558\uAE30"), /*#__PURE__*/React.createElement("button", {
     className: "btn btn-secondary",
     style: { marginTop: '8px' },
-    onClick: () => tryCreateShortcut(alert)
+    onClick: () => tryCreateShortcut(showToast ? (msg) => showToast(msg, 'info', 5000) : alert)
   }, "\uBC14\uD0D5\uD654\uBA74\uC5D0 \uBC14\uB85C\uAC00\uAE30 \uB9CC\uB4E4\uAE30"))));
 }
 
