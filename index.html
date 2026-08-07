@@ -91,6 +91,20 @@
       --radius-md: 12px;
       --radius-sm: 8px;
       --radius-full: 9999px;
+
+      /* Spacing scale (4px base grid). Any bordered container's top/bottom padding should use
+         the same step as its own left/right padding unless there's a specific compositional
+         reason not to (e.g. a sticky footer's extra safe-area inset) -- and sibling regions of
+         the same component (a modal's header/body/footer, a card's title/content) should share
+         one step rather than drifting across nearby-but-different values like 14/16/18/20px. */
+      --space-1: 4px;
+      --space-2: 8px;
+      --space-3: 12px;
+      --space-4: 16px;
+      --space-5: 20px;
+      --space-6: 24px;
+      --space-8: 32px;
+      --space-10: 40px;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1128,20 +1142,20 @@
     .modal-container > form {
       display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; overflow: hidden;
     }
-    .modal-header { padding: 18px 20px; border-bottom: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: space-between; background: #F8FAFC; flex: 0 0 auto; }
+    .modal-header { padding: var(--space-5); border-bottom: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: space-between; background: #F8FAFC; flex: 0 0 auto; }
     .modal-body {
-      padding: 20px; display: flex; flex-direction: column; gap: 16px;
+      padding: var(--space-5); display: flex; flex-direction: column; gap: var(--space-4);
       overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
       flex: 1 1 auto; min-height: 0;
     }
-    .modal-footer { padding: 16px 20px; border-top: 1px solid var(--border-subtle); display: flex; justify-content: flex-end; gap: 10px; background: #F8FAFC; flex: 0 0 auto; }
+    .modal-footer { padding: var(--space-5); border-top: 1px solid var(--border-subtle); display: flex; justify-content: flex-end; gap: 10px; background: #F8FAFC; flex: 0 0 auto; }
     @media (max-width: 640px) {
       .modal-overlay { align-items: center; padding: 12px; }
       .modal-container { max-height: calc(100vh - 24px); max-height: calc(100dvh - 24px); }
-      .modal-header { padding: 16px 18px; }
+      .modal-header { padding: 18px; }
       .modal-body { padding: 18px; gap: 14px; }
       .modal-footer {
-        padding: 14px 18px max(14px, env(safe-area-inset-bottom));
+        padding: 18px 18px max(18px, env(safe-area-inset-bottom));
         position: sticky; bottom: 0; z-index: 1;
       }
     }
@@ -10158,8 +10172,6 @@ function DateModal({
       display: 'flex',
       justifyContent: 'space-between',
       alignItems: 'center',
-      padding: '16px 20px',
-      borderBottom: '1px solid var(--border-subtle)',
       flexWrap: 'nowrap',
       overflow: 'hidden'
     }
@@ -10819,7 +10831,7 @@ function AdminModal({
     /* Header */
     /*#__PURE__*/React.createElement("div", {
       className: "modal-header",
-      style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0, padding: '16px 20px', borderBottom: '1px solid #E2E8F0' }
+      style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }
     },
       /*#__PURE__*/React.createElement("h3", { style: { fontSize: '1.1rem', fontWeight: 800, color: '#0F172A', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' } },
         /*#__PURE__*/React.createElement(SettingsIcon, null), `${calendar.title} 설정`
