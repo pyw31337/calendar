@@ -6285,11 +6285,12 @@ function App() {
       style: {
         background: 'linear-gradient(#fff, #fff) padding-box, var(--accent-gradient) border-box',
         border: '2px solid transparent',
-        borderRadius: 'var(--radius-full)',
+        borderRadius: 'var(--radius-md)',
+        padding: '10px 14px',
         display: 'flex',
-        alignItems: 'stretch',
-        overflowX: 'auto',
-        overflowY: 'hidden',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: '8px',
         cursor: 'pointer'
       },
       onClick: () => {
@@ -6298,15 +6299,11 @@ function App() {
         setIsModalOpen(true);
       }
     }, /*#__PURE__*/React.createElement("span", {
+      className: "memo-capsule-badge",
       style: {
-        padding: '6px 16px',
-        fontSize: '0.85rem',
-        fontWeight: 800,
-        whiteSpace: 'nowrap',
-        color: '#4F46E5',
         backgroundColor: '#FFFFFF',
-        display: 'flex',
-        alignItems: 'center'
+        color: '#4F46E5',
+        border: '1.5px solid #C7D2FE'
       }
     }, formatConfirmedMeetingLabel(meeting.date)), memoEntries.map(entry => {
       const p = getActiveParticipants(activeCal).find(part => part.id === entry.participantId);
@@ -6316,16 +6313,8 @@ function App() {
       if (!noteTextOnly) return null;
       return /*#__PURE__*/React.createElement("span", {
         key: entry.participantId,
-        style: {
-          padding: '6px 16px',
-          fontSize: '0.85rem',
-          fontWeight: 800,
-          whiteSpace: 'nowrap',
-          backgroundColor: p.color,
-          color: getContrastTextColor(p.color),
-          display: 'flex',
-          alignItems: 'center'
-        },
+        className: "memo-capsule-badge",
+        style: { backgroundColor: p.color, color: getContrastTextColor(p.color) },
         title: `${p.name}: ${noteTextOnly}`
       }, noteTextOnly);
     }));
