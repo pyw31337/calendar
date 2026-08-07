@@ -6125,6 +6125,9 @@ function App() {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   })();
   const showConfirmedMeetingBanner = !!activeCal?.confirmedMeeting && activeCal.confirmedMeeting.date >= todayDateStrForBanner;
+  const confirmedMeetingMemoEntries = showConfirmedMeetingBanner
+    ? getActiveAvailabilities(activeCal).filter(e => e.date === activeCal.confirmedMeeting.date && e.note && e.note.trim())
+    : [];
 
   return /*#__PURE__*/React.createElement("div", {
     className: "app-container",
@@ -6330,13 +6333,23 @@ function App() {
       borderRadius: 'var(--radius-md)',
       padding: '10px 16px',
       marginBottom: '12px',
-      fontSize: '0.88rem',
-      fontWeight: 800,
-      whiteSpace: 'nowrap',
-      overflow: 'hidden',
-      textOverflow: 'ellipsis'
+      display: 'flex',
+      alignItems: 'center',
+      flexWrap: 'wrap',
+      gap: '8px'
     }
-  }, formatConfirmedMeetingLabel(activeCal.confirmedMeeting.date)), /*#__PURE__*/React.createElement(CalendarGrid, {
+  }, /*#__PURE__*/React.createElement("span", {
+    style: { fontSize: '0.88rem', fontWeight: 800, whiteSpace: 'nowrap' }
+  }, formatConfirmedMeetingLabel(activeCal.confirmedMeeting.date)), confirmedMeetingMemoEntries.map(entry => {
+    const p = getActiveParticipants(activeCal).find(part => part.id === entry.participantId);
+    if (!p) return null;
+    return /*#__PURE__*/React.createElement("span", {
+      key: entry.participantId,
+      className: "memo-capsule-badge",
+      style: { backgroundColor: p.color, color: getContrastTextColor(p.color) },
+      title: `${p.name}: ${entry.note.trim()}`
+    }, entry.note.trim());
+  })), /*#__PURE__*/React.createElement(CalendarGrid, {
 
     calendar: activeCal,
     isLoading: isInitialDataLoading,
@@ -10112,6 +10125,7 @@ function DateModal({
     ref: noteInputRef,
     type: "text",
     className: "form-input",
+    style: { width: '100%' },
     placeholder: "예: 1시 이후 가능, 차량 운전 가능",
     value: note,
     onChange: e => setNote(e.target.value),
