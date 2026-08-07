@@ -1440,6 +1440,15 @@ function formatShortDateWithDayName(dateStr) {
   return formatted.replace(/^(\d{2})(\d{2})\./, '$2.');
 }
 
+// "[모임확정] 26.08.08 (토)" -- the confirmed-meeting banner's fixed text format.
+function formatConfirmedMeetingLabel(dateStr) {
+  if (!dateStr) return '';
+  const [y, m, d] = dateStr.split('-');
+  const dateObj = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
+  const dayName = ['일', '월', '화', '수', '목', '금', '토'][dateObj.getDay()];
+  return `[모임확정] ${y.slice(2)}.${m}.${d} (${dayName})`;
+}
+
 // The chat room header is cramped for space (back button + title + bell + share icons all
 // competing for one row), so strip a trailing "모여라 캘린더" from a calendar's title there --
 // it's just the app's own name and is redundant once already inside the app.
@@ -6109,6 +6118,14 @@ function App() {
   const mainMenuChatLatestTimestamp = mainMenuChatCount > 0 ? chatMessages[mainMenuChatCount - 1].timestamp : 0;
   const mainMenuChatHasUnread = mainMenuChatLatestTimestamp > getChatLastReadTimestamp(activeCalId);
 
+  // Confirmed-meeting banner stays up through the day of the meeting itself, then disappears
+  // once that date is in the past -- only today-or-future confirmations show on the calendar.
+  const todayDateStrForBanner = (() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  })();
+  const showConfirmedMeetingBanner = !!activeCal?.confirmedMeeting && activeCal.confirmedMeeting.date >= todayDateStrForBanner;
+
   return /*#__PURE__*/React.createElement("div", {
     className: "app-container",
     style: { paddingTop: `${mainHeaderHeight}px` }
@@ -6306,7 +6323,7 @@ function App() {
     }
   }), /*#__PURE__*/React.createElement("span", null, p.name)))))))), /*#__PURE__*/React.createElement("div", {
     ref: calendarSectionRef
-  }, activeCal?.confirmedMeeting && /*#__PURE__*/React.createElement("div", {
+  }, showConfirmedMeetingBanner && /*#__PURE__*/React.createElement("div", {
     style: {
       background: 'var(--accent-gradient)',
       color: '#FFFFFF',
@@ -6319,7 +6336,7 @@ function App() {
       overflow: 'hidden',
       textOverflow: 'ellipsis'
     }
-  }, `모임 확정 ${activeCal.confirmedMeeting.date.slice(2).replace(/-/g, '.')}${activeCal.confirmedMeeting.note ? ` (${activeCal.confirmedMeeting.note})` : ''}`), /*#__PURE__*/React.createElement(CalendarGrid, {
+  }, formatConfirmedMeetingLabel(activeCal.confirmedMeeting.date)), /*#__PURE__*/React.createElement(CalendarGrid, {
 
     calendar: activeCal,
     isLoading: isInitialDataLoading,
@@ -10120,8 +10137,10 @@ function DateModal({
   }, dateEntries.map(entry => {
     const p = activeParticipants.find(part => part.id === entry.participantId);
     if (!p) return null;
-    return /*#__PURE__*/React.createElement("div", {
-      key: entry.id || p.id,
+    const entryUrl = extractFirstUrl(entry.note);
+    return /*#__PURE__*/React.createElement(React.Fragment, {
+      key: entry.id || p.id
+    }, /*#__PURE__*/React.createElement("div", {
       style: {
         display: 'flex',
         alignItems: 'center',
@@ -10151,16 +10170,18 @@ function DateModal({
       style: {
         backgroundColor: getContrastTextColor(p.color)
       }
-    }), p.name), entry.note && /*#__PURE__*/React.createElement("span", {
+    }), p.name), entry.note && entry.note.trim() && /*#__PURE__*/React.createElement("span", {
+      className: "memo-capsule-badge",
       style: {
-        fontSize: '0.82rem',
-        color: '#475569',
+        backgroundColor: p.color,
+        color: getContrastTextColor(p.color),
         marginLeft: '6px',
         overflow: 'hidden',
         textOverflow: 'ellipsis',
         whiteSpace: 'nowrap'
-      }
-    }, "\"", entry.note, "\"")), /*#__PURE__*/React.createElement("button", {
+      },
+      title: `${p.name}: ${entry.note.trim()}`
+    }, entry.note.trim())), /*#__PURE__*/React.createElement("button", {
       type: "button",
       className: "btn btn-danger",
       style: {
@@ -10180,7 +10201,7 @@ function DateModal({
           });
         });
       }
-    }, "삭제"));
+    }, "삭제")), entryUrl && /*#__PURE__*/React.createElement(LinkPreviewCard, { url: entryUrl }));
   })))), !adminMode && /*#__PURE__*/React.createElement("div", {
     className: "modal-footer",
     style: {
