@@ -1475,6 +1475,15 @@ if (typeof window.addEventListener === 'function') {
   });
 }
 
+// Registers sw.js, which only caches static assets (icons/manifests) -- never index.html
+// itself, since this app deliberately serves its HTML as no-cache (see sw.js for why). Safe to
+// register unconditionally: browsers without service worker support simply skip this.
+if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(e => console.warn('Service worker registration failed:', e));
+  });
+}
+
 function detectBrowserForShortcutInstructions() {
   const ua = navigator.userAgent || '';
   const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
