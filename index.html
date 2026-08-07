@@ -2847,6 +2847,23 @@ try {
   console.warn('Firebase Storage init notice (falling back to inline base64 images):', e);
 }
 
+// Mobile browsers aggressively suspend a backgrounded tab's network activity, and Firestore's
+// realtime "listen" stream can come back stale/dead when the tab is foregrounded again -- the
+// onSnapshot listener is still technically subscribed, but its underlying connection stopped
+// delivering updates, so messages sent elsewhere while this tab was backgrounded never appear
+// until a full page reload re-creates everything from scratch. Cycling disableNetwork() then
+// enableNetwork() on visibility-return forces the SDK to drop and re-establish its streams,
+// which reliably clears this up without requiring a reload.
+if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && firebaseDb) {
+      firebaseDb.disableNetwork().then(() => firebaseDb.enableNetwork()).catch(e => {
+        console.warn('Firestore reconnect notice:', e);
+      });
+    }
+  });
+}
+
 async function fetchSingleCalendarWithRest(calId, timeoutMs = FIREBASE_LOAD_TIMEOUT_MS) {
   if (!isAllowedCalendarId(calId)) return null;
   const controller = new AbortController();
@@ -7840,6 +7857,10 @@ function renderChatMessageImages(msg, setActiveLightbox, singleImageStyle = {}) 
 // multi-photo gallery UX the chat bubbles are modeled after.
 function Lightbox({ urls, index, onClose, onNavigate }) {
   const touchStartXRef = React.useRef(null);
+  const dragStartXRef = React.useRef(null);
+  const isDraggingRef = React.useRef(false);
+  const wasDraggedRef = React.useRef(false);
+  const [isDragging, setIsDragging] = React.useState(false);
   const total = urls.length;
   const goTo = i => {
     if (i < 0 || i >= total) return;
@@ -7862,14 +7883,58 @@ function Lightbox({ urls, index, onClose, onNavigate }) {
     if (Math.abs(deltaX) < 50) return;
     if (deltaX < 0) goTo(index + 1); else goTo(index - 1);
   };
+  // Mouse-drag swipe for desktop: mousedown is attached on the overlay (fires regardless of
+  // whether the drag starts on the backdrop or the image itself, since mousedown bubbles),
+  // while mousemove/mouseup are tracked on the document so the drag keeps working even if the
+  // cursor leaves the image mid-drag. wasDraggedRef suppresses the click-to-close-on-backdrop
+  // behavior right after an actual drag, so dragging never also closes the lightbox.
+  const handleMouseDown = e => {
+    if (total <= 1) return;
+    dragStartXRef.current = e.clientX;
+    isDraggingRef.current = true;
+    wasDraggedRef.current = false;
+    setIsDragging(true);
+  };
+  React.useEffect(() => {
+    const handleMouseMove = e => {
+      if (!isDraggingRef.current || dragStartXRef.current == null) return;
+      if (Math.abs(e.clientX - dragStartXRef.current) > 5) wasDraggedRef.current = true;
+    };
+    const handleMouseUp = e => {
+      if (!isDraggingRef.current) return;
+      isDraggingRef.current = false;
+      setIsDragging(false);
+      if (dragStartXRef.current == null) return;
+      const deltaX = e.clientX - dragStartXRef.current;
+      dragStartXRef.current = null;
+      if (Math.abs(deltaX) < 50) return;
+      if (deltaX < 0) goTo(index + 1); else goTo(index - 1);
+    };
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [index, total]);
+  const handleOverlayClick = () => {
+    if (wasDraggedRef.current) {
+      wasDraggedRef.current = false;
+      return;
+    }
+    onClose();
+  };
   return /*#__PURE__*/React.createElement("div", {
-    onClick: onClose,
+    onClick: handleOverlayClick,
     onTouchStart: handleTouchStart,
     onTouchEnd: handleTouchEnd,
+    onMouseDown: handleMouseDown,
     style: {
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
       backgroundColor: 'rgba(15, 23, 42, 0.92)', backdropFilter: 'blur(8px)', zIndex: 9000,
-      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      cursor: total > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default',
+      userSelect: 'none'
     }
   }, /*#__PURE__*/React.createElement("button", {
     type: "button",
@@ -7916,6 +7981,7 @@ function Lightbox({ urls, index, onClose, onNavigate }) {
   /*#__PURE__*/React.createElement("img", {
     src: urls[index],
     alt: "원본 이미지",
+    draggable: false,
     onClick: e => e.stopPropagation(),
     style: {
       maxWidth: '92vw', maxHeight: '82vh', borderRadius: '12px', objectFit: 'contain',
@@ -8465,16 +8531,36 @@ function ChatRoomView({
   // Scroll-to-bottom floating button: shown once scrolled far enough away from the latest
   // message that swiping back down manually would be tedious.
   const [showScrollToBottom, setShowScrollToBottom] = React.useState(false);
+  // "새로운 메시지" banner: distinct from the generic scroll-to-bottom button above -- this one
+  // only appears when a message actually arrives WHILE the user is reading older history
+  // (scrolled away from the bottom), replacing the generic button with a labeled pill so a new
+  // message doesn't go unnoticed. Clears once the user scrolls back near the bottom themselves.
+  const [hasNewMessageBelow, setHasNewMessageBelow] = React.useState(false);
+  const prevMessageCountRef = React.useRef(chatMessages.length);
+  React.useEffect(() => {
+    const increased = chatMessages.length > prevMessageCountRef.current;
+    prevMessageCountRef.current = chatMessages.length;
+    if (!increased) return;
+    const el = chatMessagesContainerRef.current;
+    if (!el) return;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    if (distanceFromBottom > 200) setHasNewMessageBelow(true);
+  }, [chatMessages.length]);
   const handleScrollCombined = (e) => {
     if (handleChatScroll) handleChatScroll(e);
     const el = e.target;
     const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
     setShowScrollToBottom(distanceFromBottom > 200);
+    if (distanceFromBottom <= 200) setHasNewMessageBelow(false);
   };
   const scrollToBottom = () => {
     if (chatMessagesContainerRef.current) {
       chatMessagesContainerRef.current.scrollTo({ top: chatMessagesContainerRef.current.scrollHeight, behavior: 'smooth' });
     }
+  };
+  const handleNewMessageBannerClick = () => {
+    scrollToBottom();
+    setHasNewMessageBelow(false);
   };
 
   const [notifPermission, setNotifPermission] = React.useState(() => (isNotificationSupported() ? Notification.permission : 'unsupported'));
@@ -8492,8 +8578,24 @@ function ChatRoomView({
       return;
     }
     const result = await requestChatNotificationPermission();
-    setNotifPermission(result);
-    if (showToast) showToast(result === 'granted' ? '알림 켜짐' : '알림 권한 거부됨', result === 'granted' ? 'success' : 'error');
+    if (result !== 'granted') {
+      setNotifPermission(result);
+      if (showToast) showToast('알림 권한 거부됨', 'error');
+      return;
+    }
+    // Some mobile browsers (notably iOS Safari and iOS-based in-app browsers/webviews, when the
+    // page isn't installed to the home screen) report permission as granted yet still throw when
+    // actually constructing a Notification -- probe it immediately so the user gets an honest
+    // explanation now instead of silently never seeing a real notification later.
+    try {
+      const probe = new Notification(' ', { silent: true, tag: 'notif-probe' });
+      probe.close();
+      setNotifPermission('granted');
+      if (showToast) showToast('알림 켜짐', 'success');
+    } catch (e) {
+      setNotifPermission('unsupported');
+      if (showToast) showToast('이 브라우저에서는 알림을 표시할 수 없습니다 (iOS는 홈 화면 추가 필요)', 'error', 6000);
+    }
   };
 
   // Monitor visualViewport to shift layout above virtual keyboard on mobile devices
@@ -9043,7 +9145,7 @@ function ChatRoomView({
       fontSize: '0.85rem',
       marginTop: '40px'
     }
-  }, "\uC544\uC9C1 \uB4F1\uB85D\uB41C \uB300\uD654\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.") : renderedMessages), showScrollToBottom && /*#__PURE__*/React.createElement("button", {
+  }, "\uC544\uC9C1 \uB4F1\uB85D\uB41C \uB300\uD654\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.") : renderedMessages), showScrollToBottom && !hasNewMessageBelow && /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: scrollToBottom,
     "aria-label": "\uCD5C\uADFC \uB300\uD654\uB85C \uC774\uB3D9",
@@ -9074,7 +9176,41 @@ function ChatRoomView({
     "stroke-width": "2",
     "stroke-linecap": "round",
     "stroke-linejoin": "round"
-  }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), /*#__PURE__*/React.createElement("path", { d: "M6 9l6 6l6 -6" })))), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), /*#__PURE__*/React.createElement("path", { d: "M6 9l6 6l6 -6" }))), hasNewMessageBelow && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: handleNewMessageBannerClick,
+    "aria-label": "\uC0C8\uB85C\uC6B4 \uBA54\uC2DC\uC9C0\uB85C \uC774\uB3D9",
+    style: {
+      position: 'absolute',
+      bottom: '16px',
+      left: '50%',
+      transform: 'translateX(-50%)',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '6px',
+      padding: '8px 16px',
+      borderRadius: '9999px',
+      backgroundColor: '#4F46E5',
+      color: '#FFFFFF',
+      border: 'none',
+      boxShadow: '0 4px 12px rgba(79,70,229,0.35)',
+      cursor: 'pointer',
+      fontSize: '0.82rem',
+      fontWeight: 700,
+      whiteSpace: 'nowrap',
+      zIndex: 51
+    }
+  }, "\uC0C8\uB85C\uC6B4 \uBA54\uC2DC\uC9C0", /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: "16",
+    height: "16",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    "stroke-width": "2.5",
+    "stroke-linecap": "round",
+    "stroke-linejoin": "round"
+  }, /*#__PURE__*/React.createElement("path", { d: "M6 9l6 6l6 -6" })))), /*#__PURE__*/React.createElement("div", {
     style: {
       backgroundColor: '#FFFFFF',
       borderTop: '1px solid #E2E8F0',
