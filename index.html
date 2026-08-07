@@ -7144,83 +7144,202 @@ function LinkPreviewCard({ url }) {
   );
 }
 
-function compressImageToDataUrls(file) {
+// HEIC/HEIF (the default photo format on iPhone) has no native decode support in canvas/Image()
+// on any browser except some Safari versions -- a raw .heic/.heif file (e.g. picked via the
+// Files app, which unlike Safari's usual photo picker doesn't auto-convert to JPEG on select)
+// fails outright everywhere else. heic2any is a WASM-based client-side HEIC->JPEG converter;
+// it's ~1.3MB so it's loaded lazily, only the first time an actual HEIC/HEIF file shows up.
+let heic2anyLoadPromise = null;
+function loadHeic2any() {
+  if (window.heic2any) return Promise.resolve(window.heic2any);
+  if (heic2anyLoadPromise) return heic2anyLoadPromise;
+  heic2anyLoadPromise = new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js';
+    script.onload = () => {
+      if (window.heic2any) resolve(window.heic2any);
+      else reject(new Error('heic2any failed to initialize'));
+    };
+    script.onerror = () => {
+      heic2anyLoadPromise = null; // allow retrying on a later file instead of caching the failure forever
+      reject(new Error('heic2any script failed to load'));
+    };
+    document.head.appendChild(script);
+  });
+  return heic2anyLoadPromise;
+}
+
+function isHeicFile(file) {
+  const type = (file.type || '').toLowerCase();
+  if (type === 'image/heic' || type === 'image/heif' || type === 'image/heic-sequence' || type === 'image/heif-sequence') return true;
+  // file.type is often empty for HEIC on browsers/OSes with no MIME association registered,
+  // so also fall back to the extension.
+  const name = (file.name || '').toLowerCase();
+  return name.endsWith('.heic') || name.endsWith('.heif');
+}
+
+// Wraps Image() decoding with a timeout so one stuck/malformed file can't hang a whole batch
+// indefinitely (the caller is otherwise waiting on onload/onerror, which some browsers never
+// fire for certain corrupt inputs).
+function loadImageElement(objectUrl, timeoutMs = 20000) {
   return new Promise((resolve, reject) => {
     const img = new Image();
-    const objectUrl = URL.createObjectURL(file);
-    
+    let settled = false;
+    const timeoutId = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      reject(Object.assign(new Error('IMAGE_DECODE_TIMEOUT'), { code: 'IMAGE_DECODE_TIMEOUT' }));
+    }, timeoutMs);
     img.onload = () => {
-      URL.revokeObjectURL(objectUrl);
-      
-      const maxOrig = 1200; // High resolution spec (1200px instead of 720px)
-      let wOrig = img.width;
-      let hOrig = img.height;
-      if (wOrig > maxOrig || hOrig > maxOrig) {
-        if (wOrig > hOrig) {
-          hOrig = Math.round(hOrig * maxOrig / wOrig);
-          wOrig = maxOrig;
-        } else {
-          wOrig = Math.round(wOrig * maxOrig / hOrig);
-          hOrig = maxOrig;
-        }
-      }
-      const canvasOrig = document.createElement('canvas');
-      canvasOrig.width = wOrig;
-      canvasOrig.height = hOrig;
-      const ctxOrig = canvasOrig.getContext('2d');
-      ctxOrig.drawImage(img, 0, 0, wOrig, hOrig);
-      // Start at high quality (0.85), but step down for busy/detailed photos that would
-      // otherwise produce an oversized base64 payload -- this is only used as a fallback if
-      // the Firebase Storage upload below fails, but keep it bounded regardless.
-      let originalQuality = 0.85;
-      let originalBase64 = canvasOrig.toDataURL('image/jpeg', originalQuality);
-      for (const quality of [0.75, 0.65, 0.55, 0.45]) {
-        if (originalBase64.length <= MAX_CHAT_IMAGE_BASE64_LENGTH) break;
-        originalQuality = quality;
-        originalBase64 = canvasOrig.toDataURL('image/jpeg', originalQuality);
-      }
-
-      const maxThumb = 120;
-      let wThumb = img.width;
-      let hThumb = img.height;
-      if (wThumb > maxThumb || hThumb > maxThumb) {
-        if (wThumb > hThumb) {
-          hThumb = Math.round(hThumb * maxThumb / wThumb);
-          wThumb = maxThumb;
-        } else {
-          wThumb = Math.round(wThumb * maxThumb / hThumb);
-          hThumb = maxThumb;
-        }
-      }
-      const canvasThumb = document.createElement('canvas');
-      canvasThumb.width = wThumb;
-      canvasThumb.height = hThumb;
-      const ctxThumb = canvasThumb.getContext('2d');
-      ctxThumb.drawImage(img, 0, 0, wThumb, hThumb);
-      const thumbnailBase64 = canvasThumb.toDataURL('image/jpeg', 0.5);
-
-      // Also produce Blobs at the same quality level, used to upload to Firebase Storage at
-      // send time (see uploadChatImageAssets) instead of embedding base64 in the message
-      // document. The base64 strings above are kept as the fallback if that upload fails.
-      canvasOrig.toBlob(originalBlob => {
-        canvasThumb.toBlob(thumbnailBlob => {
-          resolve({
-            original: originalBase64,
-            thumbnail: thumbnailBase64,
-            originalBlob,
-            thumbnailBlob
-          });
-        }, 'image/jpeg', 0.5);
-      }, 'image/jpeg', originalQuality);
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeoutId);
+      resolve(img);
     };
-
-    img.onerror = (err) => {
-      URL.revokeObjectURL(objectUrl);
-      reject(err);
+    img.onerror = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeoutId);
+      reject(Object.assign(new Error('IMAGE_DECODE_FAILED'), { code: 'IMAGE_DECODE_FAILED' }));
     };
-
     img.src = objectUrl;
   });
+}
+
+async function compressImageToDataUrls(file) {
+  let sourceBlob = file;
+  if (isHeicFile(file)) {
+    try {
+      const heic2any = await loadHeic2any();
+      const converted = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.85 });
+      sourceBlob = Array.isArray(converted) ? converted[0] : converted;
+    } catch (err) {
+      throw Object.assign(new Error('HEIC 이미지를 변환하지 못했습니다.'), { code: 'HEIC_CONVERT_FAILED', fileName: file.name });
+    }
+  }
+
+  const objectUrl = URL.createObjectURL(sourceBlob);
+  let img;
+  try {
+    img = await loadImageElement(objectUrl);
+  } catch (err) {
+    throw Object.assign(
+      new Error('이미지를 불러오지 못했습니다. 지원하지 않는 형식이거나 손상된 파일일 수 있습니다.'),
+      { code: err.code || 'IMAGE_DECODE_FAILED', fileName: file.name }
+    );
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+
+  const maxOrig = 1200; // High resolution spec (1200px instead of 720px)
+  let wOrig = img.width;
+  let hOrig = img.height;
+  if (wOrig > maxOrig || hOrig > maxOrig) {
+    if (wOrig > hOrig) {
+      hOrig = Math.round(hOrig * maxOrig / wOrig);
+      wOrig = maxOrig;
+    } else {
+      wOrig = Math.round(wOrig * maxOrig / hOrig);
+      hOrig = maxOrig;
+    }
+  }
+  const canvasOrig = document.createElement('canvas');
+  canvasOrig.width = wOrig;
+  canvasOrig.height = hOrig;
+  const ctxOrig = canvasOrig.getContext('2d');
+  ctxOrig.drawImage(img, 0, 0, wOrig, hOrig);
+  // Start at high quality (0.85), but step down for busy/detailed photos that would
+  // otherwise produce an oversized base64 payload -- this is only used as a fallback if
+  // the Firebase Storage upload below fails, but keep it bounded regardless.
+  let originalQuality = 0.85;
+  let originalBase64 = canvasOrig.toDataURL('image/jpeg', originalQuality);
+  for (const quality of [0.75, 0.65, 0.55, 0.45]) {
+    if (originalBase64.length <= MAX_CHAT_IMAGE_BASE64_LENGTH) break;
+    originalQuality = quality;
+    originalBase64 = canvasOrig.toDataURL('image/jpeg', originalQuality);
+  }
+
+  const maxThumb = 120;
+  let wThumb = img.width;
+  let hThumb = img.height;
+  if (wThumb > maxThumb || hThumb > maxThumb) {
+    if (wThumb > hThumb) {
+      hThumb = Math.round(hThumb * maxThumb / wThumb);
+      wThumb = maxThumb;
+    } else {
+      wThumb = Math.round(wThumb * maxThumb / hThumb);
+      hThumb = maxThumb;
+    }
+  }
+  const canvasThumb = document.createElement('canvas');
+  canvasThumb.width = wThumb;
+  canvasThumb.height = hThumb;
+  const ctxThumb = canvasThumb.getContext('2d');
+  ctxThumb.drawImage(img, 0, 0, wThumb, hThumb);
+  const thumbnailBase64 = canvasThumb.toDataURL('image/jpeg', 0.5);
+
+  // Also produce Blobs at the same quality level, used to upload to Firebase Storage at
+  // send time (see uploadChatImageAssets) instead of embedding base64 in the message
+  // document. The base64 strings above are kept as the fallback if that upload fails.
+  return new Promise((resolve) => {
+    canvasOrig.toBlob(originalBlob => {
+      canvasThumb.toBlob(thumbnailBlob => {
+        resolve({
+          original: originalBase64,
+          thumbnail: thumbnailBase64,
+          originalBlob,
+          thumbnailBlob
+        });
+      }, 'image/jpeg', 0.5);
+    }, 'image/jpeg', originalQuality);
+  });
+}
+
+// Processes a batch of image files one at a time (bounds peak memory on large photos and gives
+// meaningful progress feedback), isolating failures per file so one bad file (unsupported
+// format, corrupt data, decode timeout) doesn't discard the others that succeeded.
+async function processImageFilesSequentially(files, onProgress) {
+  const succeeded = [];
+  const failed = [];
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    if (onProgress) onProgress({ current: i + 1, total: files.length, fileName: file.name });
+    try {
+      const compressed = await compressImageToDataUrls(file);
+      succeeded.push(compressed);
+    } catch (err) {
+      failed.push({ fileName: file.name, error: err });
+    }
+  }
+  return { succeeded, failed };
+}
+
+function describeImageProcessingFailures(failed) {
+  if (failed.length === 0) return '';
+  const first = failed[0];
+  const reason = first.error?.code === 'HEIC_CONVERT_FAILED'
+    ? 'HEIC/HEIF 변환 실패'
+    : first.error?.code === 'IMAGE_DECODE_TIMEOUT'
+    ? '처리 시간 초과'
+    : '지원하지 않는 형식이거나 손상된 파일';
+  if (failed.length === 1) return `${first.fileName} 첨부 실패 (${reason})`;
+  return `${failed.length}장 첨부 실패 (${reason} 등)`;
+}
+
+function ImageProcessingOverlay({ current, total, fileName }) {
+  if (!total) return null;
+  const pct = Math.min(100, Math.round((current / total) * 100));
+  return /*#__PURE__*/React.createElement('div', {
+    style: { position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.45)', zIndex: 100000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }
+  }, /*#__PURE__*/React.createElement('div', {
+    style: { backgroundColor: '#FFFFFF', borderRadius: '14px', padding: '24px 28px', width: '260px', maxWidth: '100%', textAlign: 'center', boxShadow: '0 10px 30px rgba(0,0,0,0.25)' }
+  },
+    /*#__PURE__*/React.createElement('div', { style: { fontWeight: 800, fontSize: '0.95rem', color: '#0F172A', marginBottom: '4px' } }, '사진 처리 중...'),
+    /*#__PURE__*/React.createElement('div', { style: { fontSize: '0.78rem', color: '#64748B', marginBottom: '14px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, `${current}/${total}${fileName ? ` · ${fileName}` : ''}`),
+    /*#__PURE__*/React.createElement('div', { style: { height: '8px', borderRadius: '9999px', backgroundColor: '#E2E8F0', overflow: 'hidden' } },
+      /*#__PURE__*/React.createElement('div', { style: { height: '100%', width: `${pct}%`, backgroundColor: '#4F46E5', transition: 'width 0.2s ease', borderRadius: '9999px' } })
+    )
+  ));
 }
 
 // Uploads a compressed chat image pair to Firebase Storage and returns download URLs, or null
@@ -7456,35 +7575,39 @@ function CommentsSection({
     });
   };
 
+  const [imageProcessing, setImageProcessing] = React.useState(null);
+
   const handleFileChange = async (e) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
-    
-    const count = files.length;
+
     const remainingSlots = 50 - chatImages.length;
     if (remainingSlots <= 0) {
       if (showToast) showToast('사진은 최대 50개까지 첨부할 수 있습니다.', 'error');
       e.target.value = '';
       return;
     }
-    
+
     const filesToProcess = Array.from(files).slice(0, remainingSlots);
     if (files.length > remainingSlots && showToast) {
       showToast(`최대 50장 제한으로 인해 ${remainingSlots}장의 사진만 추가됩니다.`, 'info');
     }
-    
-    if (showToast) showToast(`${filesToProcess.length}장의 사진을 처리 중입니다...`, 'info', 10000);
-    try {
-      const compressedList = [];
-      for (const file of filesToProcess) {
-        const compressed = await compressImageToDataUrls(file);
-        compressedList.push(compressed);
-      }
-      setChatImages(prev => [...prev, ...compressedList]);
-      if (showToast) showToast(`${filesToProcess.length}장의 사진이 첨부되었습니다.`, 'success', 3000);
-    } catch (err) {
-      console.error('Image compression failed:', err);
-      if (showToast) showToast('이미지 처리 중 일부 오류가 발생했습니다.', 'error');
+
+    setImageProcessing({ current: 0, total: filesToProcess.length });
+    const { succeeded, failed } = await processImageFilesSequentially(
+      filesToProcess,
+      progress => setImageProcessing(progress)
+    );
+    setImageProcessing(null);
+
+    if (succeeded.length > 0) {
+      setChatImages(prev => [...prev, ...succeeded]);
+    }
+    if (failed.length > 0) {
+      console.error('Image compression failed for:', failed.map(f => f.fileName));
+      if (showToast) showToast(describeImageProcessingFailures(failed), 'error', 5000);
+    } else if (succeeded.length > 0 && showToast) {
+      showToast(`${succeeded.length}장의 사진이 첨부되었습니다.`, 'success', 3000);
     }
     e.target.value = '';
   };
@@ -7494,7 +7617,7 @@ function CommentsSection({
     ? (reversed.length > 0 ? [reversed[reversed.length - 1]] : [])
     : reversed;
 
-  return /*#__PURE__*/React.createElement("section", {
+  return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("section", {
     style: { textAlign: 'left' }
   },
   /* Header */
@@ -7902,7 +8025,7 @@ function CommentsSection({
       objectFit: 'contain',
       boxShadow: '0 24px 80px rgba(0,0,0,0.6)'
     }
-  })) : null);
+  })) : null), imageProcessing && /*#__PURE__*/React.createElement(ImageProcessingOverlay, imageProcessing));
 }
 
 function ChatRoomView({
@@ -7962,35 +8085,38 @@ function ChatRoomView({
   }, [viewportBottom]);
 
   const fileInputRefChat = React.useRef(null);
+  const [imageProcessingChat, setImageProcessingChat] = React.useState(null);
   const handleFileChangeChat = async (e) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
-    
-    const count = files.length;
+
     const remainingSlots = 50 - chatImages.length;
     if (remainingSlots <= 0) {
       if (showToast) showToast('사진은 최대 50개까지 첨부할 수 있습니다.', 'error');
       e.target.value = '';
       return;
     }
-    
+
     const filesToProcess = Array.from(files).slice(0, remainingSlots);
     if (files.length > remainingSlots && showToast) {
       showToast(`최대 50장 제한으로 인해 ${remainingSlots}장의 사진만 추가됩니다.`, 'info');
     }
-    
-    if (showToast) showToast(`${filesToProcess.length}장의 사진을 처리 중입니다...`, 'info', 10000);
-    try {
-      const compressedList = [];
-      for (const file of filesToProcess) {
-        const compressed = await compressImageToDataUrls(file);
-        compressedList.push(compressed);
-      }
-      setChatImages(prev => [...prev, ...compressedList]);
-      if (showToast) showToast(`${filesToProcess.length}장의 사진이 첨부되었습니다.`, 'success', 3000);
-    } catch (err) {
-      console.error('Image compression failed:', err);
-      if (showToast) showToast('이미지 처리 중 일부 오류가 발생했습니다.', 'error');
+
+    setImageProcessingChat({ current: 0, total: filesToProcess.length });
+    const { succeeded, failed } = await processImageFilesSequentially(
+      filesToProcess,
+      progress => setImageProcessingChat(progress)
+    );
+    setImageProcessingChat(null);
+
+    if (succeeded.length > 0) {
+      setChatImages(prev => [...prev, ...succeeded]);
+    }
+    if (failed.length > 0) {
+      console.error('Image compression failed for:', failed.map(f => f.fileName));
+      if (showToast) showToast(describeImageProcessingFailures(failed), 'error', 5000);
+    } else if (succeeded.length > 0 && showToast) {
+      showToast(`${succeeded.length}장의 사진이 첨부되었습니다.`, 'success', 3000);
     }
     e.target.value = '';
   };
@@ -8273,7 +8399,7 @@ function ChatRoomView({
         }
       }, timeStr))]));
   });
-  return /*#__PURE__*/React.createElement("div", {
+  return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     className: "chat-room-container",
     style: {
       position: 'fixed',
@@ -8666,7 +8792,7 @@ function ChatRoomView({
       objectFit: 'contain',
       boxShadow: '0 24px 80px rgba(0,0,0,0.6)'
     }
-  })) : null);
+  })) : null), imageProcessingChat && /*#__PURE__*/React.createElement(ImageProcessingOverlay, imageProcessingChat));
 }
 
 
@@ -8851,6 +8977,7 @@ function EditMessageModal({
   });
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const fileInputRefEdit = React.useRef(null);
+  const [imageProcessingEdit, setImageProcessingEdit] = React.useState(null);
 
   const handleFileChangeEdit = async (e) => {
     const files = e.target.files;
@@ -8868,20 +8995,21 @@ function EditMessageModal({
       showToast(`최대 50장 제한으로 인해 ${remainingSlots}장의 사진만 추가됩니다.`, 'info');
     }
 
-    try {
-      const compressedList = [];
-      for (const file of filesToProcess) {
-        const compressed = await compressImageToDataUrls(file);
-        compressedList.push(compressed);
-      }
-      setImages(prev => [...prev, ...compressedList]);
-    } catch (err) {
-      console.error('Image compress error:', err);
-      if (showToast) {
-        showToast('이미지 처리 중 오류가 발생했습니다. 다른 이미지를 선택해 주세요.', 'error');
-      } else {
-        alert('이미지 처리 중 오류가 발생했습니다. 다른 이미지를 선택해 주세요.');
-      }
+    setImageProcessingEdit({ current: 0, total: filesToProcess.length });
+    const { succeeded, failed } = await processImageFilesSequentially(
+      filesToProcess,
+      progress => setImageProcessingEdit(progress)
+    );
+    setImageProcessingEdit(null);
+
+    if (succeeded.length > 0) {
+      setImages(prev => [...prev, ...succeeded]);
+    }
+    if (failed.length > 0) {
+      console.error('Image compression failed for:', failed.map(f => f.fileName));
+      const message = describeImageProcessingFailures(failed);
+      if (showToast) showToast(message, 'error', 5000);
+      else alert(message);
     }
     e.target.value = '';
   };
@@ -8899,7 +9027,7 @@ function EditMessageModal({
     }
   };
 
-  return /*#__PURE__*/React.createElement("div", {
+  return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     className: "modal-overlay",
     onClick: () => { if (!isSubmitting) onClose(); },
     style: { zIndex: 9999 }
@@ -9049,7 +9177,7 @@ function EditMessageModal({
     disabled: isSubmitting || (!text.trim() && images.length === 0),
     onClick: handleSave,
     style: { height: '34px', fontSize: '0.85rem', padding: '0 16px', opacity: (text.trim() || images.length > 0) && !isSubmitting ? 1 : 0.6 }
-  }, isSubmitting ? '...' : "수정")))));
+  }, isSubmitting ? '...' : "수정"))))), imageProcessingEdit && /*#__PURE__*/React.createElement(ImageProcessingOverlay, imageProcessingEdit));
 }
 
 
