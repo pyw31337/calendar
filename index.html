@@ -6381,12 +6381,6 @@ function App() {
       setSelectedDate(d);
       setIsModalOpen(true);
     }
-  }), /*#__PURE__*/React.createElement(RecentActivityLog, {
-    calendar: { ...activeCal, activityLogs: unionActivityLogs(activeCal, activityLogsFeed) },
-    expanded: isActivityLogExpanded,
-    onToggle: () => setIsActivityLogExpanded(value => !value),
-    onDeleteLog: handleDeleteActivityLog,
-    onRequestConfirm: showConfirmDialog
   }), isModalOpen && /*#__PURE__*/React.createElement(DateModal, {
     dateStr: selectedDate,
     calendar: activeCal,
@@ -6424,7 +6418,8 @@ function App() {
     onDeleteAllForDate: handleDeleteAllForDate,
     onRequestConfirm: showConfirmDialog,
     onClose: () => setIsAdminOpen(false),
-    showToast: showToast
+    showToast: showToast,
+    onDeleteLog: handleDeleteActivityLog
   }), isShareOpen && /*#__PURE__*/React.createElement(ShareModal, {
     calendar: activeCal,
     onClose: () => setIsShareOpen(false)
@@ -10364,7 +10359,8 @@ function AdminModal({
   onDeleteAllForDate,
   onRequestConfirm,
   onClose,
-  showToast
+  showToast,
+  onDeleteLog
 }) {
   const [activeTab, setActiveTab] = React.useState('settings'); // 'settings', 'recovery', 'calendar'
 
@@ -10605,20 +10601,8 @@ function AdminModal({
           borderBottom: activeTab === 'settings' ? '3px solid #2563EB' : '3px solid transparent',
           cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px'
         }
-      }, /*#__PURE__*/React.createElement(CalendarCogIcon, null), "일반 설정"),
-      /* Tab 2: Log-based recovery */
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        onClick: () => setActiveTab('recovery'),
-        style: {
-          padding: '12px 16px', fontSize: '0.88rem', fontWeight: 'bold', whiteSpace: 'nowrap', flexShrink: 0,
-          color: activeTab === 'recovery' ? '#2563EB' : '#64748B',
-          border: 'none', background: 'none',
-          borderBottom: activeTab === 'recovery' ? '3px solid #2563EB' : '3px solid transparent',
-          cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px'
-        }
-      }, /*#__PURE__*/React.createElement(HourglassIcon, null), "데이터 시점 복구"),
-      /* Tab 3: Calendar-based schedule deletion */
+      }, /*#__PURE__*/React.createElement(CalendarCogIcon, null), "일반"),
+      /* Tab 2: Calendar-based schedule deletion */
       /*#__PURE__*/React.createElement("button", {
         type: "button",
         onClick: () => setActiveTab('calendar'),
@@ -10629,13 +10613,37 @@ function AdminModal({
           borderBottom: activeTab === 'calendar' ? '3px solid #2563EB' : '3px solid transparent',
           cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px'
         }
-      }, /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M4 7a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12z", "M16 3v4", "M8 3v4", "M4 11h16"] }), "일정")
+      }, /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M4 7a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12z", "M16 3v4", "M8 3v4", "M4 11h16"] }), "일정"),
+      /* Tab 3: Log-based recovery */
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: () => setActiveTab('recovery'),
+        style: {
+          padding: '12px 16px', fontSize: '0.88rem', fontWeight: 'bold', whiteSpace: 'nowrap', flexShrink: 0,
+          color: activeTab === 'recovery' ? '#2563EB' : '#64748B',
+          border: 'none', background: 'none',
+          borderBottom: activeTab === 'recovery' ? '3px solid #2563EB' : '3px solid transparent',
+          cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px'
+        }
+      }, /*#__PURE__*/React.createElement(HourglassIcon, null), "복구"),
+      /* Tab 4: Logs view list */
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: () => setActiveTab('logs'),
+        style: {
+          padding: '12px 16px', fontSize: '0.88rem', fontWeight: 'bold', whiteSpace: 'nowrap', flexShrink: 0,
+          color: activeTab === 'logs' ? '#2563EB' : '#64748B',
+          border: 'none', background: 'none',
+          borderBottom: activeTab === 'logs' ? '3px solid #2563EB' : '3px solid transparent',
+          cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px'
+        }
+      }, /*#__PURE__*/React.createElement(LogIcon, null), "로그")
     ),
 
     /* Modal Scrollable Body */
     /*#__PURE__*/React.createElement("div", {
       className: "modal-body",
-      style: { flex: 1, overflowY: 'auto', padding: '20px', display: 'flex', flexDirection: 'column', gap: '20px' }
+      style: { flex: 1, overflowY: 'auto', padding: (activeTab === 'calendar' || activeTab === 'logs') ? '0px 20px 20px 20px' : '20px', display: 'flex', flexDirection: 'column', gap: '20px' }
     },
       /* ========================================== */
       /* TAB 1: OPERATIONAL METRICS & CHAT LOGS     */
@@ -10983,6 +10991,99 @@ function AdminModal({
     /* ========================================== */
     /* TAB 4: CALENDAR-BASED SCHEDULE DELETION     */
     /* ========================================== */
+    activeTab === 'logs' && /*#__PURE__*/React.createElement(React.Fragment, null,
+      /*#__PURE__*/React.createElement("div", {
+        style: { display: 'flex', flexDirection: 'column', gap: '10px' }
+      },
+        (() => {
+          const actionLabels = {
+            create: '등록',
+            update: '수정',
+            delete: '삭제',
+            poll_create: '투표 생성',
+            poll_vote: '투표',
+            poll_cancel: '투표 취소'
+          };
+          const actionColors = {
+            create: '#2563EB',
+            update: '#7C3AED',
+            delete: '#DC2626',
+            poll_create: '#0F172A',
+            poll_vote: '#2563EB',
+            poll_cancel: '#DC2626'
+          };
+          const logs = buildActivityLogsFromAvailabilities(calendar || {});
+          if (logs.length === 0) {
+            return /*#__PURE__*/React.createElement("div", {
+              style: { textAlign: 'center', color: '#94A3B8', fontSize: '0.85rem', padding: '24px 0' }
+            }, "기록된 일정 로그가 없습니다.");
+          }
+          return /*#__PURE__*/React.createElement("div", {
+            className: "recent-log-list",
+            style: { display: 'flex', flexDirection: 'column', gap: '8px' }
+          }, logs.map(log => {
+            const participant = participantsMap[log.participantId] || {
+              name: POLL_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '투표' : '알 수 없음',
+              color: POLL_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '#0F172A' : '#94A3B8'
+            };
+            const actionLabel = actionLabels[log.action] || '기록';
+            const actionColor = actionColors[log.action] || '#64748B';
+            const noteText = sanitizeText(log.note || '', 120);
+            const logDateText = log.date ? formatShortDateWithDayName(log.date) : '';
+            const logTitleText = [participant.name, `[${actionLabel}]`, logDateText].filter(Boolean).join(' ');
+            const confirmText = `${logTitleText} 로그 데이터를 삭제하시겠습니까?`;
+            return /*#__PURE__*/React.createElement("div", {
+              key: log.id,
+              className: "recent-log-row",
+              style: {
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '8px 12px',
+                backgroundColor: '#F8FAFC',
+                borderRadius: '8px',
+                border: '1px solid #E2E8F0'
+              }
+            }, /*#__PURE__*/React.createElement("div", {
+              className: "recent-log-left",
+              style: { display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }
+            }, /*#__PURE__*/React.createElement("span", {
+              className: "participant-badge",
+              style: {
+                backgroundColor: participant.color,
+                color: getContrastTextColor(participant.color),
+                fontSize: '0.72rem',
+                padding: '2px 8px'
+              }
+            }, participant.name), /*#__PURE__*/React.createElement("span", {
+              className: "recent-log-action",
+              style: { color: actionColor, fontWeight: 'bold', fontSize: '0.75rem' }
+            }, "[", actionLabel, "]"), /*#__PURE__*/React.createElement("span", {
+              className: "recent-log-date",
+              style: { fontSize: '0.78rem', color: '#475569' }
+            }, logDateText || null), noteText && /*#__PURE__*/React.createElement("span", {
+              className: "recent-log-note",
+              style: { fontSize: '0.78rem', color: '#64748B', fontStyle: 'italic' }
+            }, "\"", noteText, "\"")), /*#__PURE__*/React.createElement("div", {
+              className: "recent-log-right",
+              style: { display: 'flex', alignItems: 'center', gap: '8px' }
+            }, /*#__PURE__*/React.createElement("span", {
+              className: "registered-at-text recent-log-time",
+              style: { fontSize: '0.7rem', color: '#94A3B8' }
+            }, formatRegisteredAt(log.timestamp)), /*#__PURE__*/React.createElement("button", {
+              type: "button",
+              className: "btn btn-danger recent-log-delete-btn",
+              title: "로그 삭제",
+              style: { padding: '2px 6px', fontSize: '0.72rem', height: '24px', display: 'flex', alignItems: 'center' },
+              onClick: () => {
+                if (typeof onDeleteLog !== 'function') return;
+                onRequestConfirm('로그 삭제', confirmText, () => onDeleteLog(log));
+              }
+            }, "삭제")));
+          }));
+        })()
+      )
+    ),
     activeTab === 'calendar' && /*#__PURE__*/React.createElement(React.Fragment, null,
 
       /*#__PURE__*/React.createElement(CalendarGrid, {
@@ -11249,6 +11350,33 @@ function CalendarCogIcon() {
     cx: "18",
     cy: "18",
     r: "3"
+  }));
+}
+
+function LogIcon() {
+  return /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: "18",
+    height: "18",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: "2",
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+    className: "lucide lucide-list-todo"
+  }, /*#__PURE__*/React.createElement("rect", {
+    x: "3",
+    y: "3",
+    width: "18",
+    height: "18",
+    rx: "2"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M9 9h6"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M9 13h6"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M9 17h6"
   }));
 }
 
