@@ -1206,6 +1206,40 @@ async function copyTextToClipboard(text) {
   }
 }
 
+// Browser (Web Notifications API) chat alerts. Only works while this tab is open (foreground
+// or background) -- there's no service worker / push backend, so a fully closed tab or
+// terminated app won't receive anything. Requires the user to explicitly grant permission
+// first (see the notification bell toggle in ChatRoomView).
+function isNotificationSupported() {
+  return typeof Notification !== 'undefined';
+}
+
+async function requestChatNotificationPermission() {
+  if (!isNotificationSupported()) return 'unsupported';
+  if (Notification.permission === 'granted' || Notification.permission === 'denied') {
+    return Notification.permission;
+  }
+  try {
+    return await Notification.requestPermission();
+  } catch (e) {
+    return 'denied';
+  }
+}
+
+function notifyNewChatMessage(calendar, message, participantName) {
+  if (!isNotificationSupported() || Notification.permission !== 'granted') return;
+  try {
+    const body = message.text?.trim() || (message.imageUrls?.length || message.imageUrl ? '사진을 보냈습니다' : '');
+    new Notification(`${calendar?.title || '모여라 캘린더'} · ${participantName}`, {
+      body,
+      tag: `chat-${calendar?.id}`,
+      icon: message.thumbUrl || message.thumbUrls?.[0] || undefined
+    });
+  } catch (e) {
+    console.warn('Failed to show chat notification:', e);
+  }
+}
+
 function getContrastTextColor(hexColor) {
   if (!hexColor) return '#FFFFFF';
   const hex = hexColor.replace('#', '');
@@ -5137,6 +5171,8 @@ function App() {
   const [activityLogsFeed, setActivityLogsFeed] = React.useState([]);
   const [chatInput, setChatInput] = React.useState('');
   const [chatParticipantId, setChatParticipantId] = React.useState('');
+  const chatParticipantIdRef = React.useRef(chatParticipantId);
+  React.useEffect(() => { chatParticipantIdRef.current = chatParticipantId; }, [chatParticipantId]);
   const [isChatSheetOpen, setIsChatSheetOpen] = React.useState(false);
   const [isChatSubmitting, setIsChatSubmitting] = React.useState(false);
   const [chatUploadProgress, setChatUploadProgress] = React.useState(null);
@@ -5359,6 +5395,8 @@ function App() {
     // ascending order for rendering -- querying oldest-first + limit would instead pin
     // the window to the first 100 messages ever sent, silently hiding anything newer
     // once a calendar passes that many total messages.
+    let hasSeenInitialChatSnapshot = false;
+    let lastNotifiedMessageId = null;
     const unsubscribeChat = firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages')
       .orderBy('timestamp', 'desc')
       .limit(100)
@@ -5370,6 +5408,18 @@ function App() {
         });
         list.reverse();
         setChatMessages(list);
+
+        // Browser notification for a genuinely new incoming message from someone else --
+        // skip the very first snapshot (that's just the existing history loading, not a
+        // new message) and skip anything sent by the current participant themselves.
+        const latest = list[list.length - 1];
+        if (hasSeenInitialChatSnapshot && latest && latest.id !== lastNotifiedMessageId
+          && latest.participantId !== chatParticipantIdRef.current) {
+          const sender = getActiveParticipants(activeCal).find(p => p.id === latest.participantId);
+          notifyNewChatMessage(activeCal, latest, sender?.name || '알수없음');
+        }
+        hasSeenInitialChatSnapshot = true;
+        if (latest) lastNotifiedMessageId = latest.id;
       }, err => {
         console.warn(`Firestore chat history subscription error:`, err);
         fetchChatMessagesRest(activeCalId).then(list => {
@@ -8103,6 +8153,25 @@ function ChatRoomView({
   const [viewportBottom, setViewportBottom] = React.useState(0);
   const revealedMsgId = useTapRevealedMsgId();
 
+  const [notifPermission, setNotifPermission] = React.useState(() => (isNotificationSupported() ? Notification.permission : 'unsupported'));
+  const handleToggleNotifications = async () => {
+    if (!isNotificationSupported()) {
+      if (showToast) showToast('알림 미지원 브라우저', 'error');
+      return;
+    }
+    if (Notification.permission === 'granted') {
+      if (showToast) showToast('브라우저 알림 설정에서 끌 수 있음', 'info');
+      return;
+    }
+    if (Notification.permission === 'denied') {
+      if (showToast) showToast('브라우저 설정에서 알림 허용 필요', 'error');
+      return;
+    }
+    const result = await requestChatNotificationPermission();
+    setNotifPermission(result);
+    if (showToast) showToast(result === 'granted' ? '알림 켜짐' : '알림 권한 거부됨', result === 'granted' ? 'success' : 'error');
+  };
+
   // Monitor visualViewport to shift layout above virtual keyboard on mobile devices
   React.useEffect(() => {
     if (!window.visualViewport) return;
@@ -8528,7 +8597,34 @@ function ChatRoomView({
       whiteSpace: 'nowrap',
       pointerEvents: 'none'
     }
-  }, calendar?.title || ''), /*#__PURE__*/React.createElement("button", {
+  }, calendar?.title || ''), /*#__PURE__*/React.createElement("div", {
+    style: { display: 'flex', alignItems: 'center', gap: '2px' }
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: handleToggleNotifications,
+    title: notifPermission === 'granted' ? '\uC54C\uB9BC \uCF1C\uC9D0' : '\uC54C\uB9BC \uCF1C\uAE30',
+    style: {
+      background: 'none',
+      border: 'none',
+      cursor: 'pointer',
+      padding: '4px',
+      color: notifPermission === 'granted' ? '#4F46E5' : '#64748B',
+      display: 'flex',
+      alignItems: 'center'
+    }
+  }, /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: "22",
+    height: "22",
+    viewBox: "0 0 24 24",
+    fill: notifPermission === 'granted' ? 'currentColor' : 'none',
+    stroke: "currentColor",
+    "stroke-width": "2",
+    "stroke-linecap": "round",
+    "stroke-linejoin": "round"
+  }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }),
+    /*#__PURE__*/React.createElement("path", { d: "M10 5a2 2 0 0 1 4 0a7 7 0 0 1 4 6v3a4 4 0 0 0 2 3h-16a4 4 0 0 0 2 -3v-3a7 7 0 0 1 4 -6" }),
+    /*#__PURE__*/React.createElement("path", { d: "M9 17v1a3 3 0 0 0 6 0v-1" }))), /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: onShare,
     title: "\uACF5\uC720",
@@ -8566,7 +8662,7 @@ function ChatRoomView({
     d: "M8.7 10.7l6.6 -3.4"
   }), /*#__PURE__*/React.createElement("path", {
     d: "M8.7 13.3l6.6 3.4"
-  })))), /*#__PURE__*/React.createElement("div", {
+  }))))), /*#__PURE__*/React.createElement("div", {
     ref: chatMessagesContainerRef,
     onScroll: handleChatScroll,
     style: {
