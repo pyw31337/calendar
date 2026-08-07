@@ -1206,6 +1206,40 @@ async function copyTextToClipboard(text) {
   }
 }
 
+// Browser (Web Notifications API) chat alerts. Only works while this tab is open (foreground
+// or background) -- there's no service worker / push backend, so a fully closed tab or
+// terminated app won't receive anything. Requires the user to explicitly grant permission
+// first (see the notification bell toggle in ChatRoomView).
+function isNotificationSupported() {
+  return typeof Notification !== 'undefined';
+}
+
+async function requestChatNotificationPermission() {
+  if (!isNotificationSupported()) return 'unsupported';
+  if (Notification.permission === 'granted' || Notification.permission === 'denied') {
+    return Notification.permission;
+  }
+  try {
+    return await Notification.requestPermission();
+  } catch (e) {
+    return 'denied';
+  }
+}
+
+function notifyNewChatMessage(calendar, message, participantName) {
+  if (!isNotificationSupported() || Notification.permission !== 'granted') return;
+  try {
+    const body = message.text?.trim() || (message.imageUrls?.length || message.imageUrl ? '사진을 보냈습니다' : '');
+    new Notification(`${calendar?.title || '모여라 캘린더'} · ${participantName}`, {
+      body,
+      tag: `chat-${calendar?.id}`,
+      icon: message.thumbUrl || message.thumbUrls?.[0] || undefined
+    });
+  } catch (e) {
+    console.warn('Failed to show chat notification:', e);
+  }
+}
+
 function getContrastTextColor(hexColor) {
   if (!hexColor) return '#FFFFFF';
   const hex = hexColor.replace('#', '');
@@ -3402,11 +3436,11 @@ function validateBackupCalendars(calendarsList) {
   const uniqueById = new Map();
   normalized.forEach(calendar => uniqueById.set(calendar.id, calendar));
   const result = Array.from(uniqueById.values());
-  if (result.length === 0) return { calendars: [], error: '복구 가능한 kkot 또는 cw 캘린더 데이터가 없습니다.' };
+  if (result.length === 0) return { calendars: [], error: '복구 가능한 데이터 없음' };
   for (const calendar of result) {
     const validationError = validateCalendarShape(calendar);
     if (validationError) return { calendars: [], error: `${calendar.id}: ${validationError}` };
-    if (!assertCalendarLinks(calendar)) return { calendars: [], error: `${calendar.id}: 참여자와 일정 연결이 올바르지 않습니다.` };
+    if (!assertCalendarLinks(calendar)) return { calendars: [], error: `${calendar.id}: 참여자·일정 연결 오류` };
   }
   return { calendars: result, error: '' };
 }
@@ -3665,7 +3699,7 @@ function AdminDashboard({ initialCalendars }) {
       setAdminSession();
       setIsChangePwOpen(false);
       resetChangePwForm();
-      showAdminToast('관리자 비밀번호가 변경되었습니다.', 'success');
+      showAdminToast('비밀번호 변경완료', 'success');
     } catch (err) {
       console.warn('Admin password change failed:', err);
       setPwError('비밀번호 변경 중 오류가 발생했습니다. firestore.rules 배포 여부를 확인해 주세요.');
@@ -3821,7 +3855,7 @@ function AdminDashboard({ initialCalendars }) {
       setServerCalendars(prev => [newCal, ...prev]);
       setSelectedCalId(newCal.id);
       setIsCreateCalModalOpen(false);
-      showAdminToast('새 캘린더가 생성되었습니다. ✅', 'success');
+      showAdminToast('캘린더 생성완료', 'success');
       return '';
     }
     return '캘린더 생성에 실패했습니다.';
@@ -3831,22 +3865,22 @@ function AdminDashboard({ initialCalendars }) {
   const handleDownloadBackup = (calendarId = '') => {
     const payload = createCalendarBackupPayload(calendarsList, calendarId);
     if (!payload.calendars.length) {
-      showAdminToast('백업할 캘린더 데이터가 없습니다.', 'error');
+      showAdminToast('백업할 데이터 없음', 'error');
       return;
     }
     const suffix = calendarId || 'all';
     const timestamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
     downloadJsonFile(`calendar-backup-${suffix}-${timestamp}.json`, payload);
-    showAdminToast(`${suffix} 백업 JSON을 다운로드했습니다.`);
+    showAdminToast(`${suffix} 백업 다운로드완료`);
   };
 
   const handleImportClick = () => {
     if (!firebaseDb || !ENABLE_FIRESTORE_WRITES) {
-      showAdminToast('Firebase 쓰기 연결이 없어 복구할 수 없습니다.', 'error');
+      showAdminToast('쓰기 연결 없음', 'error');
       return;
     }
     if (!isRestoreMode) {
-      showAdminToast('복구는 관리자 주소에 restore=1을 붙인 복구 모드에서만 실행할 수 있습니다.', 'error', 6000);
+      showAdminToast('복구 모드 필요 (restore=1)', 'error', 6000);
       return;
     }
     setIsRestorePhraseModalOpen(true);
@@ -3876,11 +3910,11 @@ function AdminDashboard({ initialCalendars }) {
     }
     const failed = results.filter(result => !result.saved);
     if (failed.length) {
-      showAdminToast(`${failed.map(result => result.id).join(', ')} 복구에 실패했습니다.`, 'error', 6000);
+      showAdminToast(`${failed.map(result => result.id).join(', ')} 복구 실패`, 'error', 6000);
       return;
     }
     setServerCalendars(prev => mergeCalendarCollections(prev, results.map(result => result.calendar), { replaceMatchingId: true }));
-    showAdminToast('백업 JSON에서 데이터를 복구했습니다.');
+    showAdminToast('데이터 복구완료');
   };
 
   const handleImportBackup = async (event) => {
@@ -3899,7 +3933,7 @@ function AdminDashboard({ initialCalendars }) {
       requestConfirm('데이터 복구 확인', message, () => performBackupRestore(calendars));
     } catch (err) {
       console.error('Calendar backup import failed:', err);
-      showAdminToast('백업 JSON을 읽거나 복구하지 못했습니다.', 'error', 6000);
+      showAdminToast('복구 실패', 'error', 6000);
     }
   };
 
@@ -3909,14 +3943,14 @@ function AdminDashboard({ initialCalendars }) {
     if (!cal) return;
 
     if (!calTitle.trim()) {
-      showAdminToast('캘린더명을 입력해 주세요.', 'error');
+      showAdminToast('캘린더명 필요', 'error');
       return;
     }
 
     const activeParts = calParticipants.filter(p => !isTombstone(p));
     const activeNames = activeParts.map(p => p.name.trim().toLowerCase());
     if (new Set(activeNames).size !== activeNames.length) {
-      showAdminToast('참여자 이름은 중복될 수 없습니다.', 'error');
+      showAdminToast('참여자 이름 중복', 'error');
       return;
     }
 
@@ -3933,9 +3967,9 @@ function AdminDashboard({ initialCalendars }) {
     const saved = await pushSingleCloudCalendar(stampedCal, now, 18, null, 'settings');
     if (saved) {
       setServerCalendars(prev => prev.map(c => c.id === selectedCalId ? stampedCal : c));
-      showAdminToast('캘린더 설정이 저장되었습니다.', 'success');
+      showAdminToast('설정 저장완료', 'success');
     } else {
-      showAdminToast('설정 저장에 실패했습니다.', 'error');
+      showAdminToast('설정 저장 실패', 'error');
     }
   };
 
@@ -3977,9 +4011,9 @@ function AdminDashboard({ initialCalendars }) {
       pushSingleCloudCalendar(updatedCal, now, 18, null, 'polls').then(saved => {
         if (saved) {
           setServerCalendars(prev => prev.map(c => c.id === calId ? updatedCal : c));
-          showAdminToast('투표가 삭제되었습니다.', 'success');
+          showAdminToast('투표 삭제완료', 'success');
         } else {
-          showAdminToast('투표 삭제에 실패했습니다.', 'error');
+          showAdminToast('투표 삭제 실패', 'error');
         }
       });
     });
@@ -4010,7 +4044,7 @@ function AdminDashboard({ initialCalendars }) {
         // Save rolled-back calendar
         const calSaved = await pushSingleCloudCalendar(restoredCal, now, 18, null, 'restore');
         if (!calSaved) {
-          showAdminToast('캘린더 데이터 복구에 실패했습니다.', 'error');
+          showAdminToast('데이터 복구 실패', 'error');
           return;
         }
 
@@ -4036,10 +4070,10 @@ function AdminDashboard({ initialCalendars }) {
         }));
         setSelectedCalActivityLogs(prev => prev.filter(l => getActivityLogStamp(l) <= log.timestamp));
 
-        showAdminToast('일정, 투표 및 채팅 로그가 해당 시점으로 복구되었습니다.', 'success');
+        showAdminToast('시점 복구완료', 'success');
       } catch (err) {
         console.error('Unified PITR failed:', err);
-        showAdminToast('복구 중 오류가 발생했습니다.', 'error');
+        showAdminToast('복구 오류', 'error');
       }
     });
   };
@@ -4057,17 +4091,17 @@ function AdminDashboard({ initialCalendars }) {
       }
       if (ok) {
         deleteAllChatImagesFromStorage(msg);
-        showAdminToast('채팅이 삭제되었습니다.', 'success');
+        showAdminToast('삭제완료', 'success');
         setMessagesMap(prev => ({
           ...prev,
           [calId]: (prev[calId] || []).filter(m => m.id !== msg.id)
         }));
       } else {
-        showAdminToast('삭제에 실패했습니다.', 'error');
+        showAdminToast('삭제 실패', 'error');
       }
     } catch (e) {
       console.error(e);
-      showAdminToast('삭제에 실패했습니다.', 'error');
+      showAdminToast('삭제 실패', 'error');
     }
   };
 
@@ -4807,12 +4841,12 @@ function AdminDashboard({ initialCalendars }) {
         const saved = await pushSingleCloudCalendar(updatedCal, now, 18, null, 'polls', log ? [log] : []);
         if (saved) {
           setServerCalendars(prev => prev.map(c => c.id === targetCal.id ? updatedCal : c));
-          showAdminToast('투표가 저장되었습니다.', 'success');
+          showAdminToast('투표 저장완료', 'success');
           setIsPollModalOpen(false);
           setEditingPoll(null);
           setEditingPollCalId(null);
         } else {
-          showAdminToast('투표 저장에 실패했습니다.', 'error');
+          showAdminToast('투표 저장 실패', 'error');
         }
       },
       onClose: () => {
@@ -5059,16 +5093,16 @@ function App() {
     saveLocalMeta(serverRevisionRef.current);
   };
 
-  const updateCalendars = async (nextCalendars, toastMsg = '일정이 저장되었습니다.', toastType = 'success', targetCalId = activeCalId, saveMode = 'availability', newActivityLogs = []) => {
+  const updateCalendars = async (nextCalendars, toastMsg = '저장완료', toastType = 'success', targetCalId = activeCalId, saveMode = 'availability', newActivityLogs = []) => {
     let previousCalendars = null;
     try {
       if (!isAllowedCalendarId(targetCalId)) {
-        showToast('캘린더 ID가 올바르지 않아 저장하지 않았습니다.', 'error');
+        showToast('캘린더 ID 오류', 'error');
         return false;
       }
       const requestedId = getCalendarIdFromURL();
       if (requestedId && requestedId !== targetCalId) {
-        showToast('현재 URL의 캘린더와 저장 대상이 달라 저장하지 않았습니다.', 'error');
+        showToast('캘린더 불일치', 'error');
         return false;
       }
       const now = Date.now();
@@ -5077,7 +5111,7 @@ function App() {
       const currentCal = normalizedCalendars.find(c => c.id === targetCalId) || null;
       if (!currentCal) {
         console.warn('Active calendar not found during save:', targetCalId);
-        showToast('활성 캘린더를 찾을 수 없어 저장하지 못했습니다.', 'error');
+        showToast('캘린더 없음', 'error');
         return false;
       }
 
@@ -5088,7 +5122,7 @@ function App() {
       if (!saved) {
         console.warn('Cloud save failed for calendar:', currentCal.id);
         if (previousCalendars) setCalendarsState(previousCalendars);
-        showToast('저장에 실패했습니다. 다시 시도해 주세요.', 'error');
+        showToast('저장 실패', 'error');
         return false;
       }
 
@@ -5100,7 +5134,7 @@ function App() {
     } catch (err) {
       console.error('updateCalendars failed:', err);
       if (previousCalendars) setCalendarsState(previousCalendars);
-      showToast('저장에 실패했습니다. 다시 시도해 주세요.', 'error');
+      showToast('저장 실패', 'error');
       return false;
     } finally {
       isSavingRef.current = false;
@@ -5137,8 +5171,11 @@ function App() {
   const [activityLogsFeed, setActivityLogsFeed] = React.useState([]);
   const [chatInput, setChatInput] = React.useState('');
   const [chatParticipantId, setChatParticipantId] = React.useState('');
+  const chatParticipantIdRef = React.useRef(chatParticipantId);
+  React.useEffect(() => { chatParticipantIdRef.current = chatParticipantId; }, [chatParticipantId]);
   const [isChatSheetOpen, setIsChatSheetOpen] = React.useState(false);
   const [isChatSubmitting, setIsChatSubmitting] = React.useState(false);
+  const [chatUploadProgress, setChatUploadProgress] = React.useState(null);
   const chatTextareaRef = React.useRef(null);
   const [chatImages, setChatImages] = React.useState([]);
   const [activeLightboxUrl, setActiveLightboxUrl] = React.useState(null);
@@ -5249,16 +5286,16 @@ function App() {
       for (let attempt = 1; attempt <= FIREBASE_LOAD_MAX_ATTEMPTS && isMounted && !hasLoadedCloudCalendar; attempt += 1) {
         const result = await fetchSingleCloudCalendar(activeCalId, 1, FIREBASE_LOAD_TIMEOUT_MS);
         if (result?.calendar && applyLoadedCalendar(result.calendar, result.lastModified || Date.now())) {
-          if (attempt > 1) showToast('Firebase 데이터를 다시 불러왔습니다.', 'success', 3000);
+          if (attempt > 1) showToast('다시 불러옴', 'success', 3000);
           return;
         }
         if (attempt < FIREBASE_LOAD_MAX_ATTEMPTS && isMounted && !hasLoadedCloudCalendar) {
-          showToast(`Firebase 응답이 지연되어 ${attempt + 1}차 로딩을 시도합니다.`, 'info', 3000);
+          showToast(`${attempt + 1}차 재시도 중`, 'info', 3000);
         }
       }
       if (isMounted && !hasLoadedCloudCalendar) {
         setIsInitialDataLoading(false);
-        showToast('Firebase에서 캘린더 데이터를 불러오지 못했습니다. 네트워크를 확인한 뒤 새로고침해 주세요.', 'error', 7000);
+        showToast('데이터 로딩 실패', 'error', 7000);
       }
     };
 
@@ -5280,7 +5317,7 @@ function App() {
 
   React.useEffect(() => {
     if (firebaseDb) return;
-    showToast('Firebase 연결을 확인해 주세요. 데이터는 Firebase에서만 불러옵니다.', 'error', 5000);
+    showToast('연결 오류', 'error', 5000);
   }, []);
   const activeCalLoaded = calendars.some(c => c.id === activeCalId);
   const activeCal = calendars.find(c => c.id === activeCalId) || createLoadingCalendarShell(activeCalId);
@@ -5358,6 +5395,8 @@ function App() {
     // ascending order for rendering -- querying oldest-first + limit would instead pin
     // the window to the first 100 messages ever sent, silently hiding anything newer
     // once a calendar passes that many total messages.
+    let hasSeenInitialChatSnapshot = false;
+    let lastNotifiedMessageId = null;
     const unsubscribeChat = firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages')
       .orderBy('timestamp', 'desc')
       .limit(100)
@@ -5369,6 +5408,18 @@ function App() {
         });
         list.reverse();
         setChatMessages(list);
+
+        // Browser notification for a genuinely new incoming message from someone else --
+        // skip the very first snapshot (that's just the existing history loading, not a
+        // new message) and skip anything sent by the current participant themselves.
+        const latest = list[list.length - 1];
+        if (hasSeenInitialChatSnapshot && latest && latest.id !== lastNotifiedMessageId
+          && latest.participantId !== chatParticipantIdRef.current) {
+          const sender = getActiveParticipants(activeCal).find(p => p.id === latest.participantId);
+          notifyNewChatMessage(activeCal, latest, sender?.name || '알수없음');
+        }
+        hasSeenInitialChatSnapshot = true;
+        if (latest) lastNotifiedMessageId = latest.id;
       }, err => {
         console.warn(`Firestore chat history subscription error:`, err);
         fetchChatMessagesRest(activeCalId).then(list => {
@@ -5459,7 +5510,8 @@ function App() {
     const imageCount = chatImages.length;
     if ((!hasText && imageCount === 0) || !chatParticipantId) return;
     setIsChatSubmitting(true);
-    
+    if (imageCount > 0) setChatUploadProgress({ pct: 0, remainingSec: null });
+
     try {
       let ok = false;
       if (imageCount === 0) {
@@ -5475,65 +5527,28 @@ function App() {
           ok = await sendChatMessageRest(activeCalId, messageData);
         }
       } else {
-        const resolvedImages = await Promise.all(chatImages.map(img => resolveChatImageUrls(activeCalId, img)));
-        // Only bundle images into one multi-thumbnail message when every one of them made it
-        // to Storage (short download URLs). If Storage is unavailable and any image fell back
-        // to an embedded base64 data URL, keep the legacy one-message-per-image behavior so a
-        // single message document never has to carry dozens of base64 images at once.
-        const allStorageBacked = resolvedImages.every(r => isStorageDownloadUrl(r.imageUrl));
-
-        if (allStorageBacked && resolvedImages.length > 1) {
-          const messageData = {
-            participantId: chatParticipantId,
-            text: chatInput.trim(),
-            imageUrl: resolvedImages[0].imageUrl,
-            thumbUrl: resolvedImages[0].thumbUrl,
-            imageUrls: resolvedImages.map(r => r.imageUrl),
-            thumbUrls: resolvedImages.map(r => r.thumbUrl),
-            timestamp: Date.now()
-          };
-          if (firebaseDb) {
-            await firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages').add(messageData);
-            ok = true;
-          } else {
-            ok = await sendChatMessageRest(activeCalId, messageData);
-          }
+        // Always bundle every attached image into a single multi-thumbnail message, whether
+        // uploads land in Storage or fall back to inline base64 (the per-image size cap is
+        // scaled down for larger batches -- see processImageFilesSequentially -- so a fully
+        // inline multi-image message still fits Firestore's 1MiB/doc limit).
+        const resolvedImages = await resolveChatImageBatch(activeCalId, chatImages, setChatUploadProgress);
+        const messageData = {
+          participantId: chatParticipantId,
+          text: chatInput.trim(),
+          imageUrl: resolvedImages[0].imageUrl,
+          thumbUrl: resolvedImages[0].thumbUrl,
+          imageUrls: resolvedImages.map(r => r.imageUrl),
+          thumbUrls: resolvedImages.map(r => r.thumbUrl),
+          timestamp: Date.now()
+        };
+        if (firebaseDb) {
+          await firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages').add(messageData);
+          ok = true;
         } else {
-          // Send first image with optional text
-          const firstMessage = {
-            participantId: chatParticipantId,
-            text: chatInput.trim(),
-            imageUrl: resolvedImages[0].imageUrl,
-            thumbUrl: resolvedImages[0].thumbUrl,
-            timestamp: Date.now()
-          };
-          if (firebaseDb) {
-            await firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages').add(firstMessage);
-            ok = true;
-          } else {
-            ok = await sendChatMessageRest(activeCalId, firstMessage);
-          }
-
-          // Send subsequent images sequentially
-          if (ok && resolvedImages.length > 1) {
-            for (let i = 1; i < resolvedImages.length; i++) {
-              const extraMessage = {
-                participantId: chatParticipantId,
-                text: '',
-                imageUrl: resolvedImages[i].imageUrl,
-                thumbUrl: resolvedImages[i].thumbUrl,
-                timestamp: Date.now() + i
-              };
-              if (firebaseDb) {
-                await firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages').add(extraMessage);
-              } else {
-                await sendChatMessageRest(activeCalId, extraMessage);
-              }
-            }
-          }
+          ok = await sendChatMessageRest(activeCalId, messageData);
         }
       }
-      
+
       if (ok) {
         setChatInput('');
         setChatImages([]);
@@ -5544,15 +5559,16 @@ function App() {
           fetchRecentMessagesRest(activeCalId).then(list => setRecentMessages(list));
           fetchChatMessagesRest(activeCalId).then(list => setChatMessages(list));
         }
-        showToast('채팅이 등록되었습니다.', 'success', 3000);
+        // No success toast here -- the new message is immediately visible in the chat feed.
       } else {
-        showToast('채팅 등록에 실패했습니다.', 'error', 3000);
+        showToast('등록 실패', 'error', 3000);
       }
     } catch (err) {
       console.error('handleSendChatMessage failed:', err);
-      showToast('채팅 등록에 실패했습니다.', 'error', 3000);
+      showToast('등록 실패', 'error', 3000);
     } finally {
       setIsChatSubmitting(false);
+      setChatUploadProgress(null);
     }
   };
 
@@ -5577,13 +5593,13 @@ function App() {
           fetchRecentMessagesRest(calId).then(list => setRecentMessages(list));
           fetchChatMessagesRest(calId).then(list => setChatMessages(list));
         }
-        showToast('채팅이 삭제되었습니다.', 'success', 3000);
+        showToast('삭제완료', 'success', 3000);
       } else {
-        showToast('삭제에 실패했습니다.', 'error', 3000);
+        showToast('삭제 실패', 'error', 3000);
       }
     } catch (err) {
       console.error('handleConfirmDeleteMessage failed:', err);
-      showToast('삭제에 실패했습니다.', 'error', 3000);
+      showToast('삭제 실패', 'error', 3000);
     } finally {
       setDeletingMessage(null);
     }
@@ -5596,14 +5612,12 @@ function App() {
   const handleSaveEditMessage = async (newText, newImages) => {
     if (!editingMessage) return;
     const { id, calId } = editingMessage;
+    const hasNewImages = (newImages || []).some(img => !img.isExisting);
+    if (hasNewImages) setChatUploadProgress({ pct: 0, remainingSec: null });
     try {
       // Images already on the message (isExisting) are passed through as-is; freshly
-      // picked ones get uploaded via resolveChatImageUrls, matching the compose flow.
-      const resolvedImages = await Promise.all((newImages || []).map(img =>
-        img.isExisting
-          ? Promise.resolve({ imageUrl: img.original, thumbUrl: img.thumbnail })
-          : resolveChatImageUrls(calId, img)
-      ));
+      // picked ones get uploaded via resolveChatImageBatch, matching the compose flow.
+      const resolvedImages = await resolveChatImageBatch(calId, newImages || [], hasNewImages ? setChatUploadProgress : null);
       const data = {
         text: newText,
         imageUrl: resolvedImages[0]?.imageUrl || '',
@@ -5635,15 +5649,16 @@ function App() {
           fetchRecentMessagesRest(calId).then(list => setRecentMessages(list));
           fetchChatMessagesRest(calId).then(list => setChatMessages(list));
         }
-        showToast('채팅이 수정되었습니다.', 'success', 3000);
+        showToast('수정완료', 'success', 3000);
       } else {
-        showToast('수정에 실패했습니다.', 'error', 3000);
+        showToast('수정 실패', 'error', 3000);
       }
     } catch (err) {
       console.error('handleSaveEditMessage failed:', err);
-      showToast('수정에 실패했습니다.', 'error', 3000);
+      showToast('수정 실패', 'error', 3000);
     } finally {
       setEditingMessage(null);
+      setChatUploadProgress(null);
     }
   };
 
@@ -5652,14 +5667,14 @@ function App() {
     if (rawId && !isAllowedCalendarId(rawId)) {
       const safeUrl = getCalendarShareUrl(activeCal?.id || activeCalId);
       window.history.replaceState({}, '', safeUrl);
-      showToast('운영 캘린더는 kkot, cw만 사용할 수 있어 현재 주소로 정리했습니다.', 'error', 5000);
+      showToast('캘린더 주소 정리됨', 'error', 5000);
     }
   }, []);
   React.useEffect(() => {
     let cancelled = false;
     const requestedId = getCalendarIdFromURL();
     if (requestedId && !isAllowedCalendarId(requestedId)) {
-      showToast('운영 캘린더는 kkot, cw만 사용할 수 있습니다.', 'error', 5000);
+      showToast('지원하지 않는 캘린더', 'error', 5000);
       return;
     }
     if (requestedId && !calendars.some(c => c.id === requestedId)) {
@@ -5673,7 +5688,7 @@ function App() {
           setActiveCalId(requestedId);
           return;
         }
-        showToast('Firebase에서 해당 캘린더를 찾지 못했습니다.', 'error');
+        showToast('캘린더를 찾을 수 없음', 'error');
       };
       resolveRequestedCalendar();
     }
@@ -5683,7 +5698,7 @@ function App() {
   }, []);
   const handleSelectCalendar = id => {
     if (!isAllowedCalendarId(id)) {
-      showToast('캘린더 ID가 올바르지 않습니다.', 'error');
+      showToast('잘못된 캘린더 ID', 'error');
       return;
     }
     setActiveCalId(id);
@@ -5696,20 +5711,20 @@ function App() {
   };
   const handleSaveAvailability = (dateStr, participantId, note) => {
     if (!activeCalLoaded) {
-      showToast('Firebase 데이터를 불러온 뒤 다시 시도해 주세요.', 'error');
+      showToast('잠시 후 다시 시도', 'error');
       return false;
     }
     if (!activeCal || !isValidCalendarId(activeCal.id) || activeCal.id !== activeCalId) {
-      showToast('현재 캘린더 상태를 확인할 수 없어 저장하지 않았습니다.', 'error');
+      showToast('캘린더 상태 확인 불가', 'error');
       return false;
     }
     if (!isValidDateString(dateStr)) {
-      showToast('날짜 형식이 올바르지 않아 저장하지 않았습니다.', 'error');
+      showToast('날짜 형식 오류', 'error');
       return false;
     }
     const activeParticipantIds = new Set(getActiveParticipants(activeCal).map(participant => participant.id));
     if (!activeParticipantIds.has(participantId)) {
-      showToast('참여자 정보를 다시 선택해 주세요.', 'error');
+      showToast('참여자 재선택 필요', 'error');
       return false;
     }
     const now = Date.now();
@@ -5745,7 +5760,7 @@ function App() {
       activityLogs: activityLog ? [...getCalendarActivityLogs(activeCal), activityLog] : getCalendarActivityLogs(activeCal)
     };
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-    return updateCalendars(nextCalendars, '일정이 등록되었습니다.', 'success', updatedCal.id, 'availability', activityLog ? [activityLog] : []);
+    return updateCalendars(nextCalendars, '등록완료', 'success', updatedCal.id, 'availability', activityLog ? [activityLog] : []);
   };
   const handleDeleteAvailability = (dateStr, participantId) => {
     if (!activeCal || !isValidDateString(dateStr)) return false;
@@ -5768,7 +5783,7 @@ function App() {
       activityLogs: activityLog ? [...getCalendarActivityLogs(activeCal), activityLog] : getCalendarActivityLogs(activeCal)
     };
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-    return updateCalendars(nextCalendars, '삭제 되었습니다.', 'delete', updatedCal.id, 'availability', activityLog ? [activityLog] : []);
+    return updateCalendars(nextCalendars, '삭제완료', 'delete', updatedCal.id, 'availability', activityLog ? [activityLog] : []);
   };
   const handleDeleteAllForDate = dateStr => {
     if (!activeCal || !isValidDateString(dateStr)) return false;
@@ -5791,7 +5806,7 @@ function App() {
       activityLogs: [...getCalendarActivityLogs(activeCal), ...activityLogs]
     };
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-    return updateCalendars(nextCalendars, '삭제 되었습니다.', 'delete', updatedCal.id, 'availability', activityLogs);
+    return updateCalendars(nextCalendars, '삭제완료', 'delete', updatedCal.id, 'availability', activityLogs);
   };
   const handleDeleteActivityLog = log => {
     if (!activeCal || !log?.id) return false;
@@ -5806,7 +5821,7 @@ function App() {
       deletedActivityLogIds: mergeDeletedActivityLogIds(activeCal.deletedActivityLogIds || [], [logId])
     };
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-    return updateCalendars(nextCalendars, '로그가 삭제되었습니다.', 'delete', updatedCal.id);
+    return updateCalendars(nextCalendars, '로그 삭제완료', 'delete', updatedCal.id);
   };
   const handleOpenPollCreate = () => {
     if (!guardLoadedCalendar('Firebase 데이터를 불러온 뒤 투표를 생성해 주세요.')) return;
@@ -5830,7 +5845,7 @@ function App() {
       createdAt: poll.createdAt || now
     }, participantIds);
     if (!normalizedPoll) {
-      showToast('투표명과 선택옵션을 확인해 주세요.', 'error');
+      showToast('투표명·옵션 확인 필요', 'error');
       return false;
     }
     const activityLog = !existingPoll
@@ -5844,13 +5859,13 @@ function App() {
       activityLogs: activityLog ? [...getCalendarActivityLogs(activeCal), activityLog] : getCalendarActivityLogs(activeCal)
     };
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-    return updateCalendars(nextCalendars, '투표가 저장되었습니다.', 'success', updatedCal.id, 'polls', activityLog ? [activityLog] : []);
+    return updateCalendars(nextCalendars, '투표 저장완료', 'success', updatedCal.id, 'polls', activityLog ? [activityLog] : []);
   };
   const handleOpenVoteSheet = (poll, option) => {
     if (!guardLoadedCalendar('Firebase 데이터를 불러온 뒤 투표해 주세요.')) return false;
     const activeParticipants = getActiveParticipants(activeCal);
     if (activeParticipants.length === 0) {
-      showToast('참여자 설정 후 투표할 수 있습니다.', 'error');
+      showToast('참여자 설정 필요', 'error');
       return false;
     }
     setVoteTarget({ pollId: poll.id, optionId: option.id });
@@ -5861,13 +5876,13 @@ function App() {
     const activeParticipants = getActiveParticipants(activeCal);
     const participantIds = new Set(activeParticipants.map(participant => participant.id));
     if (!participantIds.has(participantId)) {
-      showToast('참여자를 다시 선택해 주세요.', 'error');
+      showToast('참여자 재선택 필요', 'error');
       return false;
     }
     const poll = getCalendarPolls(activeCal).find(item => item.id === pollId);
     const option = getActivePollOptions(poll).find(item => item.id === optionId);
     if (!poll || !option) {
-      showToast('투표 정보를 다시 확인해 주세요.', 'error');
+      showToast('투표 정보 확인 필요', 'error');
       return false;
     }
     const now = Date.now();
@@ -5892,7 +5907,7 @@ function App() {
     };
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
     setVoteTarget(null);
-    return updateCalendars(nextCalendars, '투표가 반영되었습니다.', 'success', updatedCal.id, 'polls', activityLog ? [activityLog] : []);
+    return updateCalendars(nextCalendars, '투표 반영완료', 'success', updatedCal.id, 'polls', activityLog ? [activityLog] : []);
   };
   const handleCancelVote = (poll, option, participantId) => {
     if (!guardLoadedCalendar('Firebase 데이터를 불러온 뒤 투표를 취소해 주세요.')) return false;
@@ -5923,17 +5938,17 @@ function App() {
   };
   const handleSaveAdmin = (updatedCal, newCalCreated) => {
     if (!activeCalLoaded && !newCalCreated) {
-      showToast('Firebase 데이터를 불러온 뒤 설정을 수정해 주세요.', 'error');
+      showToast('잠시 후 다시 시도', 'error');
       return false;
     }
     if (newCalCreated) {
       if (!isAllowedCalendarId(newCalCreated.id)) {
-        showToast('운영 캘린더는 kkot, cw만 사용할 수 있습니다.', 'error');
+        showToast('지원하지 않는 캘린더', 'error');
         return false;
       }
       const nextCalendars = [newCalCreated, ...calendars];
       handleSelectCalendar(newCalCreated.id);
-      return updateCalendars(nextCalendars, '새 캘린더가 생성되었습니다. ✅', 'success', newCalCreated.id, 'replace');
+      return updateCalendars(nextCalendars, '캘린더 생성완료', 'success', newCalCreated.id, 'replace');
     } else {
       const now = Date.now();
       const stampedCal = {
@@ -5945,11 +5960,11 @@ function App() {
         participants: updatedCal.participants
       };
       if (!assertCalendarLinks(stampedCal)) {
-        showToast('참여자와 일정 연결을 확인해 주세요.', 'error');
+        showToast('참여자·일정 확인 필요', 'error');
         return false;
       }
       const nextCalendars = calendars.map(c => c.id === stampedCal.id ? stampedCal : c);
-      return updateCalendars(nextCalendars, '캘린더 설정이 저장되었습니다. ✅', 'success', stampedCal.id, 'settings');
+      return updateCalendars(nextCalendars, '설정 저장완료', 'success', stampedCal.id, 'settings');
     }
   };
   if (activeView === 'chat') {
@@ -6403,7 +6418,7 @@ function App() {
       whiteSpace: 'nowrap',
       justifyContent: 'center'
     }
-  }, /*#__PURE__*/React.createElement("span", null, toast.message)));
+  }, /*#__PURE__*/React.createElement("span", null, toast.message)), chatUploadProgress && /*#__PURE__*/React.createElement(ImageUploadOverlay, chatUploadProgress));
 }
 
 // ---- Korean public holidays, substitute holidays, and 24 solar terms ----
@@ -7144,117 +7159,318 @@ function LinkPreviewCard({ url }) {
   );
 }
 
-function compressImageToDataUrls(file) {
+// HEIC/HEIF (the default photo format on iPhone) has no native decode support in canvas/Image()
+// on any browser except some Safari versions -- a raw .heic/.heif file (e.g. picked via the
+// Files app, which unlike Safari's usual photo picker doesn't auto-convert to JPEG on select)
+// fails outright everywhere else. heic2any is a WASM-based client-side HEIC->JPEG converter;
+// it's ~1.3MB so it's loaded lazily, only the first time an actual HEIC/HEIF file shows up.
+let heic2anyLoadPromise = null;
+function loadHeic2any() {
+  if (window.heic2any) return Promise.resolve(window.heic2any);
+  if (heic2anyLoadPromise) return heic2anyLoadPromise;
+  heic2anyLoadPromise = new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js';
+    script.onload = () => {
+      if (window.heic2any) resolve(window.heic2any);
+      else reject(new Error('heic2any failed to initialize'));
+    };
+    script.onerror = () => {
+      heic2anyLoadPromise = null; // allow retrying on a later file instead of caching the failure forever
+      reject(new Error('heic2any script failed to load'));
+    };
+    document.head.appendChild(script);
+  });
+  return heic2anyLoadPromise;
+}
+
+function isHeicFile(file) {
+  const type = (file.type || '').toLowerCase();
+  if (type === 'image/heic' || type === 'image/heif' || type === 'image/heic-sequence' || type === 'image/heif-sequence') return true;
+  // file.type is often empty for HEIC on browsers/OSes with no MIME association registered,
+  // so also fall back to the extension.
+  const name = (file.name || '').toLowerCase();
+  return name.endsWith('.heic') || name.endsWith('.heif');
+}
+
+// Wraps Image() decoding with a timeout so one stuck/malformed file can't hang a whole batch
+// indefinitely (the caller is otherwise waiting on onload/onerror, which some browsers never
+// fire for certain corrupt inputs).
+function loadImageElement(objectUrl, timeoutMs = 20000) {
   return new Promise((resolve, reject) => {
     const img = new Image();
-    const objectUrl = URL.createObjectURL(file);
-    
+    let settled = false;
+    const timeoutId = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      reject(Object.assign(new Error('IMAGE_DECODE_TIMEOUT'), { code: 'IMAGE_DECODE_TIMEOUT' }));
+    }, timeoutMs);
     img.onload = () => {
-      URL.revokeObjectURL(objectUrl);
-      
-      const maxOrig = 1200; // High resolution spec (1200px instead of 720px)
-      let wOrig = img.width;
-      let hOrig = img.height;
-      if (wOrig > maxOrig || hOrig > maxOrig) {
-        if (wOrig > hOrig) {
-          hOrig = Math.round(hOrig * maxOrig / wOrig);
-          wOrig = maxOrig;
-        } else {
-          wOrig = Math.round(wOrig * maxOrig / hOrig);
-          hOrig = maxOrig;
-        }
-      }
-      const canvasOrig = document.createElement('canvas');
-      canvasOrig.width = wOrig;
-      canvasOrig.height = hOrig;
-      const ctxOrig = canvasOrig.getContext('2d');
-      ctxOrig.drawImage(img, 0, 0, wOrig, hOrig);
-      // Start at high quality (0.85), but step down for busy/detailed photos that would
-      // otherwise produce an oversized base64 payload -- this is only used as a fallback if
-      // the Firebase Storage upload below fails, but keep it bounded regardless.
-      let originalQuality = 0.85;
-      let originalBase64 = canvasOrig.toDataURL('image/jpeg', originalQuality);
-      for (const quality of [0.75, 0.65, 0.55, 0.45]) {
-        if (originalBase64.length <= MAX_CHAT_IMAGE_BASE64_LENGTH) break;
-        originalQuality = quality;
-        originalBase64 = canvasOrig.toDataURL('image/jpeg', originalQuality);
-      }
-
-      const maxThumb = 120;
-      let wThumb = img.width;
-      let hThumb = img.height;
-      if (wThumb > maxThumb || hThumb > maxThumb) {
-        if (wThumb > hThumb) {
-          hThumb = Math.round(hThumb * maxThumb / wThumb);
-          wThumb = maxThumb;
-        } else {
-          wThumb = Math.round(wThumb * maxThumb / hThumb);
-          hThumb = maxThumb;
-        }
-      }
-      const canvasThumb = document.createElement('canvas');
-      canvasThumb.width = wThumb;
-      canvasThumb.height = hThumb;
-      const ctxThumb = canvasThumb.getContext('2d');
-      ctxThumb.drawImage(img, 0, 0, wThumb, hThumb);
-      const thumbnailBase64 = canvasThumb.toDataURL('image/jpeg', 0.5);
-
-      // Also produce Blobs at the same quality level, used to upload to Firebase Storage at
-      // send time (see uploadChatImageAssets) instead of embedding base64 in the message
-      // document. The base64 strings above are kept as the fallback if that upload fails.
-      canvasOrig.toBlob(originalBlob => {
-        canvasThumb.toBlob(thumbnailBlob => {
-          resolve({
-            original: originalBase64,
-            thumbnail: thumbnailBase64,
-            originalBlob,
-            thumbnailBlob
-          });
-        }, 'image/jpeg', 0.5);
-      }, 'image/jpeg', originalQuality);
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeoutId);
+      resolve(img);
     };
-
-    img.onerror = (err) => {
-      URL.revokeObjectURL(objectUrl);
-      reject(err);
+    img.onerror = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeoutId);
+      reject(Object.assign(new Error('IMAGE_DECODE_FAILED'), { code: 'IMAGE_DECODE_FAILED' }));
     };
-
     img.src = objectUrl;
   });
 }
 
+async function compressImageToDataUrls(file, { maxBase64Length = MAX_CHAT_IMAGE_BASE64_LENGTH } = {}) {
+  let sourceBlob = file;
+  if (isHeicFile(file)) {
+    try {
+      const heic2any = await loadHeic2any();
+      const converted = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.85 });
+      sourceBlob = Array.isArray(converted) ? converted[0] : converted;
+    } catch (err) {
+      throw Object.assign(new Error('HEIC 이미지를 변환하지 못했습니다.'), { code: 'HEIC_CONVERT_FAILED', fileName: file.name });
+    }
+  }
+
+  const objectUrl = URL.createObjectURL(sourceBlob);
+  let img;
+  try {
+    img = await loadImageElement(objectUrl);
+  } catch (err) {
+    throw Object.assign(
+      new Error('이미지를 불러오지 못했습니다. 지원하지 않는 형식이거나 손상된 파일일 수 있습니다.'),
+      { code: err.code || 'IMAGE_DECODE_FAILED', fileName: file.name }
+    );
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+
+  const maxOrig = 1200; // High resolution spec (1200px instead of 720px)
+  let wOrig = img.width;
+  let hOrig = img.height;
+  if (wOrig > maxOrig || hOrig > maxOrig) {
+    if (wOrig > hOrig) {
+      hOrig = Math.round(hOrig * maxOrig / wOrig);
+      wOrig = maxOrig;
+    } else {
+      wOrig = Math.round(wOrig * maxOrig / hOrig);
+      hOrig = maxOrig;
+    }
+  }
+  const canvasOrig = document.createElement('canvas');
+  canvasOrig.width = wOrig;
+  canvasOrig.height = hOrig;
+  const ctxOrig = canvasOrig.getContext('2d');
+  ctxOrig.drawImage(img, 0, 0, wOrig, hOrig);
+  // Start at high quality (0.85), but step down for busy/detailed photos that would
+  // otherwise produce an oversized base64 payload -- this is only used as a fallback if
+  // the Firebase Storage upload below fails, but keep it bounded regardless. maxBase64Length
+  // is scaled down per-image when a batch has several images, so a full-fallback multi-image
+  // message still fits Firestore's 1MiB/doc limit (see processImageFilesSequentially).
+  let originalQuality = 0.85;
+  let originalBase64 = canvasOrig.toDataURL('image/jpeg', originalQuality);
+  for (const quality of [0.75, 0.65, 0.55, 0.45]) {
+    if (originalBase64.length <= maxBase64Length) break;
+    originalQuality = quality;
+    originalBase64 = canvasOrig.toDataURL('image/jpeg', originalQuality);
+  }
+
+  const maxThumb = 120;
+  let wThumb = img.width;
+  let hThumb = img.height;
+  if (wThumb > maxThumb || hThumb > maxThumb) {
+    if (wThumb > hThumb) {
+      hThumb = Math.round(hThumb * maxThumb / wThumb);
+      wThumb = maxThumb;
+    } else {
+      wThumb = Math.round(wThumb * maxThumb / hThumb);
+      hThumb = maxThumb;
+    }
+  }
+  const canvasThumb = document.createElement('canvas');
+  canvasThumb.width = wThumb;
+  canvasThumb.height = hThumb;
+  const ctxThumb = canvasThumb.getContext('2d');
+  ctxThumb.drawImage(img, 0, 0, wThumb, hThumb);
+  const thumbnailBase64 = canvasThumb.toDataURL('image/jpeg', 0.5);
+
+  // Also produce Blobs at the same quality level, used to upload to Firebase Storage at
+  // send time (see uploadChatImageAssets) instead of embedding base64 in the message
+  // document. The base64 strings above are kept as the fallback if that upload fails.
+  return new Promise((resolve) => {
+    canvasOrig.toBlob(originalBlob => {
+      canvasThumb.toBlob(thumbnailBlob => {
+        resolve({
+          original: originalBase64,
+          thumbnail: thumbnailBase64,
+          originalBlob,
+          thumbnailBlob
+        });
+      }, 'image/jpeg', 0.5);
+    }, 'image/jpeg', originalQuality);
+  });
+}
+
+// Processes a batch of image files one at a time (bounds peak memory on large photos and gives
+// meaningful progress feedback), isolating failures per file so one bad file (unsupported
+// format, corrupt data, decode timeout) doesn't discard the others that succeeded.
+// Total base64 budget shared across every image in a batch, so a multi-image message that
+// ends up fully falling back to inline base64 (Storage unavailable) still fits well inside
+// Firestore's 1MiB/doc limit no matter how many images are in it. A single-image batch keeps
+// the original per-image cap unchanged.
+const CHAT_BATCH_BASE64_BUDGET = 700000; // ~700KB total across all originals in one message
+async function processImageFilesSequentially(files, onProgress) {
+  const succeeded = [];
+  const failed = [];
+  const perImageCap = Math.min(MAX_CHAT_IMAGE_BASE64_LENGTH, Math.floor(CHAT_BATCH_BASE64_BUDGET / files.length));
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    if (onProgress) onProgress({ current: i + 1, total: files.length, fileName: file.name });
+    try {
+      const compressed = await compressImageToDataUrls(file, { maxBase64Length: perImageCap });
+      succeeded.push(compressed);
+    } catch (err) {
+      failed.push({ fileName: file.name, error: err });
+    }
+  }
+  return { succeeded, failed };
+}
+
+function describeImageProcessingFailures(failed) {
+  if (failed.length === 0) return '';
+  const first = failed[0];
+  const reason = first.error?.code === 'HEIC_CONVERT_FAILED'
+    ? 'HEIC/HEIF 변환 실패'
+    : first.error?.code === 'IMAGE_DECODE_TIMEOUT'
+    ? '처리 시간 초과'
+    : '지원하지 않는 형식';
+  if (failed.length === 1) return `${first.fileName} 첨부 실패 (${reason})`;
+  return `${failed.length}장 첨부 실패 (${reason} 등)`;
+}
+
+function ImageProcessingOverlay({ current, total, fileName }) {
+  if (!total) return null;
+  const pct = Math.min(100, Math.round((current / total) * 100));
+  return /*#__PURE__*/React.createElement('div', {
+    style: { position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.45)', zIndex: 100000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }
+  }, /*#__PURE__*/React.createElement('div', {
+    style: { backgroundColor: '#FFFFFF', borderRadius: '14px', padding: '24px 28px', width: '260px', maxWidth: '100%', textAlign: 'center', boxShadow: '0 10px 30px rgba(0,0,0,0.25)' }
+  },
+    /*#__PURE__*/React.createElement('div', { style: { fontWeight: 800, fontSize: '0.95rem', color: '#0F172A', marginBottom: '4px' } }, '사진 처리 중...'),
+    /*#__PURE__*/React.createElement('div', { style: { fontSize: '0.78rem', color: '#64748B', marginBottom: '14px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, `${current}/${total}${fileName ? ` · ${fileName}` : ''}`),
+    /*#__PURE__*/React.createElement('div', { style: { height: '8px', borderRadius: '9999px', backgroundColor: '#E2E8F0', overflow: 'hidden' } },
+      /*#__PURE__*/React.createElement('div', { style: { height: '100%', width: `${pct}%`, backgroundColor: '#4F46E5', transition: 'width 0.2s ease', borderRadius: '9999px' } })
+    )
+  ));
+}
+
+function ImageUploadOverlay({ pct, remainingSec }) {
+  const clamped = Math.max(0, Math.min(100, pct || 0));
+  return /*#__PURE__*/React.createElement('div', {
+    style: { position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.45)', zIndex: 100000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }
+  }, /*#__PURE__*/React.createElement('div', {
+    style: { backgroundColor: '#FFFFFF', borderRadius: '14px', padding: '24px 28px', width: '260px', maxWidth: '100%', textAlign: 'center', boxShadow: '0 10px 30px rgba(0,0,0,0.25)' }
+  },
+    /*#__PURE__*/React.createElement('div', { style: { fontWeight: 800, fontSize: '0.95rem', color: '#0F172A', marginBottom: '4px' } }, '사진 전송 중...'),
+    /*#__PURE__*/React.createElement('div', { style: { fontSize: '0.78rem', color: '#64748B', marginBottom: '14px' } },
+      `${clamped}%${typeof remainingSec === 'number' ? ` · 약 ${remainingSec}초 남음` : ''}`),
+    /*#__PURE__*/React.createElement('div', { style: { height: '8px', borderRadius: '9999px', backgroundColor: '#E2E8F0', overflow: 'hidden' } },
+      /*#__PURE__*/React.createElement('div', { style: { height: '100%', width: `${clamped}%`, backgroundColor: '#4F46E5', transition: 'width 0.2s ease', borderRadius: '9999px' } })
+    )
+  ));
+}
+
 // Uploads a compressed chat image pair to Firebase Storage and returns download URLs, or null
 // if Storage isn't available/the upload fails -- callers should fall back to the base64 data
-// URLs already produced by compressImageToDataUrls in that case.
-async function uploadChatImageAssets(calendarId, compressed) {
-  if (!firebaseStorage || !compressed?.originalBlob || !compressed?.thumbnailBlob) return null;
-  try {
+// URLs already produced by compressImageToDataUrls in that case. `onBytes(taskKey, transferred,
+// total)` is called as each upload progresses so a caller can aggregate progress across a batch.
+function uploadChatImageAssets(calendarId, compressed, index, onBytes) {
+  return new Promise((resolve) => {
+    if (!firebaseStorage || !compressed?.originalBlob || !compressed?.thumbnailBlob) {
+      resolve(null);
+      return;
+    }
     const stamp = Date.now();
     const rand = Math.random().toString(36).slice(2, 8);
-    const basePath = `chatImages/${calendarId}/${stamp}_${rand}`;
+    const basePath = `chatImages/${calendarId}/${stamp}_${rand}_${index}`;
     const originalRef = firebaseStorage.ref(`${basePath}_original.jpg`);
     const thumbRef = firebaseStorage.ref(`${basePath}_thumb.jpg`);
-    const [originalSnap, thumbSnap] = await Promise.all([
-      originalRef.put(compressed.originalBlob, { contentType: 'image/jpeg' }),
-      thumbRef.put(compressed.thumbnailBlob, { contentType: 'image/jpeg' })
-    ]);
-    const [imageUrl, thumbUrl] = await Promise.all([
-      originalSnap.ref.getDownloadURL(),
-      thumbSnap.ref.getDownloadURL()
-    ]);
-    return { imageUrl, thumbUrl };
-  } catch (e) {
-    console.warn('Chat image Storage upload failed, falling back to inline base64:', e);
-    return null;
-  }
+
+    const runUpload = (blob, ref, taskKey) => new Promise((resolveOne) => {
+      const task = ref.put(blob, { contentType: 'image/jpeg' });
+      task.on('state_changed', snapshot => {
+        if (onBytes) onBytes(taskKey, snapshot.bytesTransferred, snapshot.totalBytes);
+      }, () => resolveOne(null), async () => {
+        try {
+          resolveOne(await task.snapshot.ref.getDownloadURL());
+        } catch (e) {
+          resolveOne(null);
+        }
+      });
+    });
+
+    Promise.all([
+      runUpload(compressed.originalBlob, originalRef, `${index}-orig`),
+      runUpload(compressed.thumbnailBlob, thumbRef, `${index}-thumb`)
+    ]).then(([imageUrl, thumbUrl]) => {
+      if (imageUrl && thumbUrl) resolve({ imageUrl, thumbUrl });
+      else {
+        console.warn('Chat image Storage upload failed, falling back to inline base64');
+        resolve(null);
+      }
+    });
+  });
 }
 
 // Resolves the {imageUrl, thumbUrl} pair a chat message should store: uploaded Storage
 // download URLs when possible, the original compressed base64 data URLs otherwise.
-async function resolveChatImageUrls(calendarId, compressed) {
-  const uploaded = await uploadChatImageAssets(calendarId, compressed);
+async function resolveChatImageUrls(calendarId, compressed, index = 0, onBytes) {
+  const uploaded = await uploadChatImageAssets(calendarId, compressed, index, onBytes);
   if (uploaded) return uploaded;
   return { imageUrl: compressed.original, thumbUrl: compressed.thumbnail };
+}
+
+// Resolves a whole batch of images (upload + fallback per image, same as resolveChatImageUrls)
+// while reporting combined byte-level progress across every upload in the batch as
+// { pct, remainingSec }. Falls back to compressed.isExisting entries as-is (no re-upload).
+async function resolveChatImageBatch(calendarId, compressedList, onProgress) {
+  const uploadIndexes = compressedList
+    .map((c, idx) => ({ c, idx }))
+    .filter(({ c }) => !c.isExisting);
+
+  if (uploadIndexes.length === 0 || !firebaseStorage) {
+    if (onProgress) onProgress({ pct: 100, remainingSec: 0 });
+    return Promise.all(compressedList.map((c, idx) =>
+      c.isExisting
+        ? Promise.resolve({ imageUrl: c.original, thumbUrl: c.thumbnail })
+        : resolveChatImageUrls(calendarId, c, idx)
+    ));
+  }
+
+  const startedAt = Date.now();
+  const progressByTask = new Map();
+  const reportProgress = () => {
+    if (!onProgress) return;
+    let transferred = 0, total = 0;
+    progressByTask.forEach(p => { transferred += p.transferred; total += p.total; });
+    const pct = total > 0 ? Math.min(99, Math.round((transferred / total) * 100)) : 0;
+    const elapsedSec = (Date.now() - startedAt) / 1000;
+    const remainingSec = pct > 0 ? Math.max(0, Math.round(elapsedSec * (100 - pct) / pct)) : null;
+    onProgress({ pct, remainingSec });
+  };
+  const onBytes = (taskKey, transferred, total) => {
+    progressByTask.set(taskKey, { transferred, total });
+    reportProgress();
+  };
+
+  const results = await Promise.all(compressedList.map((c, idx) =>
+    c.isExisting
+      ? Promise.resolve({ imageUrl: c.original, thumbUrl: c.thumbnail })
+      : resolveChatImageUrls(calendarId, c, idx, onBytes)
+  ));
+  if (onProgress) onProgress({ pct: 100, remainingSec: 0 });
+  return results;
 }
 
 // A Storage download URL looks like https://firebasestorage.googleapis.com/...; a fallback
@@ -7456,35 +7672,39 @@ function CommentsSection({
     });
   };
 
+  const [imageProcessing, setImageProcessing] = React.useState(null);
+
   const handleFileChange = async (e) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
-    
-    const count = files.length;
+
     const remainingSlots = 50 - chatImages.length;
     if (remainingSlots <= 0) {
-      if (showToast) showToast('사진은 최대 50개까지 첨부할 수 있습니다.', 'error');
+      if (showToast) showToast('사진 최대 50장', 'error');
       e.target.value = '';
       return;
     }
-    
+
     const filesToProcess = Array.from(files).slice(0, remainingSlots);
     if (files.length > remainingSlots && showToast) {
-      showToast(`최대 50장 제한으로 인해 ${remainingSlots}장의 사진만 추가됩니다.`, 'info');
+      showToast(`${remainingSlots}장만 추가됨 (최대 50장)`, 'info');
     }
-    
-    if (showToast) showToast(`${filesToProcess.length}장의 사진을 처리 중입니다...`, 'info', 10000);
-    try {
-      const compressedList = [];
-      for (const file of filesToProcess) {
-        const compressed = await compressImageToDataUrls(file);
-        compressedList.push(compressed);
-      }
-      setChatImages(prev => [...prev, ...compressedList]);
-      if (showToast) showToast(`${filesToProcess.length}장의 사진이 첨부되었습니다.`, 'success', 3000);
-    } catch (err) {
-      console.error('Image compression failed:', err);
-      if (showToast) showToast('이미지 처리 중 일부 오류가 발생했습니다.', 'error');
+
+    setImageProcessing({ current: 0, total: filesToProcess.length });
+    const { succeeded, failed } = await processImageFilesSequentially(
+      filesToProcess,
+      progress => setImageProcessing(progress)
+    );
+    setImageProcessing(null);
+
+    if (succeeded.length > 0) {
+      setChatImages(prev => [...prev, ...succeeded]);
+    }
+    if (failed.length > 0) {
+      console.error('Image compression failed for:', failed.map(f => f.fileName));
+      if (showToast) showToast(describeImageProcessingFailures(failed), 'error', 5000);
+    } else if (succeeded.length > 0 && showToast) {
+      showToast(`${succeeded.length}장 첨부완료`, 'success', 3000);
     }
     e.target.value = '';
   };
@@ -7494,7 +7714,7 @@ function CommentsSection({
     ? (reversed.length > 0 ? [reversed[reversed.length - 1]] : [])
     : reversed;
 
-  return /*#__PURE__*/React.createElement("section", {
+  return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("section", {
     style: { textAlign: 'left' }
   },
   /* Header */
@@ -7902,7 +8122,7 @@ function CommentsSection({
       objectFit: 'contain',
       boxShadow: '0 24px 80px rgba(0,0,0,0.6)'
     }
-  })) : null);
+  })) : null), imageProcessing && /*#__PURE__*/React.createElement(ImageProcessingOverlay, imageProcessing));
 }
 
 function ChatRoomView({
@@ -7933,6 +8153,25 @@ function ChatRoomView({
   const [viewportBottom, setViewportBottom] = React.useState(0);
   const revealedMsgId = useTapRevealedMsgId();
 
+  const [notifPermission, setNotifPermission] = React.useState(() => (isNotificationSupported() ? Notification.permission : 'unsupported'));
+  const handleToggleNotifications = async () => {
+    if (!isNotificationSupported()) {
+      if (showToast) showToast('알림 미지원 브라우저', 'error');
+      return;
+    }
+    if (Notification.permission === 'granted') {
+      if (showToast) showToast('브라우저 알림 설정에서 끌 수 있음', 'info');
+      return;
+    }
+    if (Notification.permission === 'denied') {
+      if (showToast) showToast('브라우저 설정에서 알림 허용 필요', 'error');
+      return;
+    }
+    const result = await requestChatNotificationPermission();
+    setNotifPermission(result);
+    if (showToast) showToast(result === 'granted' ? '알림 켜짐' : '알림 권한 거부됨', result === 'granted' ? 'success' : 'error');
+  };
+
   // Monitor visualViewport to shift layout above virtual keyboard on mobile devices
   React.useEffect(() => {
     if (!window.visualViewport) return;
@@ -7962,35 +8201,38 @@ function ChatRoomView({
   }, [viewportBottom]);
 
   const fileInputRefChat = React.useRef(null);
+  const [imageProcessingChat, setImageProcessingChat] = React.useState(null);
   const handleFileChangeChat = async (e) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
-    
-    const count = files.length;
+
     const remainingSlots = 50 - chatImages.length;
     if (remainingSlots <= 0) {
-      if (showToast) showToast('사진은 최대 50개까지 첨부할 수 있습니다.', 'error');
+      if (showToast) showToast('사진 최대 50장', 'error');
       e.target.value = '';
       return;
     }
-    
+
     const filesToProcess = Array.from(files).slice(0, remainingSlots);
     if (files.length > remainingSlots && showToast) {
-      showToast(`최대 50장 제한으로 인해 ${remainingSlots}장의 사진만 추가됩니다.`, 'info');
+      showToast(`${remainingSlots}장만 추가됨 (최대 50장)`, 'info');
     }
-    
-    if (showToast) showToast(`${filesToProcess.length}장의 사진을 처리 중입니다...`, 'info', 10000);
-    try {
-      const compressedList = [];
-      for (const file of filesToProcess) {
-        const compressed = await compressImageToDataUrls(file);
-        compressedList.push(compressed);
-      }
-      setChatImages(prev => [...prev, ...compressedList]);
-      if (showToast) showToast(`${filesToProcess.length}장의 사진이 첨부되었습니다.`, 'success', 3000);
-    } catch (err) {
-      console.error('Image compression failed:', err);
-      if (showToast) showToast('이미지 처리 중 일부 오류가 발생했습니다.', 'error');
+
+    setImageProcessingChat({ current: 0, total: filesToProcess.length });
+    const { succeeded, failed } = await processImageFilesSequentially(
+      filesToProcess,
+      progress => setImageProcessingChat(progress)
+    );
+    setImageProcessingChat(null);
+
+    if (succeeded.length > 0) {
+      setChatImages(prev => [...prev, ...succeeded]);
+    }
+    if (failed.length > 0) {
+      console.error('Image compression failed for:', failed.map(f => f.fileName));
+      if (showToast) showToast(describeImageProcessingFailures(failed), 'error', 5000);
+    } else if (succeeded.length > 0 && showToast) {
+      showToast(`${succeeded.length}장 첨부완료`, 'success', 3000);
     }
     e.target.value = '';
   };
@@ -8273,7 +8515,7 @@ function ChatRoomView({
         }
       }, timeStr))]));
   });
-  return /*#__PURE__*/React.createElement("div", {
+  return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     className: "chat-room-container",
     style: {
       position: 'fixed',
@@ -8287,7 +8529,46 @@ function ChatRoomView({
       zIndex: 1005,
       transition: 'bottom 0.12s ease-out'
     }
-  }, /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: onBack,
+    "aria-label": "뒤로가기",
+    style: {
+      position: 'fixed',
+      top: '10px',
+      left: '10px',
+      width: '36px',
+      height: '36px',
+      borderRadius: '50%',
+      backgroundColor: 'rgba(255,255,255,0.95)',
+      border: '1px solid #E2E8F0',
+      boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      cursor: 'pointer',
+      color: '#64748B',
+      zIndex: 1020
+    }
+  }, /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: "22",
+    height: "22",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    "stroke-width": "2",
+    "stroke-linecap": "round",
+    "stroke-linejoin": "round",
+    className: "icon icon-tabler icons-tabler-outline icon-tabler-chevron-down",
+    style: { transform: 'rotate(90deg)', display: 'inline-block' }
+  }, /*#__PURE__*/React.createElement("path", {
+    stroke: "none",
+    d: "M0 0h24v24H0z",
+    fill: "none"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M6 9l6 6l6 -6"
+  }))), /*#__PURE__*/React.createElement("div", {
     className: "chat-room-header",
     style: {
       position: 'fixed',
@@ -8305,37 +8586,7 @@ function ChatRoomView({
       transition: 'transform 0.3s ease',
       transform: isHeaderVisible ? 'translateY(0)' : 'translateY(-100%)'
     }
-  }, /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    onClick: onBack,
-    style: {
-      background: 'none',
-      border: 'none',
-      cursor: 'pointer',
-      padding: '4px 8px',
-      display: 'flex',
-      alignItems: 'center',
-      color: '#64748B'
-    }
-  }, /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg",
-    width: "24",
-    height: "24",
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
-    className: "icon icon-tabler icons-tabler-outline icon-tabler-chevron-down",
-    style: { transform: 'rotate(90deg)', display: 'inline-block' }
-  }, /*#__PURE__*/React.createElement("path", {
-    stroke: "none",
-    d: "M0 0h24v24H0z",
-    fill: "none"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M6 9l6 6l6 -6"
-  }))), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("div", { style: { width: '32px', flexShrink: 0 } }), /*#__PURE__*/React.createElement("div", {
     style: {
       position: 'absolute',
       left: '50%',
@@ -8346,7 +8597,34 @@ function ChatRoomView({
       whiteSpace: 'nowrap',
       pointerEvents: 'none'
     }
-  }, calendar?.title || ''), /*#__PURE__*/React.createElement("button", {
+  }, calendar?.title || ''), /*#__PURE__*/React.createElement("div", {
+    style: { display: 'flex', alignItems: 'center', gap: '2px' }
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: handleToggleNotifications,
+    title: notifPermission === 'granted' ? '\uC54C\uB9BC \uCF1C\uC9D0' : '\uC54C\uB9BC \uCF1C\uAE30',
+    style: {
+      background: 'none',
+      border: 'none',
+      cursor: 'pointer',
+      padding: '4px',
+      color: notifPermission === 'granted' ? '#4F46E5' : '#64748B',
+      display: 'flex',
+      alignItems: 'center'
+    }
+  }, /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: "22",
+    height: "22",
+    viewBox: "0 0 24 24",
+    fill: notifPermission === 'granted' ? 'currentColor' : 'none',
+    stroke: "currentColor",
+    "stroke-width": "2",
+    "stroke-linecap": "round",
+    "stroke-linejoin": "round"
+  }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }),
+    /*#__PURE__*/React.createElement("path", { d: "M10 5a2 2 0 0 1 4 0a7 7 0 0 1 4 6v3a4 4 0 0 0 2 3h-16a4 4 0 0 0 2 -3v-3a7 7 0 0 1 4 -6" }),
+    /*#__PURE__*/React.createElement("path", { d: "M9 17v1a3 3 0 0 0 6 0v-1" }))), /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: onShare,
     title: "\uACF5\uC720",
@@ -8384,7 +8662,7 @@ function ChatRoomView({
     d: "M8.7 10.7l6.6 -3.4"
   }), /*#__PURE__*/React.createElement("path", {
     d: "M8.7 13.3l6.6 3.4"
-  })))), /*#__PURE__*/React.createElement("div", {
+  }))))), /*#__PURE__*/React.createElement("div", {
     ref: chatMessagesContainerRef,
     onScroll: handleChatScroll,
     style: {
@@ -8666,7 +8944,7 @@ function ChatRoomView({
       objectFit: 'contain',
       boxShadow: '0 24px 80px rgba(0,0,0,0.6)'
     }
-  })) : null);
+  })) : null), imageProcessingChat && /*#__PURE__*/React.createElement(ImageProcessingOverlay, imageProcessingChat));
 }
 
 
@@ -8851,6 +9129,7 @@ function EditMessageModal({
   });
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const fileInputRefEdit = React.useRef(null);
+  const [imageProcessingEdit, setImageProcessingEdit] = React.useState(null);
 
   const handleFileChangeEdit = async (e) => {
     const files = e.target.files;
@@ -8858,30 +9137,31 @@ function EditMessageModal({
 
     const remainingSlots = 50 - images.length;
     if (remainingSlots <= 0) {
-      if (showToast) showToast('사진은 최대 50개까지 첨부할 수 있습니다.', 'error');
+      if (showToast) showToast('사진 최대 50장', 'error');
       e.target.value = '';
       return;
     }
 
     const filesToProcess = Array.from(files).slice(0, remainingSlots);
     if (files.length > remainingSlots && showToast) {
-      showToast(`최대 50장 제한으로 인해 ${remainingSlots}장의 사진만 추가됩니다.`, 'info');
+      showToast(`${remainingSlots}장만 추가됨 (최대 50장)`, 'info');
     }
 
-    try {
-      const compressedList = [];
-      for (const file of filesToProcess) {
-        const compressed = await compressImageToDataUrls(file);
-        compressedList.push(compressed);
-      }
-      setImages(prev => [...prev, ...compressedList]);
-    } catch (err) {
-      console.error('Image compress error:', err);
-      if (showToast) {
-        showToast('이미지 처리 중 오류가 발생했습니다. 다른 이미지를 선택해 주세요.', 'error');
-      } else {
-        alert('이미지 처리 중 오류가 발생했습니다. 다른 이미지를 선택해 주세요.');
-      }
+    setImageProcessingEdit({ current: 0, total: filesToProcess.length });
+    const { succeeded, failed } = await processImageFilesSequentially(
+      filesToProcess,
+      progress => setImageProcessingEdit(progress)
+    );
+    setImageProcessingEdit(null);
+
+    if (succeeded.length > 0) {
+      setImages(prev => [...prev, ...succeeded]);
+    }
+    if (failed.length > 0) {
+      console.error('Image compression failed for:', failed.map(f => f.fileName));
+      const message = describeImageProcessingFailures(failed);
+      if (showToast) showToast(message, 'error', 5000);
+      else alert(message);
     }
     e.target.value = '';
   };
@@ -8899,7 +9179,7 @@ function EditMessageModal({
     }
   };
 
-  return /*#__PURE__*/React.createElement("div", {
+  return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     className: "modal-overlay",
     onClick: () => { if (!isSubmitting) onClose(); },
     style: { zIndex: 9999 }
@@ -9049,7 +9329,7 @@ function EditMessageModal({
     disabled: isSubmitting || (!text.trim() && images.length === 0),
     onClick: handleSave,
     style: { height: '34px', fontSize: '0.85rem', padding: '0 16px', opacity: (text.trim() || images.length > 0) && !isSubmitting ? 1 : 0.6 }
-  }, isSubmitting ? '...' : "수정")))));
+  }, isSubmitting ? '...' : "수정"))))), imageProcessingEdit && /*#__PURE__*/React.createElement(ImageProcessingOverlay, imageProcessingEdit));
 }
 
 
@@ -9544,7 +9824,7 @@ function AdminModal({
     
     // Validate titles & names
     if (!title.trim()) {
-      if (showToast) showToast('캘린더명을 입력해 주세요.', 'error'); else alert('캘린더명을 입력해 주세요.');
+      if (showToast) showToast('캘린더명 필요', 'error'); else alert('캘린더명 필요');
       setIsSubmitting(false);
       return;
     }
@@ -9552,7 +9832,7 @@ function AdminModal({
     const activeParticipantsList = participants.filter(p => !isTombstone(p));
     const activeNames = activeParticipantsList.map(p => p.name.trim().toLowerCase());
     if (new Set(activeNames).size !== activeNames.length) {
-      if (showToast) showToast('참여자 이름은 중복될 수 없습니다.', 'error'); else alert('참여자 이름은 중복될 수 없습니다.');
+      if (showToast) showToast('참여자 이름 중복', 'error'); else alert('참여자 이름 중복');
       setIsSubmitting(false);
       return;
     }
@@ -10734,7 +11014,7 @@ function PollModal({ calendar, poll, onSave, onClose, showToast }) {
       };
     }).filter(option => !isTombstone(option) && sanitizeText(option.text, 120));
     if (!cleanTitle || activeOptions.length === 0) {
-      if (showToast) showToast('투표명과 선택옵션을 입력해 주세요.', 'error'); else alert('투표명과 선택옵션을 입력해 주세요.');
+      if (showToast) showToast('투표명·옵션 필요', 'error'); else alert('투표명·옵션 필요');
       return;
     }
     setIsSubmitting(true);
