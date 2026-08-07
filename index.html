@@ -128,16 +128,33 @@
 
     .main-header-top-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 
-    /* Menu bar's divider line spans the FULL header width (edge to edge of the header bar, not
-       just the inner content's padded box) -- achieved by pulling the bar out past
-       .main-header-inner's own left/right padding with negative margins, then re-adding that
-       same amount as the bar's own padding so its content still lines up with the title above. */
+    /* Settings gear: no fill/border (icon-only), pinned to the header's true right edge via
+       position: fixed -- .main-header-inner's own max-width: 1100px centering would otherwise
+       cap how far right a normally-positioned child could reach on wide viewports. */
+    .header-settings-btn {
+      background: none;
+      border: none;
+      position: fixed;
+      top: 14px;
+      right: 16px;
+      z-index: 501;
+    }
+    @media (min-width: 768px) {
+      .header-settings-btn { top: 18px; right: 24px; }
+    }
+
+    /* Menu bar's divider line spans the full VIEWPORT width (not just the inner content's
+       max-width: 1100px box) via the standard "break out of a centered container" trick: an
+       absolutely-positioned pseudo-element centered on the menu bar (which is itself centered
+       on the viewport through its centered ancestors), sized to 100vw. The menu bar's own
+       content stays confined to the max-width box via the negative-margin trick already
+       described below -- only the divider line itself reaches the true edges. */
     .main-menu-bar {
+      position: relative;
       display: flex;
       align-items: stretch;
       margin: 0 -16px;
       padding: 8px 2px 0;
-      border-top: 1px solid var(--border-subtle);
       gap: 0;
       /* No overflow-x:auto here: setting it forces overflow-y to compute as 'auto' too (per the
          CSS Overflow spec, an axis can't stay 'visible' once the other is non-visible), which
@@ -145,6 +162,15 @@
          "auto" bar clips it away entirely instead of just leaving it invisible-until-scrolled.
          Equal-width flex:1 items with min-width:0 already fit down to a 320px viewport without
          needing horizontal scroll (verified), so this is a straight bug fix, not a tradeoff. */
+    }
+    .main-menu-bar::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 50%;
+      width: 100vw;
+      margin-left: -50vw;
+      border-top: 1px solid var(--border-subtle);
     }
     @media (min-width: 768px) {
       .main-menu-bar { margin: 0 -24px; padding: 8px 24px 0; }
@@ -6219,7 +6245,7 @@ function App() {
 뽑기가 수월해짐.`))), activeCal?.description && /*#__PURE__*/React.createElement("div", {
     className: "calendar-desc"
   }, activeCal.description))), /*#__PURE__*/React.createElement("button", {
-    className: "btn btn-secondary",
+    className: "btn header-settings-btn",
     onClick: () => {
       if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 설정을 수정해 주세요.')) setIsAdminOpen(true);
     },
