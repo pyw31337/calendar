@@ -1,0 +1,15 @@
+{
+  "id": "./?id=kkot",
+  "name": "모여라 캘린더 · kkot",
+  "short_name": "모여라 · kkot",
+  "description": "사모임 참여자들의 가능 날짜를 캘린더에 표기하고 전원 모임 가능한 날짜를 한눈에 파악해보세요.",
+  "start_url": "./?id=kkot",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#F8FAFC",
+  "theme_color": "#4F46E5",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}
