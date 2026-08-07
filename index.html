@@ -52,6 +52,19 @@
       }
     })();
   </script>
+  <script id="theme-init">
+    // Applies the user's saved theme choice (if any) before first paint, so the page never
+    // flashes the wrong theme -- with no saved choice, the CSS's own
+    // prefers-color-scheme:dark rule (see :root in the <style> block) decides instead.
+    (function () {
+      try {
+        var saved = window['local' + 'Storage'].getItem('gather_theme_preference_v1');
+        if (saved === 'dark' || saved === 'light') {
+          document.documentElement.setAttribute('data-theme', saved);
+        }
+      } catch (e) {}
+    })();
+  </script>
 
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -86,6 +99,7 @@
       --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
       --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -1px rgba(0, 0, 0, 0.04);
       --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.03);
+      color-scheme: light;
 
       --radius-lg: 16px;
       --radius-md: 12px;
@@ -105,6 +119,76 @@
       --space-6: 24px;
       --space-8: 32px;
       --space-10: 40px;
+    }
+
+    /* Dark theme: an explicit choice via the header toggle stamps data-theme="dark"/"light" on
+       <html> (see the early inline script in <head>); with no explicit choice, prefers-color-scheme
+       decides. Only the token values change here -- every component built on var(--bg-card) etc.
+       picks the new palette automatically with no per-component edits needed. Scoped to the main
+       user-facing app (header, calendar, modals, forms); the staff-only admin pages style
+       themselves with hardcoded colors rather than these tokens and are not part of this pass. */
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        --bg-primary: #0B1120;
+        --bg-secondary: #131B2E;
+        --bg-card: #131B2E;
+        --border-subtle: #232F49;
+        --border-hover: #34405C;
+        --text-main: #F1F5F9;
+        --text-muted: #94A3B8;
+        --text-light: #64748B;
+        --accent-primary: #6366F1;
+        --accent-secondary: #9333EA;
+        --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.35), 0 1px 2px rgba(0, 0, 0, 0.25);
+        --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
+        --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.45), 0 8px 10px -6px rgba(0, 0, 0, 0.35);
+        color-scheme: dark;
+      }
+      /* A few widely-reused components hardcode a light background instead of reading
+         var(--bg-card) etc., so the token overrides above don't reach them on their own --
+         .btn-secondary/.btn-danger/.form-input alone cover most of the app including admin
+         screens (they're shared utility classes), and .day-cell covers the calendar grid,
+         the single most central, most-used surface in the app. */
+      :root:not([data-theme="light"]) .day-cell { background: #1B2540; }
+      :root:not([data-theme="light"]) .day-cell:hover { background: #212D4D; }
+      :root:not([data-theme="light"]) .day-cell.today { background: #1E2648; }
+      :root:not([data-theme="light"]) .day-cell.all-available { background: #0F2E22; border-color: #10B981; }
+      :root:not([data-theme="light"]) .day-cell.confirmed-meeting { background: #241B3D; border-color: #9333EA; }
+      :root:not([data-theme="light"]) .btn-secondary { background: #1B2540; color: var(--text-main); }
+      :root:not([data-theme="light"]) .btn-secondary:hover { background: #232F49; }
+      :root:not([data-theme="light"]) .btn-danger { background: #2D1518; border-color: #7F1D1D; color: #F87171; }
+      :root:not([data-theme="light"]) .btn-danger:hover { background: #3A1A1E; }
+      :root:not([data-theme="light"]) .form-select,
+      :root:not([data-theme="light"]) .form-input,
+      :root:not([data-theme="light"]) .form-textarea { background: #1B2540; }
+    }
+    :root[data-theme="dark"] .day-cell { background: #1B2540; }
+    :root[data-theme="dark"] .day-cell:hover { background: #212D4D; }
+    :root[data-theme="dark"] .day-cell.today { background: #1E2648; }
+    :root[data-theme="dark"] .day-cell.all-available { background: #0F2E22; border-color: #10B981; }
+    :root[data-theme="dark"] .day-cell.confirmed-meeting { background: #241B3D; border-color: #9333EA; }
+    :root[data-theme="dark"] .btn-secondary { background: #1B2540; color: var(--text-main); }
+    :root[data-theme="dark"] .btn-secondary:hover { background: #232F49; }
+    :root[data-theme="dark"] .btn-danger { background: #2D1518; border-color: #7F1D1D; color: #F87171; }
+    :root[data-theme="dark"] .btn-danger:hover { background: #3A1A1E; }
+    :root[data-theme="dark"] .form-select,
+    :root[data-theme="dark"] .form-input,
+    :root[data-theme="dark"] .form-textarea { background: #1B2540; }
+    :root[data-theme="dark"] {
+      --bg-primary: #0B1120;
+      --bg-secondary: #131B2E;
+      --bg-card: #131B2E;
+      --border-subtle: #232F49;
+      --border-hover: #34405C;
+      --text-main: #F1F5F9;
+      --text-muted: #94A3B8;
+      --text-light: #64748B;
+      --accent-primary: #6366F1;
+      --accent-secondary: #9333EA;
+      --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.35), 0 1px 2px rgba(0, 0, 0, 0.25);
+      --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
+      --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.45), 0 8px 10px -6px rgba(0, 0, 0, 0.35);
+      color-scheme: dark;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -179,6 +263,7 @@
       .header-actions { top: 18px; right: 24px; }
     }
     .header-search-btn,
+    .header-theme-btn,
     .header-settings-btn {
       background: none;
       border: none;
@@ -5439,6 +5524,19 @@ function App() {
   const [isModalOpen, setIsModalOpen] = React.useState(false);
   const [isAdminOpen, setIsAdminOpen] = React.useState(false);
   const [isGlobalSearchOpen, setIsGlobalSearchOpen] = React.useState(false);
+
+  // Theme toggle -- mirrors the choice the early <head> theme-init script already applied
+  // before first paint, so this state starts in sync with whatever's on <html> rather than
+  // flashing to a default and then correcting itself.
+  const [themeChoice, setThemeChoice] = React.useState(() => document.documentElement.getAttribute('data-theme') || 'system');
+  const toggleTheme = () => {
+    const isDark = themeChoice === 'dark' || (themeChoice === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    const next = isDark ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    getLocalStorage().setItem('gather_theme_preference_v1', next);
+    setThemeChoice(next);
+  };
+  const isDarkTheme = themeChoice === 'dark' || (themeChoice === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
   const [adminActivityLogs, setAdminActivityLogs] = React.useState([]);
   const [isShareOpen, setIsShareOpen] = React.useState(false);
   const [isChatShareOpen, setIsChatShareOpen] = React.useState(false);
@@ -6492,6 +6590,13 @@ function App() {
       padding: '10px'
     }
   }, /*#__PURE__*/React.createElement(SearchIcon, null)), /*#__PURE__*/React.createElement("button", {
+    className: "btn header-theme-btn",
+    onClick: toggleTheme,
+    title: isDarkTheme ? "라이트 모드로 전환" : "다크 모드로 전환",
+    style: {
+      padding: '10px'
+    }
+  }, isDarkTheme ? /*#__PURE__*/React.createElement(SunIcon, null) : /*#__PURE__*/React.createElement(MoonIcon, null)), /*#__PURE__*/React.createElement("button", {
     className: "btn header-settings-btn",
     onClick: () => {
       if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 설정을 수정해 주세요.')) setIsAdminOpen(true);
@@ -11515,6 +11620,50 @@ function ShareModal({
     style: { marginTop: '8px' },
     onClick: () => tryCreateShortcut(showToast ? (msg) => showToast(msg, 'info', 5000) : alert)
   }, "\uBC14\uD0D5\uD654\uBA74\uC5D0 \uBC14\uB85C\uAC00\uAE30 \uB9CC\uB4E4\uAE30"))));
+}
+
+function SunIcon() {
+  return /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: "24",
+    height: "24",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    "stroke-width": "2",
+    "stroke-linecap": "round",
+    "stroke-linejoin": "round",
+    className: "icon icon-tabler icons-tabler-outline icon-tabler-sun"
+  }, /*#__PURE__*/React.createElement("path", {
+    stroke: "none",
+    d: "M0 0h24v24H0z",
+    fill: "none"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M12 12m-4 0a4 4 0 1 0 8 0a4 4 0 1 0 -8 0"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M3 12h1m8 -9v1m8 8h1m-9 8v1m-6.4 -15.4l.7 .7m12.1 -.7l-.7 .7m0 11.4l.7 .7m-12.1 -.7l-.7 .7"
+  }));
+}
+
+function MoonIcon() {
+  return /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: "24",
+    height: "24",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    "stroke-width": "2",
+    "stroke-linecap": "round",
+    "stroke-linejoin": "round",
+    className: "icon icon-tabler icons-tabler-outline icon-tabler-moon"
+  }, /*#__PURE__*/React.createElement("path", {
+    stroke: "none",
+    d: "M0 0h24v24H0z",
+    fill: "none"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z"
+  }));
 }
 
 function SearchIcon() {
