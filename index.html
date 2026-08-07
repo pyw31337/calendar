@@ -7684,36 +7684,43 @@ function CommentsSection({
   const handleFileChange = async (e) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
+    try {
+      const remainingSlots = 50 - chatImages.length;
+      if (remainingSlots <= 0) {
+        if (showToast) showToast('사진 최대 50장', 'error');
+        return;
+      }
 
-    const remainingSlots = 50 - chatImages.length;
-    if (remainingSlots <= 0) {
-      if (showToast) showToast('사진 최대 50장', 'error');
+      const filesToProcess = Array.from(files).slice(0, remainingSlots);
+      if (files.length > remainingSlots && showToast) {
+        showToast(`${remainingSlots}장만 추가됨 (최대 50장)`, 'info');
+      }
+
+      setImageProcessing({ current: 0, total: filesToProcess.length });
+      const { succeeded, failed } = await processImageFilesSequentially(
+        filesToProcess,
+        progress => setImageProcessing(progress)
+      );
+
+      if (succeeded.length > 0) {
+        setChatImages(prev => [...prev, ...succeeded]);
+      }
+      if (failed.length > 0) {
+        console.error('Image compression failed for:', failed.map(f => f.fileName));
+        if (showToast) showToast(describeImageProcessingFailures(failed), 'error', 5000);
+      } else if (succeeded.length > 0 && showToast) {
+        showToast(`${succeeded.length}장 첨부완료`, 'success', 3000);
+      }
+    } catch (err) {
+      // Belt-and-suspenders: processImageFilesSequentially already isolates per-file
+      // failures, but this guards against anything unexpected (a browser/environment
+      // quirk we haven't seen) surfacing as silent total failure with no feedback at all.
+      console.error('handleFileChange unexpected error:', err);
+      if (showToast) showToast('사진 첨부 중 오류', 'error', 5000);
+    } finally {
+      setImageProcessing(null);
       e.target.value = '';
-      return;
     }
-
-    const filesToProcess = Array.from(files).slice(0, remainingSlots);
-    if (files.length > remainingSlots && showToast) {
-      showToast(`${remainingSlots}장만 추가됨 (최대 50장)`, 'info');
-    }
-
-    setImageProcessing({ current: 0, total: filesToProcess.length });
-    const { succeeded, failed } = await processImageFilesSequentially(
-      filesToProcess,
-      progress => setImageProcessing(progress)
-    );
-    setImageProcessing(null);
-
-    if (succeeded.length > 0) {
-      setChatImages(prev => [...prev, ...succeeded]);
-    }
-    if (failed.length > 0) {
-      console.error('Image compression failed for:', failed.map(f => f.fileName));
-      if (showToast) showToast(describeImageProcessingFailures(failed), 'error', 5000);
-    } else if (succeeded.length > 0 && showToast) {
-      showToast(`${succeeded.length}장 첨부완료`, 'success', 3000);
-    }
-    e.target.value = '';
   };
 
   const reversed = [...recentMessages].reverse();
@@ -8212,36 +8219,40 @@ function ChatRoomView({
   const handleFileChangeChat = async (e) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
+    try {
+      const remainingSlots = 50 - chatImages.length;
+      if (remainingSlots <= 0) {
+        if (showToast) showToast('사진 최대 50장', 'error');
+        return;
+      }
 
-    const remainingSlots = 50 - chatImages.length;
-    if (remainingSlots <= 0) {
-      if (showToast) showToast('사진 최대 50장', 'error');
+      const filesToProcess = Array.from(files).slice(0, remainingSlots);
+      if (files.length > remainingSlots && showToast) {
+        showToast(`${remainingSlots}장만 추가됨 (최대 50장)`, 'info');
+      }
+
+      setImageProcessingChat({ current: 0, total: filesToProcess.length });
+      const { succeeded, failed } = await processImageFilesSequentially(
+        filesToProcess,
+        progress => setImageProcessingChat(progress)
+      );
+
+      if (succeeded.length > 0) {
+        setChatImages(prev => [...prev, ...succeeded]);
+      }
+      if (failed.length > 0) {
+        console.error('Image compression failed for:', failed.map(f => f.fileName));
+        if (showToast) showToast(describeImageProcessingFailures(failed), 'error', 5000);
+      } else if (succeeded.length > 0 && showToast) {
+        showToast(`${succeeded.length}장 첨부완료`, 'success', 3000);
+      }
+    } catch (err) {
+      console.error('handleFileChangeChat unexpected error:', err);
+      if (showToast) showToast('사진 첨부 중 오류', 'error', 5000);
+    } finally {
+      setImageProcessingChat(null);
       e.target.value = '';
-      return;
     }
-
-    const filesToProcess = Array.from(files).slice(0, remainingSlots);
-    if (files.length > remainingSlots && showToast) {
-      showToast(`${remainingSlots}장만 추가됨 (최대 50장)`, 'info');
-    }
-
-    setImageProcessingChat({ current: 0, total: filesToProcess.length });
-    const { succeeded, failed } = await processImageFilesSequentially(
-      filesToProcess,
-      progress => setImageProcessingChat(progress)
-    );
-    setImageProcessingChat(null);
-
-    if (succeeded.length > 0) {
-      setChatImages(prev => [...prev, ...succeeded]);
-    }
-    if (failed.length > 0) {
-      console.error('Image compression failed for:', failed.map(f => f.fileName));
-      if (showToast) showToast(describeImageProcessingFailures(failed), 'error', 5000);
-    } else if (succeeded.length > 0 && showToast) {
-      showToast(`${succeeded.length}장 첨부완료`, 'success', 3000);
-    }
-    e.target.value = '';
   };
   const participants = getActiveParticipants(calendar);
   const participantsMap = participants.reduce((acc, p) => {
@@ -9157,36 +9168,42 @@ function EditMessageModal({
   const handleFileChangeEdit = async (e) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
+    try {
+      const remainingSlots = 50 - images.length;
+      if (remainingSlots <= 0) {
+        if (showToast) showToast('사진 최대 50장', 'error');
+        return;
+      }
 
-    const remainingSlots = 50 - images.length;
-    if (remainingSlots <= 0) {
-      if (showToast) showToast('사진 최대 50장', 'error');
-      e.target.value = '';
-      return;
-    }
+      const filesToProcess = Array.from(files).slice(0, remainingSlots);
+      if (files.length > remainingSlots && showToast) {
+        showToast(`${remainingSlots}장만 추가됨 (최대 50장)`, 'info');
+      }
 
-    const filesToProcess = Array.from(files).slice(0, remainingSlots);
-    if (files.length > remainingSlots && showToast) {
-      showToast(`${remainingSlots}장만 추가됨 (최대 50장)`, 'info');
-    }
+      setImageProcessingEdit({ current: 0, total: filesToProcess.length });
+      const { succeeded, failed } = await processImageFilesSequentially(
+        filesToProcess,
+        progress => setImageProcessingEdit(progress)
+      );
 
-    setImageProcessingEdit({ current: 0, total: filesToProcess.length });
-    const { succeeded, failed } = await processImageFilesSequentially(
-      filesToProcess,
-      progress => setImageProcessingEdit(progress)
-    );
-    setImageProcessingEdit(null);
-
-    if (succeeded.length > 0) {
-      setImages(prev => [...prev, ...succeeded]);
-    }
-    if (failed.length > 0) {
-      console.error('Image compression failed for:', failed.map(f => f.fileName));
-      const message = describeImageProcessingFailures(failed);
+      if (succeeded.length > 0) {
+        setImages(prev => [...prev, ...succeeded]);
+      }
+      if (failed.length > 0) {
+        console.error('Image compression failed for:', failed.map(f => f.fileName));
+        const message = describeImageProcessingFailures(failed);
+        if (showToast) showToast(message, 'error', 5000);
+        else alert(message);
+      }
+    } catch (err) {
+      console.error('handleFileChangeEdit unexpected error:', err);
+      const message = '사진 첨부 중 오류';
       if (showToast) showToast(message, 'error', 5000);
       else alert(message);
+    } finally {
+      setImageProcessingEdit(null);
+      e.target.value = '';
     }
-    e.target.value = '';
   };
 
   const handleSave = async () => {
