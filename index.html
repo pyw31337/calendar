@@ -5139,6 +5139,7 @@ function App() {
   const [chatParticipantId, setChatParticipantId] = React.useState('');
   const [isChatSheetOpen, setIsChatSheetOpen] = React.useState(false);
   const [isChatSubmitting, setIsChatSubmitting] = React.useState(false);
+  const [chatUploadProgress, setChatUploadProgress] = React.useState(null);
   const chatTextareaRef = React.useRef(null);
   const [chatImages, setChatImages] = React.useState([]);
   const [activeLightboxUrl, setActiveLightboxUrl] = React.useState(null);
@@ -5459,7 +5460,8 @@ function App() {
     const imageCount = chatImages.length;
     if ((!hasText && imageCount === 0) || !chatParticipantId) return;
     setIsChatSubmitting(true);
-    
+    if (imageCount > 0) setChatUploadProgress({ pct: 0, remainingSec: null });
+
     try {
       let ok = false;
       if (imageCount === 0) {
@@ -5475,65 +5477,28 @@ function App() {
           ok = await sendChatMessageRest(activeCalId, messageData);
         }
       } else {
-        const resolvedImages = await Promise.all(chatImages.map(img => resolveChatImageUrls(activeCalId, img)));
-        // Only bundle images into one multi-thumbnail message when every one of them made it
-        // to Storage (short download URLs). If Storage is unavailable and any image fell back
-        // to an embedded base64 data URL, keep the legacy one-message-per-image behavior so a
-        // single message document never has to carry dozens of base64 images at once.
-        const allStorageBacked = resolvedImages.every(r => isStorageDownloadUrl(r.imageUrl));
-
-        if (allStorageBacked && resolvedImages.length > 1) {
-          const messageData = {
-            participantId: chatParticipantId,
-            text: chatInput.trim(),
-            imageUrl: resolvedImages[0].imageUrl,
-            thumbUrl: resolvedImages[0].thumbUrl,
-            imageUrls: resolvedImages.map(r => r.imageUrl),
-            thumbUrls: resolvedImages.map(r => r.thumbUrl),
-            timestamp: Date.now()
-          };
-          if (firebaseDb) {
-            await firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages').add(messageData);
-            ok = true;
-          } else {
-            ok = await sendChatMessageRest(activeCalId, messageData);
-          }
+        // Always bundle every attached image into a single multi-thumbnail message, whether
+        // uploads land in Storage or fall back to inline base64 (the per-image size cap is
+        // scaled down for larger batches -- see processImageFilesSequentially -- so a fully
+        // inline multi-image message still fits Firestore's 1MiB/doc limit).
+        const resolvedImages = await resolveChatImageBatch(activeCalId, chatImages, setChatUploadProgress);
+        const messageData = {
+          participantId: chatParticipantId,
+          text: chatInput.trim(),
+          imageUrl: resolvedImages[0].imageUrl,
+          thumbUrl: resolvedImages[0].thumbUrl,
+          imageUrls: resolvedImages.map(r => r.imageUrl),
+          thumbUrls: resolvedImages.map(r => r.thumbUrl),
+          timestamp: Date.now()
+        };
+        if (firebaseDb) {
+          await firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages').add(messageData);
+          ok = true;
         } else {
-          // Send first image with optional text
-          const firstMessage = {
-            participantId: chatParticipantId,
-            text: chatInput.trim(),
-            imageUrl: resolvedImages[0].imageUrl,
-            thumbUrl: resolvedImages[0].thumbUrl,
-            timestamp: Date.now()
-          };
-          if (firebaseDb) {
-            await firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages').add(firstMessage);
-            ok = true;
-          } else {
-            ok = await sendChatMessageRest(activeCalId, firstMessage);
-          }
-
-          // Send subsequent images sequentially
-          if (ok && resolvedImages.length > 1) {
-            for (let i = 1; i < resolvedImages.length; i++) {
-              const extraMessage = {
-                participantId: chatParticipantId,
-                text: '',
-                imageUrl: resolvedImages[i].imageUrl,
-                thumbUrl: resolvedImages[i].thumbUrl,
-                timestamp: Date.now() + i
-              };
-              if (firebaseDb) {
-                await firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages').add(extraMessage);
-              } else {
-                await sendChatMessageRest(activeCalId, extraMessage);
-              }
-            }
-          }
+          ok = await sendChatMessageRest(activeCalId, messageData);
         }
       }
-      
+
       if (ok) {
         setChatInput('');
         setChatImages([]);
@@ -5544,7 +5509,7 @@ function App() {
           fetchRecentMessagesRest(activeCalId).then(list => setRecentMessages(list));
           fetchChatMessagesRest(activeCalId).then(list => setChatMessages(list));
         }
-        showToast('등록완료', 'success', 3000);
+        // No success toast here -- the new message is immediately visible in the chat feed.
       } else {
         showToast('등록 실패', 'error', 3000);
       }
@@ -5553,6 +5518,7 @@ function App() {
       showToast('등록 실패', 'error', 3000);
     } finally {
       setIsChatSubmitting(false);
+      setChatUploadProgress(null);
     }
   };
 
@@ -5596,14 +5562,12 @@ function App() {
   const handleSaveEditMessage = async (newText, newImages) => {
     if (!editingMessage) return;
     const { id, calId } = editingMessage;
+    const hasNewImages = (newImages || []).some(img => !img.isExisting);
+    if (hasNewImages) setChatUploadProgress({ pct: 0, remainingSec: null });
     try {
       // Images already on the message (isExisting) are passed through as-is; freshly
-      // picked ones get uploaded via resolveChatImageUrls, matching the compose flow.
-      const resolvedImages = await Promise.all((newImages || []).map(img =>
-        img.isExisting
-          ? Promise.resolve({ imageUrl: img.original, thumbUrl: img.thumbnail })
-          : resolveChatImageUrls(calId, img)
-      ));
+      // picked ones get uploaded via resolveChatImageBatch, matching the compose flow.
+      const resolvedImages = await resolveChatImageBatch(calId, newImages || [], hasNewImages ? setChatUploadProgress : null);
       const data = {
         text: newText,
         imageUrl: resolvedImages[0]?.imageUrl || '',
@@ -5644,6 +5608,7 @@ function App() {
       showToast('수정 실패', 'error', 3000);
     } finally {
       setEditingMessage(null);
+      setChatUploadProgress(null);
     }
   };
 
@@ -6403,7 +6368,7 @@ function App() {
       whiteSpace: 'nowrap',
       justifyContent: 'center'
     }
-  }, /*#__PURE__*/React.createElement("span", null, toast.message)));
+  }, /*#__PURE__*/React.createElement("span", null, toast.message)), chatUploadProgress && /*#__PURE__*/React.createElement(ImageUploadOverlay, chatUploadProgress));
 }
 
 // ---- Korean public holidays, substitute holidays, and 24 solar terms ----
@@ -7206,7 +7171,7 @@ function loadImageElement(objectUrl, timeoutMs = 20000) {
   });
 }
 
-async function compressImageToDataUrls(file) {
+async function compressImageToDataUrls(file, { maxBase64Length = MAX_CHAT_IMAGE_BASE64_LENGTH } = {}) {
   let sourceBlob = file;
   if (isHeicFile(file)) {
     try {
@@ -7250,11 +7215,13 @@ async function compressImageToDataUrls(file) {
   ctxOrig.drawImage(img, 0, 0, wOrig, hOrig);
   // Start at high quality (0.85), but step down for busy/detailed photos that would
   // otherwise produce an oversized base64 payload -- this is only used as a fallback if
-  // the Firebase Storage upload below fails, but keep it bounded regardless.
+  // the Firebase Storage upload below fails, but keep it bounded regardless. maxBase64Length
+  // is scaled down per-image when a batch has several images, so a full-fallback multi-image
+  // message still fits Firestore's 1MiB/doc limit (see processImageFilesSequentially).
   let originalQuality = 0.85;
   let originalBase64 = canvasOrig.toDataURL('image/jpeg', originalQuality);
   for (const quality of [0.75, 0.65, 0.55, 0.45]) {
-    if (originalBase64.length <= MAX_CHAT_IMAGE_BASE64_LENGTH) break;
+    if (originalBase64.length <= maxBase64Length) break;
     originalQuality = quality;
     originalBase64 = canvasOrig.toDataURL('image/jpeg', originalQuality);
   }
@@ -7298,14 +7265,20 @@ async function compressImageToDataUrls(file) {
 // Processes a batch of image files one at a time (bounds peak memory on large photos and gives
 // meaningful progress feedback), isolating failures per file so one bad file (unsupported
 // format, corrupt data, decode timeout) doesn't discard the others that succeeded.
+// Total base64 budget shared across every image in a batch, so a multi-image message that
+// ends up fully falling back to inline base64 (Storage unavailable) still fits well inside
+// Firestore's 1MiB/doc limit no matter how many images are in it. A single-image batch keeps
+// the original per-image cap unchanged.
+const CHAT_BATCH_BASE64_BUDGET = 700000; // ~700KB total across all originals in one message
 async function processImageFilesSequentially(files, onProgress) {
   const succeeded = [];
   const failed = [];
+  const perImageCap = Math.min(MAX_CHAT_IMAGE_BASE64_LENGTH, Math.floor(CHAT_BATCH_BASE64_BUDGET / files.length));
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
     if (onProgress) onProgress({ current: i + 1, total: files.length, fileName: file.name });
     try {
-      const compressed = await compressImageToDataUrls(file);
+      const compressed = await compressImageToDataUrls(file, { maxBase64Length: perImageCap });
       succeeded.push(compressed);
     } catch (err) {
       failed.push({ fileName: file.name, error: err });
@@ -7342,38 +7315,112 @@ function ImageProcessingOverlay({ current, total, fileName }) {
   ));
 }
 
+function ImageUploadOverlay({ pct, remainingSec }) {
+  const clamped = Math.max(0, Math.min(100, pct || 0));
+  return /*#__PURE__*/React.createElement('div', {
+    style: { position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.45)', zIndex: 100000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }
+  }, /*#__PURE__*/React.createElement('div', {
+    style: { backgroundColor: '#FFFFFF', borderRadius: '14px', padding: '24px 28px', width: '260px', maxWidth: '100%', textAlign: 'center', boxShadow: '0 10px 30px rgba(0,0,0,0.25)' }
+  },
+    /*#__PURE__*/React.createElement('div', { style: { fontWeight: 800, fontSize: '0.95rem', color: '#0F172A', marginBottom: '4px' } }, '사진 전송 중...'),
+    /*#__PURE__*/React.createElement('div', { style: { fontSize: '0.78rem', color: '#64748B', marginBottom: '14px' } },
+      `${clamped}%${typeof remainingSec === 'number' ? ` · 약 ${remainingSec}초 남음` : ''}`),
+    /*#__PURE__*/React.createElement('div', { style: { height: '8px', borderRadius: '9999px', backgroundColor: '#E2E8F0', overflow: 'hidden' } },
+      /*#__PURE__*/React.createElement('div', { style: { height: '100%', width: `${clamped}%`, backgroundColor: '#4F46E5', transition: 'width 0.2s ease', borderRadius: '9999px' } })
+    )
+  ));
+}
+
 // Uploads a compressed chat image pair to Firebase Storage and returns download URLs, or null
 // if Storage isn't available/the upload fails -- callers should fall back to the base64 data
-// URLs already produced by compressImageToDataUrls in that case.
-async function uploadChatImageAssets(calendarId, compressed) {
-  if (!firebaseStorage || !compressed?.originalBlob || !compressed?.thumbnailBlob) return null;
-  try {
+// URLs already produced by compressImageToDataUrls in that case. `onBytes(taskKey, transferred,
+// total)` is called as each upload progresses so a caller can aggregate progress across a batch.
+function uploadChatImageAssets(calendarId, compressed, index, onBytes) {
+  return new Promise((resolve) => {
+    if (!firebaseStorage || !compressed?.originalBlob || !compressed?.thumbnailBlob) {
+      resolve(null);
+      return;
+    }
     const stamp = Date.now();
     const rand = Math.random().toString(36).slice(2, 8);
-    const basePath = `chatImages/${calendarId}/${stamp}_${rand}`;
+    const basePath = `chatImages/${calendarId}/${stamp}_${rand}_${index}`;
     const originalRef = firebaseStorage.ref(`${basePath}_original.jpg`);
     const thumbRef = firebaseStorage.ref(`${basePath}_thumb.jpg`);
-    const [originalSnap, thumbSnap] = await Promise.all([
-      originalRef.put(compressed.originalBlob, { contentType: 'image/jpeg' }),
-      thumbRef.put(compressed.thumbnailBlob, { contentType: 'image/jpeg' })
-    ]);
-    const [imageUrl, thumbUrl] = await Promise.all([
-      originalSnap.ref.getDownloadURL(),
-      thumbSnap.ref.getDownloadURL()
-    ]);
-    return { imageUrl, thumbUrl };
-  } catch (e) {
-    console.warn('Chat image Storage upload failed, falling back to inline base64:', e);
-    return null;
-  }
+
+    const runUpload = (blob, ref, taskKey) => new Promise((resolveOne) => {
+      const task = ref.put(blob, { contentType: 'image/jpeg' });
+      task.on('state_changed', snapshot => {
+        if (onBytes) onBytes(taskKey, snapshot.bytesTransferred, snapshot.totalBytes);
+      }, () => resolveOne(null), async () => {
+        try {
+          resolveOne(await task.snapshot.ref.getDownloadURL());
+        } catch (e) {
+          resolveOne(null);
+        }
+      });
+    });
+
+    Promise.all([
+      runUpload(compressed.originalBlob, originalRef, `${index}-orig`),
+      runUpload(compressed.thumbnailBlob, thumbRef, `${index}-thumb`)
+    ]).then(([imageUrl, thumbUrl]) => {
+      if (imageUrl && thumbUrl) resolve({ imageUrl, thumbUrl });
+      else {
+        console.warn('Chat image Storage upload failed, falling back to inline base64');
+        resolve(null);
+      }
+    });
+  });
 }
 
 // Resolves the {imageUrl, thumbUrl} pair a chat message should store: uploaded Storage
 // download URLs when possible, the original compressed base64 data URLs otherwise.
-async function resolveChatImageUrls(calendarId, compressed) {
-  const uploaded = await uploadChatImageAssets(calendarId, compressed);
+async function resolveChatImageUrls(calendarId, compressed, index = 0, onBytes) {
+  const uploaded = await uploadChatImageAssets(calendarId, compressed, index, onBytes);
   if (uploaded) return uploaded;
   return { imageUrl: compressed.original, thumbUrl: compressed.thumbnail };
+}
+
+// Resolves a whole batch of images (upload + fallback per image, same as resolveChatImageUrls)
+// while reporting combined byte-level progress across every upload in the batch as
+// { pct, remainingSec }. Falls back to compressed.isExisting entries as-is (no re-upload).
+async function resolveChatImageBatch(calendarId, compressedList, onProgress) {
+  const uploadIndexes = compressedList
+    .map((c, idx) => ({ c, idx }))
+    .filter(({ c }) => !c.isExisting);
+
+  if (uploadIndexes.length === 0 || !firebaseStorage) {
+    if (onProgress) onProgress({ pct: 100, remainingSec: 0 });
+    return Promise.all(compressedList.map((c, idx) =>
+      c.isExisting
+        ? Promise.resolve({ imageUrl: c.original, thumbUrl: c.thumbnail })
+        : resolveChatImageUrls(calendarId, c, idx)
+    ));
+  }
+
+  const startedAt = Date.now();
+  const progressByTask = new Map();
+  const reportProgress = () => {
+    if (!onProgress) return;
+    let transferred = 0, total = 0;
+    progressByTask.forEach(p => { transferred += p.transferred; total += p.total; });
+    const pct = total > 0 ? Math.min(99, Math.round((transferred / total) * 100)) : 0;
+    const elapsedSec = (Date.now() - startedAt) / 1000;
+    const remainingSec = pct > 0 ? Math.max(0, Math.round(elapsedSec * (100 - pct) / pct)) : null;
+    onProgress({ pct, remainingSec });
+  };
+  const onBytes = (taskKey, transferred, total) => {
+    progressByTask.set(taskKey, { transferred, total });
+    reportProgress();
+  };
+
+  const results = await Promise.all(compressedList.map((c, idx) =>
+    c.isExisting
+      ? Promise.resolve({ imageUrl: c.original, thumbUrl: c.thumbnail })
+      : resolveChatImageUrls(calendarId, c, idx, onBytes)
+  ));
+  if (onProgress) onProgress({ pct: 100, remainingSec: 0 });
+  return results;
 }
 
 // A Storage download URL looks like https://firebasestorage.googleapis.com/...; a fallback
