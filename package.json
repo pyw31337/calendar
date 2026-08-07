@@ -11,6 +11,7 @@
     "og:generate": "node scripts/generate-og-pages.mjs",
     "regression:test": "node scripts/regression-check.mjs",
     "safety:test": "node scripts/firebase-safety-tests.mjs",
+    "check:tab-wiring": "node scripts/check-tab-wiring.mjs",
     "stress:firebase": "node scripts/firebase-live-stress-tests.mjs",
     "ops:audit": "node scripts/firebase-ops-audit.mjs",
     "ops:export": "node scripts/firebase-export-prod.mjs",

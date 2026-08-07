@@ -27,5 +27,8 @@ jobs:
       - name: Run safety tests
         run: npm run safety:test
 
+      - name: Check tab wiring
+        run: npm run check:tab-wiring
+
       - name: Build
         run: npm run build
