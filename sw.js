@@ -17,6 +17,7 @@ const STATIC_ASSETS = [
   'manifest-cw.json',
   'icons/icon-192.png',
   'icons/icon-512.png',
+  'icons/icon-512-maskable.png',
   'icons/apple-touch-icon.png'
 ];
 
