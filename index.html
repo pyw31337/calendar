@@ -8549,8 +8549,9 @@ function ChatRoomView({
       height: '36px',
       borderRadius: '50%',
       backgroundColor: 'rgba(255,255,255,0.95)',
-      border: '1px solid #E2E8F0',
-      boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+      border: 'none',
+      boxShadow: isHeaderVisible ? 'none' : '0 2px 8px rgba(0,0,0,0.12)',
+      transition: 'box-shadow 0.2s ease',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -8610,7 +8611,7 @@ function ChatRoomView({
       maxWidth: 'calc(100vw - 160px)',
       pointerEvents: 'none'
     }
-  }, /*#__PURE__*/React.createElement(ChatSectionIcon, null), /*#__PURE__*/React.createElement("span", {
+  }, /*#__PURE__*/React.createElement("span", {
     style: { overflow: 'hidden', textOverflow: 'ellipsis' }
   }, formatChatHeaderTitle(calendar?.title))), /*#__PURE__*/React.createElement("div", {
     style: { display: 'flex', alignItems: 'center', gap: '2px' }
