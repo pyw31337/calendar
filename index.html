@@ -6303,7 +6303,8 @@ function App() {
       style: {
         backgroundColor: '#FFFFFF',
         color: '#4F46E5',
-        border: '1.5px solid #C7D2FE'
+        border: 'none',
+        boxShadow: 'none'
       }
     }, formatConfirmedMeetingLabel(meeting.date)), memoEntries.map(entry => {
       const p = getActiveParticipants(activeCal).find(part => part.id === entry.participantId);
