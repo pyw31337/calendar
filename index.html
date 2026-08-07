@@ -101,20 +101,76 @@
       margin: 0 auto;
     }
 
-    /* Header Card */
-    .header-card {
+    /* Header -- full-bleed fixed bar (edge to edge), hides on scroll-down and reappears on
+       scroll-up, matching the chat room header's behavior. Inner content is centered to the
+       same max-width as .app-container so it lines up with the page content below it. */
+    .main-header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
       background: var(--bg-card);
-      border-radius: var(--radius-lg);
-      padding: 16px;
-      margin-bottom: 20px;
+      box-shadow: var(--shadow-md);
+      z-index: 500;
+      transition: transform 0.3s ease;
+    }
+    .main-header-inner {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 14px 16px;
       display: flex;
       flex-direction: column;
-      gap: 12px;
-      box-shadow: var(--shadow-md);
+      gap: 10px;
     }
     @media (min-width: 768px) {
-      .header-card { padding: 20px 24px; flex-direction: row; align-items: center; justify-content: space-between; }
+      .main-header-inner { padding: 18px 24px; }
     }
+
+    .main-header-top-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+
+    .main-menu-bar {
+      display: flex;
+      align-items: stretch;
+      border-top: 1px solid var(--border-subtle);
+      padding-top: 8px;
+      gap: 2px;
+      overflow-x: auto;
+    }
+    .main-menu-item {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      background: none;
+      border: none;
+      padding: 8px 4px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      cursor: pointer;
+      white-space: nowrap;
+      border-radius: var(--radius-sm);
+    }
+    .main-menu-item:hover { background: var(--bg-primary); color: var(--text-main); }
+    .main-menu-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 18px;
+      height: 18px;
+      padding: 0 5px;
+      border-radius: 9999px;
+      font-size: 0.68rem;
+      font-weight: 800;
+      background-color: var(--border-subtle);
+      color: var(--text-muted);
+    }
+    @media (max-width: 480px) {
+      .main-menu-item { font-size: 0.74rem; padding: 8px 2px; }
+    }
+
 
     .header-left { display: flex; align-items: center; gap: 10px; }
 
@@ -5228,6 +5284,51 @@ function App() {
   const [isGuideOpen, setIsGuideOpen] = React.useState(false);
   const [isInitialDataLoading, setIsInitialDataLoading] = React.useState(() => Boolean(firebaseDb));
   const titleRef = React.useRef(null);
+
+  // Main header: fixed full-width bar with a menu row, hides on scroll-down and reappears on
+  // scroll-up (same behavior as the chat room header). Refs below are scroll targets for the
+  // 일정잡기/투표하기 menu items; mainHeaderRef measures its own height for the scroll offset
+  // (so the fixed header doesn't cover the section being scrolled to).
+  const [isMainHeaderVisible, setIsMainHeaderVisible] = React.useState(true);
+  const mainHeaderRef = React.useRef(null);
+  const calendarSectionRef = React.useRef(null);
+  const pollsSectionRef = React.useRef(null);
+  const lastMainScrollTopRef = React.useRef(0);
+  React.useEffect(() => {
+    const handleMainScroll = () => {
+      const scrollTop = window.scrollY;
+      const lastScrollTop = lastMainScrollTopRef.current;
+      if (scrollTop < 10) {
+        setIsMainHeaderVisible(true);
+      } else if (scrollTop > lastScrollTop && scrollTop > 56) {
+        setIsMainHeaderVisible(false);
+      } else if (scrollTop < lastScrollTop) {
+        setIsMainHeaderVisible(true);
+      }
+      lastMainScrollTopRef.current = scrollTop;
+    };
+    window.addEventListener('scroll', handleMainScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleMainScroll);
+  }, []);
+  const scrollToSection = (ref) => {
+    if (!ref.current) return;
+    const headerHeight = mainHeaderRef.current ? mainHeaderRef.current.offsetHeight : 0;
+    const top = ref.current.getBoundingClientRect().top + window.scrollY - headerHeight - 12;
+    window.scrollTo({ top, behavior: 'smooth' });
+  };
+  // The header is now position:fixed (full-bleed), so page content needs top padding equal to
+  // its rendered height -- measured (not hardcoded) since it varies by title length/wrapping.
+  const [mainHeaderHeight, setMainHeaderHeight] = React.useState(0);
+  React.useEffect(() => {
+    if (!mainHeaderRef.current) return;
+    const measure = () => {
+      if (mainHeaderRef.current) setMainHeaderHeight(mainHeaderRef.current.offsetHeight);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(mainHeaderRef.current);
+    return () => ro.disconnect();
+  }, []);
   const [arrowLeft, setArrowLeft] = React.useState(200);
   const [bubbleStyle, setBubbleStyle] = React.useState({
     left: '0',
@@ -6111,10 +6212,22 @@ function App() {
     }, toast.message));
   }
 
+  const mainMenuPollCount = getCalendarPolls(activeCal).length;
+  const mainMenuChatCount = chatMessages.length;
+  const mainMenuChatLatestTimestamp = mainMenuChatCount > 0 ? chatMessages[mainMenuChatCount - 1].timestamp : 0;
+  const mainMenuChatHasUnread = mainMenuChatLatestTimestamp > getChatLastReadTimestamp(activeCalId);
+
   return /*#__PURE__*/React.createElement("div", {
-    className: "app-container"
+    className: "app-container",
+    style: { paddingTop: `${mainHeaderHeight}px` }
   }, /*#__PURE__*/React.createElement("header", {
-    className: "header-card"
+    ref: mainHeaderRef,
+    className: "main-header",
+    style: { transform: isMainHeaderVisible ? 'translateY(0)' : 'translateY(-100%)' }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "main-header-inner"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "main-header-top-row"
   }, /*#__PURE__*/React.createElement("div", {
     className: "header-left"
   }, /*#__PURE__*/React.createElement("div", {
@@ -6210,106 +6323,12 @@ function App() {
 등록해 놓아야, 공통모임 일자를
 뽑기가 수월해짐.`))), activeCal?.description && /*#__PURE__*/React.createElement("div", {
     className: "calendar-desc"
-  }, activeCal.description))), /*#__PURE__*/React.createElement("div", {
-    className: "header-actions"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "participants-anchor"
-  }, /*#__PURE__*/React.createElement("button", {
-    className: "btn btn-secondary",
-    onClick: () => setIsParticipantsOpen(!isParticipantsOpen),
-    style: {
-      gap: '6px'
-    }
-  }, /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg",
-    width: "24",
-    height: "24",
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
-    className: "icon icon-tabler icons-tabler-outline icon-tabler-users"
-  }, /*#__PURE__*/React.createElement("path", {
-    stroke: "none",
-    d: "M0 0h24v24H0z",
-    fill: "none"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M5 7a4 4 0 1 0 8 0a4 4 0 1 0 -8 0"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M3 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M16 3.13a4 4 0 0 1 0 7.75"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M21 21v-2a4 4 0 0 0 -3 -3.85"
-  })), /*#__PURE__*/React.createElement("span", null, "\uCC38\uC5EC\uC790 (", getActiveParticipants(activeCal)?.length || 0, "\uBA85)")), isParticipantsOpen && /*#__PURE__*/React.createElement("div", {
-    className: "participants-popover"
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: '0.8rem',
-      fontWeight: 800,
-      color: 'var(--text-muted)',
-      borderBottom: '1px solid var(--border-subtle)',
-      paddingBottom: '6px',
-      marginBottom: '4px'
-    }
-  }, "\uCC38\uC5EC\uC790 \uBAA9\uB85D"), getActiveParticipants(activeCal).map(p => /*#__PURE__*/React.createElement("div", {
-    key: p.id,
-    style: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: '8px',
-      fontSize: '0.85rem',
-      fontWeight: '700'
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "color-dot",
-    style: {
-      backgroundColor: p.color,
-      width: '10px',
-      height: '10px'
-    }
-  }), /*#__PURE__*/React.createElement("span", null, p.name))))), /*#__PURE__*/React.createElement("button", {
-    className: "btn btn-secondary",
-    onClick: () => {
-      if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 공유 정보를 확인해 주세요.')) setIsShareOpen(true);
-    },
-    title: "\uACF5\uC720",
-    style: {
-      padding: '10px'
-    }
-  }, /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg",
-    width: "24",
-    height: "24",
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
-    className: "icon icon-tabler icons-tabler-outline icon-tabler-share"
-  }, /*#__PURE__*/React.createElement("path", {
-    stroke: "none",
-    d: "M0 0h24v24H0z",
-    fill: "none"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M3 12a3 3 0 1 0 6 0a3 3 0 1 0 -6 0"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M15 6a3 3 0 1 0 6 0a3 3 0 1 0 -6 0"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M15 18a3 3 0 1 0 6 0a3 3 0 1 0 -6 0"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M8.7 10.7l6.6 -3.4"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M8.7 13.3l6.6 3.4"
-  }))), /*#__PURE__*/React.createElement("button", {
+  }, activeCal.description))), /*#__PURE__*/React.createElement("button", {
     className: "btn btn-secondary",
     onClick: () => {
       if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 설정을 수정해 주세요.')) setIsAdminOpen(true);
     },
-    title: "\uC124\uC815",
+    title: "설정",
     style: {
       padding: '10px'
     }
@@ -6332,7 +6351,71 @@ function App() {
     d: "M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065"
   }), /*#__PURE__*/React.createElement("path", {
     d: "M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0"
-  }))))), /*#__PURE__*/React.createElement(CalendarGrid, {
+  })))), /*#__PURE__*/React.createElement("div", {
+    className: "main-menu-bar"
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "main-menu-item",
+    onClick: () => scrollToSection(calendarSectionRef)
+  }, "일정잡기"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "main-menu-item",
+    onClick: () => scrollToSection(pollsSectionRef)
+  }, "투표하기", mainMenuPollCount > 0 && /*#__PURE__*/React.createElement("span", {
+    className: "main-menu-badge"
+  }, mainMenuPollCount)), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "main-menu-item",
+    onClick: () => changeView('chat')
+  }, "채팅하기", mainMenuChatCount > 0 && /*#__PURE__*/React.createElement("span", {
+    className: "main-menu-badge",
+    style: {
+      backgroundColor: mainMenuChatHasUnread ? '#EF4444' : '#E2E8F0',
+      color: mainMenuChatHasUnread ? '#FFFFFF' : '#64748B'
+    }
+  }, mainMenuChatCount)), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "main-menu-item",
+    onClick: () => {
+      if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 공유 정보를 확인해 주세요.')) setIsShareOpen(true);
+    }
+  }, "공유하기"), /*#__PURE__*/React.createElement("div", {
+    className: "participants-anchor"
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "main-menu-item",
+    onClick: () => setIsParticipantsOpen(!isParticipantsOpen)
+  }, "참여자 (", getActiveParticipants(activeCal)?.length || 0, "명)"), isParticipantsOpen && /*#__PURE__*/React.createElement("div", {
+    className: "participants-popover"
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: '0.8rem',
+      fontWeight: 800,
+      color: 'var(--text-muted)',
+      borderBottom: '1px solid var(--border-subtle)',
+      paddingBottom: '6px',
+      marginBottom: '4px'
+    }
+  }, "참여자 목록"), getActiveParticipants(activeCal).map(p => /*#__PURE__*/React.createElement("div", {
+    key: p.id,
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      fontSize: '0.85rem',
+      fontWeight: '700'
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "color-dot",
+    style: {
+      backgroundColor: p.color,
+      width: '10px',
+      height: '10px'
+    }
+  }), /*#__PURE__*/React.createElement("span", null, p.name)))))))), /*#__PURE__*/React.createElement("div", {
+    ref: calendarSectionRef
+  }, /*#__PURE__*/React.createElement(CalendarGrid, {
+
     calendar: activeCal,
     isLoading: isInitialDataLoading,
     monthDate: currentMonthDate,
@@ -6345,7 +6428,8 @@ function App() {
       setSelectedDate(d);
       setIsModalOpen(true);
     }
-  }), /*#__PURE__*/React.createElement("div", {
+  })), /*#__PURE__*/React.createElement("div", {
+    ref: pollsSectionRef,
     className: "calendar-card",
     style: {
       padding: '16px',
@@ -7967,6 +8051,12 @@ function CommentsSection({
         e.target.style.height = 'auto';
         e.target.style.height = `${Math.min(100, e.target.scrollHeight)}px`;
       },
+      onKeyDown: e => {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && !isChatSubmitting) {
+          e.preventDefault();
+          onSend();
+        }
+      },
       style: {
         width: '100%',
         height: '44px',
@@ -8884,6 +8974,12 @@ function ChatRoomView({
           e.target.style.height = 'auto';
           e.target.style.height = `${Math.min(100, e.target.scrollHeight)}px`;
         },
+        onKeyDown: e => {
+          if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && !isChatSubmitting) {
+            e.preventDefault();
+            onSend();
+          }
+        },
         style: {
           width: '100%',
           height: '44px',
@@ -9764,7 +9860,7 @@ function DateModal({
       title: "\uD074\uB9AD \uC2DC \uC774 \uCC38\uC5EC\uC790\uB85C \uC790\uB3D9 \uC120\uD0DD \uBC0F \uBA54\uBAA8 \uBD88\uB7EC\uC624\uAE30"
     }, p.name, " ", e.note && `(${e.note})`), registeredAt && /*#__PURE__*/React.createElement("span", {
       className: "registered-at-text"
-    }, registeredAt)), /*#__PURE__*/React.createElement("button", {
+    }, registeredAt), extractFirstUrl(e.note) && /*#__PURE__*/React.createElement(LinkPreviewCard, { url: extractFirstUrl(e.note) })), /*#__PURE__*/React.createElement("button", {
       type: "button",
       className: "btn btn-danger",
       style: {
