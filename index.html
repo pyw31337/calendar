@@ -4485,6 +4485,8 @@ function AdminDashboard({ initialCalendars }) {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
+      flexWrap: 'wrap',
+      gap: '8px',
       borderBottom: '1px solid #E2E8F0',
       paddingBottom: '10px'
     },
@@ -4687,7 +4689,7 @@ function AdminDashboard({ initialCalendars }) {
 
         /* Message scroll list */
         /*#__PURE__*/React.createElement("div", {
-          style: { maxHeight: '280px', overflowY: 'auto', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '8px', backgroundColor: '#F8FAFC' }
+          style: { maxHeight: '280px', overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '8px', backgroundColor: '#F8FAFC' }
         },
           filteredMessages.length === 0 ? /*#__PURE__*/React.createElement("div", { style: { padding: '30px', color: '#64748B', fontSize: '0.82rem', textAlign: 'center' } }, "표시할 채팅 내역이 없습니다.") :
           filteredMessages.map(msg => {
@@ -4801,7 +4803,7 @@ function AdminDashboard({ initialCalendars }) {
         /* Participant entry details */
         /*#__PURE__*/React.createElement("section", { style: { ...styles.card, display: 'flex', flexDirection: 'column' } },
           /*#__PURE__*/React.createElement("div", { style: styles.cardTitle }, "참여자별 일정 등록 수"),
-          /*#__PURE__*/React.createElement("div", { style: { flex: '1 1 auto', minHeight: 0, maxHeight: '420px', overflowY: 'auto' } },
+          /*#__PURE__*/React.createElement("div", { style: { flex: '1 1 auto', minHeight: 0, maxHeight: '420px', overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch' } },
             dashboard.calendarStats.map(stat => /*#__PURE__*/React.createElement("div", { key: `${stat.calendar.id}_parts_list`, style: { marginBottom: '14px' } },
               /*#__PURE__*/React.createElement("div", { style: { fontWeight: 950, marginBottom: '6px', color: '#0F172A', fontSize: '0.86rem' } }, stat.calendar.id),
               stat.participantStats.map(participant => {
@@ -4898,7 +4900,7 @@ function AdminDashboard({ initialCalendars }) {
             ),
 
             /* Participants List grid */
-            /*#__PURE__*/React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '8px', maxHeight: '200px', overflowY: 'auto', paddingRight: '4px' } },
+            /*#__PURE__*/React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(220px, 100%), 1fr))', gap: '8px', maxHeight: '200px', overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', paddingRight: '4px' } },
               calParticipants.map(p => isTombstone(p) ? null : /*#__PURE__*/React.createElement("div", {
                 key: p.id,
                 style: { display: 'flex', alignItems: 'center', gap: '8px' }
@@ -4933,8 +4935,8 @@ function AdminDashboard({ initialCalendars }) {
         /* Polls management card */
         /*#__PURE__*/React.createElement("section", { style: styles.card },
           /* Header */
-          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', borderBottom: '1px solid #E2E8F0', paddingBottom: '8px' } },
-            /*#__PURE__*/React.createElement("h4", { style: { fontSize: '0.96rem', fontWeight: '900', color: '#0F172A', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(PollSectionIcon, null), `[${selectedCalId}] 투표 설정 및 어드민 전용 생성`),
+          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '14px', borderBottom: '1px solid #E2E8F0', paddingBottom: '8px' } },
+            /*#__PURE__*/React.createElement("h4", { style: { fontSize: '0.96rem', fontWeight: '900', color: '#0F172A', margin: 0, display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' } }, /*#__PURE__*/React.createElement(PollSectionIcon, null), `[${selectedCalId}] 투표 설정 및 어드민 전용 생성`),
             /*#__PURE__*/React.createElement("button", {
               type: "button", className: "btn btn-primary",
               onClick: () => { setEditingPoll(null); setEditingPollCalId(selectedCalId); setIsPollModalOpen(true); }
@@ -4977,7 +4979,7 @@ function AdminDashboard({ initialCalendars }) {
     /* ================================================================= */
     activeTab === 'recovery' && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '20px' } },
       /* Calendar selector row */
-      /*#__PURE__*/React.createElement("section", { style: { ...styles.card, padding: '16px 20px', display: 'flex', alignItems: 'center', gap: '12px' } },
+      /*#__PURE__*/React.createElement("section", { style: { ...styles.card, padding: '16px 20px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' } },
         renderCalendarRadioGroup('복구할 캘린더 선택:', 'admin-recovery-cal')
       ),
 
@@ -4999,7 +5001,7 @@ function AdminDashboard({ initialCalendars }) {
 
           /* Log list */
           /*#__PURE__*/React.createElement("div", {
-            style: { display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '380px', overflowY: 'auto', paddingRight: '4px' }
+            style: { display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '380px', overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', paddingRight: '4px' }
           },
             unifiedTimeline.length === 0 ?
             /*#__PURE__*/React.createElement("div", { style: { padding: '30px', color: '#64748B', fontSize: '0.82rem', textAlign: 'center' } }, "통합 타임라인 로그가 존재하지 않습니다.") :
@@ -5027,35 +5029,31 @@ function AdminDashboard({ initialCalendars }) {
 
               return /*#__PURE__*/React.createElement("div", {
                 key: log.id,
-                className: 'admin-log-row',
-                style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '10px', backgroundColor: '#F8FAFC', gap: '6px 12px' }
+                style: { display: 'flex', flexDirection: 'column', gap: '6px', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '10px', backgroundColor: '#F8FAFC' }
               },
-                /* Left details */
-                /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 } },
-                  /* Action Badge */
+                /* Line 1: action + participant */
+                /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' } },
                   /*#__PURE__*/React.createElement("span", {
                     style: { fontSize: '0.68rem', fontWeight: 'bold', padding: '2px 6px', borderRadius: '4px', backgroundColor: badgeBg, color: badgeColor, border: `1px solid ${badgeColor}30`, whiteSpace: 'nowrap' }
                   }, actLabel),
-                  /* User */
                   /*#__PURE__*/React.createElement("span", {
                     style: { backgroundColor: p.color, color: getContrastTextColor(p.color), padding: '2px 8px', borderRadius: '9999px', fontSize: '0.7rem', fontWeight: 'bold', whiteSpace: 'nowrap' }
-                  }, p.name),
-                  /* Info Text */
-                  /*#__PURE__*/React.createElement("span", {
-                    style: { fontSize: '0.78rem', color: '#0F172A', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', flex: 1 }
-                  }, log.note)
+                  }, p.name)
                 ),
 
-                /* Right actions */
-                /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 } },
-                  /* Time string */
-                  /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.72rem', color: '#64748B', fontWeight: '500' } }, formatRegisteredAt(log.timestamp)),
-                  /* Recovery trigger */
-                  /*#__PURE__*/React.createElement("button", {
-                    type: "button", className: "btn btn-secondary", style: { padding: '4px 8px', fontSize: '0.72rem' },
-                    onClick: () => handleRestoreToLogTimestamp(selectedCalId, log)
-                  }, "이 시점으로 복구")
-                )
+                /* Line 2: memo, may wrap across multiple lines */
+                log.note && /*#__PURE__*/React.createElement("div", {
+                  style: { fontSize: '0.78rem', color: '#0F172A', whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: '1.5' }
+                }, log.note),
+
+                /* Line 3: timestamp alone */
+                /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.72rem', color: '#64748B', fontWeight: '500' } }, formatRegisteredAt(log.timestamp)),
+
+                /* Line 4: restore button alone, full width */
+                /*#__PURE__*/React.createElement("button", {
+                  type: "button", className: "btn btn-secondary", style: { width: '100%', justifyContent: 'center', fontSize: '0.78rem' },
+                  onClick: () => handleRestoreToLogTimestamp(selectedCalId, log)
+                }, "이 시점으로 복구")
               );
             })
           )
