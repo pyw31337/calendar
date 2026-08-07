@@ -443,7 +443,7 @@
     }
 
     .day-cell {
-      min-height: 58px; background: #FFFFFF; border: 1px solid var(--border-subtle);
+      min-height: 58px; background: #FAFAFA; border: 1px solid transparent;
       border-radius: var(--radius-sm); padding: 4px; cursor: pointer; transition: all 0.2s ease;
       display: flex; flex-direction: column; justify-content: space-between; position: relative;
       overflow: hidden;
@@ -465,24 +465,10 @@
     
     .day-cell.all-available {
       background: #ECFDF5; border: 1px solid #10B981;
-      box-shadow: 0 4px 14px rgba(16, 185, 129, 0.15);
     }
-    @media (min-width: 640px) {
-      .day-cell.all-available {
-        border-width: 2px;
-        box-shadow: 0 4px 14px rgba(16, 185, 129, 0.25);
-      }
-    }
-    
+
     .day-cell.confirmed-meeting {
       background: #FAF5FF; border: 1px solid #7C3AED;
-      box-shadow: 0 4px 14px rgba(124, 58, 237, 0.15);
-    }
-    @media (min-width: 640px) {
-      .day-cell.confirmed-meeting {
-        border-width: 2px;
-        box-shadow: 0 4px 14px rgba(124, 58, 237, 0.25);
-      }
     }
     
     .day-number { font-size: 0.8rem; font-weight: 700; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; }
@@ -10130,7 +10116,7 @@ function DateModal({
     placeholder: "예: 1시 이후 가능, 차량 운전 가능",
     value: note,
     onChange: e => setNote(e.target.value),
-    maxLength: 60,
+    maxLength: 120,
     disabled: isSubmitting
   })), dateEntries.length > 0 && /*#__PURE__*/React.createElement("div", {
     style: {
@@ -11592,7 +11578,21 @@ function PollList({ calendar, onCreatePoll, onEditPoll, onVotePoll, onCancelVote
   const [isCollapsed, setIsCollapsed] = React.useState(true); // default closed
   const [openPollIds, setOpenPollIds] = React.useState({});
 
-  const togglePollList = () => setIsCollapsed(prev => !prev);
+  // A poll can be visually open two ways: the whole section is expanded (!isCollapsed), or
+  // it was opened individually while the section stayed collapsed (openPollIds[id]). The
+  // section-level arrow button needs to know if ANYTHING is open to decide its direction --
+  // toggling the raw isCollapsed flag alone would expand a section that's already showing an
+  // individually-opened poll (since isCollapsed was never flipped to false for that), instead
+  // of closing it like the button visually promises.
+  const anyPollOpen = !isCollapsed || Object.values(openPollIds).some(Boolean);
+  const togglePollList = () => {
+    if (anyPollOpen) {
+      setIsCollapsed(true);
+      setOpenPollIds({});
+    } else {
+      setIsCollapsed(false);
+    }
+  };
 
   return /*#__PURE__*/React.createElement("section", {
     className: "polls-panel",
@@ -11606,9 +11606,9 @@ function PollList({ calendar, onCreatePoll, onEditPoll, onVotePoll, onCancelVote
     style: { color: '#2563EB', marginBottom: 0, display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold' }
   }, /*#__PURE__*/React.createElement(PollSectionIcon, null), "\uC9C4\uD589\uC911 \uD22C\uD45C (", polls.length, "\uAC74)"),
   /*#__PURE__*/React.createElement(SectionToggleButton, {
-    collapsed: isCollapsed,
+    collapsed: !anyPollOpen,
     onToggle: togglePollList,
-    label: isCollapsed ? "진행중 투표 펼치기" : "진행중 투표 접기"
+    label: anyPollOpen ? "진행중 투표 접기" : "진행중 투표 펼치기"
   })), polls.length === 0 ? /*#__PURE__*/React.createElement("div", {
     style: { color: 'var(--text-muted)', fontSize: '0.85rem', padding: '10px 0' }
   }, "\uC544\uC9C1 \uC0DD\uC131\uB41C \uD22C\uD45C\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.") : /*#__PURE__*/React.createElement("div", {
@@ -12231,7 +12231,7 @@ function SummaryList({
   const [collapsedSections, setCollapsedSections] = React.useState({
     partial: false,
     all: true,
-    confirmed: false,
+    confirmed: true,
     past: true
   });
   const toggleSection = sectionKey => {
@@ -12397,7 +12397,9 @@ function SummaryList({
     }, memoEntries.map(e => {
       const p = participantsMap[e.participantId];
       if (!p) return null;
-      const memoText = e.note.trim();
+      const memoUrl = extractFirstUrl(e.note);
+      const memoText = memoUrl ? e.note.replace(memoUrl, '').trim() : e.note.trim();
+      if (!memoText) return null;
       return /*#__PURE__*/React.createElement("span", {
         key: e.participantId || p.id,
         className: "memo-capsule-badge",
@@ -12512,7 +12514,9 @@ function SummaryList({
     }, memoEntries.map(e => {
       const p = participantsMap[e.participantId];
       if (!p) return null;
-      const memoText = e.note.trim();
+      const memoUrl = extractFirstUrl(e.note);
+      const memoText = memoUrl ? e.note.replace(memoUrl, '').trim() : e.note.trim();
+      if (!memoText) return null;
       return /*#__PURE__*/React.createElement("span", {
         key: e.participantId || p.id,
         className: "memo-capsule-badge",
@@ -12616,7 +12620,9 @@ function SummaryList({
     }, memoEntries.map(e => {
       const p = participantsMap[e.participantId];
       if (!p) return null;
-      const memoText = e.note.trim();
+      const memoUrl = extractFirstUrl(e.note);
+      const memoText = memoUrl ? e.note.replace(memoUrl, '').trim() : e.note.trim();
+      if (!memoText) return null;
       return /*#__PURE__*/React.createElement("span", {
         key: e.participantId || p.id,
         className: "memo-capsule-badge",
@@ -12632,9 +12638,9 @@ function SummaryList({
         title: `${p.name}: ${memoText}`
       }, memoText);
     })));
-  }))), pastMeetingDates.length > 0 && /*#__PURE__*/React.createElement("div", null, anyBeforePast && /*#__PURE__*/React.createElement("div", {
+  }))), anyBeforePast && pastMeetingDates.length > 0 && /*#__PURE__*/React.createElement("div", {
     className: "summary-section-divider"
-  }), /*#__PURE__*/React.createElement("div", {
+  }), pastMeetingDates.length > 0 && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     className: `summary-title is-toggleable${collapsedSections.past ? ' is-collapsed' : ''}`,
     role: "button",
     tabIndex: 0,
@@ -12732,6 +12738,9 @@ function SummaryList({
     }, memoEntries.map(e => {
       const p = participantsMap[e.participantId];
       if (!p) return null;
+      const memoUrl = extractFirstUrl(e.note);
+      const memoText = memoUrl ? e.note.replace(memoUrl, '').trim() : e.note.trim();
+      if (!memoText) return null;
       return /*#__PURE__*/React.createElement("span", {
         key: e.participantId,
         className: "memo-capsule-badge",
@@ -12741,8 +12750,8 @@ function SummaryList({
           border: `1px solid ${p.color}`,
           boxShadow: 'none'
         },
-        title: `${p.name}: ${e.note.trim()}`
-      }, e.note.trim());
+        title: `${p.name}: ${memoText}`
+      }, memoText);
     })));
   }))));
 }
