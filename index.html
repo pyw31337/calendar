@@ -7916,67 +7916,114 @@ function renderChatMessageImages(msg, setActiveLightbox, singleImageStyle = {}) 
 // buttons and dot indicators when there's more than one image, matching the KakaoTalk-style
 // multi-photo gallery UX the chat bubbles are modeled after.
 function Lightbox({ urls, index, onClose, onNavigate }) {
-  const touchStartXRef = React.useRef(null);
+  const total = urls.length;
+  const imgAreaRef = React.useRef(null);
+  const widthRef = React.useRef(0);
   const dragStartXRef = React.useRef(null);
   const isDraggingRef = React.useRef(false);
   const wasDraggedRef = React.useRef(false);
+  const pendingNavRef = React.useRef(null);
+  const [dragPx, setDragPx] = React.useState(0);
+  const [transitionOn, setTransitionOn] = React.useState(false);
   const [isDragging, setIsDragging] = React.useState(false);
-  const total = urls.length;
+
   const goTo = i => {
-    if (i < 0 || i >= total) return;
+    if (i < 0 || i >= total || i === index) return;
     onNavigate(i);
+  };
+  // Adjacent (±1) navigation slides the track by exactly one container-width, same visual
+  // motion as a completed drag -- used by the arrow buttons and arrow keys so every way of
+  // moving between photos feels like the same carousel, not just the drag gesture.
+  const animateToAdjacent = newIndex => {
+    if (newIndex < 0 || newIndex >= total || newIndex === index) return;
+    const el = imgAreaRef.current;
+    if (el) widthRef.current = el.getBoundingClientRect().width;
+    pendingNavRef.current = newIndex;
+    setTransitionOn(true);
+    setDragPx(newIndex > index ? -widthRef.current : widthRef.current);
   };
   React.useEffect(() => {
     const onKeyDown = e => {
       if (e.key === 'Escape') onClose();
-      else if (e.key === 'ArrowLeft') goTo(index - 1);
-      else if (e.key === 'ArrowRight') goTo(index + 1);
+      else if (e.key === 'ArrowLeft') animateToAdjacent(index - 1);
+      else if (e.key === 'ArrowRight') animateToAdjacent(index + 1);
     };
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [index, total]);
-  const handleTouchStart = e => { touchStartXRef.current = e.touches[0].clientX; };
-  const handleTouchEnd = e => {
-    if (touchStartXRef.current == null) return;
-    const deltaX = e.changedTouches[0].clientX - touchStartXRef.current;
-    touchStartXRef.current = null;
-    if (Math.abs(deltaX) < 50) return;
-    if (deltaX < 0) goTo(index + 1); else goTo(index - 1);
+
+  // Carousel drag: the track visually follows the finger/cursor 1:1 while dragging (dragPx is
+  // the live pixel offset added on top of the centered baseline), then on release either
+  // completes the slide to the adjacent photo or springs back -- both animated the same way,
+  // via a CSS transition on transform. The reset back to dragPx:0 after a completed slide
+  // happens in the same handler as the index change (onTransitionEnd), so the swap is
+  // invisible: the outgoing frame and the reset frame show the same photo in the same spot.
+  const SWIPE_THRESHOLD_RATIO = 0.18;
+  const EDGE_RESISTANCE = 0.35;
+  const dampedDelta = raw => {
+    if (raw > 0 && index === 0) return raw * EDGE_RESISTANCE;
+    if (raw < 0 && index === total - 1) return raw * EDGE_RESISTANCE;
+    return raw;
   };
-  // Mouse-drag swipe for desktop: mousedown is attached on the overlay (fires regardless of
-  // whether the drag starts on the backdrop or the image itself, since mousedown bubbles),
-  // while mousemove/mouseup are tracked on the document so the drag keeps working even if the
-  // cursor leaves the image mid-drag. wasDraggedRef suppresses the click-to-close-on-backdrop
-  // behavior right after an actual drag, so dragging never also closes the lightbox.
-  const handleMouseDown = e => {
+  const handleDragStart = clientX => {
     if (total <= 1) return;
-    dragStartXRef.current = e.clientX;
+    const el = imgAreaRef.current;
+    widthRef.current = el ? el.getBoundingClientRect().width : 0;
+    dragStartXRef.current = clientX;
     isDraggingRef.current = true;
     wasDraggedRef.current = false;
+    setTransitionOn(false);
     setIsDragging(true);
   };
+  const handleDragMove = clientX => {
+    if (!isDraggingRef.current || dragStartXRef.current == null) return;
+    const raw = clientX - dragStartXRef.current;
+    if (Math.abs(raw) > 5) wasDraggedRef.current = true;
+    setDragPx(dampedDelta(raw));
+  };
+  const handleDragEnd = () => {
+    if (!isDraggingRef.current) return;
+    isDraggingRef.current = false;
+    setIsDragging(false);
+    dragStartXRef.current = null;
+    const width = widthRef.current || 1;
+    const threshold = width * SWIPE_THRESHOLD_RATIO;
+    setTransitionOn(true);
+    setDragPx(current => {
+      if (current <= -threshold && index < total - 1) {
+        pendingNavRef.current = index + 1;
+        return -width;
+      }
+      if (current >= threshold && index > 0) {
+        pendingNavRef.current = index - 1;
+        return width;
+      }
+      pendingNavRef.current = null;
+      return 0;
+    });
+  };
+  // Mouse move/up are tracked at the document level (unlike touchmove/touchend, which keep
+  // firing on their original target even once the finger leaves it) so the drag keeps working
+  // if the cursor leaves the image area mid-drag.
   React.useEffect(() => {
-    const handleMouseMove = e => {
-      if (!isDraggingRef.current || dragStartXRef.current == null) return;
-      if (Math.abs(e.clientX - dragStartXRef.current) > 5) wasDraggedRef.current = true;
-    };
-    const handleMouseUp = e => {
-      if (!isDraggingRef.current) return;
-      isDraggingRef.current = false;
-      setIsDragging(false);
-      if (dragStartXRef.current == null) return;
-      const deltaX = e.clientX - dragStartXRef.current;
-      dragStartXRef.current = null;
-      if (Math.abs(deltaX) < 50) return;
-      if (deltaX < 0) goTo(index + 1); else goTo(index - 1);
-    };
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
+    const onMouseMove = e => handleDragMove(e.clientX);
+    const onMouseUp = () => handleDragEnd();
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
     return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
     };
   }, [index, total]);
+  const handleTrackTransitionEnd = e => {
+    if (e.target !== e.currentTarget || e.propertyName !== 'transform') return;
+    if (pendingNavRef.current == null) return;
+    const next = pendingNavRef.current;
+    pendingNavRef.current = null;
+    setTransitionOn(false);
+    setDragPx(0);
+    onNavigate(next);
+  };
   const handleOverlayClick = () => {
     if (wasDraggedRef.current) {
       wasDraggedRef.current = false;
@@ -7984,16 +8031,27 @@ function Lightbox({ urls, index, onClose, onNavigate }) {
     }
     onClose();
   };
+
+  const renderSlide = (url, slot) => /*#__PURE__*/React.createElement("div", {
+    style: { width: '33.3333%', flexShrink: 0, height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }
+  }, url && /*#__PURE__*/React.createElement("img", {
+    src: url,
+    alt: "원본 이미지",
+    "data-slide": slot,
+    draggable: false,
+    onClick: e => e.stopPropagation(),
+    style: {
+      maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: '12px',
+      boxShadow: '0 24px 80px rgba(0,0,0,0.6)'
+    }
+  }));
+
   return /*#__PURE__*/React.createElement("div", {
     onClick: handleOverlayClick,
-    onTouchStart: handleTouchStart,
-    onTouchEnd: handleTouchEnd,
-    onMouseDown: handleMouseDown,
     style: {
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
       backgroundColor: 'rgba(15, 23, 42, 0.92)', backdropFilter: 'blur(8px)', zIndex: 9000,
       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-      cursor: total > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default',
       userSelect: 'none'
     }
   }, /*#__PURE__*/React.createElement("button", {
@@ -8012,7 +8070,7 @@ function Lightbox({ urls, index, onClose, onNavigate }) {
   }, /*#__PURE__*/React.createElement("line", { x1: "18", y1: "6", x2: "6", y2: "18" }), /*#__PURE__*/React.createElement("line", { x1: "6", y1: "6", x2: "18", y2: "18" }))),
   total > 1 && index > 0 && /*#__PURE__*/React.createElement("button", {
     type: "button",
-    onClick: e => { e.stopPropagation(); goTo(index - 1); },
+    onClick: e => { e.stopPropagation(); animateToAdjacent(index - 1); },
     "aria-label": "이전 이미지",
     style: {
       position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)',
@@ -8026,7 +8084,7 @@ function Lightbox({ urls, index, onClose, onNavigate }) {
   }, /*#__PURE__*/React.createElement("path", { d: "M15 6l-6 6l6 6" }))),
   total > 1 && index < total - 1 && /*#__PURE__*/React.createElement("button", {
     type: "button",
-    onClick: e => { e.stopPropagation(); goTo(index + 1); },
+    onClick: e => { e.stopPropagation(); animateToAdjacent(index + 1); },
     "aria-label": "다음 이미지",
     style: {
       position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)',
@@ -8038,7 +8096,25 @@ function Lightbox({ urls, index, onClose, onNavigate }) {
     xmlns: "http://www.w3.org/2000/svg", width: "22", height: "22", viewBox: "0 0 24 24",
     fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
   }, /*#__PURE__*/React.createElement("path", { d: "M9 6l6 6l-6 6" }))),
-  /*#__PURE__*/React.createElement("img", {
+  total > 1 ? /*#__PURE__*/React.createElement("div", {
+    ref: imgAreaRef,
+    onMouseDown: e => handleDragStart(e.clientX),
+    onTouchStart: e => handleDragStart(e.touches[0].clientX),
+    onTouchMove: e => handleDragMove(e.touches[0].clientX),
+    onTouchEnd: handleDragEnd,
+    style: {
+      width: '92vw', height: '82vh', overflow: 'hidden',
+      cursor: isDragging ? 'grabbing' : 'grab'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    onTransitionEnd: handleTrackTransitionEnd,
+    style: {
+      display: 'flex', width: '300%', height: '100%',
+      transform: `translateX(calc(-33.3333% + ${dragPx}px))`,
+      transition: transitionOn ? 'transform 280ms ease' : 'none'
+    }
+  }, renderSlide(index > 0 ? urls[index - 1] : null, 'prev'), renderSlide(urls[index], 'current'), renderSlide(index < total - 1 ? urls[index + 1] : null, 'next')))
+    : /*#__PURE__*/React.createElement("img", {
     src: urls[index],
     alt: "원본 이미지",
     draggable: false,
