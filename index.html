@@ -139,7 +139,12 @@
       padding: 8px 16px 0;
       border-top: 1px solid var(--border-subtle);
       gap: 0;
-      overflow-x: auto;
+      /* No overflow-x:auto here: setting it forces overflow-y to compute as 'auto' too (per the
+         CSS Overflow spec, an axis can't stay 'visible' once the other is non-visible), which
+         was silently clipping the 참여자 popover -- it hangs below this bar's own box, so an
+         "auto" bar clips it away entirely instead of just leaving it invisible-until-scrolled.
+         Equal-width flex:1 items with min-width:0 already fit down to a 320px viewport without
+         needing horizontal scroll (verified), so this is a straight bug fix, not a tradeoff. */
     }
     @media (min-width: 768px) {
       .main-menu-bar { margin: 0 -24px; padding: 8px 24px 0; }
@@ -7327,18 +7332,51 @@ function LinkPreviewCard({ url }) {
 // Files app, which unlike Safari's usual photo picker doesn't auto-convert to JPEG on select)
 // fails outright everywhere else. heic2any is a WASM-based client-side HEIC->JPEG converter;
 // it's ~1.3MB so it's loaded lazily, only the first time an actual HEIC/HEIF file shows up.
+// Bounds any promise that might otherwise hang forever (a stalled network request that never
+// fires error/complete, a CDN script tag whose load/error events never trigger on a flaky
+// mobile connection) so a single stuck operation can't freeze the whole upload/processing
+// flow indefinitely -- without this, callers awaiting it never reach their finally block, so a
+// submit button or progress overlay would stay stuck on-screen with no way to recover.
+function withTimeout(promise, ms, timeoutMessage) {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const timeoutId = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      reject(Object.assign(new Error(timeoutMessage || 'TIMEOUT'), { code: 'TIMEOUT' }));
+    }, ms);
+    promise.then(
+      value => { if (settled) return; settled = true; clearTimeout(timeoutId); resolve(value); },
+      err => { if (settled) return; settled = true; clearTimeout(timeoutId); reject(err); }
+    );
+  });
+}
+
 let heic2anyLoadPromise = null;
-function loadHeic2any() {
+function loadHeic2any(timeoutMs = 15000) {
   if (window.heic2any) return Promise.resolve(window.heic2any);
   if (heic2anyLoadPromise) return heic2anyLoadPromise;
   heic2anyLoadPromise = new Promise((resolve, reject) => {
+    let settled = false;
+    const timeoutId = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      heic2anyLoadPromise = null; // allow retrying on a later file instead of caching the stall forever
+      reject(new Error('heic2any script load timed out'));
+    }, timeoutMs);
     const script = document.createElement('script');
     script.src = 'https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js';
     script.onload = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeoutId);
       if (window.heic2any) resolve(window.heic2any);
       else reject(new Error('heic2any failed to initialize'));
     };
     script.onerror = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeoutId);
       heic2anyLoadPromise = null; // allow retrying on a later file instead of caching the failure forever
       reject(new Error('heic2any script failed to load'));
     };
@@ -7389,7 +7427,14 @@ async function compressImageToDataUrls(file, { maxBase64Length = MAX_CHAT_IMAGE_
   if (isHeicFile(file)) {
     try {
       const heic2any = await loadHeic2any();
-      const converted = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.85 });
+      // A 24MP+ HEIC on a slower mobile device can genuinely take a while to decode, but must
+      // not be allowed to hang forever -- bound it generously (45s) rather than leave the
+      // attach flow stuck with no way to recover.
+      const converted = await withTimeout(
+        heic2any({ blob: file, toType: 'image/jpeg', quality: 0.85 }),
+        45000,
+        'HEIC conversion timed out'
+      );
       sourceBlob = Array.isArray(converted) ? converted[0] : converted;
     } catch (err) {
       throw Object.assign(new Error('HEIC 이미지를 변환하지 못했습니다.'), { code: 'HEIC_CONVERT_FAILED', fileName: file.name });
@@ -7560,18 +7605,28 @@ function uploadChatImageAssets(calendarId, compressed, index, onBytes) {
     const originalRef = firebaseStorage.ref(`${basePath}_original.jpg`);
     const thumbRef = firebaseStorage.ref(`${basePath}_thumb.jpg`);
 
-    const runUpload = (blob, ref, taskKey) => new Promise((resolveOne) => {
-      const task = ref.put(blob, { contentType: 'image/jpeg' });
-      task.on('state_changed', snapshot => {
-        if (onBytes) onBytes(taskKey, snapshot.bytesTransferred, snapshot.totalBytes);
-      }, () => resolveOne(null), async () => {
-        try {
-          resolveOne(await task.snapshot.ref.getDownloadURL());
-        } catch (e) {
-          resolveOne(null);
-        }
+    // On a flaky mobile connection, a stalled upload can go silent with no error/complete event
+    // ever firing (the SDK is still waiting on a dead connection) -- without a bound here, the
+    // whole send/edit flow would hang forever with no way for the user to recover. Time out and
+    // fall back to inline base64 for that image instead.
+    const runUpload = (blob, ref, taskKey) => {
+      let settled = false;
+      return new Promise((resolveOne) => {
+        const settle = value => { if (settled) return; settled = true; resolveOne(value); };
+        const timeoutId = setTimeout(() => settle(null), 45000);
+        const task = ref.put(blob, { contentType: 'image/jpeg' });
+        task.on('state_changed', snapshot => {
+          if (onBytes) onBytes(taskKey, snapshot.bytesTransferred, snapshot.totalBytes);
+        }, () => { clearTimeout(timeoutId); settle(null); }, async () => {
+          clearTimeout(timeoutId);
+          try {
+            settle(await task.snapshot.ref.getDownloadURL());
+          } catch (e) {
+            settle(null);
+          }
+        });
       });
-    });
+    };
 
     Promise.all([
       runUpload(compressed.originalBlob, originalRef, `${index}-orig`),
