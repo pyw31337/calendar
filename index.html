@@ -442,7 +442,13 @@
        narrow mobile cell widths -- hide it there (the date number still turns red), but keep it
        on desktop's roomier cells where it reads fine. */
     @media (max-width: 639px) {
-      .day-corner-label.is-holiday { display: none; }
+      .day-corner-label { display: none; }
+      .date-year { display: none; }
+      .modal-header h3 { font-size: 0.95rem !important; }
+      .modal-header .holiday-label { font-size: 0.82rem !important; }
+      .modal-header .status-badge { font-size: 0.7rem !important; padding: 2px 4px !important; }
+      .modal-header .btn { padding: 4px 6px !important; font-size: 0.72rem !important; }
+      .modal-header .btn-header-text { display: none; }
     }
 
     .day-cell {
@@ -474,6 +480,17 @@
       .day-cell.all-available {
         border-width: 2px;
         box-shadow: 0 4px 14px rgba(16, 185, 129, 0.25);
+      }
+    }
+    
+    .day-cell.confirmed-meeting {
+      background: #FAF5FF; border: 1px solid #7C3AED;
+      box-shadow: 0 4px 14px rgba(124, 58, 237, 0.15);
+    }
+    @media (min-width: 640px) {
+      .day-cell.confirmed-meeting {
+        border-width: 2px;
+        box-shadow: 0 4px 14px rgba(124, 58, 237, 0.25);
       }
     }
     
@@ -6031,9 +6048,10 @@ function App() {
   const handleConfirmMeeting = (dateStr, note) => {
     if (!activeCal || !isValidDateString(dateStr)) return false;
     const now = Date.now();
+    const isAlreadyConfirmed = activeCal.confirmedMeeting?.date === dateStr;
     const updatedCal = {
       ...activeCal,
-      confirmedMeeting: {
+      confirmedMeeting: isAlreadyConfirmed ? null : {
         date: dateStr,
         note: sanitizeText(note, 120),
         confirmedAt: now
@@ -6042,7 +6060,7 @@ function App() {
       revision: (activeCal.revision || 0) + 1
     };
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-    return updateCalendars(nextCalendars, '모임 확정', 'success', updatedCal.id, 'settings', []);
+    return updateCalendars(nextCalendars, isAlreadyConfirmed ? '모임 확정 취소' : '모임 확정', 'success', updatedCal.id, 'settings', []);
   };
   const handleDeleteActivityLog = log => {
     if (!activeCal || !log?.id) return false;
@@ -7211,9 +7229,10 @@ function CalendarGrid({
     const cornerTitle = isHoliday ? (lunarLabel ? `${holidayNames.join(', ')} (${lunarLabel})` : holidayNames.join(', ')) : undefined;
     const columnDow = idx % 7; // 0=Sun .. 6=Sat, since each week row starts on Sunday
     const isSunday = columnDow === 0;
+    const isConfirmed = calendar?.confirmedMeeting?.date === dateStr;
     return /*#__PURE__*/React.createElement("div", {
       key: idx,
-      className: `day-cell ${isCurrentMonth ? '' : 'other-month'} ${isAllAvailable ? 'all-available' : ''}`,
+      className: `day-cell ${isCurrentMonth ? '' : 'other-month'} ${isConfirmed ? 'confirmed-meeting' : isAllAvailable ? 'all-available' : ''}`,
       onClick: () => onSelectDate(dateStr)
     }, /*#__PURE__*/React.createElement("div", {
       style: {
@@ -7237,7 +7256,7 @@ function CalendarGrid({
         flexShrink: 0
       } : { flexShrink: 0 }
     }, dayNum), cornerText && /*#__PURE__*/React.createElement("span", {
-      className: `day-corner-label${isHoliday ? ' is-holiday' : ''}`,
+      className: `day-corner-label${isHoliday ? ' is-holiday' : ''}${isAllAvailable ? ' is-all-available' : ''}`,
       title: cornerTitle,
       style: {
         fontSize: '0.62rem',
@@ -9902,13 +9921,13 @@ function EditMessageModal({
 function DateModal({
   dateStr,
   calendar,
+  adminMode = false,
   onSave,
+  onConfirmMeeting,
   onDelete,
   onDeleteDate,
-  onConfirmMeeting,
   onRequestConfirm,
-  onClose,
-  adminMode = false
+  onClose
 }) {
   const getCachedParticipantId = () => {
     const cachedId = getLocalStorage().getItem('gather_active_participant_id_v20');
@@ -9963,16 +9982,27 @@ function DateModal({
     setNote('');
     onClose();
   };
-  const getShortTitle = dateStr => {
-    if (!dateStr) return '';
+  const getShortTitleParts = dateStr => {
+    if (!dateStr) return { year: '', rest: '' };
     const [year, month, day] = dateStr.split('-');
     const dateObj = new Date(year, month - 1, day);
     const dayOfWeek = ['일', '월', '화', '수', '목', '금', '토'][dateObj.getDay()];
     const shortYear = year.slice(2);
-    return `${shortYear}.${month}.${day}(${dayOfWeek})`;
+    return {
+      year: `${shortYear}.`,
+      rest: `${month}.${day}(${dayOfWeek})`
+    };
   };
-  const getDeleteDateLabel = dateStr => getShortTitle(dateStr);
+
+  const titleParts = getShortTitleParts(dateStr);
+  const getDeleteDateLabel = dateStr => `${titleParts.year}${titleParts.rest}`;
   const holidayNames = React.useMemo(() => getHolidayNamesForDate(dateStr), [dateStr]);
+  const holidayLabelText = holidayNames.length > 0 ? holidayNames.join('·') : '';
+  const totalPartCount = activeParticipants.length || 0;
+  const uniqueActiveParts = new Set(dateEntries.map(e => e.participantId));
+  const isAllAvailable = totalPartCount > 0 && uniqueActiveParts.size === totalPartCount;
+  const isConfirmed = calendar?.confirmedMeeting?.date === dateStr;
+
   const handleConfirmMeeting = async () => {
     if (isSubmitting) return;
     setIsSubmitting(true);
@@ -9986,6 +10016,7 @@ function DateModal({
     setIsSubmitting(false);
     if (saved !== false) onClose();
   };
+
   return /*#__PURE__*/React.createElement("div", {
     className: "modal-overlay",
     onClick: () => {
@@ -9999,14 +10030,69 @@ function DateModal({
     style: {
       display: 'flex',
       justifyContent: 'space-between',
-      alignItems: 'center'
+      alignItems: 'center',
+      padding: '16px 20px',
+      borderBottom: '1px solid var(--border-subtle)',
+      flexWrap: 'nowrap',
+      overflow: 'hidden'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '6px',
+      flexWrap: 'nowrap',
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+      whiteSpace: 'nowrap'
     }
   }, /*#__PURE__*/React.createElement("h3", {
     style: {
       fontSize: '1.1rem',
-      fontWeight: 800
+      fontWeight: 800,
+      color: 'var(--text-main)',
+      margin: 0,
+      display: 'flex',
+      alignItems: 'center'
     }
-  }, getShortTitle(dateStr)), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "date-year"
+  }, titleParts.year), /*#__PURE__*/React.createElement("span", null, titleParts.rest)), holidayLabelText && /*#__PURE__*/React.createElement("span", {
+    className: "holiday-label",
+    style: {
+      color: '#EF4444',
+      fontWeight: 800,
+      fontSize: '0.9rem',
+      marginLeft: '4px',
+      flexShrink: 0
+    }
+  }, holidayLabelText), isConfirmed ? /*#__PURE__*/React.createElement("span", {
+    className: "status-badge",
+    style: {
+      backgroundColor: '#F3E8FF',
+      color: '#6B21A8',
+      border: '1px solid #E9D5FF',
+      padding: '2px 6px',
+      borderRadius: '4px',
+      fontSize: '0.75rem',
+      fontWeight: '800',
+      marginLeft: '4px',
+      flexShrink: 0
+    }
+  }, "확정") : isAllAvailable ? /*#__PURE__*/React.createElement("span", {
+    className: "status-badge",
+    style: {
+      backgroundColor: '#D1FAE5',
+      color: '#065F46',
+      border: '1px solid #A7F3D0',
+      padding: '2px 6px',
+      borderRadius: '4px',
+      fontSize: '0.75rem',
+      fontWeight: '800',
+      marginLeft: '4px',
+      flexShrink: 0
+    }
+  }, "전원") : null), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       alignItems: 'center',
@@ -10029,21 +10115,20 @@ function DateModal({
         onRequestConfirm('일정 삭제', `${getDeleteDateLabel(dateStr)} 일정 전체를 삭제하시겠습니까?`, () => {
           setIsSubmitting(true);
           Promise.resolve(onDeleteDate(dateStr)).then(saved => {
-            if (saved === false) { setIsSubmitting(false); return; }
+            if (saved === false) {
+              setIsSubmitting(false);
+              return;
+            }
             onClose();
-          }).catch(err => { console.error('Date delete failed:', err); setIsSubmitting(false); });
+          }).catch(err => {
+            console.error('Date delete failed:', err);
+            setIsSubmitting(false);
+          });
         });
       }
     },
-    title: "\uD574\uB2F9 \uB0A0\uC9DC\uC758 \uBAA8\uB4E0 \uCC38\uC5EC\uC790 \uC77C\uC815 \uC0AD\uC81C"
-  }, "\uC77C\uC815 \uC0AD\uC81C") : holidayNames.length > 0 && /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: '0.78rem',
-      fontWeight: 800,
-      color: '#EF4444',
-      whiteSpace: 'nowrap'
-    }
-  }, holidayNames.join('·')), /*#__PURE__*/React.createElement("button", {
+    title: "해당 날짜의 모든 참여자 일정 삭제"
+  }, "일정 삭제") : null, /*#__PURE__*/React.createElement("button", {
     onClick: () => {
       if (!isSubmitting) onClose();
     },
@@ -10051,12 +10136,15 @@ function DateModal({
       background: 'none',
       border: 'none',
       color: '#64748B',
-      fontSize: '1.2rem',
+      fontSize: '1.25rem',
       cursor: 'pointer',
       display: 'flex',
-      alignItems: 'center'
-    }
-  }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 })))), /*#__PURE__*/React.createElement("form", {
+      alignItems: 'center',
+      padding: '2px 4px',
+      marginLeft: '4px'
+    },
+    title: "닫기"
+  }, "✕"))), /*#__PURE__*/React.createElement("form", {
     onSubmit: handleSubmit
   }, /*#__PURE__*/React.createElement("div", {
     className: "modal-body"
@@ -10068,7 +10156,7 @@ function DateModal({
       marginBottom: '6px',
       color: '#64748B'
     }
-  }, "\uCC38\uC5EC\uC790 \uC120\uD0DD"), /*#__PURE__*/React.createElement("button", {
+  }, "참여자 선택"), /*#__PURE__*/React.createElement("button", {
     type: "button",
     className: "form-select",
     style: {
@@ -10092,16 +10180,31 @@ function DateModal({
       gap: '8px'
     }
   }, /*#__PURE__*/React.createElement("span", {
-    className: "color-dot",
+    className: "form-select-color-indicator",
     style: {
-      backgroundColor: activeParticipants.find(p => p.id === participantId)?.color || '#CCC'
+      backgroundColor: activeParticipants.find(p => p.id === participantId)?.color || '#94A3B8'
     }
-  }), /*#__PURE__*/React.createElement("span", null, activeParticipants.find(p => p.id === participantId)?.name || '선택하세요')), /*#__PURE__*/React.createElement("span", {
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontWeight: 700
+    }
+  }, activeParticipants.find(p => p.id === participantId)?.name || '참여자 선택')), /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: "16",
+    height: "16",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: "2.5",
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
     style: {
       color: '#64748B',
       fontSize: '0.8rem'
     }
-  }, "\u25BC"))), !adminMode && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+  }, /*#__PURE__*/React.createElement("path", {
+    d: "m6 9 6 6 6-6"
+  })))), !adminMode && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
     style: {
       display: 'block',
       fontSize: '0.85rem',
@@ -10109,97 +10212,117 @@ function DateModal({
       marginBottom: '6px',
       color: '#64748B'
     }
-  }, "\uBA54\uBAA8 \uC785\uB825 (\uC120\uD0DD)"), /*#__PURE__*/React.createElement("input", {
+  }, "메모 입력 (선택)"), /*#__PURE__*/React.createElement("input", {
+    ref: noteInputRef,
     type: "text",
     className: "form-input",
-    style: {
-      width: '100%'
-    },
-    placeholder: "\uC608) 1\uC2DC \uC774\uD6C4 \uAC00\uB2A5, \uC784\uC9C4\uAC01 \uB4F1",
+    placeholder: "예: 1시 이후 가능, 차량 운전 가능",
     value: note,
-    disabled: isSubmitting,
-    maxLength: 120,
-    ref: noteInputRef,
-    onChange: e => setNote(e.target.value)
+    onChange: e => setNote(e.target.value),
+    maxLength: 60,
+    disabled: isSubmitting
   })), dateEntries.length > 0 && /*#__PURE__*/React.createElement("div", {
     style: {
-      borderTop: '1px solid var(--border-subtle)',
-      paddingTop: '12px'
+      marginTop: '6px'
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: '0.8rem',
-      fontWeight: 700,
-      color: 'var(--text-muted)',
-      marginBottom: '8px'
+      fontSize: '0.85rem',
+      fontWeight: 800,
+      marginBottom: '10px',
+      color: '#475569'
     }
-  }, "\uD604\uC7AC \uB4F1\uB85D\uB41C \uCC38\uC5EC\uC790:"), dateEntries.map(e => {
-    const p = activeParticipants.find(part => part.id === e.participantId);
+  }, "등록된 참석 가능 멤버 (", dateEntries.length, "/", totalPartCount, "명)"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '8px'
+    }
+  }, dateEntries.map(entry => {
+    const p = activeParticipants.find(part => part.id === entry.participantId);
     if (!p) return null;
-    const registeredAt = formatRegisteredAt(e.updatedAt);
     return /*#__PURE__*/React.createElement("div", {
-      key: p.id,
+      key: entry.id || p.id,
       style: {
         display: 'flex',
-        justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: '6px'
+        justifyContent: 'space-between',
+        padding: '10px 14px',
+        backgroundColor: '#F8FAFC',
+        borderRadius: '12px',
+        border: '1px solid #F1F5F9'
       }
     }, /*#__PURE__*/React.createElement("div", {
-      className: "registered-participant-main"
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+        minWidth: 0,
+        flex: 1
+      }
     }, /*#__PURE__*/React.createElement("span", {
       className: "participant-badge",
       style: {
         backgroundColor: p.color,
         color: getContrastTextColor(p.color),
-        cursor: 'pointer',
-        userSelect: 'none'
-      },
-      onClick: () => {
-        if (isSubmitting) return;
-        setParticipantId(p.id);
-        setNote(e.note || '');
-      },
-      title: "\uD074\uB9AD \uC2DC \uC774 \uCC38\uC5EC\uC790\uB85C \uC790\uB3D9 \uC120\uD0DD \uBC0F \uBA54\uBAA8 \uBD88\uB7EC\uC624\uAE30"
-    }, p.name, " ", e.note && `(${e.note})`), registeredAt && /*#__PURE__*/React.createElement("span", {
-      className: "registered-at-text"
-    }, registeredAt), extractFirstUrl(e.note) && /*#__PURE__*/React.createElement(LinkPreviewCard, { url: extractFirstUrl(e.note) })), /*#__PURE__*/React.createElement("button", {
+        flexShrink: 0
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "badge-dot",
+      style: {
+        backgroundColor: getContrastTextColor(p.color)
+      }
+    }), p.name), entry.note && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: '0.82rem',
+        color: '#475569',
+        marginLeft: '6px',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap'
+      }
+    }, "\"", entry.note, "\"")), /*#__PURE__*/React.createElement("button", {
       type: "button",
       className: "btn btn-danger",
       style: {
-        padding: '2px 8px',
-        fontSize: '0.75rem'
+        padding: '4px 8px',
+        fontSize: '0.75rem',
+        flexShrink: 0
       },
       disabled: isSubmitting,
       onClick: () => {
-        if (!isSubmitting) {
-          onRequestConfirm('참여자 삭제', `${p.name} 참여자를 삭제하시겠습니까?`, () => {
-            setIsSubmitting(true);
-            Promise.resolve(onDelete(dateStr, p.id)).then(saved => {
-              if (saved === false) { setIsSubmitting(false); return; }
-              onClose();
-            }).catch(err => { console.error('Availability delete failed:', err); setIsSubmitting(false); });
+        onRequestConfirm('일정 삭제', `${p.name}님의 일정을 삭제하시겠습니까?`, () => {
+          setIsSubmitting(true);
+          Promise.resolve(onDelete(dateStr, p.id)).then(saved => {
+            setIsSubmitting(false);
+          }).catch(err => {
+            console.error('Delete error:', err);
+            setIsSubmitting(false);
           });
-        }
+        });
       }
-    }, "\uC0AD\uC81C"));
-  }))), !adminMode && /*#__PURE__*/React.createElement("div", {
+    }, "삭제"));
+  })))), !adminMode && /*#__PURE__*/React.createElement("div", {
     className: "modal-footer",
-    style: { display: 'flex', justifyContent: 'flex-end', gap: '8px' }
+    style: {
+      display: 'flex',
+      justifyContent: 'flex-end',
+      gap: '8px'
+    }
   }, /*#__PURE__*/React.createElement("button", {
     type: "button",
     className: "btn btn-secondary",
     disabled: isSubmitting,
     onClick: handleConfirmMeeting,
     style: {
-      color: '#4F46E5',
-      borderColor: '#C7D2FE',
-      backgroundColor: '#EEF2FF',
+      color: isConfirmed ? '#4B5563' : '#4F46E5',
+      borderColor: isConfirmed ? '#E5E7EB' : '#C7D2FE',
+      backgroundColor: isConfirmed ? '#F3F4F6' : '#EEF2FF',
       whiteSpace: 'nowrap',
       opacity: isSubmitting ? 0.75 : 1,
       cursor: isSubmitting ? 'wait' : 'pointer'
     }
-  }, "모임확정"), /*#__PURE__*/React.createElement("button", {
+  }, isConfirmed ? "확정취소" : "모임확정"), /*#__PURE__*/React.createElement("button", {
     type: "submit",
     className: "btn btn-primary",
     disabled: isSubmitting,
@@ -10209,7 +10332,7 @@ function DateModal({
       opacity: isSubmitting ? 0.75 : 1,
       cursor: isSubmitting ? 'wait' : 'pointer'
     }
-  }, isSubmitting ? "\uC800\uC7A5 \uC911..." : "\uB4F1\uB85D")))), isSheetOpen && /*#__PURE__*/React.createElement("div", {
+  }, isSubmitting ? "저장 중..." : "등록")))), isSheetOpen && /*#__PURE__*/React.createElement("div", {
     className: "bottom-sheet-overlay",
     onClick: () => {
       if (!isSubmitting) setIsSheetOpen(false);
@@ -10219,21 +10342,19 @@ function DateModal({
     onClick: e => e.stopPropagation()
   }, /*#__PURE__*/React.createElement("div", {
     className: "bottom-sheet-header"
-  }, /*#__PURE__*/React.createElement("h4", null, "\uCC38\uC5EC\uC790 \uC120\uD0DD"), /*#__PURE__*/React.createElement("button", {
+  }, /*#__PURE__*/React.createElement("h4", null, "참여자 선택"), /*#__PURE__*/React.createElement("button", {
     type: "button",
     style: {
       background: 'none',
       border: 'none',
       color: '#64748B',
       fontSize: '1.2rem',
-      cursor: 'pointer',
-      display: 'flex',
-      alignItems: 'center'
+      cursor: 'pointer'
     },
     onClick: () => {
       if (!isSubmitting) setIsSheetOpen(false);
     }
-  }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }))), /*#__PURE__*/React.createElement("div", {
+  }, "✕")), /*#__PURE__*/React.createElement("div", {
     className: "bottom-sheet-body"
   }, activeParticipants.map(p => /*#__PURE__*/React.createElement("button", {
     key: p.id,
@@ -10265,7 +10386,7 @@ function DateModal({
       color: 'var(--accent-primary)',
       fontWeight: 800
     }
-  }, "\u2713")))))));
+  }, "✓")))))));
 }
 
 // Reconstruct calendar to a specific log timestamp (PITR)
@@ -12141,6 +12262,7 @@ function SummaryList({
     const memoEntries = dateEntries.filter(e => e.note && e.note.trim().length > 0);
     const isPast = d < todayStr;
     const availCount = new Set(dateEntries.map(e => e.participantId)).size;
+    const isConfirmed = calendar?.confirmedMeeting?.date === d;
     return /*#__PURE__*/React.createElement("button", {
       key: d,
       className: "date-item-btn",
@@ -12149,6 +12271,9 @@ function SummaryList({
         opacity: 0.7,
         backgroundColor: '#F8FAFC',
         borderColor: '#E2E8F0'
+      } : isConfirmed ? {
+        borderColor: '#E9D5FF',
+        backgroundColor: '#FAF5FF'
       } : {
         borderColor: '#DBEAFE',
         backgroundColor: '#F8FAFC'
@@ -12189,11 +12314,11 @@ function SummaryList({
     }))), /*#__PURE__*/React.createElement("span", {
       className: "date-item-badge",
       style: {
-        background: isPast ? '#E2E8F0' : '#DBEAFE',
-        color: isPast ? '#64748B' : '#1D4ED8',
-        border: isPast ? 'none' : '1px solid #BFDBFE'
+        background: isPast ? '#E2E8F0' : isConfirmed ? '#F3E8FF' : '#DBEAFE',
+        color: isPast ? '#64748B' : isConfirmed ? '#7C3AED' : '#1D4ED8',
+        border: isPast ? 'none' : isConfirmed ? '1px solid #E9D5FF' : '1px solid #BFDBFE'
       }
-    }, isPast ? '지나간 모임' : `${availCount}명 가능 (${availCount}/${totalCount}명)`));
+    }, isPast ? '지나간 모임' : isConfirmed ? '확정모임' : `${availCount}명 가능 (${availCount}/${totalCount}명)`));
   }))), thresholdN > 0 && sortedPartialDates.length > 0 && /*#__PURE__*/React.createElement("div", {
     className: `summary-section-divider${collapsedSections.partial ? ' is-after-collapsed' : ''}`
   }), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
@@ -12239,6 +12364,7 @@ function SummaryList({
     const formattedDateStr = formatDateWithDayName(d);
     const memoEntries = dateEntries.filter(e => e.note && e.note.trim().length > 0);
     const isPast = d < todayStr;
+    const isConfirmed = calendar?.confirmedMeeting?.date === d;
     return /*#__PURE__*/React.createElement("button", {
       key: d,
       className: "date-item-btn",
@@ -12247,6 +12373,11 @@ function SummaryList({
         opacity: 0.7,
         backgroundColor: '#F8FAFC',
         borderColor: '#E2E8F0',
+        flexDirection: 'column',
+        alignItems: 'flex-start'
+      } : isConfirmed ? {
+        borderColor: '#E9D5FF',
+        backgroundColor: '#FAF5FF',
         flexDirection: 'column',
         alignItems: 'flex-start'
       } : {
@@ -12271,11 +12402,12 @@ function SummaryList({
     }, formattedDateStr), /*#__PURE__*/React.createElement("span", {
       className: "date-item-badge",
       style: {
-        background: isPast ? '#E2E8F0' : '#10B981',
-        color: isPast ? '#64748B' : '#FFF',
+        background: isPast ? '#E2E8F0' : isConfirmed ? '#F3E8FF' : '#10B981',
+        color: isPast ? '#64748B' : isConfirmed ? '#7C3AED' : '#FFF',
+        border: isConfirmed ? '1px solid #E9D5FF' : 'none',
         flexShrink: 0
       }
-    }, isPast ? '지나간 모임' : '전원 가능')), memoEntries.length > 0 && /*#__PURE__*/React.createElement("div", {
+    }, isPast ? '지나간 모임' : isConfirmed ? '확정모임' : '전원 가능')), memoEntries.length > 0 && /*#__PURE__*/React.createElement("div", {
       style: {
         display: 'flex',
         alignItems: 'center',
