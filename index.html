@@ -3713,6 +3713,62 @@ function downloadJsonFile(filename, payload) {
   URL.revokeObjectURL(url);
 }
 
+function downloadTextFile(filename, content, mimeType) {
+  const blob = new Blob([content], { type: `${mimeType};charset=utf-8` });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+// Minimal RFC 5545 (.ics) export for a single confirmed-meeting date -- an all-day VEVENT with
+// the calendar's title as SUMMARY and any admin note / participant memos folded into
+// DESCRIPTION, so a confirmed date can be dropped straight into Google/Apple/Outlook Calendar.
+function escapeICSText(text) {
+  return String(text || '').replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
+}
+
+function formatICSDateOnly(dateStr) {
+  return dateStr.replace(/-/g, '');
+}
+
+function addDaysToDateStr(dateStr, days) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const date = new Date(y, m - 1, d);
+  date.setDate(date.getDate() + days);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function buildConfirmedMeetingICS(calendar, dateStr, description) {
+  const now = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  const dtstamp = `${now.getUTCFullYear()}${pad(now.getUTCMonth() + 1)}${pad(now.getUTCDate())}T${pad(now.getUTCHours())}${pad(now.getUTCMinutes())}${pad(now.getUTCSeconds())}Z`;
+  const lines = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//모여라 캘린더//KO',
+    'CALSCALE:GREGORIAN',
+    'BEGIN:VEVENT',
+    `UID:${calendar.id}_${dateStr}@moyeora-calendar`,
+    `DTSTAMP:${dtstamp}`,
+    `DTSTART;VALUE=DATE:${formatICSDateOnly(dateStr)}`,
+    `DTEND;VALUE=DATE:${formatICSDateOnly(addDaysToDateStr(dateStr, 1))}`,
+    `SUMMARY:${escapeICSText(`${calendar.title} 모임`)}`
+  ];
+  if (description) lines.push(`DESCRIPTION:${escapeICSText(description)}`);
+  lines.push('END:VEVENT', 'END:VCALENDAR');
+  return lines.join('\r\n');
+}
+
+function exportConfirmedMeetingToICS(calendar, dateStr, description) {
+  const ics = buildConfirmedMeetingICS(calendar, dateStr, description);
+  downloadTextFile(`${calendar.id}_${dateStr}.ics`, ics, 'text/calendar');
+}
+
 function extractCalendarsFromBackup(payload) {
   if (!payload) return [];
   if (Array.isArray(payload)) return payload;
@@ -11926,6 +11982,37 @@ function AlertTriangleIcon() {
   }));
 }
 
+function CalendarExportIcon() {
+  return /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: "16",
+    height: "16",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    "stroke-width": "2",
+    "stroke-linecap": "round",
+    "stroke-linejoin": "round",
+    className: "icon icon-tabler icons-tabler-outline icon-tabler-calendar-plus"
+  }, /*#__PURE__*/React.createElement("path", {
+    stroke: "none",
+    d: "M0 0h24v24H0z",
+    fill: "none"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M4 7a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12z"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M16 3v4"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M8 3v4"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M4 11h16"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M10 16h4"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M12 14v4"
+  }));
+}
+
 function GalleryIcon() {
   return /*#__PURE__*/React.createElement("svg", {
     xmlns: "http://www.w3.org/2000/svg",
@@ -12938,6 +13025,29 @@ function SummaryList({
         flexShrink: 0
       }
     }, formattedDateStr), /*#__PURE__*/React.createElement("span", {
+      role: "button",
+      tabIndex: 0,
+      title: "캘린더 앱에 추가 (.ics)",
+      "aria-label": "캘린더 앱에 추가",
+      onClick: event => {
+        event.stopPropagation();
+        const meeting = getConfirmedMeetings(calendar).find(m => m.date === d);
+        const memoLines = memoEntries.map(entry => `${participantsMap[entry.participantId]?.name || ''}: ${entry.note}`.trim()).join('\n');
+        const description = [meeting?.note, memoLines].filter(Boolean).join('\n\n');
+        exportConfirmedMeetingToICS(calendar, d, description);
+      },
+      onKeyDown: event => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        event.stopPropagation();
+        event.currentTarget.click();
+      },
+      style: {
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        width: '26px', height: '26px', borderRadius: '50%', cursor: 'pointer', flexShrink: 0,
+        color: isPast ? '#94A3B8' : '#7C3AED'
+      }
+    }, /*#__PURE__*/React.createElement(CalendarExportIcon, null)), /*#__PURE__*/React.createElement("span", {
       className: "date-item-badge",
       style: {
         background: isPast ? '#E2E8F0' : '#F3E8FF',
