@@ -8229,6 +8229,30 @@ function ChatRoomView({
   const [viewportBottom, setViewportBottom] = React.useState(0);
   const revealedMsgId = useTapRevealedMsgId();
 
+  // Read-up-to-here marker: capture the read timestamp as it was BEFORE this view marks
+  // everything read, so the marker can be placed at the right spot in the message list.
+  // Mirrors the same browser-storage key CommentsSection uses for its unread badge.
+  const [priorReadTimestamp] = React.useState(() => getChatLastReadTimestamp(calendar.id));
+  React.useEffect(() => {
+    const latest = chatMessages.length > 0 ? chatMessages[chatMessages.length - 1].timestamp : 0;
+    if (latest > 0) setChatLastReadTimestamp(calendar.id, latest);
+  }, [calendar.id, chatMessages.length > 0 ? chatMessages[chatMessages.length - 1]?.timestamp : 0]);
+
+  // Scroll-to-bottom floating button: shown once scrolled far enough away from the latest
+  // message that swiping back down manually would be tedious.
+  const [showScrollToBottom, setShowScrollToBottom] = React.useState(false);
+  const handleScrollCombined = (e) => {
+    if (handleChatScroll) handleChatScroll(e);
+    const el = e.target;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    setShowScrollToBottom(distanceFromBottom > 200);
+  };
+  const scrollToBottom = () => {
+    if (chatMessagesContainerRef.current) {
+      chatMessagesContainerRef.current.scrollTo({ top: chatMessagesContainerRef.current.scrollHeight, behavior: 'smooth' });
+    }
+  };
+
   const [notifPermission, setNotifPermission] = React.useState(() => (isNotificationSupported() ? Notification.permission : 'unsupported'));
   const handleToggleNotifications = async () => {
     if (!isNotificationSupported()) {
@@ -8323,8 +8347,32 @@ function ChatRoomView({
   }, {});
   const selectedParticipant = participants.find(p => p.id === chatParticipantId);
   let lastDateStr = '';
+  let readMarkerInserted = false;
   const renderedMessages = [];
   chatMessages.forEach((msg, idx) => {
+    if (!readMarkerInserted && priorReadTimestamp > 0 && msg.timestamp > priorReadTimestamp) {
+      readMarkerInserted = true;
+      renderedMessages.push(/*#__PURE__*/React.createElement("div", {
+        key: `read-marker-${msg.timestamp}-${idx}`,
+        style: {
+          position: 'relative',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          margin: '16px 0'
+        }
+      },
+        /*#__PURE__*/React.createElement("div", {
+          style: { position: 'absolute', left: 0, right: 0, height: '1px', backgroundColor: '#FCA5A5', zIndex: 1 }
+        }),
+        /*#__PURE__*/React.createElement("span", {
+          style: {
+            position: 'relative', zIndex: 2, backgroundColor: '#FEF2F2', border: '1px solid #FCA5A5',
+            borderRadius: '12px', padding: '3px 12px', fontSize: '0.72rem', color: '#EF4444', fontWeight: 'bold'
+          }
+        }, '여기까지 읽으셨습니다')
+      ));
+    }
     const date = new Date(msg.timestamp);
     const dateStr = `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
     if (dateStr !== lastDateStr) {
@@ -8752,10 +8800,13 @@ function ChatRoomView({
   }), /*#__PURE__*/React.createElement("path", {
     d: "M8.7 13.3l6.6 3.4"
   }))))), /*#__PURE__*/React.createElement("div", {
+    style: { flex: 1, position: 'relative', minHeight: 0 }
+  }, /*#__PURE__*/React.createElement("div", {
     ref: chatMessagesContainerRef,
-    onScroll: handleChatScroll,
+    onScroll: handleScrollCombined,
     style: {
-      flex: 1,
+      position: 'absolute',
+      inset: 0,
       overflowY: 'auto',
       padding: '16px',
       paddingTop: '72px',
@@ -8768,7 +8819,38 @@ function ChatRoomView({
       fontSize: '0.85rem',
       marginTop: '40px'
     }
-  }, "\uC544\uC9C1 \uB4F1\uB85D\uB41C \uB300\uD654\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.") : renderedMessages), /*#__PURE__*/React.createElement("div", {
+  }, "\uC544\uC9C1 \uB4F1\uB85D\uB41C \uB300\uD654\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.") : renderedMessages), showScrollToBottom && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: scrollToBottom,
+    "aria-label": "\uCD5C\uADFC \uB300\uD654\uB85C \uC774\uB3D9",
+    style: {
+      position: 'absolute',
+      bottom: '16px',
+      right: '16px',
+      width: '36px',
+      height: '36px',
+      borderRadius: '50%',
+      backgroundColor: 'rgba(255,255,255,0.95)',
+      border: 'none',
+      boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      cursor: 'pointer',
+      color: '#64748B',
+      zIndex: 50
+    }
+  }, /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: "22",
+    height: "22",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    "stroke-width": "2",
+    "stroke-linecap": "round",
+    "stroke-linejoin": "round"
+  }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), /*#__PURE__*/React.createElement("path", { d: "M6 9l6 6l6 -6" })))), /*#__PURE__*/React.createElement("div", {
     style: {
       backgroundColor: '#FFFFFF',
       borderTop: '1px solid #E2E8F0',
