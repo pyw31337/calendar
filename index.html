@@ -4707,8 +4707,18 @@ function AdminDashboard({ initialCalendars }) {
         )
       ),
       /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } },
-        /*#__PURE__*/React.createElement("a", { className: "btn btn-secondary", href: `${window.location.pathname}?id=kkot`, style: { textDecoration: 'none', display: 'flex', alignItems: 'center' } }, "kkot 달력"),
-        /*#__PURE__*/React.createElement("a", { className: "btn btn-secondary", href: `${window.location.pathname}?id=cw`, style: { textDecoration: 'none', display: 'flex', alignItems: 'center' } }, "cw 달력"),
+        /*#__PURE__*/React.createElement("select", {
+          className: "form-select",
+          defaultValue: "",
+          "aria-label": "캘린더 바로가기",
+          style: { fontWeight: 700, cursor: 'pointer', minHeight: 'auto', padding: '10px 14px' },
+          onChange: e => {
+            if (e.target.value) window.location.href = `${window.location.pathname}?id=${e.target.value}`;
+          }
+        },
+          /*#__PURE__*/React.createElement("option", { value: "", disabled: true }, "캘린더 바로가기"),
+          calendarsList.map(cal => /*#__PURE__*/React.createElement("option", { key: cal.id, value: cal.id }, `${cal.title} (${cal.id})`))
+        ),
         /*#__PURE__*/React.createElement("button", {
           type: "button", className: "btn btn-secondary",
           onClick: () => { resetChangePwForm(); setIsChangePwOpen(true); }
