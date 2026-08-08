@@ -3053,10 +3053,13 @@ function loadLocalCache() {
 
 function saveLocalCache() {}
 
+// Placeholder shown only until the real Firestore document arrives -- deliberately generic
+// (not a real-looking calendar name) so a refresh never flashes stale/outdated text before the
+// current title loads. This used to hardcode kkot/cw's actual titles as of whenever this was
+// last written, which meant every refresh briefly showed whatever those calendars used to be
+// named, however out of date, before snapping to the real (possibly renamed) title.
 function getLoadingCalendarTitle(calendarId) {
-  if (calendarId === 'kkot') return '🌸 꽃잎반 모여라 캘린더';
-  if (calendarId === 'cw') return '🛝 모아엘가 모여라 캘린더';
-  return '모여라 캘린더';
+  return '캘린더 불러오는 중...';
 }
 
 function createLoadingCalendarShell(calendarId) {
