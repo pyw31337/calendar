@@ -349,14 +349,20 @@
     }
 
 
-    .header-left { display: flex; align-items: center; gap: 10px; }
+    /* Shrinks (min-width:0 overrides the flex-item default of not shrinking below content
+       width) so a long calendar title truncates instead of pushing header-actions -- which
+       stays flex-shrink:0 -- off the row on narrow screens. */
+    .header-left { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1 1 auto; }
 
-    .calendar-title { font-size: 1.25rem; font-weight: 800; color: var(--text-main); letter-spacing: -0.02em; }
+    .calendar-title {
+      font-size: 1.25rem; font-weight: 800; color: var(--text-main); letter-spacing: -0.02em;
+      min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
     @media (min-width: 768px) { .calendar-title { font-size: 1.35rem; } }
     
     .calendar-desc {
       font-size: 0.825rem; color: var(--text-muted); margin-top: 2px;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      white-space: normal; word-break: keep-all; overflow-wrap: break-word;
     }
     @media (min-width: 768px) { .calendar-desc { font-size: 0.875rem; } }
 
@@ -1071,6 +1077,16 @@
       .memo-capsule-badge { padding: 4px 12px; font-size: 0.8rem; }
     }
 
+    /* D-day capsule on the confirmed-meeting banner */
+    .dday-badge {
+      display: inline-flex; align-items: center; flex-shrink: 0; padding: 4px 12px;
+      border-radius: var(--radius-full); font-size: 0.75rem; font-weight: 800; line-height: 1.3;
+      color: #FFFFFF; background: var(--accent-gradient); box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+    }
+    @media (min-width: 640px) {
+      .dday-badge { padding: 4px 14px; font-size: 0.8rem; }
+    }
+
     .date-item-left {
       display: flex;
       flex-direction: column;
@@ -1563,6 +1579,18 @@ function formatConfirmedMeetingLabel(dateStr) {
   const dateObj = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
   const dayName = ['일', '월', '화', '수', '목', '금', '토'][dateObj.getDay()];
   return `[모임확정] ${y.slice(2)}.${m}.${d} (${dayName})`;
+}
+
+// D-day label for the confirmed-meeting banner -- 'D-DAY' for today, 'D-N' for N days out.
+// Confirmed-meeting banners never show past dates (see visibleConfirmedMeetings' >= today
+// filter), so there's no D+N case to handle here.
+function formatDDayLabel(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const target = new Date(y, m - 1, d);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const diffDays = Math.round((target - today) / 86400000);
+  return diffDays <= 0 ? 'D-DAY' : `D-${diffDays}`;
 }
 
 // calendar.confirmedMeeting supports multiple confirmed dates as an array of
@@ -6594,12 +6622,13 @@ function App() {
   }, /*#__PURE__*/React.createElement("div", {
     className: "header-left"
   }, /*#__PURE__*/React.createElement("div", {
-    style: { position: 'relative' }
+    style: { position: 'relative', minWidth: 0 }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       alignItems: 'center',
-      gap: '10px'
+      gap: '10px',
+      minWidth: 0
     }
   }, /*#__PURE__*/React.createElement("span", {
     ref: titleRef,
@@ -6765,8 +6794,7 @@ function App() {
         borderRadius: 'var(--radius-md)',
         padding: '10px 14px',
         display: 'flex',
-        alignItems: 'center',
-        flexWrap: 'wrap',
+        flexDirection: 'column',
         gap: '8px',
         cursor: 'pointer'
       },
@@ -6775,6 +6803,8 @@ function App() {
         setSelectedDate(meeting.date);
         setIsModalOpen(true);
       }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }
     }, /*#__PURE__*/React.createElement("span", {
       className: "memo-capsule-badge",
       style: {
@@ -6783,7 +6813,11 @@ function App() {
         border: 'none',
         boxShadow: 'none'
       }
-    }, formatConfirmedMeetingLabel(meeting.date)), memoEntries.map(entry => {
+    }, formatConfirmedMeetingLabel(meeting.date)), /*#__PURE__*/React.createElement("span", {
+      className: "dday-badge"
+    }, formatDDayLabel(meeting.date))), memoEntries.length > 0 && /*#__PURE__*/React.createElement("div", {
+      style: { display: 'flex', flexWrap: 'wrap', gap: '8px' }
+    }, memoEntries.map(entry => {
       const p = getActiveParticipants(activeCal).find(part => part.id === entry.participantId);
       if (!p) return null;
       const entryUrl = extractFirstUrl(entry.note);
@@ -6795,7 +6829,7 @@ function App() {
         style: { backgroundColor: p.color, color: getContrastTextColor(p.color) },
         title: `${p.name}: ${noteTextOnly}`
       }, noteTextOnly);
-    }));
+    })));
   })), /*#__PURE__*/React.createElement(CalendarGrid, {
 
     calendar: activeCal,
@@ -10833,7 +10867,8 @@ function DateModal({
     className: "modal-footer",
     style: {
       display: 'flex',
-      justifyContent: 'flex-end',
+      justifyContent: 'space-between',
+      alignItems: 'center',
       gap: '8px'
     }
   }, /*#__PURE__*/React.createElement("button", {
@@ -10842,14 +10877,16 @@ function DateModal({
     disabled: isSubmitting,
     onClick: handleConfirmMeeting,
     style: {
-      color: isConfirmed ? '#4B5563' : '#4F46E5',
-      border: isConfirmed ? 'none' : '1px solid #C7D2FE',
-      backgroundColor: isConfirmed ? 'transparent' : '#EEF2FF',
+      color: isConfirmed ? 'var(--text-muted)' : '#4F46E5',
+      border: isConfirmed ? 'none' : '1px solid rgba(79, 70, 229, 0.35)',
+      backgroundColor: isConfirmed ? 'transparent' : 'rgba(79, 70, 229, 0.12)',
       whiteSpace: 'nowrap',
       opacity: isSubmitting ? 0.75 : 1,
       cursor: isSubmitting ? 'wait' : 'pointer'
     }
-  }, isConfirmed ? "확정취소" : "모임확정"), /*#__PURE__*/React.createElement("button", {
+  }, isConfirmed ? "확정취소" : "모임확정"), /*#__PURE__*/React.createElement("div", {
+    style: { display: 'flex', gap: '8px' }
+  }, /*#__PURE__*/React.createElement("button", {
     type: "button",
     className: "btn btn-secondary",
     disabled: isSubmitting,
@@ -10857,7 +10894,9 @@ function DateModal({
     style: {
       whiteSpace: 'nowrap',
       opacity: isSubmitting ? 0.75 : 1,
-      cursor: isSubmitting ? 'wait' : 'pointer'
+      cursor: isSubmitting ? 'wait' : 'pointer',
+      backgroundColor: 'transparent',
+      border: 'none'
     }
   }, "닫기"), /*#__PURE__*/React.createElement("button", {
     type: "submit",
@@ -10869,7 +10908,7 @@ function DateModal({
       opacity: isSubmitting ? 0.75 : 1,
       cursor: isSubmitting ? 'wait' : 'pointer'
     }
-  }, isSubmitting ? "저장 중..." : "등록")))), isSheetOpen && /*#__PURE__*/React.createElement("div", {
+  }, isSubmitting ? "저장 중..." : "등록"))))), isSheetOpen && /*#__PURE__*/React.createElement("div", {
     className: "bottom-sheet-overlay",
     onClick: () => {
       if (!isSubmitting) setIsSheetOpen(false);
