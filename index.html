@@ -1594,10 +1594,11 @@ function isInternalTestCalendarId(id) {
   return typeof id === 'string' && /^(stress_|test_)/.test(id);
 }
 
+// Any well-formed id is allowed -- calendar creation isn't restricted to a fixed allowlist
+// anymore. The matching Firestore/Storage security rules must allow the same format (see
+// firestore.rules/storage.rules), or writes from here will still be rejected server-side.
 function isAllowedCalendarId(id) {
-  if (!isValidCalendarId(id)) return false;
-  if (PUBLIC_CALENDAR_IDS.includes(id)) return true;
-  return Boolean(window.__ALLOW_INTERNAL_TEST_CALENDARS__ && isInternalTestCalendarId(id));
+  return isValidCalendarId(id);
 }
 
 function sanitizeText(value, maxLength = 120) {
@@ -3690,7 +3691,7 @@ function buildServiceUsageMetrics(calendarStats) {
 function createCalendarBackupPayload(calendarsList, targetCalendarId = '') {
   const selected = targetCalendarId
     ? calendarsList.filter(calendar => calendar.id === targetCalendarId)
-    : calendarsList.filter(calendar => PUBLIC_CALENDAR_IDS.includes(calendar.id));
+    : calendarsList.filter(calendar => isValidCalendarId(calendar.id));
   return {
     type: 'gather-calendar-backup',
     version: 1,
@@ -3813,7 +3814,7 @@ function extractCalendarsFromBackup(payload) {
 function validateBackupCalendars(calendarsList) {
   const normalized = calendarsList
     .map(normalizeCalendarForSave)
-    .filter(calendar => calendar && PUBLIC_CALENDAR_IDS.includes(calendar.id));
+    .filter(calendar => calendar && isValidCalendarId(calendar.id));
   const uniqueById = new Map();
   normalized.forEach(calendar => uniqueById.set(calendar.id, calendar));
   const result = Array.from(uniqueById.values());
@@ -4253,7 +4254,6 @@ function AdminDashboard({ initialCalendars }) {
     const titleVal = (rawTitle || '').trim();
     if (!id) return '캘린더 ID를 입력해 주세요.';
     if (!isValidCalendarId(id)) return '캘린더 ID는 영문, 숫자, -, _ 조합으로 입력해 주세요.';
-    if (!isAllowedCalendarId(id)) return '운영 캘린더는 kkot, cw만 사용할 수 있습니다.';
     if (serverCalendars.some(c => c.id === id)) return '이미 존재하는 캘린더 ID입니다.';
     if (!titleVal) return '캘린더 제목을 입력해 주세요.';
 
