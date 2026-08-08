@@ -174,6 +174,11 @@
     :root[data-theme="dark"] .form-select,
     :root[data-theme="dark"] .form-input,
     :root[data-theme="dark"] .form-textarea { background: #1B2540; }
+    /* Status/date-count badges (확정/전원/N명 가능 etc.) set pastel light-mode colors inline;
+       darkening them in place (rather than threading dark variants through every call site)
+       keeps every one of these chips legible without a per-badge color prop. */
+    :root[data-theme="dark"] .status-badge,
+    :root[data-theme="dark"] .date-item-badge { filter: brightness(0.75) saturate(1.15); }
     :root[data-theme="dark"] {
       --bg-primary: #0B1120;
       --bg-secondary: #131B2E;
@@ -243,24 +248,18 @@
       .main-header-inner { padding: 18px 24px 8px; }
     }
 
-    .main-header-top-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+    /* Calendar name + search/settings buttons share one row (space-between); the description
+       (when present) is its own full-width row underneath, truncated to a single line rather
+       than fighting the title row for space. */
+    .main-header-top-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 
-    /* Search + settings: no fill/border (icon-only), pinned to the header's true right edge as
-       one group via position: fixed -- .main-header-inner's own max-width: 1100px centering
-       would otherwise cap how far right a normally-positioned child could reach on wide
-       viewports. Grouped in one fixed wrapper (rather than each button fixed separately) so
-       their spacing is set once, in one place. */
+    /* Search + settings: no fill/border (icon-only), grouped in one flex wrapper so their own
+       spacing is set once, in one place. */
     .header-actions {
       display: flex;
       align-items: center;
       gap: 4px;
-      position: fixed;
-      top: 14px;
-      right: 16px;
-      z-index: 501;
-    }
-    @media (min-width: 768px) {
-      .header-actions { top: 18px; right: 24px; }
+      flex-shrink: 0;
     }
     .header-search-btn,
     .header-theme-btn,
@@ -355,33 +354,11 @@
     .calendar-title { font-size: 1.25rem; font-weight: 800; color: var(--text-main); letter-spacing: -0.02em; }
     @media (min-width: 768px) { .calendar-title { font-size: 1.35rem; } }
     
-    .calendar-desc { font-size: 0.825rem; color: var(--text-muted); margin-top: 2px; }
+    .calendar-desc {
+      font-size: 0.825rem; color: var(--text-muted); margin-top: 2px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
     @media (min-width: 768px) { .calendar-desc { font-size: 0.875rem; } }
-
-    .header-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; position: relative; width: 100%; justify-content: flex-start; }
-    @media (min-width: 768px) {
-      .header-actions { width: auto; justify-content: flex-end; }
-    }
-    @media (max-width: 480px) {
-      .header-actions { justify-content: space-between; }
-      .header-actions > .btn { padding: 8px 6px; font-size: 0.78rem; gap: 4px; justify-content: center; }
-      .header-actions > .participants-anchor { flex: 1; min-width: 0; }
-      .header-actions > .participants-anchor > .btn { width: 100%; white-space: nowrap; }
-      .header-actions > .btn:nth-child(2),
-      .header-actions > .btn:nth-child(3) { width: 50px; flex: 0 0 50px; }
-      .header-actions .btn svg { width: 18px; height: 18px; }
-    }
-
-    /* Participants Popover Speech Bubble -- anchored to just the participants button (not the
-       whole header-actions row) so it stays centered under the button regardless of how many
-       sibling buttons sit next to it or how wide the row is. The bubble and its arrow both use
-       left: 50% + translateX(-50%) on the SAME anchor, so the arrow always points at the exact
-       horizontal center of the button, in every browser (translateX(-50%) is standard CSS
-       Transforms Level 1, uniformly supported since Safari 9 / Firefox 16 / Chrome 36). */
-    .participants-anchor { position: relative; display: inline-flex; }
-    @media (max-width: 480px) {
-      .participants-anchor { display: flex; }
-    }
 
     /* Buttons */
     .btn {
@@ -863,7 +840,7 @@
       bottom: 0;
       transform: translateX(-50%);
       width: min(100%, 420px);
-      background: #FFFFFF;
+      background: var(--bg-card);
       border-radius: 18px 18px 0 0;
       box-shadow: 0 -20px 40px rgba(15, 23, 42, 0.24);
       z-index: 1200;
@@ -874,6 +851,13 @@
       from { transform: translate(-50%, 18px); opacity: 0.85; }
       to { transform: translate(-50%, 0); opacity: 1; }
     }
+    /* Brief flash on the chat bubble a global-search result navigates to, so it's obvious
+       which message was jumped to once the view scrolls it into place. */
+    @keyframes search-result-flash {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(79, 70, 229, 0); }
+      15%, 60% { box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.5); }
+    }
+    .search-result-flash { animation: search-result-flash 1.6s ease; border-radius: var(--radius-md); }
     .poll-voter-sheet-header {
       display: flex;
       align-items: center;
@@ -892,7 +876,7 @@
       padding: 14px 16px;
       border: 1px solid var(--border-subtle);
       border-radius: 12px;
-      background: #F8FAFC;
+      background: var(--bg-primary);
       color: var(--text-main);
       font-family: inherit;
       font-size: 0.95rem;
@@ -934,6 +918,20 @@
     .summary-title { font-size: 1.05rem; font-weight: 800; color: var(--text-main); margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
     @media (min-width: 640px) {
       .summary-title { font-size: 1.15rem; margin-bottom: 16px; }
+    }
+    .section-count-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 22px;
+      height: 20px;
+      padding: 0 6px;
+      border-radius: var(--radius-full);
+      background: color-mix(in srgb, currentColor 16%, transparent);
+      color: currentColor;
+      font-size: 0.72rem;
+      font-weight: 800;
+      line-height: 1;
     }
     .summary-title.is-toggleable {
       cursor: pointer;
@@ -1186,7 +1184,7 @@
       z-index: 2000; display: flex; align-items: flex-end; justify-content: center;
     }
     .bottom-sheet {
-      background: #FFFFFF; width: 100%; max-width: 480px;
+      background: var(--bg-card); width: 100%; max-width: 480px;
       border-radius: 20px 20px 0 0; box-shadow: 0 -8px 30px rgba(0,0,0,0.15);
       animation: sheet-slide-up 0.25s cubic-bezier(0.16, 1, 0.3, 1);
       display: flex; flex-direction: column; max-height: 70vh;
@@ -1199,7 +1197,7 @@
     .bottom-sheet-header {
       padding: 16px 20px; border-bottom: 1px solid var(--border-subtle);
       display: flex; align-items: center; justify-content: space-between;
-      background: #F8FAFC;
+      background: var(--bg-primary);
       border-radius: 20px 20px 0 0;
     }
     .bottom-sheet-header h4 { font-size: 1rem; font-weight: 800; margin: 0; }
@@ -1208,7 +1206,7 @@
     }
     .bottom-sheet-item {
       width: 100%; display: flex; align-items: center; gap: 12px; padding: 14px 16px;
-      background: #F8FAFC; border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
+      background: var(--bg-primary); border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
       cursor: pointer; text-align: left; transition: all 0.2s ease; font-family: inherit; font-size: 0.95rem;
       color: var(--text-main);
     }
@@ -1227,7 +1225,7 @@
       -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 16px;
     }
     .modal-container {
-      background: #FFFFFF; border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
+      background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
       width: 100%; max-width: 480px; box-shadow: var(--shadow-lg); overflow: hidden; color: var(--text-main);
       max-height: min(92vh, 860px); max-height: min(92dvh, 860px);
       display: flex; flex-direction: column;
@@ -1235,13 +1233,13 @@
     .modal-container > form {
       display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; overflow: hidden;
     }
-    .modal-header { padding: var(--space-5); border-bottom: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: space-between; background: #F8FAFC; flex: 0 0 auto; }
+    .modal-header { padding: var(--space-5); border-bottom: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: space-between; background: var(--bg-primary); flex: 0 0 auto; }
     .modal-body {
       padding: var(--space-5); display: flex; flex-direction: column; gap: var(--space-4);
       overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
       flex: 1 1 auto; min-height: 0;
     }
-    .modal-footer { padding: var(--space-5); border-top: 1px solid var(--border-subtle); display: flex; justify-content: flex-end; gap: 10px; background: #F8FAFC; flex: 0 0 auto; }
+    .modal-footer { padding: var(--space-5); border-top: 1px solid var(--border-subtle); display: flex; justify-content: flex-end; gap: 10px; background: var(--bg-primary); flex: 0 0 auto; }
     @media (max-width: 640px) {
       .modal-overlay { align-items: center; padding: 12px; }
       .modal-container { max-height: calc(100vh - 24px); max-height: calc(100dvh - 24px); }
@@ -1596,10 +1594,11 @@ function isInternalTestCalendarId(id) {
   return typeof id === 'string' && /^(stress_|test_)/.test(id);
 }
 
+// Any well-formed id is allowed -- calendar creation isn't restricted to a fixed allowlist
+// anymore. The matching Firestore/Storage security rules must allow the same format (see
+// firestore.rules/storage.rules), or writes from here will still be rejected server-side.
 function isAllowedCalendarId(id) {
-  if (!isValidCalendarId(id)) return false;
-  if (PUBLIC_CALENDAR_IDS.includes(id)) return true;
-  return Boolean(window.__ALLOW_INTERNAL_TEST_CALENDARS__ && isInternalTestCalendarId(id));
+  return isValidCalendarId(id);
 }
 
 function sanitizeText(value, maxLength = 120) {
@@ -3692,7 +3691,7 @@ function buildServiceUsageMetrics(calendarStats) {
 function createCalendarBackupPayload(calendarsList, targetCalendarId = '') {
   const selected = targetCalendarId
     ? calendarsList.filter(calendar => calendar.id === targetCalendarId)
-    : calendarsList.filter(calendar => PUBLIC_CALENDAR_IDS.includes(calendar.id));
+    : calendarsList.filter(calendar => isValidCalendarId(calendar.id));
   return {
     type: 'gather-calendar-backup',
     version: 1,
@@ -3752,30 +3751,53 @@ function addDaysToDateStr(dateStr, days) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
-function buildConfirmedMeetingICS(calendar, dateStr, description) {
+function buildICSTimestamp() {
   const now = new Date();
   const pad = n => String(n).padStart(2, '0');
-  const dtstamp = `${now.getUTCFullYear()}${pad(now.getUTCMonth() + 1)}${pad(now.getUTCDate())}T${pad(now.getUTCHours())}${pad(now.getUTCMinutes())}${pad(now.getUTCSeconds())}Z`;
-  const lines = [
-    'BEGIN:VCALENDAR',
-    'VERSION:2.0',
-    'PRODID:-//모여라 캘린더//KO',
-    'CALSCALE:GREGORIAN',
-    'BEGIN:VEVENT',
-    `UID:${calendar.id}_${dateStr}@moyeora-calendar`,
-    `DTSTAMP:${dtstamp}`,
-    `DTSTART;VALUE=DATE:${formatICSDateOnly(dateStr)}`,
-    `DTEND;VALUE=DATE:${formatICSDateOnly(addDaysToDateStr(dateStr, 1))}`,
-    `SUMMARY:${escapeICSText(`${calendar.title} 모임`)}`
-  ];
-  if (description) lines.push(`DESCRIPTION:${escapeICSText(description)}`);
-  lines.push('END:VEVENT', 'END:VCALENDAR');
+  return `${now.getUTCFullYear()}${pad(now.getUTCMonth() + 1)}${pad(now.getUTCDate())}T${pad(now.getUTCHours())}${pad(now.getUTCMinutes())}${pad(now.getUTCSeconds())}Z`;
+}
+
+// Wraps one VEVENT per {dateStr, description} entry in a single VCALENDAR, so every confirmed
+// meeting for a calendar can be imported at once instead of one file per date.
+function buildCalendarConfirmedMeetingsICS(calendar, events) {
+  const dtstamp = buildICSTimestamp();
+  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//모여라 캘린더//KO', 'CALSCALE:GREGORIAN'];
+  events.forEach(({ dateStr, description }) => {
+    lines.push(
+      'BEGIN:VEVENT',
+      `UID:${calendar.id}_${dateStr}@moyeora-calendar`,
+      `DTSTAMP:${dtstamp}`,
+      `DTSTART;VALUE=DATE:${formatICSDateOnly(dateStr)}`,
+      `DTEND;VALUE=DATE:${formatICSDateOnly(addDaysToDateStr(dateStr, 1))}`,
+      `SUMMARY:${escapeICSText(`${calendar.title} 모임`)}`
+    );
+    if (description) lines.push(`DESCRIPTION:${escapeICSText(description)}`);
+    lines.push('END:VEVENT');
+  });
+  lines.push('END:VCALENDAR');
   return lines.join('\r\n');
 }
 
-function exportConfirmedMeetingToICS(calendar, dateStr, description) {
-  const ics = buildConfirmedMeetingICS(calendar, dateStr, description);
-  downloadTextFile(`${calendar.id}_${dateStr}.ics`, ics, 'text/calendar');
+// Per-date description: the admin's own confirmation note plus every participant's memo for
+// that date, same content the old per-row export used to show.
+function buildConfirmedMeetingDescription(calendar, dateStr) {
+  const meeting = getConfirmedMeetings(calendar).find(m => m.date === dateStr);
+  const participantsMap = getActiveParticipants(calendar).reduce((acc, p) => {
+    acc[p.id] = p;
+    return acc;
+  }, {});
+  const memoLines = getActiveAvailabilities(calendar)
+    .filter(item => item.date === dateStr && item.note && item.note.trim())
+    .map(item => `${participantsMap[item.participantId]?.name || ''}: ${item.note}`.trim())
+    .join('\n');
+  return [meeting?.note, memoLines].filter(Boolean).join('\n\n');
+}
+
+function exportCalendarConfirmedMeetingsToICS(calendar) {
+  const dates = getConfirmedMeetings(calendar).map(m => m.date).sort();
+  const events = dates.map(dateStr => ({ dateStr, description: buildConfirmedMeetingDescription(calendar, dateStr) }));
+  const ics = buildCalendarConfirmedMeetingsICS(calendar, events);
+  downloadTextFile(`${calendar.id}_confirmed_meetings.ics`, ics, 'text/calendar');
 }
 
 function extractCalendarsFromBackup(payload) {
@@ -3792,7 +3814,7 @@ function extractCalendarsFromBackup(payload) {
 function validateBackupCalendars(calendarsList) {
   const normalized = calendarsList
     .map(normalizeCalendarForSave)
-    .filter(calendar => calendar && PUBLIC_CALENDAR_IDS.includes(calendar.id));
+    .filter(calendar => calendar && isValidCalendarId(calendar.id));
   const uniqueById = new Map();
   normalized.forEach(calendar => uniqueById.set(calendar.id, calendar));
   const result = Array.from(uniqueById.values());
@@ -4232,7 +4254,6 @@ function AdminDashboard({ initialCalendars }) {
     const titleVal = (rawTitle || '').trim();
     if (!id) return '캘린더 ID를 입력해 주세요.';
     if (!isValidCalendarId(id)) return '캘린더 ID는 영문, 숫자, -, _ 조합으로 입력해 주세요.';
-    if (!isAllowedCalendarId(id)) return '운영 캘린더는 kkot, cw만 사용할 수 있습니다.';
     if (serverCalendars.some(c => c.id === id)) return '이미 존재하는 캘린더 ID입니다.';
     if (!titleVal) return '캘린더 제목을 입력해 주세요.';
 
@@ -5602,6 +5623,16 @@ function App() {
     setThemeChoice(next);
   };
   const isDarkTheme = themeChoice === 'dark' || (themeChoice === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+
+  // Text-size preference, relative to the browser's own default (100%). The whole app is built
+  // on rem units, so scaling the root font-size scales every component's text proportionally
+  // with no per-component changes needed.
+  const [fontScalePercent, setFontScalePercent] = React.useState(() => Number(getLocalStorage().getItem('gather_font_scale_v1')) || 100);
+  React.useEffect(() => {
+    document.documentElement.style.fontSize = `${fontScalePercent}%`;
+    getLocalStorage().setItem('gather_font_scale_v1', String(fontScalePercent));
+  }, [fontScalePercent]);
+
   const [adminActivityLogs, setAdminActivityLogs] = React.useState([]);
   const [isShareOpen, setIsShareOpen] = React.useState(false);
   const [isChatShareOpen, setIsChatShareOpen] = React.useState(false);
@@ -6643,9 +6674,7 @@ function App() {
   }, "<팁>"), `
 모임 가능한 여러 일자를 선택해서
 등록해 놓아야, 공통모임 일자를
-뽑기가 수월해짐.`))), activeCal?.description && /*#__PURE__*/React.createElement("div", {
-    className: "calendar-desc"
-  }, activeCal.description))), /*#__PURE__*/React.createElement("div", {
+뽑기가 수월해짐.`))))), /*#__PURE__*/React.createElement("div", {
     className: "header-actions"
   }, /*#__PURE__*/React.createElement("button", {
     className: "btn header-search-btn",
@@ -6655,13 +6684,6 @@ function App() {
       padding: '10px'
     }
   }, /*#__PURE__*/React.createElement(SearchIcon, null)), /*#__PURE__*/React.createElement("button", {
-    className: "btn header-theme-btn",
-    onClick: toggleTheme,
-    title: isDarkTheme ? "라이트 모드로 전환" : "다크 모드로 전환",
-    style: {
-      padding: '10px'
-    }
-  }, isDarkTheme ? /*#__PURE__*/React.createElement(SunIcon, null) : /*#__PURE__*/React.createElement(MoonIcon, null)), /*#__PURE__*/React.createElement("button", {
     className: "btn header-settings-btn",
     onClick: () => {
       if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 설정을 수정해 주세요.')) setIsAdminOpen(true);
@@ -6689,7 +6711,9 @@ function App() {
     d: "M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065"
   }), /*#__PURE__*/React.createElement("path", {
     d: "M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0"
-  }))))), /*#__PURE__*/React.createElement("div", {
+  }))))), activeCal?.description && /*#__PURE__*/React.createElement("div", {
+    className: "calendar-desc"
+  }, activeCal.description), /*#__PURE__*/React.createElement("div", {
     className: "main-menu-bar"
   }, /*#__PURE__*/React.createElement("button", {
     type: "button",
@@ -6726,7 +6750,7 @@ function App() {
     return /*#__PURE__*/React.createElement("div", {
       key: meeting.date,
       style: {
-        background: 'linear-gradient(#fff, #fff) padding-box, var(--accent-gradient) border-box',
+        background: 'linear-gradient(var(--bg-card), var(--bg-card)) padding-box, var(--accent-gradient) border-box',
         border: '1px solid transparent',
         borderRadius: 'var(--radius-md)',
         padding: '10px 14px',
@@ -6744,7 +6768,7 @@ function App() {
     }, /*#__PURE__*/React.createElement("span", {
       className: "memo-capsule-badge",
       style: {
-        backgroundColor: '#FFFFFF',
+        backgroundColor: 'var(--bg-card)',
         color: '#4F46E5',
         border: 'none',
         boxShadow: 'none'
@@ -6864,7 +6888,12 @@ function App() {
     onRequestConfirm: showConfirmDialog,
     onClose: () => setIsAdminOpen(false),
     showToast: showToast,
-    onDeleteLog: handleDeleteActivityLog
+    onDeleteLog: handleDeleteActivityLog,
+    themeChoice: themeChoice,
+    toggleTheme: toggleTheme,
+    isDarkTheme: isDarkTheme,
+    fontScalePercent: fontScalePercent,
+    setFontScalePercent: setFontScalePercent
   }), isGlobalSearchOpen && /*#__PURE__*/React.createElement(GlobalSearchModal, {
     calendar: activeCal,
     chatMessages: chatMessages,
@@ -6873,7 +6902,19 @@ function App() {
       setSelectedDate(d);
       setIsModalOpen(true);
     },
-    onOpenChat: () => setIsChatSheetOpen(true)
+    onOpenChatMessage: messageId => {
+      changeView('chat');
+      // ChatRoomView mounts on the next render after changeView's setActiveView -- a short
+      // delay is simplest here (matches this file's existing scroll-after-render patterns)
+      // rather than threading a "pending scroll target" prop through just for this.
+      setTimeout(() => {
+        const el = document.querySelector(`[data-msg-row-id="${messageId}"]`);
+        if (!el) return;
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.classList.add('search-result-flash');
+        setTimeout(() => el.classList.remove('search-result-flash'), 1700);
+      }, 350);
+    }
   }), isShareOpen && /*#__PURE__*/React.createElement(ShareModal, {
     calendar: activeCal,
     showToast: showToast,
@@ -8183,11 +8224,12 @@ function renderChatMessageImages(msg, setActiveLightbox, singleImageStyle = {}) 
   if (entries.length === 0) return null;
   const thumbs = entries.map(e => e.thumb);
   const displayUrls = entries.map(e => e.full);
+  const meta = entries.map(() => ({ timestamp: msg.timestamp }));
   if (thumbs.length === 1) {
     return /*#__PURE__*/React.createElement('img', {
       src: thumbs[0],
       alt: '첨부이미지',
-      onClick: () => setActiveLightbox && setActiveLightbox({ urls: displayUrls, index: 0 }),
+      onClick: () => setActiveLightbox && setActiveLightbox({ urls: displayUrls, index: 0, meta }),
       style: { display: 'block', borderRadius: '8px', cursor: 'pointer', objectFit: 'cover', ...singleImageStyle }
     });
   }
@@ -8197,16 +8239,109 @@ function renderChatMessageImages(msg, setActiveLightbox, singleImageStyle = {}) 
     key: idx,
     src: thumb,
     alt: `첨부이미지 ${idx + 1}`,
-    onClick: () => setActiveLightbox && setActiveLightbox({ urls: displayUrls, index: idx }),
+    onClick: () => setActiveLightbox && setActiveLightbox({ urls: displayUrls, index: idx, meta }),
     style: { display: 'block', width: '56px', height: '56px', borderRadius: '6px', cursor: 'pointer', objectFit: 'cover' }
   })));
 }
 
+// Best-effort per-image metadata for the Lightbox info overlay. Chat images are stored either
+// inline as base64 data: URIs (exact size/type derivable from the string itself) or as uploaded
+// Firebase Storage URLs (always re-encoded to .jpg -- see compressImageForUpload -- so the type
+// is known but the exact byte size isn't available without a network request, shown as '-').
+function formatBytes(bytes) {
+  if (typeof bytes !== 'number' || !isFinite(bytes) || bytes < 0) return null;
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function getDataUrlInfo(url) {
+  if (typeof url !== 'string' || !url.startsWith('data:')) return null;
+  const match = url.match(/^data:([^;,]*)(;base64)?,/);
+  if (!match) return null;
+  const mime = match[1] || 'application/octet-stream';
+  const dataPart = url.slice(match[0].length);
+  let sizeBytes;
+  if (match[2]) {
+    const padding = dataPart.endsWith('==') ? 2 : dataPart.endsWith('=') ? 1 : 0;
+    sizeBytes = Math.floor(dataPart.length * 3 / 4) - padding;
+  } else {
+    sizeBytes = decodeURIComponent(dataPart).length;
+  }
+  return { mime, sizeBytes };
+}
+
+function getImageExtFromMime(mime) {
+  const map = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif', 'image/heic': 'heic' };
+  if (mime && map[mime]) return map[mime];
+  const sub = mime && mime.split('/')[1];
+  return sub ? sub.split('+')[0] : 'jpg';
+}
+
+function buildLightboxImageInfo(url, timestamp) {
+  const dataInfo = getDataUrlInfo(url);
+  const mime = dataInfo ? dataInfo.mime : 'image/jpeg';
+  const ext = getImageExtFromMime(mime);
+  const fileDate = timestamp ? new Date(timestamp) : null;
+  const fileName = fileDate
+    ? `moyeora_${fileDate.getFullYear()}${String(fileDate.getMonth() + 1).padStart(2, '0')}${String(fileDate.getDate()).padStart(2, '0')}_${String(fileDate.getHours()).padStart(2, '0')}${String(fileDate.getMinutes()).padStart(2, '0')}${String(fileDate.getSeconds()).padStart(2, '0')}.${ext}`
+    : `moyeora_image.${ext}`;
+  let dateLabel = null;
+  if (timestamp) {
+    const { dateStr, timeStr } = formatCommentDate(timestamp);
+    dateLabel = `${dateStr} ${timeStr}`;
+  }
+  return {
+    dateLabel,
+    fileName,
+    sizeLabel: dataInfo ? formatBytes(dataInfo.sizeBytes) : null,
+    typeLabel: ext.toUpperCase()
+  };
+}
+
+// Black-gradient info panel shown at the bottom of the active photo when the Lightbox's
+// tap-to-toggle info mode is on -- shows whatever metadata can actually be derived for that
+// image (see buildLightboxImageInfo); rows with no derivable value are simply omitted.
+function LightboxInfoPanel({ info }) {
+  const rows = [
+    ['업로드', info.dateLabel],
+    ['파일명', info.fileName],
+    ['용량', info.sizeLabel || '-'],
+    ['형식', info.typeLabel]
+  ].filter(([, value]) => value);
+  if (rows.length === 0) return null;
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: 'absolute', left: 0, right: 0, bottom: 0, minWidth: '190px',
+      padding: '36px 14px 12px',
+      background: 'linear-gradient(to top, rgba(0,0,0,0.82), rgba(0,0,0,0.45) 60%, transparent)',
+      borderRadius: '0 0 12px 12px',
+      color: '#FFFFFF', fontSize: '0.76rem', lineHeight: 1.7,
+      pointerEvents: 'none'
+    }
+  }, rows.map(([label, value]) => /*#__PURE__*/React.createElement("div", {
+    key: label,
+    style: { display: 'flex', gap: '8px' }
+  }, /*#__PURE__*/React.createElement("span", { style: { opacity: 0.7, flexShrink: 0, minWidth: '40px' } }, label), /*#__PURE__*/React.createElement("span", { style: { wordBreak: 'break-all' } }, value))));
+}
+
 // Full-screen image viewer for a message's photo(s) -- swipeable (touch) with left/right arrow
 // buttons and dot indicators when there's more than one image, matching the KakaoTalk-style
-// multi-photo gallery UX the chat bubbles are modeled after.
-function Lightbox({ urls, index, onClose, onNavigate }) {
+// multi-photo gallery UX the chat bubbles are modeled after. `meta` (optional, parallel to
+// `urls`) supplies each image's { timestamp } for the tap-to-toggle info overlay.
+function Lightbox({ urls, index, onClose, onNavigate, meta }) {
   const total = urls.length;
+  const [showInfo, setShowInfo] = React.useState(false);
+  React.useEffect(() => { setShowInfo(false); }, [index]);
+  const currentInfo = React.useMemo(
+    () => buildLightboxImageInfo(urls[index], meta && meta[index] && meta[index].timestamp),
+    [urls, index, meta]
+  );
+  const handleImageTap = e => {
+    e.stopPropagation();
+    if (wasDraggedRef.current) { wasDraggedRef.current = false; return; }
+    setShowInfo(prev => !prev);
+  };
   const imgAreaRef = React.useRef(null);
   const widthRef = React.useRef(0);
   const dragStartXRef = React.useRef(null);
@@ -8324,7 +8459,19 @@ function Lightbox({ urls, index, onClose, onNavigate }) {
 
   const renderSlide = (url, slot) => /*#__PURE__*/React.createElement("div", {
     style: { width: '33.3333%', flexShrink: 0, height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }
-  }, url && /*#__PURE__*/React.createElement("img", {
+  }, url && (slot === 'current' ? /*#__PURE__*/React.createElement("div", {
+    style: { position: 'relative', display: 'inline-flex', maxWidth: '100%', maxHeight: '100%' },
+    onClick: handleImageTap
+  }, /*#__PURE__*/React.createElement("img", {
+    src: url,
+    alt: "원본 이미지",
+    "data-slide": slot,
+    draggable: false,
+    style: {
+      maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: '12px',
+      boxShadow: '0 24px 80px rgba(0,0,0,0.6)', display: 'block'
+    }
+  }), showInfo && /*#__PURE__*/React.createElement(LightboxInfoPanel, { info: currentInfo })) : /*#__PURE__*/React.createElement("img", {
     src: url,
     alt: "원본 이미지",
     "data-slide": slot,
@@ -8334,7 +8481,7 @@ function Lightbox({ urls, index, onClose, onNavigate }) {
       maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: '12px',
       boxShadow: '0 24px 80px rgba(0,0,0,0.6)'
     }
-  }));
+  })));
 
   return /*#__PURE__*/React.createElement("div", {
     onClick: handleOverlayClick,
@@ -8404,16 +8551,18 @@ function Lightbox({ urls, index, onClose, onNavigate }) {
       transition: transitionOn ? 'transform 280ms ease' : 'none'
     }
   }, renderSlide(index > 0 ? urls[index - 1] : null, 'prev'), renderSlide(urls[index], 'current'), renderSlide(index < total - 1 ? urls[index + 1] : null, 'next')))
-    : /*#__PURE__*/React.createElement("img", {
+    : /*#__PURE__*/React.createElement("div", {
+    style: { position: 'relative', display: 'inline-flex', maxWidth: '92vw', maxHeight: '82vh' },
+    onClick: handleImageTap
+  }, /*#__PURE__*/React.createElement("img", {
     src: urls[index],
     alt: "원본 이미지",
     draggable: false,
-    onClick: e => e.stopPropagation(),
     style: {
       maxWidth: '92vw', maxHeight: '82vh', borderRadius: '12px', objectFit: 'contain',
-      boxShadow: '0 24px 80px rgba(0,0,0,0.6)'
+      boxShadow: '0 24px 80px rgba(0,0,0,0.6)', display: 'block'
     }
-  }),
+  }), showInfo && /*#__PURE__*/React.createElement(LightboxInfoPanel, { info: currentInfo })),
   total > 1 && /*#__PURE__*/React.createElement("div", {
     onClick: e => e.stopPropagation(),
     style: { display: 'flex', gap: '7px', marginTop: '16px', zIndex: 9001 }
@@ -8660,7 +8809,7 @@ function CommentsSection({
             /* Edit Button */
             /*#__PURE__*/React.createElement('button', {
               type: 'button', onClick: () => onEditMessage && onEditMessage(msg), title: '편집',
-              style: { width: '22px', height: '22px', border: '1px solid #E2E8F0', backgroundColor: '#FFFFFF', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0, color: '#64748B' }
+              style: { width: '22px', height: '22px', border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-card)', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0, color: '#64748B' }
             }, editSvg),
             /* Delete Button */
             /*#__PURE__*/React.createElement('button', {
@@ -8674,15 +8823,15 @@ function CommentsSection({
       /*#__PURE__*/React.createElement('div', { style: { position: 'relative', marginTop: '2px' } },
         /* Outer tail (border color) */
         /*#__PURE__*/React.createElement('div', {
-          style: { position: 'absolute', top: '-7px', left: '18px', width: 0, height: 0, borderLeft: '7px solid transparent', borderRight: '7px solid transparent', borderBottom: '7px solid #E2E8F0', zIndex: 2 }
+          style: { position: 'absolute', top: '-7px', left: '18px', width: 0, height: 0, borderLeft: '7px solid transparent', borderRight: '7px solid transparent', borderBottom: '7px solid var(--border-subtle)', zIndex: 2 }
         }),
         /* Inner tail (white fill) */
         /*#__PURE__*/React.createElement('div', {
-          style: { position: 'absolute', top: '-5px', left: '19px', width: 0, height: 0, borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderBottom: '6px solid #FFFFFF', zIndex: 3 }
+          style: { position: 'absolute', top: '-5px', left: '19px', width: 0, height: 0, borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderBottom: '6px solid var(--bg-card)', zIndex: 3 }
         }),
         /* Bubble container */
         /*#__PURE__*/React.createElement('div', {
-          style: { backgroundColor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '10px 12px', fontSize: '0.85rem', lineHeight: '1.4', color: '#1E293B', wordBreak: 'keep-all', overflowWrap: 'break-word', whiteSpace: 'pre-wrap', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', position: 'relative', zIndex: 1 }
+          style: { backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '10px 12px', fontSize: '0.85rem', lineHeight: '1.4', color: 'var(--text-main)', wordBreak: 'keep-all', overflowWrap: 'break-word', whiteSpace: 'pre-wrap', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', position: 'relative', zIndex: 1 }
         }, bubbleContent)
       )
     );
@@ -8693,13 +8842,13 @@ function CommentsSection({
     onClick: onMore,
     style: {
       width: '100%',
-      backgroundColor: '#E2E8F0',
-      border: '1px solid #CBD5E1',
+      backgroundColor: 'var(--bg-primary)',
+      border: '1px solid var(--border-subtle)',
       borderRadius: '8px',
       padding: '8px 0',
       fontSize: '0.85rem',
       fontWeight: 'bold',
-      color: '#1E293B',
+      color: 'var(--text-main)',
       cursor: 'pointer',
       textAlign: 'center',
       marginTop: '10px'
@@ -8709,8 +8858,8 @@ function CommentsSection({
   /* Input row */
   /*#__PURE__*/React.createElement("div", {
     style: {
-      backgroundColor: '#FFFFFF',
-      border: '1px solid #E2E8F0',
+      backgroundColor: 'var(--bg-card)',
+      border: '1px solid var(--border-subtle)',
       borderRadius: '12px',
       padding: '12px',
       marginTop: '12px',
@@ -8819,7 +8968,7 @@ function CommentsSection({
         alignItems: 'center',
         justifyContent: 'space-between',
         width: '100%',
-        borderTop: '1px solid #F1F5F9',
+        borderTop: '1px solid var(--border-subtle)',
         paddingTop: '8px',
         marginTop: '2px'
       }
@@ -8861,8 +9010,8 @@ function CommentsSection({
             width: '32px',
             height: '32px',
             borderRadius: '50%',
-            border: '1px solid #E2E8F0',
-            backgroundColor: '#FFFFFF',
+            border: '1px solid var(--border-subtle)',
+            backgroundColor: 'var(--bg-card)',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
@@ -8916,6 +9065,7 @@ function CommentsSection({
   activeLightbox ? /*#__PURE__*/React.createElement(Lightbox, {
     urls: activeLightbox.urls,
     index: activeLightbox.index,
+    meta: activeLightbox.meta,
     onClose: () => setActiveLightbox(null),
     onNavigate: i => setActiveLightbox(prev => prev ? { ...prev, index: i } : prev)
   }) : null), imageProcessing && /*#__PURE__*/React.createElement(ImageProcessingOverlay, imageProcessing));
@@ -9149,7 +9299,7 @@ function ChatRoomView({
             left: 0,
             right: 0,
             height: '1px',
-            backgroundColor: '#E2E8F0',
+            backgroundColor: 'var(--border-subtle)',
             zIndex: 1
           }
         }),
@@ -9158,8 +9308,8 @@ function ChatRoomView({
           style: {
             position: 'relative',
             zIndex: 2,
-            backgroundColor: '#FFFFFF',
-            border: '1px solid #E2E8F0',
+            backgroundColor: 'var(--bg-card)',
+            border: '1px solid var(--border-subtle)',
             borderRadius: '12px',
             padding: '3px 12px',
             fontSize: '0.72rem',
@@ -9259,8 +9409,8 @@ function ChatRoomView({
           style: {
             width: '24px',
             height: '24px',
-            border: '1px solid #E2E8F0',
-            backgroundColor: '#EFF3F8',
+            border: '1px solid var(--border-subtle)',
+            backgroundColor: 'var(--bg-primary)',
             borderRadius: '6px',
             display: 'flex',
             alignItems: 'center',
@@ -9297,13 +9447,13 @@ function ChatRoomView({
       style: {
         position: 'relative',
         zIndex: 1,
-        backgroundColor: '#FFFFFF',
-        border: '1px solid #E2E8F0',
+        backgroundColor: 'var(--bg-card)',
+        border: '1px solid var(--border-subtle)',
         borderRadius: '12px',
         padding: '8px 12px',
         fontSize: '0.9rem',
         lineHeight: '1.4',
-        color: '#1E293B',
+        color: 'var(--text-main)',
         wordBreak: 'keep-all',
         overflowWrap: 'break-word',
         whiteSpace: 'pre-wrap',
@@ -9318,7 +9468,7 @@ function ChatRoomView({
         height: 0,
         borderTop: '7px solid transparent',
         borderBottom: '7px solid transparent',
-        borderLeft: '7px solid #E2E8F0',
+        borderLeft: '7px solid var(--border-subtle)',
         zIndex: 2
       }
     }), /*#__PURE__*/React.createElement("div", {
@@ -9330,7 +9480,7 @@ function ChatRoomView({
         height: 0,
         borderTop: '6px solid transparent',
         borderBottom: '6px solid transparent',
-        borderLeft: '6px solid #FFFFFF',
+        borderLeft: '6px solid var(--bg-card)',
         zIndex: 3
       }
     }))] : [/*#__PURE__*/React.createElement("div", {
@@ -9340,13 +9490,13 @@ function ChatRoomView({
       style: {
         position: 'relative',
         zIndex: 1,
-        backgroundColor: '#FFFFFF',
-        border: '1px solid #E2E8F0',
+        backgroundColor: 'var(--bg-card)',
+        border: '1px solid var(--border-subtle)',
         borderRadius: '12px',
         padding: '8px 12px',
         fontSize: '0.9rem',
         lineHeight: '1.4',
-        color: '#1E293B',
+        color: 'var(--text-main)',
         wordBreak: 'keep-all',
         overflowWrap: 'break-word',
         whiteSpace: 'pre-wrap',
@@ -9361,7 +9511,7 @@ function ChatRoomView({
         height: 0,
         borderTop: '7px solid transparent',
         borderBottom: '7px solid transparent',
-        borderRight: '7px solid #E2E8F0',
+        borderRight: '7px solid var(--border-subtle)',
         zIndex: 2
       }
     }), /*#__PURE__*/React.createElement("div", {
@@ -9373,7 +9523,7 @@ function ChatRoomView({
         height: 0,
         borderTop: '6px solid transparent',
         borderBottom: '6px solid transparent',
-        borderRight: '6px solid #FFFFFF',
+        borderRight: '6px solid var(--bg-card)',
         zIndex: 3
       }
     })), /*#__PURE__*/React.createElement("div", {
@@ -9408,7 +9558,7 @@ function ChatRoomView({
       left: 0,
       right: 0,
       bottom: `${viewportBottom}px`,
-      backgroundColor: '#F1F5F9',
+      backgroundColor: 'var(--bg-primary)',
       display: 'flex',
       flexDirection: 'column',
       zIndex: 1005,
@@ -9425,7 +9575,7 @@ function ChatRoomView({
       width: '36px',
       height: '36px',
       borderRadius: '50%',
-      backgroundColor: 'rgba(255,255,255,0.95)',
+      backgroundColor: 'var(--bg-card)',
       border: 'none',
       boxShadow: isHeaderVisible ? 'none' : '0 2px 8px rgba(0,0,0,0.12)',
       transition: 'box-shadow 0.2s ease',
@@ -9462,8 +9612,8 @@ function ChatRoomView({
       left: 0,
       right: 0,
       height: '56px',
-      backgroundColor: '#FFFFFF',
-      borderBottom: '1px solid #E2E8F0',
+      backgroundColor: 'var(--bg-card)',
+      borderBottom: '1px solid var(--border-subtle)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
@@ -9481,7 +9631,7 @@ function ChatRoomView({
       alignItems: 'center',
       fontWeight: 800,
       fontSize: '0.95rem',
-      color: '#0F172A',
+      color: 'var(--text-main)',
       whiteSpace: 'nowrap',
       overflow: 'hidden',
       textOverflow: 'ellipsis',
@@ -9586,7 +9736,7 @@ function ChatRoomView({
       width: '36px',
       height: '36px',
       borderRadius: '50%',
-      backgroundColor: 'rgba(255,255,255,0.95)',
+      backgroundColor: 'var(--bg-card)',
       border: 'none',
       boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
       display: 'flex',
@@ -9642,8 +9792,8 @@ function ChatRoomView({
     "stroke-linejoin": "round"
   }, /*#__PURE__*/React.createElement("path", { d: "M6 9l6 6l6 -6" })))), /*#__PURE__*/React.createElement("div", {
     style: {
-      backgroundColor: '#FFFFFF',
-      borderTop: '1px solid #E2E8F0',
+      backgroundColor: 'var(--bg-card)',
+      borderTop: '1px solid var(--border-subtle)',
       padding: '12px 16px',
       zIndex: 1000,
       flexShrink: 0
@@ -9652,8 +9802,8 @@ function ChatRoomView({
     /* Inner card wrapper (same border/radius as CommentsSection input card) */
     /*#__PURE__*/React.createElement("div", {
       style: {
-        backgroundColor: '#FFFFFF',
-        border: '1px solid #E2E8F0',
+        backgroundColor: 'var(--bg-card)',
+        border: '1px solid var(--border-subtle)',
         borderRadius: '12px',
         padding: '12px',
         display: 'flex',
@@ -9762,7 +9912,7 @@ function ChatRoomView({
           alignItems: 'center',
           justifyContent: 'space-between',
           width: '100%',
-          borderTop: '1px solid #F1F5F9',
+          borderTop: '1px solid var(--border-subtle)',
           paddingTop: '8px',
           marginTop: '2px'
         }
@@ -9804,8 +9954,8 @@ function ChatRoomView({
               width: '32px',
               height: '32px',
               borderRadius: '50%',
-              border: '1px solid #E2E8F0',
-              backgroundColor: '#FFFFFF',
+              border: '1px solid var(--border-subtle)',
+              backgroundColor: 'var(--bg-card)',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
@@ -9859,6 +10009,7 @@ function ChatRoomView({
   activeLightbox ? /*#__PURE__*/React.createElement(Lightbox, {
     urls: activeLightbox.urls,
     index: activeLightbox.index,
+    meta: activeLightbox.meta,
     onClose: () => setActiveLightbox(null),
     onNavigate: i => setActiveLightbox(prev => prev ? { ...prev, index: i } : prev)
   }) : null), imageProcessingChat && /*#__PURE__*/React.createElement(ImageProcessingOverlay, imageProcessingChat));
@@ -9948,10 +10099,10 @@ function ConfirmDialog({ title, message, onConfirm, onCancel }) {
     style: { textAlign: 'center', marginBottom: '20px' }
   }, 
     title ? /*#__PURE__*/React.createElement("h3", {
-      style: { fontSize: '1.05rem', fontWeight: 800, marginBottom: '8px', color: '#0F172A' }
+      style: { fontSize: '1.05rem', fontWeight: 800, marginBottom: '8px', color: 'var(--text-main)' }
     }, title) : null,
     /*#__PURE__*/React.createElement("p", {
-      style: { fontSize: '0.88rem', color: '#475569', lineHeight: '1.5', wordBreak: 'keep-all' }
+      style: { fontSize: '0.88rem', color: 'var(--text-muted)', lineHeight: '1.5', wordBreak: 'keep-all' }
     }, message)
   ), /*#__PURE__*/React.createElement("div", {
     style: { display: 'flex', gap: '8px', justifyContent: 'center' }
@@ -10009,9 +10160,9 @@ function DeleteConfirmModal({
   }, /*#__PURE__*/React.createElement("div", {
     style: { textAlign: 'center', marginBottom: '20px' }
   }, /*#__PURE__*/React.createElement("h3", {
-    style: { fontSize: '1.05rem', fontWeight: 800, marginBottom: '8px', color: '#0F172A' }
+    style: { fontSize: '1.05rem', fontWeight: 800, marginBottom: '8px', color: 'var(--text-main)' }
   }, "채팅 삭제"), /*#__PURE__*/React.createElement("p", {
-    style: { fontSize: '0.88rem', color: '#475569', lineHeight: '1.5' }
+    style: { fontSize: '0.88rem', color: 'var(--text-muted)', lineHeight: '1.5' }
   }, `${name}님의 "${contentText}" 내용을 삭제하시겠습니까?`)), /*#__PURE__*/React.createElement("div", {
     style: { display: 'flex', gap: '8px', justifyContent: 'center' }
   }, /*#__PURE__*/React.createElement("button", {
@@ -10123,11 +10274,11 @@ function EditMessageModal({
       justifyContent: 'space-between',
       alignItems: 'center',
       marginBottom: '14px',
-      borderBottom: '1px solid #F1F5F9',
+      borderBottom: '1px solid var(--border-subtle)',
       paddingBottom: '8px'
     }
   }, /*#__PURE__*/React.createElement("h3", {
-    style: { fontSize: '1rem', fontWeight: 800, color: '#0F172A', margin: 0 }
+    style: { fontSize: '1rem', fontWeight: 800, color: 'var(--text-main)', margin: 0 }
   }, "채팅 수정"), /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: () => { if (!isSubmitting) onClose(); },
@@ -10149,7 +10300,7 @@ function EditMessageModal({
       objectFit: 'cover',
       borderRadius: '8px',
       display: 'block',
-      border: '1px solid #E2E8F0'
+      border: '1px solid var(--border-subtle)'
     }
   }), /*#__PURE__*/React.createElement("button", {
     type: "button",
@@ -10185,8 +10336,8 @@ function EditMessageModal({
       display: 'flex',
       alignItems: 'flex-end',
       gap: '8px',
-      backgroundColor: '#F8FAFC',
-      border: '1px solid #E2E8F0',
+      backgroundColor: 'var(--bg-primary)',
+      border: '1px solid var(--border-subtle)',
       borderRadius: '12px',
       padding: '8px'
     }
@@ -10514,7 +10665,7 @@ function DateModal({
       justifyContent: 'space-between',
       alignItems: 'center',
       textAlign: 'left',
-      background: '#FFFFFF',
+      background: 'var(--bg-card)',
       cursor: 'pointer',
       borderRadius: '9999px'
     },
@@ -10689,6 +10840,16 @@ function DateModal({
       cursor: isSubmitting ? 'wait' : 'pointer'
     }
   }, isConfirmed ? "확정취소" : "모임확정"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "btn btn-secondary",
+    disabled: isSubmitting,
+    onClick: onClose,
+    style: {
+      whiteSpace: 'nowrap',
+      opacity: isSubmitting ? 0.75 : 1,
+      cursor: isSubmitting ? 'wait' : 'pointer'
+    }
+  }, "닫기"), /*#__PURE__*/React.createElement("button", {
     type: "submit",
     className: "btn btn-primary",
     disabled: isSubmitting,
@@ -10847,9 +11008,49 @@ function AdminModal({
   onRequestConfirm,
   onClose,
   showToast,
-  onDeleteLog
+  onDeleteLog,
+  themeChoice,
+  toggleTheme,
+  isDarkTheme,
+  fontScalePercent,
+  setFontScalePercent
 }) {
   const [activeTab, setActiveTab] = React.useState('settings'); // 'settings', 'calendar', 'recovery', 'logs'
+
+  // Chat notification permission -- mirrors ChatRoomView's own bell toggle logic (kept as an
+  // independent local read of the same browser-level Notification.permission rather than shared
+  // React state, since it's not app-owned data). Lets the on/off switch live here too, in 일반
+  // tab, alongside the other personal display preferences.
+  const [notifPermission, setNotifPermission] = React.useState(() => (isNotificationSupported() ? Notification.permission : 'unsupported'));
+  const handleToggleNotifications = async () => {
+    if (!isNotificationSupported()) {
+      if (showToast) showToast('알림 미지원 브라우저', 'error');
+      return;
+    }
+    if (Notification.permission === 'granted') {
+      if (showToast) showToast('브라우저 알림 설정에서 끌 수 있음', 'info');
+      return;
+    }
+    if (Notification.permission === 'denied') {
+      if (showToast) showToast('브라우저 설정에서 알림 허용 필요', 'error');
+      return;
+    }
+    const result = await requestChatNotificationPermission();
+    if (result !== 'granted') {
+      setNotifPermission(result);
+      if (showToast) showToast('알림 권한 거부됨', 'error');
+      return;
+    }
+    try {
+      const probe = new Notification(' ', { silent: true, tag: 'notif-probe' });
+      probe.close();
+      setNotifPermission('granted');
+      if (showToast) showToast('알림 켜짐', 'success');
+    } catch (e) {
+      setNotifPermission('unsupported');
+      if (showToast) showToast('이 브라우저에서는 알림을 표시할 수 없습니다 (iOS는 홈 화면 추가 필요)', 'error', 6000);
+    }
+  };
 
   // Calendar tab: browse dates and delete schedules -- reuses DateModal in adminMode, which
   // hides the normal registration UI and shows only the registered-participant list + delete
@@ -11043,7 +11244,7 @@ function AdminModal({
       className: "modal-header",
       style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }
     },
-      /*#__PURE__*/React.createElement("h3", { style: { fontSize: '1.1rem', fontWeight: 800, color: '#0F172A', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' } },
+      /*#__PURE__*/React.createElement("h3", { style: { fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-main)', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' } },
         /*#__PURE__*/React.createElement(SettingsIcon, null), `${calendar.title} 설정`
       ),
       /*#__PURE__*/React.createElement("button", {
@@ -11055,7 +11256,7 @@ function AdminModal({
 
     /* Tab Menu Bar */
     /*#__PURE__*/React.createElement("div", {
-      style: { display: 'flex', gap: '4px', borderBottom: '1px solid #E2E8F0', padding: '0 20px', backgroundColor: '#F8FAFC', flexShrink: 0, overflowX: 'auto', minWidth: 0 }
+      style: { display: 'flex', gap: '4px', borderBottom: '1px solid var(--border-subtle)', padding: '0 20px', backgroundColor: 'var(--bg-primary)', flexShrink: 0, overflowX: 'auto', minWidth: 0 }
     },
       /* Tab 1: General settings */
       /*#__PURE__*/React.createElement("button", {
@@ -11122,13 +11323,13 @@ function AdminModal({
         },
           /* Section 1: Calendar Profile & Participants */
           /*#__PURE__*/React.createElement("div", {
-            style: { border: '1px solid #E2E8F0', borderRadius: '12px', padding: '16px', backgroundColor: '#FFFFFF' }
+            style: { border: '1px solid var(--border-subtle)', borderRadius: '12px', padding: '16px', backgroundColor: 'var(--bg-card)' }
           },
-            /*#__PURE__*/React.createElement("h4", { style: { fontSize: '0.92rem', fontWeight: 800, color: '#1E293B', margin: '0 0 14px 0', borderBottom: '1px solid #F1F5F9', paddingBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(SettingsIcon, null), "캘린더 프로필 및 참여자 설정"),
+            /*#__PURE__*/React.createElement("h4", { style: { fontSize: '0.92rem', fontWeight: 800, color: 'var(--text-main)', margin: '0 0 14px 0', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(SettingsIcon, null), "캘린더 프로필 및 참여자 설정"),
             
             /* Input: Title */
             /*#__PURE__*/React.createElement("div", { style: { marginBottom: '10px' } },
-              /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#64748B', marginBottom: '4px' } }, "캘린더명"),
+              /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '4px' } }, "캘린더명"),
               /*#__PURE__*/React.createElement("input", {
                 type: "text", className: "form-input", style: { width: '100%' },
                 value: title, disabled: isSubmitting, maxLength: 80,
@@ -11138,7 +11339,7 @@ function AdminModal({
             
             /* Input: Description */
             /*#__PURE__*/React.createElement("div", { style: { marginBottom: '14px' } },
-              /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#64748B', marginBottom: '4px' } }, "캘린더 설명"),
+              /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '4px' } }, "캘린더 설명"),
               /*#__PURE__*/React.createElement("input", {
                 type: "text", className: "form-input", style: { width: '100%' },
                 value: description, disabled: isSubmitting, maxLength: 160,
@@ -11150,7 +11351,7 @@ function AdminModal({
             /*#__PURE__*/React.createElement("div", {
               style: { borderTop: '1px solid #F1F5F9', paddingTop: '12px' }
             },
-              /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#64748B', marginBottom: '6px' } }, `참여자 설정 (${participants.filter(p => !isTombstone(p)).length}명)`),
+              /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '6px' } }, `참여자 설정 (${participants.filter(p => !isTombstone(p)).length}명)`),
               
               /* Add Row */
               /*#__PURE__*/React.createElement("div", {
@@ -11217,13 +11418,13 @@ function AdminModal({
 
           /* Section 2: Polls Creation & List */
           /*#__PURE__*/React.createElement("div", {
-            style: { border: '1px solid #E2E8F0', borderRadius: '12px', padding: '16px', backgroundColor: '#FFFFFF' }
+            style: { border: '1px solid var(--border-subtle)', borderRadius: '12px', padding: '16px', backgroundColor: 'var(--bg-card)' }
           },
             /* Header */
             /*#__PURE__*/React.createElement("div", {
-              style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', borderBottom: '1px solid #F1F5F9', paddingBottom: '6px' }
+              style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '6px' }
             },
-              /*#__PURE__*/React.createElement("h4", { style: { fontSize: '0.92rem', fontWeight: 800, color: '#1E293B', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(PollSectionIcon, null), "캘린더 투표 리스트 관리"),
+              /*#__PURE__*/React.createElement("h4", { style: { fontSize: '0.92rem', fontWeight: 800, color: 'var(--text-main)', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(PollSectionIcon, null), "캘린더 투표 리스트 관리"),
               /*#__PURE__*/React.createElement("button", {
                 type: "button",
                 onClick: () => { setEditingPoll(null); setIsPollModalOpen(true); },
@@ -11246,7 +11447,7 @@ function AdminModal({
               },
                 /* Left info */
                 /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0, flex: '1 1 160px' } },
-                  /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.85rem', fontWeight: 'bold', color: '#1E293B', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' } }, poll.title),
+                  /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--text-main)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' } }, poll.title),
                   /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.72rem', color: '#64748B' } }, `${getActivePollOptions(poll).length}개 옵션 · 총 ${getPollTotalVoteCount(poll)}표`)
                 ),
                 /* Right actions */
@@ -11272,6 +11473,71 @@ function AdminModal({
                 )
               ))
             )
+          ),
+
+          /* Section 3: Personal display preferences (theme/notifications/text size) + calendar-wide ICS export */
+          /*#__PURE__*/React.createElement("div", {
+            style: { border: '1px solid var(--border-subtle)', borderRadius: '12px', padding: '16px', backgroundColor: 'var(--bg-card)' }
+          },
+            /*#__PURE__*/React.createElement("h4", { style: { fontSize: '0.92rem', fontWeight: 800, color: 'var(--text-main)', margin: '0 0 14px 0', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(SettingsIcon, null), "화면 및 알림 설정"),
+
+            /* Dark mode row */
+            /*#__PURE__*/React.createElement("div", {
+              style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--border-subtle)', gap: '12px' }
+            },
+              /*#__PURE__*/React.createElement("div", null,
+                /*#__PURE__*/React.createElement("div", { style: { fontWeight: 700, fontSize: '0.88rem', color: 'var(--text-main)' } }, "다크 모드"),
+                /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.76rem', color: '#94A3B8', marginTop: '2px' } }, "어두운 화면 테마를 사용합니다")
+              ),
+              /*#__PURE__*/React.createElement(ToggleSwitch, { checked: isDarkTheme, onChange: toggleTheme, label: "다크 모드" })
+            ),
+
+            /* Chat notification row */
+            /*#__PURE__*/React.createElement("div", {
+              style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--border-subtle)', gap: '12px' }
+            },
+              /*#__PURE__*/React.createElement("div", null,
+                /*#__PURE__*/React.createElement("div", { style: { fontWeight: 700, fontSize: '0.88rem', color: 'var(--text-main)' } }, "채팅 알림"),
+                /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.76rem', color: '#94A3B8', marginTop: '2px' } }, "새 채팅 메시지가 오면 알려드립니다 (탭이 열려있을 때)")
+              ),
+              /*#__PURE__*/React.createElement(ToggleSwitch, { checked: notifPermission === 'granted', onChange: handleToggleNotifications, label: "채팅 알림" })
+            ),
+
+            /* Font size row */
+            /*#__PURE__*/React.createElement("div", {
+              style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--border-subtle)', gap: '12px' }
+            },
+              /*#__PURE__*/React.createElement("div", { style: { fontWeight: 700, fontSize: '0.88rem', color: 'var(--text-main)' } }, "글자 크기"),
+              /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '10px' } },
+                /*#__PURE__*/React.createElement("button", {
+                  type: "button",
+                  onClick: () => setFontScalePercent(prev => Math.max(80, prev - 10)),
+                  "aria-label": "글자 크기 줄이기",
+                  style: { width: '30px', height: '30px', borderRadius: '50%', border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)', cursor: 'pointer', fontSize: '1rem', fontWeight: 800, color: 'var(--text-main)', display: 'flex', alignItems: 'center', justifyContent: 'center' }
+                }, "−"),
+                /*#__PURE__*/React.createElement("span", { style: { fontWeight: 800, fontSize: '0.88rem', color: 'var(--text-main)', minWidth: '42px', textAlign: 'center' } }, `${fontScalePercent}%`),
+                /*#__PURE__*/React.createElement("button", {
+                  type: "button",
+                  onClick: () => setFontScalePercent(prev => Math.min(130, prev + 10)),
+                  "aria-label": "글자 크기 늘리기",
+                  style: { width: '30px', height: '30px', borderRadius: '50%', border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)', cursor: 'pointer', fontSize: '1rem', fontWeight: 800, color: 'var(--text-main)', display: 'flex', alignItems: 'center', justifyContent: 'center' }
+                }, "+")
+              )
+            ),
+
+            /* Calendar-wide ICS export */
+            /*#__PURE__*/React.createElement("button", {
+              type: "button",
+              className: "btn btn-secondary",
+              style: { width: '100%', justifyContent: 'center', marginTop: '14px' },
+              onClick: () => {
+                if (getConfirmedMeetings(calendar).length === 0) {
+                  if (showToast) showToast('확정된 모임이 없습니다', 'error');
+                  return;
+                }
+                exportCalendarConfirmedMeetingsToICS(calendar);
+              }
+            }, /*#__PURE__*/React.createElement(CalendarExportIcon, null), "캘린더 확정 일정 내보내기 (.ics)")
           )
         )
       ),
@@ -11290,9 +11556,9 @@ function AdminModal({
 
         /* Log Timeline */
         /*#__PURE__*/React.createElement("div", {
-          style: { border: '1px solid #E2E8F0', borderRadius: '12px', padding: '16px', backgroundColor: '#FFFFFF', display: 'flex', flexDirection: 'column' }
+          style: { border: '1px solid var(--border-subtle)', borderRadius: '12px', padding: '16px', backgroundColor: 'var(--bg-card)', display: 'flex', flexDirection: 'column' }
         },
-          /*#__PURE__*/React.createElement("h4", { style: { fontSize: '0.92rem', fontWeight: 800, color: '#1E293B', margin: '0 0 12px 0', display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(HourglassIcon, null), "활동 타임라인을 기반으로 시점 복구"),
+          /*#__PURE__*/React.createElement("h4", { style: { fontSize: '0.92rem', fontWeight: 800, color: 'var(--text-main)', margin: '0 0 12px 0', display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(HourglassIcon, null), "활동 타임라인을 기반으로 시점 복구"),
 
           /* Timeline scroll container */
           /*#__PURE__*/React.createElement("div", {
@@ -11319,7 +11585,7 @@ function AdminModal({
               return /*#__PURE__*/React.createElement("div", {
                 key: log.id,
                 className: 'admin-log-row',
-                style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', border: '1px solid #F1F5F9', borderRadius: '8px', padding: '10px', backgroundColor: '#FFFFFF', gap: '6px 8px' }
+                style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '10px', backgroundColor: 'var(--bg-primary)', gap: '6px 8px' }
               },
                 /* Left details */
                 /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 } },
@@ -11506,14 +11772,15 @@ function AdminModal({
 
 // Global Search Modal -- searches the active calendar's schedule memos, participant names, and
 // chat message text all in one place. Clicking a schedule result opens that date's DateModal;
-// clicking a chat result opens the chat sheet. Kept intentionally simple (substring match, no
-// fuzzy search/indexing) since a single calendar's data is small enough that this is instant.
+// clicking a chat result opens the full chat view scrolled to that exact message bubble. Kept
+// intentionally simple (substring match, no fuzzy search/indexing) since a single calendar's
+// data is small enough that this is instant.
 function GlobalSearchModal({
   calendar,
   chatMessages,
   onClose,
   onSelectDate,
-  onOpenChat
+  onOpenChatMessage
 }) {
   const [query, setQuery] = React.useState('');
   const inputRef = React.useRef(null);
@@ -11601,7 +11868,7 @@ function GlobalSearchModal({
             return /*#__PURE__*/React.createElement("button", {
               key: msg.id,
               type: "button",
-              onClick: () => { onOpenChat(); onClose(); },
+              onClick: () => { onOpenChatMessage(msg.id); onClose(); },
               style: { display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '8px 10px', backgroundColor: '#F8FAFC', cursor: 'pointer', textAlign: 'left', width: '100%' }
             },
               /*#__PURE__*/React.createElement("span", {
@@ -12126,6 +12393,35 @@ function SmallXIcon({ size = 24 } = {}) {
   }));
 }
 
+function ToggleSwitch({ checked, onChange, label }) {
+  return /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    role: "switch",
+    "aria-checked": checked,
+    "aria-label": label,
+    onClick: onChange,
+    style: {
+      width: '44px', height: '24px', borderRadius: '9999px', border: 'none', cursor: 'pointer',
+      backgroundColor: checked ? 'var(--accent-primary)' : '#CBD5E1',
+      position: 'relative', transition: 'background-color 0.2s ease', padding: 0, flexShrink: 0
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      position: 'absolute', top: '2px', left: checked ? '22px' : '2px',
+      width: '20px', height: '20px', borderRadius: '50%', backgroundColor: '#FFFFFF',
+      transition: 'left 0.2s ease', boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
+    }
+  }));
+}
+
+// Shared numeric badge for section-title counts (진행중 투표, 모임 확정, 전원 참석 가능, 갤러리 등) --
+// uses currentColor so it automatically tints to whatever accent color the surrounding title sets.
+function SectionCountBadge({ count }) {
+  return /*#__PURE__*/React.createElement("span", {
+    className: "section-count-badge"
+  }, count);
+}
+
 function SectionToggleButton({ collapsed, onToggle, label }) {
   return /*#__PURE__*/React.createElement("button", {
     type: "button",
@@ -12192,7 +12488,7 @@ function PollList({ calendar, onCreatePoll, onEditPoll, onVotePoll, onCancelVote
   }, /*#__PURE__*/React.createElement("div", {
     className: "summary-title",
     style: { color: '#2563EB', marginBottom: 0, display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold' }
-  }, /*#__PURE__*/React.createElement(PollSectionIcon, null), "\uC9C4\uD589\uC911 \uD22C\uD45C (", polls.length, "\uAC74)"),
+  }, /*#__PURE__*/React.createElement(PollSectionIcon, null), "\uC9C4\uD589\uC911 \uD22C\uD45C ", /*#__PURE__*/React.createElement(SectionCountBadge, { count: polls.length })),
   /*#__PURE__*/React.createElement(SectionToggleButton, {
     collapsed: !anyPollOpen,
     onToggle: togglePollList,
@@ -12716,32 +13012,25 @@ function SummaryList({
     return [...datesList].sort((a, b) => b.localeCompare(a));
   };
 
-  // Future only — past dates moved to '과거 모임' section. Confirmed meetings are excluded
+  // Future only — past availability dates are not shown here; confirmed meetings (past or
+  // future) still appear in the '모임 확정' section below. Confirmed meetings are excluded
   // from '전원 참석 가능' entirely -- once a date is confirmed it lives on the calendar's
   // own banner bubble instead, so it shouldn't linger here as merely "possible".
   const sortedAllDates = getSortedDates(allAvailableDates.filter(d => d >= todayStr && !isDateConfirmedMeeting(calendar, d)));
   const sortedPartialDates = getSortedDates(partialAvailableDates.filter(d => d >= todayStr));
 
-  // 3. Past meeting dates: all past dates with at least 1 active participant registered and at least 1 memo exists
-  const pastMeetingDates = getSortedDates(Object.keys(dateMap).filter(d => {
-    if (d >= todayStr) return false; // future dates excluded
-    const entries = dateMap[d].filter(e => participantsMap[e.participantId]);
-    return entries.length > 0 && entries.some(e => e.note && e.note.trim().length > 0);
-  }));
-
-  // 4. Confirmed-meeting dates -- every date promoted to 모임확정, past or future.
+  // 3. Confirmed-meeting dates -- every date promoted to 모임확정, past or future.
   const confirmedDates = getSortedDates(getConfirmedMeetings(calendar).map(m => m.date));
 
   // '6인 이상 참석 가능' / '전원 참석 가능' / '모임 확정' only ever show when they have at least
   // one matching date -- an empty one hides its title entirely rather than rendering a
-  // placeholder. '과거 모임' already followed this rule. Track which sections are actually
-  // visible so dividers between them only appear between two sections that both render.
+  // placeholder. Track which sections are actually visible so dividers between them only
+  // appear between two sections that both render.
   const isPartialVisible = thresholdN > 0 && sortedPartialDates.length > 0;
   const isAllVisible = sortedAllDates.length > 0;
   const isConfirmedVisible = confirmedDates.length > 0;
   const anyBeforeAll = isPartialVisible;
   const anyBeforeConfirmed = isPartialVisible || isAllVisible;
-  const anyBeforePast = isPartialVisible || isAllVisible || isConfirmedVisible;
 
   return /*#__PURE__*/React.createElement("div", {
     className: "summary-card",
@@ -12784,7 +13073,7 @@ function SummaryList({
     d: "M22 21v-2a4 4 0 0 0-3-3.87"
   }), /*#__PURE__*/React.createElement("path", {
     d: "M16 3.13a4 4 0 0 1 0 7.75"
-  })), thresholdN, "\uBA85 \uC774\uC0C1 \uCC38\uC11D \uAC00\uB2A5 (", sortedPartialDates.length, "\uC77C)", /*#__PURE__*/React.createElement(SectionToggleButton, {
+  })), thresholdN, "\uBA85 \uC774\uC0C1 \uCC38\uC11D \uAC00\uB2A5 ", /*#__PURE__*/React.createElement(SectionCountBadge, { count: sortedPartialDates.length }), /*#__PURE__*/React.createElement(SectionToggleButton, {
     collapsed: collapsedSections.partial,
     onToggle: () => toggleSection('partial'),
     label: collapsedSections.partial ? `${thresholdN}\uBA85 \uC774\uC0C1 \uCC38\uC11D \uAC00\uB2A5 \uD3BC\uCE58\uAE30` : `${thresholdN}\uBA85 \uC774\uC0C1 \uCC38\uC11D \uAC00\uB2A5 \uC811\uAE30`
@@ -12883,7 +13172,7 @@ function SummaryList({
     d: "M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"
   }), /*#__PURE__*/React.createElement("path", {
     d: "m9 12 2 2 4-4"
-  })), "\uC804\uC6D0 \uCC38\uC11D \uAC00\uB2A5 (", sortedAllDates.length, "\uC77C)", /*#__PURE__*/React.createElement(SectionToggleButton, {
+  })), "\uC804\uC6D0 \uCC38\uC11D \uAC00\uB2A5 ", /*#__PURE__*/React.createElement(SectionCountBadge, { count: sortedAllDates.length }), /*#__PURE__*/React.createElement(SectionToggleButton, {
     collapsed: collapsedSections.all,
     onToggle: () => toggleSection('all'),
     label: collapsedSections.all ? "\uC804\uC6D0 \uCC38\uC11D \uAC00\uB2A5 \uD3BC\uCE58\uAE30" : "\uC804\uC6D0 \uCC38\uC11D \uAC00\uB2A5 \uC811\uAE30"
@@ -12993,7 +13282,7 @@ function SummaryList({
     d: "M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"
   }), /*#__PURE__*/React.createElement("path", {
     d: "m9 12 2 2 4-4"
-  })), "모임 확정 (", confirmedDates.length, "일)", /*#__PURE__*/React.createElement(SectionToggleButton, {
+  })), "모임 확정 ", /*#__PURE__*/React.createElement(SectionCountBadge, { count: confirmedDates.length }), /*#__PURE__*/React.createElement(SectionToggleButton, {
     collapsed: collapsedSections.confirmed,
     onToggle: () => toggleSection('confirmed'),
     label: collapsedSections.confirmed ? "모임 확정 펼치기" : "모임 확정 접기"
@@ -13034,29 +13323,6 @@ function SummaryList({
         flexShrink: 0
       }
     }, formattedDateStr), /*#__PURE__*/React.createElement("span", {
-      role: "button",
-      tabIndex: 0,
-      title: "캘린더 앱에 추가 (.ics)",
-      "aria-label": "캘린더 앱에 추가",
-      onClick: event => {
-        event.stopPropagation();
-        const meeting = getConfirmedMeetings(calendar).find(m => m.date === d);
-        const memoLines = memoEntries.map(entry => `${participantsMap[entry.participantId]?.name || ''}: ${entry.note}`.trim()).join('\n');
-        const description = [meeting?.note, memoLines].filter(Boolean).join('\n\n');
-        exportConfirmedMeetingToICS(calendar, d, description);
-      },
-      onKeyDown: event => {
-        if (event.key !== 'Enter' && event.key !== ' ') return;
-        event.preventDefault();
-        event.stopPropagation();
-        event.currentTarget.click();
-      },
-      style: {
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        width: '26px', height: '26px', borderRadius: '50%', cursor: 'pointer', flexShrink: 0,
-        color: isPast ? '#94A3B8' : '#7C3AED'
-      }
-    }, /*#__PURE__*/React.createElement(CalendarExportIcon, null)), /*#__PURE__*/React.createElement("span", {
       className: "date-item-badge",
       style: {
         background: isPast ? '#E2E8F0' : '#F3E8FF',
@@ -13092,121 +13358,6 @@ function SummaryList({
         title: `${p.name}: ${memoText}`
       }, memoText);
     })));
-  }))), anyBeforePast && pastMeetingDates.length > 0 && /*#__PURE__*/React.createElement("div", {
-    className: "summary-section-divider"
-  }), pastMeetingDates.length > 0 && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    className: `summary-title is-toggleable${collapsedSections.past ? ' is-collapsed' : ''}`,
-    role: "button",
-    tabIndex: 0,
-    "aria-expanded": !collapsedSections.past,
-    onClick: () => toggleSection('past'),
-    onKeyDown: event => handleSectionTitleKeyDown(event, 'past'),
-    style: {
-      color: '#64748B',
-      marginBottom: '12px'
-    }
-  }, /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg",
-    width: "20",
-    height: "20",
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    strokeWidth: "2.5",
-    strokeLinecap: "round",
-    strokeLinejoin: "round",
-    style: {
-      marginRight: '4px'
-    }
-  }, /*#__PURE__*/React.createElement("rect", {
-    x: "3",
-    y: "4",
-    width: "18",
-    height: "18",
-    rx: "2",
-    ry: "2"
-  }), /*#__PURE__*/React.createElement("line", {
-    x1: "16",
-    y1: "2",
-    x2: "16",
-    y2: "6"
-  }), /*#__PURE__*/React.createElement("line", {
-    x1: "8",
-    y1: "2",
-    x2: "8",
-    y2: "6"
-  }), /*#__PURE__*/React.createElement("line", {
-    x1: "3",
-    y1: "10",
-    x2: "21",
-    y2: "10"
-  })), "\uACFC\uAC70 \uBAA8\uC784 (", pastMeetingDates.length, "\uC77C)", /*#__PURE__*/React.createElement(SectionToggleButton, {
-    collapsed: collapsedSections.past,
-    onToggle: () => toggleSection('past'),
-    label: collapsedSections.past ? "\uACFC\uAC70 \uBAA8\uC784 \uD3BC\uCE58\uAE30" : "\uACFC\uAC70 \uBAA8\uC784 \uC811\uAE30"
-  })), !collapsedSections.past && /*#__PURE__*/React.createElement("div", null, pastMeetingDates.map(d => {
-    const dateEntries = dateMap[d].filter(e => participantsMap[e.participantId] && !isTombstone(e));
-    const formattedDateStr = formatDateWithDayName(d);
-    const memoEntries = dateEntries.filter(e => e.note && e.note.trim().length > 0);
-    const uniqueCount = new Set(dateEntries.map(e => e.participantId)).size;
-    return /*#__PURE__*/React.createElement("button", {
-      key: d,
-      className: "date-item-btn",
-      onClick: () => onSelectDate(d),
-      style: {
-        opacity: 0.75,
-        backgroundColor: '#F8FAFC',
-        borderColor: '#E2E8F0',
-        flexDirection: 'column',
-        alignItems: 'flex-start'
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        width: '100%',
-        gap: '8px'
-      }
-    }, /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontWeight: 800,
-        color: '#94A3B8',
-        fontSize: '0.95rem',
-        flexShrink: 0
-      }
-    }, formattedDateStr), /*#__PURE__*/React.createElement("span", {
-      className: "date-item-badge",
-      style: {
-        background: '#E2E8F0',
-        color: '#64748B',
-        flexShrink: 0
-      }
-    }, uniqueCount, "/", totalCount, "\uBA85")), memoEntries.length > 0 && /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: 'flex',
-        alignItems: 'center',
-        gap: '6px',
-        flexWrap: 'wrap'
-      }
-    }, memoEntries.map(e => {
-      const p = participantsMap[e.participantId];
-      if (!p) return null;
-      const memoUrl = extractFirstUrl(e.note);
-      const memoText = memoUrl ? e.note.replace(memoUrl, '').trim() : e.note.trim();
-      if (!memoText) return null;
-      return /*#__PURE__*/React.createElement("span", {
-        key: e.participantId,
-        className: "memo-capsule-badge",
-        style: {
-          backgroundColor: '#F1F5F9',
-          color: '#64748B',
-          border: `1px solid ${p.color}`,
-          boxShadow: 'none'
-        },
-        title: `${p.name}: ${memoText}`
-      }, memoText);
-    })));
   }))));
 }
 
@@ -13224,7 +13375,8 @@ function PhotoGallery({ chatMessages }) {
     const sorted = [...(chatMessages || [])].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
     return sorted.flatMap(msg => getMessageImageEntries(msg).map((entry, i) => ({
       ...entry,
-      key: `${msg.id}_${i}`
+      key: `${msg.id}_${i}`,
+      timestamp: msg.timestamp
     })));
   }, [chatMessages]);
 
@@ -13244,11 +13396,12 @@ function PhotoGallery({ chatMessages }) {
       }
     },
       /*#__PURE__*/React.createElement(GalleryIcon, null),
-      `사진 갤러리 (${photoEntries.length}장)`,
+      "갤러리 ",
+      /*#__PURE__*/React.createElement(SectionCountBadge, { count: photoEntries.length }),
       /*#__PURE__*/React.createElement(SectionToggleButton, {
         collapsed,
         onToggle: () => setCollapsed(prev => !prev),
-        label: collapsed ? '사진 갤러리 펼치기' : '사진 갤러리 접기'
+        label: collapsed ? '갤러리 펼치기' : '갤러리 접기'
       })
     ),
     !collapsed && /*#__PURE__*/React.createElement("div", {
@@ -13259,13 +13412,14 @@ function PhotoGallery({ chatMessages }) {
         src: entry.thumb,
         alt: "채팅에 첨부된 사진",
         loading: "lazy",
-        onClick: () => setLightbox({ urls: photoEntries.map(e => e.full), index: idx }),
+        onClick: () => setLightbox({ urls: photoEntries.map(e => e.full), meta: photoEntries.map(e => ({ timestamp: e.timestamp })), index: idx }),
         style: { width: '100%', aspectRatio: '1 / 1', objectFit: 'cover', borderRadius: 'var(--radius-sm)', cursor: 'pointer' }
       }))
     ),
     lightbox && /*#__PURE__*/React.createElement(Lightbox, {
       urls: lightbox.urls,
       index: lightbox.index,
+      meta: lightbox.meta,
       onClose: () => setLightbox(null),
       onNavigate: i => setLightbox(prev => prev ? { ...prev, index: i } : prev)
     })

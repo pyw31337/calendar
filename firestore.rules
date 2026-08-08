@@ -6,19 +6,15 @@ service cloud.firestore {
       return id is string && id.matches('^[A-Za-z0-9_-]{1,64}$');
     }
 
-    function isPublicCalendarId(id) {
-      return id == 'kkot' || id == 'cw';
-    }
-
     function isCalendarDoc(calendarDocId) {
-      return calendarDocId == 'cal_kkot' || calendarDocId == 'cal_cw';
+      return calendarDocId is string
+        && calendarDocId.matches('^cal_[A-Za-z0-9_-]{1,64}$');
     }
 
     function hasValidCalendarShell(calendarDocId) {
       return request.resource.data.keys().hasOnly(['calendar', 'lastModified', 'revision'])
         && request.resource.data.calendar is map
         && isCalendarId(request.resource.data.calendar.id)
-        && isPublicCalendarId(request.resource.data.calendar.id)
         && calendarDocId == 'cal_' + request.resource.data.calendar.id
         && request.resource.data.calendar.title is string
         && request.resource.data.calendar.title.size() > 0

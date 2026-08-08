@@ -93,8 +93,8 @@ runAppScript(productionContext, `
   if (!isValidCalendarId('kkot') || isValidCalendarId('../bad') || isValidCalendarId('bad!')) {
     throw new Error('calendar id validation failed');
   }
-  if (!isAllowedCalendarId('kkot') || !isAllowedCalendarId('cw') || isAllowedCalendarId('trip')) {
-    throw new Error('production calendar allowlist failed');
+  if (!isAllowedCalendarId('kkot') || !isAllowedCalendarId('cw') || !isAllowedCalendarId('trip') || isAllowedCalendarId('../bad') || isAllowedCalendarId('bad!')) {
+    throw new Error('calendar id allowlist failed');
   }
   const registeredText = formatRegisteredAt(new Date(2026, 7, 4, 4, 39, 12).getTime());
   if (registeredText !== '26.08.04 (화) 04:39:12') {
@@ -315,10 +315,16 @@ runAppScript(adminMetricsContext, `
   }
   const restored = validateBackupCalendars(extractCalendarsFromBackup(backup));
   if (restored.error || restored.calendars.length !== 1) throw new Error('admin backup import validation failed');
-  const rejected = validateBackupCalendars(extractCalendarsFromBackup({
-    calendars: [{ id: 'bad', title: 'Bad', participants: [], availabilities: [] }]
+  const acceptedAnyValidId = validateBackupCalendars(extractCalendarsFromBackup({
+    calendars: [{ id: 'trip', title: 'Trip', participants: [], availabilities: [] }]
   }));
-  if (!rejected.error) throw new Error('admin backup import accepted disallowed calendar');
+  if (acceptedAnyValidId.error || acceptedAnyValidId.calendars.length !== 1) {
+    throw new Error('admin backup import rejected a well-formed non-kkot/cw calendar id');
+  }
+  const rejected = validateBackupCalendars(extractCalendarsFromBackup({
+    calendars: [{ id: 'bad id!', title: 'Bad', participants: [], availabilities: [] }]
+  }));
+  if (!rejected.error) throw new Error('admin backup import accepted malformed calendar id');
 `);
 
 const restContext = createContext('https://pyw31337.github.io/calendar/?id=cw');
