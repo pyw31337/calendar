@@ -1694,19 +1694,26 @@ function getCalendarShareUrl(calendarId) {
 // ever covered kkot/cw (see the pwa-manifest-switch bootstrap script in <head>) -- any
 // calendar created since (calendar creation is no longer restricted to those two ids) fell
 // back to manifest.json's generic "모여라 캘린더" name, so "Add to Home Screen" installed
-// every calendar under the same placeholder label instead of its own title. Icon URLs must
-// be absolute: a manifest served from a blob: URL has no directory of its own to resolve a
-// relative path against.
+// every calendar under the same placeholder label instead of its own title.
+//
+// Every URL below (id/start_url/scope/icons) must be absolute, not just the icons: a manifest
+// served from a blob: URL has no directory of its own to resolve a relative path against, and
+// Chrome/Firefox both fail installability outright ("Manifest start URL is not valid") when
+// start_url/scope are left relative in a blob-URL manifest -- this is a documented issue
+// (see https://github.com/200ok-ch/organice/issues/779), not just a cosmetic one: it silently
+// blocks beforeinstallprompt from firing at all, so the install button falls through to the
+// manual-instructions fallback even on an otherwise fully installable browser.
 function buildDynamicManifest(calendar) {
   const base = getAppBaseUrl();
   const name = calendar.title || '모여라 캘린더';
+  const startUrl = `${base}?id=${calendar.id}`;
   return {
-    id: `./?id=${calendar.id}`,
+    id: startUrl,
     name,
     short_name: name,
     description: calendar.description || `${name} 참여자들의 일정 조율`,
-    start_url: `./?id=${calendar.id}`,
-    scope: './',
+    start_url: startUrl,
+    scope: base,
     display: 'standalone',
     background_color: '#F8FAFC',
     theme_color: '#4F46E5',
@@ -8003,7 +8010,10 @@ async function compressImageToDataUrls(file, { maxBase64Length = MAX_CHAT_IMAGE_
     originalBase64 = canvasOrig.toDataURL('image/jpeg', originalQuality);
   }
 
-  const maxThumb = 120;
+  // 240px @ q0.72 (up from 120px @ q0.5) -- still ~10-15x smaller than the original above, but
+  // sharp enough at the sizes thumbnails actually render at (up to ~200px CSS width for a
+  // single chat image) on a high-DPI phone screen, instead of visibly soft.
+  const maxThumb = 240;
   let wThumb = img.width;
   let hThumb = img.height;
   if (wThumb > maxThumb || hThumb > maxThumb) {
@@ -8020,7 +8030,7 @@ async function compressImageToDataUrls(file, { maxBase64Length = MAX_CHAT_IMAGE_
   canvasThumb.height = hThumb;
   const ctxThumb = canvasThumb.getContext('2d');
   ctxThumb.drawImage(img, 0, 0, wThumb, hThumb);
-  const thumbnailBase64 = canvasThumb.toDataURL('image/jpeg', 0.5);
+  const thumbnailBase64 = canvasThumb.toDataURL('image/jpeg', 0.72);
 
   // Also produce Blobs at the same quality level, used to upload to Firebase Storage at
   // send time (see uploadChatImageAssets) instead of embedding base64 in the message
