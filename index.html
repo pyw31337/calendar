@@ -52,6 +52,22 @@
       }
     })();
   </script>
+  <script id="pwa-install-capture">
+    // Captures beforeinstallprompt (Chromium only -- Safari/Firefox never fire it) as early as
+    // physically possible. The main app script sits well below this, after the Firebase/React
+    // CDN <script src> tags and the rest of <head>, all of which have to download and run
+    // first -- easily enough time on a slow connection for Chrome to finish evaluating
+    // installability and fire the event before a listener attached down there would exist to
+    // catch it. A listener never catches an event that fired before it was attached, so a late
+    // listener silently means "홈 화면에 바로가기" always falls through to the manual
+    // instructions even on a fully installable Chromium browser. Stashed on window (not a
+    // local variable) so the main app script can read it once it loads.
+    window.__deferredInstallPrompt = null;
+    window.addEventListener('beforeinstallprompt', function (e) {
+      e.preventDefault();
+      window.__deferredInstallPrompt = e;
+    });
+  </script>
   <script id="theme-init">
     // Applies the user's saved theme choice (if any) before first paint, so the page never
     // flashes the wrong theme -- with no saved choice, the CSS's own
@@ -1481,13 +1497,11 @@ function notifyNewChatMessage(calendar, message, participantName) {
 // Chromium-based mobile browsers) expose a JS-triggerable native install prompt via
 // beforeinstallprompt -- Safari and Firefox have no such API by design and require the user
 // to go through their own browser UI manually, so those get step-by-step instructions instead.
-let deferredInstallPrompt = null;
-if (typeof window.addEventListener === 'function') {
-  window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();
-    deferredInstallPrompt = e;
-  });
-}
+// The event itself is captured as early as possible by the pwa-install-capture bootstrap
+// script in <head> (see its comment for why a listener down here would be too late) and
+// stashed on window.__deferredInstallPrompt -- read fresh at click time below rather than
+// cached into a local, since a late-firing event (e.g. after the manifest updates once real
+// calendar data loads) still needs to be picked up.
 
 // Registers sw.js, which only caches static assets (icons/manifests) -- never index.html
 // itself, since this app deliberately serves its HTML as no-cache (see sw.js for why). Safe to
@@ -1523,11 +1537,12 @@ function getShortcutInstructions(kind) {
 }
 
 async function tryCreateShortcut(notify) {
+  const deferredInstallPrompt = window.__deferredInstallPrompt;
   if (deferredInstallPrompt) {
     try {
       deferredInstallPrompt.prompt();
       const choice = await deferredInstallPrompt.userChoice;
-      deferredInstallPrompt = null;
+      window.__deferredInstallPrompt = null;
       if (choice?.outcome === 'accepted') {
         if (notify) notify('바로가기가 생성되었습니다!');
         return;
@@ -1666,9 +1681,59 @@ function getRawCalendarIdFromURL() {
   return urlParams.get('id') || urlParams.get('cal') || '';
 }
 
-function getCalendarShareUrl(calendarId) {
+function getAppBaseUrl() {
   const basePath = window.location.pathname.replace(/\/share\/[^/]+\/?$/, '/').replace(/\/(?:index\.html)?$/, '/');
-  return `${window.location.origin}${basePath}share/${encodeURIComponent(calendarId)}/`;
+  return `${window.location.origin}${basePath}`;
+}
+
+function getCalendarShareUrl(calendarId) {
+  return `${getAppBaseUrl()}share/${encodeURIComponent(calendarId)}/`;
+}
+
+// Builds a per-calendar Web App Manifest at runtime. Static manifest-<id>.json files only
+// ever covered kkot/cw (see the pwa-manifest-switch bootstrap script in <head>) -- any
+// calendar created since (calendar creation is no longer restricted to those two ids) fell
+// back to manifest.json's generic "모여라 캘린더" name, so "Add to Home Screen" installed
+// every calendar under the same placeholder label instead of its own title. Icon URLs must
+// be absolute: a manifest served from a blob: URL has no directory of its own to resolve a
+// relative path against.
+function buildDynamicManifest(calendar) {
+  const base = getAppBaseUrl();
+  const name = calendar.title || '모여라 캘린더';
+  return {
+    id: `./?id=${calendar.id}`,
+    name,
+    short_name: name,
+    description: calendar.description || `${name} 참여자들의 일정 조율`,
+    start_url: `./?id=${calendar.id}`,
+    scope: './',
+    display: 'standalone',
+    background_color: '#F8FAFC',
+    theme_color: '#4F46E5',
+    icons: [
+      { src: `${base}icons/icon-192.png`, sizes: '192x192', type: 'image/png', purpose: 'any' },
+      { src: `${base}icons/icon-512.png`, sizes: '512x512', type: 'image/png', purpose: 'any' },
+      { src: `${base}icons/icon-512-maskable.png`, sizes: '512x512', type: 'image/png', purpose: 'maskable' }
+    ]
+  };
+}
+
+let activeManifestBlobUrl = null;
+// Swaps <link rel="manifest"> to a blob: URL generated from this calendar's real title. Safe
+// to call repeatedly (e.g. once per calendar switch) -- the previous blob URL is revoked each
+// time so this doesn't leak memory over a long-lived tab.
+function applyDynamicManifest(calendar) {
+  try {
+    const manifest = buildDynamicManifest(calendar);
+    const blob = new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' });
+    const nextUrl = URL.createObjectURL(blob);
+    const link = document.querySelector('link[rel="manifest"]');
+    if (link) link.setAttribute('href', nextUrl);
+    if (activeManifestBlobUrl) URL.revokeObjectURL(activeManifestBlobUrl);
+    activeManifestBlobUrl = nextUrl;
+  } catch (e) {
+    console.warn('Dynamic manifest generation failed:', e);
+  }
 }
 
 function formatRegisteredAt(timestamp) {
@@ -5903,8 +5968,18 @@ function App() {
       if (window.location.pathname.includes('/share/')) {
         window.history.replaceState({}, '', currentShareUrl);
       }
+      // Only once real data has loaded -- activeCal is otherwise createLoadingCalendarShell's
+      // placeholder, and installing under "Firebase에서 실시간..." would be worse than not
+      // swapping the manifest at all yet.
+      if (activeCalLoaded) {
+        applyDynamicManifest(activeCal);
+        // iOS Safari's "홈 화면에 추가" reads this meta tag for the installed icon's label --
+        // it doesn't consult the manifest at all, so it needs the same per-calendar update.
+        const appleTitle = document.querySelector('meta[name="apple-mobile-web-app-title"]');
+        if (appleTitle) appleTitle.setAttribute('content', activeCal.title);
+      }
     }
-  }, [activeCal]);
+  }, [activeCal, activeCalLoaded]);
 
   // Synchronize chatParticipantId when activeCal changes (loads cached participant or defaults to first active)
   React.useEffect(() => {
