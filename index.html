@@ -69,12 +69,18 @@
     });
   </script>
   <script id="theme-init">
-    // Applies the user's saved theme choice (if any) before first paint, so the page never
-    // flashes the wrong theme -- with no saved choice, the CSS's own
-    // prefers-color-scheme:dark rule (see :root in the <style> block) decides instead.
+    // Applies the user's saved theme choice for THIS calendar (if any) before first paint, so
+    // the page never flashes the wrong theme -- with no saved choice, the CSS's own
+    // prefers-color-scheme:dark rule (see :root in the <style> block) decides instead. Dark
+    // mode is a per-calendar preference (see the 일반 tab in settings), so the storage key is
+    // scoped by the ?id=/?cal= URL param the same way pwa-manifest-switch above resolves it --
+    // isAllowedCalendarId() itself isn't defined yet this early, so this only needs the id to
+    // pick the right localStorage key, not to fully validate it.
     (function () {
       try {
-        var saved = window['local' + 'Storage'].getItem('gather_theme_preference_v1');
+        var params = new URLSearchParams(window.location.search);
+        var id = params.get('id') || params.get('cal') || 'kkot';
+        var saved = window['local' + 'Storage'].getItem('gather_theme_preference_' + id + '_v1');
         if (saved === 'dark' || saved === 'light') {
           document.documentElement.setAttribute('data-theme', saved);
         }
@@ -377,7 +383,7 @@
     @media (min-width: 768px) { .calendar-title { font-size: 1.35rem; } }
     
     .calendar-desc {
-      font-size: 0.825rem; color: var(--text-muted); margin-top: 2px;
+      font-size: 0.825rem; color: var(--text-muted); margin-top: -10px;
       white-space: normal; word-break: keep-all; overflow-wrap: break-word;
     }
     @media (min-width: 768px) { .calendar-desc { font-size: 0.875rem; } }
@@ -1479,8 +1485,26 @@ async function requestChatNotificationPermission() {
   }
 }
 
+// Whether to actually show a chat notification is a per-calendar preference layered on top of
+// the (origin-wide, not per-calendar) browser Notification permission -- the permission is a
+// hard prerequisite either way, but once granted, each calendar remembers its own on/off choice
+// separately, so muting one calendar's chat doesn't silence every other calendar sharing this
+// browser/origin.
+function getChatNotifyPrefKey(calId) {
+  return `gather_chat_notify_pref_${calId}_v1`;
+}
+function isChatNotifyEnabledForCalendar(calId) {
+  if (!calId) return true;
+  return getLocalStorage().getItem(getChatNotifyPrefKey(calId)) !== 'off';
+}
+function setChatNotifyEnabledForCalendar(calId, enabled) {
+  if (!calId) return;
+  getLocalStorage().setItem(getChatNotifyPrefKey(calId), enabled ? 'on' : 'off');
+}
+
 function notifyNewChatMessage(calendar, message, participantName) {
   if (!isNotificationSupported() || Notification.permission !== 'granted') return;
+  if (!isChatNotifyEnabledForCalendar(calendar?.id)) return;
   try {
     const body = message.text?.trim() || (message.imageUrls?.length || message.imageUrl ? '사진을 보냈습니다' : '');
     new Notification(`${calendar?.title || '모여라 캘린더'} · ${participantName}`, {
@@ -5724,6 +5748,13 @@ function App() {
   const [isAdminOpen, setIsAdminOpen] = React.useState(false);
   const [isGlobalSearchOpen, setIsGlobalSearchOpen] = React.useState(false);
 
+  // Theme, font size, and (below) chat notifications are per-calendar preferences, not
+  // per-browser -- someone managing several calendars can want dark mode on one and not
+  // another. Storage keys are scoped by activeCalId, and both re-read from that calendar's own
+  // key whenever activeCalId changes (handleSelectCalendar switches it without a full page
+  // reload, so a plain useState initializer alone wouldn't pick up the new calendar's saved
+  // choice).
+  //
   // Theme toggle -- mirrors the choice the early <head> theme-init script already applied
   // before first paint, so this state starts in sync with whatever's on <html> rather than
   // flashing to a default and then correcting itself.
@@ -5732,19 +5763,56 @@ function App() {
     const isDark = themeChoice === 'dark' || (themeChoice === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
     const next = isDark ? 'light' : 'dark';
     document.documentElement.setAttribute('data-theme', next);
-    getLocalStorage().setItem('gather_theme_preference_v1', next);
+    getLocalStorage().setItem(`gather_theme_preference_${activeCalId}_v1`, next);
     setThemeChoice(next);
   };
   const isDarkTheme = themeChoice === 'dark' || (themeChoice === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  const isFirstCalIdRenderRef = React.useRef(true);
+  React.useEffect(() => {
+    // Skip on first mount -- theme-init already applied the right calendar's choice before
+    // React ever ran, so re-applying here would just repeat that (harmlessly, but needlessly).
+    if (isFirstCalIdRenderRef.current) {
+      isFirstCalIdRenderRef.current = false;
+      return;
+    }
+    const saved = getLocalStorage().getItem(`gather_theme_preference_${activeCalId}_v1`);
+    const next = saved === 'dark' || saved === 'light' ? saved : 'system';
+    if (next === 'system') {
+      document.documentElement.removeAttribute('data-theme');
+    } else {
+      document.documentElement.setAttribute('data-theme', next);
+    }
+    setThemeChoice(next);
+  }, [activeCalId]);
 
   // Text-size preference, relative to the browser's own default (100%). The whole app is built
   // on rem units, so scaling the root font-size scales every component's text proportionally
   // with no per-component changes needed.
-  const [fontScalePercent, setFontScalePercent] = React.useState(() => Number(getLocalStorage().getItem('gather_font_scale_v1')) || 100);
+  const [fontScalePercent, setFontScalePercent] = React.useState(() => Number(getLocalStorage().getItem(`gather_font_scale_${activeCalId}_v1`)) || 100);
+  // Guards the write effect below against the calendar-switch effect's own setFontScalePercent
+  // call: without this, switching calendars would re-fire the write effect with the OLD
+  // calendar's still-current fontScalePercent value but the NEW calendar's key (effects run in
+  // declaration order within the same commit, so the write would land before the read below has
+  // a chance to correct the state), overwriting the newly-switched-to calendar's saved size with
+  // whatever the previous calendar had.
+  const skipNextFontWriteRef = React.useRef(false);
   React.useEffect(() => {
     document.documentElement.style.fontSize = `${fontScalePercent}%`;
-    getLocalStorage().setItem('gather_font_scale_v1', String(fontScalePercent));
+    if (skipNextFontWriteRef.current) {
+      skipNextFontWriteRef.current = false;
+      return;
+    }
+    getLocalStorage().setItem(`gather_font_scale_${activeCalId}_v1`, String(fontScalePercent));
   }, [fontScalePercent]);
+  const isFirstFontCalIdRenderRef = React.useRef(true);
+  React.useEffect(() => {
+    if (isFirstFontCalIdRenderRef.current) {
+      isFirstFontCalIdRenderRef.current = false;
+      return;
+    }
+    skipNextFontWriteRef.current = true;
+    setFontScalePercent(Number(getLocalStorage().getItem(`gather_font_scale_${activeCalId}_v1`)) || 100);
+  }, [activeCalId]);
 
   const [adminActivityLogs, setAdminActivityLogs] = React.useState([]);
   const [isShareOpen, setIsShareOpen] = React.useState(false);
@@ -8601,7 +8669,7 @@ function Lightbox({ urls, index, onClose, onNavigate, meta }) {
     draggable: false,
     style: {
       maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: '12px',
-      boxShadow: '0 24px 80px rgba(0,0,0,0.6)', display: 'block'
+      display: 'block'
     }
   }), showInfo && /*#__PURE__*/React.createElement(LightboxInfoPanel, { info: currentInfo })) : /*#__PURE__*/React.createElement("img", {
     src: url,
@@ -8610,8 +8678,7 @@ function Lightbox({ urls, index, onClose, onNavigate, meta }) {
     draggable: false,
     onClick: e => e.stopPropagation(),
     style: {
-      maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: '12px',
-      boxShadow: '0 24px 80px rgba(0,0,0,0.6)'
+      maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: '12px'
     }
   })));
 
@@ -8692,7 +8759,7 @@ function Lightbox({ urls, index, onClose, onNavigate, meta }) {
     draggable: false,
     style: {
       maxWidth: '92vw', maxHeight: '82vh', borderRadius: '12px', objectFit: 'contain',
-      boxShadow: '0 24px 80px rgba(0,0,0,0.6)', display: 'block'
+      display: 'block'
     }
   }), showInfo && /*#__PURE__*/React.createElement(LightboxInfoPanel, { info: currentInfo })),
   total > 1 && /*#__PURE__*/React.createElement("div", {
@@ -9276,13 +9343,20 @@ function ChatRoomView({
   };
 
   const [notifPermission, setNotifPermission] = React.useState(() => (isNotificationSupported() ? Notification.permission : 'unsupported'));
+  const [chatNotifyEnabled, setChatNotifyEnabled] = React.useState(() => isChatNotifyEnabledForCalendar(calendar?.id));
+  React.useEffect(() => {
+    setChatNotifyEnabled(isChatNotifyEnabledForCalendar(calendar?.id));
+  }, [calendar?.id]);
   const handleToggleNotifications = async () => {
     if (!isNotificationSupported()) {
       if (showToast) showToast('알림 미지원 브라우저', 'error');
       return;
     }
     if (Notification.permission === 'granted') {
-      if (showToast) showToast('브라우저 알림 설정에서 끌 수 있음', 'info');
+      const next = !chatNotifyEnabled;
+      setChatNotifyEnabled(next);
+      setChatNotifyEnabledForCalendar(calendar.id, next);
+      if (showToast) showToast(next ? '이 캘린더 채팅 알림 켜짐' : '이 캘린더 채팅 알림 꺼짐', 'success');
       return;
     }
     if (Notification.permission === 'denied') {
@@ -9303,6 +9377,8 @@ function ChatRoomView({
       const probe = new Notification(' ', { silent: true, tag: 'notif-probe' });
       probe.close();
       setNotifPermission('granted');
+      setChatNotifyEnabled(true);
+      setChatNotifyEnabledForCalendar(calendar.id, true);
       if (showToast) showToast('알림 켜짐', 'success');
     } catch (e) {
       setNotifPermission('unsupported');
@@ -9777,13 +9853,13 @@ function ChatRoomView({
   }, /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: handleToggleNotifications,
-    title: notifPermission === 'granted' ? '\uC54C\uB9BC \uCF1C\uC9D0' : '\uC54C\uB9BC \uCF1C\uAE30',
+    title: notifPermission === 'granted' && chatNotifyEnabled ? '\uC54C\uB9BC \uCF1C\uC9D0' : '\uC54C\uB9BC \uCF1C\uAE30',
     style: {
       background: 'none',
       border: 'none',
       cursor: 'pointer',
       padding: '4px',
-      color: notifPermission === 'granted' ? '#4F46E5' : '#64748B',
+      color: notifPermission === 'granted' && chatNotifyEnabled ? '#4F46E5' : '#64748B',
       display: 'flex',
       alignItems: 'center'
     }
@@ -9792,7 +9868,7 @@ function ChatRoomView({
     width: "22",
     height: "22",
     viewBox: "0 0 24 24",
-    fill: notifPermission === 'granted' ? 'currentColor' : 'none',
+    fill: notifPermission === 'granted' && chatNotifyEnabled ? 'currentColor' : 'none',
     stroke: "currentColor",
     "stroke-width": "2",
     "stroke-linecap": "round",
@@ -10584,7 +10660,7 @@ function DateModal({
     setIsSheetOpen(false);
     setIsSubmitting(false);
   }, [calendar?.id, dateStr]);
-  const celebrateAvailabilitySave = () => {
+  const celebratePositiveAction = () => {
     if (typeof confetti !== 'function') return;
     try {
       confetti({
@@ -10612,7 +10688,7 @@ function DateModal({
       return;
     }
 
-    celebrateAvailabilitySave();
+    celebratePositiveAction();
     setNote('');
     onClose();
   };
@@ -10640,6 +10716,7 @@ function DateModal({
   const handleConfirmMeeting = async () => {
     if (isSubmitting) return;
     setIsSubmitting(true);
+    const wasConfirmed = isConfirmed;
     const latestNote = noteInputRef.current ? noteInputRef.current.value : note;
     let saved = false;
     try {
@@ -10648,7 +10725,12 @@ function DateModal({
       console.error('Confirm meeting failed:', err);
     }
     setIsSubmitting(false);
-    if (saved !== false) onClose();
+    if (saved !== false) {
+      // Only the unconfirmed -> confirmed transition is a "positive" event worth celebrating --
+      // confirming cancellation (확정취소) shouldn't pop confetti.
+      if (!wasConfirmed) celebratePositiveAction();
+      onClose();
+    }
   };
 
   return /*#__PURE__*/React.createElement("div", {
@@ -11157,15 +11239,27 @@ function AdminModal({
   // Chat notification permission -- mirrors ChatRoomView's own bell toggle logic (kept as an
   // independent local read of the same browser-level Notification.permission rather than shared
   // React state, since it's not app-owned data). Lets the on/off switch live here too, in 일반
-  // tab, alongside the other personal display preferences.
+  // tab, alongside the other personal display preferences. Notification.permission itself is
+  // origin-wide (the browser has no concept of "per-calendar" permission), but once granted,
+  // whether THIS calendar's chat actually shows a notification is its own per-calendar
+  // preference (isChatNotifyEnabledForCalendar) -- so the switch reflects both together, and
+  // toggling it once permission is already granted flips the per-calendar preference instead of
+  // hitting a dead end.
   const [notifPermission, setNotifPermission] = React.useState(() => (isNotificationSupported() ? Notification.permission : 'unsupported'));
+  const [chatNotifyEnabled, setChatNotifyEnabled] = React.useState(() => isChatNotifyEnabledForCalendar(calendar?.id));
+  React.useEffect(() => {
+    setChatNotifyEnabled(isChatNotifyEnabledForCalendar(calendar?.id));
+  }, [calendar?.id]);
   const handleToggleNotifications = async () => {
     if (!isNotificationSupported()) {
       if (showToast) showToast('알림 미지원 브라우저', 'error');
       return;
     }
     if (Notification.permission === 'granted') {
-      if (showToast) showToast('브라우저 알림 설정에서 끌 수 있음', 'info');
+      const next = !chatNotifyEnabled;
+      setChatNotifyEnabled(next);
+      setChatNotifyEnabledForCalendar(calendar.id, next);
+      if (showToast) showToast(next ? '이 캘린더 채팅 알림 켜짐' : '이 캘린더 채팅 알림 꺼짐', 'success');
       return;
     }
     if (Notification.permission === 'denied') {
@@ -11182,6 +11276,8 @@ function AdminModal({
       const probe = new Notification(' ', { silent: true, tag: 'notif-probe' });
       probe.close();
       setNotifPermission('granted');
+      setChatNotifyEnabled(true);
+      setChatNotifyEnabledForCalendar(calendar.id, true);
       if (showToast) showToast('알림 켜짐', 'success');
     } catch (e) {
       setNotifPermission('unsupported');
@@ -11550,7 +11646,7 @@ function AdminModal({
               type: "button", className: "btn btn-primary", disabled: isSubmitting,
               onClick: handleSubmitSettings,
               style: { marginTop: '16px', width: '100%', height: '38px', fontWeight: 'bold' }
-            }, isSubmitting ? "저장 중..." : "캘린더 프로필 및 참여자 설정 저장")
+            }, isSubmitting ? "저장 중..." : "설정 저장")
           ),
 
           /* Section 2: Polls Creation & List */
@@ -11637,7 +11733,7 @@ function AdminModal({
                 /*#__PURE__*/React.createElement("div", { style: { fontWeight: 700, fontSize: '0.88rem', color: 'var(--text-main)' } }, "채팅 알림"),
                 /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.76rem', color: '#94A3B8', marginTop: '2px' } }, "새 채팅 메시지가 오면 알려드립니다 (탭이 열려있을 때)")
               ),
-              /*#__PURE__*/React.createElement(ToggleSwitch, { checked: notifPermission === 'granted', onChange: handleToggleNotifications, label: "채팅 알림" })
+              /*#__PURE__*/React.createElement(ToggleSwitch, { checked: notifPermission === 'granted' && chatNotifyEnabled, onChange: handleToggleNotifications, label: "채팅 알림" })
             ),
 
             /* Font size row */
@@ -13400,6 +13496,7 @@ function SummaryList({
     onKeyDown: event => handleSectionTitleKeyDown(event, 'confirmed'),
     style: {
       color: '#7C3AED',
+      marginTop: '-10px',
       marginBottom: '12px'
     }
   }, /*#__PURE__*/React.createElement("svg", {
