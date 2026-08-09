@@ -1316,6 +1316,13 @@
       .admin-chat-text { white-space: normal; overflow: visible; text-overflow: clip; word-break: break-word; }
       .admin-chat-footer { justify-content: space-between; }
     }
+
+    /* Admin dashboard metrics grid: fixed 2 columns on mobile (as requested), but auto-fit back
+       to compact multi-column on wider screens so desktop admins don't get oversized boxes. */
+    .admin-metrics-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+    @media (min-width: 768px) {
+      .admin-metrics-grid { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+    }
   </style>
 </head>
 <body>
@@ -4978,7 +4985,7 @@ function AdminDashboard({ initialCalendars }) {
       /* Core metrics stat-box grid: click a box to reveal its kkot/cw split + donut chart */
       /*#__PURE__*/React.createElement("section", { style: styles.card },
         /*#__PURE__*/React.createElement("div", { style: styles.cardTitle }, "핵심 운영 지표", /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.72rem', fontWeight: 700, color: '#94A3B8' } }, "박스를 클릭하면 캘린더별 비율 확인")),
-        /*#__PURE__*/React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' } },
+        /*#__PURE__*/React.createElement("div", { className: "admin-metrics-grid" },
           [
             { key: 'calendars', label: '총 캘린더', val: calendarsList.length, perCal: null, unit: '개' },
             { key: 'participants', label: '총 참여자', val: dashboard.totalParticipants, perCal: stat => stat.participants.length, unit: '명' },
@@ -5157,7 +5164,7 @@ function AdminDashboard({ initialCalendars }) {
                 padding: '6px 10px', marginBottom: '4px', backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 'var(--radius-md)', color: '#0F172A'
               }
             },
-              /*#__PURE__*/React.createElement("div", { className: "date-item-left" },
+              /*#__PURE__*/React.createElement("div", { className: "date-item-left", style: { width: 'auto', minWidth: 0 } },
                 /*#__PURE__*/React.createElement("strong", { style: { fontSize: '0.78rem', color: '#0F172A' } }, formatDateWithDayName(item.date)),
                 /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.75rem', marginLeft: '6px', color: '#64748B' } }, item.count, "/", stat.participants.length, "명 가능")
               ),
