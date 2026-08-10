@@ -4242,7 +4242,12 @@ function buildAdminDashboardMetrics(calendarsList) {
 }
 
 const CALENDAR_ACCENT_PALETTE = ['#F97316', '#3B82F6', '#8B5CF6', '#10B981', '#EC4899', '#F59E0B'];
-function getCalendarAccentColor(calId, indexInList) {
+function getCalendarAccentColor(calOrId, indexInList) {
+  const cal = calOrId && typeof calOrId === 'object' ? calOrId : null;
+  if (cal && typeof cal.accentColor === 'string' && /^#[0-9a-fA-F]{6}$/.test(cal.accentColor)) {
+    return cal.accentColor;
+  }
+  const calId = cal ? cal.id : calOrId;
   const knownIndex = PUBLIC_CALENDAR_IDS.indexOf(calId);
   const idx = knownIndex >= 0 ? knownIndex : indexInList;
   return CALENDAR_ACCENT_PALETTE[idx % CALENDAR_ACCENT_PALETTE.length];
@@ -4290,6 +4295,7 @@ function AdminDashboard({ initialCalendars }) {
   // Calendar profile edit states
   const [calTitle, setCalTitle] = React.useState('');
   const [calDesc, setCalDesc] = React.useState('');
+  const [calAccentColor, setCalAccentColor] = React.useState('');
   const [calParticipants, setCalParticipants] = React.useState([]);
   const [newPartName, setNewPartName] = React.useState('');
   const newPartNameRef = React.useRef(null);
@@ -4526,6 +4532,7 @@ function AdminDashboard({ initialCalendars }) {
       if (lastSyncedRef.current !== key) {
         setCalTitle(cal.title);
         setCalDesc(cal.description || '');
+        setCalAccentColor(normalizeColorValue(cal.accentColor, getCalendarAccentColor(cal, serverCalendars.findIndex(c => c.id === cal.id))));
         setCalParticipants(getActiveParticipants(cal));
         setNewPartName('');
         lastSyncedRef.current = key;
@@ -4664,6 +4671,7 @@ function AdminDashboard({ initialCalendars }) {
       ...cal,
       title: calTitle.trim(),
       description: calDesc.trim(),
+      accentColor: normalizeColorValue(calAccentColor, getCalendarAccentColor(cal, serverCalendars.findIndex(c => c.id === cal.id))),
       participants: calParticipants,
       updatedAt: now,
       revision: (cal.revision || 0) + 1
@@ -4967,7 +4975,7 @@ function AdminDashboard({ initialCalendars }) {
       fontSize: '1.6rem',
       fontWeight: '900',
       color: '#059669',
-      marginTop: '6px'
+      marginTop: '-4px'
     }
   };
 
@@ -5130,7 +5138,7 @@ function AdminDashboard({ initialCalendars }) {
               key: stat.calendar.id,
               style: { display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.74rem', fontWeight: 700, color: '#334155' }
             },
-              /*#__PURE__*/React.createElement("span", { style: { width: '8px', height: '8px', borderRadius: '9999px', backgroundColor: getCalendarAccentColor(stat.calendar.id, i), flexShrink: 0 } }),
+              /*#__PURE__*/React.createElement("span", { style: { width: '8px', height: '8px', borderRadius: '9999px', backgroundColor: getCalendarAccentColor(stat.calendar, i), flexShrink: 0 } }),
               stat.calendar.id
             ))
           )
@@ -5148,13 +5156,14 @@ function AdminDashboard({ initialCalendars }) {
             { key: 'pollVotes', label: '총 투표자 수', val: dashboard.totalPollVotes, perCal: stat => stat.pollVoteCount, unit: '명' }
           ].map(box => {
             const perCalValues = box.perCal ? dashboard.calendarStats.map((stat, i) => ({
-              id: stat.calendar.id, value: box.perCal(stat), color: getCalendarAccentColor(stat.calendar.id, i)
+              id: stat.calendar.id, value: box.perCal(stat), color: getCalendarAccentColor(stat.calendar, i)
             })) : [];
             return /*#__PURE__*/React.createElement("div", {
               key: box.key,
               style: {
                 border: '1px solid #E2E8F0', borderRadius: '8px', padding: '12px',
-                backgroundColor: '#F8FAFC', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px'
+                backgroundColor: '#F8FAFC', display: 'flex', flexDirection: 'column', alignItems: 'center',
+                justifyContent: 'center', gap: '6px', minHeight: '128px'
               }
             },
               box.perCal && /*#__PURE__*/React.createElement(DonutChart, {
@@ -5245,7 +5254,7 @@ function AdminDashboard({ initialCalendars }) {
           /*#__PURE__*/React.createElement("div", { style: styles.cardTitle }, "참여자별 일정 등록 수"),
           /*#__PURE__*/React.createElement("div", null,
             dashboard.calendarStats.map((stat, i) => {
-              const accent = getCalendarAccentColor(stat.calendar.id, i);
+              const accent = getCalendarAccentColor(stat.calendar, i);
               return /*#__PURE__*/React.createElement("div", {
                 key: `${stat.calendar.id}_parts_list`,
                 style: { marginBottom: '16px', paddingLeft: '10px', borderLeft: `3px solid ${accent}` }
@@ -5310,10 +5319,18 @@ function AdminDashboard({ initialCalendars }) {
           /* Title input */
           /*#__PURE__*/React.createElement("div", { style: { marginBottom: '12px' } },
             /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#64748B', marginBottom: '4px' } }, "캘린더 제목"),
-            /*#__PURE__*/React.createElement("input", {
-              type: "text", className: "form-input", style: { width: '100%' }, value: calTitle,
-              onChange: e => setCalTitle(e.target.value), placeholder: "캘린더 제목"
-            })
+            /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
+              /*#__PURE__*/React.createElement("input", {
+                type: "color", className: "participant-color-input", value: calAccentColor || '#64748B',
+                onChange: e => setCalAccentColor(e.target.value),
+                title: "캘린더 색상",
+                style: { width: '28px', height: '28px', border: 'none', background: 'none', cursor: 'pointer', flexShrink: 0 }
+              }),
+              /*#__PURE__*/React.createElement("input", {
+                type: "text", className: "form-input", style: { flex: 1, minWidth: 0 }, value: calTitle,
+                onChange: e => setCalTitle(e.target.value), placeholder: "캘린더 제목"
+              })
+            )
           ),
 
           /* Description input */
@@ -8373,34 +8390,55 @@ function loadImageElement(objectUrl, timeoutMs = 20000) {
 
 async function compressImageToDataUrls(file, { maxBase64Length = MAX_CHAT_IMAGE_BASE64_LENGTH } = {}) {
   let sourceBlob = file;
+  let img = null;
+
   if (isHeicFile(file)) {
+    // Many modern browsers -- Safari 17+ on iOS/macOS especially -- decode HEIC/HEIF natively
+    // via <img>, so try that first. It's near-instant when supported, and browsers without
+    // support report onerror almost immediately (no network wait, the file is already a local
+    // blob), so the short timeout below costs nothing when native decode doesn't apply. This
+    // also sidesteps heic2any's bundled libheif (last published 2020) failing to parse newer
+    // HDR/gain-map HEIC variants some iPhones now produce, which Safari's own decoder still
+    // handles fine -- and avoids the ~1.3MB CDN fetch entirely on capable browsers.
+    const probeUrl = URL.createObjectURL(file);
     try {
-      const heic2any = await loadHeic2any();
-      // A 24MP+ HEIC on a slower mobile device can genuinely take a while to decode, but must
-      // not be allowed to hang forever -- bound it generously (45s) rather than leave the
-      // attach flow stuck with no way to recover.
-      const converted = await withTimeout(
-        heic2any({ blob: file, toType: 'image/jpeg', quality: 0.85 }),
-        45000,
-        'HEIC conversion timed out'
-      );
-      sourceBlob = Array.isArray(converted) ? converted[0] : converted;
+      img = await loadImageElement(probeUrl, 6000);
     } catch (err) {
-      throw Object.assign(new Error('HEIC 이미지를 변환하지 못했습니다.'), { code: 'HEIC_CONVERT_FAILED', fileName: file.name });
+      img = null;
+    } finally {
+      URL.revokeObjectURL(probeUrl);
+    }
+
+    if (!img) {
+      try {
+        const heic2any = await loadHeic2any();
+        // A 24MP+ HEIC on a slower mobile device can genuinely take a while to decode, but must
+        // not be allowed to hang forever -- bound it generously (45s) rather than leave the
+        // attach flow stuck with no way to recover.
+        const converted = await withTimeout(
+          heic2any({ blob: file, toType: 'image/jpeg', quality: 0.85 }),
+          45000,
+          'HEIC conversion timed out'
+        );
+        sourceBlob = Array.isArray(converted) ? converted[0] : converted;
+      } catch (err) {
+        throw Object.assign(new Error('HEIC 이미지를 변환하지 못했습니다.'), { code: 'HEIC_CONVERT_FAILED', fileName: file.name });
+      }
     }
   }
 
-  const objectUrl = URL.createObjectURL(sourceBlob);
-  let img;
-  try {
-    img = await loadImageElement(objectUrl);
-  } catch (err) {
-    throw Object.assign(
-      new Error('이미지를 불러오지 못했습니다. 지원하지 않는 형식이거나 손상된 파일일 수 있습니다.'),
-      { code: err.code || 'IMAGE_DECODE_FAILED', fileName: file.name }
-    );
-  } finally {
-    URL.revokeObjectURL(objectUrl);
+  if (!img) {
+    const objectUrl = URL.createObjectURL(sourceBlob);
+    try {
+      img = await loadImageElement(objectUrl);
+    } catch (err) {
+      throw Object.assign(
+        new Error('이미지를 불러오지 못했습니다. 지원하지 않는 형식이거나 손상된 파일일 수 있습니다.'),
+        { code: err.code || 'IMAGE_DECODE_FAILED', fileName: file.name }
+      );
+    } finally {
+      URL.revokeObjectURL(objectUrl);
+    }
   }
 
   const maxOrig = 1200; // High resolution spec (1200px instead of 720px)
