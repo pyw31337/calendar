@@ -217,6 +217,64 @@
       --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.45), 0 8px 10px -6px rgba(0, 0, 0, 0.35);
       color-scheme: dark;
     }
+    /* The staff-only admin dashboard (.admin-scope, AdminDashboard's own root) has no dark-mode
+       feature of its own and stays light regardless of the user-facing dark-mode toggle -- but
+       dark mode is applied at :root, so without this reset the shared utility classes above
+       (.btn-secondary, .form-input, .day-cell, ...) and the token values would otherwise bleed
+       into it too, since AdminDashboard renders inside the same document as the main app. Higher
+       specificity (root attribute + .admin-scope + target class) wins over the plain
+       ":root[data-theme] .foo" rules above regardless of source order. */
+    :root[data-theme="dark"] .admin-scope,
+    :root:not([data-theme="light"]) .admin-scope {
+      --bg-primary: #F8FAFC;
+      --bg-secondary: #FFFFFF;
+      --bg-card: #FFFFFF;
+      --border-subtle: #E2E8F0;
+      --border-hover: #CBD5E1;
+      --text-main: #0F172A;
+      --text-muted: #64748B;
+      --text-light: #94A3B8;
+      --accent-primary: #4F46E5;
+      --accent-secondary: #7C3AED;
+      --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
+      --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -1px rgba(0, 0, 0, 0.04);
+      --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.03);
+      color-scheme: light;
+    }
+    :root[data-theme="dark"] .admin-scope .day-cell,
+    :root:not([data-theme="light"]) .admin-scope .day-cell { background: #FFFFFF; }
+    :root[data-theme="dark"] .admin-scope .day-cell:hover,
+    :root:not([data-theme="light"]) .admin-scope .day-cell:hover { background: #EEF2FF; }
+    :root[data-theme="dark"] .admin-scope .day-cell.today,
+    :root:not([data-theme="light"]) .admin-scope .day-cell.today { background: #EEF2FF; }
+    :root[data-theme="dark"] .admin-scope .day-cell.all-available,
+    :root:not([data-theme="light"]) .admin-scope .day-cell.all-available { background: #ECFDF5; border-color: #10B981; }
+    :root[data-theme="dark"] .admin-scope .day-cell.confirmed-meeting,
+    :root:not([data-theme="light"]) .admin-scope .day-cell.confirmed-meeting { background: #FAF5FF; border-color: #9333EA; }
+    :root[data-theme="dark"] .admin-scope .btn-secondary,
+    :root:not([data-theme="light"]) .admin-scope .btn-secondary { background: #F8FAFC; color: var(--text-main); }
+    :root[data-theme="dark"] .admin-scope .btn-secondary:hover,
+    :root:not([data-theme="light"]) .admin-scope .btn-secondary:hover { background: #EEF2FF; }
+    :root[data-theme="dark"] .admin-scope .btn-danger,
+    :root:not([data-theme="light"]) .admin-scope .btn-danger { background: #FEF2F2; border-color: #FECACA; color: #DC2626; }
+    :root[data-theme="dark"] .admin-scope .btn-danger:hover,
+    :root:not([data-theme="light"]) .admin-scope .btn-danger:hover { background: #FEE2E2; }
+    :root[data-theme="dark"] .admin-scope .form-select,
+    :root[data-theme="dark"] .admin-scope .form-input,
+    :root[data-theme="dark"] .admin-scope .form-textarea,
+    :root:not([data-theme="light"]) .admin-scope .form-select,
+    :root:not([data-theme="light"]) .admin-scope .form-input,
+    :root:not([data-theme="light"]) .admin-scope .form-textarea { background: #FFFFFF; }
+    :root[data-theme="dark"] .admin-scope .status-badge,
+    :root[data-theme="dark"] .admin-scope .date-item-badge,
+    :root:not([data-theme="light"]) .admin-scope .status-badge,
+    :root:not([data-theme="light"]) .admin-scope .date-item-badge { filter: none; }
+    :root[data-theme="dark"] .admin-scope .date-item-btn:hover,
+    :root:not([data-theme="light"]) .admin-scope .date-item-btn:hover { background: #EEF2FF; }
+    :root[data-theme="dark"] .admin-scope .date-item-btn.is-confirmed,
+    :root:not([data-theme="light"]) .admin-scope .date-item-btn.is-confirmed { border-color: #E9D5FF; background: #FAF5FF; }
+    :root[data-theme="dark"] .admin-scope .date-item-btn.is-available,
+    :root:not([data-theme="light"]) .admin-scope .date-item-btn.is-available { border-color: #DBEAFE; background: #F8FAFC; }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -714,12 +772,12 @@
       padding: 10px 12px;
       border: 1px solid var(--border-subtle);
       border-radius: var(--radius-md);
-      background: #F8FAFC;
+      background: var(--bg-primary);
     }
     .poll-sortable-row {
       border: 1px solid transparent;
       border-radius: var(--radius-md);
-      background: #FFFFFF;
+      background: var(--bg-card);
       transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease, background 0.16s ease, opacity 0.16s ease;
       position: relative;
     }
@@ -1074,7 +1132,7 @@
 
     .date-item-btn {
       width: 100%; display: flex; flex-direction: column; align-items: flex-start; padding: 12px 14px;
-      background: #FFFFFF; border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
+      background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
       color: var(--text-main); cursor: pointer; transition: all 0.2s ease; margin-bottom: 10px; text-align: left;
       gap: 10px;
     }
@@ -1088,6 +1146,20 @@
       }
     }
     .date-item-btn:hover { background: #EEF2FF; border-color: var(--accent-primary); transform: translateX(4px); }
+    /* isPast/isConfirmed/isAvailable tint variants -- see App's SummaryList date-item-btn
+       usages, which pick one of these instead of inline backgroundColor/borderColor so dark
+       mode can retint them below instead of always showing the light pastel. */
+    .date-item-btn.is-past { opacity: 0.7; background: var(--bg-primary); border-color: var(--border-subtle); }
+    .date-item-btn.is-confirmed { border-color: #E9D5FF; background: #FAF5FF; }
+    .date-item-btn.is-available { border-color: #DBEAFE; background: #F8FAFC; }
+    :root[data-theme="dark"] .date-item-btn:hover { background: #1E2A4D; }
+    :root[data-theme="dark"] .date-item-btn.is-confirmed { border-color: #5B21B6; background: #241B3D; }
+    :root[data-theme="dark"] .date-item-btn.is-available { border-color: #1D4ED8; background: #16233E; }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) .date-item-btn:hover { background: #1E2A4D; }
+      :root:not([data-theme="light"]) .date-item-btn.is-confirmed { border-color: #5B21B6; background: #241B3D; }
+      :root:not([data-theme="light"]) .date-item-btn.is-available { border-color: #1D4ED8; background: #16233E; }
+    }
 
     /* Capsule Memo Badge */
     .memo-capsule-badge {
@@ -1694,6 +1766,17 @@ function getConfirmedMeetings(calendar) {
 
 function isDateConfirmedMeeting(calendar, dateStr) {
   return getConfirmedMeetings(calendar).some(m => m.date === dateStr);
+}
+
+// pinnedNotices is the array form; pinnedNotice (singular) is kept readable here only so a
+// calendar saved by the earlier single-notice version of this feature still displays instead
+// of silently vanishing once this ships.
+function getPinnedNotices(calendar) {
+  if (Array.isArray(calendar?.pinnedNotices)) return calendar.pinnedNotices.filter(n => n && n.id && n.text);
+  if (calendar?.pinnedNotice && calendar.pinnedNotice.text) {
+    return [{ id: `legacy_${calendar.id}`, text: calendar.pinnedNotice.text, setAt: calendar.pinnedNotice.setAt, setBy: calendar.pinnedNotice.setBy }];
+  }
+  return [];
 }
 
 // The chat room header is cramped for space (back button + title + bell + share icons all
@@ -4881,6 +4964,7 @@ function AdminDashboard({ initialCalendars }) {
   };
 
   return /*#__PURE__*/React.createElement("div", {
+    className: "admin-scope",
     style: styles.dashboard
   },
     /* Toast Alert */
@@ -6683,17 +6767,26 @@ function App() {
   // does a blind {...server, ...incoming} for fields it doesn't explicitly preserve/merge (see
   // its handling of availabilities/polls for contrast), so two near-simultaneous 'settings'
   // saves from different tabs (e.g. this and handleSetPinnedNotice) can still let a stale local
-  // confirmedMeeting/pinnedNotice snapshot overwrite a fresher one. Pre-existing pattern shared
-  // by every other settings-mode field in this app (title, description, ...); a real fix would
-  // need confirmedMeeting/pinnedNotice to get their own dedicated saveMode + delta-merge
+  // confirmedMeeting/pinnedNotice/expenses snapshot overwrite a fresher one. Pre-existing pattern
+  // shared by every other settings-mode field in this app (title, description, ...); a real fix
+  // would need confirmedMeeting/pinnedNotice to get their own dedicated saveMode + delta-merge
   // function the way availabilities and polls already do.
-  const handleSaveSettlement = (dateStr, amount) => {
+  const handleSaveExpense = (dateStr, expense) => {
     if (!activeCal || !isValidDateString(dateStr)) return false;
     const existingMeetings = getConfirmedMeetings(activeCal);
-    if (!existingMeetings.some(m => m.date === dateStr)) return false;
+    const meetingIndex = existingMeetings.findIndex(m => m.date === dateStr);
+    if (meetingIndex < 0) return false;
+    const cleanLabel = sanitizeText(expense?.label || '', 120);
+    const cleanUrl = sanitizeText(expense?.url || '', 220);
+    const cleanAmount = Number.isFinite(expense?.amount) && expense.amount > 0 ? Math.round(expense.amount) : 0;
+    if (!cleanLabel || !cleanAmount) return false;
     const now = Date.now();
-    const cleanAmount = Number.isFinite(amount) && amount > 0 ? Math.round(amount) : null;
-    const nextConfirmedMeetings = existingMeetings.map(m => m.date === dateStr ? { ...m, amount: cleanAmount } : m);
+    const meeting = existingMeetings[meetingIndex];
+    const existingExpenses = Array.isArray(meeting.expenses) ? meeting.expenses : [];
+    const nextExpenses = expense?.id
+      ? existingExpenses.map(e => e.id === expense.id ? { ...e, label: cleanLabel, url: cleanUrl, amount: cleanAmount, updatedAt: now } : e)
+      : [...existingExpenses, { id: `exp_${activeCal.id}_${dateStr}_${now}_${Math.random().toString(36).slice(2, 7)}`, label: cleanLabel, url: cleanUrl, amount: cleanAmount, createdAt: now, updatedAt: now }];
+    const nextConfirmedMeetings = existingMeetings.map((m, i) => i === meetingIndex ? { ...m, expenses: nextExpenses, amount: null } : m);
     const updatedCal = {
       ...activeCal,
       confirmedMeeting: nextConfirmedMeetings,
@@ -6701,7 +6794,25 @@ function App() {
       revision: (activeCal.revision || 0) + 1
     };
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-    return updateCalendars(nextCalendars, '정산 저장완료', 'success', updatedCal.id, 'settings', []);
+    return updateCalendars(nextCalendars, '지출 저장완료', 'success', updatedCal.id, 'settings', []);
+  };
+  const handleDeleteExpense = (dateStr, expenseId) => {
+    if (!activeCal || !isValidDateString(dateStr)) return false;
+    const existingMeetings = getConfirmedMeetings(activeCal);
+    const meetingIndex = existingMeetings.findIndex(m => m.date === dateStr);
+    if (meetingIndex < 0) return false;
+    const meeting = existingMeetings[meetingIndex];
+    const nextExpenses = (Array.isArray(meeting.expenses) ? meeting.expenses : []).filter(e => e.id !== expenseId);
+    const now = Date.now();
+    const nextConfirmedMeetings = existingMeetings.map((m, i) => i === meetingIndex ? { ...m, expenses: nextExpenses } : m);
+    const updatedCal = {
+      ...activeCal,
+      confirmedMeeting: nextConfirmedMeetings,
+      updatedAt: now,
+      revision: (activeCal.revision || 0) + 1
+    };
+    const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
+    return updateCalendars(nextCalendars, '지출 삭제완료', 'success', updatedCal.id, 'settings', []);
   };
   const handleDeleteActivityLog = log => {
     if (!activeCal || !log?.id) return false;
@@ -6874,18 +6985,34 @@ function App() {
       return updateCalendars(nextCalendars, '설정 저장완료', 'success', stampedCal.id, 'settings');
     }
   };
-  const handleSetPinnedNotice = (text, authorName) => {
+  const handleAddPinnedNotice = (text, authorName) => {
     if (!guardLoadedCalendar()) return false;
-    const now = Date.now();
     const cleanText = sanitizeText(text || '', 200);
+    if (!cleanText) return false;
+    const now = Date.now();
+    const notice = { id: `notice_${activeCal.id}_${now}_${Math.random().toString(36).slice(2, 7)}`, text: cleanText, setAt: now, setBy: authorName || '' };
     const updatedCal = {
       ...activeCal,
-      pinnedNotice: cleanText ? { text: cleanText, setAt: now, setBy: authorName || '' } : null,
+      pinnedNotices: [...getPinnedNotices(activeCal), notice],
+      pinnedNotice: null,
       updatedAt: now,
       revision: (activeCal.revision || 0) + 1
     };
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-    return updateCalendars(nextCalendars, cleanText ? '공지 등록완료' : '공지 삭제완료', 'success', updatedCal.id, 'settings');
+    return updateCalendars(nextCalendars, '공지 등록완료', 'success', updatedCal.id, 'settings');
+  };
+  const handleRemovePinnedNotice = (noticeId) => {
+    if (!guardLoadedCalendar()) return false;
+    const now = Date.now();
+    const updatedCal = {
+      ...activeCal,
+      pinnedNotices: getPinnedNotices(activeCal).filter(n => n.id !== noticeId),
+      pinnedNotice: null,
+      updatedAt: now,
+      revision: (activeCal.revision || 0) + 1
+    };
+    const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
+    return updateCalendars(nextCalendars, '공지 삭제완료', 'success', updatedCal.id, 'settings');
   };
   if (activeView === 'chat') {
     return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(ChatRoomView, {
@@ -6906,7 +7033,8 @@ function App() {
       onSend: handleSendChatMessage,
       onDeleteMessage: handleDeleteMessage,
       onEditMessage: handleEditMessage,
-      onSetPinnedNotice: handleSetPinnedNotice,
+      onAddPinnedNotice: handleAddPinnedNotice,
+      onRemovePinnedNotice: handleRemovePinnedNotice,
       onBack: () => changeView('calendar'),
       isHeaderVisible: isHeaderVisible,
       handleChatScroll: handleChatScroll,
@@ -7272,7 +7400,9 @@ function App() {
     onDelete: handleDeleteAvailability,
     onDeleteDate: handleDeleteAllForDate,
     onConfirmMeeting: handleConfirmMeeting,
-    onSaveSettlement: handleSaveSettlement,
+    onSaveExpense: handleSaveExpense,
+    onDeleteExpense: handleDeleteExpense,
+    showToast: showToast,
     onRequestConfirm: showConfirmDialog,
     onClose: () => setIsModalOpen(false)
   }), confirmDialog && /*#__PURE__*/React.createElement(ConfirmDialog, {
@@ -9161,7 +9291,7 @@ function CommentsSection({
      bubbles float on, instead of each message having its own separate gray card */
   /*#__PURE__*/React.createElement("div", {
     style: {
-      backgroundColor: '#F8FAFC',
+      backgroundColor: 'var(--bg-primary)',
       borderRadius: '12px',
       padding: '12px',
       minHeight: '48px'
@@ -9510,7 +9640,8 @@ function ChatRoomView({
   onSend,
   onDeleteMessage,
   onEditMessage,
-  onSetPinnedNotice,
+  onAddPinnedNotice,
+  onRemovePinnedNotice,
   onBack,
   isHeaderVisible,
   handleChatScroll,
@@ -9519,8 +9650,10 @@ function ChatRoomView({
   onShare
 }) {
   const [viewportBottom, setViewportBottom] = React.useState(0);
-  const [isEditingNotice, setIsEditingNotice] = React.useState(false);
+  // 'closed' (default -- nothing shown) | 'list' (existing notices + 공지 추가) | 'add' (textarea)
+  const [noticePanelMode, setNoticePanelMode] = React.useState('closed');
   const [noticeInput, setNoticeInput] = React.useState('');
+  const pinnedNotices = getPinnedNotices(calendar);
   const revealedMsgId = useTapRevealedMsgId();
 
   // Read-up-to-here marker: capture the read timestamp as it was BEFORE this view marks
@@ -10138,11 +10271,15 @@ function ChatRoomView({
     d: "M8.7 10.7l6.6 -3.4"
   }), /*#__PURE__*/React.createElement("path", {
     d: "M8.7 13.3l6.6 3.4"
-  })), /*#__PURE__*/React.createElement("button", {
+  }))), /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: () => {
-      setNoticeInput((calendar && calendar.pinnedNotice && calendar.pinnedNotice.text) || '');
-      setIsEditingNotice(true);
+      setNoticePanelMode(prev => {
+        if (prev !== 'closed') return 'closed';
+        if (pinnedNotices.length > 0) return 'list';
+        setNoticeInput('');
+        return 'add';
+      });
     },
     title: "공지 설정",
     style: {
@@ -10150,7 +10287,7 @@ function ChatRoomView({
       border: 'none',
       cursor: 'pointer',
       padding: '4px',
-      color: calendar && calendar.pinnedNotice ? '#D97706' : '#64748B',
+      color: pinnedNotices.length > 0 ? '#D97706' : '#64748B',
       display: 'flex',
       alignItems: 'center'
     }
@@ -10159,14 +10296,14 @@ function ChatRoomView({
     width: "22",
     height: "22",
     viewBox: "0 0 24 24",
-    fill: calendar && calendar.pinnedNotice ? 'currentColor' : 'none',
+    fill: pinnedNotices.length > 0 ? 'currentColor' : 'none',
     stroke: "currentColor",
     "stroke-width": "2",
     "stroke-linecap": "round",
     "stroke-linejoin": "round"
   }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }),
     /*#__PURE__*/React.createElement("path", { d: "M9 4v6l-2 4v2h10v-2l-2 -4v-6" }),
-    /*#__PURE__*/React.createElement("path", { d: "M12 16l0 5" })))))), /*#__PURE__*/React.createElement("div", {
+    /*#__PURE__*/React.createElement("path", { d: "M12 16l0 5" }))))), /*#__PURE__*/React.createElement("div", {
     style: { flex: 1, position: 'relative', minHeight: 0 }
   }, /*#__PURE__*/React.createElement("div", {
     ref: chatMessagesContainerRef,
@@ -10179,7 +10316,7 @@ function ChatRoomView({
       paddingTop: '72px',
       paddingBottom: '20px'
     }
-  }, isEditingNotice && /*#__PURE__*/React.createElement("div", {
+  }, noticePanelMode === 'add' && /*#__PURE__*/React.createElement("div", {
     style: {
       position: 'sticky', top: 0, zIndex: 6,
       display: 'flex', flexDirection: 'column', gap: '8px',
@@ -10197,41 +10334,69 @@ function ChatRoomView({
       onChange: e => setNoticeInput(e.target.value)
     }),
     /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px' } },
-      calendar?.pinnedNotice && /*#__PURE__*/React.createElement("button", {
-        type: "button", className: "btn btn-danger", style: { flex: '0 0 auto' },
-        onClick: () => { onSetPinnedNotice && onSetPinnedNotice(''); setIsEditingNotice(false); }
-      }, "공지 삭제"),
       /*#__PURE__*/React.createElement("button", {
         type: "button", className: "btn btn-secondary", style: { flex: 1 },
-        onClick: () => setIsEditingNotice(false)
+        onClick: () => setNoticePanelMode(pinnedNotices.length > 0 ? 'list' : 'closed')
       }, "취소"),
       /*#__PURE__*/React.createElement("button", {
         type: "button", className: "btn btn-primary", style: { flex: 1 },
         onClick: () => {
           const trimmed = noticeInput.trim();
           if (!trimmed) { if (showToast) showToast('공지 내용을 입력해 주세요', 'error'); return; }
-          onSetPinnedNotice && onSetPinnedNotice(trimmed, (participantsMap[chatParticipantId] || {}).name || '');
-          setIsEditingNotice(false);
+          onAddPinnedNotice && onAddPinnedNotice(trimmed, (participantsMap[chatParticipantId] || {}).name || '');
+          setNoticeInput('');
+          setNoticePanelMode('list');
         }
       }, "저장")
     )
-  ), !isEditingNotice && calendar?.pinnedNotice && /*#__PURE__*/React.createElement("div", {
+  ), noticePanelMode === 'list' && /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: 'sticky', top: 0, zIndex: 6,
+      display: 'flex', flexDirection: 'column', gap: '8px',
+      backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: '8px',
+      padding: '10px 12px', marginBottom: '12px', boxShadow: 'var(--shadow-md)'
+    }
+  },
+    pinnedNotices.length === 0 ? /*#__PURE__*/React.createElement("div", {
+      style: { fontSize: '0.82rem', color: 'var(--text-muted)', textAlign: 'center', padding: '6px 0' }
+    }, "등록된 공지가 없습니다.") : pinnedNotices.map(notice => /*#__PURE__*/React.createElement("div", {
+      key: notice.id,
+      style: {
+        display: 'flex', alignItems: 'flex-start', gap: '8px',
+        backgroundColor: '#FEF3C7', border: '1px solid #FDE68A', borderRadius: '8px',
+        padding: '10px 12px', fontSize: '0.82rem', color: '#92400E', lineHeight: '1.5'
+      }
+    },
+      /*#__PURE__*/React.createElement("div", { style: { flex: 1, wordBreak: 'break-word' } }, notice.text),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: () => onRemovePinnedNotice && onRemovePinnedNotice(notice.id),
+        title: "공지 삭제",
+        style: { background: 'none', border: 'none', cursor: 'pointer', color: '#92400E', flexShrink: 0, display: 'flex', alignItems: 'center' }
+      }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 16 }))
+    )),
+    /*#__PURE__*/React.createElement("button", {
+      type: "button", className: "btn btn-secondary", style: { width: '100%' },
+      onClick: () => { setNoticeInput(''); setNoticePanelMode('add'); }
+    }, "공지 추가")
+  ), noticePanelMode === 'closed' && pinnedNotices.length > 0 && /*#__PURE__*/React.createElement("div", {
     style: {
       position: 'sticky', top: 0, zIndex: 5,
+      display: 'flex', flexDirection: 'column', gap: '6px',
+      marginBottom: '12px'
+    }
+  }, pinnedNotices.map(notice => /*#__PURE__*/React.createElement("div", {
+    key: notice.id,
+    style: {
       display: 'flex', alignItems: 'flex-start', gap: '8px',
       backgroundColor: '#FEF3C7', border: '1px solid #FDE68A', borderRadius: '8px',
-      padding: '10px 12px', marginBottom: '12px', fontSize: '0.82rem', color: '#92400E', lineHeight: '1.5'
+      padding: '10px 12px', fontSize: '0.82rem', color: '#92400E', lineHeight: '1.5'
     }
   },
     /*#__PURE__*/React.createElement("div", { style: { flex: 1, wordBreak: 'break-word' } },
-      /*#__PURE__*/React.createElement("strong", null, "공지 "), calendar.pinnedNotice.text
-    ),
-    /*#__PURE__*/React.createElement("button", {
-      type: "button",
-      onClick: () => { setNoticeInput(calendar.pinnedNotice.text); setIsEditingNotice(true); },
-      style: { background: 'none', border: 'none', cursor: 'pointer', color: '#92400E', flexShrink: 0, display: 'flex', alignItems: 'center' }
-    }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 16 }))
-  ), renderedMessages.length === 0 ? /*#__PURE__*/React.createElement("div", {
+      /*#__PURE__*/React.createElement("strong", null, "공지 "), notice.text
+    )
+  ))), renderedMessages.length === 0 ? /*#__PURE__*/React.createElement("div", {
     style: {
       textAlign: 'center',
       color: '#94A3B8',
@@ -10939,11 +11104,13 @@ function DateModal({
   adminMode = false,
   onSave,
   onConfirmMeeting,
-  onSaveSettlement,
+  onSaveExpense,
+  onDeleteExpense,
   onDelete,
   onDeleteDate,
   onRequestConfirm,
-  onClose
+  onClose,
+  showToast
 }) {
   const getCachedParticipantId = () => {
     const cachedId = getLocalStorage().getItem('gather_active_participant_id_v20');
@@ -11019,25 +11186,60 @@ function DateModal({
   const isAllAvailable = totalPartCount > 0 && uniqueActiveParts.size === totalPartCount;
   const isConfirmed = isDateConfirmedMeeting(calendar, dateStr);
   const confirmedMeetingEntry = getConfirmedMeetings(calendar).find(m => m.date === dateStr) || null;
-  const [amountInput, setAmountInput] = React.useState(() => confirmedMeetingEntry?.amount ? String(confirmedMeetingEntry.amount) : '');
-  const [isSavingSettlement, setIsSavingSettlement] = React.useState(false);
+  const expenses = React.useMemo(
+    () => (Array.isArray(confirmedMeetingEntry?.expenses) ? confirmedMeetingEntry.expenses : []).slice().sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)),
+    [confirmedMeetingEntry]
+  );
+  const [expenseLabelInput, setExpenseLabelInput] = React.useState('');
+  const [expenseAmountInput, setExpenseAmountInput] = React.useState('');
+  const [editingExpenseId, setEditingExpenseId] = React.useState(null);
+  const [isSavingExpense, setIsSavingExpense] = React.useState(false);
   React.useEffect(() => {
-    setAmountInput(confirmedMeetingEntry?.amount ? String(confirmedMeetingEntry.amount) : '');
-  }, [calendar?.id, dateStr, confirmedMeetingEntry?.amount]);
+    setExpenseLabelInput('');
+    setExpenseAmountInput('');
+    setEditingExpenseId(null);
+  }, [calendar?.id, dateStr]);
+  const expenseTotal = expenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
   const settlementAttendeeCount = uniqueActiveParts.size || 0;
-  const settlementPerPerson = settlementAttendeeCount > 0 && confirmedMeetingEntry?.amount
-    ? Math.ceil(confirmedMeetingEntry.amount / settlementAttendeeCount)
+  const settlementPerPerson = settlementAttendeeCount > 0 && expenseTotal > 0
+    ? Math.ceil(expenseTotal / settlementAttendeeCount)
     : null;
-  const handleSaveSettlementClick = async () => {
-    if (isSavingSettlement || !onSaveSettlement) return;
-    const parsed = Number(amountInput.replace(/[^0-9]/g, ''));
-    setIsSavingSettlement(true);
-    try {
-      await Promise.resolve(onSaveSettlement(dateStr, Number.isFinite(parsed) && parsed > 0 ? parsed : 0));
-    } catch (err) {
-      console.error('Settlement save failed:', err);
+  const handleSaveExpenseClick = async () => {
+    if (isSavingExpense || !onSaveExpense) return;
+    const rawLabel = expenseLabelInput.trim();
+    const url = extractFirstUrl(rawLabel);
+    const labelText = sanitizeText(url ? rawLabel.replace(url, '').trim() : rawLabel, 120);
+    const amountNum = Number(expenseAmountInput.replace(/[^0-9]/g, ''));
+    if (!labelText || !Number.isFinite(amountNum) || amountNum <= 0) {
+      if (showToast) showToast('지출명목·금액 필요', 'error'); else alert('지출명목·금액 필요');
+      return;
     }
-    setIsSavingSettlement(false);
+    setIsSavingExpense(true);
+    try {
+      await Promise.resolve(onSaveExpense(dateStr, { id: editingExpenseId, label: labelText, url, amount: amountNum }));
+    } catch (err) {
+      console.error('Expense save failed:', err);
+    }
+    setIsSavingExpense(false);
+    setExpenseLabelInput('');
+    setExpenseAmountInput('');
+    setEditingExpenseId(null);
+  };
+  const handleExpenseItemClick = (expense) => {
+    if (isSavingExpense) return;
+    setEditingExpenseId(expense.id);
+    setExpenseLabelInput(expense.url ? `${expense.label} ${expense.url}` : expense.label);
+    setExpenseAmountInput(String(expense.amount));
+  };
+  const handleDeleteExpenseClick = (event, expenseId) => {
+    event.stopPropagation();
+    if (isSavingExpense) return;
+    onDeleteExpense && onDeleteExpense(dateStr, expenseId);
+    if (editingExpenseId === expenseId) {
+      setEditingExpenseId(null);
+      setExpenseLabelInput('');
+      setExpenseAmountInput('');
+    }
   };
 
   const handleConfirmMeeting = async () => {
@@ -11294,9 +11496,9 @@ function DateModal({
         justifyContent: 'space-between',
         gap: '8px',
         padding: '10px 14px',
-        backgroundColor: '#F8FAFC',
+        backgroundColor: 'var(--bg-primary)',
         borderRadius: '12px',
-        border: '1px solid #F1F5F9'
+        border: '1px solid var(--border-subtle)'
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
@@ -11363,30 +11565,91 @@ function DateModal({
   })))), isConfirmed && !adminMode && /*#__PURE__*/React.createElement("div", {
     style: {
       margin: '0 20px 12px', padding: '12px 14px', border: '1px solid var(--border-subtle)',
-      borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-primary)', display: 'flex', flexDirection: 'column', gap: '8px'
+      borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-primary)', display: 'flex', flexDirection: 'column', gap: '10px'
     }
   },
     /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-main)' } }, "회비 정산"),
-    /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px' } },
+    /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
       /*#__PURE__*/React.createElement("input", {
         type: "text",
-        inputMode: "numeric",
         className: "form-input",
-        style: { flex: 1 },
-        placeholder: "총 회비 (원)",
-        value: amountInput,
-        disabled: isSavingSettlement,
-        onChange: e => setAmountInput(e.target.value.replace(/[^0-9]/g, ''))
+        style: { width: '100%' },
+        placeholder: "지출명목 (예: 식당 예약금, URL 첨부 가능)",
+        maxLength: 220,
+        value: expenseLabelInput,
+        disabled: isSavingExpense,
+        onChange: e => setExpenseLabelInput(e.target.value)
       }),
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        className: "btn btn-secondary",
-        disabled: isSavingSettlement,
-        onClick: handleSaveSettlementClick
-      }, isSavingSettlement ? "저장 중..." : "저장")
+      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px' } },
+        /*#__PURE__*/React.createElement("input", {
+          type: "text",
+          inputMode: "numeric",
+          className: "form-input",
+          style: { flex: 1 },
+          placeholder: "지출금액 (원)",
+          value: expenseAmountInput,
+          disabled: isSavingExpense,
+          onChange: e => {
+            const digits = e.target.value.replace(/[^0-9]/g, '');
+            setExpenseAmountInput(digits ? Number(digits).toLocaleString() : '');
+          }
+        }),
+        editingExpenseId && /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          className: "btn btn-secondary",
+          disabled: isSavingExpense,
+          onClick: () => { setEditingExpenseId(null); setExpenseLabelInput(''); setExpenseAmountInput(''); }
+        }, "취소"),
+        /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          className: "btn btn-secondary",
+          disabled: isSavingExpense,
+          onClick: handleSaveExpenseClick
+        }, isSavingExpense ? "저장 중..." : editingExpenseId ? "수정" : "추가")
+      )
+    ),
+    /*#__PURE__*/React.createElement("div", {
+      style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '4px', borderTop: '1px solid var(--border-subtle)' }
+    },
+      /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-main)' } }, "총 합계"),
+      /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-main)' } }, `${expenseTotal.toLocaleString()}원`)
     ),
     settlementPerPerson !== null && /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.8rem', color: 'var(--text-muted)' } },
       `참석 ${settlementAttendeeCount}명 · 1인당 약 ${settlementPerPerson.toLocaleString()}원`
+    ),
+    expenses.length > 0 && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
+      expenses.map(expense => /*#__PURE__*/React.createElement("div", {
+        key: expense.id,
+        onClick: () => handleExpenseItemClick(expense),
+        style: {
+          display: 'flex', flexDirection: 'column', gap: '4px', padding: '10px 12px',
+          backgroundColor: editingExpenseId === expense.id ? 'var(--bg-card)' : 'transparent',
+          border: `1px solid ${editingExpenseId === expense.id ? 'var(--accent-primary)' : 'var(--border-subtle)'}`,
+          borderRadius: 'var(--radius-md)', cursor: 'pointer'
+        }
+      },
+        /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' } },
+          expense.label && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-main)' } }, expense.label),
+          expense.url && /*#__PURE__*/React.createElement("span", {
+            style: {
+              display: 'inline-flex', alignItems: 'center', padding: '3px 10px', borderRadius: 'var(--radius-full)',
+              fontSize: '0.72rem', fontWeight: 600, backgroundColor: '#E2E8F0', color: '#475569', cursor: 'pointer', wordBreak: 'break-all'
+            },
+            title: expense.url,
+            onClick: event => { event.stopPropagation(); window.open(expense.url, '_blank', 'noopener,noreferrer'); }
+          }, expense.url)
+        ),
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-main)' } }, `${Number(expense.amount).toLocaleString()}원`),
+        /*#__PURE__*/React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
+          /*#__PURE__*/React.createElement("span", { className: "registered-at-text" }, formatRegisteredAt(expense.createdAt)),
+          /*#__PURE__*/React.createElement("button", {
+            type: "button",
+            onClick: event => handleDeleteExpenseClick(event, expense.id),
+            title: "지출 삭제",
+            style: { background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', display: 'flex', alignItems: 'center', padding: '2px' }
+          }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 14 }))
+        )
+      ))
     )
   ), !adminMode && /*#__PURE__*/React.createElement("div", {
     className: "modal-footer",
@@ -13779,19 +14042,8 @@ function SummaryList({
     const isConfirmed = isDateConfirmedMeeting(calendar, d);
     return /*#__PURE__*/React.createElement("button", {
       key: d,
-      className: "date-item-btn",
-      onClick: () => onSelectDate(d),
-      style: isPast ? {
-        opacity: 0.7,
-        backgroundColor: '#F8FAFC',
-        borderColor: '#E2E8F0'
-      } : isConfirmed ? {
-        borderColor: '#E9D5FF',
-        backgroundColor: '#FAF5FF'
-      } : {
-        borderColor: '#DBEAFE',
-        backgroundColor: '#F8FAFC'
-      }
+      className: `date-item-btn ${isPast ? 'is-past' : isConfirmed ? 'is-confirmed' : 'is-available'}`,
+      onClick: () => onSelectDate(d)
     }, /*#__PURE__*/React.createElement("div", {
       className: "date-item-left"
     }, /*#__PURE__*/React.createElement("span", {
@@ -13882,15 +14134,9 @@ function SummaryList({
     const isPast = d < todayStr;
     return /*#__PURE__*/React.createElement("button", {
       key: d,
-      className: "date-item-btn",
+      className: `date-item-btn${isPast ? ' is-past' : ''}`,
       onClick: () => onSelectDate(d),
-      style: isPast ? {
-        opacity: 0.7,
-        backgroundColor: '#F8FAFC',
-        borderColor: '#E2E8F0',
-        flexDirection: 'column',
-        alignItems: 'flex-start'
-      } : {
+      style: {
         flexDirection: 'column',
         alignItems: 'flex-start'
       }
@@ -13987,17 +14233,9 @@ function SummaryList({
     const isPast = d < todayStr;
     return /*#__PURE__*/React.createElement("button", {
       key: d,
-      className: "date-item-btn",
+      className: `date-item-btn ${isPast ? 'is-past' : 'is-confirmed'}`,
       onClick: () => onSelectDate(d),
-      style: isPast ? {
-        opacity: 0.7,
-        backgroundColor: '#F8FAFC',
-        borderColor: '#E2E8F0',
-        flexDirection: 'column',
-        alignItems: 'flex-start'
-      } : {
-        borderColor: '#E9D5FF',
-        backgroundColor: '#FAF5FF',
+      style: {
         flexDirection: 'column',
         alignItems: 'flex-start'
       }
