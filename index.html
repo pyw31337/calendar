@@ -183,6 +183,11 @@
       :root:not([data-theme="light"]) .form-select,
       :root:not([data-theme="light"]) .form-input,
       :root:not([data-theme="light"]) .form-textarea { background: #1B2540; }
+      :root:not([data-theme="light"]) .poll-progress { background: #1B2540; }
+      :root:not([data-theme="light"]) .modal-header.is-confirmed-theme,
+      :root:not([data-theme="light"]) .modal-footer.is-confirmed-theme { background-color: #241B3D; }
+      :root:not([data-theme="light"]) .modal-header.is-all-available-theme,
+      :root:not([data-theme="light"]) .modal-footer.is-all-available-theme { background-color: #0F2E22; }
     }
     :root[data-theme="dark"] .day-cell { background: #1B2540; }
     :root[data-theme="dark"] .day-cell:hover { background: #212D4D; }
@@ -196,6 +201,15 @@
     :root[data-theme="dark"] .form-select,
     :root[data-theme="dark"] .form-input,
     :root[data-theme="dark"] .form-textarea { background: #1B2540; }
+    :root[data-theme="dark"] .poll-progress { background: #1B2540; }
+    :root[data-theme="dark"] .modal-header.is-confirmed-theme,
+    :root[data-theme="dark"] .modal-footer.is-confirmed-theme { background-color: #241B3D; }
+    :root[data-theme="dark"] .modal-header.is-all-available-theme,
+    :root[data-theme="dark"] .modal-footer.is-all-available-theme { background-color: #0F2E22; }
+    /* Light-mode base (previously inline styles) -- kept as CSS now that dark-mode variants
+       need to target the same classes. */
+    .modal-header.is-confirmed-theme, .modal-footer.is-confirmed-theme { background-color: #F3E8FF; }
+    .modal-header.is-all-available-theme, .modal-footer.is-all-available-theme { background-color: #D1FAE5; }
     /* Status/date-count badges (확정/전원/N명 가능 etc.) set pastel light-mode colors inline;
        darkening them in place (rather than threading dark variants through every call site)
        keeps every one of these chips legible without a per-badge color prop. */
@@ -996,6 +1010,11 @@
       font-weight: 900;
       cursor: pointer;
     }
+    .poll-voter-option:hover, .poll-voter-option:focus-visible { background: #EEF2FF; border-color: var(--accent-primary); }
+    :root[data-theme="dark"] .poll-voter-option:hover,
+    :root[data-theme="dark"] .poll-voter-option:focus-visible,
+    :root:not([data-theme="light"]) .poll-voter-option:hover,
+    :root:not([data-theme="light"]) .poll-voter-option:focus-visible { background: #212D4D; border-color: var(--accent-primary); }
     @media (max-width: 640px) {
       .poll-option-row {
         grid-template-columns: 1fr;
@@ -8023,7 +8042,7 @@ function CalendarGrid({
       top: '60px',
       left: '0',
       zIndex: 200,
-      background: '#FFFFFF',
+      background: 'var(--bg-card)',
       border: '1px solid var(--border-subtle)',
       borderRadius: '16px',
       boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
@@ -8048,7 +8067,7 @@ function CalendarGrid({
     style: {
       fontSize: '0.8rem',
       fontWeight: 700,
-      color: '#64748B',
+      color: 'var(--text-muted)',
       display: 'block',
       marginBottom: '8px'
     }
@@ -8089,7 +8108,7 @@ function CalendarGrid({
     style: {
       fontSize: '0.8rem',
       fontWeight: 700,
-      color: '#64748B',
+      color: 'var(--text-muted)',
       display: 'block',
       marginBottom: '8px'
     }
@@ -8107,7 +8126,7 @@ function CalendarGrid({
       padding: '6px 4px',
       borderRadius: '8px',
       border: pickerMonth === idx ? '2px solid var(--accent-primary)' : '1px solid var(--border-subtle)',
-      background: pickerMonth === idx ? '#EEF2FF' : '#FFFFFF',
+      background: pickerMonth === idx ? 'rgba(99, 102, 241, 0.15)' : 'var(--bg-card)',
       color: pickerMonth === idx ? 'var(--accent-primary)' : 'var(--text-main)',
       fontWeight: pickerMonth === idx ? 800 : 500,
       fontSize: '0.82rem',
@@ -11683,14 +11702,13 @@ function DateModal({
     className: "modal-container",
     onClick: e => e.stopPropagation()
   }, /*#__PURE__*/React.createElement("div", {
-    className: "modal-header",
+    className: `modal-header${isConfirmed ? ' is-confirmed-theme' : isAllAvailable ? ' is-all-available-theme' : ''}`,
     style: {
       display: 'flex',
       justifyContent: 'space-between',
       alignItems: 'center',
       flexWrap: 'nowrap',
-      overflow: 'hidden',
-      backgroundColor: isConfirmed ? '#F3E8FF' : isAllAvailable ? '#D1FAE5' : undefined
+      overflow: 'hidden'
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -12099,13 +12117,12 @@ function DateModal({
       )
     )
   )), !adminMode && /*#__PURE__*/React.createElement("div", {
-    className: "modal-footer",
+    className: `modal-footer${isConfirmed ? ' is-confirmed-theme' : isAllAvailable ? ' is-all-available-theme' : ''}`,
     style: {
       display: 'flex',
       justifyContent: 'space-between',
       alignItems: 'center',
-      gap: '8px',
-      backgroundColor: isConfirmed ? '#F3E8FF' : isAllAvailable ? '#D1FAE5' : undefined
+      gap: '8px'
     }
   }, /*#__PURE__*/React.createElement("button", {
     type: "button",
@@ -14093,6 +14110,119 @@ function PollVoterSheet({ calendar, pollId, optionId, onSelect, onClose }) {
   }, "\u2713"))))));
 }
 
+// Custom date+time picker replacing the browser's native <input type="datetime-local"> overlay
+// (which renders with its own OS-styled chrome that doesn't follow the app's dark mode) with a
+// layer-popup matching the main calendar's year/month picker look and feel.
+const DEADLINE_PICKER_MONTH_NAMES = ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월'];
+function DeadlineDateTimePicker({ value, onChange, disabled }) {
+  const [isOpen, setIsOpen] = React.useState(false);
+  const now = new Date();
+  const parsed = value ? new Date(value) : null;
+  const isValid = parsed && !Number.isNaN(parsed.getTime());
+  const [pYear, setPYear] = React.useState(isValid ? parsed.getFullYear() : now.getFullYear());
+  const [pMonth, setPMonth] = React.useState(isValid ? parsed.getMonth() : now.getMonth());
+  const [pDay, setPDay] = React.useState(isValid ? parsed.getDate() : now.getDate());
+  const [pTime, setPTime] = React.useState(isValid ? value.slice(11, 16) : '23:59');
+
+  const openPicker = () => {
+    const d = value ? new Date(value) : null;
+    const v = d && !Number.isNaN(d.getTime());
+    setPYear(v ? d.getFullYear() : now.getFullYear());
+    setPMonth(v ? d.getMonth() : now.getMonth());
+    setPDay(v ? d.getDate() : now.getDate());
+    setPTime(v ? value.slice(11, 16) : '23:59');
+    setIsOpen(true);
+  };
+
+  const daysInMonth = new Date(pYear, pMonth + 1, 0).getDate();
+  const firstWeekday = new Date(pYear, pMonth, 1).getDay();
+
+  const handleApply = () => {
+    const mm = String(pMonth + 1).padStart(2, '0');
+    const dd = String(pDay).padStart(2, '0');
+    onChange(`${pYear}-${mm}-${dd}T${pTime}`);
+    setIsOpen(false);
+  };
+
+  const displayText = isValid
+    ? `${parsed.getFullYear()}.${String(parsed.getMonth() + 1).padStart(2, '0')}.${String(parsed.getDate()).padStart(2, '0')} ${value.slice(11, 16)}`
+    : '날짜/시간 선택';
+
+  return /*#__PURE__*/React.createElement('div', { style: { position: 'relative' } },
+    /*#__PURE__*/React.createElement('button', {
+      type: 'button',
+      className: 'form-select',
+      disabled,
+      style: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', cursor: disabled ? 'default' : 'pointer', textAlign: 'left' },
+      onClick: openPicker
+    }, /*#__PURE__*/React.createElement('span', null, displayText)),
+    isOpen && /*#__PURE__*/React.createElement('div', {
+      style: {
+        position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 200,
+        background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: '16px',
+        boxShadow: '0 8px 32px rgba(0,0,0,0.15)', padding: '16px', boxSizing: 'border-box'
+      },
+      onClick: e => e.stopPropagation()
+    },
+      /*#__PURE__*/React.createElement('div', { style: { position: 'fixed', inset: 0, zIndex: -1 }, onClick: () => setIsOpen(false) }),
+      /*#__PURE__*/React.createElement('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginBottom: '12px' } },
+        /*#__PURE__*/React.createElement('button', { type: 'button', className: 'btn btn-secondary', style: { padding: '4px 10px', fontSize: '0.85rem' }, onClick: () => setPYear(y => y - 1) }, '◀'),
+        /*#__PURE__*/React.createElement('span', { style: { fontWeight: 800, fontSize: '1rem', minWidth: '60px', textAlign: 'center' } }, `${pYear}년`),
+        /*#__PURE__*/React.createElement('button', { type: 'button', className: 'btn btn-secondary', style: { padding: '4px 10px', fontSize: '0.85rem' }, onClick: () => setPYear(y => y + 1) }, '▶')
+      ),
+      /*#__PURE__*/React.createElement('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px', marginBottom: '12px' } },
+        DEADLINE_PICKER_MONTH_NAMES.map((name, idx) => /*#__PURE__*/React.createElement('button', {
+          key: idx, type: 'button',
+          onClick: () => {
+            setPMonth(idx);
+            const dim = new Date(pYear, idx + 1, 0).getDate();
+            if (pDay > dim) setPDay(dim);
+          },
+          style: {
+            padding: '6px 4px', borderRadius: '8px',
+            border: pMonth === idx ? '2px solid var(--accent-primary)' : '1px solid var(--border-subtle)',
+            background: pMonth === idx ? 'rgba(99, 102, 241, 0.15)' : 'var(--bg-card)',
+            color: pMonth === idx ? 'var(--accent-primary)' : 'var(--text-main)',
+            fontWeight: pMonth === idx ? 800 : 500, fontSize: '0.8rem', cursor: 'pointer'
+          }
+        }, name))
+      ),
+      /*#__PURE__*/React.createElement('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', marginBottom: '4px' } },
+        ['일', '월', '화', '수', '목', '금', '토'].map(w => /*#__PURE__*/React.createElement('div', {
+          key: w, style: { textAlign: 'center', fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)' }
+        }, w))
+      ),
+      /*#__PURE__*/React.createElement('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', marginBottom: '14px' } },
+        Array.from({ length: firstWeekday }).map((_, i) => /*#__PURE__*/React.createElement('div', { key: `blank-${i}` })),
+        Array.from({ length: daysInMonth }).map((_, i) => {
+          const day = i + 1;
+          const isSelected = pDay === day;
+          return /*#__PURE__*/React.createElement('button', {
+            key: day, type: 'button', onClick: () => setPDay(day),
+            style: {
+              padding: '6px 0', borderRadius: '8px',
+              border: isSelected ? '2px solid var(--accent-primary)' : '1px solid transparent',
+              background: isSelected ? 'rgba(99, 102, 241, 0.15)' : 'transparent',
+              color: isSelected ? 'var(--accent-primary)' : 'var(--text-main)',
+              fontWeight: isSelected ? 800 : 500, fontSize: '0.8rem', cursor: 'pointer'
+            }
+          }, day);
+        })
+      ),
+      /*#__PURE__*/React.createElement('div', { style: { marginBottom: '14px' } },
+        /*#__PURE__*/React.createElement('label', { style: { fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '6px' } }, '시간'),
+        /*#__PURE__*/React.createElement('input', {
+          type: 'time', className: 'form-input', style: { width: '100%' },
+          value: pTime, onChange: e => setPTime(e.target.value)
+        })
+      ),
+      /*#__PURE__*/React.createElement('button', {
+        type: 'button', className: 'btn btn-primary', style: { width: '100%' }, onClick: handleApply
+      }, '선택 완료')
+    )
+  );
+}
+
 function PollModal({ calendar, poll, onSave, onClose, showToast }) {
   const now = Date.now();
   const isEditing = Boolean(poll?.id);
@@ -14307,17 +14437,14 @@ function PollModal({ calendar, poll, onSave, onClose, showToast }) {
     style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: isDeadlineCollapsed ? 0 : '6px', cursor: 'pointer' }
   }, /*#__PURE__*/React.createElement("label", {
     style: { fontSize: '0.85rem', fontWeight: 700, color: '#64748B', cursor: 'pointer' }
-  }, "\uB9C8\uAC10\uC2DC\uD55C (\uC120\uD0DD)"), /*#__PURE__*/React.createElement(SectionToggleButton, {
+  }, "\uB9C8\uAC10\uAE30\uD55C (\uC120\uD0DD)"), /*#__PURE__*/React.createElement(SectionToggleButton, {
     collapsed: isDeadlineCollapsed,
     onToggle: () => setIsDeadlineCollapsed(prev => !prev),
     label: isDeadlineCollapsed ? "\uB9C8\uAC10\uC2DC\uD55C \uD3BC\uCE58\uAE30" : "\uB9C8\uAC10\uC2DC\uD55C \uC811\uAE30"
-  })), !isDeadlineCollapsed && /*#__PURE__*/React.createElement("input", {
-    type: "datetime-local",
-    className: "form-input",
-    style: { width: '100%' },
+  })), !isDeadlineCollapsed && /*#__PURE__*/React.createElement(DeadlineDateTimePicker, {
     value: deadlineInput,
-    disabled: isSubmitting,
-    onChange: e => setDeadlineInput(e.target.value)
+    onChange: setDeadlineInput,
+    disabled: isSubmitting
   })), /*#__PURE__*/React.createElement("div", {
     style: { borderTop: '1px solid var(--border-subtle)', paddingTop: '12px' }
   }, /*#__PURE__*/React.createElement("label", {
