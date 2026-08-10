@@ -5493,9 +5493,9 @@ function AdminDashboard({ initialCalendars }) {
                 }, "수정"),
                 /* Delete */
                 /*#__PURE__*/React.createElement("button", {
-                  type: "button", className: "btn btn-danger", style: { padding: '4px 10px', fontSize: '0.75rem' },
+                  type: "button", className: "btn btn-danger", title: "삭제", style: { width: '30px', height: '30px', padding: 0, flexShrink: 0 },
                   onClick: () => handleDeletePollFromAdminPage(selectedCalId, poll)
-                }, "삭제")
+                }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 16 }))
               )
             ))
           )
@@ -5666,10 +5666,10 @@ function AdminDashboard({ initialCalendars }) {
               /*#__PURE__*/React.createElement("div", { className: "admin-chat-footer" },
                 /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.72rem', color: '#64748B' } }, timeStr),
                 /*#__PURE__*/React.createElement("button", {
-                  type: "button", className: "btn btn-danger",
+                  type: "button", className: "btn btn-danger", title: "삭제",
                   onClick: () => handleDeleteMessageDirect(msg.calId, msg),
-                  style: { padding: '2px 10px', fontSize: '0.72rem' }
-                }, "삭제")
+                  style: { width: '26px', height: '26px', padding: 0, flexShrink: 0 }
+                }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 14 }))
               )
             );
           })
@@ -12002,9 +12002,11 @@ function DateModal({
     }, registeredAtText)), /*#__PURE__*/React.createElement("button", {
       type: "button",
       className: "btn btn-danger",
+      title: "삭제",
       style: {
-        padding: '4px 8px',
-        fontSize: '0.75rem',
+        width: '30px',
+        height: '30px',
+        padding: 0,
         flexShrink: 0
       },
       disabled: isSubmitting,
@@ -12019,7 +12021,7 @@ function DateModal({
           });
         });
       }
-    }, "삭제"));
+    }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 16 })));
   }))), isConfirmed && !adminMode && /*#__PURE__*/React.createElement("div", null,
     /*#__PURE__*/React.createElement("div", {
       onClick: () => setIsSettlementCollapsed(prev => !prev),
@@ -12670,56 +12672,56 @@ function AdminModal({
 
     /* Tab Menu Bar */
     /*#__PURE__*/React.createElement("div", {
-      style: { display: 'flex', gap: '4px', borderBottom: '1px solid var(--border-subtle)', padding: '0 20px', backgroundColor: 'var(--bg-primary)', flexShrink: 0, overflowX: 'auto', minWidth: 0 }
+      style: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', borderBottom: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)', flexShrink: 0, minWidth: 0 }
     },
       /* Tab 1: General settings */
       /*#__PURE__*/React.createElement("button", {
         type: "button",
         onClick: () => setActiveTab('settings'),
         style: {
-          padding: '12px 16px', fontSize: '0.88rem', fontWeight: 'bold', whiteSpace: 'nowrap', flexShrink: 0,
+          padding: '12px 8px', fontSize: '0.88rem', fontWeight: 'bold', whiteSpace: 'nowrap',
           color: activeTab === 'settings' ? '#2563EB' : '#64748B',
           border: 'none', background: 'none',
           borderBottom: activeTab === 'settings' ? '3px solid #2563EB' : '3px solid transparent',
-          cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px'
+          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
         }
-      }, /*#__PURE__*/React.createElement(CalendarCogIcon, null), "일반"),
+      }, /*#__PURE__*/React.createElement("span", { className: "admin-tab-icon" }, /*#__PURE__*/React.createElement(CalendarCogIcon, null)), "일반"),
       /* Tab 2: Calendar-based schedule deletion */
       /*#__PURE__*/React.createElement("button", {
         type: "button",
         onClick: () => setActiveTab('calendar'),
         style: {
-          padding: '12px 16px', fontSize: '0.88rem', fontWeight: 'bold', whiteSpace: 'nowrap', flexShrink: 0,
+          padding: '12px 8px', fontSize: '0.88rem', fontWeight: 'bold', whiteSpace: 'nowrap',
           color: activeTab === 'calendar' ? '#2563EB' : '#64748B',
           border: 'none', background: 'none',
           borderBottom: activeTab === 'calendar' ? '3px solid #2563EB' : '3px solid transparent',
-          cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px'
+          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
         }
-      }, /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M4 7a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12z", "M16 3v4", "M8 3v4", "M4 11h16"] }), "일정"),
+      }, /*#__PURE__*/React.createElement("span", { className: "admin-tab-icon" }, /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M4 7a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12z", "M16 3v4", "M8 3v4", "M4 11h16"] })), "일정"),
       /* Tab 3: Log-based recovery */
       /*#__PURE__*/React.createElement("button", {
         type: "button",
         onClick: () => setActiveTab('recovery'),
         style: {
-          padding: '12px 16px', fontSize: '0.88rem', fontWeight: 'bold', whiteSpace: 'nowrap', flexShrink: 0,
+          padding: '12px 8px', fontSize: '0.88rem', fontWeight: 'bold', whiteSpace: 'nowrap',
           color: activeTab === 'recovery' ? '#2563EB' : '#64748B',
           border: 'none', background: 'none',
           borderBottom: activeTab === 'recovery' ? '3px solid #2563EB' : '3px solid transparent',
-          cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px'
+          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
         }
-      }, /*#__PURE__*/React.createElement(HourglassIcon, null), "복구"),
+      }, /*#__PURE__*/React.createElement("span", { className: "admin-tab-icon" }, /*#__PURE__*/React.createElement(HourglassIcon, null)), "복구"),
       /* Tab 4: Logs view list */
       /*#__PURE__*/React.createElement("button", {
         type: "button",
         onClick: () => setActiveTab('logs'),
         style: {
-          padding: '12px 16px', fontSize: '0.88rem', fontWeight: 'bold', whiteSpace: 'nowrap', flexShrink: 0,
+          padding: '12px 8px', fontSize: '0.88rem', fontWeight: 'bold', whiteSpace: 'nowrap',
           color: activeTab === 'logs' ? '#2563EB' : '#64748B',
           border: 'none', background: 'none',
           borderBottom: activeTab === 'logs' ? '3px solid #2563EB' : '3px solid transparent',
-          cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px'
+          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
         }
-      }, /*#__PURE__*/React.createElement(LogIcon, null), "로그")
+      }, /*#__PURE__*/React.createElement("span", { className: "admin-tab-icon" }, /*#__PURE__*/React.createElement(LogIcon, null)), "로그")
     ),
 
     /* Modal Scrollable Body */
@@ -12814,8 +12816,8 @@ function AdminModal({
                   }),
                   /* Remove button */
                   /*#__PURE__*/React.createElement("button", {
-                    type: "button", className: "btn btn-danger", disabled: isSubmitting,
-                    style: { padding: '4px 10px', height: '30px', display: 'flex', alignItems: 'center' },
+                    type: "button", className: "btn btn-danger", disabled: isSubmitting, title: "삭제",
+                    style: { width: '30px', height: '30px', padding: 0, flexShrink: 0 },
                     onClick: () => updateParticipant(p.id, { removedAt: Date.now() })
                   }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 16 }))
                 ))
@@ -12878,12 +12880,11 @@ function AdminModal({
                   /* Delete button */
                   /*#__PURE__*/React.createElement("button", {
                     type: "button",
+                    className: "btn btn-danger",
+                    title: "삭제",
                     onClick: () => handleDeletePollFromAdmin(poll),
-                    style: {
-                      backgroundColor: '#FEF2F2', border: '1px solid #FCA5A5', borderRadius: '6px',
-                      padding: '4px 10px', fontSize: '0.75rem', cursor: 'pointer', color: '#EF4444'
-                    }
-                  }, "삭제")
+                    style: { width: '30px', height: '30px', padding: 0, flexShrink: 0 }
+                  }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 16 }))
                 )
               ))
             )
@@ -13088,10 +13089,10 @@ function AdminModal({
                 ),
                 /* Line 2: full description text, wrapped rather than truncated */
                 /*#__PURE__*/React.createElement("span", {
-                  style: { fontSize: '0.78rem', color: '#475569', wordBreak: 'break-word', overflowWrap: 'break-word' }
+                  style: { fontSize: '0.78rem', color: '#94A3B8', wordBreak: 'break-word', overflowWrap: 'break-word' }
                 }, log.note || (log.date ? formatShortDateWithDayName(log.date) : '')),
                 /* Line 3: registered-at timestamp */
-                /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.72rem', color: '#94A3B8', fontWeight: '500' } }, formatRegisteredAt(log.timestamp)),
+                /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.72rem', color: '#475569', fontWeight: '500' } }, formatRegisteredAt(log.timestamp)),
                 /* Line 4: full-width rollback button */
                 /*#__PURE__*/React.createElement("button", {
                   type: "button",
@@ -13185,22 +13186,22 @@ function AdminModal({
             }, logDateText || null), noteText && /*#__PURE__*/React.createElement("span", {
               className: "recent-log-note",
               style: { fontSize: '0.78rem', color: '#64748B', fontStyle: 'italic' }
-            }, "\"", noteText, "\"")), /*#__PURE__*/React.createElement("div", {
+            }, "\"", noteText, "\""), /*#__PURE__*/React.createElement("span", {
+              className: "registered-at-text recent-log-time",
+              style: { fontSize: '0.7rem', color: '#94A3B8', width: '100%' }
+            }, formatRegisteredAt(log.timestamp))), /*#__PURE__*/React.createElement("div", {
               className: "recent-log-right",
               style: { display: 'flex', alignItems: 'center', gap: '8px' }
-            }, /*#__PURE__*/React.createElement("span", {
-              className: "registered-at-text recent-log-time",
-              style: { fontSize: '0.7rem', color: '#94A3B8' }
-            }, formatRegisteredAt(log.timestamp)), /*#__PURE__*/React.createElement("button", {
+            }, /*#__PURE__*/React.createElement("button", {
               type: "button",
               className: "btn btn-danger",
               title: "로그 삭제",
-              style: { padding: '10px 16px', fontSize: '0.72rem', display: 'flex', alignItems: 'center' },
+              style: { width: '30px', height: '30px', padding: 0, flexShrink: 0 },
               onClick: () => {
                 if (typeof onDeleteLog !== 'function') return;
                 onRequestConfirm('로그 삭제', confirmText, () => onDeleteLog(log));
               }
-            }, "삭제")));
+            }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 16 }))));
           }));
         })()
       )
