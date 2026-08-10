@@ -275,6 +275,11 @@
     :root:not([data-theme="light"]) .admin-scope .date-item-btn.is-confirmed { border-color: #E9D5FF; background: #FAF5FF; }
     :root[data-theme="dark"] .admin-scope .date-item-btn.is-available,
     :root:not([data-theme="light"]) .admin-scope .date-item-btn.is-available { border-color: #DBEAFE; background: #F8FAFC; }
+    /* .admin-scope only resets tokens for its own descendants -- body itself is an ANCESTOR of
+       it, so body's background-color: var(--bg-primary) below still reads the dark value from
+       :root unless it's told (via :has()) that an .admin-scope is present somewhere inside it. */
+    :root[data-theme="dark"] body:has(.admin-scope),
+    :root:not([data-theme="light"]) body:has(.admin-scope) { background-color: #F8FAFC; background-image: none; }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -14069,8 +14074,8 @@ function SummaryList({
         key: e.participantId || p.id,
         className: "memo-capsule-badge",
         style: isPast ? {
-          backgroundColor: '#F1F5F9',
-          color: '#64748B',
+          backgroundColor: 'var(--bg-primary)',
+          color: 'var(--text-muted)',
           border: `1px solid ${p.color}`,
           boxShadow: 'none'
         } : {
@@ -14180,8 +14185,8 @@ function SummaryList({
         key: e.participantId || p.id,
         className: "memo-capsule-badge",
         style: isPast ? {
-          backgroundColor: '#F1F5F9',
-          color: '#64748B',
+          backgroundColor: 'var(--bg-primary)',
+          color: 'var(--text-muted)',
           border: `1px solid ${p.color}`,
           boxShadow: 'none'
         } : {
@@ -14279,8 +14284,8 @@ function SummaryList({
         key: e.participantId || p.id,
         className: "memo-capsule-badge",
         style: isPast ? {
-          backgroundColor: '#F1F5F9',
-          color: '#64748B',
+          backgroundColor: 'var(--bg-primary)',
+          color: 'var(--text-muted)',
           border: `1px solid ${p.color}`,
           boxShadow: 'none'
         } : {
