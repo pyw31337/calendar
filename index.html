@@ -8339,6 +8339,36 @@ function withTimeout(promise, ms, timeoutMessage) {
   });
 }
 
+let heicToLoadPromise = null;
+// heic-to bundles a current libheif build (1.22.2 as of writing) inside a single self-contained
+// file -- no separate .wasm fetch, it spins up its decoder as an inline Worker built from a
+// string embedded in this same file. heic2any (below) is kept only as a second-chance fallback:
+// it hasn't been updated since 2023, and its own Emscripten build has been unreliable on some
+// mobile browsers in the wild for reasons that never surface a clear error (it's caught and
+// collapsed into one generic failure), which is exactly the profile of this bug report.
+const HEIC_TO_CDN_URLS = [
+  'https://cdn.jsdelivr.net/npm/heic-to@1.5.2/dist/heic-to.js',
+  'https://unpkg.com/heic-to@1.5.2/dist/heic-to.js'
+];
+function loadHeicTo(timeoutMs = 15000) {
+  if (heicToLoadPromise) return heicToLoadPromise;
+  heicToLoadPromise = (async () => {
+    let lastErr = null;
+    for (const src of HEIC_TO_CDN_URLS) {
+      try {
+        const mod = await withTimeout(import(/* @vite-ignore */ src), timeoutMs, `heic-to import timed out: ${src}`);
+        if (mod && typeof mod.heicTo === 'function') return mod.heicTo;
+        lastErr = new Error('heic-to module missing heicTo export');
+      } catch (err) {
+        lastErr = err;
+      }
+    }
+    heicToLoadPromise = null; // allow retrying on a later file instead of caching the failure forever
+    throw lastErr || new Error('heic-to failed to load from all CDNs');
+  })();
+  return heicToLoadPromise;
+}
+
 let heic2anyLoadPromise = null;
 // Two independent CDNs -- some mobile carrier/corporate networks block one but not the other,
 // and a single hardcoded host with no fallback turns any CDN hiccup into a hard HEIC failure.
@@ -8464,27 +8494,48 @@ async function compressImageToDataUrls(file, { maxBase64Length = MAX_CHAT_IMAGE_
     if (!img) {
       let converted = null;
       let lastErr = null;
-      // heic2any's bundled libheif occasionally fails on the very first conversion call right
-      // after its WASM module finishes loading (a known transient init race in some browsers,
-      // and possibly a flaky CDN fetch on a poor mobile connection) -- one retry recovers most
-      // of those without meaningfully slowing down a genuine, repeatable failure.
+
+      // Primary: heic-to, a self-contained, actively-maintained current-libheif build. Try it
+      // twice -- the first conversion call right after the decoder's Worker spins up can
+      // transiently fail in some browsers, and one retry recovers most of those.
       for (let attempt = 0; attempt < 2 && !converted; attempt++) {
         try {
-          const heic2any = await loadHeic2any();
-          // A 24MP+ HEIC on a slower mobile device can genuinely take a while to decode, but
-          // must not be allowed to hang forever -- bound it generously (45s) rather than leave
-          // the attach flow stuck with no way to recover.
+          const heicTo = await loadHeicTo();
           converted = await withTimeout(
-            heic2any({ blob: file, toType: 'image/jpeg', quality: 0.85 }),
+            heicTo({ blob: file, type: 'image/jpeg', quality: 0.85 }),
             45000,
             'HEIC conversion timed out'
           );
         } catch (err) {
           lastErr = err;
-          heic2anyLoadPromise = null; // force a fresh load attempt on retry, not a cached failure
-          window.heic2any = null;
+          heicToLoadPromise = null; // force a fresh load attempt on retry, not a cached failure
         }
       }
+
+      // Fallback: heic2any, an older/differently-built decoder kept only as a second opinion in
+      // case heic-to's specific CDN or Worker/WASM path is the one having trouble on a given
+      // device -- a genuinely different implementation succeeding where the first one failed is
+      // exactly the case this is here for.
+      if (!converted) {
+        for (let attempt = 0; attempt < 2 && !converted; attempt++) {
+          try {
+            const heic2any = await loadHeic2any();
+            // A 24MP+ HEIC on a slower mobile device can genuinely take a while to decode, but
+            // must not be allowed to hang forever -- bound it generously (45s) rather than leave
+            // the attach flow stuck with no way to recover.
+            converted = await withTimeout(
+              heic2any({ blob: file, toType: 'image/jpeg', quality: 0.85 }),
+              45000,
+              'HEIC conversion timed out'
+            );
+          } catch (err) {
+            lastErr = err;
+            heic2anyLoadPromise = null; // force a fresh load attempt on retry, not a cached failure
+            window.heic2any = null;
+          }
+        }
+      }
+
       if (!converted) {
         throw Object.assign(new Error('HEIC 이미지를 변환하지 못했습니다.'), { code: 'HEIC_CONVERT_FAILED', fileName: file.name, cause: lastErr });
       }
