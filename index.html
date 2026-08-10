@@ -1459,6 +1459,7 @@ const GITHUB_PAGES_FREE_LIMITS = {
 // balloon well past this on a busy/detailed source image, so cap it and step down JPEG
 // quality instead (see compressImageToDataUrls).
 const MAX_CHAT_IMAGE_BASE64_LENGTH = 350000; // ~350KB
+const MAX_CHAT_THUMB_BASE64_LENGTH = 45000; // ~45KB -- thumbnails were previously unbounded
 // A calendar document must stay under Firestore's 1MiB/doc hard limit. Refuse a save before
 // it gets there instead of surfacing Firestore's opaque rejection at the boundary. Compared
 // against the actual Firestore wire-format size (see estimateCalendarDocWireBytes), not a
@@ -8458,7 +8459,7 @@ function loadImageElement(objectUrl, timeoutMs = 20000) {
   });
 }
 
-async function compressImageToDataUrls(file, { maxBase64Length = MAX_CHAT_IMAGE_BASE64_LENGTH } = {}) {
+async function compressImageToDataUrls(file, { maxBase64Length = MAX_CHAT_IMAGE_BASE64_LENGTH, maxThumbBase64Length = MAX_CHAT_THUMB_BASE64_LENGTH } = {}) {
   let sourceBlob = file;
   let img = null;
 
@@ -8557,72 +8558,61 @@ async function compressImageToDataUrls(file, { maxBase64Length = MAX_CHAT_IMAGE_
     }
   }
 
-  const maxOrig = 1200; // High resolution spec (1200px instead of 720px)
-  let wOrig = img.width;
-  let hOrig = img.height;
-  if (wOrig > maxOrig || hOrig > maxOrig) {
-    if (wOrig > hOrig) {
-      hOrig = Math.round(hOrig * maxOrig / wOrig);
-      wOrig = maxOrig;
-    } else {
-      wOrig = Math.round(wOrig * maxOrig / hOrig);
-      hOrig = maxOrig;
+  // Encodes `img` as a JPEG data URL guaranteed to fit within `maxBase64Length`: steps down
+  // through `qualitySteps` at the current size first, and only if the lowest quality still
+  // doesn't fit does it shrink the longest side and retry from the top of the quality list.
+  // Quality-only stepping (the previous approach) could still exceed the cap on a busy/detailed
+  // photo, which -- multiplied across a multi-image batch that falls back to inline base64 --
+  // could push the whole Firestore document over its 1MiB hard limit and get the write rejected
+  // outright instead of degrading gracefully.
+  const encodeWithinBudget = (maxDimStart, qualitySteps, budget, minDim) => {
+    let maxDim = maxDimStart;
+    let best = null;
+    while (true) {
+      let w = img.width, h = img.height;
+      if (w > maxDim || h > maxDim) {
+        if (w > h) { h = Math.round(h * maxDim / w); w = maxDim; }
+        else { w = Math.round(w * maxDim / h); h = maxDim; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      for (const quality of qualitySteps) {
+        const base64 = canvas.toDataURL('image/jpeg', quality);
+        best = { base64, canvas, quality };
+        if (base64.length <= budget) return best;
+      }
+      if (maxDim <= minDim) return best; // best effort: smallest size / lowest quality tried
+      maxDim = Math.max(minDim, Math.round(maxDim * 0.75));
     }
-  }
-  const canvasOrig = document.createElement('canvas');
-  canvasOrig.width = wOrig;
-  canvasOrig.height = hOrig;
-  const ctxOrig = canvasOrig.getContext('2d');
-  ctxOrig.drawImage(img, 0, 0, wOrig, hOrig);
-  // Start at high quality (0.85), but step down for busy/detailed photos that would
-  // otherwise produce an oversized base64 payload -- this is only used as a fallback if
-  // the Firebase Storage upload below fails, but keep it bounded regardless. maxBase64Length
-  // is scaled down per-image when a batch has several images, so a full-fallback multi-image
-  // message still fits Firestore's 1MiB/doc limit (see processImageFilesSequentially).
-  let originalQuality = 0.85;
-  let originalBase64 = canvasOrig.toDataURL('image/jpeg', originalQuality);
-  for (const quality of [0.75, 0.65, 0.55, 0.45]) {
-    if (originalBase64.length <= maxBase64Length) break;
-    originalQuality = quality;
-    originalBase64 = canvasOrig.toDataURL('image/jpeg', originalQuality);
-  }
+  };
+
+  // High resolution spec (1200px instead of 720px), stepping down to as low as 480px only if
+  // quality-stepping alone can't hit the byte budget.
+  const original = encodeWithinBudget(1200, [0.85, 0.75, 0.65, 0.55, 0.45, 0.35], maxBase64Length, 480);
 
   // 240px @ q0.72 (up from 120px @ q0.5) -- still ~10-15x smaller than the original above, but
   // sharp enough at the sizes thumbnails actually render at (up to ~200px CSS width for a
-  // single chat image) on a high-DPI phone screen, instead of visibly soft.
-  const maxThumb = 240;
-  let wThumb = img.width;
-  let hThumb = img.height;
-  if (wThumb > maxThumb || hThumb > maxThumb) {
-    if (wThumb > hThumb) {
-      hThumb = Math.round(hThumb * maxThumb / wThumb);
-      wThumb = maxThumb;
-    } else {
-      wThumb = Math.round(wThumb * maxThumb / hThumb);
-      hThumb = maxThumb;
-    }
-  }
-  const canvasThumb = document.createElement('canvas');
-  canvasThumb.width = wThumb;
-  canvasThumb.height = hThumb;
-  const ctxThumb = canvasThumb.getContext('2d');
-  ctxThumb.drawImage(img, 0, 0, wThumb, hThumb);
-  const thumbnailBase64 = canvasThumb.toDataURL('image/jpeg', 0.72);
+  // single chat image) on a high-DPI phone screen, instead of visibly soft. Bounded the same
+  // way as the original -- previously unbounded, a detailed photo's thumbnail alone could add
+  // tens of extra KB per image to a fallback batch.
+  const thumbnail = encodeWithinBudget(240, [0.72, 0.6, 0.5, 0.4], maxThumbBase64Length, 120);
 
-  // Also produce Blobs at the same quality level, used to upload to Firebase Storage at
-  // send time (see uploadChatImageAssets) instead of embedding base64 in the message
-  // document. The base64 strings above are kept as the fallback if that upload fails.
+  // Also produce Blobs at the same size/quality actually chosen above, used to upload to
+  // Firebase Storage at send time (see uploadChatImageAssets) instead of embedding base64 in
+  // the message document. The base64 strings above are kept as the fallback if that upload fails.
   return new Promise((resolve) => {
-    canvasOrig.toBlob(originalBlob => {
-      canvasThumb.toBlob(thumbnailBlob => {
+    original.canvas.toBlob(originalBlob => {
+      thumbnail.canvas.toBlob(thumbnailBlob => {
         resolve({
-          original: originalBase64,
-          thumbnail: thumbnailBase64,
+          original: original.base64,
+          thumbnail: thumbnail.base64,
           originalBlob,
           thumbnailBlob
         });
-      }, 'image/jpeg', 0.5);
-    }, 'image/jpeg', originalQuality);
+      }, 'image/jpeg', thumbnail.quality);
+    }, 'image/jpeg', original.quality);
   });
 }
 
@@ -8633,21 +8623,35 @@ async function compressImageToDataUrls(file, { maxBase64Length = MAX_CHAT_IMAGE_
 // ends up fully falling back to inline base64 (Storage unavailable) still fits well inside
 // Firestore's 1MiB/doc limit no matter how many images are in it. A single-image batch keeps
 // the original per-image cap unchanged.
-const CHAT_BATCH_BASE64_BUDGET = 700000; // ~700KB total across all originals in one message
+// Left enough headroom below Firestore's 1,048,576-byte/doc hard limit to also cover the
+// thumbnail budget below, the duplicated first-image imageUrl/thumbUrl fields kept for
+// backward compatibility, and JSON field-name overhead -- a batch that fully falls back to
+// inline base64 (Storage unavailable/failed) must never be able to push the document over
+// the limit and get rejected outright by Firestore.
+const CHAT_BATCH_BASE64_BUDGET = 620000; // ~620KB total across all originals in one message
+const CHAT_BATCH_THUMB_BUDGET = 150000; // ~150KB total across all thumbnails in one message
 async function processImageFilesSequentially(files, onProgress) {
   const succeeded = [];
   const failed = [];
   const perImageCap = Math.min(MAX_CHAT_IMAGE_BASE64_LENGTH, Math.floor(CHAT_BATCH_BASE64_BUDGET / files.length));
+  const perThumbCap = Math.min(MAX_CHAT_THUMB_BASE64_LENGTH, Math.floor(CHAT_BATCH_THUMB_BUDGET / files.length));
+  const startedAt = Date.now();
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
-    if (onProgress) onProgress({ current: i + 1, total: files.length, fileName: file.name });
+    if (onProgress) {
+      const elapsedSec = (Date.now() - startedAt) / 1000;
+      const pct = Math.round((i / files.length) * 100);
+      const remainingSec = i > 0 ? Math.max(0, Math.round((elapsedSec / i) * (files.length - i))) : null;
+      onProgress({ current: i + 1, total: files.length, fileName: file.name, pct, remainingSec });
+    }
     try {
-      const compressed = await compressImageToDataUrls(file, { maxBase64Length: perImageCap });
+      const compressed = await compressImageToDataUrls(file, { maxBase64Length: perImageCap, maxThumbBase64Length: perThumbCap });
       succeeded.push(compressed);
     } catch (err) {
       failed.push({ fileName: file.name, error: err });
     }
   }
+  if (onProgress) onProgress({ current: files.length, total: files.length, fileName: null, pct: 100, remainingSec: 0 });
   return { succeeded, failed };
 }
 
@@ -8663,18 +8667,19 @@ function describeImageProcessingFailures(failed) {
   return `${failed.length}장 첨부 실패 (${reason} 등)`;
 }
 
-function ImageProcessingOverlay({ current, total, fileName }) {
+function ImageProcessingOverlay({ current, total, fileName, pct, remainingSec }) {
   if (!total) return null;
-  const pct = Math.min(100, Math.round((current / total) * 100));
+  const clamped = typeof pct === 'number' ? Math.max(0, Math.min(100, pct)) : Math.min(100, Math.round((current / total) * 100));
   return /*#__PURE__*/React.createElement('div', {
     style: { position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.45)', zIndex: 100000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }
   }, /*#__PURE__*/React.createElement('div', {
     style: { backgroundColor: '#FFFFFF', borderRadius: '14px', padding: '24px 28px', width: '260px', maxWidth: '100%', textAlign: 'center', boxShadow: '0 10px 30px rgba(0,0,0,0.25)' }
   },
-    /*#__PURE__*/React.createElement('div', { style: { fontWeight: 800, fontSize: '0.95rem', color: '#0F172A', marginBottom: '4px' } }, '사진 처리 중...'),
-    /*#__PURE__*/React.createElement('div', { style: { fontSize: '0.78rem', color: '#64748B', marginBottom: '14px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, `${current}/${total}${fileName ? ` · ${fileName}` : ''}`),
+    /*#__PURE__*/React.createElement('div', { style: { fontWeight: 800, fontSize: '0.95rem', color: '#0F172A', marginBottom: '4px' } }, '사진 변환 중...'),
+    /*#__PURE__*/React.createElement('div', { style: { fontSize: '0.78rem', color: '#64748B', marginBottom: '14px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } },
+      `${current}/${total}${fileName ? ` · ${fileName}` : ''} · ${clamped}%${typeof remainingSec === 'number' ? ` · 약 ${remainingSec}초 남음` : ''}`),
     /*#__PURE__*/React.createElement('div', { style: { height: '8px', borderRadius: '9999px', backgroundColor: '#E2E8F0', overflow: 'hidden' } },
-      /*#__PURE__*/React.createElement('div', { style: { height: '100%', width: `${pct}%`, backgroundColor: '#4F46E5', transition: 'width 0.2s ease', borderRadius: '9999px' } })
+      /*#__PURE__*/React.createElement('div', { style: { height: '100%', width: `${clamped}%`, backgroundColor: '#4F46E5', transition: 'width 0.2s ease', borderRadius: '9999px' } })
     )
   ));
 }
