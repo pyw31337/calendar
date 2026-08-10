@@ -4282,7 +4282,7 @@ function AdminDashboard({ initialCalendars }) {
   const isRestoreMode = isAdminRestoreRoute();
   
   // Tab control state
-  const [activeTab, setActiveTab] = React.useState('metrics'); // 'metrics', 'settings', 'recovery', 'logs'
+  const [activeTab, setActiveTab] = React.useState('settings'); // 'settings' (일반), 'metrics' (통계), 'logs', 'recovery'
 
   // Selected calendar for settings and recovery tabs
   const [selectedCalId, setSelectedCalId] = React.useState('kkot');
@@ -4317,7 +4317,7 @@ function AdminDashboard({ initialCalendars }) {
   // Calendar picker, shown as radio pills (few enough options that a dropdown adds an extra click).
   const renderCalendarRadioGroup = (label, groupName) => (
     /*#__PURE__*/React.createElement(React.Fragment, null,
-      /*#__PURE__*/React.createElement("span", { style: { fontWeight: '800', fontSize: '0.88rem', color: '#64748B' } }, label),
+      label && /*#__PURE__*/React.createElement("span", { style: { fontWeight: '800', fontSize: '0.88rem', color: '#64748B' } }, label),
       /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } },
         calendarsList.map(cal => {
           const isActive = selectedCalId === cal.id;
@@ -5021,24 +5021,24 @@ function AdminDashboard({ initialCalendars }) {
       },
         /* Tab 1 button */
         /*#__PURE__*/React.createElement("button", {
-          type: "button", onClick: () => setActiveTab('metrics'),
-          style: styles.tabButton(activeTab === 'metrics')
-        }, /*#__PURE__*/React.createElement(ChartBarIcon, null), "일반"),
-        /* Tab 2 button */
-        /*#__PURE__*/React.createElement("button", {
           type: "button", onClick: () => setActiveTab('settings'),
           style: styles.tabButton(activeTab === 'settings')
-        }, /*#__PURE__*/React.createElement(SettingsIcon, null), "설정"),
-        /* Tab 3 button */
+        }, /*#__PURE__*/React.createElement(SettingsIcon, null), "일반"),
+        /* Tab 2 button */
         /*#__PURE__*/React.createElement("button", {
-          type: "button", onClick: () => setActiveTab('recovery'),
-          style: styles.tabButton(activeTab === 'recovery')
-        }, /*#__PURE__*/React.createElement(HourglassIcon, null), "복구"),
-        /* Tab 4 button */
+          type: "button", onClick: () => setActiveTab('metrics'),
+          style: styles.tabButton(activeTab === 'metrics')
+        }, /*#__PURE__*/React.createElement(ChartBarIcon, null), "통계"),
+        /* Tab 3 button */
         /*#__PURE__*/React.createElement("button", {
           type: "button", onClick: () => setActiveTab('logs'),
           style: styles.tabButton(activeTab === 'logs')
-        }, /*#__PURE__*/React.createElement(ChatSectionIcon, null), "로그")
+        }, /*#__PURE__*/React.createElement(ChatSectionIcon, null), "로그"),
+        /* Tab 4 button */
+        /*#__PURE__*/React.createElement("button", {
+          type: "button", onClick: () => setActiveTab('recovery'),
+          style: styles.tabButton(activeTab === 'recovery')
+        }, /*#__PURE__*/React.createElement(HourglassIcon, null), "복구")
       )
     ),
 
@@ -5124,7 +5124,7 @@ function AdminDashboard({ initialCalendars }) {
          the same calendar legend anyway -- that legend now lives once in the section title. */
       /*#__PURE__*/React.createElement("section", { style: styles.card },
         /*#__PURE__*/React.createElement("div", { style: styles.cardTitle },
-          /*#__PURE__*/React.createElement("span", null, "핵심 운영 지표"),
+          /*#__PURE__*/React.createElement("span", { style: { display: 'flex', alignItems: 'center', gap: '6px' } }, "핵심 운영 지표", /*#__PURE__*/React.createElement(SectionCountBadge, { count: calendarsList.length })),
           /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' } },
             dashboard.calendarStats.map((stat, i) => /*#__PURE__*/React.createElement("span", {
               key: stat.calendar.id,
@@ -5137,7 +5137,6 @@ function AdminDashboard({ initialCalendars }) {
         ),
         /*#__PURE__*/React.createElement("div", { className: "admin-metrics-grid" },
           [
-            { key: 'calendars', label: '총 캘린더', val: calendarsList.length, perCal: null, unit: '개' },
             { key: 'participants', label: '총 참여자', val: dashboard.totalParticipants, perCal: stat => stat.participants.length, unit: '명' },
             { key: 'schedules', label: '총 일정 수', val: dashboard.totalSchedules, perCal: stat => stat.schedules.length, unit: '건' },
             { key: 'dates', label: '등록 날짜 수', val: dashboard.uniqueDateCount, perCal: stat => stat.dateCount, unit: '일' },
@@ -5294,7 +5293,7 @@ function AdminDashboard({ initialCalendars }) {
     activeTab === 'settings' && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '20px' } },
       /* Calendar selector row */
       /*#__PURE__*/React.createElement("section", { style: { ...styles.card, padding: '16px 20px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' } },
-        renderCalendarRadioGroup('캘린더 선택', 'admin-settings-cal'),
+        renderCalendarRadioGroup('', 'admin-settings-cal'),
 
         /* New Calendar creation button */
         /*#__PURE__*/React.createElement("button", {
@@ -5389,7 +5388,7 @@ function AdminDashboard({ initialCalendars }) {
             /*#__PURE__*/React.createElement("button", {
               type: "button", className: "btn btn-primary",
               onClick: () => { setEditingPoll(null); setEditingPollCalId(selectedCalId); setIsPollModalOpen(true); }
-            }, "+ 새 투표 생성")
+            }, "+ 새 투표")
           ),
 
           /* Polls List */
@@ -5429,7 +5428,7 @@ function AdminDashboard({ initialCalendars }) {
     activeTab === 'recovery' && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '20px' } },
       /* Calendar selector row */
       /*#__PURE__*/React.createElement("section", { style: { ...styles.card, padding: '16px 20px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' } },
-        renderCalendarRadioGroup('복구할 캘린더 선택:', 'admin-recovery-cal')
+        renderCalendarRadioGroup('', 'admin-recovery-cal')
       ),
 
       selectedCal ? /*#__PURE__*/React.createElement(React.Fragment, null,
@@ -5537,7 +5536,7 @@ function AdminDashboard({ initialCalendars }) {
         )
       )
     )
-    ),
+    ,
 
     /* ================================================================= */
     /* TAB 4: CHAT LOGS                                                   */
@@ -5602,7 +5601,7 @@ function AdminDashboard({ initialCalendars }) {
           })
         )
       )
-    ),
+    )),
 
     /* Inner PollModal to Edit/Create Polls from AdminDashboard */
     isPollModalOpen && editingPollCalId && /*#__PURE__*/React.createElement(PollModal, {
@@ -6782,7 +6781,7 @@ function App() {
     if (meetingIndex < 0) return false;
     const cleanLabel = sanitizeText(expense?.label || '', 120);
     const cleanUrl = sanitizeText(expense?.url || '', 220);
-    const cleanAmount = Number.isFinite(expense?.amount) && expense.amount > 0 ? Math.round(expense.amount) : 0;
+    const cleanAmount = Number.isFinite(expense?.amount) && expense.amount !== 0 ? Math.round(expense.amount) : 0;
     if (!cleanLabel || !cleanAmount) return false;
     const now = Date.now();
     const meeting = existingMeetings[meetingIndex];
@@ -11210,8 +11209,11 @@ function DateModal({
     const rawLabel = expenseLabelInput.trim();
     const url = extractFirstUrl(rawLabel);
     const labelText = sanitizeText(url ? rawLabel.replace(url, '').trim() : rawLabel, 120);
-    const amountNum = Number(expenseAmountInput.replace(/[^0-9]/g, ''));
-    if (!labelText || !Number.isFinite(amountNum) || amountNum <= 0) {
+    const rawAmount = expenseAmountInput.trim();
+    const isNegativeAmount = rawAmount.startsWith('-');
+    const amountDigits = rawAmount.replace(/[^0-9]/g, '');
+    const amountNum = amountDigits ? (isNegativeAmount ? -1 : 1) * Number(amountDigits) : NaN;
+    if (!labelText || !Number.isFinite(amountNum) || amountNum === 0) {
       if (showToast) showToast('지출명목·금액 필요', 'error'); else alert('지출명목·금액 필요');
       return;
     }
@@ -11230,7 +11232,7 @@ function DateModal({
     if (isSavingExpense) return;
     setEditingExpenseId(expense.id);
     setExpenseLabelInput(expense.url ? `${expense.label} ${expense.url}` : expense.label);
-    setExpenseAmountInput(String(expense.amount));
+    setExpenseAmountInput(expense.amount < 0 ? `-${Math.abs(expense.amount).toLocaleString()}` : Number(expense.amount).toLocaleString());
   };
   const handleDeleteExpenseClick = (event, expenseId) => {
     event.stopPropagation();
@@ -11605,8 +11607,11 @@ function DateModal({
             value: expenseAmountInput,
             disabled: isSavingExpense,
             onChange: e => {
-              const digits = e.target.value.replace(/[^0-9]/g, '');
-              setExpenseAmountInput(digits ? Number(digits).toLocaleString() : '');
+              const raw = e.target.value;
+              const isNegative = raw.trim().startsWith('-');
+              const digits = raw.replace(/[^0-9]/g, '');
+              const formatted = digits ? Number(digits).toLocaleString() : '';
+              setExpenseAmountInput(isNegative ? `-${formatted}` : formatted);
             }
           }),
           editingExpenseId && /*#__PURE__*/React.createElement("button", {
@@ -11643,7 +11648,7 @@ function DateModal({
           }
         },
           /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' } },
-            expense.label && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-main)' } }, expense.label),
+            expense.label && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.85rem', color: 'var(--text-main)' } }, expense.label),
             expense.url && /*#__PURE__*/React.createElement("span", {
               style: {
                 display: 'inline-flex', alignItems: 'center', padding: '3px 10px', borderRadius: 'var(--radius-full)',
@@ -11653,7 +11658,7 @@ function DateModal({
               onClick: event => { event.stopPropagation(); window.open(expense.url, '_blank', 'noopener,noreferrer'); }
             }, expense.url)
           ),
-          /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-main)' } }, `${Number(expense.amount).toLocaleString()}원`),
+          /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.85rem', fontWeight: 800, color: expense.amount < 0 ? '#DC2626' : 'var(--text-main)' } }, `${Number(expense.amount).toLocaleString()}원`),
           /*#__PURE__*/React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
             /*#__PURE__*/React.createElement("span", { className: "registered-at-text" }, formatRegisteredAt(expense.createdAt)),
             /*#__PURE__*/React.createElement("button", {
