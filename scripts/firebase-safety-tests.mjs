@@ -96,6 +96,15 @@ runAppScript(productionContext, `
   if (!isAllowedCalendarId('kkot') || !isAllowedCalendarId('cw') || !isAllowedCalendarId('trip') || isAllowedCalendarId('../bad') || isAllowedCalendarId('bad!')) {
     throw new Error('calendar id allowlist failed');
   }
+  if (extractFirstUrl('천왕역모아엘가 naver.me/54LbfTLU') !== 'https://naver.me/54LbfTLU') {
+    throw new Error('bare naver.me URL extraction failed');
+  }
+  if (extractFirstUrl('장소 www.example.com/path') !== 'https://www.example.com/path') {
+    throw new Error('bare www URL extraction failed');
+  }
+  if (removeFirstUrl('추사고택 naver.me/54LbfTLU') !== '추사고택') {
+    throw new Error('bare URL removal failed');
+  }
   const registeredText = formatRegisteredAt(new Date(2026, 7, 4, 4, 39, 12).getTime());
   if (registeredText !== '26.08.04 (화) 04:39:12') {
     throw new Error('registered timestamp formatter failed');

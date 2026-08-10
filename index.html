@@ -2140,15 +2140,30 @@ function createPollActivityLog(calendarId, action, participantId = '', timestamp
   });
 }
 
+function extractFirstUrlInfo(value = '') {
+  const source = String(value || '');
+  const match = source.match(/(?:https?:\/\/|www\.)[^\s]+|(?:[a-z0-9-]+\.)+[a-z]{2,}(?:\/[^\s]*)?/i);
+  if (!match) return { raw: '', url: '' };
+  const raw = match[0].replace(/[)\].,!?]+$/g, '');
+  if (!raw || !/[a-z0-9]/i.test(raw)) return { raw: '', url: '' };
+  const url = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+  return { raw, url };
+}
+
 function extractFirstUrl(value = '') {
-  const match = String(value || '').match(/https?:\/\/[^\s]+/i);
-  return match ? match[0] : '';
+  return extractFirstUrlInfo(value).url;
+}
+
+function removeFirstUrl(value = '') {
+  const source = String(value || '');
+  const { raw } = extractFirstUrlInfo(source);
+  return raw ? source.replace(raw, '').trim() : source.trim();
 }
 
 function normalizePollOptionInput(value = '') {
   const source = sanitizeText(value, 220);
   const url = extractFirstUrl(source);
-  const text = sanitizeText(url ? source.replace(url, '').trim() : source, 120);
+  const text = sanitizeText(url ? removeFirstUrl(source) : source, 120);
   return {
     text: text || source,
     url
@@ -7425,7 +7440,7 @@ function App() {
       const p = getActiveParticipants(activeCal).find(part => part.id === entry.participantId);
       if (!p) return null;
       const entryUrl = extractFirstUrl(entry.note);
-      const noteTextOnly = entryUrl ? entry.note.replace(entryUrl, '').trim() : entry.note.trim();
+      const noteTextOnly = entryUrl ? removeFirstUrl(entry.note) : entry.note.trim();
       if (!noteTextOnly) return null;
       return /*#__PURE__*/React.createElement("span", {
         key: entry.participantId,
@@ -11653,11 +11668,16 @@ function DateModal({
     setEditingExpenseId(null);
   }, [calendar?.id, dateStr]);
   const expenseTotal = expenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+  const getExpenseUrl = expense => sanitizeText(expense?.url || extractFirstUrl(expense?.label || ''), 220);
+  const getExpenseLabel = expense => {
+    const label = sanitizeText(expense?.label || '', 120);
+    return getExpenseUrl(expense) ? sanitizeText(removeFirstUrl(label), 120) : label;
+  };
   const handleSaveExpenseClick = async () => {
     if (isSavingExpense || !onSaveExpense) return;
     const rawLabel = expenseLabelInput.trim();
     const url = extractFirstUrl(rawLabel);
-    const labelText = sanitizeText(url ? rawLabel.replace(url, '').trim() : rawLabel, 120);
+    const labelText = sanitizeText(url ? removeFirstUrl(rawLabel) : rawLabel, 120);
     const rawAmount = expenseAmountInput.trim();
     const isNegativeAmount = rawAmount.startsWith('-');
     const amountDigits = rawAmount.replace(/[^0-9]/g, '');
@@ -11680,7 +11700,9 @@ function DateModal({
   const handleExpenseItemClick = (expense) => {
     if (isSavingExpense) return;
     setEditingExpenseId(expense.id);
-    setExpenseLabelInput(expense.url ? `${expense.label} ${expense.url}` : expense.label);
+    const displayLabel = getExpenseLabel(expense);
+    const displayUrl = getExpenseUrl(expense);
+    setExpenseLabelInput([displayLabel, displayUrl].filter(Boolean).join(' '));
     setExpenseAmountInput(expense.amount < 0 ? `-${Math.abs(expense.amount).toLocaleString()}` : Number(expense.amount).toLocaleString());
   };
   const handleDeleteExpenseClick = (event, expenseId) => {
@@ -11962,7 +11984,7 @@ function DateModal({
     const p = activeParticipants.find(part => part.id === entry.participantId);
     if (!p) return null;
     const entryUrl = extractFirstUrl(entry.note);
-    const entryTextOnly = entryUrl ? (entry.note || '').replace(entryUrl, '').trim() : (entry.note || '').trim();
+    const entryTextOnly = entryUrl ? removeFirstUrl(entry.note) : (entry.note || '').trim();
     const registeredAtText = formatRegisteredAt(entry.updatedAt);
     return /*#__PURE__*/React.createElement("div", {
       key: entry.id || p.id,
@@ -12105,27 +12127,30 @@ function DateModal({
           border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-primary)'
         }
       },
-        expenses.map(expense => /*#__PURE__*/React.createElement("div", {
-          key: expense.id,
-          onClick: () => handleExpenseItemClick(expense),
-          style: {
-            display: 'flex', flexDirection: 'column', gap: '4px', padding: '10px 12px',
-            backgroundColor: editingExpenseId === expense.id ? 'var(--bg-card)' : 'transparent',
-            border: `1px solid ${editingExpenseId === expense.id ? 'var(--accent-primary)' : 'var(--border-subtle)'}`,
-            borderRadius: 'var(--radius-md)', cursor: 'pointer'
-          }
-        },
+        expenses.map(expense => {
+          const expenseLabel = getExpenseLabel(expense);
+          const expenseUrl = getExpenseUrl(expense);
+          return /*#__PURE__*/React.createElement("div", {
+            key: expense.id,
+            onClick: () => handleExpenseItemClick(expense),
+            style: {
+              display: 'flex', flexDirection: 'column', gap: '4px', padding: '10px 12px',
+              backgroundColor: editingExpenseId === expense.id ? 'var(--bg-card)' : 'transparent',
+              border: `1px solid ${editingExpenseId === expense.id ? 'var(--accent-primary)' : 'var(--border-subtle)'}`,
+              borderRadius: 'var(--radius-md)', cursor: 'pointer'
+            }
+          },
           /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '4px', minWidth: 0 } },
-            expense.label && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.85rem', color: 'var(--text-main)' } }, expense.label),
-            expense.url && /*#__PURE__*/React.createElement("span", {
+            expenseLabel && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.85rem', color: 'var(--text-main)' } }, expenseLabel),
+            expenseUrl && /*#__PURE__*/React.createElement("span", {
               style: {
                 display: 'inline-flex', alignItems: 'center', padding: '3px 10px', borderRadius: 'var(--radius-full)',
                 fontSize: '0.72rem', fontWeight: 600, backgroundColor: '#E2E8F0', color: '#475569', cursor: 'pointer', wordBreak: 'break-all',
                 maxWidth: '100%'
               },
-              title: expense.url,
-              onClick: event => { event.stopPropagation(); window.open(expense.url, '_blank', 'noopener,noreferrer'); }
-            }, expense.url)
+              title: expenseUrl,
+              onClick: event => { event.stopPropagation(); window.open(expenseUrl, '_blank', 'noopener,noreferrer'); }
+            }, expenseUrl)
           ),
           /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.85rem', fontWeight: 800, color: expense.amount < 0 ? '#DC2626' : 'var(--text-main)' } }, `${Number(expense.amount).toLocaleString()}원`),
           /*#__PURE__*/React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
@@ -12137,7 +12162,8 @@ function DateModal({
               style: { background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', display: 'flex', alignItems: 'center', padding: '2px' }
             }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 14 }))
           )
-        ))
+        );
+        })
       )
     )
   )), !adminMode && /*#__PURE__*/React.createElement("div", {
@@ -14825,7 +14851,7 @@ function SummaryList({
       const p = participantsMap[e.participantId];
       if (!p) return null;
       const memoUrl = extractFirstUrl(e.note);
-      const memoText = memoUrl ? e.note.replace(memoUrl, '').trim() : e.note.trim();
+      const memoText = memoUrl ? removeFirstUrl(e.note) : e.note.trim();
       if (!memoText) return null;
       return /*#__PURE__*/React.createElement("span", {
         key: e.participantId || p.id,
@@ -14936,7 +14962,7 @@ function SummaryList({
       const p = participantsMap[e.participantId];
       if (!p) return null;
       const memoUrl = extractFirstUrl(e.note);
-      const memoText = memoUrl ? e.note.replace(memoUrl, '').trim() : e.note.trim();
+      const memoText = memoUrl ? removeFirstUrl(e.note) : e.note.trim();
       if (!memoText) return null;
       return /*#__PURE__*/React.createElement("span", {
         key: e.participantId || p.id,
@@ -15034,7 +15060,7 @@ function SummaryList({
       const p = participantsMap[e.participantId];
       if (!p) return null;
       const memoUrl = extractFirstUrl(e.note);
-      const memoText = memoUrl ? e.note.replace(memoUrl, '').trim() : e.note.trim();
+      const memoText = memoUrl ? removeFirstUrl(e.note) : e.note.trim();
       if (!memoText) return null;
       return /*#__PURE__*/React.createElement("span", {
         key: e.participantId || p.id,
