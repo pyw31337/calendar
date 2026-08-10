@@ -1789,6 +1789,18 @@
       display: flex; flex-direction: column; max-height: 70vh;
       color: var(--text-main);
     }
+    .emoji-sheet-overlay {
+      align-items: flex-end;
+      justify-content: center;
+      padding: 0 12px;
+      z-index: 12000;
+    }
+    .emoji-sheet {
+      width: min(480px, 100%);
+      margin: 0 auto;
+      max-height: min(60vh, 520px);
+      transform: translateZ(0);
+    }
     @keyframes sheet-slide-up {
       from { transform: translateY(100%); }
       to { transform: translateY(0); }
@@ -11619,11 +11631,11 @@ function EmojiPickerSheet({ onSelect, onClose }) {
       emojis.map((e, i) => /*#__PURE__*/React.createElement(EmojiGridButton, { key: `${key}-${i}`, emoji: e, onSelect: handlePick }))
     )
   );
-  return /*#__PURE__*/React.createElement('div', {
-    className: 'bottom-sheet-overlay',
+  const sheet = /*#__PURE__*/React.createElement('div', {
+    className: 'bottom-sheet-overlay emoji-sheet-overlay',
     onClick: onClose
   }, /*#__PURE__*/React.createElement('div', {
-    className: 'bottom-sheet',
+    className: 'bottom-sheet emoji-sheet',
     onClick: e => e.stopPropagation(),
     style: { maxHeight: '60vh' }
   },
@@ -11639,6 +11651,7 @@ function EmojiPickerSheet({ onSelect, onClose }) {
       EMOJI_CATEGORIES.map(cat => renderGroup(cat.label, cat.emojis, cat.label))
     )
   ));
+  return ReactDOM.createPortal(sheet, document.body);
 }
 
 function ChatParticipantSheet({ calendar, selectedId, onSelect, onClose }) {
