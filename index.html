@@ -493,6 +493,22 @@
     }
     .form-select:focus, .form-input:focus, .form-textarea:focus { border-color: var(--accent-primary); box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15); }
 
+    /* Native <select> elements: replace the browser's default OS-styled dropdown arrow with the
+       same chevron-down icon used everywhere else in the app (e.g. the admin header's calendar
+       picker), so every select box shares one consistent look across browsers/platforms instead
+       of each rendering its own native arrow. */
+    select.form-select {
+      appearance: none;
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      cursor: pointer;
+      padding-right: 40px;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%2394A3B8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6l6 -6'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      background-size: 18px;
+    }
+
     .color-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
 
     .participant-add-row,
@@ -1067,10 +1083,7 @@
     }
     .summary-section-divider {
       border-top: 1px solid var(--border-subtle);
-      margin: 0 0 12px;
-    }
-    .summary-section-divider.is-after-collapsed {
-      margin-top: 0;
+      margin: 0;
     }
 
     .admin-section-header {
@@ -4914,7 +4927,7 @@ function AdminDashboard({ initialCalendars }) {
       margin: '-24px -16px 0'
     },
     header: {
-      padding: '16px 16px 14px',
+      padding: '16px 10px 14px 16px',
       display: 'flex',
       justifyContent: 'space-between',
       alignItems: 'center',
@@ -5020,12 +5033,12 @@ function AdminDashboard({ initialCalendars }) {
             }, "Admin")
           )
         ),
-        /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' } },
+        /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '8px', flex: '1 1 260px', maxWidth: '360px' } },
           /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px' } },
             /*#__PURE__*/React.createElement("button", {
               type: "button",
               className: "form-select",
-              style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', cursor: 'pointer', textAlign: 'left' },
+              style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', cursor: 'pointer', textAlign: 'left', flex: '1 1 auto', minWidth: 0 },
               onClick: () => setIsHeaderCalPickerOpen(true)
             },
               /*#__PURE__*/React.createElement("span", { style: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } },
@@ -6465,26 +6478,33 @@ function App() {
           ok = await sendChatMessageRest(activeCalId, messageData);
         }
       } else {
-        // Always bundle every attached image into a single multi-thumbnail message, whether
-        // uploads land in Storage or fall back to inline base64 (the per-image size cap is
-        // scaled down for larger batches -- see processImageFilesSequentially -- so a fully
-        // inline multi-image message still fits Firestore's 1MiB/doc limit).
+        // Bundle every attached image into a single multi-thumbnail message when possible.
+        // Uploads that land in Storage produce short download URLs, so this is always a single
+        // message in the normal case. Images that fall back to inline base64 (Storage
+        // unavailable) keep their full quality -- instead the batch is split across multiple
+        // chat messages if needed so no single message can exceed Firestore's 1MiB/doc limit.
         const resolvedImages = await resolveChatImageBatch(activeCalId, chatImages, setChatUploadProgress);
-        const messageData = {
-          participantId: chatParticipantId,
-          text: chatInput.trim(),
-          imageUrl: resolvedImages[0].imageUrl,
-          thumbUrl: resolvedImages[0].thumbUrl,
-          imageUrls: resolvedImages.map(r => r.imageUrl),
-          thumbUrls: resolvedImages.map(r => r.thumbUrl),
-          timestamp: Date.now()
-        };
-        if (firebaseDb) {
-          await firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages').add(messageData);
-          ok = true;
-        } else {
-          ok = await sendChatMessageRest(activeCalId, messageData);
+        const chunks = chunkResolvedImagesForMessages(resolvedImages);
+        const baseTimestamp = Date.now();
+        for (let i = 0; i < chunks.length; i++) {
+          const chunkImages = chunks[i];
+          const messageData = {
+            participantId: chatParticipantId,
+            text: i === 0 ? chatInput.trim() : '',
+            imageUrl: chunkImages[0].imageUrl,
+            thumbUrl: chunkImages[0].thumbUrl,
+            imageUrls: chunkImages.map(r => r.imageUrl),
+            thumbUrls: chunkImages.map(r => r.thumbUrl),
+            timestamp: baseTimestamp + i
+          };
+          if (firebaseDb) {
+            await firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages').add(messageData);
+          } else {
+            const sent = await sendChatMessageRest(activeCalId, messageData);
+            if (!sent) throw new Error(`REST chat send failed for chunk ${i + 1}/${chunks.length}`);
+          }
         }
+        ok = true;
       }
 
       if (ok) {
@@ -6554,18 +6574,39 @@ function App() {
     if (hasNewImages) setChatUploadProgress({ pct: 0, remainingSec: null });
     try {
       // Images already on the message (isExisting) are passed through as-is; freshly
-      // picked ones get uploaded via resolveChatImageBatch, matching the compose flow.
+      // picked ones get uploaded via resolveChatImageBatch, matching the compose flow. If the
+      // result still doesn't fit in one document (inline base64 fallback with many images),
+      // the edited message keeps the first chunk and any remainder is appended as new messages
+      // right after it, same as the compose flow -- quality is never degraded to force a fit.
       const resolvedImages = await resolveChatImageBatch(calId, newImages || [], hasNewImages ? setChatUploadProgress : null);
+      const chunks = resolvedImages.length > 0 ? chunkResolvedImagesForMessages(resolvedImages) : [[]];
+      const firstChunk = chunks[0];
+      const extraChunks = chunks.slice(1);
       const data = {
         text: newText,
-        imageUrl: resolvedImages[0]?.imageUrl || '',
-        thumbUrl: resolvedImages[0]?.thumbUrl || '',
-        imageUrls: resolvedImages.map(r => r.imageUrl),
-        thumbUrls: resolvedImages.map(r => r.thumbUrl)
+        imageUrl: firstChunk[0]?.imageUrl || '',
+        thumbUrl: firstChunk[0]?.thumbUrl || '',
+        imageUrls: firstChunk.map(r => r.imageUrl),
+        thumbUrls: firstChunk.map(r => r.thumbUrl)
       };
       let ok = false;
       if (firebaseDb) {
         await firebaseDb.collection('calendars').doc(`cal_${calId}`).collection('messages').doc(id).update(data);
+        if (extraChunks.length > 0) {
+          const baseTimestamp = (editingMessage.timestamp || Date.now()) + 1;
+          for (let i = 0; i < extraChunks.length; i++) {
+            const chunkImages = extraChunks[i];
+            await firebaseDb.collection('calendars').doc(`cal_${calId}`).collection('messages').add({
+              participantId: editingMessage.participantId,
+              text: '',
+              imageUrl: chunkImages[0].imageUrl,
+              thumbUrl: chunkImages[0].thumbUrl,
+              imageUrls: chunkImages.map(r => r.imageUrl),
+              thumbUrls: chunkImages.map(r => r.thumbUrl),
+              timestamp: baseTimestamp + i
+            });
+          }
+        }
         ok = true;
       } else {
         ok = await updateMessageRest(calId, id, data);
@@ -8619,22 +8660,14 @@ async function compressImageToDataUrls(file, { maxBase64Length = MAX_CHAT_IMAGE_
 // Processes a batch of image files one at a time (bounds peak memory on large photos and gives
 // meaningful progress feedback), isolating failures per file so one bad file (unsupported
 // format, corrupt data, decode timeout) doesn't discard the others that succeeded.
-// Total base64 budget shared across every image in a batch, so a multi-image message that
-// ends up fully falling back to inline base64 (Storage unavailable) still fits well inside
-// Firestore's 1MiB/doc limit no matter how many images are in it. A single-image batch keeps
-// the original per-image cap unchanged.
-// Left enough headroom below Firestore's 1,048,576-byte/doc hard limit to also cover the
-// thumbnail budget below, the duplicated first-image imageUrl/thumbUrl fields kept for
-// backward compatibility, and JSON field-name overhead -- a batch that fully falls back to
-// inline base64 (Storage unavailable/failed) must never be able to push the document over
-// the limit and get rejected outright by Firestore.
-const CHAT_BATCH_BASE64_BUDGET = 620000; // ~620KB total across all originals in one message
-const CHAT_BATCH_THUMB_BUDGET = 150000; // ~150KB total across all thumbnails in one message
+// Every image keeps the SAME fixed quality/size cap regardless of how many photos are in the
+// batch -- resolution/quality never degrades just because more photos were attached. The
+// Firestore 1MiB/doc limit is instead respected by splitting a large fallback batch across
+// multiple chat messages at send time (see chunkResolvedImagesForMessages), so quality only
+// ever depends on the individual photo, never on batch size.
 async function processImageFilesSequentially(files, onProgress) {
   const succeeded = [];
   const failed = [];
-  const perImageCap = Math.min(MAX_CHAT_IMAGE_BASE64_LENGTH, Math.floor(CHAT_BATCH_BASE64_BUDGET / files.length));
-  const perThumbCap = Math.min(MAX_CHAT_THUMB_BASE64_LENGTH, Math.floor(CHAT_BATCH_THUMB_BUDGET / files.length));
   const startedAt = Date.now();
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
@@ -8645,7 +8678,7 @@ async function processImageFilesSequentially(files, onProgress) {
       onProgress({ current: i + 1, total: files.length, fileName: file.name, pct, remainingSec });
     }
     try {
-      const compressed = await compressImageToDataUrls(file, { maxBase64Length: perImageCap, maxThumbBase64Length: perThumbCap });
+      const compressed = await compressImageToDataUrls(file);
       succeeded.push(compressed);
     } catch (err) {
       failed.push({ fileName: file.name, error: err });
@@ -8653,6 +8686,31 @@ async function processImageFilesSequentially(files, onProgress) {
   }
   if (onProgress) onProgress({ current: files.length, total: files.length, fileName: null, pct: 100, remainingSec: 0 });
   return { succeeded, failed };
+}
+
+// Groups resolved images ({ imageUrl, thumbUrl }) into per-message chunks that stay safely
+// under Firestore's 1,048,576-byte/doc limit. When Storage upload succeeded (the normal case),
+// imageUrl/thumbUrl are short download URLs, so this always yields a single chunk regardless of
+// how many photos were sent. Only when images fall back to inline base64 (Storage unavailable)
+// can a batch grow large enough to need more than one chunk -- and even then, each image keeps
+// its full quality; only the number of chat messages sent scales, never the image quality.
+const CHAT_MESSAGE_SAFE_BYTE_BUDGET = 900000; // headroom under the 1MiB/doc hard limit
+function chunkResolvedImagesForMessages(resolvedImages) {
+  const chunks = [];
+  let current = [];
+  let currentBytes = 0;
+  for (const img of resolvedImages) {
+    const imgBytes = (img.imageUrl?.length || 0) + (img.thumbUrl?.length || 0);
+    if (current.length > 0 && currentBytes + imgBytes > CHAT_MESSAGE_SAFE_BYTE_BUDGET) {
+      chunks.push(current);
+      current = [];
+      currentBytes = 0;
+    }
+    current.push(img);
+    currentBytes += imgBytes;
+  }
+  if (current.length > 0) chunks.push(current);
+  return chunks;
 }
 
 function describeImageProcessingFailures(failed) {
@@ -8947,14 +9005,22 @@ function renderChatMessageImages(msg, setActiveLightbox, singleImageStyle = {}) 
       style: { display: 'block', borderRadius: '8px', cursor: 'pointer', objectFit: 'cover', ...singleImageStyle }
     });
   }
+  // 3+ images always line up 3-per-row via a proportional grid (deterministic and adapts to
+  // whatever maxWidth the caller passes in, unlike flex-wrap which can end up 2-per-row
+  // depending on the bubble's actual width) -- 2 or 3 images just sit in one row at full size.
+  const useGrid = thumbs.length > 3;
   return /*#__PURE__*/React.createElement('div', {
-    style: { display: 'flex', flexWrap: 'wrap', gap: '4px', maxWidth: singleImageStyle.maxWidth || '200px', marginBottom: singleImageStyle.marginBottom || '0' }
+    style: useGrid
+      ? { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4px', maxWidth: singleImageStyle.maxWidth || '200px', marginBottom: singleImageStyle.marginBottom || '0' }
+      : { display: 'flex', flexWrap: 'wrap', gap: '4px', maxWidth: singleImageStyle.maxWidth || '200px', marginBottom: singleImageStyle.marginBottom || '0' }
   }, thumbs.map((thumb, idx) => /*#__PURE__*/React.createElement('img', {
     key: idx,
     src: thumb,
     alt: `첨부이미지 ${idx + 1}`,
     onClick: () => setActiveLightbox && setActiveLightbox({ urls: displayUrls, index: idx, meta }),
-    style: { display: 'block', width: '56px', height: '56px', borderRadius: '6px', cursor: 'pointer', objectFit: 'cover' }
+    style: useGrid
+      ? { display: 'block', width: '100%', aspectRatio: '1', borderRadius: '6px', cursor: 'pointer', objectFit: 'cover' }
+      : { display: 'block', width: '56px', height: '56px', borderRadius: '6px', cursor: 'pointer', objectFit: 'cover' }
   })));
 }
 
@@ -12592,7 +12658,7 @@ function AdminModal({
           /*#__PURE__*/React.createElement("div", {
             style: { border: '1px solid var(--border-subtle)', borderRadius: '12px', padding: '16px', backgroundColor: 'var(--bg-card)' }
           },
-            /*#__PURE__*/React.createElement("h4", { style: { fontSize: '0.92rem', fontWeight: 800, color: 'var(--text-main)', margin: '0 0 14px 0', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(SettingsIcon, null), "캘린더 프로필 및 참여자 설정"),
+            /*#__PURE__*/React.createElement("h4", { style: { fontSize: '0.92rem', fontWeight: 800, color: 'var(--text-main)', margin: '0 0 14px 0', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(SettingsIcon, null), "프로필 설정"),
             
             /* Input: Title */
             /*#__PURE__*/React.createElement("div", { style: { marginBottom: '10px' } },
@@ -12691,7 +12757,7 @@ function AdminModal({
             /*#__PURE__*/React.createElement("div", {
               style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '6px' }
             },
-              /*#__PURE__*/React.createElement("h4", { style: { fontSize: '0.92rem', fontWeight: 800, color: 'var(--text-main)', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(PollSectionIcon, null), "캘린더 투표 리스트 관리"),
+              /*#__PURE__*/React.createElement("h4", { style: { fontSize: '0.92rem', fontWeight: 800, color: 'var(--text-main)', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(PollSectionIcon, null), "투표 설정"),
               /*#__PURE__*/React.createElement("button", {
                 type: "button",
                 onClick: () => { setEditingPoll(null); setIsPollModalOpen(true); },
@@ -12699,7 +12765,7 @@ function AdminModal({
                   backgroundColor: '#2563EB', color: '#FFFFFF', border: 'none', borderRadius: '6px',
                   padding: '6px 12px', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer'
                 }
-              }, "+ 새 투표 생성")
+              }, "+ 새 투표")
             ),
 
             /* Poll list container */
@@ -12710,7 +12776,7 @@ function AdminModal({
               getCalendarPolls(calendar).map(poll => /*#__PURE__*/React.createElement("div", {
                 key: poll.id,
                 className: 'admin-log-row',
-                style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px 8px', border: '1px solid #F1F5F9', borderRadius: '8px', padding: '10px 12px', backgroundColor: '#F8FAFC' }
+                style: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px 8px', border: '1px solid #F1F5F9', borderRadius: '8px', padding: '10px 12px', backgroundColor: '#F8FAFC' }
               },
                 /* Left info */
                 /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0, flex: '1 1 160px' } },
@@ -12746,7 +12812,7 @@ function AdminModal({
           /*#__PURE__*/React.createElement("div", {
             style: { border: '1px solid var(--border-subtle)', borderRadius: '12px', padding: '16px', backgroundColor: 'var(--bg-card)' }
           },
-            /*#__PURE__*/React.createElement("h4", { style: { fontSize: '0.92rem', fontWeight: 800, color: 'var(--text-main)', margin: '0 0 14px 0', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(SettingsIcon, null), "화면 및 알림 설정"),
+            /*#__PURE__*/React.createElement("h4", { style: { fontSize: '0.92rem', fontWeight: 800, color: 'var(--text-main)', margin: '0 0 14px 0', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(SettingsIcon, null), "화면/알림 설정"),
 
             /* Dark mode row */
             /*#__PURE__*/React.createElement("div", {
@@ -12757,17 +12823,6 @@ function AdminModal({
                 /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.76rem', color: '#94A3B8', marginTop: '2px' } }, "어두운 화면 테마를 사용합니다")
               ),
               /*#__PURE__*/React.createElement(ToggleSwitch, { checked: isDarkTheme, onChange: toggleTheme, label: "다크 모드" })
-            ),
-
-            /* Chat notification row */
-            /*#__PURE__*/React.createElement("div", {
-              style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--border-subtle)', gap: '12px' }
-            },
-              /*#__PURE__*/React.createElement("div", null,
-                /*#__PURE__*/React.createElement("div", { style: { fontWeight: 700, fontSize: '0.88rem', color: 'var(--text-main)' } }, "채팅 알림"),
-                /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.76rem', color: '#94A3B8', marginTop: '2px' } }, "새 채팅 메시지가 오면 알려드립니다 (탭이 열려있을 때)")
-              ),
-              /*#__PURE__*/React.createElement(ToggleSwitch, { checked: notifPermission === 'granted' && chatNotifyEnabled, onChange: handleToggleNotifications, label: "채팅 알림" })
             ),
 
             /* Font size row */
@@ -12790,6 +12845,17 @@ function AdminModal({
                   style: { width: '30px', height: '30px', borderRadius: '50%', border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)', cursor: 'pointer', fontSize: '1rem', fontWeight: 800, color: 'var(--text-main)', display: 'flex', alignItems: 'center', justifyContent: 'center' }
                 }, "+")
               )
+            ),
+
+            /* Chat notification row */
+            /*#__PURE__*/React.createElement("div", {
+              style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--border-subtle)', gap: '12px' }
+            },
+              /*#__PURE__*/React.createElement("div", null,
+                /*#__PURE__*/React.createElement("div", { style: { fontWeight: 700, fontSize: '0.88rem', color: 'var(--text-main)' } }, "채팅 알림"),
+                /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.76rem', color: '#94A3B8', marginTop: '2px' } }, "새 채팅 메시지가 오면 알려드립니다 (탭이 열려있을 때)")
+              ),
+              /*#__PURE__*/React.createElement(ToggleSwitch, { checked: notifPermission === 'granted' && chatNotifyEnabled, onChange: handleToggleNotifications, label: "채팅 알림" })
             ),
 
             /* Calendar-wide ICS export */
