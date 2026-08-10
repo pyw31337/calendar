@@ -4284,9 +4284,6 @@ function AdminDashboard({ initialCalendars }) {
   // Tab control state
   const [activeTab, setActiveTab] = React.useState('metrics'); // 'metrics', 'settings', 'recovery', 'logs'
 
-  // Which metrics stat-box is currently expanded to show its kkot/cw breakdown + pie chart
-  const [selectedMetricKey, setSelectedMetricKey] = React.useState(null);
-
   // Selected calendar for settings and recovery tabs
   const [selectedCalId, setSelectedCalId] = React.useState('kkot');
 
@@ -5122,9 +5119,22 @@ function AdminDashboard({ initialCalendars }) {
     /* TAB 1: OPERATIONAL METRICS & CHAT LOGS                            */
     /* ================================================================= */
     activeTab === 'metrics' && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '20px' } },
-      /* Core metrics stat-box grid: click a box to reveal its kkot/cw split + donut chart */
+      /* Core metrics stat-box grid: each drillable box shows its own always-visible kkot/cw
+         donut instead of expanding a shared detail row on click, since every box's donut uses
+         the same calendar legend anyway -- that legend now lives once in the section title. */
       /*#__PURE__*/React.createElement("section", { style: styles.card },
-        /*#__PURE__*/React.createElement("div", { style: styles.cardTitle }, "핵심 운영 지표", /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.72rem', fontWeight: 700, color: '#94A3B8' } }, "박스를 클릭하면 캘린더별 비율 확인")),
+        /*#__PURE__*/React.createElement("div", { style: styles.cardTitle },
+          /*#__PURE__*/React.createElement("span", null, "핵심 운영 지표"),
+          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' } },
+            dashboard.calendarStats.map((stat, i) => /*#__PURE__*/React.createElement("span", {
+              key: stat.calendar.id,
+              style: { display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.74rem', fontWeight: 700, color: '#334155' }
+            },
+              /*#__PURE__*/React.createElement("span", { style: { width: '8px', height: '8px', borderRadius: '9999px', backgroundColor: getCalendarAccentColor(stat.calendar.id, i), flexShrink: 0 } }),
+              stat.calendar.id
+            ))
+          )
+        ),
         /*#__PURE__*/React.createElement("div", { className: "admin-metrics-grid" },
           [
             { key: 'calendars', label: '총 캘린더', val: calendarsList.length, perCal: null, unit: '개' },
@@ -5137,49 +5147,24 @@ function AdminDashboard({ initialCalendars }) {
             { key: 'chatMessages', label: '총 채팅 메시지', val: allMergedMessages.length, perCal: stat => (messagesMap[stat.calendar.id] || []).length, unit: '건' },
             { key: 'polls', label: '총 투표 수', val: dashboard.totalPolls, perCal: stat => stat.pollCount, unit: '건' },
             { key: 'pollVotes', label: '총 투표자 수', val: dashboard.totalPollVotes, perCal: stat => stat.pollVoteCount, unit: '명' }
-          ].flatMap(box => {
-            const clickable = !!box.perCal;
-            const isSelected = selectedMetricKey === box.key;
-            const boxEl = /*#__PURE__*/React.createElement(clickable ? "button" : "div", {
+          ].map(box => {
+            const perCalValues = box.perCal ? dashboard.calendarStats.map((stat, i) => ({
+              id: stat.calendar.id, value: box.perCal(stat), color: getCalendarAccentColor(stat.calendar.id, i)
+            })) : [];
+            return /*#__PURE__*/React.createElement("div", {
               key: box.key,
-              type: clickable ? "button" : undefined,
-              onClick: clickable ? () => setSelectedMetricKey(isSelected ? null : box.key) : undefined,
               style: {
-                border: isSelected ? '2px solid #059669' : '1px solid #E2E8F0', borderRadius: '8px', padding: '12px',
-                backgroundColor: isSelected ? '#ECFDF5' : '#F8FAFC', textAlign: 'center', width: '100%',
-                cursor: clickable ? 'pointer' : 'default', fontFamily: 'inherit'
+                border: '1px solid #E2E8F0', borderRadius: '8px', padding: '12px',
+                backgroundColor: '#F8FAFC', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px'
               }
             },
-              /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.78rem', color: '#64748B', fontWeight: 'bold', marginBottom: '6px' } }, box.label),
+              box.perCal && /*#__PURE__*/React.createElement(DonutChart, {
+                segments: perCalValues.map(item => ({ label: item.id, value: item.value, color: item.color })),
+                size: 40, strokeWidth: 8
+              }),
+              /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.78rem', color: '#64748B', fontWeight: 'bold' } }, box.label),
               /*#__PURE__*/React.createElement("div", { style: styles.metricValue }, box.val)
             );
-            // Not selected (or not drillable): just the box, no detail row to insert after it.
-            if (!isSelected) return [boxEl];
-            // Selected: insert the drill-down panel right after this box in source order. CSS
-            // grid auto-flow places a full-span item on its own new row, so this lands directly
-            // below the row containing the clicked box instead of at the end of the whole grid.
-            const perCalValues = dashboard.calendarStats.map((stat, i) => ({
-              id: stat.calendar.id, value: box.perCal(stat), color: getCalendarAccentColor(stat.calendar.id, i)
-            }));
-            const sumVal = perCalValues.reduce((sum, item) => sum + item.value, 0);
-            const detailEl = /*#__PURE__*/React.createElement("div", {
-              key: `${box.key}_detail`,
-              style: { gridColumn: '1 / -1', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '14px', backgroundColor: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '20px', flexWrap: 'wrap' }
-            },
-              /*#__PURE__*/React.createElement(DonutChart, { segments: perCalValues.map(item => ({ label: item.id, value: item.value, color: item.color })) }),
-              /*#__PURE__*/React.createElement("div", { style: { flex: '1 1 200px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: '8px' } },
-                /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.86rem', fontWeight: 900, color: '#0F172A' } }, `${box.label} — 캘린더별 비율`),
-                perCalValues.map(item => {
-                  const pct = sumVal > 0 ? Math.round(item.value / sumVal * 100) : 0;
-                  return /*#__PURE__*/React.createElement("div", { key: item.id, style: { display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.82rem' } },
-                    /*#__PURE__*/React.createElement("span", { style: { width: '10px', height: '10px', borderRadius: '9999px', backgroundColor: item.color, flexShrink: 0 } }),
-                    /*#__PURE__*/React.createElement("span", { style: { fontWeight: 800, color: '#0F172A', minWidth: '48px' } }, item.id),
-                    /*#__PURE__*/React.createElement("span", { style: { color: '#64748B' } }, `${item.value}${box.unit} (${pct}%)`)
-                  );
-                })
-              )
-            );
-            return [boxEl, detailEl];
           })
         )
       ),
@@ -5309,19 +5294,19 @@ function AdminDashboard({ initialCalendars }) {
     activeTab === 'settings' && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '20px' } },
       /* Calendar selector row */
       /*#__PURE__*/React.createElement("section", { style: { ...styles.card, padding: '16px 20px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' } },
-        renderCalendarRadioGroup('관리 대상 캘린더 선택:', 'admin-settings-cal'),
+        renderCalendarRadioGroup('캘린더 선택', 'admin-settings-cal'),
 
         /* New Calendar creation button */
         /*#__PURE__*/React.createElement("button", {
           type: "button", className: "btn btn-primary", style: { marginLeft: 'auto' },
           onClick: handleCreateNewCalendarFromAdmin
-        }, "+ 새 캘린더 생성")
+        }, "+ 새 캘린더")
       ),
 
       selectedCal ? /*#__PURE__*/React.createElement(React.Fragment, null,
         /* Profile & Participants settings card */
         /*#__PURE__*/React.createElement("section", { style: styles.card },
-          /*#__PURE__*/React.createElement("h4", { style: styles.cardTitle }, /*#__PURE__*/React.createElement("span", { style: { display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(SettingsIcon, null), `[${selectedCalId}] 캘린더 상세 설정`)),
+          /*#__PURE__*/React.createElement("h4", { style: styles.cardTitle }, /*#__PURE__*/React.createElement("span", { style: { display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(SettingsIcon, null), "캘린더 설정")),
 
           /* Title input */
           /*#__PURE__*/React.createElement("div", { style: { marginBottom: '12px' } },
@@ -5393,7 +5378,7 @@ function AdminDashboard({ initialCalendars }) {
           /*#__PURE__*/React.createElement("button", {
             type: "button", className: "btn btn-primary", style: { width: '100%', height: '38px', justifyContent: 'center', marginTop: '20px' },
             onClick: handleSaveCalendarSettings
-          }, "캘린더 프로필 및 참여자 설정 저장")
+          }, "설정 저장")
         ),
 
         /* Polls management card */
@@ -5460,7 +5445,7 @@ function AdminDashboard({ initialCalendars }) {
 
           /* Title */
           /*#__PURE__*/React.createElement("h4", { style: styles.cardTitle },
-            /*#__PURE__*/React.createElement("span", { style: { display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(HourglassIcon, null), `[${selectedCalId}] 일정 · 투표 · 채팅 통합 복구 타임라인 로그 (${unifiedTimeline.length}건)`)
+            /*#__PURE__*/React.createElement("span", { style: { display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(HourglassIcon, null), `타임라인 복구 (${unifiedTimeline.length}건)`)
           ),
 
           /* Log list -- the page itself scrolls, so this doesn't need its own scrollbox */
