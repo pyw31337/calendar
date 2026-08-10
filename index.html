@@ -6884,7 +6884,7 @@ function App() {
     const cleanLabel = sanitizeText(expense?.label || '', 120);
     const cleanUrl = sanitizeText(expense?.url || '', 220);
     const cleanAmount = Number.isFinite(expense?.amount) && expense.amount !== 0 ? Math.round(expense.amount) : 0;
-    if (!cleanLabel || !cleanAmount) return false;
+    if ((!cleanLabel && !cleanUrl) || !cleanAmount) return false;
     const now = Date.now();
     const meeting = existingMeetings[meetingIndex];
     const existingExpenses = Array.isArray(meeting.expenses) ? meeting.expenses : [];
@@ -8967,6 +8967,16 @@ function parseTextWithLinks(text) {
   });
 }
 
+function isEmojiOnlyChatText(text) {
+  const compact = (text || '').trim();
+  if (!compact || extractFirstUrl(compact)) return false;
+  try {
+    return /^[\p{Emoji_Presentation}\p{Extended_Pictographic}\uFE0F\u200D\s]+$/u.test(compact);
+  } catch (e) {
+    return /^[\u203C-\u3299\uD83C-\uDBFF\uDC00-\uDFFF\uFE0F\u200D\s]+$/.test(compact);
+  }
+}
+
 function formatCommentDate(timestamp) {
   const date = new Date(timestamp);
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -10193,6 +10203,8 @@ function ChatRoomView({
     const p = participantsMap[msg.participantId];
     const isMe = msg.participantId === chatParticipantId;
     const timeStr = formatChatTime(msg.timestamp);
+    const msgHasImages = !!(msg.imageUrl || (Array.isArray(msg.imageUrls) && msg.imageUrls.length > 0));
+    const isEmojiOnlyMessage = isEmojiOnlyChatText(msg.text) && !msgHasImages;
     const rowId = msg.id || `msg-${idx}`;
     renderedMessages.push(/*#__PURE__*/React.createElement("div", {
       key: rowId,
@@ -10320,9 +10332,9 @@ function ChatRoomView({
         backgroundColor: 'var(--bg-card)',
         border: '1px solid var(--border-subtle)',
         borderRadius: '12px',
-        padding: '8px 12px',
-        fontSize: '0.9rem',
-        lineHeight: '1.4',
+        padding: isEmojiOnlyMessage ? '12px 16px' : '8px 12px',
+        fontSize: isEmojiOnlyMessage ? '4rem' : '0.9rem',
+        lineHeight: isEmojiOnlyMessage ? 1 : '1.4',
         color: 'var(--text-main)',
         wordBreak: 'keep-all',
         overflowWrap: 'break-word',
@@ -10363,9 +10375,9 @@ function ChatRoomView({
         backgroundColor: 'var(--bg-card)',
         border: '1px solid var(--border-subtle)',
         borderRadius: '12px',
-        padding: '8px 12px',
-        fontSize: '0.9rem',
-        lineHeight: '1.4',
+        padding: isEmojiOnlyMessage ? '12px 16px' : '8px 12px',
+        fontSize: isEmojiOnlyMessage ? '4rem' : '0.9rem',
+        lineHeight: isEmojiOnlyMessage ? 1 : '1.4',
         color: 'var(--text-main)',
         wordBreak: 'keep-all',
         overflowWrap: 'break-word',
@@ -10593,7 +10605,12 @@ function ChatRoomView({
       padding: '4px',
       color: pinnedNotices.length > 0 ? '#D97706' : '#64748B',
       display: 'flex',
-      alignItems: 'center'
+      alignItems: 'center',
+      justifyContent: 'center',
+      width: '32px',
+      height: '32px',
+      lineHeight: 0,
+      overflow: 'visible'
     }
   }, /*#__PURE__*/React.createElement("svg", {
     xmlns: "http://www.w3.org/2000/svg",
@@ -10604,7 +10621,8 @@ function ChatRoomView({
     stroke: "currentColor",
     "stroke-width": "2",
     "stroke-linecap": "round",
-    "stroke-linejoin": "round"
+    "stroke-linejoin": "round",
+    style: { display: 'block', overflow: 'visible' }
   }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }),
     /*#__PURE__*/React.createElement("path", { d: "M9 4v6l-2 4v2h10v-2l-2 -4v-6" }),
     /*#__PURE__*/React.createElement("path", { d: "M12 16l0 5" }))))), /*#__PURE__*/React.createElement("div", {
@@ -11644,7 +11662,7 @@ function DateModal({
     const isNegativeAmount = rawAmount.startsWith('-');
     const amountDigits = rawAmount.replace(/[^0-9]/g, '');
     const amountNum = amountDigits ? (isNegativeAmount ? -1 : 1) * Number(amountDigits) : NaN;
-    if (!labelText || !Number.isFinite(amountNum) || amountNum === 0) {
+    if ((!labelText && !url) || !Number.isFinite(amountNum) || amountNum === 0) {
       if (showToast) showToast('지출명목·금액 필요', 'error'); else alert('지출명목·금액 필요');
       return;
     }
@@ -12097,12 +12115,13 @@ function DateModal({
             borderRadius: 'var(--radius-md)', cursor: 'pointer'
           }
         },
-          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' } },
+          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '4px', minWidth: 0 } },
             expense.label && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.85rem', color: 'var(--text-main)' } }, expense.label),
             expense.url && /*#__PURE__*/React.createElement("span", {
               style: {
                 display: 'inline-flex', alignItems: 'center', padding: '3px 10px', borderRadius: 'var(--radius-full)',
-                fontSize: '0.72rem', fontWeight: 600, backgroundColor: '#E2E8F0', color: '#475569', cursor: 'pointer', wordBreak: 'break-all'
+                fontSize: '0.72rem', fontWeight: 600, backgroundColor: '#E2E8F0', color: '#475569', cursor: 'pointer', wordBreak: 'break-all',
+                maxWidth: '100%'
               },
               title: expense.url,
               onClick: event => { event.stopPropagation(); window.open(expense.url, '_blank', 'noopener,noreferrer'); }
