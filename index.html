@@ -342,6 +342,14 @@
       overflow-wrap: break-word;
     }
 
+    /* Whenever any layer popup (modal, bottom sheet) is mounted anywhere in the document, lock
+       the page's own scroll so a vertical drag/wheel inside the popup can't also scroll the
+       screen behind it -- applies uniformly to every current and future modal without needing
+       a scroll-lock effect wired into each one individually. */
+    body:has(.modal-overlay, .bottom-sheet-overlay) {
+      overflow: hidden;
+    }
+
     button, input, textarea, select {
       word-break: keep-all;
     }
@@ -1642,6 +1650,11 @@
     @media (max-width: 380px) {
       .admin-log-row { flex-direction: column; align-items: flex-start !important; }
       .admin-log-row > * { width: 100%; }
+    }
+
+    /* 복구 탭(모바일): JSON 백업관리 섹션을 타임라인 복구 섹션보다 위로 표시 */
+    @media (max-width: 640px) {
+      .recovery-backup-card { order: -1; }
     }
 
     /* Admin dashboard chat-log row: badges + message + timestamp/delete inline as one row on
@@ -5759,7 +5772,7 @@ function AdminDashboard({ initialCalendars }) {
     activeTab === 'recovery' && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '20px' } },
       selectedCal ? /*#__PURE__*/React.createElement(React.Fragment, null,
         /* Timeline log restore card (Combined schedules, polls and chat logs!) */
-        /*#__PURE__*/React.createElement("section", { style: styles.card },
+        /*#__PURE__*/React.createElement("section", { className: "recovery-timeline-card", style: styles.card },
           /* Warning banner */
           /*#__PURE__*/React.createElement("div", {
             style: { backgroundColor: '#FEF2F2', border: '1px solid #FCA5A5', borderRadius: '8px', padding: '12px 14px', color: '#B91C1C', fontSize: '0.8rem', lineHeight: '1.5', marginBottom: '16px' }
@@ -5835,7 +5848,7 @@ function AdminDashboard({ initialCalendars }) {
       ) : null,
 
       /* Original Backup card tools */
-      /*#__PURE__*/React.createElement("section", { style: styles.card },
+      /*#__PURE__*/React.createElement("section", { className: "recovery-backup-card", style: styles.card },
         /*#__PURE__*/React.createElement("div", { className: "admin-section-header" },
           /*#__PURE__*/React.createElement("div", { className: "summary-title" }, "JSON 백업관리"),
           /*#__PURE__*/React.createElement("div", { className: "admin-backup-actions" },
@@ -13241,78 +13254,6 @@ function AdminModal({
               }
             }, /*#__PURE__*/React.createElement(CalendarExportIcon, null), "ics 내보내기")
           )
-        ),
-
-        /* Section 4: Recurring weekly schedule template -- bulk-register one participant's
-           availability across the next several occurrences of a weekday in a single save. */
-        /*#__PURE__*/React.createElement("div", {
-          style: { border: '1px solid var(--border-subtle)', borderRadius: '12px', padding: '16px', backgroundColor: 'var(--bg-card)' }
-        },
-          /*#__PURE__*/React.createElement("h4", { style: { fontSize: '0.92rem', fontWeight: 800, color: 'var(--text-main)', margin: '0 0 14px 0', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(HourglassIcon, null), "반복 일정 등록"),
-          /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '12px' } },
-            "매주 반복되는 요일과 시작/종료 일자를 선택하면 해당 기간 내 그 요일에 한 번에 일정을 등록합니다."
-          ),
-          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px', marginBottom: '10px', flexWrap: 'wrap' } },
-            /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
-              title: "참여자 선택",
-              placeholder: "참여자 선택",
-              value: recurringParticipantId,
-              disabled: isRecurringSubmitting,
-              onSelect: setRecurringParticipantId,
-              options: participants.map(p => ({ value: p.id, label: p.name })),
-              style: { flex: '1 1 140px' }
-            }),
-            /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
-              title: "요일 선택",
-              placeholder: "요일 선택",
-              value: recurringWeekday,
-              disabled: isRecurringSubmitting,
-              onSelect: v => setRecurringWeekday(Number(v)),
-              options: ['일', '월', '화', '수', '목', '금', '토'].map((label, idx) => ({ value: idx, label: `매주 ${label}요일` })),
-              style: { flex: '1 1 100px' }
-            })
-          ),
-          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px', marginBottom: '10px', flexWrap: 'wrap' } },
-            /*#__PURE__*/React.createElement("div", { style: { flex: '1 1 140px' } },
-              /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.76rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '4px' } }, "시작일자"),
-              /*#__PURE__*/React.createElement("input", {
-                type: "date",
-                className: "form-input",
-                style: { width: '100%' },
-                value: recurringStartDate,
-                disabled: isRecurringSubmitting,
-                onChange: e => setRecurringStartDate(e.target.value)
-              })
-            ),
-            /*#__PURE__*/React.createElement("div", { style: { flex: '1 1 140px' } },
-              /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.76rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '4px' } }, "종료일자"),
-              /*#__PURE__*/React.createElement("input", {
-                type: "date",
-                className: "form-input",
-                style: { width: '100%' },
-                value: recurringEndDate,
-                disabled: isRecurringSubmitting,
-                onChange: e => setRecurringEndDate(e.target.value)
-              })
-            )
-          ),
-          /*#__PURE__*/React.createElement("input", {
-            type: "text",
-            className: "form-input",
-            style: { width: '100%', marginBottom: '10px' },
-            placeholder: "메모 (선택)",
-            maxLength: 120,
-            disabled: isRecurringSubmitting,
-            value: recurringNote,
-            onChange: e => setRecurringNote(e.target.value)
-          }),
-          /*#__PURE__*/React.createElement("button", {
-            type: "button",
-            className: "btn btn-primary",
-            style: { width: '100%', justifyContent: 'center' },
-            disabled: isRecurringSubmitting,
-            onClick: handleApplyRecurringTemplate
-          }, isRecurringSubmitting ? "등록 중..." : "일괄 등록")
         )
       ),
 
@@ -13355,12 +13296,16 @@ function AdminModal({
               // like #EFF6FF would look washed-out/too-bright against the dark theme's card bg.
               const actionBadgeBg = `${actionBadgeColor}1F`;
 
+              // On PC, this lines up on a single row exactly like the 로그 tab's rows do (reusing
+              // the same recent-log-row/left/right classes): badge/user/description on the far
+              // left, registered-at timestamp + restore button on the far right. Below 640px the
+              // shared media query stacks it into a column automatically.
               return /*#__PURE__*/React.createElement("div", {
                 key: log.id,
-                style: { display: 'flex', flexDirection: 'column', gap: '6px', border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '10px', backgroundColor: 'var(--bg-primary)' }
+                className: "recent-log-row"
               },
-                /* Line 1: action badge + user */
-                /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
+                /* Left: action badge + user + description */
+                /*#__PURE__*/React.createElement("div", { className: "recent-log-left" },
                   /* Action Badge */
                   /*#__PURE__*/React.createElement("span", {
                     style: {
@@ -13372,23 +13317,25 @@ function AdminModal({
                   /* User */
                   /*#__PURE__*/React.createElement("span", {
                     style: { backgroundColor: p.color, color: getContrastTextColor(p.color), padding: '2px 8px', borderRadius: '9999px', fontSize: '0.7rem', fontWeight: 'bold', whiteSpace: 'nowrap' }
-                  }, p.name)
+                  }, p.name),
+                  /* Description text, wrapped rather than truncated */
+                  /*#__PURE__*/React.createElement("span", {
+                    className: "recent-log-note",
+                    style: { fontSize: '0.78rem' }
+                  }, log.note || (log.date ? formatShortDateWithDayName(log.date) : ''))
                 ),
-                /* Line 2: full description text, wrapped rather than truncated */
-                /*#__PURE__*/React.createElement("span", {
-                  style: { fontSize: '0.78rem', color: '#94A3B8', wordBreak: 'break-word', overflowWrap: 'break-word' }
-                }, log.note || (log.date ? formatShortDateWithDayName(log.date) : '')),
-                /* Line 3: registered-at timestamp */
-                /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.72rem', color: '#475569', fontWeight: '500' } }, formatRegisteredAt(log.timestamp)),
-                /* Line 4: full-width rollback button */
-                /*#__PURE__*/React.createElement("button", {
-                  type: "button",
-                  onClick: () => handleRestoreToLog(log),
-                  style: {
-                    width: '100%', backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: '6px',
-                    padding: '6px 8px', fontSize: '0.72rem', fontWeight: 'bold', cursor: 'pointer', color: 'var(--accent-primary)'
-                  }
-                }, "이 시점으로 복구")
+                /* Right: registered-at timestamp + rollback button */
+                /*#__PURE__*/React.createElement("div", { className: "recent-log-right" },
+                  /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.72rem', color: '#475569', fontWeight: '500', whiteSpace: 'nowrap' } }, formatRegisteredAt(log.timestamp)),
+                  /*#__PURE__*/React.createElement("button", {
+                    type: "button",
+                    onClick: () => handleRestoreToLog(log),
+                    style: {
+                      backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: '6px',
+                      padding: '6px 10px', fontSize: '0.72rem', fontWeight: 'bold', cursor: 'pointer', color: 'var(--accent-primary)', whiteSpace: 'nowrap'
+                    }
+                  }, "이 시점으로 복구")
+                )
               );
             })
           )
@@ -13511,6 +13458,79 @@ function AdminModal({
         onSelectDate: d => setAdminSelectedDate(d),
         compact: true
       }),
+
+      /* Recurring weekly schedule template -- bulk-register one participant's availability
+         across a chosen weekday within a start/end date range in a single save. */
+      /*#__PURE__*/React.createElement("div", {
+        style: { border: '1px solid var(--border-subtle)', borderRadius: '12px', padding: '16px', backgroundColor: 'var(--bg-card)', marginTop: '16px' }
+      },
+        /*#__PURE__*/React.createElement("h4", { style: { fontSize: '0.92rem', fontWeight: 800, color: 'var(--text-main)', margin: '0 0 14px 0', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(HourglassIcon, null), "반복 일정 등록"),
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '12px' } },
+          "매주 반복되는 요일과 시작/종료 일자를 선택하면 해당 기간 내 그 요일에 한 번에 일정을 등록합니다."
+        ),
+        /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px', marginBottom: '10px', flexWrap: 'wrap' } },
+          /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
+            title: "참여자 선택",
+            placeholder: "참여자 선택",
+            value: recurringParticipantId,
+            disabled: isRecurringSubmitting,
+            onSelect: setRecurringParticipantId,
+            options: participants.map(p => ({ value: p.id, label: p.name })),
+            style: { flex: '1 1 140px' }
+          }),
+          /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
+            title: "요일 선택",
+            placeholder: "요일 선택",
+            value: recurringWeekday,
+            disabled: isRecurringSubmitting,
+            onSelect: v => setRecurringWeekday(Number(v)),
+            options: ['일', '월', '화', '수', '목', '금', '토'].map((label, idx) => ({ value: idx, label: `매주 ${label}요일` })),
+            style: { flex: '1 1 100px' }
+          })
+        ),
+        /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px', marginBottom: '10px', flexWrap: 'wrap' } },
+          /*#__PURE__*/React.createElement("div", { style: { flex: '1 1 140px' } },
+            /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.76rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '4px' } }, "시작일자"),
+            /*#__PURE__*/React.createElement("input", {
+              type: "date",
+              className: "form-input",
+              style: { width: '100%' },
+              value: recurringStartDate,
+              disabled: isRecurringSubmitting,
+              onChange: e => setRecurringStartDate(e.target.value)
+            })
+          ),
+          /*#__PURE__*/React.createElement("div", { style: { flex: '1 1 140px' } },
+            /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.76rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '4px' } }, "종료일자"),
+            /*#__PURE__*/React.createElement("input", {
+              type: "date",
+              className: "form-input",
+              style: { width: '100%' },
+              value: recurringEndDate,
+              disabled: isRecurringSubmitting,
+              onChange: e => setRecurringEndDate(e.target.value)
+            })
+          )
+        ),
+        /*#__PURE__*/React.createElement("input", {
+          type: "text",
+          className: "form-input",
+          style: { width: '100%', marginBottom: '10px' },
+          placeholder: "메모 (선택)",
+          maxLength: 120,
+          disabled: isRecurringSubmitting,
+          value: recurringNote,
+          onChange: e => setRecurringNote(e.target.value)
+        }),
+        /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          className: "btn btn-primary",
+          style: { width: '100%', justifyContent: 'center' },
+          disabled: isRecurringSubmitting,
+          onClick: handleApplyRecurringTemplate
+        }, isRecurringSubmitting ? "등록 중..." : "일괄 등록")
+      ),
+
       adminSelectedDate && /*#__PURE__*/React.createElement(DateModal, {
         dateStr: adminSelectedDate,
         calendar: calendar,
