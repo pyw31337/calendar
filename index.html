@@ -11205,10 +11205,6 @@ function DateModal({
     setEditingExpenseId(null);
   }, [calendar?.id, dateStr]);
   const expenseTotal = expenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
-  const settlementAttendeeCount = uniqueActiveParts.size || 0;
-  const settlementPerPerson = settlementAttendeeCount > 0 && expenseTotal > 0
-    ? Math.ceil(expenseTotal / settlementAttendeeCount)
-    : null;
   const handleSaveExpenseClick = async () => {
     if (isSavingExpense || !onSaveExpense) return;
     const rawLabel = expenseLabelInput.trim();
@@ -11567,9 +11563,9 @@ function DateModal({
         });
       }
     }, "삭제"));
-  })))), isConfirmed && !adminMode && /*#__PURE__*/React.createElement("div", {
+  }))), isConfirmed && !adminMode && /*#__PURE__*/React.createElement("div", {
     style: {
-      margin: '0 20px 12px', padding: '12px 14px', border: '1px solid var(--border-subtle)',
+      padding: '12px 14px', border: '1px solid var(--border-subtle)',
       borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-primary)', display: 'flex', flexDirection: 'column', gap: '10px'
     }
   },
@@ -11590,7 +11586,7 @@ function DateModal({
           type: "text",
           inputMode: "numeric",
           className: "form-input",
-          style: { flex: 1 },
+          style: { flex: '1 1 0%', minWidth: 0 },
           placeholder: "지출금액 (원)",
           value: expenseAmountInput,
           disabled: isSavingExpense,
@@ -11602,25 +11598,24 @@ function DateModal({
         editingExpenseId && /*#__PURE__*/React.createElement("button", {
           type: "button",
           className: "btn btn-secondary",
+          style: { flexShrink: 0 },
           disabled: isSavingExpense,
           onClick: () => { setEditingExpenseId(null); setExpenseLabelInput(''); setExpenseAmountInput(''); }
         }, "취소"),
         /*#__PURE__*/React.createElement("button", {
           type: "button",
           className: "btn btn-secondary",
+          style: { flexShrink: 0 },
           disabled: isSavingExpense,
           onClick: handleSaveExpenseClick
         }, isSavingExpense ? "저장 중..." : editingExpenseId ? "수정" : "추가")
       )
     ),
     /*#__PURE__*/React.createElement("div", {
-      style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '4px', borderTop: '1px solid var(--border-subtle)' }
+      style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderTop: '1px solid var(--border-subtle)' }
     },
       /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-main)' } }, "총 합계"),
       /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-main)' } }, `${expenseTotal.toLocaleString()}원`)
-    ),
-    settlementPerPerson !== null && /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.8rem', color: 'var(--text-muted)' } },
-      `참석 ${settlementAttendeeCount}명 · 1인당 약 ${settlementPerPerson.toLocaleString()}원`
     ),
     expenses.length > 0 && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
       expenses.map(expense => /*#__PURE__*/React.createElement("div", {
@@ -11656,7 +11651,7 @@ function DateModal({
         )
       ))
     )
-  ), !adminMode && /*#__PURE__*/React.createElement("div", {
+  )), !adminMode && /*#__PURE__*/React.createElement("div", {
     className: "modal-footer",
     style: {
       display: 'flex',
