@@ -105,6 +105,13 @@ runAppScript(productionContext, `
   if (removeFirstUrl('추사고택 naver.me/54LbfTLU') !== '추사고택') {
     throw new Error('bare URL removal failed');
   }
+  const markdownExpense = '추사고택 (도은네 다자녀 혜택 20%) [https://camping.yesan.go.kr/stay/sub02_01.do](https://camping.yesan.go.kr/stay/sub02_01.do)';
+  if (extractFirstUrl(markdownExpense) !== 'https://camping.yesan.go.kr/stay/sub02_01.do') {
+    throw new Error('markdown URL extraction failed');
+  }
+  if (removeFirstUrl(markdownExpense) !== '추사고택 (도은네 다자녀 혜택 20%)') {
+    throw new Error('markdown URL removal failed');
+  }
   const registeredText = formatRegisteredAt(new Date(2026, 7, 4, 4, 39, 12).getTime());
   if (registeredText !== '26.08.04 (화) 04:39:12') {
     throw new Error('registered timestamp formatter failed');
