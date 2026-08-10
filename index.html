@@ -1236,7 +1236,7 @@
       padding: 10px 12px;
       border: 1px solid var(--border-subtle);
       border-radius: var(--radius-md);
-      background: #FFFFFF;
+      background: var(--bg-primary);
     }
     .recent-log-left {
       display: inline-flex;
@@ -4255,26 +4255,52 @@ function getCalendarAccentColor(calOrId, indexInList) {
 
 /* Small dependency-free donut chart: N segments as SVG stroke-dasharray arcs on a ring. */
 function DonutChart({ segments, size = 84, strokeWidth = 14 }) {
+  const [activeIndex, setActiveIndex] = React.useState(null);
   const total = segments.reduce((sum, seg) => sum + seg.value, 0);
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
+  const positiveSegments = segments.filter(seg => seg.value > 0);
+  const activeSeg = activeIndex != null ? positiveSegments[activeIndex] : null;
   let dashOffsetAcc = 0;
-  return /*#__PURE__*/React.createElement("svg", { width: size, height: size, viewBox: `0 0 ${size} ${size}`, style: { flexShrink: 0 } },
-    total === 0 ?
-      /*#__PURE__*/React.createElement("circle", { cx: size / 2, cy: size / 2, r: radius, fill: "none", stroke: "#E2E8F0", strokeWidth }) :
-      segments.filter(seg => seg.value > 0).map(seg => {
-        const dash = seg.value / total * circumference;
-        const el = /*#__PURE__*/React.createElement("circle", {
-          key: seg.label, cx: size / 2, cy: size / 2, r: radius, fill: "none",
-          stroke: seg.color, strokeWidth,
-          strokeDasharray: `${dash} ${circumference - dash}`,
-          strokeDashoffset: -dashOffsetAcc,
-          transform: `rotate(-90 ${size / 2} ${size / 2})`,
-          strokeLinecap: segments.filter(s => s.value > 0).length > 1 ? 'butt' : 'round'
-        });
-        dashOffsetAcc += dash;
-        return el;
-      })
+  return /*#__PURE__*/React.createElement("div", { style: { position: 'relative', display: 'inline-flex', flexShrink: 0 } },
+    /*#__PURE__*/React.createElement("svg", {
+      width: size, height: size, viewBox: `0 0 ${size} ${size}`, style: { flexShrink: 0 },
+      onMouseLeave: () => setActiveIndex(null)
+    },
+      total === 0 ?
+        /*#__PURE__*/React.createElement("circle", { cx: size / 2, cy: size / 2, r: radius, fill: "none", stroke: "#E2E8F0", strokeWidth }) :
+        positiveSegments.map((seg, idx) => {
+          const dash = seg.value / total * circumference;
+          const el = /*#__PURE__*/React.createElement("circle", {
+            key: seg.label, cx: size / 2, cy: size / 2, r: radius, fill: "none",
+            stroke: seg.color, strokeWidth,
+            strokeDasharray: `${dash} ${circumference - dash}`,
+            strokeDashoffset: -dashOffsetAcc,
+            transform: `rotate(-90 ${size / 2} ${size / 2})`,
+            strokeLinecap: positiveSegments.length > 1 ? 'butt' : 'round',
+            style: {
+              cursor: 'pointer',
+              opacity: activeIndex == null || activeIndex === idx ? 1 : 0.4,
+              transition: 'opacity 0.12s ease'
+            },
+            onMouseEnter: () => setActiveIndex(idx),
+            onClick: event => {
+              event.stopPropagation();
+              setActiveIndex(prev => prev === idx ? null : idx);
+            }
+          });
+          dashOffsetAcc += dash;
+          return el;
+        })
+    ),
+    activeSeg && /*#__PURE__*/React.createElement("div", {
+      style: {
+        position: 'absolute', bottom: `calc(100% + 6px)`, left: '50%', transform: 'translateX(-50%)',
+        backgroundColor: 'rgba(15, 23, 42, 0.94)', color: '#FFFFFF', borderRadius: '6px',
+        padding: '4px 8px', fontSize: '0.66rem', fontWeight: 700, whiteSpace: 'nowrap',
+        pointerEvents: 'none', zIndex: 20, boxShadow: '0 2px 8px rgba(0,0,0,0.25)'
+      }
+    }, `${activeSeg.label} · ${activeSeg.value}${activeSeg.unit || '건'} (${total > 0 ? Math.round(activeSeg.value / total * 100) : 0}%)`)
   );
 }
 
@@ -5156,7 +5182,7 @@ function AdminDashboard({ initialCalendars }) {
             { key: 'pollVotes', label: '총 투표자 수', val: dashboard.totalPollVotes, perCal: stat => stat.pollVoteCount, unit: '명' }
           ].map(box => {
             const perCalValues = box.perCal ? dashboard.calendarStats.map((stat, i) => ({
-              id: stat.calendar.id, value: box.perCal(stat), color: getCalendarAccentColor(stat.calendar, i)
+              id: stat.calendar.id, title: stat.calendar.title || stat.calendar.id, value: box.perCal(stat), color: getCalendarAccentColor(stat.calendar, i)
             })) : [];
             return /*#__PURE__*/React.createElement("div", {
               key: box.key,
@@ -5167,7 +5193,7 @@ function AdminDashboard({ initialCalendars }) {
               }
             },
               box.perCal && /*#__PURE__*/React.createElement(DonutChart, {
-                segments: perCalValues.map(item => ({ label: item.id, value: item.value, color: item.color })),
+                segments: perCalValues.map(item => ({ label: item.title, value: item.value, color: item.color, unit: box.unit })),
                 size: 40, strokeWidth: 8
               }),
               /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.78rem', color: '#64748B', fontWeight: 'bold' } }, box.label),
@@ -5282,7 +5308,7 @@ function AdminDashboard({ initialCalendars }) {
 
       /* Quota Limit rules */
       /*#__PURE__*/React.createElement("section", { style: styles.card },
-        /*#__PURE__*/React.createElement("div", { style: styles.cardTitle }, "데이터 사용량 및 품질 규칙"),
+        /*#__PURE__*/React.createElement("div", { style: styles.cardTitle }, "데이터 사용량"),
         /*#__PURE__*/React.createElement("div", { className: "admin-quota-grid" },
           dashboard.serviceUsage.map(item => /*#__PURE__*/React.createElement("div", { key: item.label, className: "admin-quota-card" },
             /*#__PURE__*/React.createElement("div", { className: "admin-quota-label" }, item.label),
@@ -5306,7 +5332,7 @@ function AdminDashboard({ initialCalendars }) {
 
         /* New Calendar creation button */
         /*#__PURE__*/React.createElement("button", {
-          type: "button", className: "btn btn-primary", style: { marginLeft: 'auto' },
+          type: "button", className: "btn btn-poll-create", style: { marginLeft: 'auto' },
           onClick: handleCreateNewCalendarFromAdmin
         }, "+ 새 캘린더")
       ),
@@ -5403,7 +5429,7 @@ function AdminDashboard({ initialCalendars }) {
           /*#__PURE__*/React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '14px', borderBottom: '1px solid #E2E8F0', paddingBottom: '8px' } },
             /*#__PURE__*/React.createElement("h4", { style: { fontSize: '0.96rem', fontWeight: '900', color: '#0F172A', margin: 0, display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' } }, /*#__PURE__*/React.createElement(PollSectionIcon, null), "투표 설정"),
             /*#__PURE__*/React.createElement("button", {
-              type: "button", className: "btn btn-primary",
+              type: "button", className: "btn btn-poll-create",
               onClick: () => { setEditingPoll(null); setEditingPollCalId(selectedCalId); setIsPollModalOpen(true); }
             }, "+ 새 투표")
           ),
@@ -5526,7 +5552,7 @@ function AdminDashboard({ initialCalendars }) {
       /* Original Backup card tools */
       /*#__PURE__*/React.createElement("section", { style: styles.card },
         /*#__PURE__*/React.createElement("div", { className: "admin-section-header" },
-          /*#__PURE__*/React.createElement("div", { className: "summary-title" }, "JSON 백업 파일 관리"),
+          /*#__PURE__*/React.createElement("div", { className: "summary-title" }, "JSON 백업관리"),
           /*#__PURE__*/React.createElement("div", { className: "admin-backup-actions" },
             /*#__PURE__*/React.createElement("button", { className: "btn btn-secondary", onClick: () => handleDownloadBackup('') }, "전체 백업 다운로드"),
             /*#__PURE__*/React.createElement("button", { className: isRestoreMode ? "btn btn-danger" : "btn btn-secondary", onClick: handleImportClick },
@@ -11517,7 +11543,7 @@ function DateModal({
       marginBottom: '10px',
       color: '#475569'
     }
-  }, "등록된 참석 가능 멤버 (", dateEntries.length, "/", totalPartCount, "명)"), /*#__PURE__*/React.createElement("div", {
+  }, "참석가능 (", dateEntries.length, "/", totalPartCount, "명)"), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       flexDirection: 'column',
@@ -11603,19 +11629,14 @@ function DateModal({
         });
       }
     }, "삭제"));
-  }))), isConfirmed && !adminMode && /*#__PURE__*/React.createElement("div", {
-    style: {
-      padding: '12px 14px', border: '1px solid var(--border-subtle)',
-      borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-primary)', display: 'flex', flexDirection: 'column', gap: '10px'
-    }
-  },
+  }))), isConfirmed && !adminMode && /*#__PURE__*/React.createElement("div", null,
     /*#__PURE__*/React.createElement("div", {
       onClick: () => setIsSettlementCollapsed(prev => !prev),
-      style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', cursor: 'pointer' }
+      style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', cursor: 'pointer', marginBottom: isSettlementCollapsed ? 0 : '10px' }
     },
-      /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-main)' } }, "회비 정산"),
-      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '4px' } },
-        isSettlementCollapsed && expenseTotal > 0 && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-main)' } }, `${expenseTotal.toLocaleString()}원`),
+      /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.85rem', fontWeight: 800, color: '#475569' } }, "회비 정산"),
+      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
+        expenseTotal > 0 && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-main)' } }, `${expenseTotal.toLocaleString()}원`),
         /*#__PURE__*/React.createElement(SectionToggleButton, {
           collapsed: isSettlementCollapsed,
           onToggle: () => setIsSettlementCollapsed(prev => !prev),
@@ -11638,7 +11659,6 @@ function DateModal({
         /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px' } },
           /*#__PURE__*/React.createElement("input", {
             type: "text",
-            inputMode: "numeric",
             className: "form-input",
             style: { flex: '1 1 0%', minWidth: 0 },
             placeholder: "지출금액 (원)",
@@ -11668,13 +11688,12 @@ function DateModal({
           }, isSavingExpense ? "저장 중..." : editingExpenseId ? "수정" : "추가")
         )
       ),
-      /*#__PURE__*/React.createElement("div", {
-        style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderTop: '1px solid var(--border-subtle)' }
+      expenses.length > 0 && /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '10px', padding: '10px',
+          border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-primary)'
+        }
       },
-        /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-main)' } }, "총 합계"),
-        /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-main)' } }, `${expenseTotal.toLocaleString()}원`)
-      ),
-      expenses.length > 0 && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
         expenses.map(expense => /*#__PURE__*/React.createElement("div", {
           key: expense.id,
           onClick: () => handleExpenseItemClick(expense),
@@ -12564,15 +12583,14 @@ function AdminModal({
                 poll_create: '투표 생성', poll_vote: '투표 진행', poll_cancel: '투표 취소'
               }[log.action] || '활동';
               
-              const actionBadgeBg = {
-                create: '#ECFDF5', update: '#EFF6FF', delete: '#FEF2F2',
-                poll_create: '#F5F3FF', poll_vote: '#FDF2F8', poll_cancel: '#FFF7ED'
-              }[log.action] || '#F8FAFC';
-
               const actionBadgeColor = {
                 create: '#10B981', update: '#2563EB', delete: '#EF4444',
                 poll_create: '#8B5CF6', poll_vote: '#EC4899', poll_cancel: '#F97316'
               }[log.action] || '#64748B';
+              // A translucent tint of the badge's own color (instead of a fixed pastel hex)
+              // stays readable on both light and dark modal backgrounds -- a solid light pastel
+              // like #EFF6FF would look washed-out/too-bright against the dark theme's card bg.
+              const actionBadgeBg = `${actionBadgeColor}1F`;
 
               return /*#__PURE__*/React.createElement("div", {
                 key: log.id,
@@ -12604,8 +12622,8 @@ function AdminModal({
                   type: "button",
                   onClick: () => handleRestoreToLog(log),
                   style: {
-                    width: '100%', backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '6px',
-                    padding: '6px 8px', fontSize: '0.72rem', fontWeight: 'bold', cursor: 'pointer', color: '#2563EB'
+                    width: '100%', backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: '6px',
+                    padding: '6px 8px', fontSize: '0.72rem', fontWeight: 'bold', cursor: 'pointer', color: 'var(--accent-primary)'
                   }
                 }, "이 시점으로 복구")
               );
@@ -12668,9 +12686,9 @@ function AdminModal({
                 display: 'flex',
                 justifyContent: 'space-between',
                 padding: '8px 12px',
-                backgroundColor: '#F8FAFC',
+                backgroundColor: 'var(--bg-primary)',
                 borderRadius: '8px',
-                border: '1px solid #E2E8F0'
+                border: '1px solid var(--border-subtle)'
               }
             }, /*#__PURE__*/React.createElement("div", {
               className: "recent-log-left",
@@ -13646,6 +13664,7 @@ function PollModal({ calendar, poll, onSave, onClose, showToast }) {
     const tzOffsetMs = d.getTimezoneOffset() * 60000;
     return new Date(d.getTime() - tzOffsetMs).toISOString().slice(0, 16);
   });
+  const [isDeadlineCollapsed, setIsDeadlineCollapsed] = React.useState(true);
   const [newOption, setNewOption] = React.useState('');
   const [options, setOptions] = React.useState(getActivePollOptions(poll).map(option => ({
     ...option,
@@ -13839,9 +13858,16 @@ function PollModal({ calendar, poll, onSave, onClose, showToast }) {
     disabled: isSubmitting,
     maxLength: 160,
     onChange: e => setDescription(e.target.value)
-  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
-    style: { display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px', color: '#64748B' }
-  }, "\uB9C8\uAC10\uC2DC\uD55C (\uC120\uD0DD, \uBE44\uC6CC\uB450\uBA74 \uACC4\uC18D \uC9C4\uD589)"), /*#__PURE__*/React.createElement("input", {
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    onClick: () => setIsDeadlineCollapsed(prev => !prev),
+    style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: isDeadlineCollapsed ? 0 : '6px', cursor: 'pointer' }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: { fontSize: '0.85rem', fontWeight: 700, color: '#64748B', cursor: 'pointer' }
+  }, "\uB9C8\uAC10\uC2DC\uD55C (\uC120\uD0DD)"), /*#__PURE__*/React.createElement(SectionToggleButton, {
+    collapsed: isDeadlineCollapsed,
+    onToggle: () => setIsDeadlineCollapsed(prev => !prev),
+    label: isDeadlineCollapsed ? "\uB9C8\uAC10\uC2DC\uD55C \uD3BC\uCE58\uAE30" : "\uB9C8\uAC10\uC2DC\uD55C \uC811\uAE30"
+  })), !isDeadlineCollapsed && /*#__PURE__*/React.createElement("input", {
     type: "datetime-local",
     className: "form-input",
     style: { width: '100%' },
@@ -14260,7 +14286,6 @@ function SummaryList({
     onKeyDown: event => handleSectionTitleKeyDown(event, 'confirmed'),
     style: {
       color: '#7C3AED',
-      marginTop: '-10px',
       marginBottom: '12px'
     }
   }, /*#__PURE__*/React.createElement("svg", {
