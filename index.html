@@ -11352,6 +11352,7 @@ function DateModal({
   const [editingExpenseId, setEditingExpenseId] = React.useState(null);
   const [isSavingExpense, setIsSavingExpense] = React.useState(false);
   const [isSettlementCollapsed, setIsSettlementCollapsed] = React.useState(true);
+  const [isAttendeesCollapsed, setIsAttendeesCollapsed] = React.useState(true);
   React.useEffect(() => {
     setExpenseLabelInput('');
     setExpenseAmountInput('');
@@ -11434,7 +11435,8 @@ function DateModal({
       justifyContent: 'space-between',
       alignItems: 'center',
       flexWrap: 'nowrap',
-      overflow: 'hidden'
+      overflow: 'hidden',
+      backgroundColor: isConfirmed ? '#F3E8FF' : isAllAvailable ? '#D1FAE5' : undefined
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -11469,9 +11471,9 @@ function DateModal({
   }, holidayLabelText), isConfirmed ? /*#__PURE__*/React.createElement("span", {
     className: "status-badge",
     style: {
-      backgroundColor: '#F3E8FF',
-      color: '#6B21A8',
-      border: '1px solid #E9D5FF',
+      backgroundColor: '#7C3AED',
+      color: '#FFFFFF',
+      border: 'none',
       padding: '2px 6px',
       borderRadius: '4px',
       fontSize: '0.75rem',
@@ -11482,9 +11484,9 @@ function DateModal({
   }, "확정") : isAllAvailable ? /*#__PURE__*/React.createElement("span", {
     className: "status-badge",
     style: {
-      backgroundColor: '#D1FAE5',
-      color: '#065F46',
-      border: '1px solid #A7F3D0',
+      backgroundColor: '#10B981',
+      color: '#FFFFFF',
+      border: 'none',
       padding: '2px 6px',
       borderRadius: '4px',
       fontSize: '0.75rem',
@@ -11627,13 +11629,37 @@ function DateModal({
       marginTop: '6px'
     }
   }, /*#__PURE__*/React.createElement("div", {
+    onClick: () => setIsAttendeesCollapsed(prev => !prev),
     style: {
-      fontSize: '0.85rem',
-      fontWeight: 800,
-      marginBottom: '10px',
-      color: '#475569'
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', cursor: 'pointer',
+      marginBottom: isAttendeesCollapsed ? 0 : '10px'
     }
-  }, "참석가능 (", dateEntries.length, "/", totalPartCount, "명)"), /*#__PURE__*/React.createElement("div", {
+  },
+    /*#__PURE__*/React.createElement("span", {
+      style: { fontSize: '0.85rem', fontWeight: 800, color: '#475569' }
+    }, "참석가능"),
+    /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
+      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center' } },
+        dateEntries.map(entry => {
+          const p = activeParticipants.find(part => part.id === entry.participantId);
+          if (!p) return null;
+          return /*#__PURE__*/React.createElement("span", {
+            key: entry.id || p.id,
+            title: p.name,
+            style: {
+              width: '18px', height: '18px', borderRadius: '50%', backgroundColor: p.color,
+              border: '1.5px solid var(--bg-card)', marginLeft: '-6px', flexShrink: 0
+            }
+          });
+        })
+      ),
+      /*#__PURE__*/React.createElement(SectionToggleButton, {
+        collapsed: isAttendeesCollapsed,
+        onToggle: () => setIsAttendeesCollapsed(prev => !prev),
+        label: isAttendeesCollapsed ? "참석가능 펼치기" : "참석가능 접기"
+      })
+    )
+  ), !isAttendeesCollapsed && /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       flexDirection: 'column',
@@ -11824,7 +11850,8 @@ function DateModal({
       display: 'flex',
       justifyContent: 'space-between',
       alignItems: 'center',
-      gap: '8px'
+      gap: '8px',
+      backgroundColor: isConfirmed ? '#F3E8FF' : isAllAvailable ? '#D1FAE5' : undefined
     }
   }, /*#__PURE__*/React.createElement("button", {
     type: "button",
