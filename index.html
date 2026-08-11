@@ -350,6 +350,11 @@
       overflow: hidden;
     }
 
+    body:has(.admin-scope),
+    body:has(.admin-login-gate) {
+      padding: 24px 0px;
+    }
+
     @media (max-width: 720px) {
       body:has(.admin-scope),
       body:has(.admin-login-gate) {
@@ -5668,7 +5673,7 @@ function AdminDashboard({ initialCalendars }) {
       fontFamily: 'Inter, sans-serif'
     },
     content: {
-      padding: '20px 16px 24px'
+      padding: '10px 0px'
     },
     topBar: {
       backgroundColor: '#FFFFFF',
@@ -5728,7 +5733,7 @@ function AdminDashboard({ initialCalendars }) {
       border: 'none',
       borderRadius: 0,
       padding: '14px 24px 24px',
-      boxShadow: 'none'
+      boxShadow: '0px 4px 4px rgb(0 0 0 / 10%)'
     },
     cardTitle: {
       fontSize: '0.96rem',
