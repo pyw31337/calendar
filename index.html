@@ -1897,6 +1897,53 @@
       gap: 8px;
       min-height: 128px;
     }
+    .settlement-metric-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+    .settlement-metric-card {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-width: 0;
+      padding: 12px 10px;
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      background-color: var(--bg-card);
+    }
+    .settlement-metric-card-label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+      font-size: 0.75rem;
+      font-weight: 800;
+      color: #64748B;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .settlement-metric-card-value {
+      font-size: 1.05rem;
+      font-weight: 950;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    @media (max-width: 480px) {
+      .settlement-metric-card {
+        padding: 10px 6px;
+        gap: 4px;
+      }
+      .settlement-metric-card-label {
+        font-size: 0.6rem;
+        gap: 3px;
+      }
+      .settlement-metric-card-value {
+        font-size: 0.78rem;
+      }
+    }
     @media (max-width: 720px) {
       .admin-header {
         display: grid !important;
@@ -2436,6 +2483,13 @@ function getExpenseCategoryIcon(category) {
 function getExpenseCategoryLabel(category) {
   const name = sanitizeText(category?.name || '기타', 24) || '기타';
   return `${getExpenseCategoryIcon(category)}\u00A0\u00A0${name}`;
+}
+// A pasted expense label like "19\uC2DC [\uC800\uB141\uC2DD\uC0AC] \uC560\uC290\uB9AC ..." carries a leading time-of-day note
+// meant for display as its own badge, not as part of the item description line.
+function extractExpenseTimePrefix(label) {
+  const text = (label || '').trim();
+  const match = /^(\d{1,2}\uC2DC)\s+(.*)$/s.exec(text);
+  return match ? { time: match[1], rest: match[2].trim() } : { time: '', rest: text };
 }
 const URL_PARAMS = new URLSearchParams(window.location.search);
 const ENABLE_FIRESTORE_SYNC = true; // Firestore is the only production source of truth.
@@ -7646,7 +7700,6 @@ function App() {
   const [isShareOpen, setIsShareOpen] = React.useState(false);
   const [isChatShareOpen, setIsChatShareOpen] = React.useState(false);
   const [isMainSideMenuOpen, setIsMainSideMenuOpen] = React.useState(false);
-  const [isSettlementOpen, setIsSettlementOpen] = React.useState(false);
   const [isPollModalOpen, setIsPollModalOpen] = React.useState(false);
   const [editingPoll, setEditingPoll] = React.useState(null);
   const [voteTarget, setVoteTarget] = React.useState(null);
@@ -7792,10 +7845,10 @@ function App() {
       requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: 'auto' }));
     }
     const params = new URLSearchParams(window.location.search);
-    if (view === 'chat') {
-      params.set('view', 'chat');
-    } else {
+    if (view === 'calendar') {
       params.delete('view');
+    } else {
+      params.set('view', view);
     }
     const newUrl = `${window.location.pathname}?${params.toString()}`;
     window.history.pushState({}, '', newUrl);
@@ -8902,6 +8955,13 @@ function App() {
     }, toast.message), operationProgress && !chatUploadProgress && /*#__PURE__*/React.createElement(OperationProgressOverlay, operationProgress), chatUploadProgress && /*#__PURE__*/React.createElement(ImageUploadOverlay, chatUploadProgress));
   }
 
+  if (activeView === 'settlement') {
+    return /*#__PURE__*/React.createElement(SettlementSummaryModal, {
+      calendar: activeCal,
+      onBack: () => changeView('calendar')
+    });
+  }
+
   const mainMenuPollCount = getCalendarPolls(activeCal).filter(poll => !isPollClosed(poll)).length;
   const mainMenuChatCount = chatMessages.length;
   const mainMenuChatLatestTimestamp = mainMenuChatCount > 0 ? chatMessages[mainMenuChatCount - 1].timestamp : 0;
@@ -8984,7 +9044,7 @@ function App() {
     type: "button",
     className: "main-menu-item",
     onClick: () => {
-      if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 정산 정보를 확인해 주세요.')) setIsSettlementOpen(true);
+      if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 정산 정보를 확인해 주세요.')) changeView('settlement');
     }
   }, /*#__PURE__*/React.createElement("span", { className: "main-menu-icon" }, /*#__PURE__*/React.createElement(WalletIcon, { size: 16 })), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-full" }, "정산하기"), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-short" }, "정산"))))), isMainSideMenuOpen && /*#__PURE__*/React.createElement(MainSideMenu, {
     calendar: activeCal,
@@ -9201,9 +9261,6 @@ function App() {
     calendar: activeCal,
     showToast: showToast,
     onClose: () => setIsShareOpen(false)
-  }), isSettlementOpen && /*#__PURE__*/React.createElement(SettlementSummaryModal, {
-    calendar: activeCal,
-    onClose: () => setIsSettlementOpen(false)
   }), isChatShareOpen && /*#__PURE__*/React.createElement(ShareModal, {
     calendar: activeCal,
     shareType: "chat",
@@ -13579,6 +13636,11 @@ function DateModal({
 	  const [expenseLabelInput, setExpenseLabelInput] = React.useState('');
 	  const [expenseAmountInput, setExpenseAmountInput] = React.useState('');
 	  const [expenseCategoryInput, setExpenseCategoryInput] = React.useState(() => getExpenseCategories(calendar)[0]?.id || 'etc');
+	  // Stored amount sign is inverted from how it reads here: a saved NEGATIVE amount is an
+	  // income entry (rendered elsewhere with a "+" and green), a saved POSITIVE amount is an
+	  // expense (rendered with "-" and red) -- this toggle just drives that sign automatically
+	  // instead of requiring the user to type a leading "-" themselves.
+	  const [expenseIsIncome, setExpenseIsIncome] = React.useState(false);
 	  const [editingExpenseId, setEditingExpenseId] = React.useState(null);
   const [isSavingExpense, setIsSavingExpense] = React.useState(false);
   const [isSettlementCollapsed, setIsSettlementCollapsed] = React.useState(true);
@@ -13592,6 +13654,7 @@ function DateModal({
 	    setExpenseLabelInput('');
 	    setExpenseAmountInput('');
 	    setExpenseCategoryInput(getExpenseCategories(calendar)[0]?.id || 'etc');
+	    setExpenseIsIncome(false);
 	    setEditingExpenseId(null);
     setAttendeesView('preview');
     setDraggingExpenseId('');
@@ -13610,17 +13673,15 @@ function DateModal({
     const rawLabel = expenseLabelInput.trim();
     const url = extractFirstUrl(rawLabel);
     const labelText = sanitizeText(url ? removeFirstUrl(rawLabel) : rawLabel, 120);
-    const rawAmount = expenseAmountInput.trim();
-    const isNegativeAmount = rawAmount.startsWith('-');
-    const amountDigits = rawAmount.replace(/[^0-9]/g, '');
-    const amountNum = amountDigits ? (isNegativeAmount ? -1 : 1) * Number(amountDigits) : NaN;
+    const amountDigits = expenseAmountInput.replace(/[^0-9]/g, '');
+    const amountNum = amountDigits ? (expenseIsIncome ? -1 : 1) * Number(amountDigits) : NaN;
     if ((!labelText && !url) || !Number.isFinite(amountNum) || amountNum === 0) {
-      if (showToast) showToast('지출명목·금액 필요', 'error'); else alert('지출명목·금액 필요');
+      if (showToast) showToast(expenseIsIncome ? '수입명목·금액 필요' : '지출명목·금액 필요', 'error'); else alert('명목·금액 필요');
       return;
     }
     setIsSavingExpense(true);
     try {
-	      await Promise.resolve(onSaveExpense(dateStr, { id: editingExpenseId, label: labelText, url, categoryId: expenseCategoryInput, amount: amountNum }));
+	      await Promise.resolve(onSaveExpense(dateStr, { id: editingExpenseId, label: labelText, url, categoryId: expenseIsIncome ? 'etc' : expenseCategoryInput, amount: amountNum }));
     } catch (err) {
       console.error('Expense save failed:', err);
     }
@@ -13628,6 +13689,7 @@ function DateModal({
 	    setExpenseLabelInput('');
 	    setExpenseAmountInput('');
 	    setExpenseCategoryInput(expenseCategories[0]?.id || 'etc');
+	    setExpenseIsIncome(false);
 	    setEditingExpenseId(null);
 	  };
   const handleExpenseItemClick = (expense) => {
@@ -13635,9 +13697,11 @@ function DateModal({
     setEditingExpenseId(expense.id);
     const displayLabel = getExpenseLabel(expense);
     const displayUrl = getExpenseUrl(expense);
+    const isIncome = Number(expense.amount) < 0;
 	    setExpenseLabelInput([displayLabel, displayUrl].filter(Boolean).join(' '));
-	    setExpenseAmountInput(expense.amount < 0 ? `-${Math.abs(expense.amount).toLocaleString()}` : Number(expense.amount).toLocaleString());
+	    setExpenseAmountInput(`${isIncome ? '+' : '-'}${Math.abs(expense.amount).toLocaleString()}`);
 	    setExpenseCategoryInput(getExpenseCategory(calendar, expense.categoryId).id);
+	    setExpenseIsIncome(isIncome);
 	  };
   const handleDeleteExpenseClick = (event, expenseId) => {
     event.stopPropagation();
@@ -13648,6 +13712,7 @@ function DateModal({
 	      setExpenseLabelInput('');
 	      setExpenseAmountInput('');
 	      setExpenseCategoryInput(expenseCategories[0]?.id || 'etc');
+	      setExpenseIsIncome(false);
 	    }
 	  };
   const moveExpense = (sourceId, targetId) => {
@@ -14116,23 +14181,49 @@ function DateModal({
     ),
 		    !isSettlementCollapsed && /*#__PURE__*/React.createElement(React.Fragment, null,
 		      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
-		        /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
-		          title: "지출 카테고리 선택",
-		          placeholder: "지출 카테고리 선택",
-		          value: expenseCategoryInput,
-		          disabled: isSavingExpense,
-		          onSelect: setExpenseCategoryInput,
-		          options: expenseCategories.map(category => ({
-		            value: category.id,
-		            label: getExpenseCategoryLabel(category)
-		          })),
-		          style: { width: '100%', height: '42px' }
-		        }),
+		        /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
+		          !expenseIsIncome && /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
+		            title: "지출 카테고리 선택",
+		            placeholder: "지출 카테고리 선택",
+		            value: expenseCategoryInput,
+		            disabled: isSavingExpense,
+		            onSelect: setExpenseCategoryInput,
+		            options: expenseCategories.map(category => ({
+		              value: category.id,
+		              label: getExpenseCategoryLabel(category)
+		            })),
+		            style: { flex: '1 1 0%', minWidth: 0, height: '42px' }
+		          }),
+		          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '4px', flexShrink: 0, marginLeft: expenseIsIncome ? 'auto' : 0 } },
+		            /*#__PURE__*/React.createElement("button", {
+		              type: "button",
+		              disabled: isSavingExpense,
+		              onClick: () => setExpenseIsIncome(true),
+		              style: {
+		                padding: '10px 12px', borderRadius: 'var(--radius-md)', fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer', whiteSpace: 'nowrap',
+		                border: `1px solid ${expenseIsIncome ? '#16A34A' : 'var(--border-subtle)'}`,
+		                background: expenseIsIncome ? '#DCFCE7' : 'var(--bg-card)',
+		                color: expenseIsIncome ? '#16A34A' : 'var(--text-muted)'
+		              }
+		            }, "+ 수입"),
+		            /*#__PURE__*/React.createElement("button", {
+		              type: "button",
+		              disabled: isSavingExpense,
+		              onClick: () => setExpenseIsIncome(false),
+		              style: {
+		                padding: '10px 12px', borderRadius: 'var(--radius-md)', fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer', whiteSpace: 'nowrap',
+		                border: `1px solid ${!expenseIsIncome ? '#DC2626' : 'var(--border-subtle)'}`,
+		                background: !expenseIsIncome ? '#FEF2F2' : 'var(--bg-card)',
+		                color: !expenseIsIncome ? '#DC2626' : 'var(--text-muted)'
+		              }
+		            }, "- 지출")
+		          )
+		        ),
 		        /*#__PURE__*/React.createElement("input", {
 	          type: "text",
 	          className: "form-input",
 	          style: { width: '100%' },
-          placeholder: "지출명목 (예: 식당 예약금, URL 첨부 가능)",
+          placeholder: expenseIsIncome ? "수입명목 (예: 회비 입금, URL 첨부 가능)" : "지출명목 (예: 식당 예약금, URL 첨부 가능)",
           maxLength: 220,
           value: expenseLabelInput,
           disabled: isSavingExpense,
@@ -14143,15 +14234,13 @@ function DateModal({
             type: "text",
             className: "form-input",
             style: { flex: '1 1 0%', minWidth: 0 },
-            placeholder: "지출금액 (원)",
+            placeholder: expenseIsIncome ? "수입금액 (원)" : "지출금액 (원)",
             value: expenseAmountInput,
             disabled: isSavingExpense,
             onChange: e => {
-              const raw = e.target.value;
-              const isNegative = raw.trim().startsWith('-');
-              const digits = raw.replace(/[^0-9]/g, '');
+              const digits = e.target.value.replace(/[^0-9]/g, '');
               const formatted = digits ? Number(digits).toLocaleString() : '';
-              setExpenseAmountInput(isNegative ? `-${formatted}` : formatted);
+              setExpenseAmountInput(formatted ? `${expenseIsIncome ? '+' : '-'}${formatted}` : '');
             }
           }),
           editingExpenseId && /*#__PURE__*/React.createElement("button", {
@@ -14159,7 +14248,7 @@ function DateModal({
             className: "btn btn-secondary",
             style: { flexShrink: 0 },
             disabled: isSavingExpense,
-            onClick: () => { setEditingExpenseId(null); setExpenseLabelInput(''); setExpenseAmountInput(''); }
+            onClick: () => { setEditingExpenseId(null); setExpenseLabelInput(''); setExpenseAmountInput(''); setExpenseIsIncome(false); }
           }, "취소"),
           /*#__PURE__*/React.createElement("button", {
             type: "button",
@@ -14182,7 +14271,7 @@ function DateModal({
         }
       },
 	            expenses.map(expense => {
-	          const expenseLabel = getExpenseLabel(expense);
+	          const { time: expenseTime, rest: expenseLabel } = extractExpenseTimePrefix(getExpenseLabel(expense));
 	          const expenseUrl = getExpenseUrl(expense);
 	          const expenseCategory = getExpenseCategory(calendar, expense.categoryId);
 	          return /*#__PURE__*/React.createElement("div", {
@@ -14272,21 +14361,34 @@ function DateModal({
             }
 	          }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 14 })),
 	          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '4px', minWidth: 0 } },
-	            /*#__PURE__*/React.createElement("span", {
-	              style: {
-	                display: 'inline-flex',
-	                alignItems: 'center',
-	                gap: '5px',
-	                padding: '3px 8px',
-	                borderRadius: '999px',
-	                backgroundColor: `${expenseCategory.color}18`,
-	                color: expenseCategory.color,
-	                fontSize: '0.68rem',
-	                fontWeight: 900
-	              }
-	            }, /*#__PURE__*/React.createElement("span", {
-	              style: { width: '7px', height: '7px', borderRadius: '50%', backgroundColor: expenseCategory.color }
-	            }), expenseCategory.name),
+	            /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' } },
+	              /*#__PURE__*/React.createElement("span", {
+	                style: {
+	                  display: 'inline-flex',
+	                  alignItems: 'center',
+	                  gap: '5px',
+	                  padding: '3px 8px',
+	                  borderRadius: '999px',
+	                  backgroundColor: `${expenseCategory.color}18`,
+	                  color: expenseCategory.color,
+	                  fontSize: '0.68rem',
+	                  fontWeight: 900
+	                }
+	              }, getExpenseCategoryIcon(expenseCategory), expenseCategory.name),
+	              expenseTime && /*#__PURE__*/React.createElement("span", {
+	                style: {
+	                  display: 'inline-flex',
+	                  alignItems: 'center',
+	                  padding: '3px 8px',
+	                  borderRadius: '999px',
+	                  backgroundColor: 'var(--bg-card)',
+	                  border: '1px solid var(--border-subtle)',
+	                  color: 'var(--text-muted)',
+	                  fontSize: '0.68rem',
+	                  fontWeight: 900
+	                }
+	              }, expenseTime)
+	            ),
 	            expenseLabel && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.85rem', color: 'var(--text-main)' } }, expenseLabel),
             expenseUrl && /*#__PURE__*/React.createElement("span", {
               style: {
@@ -15869,7 +15971,7 @@ function MainSideMenu({
   ));
 }
 
-function SettlementSummaryModal({ calendar, onClose }) {
+function SettlementSummaryModal({ calendar, onBack }) {
   const [activeTab, setActiveTab] = React.useState('total');
   const categories = getExpenseCategories(calendar);
   const baseBudget = Number.isFinite(Number(calendar?.settlementBaseBudget)) ? Math.max(0, Math.round(Number(calendar.settlementBaseBudget))) : 0;
@@ -15918,10 +16020,9 @@ function SettlementSummaryModal({ calendar, onClose }) {
     count: expenseItems.filter(item => item.category.id === category.id).length
   })).filter(item => item.total > 0 || item.count > 0);
   const metricCards = [
-    { label: '기초 예산', value: baseBudget, color: '#0F172A', icon: React.createElement(WalletIcon, null) },
-    { label: '총 수입', value: totalIncome, color: '#16A34A', icon: React.createElement(MenuIcon, { paths: ["M12 19v-14", "M5 12l7 -7l7 7"] }) },
-    { label: '총 지출', value: totalExpense, color: '#DC2626', icon: React.createElement(MenuIcon, { paths: ["M12 5v14", "M19 12l-7 7l-7 -7"] }) },
-    { label: '현재 잔액', value: balance, color: balance < 0 ? '#DC2626' : '#0F172A', icon: React.createElement(ChartPieIcon, null) }
+    { label: '총 수입', value: totalIncome, color: '#16A34A', icon: React.createElement(BanknoteArrowUpIcon, { size: 16 }) },
+    { label: '총 지출', value: totalExpense, color: '#DC2626', icon: React.createElement(BanknoteArrowDownIcon, { size: 16 }) },
+    { label: '현재 잔액', value: balance, color: '#0F172A', icon: React.createElement(PiggyBankIcon, { size: 16 }) }
   ];
   const categoryBadge = category => /*#__PURE__*/React.createElement("span", {
     style: {
@@ -15941,12 +16042,14 @@ function SettlementSummaryModal({ calendar, onClose }) {
   }), category.name);
   const renderItemRow = (item, showDate = false) => /*#__PURE__*/React.createElement("div", {
     key: item.id || `${item.date}_${item.createdAt}_${item.amount}`,
-    style: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: '10px', alignItems: 'start', padding: '10px 12px', border: '1px solid var(--border-subtle)', borderRadius: '12px', backgroundColor: 'var(--bg-card)' }
+    style: { display: 'flex', flexDirection: 'column', gap: '5px', padding: '10px 12px', border: '1px solid var(--border-subtle)', borderRadius: '12px', backgroundColor: 'var(--bg-card)' }
   }, /*#__PURE__*/React.createElement("div", {
-    style: { minWidth: 0, display: 'flex', flexDirection: 'column', gap: '5px' }
+    style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }
   }, /*#__PURE__*/React.createElement("div", {
-    style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }
-  }, categoryBadge(item.category), showDate && /*#__PURE__*/React.createElement("span", { className: "registered-at-text" }, formatDateWithDayName(item.date))), /*#__PURE__*/React.createElement("span", {
+    style: { minWidth: 0, display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }
+  }, categoryBadge(item.category), showDate && /*#__PURE__*/React.createElement("span", { className: "registered-at-text" }, formatDateWithDayName(item.date))), /*#__PURE__*/React.createElement("strong", {
+    style: { fontSize: '0.9rem', color: item.isIncome ? '#16A34A' : '#DC2626', whiteSpace: 'nowrap' }
+  }, item.isIncome ? '+' : '-', Math.abs(item.amount).toLocaleString(), "원")), /*#__PURE__*/React.createElement("span", {
     style: { fontSize: '0.86rem', color: 'var(--text-main)', fontWeight: 800, overflowWrap: 'anywhere' }
   }, item.label), item.url && /*#__PURE__*/React.createElement("button", {
     type: "button",
@@ -15954,9 +16057,7 @@ function SettlementSummaryModal({ calendar, onClose }) {
     title: item.url,
     style: { alignSelf: 'flex-start', border: 0, cursor: 'pointer', textDecoration: 'none' },
     onClick: () => window.open(item.url, '_blank', 'noopener,noreferrer')
-  }, item.url)), /*#__PURE__*/React.createElement("strong", {
-    style: { fontSize: '0.9rem', color: item.isIncome ? '#16A34A' : '#DC2626', whiteSpace: 'nowrap' }
-  }, item.isIncome ? '+' : '-', Math.abs(item.amount).toLocaleString(), "원"));
+  }, item.url));
   const emptyContent = /*#__PURE__*/React.createElement("div", {
     style: { padding: '30px 12px', color: '#94A3B8', fontSize: '0.88rem', textAlign: 'center' }
   }, "등록된 정산 내역이 없습니다.");
@@ -16007,32 +16108,56 @@ function SettlementSummaryModal({ calendar, onClose }) {
   const bodyContent = allItems.length === 0 && baseBudget === 0 ? emptyContent : activeTab === 'total' ? totalContent : dailyContent;
 
   return /*#__PURE__*/React.createElement("div", {
-    className: "modal-overlay",
-    onClick: onClose,
-    style: { zIndex: 10000 }
+    className: "settlement-page-container",
+    style: {
+      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+      backgroundColor: 'var(--bg-primary)', display: 'flex', flexDirection: 'column',
+      width: '100%', maxWidth: '100%', overflow: 'hidden', zIndex: 1005
+    }
   }, /*#__PURE__*/React.createElement("div", {
-    className: "modal-container",
-    onClick: e => e.stopPropagation(),
-    style: { maxWidth: '760px' }
+    className: "settlement-page-header",
+    style: {
+      display: 'flex', alignItems: 'center', gap: '10px', padding: '0 16px', height: '56px',
+      backgroundColor: 'var(--bg-card)', borderBottom: '1px solid var(--border-subtle)', flexShrink: 0
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: onBack,
+    "aria-label": "뒤로가기",
+    style: { background: 'none', border: 'none', color: '#64748B', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: 0, flexShrink: 0 }
+  }, /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: "22",
+    height: "22",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    "stroke-width": "2",
+    "stroke-linecap": "round",
+    "stroke-linejoin": "round",
+    style: { transform: 'rotate(90deg)', display: 'inline-block' }
+  }, /*#__PURE__*/React.createElement("path", {
+    stroke: "none",
+    d: "M0 0h24v24H0z",
+    fill: "none"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M6 9l6 6l6 -6"
+  }))), /*#__PURE__*/React.createElement("h3", {
+    style: { fontSize: '1.05rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '8px', margin: 0, color: 'var(--text-main)' }
+  }, /*#__PURE__*/React.createElement(WalletIcon, { size: 20 }), "정산하기")), /*#__PURE__*/React.createElement("div", {
+    className: "settlement-page-body",
+    style: { flex: '1 1 auto', overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }
   }, /*#__PURE__*/React.createElement("div", {
-    className: "modal-header",
-    style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' }
-  }, /*#__PURE__*/React.createElement("h3", {
-    style: { fontSize: '1.1rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '8px' }
-  }, /*#__PURE__*/React.createElement(WalletIcon, null), "정산하기"), /*#__PURE__*/React.createElement("button", {
-    onClick: onClose,
-    style: { background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer', display: 'flex', alignItems: 'center' }
-  }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }))), /*#__PURE__*/React.createElement("div", {
-    className: "modal-body"
-  }, /*#__PURE__*/React.createElement("div", {
-    style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(128px, 1fr))', gap: '8px' }
+    className: "settlement-metric-grid"
   }, metricCards.map(card => /*#__PURE__*/React.createElement("div", {
     key: card.label,
-    className: "admin-metric-card",
-    style: { minHeight: '92px', padding: '12px 10px', alignItems: 'flex-start', textAlign: 'left', gap: '8px' }
+    className: "settlement-metric-card"
   }, /*#__PURE__*/React.createElement("div", {
-    style: { color: card.color, display: 'inline-flex' }
-  }, card.icon), /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.75rem', color: '#64748B', fontWeight: 800 } }, card.label), /*#__PURE__*/React.createElement("div", { style: { fontSize: '1.05rem', fontWeight: 950, color: card.color } }, card.value.toLocaleString(), "원")))), /*#__PURE__*/React.createElement("div", {
+    className: "settlement-metric-card-label"
+  }, /*#__PURE__*/React.createElement("span", { style: { color: card.color, display: 'inline-flex' } }, card.icon), card.label), /*#__PURE__*/React.createElement("div", {
+    className: "settlement-metric-card-value",
+    style: { color: card.color }
+  }, card.value.toLocaleString(), "원")))), /*#__PURE__*/React.createElement("div", {
     style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', padding: '4px', borderRadius: '14px', background: 'var(--bg-primary)', border: '1px solid var(--border-subtle)' }
   }, [['total', '누적보기'], ['daily', '일자별보기']].map(tab => /*#__PURE__*/React.createElement("button", {
     key: tab[0],
@@ -16047,7 +16172,7 @@ function SettlementSummaryModal({ calendar, onClose }) {
       fontWeight: 900,
       cursor: 'pointer'
     }
-  }, tab[1]))), bodyContent)));
+  }, tab[1]))), bodyContent));
 }
 
 function SunIcon() {
@@ -16386,6 +16511,85 @@ function WalletIcon({ size = 24 } = {}) {
     d: "M17 8v-3a1 1 0 0 0 -1 -1h-10a2 2 0 0 0 0 4h12a1 1 0 0 1 1 1v3m0 4v3a1 1 0 0 1 -1 1h-12a2 2 0 0 1 -2 -2v-12"
   }), /*#__PURE__*/React.createElement("path", {
     d: "M20 12v4h-4a2 2 0 0 1 0 -4h4"
+  }));
+}
+
+function BanknoteArrowUpIcon({ size = 24 } = {}) {
+  return /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: String(size),
+    height: String(size),
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    "stroke-width": "2",
+    "stroke-linecap": "round",
+    "stroke-linejoin": "round",
+    className: "icon lucide lucide-banknote-arrow-up"
+  }, /*#__PURE__*/React.createElement("path", {
+    d: "M12 18H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M18 12h.01"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M19 22v-6"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "m22 19-3-3-3 3"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M6 12h.01"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "12",
+    cy: "12",
+    r: "2"
+  }));
+}
+
+function BanknoteArrowDownIcon({ size = 24 } = {}) {
+  return /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: String(size),
+    height: String(size),
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    "stroke-width": "2",
+    "stroke-linecap": "round",
+    "stroke-linejoin": "round",
+    className: "icon lucide lucide-banknote-arrow-down"
+  }, /*#__PURE__*/React.createElement("path", {
+    d: "M12 18H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "m16 19 3 3 3-3"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M18 12h.01"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M19 16v6"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M6 12h.01"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "12",
+    cy: "12",
+    r: "2"
+  }));
+}
+
+function PiggyBankIcon({ size = 24 } = {}) {
+  return /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: String(size),
+    height: String(size),
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    "stroke-width": "2",
+    "stroke-linecap": "round",
+    "stroke-linejoin": "round",
+    className: "icon lucide lucide-piggy-bank"
+  }, /*#__PURE__*/React.createElement("path", {
+    d: "M11 17h3v2a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-3a3.16 3.16 0 0 0 2-2h1a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1h-1a5 5 0 0 0-2-4V3a4 4 0 0 0-3.2 1.6l-.3.4H11a6 6 0 0 0-6 6v1a5 5 0 0 0 2 4v3a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1z"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M16 10h.01"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M2 8v1a2 2 0 0 0 2 2h1"
   }));
 }
 
