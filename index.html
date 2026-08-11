@@ -325,6 +325,7 @@
     :root:not([data-theme="light"]):has(.admin-scope) { color-scheme: light; }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
+    [hidden] { display: none !important; }
     html {
       width: 100%;
       max-width: 100%;
@@ -380,13 +381,13 @@
 
     body:has(.admin-scope),
     body:has(.admin-login-gate) {
-      padding: 24px 0px;
+      padding: 0;
     }
 
     @media (max-width: 720px) {
       body:has(.admin-scope),
       body:has(.admin-login-gate) {
-        padding: 24px 0px;
+        padding: 0;
       }
     }
 
@@ -1436,6 +1437,11 @@
       background: #F1F5F9;
       color: #334155;
     }
+    :root[data-theme="dark"] .section-toggle-btn:hover,
+    :root:not([data-theme="light"]) .section-toggle-btn:hover {
+      background: var(--border-subtle);
+      color: var(--text-main);
+    }
     .section-toggle-btn svg {
       width: 24px;
       height: 24px;
@@ -1541,7 +1547,7 @@
       box-sizing: border-box;
     }
     .admin-header {
-      padding: 0 32px 16px;
+      padding: 20px 32px 16px;
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -6214,6 +6220,12 @@ function AdminDashboard({ initialCalendars }) {
   }, [selectedCal, selectedCalAllActivityLogs, messagesMap[selectedCalId]]);
 
   React.useEffect(() => {
+    try {
+      sessionStorage.removeItem('gather_admin_collapsed_sections_v1');
+    } catch (e) {}
+  }, []);
+
+  React.useEffect(() => {
     const root = document.querySelector('.admin-scope');
     if (!root) return;
 
@@ -6288,7 +6300,14 @@ function AdminDashboard({ initialCalendars }) {
         button.classList.toggle('is-collapsed', collapsed);
         button.setAttribute('aria-expanded', String(!collapsed));
         directChildren.forEach(child => {
-          if (child !== header) child.hidden = collapsed;
+          if (child !== header) {
+            child.hidden = collapsed;
+            if (collapsed) {
+              child.style.setProperty('display', 'none', 'important');
+            } else {
+              child.style.removeProperty('display');
+            }
+          }
         });
       };
 
