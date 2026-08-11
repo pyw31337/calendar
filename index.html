@@ -2059,9 +2059,10 @@
       box-shadow: none;
     }
     :root[data-theme="dark"] .confirmed-meeting-label-badge {
-      background-color: #1B2540;
+      background-color: transparent;
       color: #C4B5FD;
-      border: 1px solid #6D5DF6;
+      border: none;
+      box-shadow: none;
     }
     @media (min-width: 640px) {
       .memo-capsule-badge { padding: 4px 12px; font-size: 0.8rem; }
@@ -2168,9 +2169,10 @@
         border: 1px solid #10B981 !important;
       }
       :root:not([data-theme="light"]) .confirmed-meeting-label-badge {
-        background-color: #1B2540;
+        background-color: transparent;
         color: #C4B5FD;
-        border: 1px solid #6D5DF6;
+        border: none;
+        box-shadow: none;
       }
       :root:not([data-theme="light"]) .search-result-row {
         background-color: #1B2540;
@@ -2271,6 +2273,18 @@
       }
       .recent-log-note {
         flex-basis: 100%;
+      }
+      .schedule-result-row {
+        flex-direction: column;
+        align-items: flex-start !important;
+        gap: 6px !important;
+      }
+      .schedule-result-row .search-result-text {
+        white-space: normal !important;
+        overflow: visible !important;
+        text-overflow: clip !important;
+        width: 100%;
+        word-break: break-all;
       }
     }
 
@@ -15624,12 +15638,17 @@ function GlobalSearchModal({
               key: `${item.date}_${item.participantId}`,
               type: "button",
               onClick: () => { onSelectDate(item.date); onClose(); },
-              className: "search-result-row"
+              className: "search-result-row schedule-result-row"
             },
-              /*#__PURE__*/React.createElement("span", { className: "search-result-date" }, formatDateWithDayName(item.date)),
-              /*#__PURE__*/React.createElement("span", {
-                style: { backgroundColor: p.color, color: getContrastTextColor(p.color), padding: '2px 8px', borderRadius: '9999px', fontSize: '0.7rem', fontWeight: 'bold', whiteSpace: 'nowrap' }
-              }, p.name),
+              /*#__PURE__*/React.createElement("div", {
+                className: "schedule-result-header-row",
+                style: { display: 'flex', alignItems: 'center', gap: '8px' }
+              },
+                /*#__PURE__*/React.createElement("span", { className: "search-result-date" }, formatDateWithDayName(item.date)),
+                /*#__PURE__*/React.createElement("span", {
+                  style: { backgroundColor: p.color, color: getContrastTextColor(p.color), padding: '2px 8px', borderRadius: '9999px', fontSize: '0.7rem', fontWeight: 'bold', whiteSpace: 'nowrap' }
+                }, p.name)
+              ),
               /*#__PURE__*/React.createElement("span", { className: "search-result-text" }, item.note || '')
             );
           })
