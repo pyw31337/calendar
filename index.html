@@ -12999,15 +12999,7 @@ function DateModal({
   onClose,
   showToast
 }) {
-  const getCachedParticipantId = () => {
-    const cachedId = getLocalStorage().getItem('gather_active_participant_id_v20');
-    const activeIds = getActiveParticipants(calendar).map(p => p.id);
-    if (cachedId && activeIds.includes(cachedId)) {
-      return cachedId;
-    }
-    return activeIds[0] || '';
-  };
-  const [participantId, setParticipantId] = React.useState(getCachedParticipantId);
+  const [participantId, setParticipantId] = React.useState('');
   const [note, setNote] = React.useState('');
   const [isSheetOpen, setIsSheetOpen] = React.useState(false);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
@@ -13016,10 +13008,8 @@ function DateModal({
   const dateEntries = getActiveAvailabilities(calendar).filter(e => e.date === dateStr);
   const getExistingNoteForParticipant = id => (dateEntries.find(entry => entry.participantId === id)?.note || '');
   React.useEffect(() => {
-    const nextParticipantId = getCachedParticipantId();
-    const existingEntry = getActiveAvailabilities(calendar).find(e => e.date === dateStr && e.participantId === nextParticipantId);
-    setParticipantId(nextParticipantId);
-    setNote(existingEntry ? existingEntry.note || '' : '');
+    setParticipantId('');
+    setNote('');
     setIsSheetOpen(false);
     setIsSubmitting(false);
   }, [calendar?.id, dateStr]);
@@ -13037,7 +13027,11 @@ function DateModal({
   };
   const handleSubmit = async e => {
     e.preventDefault();
-    if (!participantId || isSubmitting) return;
+    if (isSubmitting) return;
+    if (!participantId) {
+      if (showToast) showToast('참여자를 선택해 주세요', 'error');
+      return;
+    }
     setIsSubmitting(true);
     const latestNote = noteInputRef.current ? noteInputRef.current.value : note;
     let saved = false;
@@ -13416,16 +13410,17 @@ function DateModal({
       alignItems: 'center',
       gap: '8px'
     }
-  }, /*#__PURE__*/React.createElement("span", {
+  }, participantId && /*#__PURE__*/React.createElement("span", {
     className: "form-select-color-indicator",
     style: {
       backgroundColor: activeParticipants.find(p => p.id === participantId)?.color || '#94A3B8'
     }
   }), /*#__PURE__*/React.createElement("span", {
     style: {
-      fontWeight: 700
+      fontWeight: 700,
+      color: participantId ? 'var(--text-main)' : '#94A3B8'
     }
-  }, activeParticipants.find(p => p.id === participantId)?.name || '참여자 선택')), /*#__PURE__*/React.createElement("svg", {
+  }, activeParticipants.find(p => p.id === participantId)?.name || '참여자를 선택해 주세요')), /*#__PURE__*/React.createElement("svg", {
     xmlns: "http://www.w3.org/2000/svg",
     width: "16",
     height: "16",
@@ -13441,7 +13436,7 @@ function DateModal({
     }
   }, /*#__PURE__*/React.createElement("path", {
     d: "m6 9 6 6 6-6"
-  })))), !adminMode && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+  })))), !adminMode && participantId && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
     style: {
       display: 'block',
       fontSize: '0.85rem',
@@ -13449,7 +13444,7 @@ function DateModal({
       marginBottom: '6px',
       color: '#64748B'
     }
-  }, "메모 입력 (선택)"), /*#__PURE__*/React.createElement("input", {
+  }, "메모 입력"), /*#__PURE__*/React.createElement("input", {
     ref: noteInputRef,
     type: "text",
     className: "form-input",
@@ -13472,7 +13467,7 @@ function DateModal({
   },
     /*#__PURE__*/React.createElement("span", {
       style: { fontSize: '0.85rem', fontWeight: 800, color: '#475569' }
-    }, "참석가능"),
+    }, `참석가능 (${dateEntries.length}명)`),
     /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
       /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center' } },
         dateEntries.map(entry => {
@@ -13701,7 +13696,6 @@ function DateModal({
     onClick: () => {
       if (isSubmitting) return;
       setParticipantId(p.id);
-      getLocalStorage().setItem('gather_active_participant_id_v20', p.id);
       setNote(getExistingNoteForParticipant(p.id));
       setIsSheetOpen(false);
     }
@@ -13716,13 +13710,7 @@ function DateModal({
     style: {
       fontWeight: 700
     }
-  }, p.name), participantId === p.id && /*#__PURE__*/React.createElement("span", {
-    style: {
-      marginLeft: 'auto',
-      color: 'var(--accent-primary)',
-      fontWeight: 800
-    }
-  }, "✓")))))));
+  }, p.name)))))));
 }
 
 // Reconstruct calendar to a specific log timestamp (PITR)
