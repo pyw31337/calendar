@@ -6412,7 +6412,8 @@ function AdminDashboard({ initialCalendars }) {
       style: {
         position: 'fixed', bottom: '32px', left: '50%', transform: 'translateX(-50%)', zIndex: 99999,
         backgroundColor: toast.type === 'error' ? '#EF4444' : '#3ECF8E', color: toast.type === 'error' ? '#FFFFFF' : '#000000',
-        padding: '12px 24px', borderRadius: '8px', fontSize: '0.88rem', fontWeight: 'bold', boxShadow: '0 10px 25px -5px rgba(15,23,42,0.35)'
+        padding: '12px 24px', borderRadius: '8px', fontSize: '0.88rem', fontWeight: 'bold', boxShadow: '0 10px 25px -5px rgba(15,23,42,0.35)',
+        textAlign: 'center', wordBreak: 'break-all', whiteSpace: 'pre-wrap', maxWidth: '90vw', width: 'max-content', boxSizing: 'border-box'
       }
     }, toast.message),
 
@@ -8984,7 +8985,14 @@ function App() {
         fontWeight: '800',
         display: 'flex',
         alignItems: 'center',
-        gap: '8px'
+        justifyContent: 'center',
+        gap: '8px',
+        textAlign: 'center',
+        wordBreak: 'break-all',
+        whiteSpace: 'pre-wrap',
+        maxWidth: '90vw',
+        width: 'max-content',
+        boxSizing: 'border-box'
       }
     }, toast.message), operationProgress && !chatUploadProgress && /*#__PURE__*/React.createElement(OperationProgressOverlay, operationProgress), chatUploadProgress && /*#__PURE__*/React.createElement(ImageUploadOverlay, chatUploadProgress));
   }
@@ -9342,10 +9350,13 @@ function App() {
       alignItems: 'center',
       gap: '8px',
       pointerEvents: 'none',
-      maxWidth: 'min(92vw, 520px)',
-      minWidth: 'min(80vw, 360px)',
-      whiteSpace: 'nowrap',
-      justifyContent: 'center'
+      maxWidth: '90vw',
+      width: 'max-content',
+      whiteSpace: 'pre-wrap',
+      wordBreak: 'break-all',
+      justifyContent: 'center',
+      textAlign: 'center',
+      boxSizing: 'border-box'
     }
   }, /*#__PURE__*/React.createElement("span", null, toast.message)), operationProgress && !chatUploadProgress && /*#__PURE__*/React.createElement(OperationProgressOverlay, operationProgress), chatUploadProgress && /*#__PURE__*/React.createElement(ImageUploadOverlay, chatUploadProgress));
 }
