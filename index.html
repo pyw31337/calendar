@@ -7243,6 +7243,82 @@ function App() {
     }
   };
 
+  const handlePromoteInlineChatImage = async ({ url, meta, index = 0 }) => {
+    if (typeof url !== 'string' || !url.startsWith('data:')) return url;
+    if (!firebaseStorage) {
+      showToast('이미지 저장소 연결 실패', 'error', 4000);
+      throw new Error('Firebase Storage is not available');
+    }
+
+    const messageId = meta?.messageId;
+    const sourceMessage = messageId
+      ? [...(chatMessages || []), ...(recentMessages || [])].find(msg => msg.id === messageId)
+      : null;
+    const progressMap = new Map();
+    const updateProgress = (taskKey, transferred, total) => {
+      progressMap.set(taskKey, { transferred, total });
+      const totals = Array.from(progressMap.values());
+      const totalBytes = totals.reduce((sum, item) => sum + (item.total || 0), 0);
+      const transferredBytes = totals.reduce((sum, item) => sum + (item.transferred || 0), 0);
+      const pct = totalBytes > 0 ? Math.max(1, Math.min(99, Math.round((transferredBytes / totalBytes) * 100))) : 1;
+      setChatUploadProgress({ pct, remainingSec: null });
+    };
+
+    setChatUploadProgress({ pct: 0, remainingSec: null });
+    try {
+      if (!sourceMessage) {
+        const uploaded = await uploadInlineChatImageToStorage(activeCalId, url, meta?.thumb || url, index, updateProgress);
+        if (!uploaded?.imageUrl) throw new Error('Image upload failed');
+        setChatUploadProgress({ pct: 100, remainingSec: 0 });
+        return uploaded.imageUrl;
+      }
+
+      const imageUrls = Array.isArray(sourceMessage.imageUrls) && sourceMessage.imageUrls.length > 0
+        ? [...sourceMessage.imageUrls]
+        : (sourceMessage.imageUrl ? [sourceMessage.imageUrl] : []);
+      const thumbUrls = Array.isArray(sourceMessage.thumbUrls) && sourceMessage.thumbUrls.length > 0
+        ? [...sourceMessage.thumbUrls]
+        : (sourceMessage.thumbUrl ? [sourceMessage.thumbUrl] : []);
+      let targetIndex = Number.isInteger(meta?.imageIndex) ? meta.imageIndex : Number(index || 0);
+      if (!Number.isInteger(targetIndex) || targetIndex < 0) targetIndex = Math.max(0, imageUrls.findIndex(item => item === url));
+      while (imageUrls.length <= targetIndex) imageUrls.push('');
+      while (thumbUrls.length <= targetIndex) thumbUrls.push(imageUrls[targetIndex] || url);
+
+      const originalUrl = imageUrls[targetIndex] || url;
+      const originalThumbUrl = thumbUrls[targetIndex] || meta?.thumb || originalUrl;
+      if (typeof originalUrl === 'string' && /^https?:\/\//.test(originalUrl)) return originalUrl;
+
+      const uploaded = await uploadInlineChatImageToStorage(activeCalId, originalUrl, originalThumbUrl, targetIndex, updateProgress);
+      if (!uploaded?.imageUrl || !uploaded?.thumbUrl) throw new Error('Image upload failed');
+
+      imageUrls[targetIndex] = uploaded.imageUrl;
+      thumbUrls[targetIndex] = uploaded.thumbUrl;
+      const data = {
+        imageUrl: imageUrls[0] || '',
+        thumbUrl: thumbUrls[0] || '',
+        imageUrls,
+        thumbUrls
+      };
+      if (firebaseDb) {
+        await firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages').doc(sourceMessage.id).update(data);
+      } else {
+        const ok = await updateMessageRest(activeCalId, sourceMessage.id, data);
+        if (!ok) throw new Error('Message URL update failed');
+      }
+      const patchMessage = msg => msg.id === sourceMessage.id ? { ...msg, ...data } : msg;
+      setChatMessages(prev => prev.map(patchMessage));
+      setRecentMessages(prev => prev.map(patchMessage));
+      setChatUploadProgress({ pct: 100, remainingSec: 0 });
+      return uploaded.imageUrl;
+    } catch (err) {
+      console.error('handlePromoteInlineChatImage failed:', err);
+      showToast('이미지 URL 생성 실패', 'error', 4000);
+      throw err;
+    } finally {
+      setTimeout(() => setChatUploadProgress(null), 300);
+    }
+  };
+
   React.useEffect(() => {
     const rawId = getRawCalendarIdFromURL();
     if (rawId && !isAllowedCalendarId(rawId)) {
@@ -7726,6 +7802,7 @@ function App() {
       onRevealChatInput: () => setIsHeaderVisible(true),
       chatMessagesContainerRef: chatMessagesContainerRef,
       showToast: showToast,
+      onPromoteImageUrl: handlePromoteInlineChatImage,
       onShare: () => setIsChatShareOpen(true)
     }), isChatSheetOpen && /*#__PURE__*/React.createElement(ChatParticipantSheet, {
       calendar: activeCal,
@@ -8059,7 +8136,8 @@ function App() {
     onDeleteMessage: handleDeleteMessage,
     onEditMessage: handleEditMessage,
     onMore: () => changeView('chat'),
-    showToast: showToast
+    showToast: showToast,
+    onPromoteImageUrl: handlePromoteInlineChatImage
   })), /*#__PURE__*/React.createElement(SummaryList, {
     calendar: activeCal,
     onSelectDate: d => {
@@ -8068,7 +8146,9 @@ function App() {
       setIsModalOpen(true);
     }
   }), /*#__PURE__*/React.createElement(PhotoGallery, {
-    chatMessages: chatMessages
+    chatMessages: chatMessages,
+    showToast: showToast,
+    onPromoteImageUrl: handlePromoteInlineChatImage
   }), isModalOpen && /*#__PURE__*/React.createElement(DateModal, {
     dateStr: selectedDate,
     calendar: activeCal,
@@ -9404,6 +9484,25 @@ function uploadChatImageAssets(calendarId, compressed, index, onBytes) {
   });
 }
 
+async function dataUrlToBlob(dataUrl) {
+  if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:')) return null;
+  const res = await fetch(dataUrl);
+  return res.ok ? res.blob() : null;
+}
+
+async function uploadInlineChatImageToStorage(calendarId, imageUrl, thumbUrl, index = 0, onBytes) {
+  if (!firebaseStorage) return null;
+  const originalBlob = await dataUrlToBlob(imageUrl);
+  const thumbnailBlob = await dataUrlToBlob(thumbUrl && thumbUrl.startsWith('data:') ? thumbUrl : imageUrl);
+  if (!originalBlob || !thumbnailBlob) return null;
+  return uploadChatImageAssets(calendarId, {
+    original: imageUrl,
+    thumbnail: thumbUrl || imageUrl,
+    originalBlob,
+    thumbnailBlob
+  }, `share_${index}`, onBytes);
+}
+
 // Resolves the {imageUrl, thumbUrl} pair a chat message should store: uploaded Storage
 // download URLs when possible, the original compressed base64 data URLs otherwise.
 async function resolveChatImageUrls(calendarId, compressed, index = 0, onBytes) {
@@ -9589,7 +9688,7 @@ function getMessageImageEntries(msg) {
   const urls = Array.isArray(msg.imageUrls) && msg.imageUrls.length > 0 ? msg.imageUrls : (msg.imageUrl ? [msg.imageUrl] : []);
   const thumbs = Array.isArray(msg.thumbUrls) && msg.thumbUrls.length > 0 ? msg.thumbUrls : (msg.thumbUrl ? [msg.thumbUrl] : []);
   if (thumbs.length === 0) return [];
-  return thumbs.map((thumb, i) => ({ full: urls[i] || thumb, thumb }));
+  return thumbs.map((thumb, i) => ({ full: urls[i] || thumb, thumb, imageIndex: i, messageId: msg.id, timestamp: msg.timestamp }));
 }
 
 // Renders a chat message's attached image(s): a single thumbnail for legacy/one-image
@@ -9600,7 +9699,7 @@ function renderChatMessageImages(msg, setActiveLightbox, singleImageStyle = {}) 
   if (entries.length === 0) return null;
   const thumbs = entries.map(e => e.thumb);
   const displayUrls = entries.map(e => e.full);
-  const meta = entries.map(() => ({ timestamp: msg.timestamp }));
+  const meta = entries.map(e => ({ timestamp: msg.timestamp, messageId: msg.id, imageIndex: e.imageIndex, thumb: e.thumb }));
   if (thumbs.length === 1) {
     return /*#__PURE__*/React.createElement('img', {
       src: thumbs[0],
@@ -9753,7 +9852,33 @@ function LightboxInfoPanel({ info, onOpenUrl }) {
   }, /*#__PURE__*/React.createElement("span", { style: { opacity: 0.7, flexShrink: 0, minWidth: '40px' } }, label), /*#__PURE__*/React.createElement("span", { style: { wordBreak: 'break-all' } }, value)))));
 }
 
-function ImageUrlModal({ imageUrl, onClose, showToast }) {
+function ImageUrlModal({ imageUrl, onClose, showToast, onEnsureShareUrl }) {
+  const [resolvedUrl, setResolvedUrl] = React.useState(imageUrl || '');
+  const [isGenerating, setIsGenerating] = React.useState(false);
+  const [errorText, setErrorText] = React.useState('');
+  const isInlineImageUrl = typeof resolvedUrl === 'string' && resolvedUrl.startsWith('data:');
+  const isShareableUrl = /^https?:\/\//.test(resolvedUrl || '');
+  React.useEffect(() => {
+    let cancelled = false;
+    setResolvedUrl(imageUrl || '');
+    setErrorText('');
+    if (typeof imageUrl !== 'string' || !imageUrl.startsWith('data:') || typeof onEnsureShareUrl !== 'function') return;
+    setIsGenerating(true);
+    Promise.resolve(onEnsureShareUrl(imageUrl)).then(nextUrl => {
+      if (cancelled) return;
+      if (nextUrl && /^https?:\/\//.test(nextUrl)) {
+        setResolvedUrl(nextUrl);
+      } else {
+        setErrorText('공유 URL 생성 실패');
+      }
+    }).catch(err => {
+      console.error('Image share URL generation failed:', err);
+      if (!cancelled) setErrorText('공유 URL 생성 실패');
+    }).finally(() => {
+      if (!cancelled) setIsGenerating(false);
+    });
+    return () => { cancelled = true; };
+  }, [imageUrl, onEnsureShareUrl]);
   return /*#__PURE__*/React.createElement("div", {
     className: "modal-overlay image-url-modal",
     onClick: e => { e.stopPropagation(); onClose(); },
@@ -9781,33 +9906,38 @@ function ImageUrlModal({ imageUrl, onClose, showToast }) {
     className: "modal-body"
   }, /*#__PURE__*/React.createElement("label", {
     style: { fontSize: '0.85rem', fontWeight: 700, color: '#64748B' }
-  }, "선택한 사진의 원본 이미지 URL"), /*#__PURE__*/React.createElement("input", {
+  }, isGenerating ? "공유 가능한 이미지 URL 생성 중" : "선택한 사진의 원본 이미지 URL"), /*#__PURE__*/React.createElement("input", {
     type: "text",
     className: "form-input",
     style: { width: '100%' },
-    value: imageUrl || '',
+    value: isGenerating ? '공유 URL을 생성하고 있습니다...' : (isInlineImageUrl ? '공유 가능한 HTTPS URL을 생성할 수 없습니다.' : resolvedUrl || ''),
     readOnly: true
-  }), /*#__PURE__*/React.createElement("button", {
+  }), errorText && /*#__PURE__*/React.createElement("div", {
+    style: { fontSize: '0.78rem', color: '#EF4444', fontWeight: 700 }
+  }, errorText, " Storage 업로드 권한 또는 네트워크 상태를 확인해 주세요."), /*#__PURE__*/React.createElement("button", {
     type: "button",
     className: "btn btn-primary",
+    disabled: isGenerating || !isShareableUrl,
+    style: { opacity: isGenerating || !isShareableUrl ? 0.65 : 1, cursor: isGenerating || !isShareableUrl ? 'not-allowed' : 'pointer' },
     onClick: async () => {
-      const ok = await copyTextToClipboard(imageUrl || '');
+      const ok = await copyTextToClipboard(resolvedUrl || '');
       const message = ok ? '이미지 URL이 복사되었습니다.' : '복사에 실패했습니다. URL을 직접 선택해 복사해 주세요.';
       if (showToast) showToast(message, ok ? 'success' : 'error');
       else alert(message);
     }
-  }, "URL 복사하기"))));
+  }, isGenerating ? "URL 생성 중..." : "URL 복사하기"))));
 }
 
 // Full-screen image viewer for a message's photo(s) -- swipeable (touch) with left/right arrow
 // buttons and dot indicators when there's more than one image, matching the KakaoTalk-style
 // multi-photo gallery UX the chat bubbles are modeled after. `meta` (optional, parallel to
 // `urls`) supplies each image's { timestamp } for the tap-to-toggle info overlay.
-function Lightbox({ urls, index, onClose, onNavigate, meta }) {
+function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, onPromoteImageUrl }) {
   const total = urls.length;
   const [showInfo, setShowInfo] = React.useState(false);
   const [imageUrlModalOpen, setImageUrlModalOpen] = React.useState(false);
   const [imageDimensions, setImageDimensions] = React.useState({});
+  const [displayUrls, setDisplayUrls] = React.useState(urls);
   const lightboxHistoryRef = React.useRef(false);
   React.useEffect(() => {
     try {
@@ -9833,18 +9963,31 @@ function Lightbox({ urls, index, onClose, onNavigate, meta }) {
     }
     onClose();
   };
+  React.useEffect(() => { setDisplayUrls(urls); }, [urls]);
   React.useEffect(() => { setShowInfo(false); }, [index]);
+  const currentUrl = displayUrls[index] || urls[index];
   const currentInfo = React.useMemo(
     () => {
-      const base = buildLightboxImageInfo(urls[index], meta && meta[index] && meta[index].timestamp);
-      const size = imageDimensions[urls[index]];
+      const base = buildLightboxImageInfo(currentUrl, meta && meta[index] && meta[index].timestamp);
+      const size = imageDimensions[currentUrl];
       return {
         ...base,
         dimensionLabel: size ? `${size.width} × ${size.height}px` : null
       };
     },
-    [urls, index, meta, imageDimensions]
+    [currentUrl, index, meta, imageDimensions]
   );
+  const ensureCurrentShareUrl = async url => {
+    if (typeof url !== 'string' || !url.startsWith('data:')) return url;
+    if (typeof onPromoteImageUrl !== 'function') throw new Error('No image URL promotion handler');
+    const nextUrl = await onPromoteImageUrl({ url, meta: meta && meta[index], index });
+    if (nextUrl && /^https?:\/\//.test(nextUrl)) {
+      setDisplayUrls(prev => prev.map((item, i) => i === index ? nextUrl : item));
+      if (showToast) showToast('공유 URL 생성완료', 'success', 3000);
+      return nextUrl;
+    }
+    throw new Error('Image URL promotion failed');
+  };
   const recordImageDimensions = (url, e) => {
     const img = e.currentTarget;
     const width = img.naturalWidth;
@@ -10070,15 +10213,15 @@ function Lightbox({ urls, index, onClose, onNavigate, meta }) {
       transform: `translateX(calc(-33.3333% + ${dragPx}px))`,
       transition: transitionOn ? 'transform 280ms ease' : 'none'
     }
-  }, renderSlide(index > 0 ? urls[index - 1] : null, 'prev'), renderSlide(urls[index], 'current'), renderSlide(index < total - 1 ? urls[index + 1] : null, 'next')))
+  }, renderSlide(index > 0 ? displayUrls[index - 1] : null, 'prev'), renderSlide(currentUrl, 'current'), renderSlide(index < total - 1 ? displayUrls[index + 1] : null, 'next')))
     : /*#__PURE__*/React.createElement("div", {
     style: { position: 'relative', display: 'inline-flex', maxWidth: '92vw', maxHeight: '82vh' },
     onClick: handleImageTap
   }, /*#__PURE__*/React.createElement("img", {
-    src: urls[index],
+    src: currentUrl,
     alt: "원본 이미지",
     draggable: false,
-    onLoad: e => recordImageDimensions(urls[index], e),
+    onLoad: e => recordImageDimensions(currentUrl, e),
     style: {
       maxWidth: '92vw', maxHeight: '82vh', borderRadius: '12px', objectFit: 'contain',
       display: 'block'
@@ -10099,8 +10242,10 @@ function Lightbox({ urls, index, onClose, onNavigate, meta }) {
       transition: 'background-color 0.15s'
     }
   }))), imageUrlModalOpen && /*#__PURE__*/React.createElement(ImageUrlModal, {
-    imageUrl: urls[index],
-    onClose: () => setImageUrlModalOpen(false)
+    imageUrl: currentUrl,
+    onClose: () => setImageUrlModalOpen(false),
+    showToast,
+    onEnsureShareUrl: ensureCurrentShareUrl
   }));
   return ReactDOM.createPortal(lightboxNode, document.body);
 }
@@ -10145,7 +10290,8 @@ function CommentsSection({
   onDeleteMessage,
   onEditMessage,
   onMore,
-  showToast
+  showToast,
+  onPromoteImageUrl
 }) {
   const participants = getActiveParticipants(calendar);
   const participantsMap = participants.reduce((acc, p) => {
@@ -10630,7 +10776,9 @@ function CommentsSection({
     index: activeLightbox.index,
     meta: activeLightbox.meta,
     onClose: () => setActiveLightbox(null),
-    onNavigate: i => setActiveLightbox(prev => prev ? { ...prev, index: i } : prev)
+    onNavigate: i => setActiveLightbox(prev => prev ? { ...prev, index: i } : prev),
+    showToast,
+    onPromoteImageUrl
   }) : null), imageProcessing && /*#__PURE__*/React.createElement(ImageProcessingOverlay, imageProcessing),
   isEmojiPickerOpen && /*#__PURE__*/React.createElement(EmojiPickerSheet, {
     onSelect: insertEmojiIntoChatInput,
@@ -10664,6 +10812,7 @@ function ChatRoomView({
   onRevealChatInput,
   chatMessagesContainerRef,
   showToast,
+  onPromoteImageUrl,
   onShare
 }) {
   const [viewportBottom, setViewportBottom] = React.useState(0);
@@ -11214,7 +11363,7 @@ function ChatRoomView({
     "aria-label": "채팅 입력창 열기",
     style: {
       position: 'fixed',
-      left: '10px',
+      right: '10px',
       bottom: `calc(${viewportBottom}px + 18px)`,
       width: '36px',
       height: '36px',
@@ -11802,7 +11951,9 @@ function ChatRoomView({
     index: activeLightbox.index,
     meta: activeLightbox.meta,
     onClose: () => setActiveLightbox(null),
-    onNavigate: i => setActiveLightbox(prev => prev ? { ...prev, index: i } : prev)
+    onNavigate: i => setActiveLightbox(prev => prev ? { ...prev, index: i } : prev),
+    showToast,
+    onPromoteImageUrl
   }) : null), imageProcessingChat && /*#__PURE__*/React.createElement(ImageProcessingOverlay, imageProcessingChat),
   isEmojiPickerOpen && /*#__PURE__*/React.createElement(EmojiPickerSheet, {
     onSelect: insertEmojiIntoChatInput,
@@ -15871,7 +16022,7 @@ function SummaryList({
 // reuses the shared Lightbox component for the swipeable full-screen viewer -- kept as its own
 // local lightbox state rather than sharing App's chat activeLightbox state, since the gallery
 // and the chat are independent entry points into the same viewer, not one shared session.
-function PhotoGallery({ chatMessages }) {
+function PhotoGallery({ chatMessages, showToast, onPromoteImageUrl }) {
   const [collapsed, setCollapsed] = React.useState(false);
   const [lightbox, setLightbox] = React.useState(null); // { urls: string[], index: number } | null
 
@@ -15916,7 +16067,11 @@ function PhotoGallery({ chatMessages }) {
         src: entry.thumb,
         alt: "채팅에 첨부된 사진",
         loading: "lazy",
-        onClick: () => setLightbox({ urls: photoEntries.map(e => e.full), meta: photoEntries.map(e => ({ timestamp: e.timestamp })), index: idx }),
+        onClick: () => setLightbox({
+          urls: photoEntries.map(e => e.full),
+          meta: photoEntries.map(e => ({ timestamp: e.timestamp, messageId: e.messageId, imageIndex: e.imageIndex, thumb: e.thumb })),
+          index: idx
+        }),
         style: { width: '100%', aspectRatio: '1 / 1', objectFit: 'cover', borderRadius: 'var(--radius-sm)', cursor: 'pointer' }
       }))
     ),
@@ -15925,7 +16080,9 @@ function PhotoGallery({ chatMessages }) {
       index: lightbox.index,
       meta: lightbox.meta,
       onClose: () => setLightbox(null),
-      onNavigate: i => setLightbox(prev => prev ? { ...prev, index: i } : prev)
+      onNavigate: i => setLightbox(prev => prev ? { ...prev, index: i } : prev),
+      showToast,
+      onPromoteImageUrl
     })
   );
 }
