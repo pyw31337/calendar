@@ -13579,6 +13579,11 @@ function DateModal({
 	  const [expenseLabelInput, setExpenseLabelInput] = React.useState('');
 	  const [expenseAmountInput, setExpenseAmountInput] = React.useState('');
 	  const [expenseCategoryInput, setExpenseCategoryInput] = React.useState(() => getExpenseCategories(calendar)[0]?.id || 'etc');
+	  // Stored amount sign is inverted from how it reads here: a saved NEGATIVE amount is an
+	  // income entry (rendered elsewhere with a "+" and green), a saved POSITIVE amount is an
+	  // expense (rendered with "-" and red) -- this toggle just drives that sign automatically
+	  // instead of requiring the user to type a leading "-" themselves.
+	  const [expenseIsIncome, setExpenseIsIncome] = React.useState(false);
 	  const [editingExpenseId, setEditingExpenseId] = React.useState(null);
   const [isSavingExpense, setIsSavingExpense] = React.useState(false);
   const [isSettlementCollapsed, setIsSettlementCollapsed] = React.useState(true);
@@ -13592,6 +13597,7 @@ function DateModal({
 	    setExpenseLabelInput('');
 	    setExpenseAmountInput('');
 	    setExpenseCategoryInput(getExpenseCategories(calendar)[0]?.id || 'etc');
+	    setExpenseIsIncome(false);
 	    setEditingExpenseId(null);
     setAttendeesView('preview');
     setDraggingExpenseId('');
@@ -13610,17 +13616,15 @@ function DateModal({
     const rawLabel = expenseLabelInput.trim();
     const url = extractFirstUrl(rawLabel);
     const labelText = sanitizeText(url ? removeFirstUrl(rawLabel) : rawLabel, 120);
-    const rawAmount = expenseAmountInput.trim();
-    const isNegativeAmount = rawAmount.startsWith('-');
-    const amountDigits = rawAmount.replace(/[^0-9]/g, '');
-    const amountNum = amountDigits ? (isNegativeAmount ? -1 : 1) * Number(amountDigits) : NaN;
+    const amountDigits = expenseAmountInput.replace(/[^0-9]/g, '');
+    const amountNum = amountDigits ? (expenseIsIncome ? -1 : 1) * Number(amountDigits) : NaN;
     if ((!labelText && !url) || !Number.isFinite(amountNum) || amountNum === 0) {
-      if (showToast) showToast('지출명목·금액 필요', 'error'); else alert('지출명목·금액 필요');
+      if (showToast) showToast(expenseIsIncome ? '수입명목·금액 필요' : '지출명목·금액 필요', 'error'); else alert('명목·금액 필요');
       return;
     }
     setIsSavingExpense(true);
     try {
-	      await Promise.resolve(onSaveExpense(dateStr, { id: editingExpenseId, label: labelText, url, categoryId: expenseCategoryInput, amount: amountNum }));
+	      await Promise.resolve(onSaveExpense(dateStr, { id: editingExpenseId, label: labelText, url, categoryId: expenseIsIncome ? 'etc' : expenseCategoryInput, amount: amountNum }));
     } catch (err) {
       console.error('Expense save failed:', err);
     }
@@ -13628,6 +13632,7 @@ function DateModal({
 	    setExpenseLabelInput('');
 	    setExpenseAmountInput('');
 	    setExpenseCategoryInput(expenseCategories[0]?.id || 'etc');
+	    setExpenseIsIncome(false);
 	    setEditingExpenseId(null);
 	  };
   const handleExpenseItemClick = (expense) => {
@@ -13635,9 +13640,11 @@ function DateModal({
     setEditingExpenseId(expense.id);
     const displayLabel = getExpenseLabel(expense);
     const displayUrl = getExpenseUrl(expense);
+    const isIncome = Number(expense.amount) < 0;
 	    setExpenseLabelInput([displayLabel, displayUrl].filter(Boolean).join(' '));
-	    setExpenseAmountInput(expense.amount < 0 ? `-${Math.abs(expense.amount).toLocaleString()}` : Number(expense.amount).toLocaleString());
+	    setExpenseAmountInput(`${isIncome ? '+' : '-'}${Math.abs(expense.amount).toLocaleString()}`);
 	    setExpenseCategoryInput(getExpenseCategory(calendar, expense.categoryId).id);
+	    setExpenseIsIncome(isIncome);
 	  };
   const handleDeleteExpenseClick = (event, expenseId) => {
     event.stopPropagation();
@@ -13648,6 +13655,7 @@ function DateModal({
 	      setExpenseLabelInput('');
 	      setExpenseAmountInput('');
 	      setExpenseCategoryInput(expenseCategories[0]?.id || 'etc');
+	      setExpenseIsIncome(false);
 	    }
 	  };
   const moveExpense = (sourceId, targetId) => {
@@ -14116,23 +14124,49 @@ function DateModal({
     ),
 		    !isSettlementCollapsed && /*#__PURE__*/React.createElement(React.Fragment, null,
 		      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
-		        /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
-		          title: "지출 카테고리 선택",
-		          placeholder: "지출 카테고리 선택",
-		          value: expenseCategoryInput,
-		          disabled: isSavingExpense,
-		          onSelect: setExpenseCategoryInput,
-		          options: expenseCategories.map(category => ({
-		            value: category.id,
-		            label: getExpenseCategoryLabel(category)
-		          })),
-		          style: { width: '100%', height: '42px' }
-		        }),
+		        /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
+		          !expenseIsIncome && /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
+		            title: "지출 카테고리 선택",
+		            placeholder: "지출 카테고리 선택",
+		            value: expenseCategoryInput,
+		            disabled: isSavingExpense,
+		            onSelect: setExpenseCategoryInput,
+		            options: expenseCategories.map(category => ({
+		              value: category.id,
+		              label: getExpenseCategoryLabel(category)
+		            })),
+		            style: { flex: '1 1 0%', minWidth: 0, height: '42px' }
+		          }),
+		          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '4px', flexShrink: 0, marginLeft: expenseIsIncome ? 'auto' : 0 } },
+		            /*#__PURE__*/React.createElement("button", {
+		              type: "button",
+		              disabled: isSavingExpense,
+		              onClick: () => setExpenseIsIncome(true),
+		              style: {
+		                padding: '10px 12px', borderRadius: 'var(--radius-md)', fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer', whiteSpace: 'nowrap',
+		                border: `1px solid ${expenseIsIncome ? '#16A34A' : 'var(--border-subtle)'}`,
+		                background: expenseIsIncome ? '#DCFCE7' : 'var(--bg-card)',
+		                color: expenseIsIncome ? '#16A34A' : 'var(--text-muted)'
+		              }
+		            }, "+ 수입"),
+		            /*#__PURE__*/React.createElement("button", {
+		              type: "button",
+		              disabled: isSavingExpense,
+		              onClick: () => setExpenseIsIncome(false),
+		              style: {
+		                padding: '10px 12px', borderRadius: 'var(--radius-md)', fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer', whiteSpace: 'nowrap',
+		                border: `1px solid ${!expenseIsIncome ? '#DC2626' : 'var(--border-subtle)'}`,
+		                background: !expenseIsIncome ? '#FEF2F2' : 'var(--bg-card)',
+		                color: !expenseIsIncome ? '#DC2626' : 'var(--text-muted)'
+		              }
+		            }, "- 지출")
+		          )
+		        ),
 		        /*#__PURE__*/React.createElement("input", {
 	          type: "text",
 	          className: "form-input",
 	          style: { width: '100%' },
-          placeholder: "지출명목 (예: 식당 예약금, URL 첨부 가능)",
+          placeholder: expenseIsIncome ? "수입명목 (예: 회비 입금, URL 첨부 가능)" : "지출명목 (예: 식당 예약금, URL 첨부 가능)",
           maxLength: 220,
           value: expenseLabelInput,
           disabled: isSavingExpense,
@@ -14143,15 +14177,13 @@ function DateModal({
             type: "text",
             className: "form-input",
             style: { flex: '1 1 0%', minWidth: 0 },
-            placeholder: "지출금액 (원)",
+            placeholder: expenseIsIncome ? "수입금액 (원)" : "지출금액 (원)",
             value: expenseAmountInput,
             disabled: isSavingExpense,
             onChange: e => {
-              const raw = e.target.value;
-              const isNegative = raw.trim().startsWith('-');
-              const digits = raw.replace(/[^0-9]/g, '');
+              const digits = e.target.value.replace(/[^0-9]/g, '');
               const formatted = digits ? Number(digits).toLocaleString() : '';
-              setExpenseAmountInput(isNegative ? `-${formatted}` : formatted);
+              setExpenseAmountInput(formatted ? `${expenseIsIncome ? '+' : '-'}${formatted}` : '');
             }
           }),
           editingExpenseId && /*#__PURE__*/React.createElement("button", {
@@ -14159,7 +14191,7 @@ function DateModal({
             className: "btn btn-secondary",
             style: { flexShrink: 0 },
             disabled: isSavingExpense,
-            onClick: () => { setEditingExpenseId(null); setExpenseLabelInput(''); setExpenseAmountInput(''); }
+            onClick: () => { setEditingExpenseId(null); setExpenseLabelInput(''); setExpenseAmountInput(''); setExpenseIsIncome(false); }
           }, "취소"),
           /*#__PURE__*/React.createElement("button", {
             type: "button",
