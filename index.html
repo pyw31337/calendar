@@ -757,6 +757,7 @@
     .calendar-title {
       font-size: 1.25rem; font-weight: 800; color: var(--text-main); letter-spacing: -0.02em;
       min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      cursor: pointer;
     }
     @media (min-width: 768px) { .calendar-title { font-size: 1.35rem; } }
 
@@ -9056,7 +9057,12 @@ function App() {
       minWidth: 0
     }
   }, /*#__PURE__*/React.createElement("span", {
-    className: "calendar-title"
+    className: "calendar-title",
+    onClick: () => {
+      if (activeCalId) {
+        window.location.href = `${window.location.pathname}?id=${activeCalId}`;
+      }
+    }
   }, activeCal?.title)))), /*#__PURE__*/React.createElement("div", {
     className: "header-actions"
   }, /*#__PURE__*/React.createElement("button", {
@@ -11482,19 +11488,7 @@ function CommentsSection({
     style: { color: '#2563EB', marginBottom: 0, display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold' }
   }, /*#__PURE__*/React.createElement(ChatSectionIcon, null), "채팅", totalChatCount > 0 && /*#__PURE__*/React.createElement("span", {
     title: hasUnreadChat ? '읽지 않은 채팅이 있습니다' : '모두 읽었습니다',
-    style: {
-      display: 'inline-flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      minWidth: '20px',
-      height: '20px',
-      padding: '0 6px',
-      borderRadius: '9999px',
-      fontSize: '0.7rem',
-      fontWeight: 800,
-      backgroundColor: hasUnreadChat ? '#EF4444' : '#E2E8F0',
-      color: hasUnreadChat ? '#FFFFFF' : '#64748B'
-    }
+    className: `main-menu-badge${hasUnreadChat ? ' is-unread' : ''}`
   }, totalChatCount)),
   /*#__PURE__*/React.createElement(SectionToggleButton, {
     collapsed: isCollapsed,
