@@ -6691,33 +6691,6 @@ function App() {
     const requestedId = getCalendarIdFromURL();
     return requestedId && isAllowedCalendarId(requestedId) ? requestedId : 'kkot';
   });
-  React.useEffect(() => {
-    if (initialLoadOverlayTimerRef.current) clearTimeout(initialLoadOverlayTimerRef.current);
-    if (initialLoadOverlayIntervalRef.current) clearInterval(initialLoadOverlayIntervalRef.current);
-    initialLoadOverlayTimerRef.current = null;
-    initialLoadOverlayIntervalRef.current = null;
-    if (!isInitialDataLoading) {
-      setOperationProgress(prev => prev?.id === 'initial-load' ? null : prev);
-      return;
-    }
-    let pct = 18;
-    initialLoadOverlayTimerRef.current = setTimeout(() => {
-      setOperationProgress({
-        id: 'initial-load',
-        title: '캘린더 데이터 로딩 중...',
-        detail: 'Firebase에서 최신 캘린더와 채팅 데이터를 불러오고 있습니다.',
-        pct
-      });
-      initialLoadOverlayIntervalRef.current = setInterval(() => {
-        pct = Math.min(92, pct + (pct < 60 ? 7 : 3));
-        setOperationProgress(prev => prev?.id === 'initial-load' ? { ...prev, pct } : prev);
-      }, 700);
-    }, 1000);
-    return () => {
-      if (initialLoadOverlayTimerRef.current) clearTimeout(initialLoadOverlayTimerRef.current);
-      if (initialLoadOverlayIntervalRef.current) clearInterval(initialLoadOverlayIntervalRef.current);
-    };
-  }, [isInitialDataLoading, activeCalId]);
   const [currentMonthDate, setCurrentMonthDate] = React.useState(new Date());
   const [selectedDate, setSelectedDate] = React.useState(null);
   const [isModalOpen, setIsModalOpen] = React.useState(false);
@@ -6801,6 +6774,33 @@ function App() {
   const initialLoadOverlayTimerRef = React.useRef(null);
   const initialLoadOverlayIntervalRef = React.useRef(null);
   const titleRef = React.useRef(null);
+  React.useEffect(() => {
+    if (initialLoadOverlayTimerRef.current) clearTimeout(initialLoadOverlayTimerRef.current);
+    if (initialLoadOverlayIntervalRef.current) clearInterval(initialLoadOverlayIntervalRef.current);
+    initialLoadOverlayTimerRef.current = null;
+    initialLoadOverlayIntervalRef.current = null;
+    if (!isInitialDataLoading) {
+      setOperationProgress(prev => prev?.id === 'initial-load' ? null : prev);
+      return;
+    }
+    let pct = 18;
+    initialLoadOverlayTimerRef.current = setTimeout(() => {
+      setOperationProgress({
+        id: 'initial-load',
+        title: '캘린더 데이터 로딩 중...',
+        detail: 'Firebase에서 최신 캘린더와 채팅 데이터를 불러오고 있습니다.',
+        pct
+      });
+      initialLoadOverlayIntervalRef.current = setInterval(() => {
+        pct = Math.min(92, pct + (pct < 60 ? 7 : 3));
+        setOperationProgress(prev => prev?.id === 'initial-load' ? { ...prev, pct } : prev);
+      }, 700);
+    }, 1000);
+    return () => {
+      if (initialLoadOverlayTimerRef.current) clearTimeout(initialLoadOverlayTimerRef.current);
+      if (initialLoadOverlayIntervalRef.current) clearInterval(initialLoadOverlayIntervalRef.current);
+    };
+  }, [isInitialDataLoading, activeCalId]);
 
   // Main header: fixed full-width bar with a menu row, hides on scroll-down and reappears on
   // scroll-up (same behavior as the chat room header). Refs below are scroll targets for the
