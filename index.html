@@ -3700,7 +3700,13 @@ function mergeCalendarSettingsDelta(serverCalendar, incomingCalendar) {
     availabilities: server.availabilities || [],
     activityLogs: mergeActivityLogs(server.activityLogs || [], incoming.activityLogs || [], calendarId, new Set(Array.from(participantMap.values()).map(participant => participant.id))),
     polls: server.polls || [],
-    deletedActivityLogIds: mergeDeletedActivityLogIds(server.deletedActivityLogIds || [], incoming.deletedActivityLogIds || [])
+    deletedActivityLogIds: mergeDeletedActivityLogIds(server.deletedActivityLogIds || [], incoming.deletedActivityLogIds || []),
+    // Explicit rather than relying on the "...incoming" spread above: confirmed-meeting expense
+    // edits (category/label/amount) go through this exact saveMode, so an incoming payload that's
+    // missing the field for any reason must not silently fall back to dropping the meeting data.
+    confirmedMeeting: incoming.confirmedMeeting !== undefined ? incoming.confirmedMeeting : (server.confirmedMeeting || []),
+    expenseCategories: incoming.expenseCategories !== undefined ? incoming.expenseCategories : server.expenseCategories,
+    settlementBaseBudget: incoming.settlementBaseBudget !== undefined ? incoming.settlementBaseBudget : server.settlementBaseBudget
   };
 }
 
@@ -8980,7 +8986,7 @@ function App() {
     onClick: () => {
       if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 정산 정보를 확인해 주세요.')) setIsSettlementOpen(true);
     }
-  }, /*#__PURE__*/React.createElement("span", { className: "main-menu-icon" }, /*#__PURE__*/React.createElement(WalletIcon, null)), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-full" }, "정산하기"), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-short" }, "정산"))))), isMainSideMenuOpen && /*#__PURE__*/React.createElement(MainSideMenu, {
+  }, /*#__PURE__*/React.createElement("span", { className: "main-menu-icon" }, /*#__PURE__*/React.createElement(WalletIcon, { size: 16 })), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-full" }, "정산하기"), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-short" }, "정산"))))), isMainSideMenuOpen && /*#__PURE__*/React.createElement(MainSideMenu, {
     calendar: activeCal,
     onClose: () => setIsMainSideMenuOpen(false),
     onOpenManual: () => {
@@ -14044,7 +14050,7 @@ function DateModal({
     }
   },
     /*#__PURE__*/React.createElement("span", {
-      style: { fontSize: '0.85rem', fontWeight: 800, color: '#475569' }
+      style: { fontSize: '0.85rem', fontWeight: 700, color: '#64748B' }
     }, `참석가능 (${dateEntries.length}명)`),
     /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
       /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center' } },
@@ -14098,7 +14104,7 @@ function DateModal({
       onClick: () => setIsSettlementCollapsed(prev => !prev),
       style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', cursor: 'pointer', marginBottom: isSettlementCollapsed ? 0 : '10px' }
     },
-      /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.85rem', fontWeight: 800, color: '#475569' } }, "회비 정산"),
+      /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.85rem', fontWeight: 700, color: '#64748B' } }, "회비 정산"),
       /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
         expenseTotal > 0 && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-main)' } }, `${expenseTotal.toLocaleString()}원`),
         /*#__PURE__*/React.createElement(SectionToggleButton, {
@@ -14243,7 +14249,7 @@ function DateModal({
               }
             },
             onDragEnd: resetExpensePointerSort
-	          }, /*#__PURE__*/React.createElement(LineHeightIcon, null)),
+	          }, /*#__PURE__*/React.createElement(LineHeightIcon, { size: 14 })),
           /*#__PURE__*/React.createElement("button", {
             type: "button",
             className: "expense-delete-button",
@@ -16360,11 +16366,11 @@ function ExternalLinkIcon() {
   }));
 }
 
-function WalletIcon() {
+function WalletIcon({ size = 24 } = {}) {
   return /*#__PURE__*/React.createElement("svg", {
     xmlns: "http://www.w3.org/2000/svg",
-    width: "24",
-    height: "24",
+    width: String(size),
+    height: String(size),
     viewBox: "0 0 24 24",
     fill: "none",
     stroke: "currentColor",
@@ -16705,11 +16711,11 @@ function PollSectionIcon() {
   }));
 }
 
-function LineHeightIcon() {
+function LineHeightIcon({ size = 22 } = {}) {
   return /*#__PURE__*/React.createElement("svg", {
     xmlns: "http://www.w3.org/2000/svg",
-    width: "22",
-    height: "22",
+    width: String(size),
+    height: String(size),
     viewBox: "0 0 24 24",
     fill: "none",
     stroke: "currentColor",
@@ -16860,7 +16866,7 @@ function PollList({ calendar, onCreatePoll, onEditPoll, onVotePoll, onCancelVote
     onToggle: togglePollList,
     label: anyPollOpen ? "진행중 투표 접기" : "진행중 투표 펼치기"
   })), polls.length === 0 ? /*#__PURE__*/React.createElement("div", {
-    style: { color: 'var(--text-muted)', fontSize: '0.85rem', padding: '10px 0' }
+    style: { color: 'var(--text-muted)', fontSize: '0.85rem', padding: '10px 0', textAlign: 'center' }
   }, "\uC544\uC9C1 \uC0DD\uC131\uB41C \uD22C\uD45C\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.") : /*#__PURE__*/React.createElement("div", {
     className: "polls-section"
   }, polls.map(poll => {
