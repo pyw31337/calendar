@@ -9034,7 +9034,9 @@ function App() {
       minWidth: 0
     }
   }, /*#__PURE__*/React.createElement("span", {
-    className: "calendar-title"
+    className: "calendar-title",
+    onClick: () => { window.location.href = window.location.pathname; },
+    style: { cursor: 'pointer' }
   }, activeCal?.title)))), /*#__PURE__*/React.createElement("div", {
     className: "header-actions"
   }, /*#__PURE__*/React.createElement("button", {
@@ -10903,13 +10905,20 @@ function ImageUrlModal({ imageUrl, onClose, showToast, onEnsureShareUrl }) {
   const [errorText, setErrorText] = React.useState('');
   const isInlineImageUrl = typeof resolvedUrl === 'string' && resolvedUrl.startsWith('data:');
   const isShareableUrl = /^https?:\/\//.test(resolvedUrl || '');
+  // onEnsureShareUrl is a fresh closure on every Lightbox render (it isn't memoized, since it
+  // closes over meta/index/onPromoteImageUrl), so keeping it out of the effect's dependency
+  // array -- and reading the latest version through a ref instead -- keeps an unrelated parent
+  // re-render (e.g. chat messages updating, image dimensions loading) from cancelling and
+  // restarting an in-flight share-URL generation before it can resolve.
+  const onEnsureShareUrlRef = React.useRef(onEnsureShareUrl);
+  onEnsureShareUrlRef.current = onEnsureShareUrl;
   React.useEffect(() => {
     let cancelled = false;
     setResolvedUrl(imageUrl || '');
     setErrorText('');
-    if (typeof imageUrl !== 'string' || !imageUrl.startsWith('data:') || typeof onEnsureShareUrl !== 'function') return;
+    if (typeof imageUrl !== 'string' || !imageUrl.startsWith('data:') || typeof onEnsureShareUrlRef.current !== 'function') return;
     setIsGenerating(true);
-    Promise.resolve(onEnsureShareUrl(imageUrl)).then(result => {
+    Promise.resolve(onEnsureShareUrlRef.current(imageUrl)).then(result => {
       if (cancelled) return;
       const nextUrl = typeof result === 'string' ? result : result?.shareUrl;
       if (nextUrl && /^https?:\/\//.test(nextUrl)) {
@@ -10924,7 +10933,7 @@ function ImageUrlModal({ imageUrl, onClose, showToast, onEnsureShareUrl }) {
       if (!cancelled) setIsGenerating(false);
     });
     return () => { cancelled = true; };
-  }, [imageUrl, onEnsureShareUrl]);
+  }, [imageUrl]);
   return /*#__PURE__*/React.createElement("div", {
     className: "modal-overlay image-url-modal",
     onClick: e => { e.stopPropagation(); onClose(); },
