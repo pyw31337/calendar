@@ -757,6 +757,7 @@
     .calendar-title {
       font-size: 1.25rem; font-weight: 800; color: var(--text-main); letter-spacing: -0.02em;
       min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      cursor: pointer;
     }
     @media (min-width: 768px) { .calendar-title { font-size: 1.35rem; } }
 
@@ -2059,9 +2060,10 @@
       box-shadow: none;
     }
     :root[data-theme="dark"] .confirmed-meeting-label-badge {
-      background-color: #1B2540;
+      background-color: transparent;
       color: #C4B5FD;
-      border: 1px solid #6D5DF6;
+      border: none;
+      box-shadow: none;
     }
     @media (min-width: 640px) {
       .memo-capsule-badge { padding: 4px 12px; font-size: 0.8rem; }
@@ -2168,9 +2170,10 @@
         border: 1px solid #10B981 !important;
       }
       :root:not([data-theme="light"]) .confirmed-meeting-label-badge {
-        background-color: #1B2540;
+        background-color: transparent;
         color: #C4B5FD;
-        border: 1px solid #6D5DF6;
+        border: none;
+        box-shadow: none;
       }
       :root:not([data-theme="light"]) .search-result-row {
         background-color: #1B2540;
@@ -2271,6 +2274,18 @@
       }
       .recent-log-note {
         flex-basis: 100%;
+      }
+      .schedule-result-row {
+        flex-direction: column;
+        align-items: flex-start !important;
+        gap: 6px !important;
+      }
+      .schedule-result-row .search-result-text {
+        white-space: normal !important;
+        overflow: visible !important;
+        text-overflow: clip !important;
+        width: 100%;
+        word-break: break-all;
       }
     }
 
@@ -6412,7 +6427,8 @@ function AdminDashboard({ initialCalendars }) {
       style: {
         position: 'fixed', bottom: '32px', left: '50%', transform: 'translateX(-50%)', zIndex: 99999,
         backgroundColor: toast.type === 'error' ? '#EF4444' : '#3ECF8E', color: toast.type === 'error' ? '#FFFFFF' : '#000000',
-        padding: '12px 24px', borderRadius: '8px', fontSize: '0.88rem', fontWeight: 'bold', boxShadow: '0 10px 25px -5px rgba(15,23,42,0.35)'
+        padding: '12px 24px', borderRadius: '8px', fontSize: '0.88rem', fontWeight: 'bold', boxShadow: '0 10px 25px -5px rgba(15,23,42,0.35)',
+        textAlign: 'center', wordBreak: 'break-all', whiteSpace: 'pre-wrap', maxWidth: '90vw', width: 'max-content', boxSizing: 'border-box'
       }
     }, toast.message),
 
@@ -8984,7 +9000,14 @@ function App() {
         fontWeight: '800',
         display: 'flex',
         alignItems: 'center',
-        gap: '8px'
+        justifyContent: 'center',
+        gap: '8px',
+        textAlign: 'center',
+        wordBreak: 'break-all',
+        whiteSpace: 'pre-wrap',
+        maxWidth: '90vw',
+        width: 'max-content',
+        boxSizing: 'border-box'
       }
     }, toast.message), operationProgress && !chatUploadProgress && /*#__PURE__*/React.createElement(OperationProgressOverlay, operationProgress), chatUploadProgress && /*#__PURE__*/React.createElement(ImageUploadOverlay, chatUploadProgress));
   }
@@ -9035,8 +9058,11 @@ function App() {
     }
   }, /*#__PURE__*/React.createElement("span", {
     className: "calendar-title",
-    onClick: () => { window.location.href = window.location.pathname; },
-    style: { cursor: 'pointer' }
+    onClick: () => {
+      if (activeCalId) {
+        window.location.href = `${window.location.pathname}?id=${activeCalId}`;
+      }
+    }
   }, activeCal?.title)))), /*#__PURE__*/React.createElement("div", {
     className: "header-actions"
   }, /*#__PURE__*/React.createElement("button", {
@@ -9344,10 +9370,13 @@ function App() {
       alignItems: 'center',
       gap: '8px',
       pointerEvents: 'none',
-      maxWidth: 'min(92vw, 520px)',
-      minWidth: 'min(80vw, 360px)',
-      whiteSpace: 'nowrap',
-      justifyContent: 'center'
+      maxWidth: '90vw',
+      width: 'max-content',
+      whiteSpace: 'pre-wrap',
+      wordBreak: 'break-all',
+      justifyContent: 'center',
+      textAlign: 'center',
+      boxSizing: 'border-box'
     }
   }, /*#__PURE__*/React.createElement("span", null, toast.message)), operationProgress && !chatUploadProgress && /*#__PURE__*/React.createElement(OperationProgressOverlay, operationProgress), chatUploadProgress && /*#__PURE__*/React.createElement(ImageUploadOverlay, chatUploadProgress));
 }
@@ -11466,19 +11495,7 @@ function CommentsSection({
     style: { color: '#2563EB', marginBottom: 0, display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold' }
   }, /*#__PURE__*/React.createElement(ChatSectionIcon, null), "채팅", totalChatCount > 0 && /*#__PURE__*/React.createElement("span", {
     title: hasUnreadChat ? '읽지 않은 채팅이 있습니다' : '모두 읽었습니다',
-    style: {
-      display: 'inline-flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      minWidth: '20px',
-      height: '20px',
-      padding: '0 6px',
-      borderRadius: '9999px',
-      fontSize: '0.7rem',
-      fontWeight: 800,
-      backgroundColor: hasUnreadChat ? '#EF4444' : '#E2E8F0',
-      color: hasUnreadChat ? '#FFFFFF' : '#64748B'
-    }
+    className: `main-menu-badge${hasUnreadChat ? ' is-unread' : ''}`
   }, totalChatCount)),
   /*#__PURE__*/React.createElement(SectionToggleButton, {
     collapsed: isCollapsed,
@@ -15622,12 +15639,17 @@ function GlobalSearchModal({
               key: `${item.date}_${item.participantId}`,
               type: "button",
               onClick: () => { onSelectDate(item.date); onClose(); },
-              className: "search-result-row"
+              className: "search-result-row schedule-result-row"
             },
-              /*#__PURE__*/React.createElement("span", { className: "search-result-date" }, formatDateWithDayName(item.date)),
-              /*#__PURE__*/React.createElement("span", {
-                style: { backgroundColor: p.color, color: getContrastTextColor(p.color), padding: '2px 8px', borderRadius: '9999px', fontSize: '0.7rem', fontWeight: 'bold', whiteSpace: 'nowrap' }
-              }, p.name),
+              /*#__PURE__*/React.createElement("div", {
+                className: "schedule-result-header-row",
+                style: { display: 'flex', alignItems: 'center', gap: '8px' }
+              },
+                /*#__PURE__*/React.createElement("span", { className: "search-result-date" }, formatDateWithDayName(item.date)),
+                /*#__PURE__*/React.createElement("span", {
+                  style: { backgroundColor: p.color, color: getContrastTextColor(p.color), padding: '2px 8px', borderRadius: '9999px', fontSize: '0.7rem', fontWeight: 'bold', whiteSpace: 'nowrap' }
+                }, p.name)
+              ),
               /*#__PURE__*/React.createElement("span", { className: "search-result-text" }, item.note || '')
             );
           })
