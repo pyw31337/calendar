@@ -15791,6 +15791,54 @@ function SettlementSummaryModal({ calendar, onClose }) {
   }, item.url), item.createdAt && /*#__PURE__*/React.createElement("span", { className: "registered-at-text" }, formatRegisteredAt(item.createdAt))), /*#__PURE__*/React.createElement("strong", {
     style: { fontSize: '0.9rem', color: item.isIncome ? '#16A34A' : '#DC2626', whiteSpace: 'nowrap' }
   }, item.isIncome ? '+' : '-', Math.abs(item.amount).toLocaleString(), "원"));
+  const emptyContent = /*#__PURE__*/React.createElement("div", {
+    style: { padding: '30px 12px', color: '#94A3B8', fontSize: '0.88rem', textAlign: 'center' }
+  }, "등록된 정산 내역이 없습니다.");
+  const totalContent = /*#__PURE__*/React.createElement("div", {
+    style: { display: 'flex', flexDirection: 'column', gap: '12px' }
+  }, /*#__PURE__*/React.createElement("section", {
+    style: { border: '1px solid var(--border-subtle)', borderRadius: '14px', padding: '12px', background: 'var(--bg-primary)' }
+  }, /*#__PURE__*/React.createElement("h4", {
+    style: { margin: '0 0 10px', fontSize: '0.92rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '6px' }
+  }, /*#__PURE__*/React.createElement(ChartBarIcon, null), "카테고리별 지출"), categoryTotals.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    style: { color: '#94A3B8', fontSize: '0.82rem' }
+  }, "아직 지출 항목이 없습니다.") : categoryTotals.map(item => /*#__PURE__*/React.createElement("div", {
+    key: item.category.id,
+    style: { display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr) auto', gap: '8px', alignItems: 'center', marginTop: '8px' }
+  }, categoryBadge(item.category), /*#__PURE__*/React.createElement("div", {
+    style: { height: '8px', borderRadius: '999px', background: '#E2E8F0', overflow: 'hidden' }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { width: `${totalExpense ? Math.max(4, item.total / totalExpense * 100) : 0}%`, height: '100%', background: item.category.color, borderRadius: '999px' }
+  })), /*#__PURE__*/React.createElement("strong", {
+    style: { fontSize: '0.8rem', color: 'var(--text-main)', whiteSpace: 'nowrap' }
+  }, item.total.toLocaleString(), "원")))), /*#__PURE__*/React.createElement("section", {
+    style: { display: 'flex', flexDirection: 'column', gap: '8px' }
+  }, baseBudget > 0 && /*#__PURE__*/React.createElement("div", {
+    style: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: '10px', alignItems: 'center', padding: '10px 12px', border: '1px solid #BBF7D0', borderRadius: '12px', background: '#F0FDF4' }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { display: 'flex', flexDirection: 'column', gap: '4px' }
+  }, /*#__PURE__*/React.createElement("strong", {
+    style: { color: '#15803D', fontSize: '0.86rem' }
+  }, "기초 예산"), /*#__PURE__*/React.createElement("span", {
+    className: "registered-at-text"
+  }, "어드민에서 설정한 누적 잔액")), /*#__PURE__*/React.createElement("strong", {
+    style: { color: '#16A34A', whiteSpace: 'nowrap' }
+  }, "+", baseBudget.toLocaleString(), "원")), allItems.map(item => renderItemRow(item, true))));
+  const dailyContent = /*#__PURE__*/React.createElement("div", {
+    style: { display: 'flex', flexDirection: 'column', gap: '10px' }
+  }, rows.map(row => /*#__PURE__*/React.createElement("section", {
+    key: row.meeting.date,
+    style: { border: '1px solid var(--border-subtle)', borderRadius: '14px', padding: '12px', backgroundColor: 'var(--bg-primary)' }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', marginBottom: '10px' }
+  }, /*#__PURE__*/React.createElement("strong", {
+    style: { fontSize: '0.92rem', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' }
+  }, /*#__PURE__*/React.createElement(CalendarCheckIcon, null), formatDateWithDayName(row.meeting.date)), /*#__PURE__*/React.createElement("span", {
+    style: { fontSize: '0.86rem', fontWeight: 900, color: row.net < 0 ? '#DC2626' : '#16A34A', whiteSpace: 'nowrap' }
+  }, row.net >= 0 ? '+' : '-', Math.abs(row.net).toLocaleString(), "원")), /*#__PURE__*/React.createElement("div", {
+    style: { display: 'flex', flexDirection: 'column', gap: '8px' }
+  }, row.items.map(item => renderItemRow({ ...item, date: row.meeting.date }, false))))));
+  const bodyContent = allItems.length === 0 && baseBudget === 0 ? emptyContent : activeTab === 'total' ? totalContent : dailyContent;
 
   return /*#__PURE__*/React.createElement("div", {
     className: "modal-overlay",
@@ -15818,7 +15866,7 @@ function SettlementSummaryModal({ calendar, onClose }) {
     style: { minHeight: '92px', padding: '12px 10px', alignItems: 'flex-start', textAlign: 'left', gap: '8px' }
   }, /*#__PURE__*/React.createElement("div", {
     style: { color: card.color, display: 'inline-flex' }
-  }, card.icon), /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.75rem', color: '#64748B', fontWeight: 800 } }, card.label), /*#__PURE__*/React.createElement("div", { style: { fontSize: '1.05rem', fontWeight: 950, color: card.color } }, card.value.toLocaleString(), "원"))), /*#__PURE__*/React.createElement("div", {
+  }, card.icon), /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.75rem', color: '#64748B', fontWeight: 800 } }, card.label), /*#__PURE__*/React.createElement("div", { style: { fontSize: '1.05rem', fontWeight: 950, color: card.color } }, card.value.toLocaleString(), "원")))), /*#__PURE__*/React.createElement("div", {
     style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', padding: '4px', borderRadius: '14px', background: 'var(--bg-primary)', border: '1px solid var(--border-subtle)' }
   }, [['total', '누적보기'], ['daily', '일자별보기']].map(tab => /*#__PURE__*/React.createElement("button", {
     key: tab[0],
@@ -15833,27 +15881,7 @@ function SettlementSummaryModal({ calendar, onClose }) {
       fontWeight: 900,
       cursor: 'pointer'
     }
-  }, tab[1]))), allItems.length === 0 && baseBudget === 0 ? /*#__PURE__*/React.createElement("div", {
-    style: { padding: '30px 12px', color: '#94A3B8', fontSize: '0.88rem', textAlign: 'center' }
-  }, "등록된 정산 내역이 없습니다.") : activeTab === 'total' ? /*#__PURE__*/React.createElement("div", {
-    style: { display: 'flex', flexDirection: 'column', gap: '12px' }
-  }, /*#__PURE__*/React.createElement("section", {
-    style: { border: '1px solid var(--border-subtle)', borderRadius: '14px', padding: '12px', background: 'var(--bg-primary)' }
-  }, /*#__PURE__*/React.createElement("h4", { style: { margin: '0 0 10px', fontSize: '0.92rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(ChartBarIcon, null), "카테고리별 지출"), categoryTotals.length === 0 ? /*#__PURE__*/React.createElement("div", { style: { color: '#94A3B8', fontSize: '0.82rem' } }, "아직 지출 항목이 없습니다.") : categoryTotals.map(item => /*#__PURE__*/React.createElement("div", {
-    key: item.category.id,
-    style: { display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr) auto', gap: '8px', alignItems: 'center', marginTop: '8px' }
-  }, categoryBadge(item.category), /*#__PURE__*/React.createElement("div", { style: { height: '8px', borderRadius: '999px', background: '#E2E8F0', overflow: 'hidden' } }, /*#__PURE__*/React.createElement("div", { style: { width: `${totalExpense ? Math.max(4, item.total / totalExpense * 100) : 0}%`, height: '100%', background: item.category.color, borderRadius: '999px' } })), /*#__PURE__*/React.createElement("strong", { style: { fontSize: '0.8rem', color: 'var(--text-main)', whiteSpace: 'nowrap' } }, item.total.toLocaleString(), "원"))), /*#__PURE__*/React.createElement("section", {
-    style: { display: 'flex', flexDirection: 'column', gap: '8px' }
-  }, baseBudget > 0 && /*#__PURE__*/React.createElement("div", {
-    style: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: '10px', alignItems: 'center', padding: '10px 12px', border: '1px solid #BBF7D0', borderRadius: '12px', background: '#F0FDF4' }
-  }, /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '4px' } }, /*#__PURE__*/React.createElement("strong", { style: { color: '#15803D', fontSize: '0.86rem' } }, "기초 예산"), /*#__PURE__*/React.createElement("span", { className: "registered-at-text" }, "어드민에서 설정한 누적 잔액")), /*#__PURE__*/React.createElement("strong", { style: { color: '#16A34A', whiteSpace: 'nowrap' } }, "+", baseBudget.toLocaleString(), "원")), allItems.map(item => renderItemRow(item, true)))) : /*#__PURE__*/React.createElement("div", {
-    style: { display: 'flex', flexDirection: 'column', gap: '10px' }
-  }, rows.map(row => /*#__PURE__*/React.createElement("section", {
-    key: row.meeting.date,
-    style: { border: '1px solid var(--border-subtle)', borderRadius: '14px', padding: '12px', backgroundColor: 'var(--bg-primary)' }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', marginBottom: '10px' }
-  }, /*#__PURE__*/React.createElement("strong", { style: { fontSize: '0.92rem', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(CalendarCheckIcon, null), formatDateWithDayName(row.meeting.date)), /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.86rem', fontWeight: 900, color: row.net < 0 ? '#DC2626' : '#16A34A', whiteSpace: 'nowrap' } }, row.net >= 0 ? '+' : '-', Math.abs(row.net).toLocaleString(), "원")), /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '8px' } }, row.items.map(item => renderItemRow({ ...item, date: row.meeting.date }, false))))))));
+  }, tab[1]))), bodyContent)));
 }
 
 function SunIcon() {
