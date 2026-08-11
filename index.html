@@ -6514,12 +6514,22 @@ function AdminLoginGate({ children }) {
 function App() {
   const [calendars, setCalendarsState] = React.useState(() => loadLocalCache());
   const [toast, setToast] = React.useState(null);
+  const [operationProgress, setOperationProgress] = React.useState(null);
   const toastTimeoutRef = React.useRef(null);
+  const operationTimersRef = React.useRef({ delay: null, interval: null, hide: null });
+  const clearOperationTimers = () => {
+    const timers = operationTimersRef.current;
+    if (timers.delay) clearTimeout(timers.delay);
+    if (timers.interval) clearInterval(timers.interval);
+    if (timers.hide) clearTimeout(timers.hide);
+    operationTimersRef.current = { delay: null, interval: null, hide: null };
+  };
   React.useEffect(() => {
     return () => {
       if (toastTimeoutRef.current) {
         clearTimeout(toastTimeoutRef.current);
       }
+      clearOperationTimers();
     };
   }, []);
 
@@ -6532,6 +6542,35 @@ function App() {
     toastTimeoutRef.current = setTimeout(() => {
       setToast(t => t?.message === message ? null : t);
     }, duration);
+  };
+
+  const runWithOperationProgress = async ({ title, detail, delay = 1000 } = {}, task) => {
+    if (typeof task !== 'function') return undefined;
+    const id = `op_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    let shown = false;
+    let pct = 12;
+    const finishSoon = () => {
+      clearOperationTimers();
+      if (!shown) return;
+      setOperationProgress(prev => prev?.id === id ? { ...prev, pct: 100, detail: '마무리 중입니다...' } : prev);
+      operationTimersRef.current.hide = setTimeout(() => {
+        setOperationProgress(prev => prev?.id === id ? null : prev);
+      }, 350);
+    };
+    clearOperationTimers();
+    operationTimersRef.current.delay = setTimeout(() => {
+      shown = true;
+      setOperationProgress({ id, title: title || '작업 처리 중...', detail: detail || '서버에 반영하고 있습니다.', pct });
+      operationTimersRef.current.interval = setInterval(() => {
+        pct = Math.min(92, pct + (pct < 55 ? 9 : pct < 80 ? 5 : 2));
+        setOperationProgress(prev => prev?.id === id ? { ...prev, pct } : prev);
+      }, 650);
+    }, delay);
+    try {
+      return await task();
+    } finally {
+      finishSoon();
+    }
   };
 
   React.useEffect(() => {
@@ -6614,7 +6653,19 @@ function App() {
       isSavingRef.current = true;
       previousCalendars = calendars;
       setCalendarsState(normalizedCalendars);
-      const saved = await pushSingleCloudCalendar(currentCal, now, 18, normalizedCalendars, saveMode, newActivityLogs);
+      const progressTitle = saveMode === 'polls'
+        ? '투표 저장 중...'
+        : saveMode === 'settings'
+        ? '설정 저장 중...'
+        : saveMode === 'replace'
+        ? '캘린더 저장 중...'
+        : saveMode === 'restore'
+        ? '데이터 복구 중...'
+        : '일정 저장 중...';
+      const saved = await runWithOperationProgress({
+        title: progressTitle,
+        detail: `${currentCal.title || currentCal.id} 데이터를 Firebase에 반영하고 있습니다.`
+      }, () => pushSingleCloudCalendar(currentCal, now, 18, normalizedCalendars, saveMode, newActivityLogs));
       if (!saved) {
         console.warn('Cloud save failed for calendar:', currentCal.id);
         if (previousCalendars) setCalendarsState(previousCalendars);
@@ -6640,6 +6691,33 @@ function App() {
     const requestedId = getCalendarIdFromURL();
     return requestedId && isAllowedCalendarId(requestedId) ? requestedId : 'kkot';
   });
+  React.useEffect(() => {
+    if (initialLoadOverlayTimerRef.current) clearTimeout(initialLoadOverlayTimerRef.current);
+    if (initialLoadOverlayIntervalRef.current) clearInterval(initialLoadOverlayIntervalRef.current);
+    initialLoadOverlayTimerRef.current = null;
+    initialLoadOverlayIntervalRef.current = null;
+    if (!isInitialDataLoading) {
+      setOperationProgress(prev => prev?.id === 'initial-load' ? null : prev);
+      return;
+    }
+    let pct = 18;
+    initialLoadOverlayTimerRef.current = setTimeout(() => {
+      setOperationProgress({
+        id: 'initial-load',
+        title: '캘린더 데이터 로딩 중...',
+        detail: 'Firebase에서 최신 캘린더와 채팅 데이터를 불러오고 있습니다.',
+        pct
+      });
+      initialLoadOverlayIntervalRef.current = setInterval(() => {
+        pct = Math.min(92, pct + (pct < 60 ? 7 : 3));
+        setOperationProgress(prev => prev?.id === 'initial-load' ? { ...prev, pct } : prev);
+      }, 700);
+    }, 1000);
+    return () => {
+      if (initialLoadOverlayTimerRef.current) clearTimeout(initialLoadOverlayTimerRef.current);
+      if (initialLoadOverlayIntervalRef.current) clearInterval(initialLoadOverlayIntervalRef.current);
+    };
+  }, [isInitialDataLoading, activeCalId]);
   const [currentMonthDate, setCurrentMonthDate] = React.useState(new Date());
   const [selectedDate, setSelectedDate] = React.useState(null);
   const [isModalOpen, setIsModalOpen] = React.useState(false);
@@ -6720,6 +6798,8 @@ function App() {
   const [voteTarget, setVoteTarget] = React.useState(null);
   const [isGuideOpen, setIsGuideOpen] = React.useState(false);
   const [isInitialDataLoading, setIsInitialDataLoading] = React.useState(() => Boolean(firebaseDb));
+  const initialLoadOverlayTimerRef = React.useRef(null);
+  const initialLoadOverlayIntervalRef = React.useRef(null);
   const titleRef = React.useRef(null);
 
   // Main header: fixed full-width bar with a menu row, hides on scroll-down and reappears on
@@ -7125,12 +7205,16 @@ function App() {
           text: chatInput.trim(),
           timestamp: Date.now()
         };
-        if (firebaseDb) {
-          await firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages').add(messageData);
-          ok = true;
-        } else {
-          ok = await sendChatMessageRest(activeCalId, messageData);
-        }
+        ok = await runWithOperationProgress({
+          title: '채팅 전송 중...',
+          detail: '메시지를 Firebase에 저장하고 있습니다.'
+        }, async () => {
+          if (firebaseDb) {
+            await firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages').add(messageData);
+            return true;
+          }
+          return sendChatMessageRest(activeCalId, messageData);
+        });
       } else {
         // Bundle every attached image into a single multi-thumbnail message when possible.
         // Uploads that land in Storage produce short download URLs, so this is always a single
@@ -7908,7 +7992,7 @@ function App() {
         alignItems: 'center',
         gap: '8px'
       }
-    }, toast.message));
+    }, toast.message), operationProgress && !chatUploadProgress && /*#__PURE__*/React.createElement(OperationProgressOverlay, operationProgress), chatUploadProgress && /*#__PURE__*/React.createElement(ImageUploadOverlay, chatUploadProgress));
   }
 
   const mainMenuPollCount = getCalendarPolls(activeCal).length;
@@ -8330,7 +8414,7 @@ function App() {
       whiteSpace: 'nowrap',
       justifyContent: 'center'
     }
-  }, /*#__PURE__*/React.createElement("span", null, toast.message)), chatUploadProgress && /*#__PURE__*/React.createElement(ImageUploadOverlay, chatUploadProgress));
+  }, /*#__PURE__*/React.createElement("span", null, toast.message)), operationProgress && !chatUploadProgress && /*#__PURE__*/React.createElement(OperationProgressOverlay, operationProgress), chatUploadProgress && /*#__PURE__*/React.createElement(ImageUploadOverlay, chatUploadProgress));
 }
 
 // ---- Korean public holidays, substitute holidays, and 24 solar terms ----
@@ -9485,6 +9569,22 @@ function ImageUploadOverlay({ pct, remainingSec }) {
     /*#__PURE__*/React.createElement('div', { style: { height: '8px', borderRadius: '9999px', backgroundColor: 'var(--border-subtle)', overflow: 'hidden' } },
       /*#__PURE__*/React.createElement('div', { style: { height: '100%', width: `${clamped}%`, backgroundColor: '#4F46E5', transition: 'width 0.2s ease', borderRadius: '9999px' } })
     )
+  ));
+}
+
+function OperationProgressOverlay({ title, detail, pct }) {
+  const clamped = Math.max(0, Math.min(100, pct || 0));
+  return /*#__PURE__*/React.createElement('div', {
+    style: { position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.48)', zIndex: 100000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }
+  }, /*#__PURE__*/React.createElement('div', {
+    style: { backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: '16px', padding: '24px 28px', width: '300px', maxWidth: '100%', textAlign: 'center', boxShadow: '0 16px 42px rgba(0,0,0,0.28)' }
+  },
+    /*#__PURE__*/React.createElement('div', { style: { fontWeight: 900, fontSize: '1rem', color: 'var(--text-main)', marginBottom: '6px' } }, title || '작업 처리 중...'),
+    /*#__PURE__*/React.createElement('div', { style: { fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '14px', lineHeight: 1.45 } }, detail || '서버 응답을 기다리고 있습니다.'),
+    /*#__PURE__*/React.createElement('div', { style: { height: '9px', borderRadius: '9999px', backgroundColor: 'var(--border-subtle)', overflow: 'hidden' } },
+      /*#__PURE__*/React.createElement('div', { style: { height: '100%', width: `${clamped}%`, background: 'linear-gradient(90deg, #4F46E5, #EC4899)', transition: 'width 0.35s ease', borderRadius: '9999px' } })
+    ),
+    /*#__PURE__*/React.createElement('div', { style: { marginTop: '8px', color: 'var(--text-muted)', fontSize: '0.72rem', fontWeight: 800 } }, `${Math.round(clamped)}%`)
   ));
 }
 
