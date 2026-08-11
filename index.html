@@ -350,6 +350,13 @@
       overflow: hidden;
     }
 
+    @media (max-width: 720px) {
+      body:has(.admin-scope),
+      body:has(.admin-login-gate) {
+        padding: 24px 0 0px;
+      }
+    }
+
     /* Motion system ---------------------------------------------------------
        Inspired by GSAP/Motion/Anime.js principles: transform + opacity first,
        small interruptible movements, clear press feedback, and strict reduced-
@@ -6479,6 +6486,7 @@ function AdminLoginGate({ children }) {
   if (status === 'unlocked') return children;
 
   return /*#__PURE__*/React.createElement("div", {
+    className: "admin-login-gate",
     style: {
       minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
       backgroundColor: '#F8FAFC', padding: '20px'
@@ -15194,20 +15202,11 @@ function PollList({ calendar, onCreatePoll, onEditPoll, onVotePoll, onCancelVote
     className: "summary-title",
     style: { color: '#2563EB', marginBottom: 0, display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold' }
   }, /*#__PURE__*/React.createElement(PollSectionIcon, null), "\uC9C4\uD589\uC911 \uD22C\uD45C ", /*#__PURE__*/React.createElement(SectionCountBadge, { count: polls.length })),
-  /*#__PURE__*/React.createElement("div", {
-    style: { display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }
-  }, /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    className: "btn btn-poll-create",
-    onClick: event => {
-      event.stopPropagation();
-      onCreatePoll();
-    }
-  }, "+ \uC0DD\uC131"), /*#__PURE__*/React.createElement(SectionToggleButton, {
+  /*#__PURE__*/React.createElement(SectionToggleButton, {
     collapsed: !anyPollOpen,
     onToggle: togglePollList,
     label: anyPollOpen ? "진행중 투표 접기" : "진행중 투표 펼치기"
-  }))), polls.length === 0 ? /*#__PURE__*/React.createElement("div", {
+  })), polls.length === 0 ? /*#__PURE__*/React.createElement("div", {
     style: { color: 'var(--text-muted)', fontSize: '0.85rem', padding: '10px 0' }
   }, "\uC544\uC9C1 \uC0DD\uC131\uB41C \uD22C\uD45C\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.") : /*#__PURE__*/React.createElement("div", {
     className: "polls-section"
