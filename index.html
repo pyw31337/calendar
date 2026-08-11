@@ -790,13 +790,13 @@
     .btn-secondary { background: #F1F5F9; border-color: var(--border-subtle); color: var(--text-main); }
     .btn-secondary:hover { background: #E2E8F0; border-color: var(--border-hover); }
     .calendar-month-nav-btn,
-    .calendar-month-nav-btn:focus,
-    .calendar-month-nav-btn:active {
+    .calendar-month-nav-btn:focus {
       background-color: transparent;
-      border-color: transparent;
+      border: none;
       box-shadow: none;
     }
-    .calendar-month-nav-btn:hover {
+    .calendar-month-nav-btn:hover,
+    .calendar-month-nav-btn:active {
       background-color: #E2E8F0;
       border-color: transparent;
     }
@@ -862,23 +862,24 @@
       font-size: 1.05rem;
     }
 
-    .participant-color-input {
-      width: 32px !important;
+    .color-swatch-trigger {
+      width: 32px;
       min-width: 32px;
-      height: 32px !important;
+      height: 32px;
       flex: 0 0 32px;
       padding: 0;
-      border: 1px solid var(--border-subtle) !important;
+      border: 1px solid var(--border-subtle);
       border-radius: 50%;
-      background: #FFFFFF !important;
-      overflow: hidden;
-      appearance: none;
-      -webkit-appearance: none;
+      cursor: pointer;
     }
-    .participant-color-input::-webkit-color-swatch-wrapper { padding: 0; }
-    .participant-color-input::-webkit-color-swatch { border: 0; border-radius: 50%; }
 
     @media (max-width: 480px) {
+      .color-swatch-trigger {
+        width: 34px;
+        min-width: 34px;
+        height: 34px;
+        flex-basis: 34px;
+      }
       .participant-add-row { gap: 8px; }
       .participant-action-btn {
         width: 58px;
@@ -888,12 +889,6 @@
         padding-right: 0;
       }
       .participant-edit-row { gap: 8px; }
-      .participant-color-input {
-        width: 34px !important;
-        min-width: 34px;
-        height: 34px !important;
-        flex-basis: 34px;
-      }
       .participant-remove-btn {
         width: 44px;
         min-width: 44px;
@@ -2279,10 +2274,14 @@
       }
     }
 
+    /* Higher than every modal-overlay in the app (including the 9999 override some modals use
+       to stack above other already-open modals) so a bottom-sheet picker opened from inside any
+       modal always renders on top of it instead of being visually swallowed by the modal's own
+       backdrop. Still below the always-on-top progress-overlay/toast tier (99999/100000). */
     .bottom-sheet-overlay {
       position: fixed; top: 0; left: 0; right: 0; bottom: 0;
       background: rgba(15, 23, 42, 0.6); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px);
-      z-index: 2000; display: flex; align-items: flex-end; justify-content: center;
+      z-index: 20000; display: flex; align-items: flex-end; justify-content: center;
     }
     .bottom-sheet {
       background: var(--bg-card); width: 100%; max-width: 480px;
@@ -6824,11 +6823,10 @@ function AdminDashboard({ initialCalendars }) {
           /*#__PURE__*/React.createElement("div", { style: { marginBottom: '12px' } },
             /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#64748B', marginBottom: '4px' } }, "캘린더 제목"),
             /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
-              /*#__PURE__*/React.createElement("input", {
-                type: "color", className: "participant-color-input", value: calAccentColor || '#64748B',
-                onChange: e => setCalAccentColor(e.target.value),
-                title: "캘린더 색상",
-                style: { width: '28px', height: '28px', border: 'none', background: 'none', cursor: 'pointer', flexShrink: 0 }
+              /*#__PURE__*/React.createElement(ColorSwatchPicker, {
+                value: calAccentColor || '#64748B',
+                onChange: setCalAccentColor,
+                title: "캘린더 색상"
               }),
               /*#__PURE__*/React.createElement("input", {
                 type: "text", className: "form-input", style: { flex: 1, minWidth: 0 }, value: calTitle,
@@ -6875,10 +6873,10 @@ function AdminDashboard({ initialCalendars }) {
                 style: { display: 'flex', alignItems: 'center', gap: '8px' }
               },
                 /* Color picker */
-                /*#__PURE__*/React.createElement("input", {
-                  type: "color", className: "participant-color-input", value: p.color,
-                  onChange: e => handleUpdatePart(p.id, { color: e.target.value }),
-                  style: { width: '28px', height: '28px', border: 'none', background: 'none', cursor: 'pointer' }
+                /*#__PURE__*/React.createElement(ColorSwatchPicker, {
+                  value: p.color,
+                  onChange: color => handleUpdatePart(p.id, { color }),
+                  title: "참여자 색상"
                 }),
                 /* Name input */
                 /*#__PURE__*/React.createElement("input", {
@@ -6937,12 +6935,10 @@ function AdminDashboard({ initialCalendars }) {
 	                key: category.id,
 	                style: { display: 'flex', alignItems: 'center', gap: '8px' }
 	              },
-	                /*#__PURE__*/React.createElement("input", {
-	                  type: "color",
-	                  className: "participant-color-input",
+	                /*#__PURE__*/React.createElement(ColorSwatchPicker, {
 	                  value: category.color,
-	                  onChange: e => handleUpdateExpenseCategory(category.id, { color: e.target.value }),
-	                  style: { width: '28px', height: '28px', border: 'none', background: 'none', cursor: 'pointer' }
+	                  onChange: color => handleUpdateExpenseCategory(category.id, { color }),
+	                  title: "지출 카테고리 색상"
 	                }),
 	                /*#__PURE__*/React.createElement("input", {
 	                  type: "text",
@@ -9767,110 +9763,66 @@ function CalendarGrid({
     fill: "none"
   }), /*#__PURE__*/React.createElement("path", {
     d: "M6 9l6 6l6 -6"
-  }))))), isPickerOpen && /*#__PURE__*/React.createElement("div", {
-    style: {
-      position: 'absolute',
-      top: '60px',
-      left: '0',
-      zIndex: 200,
-      background: 'var(--bg-card)',
-      border: '1px solid var(--border-subtle)',
-      borderRadius: '16px',
-      boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
-      padding: '20px',
-      minWidth: '280px',
-      maxWidth: 'calc(100vw - 32px)',
-      boxSizing: 'border-box'
+  }))))), (() => {
+    const sheet = isPickerOpen && /*#__PURE__*/React.createElement("div", {
+      className: "bottom-sheet-overlay",
+      onClick: () => setIsPickerOpen(false)
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "bottom-sheet",
+      onClick: e => e.stopPropagation()
     },
-    onClick: e => e.stopPropagation()
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      position: 'fixed',
-      inset: 0,
-      zIndex: -1
-    },
-    onClick: () => setIsPickerOpen(false)
-  }), /*#__PURE__*/React.createElement("div", {
-    style: {
-      marginBottom: '16px'
-    }
-  }, /*#__PURE__*/React.createElement("label", {
-    style: {
-      fontSize: '0.8rem',
-      fontWeight: 700,
-      color: 'var(--text-muted)',
-      display: 'block',
-      marginBottom: '8px'
-    }
-  }, "\uB144\uB3C4"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: '10px'
-    }
-  }, /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    className: "btn btn-secondary",
-    style: {
-      padding: '4px 10px',
-      fontSize: '0.85rem'
-    },
-    onClick: () => setPickerYear(y => y - 1)
-  }, "\u25C0"), /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontWeight: 800,
-      fontSize: '1.1rem',
-      minWidth: '60px',
-      textAlign: 'center'
-    }
-  }, pickerYear, "\uB144"), /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    className: "btn btn-secondary",
-    style: {
-      padding: '4px 10px',
-      fontSize: '0.85rem'
-    },
-    onClick: () => setPickerYear(y => y + 1)
-  }, "\u25B6"))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      marginBottom: '16px'
-    }
-  }, /*#__PURE__*/React.createElement("label", {
-    style: {
-      fontSize: '0.8rem',
-      fontWeight: 700,
-      color: 'var(--text-muted)',
-      display: 'block',
-      marginBottom: '8px'
-    }
-  }, "\uC6D4"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'grid',
-      gridTemplateColumns: 'repeat(4, 1fr)',
-      gap: '6px'
-    }
-  }, MONTH_NAMES.map((name, idx) => /*#__PURE__*/React.createElement("button", {
-    key: idx,
-    type: "button",
-    onClick: () => setPickerMonth(idx),
-    style: {
-      padding: '6px 4px',
-      borderRadius: '8px',
-      border: pickerMonth === idx ? '2px solid var(--accent-primary)' : '1px solid var(--border-subtle)',
-      background: pickerMonth === idx ? 'rgba(99, 102, 241, 0.15)' : 'var(--bg-card)',
-      color: pickerMonth === idx ? 'var(--accent-primary)' : 'var(--text-main)',
-      fontWeight: pickerMonth === idx ? 800 : 500,
-      fontSize: '0.82rem',
-      cursor: 'pointer'
-    }
-  }, name)))), /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    className: "btn btn-primary",
-    style: {
-      width: '100%'
-    },
-    onClick: handlePickerApply
-  }, pickerYear, "\uB144 ", pickerMonth + 1, "\uC6D4\uB85C \uC774\uB3D9")), /*#__PURE__*/React.createElement("div", {
+      /*#__PURE__*/React.createElement("div", { className: "bottom-sheet-header" },
+        /*#__PURE__*/React.createElement("h4", null, "\uC5F0\uC6D4 \uC120\uD0DD"),
+        /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          style: { background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer' },
+          onClick: () => setIsPickerOpen(false)
+        }, "\u2715")
+      ),
+      /*#__PURE__*/React.createElement("div", { className: "bottom-sheet-body" },
+        /*#__PURE__*/React.createElement("div", { style: { marginBottom: '16px' } },
+          /*#__PURE__*/React.createElement("label", {
+            style: { fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '8px' }
+          }, "\uB144\uB3C4"),
+          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '10px' } },
+            /*#__PURE__*/React.createElement("button", {
+              type: "button", className: "btn btn-secondary", style: { padding: '4px 10px', fontSize: '0.85rem' },
+              onClick: () => setPickerYear(y => y - 1)
+            }, "\u25C0"),
+            /*#__PURE__*/React.createElement("span", {
+              style: { fontWeight: 800, fontSize: '1.1rem', minWidth: '60px', textAlign: 'center' }
+            }, pickerYear, "\uB144"),
+            /*#__PURE__*/React.createElement("button", {
+              type: "button", className: "btn btn-secondary", style: { padding: '4px 10px', fontSize: '0.85rem' },
+              onClick: () => setPickerYear(y => y + 1)
+            }, "\u25B6")
+          )
+        ),
+        /*#__PURE__*/React.createElement("div", { style: { marginBottom: '16px' } },
+          /*#__PURE__*/React.createElement("label", {
+            style: { fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '8px' }
+          }, "\uC6D4"),
+          /*#__PURE__*/React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' } },
+            MONTH_NAMES.map((name, idx) => /*#__PURE__*/React.createElement("button", {
+              key: idx, type: "button", onClick: () => setPickerMonth(idx),
+              style: {
+                padding: '6px 4px', borderRadius: '8px',
+                border: pickerMonth === idx ? '2px solid var(--accent-primary)' : '1px solid var(--border-subtle)',
+                background: pickerMonth === idx ? 'rgba(99, 102, 241, 0.15)' : 'var(--bg-card)',
+                color: pickerMonth === idx ? 'var(--accent-primary)' : 'var(--text-main)',
+                fontWeight: pickerMonth === idx ? 800 : 500, fontSize: '0.82rem', cursor: 'pointer'
+              }
+            }, name))
+          )
+        ),
+        /*#__PURE__*/React.createElement("button", {
+          type: "button", className: "btn btn-primary", style: { width: '100%' },
+          onClick: handlePickerApply
+        }, pickerYear, "\uB144 ", pickerMonth + 1, "\uC6D4\uB85C \uC774\uB3D9")
+      )
+    ));
+    return sheet && typeof document !== 'undefined' && ReactDOM.createPortal ? ReactDOM.createPortal(sheet, document.body) : sheet;
+  })(), /*#__PURE__*/React.createElement("div", {
     className: "weekday-grid"
   }, /*#__PURE__*/React.createElement("div", {
     className: "weekday-label sun"
@@ -14209,7 +14161,23 @@ function DateModal({
     },
       /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.85rem', fontWeight: 700, color: '#64748B' } }, "회비 정산"),
       /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
-        expenseTotal > 0 && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-main)' } }, `${expenseTotal.toLocaleString()}원`),
+        (() => {
+          const hasSettlementData = expenses.length > 0;
+          const netAmount = -expenseTotal;
+          const isNegative = netAmount < 0;
+          return /*#__PURE__*/React.createElement("span", {
+            style: {
+              fontSize: '0.78rem',
+              fontWeight: 800,
+              padding: '3px 9px',
+              borderRadius: '999px',
+              whiteSpace: 'nowrap',
+              backgroundColor: !hasSettlementData ? 'var(--bg-card)' : isNegative ? '#FEF2F2' : '#F0FDF4',
+              border: `1px solid ${!hasSettlementData ? 'var(--border-subtle)' : isNegative ? '#FCA5A5' : '#BBF7D0'}`,
+              color: !hasSettlementData ? 'var(--text-muted)' : isNegative ? '#DC2626' : '#16A34A'
+            }
+          }, hasSettlementData ? `${isNegative ? '-' : '+'}${Math.abs(netAmount).toLocaleString()}원` : '(없음)');
+        })(),
         /*#__PURE__*/React.createElement(SectionToggleButton, {
           collapsed: isSettlementCollapsed,
           onToggle: () => setIsSettlementCollapsed(prev => !prev),
@@ -14220,19 +14188,7 @@ function DateModal({
 		    !isSettlementCollapsed && /*#__PURE__*/React.createElement(React.Fragment, null,
 		      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
 		        /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
-		          !expenseIsIncome && /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
-		            title: "지출 카테고리 선택",
-		            placeholder: "지출 카테고리 선택",
-		            value: expenseCategoryInput,
-		            disabled: isSavingExpense,
-		            onSelect: setExpenseCategoryInput,
-		            options: expenseCategories.map(category => ({
-		              value: category.id,
-		              label: getExpenseCategoryLabel(category)
-		            })),
-		            style: { flex: '1 1 0%', minWidth: 0, height: '42px' }
-		          }),
-		          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '4px', flexShrink: 0, marginLeft: expenseIsIncome ? 'auto' : 0 } },
+		          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '4px', flexShrink: 0 } },
 		            /*#__PURE__*/React.createElement("button", {
 		              type: "button",
 		              disabled: isSavingExpense,
@@ -14255,7 +14211,19 @@ function DateModal({
 		                color: !expenseIsIncome ? '#DC2626' : 'var(--text-muted)'
 		              }
 		            }, "- 지출")
-		          )
+		          ),
+		          !expenseIsIncome && /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
+		            title: "지출 카테고리 선택",
+		            placeholder: "지출 카테고리 선택",
+		            value: expenseCategoryInput,
+		            disabled: isSavingExpense,
+		            onSelect: setExpenseCategoryInput,
+		            options: expenseCategories.map(category => ({
+		              value: category.id,
+		              label: getExpenseCategoryLabel(category)
+		            })),
+		            style: { flex: '1 1 0%', minWidth: 0, height: '42px' }
+		          })
 		        ),
 		        /*#__PURE__*/React.createElement("input", {
 	          type: "text",
@@ -14614,6 +14582,66 @@ const rebuildCalendarToTimestamp = (calendar, T, logs = []) => {
     revision: (calendar.revision || 0) + 1
   };
 };
+
+// A <input type="color">-replacement: native color inputs open the OS/browser's own color
+// picker (a system popup outside the app's control, and inconsistent across browsers/dark
+// mode) -- this instead opens the same bottom-sheet pattern as every other picker in the app,
+// letting the user choose from the same PRESET_COLORS palette new participants are auto-assigned
+// from. Used for calendar accent color, participant color, and expense category color alike.
+function ColorSwatchPicker({ value, onChange, disabled, title = "색상 선택" }) {
+  const [isOpen, setIsOpen] = React.useState(false);
+  const normalized = normalizeColorValue(value, '#64748B').toUpperCase();
+  const swatchColors = PRESET_COLORS.map(c => c.toUpperCase()).includes(normalized)
+    ? PRESET_COLORS
+    : [normalized, ...PRESET_COLORS];
+  const sheet = isOpen && /*#__PURE__*/React.createElement("div", {
+    className: "bottom-sheet-overlay",
+    onClick: () => setIsOpen(false)
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bottom-sheet",
+    onClick: e => e.stopPropagation()
+  },
+    /*#__PURE__*/React.createElement("div", { className: "bottom-sheet-header" },
+      /*#__PURE__*/React.createElement("h4", null, title),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        style: { background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer' },
+        onClick: () => setIsOpen(false)
+      }, "✕")
+    ),
+    /*#__PURE__*/React.createElement("div", { className: "bottom-sheet-body" },
+      /*#__PURE__*/React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '14px' } },
+        swatchColors.map(color => {
+          const isSelected = color.toUpperCase() === normalized;
+          return /*#__PURE__*/React.createElement("button", {
+            key: color,
+            type: "button",
+            "aria-label": color,
+            onClick: () => { onChange(color); setIsOpen(false); },
+            style: {
+              width: '44px', height: '44px', borderRadius: '50%', backgroundColor: color,
+              border: isSelected ? '3px solid var(--text-main)' : '1px solid var(--border-subtle)',
+              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: '#FFFFFF', fontWeight: 900, fontSize: '1rem'
+            }
+          }, isSelected && "✓");
+        })
+      )
+    )
+  ));
+  return /*#__PURE__*/React.createElement(React.Fragment, null,
+    /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      className: "color-swatch-trigger",
+      disabled,
+      title,
+      "aria-label": title,
+      onClick: () => setIsOpen(true),
+      style: { backgroundColor: normalized }
+    }),
+    sheet && typeof document !== 'undefined' && ReactDOM.createPortal ? ReactDOM.createPortal(sheet, document.body) : sheet
+  );
+}
 
 // Admin Modal
 // A <select>-replacement styled as a form-select trigger button that opens the same bottom-sheet
@@ -15116,11 +15144,11 @@ function AdminModal({
                   style: { display: 'flex', alignItems: 'center', gap: '8px' }
                 },
                   /* Color */
-                  /*#__PURE__*/React.createElement("input", {
-                    type: "color", className: "participant-color-input", value: p.color, disabled: isSubmitting,
-                    onInput: e => updateParticipant(p.id, { color: e.target.value }),
-                    onChange: e => updateParticipant(p.id, { color: e.target.value }),
-                    style: { width: '28px', height: '28px', border: 'none', background: 'none', cursor: 'pointer' }
+                  /*#__PURE__*/React.createElement(ColorSwatchPicker, {
+                    value: p.color,
+                    disabled: isSubmitting,
+                    onChange: color => updateParticipant(p.id, { color }),
+                    title: "참여자 색상"
                   }),
                   /* Name input */
                   /*#__PURE__*/React.createElement("input", {
@@ -15158,11 +15186,8 @@ function AdminModal({
               /*#__PURE__*/React.createElement("h4", { style: { fontSize: '0.92rem', fontWeight: 800, color: 'var(--text-main)', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(PollSectionIcon, null), "투표 설정"),
               /*#__PURE__*/React.createElement("button", {
                 type: "button",
-                onClick: () => { setEditingPoll(null); setIsPollModalOpen(true); },
-                style: {
-                  backgroundColor: '#2563EB', color: '#FFFFFF', border: 'none', borderRadius: '6px',
-                  padding: '6px 12px', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer'
-                }
+                className: "btn btn-poll-create",
+                onClick: () => { setEditingPoll(null); setIsPollModalOpen(true); }
               }, "+ 새 투표")
             ),
 
@@ -15177,7 +15202,7 @@ function AdminModal({
                 style: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px 8px', borderRadius: '8px', padding: '10px 12px' }
               },
                 /* Left info */
-                /*#__PURE__*/React.createElement("div", { className: "admin-poll-row-main", style: { display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0, flex: '1 1 160px' } },
+                /*#__PURE__*/React.createElement("div", { className: "admin-poll-row-main", style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '2px', minWidth: 0, flex: '1 1 160px' } },
                   /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--text-main)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' } }, poll.title),
                   /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.72rem', color: '#64748B' } }, `${getActivePollOptions(poll).length}개 옵션 · 총 ${getPollTotalVoteCount(poll)}표${poll.deadline ? ` · 마감 ${formatPollDeadline(poll.deadline)}${isPollClosed(poll) ? ' (마감됨)' : ''}` : ''}`)
                 ),
@@ -15222,7 +15247,7 @@ function AdminModal({
         /*#__PURE__*/React.createElement("button", {
           type: "button",
           className: "btn btn-secondary",
-          style: { width: '100%', justifyContent: 'center' },
+          style: { width: '100%', justifyContent: 'center', padding: '24px' },
           onClick: () => {
             if (getTrulyConfirmedMeetings(calendar).length === 0) {
               if (showToast) showToast('확정된 모임이 없습니다', 'error');
@@ -15448,24 +15473,18 @@ function AdminModal({
         /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px', marginBottom: '10px', flexWrap: 'wrap' } },
           /*#__PURE__*/React.createElement("div", { style: { flex: '1 1 140px' } },
             /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.76rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '4px' } }, "시작일자"),
-            /*#__PURE__*/React.createElement("input", {
-              type: "date",
-              className: "form-input",
-              style: { width: '100%' },
-              value: recurringStartDate,
+            /*#__PURE__*/React.createElement(DeadlineDateTimePicker, {
+              value: `${recurringStartDate}T00:00`,
               disabled: isRecurringSubmitting,
-              onChange: e => setRecurringStartDate(e.target.value)
+              onChange: v => setRecurringStartDate(v.slice(0, 10))
             })
           ),
           /*#__PURE__*/React.createElement("div", { style: { flex: '1 1 140px' } },
             /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.76rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '4px' } }, "종료일자"),
-            /*#__PURE__*/React.createElement("input", {
-              type: "date",
-              className: "form-input",
-              style: { width: '100%' },
-              value: recurringEndDate,
+            /*#__PURE__*/React.createElement(DeadlineDateTimePicker, {
+              value: `${recurringEndDate}T00:00`,
               disabled: isRecurringSubmitting,
-              onChange: e => setRecurringEndDate(e.target.value)
+              onChange: v => setRecurringEndDate(v.slice(0, 10))
             })
           )
         ),
@@ -17304,70 +17323,96 @@ function DeadlineDateTimePicker({ value, onChange, disabled }) {
       style: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', cursor: disabled ? 'default' : 'pointer', textAlign: 'left' },
       onClick: openPicker
     }, /*#__PURE__*/React.createElement('span', null, displayText)),
-    isOpen && /*#__PURE__*/React.createElement('div', {
-      style: {
-        position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 200,
-        background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: '16px',
-        boxShadow: '0 8px 32px rgba(0,0,0,0.15)', padding: '16px', boxSizing: 'border-box'
+    (() => {
+      const sheet = isOpen && /*#__PURE__*/React.createElement('div', {
+        className: 'bottom-sheet-overlay',
+        onClick: () => setIsOpen(false)
+      }, /*#__PURE__*/React.createElement('div', {
+        className: 'bottom-sheet',
+        onClick: e => e.stopPropagation()
       },
-      onClick: e => e.stopPropagation()
-    },
-      /*#__PURE__*/React.createElement('div', { style: { position: 'fixed', inset: 0, zIndex: -1 }, onClick: () => setIsOpen(false) }),
-      /*#__PURE__*/React.createElement('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginBottom: '12px' } },
-        /*#__PURE__*/React.createElement('button', { type: 'button', className: 'btn btn-secondary', style: { padding: '4px 10px', fontSize: '0.85rem' }, onClick: () => setPYear(y => y - 1) }, '◀'),
-        /*#__PURE__*/React.createElement('span', { style: { fontWeight: 800, fontSize: '1rem', minWidth: '60px', textAlign: 'center' } }, `${pYear}년`),
-        /*#__PURE__*/React.createElement('button', { type: 'button', className: 'btn btn-secondary', style: { padding: '4px 10px', fontSize: '0.85rem' }, onClick: () => setPYear(y => y + 1) }, '▶')
-      ),
-      /*#__PURE__*/React.createElement('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px', marginBottom: '12px' } },
-        DEADLINE_PICKER_MONTH_NAMES.map((name, idx) => /*#__PURE__*/React.createElement('button', {
-          key: idx, type: 'button',
-          onClick: () => {
-            setPMonth(idx);
-            const dim = new Date(pYear, idx + 1, 0).getDate();
-            if (pDay > dim) setPDay(dim);
-          },
-          style: {
-            padding: '6px 4px', borderRadius: '8px',
-            border: pMonth === idx ? '2px solid var(--accent-primary)' : '1px solid var(--border-subtle)',
-            background: pMonth === idx ? 'rgba(99, 102, 241, 0.15)' : 'var(--bg-card)',
-            color: pMonth === idx ? 'var(--accent-primary)' : 'var(--text-main)',
-            fontWeight: pMonth === idx ? 800 : 500, fontSize: '0.8rem', cursor: 'pointer'
-          }
-        }, name))
-      ),
-      /*#__PURE__*/React.createElement('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', marginBottom: '4px' } },
-        ['일', '월', '화', '수', '목', '금', '토'].map(w => /*#__PURE__*/React.createElement('div', {
-          key: w, style: { textAlign: 'center', fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)' }
-        }, w))
-      ),
-      /*#__PURE__*/React.createElement('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', marginBottom: '14px' } },
-        Array.from({ length: firstWeekday }).map((_, i) => /*#__PURE__*/React.createElement('div', { key: `blank-${i}` })),
-        Array.from({ length: daysInMonth }).map((_, i) => {
-          const day = i + 1;
-          const isSelected = pDay === day;
-          return /*#__PURE__*/React.createElement('button', {
-            key: day, type: 'button', onClick: () => setPDay(day),
-            style: {
-              padding: '6px 0', borderRadius: '8px',
-              border: isSelected ? '2px solid var(--accent-primary)' : '1px solid transparent',
-              background: isSelected ? 'rgba(99, 102, 241, 0.15)' : 'transparent',
-              color: isSelected ? 'var(--accent-primary)' : 'var(--text-main)',
-              fontWeight: isSelected ? 800 : 500, fontSize: '0.8rem', cursor: 'pointer'
-            }
-          }, day);
-        })
-      ),
-      /*#__PURE__*/React.createElement('div', { style: { marginBottom: '14px' } },
-        /*#__PURE__*/React.createElement('label', { style: { fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '6px' } }, '시간'),
-        /*#__PURE__*/React.createElement('input', {
-          type: 'time', className: 'form-input', style: { width: '100%' },
-          value: pTime, onChange: e => setPTime(e.target.value)
-        })
-      ),
-      /*#__PURE__*/React.createElement('button', {
-        type: 'button', className: 'btn btn-primary', style: { width: '100%' }, onClick: handleApply
-      }, '선택 완료')
-    )
+        /*#__PURE__*/React.createElement('div', { className: 'bottom-sheet-header' },
+          /*#__PURE__*/React.createElement('h4', null, '날짜/시간 선택'),
+          /*#__PURE__*/React.createElement('button', {
+            type: 'button',
+            style: { background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer' },
+            onClick: () => setIsOpen(false)
+          }, '✕')
+        ),
+        /*#__PURE__*/React.createElement('div', { className: 'bottom-sheet-body' },
+          /*#__PURE__*/React.createElement('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginBottom: '12px' } },
+            /*#__PURE__*/React.createElement('button', { type: 'button', className: 'btn btn-secondary', style: { padding: '4px 10px', fontSize: '0.85rem' }, onClick: () => setPYear(y => y - 1) }, '◀'),
+            /*#__PURE__*/React.createElement('span', { style: { fontWeight: 800, fontSize: '1rem', minWidth: '60px', textAlign: 'center' } }, `${pYear}년`),
+            /*#__PURE__*/React.createElement('button', { type: 'button', className: 'btn btn-secondary', style: { padding: '4px 10px', fontSize: '0.85rem' }, onClick: () => setPYear(y => y + 1) }, '▶')
+          ),
+          /*#__PURE__*/React.createElement('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px', marginBottom: '12px' } },
+            DEADLINE_PICKER_MONTH_NAMES.map((name, idx) => /*#__PURE__*/React.createElement('button', {
+              key: idx, type: 'button',
+              onClick: () => {
+                setPMonth(idx);
+                const dim = new Date(pYear, idx + 1, 0).getDate();
+                if (pDay > dim) setPDay(dim);
+              },
+              style: {
+                padding: '6px 4px', borderRadius: '8px',
+                border: pMonth === idx ? '2px solid var(--accent-primary)' : '1px solid var(--border-subtle)',
+                background: pMonth === idx ? 'rgba(99, 102, 241, 0.15)' : 'var(--bg-card)',
+                color: pMonth === idx ? 'var(--accent-primary)' : 'var(--text-main)',
+                fontWeight: pMonth === idx ? 800 : 500, fontSize: '0.8rem', cursor: 'pointer'
+              }
+            }, name))
+          ),
+          /*#__PURE__*/React.createElement('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', marginBottom: '4px' } },
+            ['일', '월', '화', '수', '목', '금', '토'].map(w => /*#__PURE__*/React.createElement('div', {
+              key: w, style: { textAlign: 'center', fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)' }
+            }, w))
+          ),
+          /*#__PURE__*/React.createElement('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', marginBottom: '14px' } },
+            Array.from({ length: firstWeekday }).map((_, i) => /*#__PURE__*/React.createElement('div', { key: `blank-${i}` })),
+            Array.from({ length: daysInMonth }).map((_, i) => {
+              const day = i + 1;
+              const isSelected = pDay === day;
+              return /*#__PURE__*/React.createElement('button', {
+                key: day, type: 'button', onClick: () => setPDay(day),
+                style: {
+                  padding: '6px 0', borderRadius: '8px',
+                  border: isSelected ? '2px solid var(--accent-primary)' : '1px solid transparent',
+                  background: isSelected ? 'rgba(99, 102, 241, 0.15)' : 'transparent',
+                  color: isSelected ? 'var(--accent-primary)' : 'var(--text-main)',
+                  fontWeight: isSelected ? 800 : 500, fontSize: '0.8rem', cursor: 'pointer'
+                }
+              }, day);
+            })
+          ),
+          /*#__PURE__*/React.createElement('div', { style: { marginBottom: '14px' } },
+            /*#__PURE__*/React.createElement('label', { style: { fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '6px' } }, '시간'),
+            /*#__PURE__*/React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
+              /*#__PURE__*/React.createElement('input', {
+                type: 'number', className: 'form-input', style: { flex: '1 1 0%', minWidth: 0, textAlign: 'center' },
+                min: 0, max: 23, value: Number(pTime.slice(0, 2)),
+                onChange: e => {
+                  const h = Math.min(23, Math.max(0, Number(e.target.value) || 0));
+                  setPTime(`${String(h).padStart(2, '0')}:${pTime.slice(3, 5)}`);
+                }
+              }),
+              /*#__PURE__*/React.createElement('span', { style: { fontWeight: 800, color: 'var(--text-muted)' } }, ':'),
+              /*#__PURE__*/React.createElement('input', {
+                type: 'number', className: 'form-input', style: { flex: '1 1 0%', minWidth: 0, textAlign: 'center' },
+                min: 0, max: 59, value: Number(pTime.slice(3, 5)),
+                onChange: e => {
+                  const m = Math.min(59, Math.max(0, Number(e.target.value) || 0));
+                  setPTime(`${pTime.slice(0, 2)}:${String(m).padStart(2, '0')}`);
+                }
+              })
+            )
+          ),
+          /*#__PURE__*/React.createElement('button', {
+            type: 'button', className: 'btn btn-primary', style: { width: '100%' }, onClick: handleApply
+          }, '선택 완료')
+        )
+      ));
+      return sheet && typeof document !== 'undefined' && ReactDOM.createPortal ? ReactDOM.createPortal(sheet, document.body) : sheet;
+    })()
   );
 }
 
