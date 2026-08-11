@@ -1526,13 +1526,13 @@
     .admin-side-menu {
       width: min(300px, calc(100vw - 36px));
       min-height: 100%;
-      background: linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%);
+      background: #FFFFFF;
       color: #0F172A;
-      box-shadow: -18px 0 42px rgba(15, 23, 42, 0.18);
-      padding: 20px 16px 16px;
+      box-shadow: -12px 0 34px rgba(15, 23, 42, 0.12);
+      padding: 22px 16px 16px;
       display: flex;
       flex-direction: column;
-      gap: 14px;
+      gap: 0;
       animation: adminMenuSlideIn 0.22s cubic-bezier(.2,.8,.2,1);
     }
     .admin-side-menu-header {
@@ -1540,7 +1540,7 @@
       align-items: center;
       justify-content: space-between;
       gap: 12px;
-      padding: 2px 2px 12px;
+      padding: 0 2px 22px;
     }
     .admin-side-menu-brand {
       min-width: 0;
@@ -1552,13 +1552,13 @@
       width: 38px;
       height: 38px;
       border-radius: 12px;
-      background: linear-gradient(135deg, #111827, #334155);
+      background: #111827;
       color: #FFFFFF;
       display: inline-flex;
       align-items: center;
       justify-content: center;
       font-size: 1.05rem;
-      box-shadow: 0 10px 20px rgba(15, 23, 42, 0.16);
+      box-shadow: 0 12px 22px rgba(15, 23, 42, 0.18);
       flex: 0 0 38px;
     }
     .admin-side-menu-copy {
@@ -1595,7 +1595,7 @@
     }
     .admin-side-menu-close-btn:hover,
     .admin-side-menu-close-btn:focus-visible {
-      background: #F1F5F9;
+      background: #F8FAFC;
       color: #0F172A;
       outline: none;
     }
@@ -1603,17 +1603,17 @@
       display: flex;
       flex-direction: column;
       gap: 8px;
-      padding: 10px 0 12px;
+      padding: 16px 0 18px;
       border-top: 1px solid #E2E8F0;
       border-bottom: 1px solid #E2E8F0;
     }
     .admin-side-menu-item {
       width: 100%;
-      min-height: 54px;
-      padding: 0 12px;
+      min-height: 58px;
+      padding: 6px 12px;
       border: none;
       border-radius: 14px;
-      background: #FFFFFF;
+      background: transparent;
       color: #0F172A;
       display: flex;
       align-items: center;
@@ -1623,15 +1623,14 @@
       font-weight: 850;
       text-align: left;
       cursor: pointer;
-      box-shadow: 0 1px 0 rgba(15, 23, 42, 0.04), inset 0 0 0 1px #E2E8F0;
-      transition: background-color 0.16s ease, color 0.16s ease, transform 0.16s ease, box-shadow 0.16s ease;
+      box-shadow: none;
+      transition: background-color 0.16s ease, color 0.16s ease, transform 0.16s ease;
     }
     .admin-side-menu-item:hover,
     .admin-side-menu-item:focus-visible {
-      background: #0F172A;
-      color: #FFFFFF;
-      transform: translateX(-2px);
-      box-shadow: 0 14px 24px rgba(15, 23, 42, 0.16);
+      background: #F8FAFC;
+      color: #0F172A;
+      transform: translateX(2px);
       outline: none;
     }
     .admin-side-menu-item svg {
@@ -1643,7 +1642,7 @@
       width: 34px;
       height: 34px;
       border-radius: 11px;
-      background: #F1F5F9;
+      background: #F8FAFC;
       color: #0F172A;
       display: inline-flex;
       align-items: center;
@@ -1653,8 +1652,8 @@
     }
     .admin-side-menu-item:hover .admin-side-menu-item-icon,
     .admin-side-menu-item:focus-visible .admin-side-menu-item-icon {
-      background: rgba(255, 255, 255, 0.14);
-      color: #FFFFFF;
+      background: #EEF2FF;
+      color: #0F172A;
     }
     .admin-side-menu-item-copy {
       min-width: 0;
@@ -1675,17 +1674,7 @@
     }
     .admin-side-menu-item:hover .admin-side-menu-item-desc,
     .admin-side-menu-item:focus-visible .admin-side-menu-item-desc {
-      color: rgba(255, 255, 255, 0.68);
-    }
-    .admin-side-menu-footer {
-      margin-top: auto;
-      padding: 12px;
-      border-radius: 16px;
-      background: #EEF2FF;
-      color: #475569;
-      font-size: 0.72rem;
-      font-weight: 800;
-      line-height: 1.45;
+      color: #64748B;
     }
     @keyframes adminMenuFadeIn {
       from { opacity: 0; }
@@ -6096,9 +6085,6 @@ function AdminDashboard({ initialCalendars }) {
               /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "관리자 모드 종료")
             )
           )
-        ),
-        /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-footer" },
-          "관리자 전용 기능입니다. 변경 전 현재 캘린더를 한 번 더 확인해 주세요."
         )
       )
     ),
