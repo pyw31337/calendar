@@ -8164,7 +8164,7 @@ function App() {
     const existingExpenses = Array.isArray(meeting.expenses) ? meeting.expenses : [];
     const nextExpenses = expense?.id
       ? existingExpenses.map(e => e.id === expense.id ? { ...e, label: cleanLabel, url: cleanUrl, amount: cleanAmount, updatedAt: now } : e)
-      : [...existingExpenses, { id: `exp_${activeCal.id}_${dateStr}_${now}_${Math.random().toString(36).slice(2, 7)}`, label: cleanLabel, url: cleanUrl, amount: cleanAmount, createdAt: now, updatedAt: now }];
+      : [...existingExpenses, { id: `exp_${activeCal.id}_${dateStr}_${now}_${Math.random().toString(36).slice(2, 7)}`, label: cleanLabel, url: cleanUrl, amount: cleanAmount, order: existingExpenses.length, createdAt: now, updatedAt: now }];
     const nextConfirmedMeetings = existingMeetings.map((m, i) => i === meetingIndex ? { ...m, expenses: nextExpenses, amount: null } : m);
     const updatedCal = {
       ...activeCal,
@@ -8192,6 +8192,35 @@ function App() {
     };
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
     return updateCalendars(nextCalendars, '지출 삭제완료', 'success', updatedCal.id, 'settings', []);
+  };
+  const handleReorderExpenses = (dateStr, orderedExpenseIds) => {
+    if (!activeCal || !isValidDateString(dateStr) || !Array.isArray(orderedExpenseIds)) return false;
+    const existingMeetings = getConfirmedMeetings(activeCal);
+    const meetingIndex = existingMeetings.findIndex(m => m.date === dateStr);
+    if (meetingIndex < 0) return false;
+    const meeting = existingMeetings[meetingIndex];
+    const existingExpenses = Array.isArray(meeting.expenses) ? meeting.expenses : [];
+    if (existingExpenses.length < 2) return false;
+    const expenseById = new Map(existingExpenses.map(expense => [expense.id, expense]));
+    const nextExpenses = orderedExpenseIds
+      .filter(id => expenseById.has(id))
+      .map((id, index) => ({ ...expenseById.get(id), order: index }));
+    existingExpenses.forEach(expense => {
+      if (!orderedExpenseIds.includes(expense.id)) {
+        nextExpenses.push({ ...expense, order: nextExpenses.length });
+      }
+    });
+    if (nextExpenses.length !== existingExpenses.length) return false;
+    const now = Date.now();
+    const nextConfirmedMeetings = existingMeetings.map((m, i) => i === meetingIndex ? { ...m, expenses: nextExpenses } : m);
+    const updatedCal = {
+      ...activeCal,
+      confirmedMeeting: nextConfirmedMeetings,
+      updatedAt: now,
+      revision: (activeCal.revision || 0) + 1
+    };
+    const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
+    return updateCalendars(nextCalendars, '지출 순서 저장완료', 'success', updatedCal.id, 'settings', []);
   };
   const handleDeleteActivityLog = log => {
     if (!activeCal || !log?.id) return false;
@@ -8778,6 +8807,7 @@ function App() {
     onConfirmMeeting: handleConfirmMeeting,
     onSaveExpense: handleSaveExpense,
     onDeleteExpense: handleDeleteExpense,
+    onReorderExpenses: handleReorderExpenses,
     showToast: showToast,
     onRequestConfirm: showConfirmDialog,
     onClose: () => setIsModalOpen(false)
@@ -13128,6 +13158,7 @@ function DateModal({
   onConfirmMeeting,
   onSaveExpense,
   onDeleteExpense,
+  onReorderExpenses,
   onDelete,
   onDeleteDate,
   onRequestConfirm,
@@ -13206,7 +13237,12 @@ function DateModal({
   const isConfirmed = isDateConfirmedMeeting(calendar, dateStr);
   const confirmedMeetingEntry = getConfirmedMeetings(calendar).find(m => m.date === dateStr) || null;
   const expenses = React.useMemo(
-    () => (Array.isArray(confirmedMeetingEntry?.expenses) ? confirmedMeetingEntry.expenses : []).slice().sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)),
+    () => (Array.isArray(confirmedMeetingEntry?.expenses) ? confirmedMeetingEntry.expenses : []).slice().sort((a, b) => {
+      const aOrder = Number.isFinite(Number(a.order)) ? Number(a.order) : Number.POSITIVE_INFINITY;
+      const bOrder = Number.isFinite(Number(b.order)) ? Number(b.order) : Number.POSITIVE_INFINITY;
+      if (aOrder !== bOrder) return aOrder - bOrder;
+      return (a.createdAt || 0) - (b.createdAt || 0);
+    }),
     [confirmedMeetingEntry]
   );
   const [expenseLabelInput, setExpenseLabelInput] = React.useState('');
@@ -13215,6 +13251,9 @@ function DateModal({
   const [isSavingExpense, setIsSavingExpense] = React.useState(false);
   const [isSettlementCollapsed, setIsSettlementCollapsed] = React.useState(true);
   const [attendeesView, setAttendeesView] = React.useState('preview'); // preview: memo-only summary, closed: none, open: full list
+  const [draggingExpenseId, setDraggingExpenseId] = React.useState('');
+  const [dragOverExpenseId, setDragOverExpenseId] = React.useState('');
+  const expensePointerSortRef = React.useRef({ sourceId: '', targetId: '', startX: 0, startY: 0, active: false });
   const isAttendeesOpen = attendeesView === 'open';
   const isAttendeesPreview = attendeesView === 'preview';
   React.useEffect(() => {
@@ -13222,6 +13261,9 @@ function DateModal({
     setExpenseAmountInput('');
     setEditingExpenseId(null);
     setAttendeesView('preview');
+    setDraggingExpenseId('');
+    setDragOverExpenseId('');
+    expensePointerSortRef.current = { sourceId: '', targetId: '', startX: 0, startY: 0, active: false };
   }, [calendar?.id, dateStr]);
   const expenseTotal = expenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
   const getExpenseUrl = expense => sanitizeText(expense?.url || extractFirstUrl(expense?.label || ''), 220);
@@ -13271,6 +13313,72 @@ function DateModal({
       setExpenseAmountInput('');
     }
   };
+  const moveExpense = (sourceId, targetId) => {
+    if (!sourceId || !targetId || sourceId === targetId || isSavingExpense || !onReorderExpenses) return;
+    const fromIndex = expenses.findIndex(expense => expense.id === sourceId);
+    const toIndex = expenses.findIndex(expense => expense.id === targetId);
+    if (fromIndex < 0 || toIndex < 0) return;
+    const nextExpenses = [...expenses];
+    const [moved] = nextExpenses.splice(fromIndex, 1);
+    nextExpenses.splice(toIndex, 0, moved);
+    onReorderExpenses(dateStr, nextExpenses.map(expense => expense.id));
+  };
+  const resetExpensePointerSort = () => {
+    expensePointerSortRef.current = { sourceId: '', targetId: '', startX: 0, startY: 0, active: false };
+    setDraggingExpenseId('');
+    setDragOverExpenseId('');
+  };
+  const beginExpensePointerSort = (event, expenseId) => {
+    if (isSavingExpense) return;
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    expensePointerSortRef.current = {
+      sourceId: expenseId,
+      targetId: '',
+      startX: event.clientX,
+      startY: event.clientY,
+      active: false
+    };
+    setDraggingExpenseId(expenseId);
+    setDragOverExpenseId('');
+    if (event.currentTarget.setPointerCapture && event.pointerId !== undefined) {
+      try {
+        event.currentTarget.setPointerCapture(event.pointerId);
+      } catch (e) {}
+    }
+    event.preventDefault();
+    event.stopPropagation();
+  };
+  const updateExpensePointerSort = event => {
+    const session = expensePointerSortRef.current;
+    if (!session.sourceId || isSavingExpense) return;
+    const moved = Math.abs(event.clientX - session.startX) > 6 || Math.abs(event.clientY - session.startY) > 6;
+    if (!moved && !session.active) return;
+    session.active = true;
+    const element = document.elementFromPoint(event.clientX, event.clientY);
+    const targetRow = element && element.closest ? element.closest('.expense-sortable-row') : null;
+    const targetId = targetRow ? targetRow.getAttribute('data-expense-id') : '';
+    session.targetId = targetId && targetId !== session.sourceId ? targetId : '';
+    setDragOverExpenseId(session.targetId);
+    event.preventDefault();
+    event.stopPropagation();
+  };
+  const finishExpensePointerSort = event => {
+    const session = expensePointerSortRef.current;
+    if (!session.sourceId) return;
+    if (session.active && session.targetId) {
+      moveExpense(session.sourceId, session.targetId);
+    }
+    resetExpensePointerSort();
+    if (event && event.currentTarget && event.currentTarget.releasePointerCapture && event.pointerId !== undefined) {
+      try {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      } catch (e) {}
+    }
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+  };
   const selectExistingAvailabilityEntry = entry => {
     if (isSubmitting || !entry?.participantId) return;
     setParticipantId(entry.participantId);
@@ -13278,6 +13386,13 @@ function DateModal({
     requestAnimationFrame(() => noteInputRef.current?.focus());
   };
   const dateEntriesWithNotes = dateEntries.filter(entry => sanitizeText(entry.note || '', 120).trim());
+  const toggleAttendeesView = () => {
+    setAttendeesView(prev => {
+      if (prev === 'open') return 'closed';
+      if (prev === 'preview' && dateEntriesWithNotes.length > 0) return 'closed';
+      return 'open';
+    });
+  };
   const renderAvailabilityEntry = (entry, compact = false) => {
     const p = activeParticipants.find(part => part.id === entry.participantId);
     if (!p) return null;
@@ -13594,7 +13709,7 @@ function DateModal({
       marginTop: '6px'
     }
   }, /*#__PURE__*/React.createElement("div", {
-    onClick: () => setAttendeesView(prev => prev === 'open' ? 'closed' : 'open'),
+    onClick: toggleAttendeesView,
     style: {
       display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', cursor: 'pointer',
       marginBottom: isAttendeesOpen ? '10px' : 0
@@ -13633,7 +13748,7 @@ function DateModal({
       ),
       /*#__PURE__*/React.createElement(SectionToggleButton, {
         collapsed: !isAttendeesOpen,
-        onToggle: () => setAttendeesView(prev => prev === 'open' ? 'closed' : 'open'),
+        onToggle: toggleAttendeesView,
         label: isAttendeesOpen ? "참석가능 접기" : "참석가능 펼치기"
       })
     )
@@ -13703,7 +13818,12 @@ function DateModal({
           /*#__PURE__*/React.createElement("button", {
             type: "button",
             className: "btn btn-secondary",
-            style: { flexShrink: 0 },
+            style: editingExpenseId ? {
+              flexShrink: 0,
+              backgroundColor: '#0F172A',
+              borderColor: '#0F172A',
+              color: '#FFFFFF'
+            } : { flexShrink: 0 },
             disabled: isSavingExpense,
             onClick: handleSaveExpenseClick
           }, isSavingExpense ? "저장 중..." : editingExpenseId ? "수정" : "추가")
@@ -13720,14 +13840,66 @@ function DateModal({
           const expenseUrl = getExpenseUrl(expense);
           return /*#__PURE__*/React.createElement("div", {
             key: expense.id,
+            "data-expense-id": expense.id,
+            className: `expense-sortable-row poll-sortable-row${draggingExpenseId === expense.id ? ' is-dragging' : ''}${dragOverExpenseId === expense.id ? ' is-drop-target' : ''}`,
             onClick: () => handleExpenseItemClick(expense),
+            onDragOver: event => {
+              event.preventDefault();
+              event.dataTransfer.dropEffect = 'move';
+              if (draggingExpenseId && draggingExpenseId !== expense.id) setDragOverExpenseId(expense.id);
+            },
+            onDragEnter: event => {
+              event.preventDefault();
+              if (draggingExpenseId && draggingExpenseId !== expense.id) setDragOverExpenseId(expense.id);
+            },
+            onDragLeave: event => {
+              if (!event.currentTarget.contains(event.relatedTarget)) setDragOverExpenseId('');
+            },
+            onDrop: event => {
+              event.preventDefault();
+              event.stopPropagation();
+              const sourceId = event.dataTransfer.getData('text/plain') || draggingExpenseId;
+              moveExpense(sourceId, expense.id);
+              setDraggingExpenseId('');
+              setDragOverExpenseId('');
+            },
+            onDragEnd: resetExpensePointerSort,
             style: {
-              display: 'flex', flexDirection: 'column', gap: '4px', padding: '10px 12px',
+              display: 'flex', flexDirection: 'column', gap: '4px', padding: '10px 42px 10px 12px',
+              position: 'relative',
               backgroundColor: editingExpenseId === expense.id ? 'var(--bg-card)' : 'transparent',
               border: `1px solid ${editingExpenseId === expense.id ? 'var(--accent-primary)' : 'var(--border-subtle)'}`,
               borderRadius: 'var(--radius-md)', cursor: 'pointer'
             }
           },
+          expenses.length > 1 && /*#__PURE__*/React.createElement("button", {
+            type: "button",
+            className: "poll-drag-handle",
+            disabled: isSavingExpense,
+            draggable: !isSavingExpense,
+            title: "드래그하여 지출 순서 변경",
+            style: { position: 'absolute', top: '8px', right: '8px' },
+            onClick: event => {
+              event.stopPropagation();
+            },
+            onPointerDown: event => beginExpensePointerSort(event, expense.id),
+            onPointerMove: updateExpensePointerSort,
+            onPointerUp: finishExpensePointerSort,
+            onPointerCancel: resetExpensePointerSort,
+            onDragStart: event => {
+              if (isSavingExpense) return;
+              event.stopPropagation();
+              setDraggingExpenseId(expense.id);
+              event.dataTransfer.effectAllowed = 'move';
+              event.dataTransfer.setData('text/plain', expense.id);
+              const row = event.currentTarget.closest('.expense-sortable-row');
+              if (row && event.dataTransfer.setDragImage) {
+                const rect = row.getBoundingClientRect();
+                event.dataTransfer.setDragImage(row, Math.min(rect.width - 12, Math.max(24, event.clientX - rect.left)), Math.max(16, event.clientY - rect.top));
+              }
+            },
+            onDragEnd: resetExpensePointerSort
+          }, /*#__PURE__*/React.createElement(LineHeightIcon, null)),
           /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '4px', minWidth: 0 } },
             expenseLabel && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.85rem', color: 'var(--text-main)' } }, expenseLabel),
             expenseUrl && /*#__PURE__*/React.createElement("span", {
