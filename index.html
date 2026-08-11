@@ -80,7 +80,7 @@
       try {
         var params = new URLSearchParams(window.location.search);
         var id = params.get('id') || params.get('cal') || 'kkot';
-        var saved = window['local' + 'Storage'].getItem('gather_theme_preference_' + id + '_v1');
+        var saved = window['local' + 'Storage'].getItem('gather_theme_preference_global_v1') || window['local' + 'Storage'].getItem('gather_theme_preference_' + id + '_v1');
         if (saved === 'dark' || saved === 'light') {
           document.documentElement.setAttribute('data-theme', saved);
         }
@@ -2694,12 +2694,18 @@ function getChatNotifyPrefKey(calId) {
   return `gather_chat_notify_pref_${calId}_v1`;
 }
 function isChatNotifyEnabledForCalendar(calId) {
+  const globalPref = getLocalStorage().getItem('gather_chat_notify_pref_global_v1');
+  if (globalPref === 'on') return true;
+  if (globalPref === 'off') return false;
   if (!calId) return true;
   return getLocalStorage().getItem(getChatNotifyPrefKey(calId)) !== 'off';
 }
 function setChatNotifyEnabledForCalendar(calId, enabled) {
-  if (!calId) return;
-  getLocalStorage().setItem(getChatNotifyPrefKey(calId), enabled ? 'on' : 'off');
+  const val = enabled ? 'on' : 'off';
+  getLocalStorage().setItem('gather_chat_notify_pref_global_v1', val);
+  if (calId) {
+    getLocalStorage().setItem(getChatNotifyPrefKey(calId), val);
+  }
 }
 
 function notifyNewChatMessage(calendar, message, participantName) {
@@ -7653,24 +7659,30 @@ function App() {
   // Theme toggle -- mirrors the choice the early <head> theme-init script already applied
   // before first paint, so this state starts in sync with whatever's on <html> rather than
   // flashing to a default and then correcting itself.
-  const [themeChoice, setThemeChoice] = React.useState(() => document.documentElement.getAttribute('data-theme') || 'system');
+  const [themeChoice, setThemeChoice] = React.useState(() => {
+    try {
+      return getLocalStorage().getItem('gather_theme_preference_global_v1') || document.documentElement.getAttribute('data-theme') || 'system';
+    } catch (e) {
+      return 'system';
+    }
+  });
   const toggleTheme = () => {
     const isDark = themeChoice === 'dark' || (themeChoice === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
     const next = isDark ? 'light' : 'dark';
     document.documentElement.setAttribute('data-theme', next);
+    getLocalStorage().setItem('gather_theme_preference_global_v1', next);
     getLocalStorage().setItem(`gather_theme_preference_${activeCalId}_v1`, next);
     setThemeChoice(next);
   };
   const isDarkTheme = themeChoice === 'dark' || (themeChoice === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
   const isFirstCalIdRenderRef = React.useRef(true);
   React.useEffect(() => {
-    // Skip on first mount -- theme-init already applied the right calendar's choice before
-    // React ever ran, so re-applying here would just repeat that (harmlessly, but needlessly).
+    // Skip on first mount
     if (isFirstCalIdRenderRef.current) {
       isFirstCalIdRenderRef.current = false;
       return;
     }
-    const saved = getLocalStorage().getItem(`gather_theme_preference_${activeCalId}_v1`);
+    const saved = getLocalStorage().getItem('gather_theme_preference_global_v1') || getLocalStorage().getItem(`gather_theme_preference_${activeCalId}_v1`);
     const next = saved === 'dark' || saved === 'light' ? saved : 'system';
     if (next === 'system') {
       document.documentElement.removeAttribute('data-theme');
@@ -7680,16 +7692,14 @@ function App() {
     setThemeChoice(next);
   }, [activeCalId]);
 
-  // Text-size preference, relative to the browser's own default (100%). The whole app is built
-  // on rem units, so scaling the root font-size scales every component's text proportionally
-  // with no per-component changes needed.
-  const [fontScalePercent, setFontScalePercent] = React.useState(() => Number(getLocalStorage().getItem(`gather_font_scale_${activeCalId}_v1`)) || 100);
-  // Guards the write effect below against the calendar-switch effect's own setFontScalePercent
-  // call: without this, switching calendars would re-fire the write effect with the OLD
-  // calendar's still-current fontScalePercent value but the NEW calendar's key (effects run in
-  // declaration order within the same commit, so the write would land before the read below has
-  // a chance to correct the state), overwriting the newly-switched-to calendar's saved size with
-  // whatever the previous calendar had.
+  // Text-size preference, relative to the browser's own default (100%).
+  const [fontScalePercent, setFontScalePercent] = React.useState(() => {
+    const globalScale = getLocalStorage().getItem('gather_font_scale_global_v1');
+    if (globalScale) return Number(globalScale);
+    const calScale = getLocalStorage().getItem(`gather_font_scale_${activeCalId}_v1`);
+    if (calScale) return Number(calScale);
+    return 100;
+  });
   const skipNextFontWriteRef = React.useRef(false);
   React.useEffect(() => {
     document.documentElement.style.fontSize = `${fontScalePercent}%`;
@@ -7697,6 +7707,7 @@ function App() {
       skipNextFontWriteRef.current = false;
       return;
     }
+    getLocalStorage().setItem('gather_font_scale_global_v1', String(fontScalePercent));
     getLocalStorage().setItem(`gather_font_scale_${activeCalId}_v1`, String(fontScalePercent));
   }, [fontScalePercent]);
   const isFirstFontCalIdRenderRef = React.useRef(true);
@@ -7706,7 +7717,9 @@ function App() {
       return;
     }
     skipNextFontWriteRef.current = true;
-    setFontScalePercent(Number(getLocalStorage().getItem(`gather_font_scale_${activeCalId}_v1`)) || 100);
+    const globalScale = getLocalStorage().getItem('gather_font_scale_global_v1');
+    const calScale = getLocalStorage().getItem(`gather_font_scale_${activeCalId}_v1`);
+    setFontScalePercent(Number(globalScale || calScale) || 100);
   }, [activeCalId]);
 
   const [mainNotifPermission, setMainNotifPermission] = React.useState(() => (isNotificationSupported() ? Notification.permission : 'unsupported'));
@@ -8975,7 +8988,14 @@ function App() {
       chatMessagesContainerRef: chatMessagesContainerRef,
       showToast: showToast,
       onPromoteImageUrl: handlePromoteInlineChatImage,
-      onShare: () => setIsChatShareOpen(true)
+      onShare: () => setIsChatShareOpen(true),
+      isDarkTheme: isDarkTheme,
+      onToggleTheme: toggleTheme,
+      fontScalePercent: fontScalePercent,
+      onDecreaseFont: () => setFontScalePercent(prev => Math.max(80, prev - 10)),
+      onIncreaseFont: () => setFontScalePercent(prev => Math.min(130, prev + 10)),
+      isChatNotifyEnabled: mainNotifPermission === 'granted' && mainChatNotifyEnabled,
+      onToggleChatNotifications: handleMainToggleNotifications
     }), isChatSheetOpen && /*#__PURE__*/React.createElement(ChatParticipantSheet, {
       calendar: activeCal,
       selectedId: chatParticipantId,
@@ -11927,12 +11947,23 @@ function ChatRoomView({
   chatMessagesContainerRef,
   showToast,
   onPromoteImageUrl,
-  onShare
+  onShare,
+  isDarkTheme,
+  onToggleTheme,
+  fontScalePercent,
+  onDecreaseFont,
+  onIncreaseFont,
+  isChatNotifyEnabled,
+  onToggleChatNotifications
 }) {
   const [viewportBottom, setViewportBottom] = React.useState(0);
   // 'closed' (default -- nothing shown) | 'list' (existing notices + 공지 추가) | 'add' (textarea)
   const [noticePanelMode, setNoticePanelMode] = React.useState('closed');
   const [noticeInput, setNoticeInput] = React.useState('');
+  const [isChatSideMenuOpen, setIsChatSideMenuOpen] = React.useState(false);
+  const [isChatGalleryOpen, setIsChatGalleryOpen] = React.useState(false);
+  const [isSearchOpen, setIsSearchOpen] = React.useState(false);
+  const [searchQuery, setSearchQuery] = React.useState('');
   const pinnedNotices = getPinnedNotices(calendar);
   const revealedMsgId = useTapRevealedMsgId();
 
@@ -12187,6 +12218,7 @@ function ChatRoomView({
     const msgHasImages = !!(msg.imageUrl || (Array.isArray(msg.imageUrls) && msg.imageUrls.length > 0));
     const isEmojiOnlyMessage = isEmojiOnlyChatText(msg.text) && !msgHasImages;
     const rowId = msg.id || `msg-${idx}`;
+    const isSearchMatch = searchQuery && msg.text && msg.text.toLowerCase().includes(searchQuery.toLowerCase());
     renderedMessages.push(/*#__PURE__*/React.createElement("div", {
       key: rowId,
       className: `msg-row-hover ${revealedMsgId === rowId ? 'msg-actions-revealed' : ''}`,
@@ -12196,7 +12228,8 @@ function ChatRoomView({
         alignItems: 'flex-start',
         gap: '8px',
         marginBottom: '12px',
-        justifyContent: isMe ? 'flex-end' : 'flex-start'
+        justifyContent: isMe ? 'flex-end' : 'flex-start',
+        ...(isSearchMatch ? { outline: '2px solid var(--accent-primary)', outlineOffset: '4px', borderRadius: '10px' } : {})
       }
     }, !isMe && /*#__PURE__*/React.createElement("span", {
       style: {
@@ -12554,106 +12587,31 @@ function ChatRoomView({
     style: { display: 'flex', alignItems: 'center', gap: '2px' }
   }, /*#__PURE__*/React.createElement("button", {
     type: "button",
-    onClick: handleToggleNotifications,
-    title: notifPermission === 'granted' && chatNotifyEnabled ? '\uC54C\uB9BC \uCF1C\uC9D0' : '\uC54C\uB9BC \uCF1C\uAE30',
+    onClick: () => setIsChatSideMenuOpen(true),
+    title: "채팅 메뉴",
+    "aria-label": "채팅 메뉴 열기",
     style: {
       background: 'none',
       border: 'none',
       cursor: 'pointer',
-      padding: '4px',
-      color: notifPermission === 'granted' && chatNotifyEnabled ? '#4F46E5' : '#64748B',
-      display: 'flex',
-      alignItems: 'center'
-    }
-  }, /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg",
-    width: "22",
-    height: "22",
-    viewBox: "0 0 24 24",
-    fill: notifPermission === 'granted' && chatNotifyEnabled ? 'currentColor' : 'none',
-    stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round"
-  }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }),
-    /*#__PURE__*/React.createElement("path", { d: "M10 5a2 2 0 0 1 4 0a7 7 0 0 1 4 6v3a4 4 0 0 0 2 3h-16a4 4 0 0 0 2 -3v-3a7 7 0 0 1 4 -6" }),
-    /*#__PURE__*/React.createElement("path", { d: "M9 17v1a3 3 0 0 0 6 0v-1" }))), /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    onClick: onShare,
-    title: "\uACF5\uC720",
-    style: {
-      background: 'none',
-      border: 'none',
-      cursor: 'pointer',
-      padding: '4px',
-      color: '#64748B',
-      display: 'flex',
-      alignItems: 'center'
-    }
-  }, /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg",
-    width: "24",
-    height: "24",
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
-    className: "icon icon-tabler icons-tabler-outline icon-tabler-share"
-  }, /*#__PURE__*/React.createElement("path", {
-    stroke: "none",
-    d: "M0 0h24v24H0z",
-    fill: "none"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M3 12a3 3 0 1 0 6 0a3 3 0 1 0 -6 0"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M15 6a3 3 0 1 0 6 0a3 3 0 1 0 -6 0"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M15 18a3 3 0 1 0 6 0a3 3 0 1 0 -6 0"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M8.7 10.7l6.6 -3.4"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M8.7 13.3l6.6 3.4"
-  }))), /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    onClick: () => {
-      setNoticePanelMode(prev => {
-        if (prev !== 'closed') return 'closed';
-        if (pinnedNotices.length > 0) return 'list';
-        setNoticeInput('');
-        return 'add';
-      });
-    },
-    title: "공지 설정",
-    style: {
-      background: 'none',
-      border: 'none',
-      cursor: 'pointer',
-      padding: '4px',
-      color: pinnedNotices.length > 0 ? '#D97706' : '#64748B',
+      padding: '6px',
+      color: 'var(--text-muted)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      width: '32px',
-      height: '32px',
-      lineHeight: 0,
-      overflow: 'visible'
+      borderRadius: '8px'
     }
   }, /*#__PURE__*/React.createElement("svg", {
     xmlns: "http://www.w3.org/2000/svg",
     width: "22",
     height: "22",
     viewBox: "0 0 24 24",
-    fill: pinnedNotices.length > 0 ? 'currentColor' : 'none',
+    fill: "none",
     stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
-    style: { display: 'block', overflow: 'visible' }
-  }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }),
-    /*#__PURE__*/React.createElement("path", { d: "M9 4v6l-2 4v2h10v-2l-2 -4v-6" }),
-    /*#__PURE__*/React.createElement("path", { d: "M12 16l0 5" }))))), /*#__PURE__*/React.createElement("div", {
+    strokeWidth: "2",
+    strokeLinecap: "round",
+    strokeLinejoin: "round"
+  }, /*#__PURE__*/React.createElement("line", { x1: "4", x2: "20", y1: "6", y2: "6" }), /*#__PURE__*/React.createElement("line", { x1: "4", x2: "20", y1: "12", y2: "12" }), /*#__PURE__*/React.createElement("line", { x1: "4", x2: "20", y1: "18", y2: "18" }))))), /*#__PURE__*/React.createElement("div", {
     style: { flex: 1, position: 'relative', minHeight: 0 }
   }, /*#__PURE__*/React.createElement("div", {
     ref: chatMessagesContainerRef,
@@ -12663,7 +12621,7 @@ function ChatRoomView({
       inset: 0,
       overflowY: 'auto',
       padding: '16px',
-      paddingTop: '72px',
+      paddingTop: isSearchOpen ? '124px' : '72px',
       paddingBottom: '152px'
     }
   }, noticePanelMode === 'add' && /*#__PURE__*/React.createElement("div", {
@@ -13075,7 +13033,86 @@ function ChatRoomView({
   isEmojiPickerOpen && /*#__PURE__*/React.createElement(EmojiPickerSheet, {
     onSelect: insertEmojiIntoChatInput,
     onClose: () => setIsEmojiPickerOpen(false)
-  }));
+  }),
+  isChatSideMenuOpen && /*#__PURE__*/React.createElement(ChatSideMenu, {
+    calendar: calendar,
+    onClose: () => setIsChatSideMenuOpen(false),
+    onOpenSearch: () => { setIsSearchOpen(true); setSearchQuery(''); },
+    onOpenNoticeSettings: () => {
+      setNoticePanelMode(prev => {
+        if (prev !== 'closed') return 'closed';
+        if (pinnedNotices.length > 0) return 'list';
+        setNoticeInput('');
+        return 'add';
+      });
+    },
+    onOpenGallery: () => setIsChatGalleryOpen(true),
+    onOpenShare: onShare,
+    isDarkTheme: isDarkTheme,
+    onToggleTheme: onToggleTheme,
+    fontScalePercent: fontScalePercent,
+    onDecreaseFont: onDecreaseFont,
+    onIncreaseFont: onIncreaseFont,
+    isChatNotifyEnabled: isChatNotifyEnabled,
+    onToggleChatNotifications: onToggleChatNotifications
+  }),
+  isChatGalleryOpen && /*#__PURE__*/React.createElement(ChatGalleryModal, {
+    chatMessages: chatMessages,
+    onClose: () => setIsChatGalleryOpen(false),
+    setActiveLightbox: setActiveLightbox
+  }),
+  isSearchOpen && /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: 'fixed',
+      top: '56px',
+      left: 0,
+      right: 0,
+      zIndex: 1008,
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      padding: '8px 12px',
+      backgroundColor: 'var(--bg-card)',
+      borderBottom: '1px solid var(--border-subtle)',
+      boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
+    }
+  },
+    /*#__PURE__*/React.createElement("svg", {
+      xmlns: "http://www.w3.org/2000/svg",
+      width: "18",
+      height: "18",
+      viewBox: "0 0 24 24",
+      fill: "none",
+      stroke: "currentColor",
+      strokeWidth: "2",
+      strokeLinecap: "round",
+      strokeLinejoin: "round",
+      style: { color: 'var(--text-muted)', flexShrink: 0 }
+    }, /*#__PURE__*/React.createElement("circle", { cx: "11", cy: "11", r: "8" }), /*#__PURE__*/React.createElement("path", { d: "m21 21-4.3-4.3" })),
+    /*#__PURE__*/React.createElement("input", {
+      type: "text",
+      className: "form-input",
+      placeholder: "검색할 메시지를 입력하세요...",
+      value: searchQuery,
+      onChange: e => setSearchQuery(e.target.value),
+      autoFocus: true,
+      style: { flex: 1, height: '36px', fontSize: '0.9rem' }
+    }),
+    /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => { setIsSearchOpen(false); setSearchQuery(''); },
+      style: {
+        border: 'none',
+        background: 'none',
+        cursor: 'pointer',
+        color: 'var(--text-muted)',
+        padding: '4px 8px',
+        fontSize: '0.82rem',
+        fontWeight: 700,
+        flexShrink: 0
+      }
+    }, "닫기")
+  ));
 }
 
 // A curated, cross-platform-consistent emoji set (Twemoji, the same flat-design set used by
@@ -16094,6 +16131,296 @@ function MainSideMenu({
       )
     )
   ));
+}
+
+function ChatSideMenu({
+  calendar,
+  onClose,
+  onOpenSearch,
+  onOpenNoticeSettings,
+  onOpenGallery,
+  onOpenShare,
+  isDarkTheme,
+  onToggleTheme,
+  fontScalePercent,
+  onDecreaseFont,
+  onIncreaseFont,
+  isChatNotifyEnabled,
+  onToggleChatNotifications
+}) {
+  const handle = action => {
+    if (typeof action === 'function') action();
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    className: "admin-side-menu-overlay",
+    onClick: onClose
+  }, /*#__PURE__*/React.createElement("nav", {
+    className: "admin-side-menu",
+    "aria-label": "채팅 메뉴",
+    onClick: e => e.stopPropagation()
+  },
+    /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-header" },
+      /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-brand" },
+        /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-copy" },
+          /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-title" }, "채팅 메뉴")
+        )
+      ),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "admin-side-menu-close-btn",
+        title: "메뉴 닫기",
+        "aria-label": "메뉴 닫기",
+        onClick: onClose
+      }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }))
+    ),
+    /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-list" },
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "admin-side-menu-item",
+        onClick: () => { onClose(); handle(onOpenSearch); }
+      },
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", {
+          xmlns: "http://www.w3.org/2000/svg",
+          width: "20",
+          height: "20",
+          viewBox: "0 0 24 24",
+          fill: "none",
+          stroke: "currentColor",
+          strokeWidth: "2",
+          strokeLinecap: "round",
+          strokeLinejoin: "round"
+        }, /*#__PURE__*/React.createElement("circle", { cx: "11", cy: "11", r: "8" }), /*#__PURE__*/React.createElement("path", { d: "m21 21-4.3-4.3" }))),
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "대화검색"),
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "채팅 메시지 검색")
+        )
+      ),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "admin-side-menu-item",
+        onClick: () => { onClose(); handle(onOpenNoticeSettings); }
+      },
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", {
+          xmlns: "http://www.w3.org/2000/svg",
+          width: "20",
+          height: "20",
+          viewBox: "0 0 24 24",
+          fill: "none",
+          stroke: "currentColor",
+          strokeWidth: "2",
+          strokeLinecap: "round",
+          strokeLinejoin: "round"
+        }, /*#__PURE__*/React.createElement("path", { d: "M9 4v6l-2 4v2h10v-2l-2 -4v-6" }), /*#__PURE__*/React.createElement("path", { d: "M12 16v5" }))),
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "공지설정"),
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "공지 등록 및 고정 관리")
+        )
+      ),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "admin-side-menu-item",
+        onClick: () => { onClose(); handle(onOpenGallery); }
+      },
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", {
+          xmlns: "http://www.w3.org/2000/svg",
+          width: "20",
+          height: "20",
+          viewBox: "0 0 24 24",
+          fill: "none",
+          stroke: "currentColor",
+          strokeWidth: "2",
+          strokeLinecap: "round",
+          strokeLinejoin: "round"
+        }, /*#__PURE__*/React.createElement("rect", { width: "18", height: "18", x: "3", y: "3", rx: "2", ry: "2" }), /*#__PURE__*/React.createElement("circle", { cx: "9", cy: "9", r: "2" }), /*#__PURE__*/React.createElement("path", { d: "m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" }))),
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "갤러리"),
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "공유된 사진 및 링크 모아보기")
+        )
+      ),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "admin-side-menu-item",
+        onClick: () => { onClose(); handle(onOpenShare); }
+      },
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", {
+          xmlns: "http://www.w3.org/2000/svg",
+          width: "20",
+          height: "20",
+          viewBox: "0 0 24 24",
+          fill: "none",
+          stroke: "currentColor",
+          strokeWidth: "2",
+          strokeLinecap: "round",
+          strokeLinejoin: "round"
+        }, /*#__PURE__*/React.createElement("path", { d: "M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" }), /*#__PURE__*/React.createElement("polyline", { points: "16 6 12 2 8 6" }), /*#__PURE__*/React.createElement("line", { x1: "12", x2: "12", y1: "2", y2: "15" }))),
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "공유하기"),
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "채팅방 공유 URL 복사")
+        )
+      )
+    ),
+    /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-list", style: { borderTop: 'none', borderBottom: 'none', paddingTop: '14px' } },
+      /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-setting-row" },
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-label" },
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-icon", "aria-hidden": "true" }, /*#__PURE__*/React.createElement(MoonStarsIcon, null)),
+          "다크모드"
+        ),
+        /*#__PURE__*/React.createElement(ToggleSwitch, { checked: !!isDarkTheme, onChange: onToggleTheme, label: "다크모드" })
+      ),
+      /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-setting-row" },
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-label" },
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-icon", "aria-hidden": "true" }, /*#__PURE__*/React.createElement(TextResizeIcon, null)),
+          "글자크기"
+        ),
+        /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-font-controls" },
+          /*#__PURE__*/React.createElement("button", {
+            type: "button",
+            onClick: onDecreaseFont,
+            "aria-label": "글자 크기 줄이기",
+            className: "admin-side-menu-font-btn"
+          }, "−"),
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-font-value" }, `${fontScalePercent || 100}%`),
+          /*#__PURE__*/React.createElement("button", {
+            type: "button",
+            onClick: onIncreaseFont,
+            "aria-label": "글자 크기 늘리기",
+            className: "admin-side-menu-font-btn"
+          }, "+")
+        )
+      ),
+      /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-setting-row" },
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-label" },
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-icon", "aria-hidden": "true" }, /*#__PURE__*/React.createElement(BellIcon, null)),
+          "채팅알림"
+        ),
+        /*#__PURE__*/React.createElement(ToggleSwitch, { checked: !!isChatNotifyEnabled, onChange: onToggleChatNotifications, label: "채팅알림" })
+      )
+    )
+  ));
+}
+
+function ChatGalleryModal({
+  chatMessages,
+  onClose,
+  setActiveLightbox
+}) {
+  const [activeTab, setActiveTab] = React.useState('links'); // 'links' | 'photos'
+
+  const sharedLinks = React.useMemo(() => {
+    const list = [];
+    const seen = new Set();
+    chatMessages.forEach(msg => {
+      if (!msg.text) return;
+      const url = extractFirstUrl(msg.text);
+      if (url && !seen.has(url)) {
+        seen.add(url);
+        list.push({
+          url,
+          timestamp: msg.timestamp,
+          messageId: msg.id
+        });
+      }
+    });
+    return list.sort((a, b) => b.timestamp - a.timestamp);
+  }, [chatMessages]);
+
+  const sharedPhotos = React.useMemo(() => {
+    const list = [];
+    chatMessages.forEach(msg => {
+      const entries = getMessageImageEntries(msg);
+      list.push(...entries);
+    });
+    return list.sort((a, b) => b.timestamp - a.timestamp);
+  }, [chatMessages]);
+
+  return /*#__PURE__*/React.createElement("div", {
+    className: "modal-overlay",
+    onClick: onClose,
+    style: { zIndex: 1060 }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "modal-card",
+    onClick: e => e.stopPropagation(),
+    style: {
+      width: '100%',
+      maxWidth: '480px',
+      maxHeight: '85vh',
+      display: 'flex',
+      flexDirection: 'column',
+      padding: 0,
+      overflow: 'hidden'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "modal-header",
+    style: {
+      padding: '16px 20px 12px 20px',
+      borderBottom: '1px solid var(--border-subtle)',
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center'
+    }
+  }, /*#__PURE__*/React.createElement("h3", {
+    style: { fontSize: '1.05rem', fontWeight: 900, color: 'var(--text-main)', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }
+  }, /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: "20",
+    height: "20",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: "2",
+    strokeLinecap: "round",
+    strokeLinejoin: "round"
+  }, /*#__PURE__*/React.createElement("rect", { width: "18", height: "18", x: "3", y: "3", rx: "2", ry: "2" }), /*#__PURE__*/React.createElement("circle", { cx: "9", cy: "9", r: "2" }), /*#__PURE__*/React.createElement("path", { d: "m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" })), "채팅방 갤러리"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "modal-close-btn",
+    onClick: onClose,
+    style: { display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px', border: 0, background: 'none', cursor: 'pointer', color: 'var(--text-muted)' }
+  }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }))), /*#__PURE__*/React.createElement("div", {
+    style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', padding: '12px 20px 8px 20px', borderBottom: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)' }
+  }, [['links', '링크'], ['photos', '사진']].map(tab => /*#__PURE__*/React.createElement("button", {
+    key: tab[0],
+    type: "button",
+    onClick: () => setActiveTab(tab[0]),
+    style: {
+      border: 'none',
+      borderRadius: '8px',
+      padding: '8px 10px',
+      background: activeTab === tab[0] ? 'var(--accent-primary)' : 'transparent',
+      color: activeTab === tab[0] ? '#FFFFFF' : 'var(--text-muted)',
+      fontWeight: 900,
+      fontSize: '0.86rem',
+      cursor: 'pointer',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: '6px'
+    }
+  }, tab[1]))), /*#__PURE__*/React.createElement("div", {
+    style: { flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '12px' }
+  }, activeTab === 'links' ? (
+    sharedLinks.length === 0 ? /*#__PURE__*/React.createElement("div", {
+      style: { textAlign: 'center', color: 'var(--text-muted)', padding: '40px 0', fontSize: '0.88rem' }
+    }, "공유된 링크가 없습니다.") : sharedLinks.map(item => /*#__PURE__*/React.createElement("div", {
+      key: item.messageId,
+      style: { width: '100%' }
+    }, /*#__PURE__*/React.createElement(LinkPreviewCard, { url: item.url })))
+  ) : (
+    sharedPhotos.length === 0 ? /*#__PURE__*/React.createElement("div", {
+      style: { textAlign: 'center', color: 'var(--text-muted)', padding: '40px 0', fontSize: '0.88rem' }
+    }, "공유된 사진이 없습니다.") : /*#__PURE__*/React.createElement("div", {
+      style: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }
+    }, sharedPhotos.map((photo, idx) => /*#__PURE__*/React.createElement("img", {
+      key: `${photo.messageId}-${photo.imageIndex}`,
+      src: photo.thumb,
+      alt: "공유사진",
+      onClick: () => setActiveLightbox && setActiveLightbox({
+        urls: sharedPhotos.map(p => p.full),
+        index: idx,
+        meta: sharedPhotos.map(p => ({ timestamp: p.timestamp, messageId: p.messageId, imageIndex: p.imageIndex, thumb: p.thumb }))
+      }),
+      style: { width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: '6px', cursor: 'pointer', backgroundColor: 'var(--bg-primary)' }
+    })))
+  ))));
 }
 
 function SettlementSummaryModal({ calendar, onBack }) {
