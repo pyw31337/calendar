@@ -13518,12 +13518,9 @@ function DateModal({
     e.preventDefault();
     if (isSubmitting) return;
     if (!participantId) {
-      if (hasTouchedSettlement) {
-        if (showToast) showToast('정산 정보가 저장되었습니다.', 'success');
-        onClose();
-        return;
-      }
-      if (showToast) showToast('참여자를 선택해 주세요', 'error');
+      // No availability to register without a participant -- expense edits already save
+      // themselves via their own handlers, so just close instead of erroring.
+      onClose();
       return;
     }
     setIsSubmitting(true);
@@ -13582,7 +13579,6 @@ function DateModal({
   const [attendeesView, setAttendeesView] = React.useState('preview'); // preview: memo-only summary, closed: none, open: full list
   const [draggingExpenseId, setDraggingExpenseId] = React.useState('');
   const [dragOverExpenseId, setDragOverExpenseId] = React.useState('');
-  const [hasTouchedSettlement, setHasTouchedSettlement] = React.useState(false);
   const expensePointerSortRef = React.useRef({ sourceId: '', targetId: '', startX: 0, startY: 0, active: false });
   const isAttendeesOpen = attendeesView === 'open';
   const isAttendeesPreview = attendeesView === 'preview';
@@ -13594,7 +13590,6 @@ function DateModal({
     setAttendeesView('preview');
     setDraggingExpenseId('');
     setDragOverExpenseId('');
-    setHasTouchedSettlement(false);
     expensePointerSortRef.current = { sourceId: '', targetId: '', startX: 0, startY: 0, active: false };
   }, [calendar?.id, dateStr]);
 	  const expenseTotal = expenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
@@ -13619,8 +13614,7 @@ function DateModal({
     }
     setIsSavingExpense(true);
     try {
-	      const saved = await Promise.resolve(onSaveExpense(dateStr, { id: editingExpenseId, label: labelText, url, categoryId: expenseCategoryInput, amount: amountNum }));
-      if (saved !== false) setHasTouchedSettlement(true);
+	      await Promise.resolve(onSaveExpense(dateStr, { id: editingExpenseId, label: labelText, url, categoryId: expenseCategoryInput, amount: amountNum }));
     } catch (err) {
       console.error('Expense save failed:', err);
     }
@@ -13642,8 +13636,7 @@ function DateModal({
   const handleDeleteExpenseClick = (event, expenseId) => {
     event.stopPropagation();
     if (isSavingExpense) return;
-    const saved = onDeleteExpense && onDeleteExpense(dateStr, expenseId);
-    if (saved !== false) setHasTouchedSettlement(true);
+    onDeleteExpense && onDeleteExpense(dateStr, expenseId);
     if (editingExpenseId === expenseId) {
 	      setEditingExpenseId(null);
 	      setExpenseLabelInput('');
@@ -13659,8 +13652,7 @@ function DateModal({
     const nextExpenses = [...expenses];
     const [moved] = nextExpenses.splice(fromIndex, 1);
     nextExpenses.splice(toIndex, 0, moved);
-    const saved = onReorderExpenses(dateStr, nextExpenses.map(expense => expense.id));
-    if (saved !== false) setHasTouchedSettlement(true);
+    onReorderExpenses(dateStr, nextExpenses.map(expense => expense.id));
   };
   const resetExpensePointerSort = () => {
     expensePointerSortRef.current = { sourceId: '', targetId: '', startX: 0, startY: 0, active: false };
@@ -13737,7 +13729,6 @@ function DateModal({
     if (!p) return null;
     const entryUrl = extractFirstUrl(entry.note);
     const entryTextOnly = entryUrl ? removeFirstUrl(entry.note) : (entry.note || '').trim();
-    const registeredAtText = formatRegisteredAt(entry.updatedAt);
     return /*#__PURE__*/React.createElement("div", {
       key: entry.id || p.id,
       style: {
@@ -13792,9 +13783,7 @@ function DateModal({
       },
       title: entryUrl,
       onClick: () => window.open(entryUrl, '_blank', 'noopener,noreferrer')
-    }, entryUrl), registeredAtText && /*#__PURE__*/React.createElement("span", {
-      className: "registered-at-text"
-    }, registeredAtText)), /*#__PURE__*/React.createElement("button", {
+    }, entryUrl)), /*#__PURE__*/React.createElement("button", {
       type: "button",
       className: "btn btn-danger",
       title: "삭제",
@@ -14303,10 +14292,7 @@ function DateModal({
               onClick: event => { event.stopPropagation(); window.open(expenseUrl, '_blank', 'noopener,noreferrer'); }
             }, expenseUrl)
           ),
-	          /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.85rem', fontWeight: 800, color: expense.amount < 0 ? '#16A34A' : '#DC2626' } }, `${expense.amount < 0 ? '+' : '-'}${Math.abs(Number(expense.amount)).toLocaleString()}원`),
-          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', justifyContent: 'flex-start', alignItems: 'center' } },
-            /*#__PURE__*/React.createElement("span", { className: "registered-at-text" }, formatRegisteredAt(expense.createdAt))
-          )
+	          /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.85rem', fontWeight: 800, color: expense.amount < 0 ? '#16A34A' : '#DC2626' } }, `${expense.amount < 0 ? '+' : '-'}${Math.abs(Number(expense.amount)).toLocaleString()}원`)
         );
         })
       )
@@ -15961,7 +15947,7 @@ function SettlementSummaryModal({ calendar, onClose }) {
     title: item.url,
     style: { alignSelf: 'flex-start', border: 0, cursor: 'pointer', textDecoration: 'none' },
     onClick: () => window.open(item.url, '_blank', 'noopener,noreferrer')
-  }, item.url), item.createdAt && /*#__PURE__*/React.createElement("span", { className: "registered-at-text" }, formatRegisteredAt(item.createdAt))), /*#__PURE__*/React.createElement("strong", {
+  }, item.url)), /*#__PURE__*/React.createElement("strong", {
     style: { fontSize: '0.9rem', color: item.isIncome ? '#16A34A' : '#DC2626', whiteSpace: 'nowrap' }
   }, item.isIncome ? '+' : '-', Math.abs(item.amount).toLocaleString(), "원"));
   const emptyContent = /*#__PURE__*/React.createElement("div", {
