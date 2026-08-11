@@ -67,8 +67,8 @@ const summaries = docs.map((doc) => {
   };
 }).sort((a, b) => a.docId.localeCompare(b.docId));
 
-const production = summaries.filter((item) => item.docId === 'cal_kkot' || item.docId === 'cal_cw');
 const stressDocs = summaries.filter((item) => item.docId.startsWith('cal_stress_') || item.docId.startsWith('cal_test_'));
+const production = summaries.filter((item) => !stressDocs.includes(item) && /^cal_[A-Za-z0-9_-]{1,64}$/.test(item.docId) && item.calendarId && item.docId === `cal_${item.calendarId}`);
 const unexpectedDocs = summaries.filter((item) => !production.includes(item) && !stressDocs.includes(item));
 const warnings = [];
 
