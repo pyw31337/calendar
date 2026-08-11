@@ -119,26 +119,45 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // Fallback image sharing for legacy chat images that were stored as inline base64 because
-    // Firebase Storage upload was unavailable. Each document stores one already-compressed data
-    // URL and is read by /calendar/?image={id}. This keeps the user-facing share flow reliable
-    // even if Storage upload is blocked by bucket/config/network issues.
+    // Image sharing for /calendar/?image={id}. Two document shapes are written by the client
+    // (see createImageShareDocument in index.html):
+    //  - a lightweight pointer (source == 'message') for images that already live on a sent
+    //    chat message -- resolved at read time via messages/{messageId} instead of duplicating
+    //    the image data here.
+    //  - a legacy/fallback shape that embeds the image itself as an inline base64 data URL,
+    //    used only when there is no source chat message to point at (or it couldn't be
+    //    uploaded to Storage). Matches the client-side shareId format check
+    //    (/^img_[A-Za-z0-9_-]{3,180}$/ in fetchImageShareDocument).
     match /imageShares/{shareId} {
-      allow get: if shareId is string && shareId.matches('^img_[A-Za-z0-9_-]{1,64}_[0-9]{1,20}_[A-Za-z0-9]{4,16}$');
+      allow get: if shareId is string && shareId.matches('^img_[A-Za-z0-9_-]{3,180}$');
       allow list: if false;
-      allow create: if request.resource.data.keys().hasOnly(['id', 'calendarId', 'imageUrl', 'thumbUrl', 'messageId', 'imageIndex', 'createdAt'])
-        && request.resource.data.id == shareId
+
+      function isValidMessageSharePointer(data) {
+        return data.keys().hasOnly(['id', 'calendarId', 'source', 'messageId', 'imageIndex', 'thumbUrl', 'createdAt'])
+          && data.source == 'message'
+          && data.messageId is string
+          && data.messageId.size() > 0
+          && data.messageId.size() <= 200
+          && data.imageIndex is number;
+      }
+
+      function isValidInlineDataShare(data) {
+        return data.keys().hasOnly(['id', 'calendarId', 'imageUrl', 'thumbUrl', 'messageId', 'imageIndex', 'createdAt'])
+          && data.imageUrl is string
+          && data.imageUrl.size() <= 450000
+          && data.imageUrl.matches('^data:image/.*')
+          && data.messageId is string
+          && data.messageId.size() <= 200
+          && data.imageIndex is number;
+      }
+
+      allow create: if request.resource.data.id == shareId
         && request.resource.data.calendarId is string
         && isCalendarId(request.resource.data.calendarId)
-        && request.resource.data.imageUrl is string
-        && request.resource.data.imageUrl.size() <= 450000
-        && request.resource.data.imageUrl.matches('^data:image/.*')
         && request.resource.data.thumbUrl is string
         && request.resource.data.thumbUrl.size() <= 60000
-        && request.resource.data.messageId is string
-        && request.resource.data.messageId.size() <= 200
-        && request.resource.data.imageIndex is number
-        && request.resource.data.createdAt is number;
+        && request.resource.data.createdAt is number
+        && (isValidMessageSharePointer(request.resource.data) || isValidInlineDataShare(request.resource.data));
       allow update, delete: if false;
     }
 
