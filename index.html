@@ -325,6 +325,11 @@
     :root:not([data-theme="light"]):has(.admin-scope) { color-scheme: light; }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
+    html {
+      width: 100%;
+      max-width: 100%;
+      overflow-x: hidden;
+    }
 
     body {
       font-family: var(--font-sans);
@@ -340,6 +345,29 @@
       padding: 24px 16px 60px;
       word-break: keep-all;
       overflow-wrap: break-word;
+      width: 100%;
+      max-width: 100%;
+      overflow-x: hidden;
+      overscroll-behavior-x: none;
+    }
+    #root {
+      width: 100%;
+      max-width: 100%;
+      overflow-x: clip;
+    }
+    @supports not (overflow: clip) {
+      #root { overflow-x: hidden; }
+    }
+    img,
+    video,
+    canvas,
+    svg {
+      max-width: 100%;
+    }
+    pre,
+    code {
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
     }
 
     /* Whenever any layer popup (modal, bottom sheet) is mounted anywhere in the document, lock
@@ -571,11 +599,18 @@
 
     button, input, textarea, select {
       word-break: keep-all;
+      max-width: 100%;
     }
 
     .app-container {
       max-width: 1100px;
       margin: 0 auto;
+      width: 100%;
+      min-width: 0;
+      overflow-x: clip;
+    }
+    @supports not (overflow: clip) {
+      .app-container { overflow-x: hidden; }
     }
 
     /* Header -- full-bleed fixed bar (edge to edge), hides on scroll-down and reappears on
@@ -586,10 +621,15 @@
       top: 0;
       left: 0;
       right: 0;
+      max-width: 100%;
+      overflow-x: clip;
       background: var(--bg-card);
       box-shadow: var(--shadow-md);
       z-index: 500;
       transition: transform 0.3s ease;
+    }
+    @supports not (overflow: clip) {
+      .main-header { overflow-x: hidden; }
     }
     .main-header-inner {
       max-width: 1100px;
@@ -598,6 +638,7 @@
       display: flex;
       flex-direction: column;
       gap: 10px;
+      min-width: 0;
     }
     @media (min-width: 768px) {
       .main-header-inner { padding: 18px 24px 8px; }
@@ -5784,18 +5825,25 @@ function AdminDashboard({ initialCalendars }) {
     dashboard: {
       color: '#0F172A',
       minHeight: '100vh',
-      fontFamily: 'Inter, sans-serif'
+      fontFamily: 'Inter, sans-serif',
+      width: '100%',
+      maxWidth: '100%',
+      overflowX: 'hidden'
     },
     content: {
-      padding: '10px 0px'
+      padding: '10px 0px',
+      width: '100%',
+      maxWidth: '100%',
+      overflowX: 'hidden'
     },
     topBar: {
       backgroundColor: '#FFFFFF',
       borderBottom: '1px solid #E2E8F0',
-      // Escape body's own 24px/16px page padding so this sits flush against the true viewport
-      // edges (top + sides) instead of floating in a boxed card, the same negative-margin trick
-      // .main-menu-bar uses to bleed past its own ancestor's padding.
-      margin: '-24px -16px 0'
+      // Admin pages already remove body side padding, so only pull the top bar upward.
+      // Keeping horizontal margins at 0 prevents 1px/16px visual overflow on mobile browsers.
+      margin: '-24px 0 0',
+      maxWidth: '100%',
+      overflowX: 'hidden'
     },
     header: {
       padding: '16px 32px'
@@ -10627,6 +10675,7 @@ function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, onPromote
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
       backgroundColor: 'rgba(15, 23, 42, 0.92)', backdropFilter: 'blur(8px)', zIndex: 9000,
       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      width: '100%', maxWidth: '100%', overflow: 'hidden',
       userSelect: 'none'
     }
   }, /*#__PURE__*/React.createElement("button", {
@@ -11785,6 +11834,9 @@ function ChatRoomView({
       backgroundColor: 'var(--bg-primary)',
       display: 'flex',
       flexDirection: 'column',
+      width: '100%',
+      maxWidth: '100%',
+      overflowX: 'hidden',
       zIndex: 1005,
       transition: 'bottom 0.12s ease-out'
     }
