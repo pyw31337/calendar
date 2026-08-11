@@ -1720,6 +1720,7 @@
       display: inline-flex;
       align-items: center;
       gap: 8px;
+      flex: 1 1 auto;
       min-width: 0;
       flex-wrap: wrap;
     }
@@ -1738,6 +1739,7 @@
       color: rgb(100, 116, 139);
       font-size: 0.84rem;
       font-weight: 400;
+      min-width: 0;
       word-break: break-word;
       overflow-wrap: anywhere;
     }
@@ -1774,6 +1776,13 @@
       .recent-log-right {
         margin-left: 0;
         align-self: flex-end;
+      }
+      .recent-log-left {
+        align-items: flex-start;
+        width: 100%;
+      }
+      .recent-log-note {
+        flex-basis: 100%;
       }
     }
 
@@ -12215,6 +12224,88 @@ function DateModal({
     setNote(entry.note || '');
     requestAnimationFrame(() => noteInputRef.current?.focus());
   };
+  const dateEntriesWithNotes = dateEntries.filter(entry => sanitizeText(entry.note || '', 120).trim());
+  const renderAvailabilityEntry = (entry, compact = false) => {
+    const p = activeParticipants.find(part => part.id === entry.participantId);
+    if (!p) return null;
+    const entryUrl = extractFirstUrl(entry.note);
+    const entryTextOnly = entryUrl ? removeFirstUrl(entry.note) : (entry.note || '').trim();
+    const registeredAtText = formatRegisteredAt(entry.updatedAt);
+    return /*#__PURE__*/React.createElement("div", {
+      key: entry.id || p.id,
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: '8px',
+        padding: compact ? '8px 12px' : '10px 14px',
+        backgroundColor: 'var(--bg-primary)',
+        borderRadius: compact ? '10px' : '12px',
+        border: '1px solid var(--border-subtle)'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '3px',
+        minWidth: 0,
+        flex: 1
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "participant-badge",
+      style: {
+        backgroundColor: p.color,
+        color: getContrastTextColor(p.color),
+        cursor: 'pointer',
+        userSelect: 'none',
+        alignSelf: 'flex-start'
+      },
+      title: "클릭 시 이 참여자로 자동 선택 및 메모 불러오기",
+      onClick: () => {
+        selectExistingAvailabilityEntry(entry);
+      }
+    }, p.name, entryTextOnly && ` (${entryTextOnly})`), entryUrl && /*#__PURE__*/React.createElement("span", {
+      style: {
+        alignSelf: 'flex-start',
+        display: 'inline-flex',
+        alignItems: 'center',
+        padding: '3px 10px',
+        borderRadius: 'var(--radius-full)',
+        fontSize: '0.72rem',
+        fontWeight: 600,
+        backgroundColor: '#E2E8F0',
+        color: '#475569',
+        cursor: 'pointer',
+        wordBreak: 'break-all'
+      },
+      title: entryUrl,
+      onClick: () => window.open(entryUrl, '_blank', 'noopener,noreferrer')
+    }, entryUrl), registeredAtText && /*#__PURE__*/React.createElement("span", {
+      className: "registered-at-text"
+    }, registeredAtText)), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      className: "btn btn-danger",
+      title: "삭제",
+      style: {
+        width: '30px',
+        height: '30px',
+        padding: 0,
+        flexShrink: 0
+      },
+      disabled: isSubmitting,
+      onClick: () => {
+        onRequestConfirm('일정 삭제', `${p.name}님의 일정을 삭제하시겠습니까?`, () => {
+          setIsSubmitting(true);
+          Promise.resolve(onDelete(dateStr, p.id)).then(saved => {
+            setIsSubmitting(false);
+          }).catch(err => {
+            console.error('Delete error:', err);
+            setIsSubmitting(false);
+          });
+        });
+      }
+    }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 16 })));
+  };
 
   const handleConfirmMeeting = async () => {
     if (isSubmitting) return;
@@ -12487,93 +12578,20 @@ function DateModal({
         label: isAttendeesCollapsed ? "참석가능 펼치기" : "참석가능 접기"
       })
     )
-  ), !isAttendeesCollapsed && /*#__PURE__*/React.createElement("div", {
+  ), isAttendeesCollapsed && dateEntriesWithNotes.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '8px',
+      marginTop: '10px'
+    }
+  }, dateEntriesWithNotes.map(entry => renderAvailabilityEntry(entry, true))), !isAttendeesCollapsed && /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       flexDirection: 'column',
       gap: '8px'
     }
-  }, dateEntries.map(entry => {
-    const p = activeParticipants.find(part => part.id === entry.participantId);
-    if (!p) return null;
-    const entryUrl = extractFirstUrl(entry.note);
-    const entryTextOnly = entryUrl ? removeFirstUrl(entry.note) : (entry.note || '').trim();
-    const registeredAtText = formatRegisteredAt(entry.updatedAt);
-    return /*#__PURE__*/React.createElement("div", {
-      key: entry.id || p.id,
-      style: {
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: '8px',
-        padding: '10px 14px',
-        backgroundColor: 'var(--bg-primary)',
-        borderRadius: '12px',
-        border: '1px solid var(--border-subtle)'
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '3px',
-        minWidth: 0,
-        flex: 1
-      }
-    }, /*#__PURE__*/React.createElement("span", {
-      className: "participant-badge",
-      style: {
-        backgroundColor: p.color,
-        color: getContrastTextColor(p.color),
-        cursor: 'pointer',
-        userSelect: 'none',
-        alignSelf: 'flex-start'
-      },
-      title: "클릭 시 이 참여자로 자동 선택 및 메모 불러오기",
-      onClick: () => {
-        selectExistingAvailabilityEntry(entry);
-      }
-    }, p.name, entryTextOnly && ` (${entryTextOnly})`), entryUrl && /*#__PURE__*/React.createElement("span", {
-      style: {
-        alignSelf: 'flex-start',
-        display: 'inline-flex',
-        alignItems: 'center',
-        padding: '3px 10px',
-        borderRadius: 'var(--radius-full)',
-        fontSize: '0.72rem',
-        fontWeight: 600,
-        backgroundColor: '#E2E8F0',
-        color: '#475569',
-        cursor: 'pointer',
-        wordBreak: 'break-all'
-      },
-      title: entryUrl,
-      onClick: () => window.open(entryUrl, '_blank', 'noopener,noreferrer')
-    }, entryUrl), registeredAtText && /*#__PURE__*/React.createElement("span", {
-      className: "registered-at-text"
-    }, registeredAtText)), /*#__PURE__*/React.createElement("button", {
-      type: "button",
-      className: "btn btn-danger",
-      title: "삭제",
-      style: {
-        width: '30px',
-        height: '30px',
-        padding: 0,
-        flexShrink: 0
-      },
-      disabled: isSubmitting,
-      onClick: () => {
-        onRequestConfirm('일정 삭제', `${p.name}님의 일정을 삭제하시겠습니까?`, () => {
-          setIsSubmitting(true);
-          Promise.resolve(onDelete(dateStr, p.id)).then(saved => {
-            setIsSubmitting(false);
-          }).catch(err => {
-            console.error('Delete error:', err);
-            setIsSubmitting(false);
-          });
-        });
-      }
-    }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 16 })));
-  }))), isConfirmed && !adminMode && /*#__PURE__*/React.createElement("div", null,
+  }, dateEntries.map(entry => renderAvailabilityEntry(entry, false)))), isConfirmed && !adminMode && /*#__PURE__*/React.createElement("div", null,
     /*#__PURE__*/React.createElement("div", {
       onClick: () => setIsSettlementCollapsed(prev => !prev),
       style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', cursor: 'pointer', marginBottom: isSettlementCollapsed ? 0 : '10px' }
@@ -13647,18 +13665,9 @@ function AdminModal({
             const confirmText = `${logTitleText} 로그 데이터를 삭제하시겠습니까?`;
             return /*#__PURE__*/React.createElement("div", {
               key: log.id,
-              className: "recent-log-row",
-              style: {
-                display: 'flex',
-                justifyContent: 'space-between',
-                padding: '8px 12px',
-                backgroundColor: 'var(--bg-primary)',
-                borderRadius: '8px',
-                border: '1px solid var(--border-subtle)'
-              }
+              className: "recent-log-row"
             }, /*#__PURE__*/React.createElement("div", {
-              className: "recent-log-left",
-              style: { display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }
+              className: "recent-log-left"
             }, /*#__PURE__*/React.createElement("span", {
               className: "participant-badge",
               style: {
@@ -13676,13 +13685,11 @@ function AdminModal({
             }, logDateText || null), noteText && /*#__PURE__*/React.createElement("span", {
               className: "recent-log-note",
               style: { fontSize: '0.78rem', color: '#64748B', fontStyle: 'italic' }
-            }, "\"", noteText, "\""), /*#__PURE__*/React.createElement("span", {
-              className: "registered-at-text recent-log-time",
-              style: { fontSize: '0.7rem', color: '#94A3B8', width: '100%' }
-            }, formatRegisteredAt(log.timestamp))), /*#__PURE__*/React.createElement("div", {
-              className: "recent-log-right",
-              style: { display: 'flex', alignItems: 'center', gap: '8px' }
-            }, /*#__PURE__*/React.createElement("button", {
+            }, "\"", noteText, "\"")), /*#__PURE__*/React.createElement("div", {
+              className: "recent-log-right"
+            }, /*#__PURE__*/React.createElement("span", {
+              className: "registered-at-text recent-log-time"
+            }, formatRegisteredAt(log.timestamp)), /*#__PURE__*/React.createElement("button", {
               type: "button",
               className: "btn btn-danger",
               title: "로그 삭제",
