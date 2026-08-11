@@ -7669,6 +7669,7 @@ function App() {
       onBack: () => changeView('calendar'),
       isHeaderVisible: isHeaderVisible,
       handleChatScroll: handleChatScroll,
+      onRevealChatInput: () => setIsHeaderVisible(true),
       chatMessagesContainerRef: chatMessagesContainerRef,
       showToast: showToast,
       onShare: () => setIsChatShareOpen(true)
@@ -9628,30 +9629,120 @@ function buildLightboxImageInfo(url, timestamp) {
   };
 }
 
+function LinkIcon({ size = 16 }) {
+  return /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: String(size),
+    height: String(size),
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: "2",
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+    className: "icon icon-tabler icons-tabler-outline icon-tabler-link"
+  }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }),
+    /*#__PURE__*/React.createElement("path", { d: "M9 15l6 -6" }),
+    /*#__PURE__*/React.createElement("path", { d: "M11 6l.463 -.536a5 5 0 0 1 7.071 7.072l-.534 .464" }),
+    /*#__PURE__*/React.createElement("path", { d: "M13 18l-.397 .534a5.068 5.068 0 0 1 -7.127 0a4.972 4.972 0 0 1 0 -7.071l.524 -.463" }));
+}
+
 // Black-gradient info panel shown at the bottom of the active photo when the Lightbox's
 // tap-to-toggle info mode is on -- shows whatever metadata can actually be derived for that
 // image (see buildLightboxImageInfo); rows with no derivable value are simply omitted.
-function LightboxInfoPanel({ info }) {
+function LightboxInfoPanel({ info, onOpenUrl }) {
   const rows = [
     ['업로드', info.dateLabel],
     ['파일명', info.fileName],
     ['용량', info.sizeLabel || '-'],
+    ['사이즈', info.dimensionLabel || '-'],
     ['형식', info.typeLabel]
   ].filter(([, value]) => value);
   if (rows.length === 0) return null;
   return /*#__PURE__*/React.createElement("div", {
+    className: "lightbox-info-panel",
     style: {
       position: 'absolute', left: 0, right: 0, bottom: 0, minWidth: '190px',
       padding: '36px 14px 12px',
       background: 'linear-gradient(to top, rgba(0,0,0,0.82), rgba(0,0,0,0.45) 60%, transparent)',
       borderRadius: '0 0 12px 12px',
       color: '#FFFFFF', fontSize: '0.76rem', lineHeight: 1.7,
-      pointerEvents: 'none'
+      pointerEvents: 'auto'
     }
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "lightbox-url-btn",
+    onClick: e => { e.stopPropagation(); onOpenUrl && onOpenUrl(); },
+    style: {
+      position: 'absolute',
+      right: '12px',
+      bottom: '12px',
+      height: '30px',
+      padding: '0 10px',
+      borderRadius: '9999px',
+      border: '1px solid rgba(255,255,255,0.32)',
+      background: 'rgba(255,255,255,0.14)',
+      color: '#FFFFFF',
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: '5px',
+      cursor: 'pointer',
+      fontSize: '0.72rem',
+      fontWeight: 800,
+      backdropFilter: 'blur(6px)'
+    }
+  }, /*#__PURE__*/React.createElement(LinkIcon, { size: 14 }), "URL"), /*#__PURE__*/React.createElement("div", {
+    style: { paddingRight: '58px' }
   }, rows.map(([label, value]) => /*#__PURE__*/React.createElement("div", {
     key: label,
     style: { display: 'flex', gap: '8px' }
-  }, /*#__PURE__*/React.createElement("span", { style: { opacity: 0.7, flexShrink: 0, minWidth: '40px' } }, label), /*#__PURE__*/React.createElement("span", { style: { wordBreak: 'break-all' } }, value))));
+  }, /*#__PURE__*/React.createElement("span", { style: { opacity: 0.7, flexShrink: 0, minWidth: '40px' } }, label), /*#__PURE__*/React.createElement("span", { style: { wordBreak: 'break-all' } }, value)))));
+}
+
+function ImageUrlModal({ imageUrl, onClose, showToast }) {
+  return /*#__PURE__*/React.createElement("div", {
+    className: "modal-overlay image-url-modal",
+    onClick: e => { e.stopPropagation(); onClose(); },
+    style: { zIndex: 10050 }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "modal-container",
+    onClick: e => e.stopPropagation()
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "modal-header",
+    style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' }
+  }, /*#__PURE__*/React.createElement("h3", {
+    style: { fontSize: '1.1rem', fontWeight: 800 }
+  }, "이미지 URL"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: onClose,
+    style: {
+      background: 'none',
+      border: 'none',
+      color: '#64748B',
+      cursor: 'pointer',
+      display: 'flex',
+      alignItems: 'center'
+    }
+  }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }))), /*#__PURE__*/React.createElement("div", {
+    className: "modal-body"
+  }, /*#__PURE__*/React.createElement("label", {
+    style: { fontSize: '0.85rem', fontWeight: 700, color: '#64748B' }
+  }, "선택한 사진의 원본 이미지 URL"), /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    className: "form-input",
+    style: { width: '100%' },
+    value: imageUrl || '',
+    readOnly: true
+  }), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "btn btn-primary",
+    onClick: async () => {
+      const ok = await copyTextToClipboard(imageUrl || '');
+      const message = ok ? '이미지 URL이 복사되었습니다.' : '복사에 실패했습니다. URL을 직접 선택해 복사해 주세요.';
+      if (showToast) showToast(message, ok ? 'success' : 'error');
+      else alert(message);
+    }
+  }, "URL 복사하기"))));
 }
 
 // Full-screen image viewer for a message's photo(s) -- swipeable (touch) with left/right arrow
@@ -9661,11 +9752,27 @@ function LightboxInfoPanel({ info }) {
 function Lightbox({ urls, index, onClose, onNavigate, meta }) {
   const total = urls.length;
   const [showInfo, setShowInfo] = React.useState(false);
+  const [imageUrlModalOpen, setImageUrlModalOpen] = React.useState(false);
+  const [imageDimensions, setImageDimensions] = React.useState({});
   React.useEffect(() => { setShowInfo(false); }, [index]);
   const currentInfo = React.useMemo(
-    () => buildLightboxImageInfo(urls[index], meta && meta[index] && meta[index].timestamp),
-    [urls, index, meta]
+    () => {
+      const base = buildLightboxImageInfo(urls[index], meta && meta[index] && meta[index].timestamp);
+      const size = imageDimensions[urls[index]];
+      return {
+        ...base,
+        dimensionLabel: size ? `${size.width} × ${size.height}px` : null
+      };
+    },
+    [urls, index, meta, imageDimensions]
   );
+  const recordImageDimensions = (url, e) => {
+    const img = e.currentTarget;
+    const width = img.naturalWidth;
+    const height = img.naturalHeight;
+    if (!url || !width || !height) return;
+    setImageDimensions(prev => prev[url] ? prev : { ...prev, [url]: { width, height } });
+  };
   const handleImageTap = e => {
     e.stopPropagation();
     if (wasDraggedRef.current) { wasDraggedRef.current = false; return; }
@@ -9796,22 +9903,28 @@ function Lightbox({ urls, index, onClose, onNavigate, meta }) {
     alt: "원본 이미지",
     "data-slide": slot,
     draggable: false,
+    onLoad: e => recordImageDimensions(url, e),
     style: {
       maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: '12px',
       display: 'block'
     }
-  }), showInfo && /*#__PURE__*/React.createElement(LightboxInfoPanel, { info: currentInfo })) : /*#__PURE__*/React.createElement("img", {
+  }), showInfo && /*#__PURE__*/React.createElement(LightboxInfoPanel, {
+    info: currentInfo,
+    onOpenUrl: () => setImageUrlModalOpen(true)
+  })) : /*#__PURE__*/React.createElement("img", {
     src: url,
     alt: "원본 이미지",
     "data-slide": slot,
     draggable: false,
+    onLoad: e => recordImageDimensions(url, e),
     onClick: e => e.stopPropagation(),
     style: {
       maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: '12px'
     }
   })));
 
-  return /*#__PURE__*/React.createElement("div", {
+  const lightboxNode = /*#__PURE__*/React.createElement("div", {
+    className: "lightbox-overlay",
     onClick: handleOverlayClick,
     style: {
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
@@ -9886,11 +9999,15 @@ function Lightbox({ urls, index, onClose, onNavigate, meta }) {
     src: urls[index],
     alt: "원본 이미지",
     draggable: false,
+    onLoad: e => recordImageDimensions(urls[index], e),
     style: {
       maxWidth: '92vw', maxHeight: '82vh', borderRadius: '12px', objectFit: 'contain',
       display: 'block'
     }
-  }), showInfo && /*#__PURE__*/React.createElement(LightboxInfoPanel, { info: currentInfo })),
+  }), showInfo && /*#__PURE__*/React.createElement(LightboxInfoPanel, {
+    info: currentInfo,
+    onOpenUrl: () => setImageUrlModalOpen(true)
+  })),
   total > 1 && /*#__PURE__*/React.createElement("div", {
     onClick: e => e.stopPropagation(),
     style: { display: 'flex', gap: '7px', marginTop: '16px', zIndex: 9001 }
@@ -9902,7 +10019,11 @@ function Lightbox({ urls, index, onClose, onNavigate, meta }) {
       backgroundColor: i === index ? '#FFFFFF' : 'rgba(255,255,255,0.35)',
       transition: 'background-color 0.15s'
     }
-  }))));
+  }))), imageUrlModalOpen && /*#__PURE__*/React.createElement(ImageUrlModal, {
+    imageUrl: urls[index],
+    onClose: () => setImageUrlModalOpen(false)
+  }));
+  return ReactDOM.createPortal(lightboxNode, document.body);
 }
 
 // Tracks which message row's edit/delete controls should be revealed: desktop hover is
@@ -10461,6 +10582,7 @@ function ChatRoomView({
   onBack,
   isHeaderVisible,
   handleChatScroll,
+  onRevealChatInput,
   chatMessagesContainerRef,
   showToast,
   onShare
@@ -11003,7 +11125,51 @@ function ChatRoomView({
     fill: "none"
   }), /*#__PURE__*/React.createElement("path", {
     d: "M6 9l6 6l6 -6"
-  }))), /*#__PURE__*/React.createElement("div", {
+  }))), !isHeaderVisible && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "chat-keyboard-reopen-btn",
+    onClick: () => {
+      if (onRevealChatInput) onRevealChatInput();
+      requestAnimationFrame(() => chatTextareaRef.current && chatTextareaRef.current.focus());
+    },
+    "aria-label": "채팅 입력창 열기",
+    style: {
+      position: 'fixed',
+      left: '10px',
+      bottom: `calc(${viewportBottom}px + 18px)`,
+      width: '36px',
+      height: '36px',
+      borderRadius: '50%',
+      backgroundColor: 'var(--bg-card)',
+      border: '1px solid var(--border-subtle)',
+      boxShadow: '0 2px 10px rgba(0,0,0,0.16)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      cursor: 'pointer',
+      color: '#64748B',
+      zIndex: 1020
+    }
+  }, /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: "20",
+    height: "20",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: "2",
+    strokeLinecap: "round",
+    strokeLinejoin: "round"
+  }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }),
+    /*#__PURE__*/React.createElement("path", { d: "M2 6a2 2 0 0 1 2 -2h16a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-16a2 2 0 0 1 -2 -2z" }),
+    /*#__PURE__*/React.createElement("path", { d: "M6 8h.01" }),
+    /*#__PURE__*/React.createElement("path", { d: "M10 8h.01" }),
+    /*#__PURE__*/React.createElement("path", { d: "M14 8h.01" }),
+    /*#__PURE__*/React.createElement("path", { d: "M18 8h.01" }),
+    /*#__PURE__*/React.createElement("path", { d: "M8 12h.01" }),
+    /*#__PURE__*/React.createElement("path", { d: "M12 12h.01" }),
+    /*#__PURE__*/React.createElement("path", { d: "M16 12h.01" }),
+    /*#__PURE__*/React.createElement("path", { d: "M7 16h10" }))), /*#__PURE__*/React.createElement("div", {
     className: "chat-room-header",
     style: {
       position: 'fixed',
@@ -11153,7 +11319,7 @@ function ChatRoomView({
       overflowY: 'auto',
       padding: '16px',
       paddingTop: '72px',
-      paddingBottom: '20px'
+      paddingBottom: '152px'
     }
   }, noticePanelMode === 'add' && /*#__PURE__*/React.createElement("div", {
     style: {
@@ -11308,12 +11474,21 @@ function ChatRoomView({
     "stroke-linecap": "round",
     "stroke-linejoin": "round"
   }, /*#__PURE__*/React.createElement("path", { d: "M6 9l6 6l6 -6" })))), /*#__PURE__*/React.createElement("div", {
+    className: "chat-composer",
     style: {
+      position: 'fixed',
+      left: 0,
+      right: 0,
+      bottom: `${viewportBottom}px`,
       backgroundColor: 'var(--bg-card)',
       borderTop: '1px solid var(--border-subtle)',
       padding: '12px 16px',
-      zIndex: 1000,
-      flexShrink: 0
+      zIndex: 1012,
+      flexShrink: 0,
+      transform: isHeaderVisible ? 'translateY(0)' : 'translateY(calc(100% + 12px))',
+      opacity: isHeaderVisible ? 1 : 0,
+      pointerEvents: isHeaderVisible ? 'auto' : 'none',
+      transition: 'transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.18s ease'
     }
   },
     /* Inner card wrapper (same border/radius as CommentsSection input card) */
