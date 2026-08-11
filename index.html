@@ -2435,7 +2435,7 @@ function getExpenseCategoryIcon(category) {
 }
 function getExpenseCategoryLabel(category) {
   const name = sanitizeText(category?.name || '기타', 24) || '기타';
-  return `${getExpenseCategoryIcon(category)} ${name}`;
+  return `${getExpenseCategoryIcon(category)}\u00A0\u00A0${name}`;
 }
 const URL_PARAMS = new URLSearchParams(window.location.search);
 const ENABLE_FIRESTORE_SYNC = true; // Firestore is the only production source of truth.
