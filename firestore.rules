@@ -119,6 +119,29 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // Fallback image sharing for legacy chat images that were stored as inline base64 because
+    // Firebase Storage upload was unavailable. Each document stores one already-compressed data
+    // URL and is read by /calendar/?image={id}. This keeps the user-facing share flow reliable
+    // even if Storage upload is blocked by bucket/config/network issues.
+    match /imageShares/{shareId} {
+      allow get: if shareId is string && shareId.matches('^img_[A-Za-z0-9_-]{1,64}_[0-9]{1,20}_[A-Za-z0-9]{4,16}$');
+      allow list: if false;
+      allow create: if request.resource.data.keys().hasOnly(['id', 'calendarId', 'imageUrl', 'thumbUrl', 'messageId', 'imageIndex', 'createdAt'])
+        && request.resource.data.id == shareId
+        && request.resource.data.calendarId is string
+        && isCalendarId(request.resource.data.calendarId)
+        && request.resource.data.imageUrl is string
+        && request.resource.data.imageUrl.size() <= 450000
+        && request.resource.data.imageUrl.matches('^data:image/.*')
+        && request.resource.data.thumbUrl is string
+        && request.resource.data.thumbUrl.size() <= 60000
+        && request.resource.data.messageId is string
+        && request.resource.data.messageId.size() <= 200
+        && request.resource.data.imageIndex is number
+        && request.resource.data.createdAt is number;
+      allow update, delete: if false;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

@@ -4130,6 +4130,52 @@ function firestoreDocumentToJs(doc) {
   return Object.fromEntries(Object.entries(fields).map(([key, value]) => [key, firestoreValueToJs(value)]));
 }
 
+function getImageSharePageUrl(shareId) {
+  const url = new URL(window.location.href);
+  url.search = '';
+  url.hash = '';
+  url.searchParams.set('image', shareId);
+  return url.toString();
+}
+
+async function createImageShareDocument(calendarId, imageUrl, meta = {}) {
+  if (typeof imageUrl !== 'string' || !imageUrl.startsWith('data:image/')) {
+    throw new Error('Only inline image data URLs can be shared with the fallback document route');
+  }
+  const shareId = `img_${calendarId}_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+  const payload = {
+    id: shareId,
+    calendarId,
+    imageUrl,
+    thumbUrl: typeof meta?.thumb === 'string' && meta.thumb.startsWith('data:image/') ? meta.thumb : '',
+    messageId: sanitizeText(meta?.messageId || '', 180),
+    imageIndex: Number.isFinite(Number(meta?.imageIndex)) ? Number(meta.imageIndex) : 0,
+    createdAt: Date.now()
+  };
+  if (firebaseDb) {
+    await firebaseDb.collection('imageShares').doc(shareId).set(payload);
+  } else {
+    const res = await fetch(`https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/imageShares/${shareId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fields: Object.fromEntries(Object.entries(payload).map(([key, value]) => [key, jsToFirestoreValue(value)])) })
+    });
+    if (!res.ok) throw new Error(`Image share REST write failed: ${res.status}`);
+  }
+  return getImageSharePageUrl(shareId);
+}
+
+async function fetchImageShareDocument(shareId) {
+  if (!shareId || !/^img_[A-Za-z0-9_-]{1,64}_[0-9]{1,20}_[A-Za-z0-9]{4,16}$/.test(shareId)) return null;
+  if (firebaseDb) {
+    const snap = await firebaseDb.collection('imageShares').doc(shareId).get();
+    return snap.exists ? snap.data() : null;
+  }
+  const res = await fetch(`https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/imageShares/${shareId}`);
+  if (!res.ok) return null;
+  return firestoreDocumentToJs(await res.json());
+}
+
 // Estimates the actual Firestore wire-format byte size of a calendar payload (the same
 // typed-value shape jsToFirestoreValue produces for the REST commit body), so a save can be
 // refused with a clear message before it gets anywhere near Firestore's real 1MiB/doc limit.
@@ -7251,10 +7297,6 @@ function App() {
 
   const handlePromoteInlineChatImage = async ({ url, meta, index = 0 }) => {
     if (typeof url !== 'string' || !url.startsWith('data:')) return url;
-    if (!firebaseStorage) {
-      showToast('이미지 저장소 연결 실패', 'error', 4000);
-      throw new Error('Firebase Storage is not available');
-    }
 
     const messageId = meta?.messageId;
     const sourceMessage = messageId
@@ -7272,11 +7314,12 @@ function App() {
 
     setChatUploadProgress({ pct: 0, remainingSec: null });
     try {
+      if (!firebaseStorage) throw new Error('Firebase Storage is not available');
       if (!sourceMessage) {
         const uploaded = await uploadInlineChatImageToStorage(activeCalId, url, meta?.thumb || url, index, updateProgress);
         if (!uploaded?.imageUrl) throw new Error('Image upload failed');
         setChatUploadProgress({ pct: 100, remainingSec: 0 });
-        return uploaded.imageUrl;
+        return { shareUrl: uploaded.imageUrl, imageUrl: uploaded.imageUrl };
       }
 
       const imageUrls = Array.isArray(sourceMessage.imageUrls) && sourceMessage.imageUrls.length > 0
@@ -7292,7 +7335,7 @@ function App() {
 
       const originalUrl = imageUrls[targetIndex] || url;
       const originalThumbUrl = thumbUrls[targetIndex] || meta?.thumb || originalUrl;
-      if (typeof originalUrl === 'string' && /^https?:\/\//.test(originalUrl)) return originalUrl;
+      if (typeof originalUrl === 'string' && /^https?:\/\//.test(originalUrl)) return { shareUrl: originalUrl, imageUrl: originalUrl };
 
       const uploaded = await uploadInlineChatImageToStorage(activeCalId, originalUrl, originalThumbUrl, targetIndex, updateProgress);
       if (!uploaded?.imageUrl || !uploaded?.thumbUrl) throw new Error('Image upload failed');
@@ -7315,11 +7358,18 @@ function App() {
       setChatMessages(prev => prev.map(patchMessage));
       setRecentMessages(prev => prev.map(patchMessage));
       setChatUploadProgress({ pct: 100, remainingSec: 0 });
-      return uploaded.imageUrl;
+      return { shareUrl: uploaded.imageUrl, imageUrl: uploaded.imageUrl };
     } catch (err) {
-      console.error('handlePromoteInlineChatImage failed:', err);
-      showToast('이미지 URL 생성 실패', 'error', 4000);
-      throw err;
+      console.warn('Storage image URL generation failed, using Firestore share fallback:', err);
+      try {
+        const shareUrl = await createImageShareDocument(activeCalId, url, meta || {});
+        setChatUploadProgress({ pct: 100, remainingSec: 0 });
+        return { shareUrl, imageUrl: null };
+      } catch (fallbackErr) {
+        console.error('handlePromoteInlineChatImage failed:', fallbackErr);
+        showToast('이미지 URL 생성 실패', 'error', 4000);
+        throw fallbackErr;
+      }
     } finally {
       setTimeout(() => setChatUploadProgress(null), 300);
     }
@@ -9870,8 +9920,9 @@ function ImageUrlModal({ imageUrl, onClose, showToast, onEnsureShareUrl }) {
     setErrorText('');
     if (typeof imageUrl !== 'string' || !imageUrl.startsWith('data:') || typeof onEnsureShareUrl !== 'function') return;
     setIsGenerating(true);
-    Promise.resolve(onEnsureShareUrl(imageUrl)).then(nextUrl => {
+    Promise.resolve(onEnsureShareUrl(imageUrl)).then(result => {
       if (cancelled) return;
+      const nextUrl = typeof result === 'string' ? result : result?.shareUrl;
       if (nextUrl && /^https?:\/\//.test(nextUrl)) {
         setResolvedUrl(nextUrl);
       } else {
@@ -9986,11 +10037,15 @@ function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, onPromote
   const ensureCurrentShareUrl = async url => {
     if (typeof url !== 'string' || !url.startsWith('data:')) return url;
     if (typeof onPromoteImageUrl !== 'function') throw new Error('No image URL promotion handler');
-    const nextUrl = await onPromoteImageUrl({ url, meta: meta && meta[index], index });
-    if (nextUrl && /^https?:\/\//.test(nextUrl)) {
-      setDisplayUrls(prev => prev.map((item, i) => i === index ? nextUrl : item));
+    const result = await onPromoteImageUrl({ url, meta: meta && meta[index], index });
+    const nextShareUrl = typeof result === 'string' ? result : result?.shareUrl;
+    const nextImageUrl = typeof result === 'string' ? result : result?.imageUrl;
+    if (nextImageUrl && /^https?:\/\//.test(nextImageUrl)) {
+      setDisplayUrls(prev => prev.map((item, i) => i === index ? nextImageUrl : item));
+    }
+    if (nextShareUrl && /^https?:\/\//.test(nextShareUrl)) {
       if (showToast) showToast('공유 URL 생성완료', 'success', 3000);
-      return nextUrl;
+      return nextShareUrl;
     }
     throw new Error('Image URL promotion failed');
   };
@@ -16102,11 +16157,72 @@ function PhotoGallery({ chatMessages, showToast, onPromoteImageUrl }) {
   );
 }
 
+function ImageShareViewer({ shareId }) {
+  const [state, setState] = React.useState({ loading: true, share: null, error: '' });
+  React.useEffect(() => {
+    let cancelled = false;
+    fetchImageShareDocument(shareId).then(share => {
+      if (cancelled) return;
+      if (!share?.imageUrl) {
+        setState({ loading: false, share: null, error: '이미지를 찾지 못했습니다.' });
+        return;
+      }
+      setState({ loading: false, share, error: '' });
+    }).catch(err => {
+      console.error('Image share load failed:', err);
+      if (!cancelled) setState({ loading: false, share: null, error: '이미지를 불러오지 못했습니다.' });
+    });
+    return () => { cancelled = true; };
+  }, [shareId]);
+
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      minHeight: '100vh',
+      minHeight: '100dvh',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: '16px',
+      padding: '20px',
+      background: '#111827',
+      color: '#FFFFFF',
+      boxSizing: 'border-box'
+    }
+  }, state.loading ? /*#__PURE__*/React.createElement(React.Fragment, null,
+    /*#__PURE__*/React.createElement("div", {
+      style: { width: '42px', height: '42px', borderRadius: '50%', border: '4px solid rgba(255,255,255,0.22)', borderTopColor: '#FFFFFF', animation: 'spin 0.8s linear infinite' }
+    }),
+    /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.95rem', fontWeight: 800 } }, "이미지를 불러오는 중입니다...")
+  ) : state.error ? /*#__PURE__*/React.createElement(React.Fragment, null,
+    /*#__PURE__*/React.createElement("div", { style: { fontSize: '1.05rem', fontWeight: 900 } }, state.error),
+    /*#__PURE__*/React.createElement("a", { href: "./", style: { color: '#93C5FD', fontWeight: 800 } }, "캘린더로 돌아가기")
+  ) : /*#__PURE__*/React.createElement(React.Fragment, null,
+    /*#__PURE__*/React.createElement("img", {
+      src: state.share.imageUrl,
+      alt: "공유 이미지",
+      style: {
+        maxWidth: '100%',
+        maxHeight: 'calc(100dvh - 96px)',
+        objectFit: 'contain',
+        borderRadius: '14px',
+        boxShadow: '0 24px 80px rgba(0,0,0,0.35)'
+      }
+    }),
+    /*#__PURE__*/React.createElement("div", {
+      style: { fontSize: '0.78rem', color: 'rgba(255,255,255,0.72)', textAlign: 'center' }
+    }, "모여라 캘린더 공유 이미지")
+  ));
+}
+
 try {
   const rootElement = document.getElementById('root');
   if (rootElement) {
     const root = ReactDOM.createRoot(rootElement);
-    root.render(/*#__PURE__*/React.createElement(App, null));
+    const imageShareId = new URLSearchParams(window.location.search).get('image');
+    root.render(imageShareId
+      ? /*#__PURE__*/React.createElement(ImageShareViewer, { shareId: imageShareId })
+      : /*#__PURE__*/React.createElement(App, null));
   }
 } catch (e) {
   console.error('App render error:', e);
