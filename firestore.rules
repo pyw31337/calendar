@@ -66,7 +66,11 @@ service cloud.firestore {
           // imageShareUrls caches the /calendar/?image={id} share URL generated per image (see
           // handlePromoteInlineChatImage in index.html) so a second click on the same image's
           // URL button in the lightbox doesn't need to regenerate it.
-          && (!('imageShareUrls' in data) || (data.imageShareUrls is list && data.imageShareUrls.size() <= 50));
+          && (!('imageShareUrls' in data) || (data.imageShareUrls is list && data.imageShareUrls.size() <= 50))
+          // imageTags holds one free-text tag string per image, parallel-indexed to imageUrls/
+          // thumbUrls (see handleSaveImageTags in index.html) -- entered from the Lightbox's
+          // image-info panel and searched from GlobalSearchModal.
+          && (!('imageTags' in data) || (data.imageTags is list && data.imageTags.size() <= 50));
       }
 
       match /messages/{messageId} {
@@ -79,7 +83,7 @@ service cloud.firestore {
           && hasValidMessageText(request.resource.data)
           && hasValidMessageImages(request.resource.data);
         allow update: if isCalendarDoc(calendarDocId)
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['text', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageShareUrls'])
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['text', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageShareUrls', 'imageTags'])
           && hasValidMessageText(request.resource.data)
           && hasValidMessageImages(request.resource.data);
         allow delete: if isCalendarDoc(calendarDocId);
