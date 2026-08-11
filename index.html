@@ -949,6 +949,7 @@
 
     .month-display { font-size: 1.15rem; font-weight: 800; color: var(--text-main); letter-spacing: -0.02em; }
     @media (min-width: 640px) { .month-display { font-size: 1.4rem; } }
+    .month-display-year-short { display: none; }
 
     .weekday-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 8px; text-align: center; }
     @media (min-width: 640px) { .weekday-grid { gap: 8px; margin-bottom: 10px; } }
@@ -967,6 +968,8 @@
     @media (max-width: 639px) {
       .day-corner-label { display: none; }
       .date-year { display: none; }
+      .month-display-year-full { display: none; }
+      .month-display-year-short { display: inline; }
       .modal-header h3 { font-size: 0.95rem !important; }
       .modal-header .holiday-label { font-size: 0.82rem !important; }
       .modal-header .status-badge { font-size: 0.7rem !important; padding: 2px 4px !important; }
@@ -9709,7 +9712,11 @@ function CalendarGrid({
     },
     onClick: () => setIsPickerOpen(v => !v),
     title: "\uD074\uB9AD\uD558\uC5EC \uB144\uC6D4 \uC774\uB3D9"
-  }, compact ? `${String(year).slice(2)}.${String(month + 1).padStart(2, '0')}` : `${year}\uB144 ${month + 1}\uC6D4`, /*#__PURE__*/React.createElement("span", {
+  }, compact ? `${String(year).slice(2)}.${String(month + 1).padStart(2, '0')}` : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", {
+    className: "month-display-year-full"
+  }, `${year}\uB144 `), /*#__PURE__*/React.createElement("span", {
+    className: "month-display-year-short"
+  }, `${String(year).slice(2)}\uB144 `), `${month + 1}\uC6D4`), /*#__PURE__*/React.createElement("span", {
     style: {
       color: '#94A3B8',
       display: 'inline-flex',
