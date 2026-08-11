@@ -1449,7 +1449,7 @@
       flex: 0 0 auto;
       order: 3;
     }
-    .admin-auth-icon-btn {
+    .admin-menu-toggle-btn {
       width: 28px;
       height: 28px;
       padding: 0;
@@ -1462,9 +1462,78 @@
       align-items: center;
       justify-content: center;
       cursor: pointer;
+      transition: color 0.16s ease, transform 0.16s ease;
     }
-    .admin-auth-icon-btn:hover {
+    .admin-menu-toggle-btn:hover {
+      color: #2563EB;
+      transform: translateY(-1px);
+    }
+    .admin-side-menu-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 9990;
+      background: rgba(15, 23, 42, 0.28);
+      display: flex;
+      justify-content: flex-end;
+      animation: adminMenuFadeIn 0.18s ease-out;
+    }
+    .admin-side-menu {
+      width: min(320px, calc(100vw - 44px));
+      min-height: 100%;
+      background: #FFFFFF;
+      color: #0F172A;
+      box-shadow: -18px 0 42px rgba(15, 23, 42, 0.18);
+      padding: 24px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      animation: adminMenuSlideIn 0.22s cubic-bezier(.2,.8,.2,1);
+    }
+    .admin-side-menu-title {
+      font-size: 0.92rem;
+      font-weight: 900;
+      color: #0F172A;
+      margin-bottom: 8px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #E2E8F0;
+    }
+    .admin-side-menu-item {
+      width: 100%;
+      min-height: 46px;
+      padding: 0 12px;
+      border: none;
+      border-radius: 12px;
+      background: transparent;
+      color: #0F172A;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-family: inherit;
+      font-size: 0.9rem;
+      font-weight: 850;
+      text-align: left;
+      cursor: pointer;
+      transition: background-color 0.16s ease, color 0.16s ease, transform 0.16s ease;
+    }
+    .admin-side-menu-item:hover,
+    .admin-side-menu-item:focus-visible {
       background: #F1F5F9;
+      color: #2563EB;
+      transform: translateX(-2px);
+      outline: none;
+    }
+    .admin-side-menu-item svg {
+      width: 20px;
+      height: 20px;
+      flex: 0 0 20px;
+    }
+    @keyframes adminMenuFadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    @keyframes adminMenuSlideIn {
+      from { transform: translateX(24px); opacity: 0.88; }
+      to { transform: translateX(0); opacity: 1; }
     }
     .admin-header-actions {
       display: flex;
@@ -5070,6 +5139,7 @@ function AdminDashboard({ initialCalendars }) {
   // Admin password change
   const [isChangePwOpen, setIsChangePwOpen] = React.useState(false);
   const [isHeaderCalPickerOpen, setIsHeaderCalPickerOpen] = React.useState(false);
+  const [isAdminMenuOpen, setIsAdminMenuOpen] = React.useState(false);
   const [currentPwInput, setCurrentPwInput] = React.useState('');
   const [newPwInput, setNewPwInput] = React.useState('');
   const [confirmPwInput, setConfirmPwInput] = React.useState('');
@@ -5716,18 +5786,12 @@ function AdminDashboard({ initialCalendars }) {
         /*#__PURE__*/React.createElement("div", { className: "admin-auth-actions" },
           /*#__PURE__*/React.createElement("button", {
             type: "button",
-            className: "admin-auth-icon-btn",
-            title: "비밀번호 변경",
-            "aria-label": "비밀번호 변경",
-            onClick: () => { resetChangePwForm(); setIsChangePwOpen(true); }
-          }, /*#__PURE__*/React.createElement(LockIcon, null)),
-          /*#__PURE__*/React.createElement("button", {
-            type: "button",
-            className: "admin-auth-icon-btn",
-            title: "로그아웃",
-            "aria-label": "로그아웃",
-            onClick: handleLogoutAdmin
-          }, /*#__PURE__*/React.createElement(LogoutIcon, null))
+            className: "admin-menu-toggle-btn",
+            title: isAdminMenuOpen ? "메뉴 닫기" : "메뉴 열기",
+            "aria-label": isAdminMenuOpen ? "메뉴 닫기" : "메뉴 열기",
+            "aria-expanded": isAdminMenuOpen,
+            onClick: () => setIsAdminMenuOpen(prev => !prev)
+          }, isAdminMenuOpen ? /*#__PURE__*/React.createElement(SmallXIcon, { size: 24 }) : /*#__PURE__*/React.createElement(AdminFilledMenuIcon, null))
         ),
         /*#__PURE__*/React.createElement("div", { className: "admin-header-actions" },
             /*#__PURE__*/React.createElement("button", {
@@ -5807,6 +5871,36 @@ function AdminDashboard({ initialCalendars }) {
           type: "button", className: "admin-tab-button", onClick: () => setActiveTab('recovery'),
           style: styles.tabButton(activeTab === 'recovery')
         }, /*#__PURE__*/React.createElement("span", { className: "admin-tab-icon" }, /*#__PURE__*/React.createElement(HourglassIcon, null)), "복구")
+      )
+    ),
+
+    isAdminMenuOpen && /*#__PURE__*/React.createElement("div", {
+      className: "admin-side-menu-overlay",
+      onClick: () => setIsAdminMenuOpen(false)
+    },
+      /*#__PURE__*/React.createElement("nav", {
+        className: "admin-side-menu",
+        "aria-label": "관리자 메뉴",
+        onClick: e => e.stopPropagation()
+      },
+        /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-title" }, "관리자 메뉴"),
+        /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          className: "admin-side-menu-item",
+          onClick: () => {
+            setIsAdminMenuOpen(false);
+            resetChangePwForm();
+            setIsChangePwOpen(true);
+          }
+        }, /*#__PURE__*/React.createElement(LockIcon, null), /*#__PURE__*/React.createElement("span", null, "비밀번호 변경")),
+        /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          className: "admin-side-menu-item",
+          onClick: () => {
+            setIsAdminMenuOpen(false);
+            handleLogoutAdmin();
+          }
+        }, /*#__PURE__*/React.createElement(LogoutIcon, null), /*#__PURE__*/React.createElement("span", null, "로그아웃"))
       )
     ),
 
@@ -14842,6 +14936,27 @@ function LogoutIcon() {
     d: "M9 12h12l-3 -3"
   }), /*#__PURE__*/React.createElement("path", {
     d: "M18 15l3 -3"
+  }));
+}
+
+function AdminFilledMenuIcon() {
+  return /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: "24",
+    height: "24",
+    viewBox: "0 0 24 24",
+    fill: "currentColor",
+    className: "icon icon-tabler icons-tabler-filled icon-tabler-menu-2"
+  }, /*#__PURE__*/React.createElement("path", {
+    stroke: "none",
+    d: "M0 0h24v24H0z",
+    fill: "none"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M21 6a1 1 0 0 1 -1 1h-16a1 1 0 1 1 0 -2h16a1 1 0 0 1 1 1"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M21 12a1 1 0 0 1 -1 1h-16a1 1 0 0 1 0 -2h16a1 1 0 0 1 1 1"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M21 18a1 1 0 0 1 -1 1h-16a1 1 0 0 1 0 -2h16a1 1 0 0 1 1 1"
   }));
 }
 
