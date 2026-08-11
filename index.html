@@ -353,7 +353,7 @@
     @media (max-width: 720px) {
       body:has(.admin-scope),
       body:has(.admin-login-gate) {
-        padding: 24px 0 0px;
+        padding: 24px 0px;
       }
     }
 
@@ -5593,7 +5593,6 @@ function AdminDashboard({ initialCalendars }) {
   // =====================================================================
   const styles = {
     dashboard: {
-      backgroundColor: '#F8FAFC',
       color: '#0F172A',
       minHeight: '100vh',
       fontFamily: 'Inter, sans-serif'
@@ -5656,10 +5655,10 @@ function AdminDashboard({ initialCalendars }) {
     }),
     card: {
       backgroundColor: '#FFFFFF',
-      border: '1px solid var(--border-subtle)',
-      borderRadius: '12px',
+      border: 'none',
+      borderRadius: 0,
       padding: '14px 24px 24px',
-      boxShadow: '0 4px 6px -1px rgba(15,23,42,0.05), 0 2px 4px -1px rgba(15,23,42,0.03)'
+      boxShadow: 'none'
     },
     cardTitle: {
       fontSize: '0.96rem',
@@ -5859,7 +5858,7 @@ function AdminDashboard({ initialCalendars }) {
     /* ================================================================= */
     /* TAB 1: OPERATIONAL METRICS & CHAT LOGS                            */
     /* ================================================================= */
-    activeTab === 'metrics' && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '20px' } },
+    activeTab === 'metrics' && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '10px' } },
       /* Core metrics stat-box grid: each drillable box shows its own always-visible kkot/cw
          donut instead of expanding a shared detail row on click, since every box's donut uses
          the same calendar legend anyway -- that legend now lives once in the section title. */
@@ -5912,7 +5911,7 @@ function AdminDashboard({ initialCalendars }) {
           /*#__PURE__*/React.createElement("span", { style: { display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(ChartBarIcon, null), "캘린더별 세부 통계")
         ),
         dashboard.calendarStats.length === 0 ? /*#__PURE__*/React.createElement("div", { style: { color: '#64748B', fontSize: '0.9rem' } }, "표시할 캘린더가 없습니다.") :
-        /*#__PURE__*/React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(320px, 100%), 1fr))', gap: '20px' } },
+        /*#__PURE__*/React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(320px, 100%), 1fr))', gap: '10px' } },
           dashboard.calendarStats.map(stat => {
             const cal = stat.calendar;
             const width = `${Math.max(4, Math.round(stat.schedules.length / dashboard.maxSchedules * 100))}%`;
@@ -5952,7 +5951,7 @@ function AdminDashboard({ initialCalendars }) {
       ),
 
       /* Popular Dates & Registrations splits */
-      /*#__PURE__*/React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(320px, 100%), 1fr))', gap: '20px' } },
+      /*#__PURE__*/React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(320px, 100%), 1fr))', gap: '10px' } },
         /* Popular Dates Card */
         /*#__PURE__*/React.createElement("section", { style: styles.card },
           /*#__PURE__*/React.createElement("div", { style: styles.cardTitle },
@@ -6034,7 +6033,7 @@ function AdminDashboard({ initialCalendars }) {
     /* ================================================================= */
     /* TAB 2: CALENDARS & POLLS SETTINGS                                 */
     /* ================================================================= */
-    activeTab === 'settings' && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '20px' } },
+    activeTab === 'settings' && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '10px' } },
       selectedCal ? /*#__PURE__*/React.createElement(React.Fragment, null,
         /* Profile & Participants settings card */
         /*#__PURE__*/React.createElement("section", { style: styles.card },
@@ -6172,7 +6171,7 @@ function AdminDashboard({ initialCalendars }) {
     /* ================================================================= */
     /* TAB 3: POINT-IN-TIME RECOVERY & BACKUPS                           */
     /* ================================================================= */
-    activeTab === 'recovery' && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '20px' } },
+    activeTab === 'recovery' && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '10px' } },
       selectedCal ? /*#__PURE__*/React.createElement(React.Fragment, null,
         /* Timeline log restore card (Combined schedules, polls and chat logs!) */
         /*#__PURE__*/React.createElement("section", { className: "recovery-timeline-card", style: styles.card },
@@ -6285,7 +6284,7 @@ function AdminDashboard({ initialCalendars }) {
     /* ================================================================= */
     /* TAB 4: CHAT LOGS                                                   */
     /* ================================================================= */
-    activeTab === 'logs' && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '20px' } },
+    activeTab === 'logs' && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '10px' } },
       /* Unified Live Chat Logs Section */
       /*#__PURE__*/React.createElement("section", { style: styles.card },
         /* Header & Search */
