@@ -1533,6 +1533,33 @@
       }
     }
 
+    @media (max-width: 640px) {
+      .settings-poll-row {
+        align-items: center !important;
+      }
+      .settings-poll-row .admin-poll-row-main {
+        gap: 2px !important;
+        flex: 0 1 auto !important;
+      }
+      .settings-poll-row .admin-poll-row-actions {
+        margin-top: 2px;
+      }
+      .recovery-restore-footer {
+        width: 100%;
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 6px !important;
+      }
+      .recovery-restore-footer .registered-at-text,
+      .recovery-restore-footer > span {
+        align-self: flex-start;
+        text-align: left !important;
+      }
+      .recovery-restore-btn {
+        width: 100%;
+      }
+    }
+
     .date-item-btn {
       width: 100%; display: flex; flex-direction: column; align-items: flex-start; padding: 12px 14px;
       background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
@@ -1775,7 +1802,9 @@
       }
       .recent-log-right {
         margin-left: 0;
-        align-self: flex-end;
+        align-self: stretch;
+        width: 100%;
+        justify-content: space-between;
       }
       .recent-log-left {
         align-items: flex-start;
@@ -2190,9 +2219,11 @@ function detectBrowserForShortcutInstructions() {
   const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   const isSafari = /Safari/.test(ua) && !/Chrome|CriOS|EdgiOS|FxiOS/.test(ua);
   const isFirefox = /Firefox|FxiOS/.test(ua);
+  const isWhale = /Whale|NAVER/.test(ua);
   if (isIOS && isSafari) return 'ios-safari';
   if (isSafari) return 'macos-safari';
   if (isFirefox) return 'firefox';
+  if (isWhale) return 'whale';
   return 'other';
 }
 
@@ -2204,13 +2235,36 @@ function getShortcutInstructions(kind) {
       return '공유 버튼을 누른 뒤 "Dock에 추가" 또는 "홈 화면에 추가"를 선택해 주세요.';
     case 'firefox':
       return '브라우저 메뉴(≡)를 열어 "홈 화면에 추가" 또는 "설치"를 선택해 주세요.';
+    case 'whale':
+      return '웨일 하단 메뉴(≡)에서 "홈 화면 추가" 또는 "앱 설치"를 선택해 주세요.';
     default:
       return '브라우저 메뉴에서 "홈 화면에 추가" 또는 "앱 설치"를 찾아 선택해 주세요.';
   }
 }
 
+function waitForDeferredInstallPrompt(timeoutMs = 1800) {
+  if (window.__deferredInstallPrompt) return Promise.resolve(window.__deferredInstallPrompt);
+  return new Promise(resolve => {
+    let settled = false;
+    const done = promptEvent => {
+      if (settled) return;
+      settled = true;
+      window.removeEventListener('beforeinstallprompt', onPrompt);
+      clearTimeout(timer);
+      resolve(promptEvent || window.__deferredInstallPrompt || null);
+    };
+    const onPrompt = e => {
+      e.preventDefault();
+      window.__deferredInstallPrompt = e;
+      done(e);
+    };
+    const timer = setTimeout(() => done(null), timeoutMs);
+    window.addEventListener('beforeinstallprompt', onPrompt, { once: true });
+  });
+}
+
 async function tryCreateShortcut(notify) {
-  const deferredInstallPrompt = window.__deferredInstallPrompt;
+  const deferredInstallPrompt = await waitForDeferredInstallPrompt();
   if (deferredInstallPrompt) {
     try {
       deferredInstallPrompt.prompt();
@@ -9754,6 +9808,31 @@ function Lightbox({ urls, index, onClose, onNavigate, meta }) {
   const [showInfo, setShowInfo] = React.useState(false);
   const [imageUrlModalOpen, setImageUrlModalOpen] = React.useState(false);
   const [imageDimensions, setImageDimensions] = React.useState({});
+  const lightboxHistoryRef = React.useRef(false);
+  React.useEffect(() => {
+    try {
+      window.history.pushState({ ...(window.history.state || {}), __moyeoraLightbox: true }, '', window.location.href);
+      lightboxHistoryRef.current = true;
+    } catch (e) {
+      lightboxHistoryRef.current = false;
+    }
+    const handlePopState = () => {
+      lightboxHistoryRef.current = false;
+      onClose();
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      lightboxHistoryRef.current = false;
+    };
+  }, []);
+  const closeLightbox = () => {
+    if (lightboxHistoryRef.current && window.history.state && window.history.state.__moyeoraLightbox) {
+      window.history.back();
+      return;
+    }
+    onClose();
+  };
   React.useEffect(() => { setShowInfo(false); }, [index]);
   const currentInfo = React.useMemo(
     () => {
@@ -9805,7 +9884,7 @@ function Lightbox({ urls, index, onClose, onNavigate, meta }) {
   };
   React.useEffect(() => {
     const onKeyDown = e => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') closeLightbox();
       else if (e.key === 'ArrowLeft') animateToAdjacent(index - 1);
       else if (e.key === 'ArrowRight') animateToAdjacent(index + 1);
     };
@@ -9890,7 +9969,7 @@ function Lightbox({ urls, index, onClose, onNavigate, meta }) {
       wasDraggedRef.current = false;
       return;
     }
-    onClose();
+    closeLightbox();
   };
 
   const renderSlide = (url, slot) => /*#__PURE__*/React.createElement("div", {
@@ -9934,7 +10013,7 @@ function Lightbox({ urls, index, onClose, onNavigate, meta }) {
     }
   }, /*#__PURE__*/React.createElement("button", {
     type: "button",
-    onClick: e => { e.stopPropagation(); onClose(); },
+    onClick: e => { e.stopPropagation(); closeLightbox(); },
     "aria-label": "닫기",
     style: {
       position: 'absolute', top: '16px', right: '16px',
@@ -12271,9 +12350,12 @@ function DateModal({
   const noteInputRef = React.useRef(null);
   const activeParticipants = getActiveParticipants(calendar);
   const dateEntries = getActiveAvailabilities(calendar).filter(e => e.date === dateStr);
+  const getExistingNoteForParticipant = id => (dateEntries.find(entry => entry.participantId === id)?.note || '');
   React.useEffect(() => {
-    setParticipantId(getCachedParticipantId());
-    setNote('');
+    const nextParticipantId = getCachedParticipantId();
+    const existingEntry = getActiveAvailabilities(calendar).find(e => e.date === dateStr && e.participantId === nextParticipantId);
+    setParticipantId(nextParticipantId);
+    setNote(existingEntry ? existingEntry.note || '' : '');
     setIsSheetOpen(false);
     setIsSubmitting(false);
   }, [calendar?.id, dateStr]);
@@ -12339,11 +12421,14 @@ function DateModal({
   const [editingExpenseId, setEditingExpenseId] = React.useState(null);
   const [isSavingExpense, setIsSavingExpense] = React.useState(false);
   const [isSettlementCollapsed, setIsSettlementCollapsed] = React.useState(true);
-  const [isAttendeesCollapsed, setIsAttendeesCollapsed] = React.useState(true);
+  const [attendeesView, setAttendeesView] = React.useState('preview'); // preview: memo-only summary, closed: none, open: full list
+  const isAttendeesOpen = attendeesView === 'open';
+  const isAttendeesPreview = attendeesView === 'preview';
   React.useEffect(() => {
     setExpenseLabelInput('');
     setExpenseAmountInput('');
     setEditingExpenseId(null);
+    setAttendeesView('preview');
   }, [calendar?.id, dateStr]);
   const expenseTotal = expenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
   const getExpenseUrl = expense => sanitizeText(expense?.url || extractFirstUrl(expense?.label || ''), 220);
@@ -12710,10 +12795,10 @@ function DateModal({
       marginTop: '6px'
     }
   }, /*#__PURE__*/React.createElement("div", {
-    onClick: () => setIsAttendeesCollapsed(prev => !prev),
+    onClick: () => setAttendeesView(prev => prev === 'open' ? 'closed' : 'open'),
     style: {
       display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', cursor: 'pointer',
-      marginBottom: isAttendeesCollapsed ? 0 : '10px'
+      marginBottom: isAttendeesOpen ? '10px' : 0
     }
   },
     /*#__PURE__*/React.createElement("span", {
@@ -12748,19 +12833,19 @@ function DateModal({
         })
       ),
       /*#__PURE__*/React.createElement(SectionToggleButton, {
-        collapsed: isAttendeesCollapsed,
-        onToggle: () => setIsAttendeesCollapsed(prev => !prev),
-        label: isAttendeesCollapsed ? "참석가능 펼치기" : "참석가능 접기"
+        collapsed: !isAttendeesOpen,
+        onToggle: () => setAttendeesView(prev => prev === 'open' ? 'closed' : 'open'),
+        label: isAttendeesOpen ? "참석가능 접기" : "참석가능 펼치기"
       })
     )
-  ), isAttendeesCollapsed && dateEntriesWithNotes.length > 0 && /*#__PURE__*/React.createElement("div", {
+  ), isAttendeesPreview && dateEntriesWithNotes.length > 0 && /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       flexDirection: 'column',
       gap: '8px',
       marginTop: '10px'
     }
-  }, dateEntriesWithNotes.map(entry => renderAvailabilityEntry(entry, true))), !isAttendeesCollapsed && /*#__PURE__*/React.createElement("div", {
+  }, dateEntriesWithNotes.map(entry => renderAvailabilityEntry(entry, true))), isAttendeesOpen && /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       flexDirection: 'column',
@@ -12948,8 +13033,7 @@ function DateModal({
       if (isSubmitting) return;
       setParticipantId(p.id);
       getLocalStorage().setItem('gather_active_participant_id_v20', p.id);
-      const existingEntry = dateEntries.find(entry => entry.participantId === p.id);
-      setNote(existingEntry ? existingEntry.note || '' : '');
+      setNote(getExistingNoteForParticipant(p.id));
       setIsSheetOpen(false);
     }
   }, /*#__PURE__*/React.createElement("span", {
@@ -13607,16 +13691,16 @@ function AdminModal({
               getCalendarPolls(calendar).length === 0 ? /*#__PURE__*/React.createElement("div", { style: { padding: '16px', color: '#94A3B8', fontSize: '0.8rem', textAlign: 'center' } }, "현재 등록된 투표가 없습니다. 새 투표를 생성해 주세요.") :
               getCalendarPolls(calendar).map(poll => /*#__PURE__*/React.createElement("div", {
                 key: poll.id,
-                className: 'admin-log-row poll-list-row',
+                className: 'admin-log-row poll-list-row settings-poll-row',
                 style: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px 8px', borderRadius: '8px', padding: '10px 12px' }
               },
                 /* Left info */
-                /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0, flex: '1 1 160px' } },
+                /*#__PURE__*/React.createElement("div", { className: "admin-poll-row-main", style: { display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0, flex: '1 1 160px' } },
                   /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--text-main)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' } }, poll.title),
                   /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.72rem', color: '#64748B' } }, `${getActivePollOptions(poll).length}개 옵션 · 총 ${getPollTotalVoteCount(poll)}표${poll.deadline ? ` · 마감 ${formatPollDeadline(poll.deadline)}${isPollClosed(poll) ? ' (마감됨)' : ''}` : ''}`)
                 ),
                 /* Right actions */
-                /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '6px' } },
+                /*#__PURE__*/React.createElement("div", { className: "admin-poll-row-actions", style: { display: 'flex', gap: '6px' } },
                   /* Edit button */
                   /*#__PURE__*/React.createElement("button", {
                     type: "button",
@@ -13701,7 +13785,7 @@ function AdminModal({
                 }
                 exportCalendarConfirmedMeetingsToICS(calendar);
               }
-            }, /*#__PURE__*/React.createElement(CalendarExportIcon, null), "ics 내보내기")
+            }, /*#__PURE__*/React.createElement(CalendarExportIcon, null), "캘린더 내보내기 (.ics)")
           )
         )
       ),
@@ -13774,11 +13858,12 @@ function AdminModal({
                   }, log.note || (log.date ? formatShortDateWithDayName(log.date) : ''))
                 ),
                 /* Right: registered-at timestamp + rollback button */
-                /*#__PURE__*/React.createElement("div", { className: "recent-log-right" },
+                /*#__PURE__*/React.createElement("div", { className: "recent-log-right recovery-restore-footer" },
                   /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.72rem', color: '#475569', fontWeight: '500', whiteSpace: 'nowrap' } }, formatRegisteredAt(log.timestamp)),
                   /*#__PURE__*/React.createElement("button", {
                     type: "button",
                     onClick: () => handleRestoreToLog(log),
+                    className: "recovery-restore-btn",
                     style: {
                       backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: '6px',
                       padding: '6px 10px', fontSize: '0.72rem', fontWeight: 'bold', cursor: 'pointer', color: 'var(--accent-primary)', whiteSpace: 'nowrap'
