@@ -1477,10 +1477,12 @@
     .admin-top-bar {
       background-color: #FFFFFF;
       border-bottom: 1px solid #E2E8F0;
-      margin: -24px -16px 0;
+      margin: -24px 0 0;
+      padding-top: 24px;
+      box-sizing: border-box;
     }
     .admin-header {
-      padding: 16px 32px;
+      padding: 0 32px 16px;
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -5834,14 +5836,16 @@ function AdminDashboard({ initialCalendars }) {
     topBar: {
       backgroundColor: '#FFFFFF',
       borderBottom: '1px solid #E2E8F0',
-      // Admin pages already remove body side padding, so only pull the top bar upward.
-      // Keeping horizontal margins at 0 prevents 1px/16px visual overflow on mobile browsers.
+      // Body keeps the requested 24px admin padding; the top bar absorbs that
+      // safe area with its own white background so the header never shows a gray strip.
       margin: '-24px 0 0',
+      paddingTop: '24px',
+      boxSizing: 'border-box',
       maxWidth: '100%',
       overflowX: 'hidden'
     },
     header: {
-      padding: '16px 32px'
+      padding: '0 32px 16px'
     },
     title: {
       fontSize: '1.35rem',
