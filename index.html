@@ -9893,6 +9893,10 @@ function CalendarGrid({
     const isHoliday = !!holidayNames && holidayNames.length > 0;
     const lunarLabel = lunarLabelMap[dateStr];
     const isConfirmed = isDateConfirmedMeeting(calendar, dateStr);
+    const hasExpenses = (() => {
+      const entry = getConfirmedMeetings(calendar).find(m => m.date === dateStr);
+      return entry && Array.isArray(entry.expenses) && entry.expenses.length > 0;
+    })();
     const solarTermName = !isHoliday && !isAllAvailable ? solarTermMap[dateStr] : null;
     // Only one badge shows next to the date number: holiday name takes priority (it's
     // tied to the red date styling), then '확정' if this date has been promoted to a
@@ -9915,6 +9919,13 @@ function CalendarGrid({
         alignItems: 'center',
         gap: '4px'
       }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '2px',
+        flexShrink: 0
+      }
     }, /*#__PURE__*/React.createElement("span", {
       className: "day-number",
       style: isToday ? {
@@ -9929,7 +9940,7 @@ function CalendarGrid({
         fontWeight: '800',
         flexShrink: 0
       } : { flexShrink: 0 }
-    }, dayNum), cornerText && /*#__PURE__*/React.createElement("span", {
+    }, dayNum), hasExpenses && /*#__PURE__*/React.createElement(CoinIcon, null)), cornerText && /*#__PURE__*/React.createElement("span", {
       className: `day-corner-label${isHoliday ? ' is-holiday' : ''}${isAllAvailable ? ' is-all-available' : ''}`,
       title: cornerTitle,
       style: {
@@ -16117,7 +16128,7 @@ function SettlementSummaryModal({ calendar, onBack }) {
   const metricCards = [
     { label: '총 수입', value: totalIncome, color: '#16A34A', icon: React.createElement(BanknoteArrowUpIcon, { size: 16 }) },
     { label: '총 지출', value: totalExpense, color: '#DC2626', icon: React.createElement(BanknoteArrowDownIcon, { size: 16 }) },
-    { label: '현재 잔액', value: balance, color: '#0F172A', icon: React.createElement(PiggyBankIcon, { size: 16 }) }
+    { label: '현재 잔액', value: balance, color: 'var(--text-main)', icon: React.createElement(PiggyBankIcon, { size: 16 }) }
   ];
   const categoryBadge = category => /*#__PURE__*/React.createElement("span", {
     style: {
@@ -16148,9 +16159,24 @@ function SettlementSummaryModal({ calendar, onBack }) {
     style: { fontSize: '0.86rem', color: 'var(--text-main)', fontWeight: 800, overflowWrap: 'anywhere' }
   }, item.label), item.url && /*#__PURE__*/React.createElement("button", {
     type: "button",
-    className: "registered-at-text",
     title: item.url,
-    style: { alignSelf: 'flex-start', border: 0, cursor: 'pointer', textDecoration: 'none' },
+    style: {
+      alignSelf: 'flex-start',
+      border: 0,
+      cursor: 'pointer',
+      textDecoration: 'none',
+      display: 'inline-flex',
+      alignItems: 'center',
+      padding: '3px 10px',
+      borderRadius: '9999px',
+      fontSize: '0.72rem',
+      fontWeight: 600,
+      backgroundColor: 'var(--border-subtle)',
+      color: 'var(--text-muted)',
+      wordBreak: 'break-all',
+      maxWidth: '100%',
+      textAlign: 'left'
+    },
     onClick: () => window.open(item.url, '_blank', 'noopener,noreferrer')
   }, item.url));
   const emptyContent = /*#__PURE__*/React.createElement("div", {
@@ -16607,6 +16633,32 @@ function WalletIcon({ size = 24 } = {}) {
   }), /*#__PURE__*/React.createElement("path", {
     d: "M20 12v4h-4a2 2 0 0 1 0 -4h4"
   }));
+}
+
+function CoinIcon() {
+  return /*#__PURE__*/React.createElement("svg", {
+    viewBox: "0 0 24 24",
+    width: "11",
+    height: "11",
+    style: {
+      flexShrink: 0,
+      verticalAlign: 'middle',
+      marginLeft: '3px'
+    }
+  }, /*#__PURE__*/React.createElement("circle", {
+    cx: "12",
+    cy: "12",
+    r: "11",
+    fill: "#8A99AD"
+  }), /*#__PURE__*/React.createElement("text", {
+    x: "12",
+    y: "16.5",
+    fontSize: "14",
+    fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+    fontWeight: "900",
+    textAnchor: "middle",
+    fill: "#FFFFFF"
+  }, "\u20A9"));
 }
 
 function BanknoteArrowUpIcon({ size = 24 } = {}) {
