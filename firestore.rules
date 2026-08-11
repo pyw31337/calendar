@@ -62,7 +62,11 @@ service cloud.firestore {
           // messages sent with more than one photo -- only ever written alongside imageUrl/
           // thumbUrl (see handleSendChatMessage), never used for the base64-fallback path.
           && (!('imageUrls' in data) || (data.imageUrls is list && data.imageUrls.size() <= 50))
-          && (!('thumbUrls' in data) || (data.thumbUrls is list && data.thumbUrls.size() <= 50));
+          && (!('thumbUrls' in data) || (data.thumbUrls is list && data.thumbUrls.size() <= 50))
+          // imageShareUrls caches the /calendar/?image={id} share URL generated per image (see
+          // handlePromoteInlineChatImage in index.html) so a second click on the same image's
+          // URL button in the lightbox doesn't need to regenerate it.
+          && (!('imageShareUrls' in data) || (data.imageShareUrls is list && data.imageShareUrls.size() <= 50));
       }
 
       match /messages/{messageId} {
@@ -75,7 +79,7 @@ service cloud.firestore {
           && hasValidMessageText(request.resource.data)
           && hasValidMessageImages(request.resource.data);
         allow update: if isCalendarDoc(calendarDocId)
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['text', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls'])
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['text', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageShareUrls'])
           && hasValidMessageText(request.resource.data)
           && hasValidMessageImages(request.resource.data);
         allow delete: if isCalendarDoc(calendarDocId);
