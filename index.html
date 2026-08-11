@@ -7242,6 +7242,8 @@ function App() {
   const [adminActivityLogs, setAdminActivityLogs] = React.useState([]);
   const [isShareOpen, setIsShareOpen] = React.useState(false);
   const [isChatShareOpen, setIsChatShareOpen] = React.useState(false);
+  const [isMainSideMenuOpen, setIsMainSideMenuOpen] = React.useState(false);
+  const [isSettlementOpen, setIsSettlementOpen] = React.useState(false);
   const [isPollModalOpen, setIsPollModalOpen] = React.useState(false);
   const [editingPoll, setEditingPoll] = React.useState(null);
   const [voteTarget, setVoteTarget] = React.useState(null);
@@ -8603,32 +8605,14 @@ function App() {
   }, /*#__PURE__*/React.createElement(SearchIcon, null)), /*#__PURE__*/React.createElement("button", {
     className: "btn header-settings-btn",
     onClick: () => {
-      if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 설정을 수정해 주세요.')) setIsAdminOpen(true);
+      setIsMainSideMenuOpen(true);
     },
-    title: "설정",
+    title: "메뉴",
+    "aria-label": "메뉴 열기",
     style: {
       padding: '10px'
     }
-  }, /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg",
-    width: "24",
-    height: "24",
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
-    className: "icon icon-tabler icons-tabler-outline icon-tabler-settings"
-  }, /*#__PURE__*/React.createElement("path", {
-    stroke: "none",
-    d: "M0 0h24v24H0z",
-    fill: "none"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0"
-  }))))), activeCal?.description && /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(AdminFilledMenuIcon, null)))), activeCal?.description && /*#__PURE__*/React.createElement("div", {
     className: "calendar-desc"
   }, activeCal.description), /*#__PURE__*/React.createElement("div", {
     className: "main-menu-bar"
@@ -8652,9 +8636,29 @@ function App() {
     type: "button",
     className: "main-menu-item",
     onClick: () => {
-      if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 공유 정보를 확인해 주세요.')) setIsShareOpen(true);
+      if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 정산 정보를 확인해 주세요.')) setIsSettlementOpen(true);
     }
-  }, /*#__PURE__*/React.createElement("span", { className: "main-menu-icon" }, /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M3 12a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M15 6a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M15 18a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M8.7 10.7l6.6 -3.4", "M8.7 13.3l6.6 3.4"] })), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-full" }, "공유하기"), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-short" }, "공유"))))), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("span", { className: "main-menu-icon" }, /*#__PURE__*/React.createElement(WalletIcon, null)), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-full" }, "정산하기"), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-short" }, "정산"))))), isMainSideMenuOpen && /*#__PURE__*/React.createElement(MainSideMenu, {
+    calendar: activeCal,
+    onClose: () => setIsMainSideMenuOpen(false),
+    onOpenManual: () => {
+      setIsGuideOpen(true);
+      setIsMainSideMenuOpen(false);
+    },
+    onOpenSettings: () => {
+      setIsMainSideMenuOpen(false);
+      if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 설정을 수정해 주세요.')) setIsAdminOpen(true);
+    },
+    onOpenShare: () => {
+      setIsMainSideMenuOpen(false);
+      if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 공유 정보를 확인해 주세요.')) setIsShareOpen(true);
+    },
+    onCreateShortcut: () => {
+      setIsMainSideMenuOpen(false);
+      tryCreateShortcut(msg => showToast(msg, 'info', 5000));
+    },
+    onOpenAdmin: () => window.open(`${window.location.pathname}?admin=1`, '_blank', 'noopener,noreferrer')
+  }), /*#__PURE__*/React.createElement("div", {
     ref: calendarSectionRef
   }, visibleConfirmedMeetings.length > 0 && /*#__PURE__*/React.createElement("div", {
     style: { display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }
@@ -8838,6 +8842,9 @@ function App() {
     calendar: activeCal,
     showToast: showToast,
     onClose: () => setIsShareOpen(false)
+  }), isSettlementOpen && /*#__PURE__*/React.createElement(SettlementSummaryModal, {
+    calendar: activeCal,
+    onClose: () => setIsSettlementOpen(false)
   }), isChatShareOpen && /*#__PURE__*/React.createElement(ShareModal, {
     calendar: activeCal,
     shareType: "chat",
@@ -15054,6 +15061,204 @@ function ShareModal({
   }, "\uBC14\uD0D5\uD654\uBA74\uC5D0 \uBC14\uB85C\uAC00\uAE30 \uB9CC\uB4E4\uAE30"))));
 }
 
+function MainSideMenu({
+  calendar,
+  onClose,
+  onOpenManual,
+  onOpenSettings,
+  onOpenShare,
+  onCreateShortcut,
+  onOpenAdmin
+}) {
+  const handle = action => {
+    if (typeof action === 'function') action();
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    className: "admin-side-menu-overlay",
+    onClick: onClose
+  }, /*#__PURE__*/React.createElement("nav", {
+    className: "admin-side-menu",
+    "aria-label": "메인 메뉴",
+    onClick: e => e.stopPropagation()
+  },
+    /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-header" },
+      /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-brand" },
+        /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-logo", "aria-hidden": "true" }, /*#__PURE__*/React.createElement(AdminFilledMenuIcon, null)),
+        /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-copy" },
+          /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-title" }, "메뉴"),
+          /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-subtitle" }, calendar?.title || "Moyeora calendar")
+        )
+      ),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "admin-side-menu-close-btn",
+        title: "메뉴 닫기",
+        "aria-label": "메뉴 닫기",
+        onClick: onClose
+      }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }))
+    ),
+    /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-list" },
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "admin-side-menu-item",
+        onClick: () => handle(onOpenManual)
+      },
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M8 9h8", "M8 13h6", "M12 20l9 -5l-9 -5l-9 5l9 5z", "M12 12l9 -5l-9 -5l-9 5l9 5z"] })),
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "사용자 매뉴얼"),
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "캘린더 사용 방법 보기")
+        )
+      ),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "admin-side-menu-item",
+        onClick: () => handle(onOpenSettings)
+      },
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement(CalendarCogIcon, null)),
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "캘린더 설정"),
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "이름, 설명, 참여자 관리")
+        )
+      ),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "admin-side-menu-item",
+        onClick: () => handle(onOpenShare)
+      },
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M3 12a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M15 6a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M15 18a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M8.7 10.7l6.6 -3.4", "M8.7 13.3l6.6 3.4"] })),
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "공유하기"),
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "캘린더 URL 복사")
+        )
+      ),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "admin-side-menu-item",
+        onClick: () => handle(onCreateShortcut)
+      },
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement(ExternalLinkIcon, null)),
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "바로가기"),
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "홈 화면 또는 바탕화면 추가")
+        )
+      )
+    ),
+    /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-list", style: { marginTop: 'auto', borderTop: '1px solid #E2E8F0', borderBottom: 'none' } },
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "admin-side-menu-item",
+        onClick: () => {
+          onClose && onClose();
+          handle(onOpenAdmin);
+        }
+      },
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement(LockIcon, null)),
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "어드민"),
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "관리자 페이지 새창 열기")
+        )
+      )
+    )
+  ));
+}
+
+function SettlementSummaryModal({ calendar, onClose }) {
+  const meetings = getConfirmedMeetings(calendar).slice().sort((a, b) => b.date.localeCompare(a.date));
+  const rows = meetings
+    .map(meeting => {
+      const expenses = (Array.isArray(meeting.expenses) ? meeting.expenses : [])
+        .filter(expense => Number.isFinite(Number(expense.amount)) && Number(expense.amount) !== 0)
+        .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+      const total = expenses.reduce((sum, expense) => sum + Number(expense.amount || 0), 0);
+      return { meeting, expenses, total };
+    })
+    .filter(row => row.expenses.length > 0);
+  const grandTotal = rows.reduce((sum, row) => sum + row.total, 0);
+  const expenseCount = rows.reduce((sum, row) => sum + row.expenses.length, 0);
+  const getExpenseUrl = expense => sanitizeText(expense?.url || extractFirstUrl(expense?.label || ''), 220);
+  const getExpenseLabel = expense => {
+    const label = sanitizeText(expense?.label || '', 120);
+    const url = getExpenseUrl(expense);
+    return url ? sanitizeText(removeFirstUrl(label), 120) : label;
+  };
+
+  return /*#__PURE__*/React.createElement("div", {
+    className: "modal-overlay",
+    onClick: onClose,
+    style: { zIndex: 10000 }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "modal-container",
+    onClick: e => e.stopPropagation(),
+    style: { maxWidth: '620px' }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "modal-header",
+    style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' }
+  }, /*#__PURE__*/React.createElement("h3", {
+    style: { fontSize: '1.1rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '8px' }
+  }, /*#__PURE__*/React.createElement(WalletIcon, null), "정산하기"), /*#__PURE__*/React.createElement("button", {
+    onClick: onClose,
+    style: { background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer', display: 'flex', alignItems: 'center' }
+  }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }))), /*#__PURE__*/React.createElement("div", {
+    className: "modal-body"
+  },
+    /*#__PURE__*/React.createElement("div", {
+      style: { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '8px' }
+    },
+      /*#__PURE__*/React.createElement("div", { className: "admin-metric-card", style: { minHeight: '82px', padding: '12px 8px' } },
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.75rem', color: '#64748B', fontWeight: 800 } }, "정산 일정"),
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: '1.2rem', fontWeight: 900, color: '#0F172A' } }, rows.length, "일")
+      ),
+      /*#__PURE__*/React.createElement("div", { className: "admin-metric-card", style: { minHeight: '82px', padding: '12px 8px' } },
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.75rem', color: '#64748B', fontWeight: 800 } }, "정산 항목"),
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: '1.2rem', fontWeight: 900, color: '#0F172A' } }, expenseCount, "건")
+      ),
+      /*#__PURE__*/React.createElement("div", { className: "admin-metric-card", style: { minHeight: '82px', padding: '12px 8px' } },
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.75rem', color: '#64748B', fontWeight: 800 } }, "누계"),
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: '1.2rem', fontWeight: 900, color: grandTotal < 0 ? '#DC2626' : '#0F172A' } }, grandTotal.toLocaleString(), "원")
+      )
+    ),
+    rows.length === 0 ? /*#__PURE__*/React.createElement("div", {
+      style: { padding: '28px 12px', color: '#94A3B8', fontSize: '0.88rem', textAlign: 'center' }
+    }, "등록된 회비 정산 내역이 없습니다.") :
+    /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '10px' } },
+      rows.map(row => /*#__PURE__*/React.createElement("section", {
+        key: row.meeting.date,
+        style: { border: '1px solid var(--border-subtle)', borderRadius: '12px', padding: '12px', backgroundColor: 'var(--bg-subtle, #F8FAFC)' }
+      },
+        /*#__PURE__*/React.createElement("div", {
+          style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', marginBottom: '10px' }
+        },
+          /*#__PURE__*/React.createElement("strong", { style: { fontSize: '0.9rem', color: 'var(--text-main)' } }, formatDateWithDayName(row.meeting.date)),
+          /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.86rem', fontWeight: 900, color: row.total < 0 ? '#DC2626' : 'var(--text-main)', whiteSpace: 'nowrap' } }, row.total.toLocaleString(), "원")
+        ),
+        /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '8px' } },
+          row.expenses.map(expense => {
+            const url = getExpenseUrl(expense);
+            const label = getExpenseLabel(expense) || '정산 항목';
+            return /*#__PURE__*/React.createElement("div", {
+              key: expense.id || `${row.meeting.date}_${expense.createdAt}_${expense.amount}`,
+              style: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: '8px', alignItems: 'start', padding: '8px 10px', border: '1px solid var(--border-subtle)', borderRadius: '10px', backgroundColor: 'var(--bg-card)' }
+            },
+              /*#__PURE__*/React.createElement("div", { style: { minWidth: 0, display: 'flex', flexDirection: 'column', gap: '4px' } },
+                /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.84rem', color: 'var(--text-main)', fontWeight: 800 } }, label),
+                url && /*#__PURE__*/React.createElement("button", {
+                  type: "button",
+                  className: "registered-at-text",
+                  title: url,
+                  style: { alignSelf: 'flex-start', border: 0, cursor: 'pointer', textDecoration: 'none' },
+                  onClick: () => window.open(url, '_blank', 'noopener,noreferrer')
+                }, url),
+                expense.createdAt && /*#__PURE__*/React.createElement("span", { className: "registered-at-text" }, formatRegisteredAt(expense.createdAt))
+              ),
+              /*#__PURE__*/React.createElement("strong", { style: { fontSize: '0.86rem', color: Number(expense.amount) < 0 ? '#DC2626' : 'var(--text-main)', whiteSpace: 'nowrap' } }, Number(expense.amount).toLocaleString(), "원")
+            );
+          })
+        )
+      ))
+    )
+  )));
+}
+
 function SunIcon() {
   return /*#__PURE__*/React.createElement("svg", {
     xmlns: "http://www.w3.org/2000/svg",
@@ -15310,6 +15515,29 @@ function ExternalLinkIcon() {
     d: "M10 14 21 3"
   }), /*#__PURE__*/React.createElement("path", {
     d: "M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"
+  }));
+}
+
+function WalletIcon() {
+  return /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: "24",
+    height: "24",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    "stroke-width": "2",
+    "stroke-linecap": "round",
+    "stroke-linejoin": "round",
+    className: "icon icon-tabler icons-tabler-outline icon-tabler-wallet"
+  }, /*#__PURE__*/React.createElement("path", {
+    stroke: "none",
+    d: "M0 0h24v24H0z",
+    fill: "none"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M17 8v-3a1 1 0 0 0 -1 -1h-10a2 2 0 0 0 0 4h12a1 1 0 0 1 1 1v3m0 4v3a1 1 0 0 1 -1 1h-12a2 2 0 0 1 -2 -2v-12"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M20 12v4h-4a2 2 0 0 1 0 -4h4"
   }));
 }
 
