@@ -6231,29 +6231,25 @@ function AdminDashboard({ initialCalendars }) {
     } catch (e) {}
   }, []);
 
+  // Each collapsible section's header/action element carries an explicit data-collapse-anchor
+  // marker (set directly in its JSX below) instead of being located by matching its title text
+  // against a known-titles list -- the old text-matching approach picked up the WRONG element
+  // whenever a section's own body text happened to contain another section's title as a
+  // substring (e.g. the 타임라인 복구 warning banner's copy mentions "채팅 로그", so the button
+  // ended up attached to the banner instead of the actual title). The explicit marker also lets
+  // the toggle button be anchored inside a small nested group (e.g. next to the 채팅 로그 search
+  // input) rather than always the section's own first direct child.
   React.useEffect(() => {
     const root = document.querySelector('.admin-scope');
     if (!root) return;
 
-    const storageKey = 'gather_admin_collapsed_sections_v1';
+    const storageKey = 'gather_admin_collapsed_sections_v2';
     let storage = null;
     try {
       storage = typeof window !== 'undefined' && window.sessionStorage ? window.sessionStorage : null;
     } catch (e) {
       storage = null;
     }
-    const titles = [
-      '캘린더 설정',
-      '투표 설정',
-      '핵심 운영 지표',
-      '캘린더별 세부 통계',
-      '날짜별 가능 인원 Top',
-      '참여자별 일정 등록수',
-      '데이터 사용량',
-      '채팅 로그',
-      '타임라인 복구',
-      'JSON 백업관리'
-    ];
     const readCollapsed = () => {
       if (!storage) return {};
       try {
@@ -6268,52 +6264,48 @@ function AdminDashboard({ initialCalendars }) {
         storage.setItem(storageKey, JSON.stringify(value));
       } catch (e) {}
     };
-    const makeToggleButton = title => {
+    const makeToggleButton = label => {
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'section-toggle-btn admin-section-toggle-btn';
-      button.setAttribute('aria-label', `${title} 접기/펼치기`);
+      button.setAttribute('aria-label', `${label} 접기/펼치기`);
       button.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><path d="M6 9l6 6l6 -6"></path></svg>';
       return button;
     };
-    const normalize = text => (text || '').replace(/\s+/g, ' ').trim();
 
-    const applySection = section => {
-      if (section.closest('.modal-overlay')) return;
-      const directChildren = Array.from(section.children);
-      const header = directChildren.find(child => {
-        const text = normalize(child.innerText);
-        return titles.some(title => text.includes(title));
-      });
-      if (!header) return;
-      const title = titles.find(item => normalize(header.innerText).includes(item));
-      if (!title) return;
+    const applyAnchor = anchor => {
+      const section = anchor.closest('section');
+      const collapseKey = anchor.dataset.collapseKey;
+      if (!section || !collapseKey) return;
 
-      const sectionKey = `${activeTab}:${selectedCalId || 'all'}:${title}`;
+      // The anchor may be nested a level or two inside the section (e.g. the small
+      // input+arrow group in 채팅 로그) -- walk up to the section's own direct child so we
+      // know which sibling(s) to hide when collapsed.
+      let headerRow = anchor;
+      while (headerRow.parentElement && headerRow.parentElement !== section) {
+        headerRow = headerRow.parentElement;
+      }
+      if (headerRow.parentElement !== section) return;
+
+      const sectionKey = `${activeTab}:${selectedCalId || 'all'}:${collapseKey}`;
       section.classList.add('admin-collapsible-section');
       section.dataset.adminCollapseKey = sectionKey;
-      header.classList.add('admin-collapsible-header');
+      headerRow.classList.add('admin-collapsible-header');
 
-      let button = header.querySelector(':scope > .admin-section-toggle-btn');
+      let button = anchor.querySelector(':scope > .admin-section-toggle-btn');
       if (!button) {
-        button = makeToggleButton(title);
-        header.appendChild(button);
+        button = makeToggleButton(anchor.dataset.collapseLabel || collapseKey);
+        anchor.appendChild(button);
       }
 
+      const directChildren = Array.from(section.children);
       const sync = () => {
         const collapsed = !!readCollapsed()[sectionKey];
         section.classList.toggle('admin-section-collapsed', collapsed);
         button.classList.toggle('is-collapsed', collapsed);
         button.setAttribute('aria-expanded', String(!collapsed));
         directChildren.forEach(child => {
-          if (child !== header) {
-            child.hidden = collapsed;
-            if (collapsed) {
-              child.style.setProperty('display', 'none', 'important');
-            } else {
-              child.style.removeProperty('display');
-            }
-          }
+          if (child !== headerRow) child.hidden = collapsed;
         });
       };
 
@@ -6329,7 +6321,7 @@ function AdminDashboard({ initialCalendars }) {
     };
 
     const frame = requestAnimationFrame(() => {
-      Array.from(root.querySelectorAll('section')).forEach(applySection);
+      Array.from(root.querySelectorAll('[data-collapse-anchor]')).forEach(applyAnchor);
     });
     return () => cancelAnimationFrame(frame);
   }, [
@@ -6681,7 +6673,7 @@ function AdminDashboard({ initialCalendars }) {
          donut instead of expanding a shared detail row on click, since every box's donut uses
          the same calendar legend anyway -- that legend now lives once in the section title. */
       /*#__PURE__*/React.createElement("section", { style: styles.card },
-        /*#__PURE__*/React.createElement("div", { style: styles.cardTitle },
+        /*#__PURE__*/React.createElement("div", { style: styles.cardTitle, "data-collapse-anchor": "true", "data-collapse-key": "metrics-core", "data-collapse-label": "핵심 운영 지표" },
           /*#__PURE__*/React.createElement("span", { style: { display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(ChartPieIcon, null), "핵심 운영 지표", /*#__PURE__*/React.createElement(SectionCountBadge, { count: calendarsList.length })),
           /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' } },
             dashboard.calendarStats.map((stat, i) => /*#__PURE__*/React.createElement("span", {
@@ -6725,7 +6717,7 @@ function AdminDashboard({ initialCalendars }) {
 
       /* Calendar-by-calendar detail cards */
       /*#__PURE__*/React.createElement("section", { style: styles.card },
-        /*#__PURE__*/React.createElement("div", { style: styles.cardTitle },
+        /*#__PURE__*/React.createElement("div", { style: styles.cardTitle, "data-collapse-anchor": "true", "data-collapse-key": "metrics-detail", "data-collapse-label": "캘린더별 세부 통계" },
           /*#__PURE__*/React.createElement("span", { style: { display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(ChartBarIcon, null), "캘린더별 세부 통계")
         ),
         dashboard.calendarStats.length === 0 ? /*#__PURE__*/React.createElement("div", { style: { color: '#64748B', fontSize: '0.9rem' } }, "표시할 캘린더가 없습니다.") :
@@ -6772,7 +6764,7 @@ function AdminDashboard({ initialCalendars }) {
       /*#__PURE__*/React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(320px, 100%), 1fr))', gap: '10px' } },
         /* Popular Dates Card */
         /*#__PURE__*/React.createElement("section", { style: styles.card },
-          /*#__PURE__*/React.createElement("div", { style: styles.cardTitle },
+          /*#__PURE__*/React.createElement("div", { style: styles.cardTitle, "data-collapse-anchor": "true", "data-collapse-key": "metrics-top-dates", "data-collapse-label": "날짜별 가능 인원 Top" },
             /*#__PURE__*/React.createElement("span", { style: { display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(TrophyIcon, null), "날짜별 가능 인원 Top")
           ),
           dashboard.calendarStats.map(stat => /*#__PURE__*/React.createElement("div", { key: `${stat.calendar.id}_popular`, style: { marginBottom: '14px' } },
@@ -6799,7 +6791,7 @@ function AdminDashboard({ initialCalendars }) {
            scrollbox; each calendar's group gets an accent-colored rail + pill label (instead of
            plain bold text) so adjacent calendars are visually easy to tell apart. */
         /*#__PURE__*/React.createElement("section", { style: { ...styles.card, display: 'flex', flexDirection: 'column' } },
-          /*#__PURE__*/React.createElement("div", { style: styles.cardTitle },
+          /*#__PURE__*/React.createElement("div", { style: styles.cardTitle, "data-collapse-anchor": "true", "data-collapse-key": "metrics-participants", "data-collapse-label": "참여자별 일정 등록수" },
             /*#__PURE__*/React.createElement("span", { style: { display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(PodiumIcon, null), "참여자별 일정 등록수")
           ),
           /*#__PURE__*/React.createElement("div", null,
@@ -6832,7 +6824,7 @@ function AdminDashboard({ initialCalendars }) {
 
       /* Quota Limit rules */
       /*#__PURE__*/React.createElement("section", { style: styles.card },
-        /*#__PURE__*/React.createElement("div", { style: styles.cardTitle },
+        /*#__PURE__*/React.createElement("div", { style: styles.cardTitle, "data-collapse-anchor": "true", "data-collapse-key": "metrics-quota", "data-collapse-label": "데이터 사용량" },
           /*#__PURE__*/React.createElement("span", { style: { display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(CloudDataConnectionIcon, null), "데이터 사용량")
         ),
         /*#__PURE__*/React.createElement("div", { className: "admin-quota-grid" },
@@ -6855,7 +6847,7 @@ function AdminDashboard({ initialCalendars }) {
       selectedCal ? /*#__PURE__*/React.createElement(React.Fragment, null,
         /* Profile & Participants settings card */
         /*#__PURE__*/React.createElement("section", { style: styles.card },
-          /*#__PURE__*/React.createElement("h4", { style: { ...styles.cardTitle, display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
+          /*#__PURE__*/React.createElement("h4", { style: { ...styles.cardTitle, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }, "data-collapse-anchor": "true", "data-collapse-key": "settings-calendar", "data-collapse-label": "캘린더 설정" },
             /*#__PURE__*/React.createElement("span", { style: { display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(CalendarCogIcon, null), "캘린더 설정"),
             /*#__PURE__*/React.createElement("button", {
               type: "button", className: "btn btn-poll-create",
@@ -7012,7 +7004,7 @@ function AdminDashboard({ initialCalendars }) {
         /* Polls management card */
         /*#__PURE__*/React.createElement("section", { style: styles.card },
           /* Header */
-          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '14px', borderBottom: '1px solid #E2E8F0', paddingBottom: '8px' } },
+          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '14px', borderBottom: '1px solid #E2E8F0', paddingBottom: '8px' }, "data-collapse-anchor": "true", "data-collapse-key": "settings-polls", "data-collapse-label": "투표 설정" },
             /*#__PURE__*/React.createElement("h4", { style: { fontSize: '0.96rem', fontWeight: '900', color: '#0F172A', margin: 0, display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' } }, /*#__PURE__*/React.createElement(PollSectionIcon, null), "투표 설정"),
             /*#__PURE__*/React.createElement("button", {
               type: "button", className: "btn btn-poll-create",
@@ -7067,7 +7059,7 @@ function AdminDashboard({ initialCalendars }) {
           ),
 
           /* Title */
-          /*#__PURE__*/React.createElement("h4", { style: styles.cardTitle },
+          /*#__PURE__*/React.createElement("h4", { style: styles.cardTitle, "data-collapse-anchor": "true", "data-collapse-key": "recovery-timeline", "data-collapse-label": "타임라인 복구" },
             /*#__PURE__*/React.createElement("span", { style: { display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(HourglassIcon, null), `타임라인 복구 (${unifiedTimeline.length}건)`)
           ),
 
@@ -7136,7 +7128,7 @@ function AdminDashboard({ initialCalendars }) {
       /*#__PURE__*/React.createElement("section", { className: "recovery-backup-card", style: styles.card },
         /*#__PURE__*/React.createElement("div", { className: "admin-section-header" },
           /*#__PURE__*/React.createElement("div", { className: "summary-title" }, "JSON 백업관리"),
-          /*#__PURE__*/React.createElement("div", { className: "admin-backup-actions" },
+          /*#__PURE__*/React.createElement("div", { className: "admin-backup-actions", "data-collapse-anchor": "true", "data-collapse-key": "recovery-backup", "data-collapse-label": "JSON 백업관리" },
             /*#__PURE__*/React.createElement("button", { className: "btn btn-secondary", onClick: () => handleDownloadBackup('') }, "전체 백업 다운로드"),
             /*#__PURE__*/React.createElement("button", { className: isRestoreMode ? "btn btn-danger" : "btn btn-secondary", onClick: handleImportClick },
               isRestoreMode ? "JSON 파일 불러오기" : "데이터 복구 모드 필요"
@@ -7176,11 +7168,16 @@ function AdminDashboard({ initialCalendars }) {
             /*#__PURE__*/React.createElement("h4", { style: { fontSize: '0.96rem', fontWeight: '900', color: '#0F172A', margin: 0, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px' } }, /*#__PURE__*/React.createElement(ChatSectionIcon, null), "채팅 로그"),
             /*#__PURE__*/React.createElement("p", { style: { fontSize: '0.75rem', color: '#64748B', margin: '2px 0 0 0' } }, "각 캘린더별 채팅 메시지 내역을 실시간 모니터링하고 어드민 권한으로 삭제할 수 있습니다.")
           ),
-          /*#__PURE__*/React.createElement("input", {
-            type: "text", className: "form-input", placeholder: "이름, 메시지 검색...", value: chatSearchQuery,
-            onChange: e => setChatSearchQuery(e.target.value),
-            style: { maxWidth: '240px', width: '100%', minWidth: 0, flex: '1 1 160px' }
-          })
+          /*#__PURE__*/React.createElement("div", {
+            style: { display: 'flex', alignItems: 'center', gap: '8px', maxWidth: '100%', flex: '1 1 160px', justifyContent: 'flex-end' },
+            "data-collapse-anchor": "true", "data-collapse-key": "logs-chat", "data-collapse-label": "채팅 로그"
+          },
+            /*#__PURE__*/React.createElement("input", {
+              type: "text", className: "form-input", placeholder: "이름, 메시지 검색...", value: chatSearchQuery,
+              onChange: e => setChatSearchQuery(e.target.value),
+              style: { maxWidth: '240px', width: '100%', minWidth: 0 }
+            })
+          )
         ),
 
         /* Message list -- the page itself scrolls, so this doesn't need its own scrollbox */
@@ -7825,19 +7822,6 @@ function App() {
     const top = ref.current.getBoundingClientRect().top + window.scrollY - headerHeight - 12;
     window.scrollTo({ top, behavior: 'smooth' });
   };
-  // The header is now position:fixed (full-bleed), so page content needs top padding equal to
-  // its rendered height -- measured (not hardcoded) since it varies by title length/wrapping.
-  const [mainHeaderHeight, setMainHeaderHeight] = React.useState(0);
-  React.useEffect(() => {
-    if (!mainHeaderRef.current) return;
-    const measure = () => {
-      if (mainHeaderRef.current) setMainHeaderHeight(mainHeaderRef.current.offsetHeight);
-    };
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(mainHeaderRef.current);
-    return () => ro.disconnect();
-  }, []);
   // Chat-related states
   const [recentMessages, setRecentMessages] = React.useState([]);
   const [chatMessages, setChatMessages] = React.useState([]);
@@ -7867,6 +7851,25 @@ function App() {
     window.addEventListener('popstate', handleUrlChange);
     return () => window.removeEventListener('popstate', handleUrlChange);
   }, []);
+
+  // The header is now position:fixed (full-bleed), so page content needs top padding equal to
+  // its rendered height -- measured (not hardcoded) since it varies by title length/wrapping.
+  // The header itself unmounts entirely while activeView is 'chat' (ChatRoomView renders its
+  // own tree with no main header), so re-running this on activeView change is required --
+  // otherwise the ResizeObserver set up on the first mount keeps watching a detached DOM node
+  // after returning from chat, mainHeaderHeight stops tracking the real (remounted) header's
+  // height, and body content ends up hidden behind the fixed header.
+  const [mainHeaderHeight, setMainHeaderHeight] = React.useState(0);
+  React.useEffect(() => {
+    if (!mainHeaderRef.current) return;
+    const measure = () => {
+      if (mainHeaderRef.current) setMainHeaderHeight(mainHeaderRef.current.offsetHeight);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(mainHeaderRef.current);
+    return () => ro.disconnect();
+  }, [activeView]);
 
   React.useEffect(() => {
     if (!isMainSideMenuOpen) return;
@@ -9057,7 +9060,12 @@ function App() {
   if (activeView === 'settlement') {
     return /*#__PURE__*/React.createElement(SettlementSummaryModal, {
       calendar: activeCal,
-      onBack: () => changeView('calendar')
+      onBack: () => changeView('calendar'),
+      onSelectDate: d => {
+        setSelectedDate(d);
+        setIsModalOpen(true);
+        changeView('calendar');
+      }
     });
   }
 
@@ -13667,6 +13675,42 @@ function DateModal({
       console.warn('Confetti error', err);
     }
   };
+  // Coin-burst micro-animation for money/settlement actions (지출/수입 저장 등) -- reuses the
+  // same canvas-confetti library already loaded for celebratePositiveAction, just with
+  // coin-emoji shaped particles instead of confetti squares. Canvas rendering (not CSS) keeps
+  // it visually consistent across Safari/Chrome/Edge/Firefox/Whale on both desktop and mobile.
+  // originEl (the clicked save button) anchors the burst to that element instead of a fixed
+  // screen position.
+  const celebrateMoneyBurst = originEl => {
+    if (typeof confetti !== 'function') return;
+    try {
+      let origin = { y: 0.65 };
+      if (originEl && typeof originEl.getBoundingClientRect === 'function') {
+        const rect = originEl.getBoundingClientRect();
+        if (rect.width || rect.height) {
+          origin = {
+            x: (rect.left + rect.width / 2) / window.innerWidth,
+            y: (rect.top + rect.height / 2) / window.innerHeight
+          };
+        }
+      }
+      const coinShape = typeof confetti.shapeFromText === 'function'
+        ? confetti.shapeFromText({ text: '🪙', scalar: 2.4 })
+        : null;
+      confetti({
+        particleCount: 26,
+        spread: 65,
+        startVelocity: 34,
+        gravity: 1.15,
+        ticks: 130,
+        origin,
+        shapes: coinShape ? [coinShape] : ['circle'],
+        colors: coinShape ? undefined : ['#FBBF24', '#F59E0B', '#EAB308', '#FDE68A']
+      });
+    } catch (err) {
+      console.warn('Coin burst error', err);
+    }
+  };
   const handleSubmit = async e => {
     e.preventDefault();
     if (isSubmitting) return;
@@ -13758,8 +13802,9 @@ function DateModal({
     const label = sanitizeText(expense?.label || '', 120);
     return getExpenseUrl(expense) ? sanitizeText(removeFirstUrl(label), 120) : label;
   };
-  const handleSaveExpenseClick = async () => {
+  const handleSaveExpenseClick = async (event) => {
     if (isSavingExpense || !onSaveExpense) return;
+    const originEl = event?.currentTarget;
     const rawLabel = expenseLabelInput.trim();
     const url = extractFirstUrl(rawLabel);
     const labelText = sanitizeText(url ? removeFirstUrl(rawLabel) : rawLabel, 120);
@@ -13770,11 +13815,13 @@ function DateModal({
       return;
     }
     setIsSavingExpense(true);
+    let saved;
     try {
-	      await Promise.resolve(onSaveExpense(dateStr, { id: editingExpenseId, label: labelText, url, categoryId: expenseIsIncome ? 'etc' : expenseCategoryInput, amount: amountNum }));
+	      saved = await Promise.resolve(onSaveExpense(dateStr, { id: editingExpenseId, label: labelText, url, categoryId: expenseIsIncome ? 'etc' : expenseCategoryInput, amount: amountNum }));
     } catch (err) {
       console.error('Expense save failed:', err);
     }
+    if (saved !== false) celebrateMoneyBurst(originEl);
     setIsSavingExpense(false);
 	    setExpenseLabelInput('');
 	    setExpenseAmountInput('');
@@ -14268,7 +14315,7 @@ function DateModal({
           return /*#__PURE__*/React.createElement("span", {
             style: {
               fontSize: '0.78rem',
-              fontWeight: 800,
+              fontWeight: 600,
               padding: '3px 9px',
               borderRadius: '999px',
               whiteSpace: 'nowrap',
@@ -14276,7 +14323,7 @@ function DateModal({
               border: `1px solid ${!hasSettlementData ? 'var(--border-subtle)' : isNegative ? '#FCA5A5' : '#BBF7D0'}`,
               color: !hasSettlementData ? 'var(--text-muted)' : isNegative ? '#DC2626' : '#16A34A'
             }
-          }, hasSettlementData ? `${isNegative ? '-' : '+'}${Math.abs(netAmount).toLocaleString()}원` : '(없음)');
+          }, hasSettlementData ? `${isNegative ? '-' : '+'}${Math.abs(netAmount).toLocaleString()}원` : '없음');
         })(),
         /*#__PURE__*/React.createElement(SectionToggleButton, {
           collapsed: isSettlementCollapsed,
@@ -16423,7 +16470,7 @@ function ChatGalleryModal({
   ))));
 }
 
-function SettlementSummaryModal({ calendar, onBack }) {
+function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {
   const [activeTab, setActiveTab] = React.useState('total');
   const categories = getExpenseCategories(calendar);
   const baseBudget = Number.isFinite(Number(calendar?.settlementBaseBudget)) ? Math.max(0, Math.round(Number(calendar.settlementBaseBudget))) : 0;
@@ -16494,7 +16541,8 @@ function SettlementSummaryModal({ calendar, onBack }) {
   }), category.name);
   const renderItemRow = (item, showDate = false) => /*#__PURE__*/React.createElement("div", {
     key: item.id || `${item.date}_${item.createdAt}_${item.amount}`,
-    style: { display: 'flex', flexDirection: 'column', gap: '5px', padding: '10px 12px', border: '1px solid var(--border-subtle)', borderRadius: '12px', backgroundColor: 'var(--bg-card)' }
+    onClick: () => onSelectDate && onSelectDate(item.date),
+    style: { display: 'flex', flexDirection: 'column', gap: '5px', padding: '10px 12px', border: '1px solid var(--border-subtle)', borderRadius: '12px', backgroundColor: 'var(--bg-card)', cursor: onSelectDate ? 'pointer' : 'default' }
   }, /*#__PURE__*/React.createElement("div", {
     style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }
   }, /*#__PURE__*/React.createElement("div", {
@@ -16523,7 +16571,7 @@ function SettlementSummaryModal({ calendar, onBack }) {
       maxWidth: '100%',
       textAlign: 'left'
     },
-    onClick: () => window.open(item.url, '_blank', 'noopener,noreferrer')
+    onClick: e => { e.stopPropagation(); window.open(item.url, '_blank', 'noopener,noreferrer'); }
   }, item.url));
   const emptyContent = /*#__PURE__*/React.createElement("div", {
     style: { padding: '30px 12px', color: '#94A3B8', fontSize: '0.88rem', textAlign: 'center' }
@@ -16585,7 +16633,8 @@ function SettlementSummaryModal({ calendar, onBack }) {
     className: "settlement-page-header",
     style: {
       display: 'flex', alignItems: 'center', gap: '10px', padding: '0 16px', height: '56px',
-      backgroundColor: 'var(--bg-card)', borderBottom: '1px solid var(--border-subtle)', flexShrink: 0
+      backgroundColor: 'var(--bg-card)', borderBottom: '1px solid var(--border-subtle)', flexShrink: 0,
+      position: 'relative'
     }
   }, /*#__PURE__*/React.createElement("button", {
     type: "button",
@@ -16610,7 +16659,10 @@ function SettlementSummaryModal({ calendar, onBack }) {
   }), /*#__PURE__*/React.createElement("path", {
     d: "M6 9l6 6l6 -6"
   }))), /*#__PURE__*/React.createElement("h3", {
-    style: { fontSize: '1.05rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '8px', margin: 0, color: 'var(--text-main)' }
+    style: {
+      fontSize: '1.05rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '8px', margin: 0, color: 'var(--text-main)',
+      position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)'
+    }
   }, /*#__PURE__*/React.createElement(WalletIcon, { size: 20 }), "정산하기")), /*#__PURE__*/React.createElement("div", {
     className: "settlement-page-body",
     style: { flex: '1 1 auto', overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }
