@@ -1494,13 +1494,39 @@
       gap: 12px;
       animation: adminMenuSlideIn 0.22s cubic-bezier(.2,.8,.2,1);
     }
+    .admin-side-menu-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 8px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #E2E8F0;
+    }
     .admin-side-menu-title {
       font-size: 0.92rem;
       font-weight: 900;
       color: #0F172A;
-      margin-bottom: 8px;
-      padding-bottom: 12px;
-      border-bottom: 1px solid #E2E8F0;
+    }
+    .admin-side-menu-close-btn {
+      width: 30px;
+      height: 30px;
+      padding: 0;
+      border: none;
+      border-radius: 50%;
+      background: transparent;
+      color: #64748B;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: background-color 0.16s ease, color 0.16s ease;
+    }
+    .admin-side-menu-close-btn:hover,
+    .admin-side-menu-close-btn:focus-visible {
+      background: #F1F5F9;
+      color: #0F172A;
+      outline: none;
     }
     .admin-side-menu-item {
       width: 100%;
@@ -5888,7 +5914,16 @@ function AdminDashboard({ initialCalendars }) {
         "aria-label": "관리자 메뉴",
         onClick: e => e.stopPropagation()
       },
-        /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-title" }, "관리자 메뉴"),
+        /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-header" },
+          /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-title" }, "관리자 메뉴"),
+          /*#__PURE__*/React.createElement("button", {
+            type: "button",
+            className: "admin-side-menu-close-btn",
+            title: "메뉴 닫기",
+            "aria-label": "메뉴 닫기",
+            onClick: () => setIsAdminMenuOpen(false)
+          }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }))
+        ),
         /*#__PURE__*/React.createElement("button", {
           type: "button",
           className: "admin-side-menu-item",
