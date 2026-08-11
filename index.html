@@ -6,10 +6,10 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  
+
   <title>모여라 캘린더 - 사모임 일정 조율 & 가능 날짜 캘린더</title>
   <meta name="description" content="사모임 참여자들의 가능 날짜를 캘린더에 표기하고 전원 모임 가능한 날짜를 클라우드 DB로 실시간 공유해주는 웹 프로그램입니다.">
-  
+
   <!-- OpenGraph Metadata for KakaoTalk & Social Sharing -->
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="모여라 캘린더">
@@ -19,7 +19,7 @@
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta property="og:url" id="og-url" content="https://pyw31337.github.io/calendar/">
-  
+
   <!-- Twitter Cards -->
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" id="tw-title" content="모여라 캘린더">
@@ -102,22 +102,22 @@
   <style>
     :root {
       --font-sans: 'Plus Jakarta Sans', 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
-      
+
       /* White / Light Theme Colors */
       --bg-primary: #F8FAFC;
       --bg-secondary: #FFFFFF;
       --bg-card: #FFFFFF;
       --border-subtle: #E2E8F0;
       --border-hover: #CBD5E1;
-      
+
       --text-main: #0F172A;
       --text-muted: #64748B;
       --text-light: #94A3B8;
-      
+
       --accent-primary: #4F46E5;
       --accent-secondary: #7C3AED;
       --accent-gradient: linear-gradient(135deg, #4F46E5 0%, #7C3AED 50%, #EC4899 100%);
-      
+
       --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
       --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -1px rgba(0, 0, 0, 0.04);
       --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.03);
@@ -334,7 +334,7 @@
     body {
       font-family: var(--font-sans);
       background-color: var(--bg-primary);
-      background-image: 
+      background-image:
         radial-gradient(at 10% 10%, rgba(79, 70, 229, 0.05) 0px, transparent 40%),
         radial-gradient(at 90% 80%, rgba(236, 72, 153, 0.04) 0px, transparent 40%),
         radial-gradient(at 50% 50%, rgba(16, 185, 129, 0.04) 0px, transparent 40%);
@@ -759,7 +759,7 @@
       min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
     @media (min-width: 768px) { .calendar-title { font-size: 1.35rem; } }
-    
+
     .calendar-desc {
       font-size: 0.825rem; color: var(--text-muted); margin-top: -10px;
       white-space: normal; word-break: keep-all; overflow-wrap: break-word;
@@ -786,7 +786,7 @@
       border-color: #020617;
       transform: translateY(-1px);
     }
-    
+
     .btn-secondary { background: #F1F5F9; border-color: var(--border-subtle); color: var(--text-main); }
     .btn-secondary:hover { background: #E2E8F0; border-color: var(--border-hover); }
     .calendar-month-nav-btn,
@@ -795,7 +795,7 @@
     .calendar-month-nav-btn:active {
       background-color: transparent;
     }
-    
+
     .btn-danger { background: #FEF2F2; border-color: #FCA5A5; color: #DC2626; }
     .btn-danger:hover { background: #FEE2E2; }
 
@@ -942,16 +942,16 @@
     @media (min-width: 640px) {
       .calendar-card { padding: 24px; margin-bottom: 28px; }
     }
-    
+
     .calendar-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 8px; }
     @media (min-width: 640px) { .calendar-nav { margin-bottom: 20px; } }
-    
+
     .month-display { font-size: 1.15rem; font-weight: 800; color: var(--text-main); letter-spacing: -0.02em; }
     @media (min-width: 640px) { .month-display { font-size: 1.4rem; } }
 
     .weekday-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 8px; text-align: center; }
     @media (min-width: 640px) { .weekday-grid { gap: 8px; margin-bottom: 10px; } }
-    
+
     .weekday-label { font-size: 0.75rem; font-weight: 700; color: var(--text-muted); padding: 4px 0; }
     @media (min-width: 640px) { .weekday-label { font-size: 0.8rem; padding: 6px 0; } }
     .weekday-label.sun { color: #EF4444; }
@@ -989,7 +989,7 @@
     @media (max-width: 360px) {
       .day-cell { min-height: 52px; padding: 2px; }
     }
-    
+
     .day-cell:hover { background: #F8FAFC; border-color: var(--accent-primary); transform: translateY(-2px); box-shadow: var(--shadow-md); }
     .day-cell.other-month {
       opacity: 1;
@@ -1016,7 +1016,7 @@
       filter: saturate(0.55);
     }
     .day-cell.today { border-color: var(--accent-primary); background: #EEF2FF; }
-    
+
     .day-cell.all-available {
       background: #ECFDF5; border: 1px solid #10B981;
     }
@@ -1043,7 +1043,7 @@
       color: #64748B !important;
       opacity: 0.78;
     }
-    
+
     .day-number { font-size: 0.8rem; font-weight: 700; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; }
     @media (min-width: 640px) {
       .day-number { font-size: 0.95rem; width: 24px; height: 24px; }
@@ -1056,7 +1056,7 @@
     @media (max-width: 640px) {
       .badges-container { justify-content: center; }
     }
-    
+
     .participant-badge {
       display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: var(--radius-full);
       font-size: 0.72rem; font-weight: 700; line-height: 1.2; box-shadow: 0 1px 3px rgba(0,0,0,0.12);
@@ -1378,7 +1378,7 @@
         display: none;
       }
     }
-    
+
     .badge-dot { width: 5px; height: 5px; border-radius: 50%; }
 
     /* Summary Card */
@@ -1389,7 +1389,7 @@
     @media (min-width: 640px) {
       .summary-card { padding: 24px; margin-bottom: 28px; }
     }
-    
+
     .summary-title { font-size: 1.05rem; font-weight: 800; color: var(--text-main); margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
     @media (min-width: 640px) {
       .summary-title { font-size: 1.15rem; margin-bottom: 16px; }
@@ -2362,6 +2362,37 @@
 
   <script>
 const PRESET_COLORS = ['#EF4444', '#F97316', '#F59E0B', '#10B981', '#06B6D4', '#3B82F6', '#6366F1', '#8B5CF6', '#EC4899', '#14B8A6'];
+const DEFAULT_EXPENSE_CATEGORIES = [
+  { id: 'food', name: '식품', color: '#F97316' },
+  { id: 'goods', name: '물품', color: '#3B82F6' },
+  { id: 'transport', name: '교통', color: '#10B981' },
+  { id: 'lodging', name: '숙박', color: '#8B5CF6' },
+  { id: 'culture', name: '문화', color: '#EC4899' },
+  { id: 'etc', name: '기타', color: '#64748B' }
+];
+function normalizeExpenseCategories(categories) {
+  const source = Array.isArray(categories) && categories.length ? categories : DEFAULT_EXPENSE_CATEGORIES;
+  const seen = new Set();
+  const normalized = source.map((category, index) => {
+    const fallback = DEFAULT_EXPENSE_CATEGORIES[index % DEFAULT_EXPENSE_CATEGORIES.length];
+    const rawId = sanitizeText(category?.id || category?.name || fallback.id, 40).toLowerCase().replace(/[^a-z0-9가-힣_-]/g, '') || fallback.id;
+    const id = seen.has(rawId) ? `${rawId}_${index}` : rawId;
+    seen.add(id);
+    return {
+      id,
+      name: sanitizeText(category?.name || fallback.name, 24) || fallback.name,
+      color: normalizeColorValue(category?.color, fallback.color)
+    };
+  }).filter(category => category.name);
+  return normalized.length ? normalized : DEFAULT_EXPENSE_CATEGORIES;
+}
+function getExpenseCategories(calendar) {
+  return normalizeExpenseCategories(calendar?.expenseCategories);
+}
+function getExpenseCategory(calendar, categoryId) {
+  const categories = getExpenseCategories(calendar);
+  return categories.find(category => category.id === categoryId) || categories.find(category => category.id === 'etc') || DEFAULT_EXPENSE_CATEGORIES[DEFAULT_EXPENSE_CATEGORIES.length - 1];
+}
 const URL_PARAMS = new URLSearchParams(window.location.search);
 const ENABLE_FIRESTORE_SYNC = true; // Firestore is the only production source of truth.
 const ENABLE_FIRESTORE_WRITES = true;
@@ -3323,11 +3354,13 @@ function validateCalendarShape(calendar) {
   const availabilities = Array.isArray(calendar.availabilities) ? calendar.availabilities : [];
   const activityLogs = Array.isArray(calendar.activityLogs) ? calendar.activityLogs : [];
   const polls = Array.isArray(calendar.polls) ? calendar.polls : [];
-  const deletedActivityLogIds = normalizeDeletedActivityLogIds(calendar.deletedActivityLogIds || []);
-  if (participants.length > 80) return '참여자가 너무 많습니다.';
-  if (availabilities.length > 5000) return '일정 데이터가 너무 많습니다.';
-  if (activityLogs.length > 5000) return '활동 로그가 너무 많습니다.';
-  if (polls.length > 100) return '투표 데이터가 너무 많습니다.';
+	  const deletedActivityLogIds = normalizeDeletedActivityLogIds(calendar.deletedActivityLogIds || []);
+	  const expenseCategories = normalizeExpenseCategories(calendar.expenseCategories);
+	  if (participants.length > 80) return '참여자가 너무 많습니다.';
+	  if (availabilities.length > 5000) return '일정 데이터가 너무 많습니다.';
+	  if (activityLogs.length > 5000) return '활동 로그가 너무 많습니다.';
+	  if (polls.length > 100) return '투표 데이터가 너무 많습니다.';
+	  if (expenseCategories.length > 24) return '지출 카테고리가 너무 많습니다.';
   if (deletedActivityLogIds.length > 5000) return '삭제된 활동 로그 이력이 너무 많습니다.';
   const participantIds = new Set();
   const activeNames = new Set();
@@ -3410,13 +3443,15 @@ function normalizeCalendarForSave(calendar) {
 
   return {
     ...cloned,
-    participants: normalizedParticipants,
-    availabilities: Array.from(availabilityMap.values()),
-    activityLogs: normalizedActivityLogs,
-    polls: normalizedPolls,
-    deletedActivityLogIds
-  };
-}
+	    participants: normalizedParticipants,
+	    availabilities: Array.from(availabilityMap.values()),
+	    activityLogs: normalizedActivityLogs,
+	    polls: normalizedPolls,
+	    expenseCategories: normalizeExpenseCategories(cloned.expenseCategories),
+	    settlementBaseBudget: Number.isFinite(Number(cloned.settlementBaseBudget)) ? Math.max(0, Math.round(Number(cloned.settlementBaseBudget))) : 0,
+	    deletedActivityLogIds
+	  };
+	}
 
 function assertCalendarLinks(calendar) {
   const participantIds = new Set(getActiveParticipants(calendar).map((participant) => participant.id));
@@ -4907,12 +4942,14 @@ function createDefaultCalendar(id) {
       color: '#10B981',
       updatedAt: now
     }],
-    availabilities: [],
-    activityLogs: [],
-    polls: [],
-    deletedActivityLogIds: []
-  };
-}
+	    availabilities: [],
+	    activityLogs: [],
+	    polls: [],
+	    expenseCategories: DEFAULT_EXPENSE_CATEGORIES,
+	    settlementBaseBudget: 0,
+	    deletedActivityLogIds: []
+	  };
+	}
 
 async function fetchAllServerCalendars() {
   if (firebaseDb) {
@@ -5343,7 +5380,7 @@ function AdminDashboard({ initialCalendars }) {
   const [toast, setToast] = React.useState(null);
   const importInputRef = React.useRef(null);
   const isRestoreMode = isAdminRestoreRoute();
-  
+
   // Tab control state
   const [activeTab, setActiveTab] = React.useState('settings'); // 'settings' (일반), 'metrics' (통계), 'logs', 'recovery'
 
@@ -5353,9 +5390,12 @@ function AdminDashboard({ initialCalendars }) {
   // Calendar profile edit states
   const [calTitle, setCalTitle] = React.useState('');
   const [calDesc, setCalDesc] = React.useState('');
-  const [calAccentColor, setCalAccentColor] = React.useState('');
-  const [calParticipants, setCalParticipants] = React.useState([]);
-  const [newPartName, setNewPartName] = React.useState('');
+	  const [calAccentColor, setCalAccentColor] = React.useState('');
+	  const [calParticipants, setCalParticipants] = React.useState([]);
+	  const [calSettlementBaseBudget, setCalSettlementBaseBudget] = React.useState('');
+	  const [calExpenseCategories, setCalExpenseCategories] = React.useState(DEFAULT_EXPENSE_CATEGORIES);
+	  const [newExpenseCategoryName, setNewExpenseCategoryName] = React.useState('');
+	  const [newPartName, setNewPartName] = React.useState('');
   const newPartNameRef = React.useRef(null);
 
   // Poll sub-modal state
@@ -5500,7 +5540,7 @@ function AdminDashboard({ initialCalendars }) {
   // 2. Load Messages (Firestore snapshots or REST)
   React.useEffect(() => {
     if (calendarsList.length === 0) return;
-    
+
     if (firebaseDb) {
       const unsubscribes = [];
       calendarsList.forEach(cal => {
@@ -5562,9 +5602,12 @@ function AdminDashboard({ initialCalendars }) {
       if (lastSyncedRef.current !== key) {
         setCalTitle(cal.title);
         setCalDesc(cal.description || '');
-        setCalAccentColor(normalizeColorValue(cal.accentColor, getCalendarAccentColor(cal, serverCalendars.findIndex(c => c.id === cal.id))));
-        setCalParticipants(getActiveParticipants(cal));
-        setNewPartName('');
+	        setCalAccentColor(normalizeColorValue(cal.accentColor, getCalendarAccentColor(cal, serverCalendars.findIndex(c => c.id === cal.id))));
+	        setCalParticipants(getActiveParticipants(cal));
+	        setCalSettlementBaseBudget(Number(cal.settlementBaseBudget || 0).toLocaleString());
+	        setCalExpenseCategories(getExpenseCategories(cal));
+	        setNewExpenseCategoryName('');
+	        setNewPartName('');
         lastSyncedRef.current = key;
       }
     }
@@ -5701,9 +5744,11 @@ function AdminDashboard({ initialCalendars }) {
       ...cal,
       title: calTitle.trim(),
       description: calDesc.trim(),
-      accentColor: normalizeColorValue(calAccentColor, getCalendarAccentColor(cal, serverCalendars.findIndex(c => c.id === cal.id))),
-      participants: calParticipants,
-      updatedAt: now,
+	      accentColor: normalizeColorValue(calAccentColor, getCalendarAccentColor(cal, serverCalendars.findIndex(c => c.id === cal.id))),
+	      participants: calParticipants,
+	      settlementBaseBudget: Number((calSettlementBaseBudget || '').replace(/[^0-9]/g, '')) || 0,
+	      expenseCategories: normalizeExpenseCategories(calExpenseCategories),
+	      updatedAt: now,
       revision: (cal.revision || 0) + 1
     };
 
@@ -5731,11 +5776,39 @@ function AdminDashboard({ initialCalendars }) {
     if (newPartNameRef.current) newPartNameRef.current.value = '';
   };
 
-  const handleUpdatePart = (partId, patch) => {
-    setCalParticipants(prev => prev.map(p => p.id === partId ? { ...p, ...patch, updatedAt: Date.now() } : p));
-  };
+	  const handleUpdatePart = (partId, patch) => {
+	    setCalParticipants(prev => prev.map(p => p.id === partId ? { ...p, ...patch, updatedAt: Date.now() } : p));
+	  };
+	  const handleAddExpenseCategory = () => {
+	    const trimmed = sanitizeText(newExpenseCategoryName, 24);
+	    if (!trimmed) return;
+	    const slug = trimmed.toLowerCase().replace(/[^a-z0-9가-힣_-]/g, '').slice(0, 24) || `cat_${Date.now()}`;
+	    const idBase = `custom_${slug}`;
+	    const existingIds = new Set(calExpenseCategories.map(category => category.id));
+	    const id = existingIds.has(idBase) ? `${idBase}_${Date.now().toString(36).slice(-4)}` : idBase;
+	    setCalExpenseCategories(prev => [...prev, {
+	      id,
+	      name: trimmed,
+	      color: normalizeColorValue(PRESET_COLORS[prev.length % PRESET_COLORS.length], '#64748B')
+	    }]);
+	    setNewExpenseCategoryName('');
+	  };
+	  const handleUpdateExpenseCategory = (categoryId, patch) => {
+	    setCalExpenseCategories(prev => prev.map(category => category.id === categoryId ? {
+	      ...category,
+	      ...patch,
+	      name: patch.name != null ? sanitizeText(patch.name, 24) : category.name,
+	      color: patch.color != null ? normalizeColorValue(patch.color, category.color) : category.color
+	    } : category));
+	  };
+	  const handleRemoveExpenseCategory = categoryId => {
+	    setCalExpenseCategories(prev => {
+	      const next = prev.filter(category => category.id !== categoryId);
+	      return next.length ? next : DEFAULT_EXPENSE_CATEGORIES;
+	    });
+	  };
 
-  // Delete Poll from Admin Page
+	  // Delete Poll from Admin Page
   const handleDeletePollFromAdminPage = (calId, poll) => {
     requestConfirm('투표 삭제', `"${poll.title}" 투표를 삭제하시겠습니까?`, () => {
       closeConfirmDialog();
@@ -5858,7 +5931,7 @@ function AdminDashboard({ initialCalendars }) {
   const adminUpdatedText = loadedAt ? loadedAt.toLocaleString('ko-KR') : '불러오는 중';
 
   // Merge messages across all calendars for Tab 1 feed
-  const allMergedMessages = Object.entries(messagesMap).flatMap(([calId, list]) => 
+  const allMergedMessages = Object.entries(messagesMap).flatMap(([calId, list]) =>
     list.map(m => ({ ...m, calId }))
   ).sort((a, b) => b.timestamp - a.timestamp);
 
@@ -6608,11 +6681,79 @@ function AdminDashboard({ initialCalendars }) {
                   onClick: () => handleUpdatePart(p.id, { removedAt: Date.now() })
                 }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 16 }))
               ))
-            )
-          ),
+	            )
+	          ),
 
-          /* Submit settings button */
-          /*#__PURE__*/React.createElement("button", {
+	          /* Settlement Management */
+	          /*#__PURE__*/React.createElement("div", { style: { paddingTop: '14px', marginTop: '14px', borderTop: '1px solid #E2E8F0' } },
+	            /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#64748B', marginBottom: '8px' } }, "정산 설정"),
+	            /*#__PURE__*/React.createElement("input", {
+	              type: "text",
+	              className: "form-input",
+	              style: { width: '100%', marginBottom: '10px' },
+	              value: calSettlementBaseBudget,
+	              placeholder: "기초 예산 (예: 이전 모임 누적 잔액)",
+	              onChange: e => {
+	                const digits = e.target.value.replace(/[^0-9]/g, '');
+	                setCalSettlementBaseBudget(digits ? Number(digits).toLocaleString() : '');
+	              }
+	            }),
+	            /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px', marginBottom: '10px' } },
+	              /*#__PURE__*/React.createElement("input", {
+	                type: "text",
+	                className: "form-input",
+	                style: { flex: 1, minWidth: 0 },
+	                placeholder: "새 지출 카테고리",
+	                value: newExpenseCategoryName,
+	                maxLength: 24,
+	                onChange: e => setNewExpenseCategoryName(e.target.value),
+	                onKeyDown: e => {
+	                  if (e.key === 'Enter') {
+	                    e.preventDefault();
+	                    if (e.nativeEvent && e.nativeEvent.isComposing) return;
+	                    handleAddExpenseCategory();
+	                  }
+	                }
+	              }),
+	              /*#__PURE__*/React.createElement("button", {
+	                type: "button",
+	                className: "btn btn-poll-create",
+	                style: { height: '44px', whiteSpace: 'nowrap' },
+	                onClick: handleAddExpenseCategory
+	              }, "추가")
+	            ),
+	            /*#__PURE__*/React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(220px, 100%), 1fr))', gap: '8px' } },
+	              calExpenseCategories.map(category => /*#__PURE__*/React.createElement("div", {
+	                key: category.id,
+	                style: { display: 'flex', alignItems: 'center', gap: '8px' }
+	              },
+	                /*#__PURE__*/React.createElement("input", {
+	                  type: "color",
+	                  className: "participant-color-input",
+	                  value: category.color,
+	                  onChange: e => handleUpdateExpenseCategory(category.id, { color: e.target.value }),
+	                  style: { width: '28px', height: '28px', border: 'none', background: 'none', cursor: 'pointer' }
+	                }),
+	                /*#__PURE__*/React.createElement("input", {
+	                  type: "text",
+	                  className: "form-input",
+	                  style: { flex: 1, minWidth: 0, height: '30px', fontSize: '0.82rem' },
+	                  value: category.name,
+	                  maxLength: 24,
+	                  onChange: e => handleUpdateExpenseCategory(category.id, { name: e.target.value })
+	                }),
+	                /*#__PURE__*/React.createElement("button", {
+	                  type: "button",
+	                  className: "btn btn-danger",
+	                  style: { padding: '4px 10px', height: '30px', display: 'flex', alignItems: 'center' },
+	                  onClick: () => handleRemoveExpenseCategory(category.id)
+	                }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 16 }))
+	              ))
+	            )
+	          ),
+
+	          /* Submit settings button */
+	          /*#__PURE__*/React.createElement("button", {
             type: "button", className: "btn btn-primary", style: { width: '100%', height: '38px', justifyContent: 'center', marginTop: '20px' },
             onClick: handleSaveCalendarSettings
           }, "설정 저장")
@@ -6848,9 +6989,9 @@ function AdminDashboard({ initialCalendars }) {
         } else {
           nextPolls.push(updatedPoll);
         }
-        
+
         const log = createPollActivityLog(targetCal.id, 'poll_create', '', now, updatedPoll.title);
-        
+
         const updatedCal = {
           ...targetCal,
           polls: nextPolls,
@@ -6858,7 +6999,7 @@ function AdminDashboard({ initialCalendars }) {
           updatedAt: now,
           revision: (targetCal.revision || 0) + 1
         };
-        
+
         const saved = await pushSingleCloudCalendar(updatedCal, now, 18, null, 'polls', log ? [log] : []);
         if (saved) {
           setServerCalendars(prev => prev.map(c => c.id === targetCal.id ? updatedCal : c));
@@ -7652,7 +7793,7 @@ function App() {
       return;
     }
     let isMounted = true;
-    
+
     // 1. Subscribe to recent 5 messages (descending for comments block)
     const unsubscribeRecent = firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages')
       .orderBy('timestamp', 'desc')
@@ -8244,16 +8385,18 @@ function App() {
     const existingMeetings = getConfirmedMeetings(activeCal);
     const meetingIndex = existingMeetings.findIndex(m => m.date === dateStr);
     if (meetingIndex < 0) return false;
-    const cleanLabel = sanitizeText(expense?.label || '', 120);
-    const cleanUrl = sanitizeText(expense?.url || '', 220);
-    const cleanAmount = Number.isFinite(expense?.amount) && expense.amount !== 0 ? Math.round(expense.amount) : 0;
+	    const cleanLabel = sanitizeText(expense?.label || '', 120);
+	    const cleanUrl = sanitizeText(expense?.url || '', 220);
+	    const categoryIds = new Set(getExpenseCategories(activeCal).map(category => category.id));
+	    const cleanCategoryId = categoryIds.has(expense?.categoryId) ? expense.categoryId : 'etc';
+	    const cleanAmount = Number.isFinite(expense?.amount) && expense.amount !== 0 ? Math.round(expense.amount) : 0;
     if ((!cleanLabel && !cleanUrl) || !cleanAmount) return false;
     const now = Date.now();
     const meeting = existingMeetings[meetingIndex];
-    const existingExpenses = Array.isArray(meeting.expenses) ? meeting.expenses : [];
-    const nextExpenses = expense?.id
-      ? existingExpenses.map(e => e.id === expense.id ? { ...e, label: cleanLabel, url: cleanUrl, amount: cleanAmount, updatedAt: now } : e)
-      : [...existingExpenses, { id: `exp_${activeCal.id}_${dateStr}_${now}_${Math.random().toString(36).slice(2, 7)}`, label: cleanLabel, url: cleanUrl, amount: cleanAmount, order: existingExpenses.length, createdAt: now, updatedAt: now }];
+	    const existingExpenses = Array.isArray(meeting.expenses) ? meeting.expenses : [];
+	    const nextExpenses = expense?.id
+	      ? existingExpenses.map(e => e.id === expense.id ? { ...e, label: cleanLabel, url: cleanUrl, categoryId: cleanCategoryId, amount: cleanAmount, updatedAt: now } : e)
+	      : [...existingExpenses, { id: `exp_${activeCal.id}_${dateStr}_${now}_${Math.random().toString(36).slice(2, 7)}`, label: cleanLabel, url: cleanUrl, categoryId: cleanCategoryId, amount: cleanAmount, order: existingExpenses.length, createdAt: now, updatedAt: now }];
     const nextConfirmedMeetings = existingMeetings.map((m, i) => i === meetingIndex ? { ...m, expenses: nextExpenses, amount: null } : m);
     const updatedCal = {
       ...activeCal,
@@ -11077,7 +11220,7 @@ function CommentsSection({
   };
 
   const reversed = [...recentMessages].reverse();
-  const messagesToShow = isCollapsed 
+  const messagesToShow = isCollapsed
     ? (reversed.length > 0 ? [reversed[reversed.length - 1]] : [])
     : reversed;
 
@@ -11285,7 +11428,7 @@ function CommentsSection({
         overflowY: 'auto'
       }
     }),
-    
+
     /* Attached Images Preview (between Textarea and Action Row) */
     chatImages.length > 0 ? /*#__PURE__*/React.createElement("div", {
       style: { display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '4px', alignSelf: 'flex-start' }
@@ -11432,13 +11575,13 @@ function CommentsSection({
           strokeWidth: "2",
           strokeLinecap: "round",
           strokeLinejoin: "round"
-        }, 
-          /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), 
-          /*#__PURE__*/React.createElement("path", { d: "M15 8h.01" }), 
-          /*#__PURE__*/React.createElement("path", { d: "M12.5 21h-6.5a3 3 0 0 1 -3 -3v-12a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v6.5" }), 
-          /*#__PURE__*/React.createElement("path", { d: "M3 16l5 -5c.928 -.893 2.072 -.893 3 0l4 4" }), 
-          /*#__PURE__*/React.createElement("path", { d: "M14 14l1 -1c.67 -.644 1.45 -.824 2.182 -.54" }), 
-          /*#__PURE__*/React.createElement("path", { d: "M16 19h6" }), 
+        },
+          /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }),
+          /*#__PURE__*/React.createElement("path", { d: "M15 8h.01" }),
+          /*#__PURE__*/React.createElement("path", { d: "M12.5 21h-6.5a3 3 0 0 1 -3 -3v-12a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v6.5" }),
+          /*#__PURE__*/React.createElement("path", { d: "M3 16l5 -5c.928 -.893 2.072 -.893 3 0l4 4" }),
+          /*#__PURE__*/React.createElement("path", { d: "M14 14l1 -1c.67 -.644 1.45 -.824 2.182 -.54" }),
+          /*#__PURE__*/React.createElement("path", { d: "M16 19h6" }),
           /*#__PURE__*/React.createElement("path", { d: "M19 16v6" })
         )),
 
@@ -12610,13 +12753,13 @@ function ChatRoomView({
             strokeWidth: "2",
             strokeLinecap: "round",
             strokeLinejoin: "round"
-          }, 
-            /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), 
-            /*#__PURE__*/React.createElement("path", { d: "M15 8h.01" }), 
-            /*#__PURE__*/React.createElement("path", { d: "M12.5 21h-6.5a3 3 0 0 1 -3 -3v-12a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v6.5" }), 
-            /*#__PURE__*/React.createElement("path", { d: "M3 16l5 -5c.928 -.893 2.072 -.893 3 0l4 4" }), 
-            /*#__PURE__*/React.createElement("path", { d: "M14 14l1 -1c.67 -.644 1.45 -.824 2.182 -.54" }), 
-            /*#__PURE__*/React.createElement("path", { d: "M16 19h6" }), 
+          },
+            /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }),
+            /*#__PURE__*/React.createElement("path", { d: "M15 8h.01" }),
+            /*#__PURE__*/React.createElement("path", { d: "M12.5 21h-6.5a3 3 0 0 1 -3 -3v-12a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v6.5" }),
+            /*#__PURE__*/React.createElement("path", { d: "M3 16l5 -5c.928 -.893 2.072 -.893 3 0l4 4" }),
+            /*#__PURE__*/React.createElement("path", { d: "M14 14l1 -1c.67 -.644 1.45 -.824 2.182 -.54" }),
+            /*#__PURE__*/React.createElement("path", { d: "M16 19h6" }),
             /*#__PURE__*/React.createElement("path", { d: "M19 16v6" })
           )),
 
@@ -12766,7 +12909,7 @@ function EmojiPickerSheet({ onSelect, onClose }) {
 
 function ChatParticipantSheet({ calendar, selectedId, onSelect, onClose }) {
   const participants = getActiveParticipants(calendar);
-  return /*#__PURE__*/React.createElement(React.Fragment, null, 
+  return /*#__PURE__*/React.createElement(React.Fragment, null,
     /* Overlay */
     /*#__PURE__*/React.createElement("div", {
       className: "modal-overlay",
@@ -12776,27 +12919,27 @@ function ChatParticipantSheet({ calendar, selectedId, onSelect, onClose }) {
         backgroundColor: 'rgba(15, 23, 42, 0.68)',
         zIndex: 11000
       }
-    }), 
+    }),
     /* Bottom Sheet */
     /*#__PURE__*/React.createElement("div", {
       className: "poll-voter-sheet",
       style: { zIndex: 11001 }
-    }, 
+    },
       /* Header */
       /*#__PURE__*/React.createElement("div", {
         className: "poll-voter-sheet-header"
-      }, 
-        /*#__PURE__*/React.createElement("span", null, "참여자 선택"), 
+      },
+        /*#__PURE__*/React.createElement("span", null, "참여자 선택"),
         /*#__PURE__*/React.createElement("button", {
           type: "button",
           onClick: onClose,
           style: { background: 'none', border: 'none', color: '#64748B', cursor: 'pointer', padding: '4px' }
         }, /*#__PURE__*/React.createElement(SmallXIcon, null))
-      ), 
+      ),
       /* List */
       /*#__PURE__*/React.createElement("div", {
         style: { display: 'grid', gap: '8px', padding: '14px 20px 24px' }
-      }, 
+      },
         participants.map(participant => /*#__PURE__*/React.createElement("button", {
           key: participant.id,
           type: "button",
@@ -12805,17 +12948,17 @@ function ChatParticipantSheet({ calendar, selectedId, onSelect, onClose }) {
             onSelect(participant.id);
             onClose();
           }
-        }, 
+        },
           /* Left content: dot + name */
           /*#__PURE__*/React.createElement("span", {
             style: { display: 'inline-flex', alignItems: 'center', gap: '10px' }
-          }, 
+          },
             /*#__PURE__*/React.createElement("span", {
               className: "color-dot",
               style: { backgroundColor: participant.color }
-            }), 
+            }),
             participant.name
-          ), 
+          ),
           /* Right content: checkmark if selected */
           selectedId === participant.id && /*#__PURE__*/React.createElement("span", {
             style: { color: '#2563EB', fontWeight: 900 }
@@ -12845,7 +12988,7 @@ function ConfirmDialog({ title, message, onConfirm, onCancel }) {
     style: { maxWidth: '320px', padding: '20px', borderRadius: '12px' }
   }, /*#__PURE__*/React.createElement("div", {
     style: { textAlign: 'center', marginBottom: '20px' }
-  }, 
+  },
     title ? /*#__PURE__*/React.createElement("h3", {
       style: { fontSize: '1.05rem', fontWeight: 800, marginBottom: '8px', color: 'var(--text-main)' }
     }, title) : null,
@@ -12854,13 +12997,13 @@ function ConfirmDialog({ title, message, onConfirm, onCancel }) {
     }, message)
   ), /*#__PURE__*/React.createElement("div", {
     style: { display: 'flex', gap: '8px', justifyContent: 'center' }
-  }, 
+  },
     /*#__PURE__*/React.createElement("button", {
       type: "button",
       className: "btn btn-secondary",
       onClick: onCancel,
       style: { flex: 1, height: '36px', fontSize: '0.85rem' }
-    }, "취소"), 
+    }, "취소"),
     /*#__PURE__*/React.createElement("button", {
       type: "button",
       className: "btn btn-danger",
@@ -12889,7 +13032,7 @@ function DeleteConfirmModal({
   const participants = getActiveParticipants(calendar);
   const p = participants.find(part => part.id === message.participantId);
   const name = p?.name || '알수없음';
-  
+
   let contentText = message.text || '';
   if (contentText.length > 20) {
     contentText = contentText.substring(0, 20) + '...';
@@ -13268,9 +13411,10 @@ function DateModal({
     }),
     [confirmedMeetingEntry]
   );
-  const [expenseLabelInput, setExpenseLabelInput] = React.useState('');
-  const [expenseAmountInput, setExpenseAmountInput] = React.useState('');
-  const [editingExpenseId, setEditingExpenseId] = React.useState(null);
+	  const [expenseLabelInput, setExpenseLabelInput] = React.useState('');
+	  const [expenseAmountInput, setExpenseAmountInput] = React.useState('');
+	  const [expenseCategoryInput, setExpenseCategoryInput] = React.useState(() => getExpenseCategories(calendar)[0]?.id || 'etc');
+	  const [editingExpenseId, setEditingExpenseId] = React.useState(null);
   const [isSavingExpense, setIsSavingExpense] = React.useState(false);
   const [isSettlementCollapsed, setIsSettlementCollapsed] = React.useState(true);
   const [attendeesView, setAttendeesView] = React.useState('preview'); // preview: memo-only summary, closed: none, open: full list
@@ -13281,16 +13425,18 @@ function DateModal({
   const isAttendeesOpen = attendeesView === 'open';
   const isAttendeesPreview = attendeesView === 'preview';
   React.useEffect(() => {
-    setExpenseLabelInput('');
-    setExpenseAmountInput('');
-    setEditingExpenseId(null);
+	    setExpenseLabelInput('');
+	    setExpenseAmountInput('');
+	    setExpenseCategoryInput(getExpenseCategories(calendar)[0]?.id || 'etc');
+	    setEditingExpenseId(null);
     setAttendeesView('preview');
     setDraggingExpenseId('');
     setDragOverExpenseId('');
     setHasTouchedSettlement(false);
     expensePointerSortRef.current = { sourceId: '', targetId: '', startX: 0, startY: 0, active: false };
   }, [calendar?.id, dateStr]);
-  const expenseTotal = expenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+	  const expenseTotal = expenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+	  const expenseCategories = getExpenseCategories(calendar);
   const getExpenseUrl = expense => sanitizeText(expense?.url || extractFirstUrl(expense?.label || ''), 220);
   const getExpenseLabel = expense => {
     const label = sanitizeText(expense?.label || '', 120);
@@ -13311,35 +13457,38 @@ function DateModal({
     }
     setIsSavingExpense(true);
     try {
-      const saved = await Promise.resolve(onSaveExpense(dateStr, { id: editingExpenseId, label: labelText, url, amount: amountNum }));
+	      const saved = await Promise.resolve(onSaveExpense(dateStr, { id: editingExpenseId, label: labelText, url, categoryId: expenseCategoryInput, amount: amountNum }));
       if (saved !== false) setHasTouchedSettlement(true);
     } catch (err) {
       console.error('Expense save failed:', err);
     }
     setIsSavingExpense(false);
-    setExpenseLabelInput('');
-    setExpenseAmountInput('');
-    setEditingExpenseId(null);
-  };
+	    setExpenseLabelInput('');
+	    setExpenseAmountInput('');
+	    setExpenseCategoryInput(expenseCategories[0]?.id || 'etc');
+	    setEditingExpenseId(null);
+	  };
   const handleExpenseItemClick = (expense) => {
     if (isSavingExpense) return;
     setEditingExpenseId(expense.id);
     const displayLabel = getExpenseLabel(expense);
     const displayUrl = getExpenseUrl(expense);
-    setExpenseLabelInput([displayLabel, displayUrl].filter(Boolean).join(' '));
-    setExpenseAmountInput(expense.amount < 0 ? `-${Math.abs(expense.amount).toLocaleString()}` : Number(expense.amount).toLocaleString());
-  };
+	    setExpenseLabelInput([displayLabel, displayUrl].filter(Boolean).join(' '));
+	    setExpenseAmountInput(expense.amount < 0 ? `-${Math.abs(expense.amount).toLocaleString()}` : Number(expense.amount).toLocaleString());
+	    setExpenseCategoryInput(getExpenseCategory(calendar, expense.categoryId).id);
+	  };
   const handleDeleteExpenseClick = (event, expenseId) => {
     event.stopPropagation();
     if (isSavingExpense) return;
     const saved = onDeleteExpense && onDeleteExpense(dateStr, expenseId);
     if (saved !== false) setHasTouchedSettlement(true);
     if (editingExpenseId === expenseId) {
-      setEditingExpenseId(null);
-      setExpenseLabelInput('');
-      setExpenseAmountInput('');
-    }
-  };
+	      setEditingExpenseId(null);
+	      setExpenseLabelInput('');
+	      setExpenseAmountInput('');
+	      setExpenseCategoryInput(expenseCategories[0]?.id || 'etc');
+	    }
+	  };
   const moveExpense = (sourceId, targetId) => {
     if (!sourceId || !targetId || sourceId === targetId || isSavingExpense || !onReorderExpenses) return;
     const fromIndex = expenses.findIndex(expense => expense.id === sourceId);
@@ -13808,12 +13957,22 @@ function DateModal({
         })
       )
     ),
-    !isSettlementCollapsed && /*#__PURE__*/React.createElement(React.Fragment, null,
-      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
-        /*#__PURE__*/React.createElement("input", {
-          type: "text",
-          className: "form-input",
-          style: { width: '100%' },
+	    !isSettlementCollapsed && /*#__PURE__*/React.createElement(React.Fragment, null,
+	      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
+	        /*#__PURE__*/React.createElement("select", {
+	          className: "form-select",
+	          value: expenseCategoryInput,
+	          disabled: isSavingExpense,
+	          onChange: e => setExpenseCategoryInput(e.target.value),
+	          style: { width: '100%', height: '42px' }
+	        }, expenseCategories.map(category => /*#__PURE__*/React.createElement("option", {
+	          key: category.id,
+	          value: category.id
+	        }, category.name))),
+	        /*#__PURE__*/React.createElement("input", {
+	          type: "text",
+	          className: "form-input",
+	          style: { width: '100%' },
           placeholder: "지출명목 (예: 식당 예약금, URL 첨부 가능)",
           maxLength: 220,
           value: expenseLabelInput,
@@ -13863,10 +14022,11 @@ function DateModal({
           border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-primary)'
         }
       },
-        expenses.map(expense => {
-          const expenseLabel = getExpenseLabel(expense);
-          const expenseUrl = getExpenseUrl(expense);
-          return /*#__PURE__*/React.createElement("div", {
+	            expenses.map(expense => {
+	          const expenseLabel = getExpenseLabel(expense);
+	          const expenseUrl = getExpenseUrl(expense);
+	          const expenseCategory = getExpenseCategory(calendar, expense.categoryId);
+	          return /*#__PURE__*/React.createElement("div", {
             key: expense.id,
             "data-expense-id": expense.id,
             className: `expense-sortable-row poll-sortable-row${draggingExpenseId === expense.id ? ' is-dragging' : ''}${dragOverExpenseId === expense.id ? ' is-drop-target' : ''}`,
@@ -13930,7 +14090,7 @@ function DateModal({
               }
             },
             onDragEnd: resetExpensePointerSort
-          }, /*#__PURE__*/React.createElement(LineHeightIcon, null)),
+	          }, /*#__PURE__*/React.createElement(LineHeightIcon, null)),
           /*#__PURE__*/React.createElement("button", {
             type: "button",
             className: "expense-delete-button",
@@ -13951,9 +14111,24 @@ function DateModal({
               justifyContent: 'center',
               padding: 0
             }
-          }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 14 })),
-          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '4px', minWidth: 0 } },
-            expenseLabel && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.85rem', color: 'var(--text-main)' } }, expenseLabel),
+	          }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 14 })),
+	          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '4px', minWidth: 0 } },
+	            /*#__PURE__*/React.createElement("span", {
+	              style: {
+	                display: 'inline-flex',
+	                alignItems: 'center',
+	                gap: '5px',
+	                padding: '3px 8px',
+	                borderRadius: '999px',
+	                backgroundColor: `${expenseCategory.color}18`,
+	                color: expenseCategory.color,
+	                fontSize: '0.68rem',
+	                fontWeight: 900
+	              }
+	            }, /*#__PURE__*/React.createElement("span", {
+	              style: { width: '7px', height: '7px', borderRadius: '50%', backgroundColor: expenseCategory.color }
+	            }), expenseCategory.name),
+	            expenseLabel && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.85rem', color: 'var(--text-main)' } }, expenseLabel),
             expenseUrl && /*#__PURE__*/React.createElement("span", {
               style: {
                 display: 'inline-flex', alignItems: 'center', padding: '3px 10px', borderRadius: 'var(--radius-full)',
@@ -13964,7 +14139,7 @@ function DateModal({
               onClick: event => { event.stopPropagation(); window.open(expenseUrl, '_blank', 'noopener,noreferrer'); }
             }, expenseUrl)
           ),
-          /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.85rem', fontWeight: 800, color: expense.amount < 0 ? '#DC2626' : 'var(--text-main)' } }, `${Number(expense.amount).toLocaleString()}원`),
+	          /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.85rem', fontWeight: 800, color: expense.amount < 0 ? '#16A34A' : '#DC2626' } }, `${expense.amount < 0 ? '+' : '-'}${Math.abs(Number(expense.amount)).toLocaleString()}원`),
           /*#__PURE__*/React.createElement("div", { style: { display: 'flex', justifyContent: 'flex-start', alignItems: 'center' } },
             /*#__PURE__*/React.createElement("span", { className: "registered-at-text" }, formatRegisteredAt(expense.createdAt))
           )
@@ -14072,7 +14247,7 @@ const rebuildCalendarToTimestamp = (calendar, T, logs = []) => {
 
   // Sort chronologically
   const sortedLogs = [...logs].sort((a, b) => a.timestamp - b.timestamp);
-  
+
   // 1. Rebuild participants (only kept if created before T, un-removed if deleted after T)
   const rebuiltParticipants = (calendar.participants || [])
     .filter(p => (p.updatedAt || 0) <= T)
@@ -14092,7 +14267,7 @@ const rebuildCalendarToTimestamp = (calendar, T, logs = []) => {
     if (log.timestamp > T) continue;
     if (POLL_ACTIVITY_ACTIONS.includes(log.action)) continue;
     if (log.participantId && !participantIds.has(log.participantId)) continue;
-    
+
     const key = `${log.date}_${log.participantId}`;
     if (log.action === 'create' || log.action === 'update') {
       rebuiltAvailabilities.set(key, {
@@ -14115,11 +14290,11 @@ const rebuildCalendarToTimestamp = (calendar, T, logs = []) => {
         acc[opt.text] = opt.id;
         return acc;
       }, {});
-      
+
       for (const log of sortedLogs) {
         if (log.timestamp > T) continue;
         if (!participantIds.has(log.participantId)) continue;
-        
+
         if (log.action === 'poll_vote' && log.note.startsWith(`${poll.title} / `)) {
           const optText = log.note.substring(poll.title.length + 3);
           const optId = optionMap[optText];
@@ -14378,7 +14553,7 @@ function AdminModal({
     if (isSubmitting) return;
     setIsSubmitting(true);
     const now = Date.now();
-    
+
     // Validate titles & names
     if (!title.trim()) {
       if (showToast) showToast('캘린더명 필요', 'error'); else alert('캘린더명 필요');
@@ -14425,7 +14600,7 @@ function AdminModal({
     } else {
       nextPolls.push(updatedPoll);
     }
-    
+
     const log = createPollActivityLog(
       calendar.id,
       'poll_create',
@@ -14433,7 +14608,7 @@ function AdminModal({
       now,
       updatedPoll.title
     );
-    
+
     const updatedCal = {
       ...calendar,
       polls: nextPolls,
@@ -14441,7 +14616,7 @@ function AdminModal({
       updatedAt: now,
       revision: (calendar.revision || 0) + 1
     };
-    
+
     const saved = await onSave(updatedCal, null);
     if (saved !== false) {
       setIsPollModalOpen(false);
@@ -14585,7 +14760,7 @@ function AdminModal({
             style: { border: '1px solid var(--border-subtle)', borderRadius: '12px', padding: '16px', backgroundColor: 'var(--bg-card)' }
           },
             /*#__PURE__*/React.createElement("h4", { style: { fontSize: '0.92rem', fontWeight: 800, color: 'var(--text-main)', margin: '0 0 14px 0', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(SettingsIcon, null), "프로필 설정"),
-            
+
             /* Input: Title */
             /*#__PURE__*/React.createElement("div", { style: { marginBottom: '10px' } },
               /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '4px' } }, "캘린더명"),
@@ -14595,7 +14770,7 @@ function AdminModal({
                 onChange: e => setTitle(e.target.value)
               })
             ),
-            
+
             /* Input: Description */
             /*#__PURE__*/React.createElement("div", { style: { marginBottom: '14px' } },
               /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '4px' } }, "캘린더 설명"),
@@ -14611,7 +14786,7 @@ function AdminModal({
               style: { borderTop: '1px solid var(--border-subtle)', paddingTop: '12px' }
             },
               /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '6px' } }, `참여자 설정 (${participants.filter(p => !isTombstone(p)).length}명)`),
-              
+
               /* Add Row */
               /*#__PURE__*/React.createElement("div", {
                 style: { display: 'flex', gap: '8px', marginBottom: '12px' }
@@ -14777,7 +14952,7 @@ function AdminModal({
                 create: '일정 추가', update: '일정 변경', delete: '일정 삭제',
                 poll_create: '투표 생성', poll_vote: '투표 진행', poll_cancel: '투표 취소'
               }[log.action] || '활동';
-              
+
               const actionBadgeColor = {
                 create: '#10B981', update: '#2563EB', delete: '#EF4444',
                 poll_create: '#8B5CF6', poll_vote: '#EC4899', poll_cancel: '#F97316'
@@ -15421,12 +15596,11 @@ function MainSideMenu({
     "aria-label": "메인 메뉴",
     onClick: e => e.stopPropagation()
   },
-    /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-header" },
-      /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-brand" },
-        /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-logo", "aria-hidden": "true" }, /*#__PURE__*/React.createElement(AdminFilledMenuIcon, null)),
-        /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-copy" },
-          /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-title" }, "메뉴")
-        )
+	    /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-header" },
+	      /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-brand" },
+	        /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-copy" },
+	          /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-title" }, "메뉴")
+	        )
       ),
       /*#__PURE__*/React.createElement("button", {
         type: "button",
@@ -15530,24 +15704,93 @@ function MainSideMenu({
 }
 
 function SettlementSummaryModal({ calendar, onClose }) {
-  const meetings = getConfirmedMeetings(calendar).slice().sort((a, b) => b.date.localeCompare(a.date));
-  const rows = meetings
-    .map(meeting => {
-      const expenses = (Array.isArray(meeting.expenses) ? meeting.expenses : [])
-        .filter(expense => Number.isFinite(Number(expense.amount)) && Number(expense.amount) !== 0)
-        .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
-      const total = expenses.reduce((sum, expense) => sum + Number(expense.amount || 0), 0);
-      return { meeting, expenses, total };
-    })
-    .filter(row => row.expenses.length > 0);
-  const grandTotal = rows.reduce((sum, row) => sum + row.total, 0);
-  const expenseCount = rows.reduce((sum, row) => sum + row.expenses.length, 0);
+  const [activeTab, setActiveTab] = React.useState('total');
+  const categories = getExpenseCategories(calendar);
+  const baseBudget = Number.isFinite(Number(calendar?.settlementBaseBudget)) ? Math.max(0, Math.round(Number(calendar.settlementBaseBudget))) : 0;
   const getExpenseUrl = expense => sanitizeText(expense?.url || extractFirstUrl(expense?.label || ''), 220);
   const getExpenseLabel = expense => {
     const label = sanitizeText(expense?.label || '', 120);
     const url = getExpenseUrl(expense);
     return url ? sanitizeText(removeFirstUrl(label), 120) : label;
   };
+  const rows = getConfirmedMeetings(calendar).slice().sort((a, b) => b.date.localeCompare(a.date))
+    .map(meeting => {
+      const items = (Array.isArray(meeting.expenses) ? meeting.expenses : [])
+        .filter(expense => Number.isFinite(Number(expense.amount)) && Number(expense.amount) !== 0)
+        .sort((a, b) => {
+          const aOrder = Number.isFinite(Number(a.order)) ? Number(a.order) : Number.POSITIVE_INFINITY;
+          const bOrder = Number.isFinite(Number(b.order)) ? Number(b.order) : Number.POSITIVE_INFINITY;
+          if (aOrder !== bOrder) return aOrder - bOrder;
+          return (a.createdAt || 0) - (b.createdAt || 0);
+        })
+        .map(expense => {
+          const amount = Number(expense.amount || 0);
+          const isIncome = expense.type === 'income' || amount < 0;
+          return {
+            ...expense,
+            amount,
+            isIncome,
+            category: getExpenseCategory(calendar, expense.categoryId),
+            label: getExpenseLabel(expense) || '정산 항목',
+            url: getExpenseUrl(expense)
+          };
+        });
+      const expenseTotal = items.filter(item => !item.isIncome).reduce((sum, item) => sum + Math.abs(item.amount), 0);
+      const incomeTotal = items.filter(item => item.isIncome).reduce((sum, item) => sum + Math.abs(item.amount), 0);
+      return { meeting, items, expenseTotal, incomeTotal, net: incomeTotal - expenseTotal };
+    })
+    .filter(row => row.items.length > 0);
+  const allItems = rows.flatMap(row => row.items.map(item => ({ ...item, date: row.meeting.date, meetingNote: row.meeting.note || '' })));
+  const incomeItems = allItems.filter(item => item.isIncome);
+  const expenseItems = allItems.filter(item => !item.isIncome);
+  const totalIncome = baseBudget + incomeItems.reduce((sum, item) => sum + Math.abs(item.amount), 0);
+  const totalExpense = expenseItems.reduce((sum, item) => sum + Math.abs(item.amount), 0);
+  const balance = totalIncome - totalExpense;
+  const categoryTotals = categories.map(category => ({
+    category,
+    total: expenseItems.filter(item => item.category.id === category.id).reduce((sum, item) => sum + Math.abs(item.amount), 0),
+    count: expenseItems.filter(item => item.category.id === category.id).length
+  })).filter(item => item.total > 0 || item.count > 0);
+  const metricCards = [
+    { label: '기초 예산', value: baseBudget, color: '#0F172A', icon: React.createElement(WalletIcon, null) },
+    { label: '총 수입', value: totalIncome, color: '#16A34A', icon: React.createElement(MenuIcon, { paths: ["M12 19v-14", "M5 12l7 -7l7 7"] }) },
+    { label: '총 지출', value: totalExpense, color: '#DC2626', icon: React.createElement(MenuIcon, { paths: ["M12 5v14", "M19 12l-7 7l-7 -7"] }) },
+    { label: '현재 잔액', value: balance, color: balance < 0 ? '#DC2626' : '#0F172A', icon: React.createElement(ChartPieIcon, null) }
+  ];
+  const categoryBadge = category => /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: '5px',
+      padding: '4px 9px',
+      borderRadius: '999px',
+      backgroundColor: `${category.color}18`,
+      color: category.color,
+      fontSize: '0.68rem',
+      fontWeight: 900,
+      whiteSpace: 'nowrap'
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: { width: '7px', height: '7px', borderRadius: '50%', backgroundColor: category.color }
+  }), category.name);
+  const renderItemRow = (item, showDate = false) => /*#__PURE__*/React.createElement("div", {
+    key: item.id || `${item.date}_${item.createdAt}_${item.amount}`,
+    style: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: '10px', alignItems: 'start', padding: '10px 12px', border: '1px solid var(--border-subtle)', borderRadius: '12px', backgroundColor: 'var(--bg-card)' }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { minWidth: 0, display: 'flex', flexDirection: 'column', gap: '5px' }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }
+  }, categoryBadge(item.category), showDate && /*#__PURE__*/React.createElement("span", { className: "registered-at-text" }, formatDateWithDayName(item.date))), /*#__PURE__*/React.createElement("span", {
+    style: { fontSize: '0.86rem', color: 'var(--text-main)', fontWeight: 800, overflowWrap: 'anywhere' }
+  }, item.label), item.url && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "registered-at-text",
+    title: item.url,
+    style: { alignSelf: 'flex-start', border: 0, cursor: 'pointer', textDecoration: 'none' },
+    onClick: () => window.open(item.url, '_blank', 'noopener,noreferrer')
+  }, item.url), item.createdAt && /*#__PURE__*/React.createElement("span", { className: "registered-at-text" }, formatRegisteredAt(item.createdAt))), /*#__PURE__*/React.createElement("strong", {
+    style: { fontSize: '0.9rem', color: item.isIncome ? '#16A34A' : '#DC2626', whiteSpace: 'nowrap' }
+  }, item.isIncome ? '+' : '-', Math.abs(item.amount).toLocaleString(), "원"));
 
   return /*#__PURE__*/React.createElement("div", {
     className: "modal-overlay",
@@ -15556,7 +15799,7 @@ function SettlementSummaryModal({ calendar, onClose }) {
   }, /*#__PURE__*/React.createElement("div", {
     className: "modal-container",
     onClick: e => e.stopPropagation(),
-    style: { maxWidth: '620px' }
+    style: { maxWidth: '760px' }
   }, /*#__PURE__*/React.createElement("div", {
     className: "modal-header",
     style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' }
@@ -15567,63 +15810,50 @@ function SettlementSummaryModal({ calendar, onClose }) {
     style: { background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer', display: 'flex', alignItems: 'center' }
   }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }))), /*#__PURE__*/React.createElement("div", {
     className: "modal-body"
-  },
-    /*#__PURE__*/React.createElement("div", {
-      style: { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '8px' }
-    },
-      /*#__PURE__*/React.createElement("div", { className: "admin-metric-card", style: { minHeight: '82px', padding: '12px 8px' } },
-        /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.75rem', color: '#64748B', fontWeight: 800 } }, "정산 일정"),
-        /*#__PURE__*/React.createElement("div", { style: { fontSize: '1.2rem', fontWeight: 900, color: '#0F172A' } }, rows.length, "일")
-      ),
-      /*#__PURE__*/React.createElement("div", { className: "admin-metric-card", style: { minHeight: '82px', padding: '12px 8px' } },
-        /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.75rem', color: '#64748B', fontWeight: 800 } }, "정산 항목"),
-        /*#__PURE__*/React.createElement("div", { style: { fontSize: '1.2rem', fontWeight: 900, color: '#0F172A' } }, expenseCount, "건")
-      ),
-      /*#__PURE__*/React.createElement("div", { className: "admin-metric-card", style: { minHeight: '82px', padding: '12px 8px' } },
-        /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.75rem', color: '#64748B', fontWeight: 800 } }, "누계"),
-        /*#__PURE__*/React.createElement("div", { style: { fontSize: '1.2rem', fontWeight: 900, color: grandTotal < 0 ? '#DC2626' : '#0F172A' } }, grandTotal.toLocaleString(), "원")
-      )
-    ),
-    rows.length === 0 ? /*#__PURE__*/React.createElement("div", {
-      style: { padding: '28px 12px', color: '#94A3B8', fontSize: '0.88rem', textAlign: 'center' }
-    }, "등록된 회비 정산 내역이 없습니다.") :
-    /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '10px' } },
-      rows.map(row => /*#__PURE__*/React.createElement("section", {
-        key: row.meeting.date,
-        style: { border: '1px solid var(--border-subtle)', borderRadius: '12px', padding: '12px', backgroundColor: 'var(--bg-subtle, #F8FAFC)' }
-      },
-        /*#__PURE__*/React.createElement("div", {
-          style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', marginBottom: '10px' }
-        },
-          /*#__PURE__*/React.createElement("strong", { style: { fontSize: '0.9rem', color: 'var(--text-main)' } }, formatDateWithDayName(row.meeting.date)),
-          /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.86rem', fontWeight: 900, color: row.total < 0 ? '#DC2626' : 'var(--text-main)', whiteSpace: 'nowrap' } }, row.total.toLocaleString(), "원")
-        ),
-        /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '8px' } },
-          row.expenses.map(expense => {
-            const url = getExpenseUrl(expense);
-            const label = getExpenseLabel(expense) || '정산 항목';
-            return /*#__PURE__*/React.createElement("div", {
-              key: expense.id || `${row.meeting.date}_${expense.createdAt}_${expense.amount}`,
-              style: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: '8px', alignItems: 'start', padding: '8px 10px', border: '1px solid var(--border-subtle)', borderRadius: '10px', backgroundColor: 'var(--bg-card)' }
-            },
-              /*#__PURE__*/React.createElement("div", { style: { minWidth: 0, display: 'flex', flexDirection: 'column', gap: '4px' } },
-                /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.84rem', color: 'var(--text-main)', fontWeight: 800 } }, label),
-                url && /*#__PURE__*/React.createElement("button", {
-                  type: "button",
-                  className: "registered-at-text",
-                  title: url,
-                  style: { alignSelf: 'flex-start', border: 0, cursor: 'pointer', textDecoration: 'none' },
-                  onClick: () => window.open(url, '_blank', 'noopener,noreferrer')
-                }, url),
-                expense.createdAt && /*#__PURE__*/React.createElement("span", { className: "registered-at-text" }, formatRegisteredAt(expense.createdAt))
-              ),
-              /*#__PURE__*/React.createElement("strong", { style: { fontSize: '0.86rem', color: Number(expense.amount) < 0 ? '#DC2626' : 'var(--text-main)', whiteSpace: 'nowrap' } }, Number(expense.amount).toLocaleString(), "원")
-            );
-          })
-        )
-      ))
-    )
-  )));
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(128px, 1fr))', gap: '8px' }
+  }, metricCards.map(card => /*#__PURE__*/React.createElement("div", {
+    key: card.label,
+    className: "admin-metric-card",
+    style: { minHeight: '92px', padding: '12px 10px', alignItems: 'flex-start', textAlign: 'left', gap: '8px' }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { color: card.color, display: 'inline-flex' }
+  }, card.icon), /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.75rem', color: '#64748B', fontWeight: 800 } }, card.label), /*#__PURE__*/React.createElement("div", { style: { fontSize: '1.05rem', fontWeight: 950, color: card.color } }, card.value.toLocaleString(), "원"))), /*#__PURE__*/React.createElement("div", {
+    style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', padding: '4px', borderRadius: '14px', background: 'var(--bg-primary)', border: '1px solid var(--border-subtle)' }
+  }, [['total', '누적보기'], ['daily', '일자별보기']].map(tab => /*#__PURE__*/React.createElement("button", {
+    key: tab[0],
+    type: "button",
+    onClick: () => setActiveTab(tab[0]),
+    style: {
+      border: 'none',
+      borderRadius: '11px',
+      padding: '10px',
+      background: activeTab === tab[0] ? '#0F172A' : 'transparent',
+      color: activeTab === tab[0] ? '#FFFFFF' : 'var(--text-muted)',
+      fontWeight: 900,
+      cursor: 'pointer'
+    }
+  }, tab[1]))), allItems.length === 0 && baseBudget === 0 ? /*#__PURE__*/React.createElement("div", {
+    style: { padding: '30px 12px', color: '#94A3B8', fontSize: '0.88rem', textAlign: 'center' }
+  }, "등록된 정산 내역이 없습니다.") : activeTab === 'total' ? /*#__PURE__*/React.createElement("div", {
+    style: { display: 'flex', flexDirection: 'column', gap: '12px' }
+  }, /*#__PURE__*/React.createElement("section", {
+    style: { border: '1px solid var(--border-subtle)', borderRadius: '14px', padding: '12px', background: 'var(--bg-primary)' }
+  }, /*#__PURE__*/React.createElement("h4", { style: { margin: '0 0 10px', fontSize: '0.92rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(ChartBarIcon, null), "카테고리별 지출"), categoryTotals.length === 0 ? /*#__PURE__*/React.createElement("div", { style: { color: '#94A3B8', fontSize: '0.82rem' } }, "아직 지출 항목이 없습니다.") : categoryTotals.map(item => /*#__PURE__*/React.createElement("div", {
+    key: item.category.id,
+    style: { display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr) auto', gap: '8px', alignItems: 'center', marginTop: '8px' }
+  }, categoryBadge(item.category), /*#__PURE__*/React.createElement("div", { style: { height: '8px', borderRadius: '999px', background: '#E2E8F0', overflow: 'hidden' } }, /*#__PURE__*/React.createElement("div", { style: { width: `${totalExpense ? Math.max(4, item.total / totalExpense * 100) : 0}%`, height: '100%', background: item.category.color, borderRadius: '999px' } })), /*#__PURE__*/React.createElement("strong", { style: { fontSize: '0.8rem', color: 'var(--text-main)', whiteSpace: 'nowrap' } }, item.total.toLocaleString(), "원"))), /*#__PURE__*/React.createElement("section", {
+    style: { display: 'flex', flexDirection: 'column', gap: '8px' }
+  }, baseBudget > 0 && /*#__PURE__*/React.createElement("div", {
+    style: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: '10px', alignItems: 'center', padding: '10px 12px', border: '1px solid #BBF7D0', borderRadius: '12px', background: '#F0FDF4' }
+  }, /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '4px' } }, /*#__PURE__*/React.createElement("strong", { style: { color: '#15803D', fontSize: '0.86rem' } }, "기초 예산"), /*#__PURE__*/React.createElement("span", { className: "registered-at-text" }, "어드민에서 설정한 누적 잔액")), /*#__PURE__*/React.createElement("strong", { style: { color: '#16A34A', whiteSpace: 'nowrap' } }, "+", baseBudget.toLocaleString(), "원")), allItems.map(item => renderItemRow(item, true)))) : /*#__PURE__*/React.createElement("div", {
+    style: { display: 'flex', flexDirection: 'column', gap: '10px' }
+  }, rows.map(row => /*#__PURE__*/React.createElement("section", {
+    key: row.meeting.date,
+    style: { border: '1px solid var(--border-subtle)', borderRadius: '14px', padding: '12px', backgroundColor: 'var(--bg-primary)' }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', marginBottom: '10px' }
+  }, /*#__PURE__*/React.createElement("strong", { style: { fontSize: '0.92rem', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(CalendarCheckIcon, null), formatDateWithDayName(row.meeting.date)), /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.86rem', fontWeight: 900, color: row.net < 0 ? '#DC2626' : '#16A34A', whiteSpace: 'nowrap' } }, row.net >= 0 ? '+' : '-', Math.abs(row.net).toLocaleString(), "원")), /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '8px' } }, row.items.map(item => renderItemRow({ ...item, date: row.meeting.date }, false))))))));
 }
 
 function SunIcon() {
