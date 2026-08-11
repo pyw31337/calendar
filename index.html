@@ -1315,6 +1315,7 @@
       margin-left: auto;
       width: 28px;
       height: 28px;
+      flex: 0 0 28px;
       border: 0;
       background: transparent;
       color: #94A3B8;
@@ -1806,6 +1807,10 @@
         width: 100%;
         justify-content: space-between;
       }
+      .recent-log-right .recent-log-time {
+        margin-left: 0;
+        text-align: left;
+      }
       .recent-log-left {
         align-items: flex-start;
         width: 100%;
@@ -1872,10 +1877,11 @@
     .modal-overlay {
       position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.6);
       -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 16px;
+      overflow-x: hidden;
     }
     .modal-container {
       background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
-      width: 100%; max-width: 480px; box-shadow: var(--shadow-lg); overflow: hidden; color: var(--text-main);
+      width: 100%; max-width: 480px; box-shadow: var(--shadow-lg); overflow: hidden; overflow-x: hidden; color: var(--text-main);
       max-height: min(92vh, 860px); max-height: min(92dvh, 860px);
       display: flex; flex-direction: column;
     }
@@ -1885,7 +1891,7 @@
     .modal-header { padding: var(--space-5); border-bottom: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: space-between; background: var(--bg-primary); flex: 0 0 auto; }
     .modal-body {
       padding: var(--space-5); display: flex; flex-direction: column; gap: var(--space-4);
-      overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+      overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
       flex: 1 1 auto; min-height: 0;
     }
     .modal-footer { padding: var(--space-5); border-top: 1px solid var(--border-subtle); display: flex; justify-content: flex-end; gap: 10px; background: var(--bg-primary); flex: 0 0 auto; }
@@ -12669,7 +12675,11 @@ function DateModal({
         color: getContrastTextColor(p.color),
         cursor: 'pointer',
         userSelect: 'none',
-        alignSelf: 'flex-start'
+        alignSelf: 'flex-start',
+        maxWidth: '100%',
+        minWidth: 0,
+        whiteSpace: 'normal',
+        overflowWrap: 'anywhere'
       },
       title: "클릭 시 이 참여자로 자동 선택 및 메모 불러오기",
       onClick: () => {
@@ -12687,7 +12697,8 @@ function DateModal({
         backgroundColor: '#E2E8F0',
         color: '#475569',
         cursor: 'pointer',
-        wordBreak: 'break-all'
+        wordBreak: 'break-all',
+        maxWidth: '100%'
       },
       title: entryUrl,
       onClick: () => window.open(entryUrl, '_blank', 'noopener,noreferrer')
@@ -14002,15 +14013,19 @@ function AdminModal({
                   /*#__PURE__*/React.createElement("span", {
                     style: { backgroundColor: p.color, color: getContrastTextColor(p.color), padding: '2px 8px', borderRadius: '9999px', fontSize: '0.7rem', fontWeight: 'bold', whiteSpace: 'nowrap' }
                   }, p.name),
+                  log.date && /*#__PURE__*/React.createElement("span", {
+                    className: "recent-log-date",
+                    style: { fontSize: '0.78rem' }
+                  }, formatShortDateWithDayName(log.date)),
                   /* Description text, wrapped rather than truncated */
-                  /*#__PURE__*/React.createElement("span", {
+                  log.note && /*#__PURE__*/React.createElement("span", {
                     className: "recent-log-note",
                     style: { fontSize: '0.78rem' }
-                  }, log.note || (log.date ? formatShortDateWithDayName(log.date) : ''))
+                  }, log.note)
                 ),
                 /* Right: registered-at timestamp + rollback button */
                 /*#__PURE__*/React.createElement("div", { className: "recent-log-right recovery-restore-footer" },
-                  /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.72rem', color: '#475569', fontWeight: '500', whiteSpace: 'nowrap' } }, formatRegisteredAt(log.timestamp)),
+                  /*#__PURE__*/React.createElement("span", { className: "registered-at-text recent-log-time" }, formatRegisteredAt(log.timestamp)),
                   /*#__PURE__*/React.createElement("button", {
                     type: "button",
                     onClick: () => handleRestoreToLog(log),
