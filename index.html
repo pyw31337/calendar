@@ -2886,8 +2886,20 @@ function getConfirmedMeetings(calendar) {
   return (Array.isArray(cm) ? cm : [cm]).filter(m => m && m.date);
 }
 
+// An entry can exist purely to hold 회비 정산 (settlement) data for a date that was never
+// actually confirmed as a meeting (confirmed === false, written by handleSaveExpense when a
+// user logs income/expenses on a date with no confirmedMeeting entry yet). Callers that mean
+// "was this date actually confirmed" (badges, reminders, ICS export, stats, summary lists) must
+// filter those out with this helper; callers that just want settlement data regardless of
+// confirmation status (SettlementSummaryModal, DateModal's own expense list) should keep using
+// the raw getConfirmedMeetings list. Entries with no confirmed field at all (all pre-existing
+// data) are treated as confirmed for backward compatibility.
+function getTrulyConfirmedMeetings(calendar) {
+  return getConfirmedMeetings(calendar).filter(m => m.confirmed !== false);
+}
+
 function isDateConfirmedMeeting(calendar, dateStr) {
-  return getConfirmedMeetings(calendar).some(m => m.date === dateStr);
+  return getTrulyConfirmedMeetings(calendar).some(m => m.date === dateStr);
 }
 
 // pinnedNotices is the array form; pinnedNotice (singular) is kept readable here only so a
@@ -5335,7 +5347,7 @@ function buildCalendarConfirmedMeetingsICS(calendar, events) {
 // Per-date description: the admin's own confirmation note plus every participant's memo for
 // that date, same content the old per-row export used to show.
 function buildConfirmedMeetingDescription(calendar, dateStr) {
-  const meeting = getConfirmedMeetings(calendar).find(m => m.date === dateStr);
+  const meeting = getTrulyConfirmedMeetings(calendar).find(m => m.date === dateStr);
   const participantsMap = getActiveParticipants(calendar).reduce((acc, p) => {
     acc[p.id] = p;
     return acc;
@@ -5348,7 +5360,7 @@ function buildConfirmedMeetingDescription(calendar, dateStr) {
 }
 
 function exportCalendarConfirmedMeetingsToICS(calendar) {
-  const dates = getConfirmedMeetings(calendar).map(m => m.date).sort();
+  const dates = getTrulyConfirmedMeetings(calendar).map(m => m.date).sort();
   const events = dates.map(dateStr => ({ dateStr, description: buildConfirmedMeetingDescription(calendar, dateStr) }));
   const ics = buildCalendarConfirmedMeetingsICS(calendar, events);
   downloadTextFile(`${calendar.id}_confirmed_meetings.ics`, ics, 'text/calendar');
@@ -5444,7 +5456,7 @@ function buildAdminDashboardMetrics(calendarsList) {
     const storedAvailabilities = Array.isArray(cal.availabilities) ? cal.availabilities.length : 0;
     const deletedCount = storedAvailabilities - schedules.length;
     const sizeBytes = estimateFirestoreDocumentSize(cal);
-    const confirmedCount = getConfirmedMeetings(cal).length;
+    const confirmedCount = getTrulyConfirmedMeetings(cal).length;
     return {
       calendar: cal,
       participants,
@@ -7963,7 +7975,7 @@ function App() {
   // happens to be opened (no backend push exists here -- see notifyMeetingReminder's own note).
   React.useEffect(() => {
     if (!activeCalLoaded || !activeCal) return;
-    const meetings = getConfirmedMeetings(activeCal);
+    const meetings = getTrulyConfirmedMeetings(activeCal);
     if (meetings.length === 0) return;
     const now = new Date();
     const toDateStr = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -8580,10 +8592,28 @@ function App() {
     if (!activeCal || !isValidDateString(dateStr)) return false;
     const now = Date.now();
     const existingMeetings = getConfirmedMeetings(activeCal);
-    const isAlreadyConfirmed = existingMeetings.some(m => m.date === dateStr);
-    const nextConfirmedMeetings = isAlreadyConfirmed
-      ? existingMeetings.filter(m => m.date !== dateStr)
-      : [...existingMeetings, { date: dateStr, note: sanitizeText(note, 120), confirmedAt: now }];
+    const meetingIndex = existingMeetings.findIndex(m => m.date === dateStr);
+    const isAlreadyConfirmed = meetingIndex >= 0 && existingMeetings[meetingIndex].confirmed !== false;
+    let nextConfirmedMeetings;
+    if (isAlreadyConfirmed) {
+      // Un-confirming: if the entry also carries settlement data, keep it around as an
+      // unconfirmed placeholder instead of deleting it outright, so previously entered
+      // 회비 정산 expenses/income for the date survive the toggle.
+      const meeting = existingMeetings[meetingIndex];
+      const hasSettlementData = Array.isArray(meeting.expenses) && meeting.expenses.length > 0;
+      nextConfirmedMeetings = hasSettlementData
+        ? existingMeetings.map((m, i) => i === meetingIndex ? { ...m, confirmed: false } : m)
+        : existingMeetings.filter(m => m.date !== dateStr);
+    } else if (meetingIndex >= 0) {
+      // A settlement-only placeholder already exists for this date (created by
+      // handleSaveExpense below) -- promote it to a real confirmed meeting instead of adding
+      // a duplicate entry for the same date.
+      nextConfirmedMeetings = existingMeetings.map((m, i) => i === meetingIndex
+        ? { ...m, confirmed: true, note: sanitizeText(note, 120), confirmedAt: now }
+        : m);
+    } else {
+      nextConfirmedMeetings = [...existingMeetings, { date: dateStr, note: sanitizeText(note, 120), confirmedAt: now, confirmed: true }];
+    }
     const updatedCal = {
       ...activeCal,
       confirmedMeeting: nextConfirmedMeetings,
@@ -8604,8 +8634,11 @@ function App() {
   const handleSaveExpense = (dateStr, expense) => {
     if (!activeCal || !isValidDateString(dateStr)) return false;
     const existingMeetings = getConfirmedMeetings(activeCal);
-    const meetingIndex = existingMeetings.findIndex(m => m.date === dateStr);
-    if (meetingIndex < 0) return false;
+    let meetingIndex = existingMeetings.findIndex(m => m.date === dateStr);
+    // Editing an existing expense always targets an already-saved entry; adding a new one is
+    // allowed on any date (모임확정 여부와 무관), so create an unconfirmed settlement-only
+    // placeholder entry on the fly the first time someone logs income/expenses for that date.
+    if (meetingIndex < 0 && expense?.id) return false;
 	    const cleanLabel = sanitizeText(expense?.label || '', 120);
 	    const cleanUrl = sanitizeText(expense?.url || '', 220);
 	    const categoryIds = new Set(getExpenseCategories(activeCal).map(category => category.id));
@@ -8613,12 +8646,17 @@ function App() {
 	    const cleanAmount = Number.isFinite(expense?.amount) && expense.amount !== 0 ? Math.round(expense.amount) : 0;
     if ((!cleanLabel && !cleanUrl) || !cleanAmount) return false;
     const now = Date.now();
-    const meeting = existingMeetings[meetingIndex];
+    let meetings = existingMeetings;
+    if (meetingIndex < 0) {
+      meetings = [...existingMeetings, { date: dateStr, note: '', confirmedAt: null, confirmed: false, expenses: [] }];
+      meetingIndex = meetings.length - 1;
+    }
+    const meeting = meetings[meetingIndex];
 	    const existingExpenses = Array.isArray(meeting.expenses) ? meeting.expenses : [];
 	    const nextExpenses = expense?.id
 	      ? existingExpenses.map(e => e.id === expense.id ? { ...e, label: cleanLabel, url: cleanUrl, categoryId: cleanCategoryId, amount: cleanAmount, updatedAt: now } : e)
 	      : [...existingExpenses, { id: `exp_${activeCal.id}_${dateStr}_${now}_${Math.random().toString(36).slice(2, 7)}`, label: cleanLabel, url: cleanUrl, categoryId: cleanCategoryId, amount: cleanAmount, order: existingExpenses.length, createdAt: now, updatedAt: now }];
-    const nextConfirmedMeetings = existingMeetings.map((m, i) => i === meetingIndex ? { ...m, expenses: nextExpenses, amount: null } : m);
+    const nextConfirmedMeetings = meetings.map((m, i) => i === meetingIndex ? { ...m, expenses: nextExpenses, amount: null } : m);
     const updatedCal = {
       ...activeCal,
       confirmedMeeting: nextConfirmedMeetings,
@@ -8973,7 +9011,7 @@ function App() {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   })();
-  const visibleConfirmedMeetings = getConfirmedMeetings(activeCal)
+  const visibleConfirmedMeetings = getTrulyConfirmedMeetings(activeCal)
     .filter(m => m.date >= todayDateStrForBanner)
     .sort((a, b) => a.date.localeCompare(b.date));
 
@@ -14164,7 +14202,7 @@ function DateModal({
       flexDirection: 'column',
       gap: '8px'
     }
-  }, dateEntries.map(entry => renderAvailabilityEntry(entry, false)))), isConfirmed && !adminMode && /*#__PURE__*/React.createElement("div", null,
+  }, dateEntries.map(entry => renderAvailabilityEntry(entry, false)))), !adminMode && /*#__PURE__*/React.createElement("div", null,
     /*#__PURE__*/React.createElement("div", {
       onClick: () => setIsSettlementCollapsed(prev => !prev),
       style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', cursor: 'pointer', marginBottom: isSettlementCollapsed ? 0 : '10px' }
@@ -15186,7 +15224,7 @@ function AdminModal({
           className: "btn btn-secondary",
           style: { width: '100%', justifyContent: 'center' },
           onClick: () => {
-            if (getConfirmedMeetings(calendar).length === 0) {
+            if (getTrulyConfirmedMeetings(calendar).length === 0) {
               if (showToast) showToast('확정된 모임이 없습니다', 'error');
               return;
             }
@@ -17741,7 +17779,7 @@ function SummaryList({
   const sortedPartialDates = getSortedDates(partialAvailableDates.filter(d => d >= todayStr));
 
   // 3. Confirmed-meeting dates -- every date promoted to 모임확정, past or future.
-  const confirmedDates = getSortedDates(getConfirmedMeetings(calendar).map(m => m.date));
+  const confirmedDates = getSortedDates(getTrulyConfirmedMeetings(calendar).map(m => m.date));
 
   // '6인 이상 참석 가능' / '전원 참석 가능' / '모임 확정' only ever show when they have at least
   // one matching date -- an empty one hides its title entirely rather than rendering a
