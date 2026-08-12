@@ -13515,7 +13515,7 @@ function ChatRoomView({
       className: "form-input",
       placeholder: "검색할 메시지를 입력하세요...",
       value: searchQuery,
-      onChange: e => { setSearchQuery(e.target.value); setSearchFocusIndex(0); },
+      onChange: e => { setSearchQuery(e.target.value); setSearchFocusIndex(Number.MAX_SAFE_INTEGER); },
       autoFocus: true,
       style: { flex: 1, height: '34px', fontSize: '0.88rem' }
     }),
