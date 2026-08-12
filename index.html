@@ -11460,8 +11460,8 @@ function renderChatMessageImages(msg, setActiveLightbox, singleImageStyle = {}) 
       display: 'grid',
       gridTemplateColumns: `repeat(${cols}, 1fr)`,
       gap: '4px',
-      width: '100%',
-      maxWidth: `min(100%, ${maxW})`,
+      width: maxW,
+      maxWidth: '100%',
       marginBottom: singleImageStyle.marginBottom || '0'
     }
   }, thumbs.map((thumb, idx) => /*#__PURE__*/React.createElement('img', {
