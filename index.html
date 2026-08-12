@@ -3181,14 +3181,17 @@ const POLL_ACTIVITY_ACTIONS = ['poll_create', 'poll_vote', 'poll_cancel'];
 // carry an empty participantId, same as poll activity logs, so they need the same
 // participant-optional treatment in normalizeActivityLog below.
 const EXPENSE_ACTIVITY_ACTIONS = ['expense_create', 'expense_update', 'expense_delete'];
-const ACTIVITY_ACTIONS = [...SCHEDULE_ACTIVITY_ACTIONS, ...POLL_ACTIVITY_ACTIONS, ...EXPENSE_ACTIVITY_ACTIONS];
+// Photo hashtags (라이트박스 이미지정보 패널) also have no participant selector of their own --
+// same participant-optional treatment as expense/poll logs below.
+const IMAGE_TAG_ACTIVITY_ACTIONS = ['tag_add', 'tag_remove'];
+const ACTIVITY_ACTIONS = [...SCHEDULE_ACTIVITY_ACTIONS, ...POLL_ACTIVITY_ACTIONS, ...EXPENSE_ACTIVITY_ACTIONS, ...IMAGE_TAG_ACTIVITY_ACTIONS];
 
 function normalizeActivityLog(calendarId, log, participantIds = null, idRedirects = new Map()) {
   if (!log || typeof log !== 'object') return null;
   if (log.calendarId && log.calendarId !== calendarId) return null;
   const participantId = sanitizeText(idRedirects.get(log.participantId) || log.participantId || '', 120);
   const action = ACTIVITY_ACTIONS.includes(log.action) ? log.action : '';
-  const isParticipantOptionalAction = POLL_ACTIVITY_ACTIONS.includes(action) || EXPENSE_ACTIVITY_ACTIONS.includes(action);
+  const isParticipantOptionalAction = POLL_ACTIVITY_ACTIONS.includes(action) || EXPENSE_ACTIVITY_ACTIONS.includes(action) || IMAGE_TAG_ACTIVITY_ACTIONS.includes(action);
   const date = sanitizeText(log.date || '', 20);
   const timestamp = Number(log.timestamp || log.updatedAt || 0) || 0;
   if (!action || !timestamp) return null;
@@ -6093,7 +6096,9 @@ function AdminDashboard({ initialCalendars }) {
                       log.action === 'poll_cancel' ? '투표 취소' :
                       log.action === 'expense_create' ? '지출/수입 등록' :
                       log.action === 'expense_update' ? '지출/수입 수정' :
-                      log.action === 'expense_delete' ? '지출/수입 삭제' : '활동';
+                      log.action === 'expense_delete' ? '지출/수입 삭제' :
+                      log.action === 'tag_add' ? '사진 태그 추가' :
+                      log.action === 'tag_remove' ? '사진 태그 삭제' : '활동';
 
     const msg = `[${calId}] 시점 데이터 전체 복구 (타겟 로그: [${timeLabel}] [${typeLabel}]) — 이 시점으로 데이터를 복구하시겠습니까? 이 시점 이후 등록된 모든 일정/투표 롤백과 동시에, 이 시간 이후 전송된 모든 채팅 메시지도 서버에서 영구적으로 삭제됩니다.`;
     requestConfirm('시점 데이터 복구', msg, async () => {
@@ -7081,6 +7086,7 @@ function AdminDashboard({ initialCalendars }) {
               const p = pMap[log.participantId] || {
                 name: log.type === 'chat' ? '메시지' :
                       EXPENSE_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '정산' :
+                      IMAGE_TAG_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '태그' :
                       POLL_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '투표' : '알수없음',
                 color: '#94A3B8'
               };
@@ -7089,21 +7095,24 @@ function AdminDashboard({ initialCalendars }) {
                                {
                                  create: '일정 등록', update: '일정 수정', delete: '일정 삭제',
                                  poll_create: '투표 생성', poll_vote: '투표 진행', poll_cancel: '투표 취소',
-                                 expense_create: '지출/수입 등록', expense_update: '지출/수입 수정', expense_delete: '지출/수입 삭제'
+                                 expense_create: '지출/수입 등록', expense_update: '지출/수입 수정', expense_delete: '지출/수입 삭제',
+                                 tag_add: '사진 태그 추가', tag_remove: '사진 태그 삭제'
                                }[log.action] || '활동';
 
               const badgeBg = log.type === 'chat' ? '#E0F2FE' :
                               {
                                 create: '#DCFCE7', update: '#DBEAFE', delete: '#FEE2E2',
                                 poll_create: '#F3E8FF', poll_vote: '#FCE7F3', poll_cancel: '#FFEDD5',
-                                expense_create: '#FEF3C7', expense_update: '#FEF3C7', expense_delete: '#FFEDD5'
+                                expense_create: '#FEF3C7', expense_update: '#FEF3C7', expense_delete: '#FFEDD5',
+                                tag_add: '#E0E7FF', tag_remove: '#FEE2E2'
                               }[log.action] || '#F1F5F9';
 
               const badgeColor = log.type === 'chat' ? '#0369A1' :
                                  {
                                    create: '#15803D', update: '#1D4ED8', delete: '#B91C1C',
                                    poll_create: '#7E22CE', poll_vote: '#BE185D', poll_cancel: '#C2410C',
-                                   expense_create: '#B45309', expense_update: '#B45309', expense_delete: '#C2410C'
+                                   expense_create: '#B45309', expense_update: '#B45309', expense_delete: '#C2410C',
+                                   tag_add: '#4338CA', tag_remove: '#B91C1C'
                                  }[log.action] || '#64748B';
 
               return /*#__PURE__*/React.createElement("div", {
@@ -7660,6 +7669,7 @@ function App() {
   const [isModalOpen, setIsModalOpen] = React.useState(false);
   const [isAdminOpen, setIsAdminOpen] = React.useState(false);
   const [isGlobalSearchOpen, setIsGlobalSearchOpen] = React.useState(false);
+  const [globalSearchInitialQuery, setGlobalSearchInitialQuery] = React.useState('');
 
   // Theme, font size, and (below) chat notifications are per-calendar preferences, not
   // per-browser -- someone managing several calendars can want dark mode on one and not
@@ -7850,6 +7860,17 @@ function App() {
   const chatTextareaRef = React.useRef(null);
   const [chatImages, setChatImages] = React.useState([]);
   const [activeLightbox, setActiveLightbox] = React.useState(null); // { urls: string[], index: number } | null
+  // Clicking a #해시태그 in the lightbox's image-info panel closes the lightbox and opens the
+  // global search prefilled with that tag -- shared by every Lightbox instance in the app.
+  // GlobalSearchModal is only mounted in the default (calendar) tree, not in the separate
+  // early-returned activeView==='chat' tree, so switching back to 'calendar' first is required
+  // for the search modal to actually become visible when a tag is clicked from inside chat.
+  const handleSearchTag = tagText => {
+    setActiveLightbox(null);
+    setGlobalSearchInitialQuery(tagText);
+    setIsGlobalSearchOpen(true);
+    changeView('calendar');
+  };
   const [deletingMessage, setDeletingMessage] = React.useState(null); // {id, participantId, text, calId}
   const [editingMessage, setEditingMessage] = React.useState(null); // {id, participantId, text, imageUrl, thumbUrl, calId}
 
@@ -8465,16 +8486,23 @@ function App() {
     }
   };
 
-  // Per-image free-text tags (회비정산 URL 캐시와 동일하게 imageUrls/thumbUrls와 나란한 배열로
-  // 메시지 문서에 저장) -- 갤러리/라이트박스의 이미지정보 패널에서 입력하고, GlobalSearchModal의
-  // 태그 검색에서 사용된다.
+  // Per-image hashtags (회비정산 URL 캐시와 동일하게 imageUrls/thumbUrls와 나란한 배열로 메시지
+  // 문서에 저장, 한 이미지당 공백/쉼표로 구분된 태그 여러 개를 하나의 문자열로 보관) -- 갤러리/
+  // 라이트박스의 이미지정보 패널에서 입력하고, GlobalSearchModal의 태그 검색에서 사용된다.
+  // 이전 태그 목록과 비교해 새로 추가/삭제된 토큰마다 활동 로그를 남겨 어드민 페이지에서
+  // 언제 어떤 해시태그가 추가/삭제됐는지 확인할 수 있게 한다.
   const handleSaveImageTags = async (messageId, imageIndex, tagsText) => {
     if (!messageId || !Number.isInteger(imageIndex) || imageIndex < 0) return false;
     const sourceMessage = [...(chatMessages || []), ...(recentMessages || [])].find(msg => msg.id === messageId);
     if (!sourceMessage) return false;
     const entryCount = getMessageImageEntries(sourceMessage).length;
     if (imageIndex >= entryCount) return false;
-    const cleanTags = sanitizeText(tagsText || '', 100);
+    const parseTagTokens = text => Array.from(new Set(
+      String(text || '').split(/[,\s#]+/).map(t => sanitizeText(t.trim(), 30)).filter(Boolean)
+    )).slice(0, 20);
+    const prevTokens = parseTagTokens(Array.isArray(sourceMessage.imageTags) ? sourceMessage.imageTags[imageIndex] : '');
+    const nextTokens = parseTagTokens(tagsText);
+    const cleanTags = sanitizeText(nextTokens.join(' '), 100);
     const nextImageTags = Array.isArray(sourceMessage.imageTags) ? [...sourceMessage.imageTags] : [];
     while (nextImageTags.length < entryCount) nextImageTags.push('');
     nextImageTags[imageIndex] = cleanTags;
@@ -8486,6 +8514,14 @@ function App() {
         const ok = await updateMessageRest(activeCalId, messageId, data);
         if (!ok) throw new Error('Image tags update failed');
       }
+      const now = Date.now();
+      const added = nextTokens.filter(t => !prevTokens.includes(t));
+      const removed = prevTokens.filter(t => !nextTokens.includes(t));
+      const tagLogs = [
+        ...added.map((t, i) => createActivityLog(activeCalId, 'tag_add', '', '', now + i, `#${t}`)),
+        ...removed.map((t, i) => createActivityLog(activeCalId, 'tag_remove', '', '', now + added.length + i, `#${t}`))
+      ].filter(Boolean);
+      if (tagLogs.length > 0) await writeActivityLogsToFirestore(activeCalId, tagLogs);
     } catch (err) {
       console.error('Image tag save failed:', err);
       showToast('태그 저장 실패', 'error');
@@ -9053,6 +9089,7 @@ function App() {
       showToast: showToast,
       onPromoteImageUrl: handlePromoteInlineChatImage,
       onSaveImageTags: handleSaveImageTags,
+      onSearchTag: handleSearchTag,
       onShare: () => setIsChatShareOpen(true),
       isDarkTheme: isDarkTheme,
       onToggleTheme: toggleTheme,
@@ -9179,7 +9216,7 @@ function App() {
     className: "header-actions"
   }, /*#__PURE__*/React.createElement("button", {
     className: "btn header-search-btn",
-    onClick: () => setIsGlobalSearchOpen(true),
+    onClick: () => { setGlobalSearchInitialQuery(''); setIsGlobalSearchOpen(true); },
     title: "검색",
     style: {
       padding: '10px'
@@ -9349,7 +9386,9 @@ function App() {
     onEditMessage: handleEditMessage,
     onMore: () => changeView('chat'),
     showToast: showToast,
-    onPromoteImageUrl: handlePromoteInlineChatImage
+    onPromoteImageUrl: handlePromoteInlineChatImage,
+    onSaveImageTags: handleSaveImageTags,
+    onSearchTag: handleSearchTag
   })), /*#__PURE__*/React.createElement(SummaryList, {
     calendar: activeCal,
     onSelectDate: d => {
@@ -9361,7 +9400,8 @@ function App() {
     chatMessages: chatMessages,
     showToast: showToast,
     onPromoteImageUrl: handlePromoteInlineChatImage,
-    onSaveImageTags: handleSaveImageTags
+    onSaveImageTags: handleSaveImageTags,
+    onSearchTag: handleSearchTag
   }), isModalOpen && /*#__PURE__*/React.createElement(DateModal, {
     dateStr: selectedDate,
     calendar: activeCal,
@@ -9414,6 +9454,7 @@ function App() {
   }), isGlobalSearchOpen && /*#__PURE__*/React.createElement(GlobalSearchModal, {
     calendar: activeCal,
     chatMessages: chatMessages,
+    initialQuery: globalSearchInitialQuery,
     onClose: () => setIsGlobalSearchOpen(false),
     onSelectDate: d => {
       setSelectedDate(d);
@@ -11019,20 +11060,18 @@ function LinkIcon({ size = 16 }) {
 }
 
 // Black-gradient info panel shown at the bottom of the active photo when the Lightbox's
-// tap-to-toggle info mode is on -- shows whatever metadata can actually be derived for that
-// image (see buildLightboxImageInfo); rows with no derivable value are simply omitted.
-function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags }) {
-  const rows = [
-    ['업로드', info.dateLabel],
-    ['파일명', info.fileName],
-    ['용량', info.sizeLabel || '-'],
-    ['사이즈', info.dimensionLabel || '-'],
-    ['형식', info.typeLabel]
-  ].filter(([, value]) => value);
+// tap-to-toggle info mode is on. Fixed 4-line layout: 업로드 date, 파일정보 (format/size/
+// dimensions), 해시태그 capsules + URL button, and the 태그입력 input row. 해시태그 is the
+// public-facing name for what's stored as one space/comma-delimited string per image (see
+// handleSaveImageTags) -- parsed into individual #tag capsules here for display/delete/search.
+function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSearchTag }) {
+  const tagTokens = String(tags || '').split(/[,\s#]+/).map(t => t.trim()).filter(Boolean);
   const [tagInput, setTagInput] = React.useState(tags || '');
   const [isSavingTags, setIsSavingTags] = React.useState(false);
+  const [confirmDeleteTag, setConfirmDeleteTag] = React.useState(null);
+  const [isDeletingTag, setIsDeletingTag] = React.useState(false);
   React.useEffect(() => { setTagInput(tags || ''); }, [tags]);
-  if (rows.length === 0 && !onSaveTags) return null;
+  if (!info.dateLabel && !info.typeLabel && !onSaveTags) return null;
   const handleSaveTags = async () => {
     if (!onSaveTags || isSavingTags) return;
     setIsSavingTags(true);
@@ -11042,74 +11081,120 @@ function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags }) {
       setIsSavingTags(false);
     }
   };
-  return /*#__PURE__*/React.createElement("div", {
+  const handleConfirmDeleteTag = async () => {
+    if (!onSaveTags || !confirmDeleteTag || isDeletingTag) return;
+    setIsDeletingTag(true);
+    try {
+      await onSaveTags(tagTokens.filter(t => t !== confirmDeleteTag).join(' '));
+    } finally {
+      setIsDeletingTag(false);
+      setConfirmDeleteTag(null);
+    }
+  };
+  const labelStyle = { opacity: 0.7, flexShrink: 0, minWidth: '52px' };
+  return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     className: "lightbox-info-panel",
     style: {
       position: 'absolute', left: 0, right: 0, bottom: 0, minWidth: '190px',
-      padding: onSaveTags ? '36px 14px 48px' : '36px 14px 12px',
+      padding: '14px 14px 12px',
       background: 'linear-gradient(to top, rgba(0,0,0,0.82), rgba(0,0,0,0.45) 60%, transparent)',
       borderRadius: '0 0 12px 12px',
       color: '#FFFFFF', fontSize: '0.76rem', lineHeight: 1.7,
+      display: 'flex', flexDirection: 'column', gap: '4px',
       pointerEvents: 'auto'
-    }
-  }, /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    className: "lightbox-url-btn",
-    onClick: e => { e.stopPropagation(); onOpenUrl && onOpenUrl(); },
-    style: {
-      position: 'absolute',
-      right: '12px',
-      bottom: '12px',
-      height: '30px',
-      padding: '0 10px',
-      borderRadius: '9999px',
-      border: '1px solid rgba(255,255,255,0.32)',
-      background: 'rgba(255,255,255,0.14)',
-      color: '#FFFFFF',
-      display: 'inline-flex',
-      alignItems: 'center',
-      gap: '5px',
-      cursor: 'pointer',
-      fontSize: '0.72rem',
-      fontWeight: 800,
-      backdropFilter: 'blur(6px)'
-    }
-  }, /*#__PURE__*/React.createElement(LinkIcon, { size: 14 }), "URL"), rows.length > 0 && /*#__PURE__*/React.createElement("div", {
-    style: { paddingRight: '58px' }
-  }, rows.map(([label, value]) => /*#__PURE__*/React.createElement("div", {
-    key: label,
-    style: { display: 'flex', gap: '8px' }
-  }, /*#__PURE__*/React.createElement("span", { style: { opacity: 0.7, flexShrink: 0, minWidth: '40px' } }, label), /*#__PURE__*/React.createElement("span", { style: { wordBreak: 'break-all' } }, value)))),
-  onSaveTags && /*#__PURE__*/React.createElement("div", {
-    style: { display: 'flex', alignItems: 'center', gap: '6px', marginTop: rows.length > 0 ? '8px' : 0 },
+    },
     onClick: e => e.stopPropagation()
   },
-    /*#__PURE__*/React.createElement("input", {
-      type: "text",
-      className: "lightbox-tag-input",
-      value: tagInput,
-      onChange: e => setTagInput(e.target.value),
-      onKeyDown: e => { if (e.key === 'Enter') { e.preventDefault(); handleSaveTags(); } },
-      placeholder: "태그 입력 (예: 생일, 파티)",
-      maxLength: 100,
-      style: {
-        flex: 1, minWidth: 0, height: '28px', padding: '0 8px', borderRadius: '6px',
-        border: '1px solid rgba(255,255,255,0.32)', background: 'rgba(255,255,255,0.14)',
-        color: '#FFFFFF', fontSize: '0.74rem'
-      }
-    }),
-    /*#__PURE__*/React.createElement("button", {
-      type: "button",
-      onClick: handleSaveTags,
-      disabled: isSavingTags,
-      style: {
-        flexShrink: 0, height: '28px', padding: '0 10px', borderRadius: '6px',
-        border: '1px solid rgba(255,255,255,0.32)', background: 'rgba(255,255,255,0.22)',
-        color: '#FFFFFF', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer',
-        opacity: isSavingTags ? 0.6 : 1
-      }
-    }, isSavingTags ? '...' : '저장')
-  ));
+    info.dateLabel && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px' } },
+      /*#__PURE__*/React.createElement("span", { style: labelStyle }, "업로드"),
+      /*#__PURE__*/React.createElement("span", { style: { wordBreak: 'break-all' } }, info.dateLabel)
+    ),
+    info.typeLabel && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' } },
+      /*#__PURE__*/React.createElement("span", { style: labelStyle }, "파일정보"),
+      /*#__PURE__*/React.createElement("span", {
+        style: {
+          display: 'inline-flex', alignItems: 'center', padding: '1px 8px', borderRadius: '9999px',
+          border: '1px solid #FFFFFF', color: '#FFFFFF', fontSize: '0.68rem', fontWeight: 800
+        }
+      }, info.typeLabel),
+      /*#__PURE__*/React.createElement("span", null, "/"),
+      /*#__PURE__*/React.createElement("span", null, info.sizeLabel || '-'),
+      /*#__PURE__*/React.createElement("span", null, "/"),
+      /*#__PURE__*/React.createElement("span", null, info.dimensionLabel || '-')
+    ),
+    /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' } },
+      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', minWidth: 0 } },
+        /*#__PURE__*/React.createElement("span", { style: labelStyle }, "해시태그"),
+        tagTokens.map(tag => /*#__PURE__*/React.createElement("span", {
+          key: tag,
+          className: "lightbox-tag-badge",
+          onClick: () => onSearchTag && onSearchTag(tag),
+          style: {
+            display: 'inline-flex', alignItems: 'center', gap: '6px', borderRadius: '9999px',
+            padding: '3px 4px 3px 10px', fontSize: '0.72rem', fontWeight: 900, lineHeight: 1,
+            border: '1px solid #FFFFFF', color: '#FFFFFF', background: 'transparent',
+            cursor: onSearchTag ? 'pointer' : 'default'
+          }
+        }, `#${tag}`, onSaveTags && /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          title: `#${tag} 태그 삭제`,
+          onClick: e => { e.stopPropagation(); setConfirmDeleteTag(tag); },
+          style: {
+            width: '17px', height: '17px', border: 0, borderRadius: '50%',
+            background: '#FFFFFF', color: '#0F172A', display: 'inline-flex',
+            alignItems: 'center', justifyContent: 'center', padding: 0, cursor: 'pointer',
+            flexShrink: 0
+          }
+        }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 12 }))))
+      ),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "lightbox-url-btn",
+        onClick: () => onOpenUrl && onOpenUrl(),
+        style: {
+          flexShrink: 0, height: '30px', padding: '0 10px', borderRadius: '9999px',
+          border: '1px solid rgba(255,255,255,0.32)', background: 'rgba(255,255,255,0.14)',
+          color: '#FFFFFF', display: 'inline-flex', alignItems: 'center', gap: '5px',
+          cursor: 'pointer', fontSize: '0.72rem', fontWeight: 800, backdropFilter: 'blur(6px)'
+        }
+      }, /*#__PURE__*/React.createElement(LinkIcon, { size: 14 }), "URL")
+    ),
+    onSaveTags && /*#__PURE__*/React.createElement("div", {
+      style: { display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }
+    },
+      /*#__PURE__*/React.createElement("span", { style: labelStyle }, "태그입력"),
+      /*#__PURE__*/React.createElement("input", {
+        type: "text",
+        className: "lightbox-tag-input",
+        value: tagInput,
+        onChange: e => setTagInput(e.target.value),
+        onKeyDown: e => { if (e.key === 'Enter') { e.preventDefault(); handleSaveTags(); } },
+        placeholder: "태그 입력 (예: 생일, 파티)",
+        maxLength: 100,
+        style: {
+          flex: 1, minWidth: 0, height: '28px', padding: '0 8px', borderRadius: '6px',
+          border: '1px solid rgba(255,255,255,0.32)', background: 'rgba(255,255,255,0.14)',
+          color: '#FFFFFF', fontSize: '0.74rem'
+        }
+      }),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: handleSaveTags,
+        disabled: isSavingTags,
+        style: {
+          flexShrink: 0, height: '28px', padding: '0 10px', borderRadius: '6px',
+          border: '1px solid rgba(255,255,255,0.32)', background: 'rgba(255,255,255,0.22)',
+          color: '#FFFFFF', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer',
+          opacity: isSavingTags ? 0.6 : 1
+        }
+      }, isSavingTags ? '...' : '저장')
+    )
+  ), confirmDeleteTag && /*#__PURE__*/React.createElement(ConfirmDialog, {
+    title: "해시태그 삭제",
+    message: `#${confirmDeleteTag} 태그를 삭제하시겠습니까?`,
+    onConfirm: handleConfirmDeleteTag,
+    onCancel: () => setConfirmDeleteTag(null)
+  }));
 }
 
 function ImageUrlModal({ imageUrl, onClose, showToast, onEnsureShareUrl }) {
@@ -11200,7 +11285,7 @@ function ImageUrlModal({ imageUrl, onClose, showToast, onEnsureShareUrl }) {
 // buttons and dot indicators when there's more than one image, matching the KakaoTalk-style
 // multi-photo gallery UX the chat bubbles are modeled after. `meta` (optional, parallel to
 // `urls`) supplies each image's { timestamp } for the tap-to-toggle info overlay.
-function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, onPromoteImageUrl, onSaveImageTags }) {
+function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, onPromoteImageUrl, onSaveImageTags, onSearchTag }) {
   const total = urls.length;
   const [showInfo, setShowInfo] = React.useState(false);
   const [imageUrlModalOpen, setImageUrlModalOpen] = React.useState(false);
@@ -11245,10 +11330,25 @@ function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, onPromote
     },
     [currentUrl, index, meta, imageDimensions]
   );
+  // meta is a static snapshot handed in when the Lightbox was opened (built once from
+  // chatMessages at click time), so it never reflects a tag save/delete that happens while the
+  // Lightbox stays open on the same image -- track successful saves here so the info panel
+  // shows the result immediately instead of only after the Lightbox is closed and reopened.
+  const [tagOverrides, setTagOverrides] = React.useState({});
   const currentMeta = meta && meta[index];
-  const currentTags = currentMeta?.tags || '';
+  const tagOverrideKey = currentMeta ? `${currentMeta.messageId}_${currentMeta.imageIndex}` : null;
+  const currentTags = (tagOverrideKey && tagOverrideKey in tagOverrides) ? tagOverrides[tagOverrideKey] : (currentMeta?.tags || '');
+  // Mirrors handleSaveImageTags' own parse/dedupe/limit rules so the optimistic override shown
+  // here matches what actually got persisted, without needing the save call to round-trip it.
+  const normalizeTagsForDisplay = text => Array.from(new Set(
+    String(text || '').split(/[,\s#]+/).map(t => t.trim()).filter(Boolean)
+  )).slice(0, 20).join(' ');
   const saveCurrentTags = onSaveImageTags && currentMeta?.messageId != null
-    ? tagsText => onSaveImageTags(currentMeta.messageId, currentMeta.imageIndex, tagsText)
+    ? async tagsText => {
+        const ok = await onSaveImageTags(currentMeta.messageId, currentMeta.imageIndex, tagsText);
+        if (ok && tagOverrideKey) setTagOverrides(prev => ({ ...prev, [tagOverrideKey]: normalizeTagsForDisplay(tagsText) }));
+        return ok;
+      }
     : null;
   const ensureCurrentShareUrl = async url => {
     if (typeof url !== 'string' || !url.startsWith('data:')) return url;
@@ -11411,6 +11511,7 @@ function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, onPromote
     info: currentInfo,
     tags: currentTags,
     onSaveTags: saveCurrentTags,
+    onSearchTag: onSearchTag,
     onOpenUrl: () => setImageUrlModalOpen(true)
   })) : /*#__PURE__*/React.createElement("img", {
     src: url,
@@ -11510,6 +11611,7 @@ function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, onPromote
     info: currentInfo,
     tags: currentTags,
     onSaveTags: saveCurrentTags,
+    onSearchTag: onSearchTag,
     onOpenUrl: () => setImageUrlModalOpen(true)
   })),
   total > 1 && /*#__PURE__*/React.createElement("div", {
@@ -11573,7 +11675,9 @@ function CommentsSection({
   onEditMessage,
   onMore,
   showToast,
-  onPromoteImageUrl
+  onPromoteImageUrl,
+  onSaveImageTags,
+  onSearchTag
 }) {
   const participants = getActiveParticipants(calendar);
   const participantsMap = participants.reduce((acc, p) => {
@@ -12049,7 +12153,8 @@ function CommentsSection({
     onNavigate: i => setActiveLightbox(prev => prev ? { ...prev, index: i } : prev),
     showToast,
     onPromoteImageUrl,
-    onSaveImageTags: handleSaveImageTags
+    onSaveImageTags,
+    onSearchTag
   }) : null), imageProcessing && /*#__PURE__*/React.createElement(ImageProcessingOverlay, imageProcessing),
   isEmojiPickerOpen && /*#__PURE__*/React.createElement(EmojiPickerSheet, {
     onSelect: insertEmojiIntoChatInput,
@@ -12085,6 +12190,7 @@ function ChatRoomView({
   showToast,
   onPromoteImageUrl,
   onSaveImageTags,
+  onSearchTag,
   onShare,
   isDarkTheme,
   onToggleTheme,
@@ -13167,7 +13273,8 @@ function ChatRoomView({
     onNavigate: i => setActiveLightbox(prev => prev ? { ...prev, index: i } : prev),
     showToast,
     onPromoteImageUrl,
-    onSaveImageTags
+    onSaveImageTags,
+    onSearchTag
   }) : null), imageProcessingChat && /*#__PURE__*/React.createElement(ImageProcessingOverlay, imageProcessingChat),
   isEmojiPickerOpen && /*#__PURE__*/React.createElement(EmojiPickerSheet, {
     onSelect: insertEmojiIntoChatInput,
@@ -15549,19 +15656,22 @@ function AdminModal({
             activityLogsSorted.map(log => {
               const p = participantsMap[log.participantId] || {
                 name: EXPENSE_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '정산' :
+                      IMAGE_TAG_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '태그' :
                       POLL_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '투표' : '알수없음',
                 color: '#94A3B8'
               };
               const actionLabel = {
                 create: '일정 추가', update: '일정 변경', delete: '일정 삭제',
                 poll_create: '투표 생성', poll_vote: '투표 진행', poll_cancel: '투표 취소',
-                expense_create: '지출/수입 등록', expense_update: '지출/수입 수정', expense_delete: '지출/수입 삭제'
+                expense_create: '지출/수입 등록', expense_update: '지출/수입 수정', expense_delete: '지출/수입 삭제',
+                tag_add: '사진 태그 추가', tag_remove: '사진 태그 삭제'
               }[log.action] || '활동';
 
               const actionBadgeColor = {
                 create: '#10B981', update: '#2563EB', delete: '#EF4444',
                 poll_create: '#8B5CF6', poll_vote: '#EC4899', poll_cancel: '#F97316',
-                expense_create: '#F59E0B', expense_update: '#F59E0B', expense_delete: '#DC2626'
+                expense_create: '#F59E0B', expense_update: '#F59E0B', expense_delete: '#DC2626',
+                tag_add: '#6366F1', tag_remove: '#DC2626'
               }[log.action] || '#64748B';
               // A translucent tint of the badge's own color (instead of a fixed pastel hex)
               // stays readable on both light and dark modal backgrounds -- a solid light pastel
@@ -15829,9 +15939,10 @@ function GlobalSearchModal({
   onClose,
   onSelectDate,
   onOpenChatMessage,
-  onOpenImage
+  onOpenImage,
+  initialQuery = ''
 }) {
-  const [query, setQuery] = React.useState('');
+  const [query, setQuery] = React.useState(initialQuery);
   const inputRef = React.useRef(null);
   React.useEffect(() => { inputRef.current?.focus(); }, []);
 
@@ -18807,7 +18918,7 @@ function SummaryList({
 // reuses the shared Lightbox component for the swipeable full-screen viewer -- kept as its own
 // local lightbox state rather than sharing App's chat activeLightbox state, since the gallery
 // and the chat are independent entry points into the same viewer, not one shared session.
-function PhotoGallery({ chatMessages, showToast, onPromoteImageUrl, onSaveImageTags }) {
+function PhotoGallery({ chatMessages, showToast, onPromoteImageUrl, onSaveImageTags, onSearchTag }) {
   const [collapsed, setCollapsed] = React.useState(false);
   const [lightbox, setLightbox] = React.useState(null); // { urls: string[], index: number } | null
 
@@ -18868,7 +18979,8 @@ function PhotoGallery({ chatMessages, showToast, onPromoteImageUrl, onSaveImageT
       onNavigate: i => setLightbox(prev => prev ? { ...prev, index: i } : prev),
       showToast,
       onPromoteImageUrl,
-      onSaveImageTags
+      onSaveImageTags,
+      onSearchTag
     })
   );
 }
