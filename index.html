@@ -2736,6 +2736,91 @@ function setChatNotifyEnabledForCalendar(calId, enabled) {
   }
 }
 
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding)
+    .replace(/\-/g, '+')
+    .replace(/_/g, '/');
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
+
+function arrayBufferToBase64(buffer) {
+  let binary = '';
+  const bytes = new Uint8Array(buffer);
+  const len = bytes.byteLength;
+  for (let i = 0; i < len; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return window.btoa(binary);
+}
+
+function getSubscriptionHashId(endpoint) {
+  let hash = 0;
+  for (let i = 0; i < endpoint.length; i++) {
+    hash = (hash << 5) - hash + endpoint.charCodeAt(i);
+    hash |= 0;
+  }
+  return 'sub_' + Math.abs(hash) + '_' + endpoint.slice(-20).replace(/[^a-zA-Z0-9]/g, '');
+}
+
+async function subscribeUserToPush(calendarId) {
+  if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return;
+  try {
+    const registration = await navigator.serviceWorker.ready;
+    if (!registration.pushManager) {
+      console.warn('Push manager not supported on this browser');
+      return;
+    }
+    let subscription = await registration.pushManager.getSubscription();
+    const publicVapidKey = 'BNk35C4KAQy9JdQJ8uzLuzDAc7zUBCznmPFJc194fcWqEtD3EZTnj03ZCwE_P2SxwVILZnDzHsj2UZxIQ0Q-huU';
+    if (!subscription) {
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(publicVapidKey)
+      });
+    }
+    if (firebaseDb) {
+      const participantId = getLocalStorage().getItem('gather_active_participant_id_v20') || 'anonymous';
+      const subId = getSubscriptionHashId(subscription.endpoint);
+      await firebaseDb.collection('calendars').doc('cal_' + calendarId).collection('push_subscriptions').doc(subId).set({
+        endpoint: subscription.endpoint,
+        keys: {
+          auth: arrayBufferToBase64(subscription.getKey('auth')),
+          p256dh: arrayBufferToBase64(subscription.getKey('p256dh'))
+        },
+        participantId: participantId,
+        createdAt: Date.now()
+      });
+      console.log('Web Push subscription registered successfully in Firestore.');
+    }
+  } catch (err) {
+    console.error('Failed to subscribe user to Web Push:', err);
+  }
+}
+
+async function unsubscribeUserFromPush(calendarId) {
+  if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return;
+  try {
+    const registration = await navigator.serviceWorker.ready;
+    const subscription = await registration.pushManager.getSubscription();
+    if (subscription) {
+      const subId = getSubscriptionHashId(subscription.endpoint);
+      if (firebaseDb) {
+        await firebaseDb.collection('calendars').doc('cal_' + calendarId).collection('push_subscriptions').doc(subId).delete();
+      }
+      await subscription.unsubscribe();
+      console.log('Unsubscribed from Web Push successfully');
+    }
+  } catch (err) {
+    console.error('Failed to unsubscribe from Web Push:', err);
+  }
+}
+
 function notifyNewChatMessage(calendar, message, participantName) {
   if (!isNotificationSupported() || Notification.permission !== 'granted') return;
   if (!isChatNotifyEnabledForCalendar(calendar?.id)) return;
@@ -12769,6 +12854,14 @@ function ChatRoomView({
   React.useEffect(() => {
     setChatNotifyEnabled(isChatNotifyEnabledForCalendar(calendar?.id));
   }, [calendar?.id]);
+
+  // Synchronize Web Push subscription automatically whenever notifications are enabled
+  React.useEffect(() => {
+    if (chatNotifyEnabled && calendar?.id && notifPermission === 'granted') {
+      subscribeUserToPush(calendar.id);
+    }
+  }, [chatNotifyEnabled, calendar?.id, notifPermission]);
+
   const handleToggleNotifications = async () => {
     if (!isNotificationSupported()) {
       if (showToast) showToast('알림 미지원 브라우저', 'error');
@@ -12778,6 +12871,11 @@ function ChatRoomView({
       const next = !chatNotifyEnabled;
       setChatNotifyEnabled(next);
       setChatNotifyEnabledForCalendar(calendar.id, next);
+      if (next) {
+        await subscribeUserToPush(calendar.id);
+      } else {
+        await unsubscribeUserFromPush(calendar.id);
+      }
       if (showToast) showToast(next ? '이 캘린더 채팅 알림 켜짐' : '이 캘린더 채팅 알림 꺼짐', 'success');
       return;
     }
@@ -12801,6 +12899,7 @@ function ChatRoomView({
       setNotifPermission('granted');
       setChatNotifyEnabled(true);
       setChatNotifyEnabledForCalendar(calendar.id, true);
+      await subscribeUserToPush(calendar.id);
       if (showToast) showToast('알림 켜짐', 'success');
     } catch (e) {
       setNotifPermission('unsupported');

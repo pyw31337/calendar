@@ -88,12 +88,25 @@ self.addEventListener('push', event => {
 self.addEventListener('notificationclick', event => {
   event.notification.close();
   const targetUrl = event.notification.data || './';
+  const absoluteTargetUrl = new URL(targetUrl, self.location.href).href;
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clientList => {
+      // 1. Try to find a tab matching the target URL exactly
       for (const client of clientList) {
-        if (client.url.includes(targetUrl) && 'focus' in client) return client.focus();
+        if (client.url === absoluteTargetUrl && 'focus' in client) return client.focus();
       }
-      if (self.clients.openWindow) return self.clients.openWindow(targetUrl);
+      // 2. If not found, find any tab on our origin, navigate it to target URL, and focus it
+      for (const client of clientList) {
+        const clientUrl = new URL(client.url);
+        if (clientUrl.origin === self.location.origin && 'focus' in client) {
+          if (client.navigate) {
+            client.navigate(absoluteTargetUrl);
+          }
+          return client.focus();
+        }
+      }
+      // 3. Fallback to opening a new tab
+      if (self.clients.openWindow) return self.clients.openWindow(absoluteTargetUrl);
     })
   );
 });
