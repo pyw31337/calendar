@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
@@ -8275,22 +8275,89 @@ function App() {
   const [isHeaderVisible, setIsHeaderVisible] = React.useState(true);
   const lastScrollTopRef = React.useRef(0);
 
-  // Track whether the virtual keyboard is currently open (visualViewport shorter than window)
+  // Cross-browser virtual keyboard detection.
+  // Strategy:
+  //  1. visualViewport resize/scroll events (all browsers)
+  //  2. document focusin/focusout events (iOS Safari workaround for resize event delay)
+  //  3. Distinguish address-bar shrink from true keyboard: keyboard height > 120px threshold
+  //     (address bar change is typically only 40-60px on iOS; keyboard is 250px+)
+  //  4. requestAnimationFrame coalescing to prevent Samsung double-fire flicker
   const isKeyboardOpenRef = React.useRef(false);
+  const kbRafRef = React.useRef(null);
   React.useEffect(() => {
-    if (!window.visualViewport) return;
-    const onVpChange = () => {
-      const keyboardHeight = window.innerHeight - window.visualViewport.height;
-      isKeyboardOpenRef.current = keyboardHeight > 80; // >80px gap = keyboard is up
-      // When keyboard opens, always ensure input bar is visible
-      if (isKeyboardOpenRef.current) setIsHeaderVisible(true);
+    const measureKeyboard = () => {
+      // Use visualViewport when available; fall back to window dimensions (Firefox Android)
+      const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+      // On iOS the page may have scrolled up (visualViewport.offsetTop > 0), which adds to
+      // the gap but isn't keyboard. On Android innerHeight truly shrinks with the keyboard.
+      const offsetTop = window.visualViewport ? (window.visualViewport.offsetTop || 0) : 0;
+      const keyboardHeight = window.innerHeight - vh - offsetTop;
+      // 120px threshold: rules out iOS address bar animation (typically 40-60px change)
+      const wasOpen = isKeyboardOpenRef.current;
+      isKeyboardOpenRef.current = keyboardHeight > 120;
+      if (isKeyboardOpenRef.current && !wasOpen) {
+        // Keyboard just opened → force input bar visible immediately
+        setIsHeaderVisible(true);
+      }
     };
-    window.visualViewport.addEventListener('resize', onVpChange);
-    window.visualViewport.addEventListener('scroll', onVpChange);
-    onVpChange();
+
+    const onVpChangeRaf = () => {
+      if (kbRafRef.current) cancelAnimationFrame(kbRafRef.current);
+      kbRafRef.current = requestAnimationFrame(measureKeyboard);
+    };
+
+    // Fallback for iOS Safari: resize event can be delayed up to ~300ms.
+    // focusin on an input/textarea fires immediately → pre-mark keyboard as open so
+    // the scroll handler ignores the incoming programmatic scrollTop update.
+    const onFocusIn = (e) => {
+      const target = e.target;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) {
+        if (target.closest && target.closest('.chat-room-container')) {
+          // Pre-emptively flag keyboard as open and reveal input bar BEFORE the
+          // visualViewport resize fires (critical for iOS Safari where resize is delayed)
+          isKeyboardOpenRef.current = true;
+          setIsHeaderVisible(true);
+          // Schedule a real measurement after keyboard animation (~350ms on iOS)
+          setTimeout(measureKeyboard, 400);
+        }
+      }
+    };
+    const onFocusOut = (e) => {
+      const target = e.target;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) {
+        if (target.closest && target.closest('.chat-room-container')) {
+          // Delay clearing keyboard flag to avoid race with next focusin (e.g. tapping emoji picker)
+          setTimeout(() => {
+            if (!document.activeElement || document.activeElement.tagName === 'BODY') {
+              isKeyboardOpenRef.current = false;
+            } else {
+              measureKeyboard();
+            }
+          }, 300);
+        }
+      }
+    };
+
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', onVpChangeRaf);
+      window.visualViewport.addEventListener('scroll', onVpChangeRaf);
+    } else {
+      // Firefox Android fallback: window resize
+      window.addEventListener('resize', onVpChangeRaf);
+    }
+    document.addEventListener('focusin', onFocusIn);
+    document.addEventListener('focusout', onFocusOut);
+    measureKeyboard();
     return () => {
-      window.visualViewport.removeEventListener('resize', onVpChange);
-      window.visualViewport.removeEventListener('scroll', onVpChange);
+      if (kbRafRef.current) cancelAnimationFrame(kbRafRef.current);
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', onVpChangeRaf);
+        window.visualViewport.removeEventListener('scroll', onVpChangeRaf);
+      } else {
+        window.removeEventListener('resize', onVpChangeRaf);
+      }
+      document.removeEventListener('focusin', onFocusIn);
+      document.removeEventListener('focusout', onFocusOut);
     };
   }, []);
 
@@ -10387,10 +10454,12 @@ function useLinkPreview(url) {
   }, [url]);
   return state;
 }
-function LinkPreviewCard({ url }) {
+function LinkPreviewCard({ url, fallbackTitle }) {
   const preview = useLinkPreview(url);
   if (!preview || preview.status === 'loading' || preview.status === 'error' || preview.status === 'empty') return null;
   const { title, description, image, siteName } = preview.data;
+  const isGenericTitle = !title || title === 'map.naver.com' || title === 'naver.me' || title.startsWith('map.naver');
+  const displayTitle = (isGenericTitle && fallbackTitle) ? fallbackTitle : (title || siteName);
   return /*#__PURE__*/React.createElement('a', {
     href: url,
     target: '_blank',
@@ -10416,9 +10485,9 @@ function LinkPreviewCard({ url }) {
     /*#__PURE__*/React.createElement('div', {
       style: { padding: '6px 8px', minWidth: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '2px' }
     },
-      title && /*#__PURE__*/React.createElement('div', {
+      displayTitle && /*#__PURE__*/React.createElement('div', {
       style: { fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
-      }, title),
+      }, displayTitle),
       description && /*#__PURE__*/React.createElement('div', {
       style: { fontSize: '0.7rem', color: 'var(--text-muted)', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }
       }, description),
@@ -10975,18 +11044,21 @@ async function resolveChatImageBatch(calendarId, compressedList, onProgress) {
     reportUploadProgress();
   };
 
-  // Sequential per-image: compress then immediately upload, tracking compression progress
-  const results = await Promise.all(compressedList.map(async (c, idx) => {
+  // Truly sequential per-image upload to prevent network starvation and timeouts
+  const results = [];
+  for (let idx = 0; idx < compressedList.length; idx++) {
+    const c = compressedList[idx];
     if (c.isExisting) {
       compressionDone++;
       reportCompressionProgress();
-      return { imageUrl: c.original, thumbUrl: c.thumbnail };
+      results.push({ imageUrl: c.original, thumbUrl: c.thumbnail });
+    } else {
+      const result = await resolveChatImageUrls(calendarId, c, idx, onBytes);
+      compressionDone++;
+      reportCompressionProgress();
+      results.push(result);
     }
-    const result = await resolveChatImageUrls(calendarId, c, idx, onBytes);
-    compressionDone++;
-    reportCompressionProgress();
-    return result;
-  }));
+  }
   if (onProgress) onProgress({ pct: 100, remainingSec: 0 });
   return results;
 }
@@ -11175,7 +11247,17 @@ function renderChatMessageImages(msg, setActiveLightbox, singleImageStyle = {}) 
       src: thumbs[0],
       alt: '첨부이미지',
       onClick: () => setActiveLightbox && setActiveLightbox({ urls: displayUrls, index: 0, meta }),
-      style: { display: 'block', borderRadius: '8px', cursor: 'pointer', objectFit: 'cover', maxWidth: '100%', ...singleImageStyle }
+      style: { 
+        display: 'block', 
+        borderRadius: '8px', 
+        cursor: 'pointer', 
+        objectFit: 'cover', 
+        width: '100%', 
+        height: 'auto', 
+        ...singleImageStyle, 
+        maxWidth: 'min(100%, ' + (singleImageStyle.maxWidth || '200px') + ')', 
+        maxHeight: singleImageStyle.maxHeight || '150px' 
+      }
     });
   }
   // 3+ images always line up 3-per-row via a proportional grid (deterministic and adapts to
@@ -11184,8 +11266,8 @@ function renderChatMessageImages(msg, setActiveLightbox, singleImageStyle = {}) 
   const useGrid = thumbs.length > 3;
   return /*#__PURE__*/React.createElement('div', {
     style: useGrid
-      ? { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4px', maxWidth: singleImageStyle.maxWidth || '200px', marginBottom: singleImageStyle.marginBottom || '0' }
-      : { display: 'flex', flexWrap: 'wrap', gap: '4px', maxWidth: singleImageStyle.maxWidth || '200px', marginBottom: singleImageStyle.marginBottom || '0' }
+      ? { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4px', width: '100%', maxWidth: 'min(100%, ' + (singleImageStyle.maxWidth || '200px') + ')', marginBottom: singleImageStyle.marginBottom || '0' }
+      : { display: 'flex', flexWrap: 'wrap', gap: '4px', width: '100%', maxWidth: 'min(100%, ' + (singleImageStyle.maxWidth || '200px') + ')', marginBottom: singleImageStyle.marginBottom || '0' }
   }, thumbs.map((thumb, idx) => /*#__PURE__*/React.createElement('img', {
     key: idx,
     src: thumb,
@@ -12054,7 +12136,7 @@ function CommentsSection({
     const bubbleContent = /*#__PURE__*/React.createElement(React.Fragment, null,
       msgImages ? /*#__PURE__*/React.createElement('div', { style: { marginBottom: '8px' } }, msgImages) : null,
       msg.text ? parseTextWithLinks(msg.text) : null,
-      msgFirstUrl && /*#__PURE__*/React.createElement(LinkPreviewCard, { url: msgFirstUrl })
+      msgFirstUrl && /*#__PURE__*/React.createElement(LinkPreviewCard, { url: msgFirstUrl, fallbackTitle: msg.text ? removeFirstUrl(msg.text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : '' })
     );
 
     const editSvg = /*#__PURE__*/React.createElement('svg', { xmlns: 'http://www.w3.org/2000/svg', width: '12', height: '12', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '2.5', strokeLinecap: 'round', strokeLinejoin: 'round' },
@@ -12585,19 +12667,62 @@ function ChatRoomView({
     }
   };
 
-  // Monitor visualViewport to shift layout above virtual keyboard on mobile devices
+  // Monitor visualViewport to shift layout above virtual keyboard on mobile devices.
+  // Cross-browser notes:
+  //  - iOS Safari: visualViewport.height shrinks when keyboard is up; offsetTop may be > 0 if
+  //    the page has scrolled up to keep the input in view -- we must subtract offsetTop to get
+  //    only the keyboard portion, not page scroll.
+  //  - Android Chrome/Samsung: innerHeight truly shrinks with interactive-widget=resizes-content
+  //    so the viewportBottom calc yields ~0. The layout simply follows the shrunk window.
+  //  - Android Firefox: same as Chrome (innerHeight shrinks).
+  //  - All: rAF coalesces rapid back-to-back events (Samsung keyboard auto-complete bar pop-in).
+  const vpRafRef = React.useRef(null);
   React.useEffect(() => {
-    if (!window.visualViewport) return;
     const updateViewport = () => {
-      const pendingBottom = window.innerHeight - window.visualViewport.height;
-      setViewportBottom(Math.max(0, pendingBottom));
+      if (!window.visualViewport) return;
+      // offsetTop is non-zero on iOS when the browser scrolls the page to keep the input
+      // in view -- that scroll portion is NOT keyboard, so subtract it.
+      const offsetTop = window.visualViewport.offsetTop || 0;
+      const kbHeight = window.innerHeight - window.visualViewport.height - offsetTop;
+      setViewportBottom(Math.max(0, kbHeight));
     };
-    window.visualViewport.addEventListener('resize', updateViewport);
-    window.visualViewport.addEventListener('scroll', updateViewport);
+    const onVpEvent = () => {
+      if (vpRafRef.current) cancelAnimationFrame(vpRafRef.current);
+      vpRafRef.current = requestAnimationFrame(updateViewport);
+    };
+
+    // iOS Safari focus-in fallback: visualViewport resize fires late.
+    // When a textarea inside the chat room gets focus, force a delayed measurement.
+    const onFocus = (e) => {
+      const t = e.target;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA') && t.closest && t.closest('.chat-room-container')) {
+        // Two-pass: immediate (catches partial-open) + 400ms (catches fully-open on iOS)
+        setTimeout(updateViewport, 50);
+        setTimeout(updateViewport, 400);
+      }
+    };
+    const onBlur = (e) => {
+      const t = e.target;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA') && t.closest && t.closest('.chat-room-container')) {
+        setTimeout(updateViewport, 300);
+      }
+    };
+
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', onVpEvent);
+      window.visualViewport.addEventListener('scroll', onVpEvent);
+    }
+    document.addEventListener('focusin', onFocus);
+    document.addEventListener('focusout', onBlur);
     updateViewport();
     return () => {
-      window.visualViewport.removeEventListener('resize', updateViewport);
-      window.visualViewport.removeEventListener('scroll', updateViewport);
+      if (vpRafRef.current) cancelAnimationFrame(vpRafRef.current);
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', onVpEvent);
+        window.visualViewport.removeEventListener('scroll', onVpEvent);
+      }
+      document.removeEventListener('focusin', onFocus);
+      document.removeEventListener('focusout', onBlur);
     };
   }, []);
 
@@ -12889,7 +13014,7 @@ function ChatRoomView({
         whiteSpace: 'pre-wrap',
         boxShadow: '0 2px 6px rgba(0,0,0,0.06)'
       }
-    }, renderChatMessageImages(msg, setActiveLightbox, { maxWidth: '200px', maxHeight: '150px', marginBottom: msg.text ? '10px' : '0' }), msg.text ? parseTextWithLinks(msg.text, searchQuery) : null, extractFirstUrl(msg.text) && /*#__PURE__*/React.createElement(LinkPreviewCard, { url: extractFirstUrl(msg.text) })), /*#__PURE__*/React.createElement("div", {
+    }, renderChatMessageImages(msg, setActiveLightbox, { maxWidth: '200px', maxHeight: '150px', marginBottom: msg.text ? '10px' : '0' }), msg.text ? parseTextWithLinks(msg.text, searchQuery) : null, extractFirstUrl(msg.text) && /*#__PURE__*/React.createElement(LinkPreviewCard, { url: extractFirstUrl(msg.text), fallbackTitle: msg.text ? removeFirstUrl(msg.text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : '' })), /*#__PURE__*/React.createElement("div", {
       style: {
         position: 'absolute',
         right: '-7px',
@@ -12942,7 +13067,7 @@ function ChatRoomView({
         whiteSpace: 'pre-wrap',
         boxShadow: '0 2px 6px rgba(0,0,0,0.06)'
       }
-    }, renderChatMessageImages(msg, setActiveLightbox, { maxWidth: '200px', maxHeight: '150px', marginBottom: msg.text ? '10px' : '0' }), msg.text ? parseTextWithLinks(msg.text, searchQuery) : null, extractFirstUrl(msg.text) && /*#__PURE__*/React.createElement(LinkPreviewCard, { url: extractFirstUrl(msg.text) })), /*#__PURE__*/React.createElement("div", {
+    }, renderChatMessageImages(msg, setActiveLightbox, { maxWidth: '200px', maxHeight: '150px', marginBottom: msg.text ? '10px' : '0' }), msg.text ? parseTextWithLinks(msg.text, searchQuery) : null, extractFirstUrl(msg.text) && /*#__PURE__*/React.createElement(LinkPreviewCard, { url: extractFirstUrl(msg.text), fallbackTitle: msg.text ? removeFirstUrl(msg.text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : '' })), /*#__PURE__*/React.createElement("div", {
       style: {
         position: 'absolute',
         left: '-7px',
@@ -13055,51 +13180,7 @@ function ChatRoomView({
     fill: "none"
   }), /*#__PURE__*/React.createElement("path", {
     d: "M6 9l6 6l6 -6"
-  }))), !isHeaderVisible && /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    className: "chat-keyboard-reopen-btn",
-    onClick: () => {
-      if (onRevealChatInput) onRevealChatInput();
-      requestAnimationFrame(() => chatTextareaRef.current && chatTextareaRef.current.focus());
-    },
-    "aria-label": "채팅 입력창 열기",
-    style: {
-      position: 'fixed',
-      left: '10px',
-      bottom: `calc(${viewportBottom}px + 16px)`,
-      width: '36px',
-      height: '36px',
-      borderRadius: '50%',
-      backgroundColor: 'var(--bg-card)',
-      border: '1px solid var(--border-subtle)',
-      boxShadow: '0 2px 10px rgba(0,0,0,0.16)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      cursor: 'pointer',
-      color: '#64748B',
-      zIndex: 1020
-    }
-  }, /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg",
-    width: "20",
-    height: "20",
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    strokeWidth: "2",
-    strokeLinecap: "round",
-    strokeLinejoin: "round"
-  }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }),
-    /*#__PURE__*/React.createElement("path", { d: "M2 6a2 2 0 0 1 2 -2h16a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-16a2 2 0 0 1 -2 -2z" }),
-    /*#__PURE__*/React.createElement("path", { d: "M6 8h.01" }),
-    /*#__PURE__*/React.createElement("path", { d: "M10 8h.01" }),
-    /*#__PURE__*/React.createElement("path", { d: "M14 8h.01" }),
-    /*#__PURE__*/React.createElement("path", { d: "M18 8h.01" }),
-    /*#__PURE__*/React.createElement("path", { d: "M8 12h.01" }),
-    /*#__PURE__*/React.createElement("path", { d: "M12 12h.01" }),
-    /*#__PURE__*/React.createElement("path", { d: "M16 12h.01" }),
-    /*#__PURE__*/React.createElement("path", { d: "M7 16h10" }))), noticePanelMode === 'floating' && /*#__PURE__*/React.createElement("button", {
+  }))), noticePanelMode === 'floating' && /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: () => setNoticePanelMode(pinnedNotices.length > 0 ? 'list' : 'add'),
     title: "공지",
@@ -13369,10 +13450,7 @@ function ChatRoomView({
       padding: '12px 16px',
       zIndex: 1012,
       flexShrink: 0,
-      transform: isHeaderVisible ? 'translateY(0)' : 'translateY(calc(100% + 12px))',
-      opacity: isHeaderVisible ? 1 : 0,
-      pointerEvents: isHeaderVisible ? 'auto' : 'none',
-      transition: 'transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.18s ease'
+      transition: 'bottom 0.12s ease-out'
     }
   },
     /* Inner card wrapper (same border/radius as CommentsSection input card) */
@@ -17489,7 +17567,8 @@ function ChatGalleryModal({
         list.push({
           url,
           timestamp: msg.timestamp,
-          messageId: msg.id
+          messageId: msg.id,
+          text: msg.text
         });
       }
     });
@@ -17566,7 +17645,7 @@ function ChatGalleryModal({
     }, "공유된 링크가 없습니다.") : sharedLinks.map(item => /*#__PURE__*/React.createElement("div", {
       key: item.messageId,
       style: { width: '100%' }
-    }, /*#__PURE__*/React.createElement(LinkPreviewCard, { url: item.url })))
+    }, /*#__PURE__*/React.createElement(LinkPreviewCard, { url: item.url, fallbackTitle: item.text ? removeFirstUrl(item.text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : '' })))
   ) : (
     sharedPhotos.length === 0 ? /*#__PURE__*/React.createElement("div", {
       style: { textAlign: 'center', color: 'var(--text-muted)', padding: '40px 0', fontSize: '0.88rem' }
