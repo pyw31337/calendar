@@ -5730,8 +5730,16 @@ function AdminDashboard({ initialCalendars }) {
 
   // Generic layer-popup confirm dialog (replaces window.confirm across this page)
   const [confirmDialog, setConfirmDialog] = React.useState(null);
-  const requestConfirm = (title, message, onConfirm) => {
-    setConfirmDialog({ title, message, onConfirm });
+  const requestConfirm = (title, message, onConfirm, showPasswordInput = false) => {
+    setConfirmDialog({
+      title,
+      message,
+      onConfirm: () => {
+        setConfirmDialog(null);
+        onConfirm();
+      },
+      showPasswordInput
+    });
   };
   const closeConfirmDialog = () => setConfirmDialog(null);
 
@@ -6112,10 +6120,18 @@ function AdminDashboard({ initialCalendars }) {
 	    } : category));
 	  };
 	  const handleRemoveExpenseCategory = categoryId => {
-	    setCalExpenseCategories(prev => {
-	      const next = prev.filter(category => category.id !== categoryId);
-	      return next.length ? next : DEFAULT_EXPENSE_CATEGORIES;
-	    });
+	    const target = calExpenseCategories.find(c => c.id === categoryId);
+	    const nameText = target ? target.name : '카테고리';
+	    requestConfirm(
+	      '지출 카테고리 삭제',
+	      `"${nameText}" 지출 카테고리를 삭제하시겠습니까?`,
+	      () => {
+	        setCalExpenseCategories(prev => {
+	          const next = prev.filter(category => category.id !== categoryId);
+	          return next.length ? next : DEFAULT_EXPENSE_CATEGORIES;
+	        });
+	      }
+	    );
 	  };
 
 	  // Delete Poll from Admin Page
@@ -6990,7 +7006,7 @@ function AdminDashboard({ initialCalendars }) {
                 /* Remove trigger */
                 /*#__PURE__*/React.createElement("button", {
                   type: "button", className: "btn btn-danger", style: { padding: '4px 10px', height: '30px', display: 'flex', alignItems: 'center' },
-                  onClick: () => handleUpdatePart(p.id, { removedAt: Date.now() })
+                  onClick: () => requestConfirm('참여자 삭제', `"${p.name}" 참여자를 삭제하시겠습니까?`, () => handleUpdatePart(p.id, { removedAt: Date.now() }))
                 }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 16 }))
               ))
 	            )
@@ -7298,6 +7314,7 @@ function AdminDashboard({ initialCalendars }) {
     isPollModalOpen && editingPollCalId && /*#__PURE__*/React.createElement(PollModal, {
       calendar: serverCalendars.find(c => c.id === editingPollCalId),
       poll: editingPoll,
+      onRequestConfirm: requestConfirm,
       onSave: async (updatedPoll) => {
         const now = Date.now();
         const targetCal = serverCalendars.find(c => c.id === editingPollCalId);
@@ -7343,7 +7360,8 @@ function AdminDashboard({ initialCalendars }) {
       title: confirmDialog.title,
       message: confirmDialog.message,
       onConfirm: confirmDialog.onConfirm,
-      onCancel: closeConfirmDialog
+      onCancel: closeConfirmDialog,
+      showPasswordInput: confirmDialog.showPasswordInput
     }),
 
     /* New calendar creation modal (replaces window.prompt) */
@@ -7631,8 +7649,16 @@ function App() {
 
   // ---- Generic Confirm Dialog ----
   const [confirmDialog, setConfirmDialog] = React.useState(null);
-  const showConfirmDialog = (title, message, onConfirm) => {
-    setConfirmDialog({ title, message, onConfirm });
+  const showConfirmDialog = (title, message, onConfirm, showPasswordInput = false) => {
+    setConfirmDialog({
+      title,
+      message,
+      onConfirm: () => {
+        setConfirmDialog(null);
+        onConfirm();
+      },
+      showPasswordInput
+    });
   };
 
   const isSavingRef = React.useRef(false);
@@ -8866,22 +8892,33 @@ function App() {
     if (meetingIndex < 0) return false;
     const meeting = existingMeetings[meetingIndex];
     const deletedExpense = (Array.isArray(meeting.expenses) ? meeting.expenses : []).find(e => e.id === expenseId);
-    const nextExpenses = (Array.isArray(meeting.expenses) ? meeting.expenses : []).filter(e => e.id !== expenseId);
-    const now = Date.now();
-    const nextConfirmedMeetings = existingMeetings.map((m, i) => i === meetingIndex ? { ...m, expenses: nextExpenses } : m);
-    const expenseLogNote = deletedExpense
-      ? sanitizeText(`${deletedExpense.amount < 0 ? '+' : '-'}${Math.abs(deletedExpense.amount).toLocaleString()}원 ${deletedExpense.label || deletedExpense.url || ''}`, 120)
-      : '';
-    const expenseActivityLog = deletedExpense ? createActivityLog(activeCal.id, 'expense_delete', dateStr, '', now, expenseLogNote) : null;
-    const updatedCal = {
-      ...activeCal,
-      confirmedMeeting: nextConfirmedMeetings,
-      updatedAt: now,
-      revision: (activeCal.revision || 0) + 1,
-      activityLogs: expenseActivityLog ? [...getCalendarActivityLogs(activeCal), expenseActivityLog] : getCalendarActivityLogs(activeCal)
-    };
-    const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-    return updateCalendars(nextCalendars, '지출 삭제완료', 'success', updatedCal.id, 'settings', expenseActivityLog ? [expenseActivityLog] : []);
+    if (!deletedExpense) return false;
+
+    const labelText = deletedExpense.label || deletedExpense.url || '지출 내역';
+    const shortText = labelText.length > 20 ? labelText.substring(0, 20) + '...' : labelText;
+
+    showConfirmDialog(
+      '지출 내역 삭제',
+      `"${shortText}" 지출 내역을 삭제하시겠습니까?`,
+      () => {
+        const nextExpenses = (Array.isArray(meeting.expenses) ? meeting.expenses : []).filter(e => e.id !== expenseId);
+        const now = Date.now();
+        const nextConfirmedMeetings = existingMeetings.map((m, i) => i === meetingIndex ? { ...m, expenses: nextExpenses } : m);
+        const expenseLogNote = deletedExpense
+          ? sanitizeText(`${deletedExpense.amount < 0 ? '+' : '-'}${Math.abs(deletedExpense.amount).toLocaleString()}원 ${deletedExpense.label || deletedExpense.url || ''}`, 120)
+          : '';
+        const expenseActivityLog = deletedExpense ? createActivityLog(activeCal.id, 'expense_delete', dateStr, '', now, expenseLogNote) : null;
+        const updatedCal = {
+          ...activeCal,
+          confirmedMeeting: nextConfirmedMeetings,
+          updatedAt: now,
+          revision: (activeCal.revision || 0) + 1,
+          activityLogs: expenseActivityLog ? [...getCalendarActivityLogs(activeCal), expenseActivityLog] : getCalendarActivityLogs(activeCal)
+        };
+        const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
+        updateCalendars(nextCalendars, '지출 삭제완료', 'success', updatedCal.id, 'settings', expenseActivityLog ? [expenseActivityLog] : []);
+      }
+    );
   };
   const handleReorderExpenses = (dateStr, orderedExpenseIds) => {
     if (!activeCal || !isValidDateString(dateStr) || !Array.isArray(orderedExpenseIds)) return false;
@@ -9101,16 +9138,25 @@ function App() {
   };
   const handleRemovePinnedNotice = (noticeId) => {
     if (!guardLoadedCalendar()) return false;
-    const now = Date.now();
-    const updatedCal = {
-      ...activeCal,
-      pinnedNotices: getPinnedNotices(activeCal).filter(n => n.id !== noticeId),
-      pinnedNotice: null,
-      updatedAt: now,
-      revision: (activeCal.revision || 0) + 1
-    };
-    const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-    return updateCalendars(nextCalendars, '공지 삭제완료', 'success', updatedCal.id, 'settings');
+    const target = getPinnedNotices(activeCal).find(n => n.id === noticeId);
+    const noticeText = target ? target.text : '';
+    const shortText = noticeText.length > 30 ? noticeText.substring(0, 30) + '...' : noticeText;
+    showConfirmDialog(
+      '공지사항 삭제',
+      `"${shortText}" 내용의 공지사항을 삭제하시겠습니까?`,
+      () => {
+        const now = Date.now();
+        const updatedCal = {
+          ...activeCal,
+          pinnedNotices: getPinnedNotices(activeCal).filter(n => n.id !== noticeId),
+          pinnedNotice: null,
+          updatedAt: now,
+          revision: (activeCal.revision || 0) + 1
+        };
+        const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
+        updateCalendars(nextCalendars, '공지 삭제완료', 'success', updatedCal.id, 'settings');
+      }
+    );
   };
   if (activeView === 'chat') {
     return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(ChatRoomView, {
@@ -9171,8 +9217,9 @@ function App() {
     }), confirmDialog && /*#__PURE__*/React.createElement(ConfirmDialog, {
     title: confirmDialog.title,
     message: confirmDialog.message,
-    onConfirm: () => { const fn = confirmDialog.onConfirm; setConfirmDialog(null); fn(); },
-    onCancel: () => setConfirmDialog(null)
+    onConfirm: confirmDialog.onConfirm,
+    onCancel: () => setConfirmDialog(null),
+    showPasswordInput: confirmDialog.showPasswordInput
   }), editingMessage && /*#__PURE__*/React.createElement(EditMessageModal, {
       message: editingMessage,
       calendar: activeCal,
@@ -9470,8 +9517,9 @@ function App() {
   }), confirmDialog && /*#__PURE__*/React.createElement(ConfirmDialog, {
     title: confirmDialog.title,
     message: confirmDialog.message,
-    onConfirm: () => { const fn = confirmDialog.onConfirm; setConfirmDialog(null); fn(); },
-    onCancel: () => setConfirmDialog(null)
+    onConfirm: confirmDialog.onConfirm,
+    onCancel: () => setConfirmDialog(null),
+    showPasswordInput: confirmDialog.showPasswordInput
   }), deletingMessage && /*#__PURE__*/React.createElement(DeleteConfirmModal, {
     message: deletingMessage,
     calendar: activeCal,
@@ -9502,7 +9550,34 @@ function App() {
     toggleTheme: toggleTheme,
     isDarkTheme: isDarkTheme,
     fontScalePercent: fontScalePercent,
-    setFontScalePercent: setFontScalePercent
+    setFontScalePercent: setFontScalePercent,
+    onSelectDate: d => {
+      setSelectedDate(d);
+      setIsModalOpen(true);
+    },
+    onOpenChatMessage: messageId => {
+      changeView('chat');
+      setTimeout(() => {
+        const el = document.querySelector(`[data-msg-row-id="${messageId}"]`);
+        if (!el) return;
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.classList.add('search-result-flash');
+        setTimeout(() => el.classList.remove('search-result-flash'), 1700);
+      }, 350);
+    },
+    onOpenImage: (messageId, imageIndex) => {
+      changeView('chat');
+      setTimeout(() => {
+        const msg = chatMessages.find(m => m.id === messageId);
+        if (!msg) return;
+        const entries = getMessageImageEntries(msg);
+        setActiveLightbox({
+          urls: entries.map(e => e.full),
+          meta: entries.map(e => ({ timestamp: msg.timestamp, messageId: msg.id, imageIndex: e.imageIndex, thumb: e.thumb, tags: e.tags })),
+          index: imageIndex
+        });
+      }, 350);
+    }
   }), isGlobalSearchOpen && /*#__PURE__*/React.createElement(GlobalSearchModal, {
     calendar: activeCal,
     chatMessages: chatMessages,
@@ -9550,6 +9625,7 @@ function App() {
   }), isPollModalOpen && /*#__PURE__*/React.createElement(PollModal, {
     calendar: activeCal,
     poll: editingPoll,
+    onRequestConfirm: showConfirmDialog,
     onSave: handleSavePoll,
     onClose: () => {
       setIsPollModalOpen(false);
@@ -13759,15 +13835,35 @@ function ChatParticipantSheet({ calendar, selectedId, onSelect, onClose }) {
   );
 }
 
-function ConfirmDialog({ title, message, onConfirm, onCancel }) {
+function ConfirmDialog({ title, message, onConfirm, onCancel, showPasswordInput }) {
+  const [password, setPassword] = React.useState('');
+  const [errorMsg, setErrorMsg] = React.useState('');
+
   React.useEffect(() => {
     const onKeyDown = (e) => {
       if (e.key === 'Escape') onCancel();
-      if (e.key === 'Enter') onConfirm();
+      if (e.key === 'Enter') handleConfirmClick();
     };
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, []);
+  }, [password]);
+
+  const handleConfirmClick = async () => {
+    if (showPasswordInput) {
+      if (!password) {
+        setErrorMsg('비밀번호를 입력하세요.');
+        return;
+      }
+      const hashed = await sha256Hex(password);
+      const correctHash = await fetchAdminPasswordHash();
+      if (hashed !== correctHash) {
+        setErrorMsg('비밀번호가 일치하지 않습니다.');
+        return;
+      }
+    }
+    onConfirm();
+  };
+
   return /*#__PURE__*/React.createElement("div", {
     className: "modal-overlay",
     onClick: onCancel,
@@ -13785,7 +13881,20 @@ function ConfirmDialog({ title, message, onConfirm, onCancel }) {
     /*#__PURE__*/React.createElement("p", {
       style: { fontSize: '0.88rem', color: 'var(--text-muted)', lineHeight: '1.5', wordBreak: 'keep-all' }
     }, message)
-  ), /*#__PURE__*/React.createElement("div", {
+  ), 
+  showPasswordInput && /*#__PURE__*/React.createElement("div", { style: { marginBottom: '14px', textAlign: 'left' } },
+    /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.78rem', fontWeight: 'bold', color: 'var(--text-muted)', marginBottom: '6px' } }, "어드민 비밀번호"),
+    /*#__PURE__*/React.createElement("input", {
+      type: "password",
+      className: "form-input",
+      placeholder: "비밀번호 입력",
+      value: password,
+      onChange: e => { setPassword(e.target.value); setErrorMsg(''); },
+      style: { width: '100%', boxSizing: 'border-box' }
+    }),
+    errorMsg && /*#__PURE__*/React.createElement("div", { style: { color: '#EF4444', fontSize: '0.72rem', marginTop: '4px', fontWeight: 'bold' } }, errorMsg)
+  ),
+  /*#__PURE__*/React.createElement("div", {
     style: { display: 'flex', gap: '8px', justifyContent: 'center' }
   },
     /*#__PURE__*/React.createElement("button", {
@@ -13797,7 +13906,7 @@ function ConfirmDialog({ title, message, onConfirm, onCancel }) {
     /*#__PURE__*/React.createElement("button", {
       type: "button",
       className: "btn btn-danger",
-      onClick: onConfirm,
+      onClick: handleConfirmClick,
       style: {
         flex: 1,
         height: '36px',
@@ -15408,7 +15517,10 @@ function AdminModal({
   toggleTheme,
   isDarkTheme,
   fontScalePercent,
-  setFontScalePercent
+  setFontScalePercent,
+  onSelectDate,
+  onOpenChatMessage,
+  onOpenImage
 }) {
   const [activeTab, setActiveTab] = React.useState('settings'); // 'settings', 'calendar', 'recovery', 'logs'
 
@@ -15680,8 +15792,39 @@ function AdminModal({
           await deleteActivityLogsAfterTimestamp(calendar.id, fullLogs, log.timestamp);
           onClose();
         }
-      }
+      },
+      true // showPasswordInput = true
     );
+  };
+
+  const handleTimelineRowClick = (log) => {
+    onClose(); // Close AdminModal settings popup
+
+    const dateStr = log.date;
+    const action = log.action || '';
+
+    if (log.type === 'chat' || action === 'chat_send') {
+      onOpenChatMessage && onOpenChatMessage(log.id);
+    } else if (action === 'tag_add' || action === 'tag_remove') {
+      let found = false;
+      const cleanTag = (log.note || '').replace('#', '').trim();
+      if (chatMessages && cleanTag) {
+        for (const msg of chatMessages) {
+          const entries = getMessageImageEntries(msg);
+          const entry = entries.find(e => (e.tags || '').includes(cleanTag));
+          if (entry) {
+            onOpenImage && onOpenImage(msg.id, entry.imageIndex);
+            found = true;
+            break;
+          }
+        }
+      }
+      if (!found) {
+        onOpenChatMessage && onOpenChatMessage(log.participantId);
+      }
+    } else if (dateStr && isValidDateString(dateStr)) {
+      onSelectDate && onSelectDate(dateStr);
+    }
   };
 
   // Re-build map of participants for info
@@ -15864,7 +16007,7 @@ function AdminModal({
                   /*#__PURE__*/React.createElement("button", {
                     type: "button", className: "btn btn-danger", disabled: isSubmitting, title: "삭제",
                     style: { width: '30px', height: '30px', padding: 0, flexShrink: 0 },
-                    onClick: () => updateParticipant(p.id, { removedAt: Date.now() })
+                    onClick: () => onRequestConfirm('참여자 삭제', `"${p.name}" 참여자를 삭제하시겠습니까?`, () => updateParticipant(p.id, { removedAt: Date.now() }))
                   }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 16 }))
                 ))
               )
@@ -16004,7 +16147,9 @@ function AdminModal({
               // shared media query stacks it into a column automatically.
               return /*#__PURE__*/React.createElement("div", {
                 key: log.id,
-                className: "recent-log-row"
+                className: "recent-log-row",
+                style: { cursor: 'pointer' },
+                onClick: () => handleTimelineRowClick(log)
               },
                 /* Left: action badge + user + description */
                 /*#__PURE__*/React.createElement("div", { className: "recent-log-left" },
@@ -16035,7 +16180,7 @@ function AdminModal({
                   /*#__PURE__*/React.createElement("span", { className: "registered-at-text recent-log-time" }, formatRegisteredAt(log.timestamp)),
                   /*#__PURE__*/React.createElement("button", {
                     type: "button",
-                    onClick: () => handleRestoreToLog(log),
+                    onClick: (e) => { e.stopPropagation(); handleRestoreToLog(log); },
                     className: "recovery-restore-btn",
                     style: {
                       backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: '6px',
@@ -16098,7 +16243,9 @@ function AdminModal({
             const confirmText = `${logTitleText} 로그 데이터를 삭제하시겠습니까?`;
             return /*#__PURE__*/React.createElement("div", {
               key: log.id,
-              className: "recent-log-row"
+              className: "recent-log-row",
+              style: { cursor: 'pointer' },
+              onClick: () => handleTimelineRowClick(log)
             }, /*#__PURE__*/React.createElement("div", {
               className: "recent-log-left"
             }, /*#__PURE__*/React.createElement("span", {
@@ -16127,7 +16274,8 @@ function AdminModal({
               className: "btn btn-danger",
               title: "로그 삭제",
               style: { width: '30px', height: '30px', padding: 0, flexShrink: 0 },
-              onClick: () => {
+              onClick: (e) => {
+                e.stopPropagation();
                 if (typeof onDeleteLog !== 'function') return;
                 onRequestConfirm('로그 삭제', confirmText, () => onDeleteLog(log));
               }
@@ -16238,6 +16386,7 @@ function AdminModal({
     isPollModalOpen && /*#__PURE__*/React.createElement(PollModal, {
       calendar: calendar,
       poll: editingPoll,
+      onRequestConfirm: onRequestConfirm,
       onSave: handleSavePollFromAdmin,
       onClose: () => {
         setIsPollModalOpen(false);
@@ -18805,7 +18954,7 @@ function DeadlineDateTimePicker({ value, onChange, disabled }) {
   );
 }
 
-function PollModal({ calendar, poll, onSave, onClose, showToast }) {
+function PollModal({ calendar, poll, onSave, onClose, showToast, onRequestConfirm }) {
   const now = Date.now();
   const isEditing = Boolean(poll?.id);
   const createdAtText = isEditing ? formatRegisteredAt(poll?.createdAt) : '';
@@ -19124,7 +19273,14 @@ function PollModal({ calendar, poll, onSave, onClose, showToast }) {
     type: "button",
     className: "btn btn-danger participant-remove-btn",
     disabled: isSubmitting,
-    onClick: () => setOptions(prev => prev.map(item => item.id === option.id ? { ...item, removedAt: Date.now(), updatedAt: Date.now() } : item))
+    onClick: () => {
+      const performDelete = () => setOptions(prev => prev.map(item => item.id === option.id ? { ...item, removedAt: Date.now(), updatedAt: Date.now() } : item));
+      if (onRequestConfirm) {
+        onRequestConfirm('투표 항목 삭제', `"${option.text || '빈 항목'}" 항목을 삭제하시겠습니까?`, performDelete);
+      } else if (window.confirm(`"${option.text || '빈 항목'}" 항목을 삭제하시겠습니까?`)) {
+        performDelete();
+      }
+    }
   }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 })))))), /*#__PURE__*/React.createElement("div", {
     className: "modal-footer"
   }, /*#__PURE__*/React.createElement("button", {
