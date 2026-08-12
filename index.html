@@ -18552,20 +18552,26 @@ function MemoView({ calendar, memos, onBack, showToast, isDarkTheme, onRequestCo
             /*#__PURE__*/React.createElement("div", {
               style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }
             },
-              /* Title input */
+              /* Title input - Styled precisely as user requested */
               /*#__PURE__*/React.createElement("input", {
                 type: "text",
                 placeholder: "제목",
                 value: newTitle,
                 onChange: e => setNewTitle(e.target.value),
                 style: {
+                  padding: '8px 8px',
                   background: 'transparent',
-                  border: 'none',
+                  borderWidth: 'medium',
+                  borderStyle: 'none',
+                  borderColor: 'currentcolor',
+                  borderImage: 'none',
                   outline: 'none',
                   fontSize: '0.95rem',
                   fontWeight: 'bold',
                   color: 'var(--text-main)',
-                  width: '100%'
+                  width: '100%',
+                  borderBottom: '1px solid var(--border-subtle)',
+                  boxSizing: 'border-box'
                 }
               }),
               /* Pin Toggle button */
@@ -18578,7 +18584,7 @@ function MemoView({ calendar, memos, onBack, showToast, isDarkTheme, onRequestCo
               }, /*#__PURE__*/React.createElement("line", { x1: "12", y1: "17", x2: "12", y2: "22" }), /*#__PURE__*/React.createElement("path", { d: "M5 17h14v-1.76a2 2 0 0 0-.44-1.24l-2.78-3.4A2 2 0 0 1 15 9.36V5a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v4.36a2 2 0 0 1-.78 1.64l-2.78 3.4a2 2 0 0 0-.44 1.24Z" })))
             ),
 
-            /* Body Textarea wrapped relatively with bottom-right emoji & file picker icons */
+            /* Body Textarea wrapped relatively with bottom-right emoji & file picker icons - Styled precisely as user requested */
             /*#__PURE__*/React.createElement("div", {
               style: { position: 'relative', width: '100%' }
             },
@@ -18589,14 +18595,18 @@ function MemoView({ calendar, memos, onBack, showToast, isDarkTheme, onRequestCo
                 onChange: e => setNewText(e.target.value),
                 rows: "4",
                 style: {
+                  padding: '8px 4px',
                   background: 'transparent',
-                  border: 'none',
+                  borderWidth: 'medium',
+                  borderStyle: 'none',
+                  borderColor: 'currentcolor',
+                  borderImage: 'none',
                   outline: 'none',
                   resize: 'none',
                   fontSize: '0.88rem',
                   color: 'var(--text-main)',
                   width: '100%',
-                  paddingBottom: '28px', // Prevent text overlapping corner icons
+                  paddingBottom: '28px',
                   fontFamily: 'inherit',
                   boxSizing: 'border-box'
                 }
@@ -18673,21 +18683,32 @@ function MemoView({ calendar, memos, onBack, showToast, isDarkTheme, onRequestCo
               }, "✕")
             ))),
 
-            /* Tags field */
+            /* Tags field - Styled precisely as user requested */
             /*#__PURE__*/React.createElement("input", {
               type: "text",
               placeholder: "해시태그 (쉼표로 구분 예: 맛집, 추천)",
               value: newTags,
               onChange: e => setNewTags(e.target.value),
               style: {
-                background: 'transparent',
-                border: 'none',
-                borderTop: '1px solid var(--border-subtle)',
+                background: '#e2e8f059',
+                borderTop: '0',
+                borderRightWidth: 'medium',
+                borderBottomWidth: 'medium',
+                borderLeftWidth: 'medium',
+                borderRightStyle: 'none',
+                borderBottomStyle: 'none',
+                borderLeftStyle: 'none',
+                borderRightColor: 'currentcolor',
+                borderBottomColor: 'currentcolor',
+                borderLeftColor: 'currentcolor',
+                borderImage: 'none',
                 outline: 'none',
                 fontSize: '0.78rem',
                 color: 'var(--text-main)',
-                padding: '6px 0 2px',
-                width: '100%'
+                padding: '10px 10px',
+                borderRadius: '10px',
+                width: '100%',
+                boxSizing: 'border-box'
               }
             }),
 
@@ -18717,7 +18738,7 @@ function MemoView({ calendar, memos, onBack, showToast, isDarkTheme, onRequestCo
                   }
                 }))),
 
-                /* Participant selection capsule button */
+                /* Participant selection capsule button - Styled to perfectly match chat input */
                 /*#__PURE__*/React.createElement("button", {
                   type: "button",
                   onClick: () => setIsComposerPartOpen(true),
@@ -18726,18 +18747,21 @@ function MemoView({ calendar, memos, onBack, showToast, isDarkTheme, onRequestCo
                     color: '#FFFFFF',
                     border: 'none',
                     borderRadius: '9999px',
-                    padding: '4px 10px',
-                    fontSize: '0.72rem',
+                    padding: '6px 14px',
+                    fontSize: '0.8rem',
                     fontWeight: 'bold',
                     cursor: 'pointer',
                     whiteSpace: 'nowrap',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '4px',
-                    height: '24px',
-                    boxSizing: 'border-box'
+                    gap: '6px',
+                    height: '32px',
+                    boxSizing: 'border-box',
+                    flexShrink: 0
                   }
-                }, composerPart?.name || '작성자 선택')
+                }, composerPart?.name || '작성자 선택', /*#__PURE__*/React.createElement("span", {
+                  style: { fontSize: '0.6rem' }
+                }, "▼"))
               ),
 
               /* Save & Close buttons formatted using DateModal styles */
@@ -18863,16 +18887,26 @@ function MemoView({ calendar, memos, onBack, showToast, isDarkTheme, onRequestCo
         /*#__PURE__*/React.createElement("div", {
           style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }
         },
-          /* Title input */
+          /* Title input - Styled precisely as user requested */
           /*#__PURE__*/React.createElement("input", {
             type: "text",
             placeholder: "제목",
             value: editTitle,
             onChange: e => setEditTitle(e.target.value),
             style: {
-              background: 'transparent', border: 'none', outline: 'none',
-              fontSize: '1rem', fontWeight: 'bold', color: 'var(--text-main)',
-              width: '100%'
+              padding: '8px 8px',
+              background: 'transparent',
+              borderWidth: 'medium',
+              borderStyle: 'none',
+              borderColor: 'currentcolor',
+              borderImage: 'none',
+              outline: 'none',
+              fontSize: '0.95rem',
+              fontWeight: 'bold',
+              color: 'var(--text-main)',
+              width: '100%',
+              borderBottom: '1px solid var(--border-subtle)',
+              boxSizing: 'border-box'
             }
           }),
           /* Pin Toggle button */
@@ -18885,7 +18919,7 @@ function MemoView({ calendar, memos, onBack, showToast, isDarkTheme, onRequestCo
           }, /*#__PURE__*/React.createElement("line", { x1: "12", y1: "17", x2: "12", y2: "22" }), /*#__PURE__*/React.createElement("path", { d: "M5 17h14v-1.76a2 2 0 0 0-.44-1.24l-2.78-3.4A2 2 0 0 1 15 9.36V5a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v4.36a2 2 0 0 1-.78 1.64l-2.78 3.4a2 2 0 0 0-.44 1.24Z" })))
         ),
 
-        /* Textarea wrapped relatively with bottom-right emoji & file picker icons */
+        /* Textarea wrapped relatively with bottom-right emoji & file picker icons - Styled precisely as user requested */
         /*#__PURE__*/React.createElement("div", {
           style: { position: 'relative', width: '100%' }
         },
@@ -18896,9 +18930,18 @@ function MemoView({ calendar, memos, onBack, showToast, isDarkTheme, onRequestCo
             onChange: e => setEditText(e.target.value),
             rows: "6",
             style: {
-              background: 'transparent', border: 'none', outline: 'none', resize: 'none',
-              fontSize: '0.9rem', color: 'var(--text-main)', width: '100%',
-              paddingBottom: '28px', // Make room for absolute buttons
+              padding: '8px 4px',
+              background: 'transparent',
+              borderWidth: 'medium',
+              borderStyle: 'none',
+              borderColor: 'currentcolor',
+              borderImage: 'none',
+              outline: 'none',
+              resize: 'none',
+              fontSize: '0.88rem',
+              color: 'var(--text-main)',
+              width: '100%',
+              paddingBottom: '28px',
               fontFamily: 'inherit',
               boxSizing: 'border-box'
             }
@@ -18975,21 +19018,32 @@ function MemoView({ calendar, memos, onBack, showToast, isDarkTheme, onRequestCo
           }, "✕")
         ))),
 
-        /* Tags field */
+        /* Tags field - Styled precisely as user requested */
         /*#__PURE__*/React.createElement("input", {
           type: "text",
           placeholder: "해시태그 (쉼표로 구분 예: 맛집, 추천)",
           value: editTags,
           onChange: e => setEditTags(e.target.value),
           style: {
-            background: 'transparent',
-            border: 'none',
-            borderTop: '1px solid var(--border-subtle)',
+            background: '#e2e8f059',
+            borderTop: '0',
+            borderRightWidth: 'medium',
+            borderBottomWidth: 'medium',
+            borderLeftWidth: 'medium',
+            borderRightStyle: 'none',
+            borderBottomStyle: 'none',
+            borderLeftStyle: 'none',
+            borderRightColor: 'currentcolor',
+            borderBottomColor: 'currentcolor',
+            borderLeftColor: 'currentcolor',
+            borderImage: 'none',
             outline: 'none',
-            fontSize: '0.8rem',
+            fontSize: '0.78rem',
             color: 'var(--text-main)',
-            padding: '8px 0 2px',
-            width: '100%'
+            padding: '10px 10px',
+            borderRadius: '10px',
+            width: '100%',
+            boxSizing: 'border-box'
           }
         }),
 
@@ -19019,7 +19073,7 @@ function MemoView({ calendar, memos, onBack, showToast, isDarkTheme, onRequestCo
               }
             }))),
 
-            /* Participant selection capsule button */
+            /* Participant selection capsule button - Styled to perfectly match chat input */
             /*#__PURE__*/React.createElement("button", {
               type: "button",
               onClick: () => setIsEditPartOpen(true),
@@ -19028,18 +19082,21 @@ function MemoView({ calendar, memos, onBack, showToast, isDarkTheme, onRequestCo
                 color: '#FFFFFF',
                 border: 'none',
                 borderRadius: '9999px',
-                padding: '4px 10px',
-                fontSize: '0.72rem',
+                padding: '6px 14px',
+                fontSize: '0.8rem',
                 fontWeight: 'bold',
                 cursor: 'pointer',
                 whiteSpace: 'nowrap',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '4px',
-                height: '24px',
-                boxSizing: 'border-box'
+                gap: '6px',
+                height: '32px',
+                boxSizing: 'border-box',
+                flexShrink: 0
               }
-            }, editPart?.name || '작성자 선택')
+            }, editPart?.name || '작성자 선택', /*#__PURE__*/React.createElement("span", {
+              style: { fontSize: '0.6rem' }
+            }, "▼"))
           ),
 
           /* Save / Delete / Cancel Actions using DateModal layout styles */
