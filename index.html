@@ -754,6 +754,9 @@
        width) so a long calendar title truncates instead of pushing header-actions -- which
        stays flex-shrink:0 -- off the row on narrow screens. */
     .header-left { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1 1 auto; }
+    @media (max-width: 640px) {
+      .header-left { margin-left: 10px; }
+    }
 
     .calendar-title {
       font-size: 1.25rem; font-weight: 800; color: var(--text-main); letter-spacing: -0.02em;
