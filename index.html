@@ -17761,7 +17761,76 @@ function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {
     const url = getExpenseUrl(expense);
     return url ? sanitizeText(removeFirstUrl(label), 120) : label;
   };
+
+  const today = new Date();
+  const [year, setYear] = React.useState(today.getFullYear());
+  const [month, setMonth] = React.useState(today.getMonth()); // 0-indexed
+  const [isPickerOpen, setIsPickerOpen] = React.useState(false);
+  const [pickerYear, setPickerYear] = React.useState(today.getFullYear());
+  const [pickerMonth, setPickerMonth] = React.useState(today.getMonth());
+  const monthNames = ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월'];
+
+  const handleOpenPicker = () => {
+    setPickerYear(year);
+    setPickerMonth(month);
+    setIsPickerOpen(true);
+  };
+  const onPrevMonth = () => {
+    if (month === 0) {
+      setYear(y => y - 1);
+      setMonth(11);
+    } else {
+      setMonth(m => m - 1);
+    }
+  };
+  const onNextMonth = () => {
+    if (month === 11) {
+      setYear(y => y + 1);
+      setMonth(0);
+    } else {
+      setMonth(m => m + 1);
+    }
+  };
+  const onToday = () => {
+    const d = new Date();
+    setYear(d.getFullYear());
+    setMonth(d.getMonth());
+  };
+  const handlePickerApply = () => {
+    setYear(pickerYear);
+    setMonth(pickerMonth);
+    setIsPickerOpen(false);
+  };
+
+  const allTimeRows = getConfirmedMeetings(calendar).slice().sort((a, b) => b.date.localeCompare(a.date))
+    .map(meeting => {
+      const items = (Array.isArray(meeting.expenses) ? meeting.expenses : [])
+        .filter(expense => Number.isFinite(Number(expense.amount)) && Number(expense.amount) !== 0)
+        .map(expense => {
+          const amount = Number(expense.amount || 0);
+          const isIncome = expense.type === 'income' || amount < 0;
+          return {
+            ...expense,
+            amount,
+            isIncome,
+            category: getExpenseCategory(calendar, expense.categoryId),
+            label: getExpenseLabel(expense) || '정산 항목',
+            url: getExpenseUrl(expense)
+          };
+        });
+      const expenseTotal = items.filter(item => !item.isIncome).reduce((sum, item) => sum + Math.abs(item.amount), 0);
+      const incomeTotal = items.filter(item => item.isIncome).reduce((sum, item) => sum + Math.abs(item.amount), 0);
+      return { meeting, items, expenseTotal, incomeTotal, net: incomeTotal - expenseTotal };
+    })
+    .filter(row => row.items.length > 0);
+  const allTimeItems = allTimeRows.flatMap(row => row.items.map(item => ({ ...item, date: row.meeting.date, meetingNote: row.meeting.note || '' })));
+  const allTimeIncome = baseBudget + allTimeItems.filter(item => item.isIncome).reduce((sum, item) => sum + Math.abs(item.amount), 0);
+  const allTimeExpense = allTimeItems.filter(item => !item.isIncome).reduce((sum, item) => sum + Math.abs(item.amount), 0);
+  const overallBalance = allTimeIncome - allTimeExpense;
+
+  const targetPrefix = `${year}-${String(month + 1).padStart(2, '0')}-`;
   const rows = getConfirmedMeetings(calendar).slice().sort((a, b) => b.date.localeCompare(a.date))
+    .filter(meeting => activeTab === 'total' || meeting.date.startsWith(targetPrefix))
     .map(meeting => {
       const items = (Array.isArray(meeting.expenses) ? meeting.expenses : [])
         .filter(expense => Number.isFinite(Number(expense.amount)) && Number(expense.amount) !== 0)
@@ -17788,22 +17857,33 @@ function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {
       return { meeting, items, expenseTotal, incomeTotal, net: incomeTotal - expenseTotal };
     })
     .filter(row => row.items.length > 0);
+
   const allItems = rows.flatMap(row => row.items.map(item => ({ ...item, date: row.meeting.date, meetingNote: row.meeting.note || '' })));
   const incomeItems = allItems.filter(item => item.isIncome);
   const expenseItems = allItems.filter(item => !item.isIncome);
-  const totalIncome = baseBudget + incomeItems.reduce((sum, item) => sum + Math.abs(item.amount), 0);
-  const totalExpense = expenseItems.reduce((sum, item) => sum + Math.abs(item.amount), 0);
-  const balance = totalIncome - totalExpense;
+
+  const displayIncome = activeTab === 'total'
+    ? allTimeIncome
+    : incomeItems.reduce((sum, item) => sum + Math.abs(item.amount), 0);
+
+  const displayExpense = activeTab === 'total'
+    ? allTimeExpense
+    : expenseItems.reduce((sum, item) => sum + Math.abs(item.amount), 0);
+
+  const displayBalance = overallBalance;
+
   const categoryTotals = categories.map(category => ({
     category,
-    total: expenseItems.filter(item => item.category.id === category.id).reduce((sum, item) => sum + Math.abs(item.amount), 0),
-    count: expenseItems.filter(item => item.category.id === category.id).length
+    total: allTimeItems.filter(item => item.category.id === category.id).reduce((sum, item) => sum + Math.abs(item.amount), 0),
+    count: allTimeItems.filter(item => item.category.id === category.id).length
   })).filter(item => item.total > 0 || item.count > 0);
+
   const metricCards = [
-    { label: '총 수입', value: totalIncome, color: '#16A34A', icon: React.createElement(BanknoteArrowUpIcon, { size: 16 }) },
-    { label: '총 지출', value: totalExpense, color: '#DC2626', icon: React.createElement(BanknoteArrowDownIcon, { size: 16 }) },
-    { label: '현재 잔액', value: balance, color: 'var(--text-main)', icon: React.createElement(PiggyBankIcon, { size: 16 }) }
+    { label: '총 수입', value: displayIncome, color: '#16A34A', icon: React.createElement(BanknoteArrowUpIcon, { size: 16 }) },
+    { label: '총 지출', value: displayExpense, color: '#DC2626', icon: React.createElement(BanknoteArrowDownIcon, { size: 16 }) },
+    { label: '현재 잔액', value: displayBalance, color: 'var(--text-main)', icon: React.createElement(PiggyBankIcon, { size: 16 }) }
   ];
+
   const categoryBadge = category => /*#__PURE__*/React.createElement("span", {
     style: {
       display: 'inline-flex',
@@ -17820,6 +17900,7 @@ function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {
   }, /*#__PURE__*/React.createElement("span", {
     style: { width: '7px', height: '7px', borderRadius: '50%', backgroundColor: category.color }
   }), category.name);
+
   const renderItemRow = (item, showDate = false) => /*#__PURE__*/React.createElement("div", {
     key: item.id || `${item.date}_${item.createdAt}_${item.amount}`,
     onClick: () => onSelectDate && onSelectDate(item.date),
@@ -17854,9 +17935,11 @@ function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {
     },
     onClick: e => { e.stopPropagation(); window.open(item.url, '_blank', 'noopener,noreferrer'); }
   }, item.url));
+
   const emptyContent = /*#__PURE__*/React.createElement("div", {
     style: { padding: '30px 12px', color: '#94A3B8', fontSize: '0.88rem', textAlign: 'center' }
   }, "등록된 정산 내역이 없습니다.");
+
   const totalContent = /*#__PURE__*/React.createElement("div", {
     style: { display: 'flex', flexDirection: 'column', gap: '12px' }
   }, /*#__PURE__*/React.createElement("section", {
@@ -17871,7 +17954,7 @@ function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {
   }, categoryBadge(item.category), /*#__PURE__*/React.createElement("div", {
     style: { height: '8px', borderRadius: '999px', background: '#E2E8F0', overflow: 'hidden' }
   }, /*#__PURE__*/React.createElement("div", {
-    style: { width: `${totalExpense ? Math.max(4, item.total / totalExpense * 100) : 0}%`, height: '100%', background: item.category.color, borderRadius: '999px' }
+    style: { width: `${allTimeExpense ? Math.max(4, item.total / allTimeExpense * 100) : 0}%`, height: '100%', background: item.category.color, borderRadius: '999px' }
   })), /*#__PURE__*/React.createElement("strong", {
     style: { fontSize: '0.8rem', color: 'var(--text-main)', whiteSpace: 'nowrap' }
   }, item.total.toLocaleString(), "원")))), /*#__PURE__*/React.createElement("section", {
@@ -17886,8 +17969,13 @@ function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {
     className: "registered-at-text"
   }, "어드민에서 설정한 누적 잔액")), /*#__PURE__*/React.createElement("strong", {
     style: { color: '#16A34A', whiteSpace: 'nowrap' }
-  }, "+", baseBudget.toLocaleString(), "원")), allItems.map(item => renderItemRow(item, true))));
-  const dailyContent = /*#__PURE__*/React.createElement("div", {
+  }, "+", baseBudget.toLocaleString(), "원")), allTimeItems.map(item => renderItemRow(item, true))));
+
+  const monthEmptyContent = /*#__PURE__*/React.createElement("div", {
+    style: { padding: '40px 12px', color: 'var(--text-muted)', fontSize: '0.88rem', textAlign: 'center' }
+  }, `${year}년 ${month + 1}월 정산 내역이 없습니다.`);
+
+  const dailyContent = rows.length === 0 ? monthEmptyContent : /*#__PURE__*/React.createElement("div", {
     style: { display: 'flex', flexDirection: 'column', gap: '10px' }
   }, rows.map(row => /*#__PURE__*/React.createElement("section", {
     key: row.meeting.date,
@@ -17901,7 +17989,8 @@ function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {
   }, row.net >= 0 ? '+' : '-', Math.abs(row.net).toLocaleString(), "원")), /*#__PURE__*/React.createElement("div", {
     style: { display: 'flex', flexDirection: 'column', gap: '8px' }
   }, row.items.map(item => renderItemRow({ ...item, date: row.meeting.date }, false))))));
-  const bodyContent = allItems.length === 0 && baseBudget === 0 ? emptyContent : activeTab === 'total' ? totalContent : dailyContent;
+
+  const bodyContent = allTimeItems.length === 0 && baseBudget === 0 ? emptyContent : activeTab === 'total' ? totalContent : dailyContent;
 
   return /*#__PURE__*/React.createElement("div", {
     className: "settlement-page-container",
@@ -17929,9 +18018,9 @@ function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {
     viewBox: "0 0 24 24",
     fill: "none",
     stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
+    strokeWidth: "2",
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
     style: { transform: 'rotate(90deg)', display: 'inline-block' }
   }, /*#__PURE__*/React.createElement("path", {
     stroke: "none",
@@ -17958,7 +18047,7 @@ function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {
     className: "settlement-metric-card-value",
     style: { color: card.color }
   }, card.value.toLocaleString(), "원")))), /*#__PURE__*/React.createElement("div", {
-    style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', padding: '4px', borderRadius: '14px', background: 'var(--bg-primary)', border: '1px solid var(--border-subtle)' }
+    style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', padding: '4px', borderRadius: '14px', background: 'var(--bg-primary)', border: '1px solid var(--border-subtle)', flexShrink: 0 }
   }, [['total', '누적보기'], ['daily', '일자별보기']].map(tab => /*#__PURE__*/React.createElement("button", {
     key: tab[0],
     type: "button",
@@ -17972,10 +18061,175 @@ function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {
       fontWeight: 900,
       cursor: 'pointer'
     }
-  }, tab[1]))), bodyContent));
-}
-
-function SunIcon() {
+  }, tab[1]))), 
+  activeTab === 'daily' && /*#__PURE__*/React.createElement("div", {
+    className: "calendar-nav",
+    style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '6px', marginBottom: '2px', flexShrink: 0 }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "month-display",
+    style: {
+      cursor: 'pointer',
+      userSelect: 'none',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '6px'
+    },
+    onClick: handleOpenPicker,
+    title: "클릭하여 년월 이동"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "month-display-year-full"
+  }, `${year}년 `), /*#__PURE__*/React.createElement("span", {
+    className: "month-display-year-short"
+  }, `${String(year).slice(2)}년 `), `${month + 1}월`, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: '#94A3B8',
+      display: 'inline-flex',
+      alignItems: 'center'
+    }
+  }, /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: "24",
+    height: "24",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: "2",
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+    className: "icon icon-tabler icons-tabler-outline icon-tabler-chevron-down"
+  }, /*#__PURE__*/React.createElement("path", {
+    stroke: "none",
+    d: "M0 0h24v24H0z",
+    fill: "none"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M6 9l6 6l6 -6"
+  })))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: '6px'
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "btn btn-secondary calendar-month-nav-btn",
+    title: "이전달",
+    "aria-label": "이전달",
+    style: { padding: '8px' },
+    onClick: onPrevMonth
+  }, /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: "20",
+    height: "20",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: "2",
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+    style: { transform: 'rotate(90deg)' },
+    className: "icon icon-tabler icons-tabler-outline icon-tabler-chevron-down"
+  }, /*#__PURE__*/React.createElement("path", {
+    stroke: "none",
+    d: "M0 0h24v24H0z",
+    fill: "none"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M6 9l6 6l6 -6"
+  }))), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "btn btn-secondary calendar-month-nav-btn",
+    title: "오늘",
+    "aria-label": "오늘",
+    style: { padding: '8px' },
+    onClick: onToday
+  }, /*#__PURE__*/React.createElement(CalendarCheckIcon, null)), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "btn btn-secondary calendar-month-nav-btn",
+    title: "다음달",
+    "aria-label": "다음달",
+    style: { padding: '8px' },
+    onClick: onNextMonth
+  }, /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: "20",
+    height: "20",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: "2",
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+    style: { transform: 'rotate(-90deg)' },
+    className: "icon icon-tabler icons-tabler-outline icon-tabler-chevron-down"
+  }, /*#__PURE__*/React.createElement("path", {
+    stroke: "none",
+    d: "M0 0h24v24H0z",
+    fill: "none"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M6 9l6 6l6 -6"
+  }))))),
+  bodyContent,
+  (() => {
+    const sheet = isPickerOpen && /*#__PURE__*/React.createElement("div", {
+      className: "bottom-sheet-overlay",
+      onClick: () => setIsPickerOpen(false),
+      style: { zIndex: 12000 }
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "bottom-sheet",
+      onClick: e => e.stopPropagation()
+    },
+      /*#__PURE__*/React.createElement("div", { className: "bottom-sheet-header" },
+        /*#__PURE__*/React.createElement("h4", null, "연월 선택"),
+        /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          style: { background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer' },
+          onClick: () => setIsPickerOpen(false)
+        }, "✕")
+      ),
+      /*#__PURE__*/React.createElement("div", { className: "bottom-sheet-body" },
+        /*#__PURE__*/React.createElement("div", { style: { marginBottom: '16px' } },
+          /*#__PURE__*/React.createElement("label", {
+            style: { fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '8px' }
+          }, "년도"),
+          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '10px' } },
+            /*#__PURE__*/React.createElement("button", {
+              type: "button", className: "btn btn-secondary", style: { padding: '4px 10px', fontSize: '0.85rem' },
+              onClick: () => setPickerYear(y => y - 1)
+            }, "◀"),
+            /*#__PURE__*/React.createElement("span", {
+              style: { fontWeight: 800, fontSize: '1.1rem', minWidth: '60px', textAlign: 'center' }
+            }, pickerYear, "년"),
+            /*#__PURE__*/React.createElement("button", {
+              type: "button", className: "btn btn-secondary", style: { padding: '4px 10px', fontSize: '0.85rem' },
+              onClick: () => setPickerYear(y => y + 1)
+            }, "▶")
+          )
+        ),
+        /*#__PURE__*/React.createElement("div", { style: { marginBottom: '16px' } },
+          /*#__PURE__*/React.createElement("label", {
+            style: { fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '8px' }
+          }, "월"),
+          /*#__PURE__*/React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' } },
+            monthNames.map((name, idx) => /*#__PURE__*/React.createElement("button", {
+              key: idx, type: "button", onClick: () => setPickerMonth(idx),
+              style: {
+                padding: '6px 4px', borderRadius: '8px',
+                border: pickerMonth === idx ? '2px solid var(--accent-primary)' : '1px solid var(--border-subtle)',
+                background: pickerMonth === idx ? 'rgba(99, 102, 241, 0.15)' : 'var(--bg-card)',
+                color: pickerMonth === idx ? 'var(--accent-primary)' : 'var(--text-main)',
+                fontWeight: pickerMonth === idx ? 800 : 500, fontSize: '0.82rem', cursor: 'pointer'
+              }
+            }, name))
+          )
+        ),
+        /*#__PURE__*/React.createElement("button", {
+          type: "button", className: "btn btn-primary", style: { width: '100%' },
+          onClick: handlePickerApply
+        }, pickerYear, "년 ", pickerMonth + 1, "월로 이동")
+      )
+    ));
+    return sheet && typeof document !== 'undefined' && ReactDOM.createPortal ? ReactDOM.createPortal(sheet, document.body) : sheet;
+  })()
+  ));
+}function SunIcon() {
   return /*#__PURE__*/React.createElement("svg", {
     xmlns: "http://www.w3.org/2000/svg",
     width: "24",
