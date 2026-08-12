@@ -109,6 +109,11 @@ service cloud.firestore {
         allow read, write: if isCalendarDoc(calendarDocId);
       }
 
+      // Collaborative anniversaries (Yearly repeating solar/lunar events & D-days).
+      match /anniversaries/{anniversaryId} {
+        allow read, write: if isCalendarDoc(calendarDocId);
+      }
+
       // Activity log audit trail. Used to embed as a growing array on the calendar document
       // itself, which had no de-duplication and was the single biggest long-term threat to the
       // document's 1MiB size limit -- moved to its own subcollection (one document per entry,

@@ -93,6 +93,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/korean-lunar-calendar/dist/korean-lunar-calendar.min.js"></script>
 
   <!-- Firebase SDK for Realtime Multi-User Firestore Sync -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -4766,6 +4767,23 @@ async function fetchMemosRest(calId) {
   }
 }
 
+async function fetchAnniversariesRest(calId) {
+  try {
+    const url = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/calendars/cal_${calId}/anniversaries?orderBy=createdAt%20desc`;
+    const res = await fetch(url);
+    if (!res.ok) return [];
+    const data = await res.json();
+    const docs = data.documents || [];
+    return docs.map(doc => ({
+      id: doc.name.split('/').pop(),
+      ...firestoreDocumentToJs(doc)
+    }));
+  } catch (err) {
+    console.warn('fetchAnniversariesRest error:', err);
+    return [];
+  }
+}
+
 async function sendChatMessageRest(calId, message) {
   try {
     const url = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/calendars/cal_${calId}/messages`;
@@ -7996,6 +8014,7 @@ function App() {
   const [editingPoll, setEditingPoll] = React.useState(null);
   const [voteTarget, setVoteTarget] = React.useState(null);
   const [isGuideOpen, setIsGuideOpen] = React.useState(false);
+  const [isAnniversariesOpen, setIsAnniversariesOpen] = React.useState(false);
   const [isInitialDataLoading, setIsInitialDataLoading] = React.useState(() => Boolean(firebaseDb));
   const initialLoadOverlayTimerRef = React.useRef(null);
   const initialLoadOverlayIntervalRef = React.useRef(null);
@@ -8062,6 +8081,7 @@ function App() {
   const [recentMessages, setRecentMessages] = React.useState([]);
   const [chatMessages, setChatMessages] = React.useState([]);
   const [memos, setMemos] = React.useState([]);
+  const [anniversaries, setAnniversaries] = React.useState([]);
   const [chatInput, setChatInput] = React.useState('');
   const [chatParticipantId, setChatParticipantId] = React.useState('');
   const chatParticipantIdRef = React.useRef(chatParticipantId);
@@ -8389,11 +8409,28 @@ function App() {
         });
       });
 
+    const unsubscribeAnniversaries = firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('anniversaries')
+      .orderBy('createdAt', 'desc')
+      .onSnapshot(snapshot => {
+        if (!isMounted) return;
+        const list = [];
+        snapshot.forEach(doc => {
+          list.push({ id: doc.id, ...doc.data() });
+        });
+        setAnniversaries(list);
+      }, err => {
+        console.warn(`Firestore anniversaries subscription error:`, err);
+        fetchAnniversariesRest(activeCalId).then(list => {
+          if (isMounted) setAnniversaries(list);
+        });
+      });
+
     return () => {
       isMounted = false;
       if (unsubscribeRecent) unsubscribeRecent();
       if (unsubscribeChat) unsubscribeChat();
       if (unsubscribeMemos) unsubscribeMemos();
+      if (unsubscribeAnniversaries) unsubscribeAnniversaries();
     };
   }, [activeCalId]);
 
@@ -9624,6 +9661,10 @@ function App() {
       setIsMainSideMenuOpen(false);
       if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 설정을 수정해 주세요.')) setIsAdminOpen(true);
     },
+    onOpenAnniversaries: () => {
+      setIsMainSideMenuOpen(false);
+      if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 기념일 설정을 수정해 주세요.')) setIsAnniversariesOpen(true);
+    },
     onOpenShare: () => {
       setIsMainSideMenuOpen(false);
       if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 공유 정보를 확인해 주세요.')) setIsShareOpen(true);
@@ -9643,6 +9684,14 @@ function App() {
   }), isGuideOpen && /*#__PURE__*/React.createElement(UserManualOverlay, {
     calendar: activeCal,
     onClose: () => setIsGuideOpen(false)
+  }), isAnniversariesOpen && /*#__PURE__*/React.createElement(AnniversaryModal, {
+    calendar: activeCal,
+    anniversaries: anniversaries,
+    onClose: () => setIsAnniversariesOpen(false),
+    showToast: showToast,
+    onRequestConfirm: showConfirmDialog,
+    onBulkRegister: handleBulkRegisterAvailability,
+    isDarkTheme: isDarkTheme
   }), /*#__PURE__*/React.createElement("div", {
     ref: calendarSectionRef
   }, visibleConfirmedMeetings.length > 0 && /*#__PURE__*/React.createElement("div", {
@@ -9688,7 +9737,7 @@ function App() {
       }, noteTextOnly);
     })));
   })), /*#__PURE__*/React.createElement(CalendarGrid, {
-
+    anniversaries: anniversaries,
     calendar: activeCal,
     isLoading: isInitialDataLoading,
     monthDate: currentMonthDate,
@@ -9759,6 +9808,7 @@ function App() {
     onSaveImageTags: handleSaveImageTags,
     onSearchTag: handleSearchTag
   }), isModalOpen && /*#__PURE__*/React.createElement(DateModal, {
+    anniversaries: anniversaries,
     dateStr: selectedDate,
     calendar: activeCal,
     onSave: handleSaveAvailability,
@@ -9789,6 +9839,7 @@ function App() {
     onClose: () => setEditingMessage(null),
     showToast: showToast
   }), isAdminOpen && /*#__PURE__*/React.createElement(AdminModal, {
+    anniversaries: anniversaries,
     calendar: { ...activeCal, activityLogs: unionActivityLogs(activeCal, adminActivityLogs) },
     allCalendars: calendars,
     onSelectCalendar: handleSelectCalendar,
@@ -10468,7 +10519,37 @@ function CalendarGrid({
         alignItems: 'center',
         gap: '4px'
       }
-    }, /*#__PURE__*/React.createElement("div", {
+    },
+      /* Anniversaries list overlay inside day cell */
+      cellAnns.length > 0 && /*#__PURE__*/React.createElement("div", {
+        className: "anniversaries-container",
+        style: {
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '2px',
+          width: '100%',
+          margin: '2px 0 4px',
+          pointerEvents: 'none'
+        }
+      }, cellAnns.map((ann, aIdx) => /*#__PURE__*/React.createElement("div", {
+        key: ann.id || aIdx,
+        style: {
+          fontSize: '0.66rem',
+          fontWeight: 'bold',
+          color: ann.badgeColor,
+          backgroundColor: `${ann.badgeColor}15`,
+          borderLeft: `2px solid ${ann.badgeColor}`,
+          padding: '1px 4px',
+          borderRadius: '3px',
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '2px'
+        }
+      }, ann.icon, " ", ann.title))),
+ /*#__PURE__*/React.createElement("div", {
       style: {
         display: 'flex',
         alignItems: 'center',
@@ -14726,6 +14807,7 @@ function EditMessageModal({
 
 
 function DateModal({
+  anniversaries = [],
   dateStr,
   calendar,
   adminMode = false,
@@ -14747,6 +14829,7 @@ function DateModal({
   const noteInputRef = React.useRef(null);
   const activeParticipants = getActiveParticipants(calendar);
   const dateEntries = getActiveAvailabilities(calendar).filter(e => e.date === dateStr);
+  const dateAnns = getAnniversariesForDate(dateStr, anniversaries);
   const getExistingNoteForParticipant = id => (dateEntries.find(entry => entry.participantId === id)?.note || '');
   React.useEffect(() => {
     setParticipantId('');
@@ -15257,7 +15340,28 @@ function DateModal({
     onSubmit: handleSubmit
   }, /*#__PURE__*/React.createElement("div", {
     className: "modal-body"
-  }, !adminMode && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+  },
+    /* Anniversaries banner list inside DateModal body */
+    dateAnns.length > 0 && /*#__PURE__*/React.createElement("div", {
+      style: { display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '14px' }
+    }, dateAnns.map((ann, aIdx) => /*#__PURE__*/React.createElement("div", {
+      key: ann.id || aIdx,
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+        padding: '10px 14px',
+        backgroundColor: `${ann.badgeColor}12`,
+        color: ann.badgeColor,
+        border: `1px solid ${ann.badgeColor}30`,
+        borderLeft: `4px solid ${ann.badgeColor}`,
+        borderRadius: '8px',
+        fontSize: '0.82rem',
+        fontWeight: 'bold'
+      }
+    }, ann.icon, " ", ann.title))),
+
+    !adminMode && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
     style: {
       display: 'block',
       fontSize: '0.85rem',
@@ -16016,6 +16120,7 @@ function SimpleBottomSheetPicker({ title, value, options, onSelect, placeholder,
 }
 
 function AdminModal({
+  anniversaries = [],
   calendar,
   allCalendars,
   onSelectCalendar,
@@ -16101,59 +16206,7 @@ function AdminModal({
   const [title, setTitle] = React.useState(calendar.title);
   const [description, setDescription] = React.useState(calendar.description || '');
   const [participants, setParticipants] = React.useState(getActiveParticipants(calendar));
-  const [recurringParticipantId, setRecurringParticipantId] = React.useState('');
-  const [recurringWeekday, setRecurringWeekday] = React.useState(1);
-  const [recurringNote, setRecurringNote] = React.useState('');
-  const [isRecurringSubmitting, setIsRecurringSubmitting] = React.useState(false);
-  const RECURRING_WEEKS_AHEAD = 8;
-  const formatDateInputValue = d => {
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${y}-${m}-${day}`;
-  };
-  const [recurringStartDate, setRecurringStartDate] = React.useState(() => formatDateInputValue(new Date()));
-  const [recurringEndDate, setRecurringEndDate] = React.useState(() => {
-    const d = new Date();
-    d.setDate(d.getDate() + RECURRING_WEEKS_AHEAD * 7);
-    return formatDateInputValue(d);
-  });
-  // Hard cap on how many dates a single bulk-apply can generate, independent of how far apart
-  // the user sets start/end -- protects against an accidental multi-year range silently trying
-  // to register hundreds of availabilities in one save.
-  const RECURRING_MAX_DATES = 104;
-  const handleApplyRecurringTemplate = async () => {
-    if (isRecurringSubmitting || !onBulkRegister) return;
-    if (!recurringParticipantId) {
-      if (showToast) showToast('참여자를 선택해 주세요', 'error');
-      return;
-    }
-    const start = new Date(`${recurringStartDate}T00:00:00`);
-    const end = new Date(`${recurringEndDate}T00:00:00`);
-    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start > end) {
-      if (showToast) showToast('시작일자가 종료일자보다 늦습니다', 'error');
-      return;
-    }
-    const dates = [];
-    const cursor = new Date(start);
-    while (cursor <= end && dates.length < RECURRING_MAX_DATES) {
-      if (cursor.getDay() === recurringWeekday) {
-        dates.push(formatDateInputValue(cursor));
-      }
-      cursor.setDate(cursor.getDate() + 1);
-    }
-    if (dates.length === 0) {
-      if (showToast) showToast('선택한 기간에 해당 요일이 없습니다', 'error');
-      return;
-    }
-    setIsRecurringSubmitting(true);
-    try {
-      await Promise.resolve(onBulkRegister(recurringParticipantId, dates, recurringNote));
-    } catch (err) {
-      console.error('Recurring template apply failed:', err);
-    }
-    setIsRecurringSubmitting(false);
-  };
+
   const [newName, setNewName] = React.useState('');
   const newNameInputRef = React.useRef(null);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
@@ -16811,6 +16864,7 @@ function AdminModal({
       style: { flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', padding: '0 20px 20px' }
     },
       /*#__PURE__*/React.createElement(CalendarGrid, {
+        anniversaries: anniversaries,
         calendar: calendar,
         isLoading: false,
         monthDate: adminCalMonthDate,
@@ -16822,73 +16876,10 @@ function AdminModal({
         compact: true
       }),
 
-      /* Recurring weekly schedule template -- bulk-register one participant's availability
-         across a chosen weekday within a start/end date range in a single save. */
-      /*#__PURE__*/React.createElement("div", {
-        style: { border: '1px solid var(--border-subtle)', borderRadius: '12px', padding: '16px', backgroundColor: 'var(--bg-card)', marginTop: '16px' }
-      },
-        /*#__PURE__*/React.createElement("h4", { style: { fontSize: '0.92rem', fontWeight: 800, color: 'var(--text-main)', margin: '0 0 14px 0', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(HourglassIcon, null), "반복 일정 등록"),
-        /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '12px' } },
-          "매주 반복되는 요일과 시작/종료 일자를 선택하면 해당 기간 내 그 요일에 한 번에 일정을 등록합니다."
-        ),
-        /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px', marginBottom: '10px', flexWrap: 'wrap' } },
-          /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
-            title: "참여자 선택",
-            placeholder: "참여자 선택",
-            value: recurringParticipantId,
-            disabled: isRecurringSubmitting,
-            onSelect: setRecurringParticipantId,
-            options: participants.map(p => ({ value: p.id, label: p.name })),
-            style: { flex: '1 1 140px' }
-          }),
-          /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
-            title: "요일 선택",
-            placeholder: "요일 선택",
-            value: recurringWeekday,
-            disabled: isRecurringSubmitting,
-            onSelect: v => setRecurringWeekday(Number(v)),
-            options: ['일', '월', '화', '수', '목', '금', '토'].map((label, idx) => ({ value: idx, label: `매주 ${label}요일` })),
-            style: { flex: '1 1 100px' }
-          })
-        ),
-        /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px', marginBottom: '10px', flexWrap: 'wrap' } },
-          /*#__PURE__*/React.createElement("div", { style: { flex: '1 1 140px' } },
-            /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.76rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '4px' } }, "시작일자"),
-            /*#__PURE__*/React.createElement(DeadlineDateTimePicker, {
-              value: `${recurringStartDate}T00:00`,
-              disabled: isRecurringSubmitting,
-              onChange: v => setRecurringStartDate(v.slice(0, 10))
-            })
-          ),
-          /*#__PURE__*/React.createElement("div", { style: { flex: '1 1 140px' } },
-            /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.76rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '4px' } }, "종료일자"),
-            /*#__PURE__*/React.createElement(DeadlineDateTimePicker, {
-              value: `${recurringEndDate}T00:00`,
-              disabled: isRecurringSubmitting,
-              onChange: v => setRecurringEndDate(v.slice(0, 10))
-            })
-          )
-        ),
-        /*#__PURE__*/React.createElement("input", {
-          type: "text",
-          className: "form-input",
-          style: { width: '100%', marginBottom: '10px' },
-          placeholder: "메모 (선택)",
-          maxLength: 120,
-          disabled: isRecurringSubmitting,
-          value: recurringNote,
-          onChange: e => setRecurringNote(e.target.value)
-        }),
-        /*#__PURE__*/React.createElement("button", {
-          type: "button",
-          className: "btn btn-primary",
-          style: { width: '100%', justifyContent: 'center' },
-          disabled: isRecurringSubmitting,
-          onClick: handleApplyRecurringTemplate
-        }, isRecurringSubmitting ? "등록 중..." : "일괄 등록")
-      ),
+
 
       adminSelectedDate && /*#__PURE__*/React.createElement(DateModal, {
+        anniversaries: anniversaries,
         dateStr: adminSelectedDate,
         calendar: calendar,
         adminMode: true,
@@ -17610,6 +17601,7 @@ function MainSideMenu({
   onClose,
   onOpenManual,
   onOpenSettings,
+  onOpenAnniversaries,
   onOpenShare,
   onCreateShortcut,
   onOpenAdmin,
@@ -17667,6 +17659,17 @@ function MainSideMenu({
         /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
           /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "캘린더 설정"),
           /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "이름, 설명, 참여자 관리")
+        )
+      ),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "admin-side-menu-item",
+        onClick: () => handle(onOpenAnniversaries)
+      },
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement(GiftIcon, null)),
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "기념일 설정"),
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "매년 반복, 음양력, 디데이 관리")
         )
       ),
       /*#__PURE__*/React.createElement("button", {
@@ -19111,6 +19114,672 @@ function uploadMemoImageAssets(calendarId, compressed, index, onBytes, timeoutMs
       }
     });
   });
+}
+
+
+
+function getAnniversariesForDate(dateStr, anniversariesList) {
+  if (!dateStr || !Array.isArray(anniversariesList)) return [];
+  const [y, m, d] = dateStr.split('-').map(Number);
+  
+  const results = [];
+  anniversariesList.forEach(ann => {
+    if (ann.type === 'yearly') {
+      if (ann.isLunar) {
+        try {
+          const cal = new KoreanLunarCalendar();
+          const [lunarM, lunarD] = ann.date.split('-').map(Number);
+          cal.setLunarDate(y, lunarM, lunarD, !!ann.isLeap);
+          const solar = cal.getSolarCalendar();
+          if (solar && solar.year === y && solar.month === m && solar.day === d) {
+            results.push({
+              id: ann.id,
+              title: `${ann.title} (음)`,
+              badgeColor: '#EF4444',
+              icon: '🎂'
+            });
+          }
+        } catch (e) {
+          console.warn('Lunar date calculation failed for', ann.title, e);
+        }
+      } else {
+        const [solarM, solarD] = ann.date.split('-').map(Number);
+        if (solarM === m && solarD === d) {
+          results.push({
+            id: ann.id,
+            title: `${ann.title}`,
+            badgeColor: '#EF4444',
+            icon: '🎂'
+          });
+        }
+      }
+    } else if (ann.type === 'dday') {
+      const targetStr = ann.targetDate;
+      if (targetStr === dateStr) {
+        results.push({
+          id: ann.id,
+          title: `${ann.title} (D-Day)`,
+          badgeColor: '#3B82F6',
+          icon: '🎁'
+        });
+      } else {
+        const tDate = new Date(`${targetStr}T00:00:00`);
+        const cDate = new Date(`${dateStr}T00:00:00`);
+        const diffMs = cDate.getTime() - tDate.getTime();
+        const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+        
+        if (ann.isCountDown) {
+          if (diffDays < 0) {
+            const daysLeft = Math.abs(diffDays);
+            if (daysLeft === 100 || daysLeft === 50 || daysLeft === 10 || daysLeft === 30) {
+              results.push({
+                id: ann.id,
+                title: `${ann.title} D-${daysLeft}`,
+                badgeColor: '#6366F1',
+                icon: '📅'
+              });
+            }
+          }
+        } else {
+          if (diffDays === 99) {
+            results.push({
+              id: ann.id,
+              title: `${ann.title} 100일`,
+              badgeColor: '#EC4899',
+              icon: '💖'
+            });
+          } else if (diffDays === 199) {
+            results.push({
+              id: ann.id,
+              title: `${ann.title} 200일`,
+              badgeColor: '#EC4899',
+              icon: '💖'
+            });
+          } else if (diffDays === 299) {
+            results.push({
+              id: ann.id,
+              title: `${ann.title} 300일`,
+              badgeColor: '#EC4899',
+              icon: '💖'
+            });
+          } else if (diffDays === 364) {
+            results.push({
+              id: ann.id,
+              title: `${ann.title} 1주년`,
+              badgeColor: '#EC4899',
+              icon: '🎉'
+            });
+          } else if (diffDays > 0 && diffDays % 365 === 364) {
+            const years = Math.round((diffDays + 1) / 365);
+            results.push({
+              id: ann.id,
+              title: `${ann.title} ${years}주년`,
+              badgeColor: '#EC4899',
+              icon: '🎉'
+            });
+          }
+        }
+      }
+    }
+  });
+  return results;
+}
+
+
+function AnniversaryModal({
+  calendar,
+  anniversaries,
+  onClose,
+  showToast,
+  onRequestConfirm,
+  onBulkRegister,
+  isDarkTheme
+}) {
+  const [activeTab, setActiveTab] = React.useState('list'); // 'list', 'add', 'bulk'
+  
+  // Add Anniversary form states
+  const [newTitle, setNewTitle] = React.useState('');
+  const [newType, setNewType] = React.useState('yearly'); // 'yearly', 'dday'
+  // Yearly options
+  const [yearlyMonth, setYearlyMonth] = React.useState(1);
+  const [yearlyDay, setYearlyDay] = React.useState(1);
+  const [isLunar, setIsLunar] = React.useState(false);
+  const [isLeap, setIsLeap] = React.useState(false);
+  // D-Day options
+  const [targetDate, setTargetDate] = React.useState(() => {
+    const today = new Date();
+    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  });
+  const [ddayMode, setDdayMode] = React.useState('countdown'); // 'countdown', 'milestone'
+
+  // Migrated bulk register availability states
+  const [bulkParticipantId, setBulkParticipantId] = React.useState('');
+  const [bulkWeekday, setBulkWeekday] = React.useState(1);
+  const [bulkNote, setBulkNote] = React.useState('');
+  const [isBulkSubmitting, setIsBulkSubmitting] = React.useState(false);
+  const [bulkStartDate, setBulkStartDate] = React.useState(() => {
+    const today = new Date();
+    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  });
+  const [bulkEndDate, setBulkEndDate] = React.useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 56); // 8 weeks ahead
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  });
+
+  const participants = getActiveParticipants(calendar);
+
+  // Years option range
+  const months = Array.from({ length: 12 }, (_, i) => i + 1);
+  const days = Array.from({ length: 31 }, (_, i) => i + 1);
+
+  const handleSaveAnniversary = async () => {
+    if (!newTitle.trim()) {
+      showToast('기념일 제목을 입력해 주세요.', 'error');
+      return;
+    }
+
+    try {
+      const stamp = Date.now();
+      const anniversaryId = 'anniversary_' + stamp + '_' + Math.random().toString(36).slice(2, 8);
+      const calendarId = calendar.id;
+
+      let annData = {
+        id: anniversaryId,
+        calendarId,
+        title: newTitle.trim(),
+        type: newType,
+        createdAt: stamp,
+        updatedAt: stamp
+      };
+
+      if (newType === 'yearly') {
+        annData.date = `${String(yearlyMonth).padStart(2, '0')}-${String(yearlyDay).padStart(2, '0')}`;
+        annData.isLunar = isLunar;
+        annData.isLeap = isLunar ? isLeap : false;
+      } else {
+        annData.targetDate = targetDate;
+        annData.isCountDown = ddayMode === 'countdown';
+      }
+
+      await firebaseDb.collection('calendars').doc('cal_' + calendarId).collection('anniversaries').doc(anniversaryId).set(annData);
+      showToast('기념일이 등록되었습니다.', 'success');
+      
+      // Reset form
+      setNewTitle('');
+      setIsLunar(false);
+      setIsLeap(false);
+      setActiveTab('list');
+    } catch (err) {
+      console.error('Anniversary save error:', err);
+      showToast('기념일 저장 실패', 'error');
+    }
+  };
+
+  const handleDeleteAnniversary = (ann) => {
+    onRequestConfirm('기념일 삭제', `"${ann.title}" 기념일을 삭제하시겠습니까?`, async () => {
+      try {
+        const calendarId = calendar.id;
+        await firebaseDb.collection('calendars').doc('cal_' + calendarId).collection('anniversaries').doc(ann.id).delete();
+        showToast('기념일이 삭제되었습니다.', 'success');
+      } catch (err) {
+        console.error('Anniversary delete error:', err);
+        showToast('기념일 삭제 실패', 'error');
+      }
+    });
+  };
+
+  const handleApplyBulkRegister = async () => {
+    if (isBulkSubmitting || !onBulkRegister) return;
+    if (!bulkParticipantId) {
+      showToast('참여자를 선택해 주세요.', 'error');
+      return;
+    }
+    const start = new Date(`${bulkStartDate}T00:00:00`);
+    const end = new Date(`${bulkEndDate}T00:00:00`);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start > end) {
+      showToast('시작일자가 종료일자보다 늦습니다.', 'error');
+      return;
+    }
+
+    const dates = [];
+    const cursor = new Date(start);
+    const maxLimit = 104; // Hard cap
+    while (cursor <= end && dates.length < maxLimit) {
+      if (cursor.getDay() === bulkWeekday) {
+        const y = cursor.getFullYear();
+        const m = String(cursor.getMonth() + 1).padStart(2, '0');
+        const d = String(cursor.getDate()).padStart(2, '0');
+        dates.push(`${y}-${m}-${d}`);
+      }
+      cursor.setDate(cursor.getDate() + 1);
+    }
+
+    if (dates.length === 0) {
+      showToast('선택한 기간에 해당 요일이 없습니다.', 'error');
+      return;
+    }
+
+    setIsBulkSubmitting(true);
+    try {
+      await Promise.resolve(onBulkRegister(bulkParticipantId, dates, bulkNote));
+      showToast('반복 일정이 일괄 등록되었습니다.', 'success');
+      setBulkNote('');
+    } catch (err) {
+      console.error('Bulk register error:', err);
+      showToast('반복 일정 일괄 등록 실패', 'error');
+    }
+    setIsBulkSubmitting(false);
+  };
+
+  const getYearlyDisplay = (ann) => {
+    const [m, d] = ann.date.split('-').map(Number);
+    let str = `매년 ${m}월 ${d}일`;
+    if (ann.isLunar) {
+      str += ' (음력';
+      if (ann.isLeap) str += ', 윤달';
+      str += ')';
+      // Calculate current solar match
+      try {
+        const curYear = new Date().getFullYear();
+        const cal = new KoreanLunarCalendar();
+        cal.setLunarDate(curYear, m, d, !!ann.isLeap);
+        const solar = cal.getSolarCalendar();
+        str += ` → 올해 ${solar.month}/${solar.day}`;
+      } catch (e) {}
+    } else {
+      str += ' (양력)';
+    }
+    return str;
+  };
+
+  const getDdayDisplay = (ann) => {
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    const target = new Date(`${ann.targetDate}T00:00:00`);
+    target.setHours(0,0,0,0);
+    const diff = Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    
+    let str = `기준일: ${ann.targetDate}`;
+    if (ann.isCountDown) {
+      str += ' (카운트다운)';
+      if (diff === 0) str += ' → 오늘 D-Day';
+      else if (diff > 0) str += ` → D-${diff}`;
+      else str += ` → D+${Math.abs(diff)} (종료)`;
+    } else {
+      str += ' (일자수 기준)';
+      // 100th day is target + 99 days
+      const elapsed = diff <= 0 ? Math.abs(diff) + 1 : 0;
+      if (elapsed > 0) {
+        str += ` → 오늘 ${elapsed}일째`;
+      } else {
+        str += ` → 시작일 ${diff}일 전`;
+      }
+    }
+    return str;
+  };
+
+  const portalContent = /*#__PURE__*/React.createElement("div", {
+    className: "modal-overlay",
+    onClick: onClose,
+    style: { zIndex: 10040 } // Admin side panel matches overlay zIndex
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "modal-container",
+    onClick: e => e.stopPropagation(),
+    style: { width: 'min(480px, 95vw)' }
+  },
+    /* Modal Header */
+    /*#__PURE__*/React.createElement("div", {
+      className: "modal-header",
+      style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' }
+    },
+      /*#__PURE__*/React.createElement("h3", {
+        style: { fontSize: '1.05rem', fontWeight: 900, color: 'var(--text-main)', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }
+      }, /*#__PURE__*/React.createElement(HourglassIcon, null), "기념일 & 반복 일정 설정"),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: onClose,
+        style: { width: '30px', height: '30px', borderRadius: '50%', border: 'none', background: 'var(--border-subtle)', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }
+      }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 16 }))
+    ),
+
+    /* Modal Navigation Tabs */
+    /*#__PURE__*/React.createElement("div", {
+      style: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', borderBottom: '1px solid var(--border-subtle)' }
+    },
+      /* Tab list */
+      [['list', '기념일 목록'], ['add', '기념일 등록'], ['bulk', '반복 일정']].map(([id, label]) => /*#__PURE__*/React.createElement("button", {
+        key: id,
+        type: "button",
+        onClick: () => setActiveTab(id),
+        style: {
+          padding: '12px 6px',
+          border: 'none',
+          background: 'none',
+          fontSize: '0.82rem',
+          fontWeight: activeTab === id ? '900' : '600',
+          color: activeTab === id ? '#3B82F6' : 'var(--text-muted)',
+          borderBottom: activeTab === id ? '2px solid #3B82F6' : 'none',
+          cursor: 'pointer'
+        }
+      }, label))
+    ),
+
+    /* Modal Scrollable Body */
+    /*#__PURE__*/React.createElement("div", {
+      style: { padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px', maxHeight: '60vh', overflowY: 'auto' }
+    },
+      /* TAB 1: Anniversaries List */
+      activeTab === 'list' && /*#__PURE__*/React.createElement("div", {
+        style: { display: 'flex', flexDirection: 'column', gap: '10px' }
+      },
+        anniversaries.length === 0 ? 
+          /*#__PURE__*/React.createElement("div", {
+            style: { padding: '40px 10px', textColor: 'var(--text-muted)', fontSize: '0.82rem', textAlign: 'center' }
+          }, "등록된 기념일이 없습니다. 매년 돌아오는 생일이나 D-Day를 등록해 보세요. 🎂")
+        :
+          anniversaries.map(ann => /*#__PURE__*/React.createElement("div", {
+            key: ann.id,
+            style: {
+              padding: '10px 12px',
+              backgroundColor: 'var(--bg-primary)',
+              borderRadius: '10px',
+              border: '1px solid var(--border-subtle)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '8px'
+            }
+          },
+            /* Left: text details */
+            /*#__PURE__*/React.createElement("div", { style: { minWidth: 0 } },
+              /* Title & Badge */
+              /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px', flexWrap: 'wrap' } },
+                /* Icon */
+                /*#__PURE__*/React.createElement("span", null, ann.type === 'yearly' ? '🎂' : '🎁'),
+                /* Title */
+                /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.84rem', fontWeight: 'bold', color: 'var(--text-main)' } }, ann.title),
+                /* Type Badge */
+                /*#__PURE__*/React.createElement("span", {
+                  style: {
+                    fontSize: '0.66rem',
+                    fontWeight: 700,
+                    padding: '1px 5px',
+                    borderRadius: '4px',
+                    backgroundColor: ann.type === 'yearly' ? 'rgba(239, 68, 68, 0.08)' : 'rgba(59, 130, 246, 0.08)',
+                    color: ann.type === 'yearly' ? '#EF4444' : '#3B82F6'
+                  }
+                }, ann.type === 'yearly' ? '매년 반복' : '디데이')
+              ),
+              /* Details descriptor */
+              /*#__PURE__*/React.createElement("div", {
+                style: { fontSize: '0.74rem', color: 'var(--text-muted)' }
+              }, ann.type === 'yearly' ? getYearlyDisplay(ann) : getDdayDisplay(ann))
+            ),
+            /* Right: delete button */
+            /*#__PURE__*/React.createElement("button", {
+              type: "button",
+              className: "btn btn-danger",
+              onClick: () => handleDeleteAnniversary(ann),
+              style: { width: '28px', height: '28px', padding: 0, flexShrink: 0 }
+            }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 14 }))
+          ))
+      ),
+
+      /* TAB 2: Add Anniversary Form */
+      activeTab === 'add' && /*#__PURE__*/React.createElement("div", {
+        style: { display: 'flex', flexDirection: 'column', gap: '12px' }
+      },
+        /* Title input */
+        /*#__PURE__*/React.createElement("div", null,
+          /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.76rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '4px' } }, "기념일 이름"),
+          /*#__PURE__*/React.createElement("input", {
+            type: "text",
+            className: "form-input",
+            style: { width: '100%' },
+            placeholder: "예: 홍길동 생일, 커플 1주년",
+            value: newTitle,
+            onChange: e => setNewTitle(e.target.value),
+            maxLength: 50
+          })
+        ),
+
+        /* Type switcher */
+        /*#__PURE__*/React.createElement("div", null,
+          /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.76rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '4px' } }, "종류"),
+          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px' } },
+            [['yearly', '매년 특정일자 반복 (생일 등)'], ['dday', '기준일 D-Day (커플, 시험 등)']].map(([typeVal, label]) => /*#__PURE__*/React.createElement("label", {
+              key: typeVal,
+              style: {
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '8px 10px',
+                backgroundColor: newType === typeVal ? 'rgba(59,130,246,0.06)' : 'var(--bg-primary)',
+                border: '1px solid ' + (newType === typeVal ? '#3B82F6' : 'var(--border-subtle)'),
+                borderRadius: '8px',
+                fontSize: '0.76rem',
+                cursor: 'pointer',
+                fontWeight: newType === typeVal ? 'bold' : 'normal'
+              }
+            },
+              /*#__PURE__*/React.createElement("input", {
+                type: "radio",
+                name: "annType",
+                value: typeVal,
+                checked: newType === typeVal,
+                onChange: () => setNewType(typeVal),
+                style: { margin: 0 }
+              }),
+              label
+            ))
+          )
+        ),
+
+        /* Cond 1: Yearly details fields */
+        newType === 'yearly' && /*#__PURE__*/React.createElement("div", {
+          style: { display: 'flex', flexDirection: 'column', gap: '10px', padding: '10px', border: '1px solid var(--border-subtle)', borderRadius: '10px', backgroundColor: 'var(--bg-primary)' }
+        },
+          /* Month / Day Selectors Row */
+          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px' } },
+            /* Month */
+            /*#__PURE__*/React.createElement("div", { style: { flex: 1 } },
+              /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '3px' } }, "월"),
+              /*#__PURE__*/React.createElement("select", {
+                className: "form-input",
+                value: yearlyMonth,
+                onChange: e => setYearlyMonth(Number(e.target.value)),
+                style: { width: '100%', padding: '6px 8px' }
+              }, months.map(m => /*#__PURE__*/React.createElement("option", { key: m, value: m }, `${m}월`)))
+            ),
+            /* Day */
+            /*#__PURE__*/React.createElement("div", { style: { flex: 1 } },
+              /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '3px' } }, "일"),
+              /*#__PURE__*/React.createElement("select", {
+                className: "form-input",
+                value: yearlyDay,
+                onChange: e => setYearlyDay(Number(e.target.value)),
+                style: { width: '100%', padding: '6px 8px' }
+              }, days.map(d => /*#__PURE__*/React.createElement("option", { key: d, value: d }, `${d}일`)))
+            )
+          ),
+          /* Lunar / Leap month settings */
+          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '14px', marginTop: '4px', flexWrap: 'wrap' } },
+            /* Lunar toggle */
+            /*#__PURE__*/React.createElement("label", { style: { display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.76rem', cursor: 'pointer', userSelect: 'none' } },
+              /*#__PURE__*/React.createElement("input", {
+                type: "checkbox",
+                checked: isLunar,
+                onChange: e => setIsLunar(e.target.checked),
+                style: { margin: 0 }
+              }),
+              "음력으로 계산"
+            ),
+            /* Leap month toggle (shows only if Lunar) */
+            isLunar && /*#__PURE__*/React.createElement("label", { style: { display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.76rem', cursor: 'pointer', userSelect: 'none', color: '#6366F1' } },
+              /*#__PURE__*/React.createElement("input", {
+                type: "checkbox",
+                checked: isLeap,
+                onChange: e => setIsLeap(e.target.checked),
+                style: { margin: 0 }
+              }),
+              "윤달 여부"
+            )
+          )
+        ),
+
+        /* Cond 2: D-Day details fields */
+        newType === 'dday' && /*#__PURE__*/React.createElement("div", {
+          style: { display: 'flex', flexDirection: 'column', gap: '10px', padding: '10px', border: '1px solid var(--border-subtle)', borderRadius: '10px', backgroundColor: 'var(--bg-primary)' }
+        },
+          /* Target date picker */
+          /*#__PURE__*/React.createElement("div", null,
+            /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '3px' } }, "시작일자 / 기준일자"),
+            /*#__PURE__*/React.createElement(DeadlineDateTimePicker, {
+              value: `${targetDate}T00:00`,
+              onChange: v => setTargetDate(v.slice(0, 10))
+            })
+          ),
+          /* Mode Selector Radio */
+          /*#__PURE__*/React.createElement("div", null,
+            /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '3px' } }, "디데이 표기방식"),
+            /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '6px' } },
+              [['countdown', 'D-Day 카운트다운 (D-100)'], ['milestone', '날짜수 자동경과 (100일째)']].map(([modeVal, modeLabel]) => /*#__PURE__*/React.createElement("label", {
+                key: modeVal,
+                style: {
+                  flex: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  fontSize: '0.72rem',
+                  cursor: 'pointer'
+                }
+              },
+                /*#__PURE__*/React.createElement("input", {
+                  type: "radio",
+                  name: "ddayMode",
+                  value: modeVal,
+                  checked: ddayMode === modeVal,
+                  onChange: () => setDdayMode(modeVal)
+                }),
+                modeLabel
+              ))
+            )
+          )
+        ),
+
+        /* Save Button */
+        /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          className: "btn btn-primary",
+          onClick: handleSaveAnniversary,
+          style: { width: '100%', justifyContent: 'center', padding: '10px', fontSize: '0.82rem', marginTop: '6px' }
+        }, "기념일 등록")
+      ),
+
+      /* TAB 3: Bulk Repeating Schedule Register */
+      activeTab === 'bulk' && /*#__PURE__*/React.createElement("div", {
+        style: { display: 'flex', flexDirection: 'column', gap: '12px' }
+      },
+        /* User instructions */
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.76rem', color: 'var(--text-muted)', lineHeight: '1.45', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '6px' } },
+          "매주 특정 요일에 반복되는 사용자의 스케줄을 한 번에 일괄 등록합니다."
+        ),
+        
+        /* Participant & Weekday Select row */
+        /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } },
+          /* Participant picker */
+          /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
+            title: "참여자 선택",
+            placeholder: "참여자 선택",
+            value: bulkParticipantId,
+            disabled: isBulkSubmitting,
+            onSelect: setBulkParticipantId,
+            options: participants.map(p => ({ value: p.id, label: p.name })),
+            style: { flex: '1 1 140px' }
+          }),
+          /* Weekday picker */
+          /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
+            title: "요일 선택",
+            placeholder: "요일 선택",
+            value: bulkWeekday,
+            disabled: isBulkSubmitting,
+            onSelect: v => setBulkWeekday(Number(v)),
+            options: ['일', '월', '화', '수', '목', '금', '토'].map((label, idx) => ({ value: idx, label: `매주 ${label}요일` })),
+            style: { flex: '1 1 100px' }
+          })
+        ),
+
+        /* Start / End dates selectors */
+        /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } },
+          /* Start */
+          /*#__PURE__*/React.createElement("div", { style: { flex: '1 1 130px' } },
+            /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.74rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '4px' } }, "시작일자"),
+            /*#__PURE__*/React.createElement(DeadlineDateTimePicker, {
+              value: `${bulkStartDate}T00:00`,
+              disabled: isBulkSubmitting,
+              onChange: v => setBulkStartDate(v.slice(0, 10))
+            })
+          ),
+          /* End */
+          /*#__PURE__*/React.createElement("div", { style: { flex: '1 1 130px' } },
+            /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.74rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '4px' } }, "종료일자"),
+            /*#__PURE__*/React.createElement(DeadlineDateTimePicker, {
+              value: `${bulkEndDate}T00:00`,
+              disabled: isBulkSubmitting,
+              onChange: v => setBulkEndDate(v.slice(0, 10))
+            })
+          )
+        ),
+
+        /* Bulk Note */
+        /*#__PURE__*/React.createElement("input", {
+          type: "text",
+          className: "form-input",
+          placeholder: "반복 일정 메모 (선택)",
+          maxLength: 120,
+          value: bulkNote,
+          onChange: e => setBulkNote(e.target.value),
+          disabled: isBulkSubmitting,
+          style: { width: '100%', fontSize: '0.8rem' }
+        }),
+
+        /* Apply button */
+        /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          className: "btn btn-primary",
+          onClick: handleApplyBulkRegister,
+          disabled: isBulkSubmitting,
+          style: { width: '100%', justifyContent: 'center', padding: '10px', fontSize: '0.82rem', marginTop: '4px' }
+        }, isBulkSubmitting ? "등록 진행 중..." : "반복 일정 일괄 등록")
+      )
+    )
+  ));
+
+  return ReactDOM.createPortal(portalContent, document.body);
+}
+
+// Icon helper function for gift
+function GiftIcon({ size = 20 } = {}) {
+  return /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: String(size),
+    height: String(size),
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: "2",
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+    className: "icon icon-tabler icons-tabler-outline icon-tabler-gift"
+  },
+    /*#__PURE__*/React.createElement("rect", { x: "3", y: "8", width: "18", height: "4", rx: "1" }),
+    /*#__PURE__*/React.createElement("path", { d: "M12 8v13" }),
+    /*#__PURE__*/React.createElement("path", { d: "M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7" }),
+    /*#__PURE__*/React.createElement("path", { d: "M12 8H7.5a2.5 2.5 0 0 1 0-5C11 3 12 8 12 8z" }),
+    /*#__PURE__*/React.createElement("path", { d: "M12 8h4.5a2.5 2.5 0 0 0 0-5C13 3 12 8 12 8z" })
+  );
 }
 
 

@@ -18,7 +18,8 @@ const STATIC_ASSETS = [
   'icons/icon-192.png',
   'icons/icon-512.png',
   'icons/icon-512-maskable.png',
-  'icons/apple-touch-icon.png'
+  'icons/apple-touch-icon.png',
+  'https://cdn.jsdelivr.net/npm/korean-lunar-calendar/dist/korean-lunar-calendar.min.js'
 ];
 
 self.addEventListener('install', event => {
