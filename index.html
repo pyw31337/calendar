@@ -11449,22 +11449,34 @@ function renderChatMessageImages(msg, setActiveLightbox, singleImageStyle = {}) 
       }
     });
   }
-  // 3+ images always line up 3-per-row via a proportional grid (deterministic and adapts to
-  // whatever maxWidth the caller passes in, unlike flex-wrap which can end up 2-per-row
-  // depending on the bubble's actual width) -- 2 or 3 images just sit in one row at full size.
-  const useGrid = thumbs.length > 3;
+
+  // Multi-image layout: uses a proportional CSS Grid to cleanly fit the images
+  // without empty right-hand spacing. 2 images = 2 columns, 3+ images = 3 columns.
+  const cols = thumbs.length === 2 ? 2 : 3;
+  const maxW = thumbs.length === 2 ? '180px' : '240px'; // 2 cols slightly narrower, 3 cols wider
+
   return /*#__PURE__*/React.createElement('div', {
-    style: useGrid
-      ? { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4px', width: '100%', maxWidth: 'min(100%, ' + (singleImageStyle.maxWidth || '200px') + ')', marginBottom: singleImageStyle.marginBottom || '0' }
-      : { display: 'flex', flexWrap: 'wrap', gap: '4px', width: '100%', maxWidth: 'min(100%, ' + (singleImageStyle.maxWidth || '200px') + ')', marginBottom: singleImageStyle.marginBottom || '0' }
+    style: {
+      display: 'grid',
+      gridTemplateColumns: `repeat(${cols}, 1fr)`,
+      gap: '4px',
+      width: '100%',
+      maxWidth: `min(100%, ${maxW})`,
+      marginBottom: singleImageStyle.marginBottom || '0'
+    }
   }, thumbs.map((thumb, idx) => /*#__PURE__*/React.createElement('img', {
     key: idx,
     src: thumb,
     alt: `첨부이미지 ${idx + 1}`,
     onClick: () => setActiveLightbox && setActiveLightbox({ urls: displayUrls, index: idx, meta }),
-    style: useGrid
-      ? { display: 'block', width: '100%', aspectRatio: '1', borderRadius: '6px', cursor: 'pointer', objectFit: 'cover' }
-      : { display: 'block', width: '56px', height: '56px', borderRadius: '6px', cursor: 'pointer', objectFit: 'cover' }
+    style: {
+      display: 'block',
+      width: '100%',
+      aspectRatio: '1',
+      borderRadius: '6px',
+      cursor: 'pointer',
+      objectFit: 'cover'
+    }
   })));
 }
 
