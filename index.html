@@ -6300,6 +6300,7 @@ function AdminDashboard({ initialCalendars }) {
       action: l.action,
       timestamp: l.timestamp,
       participantId: l.participantId,
+      date: l.date,
       note: l.note || (l.date ? formatShortDateWithDayName(l.date) : ''),
       raw: l
     }));
@@ -7183,18 +7184,21 @@ function AdminDashboard({ initialCalendars }) {
                 key: log.id,
                 className: "admin-chat-row"
               },
-                /* Left: action + participant badges */
-                /*#__PURE__*/React.createElement("div", { className: "admin-chat-header" },
+                /* Left: action + participant badges + date */
+                /*#__PURE__*/React.createElement("div", { className: "admin-chat-header", style: { display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' } },
                   /*#__PURE__*/React.createElement("span", {
                     style: { fontSize: '0.68rem', fontWeight: 'bold', padding: '2px 6px', borderRadius: '4px', backgroundColor: badgeBg, color: badgeColor, border: `1px solid ${badgeColor}30`, whiteSpace: 'nowrap' }
                   }, actLabel),
                   /*#__PURE__*/React.createElement("span", {
                     style: { backgroundColor: p.color, color: getContrastTextColor(p.color), padding: '2px 8px', borderRadius: '9999px', fontSize: '0.7rem', fontWeight: 'bold', whiteSpace: 'nowrap' }
-                  }, p.name)
+                  }, p.name),
+                  log.date && /*#__PURE__*/React.createElement("span", {
+                    style: { fontSize: '0.8rem', fontWeight: 'bold', color: '#475569' }
+                  }, formatShortDateWithDayName(log.date))
                 ),
 
                 /* Middle: memo, ellipsized on wide screens like admin-chat-text, wraps on narrow */
-                /*#__PURE__*/React.createElement("span", { className: "admin-chat-text", title: log.note || '' }, log.note || ''),
+                log.note && log.note !== (log.date ? formatShortDateWithDayName(log.date) : '') && /*#__PURE__*/React.createElement("span", { className: "admin-chat-text", title: log.note || '' }, log.note || ''),
 
                 /* Right: timestamp + restore button -- the button drops to its own full-width
                    row on mobile (recovery-restore-footer) rather than squeezing onto the
