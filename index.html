@@ -12546,6 +12546,7 @@ function ChatRoomView({
   onToggleChatNotifications
 }) {
   const [viewportBottom, setViewportBottom] = React.useState(0);
+  const [isInputFocused, setIsInputFocused] = React.useState(false);
   // 'closed' (default -- nothing shown) | 'list' (existing notices + 공지 추가) | 'add' (textarea)
   const [noticePanelMode, setNoticePanelMode] = React.useState('closed');
   const [noticeInput, setNoticeInput] = React.useState('');
@@ -12730,6 +12731,7 @@ function ChatRoomView({
     const onFocus = (e) => {
       const t = e.target;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA') && t.closest && t.closest('.chat-room-container')) {
+        setIsInputFocused(true);
         // Two-pass: immediate (catches partial-open) + 400ms (catches fully-open on iOS)
         setTimeout(updateViewport, 50);
         setTimeout(updateViewport, 400);
@@ -12738,6 +12740,7 @@ function ChatRoomView({
     const onBlur = (e) => {
       const t = e.target;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA') && t.closest && t.closest('.chat-room-container')) {
+        setIsInputFocused(false);
         setTimeout(updateViewport, 300);
       }
     };
@@ -13215,7 +13218,7 @@ function ChatRoomView({
   }), /*#__PURE__*/React.createElement("path", {
     d: "M6 9l6 6l6 -6"
   }))),
-  !(isHeaderVisible || viewportBottom > 80) && /*#__PURE__*/React.createElement("button", {
+  !(isHeaderVisible || viewportBottom > 80 || isInputFocused) && /*#__PURE__*/React.createElement("button", {
     type: "button",
     className: "chat-keyboard-reopen-btn",
     onClick: () => {
@@ -13529,9 +13532,9 @@ function ChatRoomView({
       padding: '12px 16px',
       zIndex: 1012,
       flexShrink: 0,
-      transform: (isHeaderVisible || viewportBottom > 80) ? 'translateY(0)' : 'translateY(calc(100% + 12px))',
-      opacity: (isHeaderVisible || viewportBottom > 80) ? 1 : 0,
-      pointerEvents: (isHeaderVisible || viewportBottom > 80) ? 'auto' : 'none',
+      transform: (isHeaderVisible || viewportBottom > 80 || isInputFocused) ? 'translateY(0)' : 'translateY(calc(100% + 12px))',
+      opacity: (isHeaderVisible || viewportBottom > 80 || isInputFocused) ? 1 : 0,
+      pointerEvents: (isHeaderVisible || viewportBottom > 80 || isInputFocused) ? 'auto' : 'none',
       transition: 'transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.18s ease, bottom 0.12s ease-out'
     }
   },
