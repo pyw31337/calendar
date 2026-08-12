@@ -1550,7 +1550,7 @@
       box-sizing: border-box;
     }
     .admin-header {
-      padding: 20px 32px 16px;
+      padding: 20px 16px;
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -2521,15 +2521,19 @@ function getExpenseCategory(calendar, categoryId) {
 }
 function getExpenseCategoryIcon(category) {
   if (!category) return EXPENSE_CATEGORY_ICONS.etc;
+  const name = String(category.name || '');
+  // If name already contains/starts with an emoji or non-alphanumeric icon, return empty string
+  const hasEmoji = /[\uD800-\uDBFF][\uDC00-\uDFFF]/.test(name) || /\p{Emoji_Presentation}/u.test(name);
+  if (hasEmoji) return '';
   const id = String(category.id || '').toLowerCase();
   if (EXPENSE_CATEGORY_ICONS[id]) return EXPENSE_CATEGORY_ICONS[id];
-  const name = String(category.name || '');
   const matchedDefault = DEFAULT_EXPENSE_CATEGORIES.find(item => item.name === name);
   return matchedDefault ? EXPENSE_CATEGORY_ICONS[matchedDefault.id] : EXPENSE_CATEGORY_ICONS.etc;
 }
 function getExpenseCategoryLabel(category) {
   const name = sanitizeText(category?.name || '기타', 24) || '기타';
-  return `${getExpenseCategoryIcon(category)}\u00A0\u00A0${name}`;
+  const icon = getExpenseCategoryIcon(category);
+  return icon ? `${icon}\u00A0\u00A0${name}` : name;
 }
 // A pasted expense label like "19\uC2DC [\uC800\uB141\uC2DD\uC0AC] \uC560\uC290\uB9AC ..." carries a leading time-of-day note
 // meant for display as its own badge, not as part of the item description line.
@@ -3208,14 +3212,15 @@ const EXPENSE_ACTIVITY_ACTIONS = ['expense_create', 'expense_update', 'expense_d
 // Photo hashtags (라이트박스 이미지정보 패널) also have no participant selector of their own --
 // same participant-optional treatment as expense/poll logs below.
 const IMAGE_TAG_ACTIVITY_ACTIONS = ['tag_add', 'tag_remove'];
-const ACTIVITY_ACTIONS = [...SCHEDULE_ACTIVITY_ACTIONS, ...POLL_ACTIVITY_ACTIONS, ...EXPENSE_ACTIVITY_ACTIONS, ...IMAGE_TAG_ACTIVITY_ACTIONS];
+const MEETING_ACTIVITY_ACTIONS = ['meeting_confirm', 'meeting_cancel'];
+const ACTIVITY_ACTIONS = [...SCHEDULE_ACTIVITY_ACTIONS, ...POLL_ACTIVITY_ACTIONS, ...EXPENSE_ACTIVITY_ACTIONS, ...IMAGE_TAG_ACTIVITY_ACTIONS, ...MEETING_ACTIVITY_ACTIONS];
 
 function normalizeActivityLog(calendarId, log, participantIds = null, idRedirects = new Map()) {
   if (!log || typeof log !== 'object') return null;
   if (log.calendarId && log.calendarId !== calendarId) return null;
   const participantId = sanitizeText(idRedirects.get(log.participantId) || log.participantId || '', 120);
   const action = ACTIVITY_ACTIONS.includes(log.action) ? log.action : '';
-  const isParticipantOptionalAction = POLL_ACTIVITY_ACTIONS.includes(action) || EXPENSE_ACTIVITY_ACTIONS.includes(action) || IMAGE_TAG_ACTIVITY_ACTIONS.includes(action);
+  const isParticipantOptionalAction = POLL_ACTIVITY_ACTIONS.includes(action) || EXPENSE_ACTIVITY_ACTIONS.includes(action) || IMAGE_TAG_ACTIVITY_ACTIONS.includes(action) || MEETING_ACTIVITY_ACTIONS.includes(action);
   const date = sanitizeText(log.date || '', 20);
   const timestamp = Number(log.timestamp || log.updatedAt || 0) || 0;
   if (!action || !timestamp) return null;
@@ -6156,6 +6161,8 @@ function AdminDashboard({ initialCalendars }) {
                       log.action === 'expense_create' ? '지출/수입 등록' :
                       log.action === 'expense_update' ? '지출/수입 수정' :
                       log.action === 'expense_delete' ? '지출/수입 삭제' :
+                      log.action === 'meeting_confirm' ? '모임 확정' :
+                      log.action === 'meeting_cancel' ? '모임 확정 취소' :
                       log.action === 'tag_add' ? '사진 태그 추가' :
                       log.action === 'tag_remove' ? '사진 태그 삭제' : '활동';
 
@@ -6436,7 +6443,7 @@ function AdminDashboard({ initialCalendars }) {
       overflowX: 'hidden'
     },
     header: {
-      padding: '0 32px 16px'
+      padding: '20px 16px'
     },
     title: {
       fontSize: '1.35rem',
@@ -6746,15 +6753,7 @@ function AdminDashboard({ initialCalendars }) {
       /*#__PURE__*/React.createElement("section", { style: styles.card },
         /*#__PURE__*/React.createElement("div", { style: styles.cardTitle, "data-collapse-anchor": "true", "data-collapse-key": "metrics-core", "data-collapse-label": "핵심 운영 지표" },
           /*#__PURE__*/React.createElement("span", { style: { display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(ChartPieIcon, null), "핵심 운영 지표", /*#__PURE__*/React.createElement(SectionCountBadge, { count: calendarsList.length })),
-          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' } },
-            dashboard.calendarStats.map((stat, i) => /*#__PURE__*/React.createElement("span", {
-              key: stat.calendar.id,
-              style: { display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.74rem', fontWeight: 700, color: '#334155' }
-            },
-              /*#__PURE__*/React.createElement("span", { style: { width: '8px', height: '8px', borderRadius: '9999px', backgroundColor: getCalendarAccentColor(stat.calendar, i), flexShrink: 0 } }),
-              stat.calendar.id
-            ))
-          )
+
         ),
         /*#__PURE__*/React.createElement("div", { className: "admin-metrics-grid" },
           [
@@ -6799,11 +6798,9 @@ function AdminDashboard({ initialCalendars }) {
             return /*#__PURE__*/React.createElement("div", {
               key: cal.id, style: { border: '1px solid #E2E8F0', borderRadius: '10px', padding: '16px', backgroundColor: '#F8FAFC' }
             },
-              /*#__PURE__*/React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' } },
-                /*#__PURE__*/React.createElement("div", null,
-                  /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.92rem', fontWeight: 'bold', color: '#0F172A' } }, cal.title || cal.id),
-                  /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.76rem', color: '#64748B', marginTop: '2px' } }, cal.description || cal.id)
-                )
+              /*#__PURE__*/React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '8px' } },
+                /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.92rem', fontWeight: 'bold', color: '#0F172A' } }, cal.title || cal.id),
+                /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.76rem', color: '#64748B', fontWeight: 500 } }, cal.id)
               ),
               /*#__PURE__*/React.createElement("div", {
                 style: { display: 'flex', flexWrap: 'wrap', gap: '6px', margin: '12px 0' }
@@ -7002,17 +6999,6 @@ function AdminDashboard({ initialCalendars }) {
 	          /* Settlement Management */
 	          /*#__PURE__*/React.createElement("div", { style: { paddingTop: '14px', marginTop: '14px', borderTop: '1px solid #E2E8F0' } },
 	            /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#64748B', marginBottom: '8px' } }, "정산 설정"),
-	            /*#__PURE__*/React.createElement("input", {
-	              type: "text",
-	              className: "form-input",
-	              style: { width: '100%', marginBottom: '10px' },
-	              value: calSettlementBaseBudget,
-	              placeholder: "기초 예산 (예: 이전 모임 누적 잔액)",
-	              onChange: e => {
-	                const digits = e.target.value.replace(/[^0-9]/g, '');
-	                setCalSettlementBaseBudget(digits ? Number(digits).toLocaleString() : '');
-	              }
-	            }),
 	            /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px', marginBottom: '10px' } },
 	              /*#__PURE__*/React.createElement("input", {
 	                type: "text",
@@ -7146,7 +7132,7 @@ function AdminDashboard({ initialCalendars }) {
                 name: log.type === 'chat' ? '메시지' :
                       EXPENSE_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '정산' :
                       IMAGE_TAG_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '태그' :
-                      POLL_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '투표' : '알수없음',
+                      POLL_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '투표' : MEETING_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '정산' : '알수없음',
                 color: '#94A3B8'
               };
 
@@ -7155,7 +7141,8 @@ function AdminDashboard({ initialCalendars }) {
                                  create: '일정 등록', update: '일정 수정', delete: '일정 삭제',
                                  poll_create: '투표 생성', poll_vote: '투표 진행', poll_cancel: '투표 취소',
                                  expense_create: '지출/수입 등록', expense_update: '지출/수입 수정', expense_delete: '지출/수입 삭제',
-                                 tag_add: '사진 태그 추가', tag_remove: '사진 태그 삭제'
+                                 tag_add: '사진 태그 추가', tag_remove: '사진 태그 삭제',
+                                 meeting_confirm: '모임 확정', meeting_cancel: '모임 확정 취소'
                                }[log.action] || '활동';
 
               const badgeBg = log.type === 'chat' ? '#E0F2FE' :
@@ -7163,7 +7150,8 @@ function AdminDashboard({ initialCalendars }) {
                                 create: '#DCFCE7', update: '#DBEAFE', delete: '#FEE2E2',
                                 poll_create: '#F3E8FF', poll_vote: '#FCE7F3', poll_cancel: '#FFEDD5',
                                 expense_create: '#FEF3C7', expense_update: '#FEF3C7', expense_delete: '#FFEDD5',
-                                tag_add: '#E0E7FF', tag_remove: '#FEE2E2'
+                                tag_add: '#E0E7FF', tag_remove: '#FEE2E2',
+                                meeting_confirm: '#F3E8FF', meeting_cancel: '#FEE2E2'
                               }[log.action] || '#F1F5F9';
 
               const badgeColor = log.type === 'chat' ? '#0369A1' :
@@ -7171,7 +7159,8 @@ function AdminDashboard({ initialCalendars }) {
                                    create: '#15803D', update: '#1D4ED8', delete: '#B91C1C',
                                    poll_create: '#7E22CE', poll_vote: '#BE185D', poll_cancel: '#C2410C',
                                    expense_create: '#B45309', expense_update: '#B45309', expense_delete: '#C2410C',
-                                   tag_add: '#4338CA', tag_remove: '#B91C1C'
+                                   tag_add: '#4338CA', tag_remove: '#B91C1C',
+                                   meeting_confirm: '#7E22CE', meeting_cancel: '#B91C1C'
                                  }[log.action] || '#64748B';
 
               return /*#__PURE__*/React.createElement("div", {
@@ -8807,14 +8796,18 @@ function App() {
     } else {
       nextConfirmedMeetings = [...existingMeetings, { date: dateStr, note: sanitizeText(note, 120), confirmedAt: now, confirmed: true }];
     }
+    const action = isAlreadyConfirmed ? 'meeting_cancel' : 'meeting_confirm';
+    const logNote = sanitizeText(note || '', 120) || (isAlreadyConfirmed ? '모임 확정 취소됨' : '모임 확정됨');
+    const meetingLog = createActivityLog(activeCal.id, action, dateStr, '', now, logNote);
     const updatedCal = {
       ...activeCal,
       confirmedMeeting: nextConfirmedMeetings,
       updatedAt: now,
-      revision: (activeCal.revision || 0) + 1
+      revision: (activeCal.revision || 0) + 1,
+      activityLogs: meetingLog ? [...getCalendarActivityLogs(activeCal), meetingLog] : getCalendarActivityLogs(activeCal)
     };
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-    return updateCalendars(nextCalendars, isAlreadyConfirmed ? '모임 확정 취소' : '모임 확정', 'success', updatedCal.id, 'settings', []);
+    return updateCalendars(nextCalendars, isAlreadyConfirmed ? '모임 확정 취소' : '모임 확정', 'success', updatedCal.id, 'settings', meetingLog ? [meetingLog] : []);
   };
   // Saved via saveMode 'settings' like confirmedMeeting itself -- mergeCalendarSettingsDelta
   // does a blind {...server, ...incoming} for fields it doesn't explicitly preserve/merge (see
@@ -15001,7 +14994,7 @@ function DateModal({
 	                  fontSize: '0.68rem',
 	                  fontWeight: 900
 	                }
-	              }, getExpenseCategoryIcon(expenseCategory), expenseCategory.name),
+	              }, getExpenseCategoryIcon(expenseCategory), getExpenseCategoryIcon(expenseCategory) ? '\u00A0' : '', expenseCategory.name),
 	              expenseTime && /*#__PURE__*/React.createElement("span", {
 	                style: {
 	                  display: 'inline-flex',
@@ -15191,6 +15184,94 @@ const rebuildCalendarToTimestamp = (calendar, T, logs = []) => {
       return { ...poll, votes, updatedAt: T };
     });
 
+  // 4. Rebuild Confirmed Meetings and Expenses
+  const rebuiltMeetingsMap = new Map();
+  (calendar.confirmedMeeting || []).forEach(m => {
+    if (!m) return;
+    const expenses = (m.expenses || []).filter(e => (e.createdAt || 0) <= T);
+    const isConfirmed = m.confirmed !== false && (m.confirmedAt || 0) <= T;
+    rebuiltMeetingsMap.set(m.date, {
+      ...m,
+      confirmed: isConfirmed,
+      confirmedAt: isConfirmed ? m.confirmedAt : null,
+      expenses: expenses
+    });
+  });
+
+  for (const log of sortedLogs) {
+    if (log.timestamp > T) continue;
+    const dateStr = log.date;
+    if (!dateStr) continue;
+
+    if (log.action === 'meeting_confirm') {
+      const existing = rebuiltMeetingsMap.get(dateStr) || { date: dateStr, expenses: [] };
+      rebuiltMeetingsMap.set(dateStr, {
+        ...existing,
+        confirmed: true,
+        confirmedAt: log.timestamp,
+        note: log.note
+      });
+    } else if (log.action === 'meeting_cancel') {
+      const existing = rebuiltMeetingsMap.get(dateStr) || { date: dateStr, expenses: [] };
+      rebuiltMeetingsMap.set(dateStr, {
+        ...existing,
+        confirmed: false,
+        confirmedAt: null
+      });
+    } else if (log.action === 'expense_create' || log.action === 'expense_update') {
+      const existing = rebuiltMeetingsMap.get(dateStr) || { date: dateStr, expenses: [] };
+      const match = /^([+-])([\d,]+)원\s*(.*)$/.exec(log.note);
+      if (match) {
+        const sign = match[1];
+        const amountVal = Number(match[2].replace(/,/g, ''));
+        const amount = sign === '+' ? -amountVal : amountVal;
+        const label = match[3] || '';
+        const expId = `rebuilt_exp_${log.id}`;
+        const categoryId = 'etc';
+
+        if (log.action === 'expense_create') {
+          existing.expenses.push({
+            id: expId,
+            label,
+            url: '',
+            categoryId,
+            amount,
+            createdAt: log.timestamp,
+            updatedAt: log.timestamp
+          });
+        } else {
+          const idx = existing.expenses.findIndex(e => e.label === label);
+          if (idx >= 0) {
+            existing.expenses[idx] = {
+              ...existing.expenses[idx],
+              amount,
+              updatedAt: log.timestamp
+            };
+          } else {
+            existing.expenses.push({
+              id: expId,
+              label,
+              url: '',
+              categoryId,
+              amount,
+              createdAt: log.timestamp,
+              updatedAt: log.timestamp
+            });
+          }
+        }
+      }
+      rebuiltMeetingsMap.set(dateStr, existing);
+    } else if (log.action === 'expense_delete') {
+      const existing = rebuiltMeetingsMap.get(dateStr) || { date: dateStr, expenses: [] };
+      const match = /^([+-])([\d,]+)원\s*(.*)$/.exec(log.note);
+      if (match) {
+        const label = match[3] || '';
+        existing.expenses = existing.expenses.filter(e => e.label !== label);
+      }
+      rebuiltMeetingsMap.set(dateStr, existing);
+    }
+  }
+
   const rebuiltLogs = logs.filter(log => log.timestamp <= T);
 
   return {
@@ -15198,6 +15279,7 @@ const rebuildCalendarToTimestamp = (calendar, T, logs = []) => {
     participants: rebuiltParticipants,
     availabilities: Array.from(rebuiltAvailabilities.values()),
     polls: rebuiltPolls,
+    confirmedMeeting: Array.from(rebuiltMeetingsMap.values()).filter(m => m.confirmed !== false || m.expenses.length > 0),
     activityLogs: rebuiltLogs,
     updatedAt: now,
     revision: (calendar.revision || 0) + 1
@@ -15893,21 +15975,23 @@ function AdminModal({
               const p = participantsMap[log.participantId] || {
                 name: EXPENSE_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '정산' :
                       IMAGE_TAG_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '태그' :
-                      POLL_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '투표' : '알수없음',
+                      POLL_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '투표' : MEETING_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '정산' : '알수없음',
                 color: '#94A3B8'
               };
               const actionLabel = {
                 create: '일정 추가', update: '일정 변경', delete: '일정 삭제',
                 poll_create: '투표 생성', poll_vote: '투표 진행', poll_cancel: '투표 취소',
                 expense_create: '지출/수입 등록', expense_update: '지출/수입 수정', expense_delete: '지출/수입 삭제',
-                tag_add: '사진 태그 추가', tag_remove: '사진 태그 삭제'
+                tag_add: '사진 태그 추가', tag_remove: '사진 태그 삭제',
+                meeting_confirm: '모임 확정', meeting_cancel: '모임 확정 취소'
               }[log.action] || '활동';
 
               const actionBadgeColor = {
                 create: '#10B981', update: '#2563EB', delete: '#EF4444',
                 poll_create: '#8B5CF6', poll_vote: '#EC4899', poll_cancel: '#F97316',
                 expense_create: '#F59E0B', expense_update: '#F59E0B', expense_delete: '#DC2626',
-                tag_add: '#6366F1', tag_remove: '#DC2626'
+                tag_add: '#6366F1', tag_remove: '#DC2626',
+                meeting_confirm: '#8B5CF6', meeting_cancel: '#EF4444'
               }[log.action] || '#64748B';
               // A translucent tint of the badge's own color (instead of a fixed pastel hex)
               // stays readable on both light and dark modal backgrounds -- a solid light pastel
