@@ -20307,7 +20307,7 @@ function SummaryList({
 // local lightbox state rather than sharing App's chat activeLightbox state, since the gallery
 // and the chat are independent entry points into the same viewer, not one shared session.
 function PhotoGallery({ chatMessages, showToast, onPromoteImageUrl, onSaveImageTags, onSearchTag }) {
-  const [collapsed, setCollapsed] = React.useState(false);
+  const [collapsed, setCollapsed] = React.useState(true); // Closed initially by default
   const [lightbox, setLightbox] = React.useState(null); // { urls: string[], index: number } | null
 
   const photoEntries = React.useMemo(() => {
@@ -20320,6 +20320,9 @@ function PhotoGallery({ chatMessages, showToast, onPromoteImageUrl, onSaveImageT
   }, [chatMessages]);
 
   if (photoEntries.length === 0) return null;
+
+  // Show only recent 12 images when collapsed, and all images when expanded
+  const displayedEntries = collapsed ? photoEntries.slice(0, 12) : photoEntries;
 
   return /*#__PURE__*/React.createElement("section", { className: "summary-card" },
     /*#__PURE__*/React.createElement("div", {
@@ -20343,10 +20346,10 @@ function PhotoGallery({ chatMessages, showToast, onPromoteImageUrl, onSaveImageT
         label: collapsed ? '갤러리 펼치기' : '갤러리 접기'
       })
     ),
-    !collapsed && /*#__PURE__*/React.createElement("div", {
-      style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(80px, 100%), 1fr))', gap: '6px' }
+    /*#__PURE__*/React.createElement("div", {
+      style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(80px, 100%), 1fr))', gap: '6px', marginTop: '12px' }
     },
-      photoEntries.map((entry, idx) => /*#__PURE__*/React.createElement("img", {
+      displayedEntries.map((entry, idx) => /*#__PURE__*/React.createElement("img", {
         key: entry.key,
         src: entry.thumb,
         alt: "채팅에 첨부된 사진",
