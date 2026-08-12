@@ -10815,20 +10815,50 @@ async function compressImageToDataUrls(file, { maxBase64Length = MAX_CHAT_IMAGE_
   // tens of extra KB per image to a fallback batch.
   const thumbnail = encodeWithinBudget(240, [0.72, 0.6, 0.5, 0.4], maxThumbBase64Length, 120);
 
+  // High-quality blob for Firebase Storage (when storage is working, we bypass low-res restrictions
+  // to upload a gorgeous 2048px image, while maintaining the small original.base64 for database safety).
+  const getHighQualityBlob = () => {
+    if (isStorageDisabled) return Promise.resolve(null);
+    return new Promise(res => {
+      let w = img.width, h = img.height;
+      const maxDimHigh = 2048;
+      if (w > maxDimHigh || h > maxDimHigh) {
+        if (w > h) { h = Math.round(h * maxDimHigh / w); w = maxDimHigh; }
+        else { w = Math.round(w * maxDimHigh / h); h = maxDimHigh; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      canvas.toBlob(blob => res(blob), 'image/jpeg', 0.90);
+    });
+  };
+
+  const highQualityBlob = await getHighQualityBlob();
+
   // Also produce Blobs at the same size/quality actually chosen above, used to upload to
   // Firebase Storage at send time (see uploadChatImageAssets) instead of embedding base64 in
   // the message document. The base64 strings above are kept as the fallback if that upload fails.
   return new Promise((resolve) => {
-    original.canvas.toBlob(originalBlob => {
-      thumbnail.canvas.toBlob(thumbnailBlob => {
+    thumbnail.canvas.toBlob(thumbnailBlob => {
+      if (highQualityBlob) {
         resolve({
           original: original.base64,
           thumbnail: thumbnail.base64,
-          originalBlob,
+          originalBlob: highQualityBlob,
           thumbnailBlob
         });
-      }, 'image/jpeg', thumbnail.quality);
-    }, 'image/jpeg', original.quality);
+      } else {
+        original.canvas.toBlob(originalBlob => {
+          resolve({
+            original: original.base64,
+            thumbnail: thumbnail.base64,
+            originalBlob,
+            thumbnailBlob
+          });
+        }, 'image/jpeg', original.quality);
+      }
+    }, 'image/jpeg', thumbnail.quality);
   });
 }
 
