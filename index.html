@@ -10321,12 +10321,12 @@ async function fetchLinkPreview(url) {
       if (!json.ok) throw new Error(json.message || 'peekalink request failed');
       const image = json.image?.medium?.url || json.image?.large?.url || json.image?.thumbnail?.url || json.icon?.url || '';
       const result = {
-        status: (json.title || image) ? 'success' : 'empty',
+        status: (json.title || image || json.description) ? 'success' : 'empty',
         data: {
-          title: json.title || '',
+          title: json.title || (json.redirected && json.redirectionUrl ? new URL(json.redirectionUrl).hostname.replace('www.','') : '') || json.domain || '',
           description: json.description || '',
           image,
-          siteName: json.domain || ''
+          siteName: json.siteName || json.domain || ''
         }
       };
       linkPreviewCache.set(url, result);
@@ -10918,27 +10918,50 @@ async function resolveChatImageBatch(calendarId, compressedList, onProgress) {
     ));
   }
 
+  // Progress split: compression = 0~45%, upload = 45~99%
+  // This ensures the bar visibly moves during the (previously silent) compression phase.
   const startedAt = Date.now();
-  const progressByTask = new Map();
-  const reportProgress = () => {
+  const total = compressedList.length;
+  let compressionDone = 0;
+
+  const reportCompressionProgress = () => {
     if (!onProgress) return;
-    let transferred = 0, total = 0;
-    progressByTask.forEach(p => { transferred += p.transferred; total += p.total; });
-    const pct = total > 0 ? Math.min(99, Math.round((transferred / total) * 100)) : 0;
+    const pct = Math.min(44, Math.round((compressionDone / total) * 45));
     const elapsedSec = (Date.now() - startedAt) / 1000;
-    const remainingSec = pct > 0 ? Math.max(0, Math.round(elapsedSec * (100 - pct) / pct)) : null;
+    const remainingSec = compressionDone > 0
+      ? Math.max(0, Math.round((elapsedSec / compressionDone) * (total - compressionDone) * 2)) // *2 for upload phase too
+      : null;
+    onProgress({ pct, remainingSec });
+  };
+
+  const progressByTask = new Map();
+  const reportUploadProgress = () => {
+    if (!onProgress) return;
+    let transferred = 0, totalBytes = 0;
+    progressByTask.forEach(p => { transferred += p.transferred; totalBytes += p.total; });
+    const uploadPct = totalBytes > 0 ? Math.min(54, Math.round((transferred / totalBytes) * 54)) : 0;
+    const pct = Math.min(99, 45 + uploadPct);
+    const elapsedSec = (Date.now() - startedAt) / 1000;
+    const remainingSec = pct > 46 ? Math.max(0, Math.round(elapsedSec * (100 - pct) / pct)) : null;
     onProgress({ pct, remainingSec });
   };
   const onBytes = (taskKey, transferred, total) => {
     progressByTask.set(taskKey, { transferred, total });
-    reportProgress();
+    reportUploadProgress();
   };
 
-  const results = await Promise.all(compressedList.map((c, idx) =>
-    c.isExisting
-      ? Promise.resolve({ imageUrl: c.original, thumbUrl: c.thumbnail })
-      : resolveChatImageUrls(calendarId, c, idx, onBytes)
-  ));
+  // Sequential per-image: compress then immediately upload, tracking compression progress
+  const results = await Promise.all(compressedList.map(async (c, idx) => {
+    if (c.isExisting) {
+      compressionDone++;
+      reportCompressionProgress();
+      return { imageUrl: c.original, thumbUrl: c.thumbnail };
+    }
+    const result = await resolveChatImageUrls(calendarId, c, idx, onBytes);
+    compressionDone++;
+    reportCompressionProgress();
+    return result;
+  }));
   if (onProgress) onProgress({ pct: 100, remainingSec: 0 });
   return results;
 }
@@ -11127,7 +11150,7 @@ function renderChatMessageImages(msg, setActiveLightbox, singleImageStyle = {}) 
       src: thumbs[0],
       alt: '첨부이미지',
       onClick: () => setActiveLightbox && setActiveLightbox({ urls: displayUrls, index: 0, meta }),
-      style: { display: 'block', borderRadius: '8px', cursor: 'pointer', objectFit: 'cover', ...singleImageStyle }
+      style: { display: 'block', borderRadius: '8px', cursor: 'pointer', objectFit: 'cover', maxWidth: '100%', ...singleImageStyle }
     });
   }
   // 3+ images always line up 3-per-row via a proportional grid (deterministic and adapts to
