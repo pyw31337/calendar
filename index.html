@@ -1721,7 +1721,25 @@
       align-items: center;
       justify-content: center;
       flex: 0 0 34px;
+      overflow: visible;
       transition: background-color 0.16s ease, color 0.16s ease;
+    }
+    @keyframes chat-search-shake {
+      0%   { transform: translateY(0); }
+      20%  { transform: translateY(-4px); }
+      40%  { transform: translateY(3px); }
+      60%  { transform: translateY(-2px); }
+      80%  { transform: translateY(1px); }
+      100% { transform: translateY(0); }
+    }
+    .chat-search-focused-bubble {
+      border: 1.5px solid #7C3AED !important;
+      background-color: rgba(124, 58, 237, 0.06) !important;
+      animation: chat-search-shake 0.38s ease;
+    }
+    .chat-search-match-bubble {
+      border: 1px solid rgba(124, 58, 237, 0.35) !important;
+      background-color: rgba(124, 58, 237, 0.03) !important;
     }
     .admin-side-menu-item:hover .admin-side-menu-item-icon,
     .admin-side-menu-item:focus-visible .admin-side-menu-item-icon {
@@ -12388,6 +12406,27 @@ function ChatRoomView({
     return acc;
   }, {});
   const selectedParticipant = participants.find(p => p.id === chatParticipantId);
+  // Compute ordered list of IDs for matched messages (used for search navigation)
+  const searchMatchIds = React.useMemo(() => {
+    if (!searchQuery) return [];
+    const q = searchQuery.toLowerCase();
+    return chatMessages
+      .filter(m => m.text && m.text.toLowerCase().includes(q))
+      .map(m => m.id || null)
+      .filter(Boolean);
+  }, [chatMessages, searchQuery]);
+  // Clamp focus index
+  const clampedFocusIdx = searchMatchIds.length > 0
+    ? Math.max(0, Math.min(searchFocusIndex, searchMatchIds.length - 1))
+    : 0;
+  const focusedMsgId = searchMatchIds[clampedFocusIdx] || null;
+  // Scroll focused message into view when it changes
+  React.useEffect(() => {
+    if (!focusedMsgId) return;
+    const el = document.querySelector(`[data-msg-row-id="${focusedMsgId}"]`);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [focusedMsgId]);
+
   let lastDateStr = '';
   let readMarkerInserted = false;
   const renderedMessages = [];
@@ -12463,6 +12502,7 @@ function ChatRoomView({
     const isEmojiOnlyMessage = isEmojiOnlyChatText(msg.text) && !msgHasImages;
     const rowId = msg.id || `msg-${idx}`;
     const isSearchMatch = searchQuery && msg.text && msg.text.toLowerCase().includes(searchQuery.toLowerCase());
+    const isSearchFocused = isSearchMatch && rowId === focusedMsgId;
     renderedMessages.push(/*#__PURE__*/React.createElement("div", {
       key: rowId,
       className: `msg-row-hover ${revealedMsgId === rowId ? 'msg-actions-revealed' : ''}`,
@@ -12584,6 +12624,8 @@ function ChatRoomView({
       key: "bubble-wrapper",
       style: { position: 'relative', maxWidth: '65%', zIndex: 1, alignSelf: 'flex-end' }
     }, /*#__PURE__*/React.createElement("div", {
+      key: isSearchFocused ? `bubble-focused-${rowId}` : undefined,
+      className: isSearchFocused ? 'chat-search-focused-bubble' : (isSearchMatch ? 'chat-search-match-bubble' : ''),
       style: {
         position: 'relative',
         zIndex: 1,
@@ -12627,6 +12669,8 @@ function ChatRoomView({
       key: "bubble-wrapper",
       style: { position: 'relative', maxWidth: '65%', zIndex: 1 }
     }, /*#__PURE__*/React.createElement("div", {
+      key: isSearchFocused ? `bubble-focused-${rowId}` : undefined,
+      className: isSearchFocused ? 'chat-search-focused-bubble' : (isSearchMatch ? 'chat-search-match-bubble' : ''),
       style: {
         position: 'relative',
         zIndex: 1,
@@ -13316,8 +13360,8 @@ function ChatRoomView({
       zIndex: 1008,
       display: 'flex',
       alignItems: 'center',
-      gap: '8px',
-      padding: '8px 12px',
+      gap: '6px',
+      padding: '7px 10px',
       backgroundColor: 'var(--bg-card)',
       borderBottom: '1px solid var(--border-subtle)',
       boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
@@ -13325,8 +13369,8 @@ function ChatRoomView({
   },
     /*#__PURE__*/React.createElement("svg", {
       xmlns: "http://www.w3.org/2000/svg",
-      width: "18",
-      height: "18",
+      width: "17",
+      height: "17",
       viewBox: "0 0 24 24",
       fill: "none",
       stroke: "currentColor",
@@ -13340,20 +13384,78 @@ function ChatRoomView({
       className: "form-input",
       placeholder: "검색할 메시지를 입력하세요...",
       value: searchQuery,
-      onChange: e => setSearchQuery(e.target.value),
+      onChange: e => { setSearchQuery(e.target.value); setSearchFocusIndex(0); },
       autoFocus: true,
-      style: { flex: 1, height: '36px', fontSize: '0.9rem' }
+      style: { flex: 1, height: '34px', fontSize: '0.88rem' }
     }),
+    searchQuery && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: '0.76rem',
+        color: 'var(--text-muted)',
+        flexShrink: 0,
+        minWidth: '36px',
+        textAlign: 'center',
+        fontVariantNumeric: 'tabular-nums'
+      }
+    }, searchMatchIds.length > 0 ? `${clampedFocusIdx + 1}/${searchMatchIds.length}` : '0/0'),
     /*#__PURE__*/React.createElement("button", {
       type: "button",
-      onClick: () => { setIsSearchOpen(false); setSearchQuery(''); },
+      disabled: searchMatchIds.length === 0,
+      onClick: () => setSearchFocusIndex(i => {
+        const next = i - 1;
+        return next < 0 ? searchMatchIds.length - 1 : next;
+      }),
+      title: "이전 결과",
+      style: {
+        border: 'none',
+        background: 'none',
+        cursor: searchMatchIds.length > 0 ? 'pointer' : 'default',
+        color: searchMatchIds.length > 0 ? 'var(--text-main)' : 'var(--text-muted)',
+        padding: '4px',
+        display: 'flex',
+        alignItems: 'center',
+        flexShrink: 0,
+        opacity: searchMatchIds.length > 0 ? 1 : 0.4
+      }
+    }, /*#__PURE__*/React.createElement("svg", {
+      xmlns: "http://www.w3.org/2000/svg", width: "18", height: "18",
+      viewBox: "0 0 24 24", fill: "none", stroke: "currentColor",
+      strokeWidth: "2.5", strokeLinecap: "round", strokeLinejoin: "round"
+    }, /*#__PURE__*/React.createElement("path", { d: "m18 15-6-6-6 6" }))),
+    /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      disabled: searchMatchIds.length === 0,
+      onClick: () => setSearchFocusIndex(i => {
+        const next = i + 1;
+        return next >= searchMatchIds.length ? 0 : next;
+      }),
+      title: "다음 결과",
+      style: {
+        border: 'none',
+        background: 'none',
+        cursor: searchMatchIds.length > 0 ? 'pointer' : 'default',
+        color: searchMatchIds.length > 0 ? 'var(--text-main)' : 'var(--text-muted)',
+        padding: '4px',
+        display: 'flex',
+        alignItems: 'center',
+        flexShrink: 0,
+        opacity: searchMatchIds.length > 0 ? 1 : 0.4
+      }
+    }, /*#__PURE__*/React.createElement("svg", {
+      xmlns: "http://www.w3.org/2000/svg", width: "18", height: "18",
+      viewBox: "0 0 24 24", fill: "none", stroke: "currentColor",
+      strokeWidth: "2.5", strokeLinecap: "round", strokeLinejoin: "round"
+    }, /*#__PURE__*/React.createElement("path", { d: "m6 9 6 6 6-6" }))),
+    /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => { setIsSearchOpen(false); setSearchQuery(''); setSearchFocusIndex(0); },
       style: {
         border: 'none',
         background: 'none',
         cursor: 'pointer',
         color: 'var(--text-muted)',
-        padding: '4px 8px',
-        fontSize: '0.82rem',
+        padding: '4px 6px',
+        fontSize: '0.8rem',
         fontWeight: 700,
         flexShrink: 0
       }
@@ -16669,17 +16771,8 @@ function ChatGalleryModal({
     onClick: onClose,
     style: { zIndex: 1060 }
   }, /*#__PURE__*/React.createElement("div", {
-    className: "modal-card",
-    onClick: e => e.stopPropagation(),
-    style: {
-      width: '100%',
-      maxWidth: '480px',
-      maxHeight: '85vh',
-      display: 'flex',
-      flexDirection: 'column',
-      padding: 0,
-      overflow: 'hidden'
-    }
+    className: "modal-container",
+    onClick: e => e.stopPropagation()
   }, /*#__PURE__*/React.createElement("div", {
     className: "modal-header",
     style: {
