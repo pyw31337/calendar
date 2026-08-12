@@ -14647,11 +14647,12 @@ function DateModal({
     }
   };
 
-  return /*#__PURE__*/React.createElement("div", {
+  const portalContent = /*#__PURE__*/React.createElement("div", {
     className: "modal-overlay",
     onClick: () => {
       if (!isSubmitting) onClose();
-    }
+    },
+    style: { zIndex: 10005 } // Always open on top of AdminModal (9999) and dim it
   }, /*#__PURE__*/React.createElement("div", {
     className: "modal-container",
     onClick: e => e.stopPropagation()
@@ -15261,6 +15262,7 @@ function DateModal({
       fontWeight: 700
     }
   }, p.name)))))));
+  return typeof document !== 'undefined' && ReactDOM.createPortal ? ReactDOM.createPortal(portalContent, document.body) : portalContent;
 }
 
 // Reconstruct calendar to a specific log timestamp (PITR)
