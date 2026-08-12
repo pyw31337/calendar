@@ -10816,13 +10816,20 @@ async function compressImageToDataUrls(file, { maxBase64Length = MAX_CHAT_IMAGE_
   const thumbnail = encodeWithinBudget(240, [0.72, 0.6, 0.5, 0.4], maxThumbBase64Length, 120);
 
   // High-quality blob for Firebase Storage (when storage is working, we bypass low-res restrictions
-  // to upload a gorgeous image: lossless PNG for screenshots/PNG files, and high-quality 2560px JPEG for other formats).
+  // to upload the original file completely untouched if it is under 4MB, preserving 100% original quality and formats).
   const getHighQualityBlob = () => {
     if (isStorageDisabled) return Promise.resolve(null);
+    
+    // If the original file is already under 4MB, upload it directly.
+    // This guarantees 100% pixel-perfect original quality (PNG or JPG) with ZERO compression noise.
+    if (file.size <= 4 * 1024 * 1024) {
+      return Promise.resolve(file);
+    }
+    
     return new Promise(res => {
       let w = img.width, h = img.height;
       const isPng = (file.type === 'image/png' || file.name.toLowerCase().endsWith('.png'));
-      const maxDimHigh = isPng ? 2560 : 2560; // 2560px resolution limit to preserve fine text details
+      const maxDimHigh = 2560;
       if (w > maxDimHigh || h > maxDimHigh) {
         if (w > h) { h = Math.round(h * maxDimHigh / w); w = maxDimHigh; }
         else { w = Math.round(w * maxDimHigh / h); h = maxDimHigh; }
@@ -10832,10 +10839,8 @@ async function compressImageToDataUrls(file, { maxBase64Length = MAX_CHAT_IMAGE_
       canvas.height = h;
       canvas.getContext('2d').drawImage(img, 0, 0, w, h);
       if (isPng) {
-        // PNG is lossless and perfect for screenshots or images containing text
         canvas.toBlob(blob => res(blob), 'image/png');
       } else {
-        // High quality JPEG for normal photos, minimizing ringing artifacts around edges
         canvas.toBlob(blob => res(blob), 'image/jpeg', 0.94);
       }
     });
