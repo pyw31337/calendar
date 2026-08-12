@@ -18061,7 +18061,8 @@ function MemoView({ calendar, memos, onBack, showToast, isDarkTheme, onRequestCo
   const [editText, setEditText] = React.useState('');
   const [editColor, setEditColor] = React.useState('');
   const [editIsPinned, setEditIsPinned] = React.useState(false);
-  const [editTags, setEditTags] = React.useState('');
+  const [editTags, setEditTags] = React.useState([]); // array of strings (tag tokens)
+  const [editTagInput, setEditTagInput] = React.useState('');
   const [editImages, setEditImages] = React.useState([]); // combined existing URLs + new uploads
   const [editUploadProgress, setEditUploadProgress] = React.useState(null);
 
@@ -18284,11 +18285,8 @@ function MemoView({ calendar, memos, onBack, showToast, isDarkTheme, onRequestCo
       }
       setEditUploadProgress(100);
 
-      const tagsArray = editTags.split(',')
-        .map(t => t.trim())
-        .filter(t => t.startsWith('#') ? t.slice(1).trim() : t)
-        .map(t => t.startsWith('#') ? t : '#' + t)
-        .filter(t => t.length > 1);
+      // Save tags formatted back to database (prepend '#' prefix if needed)
+      const tagsArray = editTags.map(t => t.startsWith('#') ? t : '#' + t);
 
       const participantId = editParticipantId || 'anonymous';
 
@@ -18377,7 +18375,13 @@ function MemoView({ calendar, memos, onBack, showToast, isDarkTheme, onRequestCo
     setEditText(memo.text || '');
     setEditColor(memo.color || 'var(--bg-card)');
     setEditIsPinned(!!memo.isPinned);
-    setEditTags((memo.tags || []).join(', '));
+    
+    // Parse tag tokens (strip '#' prefix for local state management)
+    const rawTags = memo.tags || [];
+    const cleanTags = rawTags.map(t => t.startsWith('#') ? t.slice(1).trim() : t).filter(Boolean);
+    setEditTags(cleanTags);
+    setEditTagInput('');
+
     // Reconstruct list of images for editing
     const currentImgs = (memo.imageUrls || []).map((url, idx) => ({
       imageUrl: url,
@@ -18395,6 +18399,25 @@ function MemoView({ calendar, memos, onBack, showToast, isDarkTheme, onRequestCo
 
   const removeEditImage = (idx) => {
     setEditImages(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const handleAddEditTag = () => {
+    const val = editTagInput.trim();
+    if (!val) return;
+
+    const cleanTag = val.startsWith('#') ? val.slice(1).trim() : val;
+    if (!cleanTag) return;
+
+    if (editTags.includes(cleanTag)) {
+      showToast('이미 등록된 태그입니다.', 'error');
+      return;
+    }
+    if (editTags.length >= 10) {
+      showToast('태그는 최대 10개까지 등록 가능합니다.', 'error');
+      return;
+    }
+    setEditTags(prev => [...prev, cleanTag]);
+    setEditTagInput('');
   };
 
   const filteredMemos = memos.filter(memo => {
@@ -19018,61 +19041,52 @@ function MemoView({ calendar, memos, onBack, showToast, isDarkTheme, onRequestCo
           }, "✕")
         ))),
 
-        /* Tags field - Styled precisely as user requested */
-        /*#__PURE__*/React.createElement("input", {
-          type: "text",
-          placeholder: "해시태그 (쉼표로 구분 예: 맛집, 추천)",
-          value: editTags,
-          onChange: e => setEditTags(e.target.value),
-          style: {
-            background: '#e2e8f059',
-            borderTop: '0',
-            borderRightWidth: 'medium',
-            borderBottomWidth: 'medium',
-            borderLeftWidth: 'medium',
-            borderRightStyle: 'none',
-            borderBottomStyle: 'none',
-            borderLeftStyle: 'none',
-            borderRightColor: 'currentcolor',
-            borderBottomColor: 'currentcolor',
-            borderLeftColor: 'currentcolor',
-            borderImage: 'none',
-            outline: 'none',
-            fontSize: '0.78rem',
-            color: 'var(--text-main)',
-            padding: '10px 10px',
-            borderRadius: '10px',
-            width: '100%',
-            boxSizing: 'border-box'
-          }
-        }),
+        /* Tag Input Module (migrated directly from Lightbox component, white background responsive) */
+        /*#__PURE__*/React.createElement("div", {
+          style: { display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }
+        },
+          /*#__PURE__*/React.createElement("span", {
+            style: { fontSize: '0.74rem', fontWeight: 800, color: 'var(--text-muted)', flexShrink: 0 }
+          }, "태그입력"),
+          /*#__PURE__*/React.createElement("input", {
+            type: "text",
+            placeholder: editTags.length >= 10 ? "태그 최대 10개 도달" : `태그 입력 (${editTags.length}/10)`,
+            value: editTagInput,
+            onChange: e => setEditTagInput(e.target.value),
+            onKeyDown: e => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                handleAddEditTag();
+              }
+            },
+            maxLength: 100,
+            style: {
+              flex: 1, minWidth: 0, height: '28px', padding: '0 8px', borderRadius: '6px',
+              border: '1px solid var(--border-subtle)', background: 'var(--bg-primary)',
+              color: 'var(--text-main)', fontSize: '0.74rem'
+            }
+          }),
+          /*#__PURE__*/React.createElement("button", {
+            type: "button",
+            onClick: handleAddEditTag,
+            disabled: editTags.length >= 10,
+            style: {
+              flexShrink: 0, height: '28px', padding: '0 10px', borderRadius: '6px',
+              border: '1px solid var(--border-subtle)', background: 'var(--border-subtle)',
+              color: 'var(--text-main)', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer',
+              opacity: editTags.length >= 10 ? 0.45 : 1
+            }
+          }, "저장")
+        ),
 
-        /* Footer Controls */
+        /* Footer Controls: Participant button and Tag Badges row (Swatches dot menu removed completely) */
         /*#__PURE__*/React.createElement("div", {
           style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '8px', gap: '8px', flexWrap: 'wrap' }
         },
-          /* Color swatches & Participant select box next to it */
+          /* Participant select box & tag badges list to its right */
           /*#__PURE__*/React.createElement("div", {
-            style: { display: 'flex', alignItems: 'center', gap: '10px' }
+            style: { display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }
           },
-            /* Palette dots */
-            /*#__PURE__*/React.createElement("div", {
-              style: { display: 'flex', gap: '4px' }
-            }, MEMO_COLORS.map(color => /*#__PURE__*/React.createElement("button", {
-              key: color.name,
-              type: "button",
-              onClick: () => setEditColor(color.value),
-              title: color.name,
-              style: {
-                width: '16px', height: '16px',
-                borderRadius: '50%',
-                backgroundColor: color.value === 'var(--bg-card)' ? (isDarkTheme ? '#1e293b' : '#f1f5f9') : color.value,
-                border: editColor === color.value ? '2px solid #3B82F6' : '1px solid var(--border-subtle)',
-                cursor: 'pointer',
-                padding: 0
-              }
-            }))),
-
             /* Participant selection capsule button - Styled to perfectly match chat input */
             /*#__PURE__*/React.createElement("button", {
               type: "button",
@@ -19096,7 +19110,30 @@ function MemoView({ calendar, memos, onBack, showToast, isDarkTheme, onRequestCo
               }
             }, editPart?.name || '작성자 선택', /*#__PURE__*/React.createElement("span", {
               style: { fontSize: '0.6rem' }
-            }, "▼"))
+            }, "▼")),
+
+            /* Active tag capsule badges (Responsive white background style: (#레시피 (✕))) */
+            editTags.map(tag => /*#__PURE__*/React.createElement("span", {
+              key: tag,
+              style: {
+                display: 'inline-flex', alignItems: 'center', gap: '6px', borderRadius: '9999px',
+                padding: '3px 4px 3px 10px', fontSize: '0.72rem', fontWeight: 900, lineHeight: 1,
+                border: '1px solid var(--border-subtle)', color: 'var(--text-main)', background: 'var(--bg-primary)'
+              }
+            }, `#${tag}`, /*#__PURE__*/React.createElement("button", {
+              type: "button",
+              title: `#${tag} 태그 삭제`,
+              onClick: e => {
+                e.stopPropagation();
+                setEditTags(prev => prev.filter(t => t !== tag));
+              },
+              style: {
+                width: '17px', height: '17px', border: 0, borderRadius: '50%',
+                background: 'var(--border-subtle)', color: 'var(--text-main)', display: 'inline-flex',
+                alignItems: 'center', justifyContent: 'center', padding: 0, cursor: 'pointer',
+                flexShrink: 0
+              }
+            }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 12 }))))
           ),
 
           /* Save / Delete / Cancel Actions using DateModal layout styles */
