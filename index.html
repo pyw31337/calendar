@@ -12515,8 +12515,7 @@ function ChatRoomView({
         alignItems: 'flex-start',
         gap: '8px',
         marginBottom: '12px',
-        justifyContent: isMe ? 'flex-end' : 'flex-start',
-        ...(isSearchMatch ? { outline: '2px solid var(--accent-primary)', outlineOffset: '4px', borderRadius: '10px' } : {})
+        justifyContent: isMe ? 'flex-end' : 'flex-start'
       }
     }, !isMe && /*#__PURE__*/React.createElement("span", {
       style: {
@@ -12653,7 +12652,11 @@ function ChatRoomView({
         height: 0,
         borderTop: '7px solid transparent',
         borderBottom: '7px solid transparent',
-        borderLeft: '7px solid var(--border-subtle)',
+        borderLeft: isSearchFocused
+          ? '7px solid #7C3AED'
+          : isSearchMatch
+            ? '7px solid rgba(124,58,237,0.45)'
+            : '7px solid var(--border-subtle)',
         zIndex: 2
       }
     }), /*#__PURE__*/React.createElement("div", {
@@ -12665,7 +12668,11 @@ function ChatRoomView({
         height: 0,
         borderTop: '6px solid transparent',
         borderBottom: '6px solid transparent',
-        borderLeft: '6px solid var(--bg-card)',
+        borderLeft: isSearchFocused
+          ? '6px solid rgba(124,58,237,0.06)'
+          : isSearchMatch
+            ? '6px solid rgba(124,58,237,0.03)'
+            : '6px solid var(--bg-card)',
         zIndex: 3
       }
     }))] : [/*#__PURE__*/React.createElement("div", {
@@ -12698,7 +12705,11 @@ function ChatRoomView({
         height: 0,
         borderTop: '7px solid transparent',
         borderBottom: '7px solid transparent',
-        borderRight: '7px solid var(--border-subtle)',
+        borderRight: isSearchFocused
+          ? '7px solid #7C3AED'
+          : isSearchMatch
+            ? '7px solid rgba(124,58,237,0.45)'
+            : '7px solid var(--border-subtle)',
         zIndex: 2
       }
     }), /*#__PURE__*/React.createElement("div", {
@@ -12710,7 +12721,11 @@ function ChatRoomView({
         height: 0,
         borderTop: '6px solid transparent',
         borderBottom: '6px solid transparent',
-        borderRight: '6px solid var(--bg-card)',
+        borderRight: isSearchFocused
+          ? '6px solid rgba(124,58,237,0.06)'
+          : isSearchMatch
+            ? '6px solid rgba(124,58,237,0.03)'
+            : '6px solid var(--bg-card)',
         zIndex: 3
       }
     })), /*#__PURE__*/React.createElement("div", {
