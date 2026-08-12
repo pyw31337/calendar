@@ -10320,8 +10320,9 @@ async function fetchLinkPreview(url) {
       const json = await res.json();
       if (!json.ok) throw new Error(json.message || 'peekalink request failed');
       const image = json.image?.medium?.url || json.image?.large?.url || json.image?.thumbnail?.url || json.icon?.url || '';
+      const hasContent = !!(json.title || image || json.description);
       const result = {
-        status: (json.title || image || json.description) ? 'success' : 'empty',
+        status: hasContent ? 'success' : 'empty',
         data: {
           title: json.title || (json.redirected && json.redirectionUrl ? new URL(json.redirectionUrl).hostname.replace('www.','') : '') || json.domain || '',
           description: json.description || '',
@@ -10329,11 +10330,12 @@ async function fetchLinkPreview(url) {
           siteName: json.siteName || json.domain || ''
         }
       };
-      linkPreviewCache.set(url, result);
+      // Only cache successful results; let empty/failed results be retried on next render
+      if (hasContent) linkPreviewCache.set(url, result);
       return result;
     } catch (e) {
       const result = { status: 'error' };
-      linkPreviewCache.set(url, result);
+      // Don't cache errors -- let them be retried when the component remounts or page reloads
       return result;
     } finally {
       linkPreviewInflight.delete(url);
