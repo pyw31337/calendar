@@ -8275,7 +8275,30 @@ function App() {
   const [isHeaderVisible, setIsHeaderVisible] = React.useState(true);
   const lastScrollTopRef = React.useRef(0);
 
+  // Track whether the virtual keyboard is currently open (visualViewport shorter than window)
+  const isKeyboardOpenRef = React.useRef(false);
+  React.useEffect(() => {
+    if (!window.visualViewport) return;
+    const onVpChange = () => {
+      const keyboardHeight = window.innerHeight - window.visualViewport.height;
+      isKeyboardOpenRef.current = keyboardHeight > 80; // >80px gap = keyboard is up
+      // When keyboard opens, always ensure input bar is visible
+      if (isKeyboardOpenRef.current) setIsHeaderVisible(true);
+    };
+    window.visualViewport.addEventListener('resize', onVpChange);
+    window.visualViewport.addEventListener('scroll', onVpChange);
+    onVpChange();
+    return () => {
+      window.visualViewport.removeEventListener('resize', onVpChange);
+      window.visualViewport.removeEventListener('scroll', onVpChange);
+    };
+  }, []);
+
   const handleChatScroll = (e) => {
+    // IMPORTANT: When the virtual keyboard is open, programmatic scrollTop changes triggered
+    // by the keyboard resize should NOT hide the header/input bar. Only user-initiated
+    // downward scrolling (when keyboard is closed) should hide the composer.
+    if (isKeyboardOpenRef.current) return;
     const scrollTop = e.target.scrollTop;
     const lastScrollTop = lastScrollTopRef.current;
     if (scrollTop < 10) {
@@ -12578,7 +12601,9 @@ function ChatRoomView({
     };
   }, []);
 
-  // Scroll to bottom when viewport height changes (keyboard slides in/out)
+  // Keyboard open/close: scroll to bottom AND ensure composer is always visible
+  // when keyboard is up. On some Android browsers (Samsung Internet, Chrome), the keyboard
+  // appears without a scroll event, so isHeaderVisible must be forced here too.
   React.useEffect(() => {
     if (chatMessagesContainerRef.current) {
       const container = chatMessagesContainerRef.current;
