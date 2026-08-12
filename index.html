@@ -8555,7 +8555,7 @@ function App() {
     if (imageIndex >= entryCount) return false;
     const parseTagTokens = text => Array.from(new Set(
       String(text || '').split(/[,\s#]+/).map(t => sanitizeText(t.trim(), 30)).filter(Boolean)
-    )).slice(0, 20);
+    )).slice(0, 10);
     const prevTokens = parseTagTokens(Array.isArray(sourceMessage.imageTags) ? sourceMessage.imageTags[imageIndex] : '');
     const nextTokens = parseTagTokens(tagsText);
     const cleanTags = sanitizeText(nextTokens.join(' '), 100);
@@ -11120,7 +11120,7 @@ function LinkIcon({ size = 16 }) {
 // dimensions), 해시태그 capsules + URL button, and the 태그입력 input row. 해시태그 is the
 // public-facing name for what's stored as one space/comma-delimited string per image (see
 // handleSaveImageTags) -- parsed into individual #tag capsules here for display/delete/search.
-function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSearchTag }) {
+function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSearchTag, showToast }) {
   const tagTokens = String(tags || '').split(/[,\s#]+/).map(t => t.trim()).filter(Boolean);
   const [tagInput, setTagInput] = React.useState(tags || '');
   const [isSavingTags, setIsSavingTags] = React.useState(false);
@@ -11128,11 +11128,27 @@ function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSearchTag
   const [isDeletingTag, setIsDeletingTag] = React.useState(false);
   React.useEffect(() => { setTagInput(tags || ''); }, [tags]);
   if (!info.dateLabel && !info.typeLabel && !onSaveTags) return null;
+  const MAX_TAGS = 10;
   const handleSaveTags = async () => {
     if (!onSaveTags || isSavingTags) return;
+    // Parse new tokens from input
+    const newTokens = String(tagInput || '').split(/[,\s#]+/).map(t => t.trim()).filter(Boolean);
+    if (newTokens.length === 0) return;
+    // Merge with existing, deduplicate, enforce limit
+    const merged = Array.from(new Set([...tagTokens, ...newTokens]));
+    if (merged.length > MAX_TAGS) {
+      // Check if any of the new tokens would actually be added
+      const wouldAdd = newTokens.filter(t => !tagTokens.includes(t));
+      if (tagTokens.length >= MAX_TAGS || (tagTokens.length + wouldAdd.length) > MAX_TAGS) {
+        if (typeof showToast === 'function') showToast('태그는 최대 10개 저장 가능', 'error');
+        return;
+      }
+    }
+    const finalTags = merged.slice(0, MAX_TAGS);
     setIsSavingTags(true);
     try {
-      await onSaveTags(tagInput);
+      const saved = await onSaveTags(finalTags.join(' '));
+      if (saved !== false) setTagInput('');
     } finally {
       setIsSavingTags(false);
     }
@@ -11225,7 +11241,7 @@ function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSearchTag
         value: tagInput,
         onChange: e => setTagInput(e.target.value),
         onKeyDown: e => { if (e.key === 'Enter') { e.preventDefault(); handleSaveTags(); } },
-        placeholder: "태그 입력 (예: 생일, 파티)",
+        placeholder: tagTokens.length >= 10 ? "태그 최대 10개 도달" : `태그 입력 (${tagTokens.length}/10)`,
         maxLength: 100,
         style: {
           flex: 1, minWidth: 0, height: '28px', padding: '0 8px', borderRadius: '6px',
@@ -11236,12 +11252,12 @@ function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSearchTag
       /*#__PURE__*/React.createElement("button", {
         type: "button",
         onClick: handleSaveTags,
-        disabled: isSavingTags,
+        disabled: isSavingTags || tagTokens.length >= 10,
         style: {
           flexShrink: 0, height: '28px', padding: '0 10px', borderRadius: '6px',
           border: '1px solid rgba(255,255,255,0.32)', background: 'rgba(255,255,255,0.22)',
           color: '#FFFFFF', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer',
-          opacity: isSavingTags ? 0.6 : 1
+          opacity: (isSavingTags || tagTokens.length >= 10) ? 0.45 : 1
         }
       }, isSavingTags ? '...' : '저장')
     )
@@ -11568,7 +11584,8 @@ function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, onPromote
     tags: currentTags,
     onSaveTags: saveCurrentTags,
     onSearchTag: onSearchTag,
-    onOpenUrl: () => setImageUrlModalOpen(true)
+    onOpenUrl: () => setImageUrlModalOpen(true),
+    showToast: showToast
   })) : /*#__PURE__*/React.createElement("img", {
     src: url,
     alt: "원본 이미지",
@@ -11668,7 +11685,8 @@ function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, onPromote
     tags: currentTags,
     onSaveTags: saveCurrentTags,
     onSearchTag: onSearchTag,
-    onOpenUrl: () => setImageUrlModalOpen(true)
+    onOpenUrl: () => setImageUrlModalOpen(true),
+    showToast: showToast
   })),
   total > 1 && /*#__PURE__*/React.createElement("div", {
     onClick: e => e.stopPropagation(),
