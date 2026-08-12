@@ -10846,31 +10846,59 @@ async function compressImageToDataUrls(file, { maxBase64Length = MAX_CHAT_IMAGE_
     });
   };
 
+  const getHighQualityThumbBlob = () => {
+    if (isStorageDisabled) return Promise.resolve(null);
+    return new Promise(res => {
+      let w = img.width, h = img.height;
+      const maxDimThumb = 480; // Raised to 480px for super sharp high-DPI thumbnails in the chat bubble list
+      if (w > maxDimThumb || h > maxDimThumb) {
+        if (w > h) { h = Math.round(h * maxDimThumb / w); w = maxDimThumb; }
+        else { w = Math.round(w * maxDimThumb / h); h = maxDimThumb; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      const isPng = (file.type === 'image/png' || file.name.toLowerCase().endsWith('.png'));
+      if (isPng) {
+        canvas.toBlob(blob => res(blob), 'image/png');
+      } else {
+        canvas.toBlob(blob => res(blob), 'image/jpeg', 0.85); // High quality JPEG thumbnail
+      }
+    });
+  };
+
   const highQualityBlob = await getHighQualityBlob();
+  const highQualityThumbBlob = await getHighQualityThumbBlob();
 
   // Also produce Blobs at the same size/quality actually chosen above, used to upload to
   // Firebase Storage at send time (see uploadChatImageAssets) instead of embedding base64 in
   // the message document. The base64 strings above are kept as the fallback if that upload fails.
   return new Promise((resolve) => {
-    thumbnail.canvas.toBlob(thumbnailBlob => {
-      if (highQualityBlob) {
-        resolve({
-          original: original.base64,
-          thumbnail: thumbnail.base64,
-          originalBlob: highQualityBlob,
-          thumbnailBlob
-        });
-      } else {
-        original.canvas.toBlob(originalBlob => {
-          resolve({
-            original: original.base64,
-            thumbnail: thumbnail.base64,
-            originalBlob,
-            thumbnailBlob
-          });
-        }, 'image/jpeg', original.quality);
-      }
-    }, 'image/jpeg', thumbnail.quality);
+    const resolveAll = (origBlob, thumbBlob) => {
+      resolve({
+        original: original.base64,
+        thumbnail: thumbnail.base64,
+        originalBlob: origBlob,
+        thumbnailBlob: thumbBlob
+      });
+    };
+
+    const getBase64OrigBlob = (cb) => {
+      if (highQualityBlob) cb(highQualityBlob);
+      else original.canvas.toBlob(blob => cb(blob), 'image/jpeg', original.quality);
+    };
+
+    const getBase64ThumbBlob = (cb) => {
+      if (highQualityThumbBlob) cb(highQualityThumbBlob);
+      else thumbnail.canvas.toBlob(blob => cb(blob), 'image/jpeg', thumbnail.quality);
+    };
+
+    getBase64OrigBlob(origBlob => {
+      getBase64ThumbBlob(thumbBlob => {
+        resolveAll(origBlob, thumbBlob);
+      });
+    });
   });
 }
 
