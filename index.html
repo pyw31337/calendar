@@ -3279,6 +3279,41 @@ function removeFirstUrl(value = '') {
   return raw ? source.replace(raw, '').trim() : source.trim();
 }
 
+// Shared "URL 뱃지" renderer: splits free text into its plain-text portion plus a clickable
+// gray capsule badge for the first URL found (matches the existing memo/expense/availability
+// badge styling elsewhere in the app). Returns a plain string when there's no URL so callers
+// that don't need JSX (titles, etc.) can still use it directly.
+function renderTextWithUrlBadge(text) {
+  const source = String(text || '');
+  const url = extractFirstUrl(source);
+  const textOnly = url ? removeFirstUrl(source) : source.trim();
+  if (!url) return textOnly;
+  return /*#__PURE__*/React.createElement(React.Fragment, null,
+    textOnly && /*#__PURE__*/React.createElement("span", { style: { wordBreak: 'break-word' } }, textOnly),
+    /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      title: url,
+      onClick: e => { e.stopPropagation(); window.open(url, '_blank', 'noopener,noreferrer'); },
+      style: {
+        display: 'inline-flex',
+        alignItems: 'center',
+        marginLeft: textOnly ? '6px' : 0,
+        padding: '3px 10px',
+        borderRadius: 'var(--radius-full)',
+        fontSize: '0.72rem',
+        fontWeight: 600,
+        border: 0,
+        backgroundColor: '#E2E8F0',
+        color: '#475569',
+        cursor: 'pointer',
+        wordBreak: 'break-all',
+        maxWidth: '100%',
+        textAlign: 'left'
+      }
+    }, url)
+  );
+}
+
 function normalizePollOptionInput(value = '') {
   const source = sanitizeText(value, 220);
   const url = extractFirstUrl(source);
@@ -9233,7 +9268,7 @@ function App() {
     }
   }, /*#__PURE__*/React.createElement(AdminFilledMenuIcon, null)))), activeCal?.description && /*#__PURE__*/React.createElement("div", {
     className: "calendar-desc"
-  }, activeCal.description), /*#__PURE__*/React.createElement("div", {
+  }, renderTextWithUrlBadge(activeCal.description)), /*#__PURE__*/React.createElement("div", {
     className: "main-menu-bar"
   }, /*#__PURE__*/React.createElement("button", {
     type: "button",
@@ -12238,6 +12273,39 @@ function ChatRoomView({
     const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
     if (distanceFromBottom > 200) setHasNewMessageBelow(true);
   }, [chatMessages.length]);
+  // Confetti burst around a newly-sent bubble -- only for messages I just sent myself (not
+  // ones arriving from other participants, and not the initial batch on mount). Anchors the
+  // burst to the actual bubble's on-screen position via its data-msg-row-id, same pattern as
+  // celebrateMoneyBurst's origin-element math elsewhere in the app.
+  const prevLastMsgIdRef = React.useRef(undefined);
+  React.useEffect(() => {
+    const last = chatMessages[chatMessages.length - 1];
+    const prevId = prevLastMsgIdRef.current;
+    prevLastMsgIdRef.current = last ? last.id : null;
+    if (prevId === undefined || !last || last.id === prevId) return;
+    if (last.participantId !== chatParticipantId) return;
+    if (typeof confetti !== 'function') return;
+    requestAnimationFrame(() => {
+      const el = chatMessagesContainerRef.current && last.id
+        ? chatMessagesContainerRef.current.querySelector(`[data-msg-row-id="${last.id}"]`)
+        : null;
+      let origin = { y: 0.75 };
+      if (el && typeof el.getBoundingClientRect === 'function') {
+        const rect = el.getBoundingClientRect();
+        if (rect.width || rect.height) {
+          origin = {
+            x: (rect.left + rect.width / 2) / window.innerWidth,
+            y: (rect.top + rect.height / 2) / window.innerHeight
+          };
+        }
+      }
+      try {
+        confetti({ particleCount: 36, spread: 60, startVelocity: 26, gravity: 1.1, ticks: 90, origin, scalar: 0.85 });
+      } catch (err) {
+        console.warn('Chat confetti error', err);
+      }
+    });
+  }, [chatMessages.length]);
   const handleScrollCombined = (e) => {
     if (handleChatScroll) handleChatScroll(e);
     const el = e.target;
@@ -12791,7 +12859,29 @@ function ChatRoomView({
     /*#__PURE__*/React.createElement("path", { d: "M8 12h.01" }),
     /*#__PURE__*/React.createElement("path", { d: "M12 12h.01" }),
     /*#__PURE__*/React.createElement("path", { d: "M16 12h.01" }),
-    /*#__PURE__*/React.createElement("path", { d: "M7 16h10" }))), /*#__PURE__*/React.createElement("div", {
+    /*#__PURE__*/React.createElement("path", { d: "M7 16h10" }))), noticePanelMode === 'floating' && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => setNoticePanelMode(pinnedNotices.length > 0 ? 'list' : 'add'),
+    title: "공지",
+    "aria-label": "공지 펼치기",
+    style: {
+      position: 'fixed',
+      top: '10px',
+      right: '16px',
+      width: '36px',
+      height: '36px',
+      borderRadius: '50%',
+      backgroundColor: 'var(--bg-card)',
+      border: 'none',
+      boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      cursor: 'pointer',
+      color: '#64748B',
+      zIndex: 1000
+    }
+  }, /*#__PURE__*/React.createElement(MegaphoneIcon, { size: 18 })), /*#__PURE__*/React.createElement("div", {
     className: "chat-room-header",
     style: {
       position: 'fixed',
@@ -12919,7 +13009,7 @@ function ChatRoomView({
         padding: '10px 12px', fontSize: '0.82rem', color: '#92400E', lineHeight: '1.5'
       }
     },
-      /*#__PURE__*/React.createElement("div", { style: { flex: 1, wordBreak: 'break-word' } }, notice.text),
+      /*#__PURE__*/React.createElement("div", { style: { flex: 1, wordBreak: 'break-word' } }, renderTextWithUrlBadge(notice.text)),
       /*#__PURE__*/React.createElement("button", {
         type: "button",
         onClick: () => onRemovePinnedNotice && onRemovePinnedNotice(notice.id),
@@ -12927,10 +13017,17 @@ function ChatRoomView({
         style: { background: 'none', border: 'none', cursor: 'pointer', color: '#92400E', flexShrink: 0, display: 'flex', alignItems: 'center' }
       }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 16 }))
     )),
-    /*#__PURE__*/React.createElement("button", {
-      type: "button", className: "btn btn-secondary", style: { width: '100%' },
-      onClick: () => { setNoticeInput(''); setNoticePanelMode('add'); }
-    }, "공지 추가")
+    /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px' } },
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        style: { flex: 1, border: '1px solid #0F172A', borderRadius: '10px', padding: '10px', fontWeight: 800, cursor: 'pointer', backgroundColor: '#0F172A', color: '#FFFFFF' },
+        onClick: () => { setNoticeInput(''); setNoticePanelMode('add'); }
+      }, "공지 추가"),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button", className: "btn btn-secondary", style: { flex: 1 },
+        onClick: () => setNoticePanelMode('floating')
+      }, "공지 접기")
+    )
   ), noticePanelMode === 'closed' && pinnedNotices.length > 0 && /*#__PURE__*/React.createElement("div", {
     style: {
       position: 'sticky', top: 0, zIndex: 5,
@@ -12946,7 +13043,7 @@ function ChatRoomView({
     }
   },
     /*#__PURE__*/React.createElement("div", { style: { flex: 1, wordBreak: 'break-word' } },
-      /*#__PURE__*/React.createElement("strong", null, "공지 "), notice.text
+      /*#__PURE__*/React.createElement("strong", null, "공지 "), renderTextWithUrlBadge(notice.text)
     )
   ))), renderedMessages.length === 0 ? /*#__PURE__*/React.createElement("div", {
     style: {
@@ -13285,12 +13382,7 @@ function ChatRoomView({
     onClose: () => setIsChatSideMenuOpen(false),
     onOpenSearch: () => { setIsSearchOpen(true); setSearchQuery(''); },
     onOpenNoticeSettings: () => {
-      setNoticePanelMode(prev => {
-        if (prev !== 'closed') return 'closed';
-        if (pinnedNotices.length > 0) return 'list';
-        setNoticeInput('');
-        return 'add';
-      });
+      if (pinnedNotices.length > 0) { setNoticePanelMode('list'); } else { setNoticeInput(''); setNoticePanelMode('add'); }
     },
     onOpenGallery: () => setIsChatGalleryOpen(true),
     onOpenShare: onShare,
@@ -16531,19 +16623,9 @@ function ChatSideMenu({
         className: "admin-side-menu-item",
         onClick: () => { onClose(); handle(onOpenNoticeSettings); }
       },
-        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", {
-          xmlns: "http://www.w3.org/2000/svg",
-          width: "20",
-          height: "20",
-          viewBox: "0 0 24 24",
-          fill: "none",
-          stroke: "currentColor",
-          strokeWidth: "2",
-          strokeLinecap: "round",
-          strokeLinejoin: "round"
-        }, /*#__PURE__*/React.createElement("path", { d: "M9 4v6l-2 4v2h10v-2l-2 -4v-6" }), /*#__PURE__*/React.createElement("path", { d: "M12 16v5" }))),
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement(MegaphoneIcon, { size: 20 })),
         /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
-          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "공지설정"),
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "공지사항"),
           /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "공지 등록 및 고정 관리")
         )
       ),
@@ -16834,7 +16916,7 @@ function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {
   }, categoryBadge(item.category), showDate && /*#__PURE__*/React.createElement("span", { className: "registered-at-text" }, formatDateWithDayName(item.date))), /*#__PURE__*/React.createElement("strong", {
     style: { fontSize: '0.9rem', color: item.isIncome ? '#16A34A' : '#DC2626', whiteSpace: 'nowrap' }
   }, item.isIncome ? '+' : '-', Math.abs(item.amount).toLocaleString(), "원")), /*#__PURE__*/React.createElement("span", {
-    style: { fontSize: '0.86rem', color: 'var(--text-main)', fontWeight: 800, overflowWrap: 'anywhere' }
+    style: { fontSize: '0.86rem', color: 'var(--text-main)', fontWeight: 500, overflowWrap: 'anywhere' }
   }, item.label), item.url && /*#__PURE__*/React.createElement("button", {
     type: "button",
     title: item.url,
@@ -16848,7 +16930,7 @@ function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {
       padding: '3px 10px',
       borderRadius: '9999px',
       fontSize: '0.72rem',
-      fontWeight: 600,
+      fontWeight: 400,
       backgroundColor: 'var(--border-subtle)',
       color: 'var(--text-muted)',
       wordBreak: 'break-all',
@@ -17775,6 +17857,27 @@ function LineHeightIcon({ size = 22 } = {}) {
   }));
 }
 
+function MegaphoneIcon({ size = 20 } = {}) {
+  return /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: String(size),
+    height: String(size),
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    "stroke-width": "2",
+    "stroke-linecap": "round",
+    "stroke-linejoin": "round",
+    className: "lucide lucide-megaphone-icon lucide-megaphone"
+  }, /*#__PURE__*/React.createElement("path", {
+    d: "M11 6a13 13 0 0 0 8.4-2.8A1 1 0 0 1 21 4v12a1 1 0 0 1-1.6.8A13 13 0 0 0 11 14H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M6 14a12 12 0 0 0 2.4 7.2 2 2 0 0 0 3.2-2.4A8 8 0 0 1 10 14"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M8 6v8"
+  }));
+}
+
 function SmallXIcon({ size = 24 } = {}) {
   return /*#__PURE__*/React.createElement("svg", {
     xmlns: "http://www.w3.org/2000/svg",
@@ -17939,7 +18042,7 @@ function PollList({ calendar, onCreatePoll, onEditPoll, onVotePoll, onCancelVote
       }
     }, closed ? '마감됨' : `마감 ${formatPollDeadline(poll.deadline)}`)), poll.description && /*#__PURE__*/React.createElement("div", {
       className: "poll-desc"
-    }, poll.description)), /*#__PURE__*/React.createElement("button", {
+    }, renderTextWithUrlBadge(poll.description))), /*#__PURE__*/React.createElement("button", {
       type: "button",
       className: "btn btn-secondary",
       title: "\uD22C\uD45C \uC124\uC815",
