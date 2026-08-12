@@ -11874,7 +11874,7 @@ function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, onPromote
     onClick: handleOverlayClick,
     style: {
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-      backgroundColor: 'rgba(15, 23, 42, 0.92)', backdropFilter: 'blur(8px)', zIndex: 9000,
+      backgroundColor: 'rgba(15, 23, 42, 0.92)', backdropFilter: 'blur(8px)', zIndex: 50000,
       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
       width: '100%', maxWidth: '100%', overflow: 'hidden',
       userSelect: 'none'
@@ -13853,7 +13853,8 @@ function ChatRoomView({
       type: "button",
       disabled: searchMatchIds.length === 0,
       onClick: () => setSearchFocusIndex(i => {
-        const next = i - 1;
+        const currentIdx = i >= searchMatchIds.length ? searchMatchIds.length - 1 : i;
+        const next = currentIdx - 1;
         return next < 0 ? searchMatchIds.length - 1 : next;
       }),
       title: "이전 결과",
@@ -13877,7 +13878,8 @@ function ChatRoomView({
       type: "button",
       disabled: searchMatchIds.length === 0,
       onClick: () => setSearchFocusIndex(i => {
-        const next = i + 1;
+        const currentIdx = i >= searchMatchIds.length ? searchMatchIds.length - 1 : i;
+        const next = currentIdx + 1;
         return next >= searchMatchIds.length ? 0 : next;
       }),
       title: "다음 결과",
