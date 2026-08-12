@@ -104,6 +104,11 @@ service cloud.firestore {
         allow delete: if isCalendarDoc(calendarDocId);
       }
 
+      // Collaborative memos. Allows participants to create, update, delete, and read notes in the calendar.
+      match /memos/{memoId} {
+        allow read, write: if isCalendarDoc(calendarDocId);
+      }
+
       // Activity log audit trail. Used to embed as a growing array on the calendar document
       // itself, which had no de-duplication and was the single biggest long-term threat to the
       // document's 1MiB size limit -- moved to its own subcollection (one document per entry,

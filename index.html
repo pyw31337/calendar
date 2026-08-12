@@ -3298,14 +3298,15 @@ const EXPENSE_ACTIVITY_ACTIONS = ['expense_create', 'expense_update', 'expense_d
 // same participant-optional treatment as expense/poll logs below.
 const IMAGE_TAG_ACTIVITY_ACTIONS = ['tag_add', 'tag_remove'];
 const MEETING_ACTIVITY_ACTIONS = ['meeting_confirm', 'meeting_cancel'];
-const ACTIVITY_ACTIONS = [...SCHEDULE_ACTIVITY_ACTIONS, ...POLL_ACTIVITY_ACTIONS, ...EXPENSE_ACTIVITY_ACTIONS, ...IMAGE_TAG_ACTIVITY_ACTIONS, ...MEETING_ACTIVITY_ACTIONS];
+const MEMO_ACTIVITY_ACTIONS = ['memo_create', 'memo_update', 'memo_delete'];
+const ACTIVITY_ACTIONS = [...SCHEDULE_ACTIVITY_ACTIONS, ...POLL_ACTIVITY_ACTIONS, ...EXPENSE_ACTIVITY_ACTIONS, ...IMAGE_TAG_ACTIVITY_ACTIONS, ...MEETING_ACTIVITY_ACTIONS, ...MEMO_ACTIVITY_ACTIONS];
 
 function normalizeActivityLog(calendarId, log, participantIds = null, idRedirects = new Map()) {
   if (!log || typeof log !== 'object') return null;
   if (log.calendarId && log.calendarId !== calendarId) return null;
   const participantId = sanitizeText(idRedirects.get(log.participantId) || log.participantId || '', 120);
   const action = ACTIVITY_ACTIONS.includes(log.action) ? log.action : '';
-  const isParticipantOptionalAction = POLL_ACTIVITY_ACTIONS.includes(action) || EXPENSE_ACTIVITY_ACTIONS.includes(action) || IMAGE_TAG_ACTIVITY_ACTIONS.includes(action) || MEETING_ACTIVITY_ACTIONS.includes(action);
+  const isParticipantOptionalAction = POLL_ACTIVITY_ACTIONS.includes(action) || EXPENSE_ACTIVITY_ACTIONS.includes(action) || IMAGE_TAG_ACTIVITY_ACTIONS.includes(action) || MEETING_ACTIVITY_ACTIONS.includes(action) || MEMO_ACTIVITY_ACTIONS.includes(action);
   const date = sanitizeText(log.date || '', 20);
   const timestamp = Number(log.timestamp || log.updatedAt || 0) || 0;
   if (!action || !timestamp) return null;
@@ -4744,6 +4745,23 @@ async function fetchChatMessagesRest(calId) {
     })).reverse();
   } catch (err) {
     console.warn('fetchChatMessagesRest error:', err);
+    return [];
+  }
+}
+
+async function fetchMemosRest(calId) {
+  try {
+    const url = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/calendars/cal_${calId}/memos?orderBy=createdAt%20desc`;
+    const res = await fetch(url);
+    if (!res.ok) return [];
+    const data = await res.json();
+    const docs = data.documents || [];
+    return docs.map(doc => ({
+      id: doc.name.split('/').pop(),
+      ...firestoreDocumentToJs(doc)
+    }));
+  } catch (err) {
+    console.warn('fetchMemosRest error:', err);
     return [];
   }
 }
@@ -8043,6 +8061,7 @@ function App() {
   // Chat-related states
   const [recentMessages, setRecentMessages] = React.useState([]);
   const [chatMessages, setChatMessages] = React.useState([]);
+  const [memos, setMemos] = React.useState([]);
   const [chatInput, setChatInput] = React.useState('');
   const [chatParticipantId, setChatParticipantId] = React.useState('');
   const chatParticipantIdRef = React.useRef(chatParticipantId);
@@ -8354,10 +8373,27 @@ function App() {
         });
       });
 
+    const unsubscribeMemos = firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('memos')
+      .orderBy('createdAt', 'desc')
+      .onSnapshot(snapshot => {
+        if (!isMounted) return;
+        const list = [];
+        snapshot.forEach(doc => {
+          list.push({ id: doc.id, ...doc.data() });
+        });
+        setMemos(list);
+      }, err => {
+        console.warn(`Firestore memos subscription error:`, err);
+        fetchMemosRest(activeCalId).then(list => {
+          if (isMounted) setMemos(list);
+        });
+      });
+
     return () => {
       isMounted = false;
       if (unsubscribeRecent) unsubscribeRecent();
       if (unsubscribeChat) unsubscribeChat();
+      if (unsubscribeMemos) unsubscribeMemos();
     };
   }, [activeCalId]);
 
@@ -9476,6 +9512,16 @@ function App() {
     });
   }
 
+  if (activeView === 'memo') {
+    return /*#__PURE__*/React.createElement(MemoView, {
+      calendar: activeCal,
+      memos: memos,
+      onBack: () => changeView('calendar'),
+      showToast: showToast,
+      isDarkTheme: isDarkTheme
+    });
+  }
+
   const mainMenuPollCount = getCalendarPolls(activeCal).filter(poll => !isPollClosed(poll)).length;
   const mainMenuChatCount = chatMessages.length;
   const mainMenuChatLatestTimestamp = mainMenuChatCount > 0 ? chatMessages[mainMenuChatCount - 1].timestamp : 0;
@@ -9546,18 +9592,14 @@ function App() {
   }, /*#__PURE__*/React.createElement("button", {
     type: "button",
     className: "main-menu-item",
-    onClick: () => scrollToSection(calendarSectionRef)
-  }, /*#__PURE__*/React.createElement("span", { className: "main-menu-icon" }, /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M4 7a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12z", "M16 3v4", "M8 3v4", "M4 11h16"] })), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-full" }, "일정잡기"), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-short" }, "일정")), /*#__PURE__*/React.createElement("div", { className: "main-menu-sep" }), /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    className: "main-menu-item",
     onClick: () => scrollToSection(pollsSectionRef)
-  }, /*#__PURE__*/React.createElement("span", { className: "main-menu-icon" }, /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M9 11l3 3l8 -8", "M20 12v6a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h9"] })), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-full" }, "투표하기"), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-short" }, "투표"), mainMenuPollCount > 0 && /*#__PURE__*/React.createElement("span", {
+  }, /*#__PURE__*/React.createElement("span", { className: "main-menu-icon" }, /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M9 11l3 3l8 -8", "M20 12v6a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h9"] })), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-full" }, "투표"), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-short" }, "투표"), mainMenuPollCount > 0 && /*#__PURE__*/React.createElement("span", {
     className: "main-menu-badge"
   }, mainMenuPollCount)), /*#__PURE__*/React.createElement("div", { className: "main-menu-sep" }), /*#__PURE__*/React.createElement("button", {
     type: "button",
     className: "main-menu-item",
     onClick: () => changeView('chat')
-  }, /*#__PURE__*/React.createElement("span", { className: "main-menu-icon" }, /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"] })), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-full" }, "채팅하기"), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-short" }, "채팅"), mainMenuChatCount > 0 && /*#__PURE__*/React.createElement("span", {
+  }, /*#__PURE__*/React.createElement("span", { className: "main-menu-icon" }, /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"] })), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-full" }, "채팅"), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-short" }, "채팅"), mainMenuChatCount > 0 && /*#__PURE__*/React.createElement("span", {
     className: `main-menu-badge${mainMenuChatHasUnread ? ' is-unread' : ''}`
   }, mainMenuChatCount)), /*#__PURE__*/React.createElement("div", { className: "main-menu-sep" }), /*#__PURE__*/React.createElement("button", {
     type: "button",
@@ -9565,7 +9607,13 @@ function App() {
     onClick: () => {
       if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 정산 정보를 확인해 주세요.')) changeView('settlement');
     }
-  }, /*#__PURE__*/React.createElement("span", { className: "main-menu-icon" }, /*#__PURE__*/React.createElement(WalletIcon, { size: 16 })), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-full" }, "정산하기"), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-short" }, "정산"))))), isMainSideMenuOpen && /*#__PURE__*/React.createElement(MainSideMenu, {
+  }, /*#__PURE__*/React.createElement("span", { className: "main-menu-icon" }, /*#__PURE__*/React.createElement(WalletIcon, { size: 16 })), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-full" }, "정산"), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-short" }, "정산")), /*#__PURE__*/React.createElement("div", { className: "main-menu-sep" }), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "main-menu-item",
+    onClick: () => {
+      if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 메모 정보를 확인해 주세요.')) changeView('memo');
+    }
+  }, /*#__PURE__*/React.createElement("span", { className: "main-menu-icon" }, /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"] })), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-full" }, "메모"), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-short" }, "메모"))))), isMainSideMenuOpen && /*#__PURE__*/React.createElement(MainSideMenu, {
     calendar: activeCal,
     onClose: () => setIsMainSideMenuOpen(false),
     onOpenManual: () => {
@@ -16595,7 +16643,8 @@ function AdminModal({
                 poll_create: '투표 생성', poll_vote: '투표 진행', poll_cancel: '투표 취소',
                 expense_create: '지출/수입 등록', expense_update: '지출/수입 수정', expense_delete: '지출/수입 삭제',
                 tag_add: '사진 태그 추가', tag_remove: '사진 태그 삭제',
-                meeting_confirm: '모임 확정', meeting_cancel: '모임 확정 취소'
+                meeting_confirm: '모임 확정', meeting_cancel: '모임 확정 취소',
+                memo_create: '메모 추가', memo_update: '메모 변경', memo_delete: '메모 삭제'
               }[log.action] || '활동';
 
               const actionBadgeColor = {
@@ -16603,7 +16652,8 @@ function AdminModal({
                 poll_create: '#8B5CF6', poll_vote: '#EC4899', poll_cancel: '#F97316',
                 expense_create: '#F59E0B', expense_update: '#F59E0B', expense_delete: '#DC2626',
                 tag_add: '#6366F1', tag_remove: '#DC2626',
-                meeting_confirm: '#8B5CF6', meeting_cancel: '#EF4444'
+                meeting_confirm: '#8B5CF6', meeting_cancel: '#EF4444',
+                memo_create: '#6366F1', memo_update: '#F59E0B', memo_delete: '#EF4444'
               }[log.action] || '#64748B';
               // A translucent tint of the badge's own color (instead of a fixed pastel hex)
               // stays readable on both light and dark modal backgrounds -- a solid light pastel
@@ -17969,6 +18019,1100 @@ function ChatGalleryModal({
     })))
   ))));
 }
+
+function MemoView({ calendar, memos, onBack, showToast, isDarkTheme }) {
+  const [searchQuery, setSearchQuery] = React.useState('');
+  const [selectedTag, setSelectedTag] = React.useState('');
+  const [isComposerExpanded, setIsComposerExpanded] = React.useState(false);
+
+  // New Memo Composer State
+  const [newTitle, setNewTitle] = React.useState('');
+  const [newText, setNewText] = React.useState('');
+  const [newColor, setNewColor] = React.useState('var(--bg-card)');
+  const [newIsPinned, setNewIsPinned] = React.useState(false);
+  const [newTags, setNewTags] = React.useState('');
+  const [newImages, setNewImages] = React.useState([]); // array of { originalBlob, thumbnailBlob, previewUrl }
+  const [newUploadProgress, setNewUploadProgress] = React.useState(null);
+
+  // Editing Memo State
+  const [editingMemo, setEditingMemo] = React.useState(null);
+  const [editTitle, setEditTitle] = React.useState('');
+  const [editText, setEditText] = React.useState('');
+  const [editColor, setEditColor] = React.useState('');
+  const [editIsPinned, setEditIsPinned] = React.useState(false);
+  const [editTags, setEditTags] = React.useState('');
+  const [editImages, setEditImages] = React.useState([]); // combined existing URLs + new uploads
+  const [editUploadProgress, setEditUploadProgress] = React.useState(null);
+
+  // Curated RGBA pastel background colors that work perfectly in both Light and Dark mode
+  const MEMO_COLORS = [
+    { name: '기본', value: 'var(--bg-card)', border: 'var(--border-subtle)' },
+    { name: '빨강', value: 'rgba(239, 68, 68, 0.12)', border: 'rgba(239, 68, 68, 0.3)' },
+    { name: '오렌지', value: 'rgba(245, 158, 11, 0.12)', border: 'rgba(245, 158, 11, 0.3)' },
+    { name: '노랑', value: 'rgba(234, 179, 8, 0.12)', border: 'rgba(234, 179, 8, 0.3)' },
+    { name: '초록', value: 'rgba(16, 185, 129, 0.12)', border: 'rgba(16, 185, 129, 0.3)' },
+    { name: '하늘', value: 'rgba(6, 182, 212, 0.12)', border: 'rgba(6, 182, 212, 0.3)' },
+    { name: '파랑', value: 'rgba(59, 130, 246, 0.12)', border: 'rgba(59, 130, 246, 0.3)' },
+    { name: '보라', value: 'rgba(139, 92, 246, 0.12)', border: 'rgba(139, 92, 246, 0.3)' },
+    { name: '핑크', value: 'rgba(236, 72, 153, 0.12)', border: 'rgba(236, 72, 153, 0.3)' }
+  ];
+
+  const getBorderColor = (colorVal) => {
+    const matched = MEMO_COLORS.find(c => c.value === colorVal);
+    return matched ? matched.border : 'var(--border-subtle)';
+  };
+
+  const handleComposerFileSelect = async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    
+    // Process each image using our high-quality guidelines
+    const processed = [];
+    for (const file of files) {
+      try {
+        let targetFile = file;
+        const lowerName = file.name.toLowerCase();
+        if (lowerName.endsWith('.heic') || lowerName.endsWith('.heif')) {
+          showToast('HEIC 이미지 변환 중...', 'info');
+          const heicTo = await loadHeicTo();
+          const jpgBlob = await heicTo({ blob: file, type: 'image/jpeg' });
+          targetFile = new File([jpgBlob], file.name.replace(/\.(heic|heif)$/i, '.jpg'), { type: 'image/jpeg' });
+        }
+
+        // Direct upload bypass under 4MB
+        let originalBlob, thumbnailBlob;
+        if (targetFile.size <= 4 * 1024 * 1024) {
+          originalBlob = targetFile;
+          // Generate a high-quality 480px thumbnail
+          thumbnailBlob = await getHighQualityThumbBlob(targetFile);
+        } else {
+          // Downscale large files
+          originalBlob = await getHighQualityBlob(targetFile);
+          thumbnailBlob = await getHighQualityThumbBlob(targetFile);
+        }
+
+        const previewUrl = URL.createObjectURL(originalBlob);
+        processed.push({ originalBlob, thumbnailBlob, previewUrl });
+      } catch (err) {
+        console.error('Failed to process image:', err);
+        showToast('이미지 처리 실패', 'error');
+      }
+    }
+    setNewImages(prev => [...prev, ...processed]);
+  };
+
+  const handleEditFileSelect = async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    const processed = [];
+    for (const file of files) {
+      try {
+        let targetFile = file;
+        const lowerName = file.name.toLowerCase();
+        if (lowerName.endsWith('.heic') || lowerName.endsWith('.heif')) {
+          showToast('HEIC 이미지 변환 중...', 'info');
+          const heicTo = await loadHeicTo();
+          const jpgBlob = await heicTo({ blob: file, type: 'image/jpeg' });
+          targetFile = new File([jpgBlob], file.name.replace(/\.(heic|heif)$/i, '.jpg'), { type: 'image/jpeg' });
+        }
+
+        let originalBlob, thumbnailBlob;
+        if (targetFile.size <= 4 * 1024 * 1024) {
+          originalBlob = targetFile;
+          thumbnailBlob = await getHighQualityThumbBlob(targetFile);
+        } else {
+          originalBlob = await getHighQualityBlob(targetFile);
+          thumbnailBlob = await getHighQualityThumbBlob(targetFile);
+        }
+
+        const previewUrl = URL.createObjectURL(originalBlob);
+        processed.push({ originalBlob, thumbnailBlob, previewUrl, isNew: true });
+      } catch (err) {
+        console.error('Failed to process image:', err);
+        showToast('이미지 처리 실패', 'error');
+      }
+    }
+    setEditImages(prev => [...prev, ...processed]);
+  };
+
+  const handleSaveMemo = async () => {
+    if (!newText.trim() && newImages.length === 0) {
+      showToast('내용을 입력해 주세요.', 'error');
+      return;
+    }
+
+    try {
+      setNewUploadProgress(0);
+      const calendarId = calendar.id;
+      const stamp = Date.now();
+      const memoId = 'memo_' + stamp + '_' + Math.random().toString(36).slice(2, 8);
+      
+      // 1. Upload attachments
+      const uploadedUrls = [];
+      const uploadedThumbs = [];
+      
+      for (let i = 0; i < newImages.length; i++) {
+        setNewUploadProgress(Math.round(((i) / newImages.length) * 100));
+        const res = await uploadMemoImageAssets(calendarId, newImages[i], i);
+        if (res) {
+          uploadedUrls.push(res.imageUrl);
+          uploadedThumbs.push(res.thumbUrl);
+        }
+      }
+      setNewUploadProgress(100);
+
+      // Parse tags
+      const tagsArray = newTags.split(',')
+        .map(t => t.trim())
+        .filter(t => t.startsWith('#') ? t.slice(1).trim() : t)
+        .map(t => t.startsWith('#') ? t : '#' + t)
+        .filter(t => t.length > 1);
+
+      const participantId = getLocalStorage().getItem('gather_active_participant_id_v20') || 'anonymous';
+      const participantName = (calendar.participants || []).find(p => p.id === participantId)?.name || '알수없음';
+
+      // 2. Write to Firestore
+      const memoData = {
+        id: memoId,
+        participantId,
+        title: newTitle.trim(),
+        text: newText.trim(),
+        imageUrls: uploadedUrls,
+        thumbUrls: uploadedThumbs,
+        color: newColor,
+        isPinned: newIsPinned,
+        tags: tagsArray,
+        createdAt: stamp,
+        updatedAt: stamp
+      };
+
+      await firebaseDb.collection('calendars').doc('cal_' + calendarId).collection('memos').doc(memoId).set(memoData);
+
+      // 3. Write Activity Log
+      const logNote = newTitle.trim() ? `제목: ${newTitle.trim()}` : (newText.trim().slice(0, 30) + '...');
+      const activityLog = createMemoActivityLog(calendarId, 'memo_create', participantId, stamp, logNote);
+      if (activityLog) {
+        // Embed the log on local app state if needed or save direct to subcollection
+        await firebaseDb.collection('calendars').doc('cal_' + calendarId).collection('activityLogs').doc(activityLog.id).set(activityLog);
+        
+        // Also trigger calendar document updatedAt/revision update to sync other clients
+        const nextCal = {
+          ...calendar,
+          updatedAt: stamp,
+          revision: (calendar.revision || 0) + 1
+        };
+        await pushSingleCloudCalendar(nextCal, stamp, 18, null, 'settings', [activityLog]);
+      }
+
+      showToast('메모가 저장되었습니다.', 'success');
+      
+      // Reset composer
+      setNewTitle('');
+      setNewText('');
+      setNewColor('var(--bg-card)');
+      setNewIsPinned(false);
+      setNewTags('');
+      setNewImages([]);
+      setIsComposerExpanded(false);
+    } catch (err) {
+      console.error('Failed to save memo:', err);
+      showToast('메모 저장 실패', 'error');
+    } finally {
+      setNewUploadProgress(null);
+    }
+  };
+
+  const handleUpdateMemo = async () => {
+    if (!editText.trim() && editImages.length === 0) {
+      showToast('내용을 입력해 주세요.', 'error');
+      return;
+    }
+
+    try {
+      setEditUploadProgress(0);
+      const calendarId = calendar.id;
+      const stamp = Date.now();
+      
+      const uploadedUrls = [];
+      const uploadedThumbs = [];
+
+      // Separate existing images from newly added images
+      for (let i = 0; i < editImages.length; i++) {
+        const img = editImages[i];
+        if (!img.isNew) {
+          uploadedUrls.push(img.imageUrl);
+          uploadedThumbs.push(img.thumbUrl);
+        } else {
+          setEditUploadProgress(Math.round(((i) / editImages.length) * 100));
+          const res = await uploadMemoImageAssets(calendarId, img, i);
+          if (res) {
+            uploadedUrls.push(res.imageUrl);
+            uploadedThumbs.push(res.thumbUrl);
+          }
+        }
+      }
+      setEditUploadProgress(100);
+
+      const tagsArray = editTags.split(',')
+        .map(t => t.trim())
+        .filter(t => t.startsWith('#') ? t.slice(1).trim() : t)
+        .map(t => t.startsWith('#') ? t : '#' + t)
+        .filter(t => t.length > 1);
+
+      const participantId = getLocalStorage().getItem('gather_active_participant_id_v20') || 'anonymous';
+      const participantName = (calendar.participants || []).find(p => p.id === participantId)?.name || '알수없음';
+
+      const memoData = {
+        ...editingMemo,
+        title: editTitle.trim(),
+        text: editText.trim(),
+        imageUrls: uploadedUrls,
+        thumbUrls: uploadedThumbs,
+        color: editColor,
+        isPinned: editIsPinned,
+        tags: tagsArray,
+        updatedAt: stamp
+      };
+
+      await firebaseDb.collection('calendars').doc('cal_' + calendarId).collection('memos').doc(editingMemo.id).set(memoData);
+
+      // Log Memo Update
+      const logNote = editTitle.trim() ? `제목: ${editTitle.trim()}` : (editText.trim().slice(0, 30) + '...');
+      const activityLog = createMemoActivityLog(calendarId, 'memo_update', participantId, stamp, logNote);
+      if (activityLog) {
+        await firebaseDb.collection('calendars').doc('cal_' + calendarId).collection('activityLogs').doc(activityLog.id).set(activityLog);
+        
+        const nextCal = {
+          ...calendar,
+          updatedAt: stamp,
+          revision: (calendar.revision || 0) + 1
+        };
+        await pushSingleCloudCalendar(nextCal, stamp, 18, null, 'settings', [activityLog]);
+      }
+
+      showToast('메모가 수정되었습니다.', 'success');
+      setEditingMemo(null);
+    } catch (err) {
+      console.error('Failed to update memo:', err);
+      showToast('메모 수정 실패', 'error');
+    } finally {
+      setEditUploadProgress(null);
+    }
+  };
+
+  const handleDeleteMemo = async (memo) => {
+    if (!confirm('이 메모를 삭제하시겠습니까?')) return;
+
+    try {
+      const calendarId = calendar.id;
+      const stamp = Date.now();
+      const participantId = getLocalStorage().getItem('gather_active_participant_id_v20') || 'anonymous';
+
+      await firebaseDb.collection('calendars').doc('cal_' + calendarId).collection('memos').doc(memo.id).delete();
+
+      // Log Memo Delete
+      const logNote = memo.title ? `제목: ${memo.title}` : (memo.text.slice(0, 30) + '...');
+      const activityLog = createMemoActivityLog(calendarId, 'memo_delete', participantId, stamp, logNote);
+      if (activityLog) {
+        await firebaseDb.collection('calendars').doc('cal_' + calendarId).collection('activityLogs').doc(activityLog.id).set(activityLog);
+        
+        const nextCal = {
+          ...calendar,
+          updatedAt: stamp,
+          revision: (calendar.revision || 0) + 1
+        };
+        await pushSingleCloudCalendar(nextCal, stamp, 18, null, 'settings', [activityLog]);
+      }
+
+      showToast('메모가 삭제되었습니다.', 'success');
+      setEditingMemo(null);
+    } catch (err) {
+      console.error('Failed to delete memo:', err);
+      showToast('메모 삭제 실패', 'error');
+    }
+  };
+
+  const handleOpenEdit = (memo) => {
+    setEditingMemo(memo);
+    setEditTitle(memo.title || '');
+    setEditText(memo.text || '');
+    setEditColor(memo.color || 'var(--bg-card)');
+    setEditIsPinned(!!memo.isPinned);
+    setEditTags((memo.tags || []).join(', '));
+    // Reconstruct list of images for editing
+    const currentImgs = (memo.imageUrls || []).map((url, idx) => ({
+      imageUrl: url,
+      thumbUrl: memo.thumbUrls?.[idx] || url,
+      previewUrl: url,
+      isNew: false
+    }));
+    setEditImages(currentImgs);
+  };
+
+  const removeComposerImage = (idx) => {
+    setNewImages(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const removeEditImage = (idx) => {
+    setEditImages(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  // Searching logic
+  const filteredMemos = memos.filter(memo => {
+    const q = searchQuery.toLowerCase().trim();
+    const titleMatch = (memo.title || '').toLowerCase().includes(q);
+    const textMatch = (memo.text || '').toLowerCase().includes(q);
+    const tagsMatch = (memo.tags || []).some(t => t.toLowerCase().includes(q));
+    
+    // Tag filtering chip match
+    const filterTagMatch = selectedTag ? (memo.tags || []).includes(selectedTag) : true;
+
+    return (titleMatch || textMatch || tagsMatch) && filterTagMatch;
+  });
+
+  const pinnedMemos = filteredMemos.filter(m => m.isPinned);
+  const otherMemos = filteredMemos.filter(m => !m.isPinned);
+
+  return /*#__PURE__*/React.createElement("div", {
+    className: "settlement-summary-container",
+    style: { paddingBottom: '80px', display: 'flex', flexDirection: 'column', minHeight: '100vh', backgroundColor: 'var(--bg-primary)' }
+  }, 
+    /* Glassmorphism Header */
+    /*#__PURE__*/React.createElement("div", {
+      style: {
+        position: 'sticky',
+        top: 0,
+        zIndex: 100,
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+        backgroundColor: 'var(--bg-header)',
+        borderBottom: '1px solid var(--border-subtle)',
+        padding: '12px 16px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '12px'
+      }
+    },
+      /* Row 1: Back + Title + Close */
+      /*#__PURE__*/React.createElement("div", {
+        style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }
+      },
+        /* Left back button */
+        /*#__PURE__*/React.createElement("button", {
+          onClick: onBack,
+          style: { background: 'none', border: 'none', color: 'var(--text-main)', cursor: 'pointer', padding: '4px' }
+        }, /*#__PURE__*/React.createElement("svg", {
+          xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2"
+        }, /*#__PURE__*/React.createElement("path", { d: "M19 12H5" }), /*#__PURE__*/React.createElement("path", { d: "M12 19l-7-7 7-7" }))),
+        
+        /* Center Title */
+        /*#__PURE__*/React.createElement("span", {
+          style: { fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-main)' }
+        }, calendar.title, " 메모"),
+
+        /* Right spacer */
+        /*#__PURE__*/React.createElement("div", { style: { width: '24px' } })
+      ),
+
+      /* Row 2: Live Search Bar */
+      /*#__PURE__*/React.createElement("div", {
+        style: { position: 'relative', display: 'flex', alignItems: 'center', width: '100%' }
+      },
+        /* Search icon */
+        /*#__PURE__*/React.createElement("span", {
+          style: { position: 'absolute', left: '12px', color: '#94A3B8', display: 'flex', alignItems: 'center' }
+        }, /*#__PURE__*/React.createElement("svg", {
+          xmlns: "http://www.w3.org/2000/svg", width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.5"
+        }, /*#__PURE__*/React.createElement("circle", { cx: "11", cy: "11", r: "8" }), /*#__PURE__*/React.createElement("path", { d: "m21 21-4.3-4.3" }))),
+        
+        /* Search Input */
+        /*#__PURE__*/React.createElement("input", {
+          type: "text",
+          placeholder: "메모 제목, 내용, 해시태그 검색...",
+          value: searchQuery,
+          onChange: e => setSearchQuery(e.target.value),
+          style: {
+            width: '100%',
+            padding: '8px 12px 8px 36px',
+            borderRadius: '20px',
+            border: '1px solid var(--border-subtle)',
+            backgroundColor: 'var(--bg-primary)',
+            color: 'var(--text-main)',
+            fontSize: '0.85rem',
+            outline: 'none',
+            boxSizing: 'border-box'
+          }
+        }),
+
+        /* Clear filter tags button if selectedTag is active */
+        selectedTag && /*#__PURE__*/React.createElement("button", {
+          onClick: () => setSelectedTag(''),
+          style: {
+            marginLeft: '8px',
+            padding: '6px 12px',
+            borderRadius: '16px',
+            backgroundColor: 'var(--bg-card)',
+            border: '1px solid var(--border-subtle)',
+            color: '#3B82F6',
+            fontSize: '0.75rem',
+            fontWeight: 'bold',
+            cursor: 'pointer',
+            flexShrink: 0
+          }
+        }, selectedTag, " ✕")
+      )
+    ),
+
+    /* Main Scrollable Body */
+    /*#__PURE__*/React.createElement("div", {
+      style: { padding: '16px', display: 'flex', flexDirection: 'column', gap: '20px', flex: 1, overflowY: 'auto' }
+    },
+      /* Rich Memo Input Composer (Google Keep style) */
+      /*#__PURE__*/React.createElement("div", {
+        style: {
+          width: '100%',
+          maxWidth: '520px',
+          margin: '0 auto',
+          backgroundColor: isComposerExpanded ? newColor : 'var(--bg-card)',
+          border: '1px solid ' + (isComposerExpanded ? getBorderColor(newColor) : 'var(--border-subtle)'),
+          borderRadius: '12px',
+          padding: '12px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '8px',
+          transition: 'all 0.2s ease',
+          boxSizing: 'border-box'
+        }
+      },
+        !isComposerExpanded ? 
+          /* Collapsed state */
+          /*#__PURE__*/React.createElement("div", {
+            onClick: () => setIsComposerExpanded(true),
+            style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', color: 'var(--text-muted)' }
+          },
+            /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.88rem' } }, "새로운 메모를 남겨보세요..."),
+            /*#__PURE__*/React.createElement("span", { style: { display: 'flex', gap: '8px', color: '#64748B' } }, 
+              /* Photo icon shortcut */
+              /*#__PURE__*/React.createElement("svg", {
+                xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2"
+              }, /*#__PURE__*/React.createElement("rect", { width: "18", height: "18", x: "3", y: "3", rx: "2", ry: "2" }), /*#__PURE__*/React.createElement("circle", { cx: "9", cy: "9", r: "2" }), /*#__PURE__*/React.createElement("path", { d: "m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" }))
+            )
+          )
+        :
+          /* Expanded state */
+          /*#__PURE__*/React.createElement("div", {
+            style: { display: 'flex', flexDirection: 'column', gap: '8px' }
+          },
+            /* Title & Pin row */
+            /*#__PURE__*/React.createElement("div", {
+              style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }
+            },
+              /* Title input */
+              /*#__PURE__*/React.createElement("input", {
+                type: "text",
+                placeholder: "제목",
+                value: newTitle,
+                onChange: e => setNewTitle(e.target.value),
+                style: {
+                  background: 'transparent',
+                  border: 'none',
+                  outline: 'none',
+                  fontSize: '0.95rem',
+                  fontWeight: 'bold',
+                  color: 'var(--text-main)',
+                  width: '100%'
+                }
+              }),
+              /* Pin Toggle button */
+              /*#__PURE__*/React.createElement("button", {
+                type: "button",
+                onClick: () => setNewIsPinned(!newIsPinned),
+                style: { background: 'none', border: 'none', cursor: 'pointer', color: newIsPinned ? '#F59E0B' : '#94A3B8' }
+              }, /*#__PURE__*/React.createElement("svg", {
+                xmlns: "http://www.w3.org/2000/svg", width: "18", height: "18", viewBox: "0 0 24 24", fill: newIsPinned ? "currentColor" : "none", stroke: "currentColor", strokeWidth: "2"
+              }, /*#__PURE__*/React.createElement("line", { x1: "12", y1: "17", x2: "12", y2: "22" }), /*#__PURE__*/React.createElement("path", { d: "M5 17h14v-1.76a2 2 0 0 0-.44-1.24l-2.78-3.4A2 2 0 0 1 15 9.36V5a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v4.36a2 2 0 0 1-.78 1.64l-2.78 3.4a2 2 0 0 0-.44 1.24Z" })))
+            ),
+
+            /* Body Textarea */
+            /*#__PURE__*/React.createElement("textarea", {
+              placeholder: "메모 입력...",
+              value: newText,
+              onChange: e => setNewText(e.target.value),
+              rows: "4",
+              style: {
+                background: 'transparent',
+                border: 'none',
+                outline: 'none',
+                resize: 'none',
+                fontSize: '0.88rem',
+                color: 'var(--text-main)',
+                width: '100%',
+                fontFamily: 'inherit'
+              }
+            }),
+
+            /* Live Link Preview Area inside input */
+            extractFirstUrl(newText) && /*#__PURE__*/React.createElement("div", {
+              style: { marginTop: '4px', marginBottom: '4px' }
+            }, /*#__PURE__*/React.createElement(LinkPreviewCard, { url: extractFirstUrl(newText) })),
+
+            /* Images previews list */
+            newImages.length > 0 && /*#__PURE__*/React.createElement("div", {
+              style: { display: 'flex', flexWrap: 'wrap', gap: '6px', margin: '4px 0' }
+            }, newImages.map((img, idx) => /*#__PURE__*/React.createElement("div", {
+              key: idx,
+              style: { position: 'relative', width: '60px', height: '60px' }
+            }, 
+              /* Image element */
+              /*#__PURE__*/React.createElement("img", {
+                src: img.previewUrl,
+                style: { width: '100%', height: '100%', objectFit: 'cover', borderRadius: '6px', border: '1px solid var(--border-subtle)' }
+              }),
+              /* Remove button */
+              /*#__PURE__*/React.createElement("button", {
+                type: "button",
+                onClick: () => removeComposerImage(idx),
+                style: {
+                  position: 'absolute', top: '-4px', right: '-4px',
+                  backgroundColor: '#EF4444', color: '#FFFFFF',
+                  border: 'none', borderRadius: '50%',
+                  width: '16px', height: '16px',
+                  fontSize: '9px', fontWeight: 'bold',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer'
+                }
+              }, "✕")
+            ))),
+
+            /* Tags field */
+            /*#__PURE__*/React.createElement("input", {
+              type: "text",
+              placeholder: "해시태그 (쉼표로 구분 예: 맛집, 추천)",
+              value: newTags,
+              onChange: e => setNewTags(e.target.value),
+              style: {
+                background: 'transparent',
+                border: 'none',
+                borderTop: '1px solid var(--border-subtle)',
+                outline: 'none',
+                fontSize: '0.78rem',
+                color: 'var(--text-main)',
+                padding: '6px 0 2px',
+                width: '100%'
+              }
+            }),
+
+            /* Actions Row */
+            /*#__PURE__*/React.createElement("div", {
+              style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '6px', gap: '8px', flexWrap: 'wrap' }
+            },
+              /* Color & Photo tools */
+              /*#__PURE__*/React.createElement("div", {
+                style: { display: 'flex', alignItems: 'center', gap: '8px' }
+              },
+                /* Color swatches button wrapper */
+                /*#__PURE__*/React.createElement("div", {
+                  style: { display: 'flex', gap: '4px' }
+                }, MEMO_COLORS.map(color => /*#__PURE__*/React.createElement("button", {
+                  key: color.name,
+                  type: "button",
+                  onClick: () => setNewColor(color.value),
+                  title: color.name,
+                  style: {
+                    width: '16px', height: '16px',
+                    borderRadius: '50%',
+                    backgroundColor: color.value === 'var(--bg-card)' ? (isDarkTheme ? '#1e293b' : '#f1f5f9') : color.value,
+                    border: newColor === color.value ? '2px solid #3B82F6' : '1px solid var(--border-subtle)',
+                    cursor: 'pointer',
+                    padding: 0
+                  }
+                }))),
+
+                /* File Upload label icon */
+                /*#__PURE__*/React.createElement("label", {
+                  style: { display: 'flex', alignItems: 'center', cursor: 'pointer', color: '#64748B', padding: '4px' },
+                  title: "사진 첨부"
+                }, 
+                  /*#__PURE__*/React.createElement("input", {
+                    type: "file",
+                    multiple: true,
+                    accept: "image/*",
+                    onChange: handleComposerFileSelect,
+                    style: { display: 'none' }
+                  }),
+                  /*#__PURE__*/React.createElement("svg", {
+                    xmlns: "http://www.w3.org/2000/svg", width: "18", height: "18", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2"
+                  }, /*#__PURE__*/React.createElement("rect", { width: "18", height: "18", x: "3", y: "3", rx: "2", ry: "2" }), /*#__PURE__*/React.createElement("circle", { cx: "9", cy: "9", r: "2" }), /*#__PURE__*/React.createElement("path", { d: "m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" }))
+                )
+              ),
+
+              /* Save & Close buttons */
+              /*#__PURE__*/React.createElement("div", {
+                style: { display: 'flex', gap: '6px' }
+              },
+                /* Close without saving */
+                /*#__PURE__*/React.createElement("button", {
+                  type: "button",
+                  onClick: () => setIsComposerExpanded(false),
+                  style: {
+                    background: 'none', border: 'none',
+                    color: 'var(--text-muted)', fontSize: '0.8rem',
+                    cursor: 'pointer', padding: '6px 10px'
+                  }
+                }, "닫기"),
+                /* Save memo */
+                /*#__PURE__*/React.createElement("button", {
+                  type: "button",
+                  onClick: handleSaveMemo,
+                  disabled: newUploadProgress !== null,
+                  style: {
+                    backgroundColor: '#3B82F6', color: '#FFFFFF',
+                    border: 'none', borderRadius: '6px',
+                    fontSize: '0.8rem', fontWeight: 'bold',
+                    cursor: 'pointer', padding: '6px 12px'
+                  }
+                }, newUploadProgress !== null ? `업로드 (${newUploadProgress}%)` : "저장")
+              )
+            )
+          )
+      ),
+
+      /* MEMOS SECTIONS (Pinned vs Normal) */
+      
+      /* 1. Pinned Memos Section */
+      pinnedMemos.length > 0 && /*#__PURE__*/React.createElement("div", {
+        style: { display: 'flex', flexDirection: 'column', gap: '8px' }
+      },
+        /* Label */
+        /*#__PURE__*/React.createElement("div", {
+          style: { fontSize: '0.72rem', fontWeight: 'bold', color: '#64748B', letterSpacing: '0.05em', textTransform: 'uppercase' }
+        }, "고정됨"),
+        /* Grid */
+        /*#__PURE__*/React.createElement("div", {
+          style: {
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+            gap: '12px'
+          }
+        }, pinnedMemos.map(memo => /*#__PURE__*/React.createElement(MemoCard, {
+          key: memo.id,
+          memo: memo,
+          onOpenEdit: handleOpenEdit,
+          onTogglePin: async () => {
+            const nextPinned = !memo.isPinned;
+            await firebaseDb.collection('calendars').doc('cal_' + calendar.id).collection('memos').doc(memo.id).update({ isPinned: nextPinned });
+          },
+          onSelectTag: setSelectedTag,
+          getBorderColor: getBorderColor
+        })))
+      ),
+
+      /* 2. Other Memos Section */
+      otherMemos.length > 0 && /*#__PURE__*/React.createElement("div", {
+        style: { display: 'flex', flexDirection: 'column', gap: '8px', marginTop: pinnedMemos.length > 0 ? '12px' : '0' }
+      },
+        /* Label */
+        pinnedMemos.length > 0 && /*#__PURE__*/React.createElement("div", {
+          style: { fontSize: '0.72rem', fontWeight: 'bold', color: '#64748B', letterSpacing: '0.05em', textTransform: 'uppercase' }
+        }, "메모 목록"),
+        /* Grid */
+        /*#__PURE__*/React.createElement("div", {
+          style: {
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+            gap: '12px'
+          }
+        }, otherMemos.map(memo => /*#__PURE__*/React.createElement(MemoCard, {
+          key: memo.id,
+          memo: memo,
+          onOpenEdit: handleOpenEdit,
+          onTogglePin: async () => {
+            const nextPinned = !memo.isPinned;
+            await firebaseDb.collection('calendars').doc('cal_' + calendar.id).collection('memos').doc(memo.id).update({ isPinned: nextPinned });
+          },
+          onSelectTag: setSelectedTag,
+          getBorderColor: getBorderColor
+        })))
+      ),
+
+      /* Empty State */
+      filteredMemos.length === 0 && /*#__PURE__*/React.createElement("div", {
+        style: { padding: '60px 20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.88rem' }
+      }, "등록된 메모가 없거나 검색 조건과 일치하는 메모가 없습니다. 📝")
+    ),
+
+    /* Memo Editor Modal Overlay */
+    editingMemo && /*#__PURE__*/React.createElement("div", {
+      style: {
+        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+        backgroundColor: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)',
+        zIndex: 50000,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px'
+      }
+    },
+      /* Modal Container */
+      /*#__PURE__*/React.createElement("div", {
+        style: {
+          width: '100%', maxWidth: '520px',
+          backgroundColor: editColor,
+          border: '1px solid ' + getBorderColor(editColor),
+          borderRadius: '12px',
+          boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04)',
+          display: 'flex', flexDirection: 'column', gap: '12px',
+          padding: '16px', boxSizing: 'border-box',
+          animation: 'modalFadeIn 0.2s ease'
+        }
+      },
+        /* Header: Title & Pin */
+        /*#__PURE__*/React.createElement("div", {
+          style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }
+        },
+          /* Title input */
+          /*#__PURE__*/React.createElement("input", {
+            type: "text",
+            placeholder: "제목",
+            value: editTitle,
+            onChange: e => setEditTitle(e.target.value),
+            style: {
+              background: 'transparent', border: 'none', outline: 'none',
+              fontSize: '1rem', fontWeight: 'bold', color: 'var(--text-main)',
+              width: '100%'
+            }
+          }),
+          /* Pin Toggle button */
+          /*#__PURE__*/React.createElement("button", {
+            type: "button",
+            onClick: () => setEditIsPinned(!editIsPinned),
+            style: { background: 'none', border: 'none', cursor: 'pointer', color: editIsPinned ? '#F59E0B' : '#94A3B8' }
+          }, /*#__PURE__*/React.createElement("svg", {
+            xmlns: "http://www.w3.org/2000/svg", width: "18", height: "18", viewBox: "0 0 24 24", fill: editIsPinned ? "currentColor" : "none", stroke: "currentColor", strokeWidth: "2"
+          }, /*#__PURE__*/React.createElement("line", { x1: "12", y1: "17", x2: "12", y2: "22" }), /*#__PURE__*/React.createElement("path", { d: "M5 17h14v-1.76a2 2 0 0 0-.44-1.24l-2.78-3.4A2 2 0 0 1 15 9.36V5a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v4.36a2 2 0 0 1-.78 1.64l-2.78 3.4a2 2 0 0 0-.44 1.24Z" })))
+        ),
+
+        /* Body Textarea */
+        /*#__PURE__*/React.createElement("textarea", {
+          placeholder: "메모 입력...",
+          value: editText,
+          onChange: e => setEditText(e.target.value),
+          rows: "6",
+          style: {
+            background: 'transparent', border: 'none', outline: 'none', resize: 'none',
+            fontSize: '0.9rem', color: 'var(--text-main)', width: '100%',
+            fontFamily: 'inherit'
+          }
+        }),
+
+        /* Links Card Preview inside edit modal */
+        extractFirstUrl(editText) && /*#__PURE__*/React.createElement("div", {
+          style: { marginTop: '4px', marginBottom: '4px' }
+        }, /*#__PURE__*/React.createElement(LinkPreviewCard, { url: extractFirstUrl(editText) })),
+
+        /* Images previews list */
+        editImages.length > 0 && /*#__PURE__*/React.createElement("div", {
+          style: { display: 'flex', flexWrap: 'wrap', gap: '6px', margin: '4px 0' }
+        }, editImages.map((img, idx) => /*#__PURE__*/React.createElement("div", {
+          key: idx,
+          style: { position: 'relative', width: '60px', height: '60px' }
+        }, 
+          /* Image element */
+          /*#__PURE__*/React.createElement("img", {
+            src: img.previewUrl,
+            style: { width: '100%', height: '100%', objectFit: 'cover', borderRadius: '6px', border: '1px solid var(--border-subtle)' }
+          }),
+          /* Remove button */
+          /*#__PURE__*/React.createElement("button", {
+            type: "button",
+            onClick: () => removeEditImage(idx),
+            style: {
+              position: 'absolute', top: '-4px', right: '-4px',
+              backgroundColor: '#EF4444', color: '#FFFFFF',
+              border: 'none', borderRadius: '50%',
+              width: '16px', height: '16px',
+              fontSize: '9px', fontWeight: 'bold',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer'
+            }
+          }, "✕")
+        ))),
+
+        /* Tags field */
+        /*#__PURE__*/React.createElement("input", {
+          type: "text",
+          placeholder: "해시태그 (쉼표로 구분 예: 맛집, 추천)",
+          value: editTags,
+          onChange: e => setEditTags(e.target.value),
+          style: {
+            background: 'transparent',
+            border: 'none',
+            borderTop: '1px solid var(--border-subtle)',
+            outline: 'none',
+            fontSize: '0.8rem',
+            color: 'var(--text-main)',
+            padding: '8px 0 2px',
+            width: '100%'
+          }
+        }),
+
+        /* Footer Controls */
+        /*#__PURE__*/React.createElement("div", {
+          style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '8px', gap: '8px', flexWrap: 'wrap' }
+        },
+          /* Color swatches & Upload image */
+          /*#__PURE__*/React.createElement("div", {
+            style: { display: 'flex', alignItems: 'center', gap: '8px' }
+          },
+            /* Palette dots */
+            /*#__PURE__*/React.createElement("div", {
+              style: { display: 'flex', gap: '4px' }
+            }, MEMO_COLORS.map(color => /*#__PURE__*/React.createElement("button", {
+              key: color.name,
+              type: "button",
+              onClick: () => setEditColor(color.value),
+              title: color.name,
+              style: {
+                width: '16px', height: '16px',
+                borderRadius: '50%',
+                backgroundColor: color.value === 'var(--bg-card)' ? (isDarkTheme ? '#1e293b' : '#f1f5f9') : color.value,
+                border: editColor === color.value ? '2px solid #3B82F6' : '1px solid var(--border-subtle)',
+                cursor: 'pointer',
+                padding: 0
+              }
+            }))),
+
+            /* Upload in edit label */
+            /*#__PURE__*/React.createElement("label", {
+              style: { display: 'flex', alignItems: 'center', cursor: 'pointer', color: '#64748B', padding: '4px' },
+              title: "사진 추가"
+            }, 
+              /*#__PURE__*/React.createElement("input", {
+                type: "file",
+                multiple: true,
+                accept: "image/*",
+                onChange: handleEditFileSelect,
+                style: { display: 'none' }
+              }),
+              /*#__PURE__*/React.createElement("svg", {
+                xmlns: "http://www.w3.org/2000/svg", width: "18", height: "18", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2"
+              }, /*#__PURE__*/React.createElement("rect", { width: "18", height: "18", x: "3", y: "3", rx: "2", ry: "2" }), /*#__PURE__*/React.createElement("circle", { cx: "9", cy: "9", r: "2" }), /*#__PURE__*/React.createElement("path", { d: "m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" }))
+            )
+          ),
+
+          /* Save / Delete / Cancel Actions */
+          /*#__PURE__*/React.createElement("div", {
+            style: { display: 'flex', gap: '6px' }
+          },
+            /* Delete Memo Button */
+            /*#__PURE__*/React.createElement("button", {
+              type: "button",
+              onClick: () => handleDeleteMemo(editingMemo),
+              style: {
+                backgroundColor: 'rgba(239, 68, 68, 0.1)', color: '#EF4444',
+                border: 'none', borderRadius: '6px',
+                fontSize: '0.8rem', fontWeight: 'bold',
+                cursor: 'pointer', padding: '6px 12px'
+              }
+            }, "삭제"),
+            /* Cancel */
+            /*#__PURE__*/React.createElement("button", {
+              type: "button",
+              onClick: () => setEditingMemo(null),
+              style: {
+                background: 'none', border: 'none',
+                color: 'var(--text-muted)', fontSize: '0.8rem',
+                cursor: 'pointer', padding: '6px 10px'
+              }
+            }, "취소"),
+            /* Update */
+            /*#__PURE__*/React.createElement("button", {
+              type: "button",
+              onClick: handleUpdateMemo,
+              disabled: editUploadProgress !== null,
+              style: {
+                backgroundColor: '#3B82F6', color: '#FFFFFF',
+                border: 'none', borderRadius: '6px',
+                fontSize: '0.8rem', fontWeight: 'bold',
+                cursor: 'pointer', padding: '6px 12px'
+              }
+            }, editUploadProgress !== null ? `업로드 (${editUploadProgress}%)` : "적용")
+          )
+        )
+      )
+    )
+  );
+}
+
+// Memo Card component for clean grid layout separation
+function MemoCard({ memo, onOpenEdit, onTogglePin, onSelectTag, getBorderColor }) {
+  const imageUrls = memo.imageUrls || [];
+  const thumbUrls = memo.thumbUrls || [];
+
+  // Reusable multi-image proportional CSS Grid to cleanly fit layout inside card
+  const renderMemoCardImages = () => {
+    if (imageUrls.length === 0) return null;
+    if (imageUrls.length === 1) {
+      return /*#__PURE__*/React.createElement("img", {
+        src: thumbUrls[0] || imageUrls[0],
+        style: { width: '100%', maxHeight: '140px', objectFit: 'cover', borderRadius: '6px', marginBottom: '8px' }
+      });
+    }
+
+    const cols = imageUrls.length === 2 ? 2 : 3;
+    const maxW = imageUrls.length === 2 ? '100%' : '100%';
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'grid',
+        gridTemplateColumns: `repeat(${cols}, 1fr)`,
+        gap: '4px',
+        width: '100%',
+        maxWidth: maxW,
+        marginBottom: '8px'
+      }
+    }, thumbUrls.slice(0, 6).map((thumb, idx) => /*#__PURE__*/React.createElement("img", {
+      key: idx,
+      src: thumb || imageUrls[idx],
+      style: {
+        display: 'block',
+        width: '100%',
+        aspectRatio: '1',
+        borderRadius: '4px',
+        objectFit: 'cover'
+      }
+    })));
+  };
+
+  return /*#__PURE__*/React.createElement("div", {
+    onClick: () => onOpenEdit(memo),
+    style: {
+      backgroundColor: memo.color || 'var(--bg-card)',
+      border: '1px solid ' + getBorderColor(memo.color || 'var(--bg-card)'),
+      borderRadius: '12px',
+      padding: '12px',
+      cursor: 'pointer',
+      boxShadow: '0 2px 5px rgba(0,0,0,0.03)',
+      display: 'flex',
+      flexDirection: 'column',
+      position: 'relative',
+      transition: 'box-shadow 0.2s ease',
+      boxSizing: 'border-box'
+    },
+    className: "memo-card-hover"
+  },
+    /* Pin action toggle button (stops click propagation so it doesn't open edit modal!) */
+    /*#__PURE__*/React.createElement("button", {
+      onClick: (e) => {
+        e.stopPropagation();
+        onTogglePin();
+      },
+      style: {
+        position: 'absolute', top: '10px', right: '10px',
+        background: 'none', border: 'none', cursor: 'pointer',
+        color: memo.isPinned ? '#F59E0B' : '#64748B',
+        opacity: memo.isPinned ? 1 : 0.2
+      },
+      className: "memo-card-pin-btn"
+    }, /*#__PURE__*/React.createElement("svg", {
+      xmlns: "http://www.w3.org/2000/svg", width: "16", height: "16", viewBox: "0 0 24 24", fill: memo.isPinned ? "currentColor" : "none", stroke: "currentColor", strokeWidth: "2"
+    }, /*#__PURE__*/React.createElement("line", { x1: "12", y1: "17", x2: "12", y2: "22" }), /*#__PURE__*/React.createElement("path", { d: "M5 17h14v-1.76a2 2 0 0 0-.44-1.24l-2.78-3.4A2 2 0 0 1 15 9.36V5a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v4.36a2 2 0 0 1-.78 1.64l-2.78 3.4a2 2 0 0 0-.44 1.24Z" }))),
+
+    /* Title if exists */
+    memo.title && /*#__PURE__*/React.createElement("div", {
+      style: { fontSize: '0.88rem', fontWeight: 'bold', color: 'var(--text-main)', marginBottom: '8px', paddingRight: '20px', wordBreak: 'break-all' }
+    }, memo.title),
+
+    /* Images */
+    renderMemoCardImages(),
+
+    /* Content Body */
+    memo.text && /*#__PURE__*/React.createElement("div", {
+      style: { fontSize: '0.82rem', color: 'var(--text-main)', lineHeight: '1.4', whiteSpace: 'pre-wrap', overflowWrap: 'break-word', wordBreak: 'break-all' }
+    }, parseTextWithLinks(memo.text)),
+
+    /* Link Preview Card under the card content if applicable */
+    extractFirstUrl(memo.text) && /*#__PURE__*/React.createElement("div", {
+      style: { marginTop: '8px' }
+    }, /*#__PURE__*/React.createElement(LinkPreviewCard, { url: extractFirstUrl(memo.text) })),
+
+    /* Tags container if exists */
+    memo.tags && memo.tags.length > 0 && /*#__PURE__*/React.createElement("div", {
+      style: { display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '10px' }
+    }, memo.tags.map(tag => /*#__PURE__*/React.createElement("span", {
+      key: tag,
+      onClick: (e) => {
+        e.stopPropagation();
+        onSelectTag(tag);
+      },
+      style: {
+        fontSize: '0.68rem', fontWeight: '600',
+        color: '#2563EB', backgroundColor: 'rgba(37, 99, 235, 0.08)',
+        padding: '2px 6px', borderRadius: '4px',
+        cursor: 'pointer'
+      }
+    }, tag)))
+  );
+}
+
+// Activity Log generator function for memos
+function createMemoActivityLog(calendarId, action, participantId = '', timestamp = Date.now(), note = '') {
+  const dateStr = new Date(timestamp).toISOString().split('T')[0];
+  const participantPart = sanitizeText(participantId || 'system', 120);
+  return normalizeActivityLog(calendarId, {
+    id: `${calendarId}_memo_${participantPart}_${action}_${timestamp}_${Math.random().toString(36).slice(2, 8)}`,
+    calendarId,
+    participantId: sanitizeText(participantId || '', 120),
+    action,
+    note,
+    timestamp,
+    date: dateStr
+  });
+}
+
+// REST fallback helper for uploading memo image assets to Firebase Storage
+function uploadMemoImageAssets(calendarId, compressed, index, onBytes, timeoutMs = 45000) {
+  return new Promise((resolve) => {
+    if (!firebaseStorage || !compressed?.originalBlob || !compressed?.thumbnailBlob) {
+      resolve(null);
+      return;
+    }
+    const stamp = Date.now();
+    const rand = Math.random().toString(36).slice(2, 8);
+    const basePath = `memoImages/${calendarId}/${stamp}_${rand}_${index}`;
+    const originalRef = firebaseStorage.ref(`${basePath}_original.jpg`);
+    const thumbRef = firebaseStorage.ref(`${basePath}_thumb.jpg`);
+
+    const runUpload = (blob, ref, taskKey) => {
+      let settled = false;
+      return new Promise((resolveOne) => {
+        const settle = value => { if (settled) return; settled = true; resolveOne(value); };
+        const timeoutId = setTimeout(() => settle(null), timeoutMs);
+        const task = ref.put(blob, { contentType: 'image/jpeg' });
+        task.on('state_changed', snapshot => {
+          if (onBytes) onBytes(taskKey, snapshot.bytesTransferred, snapshot.totalBytes);
+        }, () => { clearTimeout(timeoutId); settle(null); }, async () => {
+          clearTimeout(timeoutId);
+          try {
+            settle(await task.snapshot.ref.getDownloadURL());
+          } catch (e) {
+            settle(null);
+          }
+        });
+      });
+    };
+
+    Promise.all([
+      runUpload(compressed.originalBlob, originalRef, `${index}-orig`),
+      runUpload(compressed.thumbnailBlob, thumbRef, `${index}-thumb`)
+    ]).then(([imageUrl, thumbUrl]) => {
+      if (imageUrl && thumbUrl) resolve({ imageUrl, thumbUrl });
+      else {
+        console.warn('Memo image Storage upload failed');
+        resolve(null);
+      }
+    });
+  });
+}
+
 
 function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {
   const [activeTab, setActiveTab] = React.useState('total');
