@@ -11229,11 +11229,11 @@ function LinkIcon({ size = 16 }) {
 // handleSaveImageTags) -- parsed into individual #tag capsules here for display/delete/search.
 function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSearchTag, showToast }) {
   const tagTokens = String(tags || '').split(/[,\s#]+/).map(t => t.trim()).filter(Boolean);
-  const [tagInput, setTagInput] = React.useState(tags || '');
+  const [tagInput, setTagInput] = React.useState('');
   const [isSavingTags, setIsSavingTags] = React.useState(false);
   const [confirmDeleteTag, setConfirmDeleteTag] = React.useState(null);
   const [isDeletingTag, setIsDeletingTag] = React.useState(false);
-  React.useEffect(() => { setTagInput(tags || ''); }, [tags]);
+  React.useEffect(() => { setTagInput(''); }, [tags]);
   if (!info.dateLabel && !info.typeLabel && !onSaveTags) return null;
   const MAX_TAGS = 10;
   const handleSaveTags = async () => {
