@@ -6646,12 +6646,12 @@ function AdminDashboard({ initialCalendars }) {
         /*#__PURE__*/React.createElement("button", {
           type: "button", className: "admin-tab-button", onClick: () => setActiveTab('logs'),
           style: styles.tabButton(activeTab === 'logs')
-        }, /*#__PURE__*/React.createElement("span", { className: "admin-tab-icon" }, /*#__PURE__*/React.createElement(ChatSectionIcon, null)), "로그"),
+        }, /*#__PURE__*/React.createElement("span", { className: "admin-tab-icon" }, /*#__PURE__*/React.createElement(ChatSectionIcon, null)), "채팅"),
         /* Tab 4 button */
         /*#__PURE__*/React.createElement("button", {
           type: "button", className: "admin-tab-button", onClick: () => setActiveTab('recovery'),
           style: styles.tabButton(activeTab === 'recovery')
-        }, /*#__PURE__*/React.createElement("span", { className: "admin-tab-icon" }, /*#__PURE__*/React.createElement(HourglassIcon, null)), "복구")
+        }, /*#__PURE__*/React.createElement("span", { className: "admin-tab-icon" }, /*#__PURE__*/React.createElement(HourglassIcon, null)), "로그")
       )
     ),
 
@@ -7294,7 +7294,7 @@ function AdminDashboard({ initialCalendars }) {
               /*#__PURE__*/React.createElement("span", {
                 className: "admin-chat-text",
                 title: msg.text || ''
-              }, msg.text || (msg.imageUrl ? '[사진 첨부됨]' : '')),
+              }, msg.text ? highlightTextWithYellowMarker(msg.text, chatSearchQuery) : (msg.imageUrl ? '[사진 첨부됨]' : '')),
               /* Line 3: timestamp + boxed delete button */
               /*#__PURE__*/React.createElement("div", { className: "admin-chat-footer" },
                 /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.72rem', color: '#64748B' } }, timeStr),
@@ -11000,7 +11000,38 @@ function ChatSectionIcon() {
   }));
 }
 
-function parseTextWithLinks(text) {
+function highlightTextWithYellowMarker(text, keyword) {
+  if (!text) return '';
+  if (!keyword) return text;
+  const cleanKeyword = keyword.trim().toLowerCase();
+  if (!cleanKeyword) return text;
+
+  const parts = [];
+  let remaining = text;
+  const lowerRemaining = () => remaining.toLowerCase();
+
+  while (remaining) {
+    const idx = lowerRemaining().indexOf(cleanKeyword);
+    if (idx === -1) {
+      parts.push(remaining);
+      break;
+    }
+    if (idx > 0) {
+      parts.push(remaining.substring(0, idx));
+    }
+    const matchText = remaining.substring(idx, idx + cleanKeyword.length);
+    parts.push(
+      /*#__PURE__*/React.createElement("mark", {
+        key: remaining.length + idx,
+        style: { backgroundColor: '#FEF08A', color: '#1E293B', padding: '0 2px', borderRadius: '2px', fontWeight: 'bold' }
+      }, matchText)
+    );
+    remaining = remaining.substring(idx + cleanKeyword.length);
+  }
+  return React.createElement(React.Fragment, null, ...parts);
+}
+
+function parseTextWithLinks(text, keyword = '') {
   if (!text) return '';
   const urlRegex = /(https?:\/\/[^\s]+)/g;
   const urlTestRegex = /^https?:\/\/[^\s]+$/;
@@ -11020,7 +11051,7 @@ function parseTextWithLinks(text) {
         }
       }, part);
     }
-    return part;
+    return keyword ? highlightTextWithYellowMarker(part, keyword) : part;
   });
 }
 
@@ -12804,7 +12835,7 @@ function ChatRoomView({
         whiteSpace: 'pre-wrap',
         boxShadow: '0 2px 6px rgba(0,0,0,0.06)'
       }
-    }, renderChatMessageImages(msg, setActiveLightbox, { maxWidth: '200px', maxHeight: '150px', marginBottom: msg.text ? '10px' : '0' }), msg.text ? parseTextWithLinks(msg.text) : null, extractFirstUrl(msg.text) && /*#__PURE__*/React.createElement(LinkPreviewCard, { url: extractFirstUrl(msg.text) })), /*#__PURE__*/React.createElement("div", {
+    }, renderChatMessageImages(msg, setActiveLightbox, { maxWidth: '200px', maxHeight: '150px', marginBottom: msg.text ? '10px' : '0' }), msg.text ? parseTextWithLinks(msg.text, searchQuery) : null, extractFirstUrl(msg.text) && /*#__PURE__*/React.createElement(LinkPreviewCard, { url: extractFirstUrl(msg.text) })), /*#__PURE__*/React.createElement("div", {
       style: {
         position: 'absolute',
         right: '-7px',
@@ -12857,7 +12888,7 @@ function ChatRoomView({
         whiteSpace: 'pre-wrap',
         boxShadow: '0 2px 6px rgba(0,0,0,0.06)'
       }
-    }, renderChatMessageImages(msg, setActiveLightbox, { maxWidth: '200px', maxHeight: '150px', marginBottom: msg.text ? '10px' : '0' }), msg.text ? parseTextWithLinks(msg.text) : null, extractFirstUrl(msg.text) && /*#__PURE__*/React.createElement(LinkPreviewCard, { url: extractFirstUrl(msg.text) })), /*#__PURE__*/React.createElement("div", {
+    }, renderChatMessageImages(msg, setActiveLightbox, { maxWidth: '200px', maxHeight: '150px', marginBottom: msg.text ? '10px' : '0' }), msg.text ? parseTextWithLinks(msg.text, searchQuery) : null, extractFirstUrl(msg.text) && /*#__PURE__*/React.createElement(LinkPreviewCard, { url: extractFirstUrl(msg.text) })), /*#__PURE__*/React.createElement("div", {
       style: {
         position: 'absolute',
         left: '-7px',
