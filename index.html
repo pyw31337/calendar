@@ -12226,6 +12226,30 @@ function ChatRoomView({
   const [isChatGalleryOpen, setIsChatGalleryOpen] = React.useState(false);
   const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState('');
+  const [searchFocusIndex, setSearchFocusIndex] = React.useState(0);
+
+  // Ordered list of message IDs matching the current search query (for ▲▼ navigation)
+  const searchMatchIds = React.useMemo(() => {
+    if (!searchQuery) return [];
+    const q = searchQuery.toLowerCase();
+    return chatMessages
+      .filter(m => m.text && m.text.toLowerCase().includes(q))
+      .map(m => m.id)
+      .filter(id => !!id);
+  }, [chatMessages, searchQuery]);
+
+  const clampedFocusIdx = searchMatchIds.length > 0
+    ? Math.max(0, Math.min(searchFocusIndex, searchMatchIds.length - 1))
+    : 0;
+  const focusedMsgId = searchMatchIds.length > 0 ? searchMatchIds[clampedFocusIdx] : null;
+
+  // Scroll focused match into view whenever it changes
+  React.useEffect(() => {
+    if (!focusedMsgId) return;
+    const el = document.querySelector('[data-msg-row-id="' + focusedMsgId + '"]');
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [focusedMsgId]);
+
   const pinnedNotices = getPinnedNotices(calendar);
   const revealedMsgId = useTapRevealedMsgId();
 
@@ -12406,27 +12430,6 @@ function ChatRoomView({
     return acc;
   }, {});
   const selectedParticipant = participants.find(p => p.id === chatParticipantId);
-  // Compute ordered list of IDs for matched messages (used for search navigation)
-  const searchMatchIds = React.useMemo(() => {
-    if (!searchQuery) return [];
-    const q = searchQuery.toLowerCase();
-    return chatMessages
-      .filter(m => m.text && m.text.toLowerCase().includes(q))
-      .map(m => m.id || null)
-      .filter(Boolean);
-  }, [chatMessages, searchQuery]);
-  // Clamp focus index
-  const clampedFocusIdx = searchMatchIds.length > 0
-    ? Math.max(0, Math.min(searchFocusIndex, searchMatchIds.length - 1))
-    : 0;
-  const focusedMsgId = searchMatchIds[clampedFocusIdx] || null;
-  // Scroll focused message into view when it changes
-  React.useEffect(() => {
-    if (!focusedMsgId) return;
-    const el = document.querySelector(`[data-msg-row-id="${focusedMsgId}"]`);
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }, [focusedMsgId]);
-
   let lastDateStr = '';
   let readMarkerInserted = false;
   const renderedMessages = [];
@@ -16737,7 +16740,7 @@ function ChatGalleryModal({
   onClose,
   setActiveLightbox
 }) {
-  const [activeTab, setActiveTab] = React.useState('links'); // 'links' | 'photos'
+  const [activeTab, setActiveTab] = React.useState('photos'); // 'photos' | 'links'
 
   const sharedLinks = React.useMemo(() => {
     const list = [];
@@ -16801,7 +16804,7 @@ function ChatGalleryModal({
     style: { display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px', border: 0, background: 'none', cursor: 'pointer', color: 'var(--text-muted)' }
   }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }))), /*#__PURE__*/React.createElement("div", {
     style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', padding: '12px 20px 8px 20px', borderBottom: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)' }
-  }, [['links', '링크'], ['photos', '사진']].map(tab => /*#__PURE__*/React.createElement("button", {
+  }, [['photos', '사진'], ['links', '링크']].map(tab => /*#__PURE__*/React.createElement("button", {
     key: tab[0],
     type: "button",
     onClick: () => setActiveTab(tab[0]),
