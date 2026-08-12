@@ -10182,6 +10182,7 @@ function getKoreanSolarTermsForYear(year) {
 
 // Calendar Grid Component
 function CalendarGrid({
+  anniversaries = [],
   calendar,
   isLoading = false,
   monthDate,
@@ -10498,6 +10499,7 @@ function CalendarGrid({
       return entry && Array.isArray(entry.expenses) && entry.expenses.length > 0;
     })();
     const solarTermName = !isHoliday && !isAllAvailable ? solarTermMap[dateStr] : null;
+    const cellAnns = getAnniversariesForDate(dateStr, anniversaries);
     // Only one badge shows next to the date number: holiday name takes priority (it's
     // tied to the red date styling), then '확정' if this date has been promoted to a
     // confirmed meeting, then '전원' if everyone's available that day (replacing a solar
