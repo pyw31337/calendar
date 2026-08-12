@@ -1726,16 +1726,19 @@
     }
     @keyframes chat-search-shake {
       0%   { transform: translateY(0); }
-      20%  { transform: translateY(-4px); }
-      40%  { transform: translateY(3px); }
-      60%  { transform: translateY(-2px); }
-      80%  { transform: translateY(1px); }
+      12%  { transform: translateY(-11px); }
+      24%  { transform: translateY(9px); }
+      36%  { transform: translateY(-7px); }
+      48%  { transform: translateY(6px); }
+      60%  { transform: translateY(-4px); }
+      72%  { transform: translateY(3px); }
+      84%  { transform: translateY(-2px); }
       100% { transform: translateY(0); }
     }
     .chat-search-focused-bubble {
       border: 1.5px solid #7C3AED !important;
       background-color: rgba(124, 58, 237, 0.06) !important;
-      animation: chat-search-shake 0.38s ease;
+      animation: chat-search-shake 0.72s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
     }
     .chat-search-match-bubble {
       border: 1px solid rgba(124, 58, 237, 0.35) !important;
