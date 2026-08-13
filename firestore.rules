@@ -55,6 +55,21 @@ service cloud.firestore {
       function hasValidMessageText(data) {
         return data.text is string && data.text.size() <= 5000;
       }
+      // Cached OpenGraph preview embedded on a message when its text contains a URL (see
+      // fetchLinkPreview / linkPreviews collection above) -- same field shape as that shared
+      // cache doc, since it's just copied from there onto the message at send/edit time.
+      function hasValidLinkPreview(data) {
+        return !('linkPreview' in data) || data.linkPreview == null || (
+          data.linkPreview is map
+          && data.linkPreview.keys().hasOnly(['url', 'title', 'description', 'image', 'siteName', 'fetchedAt'])
+          && data.linkPreview.url is string && data.linkPreview.url.size() <= 2000
+          && data.linkPreview.title is string && data.linkPreview.title.size() <= 300
+          && data.linkPreview.description is string && data.linkPreview.description.size() <= 500
+          && data.linkPreview.image is string && data.linkPreview.image.size() <= 2000
+          && data.linkPreview.siteName is string && data.linkPreview.siteName.size() <= 200
+          && data.linkPreview.fetchedAt is number
+        );
+      }
       function hasValidMessageImages(data) {
         return (!('imageUrl' in data) || (data.imageUrl is string && data.imageUrl.size() <= 400000))
           && (!('thumbUrl' in data) || (data.thumbUrl is string && data.thumbUrl.size() <= 50000))
@@ -76,16 +91,18 @@ service cloud.firestore {
       match /messages/{messageId} {
         allow get, list: if isCalendarDoc(calendarDocId);
         allow create: if isCalendarDoc(calendarDocId)
-          && request.resource.data.keys().hasOnly(['participantId', 'text', 'timestamp', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls'])
+          && request.resource.data.keys().hasOnly(['participantId', 'text', 'timestamp', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'linkPreview'])
           && request.resource.data.participantId is string
           && request.resource.data.participantId.size() <= 160
           && request.resource.data.timestamp is number
           && hasValidMessageText(request.resource.data)
-          && hasValidMessageImages(request.resource.data);
+          && hasValidMessageImages(request.resource.data)
+          && hasValidLinkPreview(request.resource.data);
         allow update: if isCalendarDoc(calendarDocId)
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['text', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageShareUrls', 'imageTags', 'participantId'])
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['text', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageShareUrls', 'imageTags', 'participantId', 'linkPreview'])
           && hasValidMessageText(request.resource.data)
           && hasValidMessageImages(request.resource.data)
+          && hasValidLinkPreview(request.resource.data)
           && (!('participantId' in request.resource.data) ||
               (request.resource.data.participantId is string && request.resource.data.participantId.size() <= 160));
         allow delete: if isCalendarDoc(calendarDocId);
