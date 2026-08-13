@@ -9819,7 +9819,7 @@ function App() {
     onClick: () => {
       if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 메모 정보를 확인해 주세요.')) changeView('memo');
     }
-  }, /*#__PURE__*/React.createElement("span", { className: "main-menu-icon" }, /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"] })), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-full" }, "메모"), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-short" }, "메모"), activeCal && memos.length > 0 && /*#__PURE__*/React.createElement("span", {
+  }, /*#__PURE__*/React.createElement("span", { className: "main-menu-icon" }, /*#__PURE__*/React.createElement(NotepadTextIcon, null)), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-full" }, "메모"), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-short" }, "메모"), activeCal && memos.length > 0 && /*#__PURE__*/React.createElement("span", {
     className: "main-menu-badge"
   }, memos.length))))), isMainSideMenuOpen && /*#__PURE__*/React.createElement(MainSideMenu, {
     calendar: activeCal,
@@ -11668,6 +11668,31 @@ function MenuIcon({ paths }) {
     strokeLinejoin: "round",
     style: { flexShrink: 0 }
   }, paths.map((d, i) => /*#__PURE__*/React.createElement("path", { key: i, d })));
+}
+
+// Matches MenuIcon's exact svg wrapper (16x16, stroke 2, round caps) but needs a <rect> child
+// alongside its <path>s, which MenuIcon's paths-only prop can't express.
+function NotepadTextIcon() {
+  return /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: "16",
+    height: "16",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: "2",
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+    style: { flexShrink: 0 }
+  },
+    /*#__PURE__*/React.createElement("path", { d: "M8 2v4" }),
+    /*#__PURE__*/React.createElement("path", { d: "M12 2v4" }),
+    /*#__PURE__*/React.createElement("path", { d: "M16 2v4" }),
+    /*#__PURE__*/React.createElement("rect", { width: "16", height: "18", x: "4", y: "4", rx: "2" }),
+    /*#__PURE__*/React.createElement("path", { d: "M8 10h6" }),
+    /*#__PURE__*/React.createElement("path", { d: "M8 14h8" }),
+    /*#__PURE__*/React.createElement("path", { d: "M8 18h5" })
+  );
 }
 
 function ChatSectionIcon() {
@@ -19054,7 +19079,7 @@ function MemoView({ calendar, memos, onBack, showToast, isDarkTheme, onRequestCo
           /* Collapsed state */
           /*#__PURE__*/React.createElement("div", {
             onClick: () => setIsComposerExpanded(true),
-            style: { display: 'flex', alignItems: 'center', justifycontent: 'space-between', cursor: 'pointer', color: 'var(--text-muted)' }
+            style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', color: 'var(--text-muted)' }
           },
             /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.88rem' } }, "새로운 메모를 남겨보세요..."),
             /*#__PURE__*/React.createElement("span", { style: { display: 'flex', gap: '8px', color: '#64748B', marginLeft: 'auto' } }, 
@@ -19071,7 +19096,7 @@ function MemoView({ calendar, memos, onBack, showToast, isDarkTheme, onRequestCo
           },
             /* Title & Pin row */
             /*#__PURE__*/React.createElement("div", {
-              style: { display: 'flex', alignItems: 'center', justifycontent: 'space-between', gap: '8px' }
+              style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }
             },
               /* Title input - Styled precisely as user requested */
               /*#__PURE__*/React.createElement("input", {
@@ -19205,7 +19230,7 @@ function MemoView({ calendar, memos, onBack, showToast, isDarkTheme, onRequestCo
                   border: 'none', borderRadius: '50%',
                   width: '16px', height: '16px',
                   fontSize: '9px', fontWeight: 'bold',
-                  display: 'flex', alignItems: 'center', justifycontent: 'center',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
                   cursor: 'pointer'
                 }
               }, "✕")
@@ -19252,7 +19277,7 @@ function MemoView({ calendar, memos, onBack, showToast, isDarkTheme, onRequestCo
 
             /* Actions Row: swatches completely removed, shows writer and tags side-by-side */
             /*#__PURE__*/React.createElement("div", {
-              style: { display: 'flex', alignItems: 'center', justifycontent: 'space-between', marginTop: '6px', gap: '8px', flexWrap: 'wrap' }
+              style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '6px', gap: '8px', flexWrap: 'wrap' }
             },
               /* Participant select box & tag badges list to its right */
               /*#__PURE__*/React.createElement("div", {
@@ -19301,7 +19326,7 @@ function MemoView({ calendar, memos, onBack, showToast, isDarkTheme, onRequestCo
                   style: {
                     width: '17px', height: '17px', border: 0, borderRadius: '50%',
                     background: 'var(--border-subtle)', color: 'var(--text-main)', display: 'inline-flex',
-                    alignItems: 'center', justifycontent: 'center', padding: 0, cursor: 'pointer',
+                    alignItems: 'center', justifyContent: 'center', padding: 0, cursor: 'pointer',
                     flexShrink: 0
                   }
                 }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 12 }))))
@@ -19412,7 +19437,7 @@ function MemoView({ calendar, memos, onBack, showToast, isDarkTheme, onRequestCo
         position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
         backgroundColor: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)',
         zIndex: 10000,
-        display: 'flex', alignItems: 'center', justifycontent: 'center', padding: '16px'
+        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px'
       }
     },
       /* Modal Container */
@@ -19430,7 +19455,7 @@ function MemoView({ calendar, memos, onBack, showToast, isDarkTheme, onRequestCo
       },
         /* Header: Title & Pin */
         /*#__PURE__*/React.createElement("div", {
-          style: { display: 'flex', alignItems: 'center', justifycontent: 'space-between', gap: '8px' }
+          style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }
         },
           /* Title input - Styled precisely as user requested */
           /*#__PURE__*/React.createElement("input", {
@@ -19568,7 +19593,7 @@ function MemoView({ calendar, memos, onBack, showToast, isDarkTheme, onRequestCo
               border: 'none', borderRadius: '50%',
               width: '16px', height: '16px',
               fontSize: '9px', fontWeight: 'bold',
-              display: 'flex', alignItems: 'center', justifycontent: 'center',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
               cursor: 'pointer'
             }
           }, "✕")
@@ -19615,7 +19640,7 @@ function MemoView({ calendar, memos, onBack, showToast, isDarkTheme, onRequestCo
 
         /* Footer Controls: Participant button and Tag Badges row (Swatches dot menu removed completely) */
         /*#__PURE__*/React.createElement("div", {
-          style: { display: 'flex', alignItems: 'center', justifycontent: 'space-between', marginTop: '8px', gap: '8px', flexWrap: 'wrap' }
+          style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '8px', gap: '8px', flexWrap: 'wrap' }
         },
           /* Participant select box & tag badges list to its right */
           /*#__PURE__*/React.createElement("div", {
@@ -19677,7 +19702,7 @@ function MemoView({ calendar, memos, onBack, showToast, isDarkTheme, onRequestCo
               style: {
                 width: '17px', height: '17px', border: 0, borderRadius: '50%',
                 background: 'var(--border-subtle)', color: 'var(--text-main)', display: 'inline-flex',
-                alignItems: 'center', justifycontent: 'center', padding: 0, cursor: 'pointer',
+                alignItems: 'center', justifyContent: 'center', padding: 0, cursor: 'pointer',
                 flexShrink: 0
               }
             }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 12 }))))
@@ -19685,7 +19710,7 @@ function MemoView({ calendar, memos, onBack, showToast, isDarkTheme, onRequestCo
 
           /* Save / Delete / Cancel Actions using DateModal layout styles */
           /*#__PURE__*/React.createElement("div", {
-            style: { display: 'flex', gap: '8px', width: '100%', justifycontent: 'flex-end', marginTop: '6px' }
+            style: { display: 'flex', gap: '8px', width: '100%', justifyContent: 'flex-end', marginTop: '6px' }
           },
             /* Delete Memo Button (Pushed to the far left) */
             /*#__PURE__*/React.createElement("button", {
@@ -19862,10 +19887,13 @@ function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onSelectTag, getBor
     /* Images */
     renderMemoCardImages(),
 
-    /* Content Body */
+    /* Content Body -- when a link preview card is available below, the bare URL inside the
+       text is redundant (same link shown twice), so it's stripped from the body here only.
+       memo.linkPreview is the source of truth for whether the preview actually has content
+       (same field LinkPreviewCard's cachedData reads), so this stays in sync with it. */
     memo.text && /*#__PURE__*/React.createElement("div", {
       style: { fontSize: '0.82rem', color: 'var(--text-main)', lineHeight: '1.4', whiteSpace: 'pre-wrap', overflowWrap: 'break-word', wordBreak: 'break-all' }
-    }, parseTextWithLinks(memo.text)),
+    }, parseTextWithLinks(memo.linkPreview ? removeFirstUrl(memo.text) : memo.text)),
 
     /* Link Preview Card under the card content if applicable */
     extractFirstUrl(memo.text) && /*#__PURE__*/React.createElement("div", {
