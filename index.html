@@ -2576,6 +2576,11 @@ const ENABLE_FIRESTORE_WRITES = true;
 const PUBLIC_CALENDAR_IDS = ['kkot', 'cw'];
 const FIREBASE_LOAD_TIMEOUT_MS = 10000;
 const FIREBASE_LOAD_MAX_ATTEMPTS = 3;
+// Memos load newest-first in pages of this size instead of the whole collection at once, so a
+// calendar with thousands of memos doesn't download/subscribe to all of them on every open.
+// Pinned memos are fetched separately and unbounded (pinning is a deliberate, self-limiting
+// action) so an old pinned memo never silently falls out of view as later pages load.
+const MEMOS_PAGE_SIZE = 60;
 const FIRESTORE_FREE_LIMITS = {
   storageBytes: 1024 * 1024 * 1024,
   documentBytes: 1024 * 1024,
@@ -8295,6 +8300,8 @@ function App() {
   const [recentMessages, setRecentMessages] = React.useState([]);
   const [chatMessages, setChatMessages] = React.useState([]);
   const [memos, setMemos] = React.useState([]);
+  const [memosLimit, setMemosLimit] = React.useState(MEMOS_PAGE_SIZE);
+  const [hasMoreMemos, setHasMoreMemos] = React.useState(false);
   const [anniversaries, setAnniversaries] = React.useState([]);
   const [chatInput, setChatInput] = React.useState('');
   const [chatParticipantId, setChatParticipantId] = React.useState('');
@@ -8607,22 +8614,6 @@ function App() {
         });
       });
 
-    const unsubscribeMemos = firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('memos')
-      .orderBy('createdAt', 'desc')
-      .onSnapshot(snapshot => {
-        if (!isMounted) return;
-        const list = [];
-        snapshot.forEach(doc => {
-          list.push({ id: doc.id, ...doc.data() });
-        });
-        setMemos(list);
-      }, err => {
-        console.warn(`Firestore memos subscription error:`, err);
-        fetchMemosRest(activeCalId).then(list => {
-          if (isMounted) setMemos(list);
-        });
-      });
-
     const unsubscribeAnniversaries = firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('anniversaries')
       .orderBy('createdAt', 'desc')
       .onSnapshot(snapshot => {
@@ -8643,10 +8634,78 @@ function App() {
       isMounted = false;
       if (unsubscribeRecent) unsubscribeRecent();
       if (unsubscribeChat) unsubscribeChat();
-      if (unsubscribeMemos) unsubscribeMemos();
       if (unsubscribeAnniversaries) unsubscribeAnniversaries();
     };
   }, [activeCalId]);
+
+  // Memos: paginated newest-first load (rather than subscribing to the entire collection at
+  // once, which would download/re-sync thousands of memos on every open as a calendar grows).
+  // Pinned memos are fetched separately and unbounded -- pinning is a deliberate, self-limiting
+  // action, and keeping it a separate always-live query means an old pinned memo can never
+  // silently fall out of view just because it's outside the paginated recent window.
+  React.useEffect(() => {
+    setMemosLimit(MEMOS_PAGE_SIZE);
+  }, [activeCalId]);
+
+  React.useEffect(() => {
+    if (!activeCalId) {
+      setMemos([]);
+      setHasMoreMemos(false);
+      return;
+    }
+    if (!firebaseDb) {
+      fetchMemosRest(activeCalId).then(list => {
+        setMemos(list.slice(0, memosLimit));
+        setHasMoreMemos(list.length > memosLimit);
+      });
+      return;
+    }
+    let isMounted = true;
+    let pinnedList = [];
+    let recentList = [];
+    const applyMerged = () => {
+      const byId = new Map();
+      pinnedList.forEach(m => byId.set(m.id, m));
+      recentList.forEach(m => byId.set(m.id, m));
+      setMemos(Array.from(byId.values()).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)));
+    };
+
+    const unsubscribePinned = firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('memos')
+      .where('isPinned', '==', true)
+      .onSnapshot(snapshot => {
+        if (!isMounted) return;
+        pinnedList = [];
+        snapshot.forEach(doc => pinnedList.push({ id: doc.id, ...doc.data() }));
+        applyMerged();
+      }, err => {
+        console.warn(`Firestore pinned memos subscription error:`, err);
+      });
+
+    const unsubscribeRecent = firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('memos')
+      .orderBy('createdAt', 'desc')
+      .limit(memosLimit)
+      .onSnapshot(snapshot => {
+        if (!isMounted) return;
+        recentList = [];
+        snapshot.forEach(doc => recentList.push({ id: doc.id, ...doc.data() }));
+        setHasMoreMemos(recentList.length >= memosLimit);
+        applyMerged();
+      }, err => {
+        console.warn(`Firestore memos subscription error:`, err);
+        fetchMemosRest(activeCalId).then(list => {
+          if (!isMounted) return;
+          recentList = list.slice(0, memosLimit);
+          setHasMoreMemos(list.length > memosLimit);
+          applyMerged();
+        });
+      });
+
+    return () => {
+      isMounted = false;
+      unsubscribePinned();
+      unsubscribeRecent();
+    };
+  }, [activeCalId, memosLimit]);
 
   // Dynamic body padding override for full-screen subviews (chat, settlement, memo)
   React.useEffect(() => {
@@ -9839,6 +9898,8 @@ function App() {
     return /*#__PURE__*/React.createElement(MemoView, {
       calendar: activeCal,
       memos: memos,
+      hasMoreMemos: hasMoreMemos,
+      onLoadMoreMemos: () => setMemosLimit(prev => prev + MEMOS_PAGE_SIZE),
       onBack: () => changeView('calendar'),
       showToast: showToast,
       isDarkTheme: isDarkTheme,
@@ -18619,7 +18680,7 @@ function useScrollHideHeader() {
   return { isHeaderVisible, onScroll };
 }
 
-function MemoView({ calendar, memos, onBack, showToast, isDarkTheme, onRequestConfirm }) {
+function MemoView({ calendar, memos, hasMoreMemos, onLoadMoreMemos, onBack, showToast, isDarkTheme, onRequestConfirm }) {
   const [searchQuery, setSearchQuery] = React.useState('');
   const [selectedTag, setSelectedTag] = React.useState('');
   // Header hides on scroll-down / reappears on scroll-up, matching the chat room header exactly.
@@ -19540,6 +19601,28 @@ function MemoView({ calendar, memos, onBack, showToast, isDarkTheme, onRequestCo
           getBorderColor: getBorderColor
         })))
       ),
+
+      /* "메모 더 보기" -- memos load newest-first in pages rather than all at once, so this
+         fetches the next page of older memos (mirrors chat room's "이전 채팅 더보기"). Pinned
+         memos are always fully loaded regardless of this button, so pinning an old memo never
+         depends on paging back to it first. */
+      hasMoreMemos && /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: onLoadMoreMemos,
+        style: {
+          width: '100%',
+          backgroundColor: 'var(--bg-primary)',
+          border: '1px solid var(--border-subtle)',
+          borderRadius: '8px',
+          padding: '10px 0',
+          fontSize: '0.85rem',
+          fontWeight: 'bold',
+          color: 'var(--text-main)',
+          cursor: 'pointer',
+          textAlign: 'center',
+          marginTop: '4px'
+        }
+      }, "메모 더 보기"),
 
       /* Empty State */
       filteredMemos.length === 0 && /*#__PURE__*/React.createElement("div", {
