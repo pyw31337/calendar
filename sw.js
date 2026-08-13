@@ -62,12 +62,14 @@ self.addEventListener('fetch', event => {
   );
 });
 
-// Push/notificationclick scaffolding -- nothing currently sends a push message (that needs a
-// trusted server holding VAPID/FCM credentials, which this app -- a static GitHub Pages site
-// backed only by client-reachable Firestore -- does not have; new-message alerts today are the
-// foreground Web Notifications API path in index.html's notifyNewChatMessage(), which only
-// works while a tab is open). Kept minimal and inert until/unless a server-side sender exists,
-// so the app is ready to receive real pushes without needing a second service worker rewrite.
+// Push/notificationclick handling. Real push messages are sent by the onMessageCreate Cloud
+// Function (functions/index.js), which holds the VAPID private key and calls web-push's
+// sendNotification on every new chat message -- that function must be deployed separately
+// (`firebase deploy --only functions`, and the Firebase project must be on the Blaze plan,
+// since Cloud Functions' outbound network calls aren't available on the free Spark plan) for
+// this to actually fire; this listener only displays whatever payload arrives. The foreground
+// Web Notifications API path in index.html's notifyNewChatMessage() is a separate, tab-must-
+// be-open fallback that doesn't depend on this at all.
 self.addEventListener('push', event => {
   if (!event.data) return;
   let payload;

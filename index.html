@@ -3161,6 +3161,23 @@ function sanitizeText(value, maxLength = 120) {
     .slice(0, maxLength);
 }
 
+// Turns a raw Firestore/Firebase write error into a toast message that hints at *why* it
+// failed instead of a bare "실패", since the most common real-world cause here (a
+// firestore.rules/storage.rules change that hasn't been deployed yet -- `firebase deploy
+// --only firestore:rules`/`--only storage`) is otherwise indistinguishable from a genuine bug
+// without opening devtools. Falls back to the given generic label for anything else.
+function describeFirebaseWriteError(err, genericLabel) {
+  const code = err?.code || '';
+  const message = err?.message || '';
+  if (code === 'permission-denied' || /insufficient permission/i.test(message)) {
+    return `${genericLabel}: 서버 권한 오류 (firestore.rules 배포가 필요할 수 있습니다)`;
+  }
+  if (code === 'unavailable' || /network/i.test(message)) {
+    return `${genericLabel}: 네트워크 오류, 잠시 후 다시 시도해 주세요`;
+  }
+  return genericLabel;
+}
+
 function normalizeColorValue(value, fallback = '#64748B') {
   const color = String(value || '').trim();
   return /^#[0-9A-Fa-f]{6}$/.test(color) ? color : fallback;
@@ -8964,7 +8981,7 @@ function App() {
       }
     } catch (err) {
       console.error('handleSaveEditMessage failed:', err);
-      showToast('수정 실패', 'error', 3000);
+      showToast(describeFirebaseWriteError(err, '수정 실패'), 'error', 4000);
     } finally {
       setEditingMessage(null);
       setChatUploadProgress(null);
@@ -17830,7 +17847,7 @@ function ShareModal({
   showToast
 }) {
   const shareUrl = shareType === 'chat'
-    ? `${getCalendarShareUrl(calendar.id)}?view=chat`
+    ? `${getCalendarShareUrl(calendar.id)}chat/`
     : getCalendarShareUrl(calendar.id);
   return /*#__PURE__*/React.createElement("div", {
     className: "modal-overlay",
@@ -20859,6 +20876,7 @@ function GiftIcon({ size = 20 } = {}) {
 
 
 function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {
+  const { isHeaderVisible, onScroll: handleSettlementScroll } = useScrollHideHeader();
   const [activeTab, setActiveTab] = React.useState('total');
   const categories = getExpenseCategories(calendar);
   const baseBudget = Number.isFinite(Number(calendar?.settlementBaseBudget)) ? Math.max(0, Math.round(Number(calendar.settlementBaseBudget))) : 0;
@@ -21106,26 +21124,40 @@ function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {
       backgroundColor: 'var(--bg-primary)', display: 'flex', flexDirection: 'column',
       width: '100%', maxWidth: '100%', overflow: 'hidden', zIndex: 1005
     }
-  }, /*#__PURE__*/React.createElement("div", {
+  },
+    /* Floating back button -- always fixed in place; gains a shadow once the header itself
+       has scrolled out of view, matching the chat room / memo page back button behavior. */
+    /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: onBack,
+      "aria-label": "뒤로가기",
+      style: {
+        position: 'fixed', top: '10px', left: '10px', width: '36px', height: '36px',
+        borderRadius: '50%', backgroundColor: 'var(--bg-card)', border: 'none',
+        boxShadow: isHeaderVisible ? 'none' : '0 2px 8px rgba(0,0,0,0.12)',
+        transition: 'box-shadow 0.2s ease',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        cursor: 'pointer', color: '#64748B', zIndex: 1020
+      }
+    }, /*#__PURE__*/React.createElement(BackArrowIcon, { size: 22 })),
+    /*#__PURE__*/React.createElement("div", {
     className: "settlement-page-header",
     style: {
-      display: 'flex', alignItems: 'center', gap: '10px', padding: '0 16px', height: '56px',
-      backgroundColor: 'var(--bg-card)', borderBottom: '1px solid var(--border-subtle)', flexShrink: 0,
-      position: 'relative'
+      position: 'fixed', top: 0, left: 0, right: 0, height: '56px',
+      display: 'flex', alignItems: 'center', gap: '10px', padding: '0 16px',
+      backgroundColor: 'var(--bg-card)', borderBottom: '1px solid var(--border-subtle)',
+      zIndex: 1010, transition: 'transform 0.3s ease',
+      transform: isHeaderVisible ? 'translateY(0)' : 'translateY(-100%)'
     }
-  }, /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    onClick: onBack,
-    "aria-label": "뒤로가기",
-    style: { background: 'none', border: 'none', color: '#64748B', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: 0, flexShrink: 0 }
-  }, /*#__PURE__*/React.createElement(BackArrowIcon, { size: 22 })), /*#__PURE__*/React.createElement("h3", {
+  }, /*#__PURE__*/React.createElement("div", { style: { width: '22px', flexShrink: 0 } }), /*#__PURE__*/React.createElement("h3", {
     style: {
       fontSize: '1.05rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '8px', margin: 0, color: 'var(--text-main)',
       position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)'
     }
   }, /*#__PURE__*/React.createElement(WalletIcon, { size: 20 }), "정산하기")), /*#__PURE__*/React.createElement("div", {
     className: "settlement-page-body",
-    style: { flex: '1 1 auto', overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }
+    onScroll: handleSettlementScroll,
+    style: { flex: '1 1 auto', overflowY: 'auto', padding: '72px 16px 16px', display: 'flex', flexDirection: 'column', gap: '14px' }
   }, /*#__PURE__*/React.createElement("div", {
     className: "settlement-metric-grid"
   }, metricCards.map(card => /*#__PURE__*/React.createElement("div", {

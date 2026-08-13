@@ -57,15 +57,17 @@ async function fetchCalendars() {
   return (json.documents || []).map(normalizeCalendar).filter(Boolean);
 }
 
-function createShareHtml(calendar) {
-  const title = `${calendar.title} - 모여라 캘린더`;
-  const description = calendar.description || FALLBACK_DESCRIPTION;
-  const calendarUrl = `${BASE_URL}/?id=${encodeURIComponent(calendar.id)}`;
-  const shareUrl = `${BASE_URL}/share/${encodeURIComponent(calendar.id)}/`;
+// `forwardSearch` keeps any legacy query string (e.g. an old `?view=chat` link generated
+// before the dedicated chat share page below existed) alive across the redirect instead of
+// silently dropping it and landing on the calendar view.
+function createShareHtml(calendar, { title, description, calendarUrl, shareUrl, forwardSearch = true }) {
   const escapedTitle = escapeHtml(title);
   const escapedDescription = escapeHtml(description);
   const escapedShareUrl = escapeHtml(shareUrl);
   const escapedCalendarUrl = escapeHtml(calendarUrl);
+  const redirectScript = forwardSearch
+    ? `var u = ${JSON.stringify(calendarUrl)}; if (window.location.search) u += (u.indexOf('?') === -1 ? '?' : '&') + window.location.search.slice(1); window.location.replace(u);`
+    : `window.location.replace(${JSON.stringify(calendarUrl)});`;
 
   return `<!DOCTYPE html>
 <html lang="ko">
@@ -88,7 +90,7 @@ function createShareHtml(calendar) {
   <meta name="twitter:description" content="${escapedDescription}">
   <meta name="twitter:image" content="${OG_IMAGE_URL}">
   <script>
-    window.location.replace(${JSON.stringify(calendarUrl)});
+    ${redirectScript}
   </script>
 </head>
 <body>
@@ -102,6 +104,25 @@ function createShareHtml(calendar) {
 `;
 }
 
+function createCalendarShareHtml(calendar) {
+  return createShareHtml(calendar, {
+    title: `${calendar.title} - 모여라 캘린더`,
+    description: calendar.description || FALLBACK_DESCRIPTION,
+    calendarUrl: `${BASE_URL}/?id=${encodeURIComponent(calendar.id)}`,
+    shareUrl: `${BASE_URL}/share/${encodeURIComponent(calendar.id)}/`
+  });
+}
+
+function createChatShareHtml(calendar) {
+  return createShareHtml(calendar, {
+    title: `${calendar.title} 채팅방 - 모여라 캘린더`,
+    description: `${calendar.title} 채팅방에서 대화를 확인해보세요.`,
+    calendarUrl: `${BASE_URL}/?id=${encodeURIComponent(calendar.id)}&view=chat`,
+    shareUrl: `${BASE_URL}/share/${encodeURIComponent(calendar.id)}/chat/`,
+    forwardSearch: false
+  });
+}
+
 async function main() {
   const calendars = await fetchCalendars();
   await rm(OUT_DIR, { recursive: true, force: true });
@@ -110,8 +131,10 @@ async function main() {
 
   await Promise.all(calendars.map(async (calendar) => {
     const targetDir = path.join(OUT_DIR, calendar.id);
-    await mkdir(targetDir, { recursive: true });
-    await writeFile(path.join(targetDir, 'index.html'), createShareHtml(calendar));
+    const chatDir = path.join(targetDir, 'chat');
+    await mkdir(chatDir, { recursive: true });
+    await writeFile(path.join(targetDir, 'index.html'), createCalendarShareHtml(calendar));
+    await writeFile(path.join(chatDir, 'index.html'), createChatShareHtml(calendar));
   }));
 
   const indexHtml = `<!DOCTYPE html>
