@@ -9017,12 +9017,32 @@ function App() {
       const chunks = resolvedImages.length > 0 ? chunkResolvedImagesForMessages(resolvedImages) : [[]];
       const firstChunk = chunks[0];
       const extraChunks = chunks.slice(1);
+
+      // imageTags is parallel-indexed to imageUrls/thumbUrls by ARRAY POSITION, not by the
+      // image's identity -- so it has to be explicitly rebuilt here to match the edited image
+      // order. Previously this was omitted from `data` entirely, so Firestore's partial update
+      // left the old imageTags array untouched: removing a tagged photo and attaching a new one
+      // in its place made the new photo silently inherit the old one's tag, since it landed on
+      // the same array index. Kept (isExisting) images carry their own tag forward by matching
+      // their original URL (not position, since an earlier removal can shift everything after
+      // it); freshly attached images start untagged.
+      const originalUrls = Array.isArray(editingMessage.imageUrls) && editingMessage.imageUrls.length > 0
+        ? editingMessage.imageUrls
+        : (editingMessage.imageUrl ? [editingMessage.imageUrl] : []);
+      const originalTags = Array.isArray(editingMessage.imageTags) ? editingMessage.imageTags : [];
+      const nextImageTags = (newImages || []).map(img => {
+        if (!img.isExisting) return '';
+        const originalIdx = originalUrls.indexOf(img.original);
+        return originalIdx >= 0 ? (originalTags[originalIdx] || '') : '';
+      });
+
       const data = {
         text: newText,
         imageUrl: firstChunk[0]?.imageUrl || '',
         thumbUrl: firstChunk[0]?.thumbUrl || '',
         imageUrls: firstChunk.map(r => r.imageUrl),
         thumbUrls: firstChunk.map(r => r.thumbUrl),
+        imageTags: nextImageTags.slice(0, firstChunk.length),
         linkPreview: linkPreview || null
       };
       if (resolvedParticipantId !== editingMessage.participantId) data.participantId = resolvedParticipantId;
