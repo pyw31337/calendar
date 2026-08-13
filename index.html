@@ -14576,7 +14576,7 @@ function ChatRoomView({
       value: searchQuery,
       onChange: e => { setSearchQuery(e.target.value); setSearchFocusIndex(Number.MAX_SAFE_INTEGER); },
       autoFocus: true,
-      style: { flex: 1, height: '34px', fontSize: '0.88rem' }
+      style: { flex: 1, minWidth: 0, height: '34px', fontSize: '0.88rem' }
     }),
     searchQuery && /*#__PURE__*/React.createElement("span", {
       style: {
@@ -17756,17 +17756,19 @@ function AdminUnifiedSearchResultsView({ query, calendarsList, messagesMap, memo
         style: { background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '32px', height: '32px', color: '#0F172A', padding: 0, flexShrink: 0 }
       }, /*#__PURE__*/React.createElement(BackArrowIcon, { size: 22 })),
       /*#__PURE__*/React.createElement("div", {
-        style: { position: 'absolute', left: '50%', transform: 'translateX(-50%)', fontWeight: 800, fontSize: '0.95rem', color: '#0F172A', whiteSpace: 'nowrap' }
-      }, "통합 검색결과"),
+        style: { position: 'absolute', left: '50%', transform: 'translateX(-50%)', display: 'flex', alignItems: 'baseline', whiteSpace: 'nowrap' }
+      },
+        /*#__PURE__*/React.createElement("span", { style: { fontWeight: 800, fontSize: '0.95rem', color: '#0F172A' } }, "통합 검색결과"),
+        /*#__PURE__*/React.createElement("span", { style: { fontWeight: 500, marginLeft: '10px', fontSize: '0.78rem', color: '#64748B' } },
+          `"${query}" · ${grandTotal}건 · 캘린더 ${calendarCount}개`
+        )
+      ),
       /*#__PURE__*/React.createElement("div", { style: { width: '32px', flexShrink: 0 } })
-    ),
-    /*#__PURE__*/React.createElement("div", { style: { textAlign: 'center', padding: '10px 12px 0', fontSize: '0.78rem', color: '#64748B' } },
-      `"${query}" · ${grandTotal}건 · 캘린더 ${calendarCount}개`
     ),
 
     /*#__PURE__*/React.createElement(SearchCategoryTabs, { tabs: tabDefs, activeKey: activeTab, onSelect: setActiveTab }),
 
-    /*#__PURE__*/React.createElement("div", { style: { padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' } },
+    /*#__PURE__*/React.createElement("div", { style: { padding: 0, display: 'flex', flexDirection: 'column', gap: '8px' } },
       grandTotal === 0 ? /*#__PURE__*/React.createElement("div", {
         style: { textAlign: 'center', color: '#94A3B8', fontSize: '0.88rem', padding: '40px 0' }
       }, "검색 결과가 없습니다.") : null,
@@ -17807,8 +17809,8 @@ function AdminUnifiedSearchResultsView({ query, calendarsList, messagesMap, memo
         badgeName: memo.participantName, badgeColor: memo.participantColor,
         calendarLabel: memo.calendarLabel, timeStr: formatLogTimestamp(memo.createdAt)
       },
-        memo.title && /*#__PURE__*/React.createElement("div", { style: { fontWeight: 800, marginBottom: '2px' } }, highlightKeyword(memo.title, q)),
-        memo.text && highlightKeyword(memo.text.length > 100 ? memo.text.slice(0, 100) + '...' : memo.text, q)
+        memo.title && /*#__PURE__*/React.createElement("div", { style: { fontWeight: 500, marginBottom: '2px' } }, highlightKeyword(memo.title, q)),
+        memo.text && /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.7rem', color: '#94A3B8' } }, highlightKeyword(memo.text.length > 100 ? memo.text.slice(0, 100) + '...' : memo.text, q))
       ))
     )
   );
@@ -18655,8 +18657,8 @@ function MemoView({ calendar, memos, onBack, showToast, isDarkTheme, onRequestCo
   };
 
   const handleSaveMemo = async () => {
-    if (!newText.trim() && newImages.length === 0) {
-      showToast('내용을 입력해 주세요.', 'error');
+    if (!newTitle.trim() && !newText.trim() && newImages.length === 0) {
+      showToast('제목, 내용, 사진 중 하나 이상 입력해 주세요.', 'error');
       return;
     }
 
@@ -18714,7 +18716,7 @@ function MemoView({ calendar, memos, onBack, showToast, isDarkTheme, onRequestCo
       await firebaseDb.collection('calendars').doc('cal_' + calendarId).collection('memos').doc(memoId).set(memoData);
 
       // 3. Write Activity Log
-      const logNote = newTitle.trim() ? `제목: ${newTitle.trim()}` : (newText.trim().slice(0, 30) + '...');
+      const logNote = newTitle.trim() ? `제목: ${newTitle.trim()}` : (newText.trim() ? newText.trim().slice(0, 30) + '...' : '사진 첨부');
       const activityLog = createMemoActivityLog(calendarId, 'memo_create', participantId, stamp, logNote);
       if (activityLog) {
         await firebaseDb.collection('calendars').doc('cal_' + calendarId).collection('activityLogs').doc(activityLog.id).set(activityLog);
@@ -18747,8 +18749,8 @@ function MemoView({ calendar, memos, onBack, showToast, isDarkTheme, onRequestCo
   };
 
   const handleUpdateMemo = async () => {
-    if (!editText.trim() && editImages.length === 0) {
-      showToast('내용을 입력해 주세요.', 'error');
+    if (!editTitle.trim() && !editText.trim() && editImages.length === 0) {
+      showToast('제목, 내용, 사진 중 하나 이상 입력해 주세요.', 'error');
       return;
     }
 

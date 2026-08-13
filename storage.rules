@@ -1,8 +1,9 @@
 rules_version = '2';
 
 // Same trust model as firestore.rules: this project has no real user auth, so these
-// rules validate shape/path only, not who the caller is. Chat images are the only
-// thing stored here (see uploadChatImageAssets/deleteChatImageFromStorage in index.html).
+// rules validate shape/path only, not who the caller is. Chat and memo images are the
+// only things stored here (see uploadChatImageAssets/uploadMemoImageAssets and their
+// delete counterparts in index.html).
 service firebase.storage {
   match /b/{bucket}/o {
     function isCalendarId(id) {
@@ -10,6 +11,14 @@ service firebase.storage {
     }
 
     match /chatImages/{calendarId}/{fileName} {
+      allow read: if isCalendarId(calendarId);
+      allow write: if isCalendarId(calendarId)
+        && request.resource.size <= 8 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+      allow delete: if isCalendarId(calendarId);
+    }
+
+    match /memoImages/{calendarId}/{fileName} {
       allow read: if isCalendarId(calendarId);
       allow write: if isCalendarId(calendarId)
         && request.resource.size <= 8 * 1024 * 1024
