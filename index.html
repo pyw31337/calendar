@@ -4730,7 +4730,11 @@ async function checkFirebaseStorageHealth() {
     return false;
   }
   try {
-    const probeRef = firebaseStorage.ref('chatImages/probe.txt');
+    // Path must satisfy storage.rules' chatImages/{calendarId}/{fileName} shape (two segments
+    // after chatImages/) or it falls through to the deny-all catch-all rule and this probe
+    // always "fails" even when Storage itself is perfectly healthy -- silently capping every
+    // chat/memo image at the low-res inline-base64 fallback instead of the high-quality upload.
+    const probeRef = firebaseStorage.ref('chatImages/_health/probe.txt');
     const blob = new Blob(['1'], { type: 'text/plain' });
     const probePromise = probeRef.put(blob);
     const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('PROBE_TIMEOUT')), 2500));
