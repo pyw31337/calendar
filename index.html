@@ -19151,6 +19151,7 @@ function MemoView({ calendar, memos, onBack, showToast, isDarkTheme, onRequestCo
         }, pinnedMemos.map(memo => /*#__PURE__*/React.createElement(MemoCard, {
           key: memo.id,
           memo: memo,
+          calendar: calendar,
           onOpenEdit: handleOpenEdit,
           onTogglePin: async () => {
             const nextPinned = !memo.isPinned;
@@ -19179,6 +19180,7 @@ function MemoView({ calendar, memos, onBack, showToast, isDarkTheme, onRequestCo
         }, otherMemos.map(memo => /*#__PURE__*/React.createElement(MemoCard, {
           key: memo.id,
           memo: memo,
+          calendar: calendar,
           onOpenEdit: handleOpenEdit,
           onTogglePin: async () => {
             const nextPinned = !memo.isPinned;
@@ -19558,7 +19560,7 @@ function MemoView({ calendar, memos, onBack, showToast, isDarkTheme, onRequestCo
 
 
 // Memo Card component for clean grid layout separation
-function MemoCard({ memo, onOpenEdit, onTogglePin, onSelectTag, getBorderColor }) {
+function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onSelectTag, getBorderColor }) {
   const imageUrls = memo.imageUrls || [];
   const thumbUrls = memo.thumbUrls || [];
 
@@ -19657,21 +19659,43 @@ function MemoCard({ memo, onOpenEdit, onTogglePin, onSelectTag, getBorderColor }
     }, /*#__PURE__*/React.createElement(LinkPreviewCard, { url: extractFirstUrl(memo.text), cachedData: memo.linkPreview })),
 
     /* Tags container if exists */
-    memo.tags && memo.tags.length > 0 && /*#__PURE__*/React.createElement("div", {
-      style: { display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '10px' }
-    }, memo.tags.map(tag => /*#__PURE__*/React.createElement("span", {
-      key: tag,
-      onClick: (e) => {
-        e.stopPropagation();
-        onSelectTag(tag);
-      },
-      style: {
-        fontSize: '0.68rem', fontWeight: '600',
-        color: '#2563EB', backgroundColor: 'rgba(37, 99, 235, 0.08)',
-        padding: '2px 6px', borderRadius: '4px',
-        cursor: 'pointer'
-      }
-    }, tag)))
+    /*#__PURE__*/React.createElement("div", {
+      style: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px', marginTop: '10px' }
+    },
+      /* Writer badge (capsule with participant's color and white text) */
+      (() => {
+        const writer = (calendar?.participants || []).find(p => p.id === memo.participantId);
+        if (!writer) return null;
+        return /*#__PURE__*/React.createElement("span", {
+          style: {
+            backgroundColor: writer.color || '#94A3B8',
+            color: '#FFFFFF',
+            borderRadius: '9999px',
+            padding: '3px 8px',
+            fontSize: '0.68rem',
+            fontWeight: 'bold',
+            lineHeight: 1,
+            whiteSpace: 'nowrap'
+          }
+        }, writer.name);
+      })(),
+      
+      /* Tags */
+      memo.tags && memo.tags.length > 0 && memo.tags.map(tag => /*#__PURE__*/React.createElement("span", {
+        key: tag,
+        onClick: (e) => {
+          e.stopPropagation();
+          onSelectTag(tag);
+        },
+        style: {
+          fontSize: '0.68rem', fontWeight: '600',
+          color: '#2563EB', backgroundColor: 'rgba(37, 99, 235, 0.08)',
+          padding: '3px 8px', borderRadius: '4px',
+          cursor: 'pointer', lineHeight: 1,
+          whiteSpace: 'nowrap'
+        }
+      }, tag))
+    )
   );
 }
 
