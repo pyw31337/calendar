@@ -2796,7 +2796,7 @@ function getSubscriptionHashId(endpoint) {
   return 'sub_' + Math.abs(hash) + '_' + endpoint.slice(-20).replace(/[^a-zA-Z0-9]/g, '');
 }
 
-async function subscribeUserToPush(calendarId) {
+async function subscribeUserToPush(calendarId, activeParticipantId) {
   if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return;
   try {
     const registration = await navigator.serviceWorker.ready;
@@ -2813,7 +2813,13 @@ async function subscribeUserToPush(calendarId) {
       });
     }
     if (firebaseDb) {
-      const participantId = getLocalStorage().getItem('gather_active_participant_id_v20') || 'anonymous';
+      // The caller's own chatParticipantId (the participant actually selected in THIS
+      // calendar's chat room), not the app-wide "last selected participant" saved-preference
+      // key -- that key isn't calendar-scoped, so a browser that had visited a different
+      // calendar most recently would silently register this calendar's push subscription under
+      // the WRONG participant (or 'anonymous' if never set yet), breaking the "don't notify the
+      // sender" check server-side and making the admin's subscriber list wrong.
+      const participantId = activeParticipantId || 'anonymous';
       const subId = getSubscriptionHashId(subscription.endpoint);
       await firebaseDb.collection('calendars').doc('cal_' + calendarId).collection('push_subscriptions').doc(subId).set({
         endpoint: subscription.endpoint,
@@ -13491,12 +13497,15 @@ function ChatRoomView({
     setChatNotifyEnabled(isChatNotifyEnabledForCalendar(calendar?.id));
   }, [calendar?.id]);
 
-  // Synchronize Web Push subscription automatically whenever notifications are enabled
+  // Synchronize Web Push subscription automatically whenever notifications are enabled -- also
+  // re-runs when chatParticipantId changes, so switching which participant this browser is
+  // acting as re-registers the subscription under the correct identity instead of leaving it
+  // stuck on whichever one (or none) was active the first time this fired.
   React.useEffect(() => {
-    if (chatNotifyEnabled && calendar?.id && notifPermission === 'granted') {
-      subscribeUserToPush(calendar.id);
+    if (chatNotifyEnabled && calendar?.id && notifPermission === 'granted' && chatParticipantId) {
+      subscribeUserToPush(calendar.id, chatParticipantId);
     }
-  }, [chatNotifyEnabled, calendar?.id, notifPermission]);
+  }, [chatNotifyEnabled, calendar?.id, notifPermission, chatParticipantId]);
 
   const handleToggleNotifications = async () => {
     if (!isNotificationSupported()) {
@@ -13508,7 +13517,7 @@ function ChatRoomView({
       setChatNotifyEnabled(next);
       setChatNotifyEnabledForCalendar(calendar.id, next);
       if (next) {
-        await subscribeUserToPush(calendar.id);
+        await subscribeUserToPush(calendar.id, chatParticipantId);
       } else {
         await unsubscribeUserFromPush(calendar.id);
       }
@@ -13535,7 +13544,7 @@ function ChatRoomView({
       setNotifPermission('granted');
       setChatNotifyEnabled(true);
       setChatNotifyEnabledForCalendar(calendar.id, true);
-      await subscribeUserToPush(calendar.id);
+      await subscribeUserToPush(calendar.id, chatParticipantId);
       if (showToast) showToast('알림 켜짐', 'success');
     } catch (e) {
       setNotifPermission('unsupported');
