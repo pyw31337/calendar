@@ -1167,6 +1167,16 @@
       font-size: 0.86rem;
       margin-top: 4px;
     }
+    /* 미참여 (non-voter) badges: shown inline next to the 설정 button on desktop, but that row
+       has no room for them on narrow screens, so they drop to their own full-width row below
+       the title/description there instead. Both blocks always render; CSS picks which is
+       visible, mirroring the main-menu-label-full/short pattern above. */
+    .poll-nonvoters-desktop { display: none; }
+    .poll-nonvoters-mobile { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+    @media (min-width: 768px) {
+      .poll-nonvoters-desktop { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+      .poll-nonvoters-mobile { display: none; }
+    }
     .poll-option-list {
       display: flex;
       flex-direction: column;
@@ -9471,6 +9481,30 @@ function App() {
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
     return updateCalendars(nextCalendars, isAlreadyConfirmed ? '모임 확정 취소' : '모임 확정', 'success', updatedCal.id, 'settings', meetingLog ? [meetingLog] : []);
   };
+  // Updates just the location on an already-existing confirmedMeeting entry, independent of the
+  // confirm/un-confirm toggle above. handleConfirmMeeting only ever writes note/location as a
+  // side effect of the FIRST confirm (or of promoting a settlement-only placeholder) -- once a
+  // meeting is already confirmed, there was no way to edit its location without first
+  // un-confirming it, and un-confirming itself dropped the edit (it only flips `confirmed`,
+  // spreading the rest of the entry unchanged). This is the dedicated save path DateModal's
+  // 장소 "저장" button uses instead.
+  const handleUpdateMeetingLocation = (dateStr, location) => {
+    if (!activeCal || !isValidDateString(dateStr)) return false;
+    const existingMeetings = getConfirmedMeetings(activeCal);
+    const meetingIndex = existingMeetings.findIndex(m => m.date === dateStr);
+    if (meetingIndex < 0) return false;
+    const now = Date.now();
+    const cleanLocation = sanitizeText(location || '', 200);
+    const nextConfirmedMeetings = existingMeetings.map((m, i) => i === meetingIndex ? { ...m, location: cleanLocation } : m);
+    const updatedCal = {
+      ...activeCal,
+      confirmedMeeting: nextConfirmedMeetings,
+      updatedAt: now,
+      revision: (activeCal.revision || 0) + 1
+    };
+    const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
+    return updateCalendars(nextCalendars, '장소 저장', 'success', updatedCal.id, 'settings', []);
+  };
   // Saved via saveMode 'settings' like confirmedMeeting itself -- mergeCalendarSettingsDelta
   // does a blind {...server, ...incoming} for fields it doesn't explicitly preserve/merge (see
   // its handling of availabilities/polls for contrast), so two near-simultaneous 'settings'
@@ -10211,6 +10245,7 @@ function App() {
     onDelete: handleDeleteAvailability,
     onDeleteDate: handleDeleteAllForDate,
     onConfirmMeeting: handleConfirmMeeting,
+    onUpdateMeetingLocation: handleUpdateMeetingLocation,
     onSaveExpense: handleSaveExpense,
     onDeleteExpense: handleDeleteExpense,
     onReorderExpenses: handleReorderExpenses,
@@ -15398,6 +15433,7 @@ function DateModal({
   adminMode = false,
   onSave,
   onConfirmMeeting,
+  onUpdateMeetingLocation,
   onSaveExpense,
   onDeleteExpense,
   onReorderExpenses,
@@ -15416,18 +15452,6 @@ function DateModal({
   const dateEntries = getActiveAvailabilities(calendar).filter(e => e.date === dateStr);
   const dateAnns = getAnniversariesForDate(dateStr, anniversaries);
   const getExistingNoteForParticipant = id => (dateEntries.find(entry => entry.participantId === id)?.note || '');
-  // Who among the active roster hasn't registered availability for this date at all yet --
-  // surfaced so the organizer can see at a glance who still needs a nudge, without having to
-  // mentally diff the participant list against the 참석가능 badges above.
-  const respondedParticipantIds = new Set(dateEntries.map(entry => entry.participantId));
-  const unrespondedParticipants = activeParticipants.filter(p => !respondedParticipantIds.has(p.id));
-  const handleCopyReminderText = async () => {
-    const dateLabel = formatShortDateWithDayName(dateStr);
-    const names = unrespondedParticipants.map(p => p.name).join(', ');
-    const message = `[${dateLabel}] 아직 응답하지 않으신 분: ${names} — 가능 여부 확인 부탁드려요! 🙏`;
-    const ok = await copyTextToClipboard(message);
-    if (showToast) showToast(ok ? '리마인드 문구가 복사되었습니다' : '복사에 실패했습니다', ok ? 'success' : 'error');
-  };
   React.useEffect(() => {
     setParticipantId('');
     setNote('');
@@ -15531,10 +15555,31 @@ function DateModal({
   const confirmedMeetingEntry = getConfirmedMeetings(calendar).find(m => m.date === dateStr) || null;
   const [location, setLocation] = React.useState(confirmedMeetingEntry?.location || '');
   const locationInputRef = React.useRef(null);
+  const [isSavingLocation, setIsSavingLocation] = React.useState(false);
   React.useEffect(() => {
     setLocation(confirmedMeetingEntry?.location || '');
   }, [calendar?.id, dateStr]);
   const locationIsUrl = /^https?:\/\//i.test((confirmedMeetingEntry?.location || '').trim());
+  // Independent save path for the 장소 field -- the 확정/확정취소 toggle below only ever writes
+  // location as a side effect of the FIRST confirm, so an already-confirmed meeting had no way
+  // to save an edited location at all (confirmed meetings can't reach that code path again
+  // without un-confirming first, which itself doesn't pick up the new value either). Only shown
+  // once a confirmedMeeting entry actually exists to attach the location to.
+  const handleSaveLocation = async () => {
+    if (isSavingLocation || typeof onUpdateMeetingLocation !== 'function') return;
+    const latestLocation = locationInputRef.current ? locationInputRef.current.value : location;
+    setIsSavingLocation(true);
+    try {
+      const saved = await Promise.resolve(onUpdateMeetingLocation(dateStr, latestLocation));
+      if (saved !== false && showToast) showToast('장소가 저장되었습니다', 'success');
+      else if (saved === false && showToast) showToast('장소 저장 실패', 'error');
+    } catch (err) {
+      console.error('Save location failed:', err);
+      if (showToast) showToast('장소 저장 실패', 'error');
+    } finally {
+      setIsSavingLocation(false);
+    }
+  };
   const expenses = React.useMemo(
     () => (Array.isArray(confirmedMeetingEntry?.expenses) ? confirmedMeetingEntry.expenses : []).slice().sort((a, b) => {
       const aOrder = Number.isFinite(Number(a.order)) ? Number(a.order) : Number.POSITIVE_INFINITY;
@@ -16033,7 +16078,7 @@ function DateModal({
       marginBottom: '6px',
       color: '#64748B'
     }
-  }, "메모 입력"), /*#__PURE__*/React.createElement("input", {
+  }, "메모 입력 (선택)"), /*#__PURE__*/React.createElement("input", {
     ref: noteInputRef,
     type: "text",
     className: "form-input",
@@ -16047,17 +16092,29 @@ function DateModal({
     /*#__PURE__*/React.createElement("label", {
       style: { display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px', color: '#64748B' }
     }, "장소 (선택)"),
-    /*#__PURE__*/React.createElement("input", {
-      ref: locationInputRef,
-      type: "text",
-      className: "form-input",
-      style: { width: '100%' },
-      placeholder: "예: 네이버 지도 링크 또는 장소명",
-      value: location,
-      onChange: e => setLocation(e.target.value),
-      maxLength: 200,
-      disabled: isSubmitting
-    }),
+    /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '6px' } },
+      /*#__PURE__*/React.createElement("input", {
+        ref: locationInputRef,
+        type: "text",
+        className: "form-input",
+        style: { width: '100%' },
+        placeholder: "예: 네이버 지도 링크 또는 장소명",
+        value: location,
+        onChange: e => setLocation(e.target.value),
+        maxLength: 200,
+        disabled: isSubmitting
+      }),
+      // Confirming for the first time already saves whatever's typed here (see 확정 button
+      // below), so this button is only needed once a meeting is already confirmed -- editing
+      // location on an unconfirmed date still gets picked up automatically when you confirm.
+      confirmedMeetingEntry && /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "btn btn-secondary",
+        onClick: handleSaveLocation,
+        disabled: isSubmitting || isSavingLocation,
+        style: { flexShrink: 0, whiteSpace: 'nowrap', fontSize: '0.82rem', padding: '0 14px' }
+      }, isSavingLocation ? '...' : "저장")
+    ),
     confirmedMeetingEntry?.location && /*#__PURE__*/React.createElement("div", {
       style: { marginTop: '6px', fontSize: '0.8rem', color: 'var(--text-muted)', wordBreak: 'break-all' }
     }, locationIsUrl
@@ -16127,35 +16184,7 @@ function DateModal({
       flexDirection: 'column',
       gap: '8px'
     }
-  }, dateEntries.map(entry => renderAvailabilityEntry(entry, false)))),
-  /* 미응답 -- who on the active roster hasn't registered anything for this date yet, with a
-     one-tap "리마인드 문구 복사" so the organizer doesn't have to hand-type names into the chat. */
-  !adminMode && unrespondedParticipants.length > 0 && /*#__PURE__*/React.createElement("div", {
-    style: { display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '6px' }
-  },
-    /*#__PURE__*/React.createElement("div", {
-      style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }
-    },
-      /*#__PURE__*/React.createElement("span", {
-        style: { fontSize: '0.85rem', fontWeight: 700, color: '#64748B' }
-      }, `미응답 (${unrespondedParticipants.length}명)`),
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        onClick: handleCopyReminderText,
-        style: {
-          fontSize: '0.74rem', fontWeight: 700, color: 'var(--accent-primary)',
-          background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px'
-        }
-      }, "리마인드 문구 복사")
-    ),
-    /*#__PURE__*/React.createElement("div", {
-      style: { display: 'flex', flexWrap: 'wrap', gap: '6px' }
-    }, unrespondedParticipants.map(p => /*#__PURE__*/React.createElement("span", {
-      key: p.id,
-      className: "participant-badge",
-      style: { backgroundColor: p.color, color: getContrastTextColor(p.color), opacity: 0.65 }
-    }, p.name)))
-  ), !adminMode && /*#__PURE__*/React.createElement("div", null,
+  }, dateEntries.map(entry => renderAvailabilityEntry(entry, false)))), !adminMode && /*#__PURE__*/React.createElement("div", null,
     /*#__PURE__*/React.createElement("div", {
       onClick: () => setIsSettlementCollapsed(prev => !prev),
       style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', cursor: 'pointer', marginBottom: isSettlementCollapsed ? 0 : '10px' }
@@ -22774,6 +22803,24 @@ function PollList({ calendar, onCreatePoll, onEditPoll, onVotePoll, onCancelVote
     const totalVotes = getPollTotalVoteCount(poll);
     const isOptionsVisible = !isCollapsed || !!openPollIds[poll.id];
     const closed = isPollClosed(poll);
+    // 미참여: active roster members who haven't voted on ANY option of this poll yet (union
+    // across options, not per-option) -- who still needs a nudge to vote at all.
+    const votedParticipantIds = new Set(
+      getActivePollOptions(poll).flatMap(option => getPollOptionVoterIds(poll, option.id))
+    );
+    const nonVoters = participants.filter(p => !votedParticipantIds.has(p.id));
+    const renderNonVoterBadges = className => nonVoters.length > 0 && /*#__PURE__*/React.createElement("div", {
+      key: className, className
+    },
+      /*#__PURE__*/React.createElement("span", {
+        style: { fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', whiteSpace: 'nowrap' }
+      }, "미참여"),
+      nonVoters.map(p => /*#__PURE__*/React.createElement("span", {
+        key: p.id,
+        className: "participant-badge",
+        style: { backgroundColor: p.color, color: getContrastTextColor(p.color), opacity: 0.65, fontSize: '0.7rem' }
+      }, p.name))
+    );
 
     const togglePollOptions = (event) => {
       if (isCollapsed) {
@@ -22807,13 +22854,13 @@ function PollList({ calendar, onCreatePoll, onEditPoll, onVotePoll, onCancelVote
       }
     }, closed ? '마감됨' : `마감 ${formatPollDeadline(poll.deadline)}`)), poll.description && /*#__PURE__*/React.createElement("div", {
       className: "poll-desc"
-    }, renderTextWithUrlBadge(poll.description))), /*#__PURE__*/React.createElement("button", {
+    }, renderTextWithUrlBadge(poll.description))), renderNonVoterBadges('poll-nonvoters-desktop'), /*#__PURE__*/React.createElement("button", {
       type: "button",
       className: "btn btn-secondary",
       title: "\uD22C\uD45C \uC124\uC815",
       style: { padding: '8px' },
       onClick: () => onEditPoll(poll)
-    }, /*#__PURE__*/React.createElement(SettingsIcon, null))), isOptionsVisible && /*#__PURE__*/React.createElement("div", {
+    }, /*#__PURE__*/React.createElement(SettingsIcon, null))), renderNonVoterBadges('poll-nonvoters-mobile'), isOptionsVisible && /*#__PURE__*/React.createElement("div", {
       className: "poll-option-list"
     }, getActivePollOptions(poll).map((option, index) => {
       const voterIds = getPollOptionVoterIds(poll, option.id).filter(participantId => participantsMap[participantId]);
