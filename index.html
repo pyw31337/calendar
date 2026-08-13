@@ -21173,6 +21173,12 @@ function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {
   const [activeTab, setActiveTab] = React.useState('total');
   const categories = getExpenseCategories(calendar);
   const baseBudget = Number.isFinite(Number(calendar?.settlementBaseBudget)) ? Math.max(0, Math.round(Number(calendar.settlementBaseBudget))) : 0;
+  // Income entries have no meaningful expense category of their own (their categoryId is
+  // whatever was selected/defaulted at entry time, usually '기타') -- badge them as 수입 instead
+  // of showing a misleading expense category, and keep them out of "카테고리별 지출" entirely
+  // since that section is specifically about expense breakdown, not income.
+  const INCOME_CATEGORY = { id: 'income', name: '수입', color: '#16A34A' };
+  const getDisplayCategory = item => (item.isIncome ? INCOME_CATEGORY : item.category);
   const getExpenseUrl = expense => sanitizeText(expense?.url || extractFirstUrl(expense?.label || ''), 220);
   const getExpenseLabel = expense => {
     const label = sanitizeText(expense?.label || '', 120);
@@ -21290,10 +21296,11 @@ function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {
 
   const displayBalance = overallBalance;
 
+  const allTimeExpenseItems = allTimeItems.filter(item => !item.isIncome);
   const categoryTotals = categories.map(category => ({
     category,
-    total: allTimeItems.filter(item => item.category.id === category.id).reduce((sum, item) => sum + Math.abs(item.amount), 0),
-    count: allTimeItems.filter(item => item.category.id === category.id).length
+    total: allTimeExpenseItems.filter(item => item.category.id === category.id).reduce((sum, item) => sum + Math.abs(item.amount), 0),
+    count: allTimeExpenseItems.filter(item => item.category.id === category.id).length
   })).filter(item => item.total > 0 || item.count > 0);
 
   const metricCards = [
@@ -21416,7 +21423,7 @@ function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {
     style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }
   }, /*#__PURE__*/React.createElement("div", {
     style: { minWidth: 0, display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }
-  }, categoryBadge(item.category), showDate && /*#__PURE__*/React.createElement("span", { className: "registered-at-text" }, formatDateWithDayName(item.date))), /*#__PURE__*/React.createElement("strong", {
+  }, categoryBadge(getDisplayCategory(item)), showDate && /*#__PURE__*/React.createElement("span", { className: "registered-at-text" }, formatDateWithDayName(item.date))), /*#__PURE__*/React.createElement("strong", {
     style: { fontSize: '0.9rem', color: item.isIncome ? '#16A34A' : '#DC2626', whiteSpace: 'nowrap' }
   }, item.isIncome ? '+' : '-', Math.abs(item.amount).toLocaleString(), "원")), /*#__PURE__*/React.createElement("span", {
     style: { fontSize: '0.86rem', color: 'var(--text-main)', fontWeight: 500, overflowWrap: 'anywhere' }
@@ -21542,8 +21549,8 @@ function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {
     title: "정산 결과 공유 이미지 생성",
     style: {
       position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)',
-      width: '32px', height: '32px', borderRadius: '50%', border: '1px solid var(--border-subtle)',
-      backgroundColor: 'var(--bg-primary)', cursor: 'pointer', display: 'flex',
+      width: '32px', height: '32px', borderRadius: '50%', border: 'none',
+      backgroundColor: 'transparent', cursor: 'pointer', display: 'flex',
       alignItems: 'center', justifyContent: 'center', color: '#64748B', padding: 0
     }
   }, /*#__PURE__*/React.createElement(ShareIcon, { size: 16 }))), /*#__PURE__*/React.createElement("div", {
