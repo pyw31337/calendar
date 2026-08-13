@@ -8661,6 +8661,21 @@ function App() {
     if (imageCount > 0) setChatUploadProgress({ pct: 0, remainingSec: null });
 
     try {
+      let linkPreview = null;
+      if (hasText) {
+        const url = extractFirstUrl(chatInput);
+        if (url) {
+          try {
+            const res = await fetchLinkPreview(url);
+            if (res && res.status === 'success') {
+              linkPreview = res.data;
+            }
+          } catch (e) {
+            console.error('Failed to fetch link preview on chat send:', e);
+          }
+        }
+      }
+
       let ok = false;
       if (imageCount === 0) {
         const messageData = {
@@ -8668,6 +8683,7 @@ function App() {
           text: chatInput.trim(),
           timestamp: Date.now()
         };
+        if (linkPreview) messageData.linkPreview = linkPreview;
         ok = await runWithOperationProgress({
           title: '채팅 전송 중...',
           detail: '메시지를 Firebase에 저장하고 있습니다.'
@@ -8698,6 +8714,7 @@ function App() {
             thumbUrls: chunkImages.map(r => r.thumbUrl),
             timestamp: baseTimestamp + i
           };
+          if (i === 0 && linkPreview) messageData.linkPreview = linkPreview;
           if (firebaseDb) {
             await firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages').add(messageData);
           } else {
@@ -8774,6 +8791,24 @@ function App() {
     const hasNewImages = (newImages || []).some(img => !img.isExisting);
     if (hasNewImages) setChatUploadProgress({ pct: 0, remainingSec: null });
     try {
+      let linkPreview = null;
+      const url = extractFirstUrl(newText);
+      if (url) {
+        const oldUrl = extractFirstUrl(editingMessage.text);
+        if (oldUrl === url && editingMessage.linkPreview) {
+          linkPreview = editingMessage.linkPreview;
+        } else {
+          try {
+            const res = await fetchLinkPreview(url);
+            if (res && res.status === 'success') {
+              linkPreview = res.data;
+            }
+          } catch (e) {
+            console.error('Failed to fetch link preview on message update:', e);
+          }
+        }
+      }
+
       // Images already on the message (isExisting) are passed through as-is; freshly
       // picked ones get uploaded via resolveChatImageBatch, matching the compose flow. If the
       // result still doesn't fit in one document (inline base64 fallback with many images),
@@ -8788,7 +8823,8 @@ function App() {
         imageUrl: firstChunk[0]?.imageUrl || '',
         thumbUrl: firstChunk[0]?.thumbUrl || '',
         imageUrls: firstChunk.map(r => r.imageUrl),
-        thumbUrls: firstChunk.map(r => r.thumbUrl)
+        thumbUrls: firstChunk.map(r => r.thumbUrl),
+        linkPreview: linkPreview || null
       };
       let ok = false;
       if (firebaseDb) {
@@ -9212,7 +9248,7 @@ function App() {
   // shared by every other settings-mode field in this app (title, description, ...); a real fix
   // would need confirmedMeeting/pinnedNotice to get their own dedicated saveMode + delta-merge
   // function the way availabilities and polls already do.
-  const handleSaveExpense = (dateStr, expense) => {
+  const handleSaveExpense = async (dateStr, expense) => {
     if (!activeCal || !isValidDateString(dateStr)) return false;
     const existingMeetings = getConfirmedMeetings(activeCal);
     let meetingIndex = existingMeetings.findIndex(m => m.date === dateStr);
@@ -9226,6 +9262,28 @@ function App() {
 	    const cleanCategoryId = categoryIds.has(expense?.categoryId) ? expense.categoryId : 'etc';
 	    const cleanAmount = Number.isFinite(expense?.amount) && expense.amount !== 0 ? Math.round(expense.amount) : 0;
     if ((!cleanLabel && !cleanUrl) || !cleanAmount) return false;
+    
+    let linkPreview = null;
+    if (cleanUrl) {
+      if (expense?.id) {
+        const meeting = existingMeetings[meetingIndex];
+        const existingExp = meeting?.expenses?.find(e => e.id === expense.id);
+        if (existingExp && existingExp.url === cleanUrl && existingExp.linkPreview) {
+          linkPreview = existingExp.linkPreview;
+        }
+      }
+      if (!linkPreview) {
+        try {
+          const res = await fetchLinkPreview(cleanUrl);
+          if (res && res.status === 'success') {
+            linkPreview = res.data;
+          }
+        } catch (e) {
+          print("Failed to fetch link preview on expense save:", e)
+        }
+      }
+    }
+
     const now = Date.now();
     let meetings = existingMeetings;
     if (meetingIndex < 0) {
@@ -9236,8 +9294,8 @@ function App() {
 	    const existingExpenses = Array.isArray(meeting.expenses) ? meeting.expenses : [];
 	    const isEditing = !!expense?.id;
 	    const nextExpenses = isEditing
-	      ? existingExpenses.map(e => e.id === expense.id ? { ...e, label: cleanLabel, url: cleanUrl, categoryId: cleanCategoryId, amount: cleanAmount, updatedAt: now } : e)
-	      : [...existingExpenses, { id: `exp_${activeCal.id}_${dateStr}_${now}_${Math.random().toString(36).slice(2, 7)}`, label: cleanLabel, url: cleanUrl, categoryId: cleanCategoryId, amount: cleanAmount, order: existingExpenses.length, createdAt: now, updatedAt: now }];
+	      ? existingExpenses.map(e => e.id === expense.id ? { ...e, label: cleanLabel, url: cleanUrl, categoryId: cleanCategoryId, amount: cleanAmount, updatedAt: now, linkPreview: linkPreview || null } : e)
+	      : [...existingExpenses, { id: `exp_${activeCal.id}_${dateStr}_${now}_${Math.random().toString(36).slice(2, 7)}`, label: cleanLabel, url: cleanUrl, categoryId: cleanCategoryId, amount: cleanAmount, order: existingExpenses.length, createdAt: now, updatedAt: now, linkPreview: linkPreview || null }];
     const nextConfirmedMeetings = meetings.map((m, i) => i === meetingIndex ? { ...m, expenses: nextExpenses, amount: null } : m);
     // Expense/income entries have no participant selector of their own, so these logs carry an
     // empty participantId (matching how poll activity logs already handle system-level actions)
@@ -10834,9 +10892,16 @@ async function fetchLinkPreview(url) {
   linkPreviewInflight.set(url, promise);
   return promise;
 }
-function useLinkPreview(url) {
-  const [state, setState] = React.useState(() => (url ? linkPreviewCache.get(url) : null) || null);
+function useLinkPreview(url, cachedData) {
+  const [state, setState] = React.useState(() => {
+    if (cachedData) return { status: 'success', data: cachedData };
+    return (url ? linkPreviewCache.get(url) : null) || null;
+  });
   React.useEffect(() => {
+    if (cachedData) {
+      setState({ status: 'success', data: cachedData });
+      return;
+    }
     if (!url) return;
     const cached = linkPreviewCache.get(url);
     if (cached) {
@@ -10851,11 +10916,11 @@ function useLinkPreview(url) {
     return () => {
       cancelled = true;
     };
-  }, [url]);
+  }, [url, cachedData]);
   return state;
 }
-function LinkPreviewCard({ url, fallbackTitle }) {
-  const preview = useLinkPreview(url);
+function LinkPreviewCard({ url, fallbackTitle, cachedData }) {
+  const preview = useLinkPreview(url, cachedData);
   if (!preview || preview.status === 'loading' || preview.status === 'error' || preview.status === 'empty') return null;
   const { title, description, image, siteName } = preview.data;
   const isGenericTitle = !title || title === 'map.naver.com' || title === 'naver.me' || title.startsWith('map.naver');
@@ -12664,7 +12729,7 @@ function CommentsSection({
     const bubbleContent = /*#__PURE__*/React.createElement(React.Fragment, null,
       msgImages ? /*#__PURE__*/React.createElement('div', { style: { marginBottom: '8px' } }, msgImages) : null,
       msg.text ? parseTextWithLinks(msg.text) : null,
-      msgFirstUrl && /*#__PURE__*/React.createElement(LinkPreviewCard, { url: msgFirstUrl, fallbackTitle: msg.text ? removeFirstUrl(msg.text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : '' })
+      msgFirstUrl && /*#__PURE__*/React.createElement(LinkPreviewCard, { url: msgFirstUrl, fallbackTitle: msg.text ? removeFirstUrl(msg.text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : '', cachedData: msg.linkPreview })
     );
 
     const editSvg = /*#__PURE__*/React.createElement('svg', { xmlns: 'http://www.w3.org/2000/svg', width: '12', height: '12', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '2.5', strokeLinecap: 'round', strokeLinejoin: 'round' },
@@ -13559,7 +13624,7 @@ function ChatRoomView({
         whiteSpace: 'pre-wrap',
         boxShadow: '0 2px 6px rgba(0,0,0,0.06)'
       }
-    }, renderChatMessageImages(msg, setActiveLightbox, { maxWidth: '200px', maxHeight: '150px', marginBottom: msg.text ? '10px' : '0' }), msg.text ? parseTextWithLinks(msg.text, searchQuery) : null, extractFirstUrl(msg.text) && /*#__PURE__*/React.createElement(LinkPreviewCard, { url: extractFirstUrl(msg.text), fallbackTitle: msg.text ? removeFirstUrl(msg.text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : '' })), /*#__PURE__*/React.createElement("div", {
+    }, renderChatMessageImages(msg, setActiveLightbox, { maxWidth: '200px', maxHeight: '150px', marginBottom: msg.text ? '10px' : '0' }), msg.text ? parseTextWithLinks(msg.text, searchQuery) : null, extractFirstUrl(msg.text) && /*#__PURE__*/React.createElement(LinkPreviewCard, { url: extractFirstUrl(msg.text), fallbackTitle: msg.text ? removeFirstUrl(msg.text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : '', cachedData: msg.linkPreview })), /*#__PURE__*/React.createElement("div", {
       style: {
         position: 'absolute',
         right: '-7px',
@@ -13612,7 +13677,7 @@ function ChatRoomView({
         whiteSpace: 'pre-wrap',
         boxShadow: '0 2px 6px rgba(0,0,0,0.06)'
       }
-    }, renderChatMessageImages(msg, setActiveLightbox, { maxWidth: '200px', maxHeight: '150px', marginBottom: msg.text ? '10px' : '0' }), msg.text ? parseTextWithLinks(msg.text, searchQuery) : null, extractFirstUrl(msg.text) && /*#__PURE__*/React.createElement(LinkPreviewCard, { url: extractFirstUrl(msg.text), fallbackTitle: msg.text ? removeFirstUrl(msg.text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : '' })), /*#__PURE__*/React.createElement("div", {
+    }, renderChatMessageImages(msg, setActiveLightbox, { maxWidth: '200px', maxHeight: '150px', marginBottom: msg.text ? '10px' : '0' }), msg.text ? parseTextWithLinks(msg.text, searchQuery) : null, extractFirstUrl(msg.text) && /*#__PURE__*/React.createElement(LinkPreviewCard, { url: extractFirstUrl(msg.text), fallbackTitle: msg.text ? removeFirstUrl(msg.text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : '', cachedData: msg.linkPreview })), /*#__PURE__*/React.createElement("div", {
       style: {
         position: 'absolute',
         left: '-7px',
@@ -18099,7 +18164,8 @@ function ChatGalleryModal({
           url,
           timestamp: msg.timestamp,
           messageId: msg.id,
-          text: msg.text
+          text: msg.text,
+          linkPreview: msg.linkPreview
         });
       }
     });
@@ -18176,7 +18242,7 @@ function ChatGalleryModal({
     }, "공유된 링크가 없습니다.") : sharedLinks.map(item => /*#__PURE__*/React.createElement("div", {
       key: item.messageId,
       style: { width: '100%' }
-    }, /*#__PURE__*/React.createElement(LinkPreviewCard, { url: item.url, fallbackTitle: item.text ? removeFirstUrl(item.text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : '' })))
+    }, /*#__PURE__*/React.createElement(LinkPreviewCard, { url: item.url, fallbackTitle: item.text ? removeFirstUrl(item.text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : '', cachedData: item.linkPreview })))
   ) : (
     sharedPhotos.length === 0 ? /*#__PURE__*/React.createElement("div", {
       style: { textAlign: 'center', color: 'var(--text-muted)', padding: '40px 0', fontSize: '0.88rem' }
@@ -18357,6 +18423,20 @@ function MemoView({ calendar, memos, onBack, showToast, isDarkTheme, onRequestCo
 
       const participantId = composerParticipantId || 'anonymous';
 
+      // Check for link preview
+      const url = extractFirstUrl(newText);
+      let linkPreview = null;
+      if (url) {
+        try {
+          const res = await fetchLinkPreview(url);
+          if (res && res.status === 'success') {
+            linkPreview = res.data;
+          }
+        } catch (e) {
+          console.error('Failed to fetch link preview on memo save:', e);
+        }
+      }
+
       // 2. Write to Firestore
       const memoData = {
         id: memoId,
@@ -18371,6 +18451,7 @@ function MemoView({ calendar, memos, onBack, showToast, isDarkTheme, onRequestCo
         createdAt: stamp,
         updatedAt: stamp
       };
+      if (linkPreview) memoData.linkPreview = linkPreview;
 
       await firebaseDb.collection('calendars').doc('cal_' + calendarId).collection('memos').doc(memoId).set(memoData);
 
@@ -18443,6 +18524,25 @@ function MemoView({ calendar, memos, onBack, showToast, isDarkTheme, onRequestCo
 
       const participantId = editParticipantId || 'anonymous';
 
+      // Check for link preview
+      const url = extractFirstUrl(editText);
+      let linkPreview = null;
+      if (url) {
+        const oldUrl = extractFirstUrl(editingMemo.text);
+        if (oldUrl === url && editingMemo.linkPreview) {
+          linkPreview = editingMemo.linkPreview;
+        } else {
+          try {
+            const res = await fetchLinkPreview(url);
+            if (res && res.status === 'success') {
+              linkPreview = res.data;
+            }
+          } catch (e) {
+            console.error('Failed to fetch link preview on memo update:', e);
+          }
+        }
+      }
+
       const memoData = {
         ...editingMemo,
         participantId,
@@ -18453,7 +18553,8 @@ function MemoView({ calendar, memos, onBack, showToast, isDarkTheme, onRequestCo
         color: editColor,
         isPinned: editIsPinned,
         tags: tagsArray,
-        updatedAt: stamp
+        updatedAt: stamp,
+        linkPreview: linkPreview || null
       };
 
       await firebaseDb.collection('calendars').doc('cal_' + calendarId).collection('memos').doc(editingMemo.id).set(memoData);
@@ -19225,9 +19326,14 @@ function MemoView({ calendar, memos, onBack, showToast, isDarkTheme, onRequestCo
         ),
 
         /* Links Card Preview inside edit modal */
-        extractFirstUrl(editText) && /*#__PURE__*/React.createElement("div", {
-          style: { marginTop: '4px', marginBottom: '4px' }
-        }, /*#__PURE__*/React.createElement(LinkPreviewCard, { url: extractFirstUrl(editText) })),
+        extractFirstUrl(editText) && (() => {
+          const url = extractFirstUrl(editText);
+          const oldUrl = extractFirstUrl(editingMemo?.text);
+          const cachedData = (oldUrl === url) ? editingMemo?.linkPreview : null;
+          return /*#__PURE__*/React.createElement("div", {
+            style: { marginTop: '4px', marginBottom: '4px' }
+          }, /*#__PURE__*/React.createElement(LinkPreviewCard, { url: url, cachedData: cachedData }));
+        })(),
 
         /* Images previews list */
         editImages.length > 0 && /*#__PURE__*/React.createElement("div", {
@@ -19540,7 +19646,7 @@ function MemoCard({ memo, onOpenEdit, onTogglePin, onSelectTag, getBorderColor }
     /* Link Preview Card under the card content if applicable */
     extractFirstUrl(memo.text) && /*#__PURE__*/React.createElement("div", {
       style: { marginTop: '8px' }
-    }, /*#__PURE__*/React.createElement(LinkPreviewCard, { url: extractFirstUrl(memo.text) })),
+    }, /*#__PURE__*/React.createElement(LinkPreviewCard, { url: extractFirstUrl(memo.text), cachedData: memo.linkPreview })),
 
     /* Tags container if exists */
     memo.tags && memo.tags.length > 0 && /*#__PURE__*/React.createElement("div", {
