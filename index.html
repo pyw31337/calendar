@@ -94,6 +94,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/korean-lunar-calendar/dist/korean-lunar-calendar.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@2.0.4/dist/qrcode.js"></script>
 
   <!-- Firebase SDK for Realtime Multi-User Firestore Sync -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -7234,8 +7235,8 @@ function AdminDashboard({ initialCalendars }) {
            scrollbox; each calendar's group gets an accent-colored rail + pill label (instead of
            plain bold text) so adjacent calendars are visually easy to tell apart. */
         /*#__PURE__*/React.createElement("section", { style: { ...styles.card, display: 'flex', flexDirection: 'column' } },
-          /*#__PURE__*/React.createElement("div", { style: styles.cardTitle, "data-collapse-anchor": "true", "data-collapse-key": "metrics-participants", "data-collapse-label": "참여자별 일정 등록수" },
-            /*#__PURE__*/React.createElement("span", { style: { display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(PodiumIcon, null), "참여자별 일정 등록수")
+          /*#__PURE__*/React.createElement("div", { style: styles.cardTitle, "data-collapse-anchor": "true", "data-collapse-key": "metrics-participants", "data-collapse-label": "참여자별 일정 등록수 / 참석률" },
+            /*#__PURE__*/React.createElement("span", { style: { display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(PodiumIcon, null), "참여자별 일정 등록수 / 참석률")
           ),
           /*#__PURE__*/React.createElement("div", null,
             dashboard.calendarStats.map((stat, i) => {
@@ -7249,10 +7250,19 @@ function AdminDashboard({ initialCalendars }) {
               }, stat.calendar.id),
               stat.participantStats.map(participant => {
                 const pct = `${Math.max(4, Math.round(participant.count / Math.max(1, stat.schedules.length) * 100))}%`;
+                // 참석률: 이 캘린더에 등록된 전체 날짜(dateCount, 등록자 상관없이 유니크 날짜 수) 중
+                // 이 참여자가 응답한 날짜의 비율 -- 위 pct(전체 등록 건수 중 이 사람 몫)와는 다른 지표라
+                // 별도 뱃지로 병기. 등록된 날짜가 아직 없는 캘린더는 0%로 표시.
+                const attendanceRate = stat.dateCount > 0 ? Math.round(participant.count / stat.dateCount * 100) : 0;
                 return /*#__PURE__*/React.createElement("div", { key: participant.id, style: { marginBottom: '6px' } },
-                  /*#__PURE__*/React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', fontWeight: 800 } },
+                  /*#__PURE__*/React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.78rem', fontWeight: 800 } },
                     /*#__PURE__*/React.createElement("span", null, participant.name),
-                    /*#__PURE__*/React.createElement("span", { style: { color: '#64748B' } }, participant.count, "건")
+                    /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px' } },
+                      /*#__PURE__*/React.createElement("span", { style: { color: '#64748B' } }, participant.count, "건"),
+                      /*#__PURE__*/React.createElement("span", {
+                        style: { fontSize: '0.68rem', fontWeight: 700, padding: '1px 7px', borderRadius: '9999px', backgroundColor: '#EEF2FF', color: '#4338CA' }
+                      }, "참석률 ", attendanceRate, "%")
+                    )
                   ),
                   /*#__PURE__*/React.createElement("div", { style: { width: '100%', height: '5px', borderRadius: '999px', background: '#E2E8F0', overflow: 'hidden', marginTop: '2px', border: '1px solid #E2E8F0' } },
                     /*#__PURE__*/React.createElement("div", { style: { width: pct, height: '100%', background: participant.color || '#64748B' } })
@@ -9017,12 +9027,32 @@ function App() {
       const chunks = resolvedImages.length > 0 ? chunkResolvedImagesForMessages(resolvedImages) : [[]];
       const firstChunk = chunks[0];
       const extraChunks = chunks.slice(1);
+
+      // imageTags is parallel-indexed to imageUrls/thumbUrls by ARRAY POSITION, not by the
+      // image's identity -- so it has to be explicitly rebuilt here to match the edited image
+      // order. Previously this was omitted from `data` entirely, so Firestore's partial update
+      // left the old imageTags array untouched: removing a tagged photo and attaching a new one
+      // in its place made the new photo silently inherit the old one's tag, since it landed on
+      // the same array index. Kept (isExisting) images carry their own tag forward by matching
+      // their original URL (not position, since an earlier removal can shift everything after
+      // it); freshly attached images start untagged.
+      const originalUrls = Array.isArray(editingMessage.imageUrls) && editingMessage.imageUrls.length > 0
+        ? editingMessage.imageUrls
+        : (editingMessage.imageUrl ? [editingMessage.imageUrl] : []);
+      const originalTags = Array.isArray(editingMessage.imageTags) ? editingMessage.imageTags : [];
+      const nextImageTags = (newImages || []).map(img => {
+        if (!img.isExisting) return '';
+        const originalIdx = originalUrls.indexOf(img.original);
+        return originalIdx >= 0 ? (originalTags[originalIdx] || '') : '';
+      });
+
       const data = {
         text: newText,
         imageUrl: firstChunk[0]?.imageUrl || '',
         thumbUrl: firstChunk[0]?.thumbUrl || '',
         imageUrls: firstChunk.map(r => r.imageUrl),
         thumbUrls: firstChunk.map(r => r.thumbUrl),
+        imageTags: nextImageTags.slice(0, firstChunk.length),
         linkPreview: linkPreview || null
       };
       if (resolvedParticipantId !== editingMessage.participantId) data.participantId = resolvedParticipantId;
@@ -9401,12 +9431,13 @@ function App() {
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
     return updateCalendars(nextCalendars, '삭제완료', 'delete', updatedCal.id, 'availability', activityLogs);
   };
-  const handleConfirmMeeting = (dateStr, note) => {
+  const handleConfirmMeeting = (dateStr, note, location) => {
     if (!activeCal || !isValidDateString(dateStr)) return false;
     const now = Date.now();
     const existingMeetings = getConfirmedMeetings(activeCal);
     const meetingIndex = existingMeetings.findIndex(m => m.date === dateStr);
     const isAlreadyConfirmed = meetingIndex >= 0 && existingMeetings[meetingIndex].confirmed !== false;
+    const cleanLocation = sanitizeText(location || '', 200);
     let nextConfirmedMeetings;
     if (isAlreadyConfirmed) {
       // Un-confirming: if the entry also carries settlement data, keep it around as an
@@ -9422,10 +9453,10 @@ function App() {
       // handleSaveExpense below) -- promote it to a real confirmed meeting instead of adding
       // a duplicate entry for the same date.
       nextConfirmedMeetings = existingMeetings.map((m, i) => i === meetingIndex
-        ? { ...m, confirmed: true, note: sanitizeText(note, 120), confirmedAt: now }
+        ? { ...m, confirmed: true, note: sanitizeText(note, 120), location: cleanLocation, confirmedAt: now }
         : m);
     } else {
-      nextConfirmedMeetings = [...existingMeetings, { date: dateStr, note: sanitizeText(note, 120), confirmedAt: now, confirmed: true }];
+      nextConfirmedMeetings = [...existingMeetings, { date: dateStr, note: sanitizeText(note, 120), location: cleanLocation, confirmedAt: now, confirmed: true }];
     }
     const action = isAlreadyConfirmed ? 'meeting_cancel' : 'meeting_confirm';
     const logNote = sanitizeText(note || '', 120) || (isAlreadyConfirmed ? '모임 확정 취소됨' : '모임 확정됨');
@@ -15385,6 +15416,18 @@ function DateModal({
   const dateEntries = getActiveAvailabilities(calendar).filter(e => e.date === dateStr);
   const dateAnns = getAnniversariesForDate(dateStr, anniversaries);
   const getExistingNoteForParticipant = id => (dateEntries.find(entry => entry.participantId === id)?.note || '');
+  // Who among the active roster hasn't registered availability for this date at all yet --
+  // surfaced so the organizer can see at a glance who still needs a nudge, without having to
+  // mentally diff the participant list against the 참석가능 badges above.
+  const respondedParticipantIds = new Set(dateEntries.map(entry => entry.participantId));
+  const unrespondedParticipants = activeParticipants.filter(p => !respondedParticipantIds.has(p.id));
+  const handleCopyReminderText = async () => {
+    const dateLabel = formatShortDateWithDayName(dateStr);
+    const names = unrespondedParticipants.map(p => p.name).join(', ');
+    const message = `[${dateLabel}] 아직 응답하지 않으신 분: ${names} — 가능 여부 확인 부탁드려요! 🙏`;
+    const ok = await copyTextToClipboard(message);
+    if (showToast) showToast(ok ? '리마인드 문구가 복사되었습니다' : '복사에 실패했습니다', ok ? 'success' : 'error');
+  };
   React.useEffect(() => {
     setParticipantId('');
     setNote('');
@@ -15486,6 +15529,12 @@ function DateModal({
   const isAllAvailable = totalPartCount > 0 && uniqueActiveParts.size === totalPartCount;
   const isConfirmed = isDateConfirmedMeeting(calendar, dateStr);
   const confirmedMeetingEntry = getConfirmedMeetings(calendar).find(m => m.date === dateStr) || null;
+  const [location, setLocation] = React.useState(confirmedMeetingEntry?.location || '');
+  const locationInputRef = React.useRef(null);
+  React.useEffect(() => {
+    setLocation(confirmedMeetingEntry?.location || '');
+  }, [calendar?.id, dateStr]);
+  const locationIsUrl = /^https?:\/\//i.test((confirmedMeetingEntry?.location || '').trim());
   const expenses = React.useMemo(
     () => (Array.isArray(confirmedMeetingEntry?.expenses) ? confirmedMeetingEntry.expenses : []).slice().sort((a, b) => {
       const aOrder = Number.isFinite(Number(a.order)) ? Number(a.order) : Number.POSITIVE_INFINITY;
@@ -15749,9 +15798,10 @@ function DateModal({
     setIsSubmitting(true);
     const wasConfirmed = isConfirmed;
     const latestNote = noteInputRef.current ? noteInputRef.current.value : note;
+    const latestLocation = locationInputRef.current ? locationInputRef.current.value : location;
     let saved = false;
     try {
-      saved = await Promise.resolve(onConfirmMeeting(dateStr, latestNote));
+      saved = await Promise.resolve(onConfirmMeeting(dateStr, latestNote, latestLocation));
     } catch (err) {
       console.error('Confirm meeting failed:', err);
     }
@@ -15993,7 +16043,30 @@ function DateModal({
     onChange: e => setNote(e.target.value),
     maxLength: 120,
     disabled: isSubmitting
-  })), dateEntries.length > 0 && /*#__PURE__*/React.createElement("div", {
+  })), !adminMode && /*#__PURE__*/React.createElement("div", null,
+    /*#__PURE__*/React.createElement("label", {
+      style: { display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px', color: '#64748B' }
+    }, "장소 (선택)"),
+    /*#__PURE__*/React.createElement("input", {
+      ref: locationInputRef,
+      type: "text",
+      className: "form-input",
+      style: { width: '100%' },
+      placeholder: "예: 네이버 지도 링크 또는 장소명",
+      value: location,
+      onChange: e => setLocation(e.target.value),
+      maxLength: 200,
+      disabled: isSubmitting
+    }),
+    confirmedMeetingEntry?.location && /*#__PURE__*/React.createElement("div", {
+      style: { marginTop: '6px', fontSize: '0.8rem', color: 'var(--text-muted)', wordBreak: 'break-all' }
+    }, locationIsUrl
+      ? /*#__PURE__*/React.createElement("a", {
+          href: confirmedMeetingEntry.location, target: "_blank", rel: "noopener noreferrer",
+          style: { color: 'var(--accent-primary)', fontWeight: 600 }
+        }, "📍 ", confirmedMeetingEntry.location)
+      : `📍 ${confirmedMeetingEntry.location}`)
+  ), dateEntries.length > 0 && /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: '6px'
     }
@@ -16054,7 +16127,35 @@ function DateModal({
       flexDirection: 'column',
       gap: '8px'
     }
-  }, dateEntries.map(entry => renderAvailabilityEntry(entry, false)))), !adminMode && /*#__PURE__*/React.createElement("div", null,
+  }, dateEntries.map(entry => renderAvailabilityEntry(entry, false)))),
+  /* 미응답 -- who on the active roster hasn't registered anything for this date yet, with a
+     one-tap "리마인드 문구 복사" so the organizer doesn't have to hand-type names into the chat. */
+  !adminMode && unrespondedParticipants.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: { display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '6px' }
+  },
+    /*#__PURE__*/React.createElement("div", {
+      style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }
+    },
+      /*#__PURE__*/React.createElement("span", {
+        style: { fontSize: '0.85rem', fontWeight: 700, color: '#64748B' }
+      }, `미응답 (${unrespondedParticipants.length}명)`),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: handleCopyReminderText,
+        style: {
+          fontSize: '0.74rem', fontWeight: 700, color: 'var(--accent-primary)',
+          background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px'
+        }
+      }, "리마인드 문구 복사")
+    ),
+    /*#__PURE__*/React.createElement("div", {
+      style: { display: 'flex', flexWrap: 'wrap', gap: '6px' }
+    }, unrespondedParticipants.map(p => /*#__PURE__*/React.createElement("span", {
+      key: p.id,
+      className: "participant-badge",
+      style: { backgroundColor: p.color, color: getContrastTextColor(p.color), opacity: 0.65 }
+    }, p.name)))
+  ), !adminMode && /*#__PURE__*/React.createElement("div", null,
     /*#__PURE__*/React.createElement("div", {
       onClick: () => setIsSettlementCollapsed(prev => !prev),
       style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', cursor: 'pointer', marginBottom: isSettlementCollapsed ? 0 : '10px' }
@@ -17995,6 +18096,18 @@ function ShareModal({
   const shareUrl = shareType === 'chat'
     ? `${getCalendarShareUrl(calendar.id)}chat/`
     : getCalendarShareUrl(calendar.id);
+  const qrDataUrl = React.useMemo(() => {
+    if (typeof qrcode === 'undefined') return null;
+    try {
+      const qr = qrcode(0, 'M'); // typeNumber 0 = auto-select smallest size that fits the data
+      qr.addData(shareUrl);
+      qr.make();
+      return qr.createDataURL(6, 8);
+    } catch (e) {
+      console.warn('QR code render failed:', e);
+      return null;
+    }
+  }, [shareUrl]);
   return /*#__PURE__*/React.createElement("div", {
     className: "modal-overlay",
     onClick: onClose,
@@ -18049,7 +18162,18 @@ function ShareModal({
       if (showToast) showToast(message, ok ? 'success' : 'error');
       else alert(message);
     }
-  }, "URL \uBCF5\uC0AC\uD558\uAE30"))));
+  }, "URL \uBCF5\uC0AC\uD558\uAE30"),
+  /* QR code -- lets an in-person meetup invite happen with a phone camera scan instead of
+     retyping or messaging the URL. Generated entirely client-side as a data: URL (the
+     qrcode.js library itself needs one network fetch to load, but encoding the URL into a QR
+     code never sends the URL anywhere) and just hidden if that library failed to load -- the
+     URL/\uBCF5\uC0AC button above still works either way. */
+  qrDataUrl && /*#__PURE__*/React.createElement("div", {
+    style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', marginTop: '16px' }
+  },
+    /*#__PURE__*/React.createElement("img", { src: qrDataUrl, alt: "\uCE98\uB9B0\uB354 \uCD08\uB300 QR\uCF54\uB4DC", style: { borderRadius: '8px', border: '1px solid var(--border-subtle)' } }),
+    /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.76rem', color: 'var(--text-muted)' } }, "QR\uCF54\uB4DC\uB97C \uCE74\uBA54\uB77C\uB85C \uC2A4\uCE94\uD574 \uC811\uC18D\uD558\uC138\uC694")
+  ))));
 }
 
 function UserManualOverlay({ calendar, onClose }) {
@@ -21178,6 +21302,95 @@ function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {
     { label: '현재 잔액', value: displayBalance, color: 'var(--text-main)', icon: React.createElement(PiggyBankIcon, { size: 16 }) }
   ];
 
+  // Shareable result card -- rendered client-side onto an offscreen canvas so it can be saved
+  // as a plain image and pasted into KakaoTalk/문자 without anyone needing app access. Shown in
+  // an overlay (not auto-downloaded) since a direct file download is unreliable on iOS Safari;
+  // long-pressing the image to save works everywhere, and the download link below it covers
+  // desktop/Android.
+  const [shareImageUrl, setShareImageUrl] = React.useState(null);
+  const periodLabel = activeTab === 'total' ? '전체 기간' : `${year}년 ${month + 1}월`;
+  const handleGenerateShareImage = () => {
+    const canvas = document.createElement('canvas');
+    const W = 720, H = 960;
+    canvas.width = W;
+    canvas.height = H;
+    const ctx = canvas.getContext('2d');
+
+    ctx.fillStyle = '#F8FAFC';
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.fillStyle = '#4F46E5';
+    ctx.fillRect(0, 0, W, 160);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = '700 22px sans-serif';
+    ctx.fillText(calendar?.title || '모여라 캘린더', 40, 60);
+    ctx.font = '900 34px sans-serif';
+    ctx.fillText('회비 정산 결과', 40, 105);
+    ctx.font = '500 18px sans-serif';
+    ctx.fillText(periodLabel, 40, 138);
+
+    const rowsStats = [
+      { label: '총 수입', value: displayIncome, color: '#16A34A' },
+      { label: '총 지출', value: displayExpense, color: '#DC2626' },
+      { label: '현재 잔액', value: displayBalance, color: '#0F172A' }
+    ];
+    let y = 230;
+    rowsStats.forEach(stat => {
+      ctx.fillStyle = '#64748B';
+      ctx.font = '600 18px sans-serif';
+      ctx.fillText(stat.label, 40, y);
+      ctx.fillStyle = stat.color;
+      ctx.font = '900 30px sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillText(`${stat.value < 0 ? '-' : ''}${Math.abs(stat.value).toLocaleString()}원`, W - 40, y + 2);
+      ctx.textAlign = 'left';
+      y += 56;
+    });
+
+    y += 16;
+    ctx.strokeStyle = '#E2E8F0';
+    ctx.beginPath();
+    ctx.moveTo(40, y);
+    ctx.lineTo(W - 40, y);
+    ctx.stroke();
+    y += 40;
+
+    ctx.fillStyle = '#0F172A';
+    ctx.font = '800 18px sans-serif';
+    ctx.fillText('카테고리별 지출', 40, y);
+    y += 30;
+
+    const topCategories = categoryTotals.slice().sort((a, b) => b.total - a.total).slice(0, 6);
+    const maxCategoryTotal = Math.max(1, ...topCategories.map(c => c.total));
+    topCategories.forEach(item => {
+      ctx.fillStyle = '#334155';
+      ctx.font = '600 15px sans-serif';
+      ctx.fillText(item.category.name, 40, y);
+      ctx.textAlign = 'right';
+      ctx.fillText(`${item.total.toLocaleString()}원`, W - 40, y);
+      ctx.textAlign = 'left';
+      y += 10;
+      const barW = Math.max(6, Math.round((item.total / maxCategoryTotal) * (W - 80)));
+      ctx.fillStyle = '#E2E8F0';
+      ctx.fillRect(40, y, W - 80, 8);
+      ctx.fillStyle = item.category.color || '#6366F1';
+      ctx.fillRect(40, y, barW, 8);
+      y += 34;
+    });
+    if (topCategories.length === 0) {
+      ctx.fillStyle = '#94A3B8';
+      ctx.font = '500 15px sans-serif';
+      ctx.fillText('등록된 지출 항목이 없습니다.', 40, y);
+      y += 34;
+    }
+
+    ctx.fillStyle = '#94A3B8';
+    ctx.font = '500 13px sans-serif';
+    ctx.fillText(`모여라 캘린더 · ${new Date().toLocaleDateString('ko-KR')} 생성`, 40, H - 30);
+
+    setShareImageUrl(canvas.toDataURL('image/png'));
+  };
+
   const categoryBadge = category => /*#__PURE__*/React.createElement("span", {
     style: {
       display: 'inline-flex',
@@ -21323,7 +21536,17 @@ function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {
       fontSize: '1.05rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '8px', margin: 0, color: 'var(--text-main)',
       position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)'
     }
-  }, /*#__PURE__*/React.createElement(WalletIcon, { size: 20 }), "정산하기")), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(WalletIcon, { size: 20 }), "정산하기"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: handleGenerateShareImage,
+    title: "정산 결과 공유 이미지 생성",
+    style: {
+      position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)',
+      width: '32px', height: '32px', borderRadius: '50%', border: '1px solid var(--border-subtle)',
+      backgroundColor: 'var(--bg-primary)', cursor: 'pointer', display: 'flex',
+      alignItems: 'center', justifyContent: 'center', color: '#64748B', padding: 0
+    }
+  }, /*#__PURE__*/React.createElement(ShareIcon, { size: 16 }))), /*#__PURE__*/React.createElement("div", {
     className: "settlement-page-body",
     onScroll: handleSettlementScroll,
     style: { flex: '1 1 auto', overflowY: 'auto', padding: '72px 16px 16px', display: 'flex', flexDirection: 'column', gap: '14px' }
@@ -21518,7 +21741,34 @@ function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {
       )
     ));
     return sheet && typeof document !== 'undefined' && ReactDOM.createPortal ? ReactDOM.createPortal(sheet, document.body) : sheet;
-  })()
+  })(),
+  /* Generated share-image overlay -- shown instead of auto-downloading since a triggered file
+     download is unreliable on iOS Safari; long-pressing the <img> to save works on every
+     mobile browser, and the explicit 다운로드 link below covers desktop. */
+  shareImageUrl && /*#__PURE__*/React.createElement("div", {
+    className: "modal-overlay",
+    onClick: () => setShareImageUrl(null),
+    style: { zIndex: 12000 }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "modal-container",
+    onClick: e => e.stopPropagation(),
+    style: { width: '90%', maxWidth: '360px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center' }
+  },
+    /*#__PURE__*/React.createElement("img", { src: shareImageUrl, alt: "정산 결과 공유 이미지", style: { width: '100%', borderRadius: '10px', border: '1px solid var(--border-subtle)' } }),
+    /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.76rem', color: 'var(--text-muted)', textAlign: 'center' } }, "이미지를 길게 눌러 저장하거나, 아래 버튼으로 다운로드하세요"),
+    /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px', width: '100%' } },
+      /*#__PURE__*/React.createElement("button", {
+        type: "button", className: "btn btn-secondary", style: { flex: 1 },
+        onClick: () => setShareImageUrl(null)
+      }, "닫기"),
+      /*#__PURE__*/React.createElement("a", {
+        href: shareImageUrl,
+        download: `${calendar?.title || '정산'}_정산결과.png`,
+        className: "btn btn-primary",
+        style: { flex: 1, textAlign: 'center', textDecoration: 'none' }
+      }, "다운로드")
+    )
+  ))
   ));
 }function SunIcon() {
   return /*#__PURE__*/React.createElement("svg", {
@@ -21834,6 +22084,24 @@ function ExternalLinkIcon() {
   }), /*#__PURE__*/React.createElement("path", {
     d: "M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"
   }));
+}
+
+function ShareIcon({ size = 20 } = {}) {
+  return /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: String(size),
+    height: String(size),
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    "stroke-width": "2",
+    "stroke-linecap": "round",
+    "stroke-linejoin": "round"
+  }, /*#__PURE__*/React.createElement("circle", { cx: "18", cy: "5", r: "3" }),
+     /*#__PURE__*/React.createElement("circle", { cx: "6", cy: "12", r: "3" }),
+     /*#__PURE__*/React.createElement("circle", { cx: "18", cy: "19", r: "3" }),
+     /*#__PURE__*/React.createElement("line", { x1: "8.59", y1: "13.51", x2: "15.42", y2: "17.49" }),
+     /*#__PURE__*/React.createElement("line", { x1: "15.41", y1: "6.51", x2: "8.59", y2: "10.49" }));
 }
 
 function WalletIcon({ size = 24 } = {}) {
