@@ -11456,7 +11456,7 @@ async function compressImageToDataUrls(file, { maxBase64Length = MAX_CHAT_IMAGE_
       if (isPng) {
         canvas.toBlob(blob => res(blob), 'image/png');
       } else {
-        canvas.toBlob(blob => res(blob), 'image/jpeg', 0.94);
+        canvas.toBlob(blob => res(blob), 'image/jpeg', 0.7);
       }
     });
   };
