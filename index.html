@@ -8111,6 +8111,7 @@ function App() {
   const mainHeaderRef = React.useRef(null);
   const calendarSectionRef = React.useRef(null);
   const pollsSectionRef = React.useRef(null);
+  const [pollsExpandSignal, setPollsExpandSignal] = React.useState(0);
   const lastMainScrollTopRef = React.useRef(0);
   React.useEffect(() => {
     const handleMainScroll = () => {
@@ -9757,7 +9758,10 @@ function App() {
   }, /*#__PURE__*/React.createElement("button", {
     type: "button",
     className: "main-menu-item",
-    onClick: () => scrollToSection(pollsSectionRef)
+    onClick: () => {
+      setPollsExpandSignal(prev => prev + 1);
+      scrollToSection(pollsSectionRef);
+    }
   }, /*#__PURE__*/React.createElement("span", { className: "main-menu-icon" }, /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M9 11l3 3l8 -8", "M20 12v6a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h9"] })), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-full" }, "투표"), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-short" }, "투표"), mainMenuPollCount > 0 && /*#__PURE__*/React.createElement("span", {
     className: "main-menu-badge"
   }, mainMenuPollCount)), /*#__PURE__*/React.createElement("div", { className: "main-menu-sep" }), /*#__PURE__*/React.createElement("button", {
@@ -9904,7 +9908,8 @@ function App() {
     onEditPoll: handleOpenPollEdit,
     onVotePoll: handleOpenVoteSheet,
     onCancelVote: handleCancelVote,
-    onRequestConfirm: showConfirmDialog
+    onRequestConfirm: showConfirmDialog,
+    expandSignal: pollsExpandSignal
   })), /*#__PURE__*/React.createElement("div", {
     className: "calendar-card",
     style: {
@@ -21853,7 +21858,7 @@ function SectionToggleButton({ collapsed, onToggle, label }) {
   })));
 }
 
-function PollList({ calendar, onCreatePoll, onEditPoll, onVotePoll, onCancelVote, onRequestConfirm }) {
+function PollList({ calendar, onCreatePoll, onEditPoll, onVotePoll, onCancelVote, onRequestConfirm, expandSignal }) {
   const polls = getCalendarPolls(calendar).filter(poll => !isPollClosed(poll));
   const participants = getActiveParticipants(calendar);
   const participantsMap = participants.reduce((acc, participant) => {
@@ -21862,6 +21867,13 @@ function PollList({ calendar, onCreatePoll, onEditPoll, onVotePoll, onCancelVote
   }, {});
   const [isCollapsed, setIsCollapsed] = React.useState(true); // default closed
   const [openPollIds, setOpenPollIds] = React.useState({});
+
+  // Header's "투표" main-menu button bumps expandSignal to force this section open (and its
+  // poll cards visible) even if the user had collapsed it -- scrolling here without expanding
+  // would otherwise land on an empty-looking, collapsed header.
+  React.useEffect(() => {
+    if (expandSignal) setIsCollapsed(false);
+  }, [expandSignal]);
 
   // A poll can be visually open two ways: the whole section is expanded (!isCollapsed), or
   // it was opened individually while the section stayed collapsed (openPollIds[id]). The
