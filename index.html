@@ -11512,18 +11512,20 @@ async function uploadInlineChatImageToStorage(calendarId, imageUrl, thumbUrl, in
   }, `share_${index}`, onBytes, timeoutMs);
 }
 
-// Resolves the {imageUrl, thumbUrl} pair a chat message should store: uploaded Storage
-// download URLs when possible, the original compressed base64 data URLs otherwise.
-async function resolveChatImageUrls(calendarId, compressed, index = 0, onBytes) {
-  const uploaded = await uploadChatImageAssets(calendarId, compressed, index, onBytes);
+// Resolves the {imageUrl, thumbUrl} pair a message/memo should store: uploaded Storage
+// download URLs when possible, the original compressed base64 data URLs otherwise. uploadFn
+// is uploadChatImageAssets or uploadMemoImageAssets, keeping each feature's Storage path.
+async function resolveImageUrls(calendarId, compressed, index, onBytes, uploadFn) {
+  const uploaded = await uploadFn(calendarId, compressed, index, onBytes);
   if (uploaded) return uploaded;
   return { imageUrl: compressed.original, thumbUrl: compressed.thumbnail };
 }
 
-// Resolves a whole batch of images (upload + fallback per image, same as resolveChatImageUrls)
+// Resolves a whole batch of images (upload + fallback per image, same as resolveImageUrls)
 // while reporting combined byte-level progress across every upload in the batch as
 // { pct, remainingSec }. Falls back to compressed.isExisting entries as-is (no re-upload).
-async function resolveChatImageBatch(calendarId, compressedList, onProgress) {
+// Shared by chat and memo attachments; uploadFn picks which Storage path each uses.
+async function resolveImageBatch(calendarId, compressedList, onProgress, uploadFn) {
   const uploadIndexes = compressedList
     .map((c, idx) => ({ c, idx }))
     .filter(({ c }) => !c.isExisting);
@@ -11579,7 +11581,7 @@ async function resolveChatImageBatch(calendarId, compressedList, onProgress) {
       reportCompressionProgress();
       results.push({ imageUrl: c.original, thumbUrl: c.thumbnail });
     } else {
-      const result = await resolveChatImageUrls(calendarId, c, idx, onBytes);
+      const result = await resolveImageUrls(calendarId, c, idx, onBytes, uploadFn);
       compressionDone++;
       reportCompressionProgress();
       results.push(result);
@@ -11587,6 +11589,14 @@ async function resolveChatImageBatch(calendarId, compressedList, onProgress) {
   }
   if (onProgress) onProgress({ pct: 100, remainingSec: 0 });
   return results;
+}
+
+async function resolveChatImageBatch(calendarId, compressedList, onProgress) {
+  return resolveImageBatch(calendarId, compressedList, onProgress, uploadChatImageAssets);
+}
+
+async function resolveMemoImageBatch(calendarId, compressedList, onProgress) {
+  return resolveImageBatch(calendarId, compressedList, onProgress, uploadMemoImageAssets);
 }
 
 // A Storage download URL looks like https://firebasestorage.googleapis.com/...; a fallback
@@ -18254,6 +18264,10 @@ function MemoView({ calendar, memos, onBack, showToast, isDarkTheme, onRequestCo
   const [searchQuery, setSearchQuery] = React.useState('');
   const [selectedTag, setSelectedTag] = React.useState('');
   const [isComposerExpanded, setIsComposerExpanded] = React.useState(false);
+  const newTitleInputRef = React.useRef(null);
+  React.useEffect(() => {
+    if (isComposerExpanded) newTitleInputRef.current?.focus();
+  }, [isComposerExpanded]);
 
   // New Memo Composer State
   const [newTitle, setNewTitle] = React.useState('');
@@ -18262,8 +18276,9 @@ function MemoView({ calendar, memos, onBack, showToast, isDarkTheme, onRequestCo
   const [newIsPinned, setNewIsPinned] = React.useState(false);
   const [newTags, setNewTags] = React.useState([]); // array of strings (tag tokens)
   const [newTagInput, setNewTagInput] = React.useState('');
-  const [newImages, setNewImages] = React.useState([]); // array of { originalBlob, thumbnailBlob, previewUrl }
-  const [newUploadProgress, setNewUploadProgress] = React.useState(null);
+  const [newImages, setNewImages] = React.useState([]); // array of { original, thumbnail, originalBlob, thumbnailBlob } (same shape chat uses)
+  const [imageProcessingNew, setImageProcessingNew] = React.useState(null); // compression phase, mirrors chat's imageProcessing
+  const [newUploadProgress, setNewUploadProgress] = React.useState(null); // upload phase: { pct, remainingSec }
 
   // Editing Memo State
   const [editingMemo, setEditingMemo] = React.useState(null);
@@ -18273,8 +18288,9 @@ function MemoView({ calendar, memos, onBack, showToast, isDarkTheme, onRequestCo
   const [editIsPinned, setEditIsPinned] = React.useState(false);
   const [editTags, setEditTags] = React.useState([]); // array of strings (tag tokens)
   const [editTagInput, setEditTagInput] = React.useState('');
-  const [editImages, setEditImages] = React.useState([]); // combined existing URLs + new uploads
-  const [editUploadProgress, setEditUploadProgress] = React.useState(null);
+  const [editImages, setEditImages] = React.useState([]); // { original, thumbnail, isExisting } for kept photos, { original, thumbnail, originalBlob, thumbnailBlob } for new ones
+  const [imageProcessingEdit, setImageProcessingEdit] = React.useState(null); // compression phase, mirrors chat's imageProcessingEdit
+  const [editUploadProgress, setEditUploadProgress] = React.useState(null); // upload phase: { pct, remainingSec }
 
   // Participant Picker States
   const [composerParticipantId, setComposerParticipantId] = React.useState(() => {
@@ -18306,78 +18322,80 @@ function MemoView({ calendar, memos, onBack, showToast, isDarkTheme, onRequestCo
     return matched ? matched.border : 'var(--border-subtle)';
   };
 
+  // Reuses the exact same compression/thumbnail pipeline chat attachments use
+  // (processImageFilesSequentially -> compressImageToDataUrls), so memo photos get
+  // identical quality handling, HEIC support, and a { original, thumbnail, originalBlob,
+  // thumbnailBlob } shape that resolveMemoImageBatch and the thumbnail <img> below expect.
   const handleComposerFileSelect = async (e) => {
-    const files = Array.from(e.target.files || []);
-    if (files.length === 0) return;
-    
-    // Process each image using our high-quality guidelines
-    const processed = [];
-    for (const file of files) {
-      try {
-        let targetFile = file;
-        const lowerName = file.name.toLowerCase();
-        if (lowerName.endsWith('.heic') || lowerName.endsWith('.heif')) {
-          showToast('HEIC 이미지 변환 중...', 'info');
-          const heicTo = await loadHeicTo();
-          const jpgBlob = await heicTo({ blob: file, type: 'image/jpeg' });
-          targetFile = new File([jpgBlob], file.name.replace(/\.(heic|heif)$/i, '.jpg'), { type: 'image/jpeg' });
-        }
-
-        // Direct upload bypass under 4MB
-        let originalBlob, thumbnailBlob;
-        if (targetFile.size <= 4 * 1024 * 1024) {
-          originalBlob = targetFile;
-          // Generate a high-quality 480px thumbnail
-          thumbnailBlob = await getHighQualityThumbBlob(targetFile);
-        } else {
-          // Downscale large files
-          originalBlob = await getHighQualityBlob(targetFile);
-          thumbnailBlob = await getHighQualityThumbBlob(targetFile);
-        }
-
-        const previewUrl = URL.createObjectURL(originalBlob);
-        processed.push({ originalBlob, thumbnailBlob, previewUrl });
-      } catch (err) {
-        console.error('Failed to process image:', err);
-        showToast('이미지 처리 실패', 'error');
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    try {
+      const remainingSlots = 50 - newImages.length;
+      if (remainingSlots <= 0) {
+        if (showToast) showToast('사진 최대 50장', 'error');
+        return;
       }
+      const filesToProcess = Array.from(files).slice(0, remainingSlots);
+      if (files.length > remainingSlots && showToast) {
+        showToast(`${remainingSlots}장만 추가됨 (최대 50장)`, 'info');
+      }
+
+      setImageProcessingNew({ current: 0, total: filesToProcess.length });
+      const { succeeded, failed } = await processImageFilesSequentially(
+        filesToProcess,
+        progress => setImageProcessingNew(progress)
+      );
+
+      if (succeeded.length > 0) setNewImages(prev => [...prev, ...succeeded]);
+      if (failed.length > 0) {
+        console.error('Image compression failed for:', failed.map(f => f.fileName));
+        if (showToast) showToast(describeImageProcessingFailures(failed), 'error', 5000);
+      } else if (succeeded.length > 0 && showToast) {
+        showToast(`${succeeded.length}장 첨부완료`, 'success', 3000);
+      }
+    } catch (err) {
+      console.error('handleComposerFileSelect unexpected error:', err);
+      if (showToast) showToast('사진 첨부 중 오류', 'error', 5000);
+    } finally {
+      setImageProcessingNew(null);
+      e.target.value = '';
     }
-    setNewImages(prev => [...prev, ...processed]);
   };
 
   const handleEditFileSelect = async (e) => {
-    const files = Array.from(e.target.files || []);
-    if (files.length === 0) return;
-
-    const processed = [];
-    for (const file of files) {
-      try {
-        let targetFile = file;
-        const lowerName = file.name.toLowerCase();
-        if (lowerName.endsWith('.heic') || lowerName.endsWith('.heif')) {
-          showToast('HEIC 이미지 변환 중...', 'info');
-          const heicTo = await loadHeicTo();
-          const jpgBlob = await heicTo({ blob: file, type: 'image/jpeg' });
-          targetFile = new File([jpgBlob], file.name.replace(/\.(heic|heif)$/i, '.jpg'), { type: 'image/jpeg' });
-        }
-
-        let originalBlob, thumbnailBlob;
-        if (targetFile.size <= 4 * 1024 * 1024) {
-          originalBlob = targetFile;
-          thumbnailBlob = await getHighQualityThumbBlob(targetFile);
-        } else {
-          originalBlob = await getHighQualityBlob(targetFile);
-          thumbnailBlob = await getHighQualityThumbBlob(targetFile);
-        }
-
-        const previewUrl = URL.createObjectURL(originalBlob);
-        processed.push({ originalBlob, thumbnailBlob, previewUrl, isNew: true });
-      } catch (err) {
-        console.error('Failed to process image:', err);
-        showToast('이미지 처리 실패', 'error');
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    try {
+      const remainingSlots = 50 - editImages.length;
+      if (remainingSlots <= 0) {
+        if (showToast) showToast('사진 최대 50장', 'error');
+        return;
       }
+      const filesToProcess = Array.from(files).slice(0, remainingSlots);
+      if (files.length > remainingSlots && showToast) {
+        showToast(`${remainingSlots}장만 추가됨 (최대 50장)`, 'info');
+      }
+
+      setImageProcessingEdit({ current: 0, total: filesToProcess.length });
+      const { succeeded, failed } = await processImageFilesSequentially(
+        filesToProcess,
+        progress => setImageProcessingEdit(progress)
+      );
+
+      if (succeeded.length > 0) setEditImages(prev => [...prev, ...succeeded]);
+      if (failed.length > 0) {
+        console.error('Image compression failed for:', failed.map(f => f.fileName));
+        if (showToast) showToast(describeImageProcessingFailures(failed), 'error', 5000);
+      } else if (succeeded.length > 0 && showToast) {
+        showToast(`${succeeded.length}장 첨부완료`, 'success', 3000);
+      }
+    } catch (err) {
+      console.error('handleEditFileSelect unexpected error:', err);
+      if (showToast) showToast('사진 첨부 중 오류', 'error', 5000);
+    } finally {
+      setImageProcessingEdit(null);
+      e.target.value = '';
     }
-    setEditImages(prev => [...prev, ...processed]);
   };
 
   const handleSaveMemo = async () => {
@@ -18387,24 +18405,20 @@ function MemoView({ calendar, memos, onBack, showToast, isDarkTheme, onRequestCo
     }
 
     try {
-      setNewUploadProgress(0);
       const calendarId = calendar.id;
       const stamp = Date.now();
       const memoId = 'memo_' + stamp + '_' + Math.random().toString(36).slice(2, 8);
-      
-      // 1. Upload attachments
-      const uploadedUrls = [];
-      const uploadedThumbs = [];
-      
-      for (let i = 0; i < newImages.length; i++) {
-        setNewUploadProgress(Math.round(((i) / newImages.length) * 100));
-        const res = await uploadMemoImageAssets(calendarId, newImages[i], i);
-        if (res) {
-          uploadedUrls.push(res.imageUrl);
-          uploadedThumbs.push(res.thumbUrl);
-        }
+
+      // 1. Upload attachments (Storage upload with inline-base64 fallback + progress,
+      // exactly the same module chat uses -- see resolveMemoImageBatch/resolveImageBatch)
+      let uploadedUrls = [];
+      let uploadedThumbs = [];
+      if (newImages.length > 0) {
+        setNewUploadProgress({ pct: 0, remainingSec: null });
+        const resolved = await resolveMemoImageBatch(calendarId, newImages, setNewUploadProgress);
+        uploadedUrls = resolved.map(r => r.imageUrl);
+        uploadedThumbs = resolved.map(r => r.thumbUrl);
       }
-      setNewUploadProgress(100);
 
       // Save tags formatted back to database (prepend '#' prefix if needed)
       const tagsArray = newTags.map(t => t.startsWith('#') ? t : '#' + t);
@@ -18483,29 +18497,19 @@ function MemoView({ calendar, memos, onBack, showToast, isDarkTheme, onRequestCo
     }
 
     try {
-      setEditUploadProgress(0);
       const calendarId = calendar.id;
       const stamp = Date.now();
-      
-      const uploadedUrls = [];
-      const uploadedThumbs = [];
 
-      // Separate existing images from newly added images
-      for (let i = 0; i < editImages.length; i++) {
-        const img = editImages[i];
-        if (!img.isNew) {
-          uploadedUrls.push(img.imageUrl);
-          uploadedThumbs.push(img.thumbUrl);
-        } else {
-          setEditUploadProgress(Math.round(((i) / editImages.length) * 100));
-          const res = await uploadMemoImageAssets(calendarId, img, i);
-          if (res) {
-            uploadedUrls.push(res.imageUrl);
-            uploadedThumbs.push(res.thumbUrl);
-          }
-        }
+      // Kept photos carry isExisting (pass through as-is) and new ones get uploaded, same
+      // module chat's edit flow uses (see resolveMemoImageBatch/resolveImageBatch).
+      let uploadedUrls = [];
+      let uploadedThumbs = [];
+      if (editImages.length > 0) {
+        setEditUploadProgress({ pct: 0, remainingSec: null });
+        const resolved = await resolveMemoImageBatch(calendarId, editImages, setEditUploadProgress);
+        uploadedUrls = resolved.map(r => r.imageUrl);
+        uploadedThumbs = resolved.map(r => r.thumbUrl);
       }
-      setEditUploadProgress(100);
 
       // Save tags formatted back to database (prepend '#' prefix if needed)
       const tagsArray = editTags.map(t => t.startsWith('#') ? t : '#' + t);
@@ -18624,12 +18628,12 @@ function MemoView({ calendar, memos, onBack, showToast, isDarkTheme, onRequestCo
     setEditTags(cleanTags);
     setEditTagInput('');
 
-    // Reconstruct list of images for editing
+    // Reconstruct list of images for editing (same { original, thumbnail, isExisting }
+    // shape chat's edit flow uses, so resolveMemoImageBatch passes these through untouched)
     const currentImgs = (memo.imageUrls || []).map((url, idx) => ({
-      imageUrl: url,
-      thumbUrl: memo.thumbUrls?.[idx] || url,
-      previewUrl: url,
-      isNew: false
+      original: url,
+      thumbnail: memo.thumbUrls?.[idx] || url,
+      isExisting: true
     }));
     setEditImages(currentImgs);
     setEditParticipantId(memo.participantId || '');
@@ -18856,6 +18860,7 @@ function MemoView({ calendar, memos, onBack, showToast, isDarkTheme, onRequestCo
               /* Title input - Styled precisely as user requested */
               /*#__PURE__*/React.createElement("input", {
                 type: "text",
+                ref: newTitleInputRef,
                 placeholder: "제목",
                 value: newTitle,
                 onChange: e => setNewTitle(e.target.value),
@@ -18971,7 +18976,7 @@ function MemoView({ calendar, memos, onBack, showToast, isDarkTheme, onRequestCo
             }, 
               /* Image element */
               /*#__PURE__*/React.createElement("img", {
-                src: img.previewUrl,
+                src: img.thumbnail,
                 style: { width: '100%', height: '100%', objectFit: 'cover', borderRadius: '6px', border: '1px solid var(--border-subtle)' }
               }),
               /* Remove button */
@@ -19113,7 +19118,7 @@ function MemoView({ calendar, memos, onBack, showToast, isDarkTheme, onRequestCo
                     whiteSpace: 'nowrap',
                     cursor: 'pointer'
                   }
-                }, newUploadProgress !== null ? `업로드 (${newUploadProgress}%)` : "저장")
+                }, newUploadProgress !== null ? `업로드 (${newUploadProgress.pct}%)` : "저장")
               )
             )
           )
@@ -19334,7 +19339,7 @@ function MemoView({ calendar, memos, onBack, showToast, isDarkTheme, onRequestCo
         }, 
           /* Image element */
           /*#__PURE__*/React.createElement("img", {
-            src: img.previewUrl,
+            src: img.thumbnail,
             style: { width: '100%', height: '100%', objectFit: 'cover', borderRadius: '6px', border: '1px solid var(--border-subtle)' }
           }),
           /* Remove button */
@@ -19503,7 +19508,7 @@ function MemoView({ calendar, memos, onBack, showToast, isDarkTheme, onRequestCo
                 whiteSpace: 'nowrap',
                 cursor: 'pointer'
               }
-            }, editUploadProgress !== null ? `업로드 (${editUploadProgress}%)` : "저장")
+            }, editUploadProgress !== null ? `업로드 (${editUploadProgress.pct}%)` : "저장")
           )
         )
       )
@@ -19542,7 +19547,12 @@ function MemoView({ calendar, memos, onBack, showToast, isDarkTheme, onRequestCo
         setIsEditPartOpen(false);
       },
       onClose: () => setIsEditPartOpen(false)
-    })
+    }),
+
+    imageProcessingNew && /*#__PURE__*/React.createElement(ImageProcessingOverlay, imageProcessingNew),
+    newUploadProgress && /*#__PURE__*/React.createElement(ImageUploadOverlay, newUploadProgress),
+    imageProcessingEdit && /*#__PURE__*/React.createElement(ImageProcessingOverlay, imageProcessingEdit),
+    editUploadProgress && /*#__PURE__*/React.createElement(ImageUploadOverlay, editUploadProgress)
   );
 }
 
