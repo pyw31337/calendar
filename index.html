@@ -9422,12 +9422,13 @@ function App() {
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
     return updateCalendars(nextCalendars, '삭제완료', 'delete', updatedCal.id, 'availability', activityLogs);
   };
-  const handleConfirmMeeting = (dateStr, note) => {
+  const handleConfirmMeeting = (dateStr, note, location) => {
     if (!activeCal || !isValidDateString(dateStr)) return false;
     const now = Date.now();
     const existingMeetings = getConfirmedMeetings(activeCal);
     const meetingIndex = existingMeetings.findIndex(m => m.date === dateStr);
     const isAlreadyConfirmed = meetingIndex >= 0 && existingMeetings[meetingIndex].confirmed !== false;
+    const cleanLocation = sanitizeText(location || '', 200);
     let nextConfirmedMeetings;
     if (isAlreadyConfirmed) {
       // Un-confirming: if the entry also carries settlement data, keep it around as an
@@ -9443,10 +9444,10 @@ function App() {
       // handleSaveExpense below) -- promote it to a real confirmed meeting instead of adding
       // a duplicate entry for the same date.
       nextConfirmedMeetings = existingMeetings.map((m, i) => i === meetingIndex
-        ? { ...m, confirmed: true, note: sanitizeText(note, 120), confirmedAt: now }
+        ? { ...m, confirmed: true, note: sanitizeText(note, 120), location: cleanLocation, confirmedAt: now }
         : m);
     } else {
-      nextConfirmedMeetings = [...existingMeetings, { date: dateStr, note: sanitizeText(note, 120), confirmedAt: now, confirmed: true }];
+      nextConfirmedMeetings = [...existingMeetings, { date: dateStr, note: sanitizeText(note, 120), location: cleanLocation, confirmedAt: now, confirmed: true }];
     }
     const action = isAlreadyConfirmed ? 'meeting_cancel' : 'meeting_confirm';
     const logNote = sanitizeText(note || '', 120) || (isAlreadyConfirmed ? '모임 확정 취소됨' : '모임 확정됨');
@@ -15519,6 +15520,12 @@ function DateModal({
   const isAllAvailable = totalPartCount > 0 && uniqueActiveParts.size === totalPartCount;
   const isConfirmed = isDateConfirmedMeeting(calendar, dateStr);
   const confirmedMeetingEntry = getConfirmedMeetings(calendar).find(m => m.date === dateStr) || null;
+  const [location, setLocation] = React.useState(confirmedMeetingEntry?.location || '');
+  const locationInputRef = React.useRef(null);
+  React.useEffect(() => {
+    setLocation(confirmedMeetingEntry?.location || '');
+  }, [calendar?.id, dateStr]);
+  const locationIsUrl = /^https?:\/\//i.test((confirmedMeetingEntry?.location || '').trim());
   const expenses = React.useMemo(
     () => (Array.isArray(confirmedMeetingEntry?.expenses) ? confirmedMeetingEntry.expenses : []).slice().sort((a, b) => {
       const aOrder = Number.isFinite(Number(a.order)) ? Number(a.order) : Number.POSITIVE_INFINITY;
@@ -15782,9 +15789,10 @@ function DateModal({
     setIsSubmitting(true);
     const wasConfirmed = isConfirmed;
     const latestNote = noteInputRef.current ? noteInputRef.current.value : note;
+    const latestLocation = locationInputRef.current ? locationInputRef.current.value : location;
     let saved = false;
     try {
-      saved = await Promise.resolve(onConfirmMeeting(dateStr, latestNote));
+      saved = await Promise.resolve(onConfirmMeeting(dateStr, latestNote, latestLocation));
     } catch (err) {
       console.error('Confirm meeting failed:', err);
     }
@@ -16026,7 +16034,30 @@ function DateModal({
     onChange: e => setNote(e.target.value),
     maxLength: 120,
     disabled: isSubmitting
-  })), dateEntries.length > 0 && /*#__PURE__*/React.createElement("div", {
+  })), !adminMode && /*#__PURE__*/React.createElement("div", null,
+    /*#__PURE__*/React.createElement("label", {
+      style: { display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px', color: '#64748B' }
+    }, "장소 (선택)"),
+    /*#__PURE__*/React.createElement("input", {
+      ref: locationInputRef,
+      type: "text",
+      className: "form-input",
+      style: { width: '100%' },
+      placeholder: "예: 네이버 지도 링크 또는 장소명",
+      value: location,
+      onChange: e => setLocation(e.target.value),
+      maxLength: 200,
+      disabled: isSubmitting
+    }),
+    confirmedMeetingEntry?.location && /*#__PURE__*/React.createElement("div", {
+      style: { marginTop: '6px', fontSize: '0.8rem', color: 'var(--text-muted)', wordBreak: 'break-all' }
+    }, locationIsUrl
+      ? /*#__PURE__*/React.createElement("a", {
+          href: confirmedMeetingEntry.location, target: "_blank", rel: "noopener noreferrer",
+          style: { color: 'var(--accent-primary)', fontWeight: 600 }
+        }, "📍 ", confirmedMeetingEntry.location)
+      : `📍 ${confirmedMeetingEntry.location}`)
+  ), dateEntries.length > 0 && /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: '6px'
     }
