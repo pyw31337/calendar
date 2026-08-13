@@ -4903,6 +4903,7 @@ async function updateMessageRest(calId, messageId, data) {
     if (data.thumbUrl !== undefined) fields.thumbUrl = jsToFirestoreValue(data.thumbUrl);
     if (data.imageUrls !== undefined) fields.imageUrls = jsToFirestoreValue(data.imageUrls);
     if (data.thumbUrls !== undefined) fields.thumbUrls = jsToFirestoreValue(data.thumbUrls);
+    if (data.participantId !== undefined) fields.participantId = jsToFirestoreValue(data.participantId);
     const updateMask = Object.keys(fields).map(k => `updateMask.fieldPaths=${k}`).join('&');
     const url = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/calendars/cal_${calId}/messages/${messageId}?${updateMask}`;
     const res = await fetch(url, {
@@ -8871,9 +8872,10 @@ function App() {
     setEditingMessage({ ...msg, calId: activeCalId });
   };
 
-  const handleSaveEditMessage = async (newText, newImages) => {
+  const handleSaveEditMessage = async (newText, newImages, newParticipantId) => {
     if (!editingMessage) return;
     const { id, calId } = editingMessage;
+    const resolvedParticipantId = newParticipantId || editingMessage.participantId;
     const hasNewImages = (newImages || []).some(img => !img.isExisting);
     if (hasNewImages) setChatUploadProgress({ pct: 0, remainingSec: null });
     try {
@@ -8912,6 +8914,7 @@ function App() {
         thumbUrls: firstChunk.map(r => r.thumbUrl),
         linkPreview: linkPreview || null
       };
+      if (resolvedParticipantId !== editingMessage.participantId) data.participantId = resolvedParticipantId;
       let ok = false;
       if (firebaseDb) {
         await firebaseDb.collection('calendars').doc(`cal_${calId}`).collection('messages').doc(id).update(data);
@@ -8920,7 +8923,7 @@ function App() {
           for (let i = 0; i < extraChunks.length; i++) {
             const chunkImages = extraChunks[i];
             await firebaseDb.collection('calendars').doc(`cal_${calId}`).collection('messages').add({
-              participantId: editingMessage.participantId,
+              participantId: resolvedParticipantId,
               text: '',
               imageUrl: chunkImages[0].imageUrl,
               thumbUrl: chunkImages[0].thumbUrl,
@@ -14759,6 +14762,33 @@ function EmojiPickerSheet({ onSelect, onClose }) {
   return ReactDOM.createPortal(sheet, document.body);
 }
 
+// Colored capsule button that opens a ChatParticipantSheet -- the "누구 작성" trigger used by
+// the memo composer/editor and the chat edit modal (so a message posted under the wrong
+// participant can be corrected). One definition so the pill's look stays identical everywhere.
+function ParticipantPickerButton({ participant, onClick }) {
+  return /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick,
+    style: {
+      backgroundColor: participant?.color || '#94A3B8',
+      color: '#FFFFFF',
+      border: 'none',
+      borderRadius: '9999px',
+      padding: '6px 14px',
+      fontSize: '0.8rem',
+      fontWeight: 'bold',
+      cursor: 'pointer',
+      whiteSpace: 'nowrap',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '6px',
+      height: '32px',
+      boxSizing: 'border-box',
+      flexShrink: 0
+    }
+  }, participant?.name || '작성자 선택', /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.6rem' } }, "▼"));
+}
+
 function ChatParticipantSheet({ calendar, selectedId, onSelect, onClose }) {
   const participants = getActiveParticipants(calendar);
   return /*#__PURE__*/React.createElement(React.Fragment, null,
@@ -14962,6 +14992,9 @@ function EditMessageModal({
   showToast
 }) {
   const [text, setText] = React.useState(message.text || '');
+  const [participantId, setParticipantId] = React.useState(message.participantId || '');
+  const [isPartSheetOpen, setIsPartSheetOpen] = React.useState(false);
+  const part = (calendar.participants || []).find(p => p.id === participantId);
   const [images, setImages] = React.useState(() => {
     const urls = Array.isArray(message.imageUrls) && message.imageUrls.length > 0
       ? message.imageUrls
@@ -15027,7 +15060,7 @@ function EditMessageModal({
     if ((!text.trim() && images.length === 0) || isSubmitting) return;
     setIsSubmitting(true);
     try {
-      await onSave(text.trim(), images);
+      await onSave(text.trim(), images, participantId);
       onClose();
     } catch (err) {
       console.error('EditMessageModal save error:', err);
@@ -15078,35 +15111,9 @@ function EditMessageModal({
       display: 'block',
       border: '1px solid var(--border-subtle)'
     }
-  }), /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    onClick: () => setImages(prev => prev.filter((_, idx) => idx !== index)),
-    style: {
-      position: 'absolute',
-      top: '-6px',
-      right: '-6px',
-      width: '20px',
-      height: '20px',
-      borderRadius: '50%',
-      backgroundColor: '#EF4444',
-      border: 'none',
-      cursor: 'pointer',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: 0
-    }
-  }, /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg",
-    width: "12",
-    height: "12",
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "#FFFFFF",
-    strokeWidth: "3",
-    strokeLinecap: "round",
-    strokeLinejoin: "round"
-  }, /*#__PURE__*/React.createElement("line", { x1: "18", y1: "6", x2: "6", y2: "18" }), /*#__PURE__*/React.createElement("line", { x1: "6", y1: "6", x2: "18", y2: "18" })))))) : null,
+  }), /*#__PURE__*/React.createElement(ImageThumbRemoveButton, {
+    onClick: () => setImages(prev => prev.filter((_, idx) => idx !== index))
+  })))) : null,
   /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
@@ -15178,20 +15185,35 @@ function EditMessageModal({
     strokeLinecap: "round",
     strokeLinejoin: "round"
   }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), /*#__PURE__*/React.createElement("path", { d: "M15 8h.01" }), /*#__PURE__*/React.createElement("path", { d: "M12.5 21h-6.5a3 3 0 0 1 -3 -3v-12a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v6.5" }), /*#__PURE__*/React.createElement("path", { d: "M3 16l5 -5c.928 -.893 2.072 -.893 3 0l4 4" }), /*#__PURE__*/React.createElement("path", { d: "M14 14l1 -1c.67 -.644 1.45 -.824 2.182 -.54" }), /*#__PURE__*/React.createElement("path", { d: "M16 19h6" }), /*#__PURE__*/React.createElement("path", { d: "M19 16v6" })))), /*#_PURE_*/React.createElement("div", {
-    style: { display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '8px' }
-  }, /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    className: "btn btn-secondary",
-    disabled: isSubmitting,
-    onClick: onClose,
-    style: { height: '34px', fontSize: '0.85rem', padding: '0 14px' }
-  }, "취소"), /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    className: "btn btn-poll-create",
-    disabled: isSubmitting || (!text.trim() && images.length === 0),
-    onClick: handleSave,
-    style: { height: '34px', fontSize: '0.85rem', padding: '0 16px', opacity: (text.trim() || images.length > 0) && !isSubmitting ? 1 : 0.6 }
-  }, isSubmitting ? '...' : "수정"))))), imageProcessingEdit && /*#__PURE__*/React.createElement(ImageProcessingOverlay, imageProcessingEdit));
+    style: { display: 'flex', gap: '8px', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }
+  },
+    /* Participant reassignment -- fixes a message posted under the wrong participant */
+    /*#__PURE__*/React.createElement(ParticipantPickerButton, {
+      participant: part,
+      onClick: () => setIsPartSheetOpen(true)
+    }),
+    /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px' } },
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "btn btn-secondary",
+        disabled: isSubmitting,
+        onClick: onClose,
+        style: { height: '34px', fontSize: '0.85rem', padding: '0 14px' }
+      }, "취소"),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "btn btn-poll-create",
+        disabled: isSubmitting || (!text.trim() && images.length === 0),
+        onClick: handleSave,
+        style: { height: '34px', fontSize: '0.85rem', padding: '0 16px', opacity: (text.trim() || images.length > 0) && !isSubmitting ? 1 : 0.6 }
+      }, isSubmitting ? '...' : "수정")
+    )
+  )))), isPartSheetOpen && /*#__PURE__*/React.createElement(ChatParticipantSheet, {
+    calendar: calendar,
+    selectedId: participantId,
+    onSelect: id => { setParticipantId(id); setIsPartSheetOpen(false); },
+    onClose: () => setIsPartSheetOpen(false)
+  }), imageProcessingEdit && /*#__PURE__*/React.createElement(ImageProcessingOverlay, imageProcessingEdit));
 }
 
 
@@ -18465,9 +18487,38 @@ function ChatGalleryModal({
   ))));
 }
 
+// Scroll-direction-based header visibility (hide on scroll-down, reveal on scroll-up or near
+// the top), the same behavior as the chat room header (see handleChatScroll in ChatRoomView).
+// Shared here so any other full-page header (memo, and future pages) can adopt the identical
+// hide/show + floating-back-button pattern without re-deriving the threshold logic.
+function useScrollHideHeader() {
+  const [isHeaderVisible, setIsHeaderVisible] = React.useState(true);
+  const lastScrollTopRef = React.useRef(0);
+  const onScroll = React.useCallback((e) => {
+    const scrollTop = e.target.scrollTop;
+    const lastScrollTop = lastScrollTopRef.current;
+    if (scrollTop < 10) {
+      setIsHeaderVisible(true);
+    } else if (scrollTop > lastScrollTop && scrollTop > 56) {
+      setIsHeaderVisible(false);
+    } else if (scrollTop < lastScrollTop) {
+      setIsHeaderVisible(true);
+    }
+    lastScrollTopRef.current = scrollTop;
+  }, []);
+  return { isHeaderVisible, onScroll };
+}
+
 function MemoView({ calendar, memos, onBack, showToast, isDarkTheme, onRequestConfirm }) {
   const [searchQuery, setSearchQuery] = React.useState('');
   const [selectedTag, setSelectedTag] = React.useState('');
+  // Header hides on scroll-down / reappears on scroll-up, matching the chat room header exactly.
+  const { isHeaderVisible, onScroll: handleMemoScroll } = useScrollHideHeader();
+  const [isSearchOpen, setIsSearchOpen] = React.useState(false);
+  const memoSearchInputRef = React.useRef(null);
+  React.useEffect(() => {
+    if (isSearchOpen) memoSearchInputRef.current?.focus();
+  }, [isSearchOpen]);
   const [isComposerExpanded, setIsComposerExpanded] = React.useState(false);
   const newTitleInputRef = React.useRef(null);
   React.useEffect(() => {
@@ -18928,98 +18979,112 @@ function MemoView({ calendar, memos, onBack, showToast, isDarkTheme, onRequestCo
   const editPart = (calendar.participants || []).find(p => p.id === editParticipantId);
 
   return /*#__PURE__*/React.createElement("div", {
-    className: "settlement-summary-container",
-    style: { paddingBottom: '80px', display: 'flex', flexDirection: 'column', minHeight: '100vh', backgroundColor: 'var(--bg-primary)' }
-  }, 
-    /* Glassmorphism Header */
-    /*#__PURE__*/React.createElement("div", {
+    className: "memo-view-container",
+    style: {
+      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+      backgroundColor: 'var(--bg-primary)',
+      display: 'flex', flexDirection: 'column',
+      width: '100%', maxWidth: '100%', overflowX: 'hidden'
+    }
+  },
+    /* Floating back button -- always fixed in place; gains a shadow once the header itself
+       has scrolled out of view, exactly like the chat room's back button. */
+    /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: onBack,
+      "aria-label": "뒤로가기",
       style: {
-        position: 'sticky',
-        top: 0,
-        zIndex: 100,
-        backdropFilter: 'blur(12px)',
-        WebkitBackdropFilter: 'blur(12px)',
-        backgroundColor: 'var(--bg-header)',
-        borderBottom: 'none',
-        padding: '12px 16px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '12px'
+        position: 'fixed', top: '10px', left: '10px', width: '36px', height: '36px',
+        borderRadius: '50%', backgroundColor: 'var(--bg-card)', border: 'none',
+        boxShadow: isHeaderVisible ? 'none' : '0 2px 8px rgba(0,0,0,0.12)',
+        transition: 'box-shadow 0.2s ease',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        cursor: 'pointer', color: '#64748B', zIndex: 1020
+      }
+    }, /*#__PURE__*/React.createElement(BackArrowIcon, { size: 22 })),
+
+    /* Chat-room-header-style header: left spacer (back button floats over it), centered
+       title, right search-toggle button. */
+    /*#__PURE__*/React.createElement("div", {
+      className: "memo-view-header",
+      style: {
+        position: 'fixed', top: 0, left: 0, right: 0, height: '56px',
+        backgroundColor: 'var(--bg-card)', borderBottom: '1px solid var(--border-subtle)',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '0 16px', zIndex: 1010,
+        transition: 'transform 0.3s ease',
+        transform: isHeaderVisible ? 'translateY(0)' : 'translateY(-100%)'
       }
     },
-      /* Row 1: Back + Title + Close */
+      /*#__PURE__*/React.createElement("div", { style: { width: '32px', flexShrink: 0 } }),
       /*#__PURE__*/React.createElement("div", {
-        style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }
-      },
-        /* Left back button */
-        /*#__PURE__*/React.createElement("button", {
-          onClick: onBack,
-          style: { background: 'none', border: 'none', color: 'var(--text-main)', cursor: 'pointer', padding: '4px' }
-        }, /*#__PURE__*/React.createElement("svg", {
-          xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2"
-        }, /*#__PURE__*/React.createElement("path", { d: "M19 12H5" }), /*#__PURE__*/React.createElement("path", { d: "M12 19l-7-7 7-7" }))),
-        
-        /* Center Title */
-        /*#__PURE__*/React.createElement("span", {
-          style: { fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-main)' }
-        }, calendar.title, " 메모"),
+        style: {
+          position: 'absolute', left: '50%', transform: 'translateX(-50%)',
+          display: 'flex', alignItems: 'center', fontWeight: 800, fontSize: '0.95rem',
+          color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden',
+          textOverflow: 'ellipsis', maxWidth: 'calc(100vw - 160px)', pointerEvents: 'none'
+        }
+      }, calendar.title, " 메모"),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: () => setIsSearchOpen(v => !v),
+        title: "검색",
+        "aria-label": "메모 검색",
+        style: {
+          background: 'none', border: 'none', cursor: 'pointer', padding: '6px',
+          color: isSearchOpen ? 'var(--accent-primary)' : 'var(--text-muted)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '8px'
+        }
+      }, /*#__PURE__*/React.createElement("svg", {
+        xmlns: "http://www.w3.org/2000/svg", width: "22", height: "22", viewBox: "0 0 24 24",
+        fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
+      }, /*#__PURE__*/React.createElement("circle", { cx: "11", cy: "11", r: "8" }), /*#__PURE__*/React.createElement("path", { d: "m21 21-4.3-4.3" })))
+    ),
 
-        /* Right spacer */
-        /*#__PURE__*/React.createElement("div", { style: { width: '24px' } })
-      ),
-
-      /* Row 2: Live Search Bar */
-      /*#__PURE__*/React.createElement("div", {
-        style: { position: 'relative', display: 'flex', alignItems: 'center', width: '100%' }
-      },
-        /* Search icon */
-        /*#__PURE__*/React.createElement("span", {
-          style: { position: 'absolute', left: '12px', color: '#94A3B8', display: 'flex', alignItems: 'center' }
-        }, /*#__PURE__*/React.createElement("svg", {
-          xmlns: "http://www.w3.org/2000/svg", width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.5"
-        }, /*#__PURE__*/React.createElement("circle", { cx: "11", cy: "11", r: "8" }), /*#__PURE__*/React.createElement("path", { d: "m21 21-4.3-4.3" }))),
-        
-        /* Search Input */
-        /*#__PURE__*/React.createElement("input", {
-          type: "text",
-          placeholder: "메모 제목, 내용, 해시태그 검색...",
-          value: searchQuery,
-          onChange: e => setSearchQuery(e.target.value),
-          style: {
-            width: '100%',
-            padding: '8px 12px 8px 36px',
-            borderRadius: '20px',
-            border: '1px solid var(--border-subtle)',
-            backgroundColor: 'var(--bg-primary)',
-            color: 'var(--text-main)',
-            fontSize: '0.85rem',
-            outline: 'none',
-            boxSizing: 'border-box'
-          }
-        }),
-
-        /* Clear filter tags button if selectedTag is active */
-        selectedTag && /*#__PURE__*/React.createElement("button", {
-          onClick: () => setSelectedTag(''),
-          style: {
-            marginLeft: '8px',
-            padding: '6px 12px',
-            borderRadius: '16px',
-            backgroundColor: 'var(--bg-card)',
-            border: '1px solid var(--border-subtle)',
-            color: '#3B82F6',
-            fontSize: '0.75rem',
-            fontWeight: 'bold',
-            cursor: 'pointer',
-            flexShrink: 0
-          }
-        }, selectedTag, " ✕")
-      )
+    /* Search bar -- hidden by default, slides in below the header when the search button is
+       tapped (same slot/z-index the chat room's own search bar uses). */
+    isSearchOpen && /*#__PURE__*/React.createElement("div", {
+      style: {
+        position: 'fixed', top: '56px', left: 0, right: 0, zIndex: 1008,
+        display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 10px',
+        backgroundColor: 'var(--bg-card)', borderBottom: '1px solid var(--border-subtle)',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
+      }
+    },
+      /*#__PURE__*/React.createElement("svg", {
+        xmlns: "http://www.w3.org/2000/svg", width: "17", height: "17", viewBox: "0 0 24 24",
+        fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round",
+        style: { color: 'var(--text-muted)', flexShrink: 0 }
+      }, /*#__PURE__*/React.createElement("circle", { cx: "11", cy: "11", r: "8" }), /*#__PURE__*/React.createElement("path", { d: "m21 21-4.3-4.3" })),
+      /*#__PURE__*/React.createElement("input", {
+        ref: memoSearchInputRef,
+        type: "text",
+        placeholder: "메모 제목, 내용, 해시태그 검색...",
+        value: searchQuery,
+        onChange: e => setSearchQuery(e.target.value),
+        style: { flex: 1, height: '34px', fontSize: '0.85rem', border: '1px solid var(--border-subtle)', borderRadius: '20px', padding: '0 12px', backgroundColor: 'var(--bg-primary)', color: 'var(--text-main)', outline: 'none', boxSizing: 'border-box' }
+      }),
+      selectedTag && /*#__PURE__*/React.createElement("button", {
+        onClick: () => setSelectedTag(''),
+        style: {
+          padding: '6px 12px', borderRadius: '16px', backgroundColor: 'var(--bg-primary)',
+          border: '1px solid var(--border-subtle)', color: '#3B82F6', fontSize: '0.75rem',
+          fontWeight: 'bold', cursor: 'pointer', flexShrink: 0
+        }
+      }, selectedTag, " ✕"),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: () => { setIsSearchOpen(false); setSearchQuery(''); setSelectedTag(''); },
+        style: { border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '4px 6px', fontSize: '0.8rem', fontWeight: 700, flexShrink: 0 }
+      }, "닫기")
     ),
 
     /* Main Scrollable Body */
     /*#__PURE__*/React.createElement("div", {
-      style: { padding: '16px', display: 'flex', flexDirection: 'column', gap: '20px', flex: 1, overflowY: 'auto' }
+      style: { flex: 1, position: 'relative', minHeight: 0 }
+    }, /*#__PURE__*/React.createElement("div", {
+      onScroll: handleMemoScroll,
+      style: { position: 'absolute', inset: 0, overflowY: 'auto', padding: '16px', paddingTop: isSearchOpen ? '116px' : '72px', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: '20px' }
     },
       /* Rich Memo Input Composer (Google Keep style) */
       /*#__PURE__*/React.createElement("div", {
@@ -19237,30 +19302,11 @@ function MemoView({ calendar, memos, onBack, showToast, isDarkTheme, onRequestCo
               /*#__PURE__*/React.createElement("div", {
                 style: { display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }
               },
-                /* Participant selection capsule button - Styled to perfectly match chat input */
-                /*#__PURE__*/React.createElement("button", {
-                  type: "button",
-                  onClick: () => setIsComposerPartOpen(true),
-                  style: {
-                    backgroundColor: composerPart?.color || '#94A3B8',
-                    color: '#FFFFFF',
-                    border: 'none',
-                    borderRadius: '9999px',
-                    padding: '6px 14px',
-                    fontSize: '0.8rem',
-                    fontWeight: 'bold',
-                    cursor: 'pointer',
-                    whiteSpace: 'nowrap',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    height: '32px',
-                    boxSizing: 'border-box',
-                    flexShrink: 0
-                  }
-                }, composerPart?.name || '작성자 선택', /*#__PURE__*/React.createElement("span", {
-                  style: { fontSize: '0.6rem' }
-                }, "▼")),
+                /* Participant selection capsule button (shared with memo edit + chat edit modal) */
+                /*#__PURE__*/React.createElement(ParticipantPickerButton, {
+                  participant: composerPart,
+                  onClick: () => setIsComposerPartOpen(true)
+                }),
 
                 /* Active tag capsule badges (Responsive white background style: (#레시피 (✕))) */
                 newTags.map(tag => /*#__PURE__*/React.createElement("span", {
@@ -19345,7 +19391,7 @@ function MemoView({ calendar, memos, onBack, showToast, isDarkTheme, onRequestCo
             const nextPinned = !memo.isPinned;
             await firebaseDb.collection('calendars').doc('cal_' + calendar.id).collection('memos').doc(memo.id).update({ isPinned: nextPinned });
           },
-          onSelectTag: setSelectedTag,
+          onSelectTag: (tag) => { setSelectedTag(tag); setIsSearchOpen(true); },
           getBorderColor: getBorderColor
         })))
       ),
@@ -19374,7 +19420,7 @@ function MemoView({ calendar, memos, onBack, showToast, isDarkTheme, onRequestCo
             const nextPinned = !memo.isPinned;
             await firebaseDb.collection('calendars').doc('cal_' + calendar.id).collection('memos').doc(memo.id).update({ isPinned: nextPinned });
           },
-          onSelectTag: setSelectedTag,
+          onSelectTag: (tag) => { setSelectedTag(tag); setIsSearchOpen(true); },
           getBorderColor: getBorderColor
         })))
       ),
@@ -19590,30 +19636,11 @@ function MemoView({ calendar, memos, onBack, showToast, isDarkTheme, onRequestCo
           /*#__PURE__*/React.createElement("div", {
             style: { display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }
           },
-            /* Participant selection capsule button - Styled to perfectly match chat input */
-            /*#__PURE__*/React.createElement("button", {
-              type: "button",
-              onClick: () => setIsEditPartOpen(true),
-              style: {
-                backgroundColor: editPart?.color || '#94A3B8',
-                color: '#FFFFFF',
-                border: 'none',
-                borderRadius: '9999px',
-                padding: '6px 14px',
-                fontSize: '0.8rem',
-                fontWeight: 'bold',
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                height: '32px',
-                boxSizing: 'border-box',
-                flexShrink: 0
-              }
-            }, editPart?.name || '작성자 선택', /*#__PURE__*/React.createElement("span", {
-              style: { fontSize: '0.6rem' }
-            }, "▼")),
+            /* Participant selection capsule button (shared with memo composer + chat edit modal) */
+            /*#__PURE__*/React.createElement(ParticipantPickerButton, {
+              participant: editPart,
+              onClick: () => setIsEditPartOpen(true)
+            }),
 
             /* Active tag capsule badges (Responsive white background style: (#레시피 (✕))) */
             editTags.map(tag => /*#__PURE__*/React.createElement("span", {
@@ -19697,7 +19724,7 @@ function MemoView({ calendar, memos, onBack, showToast, isDarkTheme, onRequestCo
           )
         )
       )
-    ),
+    )),
 
     /* Emoji Picker Overlay & Bottom Sheets for selector sheets */
     isComposerEmojiOpen && /*#__PURE__*/React.createElement(EmojiPickerSheet, {
