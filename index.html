@@ -4737,12 +4737,26 @@ try {
 }
 
 let isStorageDisabled = false;
-let hasCheckedStorageHealth = false;
+let lastStorageHealthCheckAt = 0;
+let lastStorageHealthOk = null; // null = never checked yet
+
+// A success is trusted for the rest of the session (Storage being reachable once means the
+// SDK/network path itself is fine), but a failure is retried after a cooldown instead of
+// latching forever -- this runs automatically ~1s after script load, so a single transient
+// hiccup at that exact moment (slow initial connection competing with other startup requests,
+// SDK not fully warmed up yet, etc.) would otherwise permanently degrade every image for the
+// rest of the session even though Storage is actually fine moments later.
+const STORAGE_HEALTH_RECHECK_COOLDOWN_MS = 20000;
 
 async function checkFirebaseStorageHealth() {
-  if (hasCheckedStorageHealth) return !isStorageDisabled;
-  hasCheckedStorageHealth = true;
+  const now = Date.now();
+  if (lastStorageHealthOk === true) return true;
+  if (lastStorageHealthOk === false && (now - lastStorageHealthCheckAt) < STORAGE_HEALTH_RECHECK_COOLDOWN_MS) {
+    return false;
+  }
   if (!firebaseStorage) {
+    lastStorageHealthOk = false;
+    lastStorageHealthCheckAt = now;
     isStorageDisabled = true;
     return false;
   }
@@ -4756,13 +4770,16 @@ async function checkFirebaseStorageHealth() {
     const probeRef = firebaseStorage.ref('chatImages/_health/probe.png');
     const blob = new Blob(['1'], { type: 'image/png' });
     const probePromise = probeRef.put(blob);
-    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('PROBE_TIMEOUT')), 2500));
+    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('PROBE_TIMEOUT')), 5000));
     await Promise.race([probePromise, timeoutPromise]);
     isStorageDisabled = false;
+    lastStorageHealthOk = true;
   } catch (e) {
-    console.warn('Firebase Storage health check failed (will use inline base64 fallback):', e);
+    console.warn('Firebase Storage health check failed (will retry after cooldown):', e);
     isStorageDisabled = true;
+    lastStorageHealthOk = false;
   }
+  lastStorageHealthCheckAt = now;
   return !isStorageDisabled;
 }
 
@@ -11526,6 +11543,11 @@ async function compressImageToDataUrls(file, { maxBase64Length = MAX_CHAT_IMAGE_
 // multiple chat messages at send time (see chunkResolvedImagesForMessages), so quality only
 // ever depends on the individual photo, never on batch size.
 async function processImageFilesSequentially(files, onProgress) {
+  // Re-check (rather than trusting only the one automatic probe ~1s after script load) so a
+  // session that started with a transient/false-negative health check gets a real chance to
+  // recover once its cooldown has passed, instead of staying stuck on the low-res fallback for
+  // every photo for the rest of the session.
+  await checkFirebaseStorageHealth().catch(() => {});
   const succeeded = [];
   const failed = [];
   const startedAt = Date.now();
