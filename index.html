@@ -13775,17 +13775,7 @@ function ChatRoomView({
             padding: 0,
             color: '#64748B'
           }
-        }, /*#__PURE__*/React.createElement("svg", {
-          xmlns: "http://www.w3.org/2000/svg",
-          width: "12",
-          height: "12",
-          viewBox: "0 0 24 24",
-          fill: "none",
-          stroke: "currentColor",
-          strokeWidth: "2.5",
-          strokeLinecap: "round",
-          strokeLinejoin: "round"
-        }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), /*#__PURE__*/React.createElement("path", { d: "M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" }), /*#__PURE__*/React.createElement("path", { d: "M13.5 6.5l4 4" }))),
+        }, /*#__PURE__*/React.createElement(PencilIcon, { size: 12 })),
         /* Timestamp */
         /*#__PURE__*/React.createElement("span", {
           style: {
@@ -13965,25 +13955,7 @@ function ChatRoomView({
       color: '#64748B',
       zIndex: 1020
     }
-  }, /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg",
-    width: "22",
-    height: "22",
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
-    className: "icon icon-tabler icons-tabler-outline icon-tabler-chevron-down",
-    style: { transform: 'rotate(90deg)', display: 'inline-block' }
-  }, /*#__PURE__*/React.createElement("path", {
-    stroke: "none",
-    d: "M0 0h24v24H0z",
-    fill: "none"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M6 9l6 6l6 -6"
-  }))),
+  }, /*#__PURE__*/React.createElement(BackArrowIcon, { size: 22 })),
   !(isHeaderVisible || viewportBottom > 80 || isInputFocused) && /*#__PURE__*/React.createElement("button", {
     type: "button",
     className: "chat-keyboard-reopen-btn",
@@ -14787,6 +14759,32 @@ function ParticipantPickerButton({ participant, onClick }) {
       flexShrink: 0
     }
   }, participant?.name || '작성자 선택', /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.6rem' } }, "▼"));
+}
+
+// Speech-bubble "comment" icon (Lucide message), used by the memo comment toggle button.
+function MessageCommentIcon({ size = 24 } = {}) {
+  return /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg", width: String(size), height: String(size), viewBox: "0 0 24 24",
+    fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
+  },
+    /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }),
+    /*#__PURE__*/React.createElement("path", { d: "M8 9h8" }),
+    /*#__PURE__*/React.createElement("path", { d: "M8 13h6" }),
+    /*#__PURE__*/React.createElement("path", { d: "M18 4a3 3 0 0 1 3 3v8a3 3 0 0 1 -3 3h-5l-5 3v-3h-2a3 3 0 0 1 -3 -3v-8a3 3 0 0 1 3 -3h12" })
+  );
+}
+
+// Pencil "edit" icon, matching the exact glyph the chat message action row already uses --
+// shared here so the memo comment feature's edit button looks identical rather than a copy.
+function PencilIcon({ size = 12 } = {}) {
+  return /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg", width: String(size), height: String(size), viewBox: "0 0 24 24",
+    fill: "none", stroke: "currentColor", strokeWidth: "2.5", strokeLinecap: "round", strokeLinejoin: "round"
+  },
+    /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }),
+    /*#__PURE__*/React.createElement("path", { d: "M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" }),
+    /*#__PURE__*/React.createElement("path", { d: "M13.5 6.5l4 4" })
+  );
 }
 
 function ChatParticipantSheet({ calendar, selectedId, onSelect, onClose }) {
@@ -17365,11 +17363,15 @@ function formatLogTimestamp(ts) {
 // Left-pointing chevron/arrow used by every "back to previous screen" header in this app
 // (memo view, unified search results, etc.) -- one definition so the stroke weight/shape never
 // drifts between screens.
+// The single "<" back-button glyph used at the left of every page header in the app (chat room,
+// memo, admin unified search, and any future page) -- a chevron-down rotated 90deg, matching the
+// exact shape/weight this app has always used for "go back", not a full arrow-with-shaft.
 function BackArrowIcon({ size = 24 } = {}) {
   return /*#__PURE__*/React.createElement("svg", {
     xmlns: "http://www.w3.org/2000/svg", width: String(size), height: String(size), viewBox: "0 0 24 24",
-    fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
-  }, /*#__PURE__*/React.createElement("path", { d: "M19 12H5" }), /*#__PURE__*/React.createElement("path", { d: "M12 19l-7-7 7-7" }));
+    fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round",
+    style: { transform: 'rotate(90deg)', display: 'inline-block' }
+  }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), /*#__PURE__*/React.createElement("path", { d: "M6 9l6 6l6 -6" }));
 }
 
 // One keyword-search pass over a single calendar's 일정/채팅/태그/정산/메모 data. Shared by
@@ -19394,6 +19396,9 @@ function MemoView({ calendar, memos, onBack, showToast, isDarkTheme, onRequestCo
             await firebaseDb.collection('calendars').doc('cal_' + calendar.id).collection('memos').doc(memo.id).update({ isPinned: nextPinned });
           },
           onSelectTag: (tag) => { setSelectedTag(tag); setIsSearchOpen(true); },
+          onCommentsChange: async (nextComments) => {
+            await firebaseDb.collection('calendars').doc('cal_' + calendar.id).collection('memos').doc(memo.id).update({ comments: nextComments });
+          },
           getBorderColor: getBorderColor
         })))
       ),
@@ -19423,6 +19428,9 @@ function MemoView({ calendar, memos, onBack, showToast, isDarkTheme, onRequestCo
             await firebaseDb.collection('calendars').doc('cal_' + calendar.id).collection('memos').doc(memo.id).update({ isPinned: nextPinned });
           },
           onSelectTag: (tag) => { setSelectedTag(tag); setIsSearchOpen(true); },
+          onCommentsChange: async (nextComments) => {
+            await firebaseDb.collection('calendars').doc('cal_' + calendar.id).collection('memos').doc(memo.id).update({ comments: nextComments });
+          },
           getBorderColor: getBorderColor
         })))
       ),
@@ -19772,9 +19780,51 @@ function MemoView({ calendar, memos, onBack, showToast, isDarkTheme, onRequestCo
 
 
 // Memo Card component for clean grid layout separation
-function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onSelectTag, getBorderColor }) {
+function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onSelectTag, onCommentsChange, getBorderColor }) {
   const imageUrls = memo.imageUrls || [];
   const thumbUrls = memo.thumbUrls || [];
+
+  // Comments: stored inline on the memo doc (memos collection has no per-field schema, so no
+  // firestore.rules change needed). Composer mirrors the tag-input module's pattern.
+  const comments = memo.comments || [];
+  const [isCommentComposerOpen, setIsCommentComposerOpen] = React.useState(false);
+  const [commentText, setCommentText] = React.useState('');
+  const [commentParticipantId, setCommentParticipantId] = React.useState(() => getLocalStorage().getItem('gather_active_participant_id_v20') || '');
+  const [isCommentPartOpen, setIsCommentPartOpen] = React.useState(false);
+  const [editingCommentId, setEditingCommentId] = React.useState(null);
+  const commentPart = (calendar?.participants || []).find(p => p.id === commentParticipantId);
+
+  const handleSaveComment = (e) => {
+    e.stopPropagation();
+    const text = commentText.trim();
+    if (!text || !commentParticipantId) return;
+    const now = Date.now();
+    const nextComments = editingCommentId
+      ? comments.map(c => c.id === editingCommentId ? { ...c, text, participantId: commentParticipantId, updatedAt: now } : c)
+      : [...comments, { id: `cmt_${now}_${Math.random().toString(36).slice(2, 8)}`, participantId: commentParticipantId, text, createdAt: now }];
+    onCommentsChange(nextComments);
+    setCommentText('');
+    setEditingCommentId(null);
+    setIsCommentComposerOpen(false);
+  };
+
+  const handleStartEditComment = (e, comment) => {
+    e.stopPropagation();
+    setEditingCommentId(comment.id);
+    setCommentText(comment.text);
+    setCommentParticipantId(comment.participantId);
+    setIsCommentComposerOpen(true);
+  };
+
+  const handleDeleteComment = (e, commentId) => {
+    e.stopPropagation();
+    onCommentsChange(comments.filter(c => c.id !== commentId));
+    if (editingCommentId === commentId) {
+      setEditingCommentId(null);
+      setCommentText('');
+      setIsCommentComposerOpen(false);
+    }
+  };
 
   // Reusable multi-image proportional CSS Grid to cleanly fit layout inside card
   const renderMemoCardImages = () => {
@@ -19909,8 +19959,98 @@ function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onSelectTag, getBor
           cursor: 'pointer', lineHeight: 1,
           whiteSpace: 'nowrap'
         }
-      }, tag))
-    )
+      }, tag)),
+
+      /* Comment toggle button -- pushed to the far right of the row */
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: (e) => {
+          e.stopPropagation();
+          setEditingCommentId(null);
+          setCommentText('');
+          setIsCommentComposerOpen(v => !v);
+        },
+        title: "댓글",
+        "aria-label": "댓글",
+        style: {
+          marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', padding: '2px',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: (comments.length > 0 || isCommentComposerOpen) ? 'var(--accent-primary)' : '#94A3B8', flexShrink: 0
+        }
+      }, /*#__PURE__*/React.createElement(MessageCommentIcon, { size: 18 }))
+    ),
+
+    /* Comment list -- gray capsule rows: participant-color dot, text, edit/delete */
+    comments.length > 0 && /*#__PURE__*/React.createElement("div", {
+      style: { display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '8px' }
+    }, comments.map(comment => {
+      const author = (calendar?.participants || []).find(p => p.id === comment.participantId);
+      return /*#__PURE__*/React.createElement("div", {
+        key: comment.id,
+        onClick: e => e.stopPropagation(),
+        style: {
+          display: 'flex', alignItems: 'center', gap: '8px',
+          backgroundColor: 'rgba(148, 163, 184, 0.14)', borderRadius: '8px', padding: '6px 8px'
+        }
+      },
+        /*#__PURE__*/React.createElement("span", {
+          style: { width: '8px', height: '8px', borderRadius: '50%', backgroundColor: author?.color || '#94A3B8', flexShrink: 0 }
+        }),
+        /*#__PURE__*/React.createElement("span", {
+          style: { flex: 1, minWidth: 0, fontSize: '0.78rem', color: 'var(--text-main)', wordBreak: 'break-word' }
+        }, comment.text),
+        /*#__PURE__*/React.createElement("button", {
+          type: "button", onClick: e => handleStartEditComment(e, comment), title: "편집", "aria-label": "댓글 편집",
+          style: { background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', color: '#64748B', flexShrink: 0 }
+        }, /*#__PURE__*/React.createElement(PencilIcon, { size: 12 })),
+        /*#__PURE__*/React.createElement("button", {
+          type: "button", onClick: e => handleDeleteComment(e, comment.id), title: "삭제", "aria-label": "댓글 삭제",
+          style: { background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', color: '#64748B', flexShrink: 0 }
+        }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 12 }))
+      );
+    })),
+
+    /* Comment composer -- same shape as the tag-input module: participant picker + input + save */
+    isCommentComposerOpen && /*#__PURE__*/React.createElement("div", {
+      onClick: e => e.stopPropagation(),
+      style: { display: 'flex', alignItems: 'center', gap: '6px', marginTop: '8px' }
+    },
+      /*#__PURE__*/React.createElement(ParticipantPickerButton, {
+        participant: commentPart,
+        onClick: () => setIsCommentPartOpen(true)
+      }),
+      /*#__PURE__*/React.createElement("input", {
+        type: "text",
+        value: commentText,
+        onChange: e => setCommentText(e.target.value),
+        onKeyDown: e => {
+          if (e.key === 'Enter') {
+            if (e.nativeEvent && e.nativeEvent.isComposing) return;
+            e.preventDefault();
+            handleSaveComment(e);
+          }
+        },
+        placeholder: "댓글을 입력하세요...",
+        style: { flex: 1, minWidth: 0, height: '30px', fontSize: '0.8rem', border: '1px solid var(--border-subtle)', borderRadius: '6px', padding: '0 8px', backgroundColor: 'var(--bg-primary)', color: 'var(--text-main)', outline: 'none', boxSizing: 'border-box' }
+      }),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: handleSaveComment,
+        disabled: !commentText.trim() || !commentParticipantId,
+        style: {
+          flexShrink: 0, height: '30px', padding: '0 12px', borderRadius: '6px', border: 'none',
+          backgroundColor: 'var(--accent-primary)', color: '#FFFFFF', fontSize: '0.78rem', fontWeight: 'bold',
+          cursor: 'pointer', opacity: (commentText.trim() && commentParticipantId) ? 1 : 0.5
+        }
+      }, "저장")
+    ),
+
+    isCommentPartOpen && /*#__PURE__*/React.createElement(ChatParticipantSheet, {
+      calendar: calendar,
+      selectedId: commentParticipantId,
+      onSelect: id => { setCommentParticipantId(id); setIsCommentPartOpen(false); },
+      onClose: () => setIsCommentPartOpen(false)
+    })
   );
 }
 
@@ -20974,24 +21114,7 @@ function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {
     onClick: onBack,
     "aria-label": "뒤로가기",
     style: { background: 'none', border: 'none', color: '#64748B', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: 0, flexShrink: 0 }
-  }, /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg",
-    width: "22",
-    height: "22",
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    strokeWidth: "2",
-    strokeLinecap: "round",
-    strokeLinejoin: "round",
-    style: { transform: 'rotate(90deg)', display: 'inline-block' }
-  }, /*#__PURE__*/React.createElement("path", {
-    stroke: "none",
-    d: "M0 0h24v24H0z",
-    fill: "none"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M6 9l6 6l6 -6"
-  }))), /*#__PURE__*/React.createElement("h3", {
+  }, /*#__PURE__*/React.createElement(BackArrowIcon, { size: 22 })), /*#__PURE__*/React.createElement("h3", {
     style: {
       fontSize: '1.05rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '8px', margin: 0, color: 'var(--text-main)',
       position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)'
