@@ -83,9 +83,11 @@ service cloud.firestore {
           && hasValidMessageText(request.resource.data)
           && hasValidMessageImages(request.resource.data);
         allow update: if isCalendarDoc(calendarDocId)
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['text', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageShareUrls', 'imageTags'])
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['text', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageShareUrls', 'imageTags', 'participantId'])
           && hasValidMessageText(request.resource.data)
-          && hasValidMessageImages(request.resource.data);
+          && hasValidMessageImages(request.resource.data)
+          && (!('participantId' in request.resource.data) ||
+              (request.resource.data.participantId is string && request.resource.data.participantId.size() <= 160));
         allow delete: if isCalendarDoc(calendarDocId);
       }
 
