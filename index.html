@@ -3161,6 +3161,23 @@ function sanitizeText(value, maxLength = 120) {
     .slice(0, maxLength);
 }
 
+// Turns a raw Firestore/Firebase write error into a toast message that hints at *why* it
+// failed instead of a bare "실패", since the most common real-world cause here (a
+// firestore.rules/storage.rules change that hasn't been deployed yet -- `firebase deploy
+// --only firestore:rules`/`--only storage`) is otherwise indistinguishable from a genuine bug
+// without opening devtools. Falls back to the given generic label for anything else.
+function describeFirebaseWriteError(err, genericLabel) {
+  const code = err?.code || '';
+  const message = err?.message || '';
+  if (code === 'permission-denied' || /insufficient permission/i.test(message)) {
+    return `${genericLabel}: 서버 권한 오류 (firestore.rules 배포가 필요할 수 있습니다)`;
+  }
+  if (code === 'unavailable' || /network/i.test(message)) {
+    return `${genericLabel}: 네트워크 오류, 잠시 후 다시 시도해 주세요`;
+  }
+  return genericLabel;
+}
+
 function normalizeColorValue(value, fallback = '#64748B') {
   const color = String(value || '').trim();
   return /^#[0-9A-Fa-f]{6}$/.test(color) ? color : fallback;
@@ -8964,7 +8981,7 @@ function App() {
       }
     } catch (err) {
       console.error('handleSaveEditMessage failed:', err);
-      showToast('수정 실패', 'error', 3000);
+      showToast(describeFirebaseWriteError(err, '수정 실패'), 'error', 4000);
     } finally {
       setEditingMessage(null);
       setChatUploadProgress(null);
@@ -17830,7 +17847,7 @@ function ShareModal({
   showToast
 }) {
   const shareUrl = shareType === 'chat'
-    ? `${getCalendarShareUrl(calendar.id)}?view=chat`
+    ? `${getCalendarShareUrl(calendar.id)}chat/`
     : getCalendarShareUrl(calendar.id);
   return /*#__PURE__*/React.createElement("div", {
     className: "modal-overlay",
