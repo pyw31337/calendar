@@ -11678,8 +11678,13 @@ function uploadChatImageAssets(calendarId, compressed, index, onBytes, timeoutMs
     const stamp = Date.now();
     const rand = Math.random().toString(36).slice(2, 8);
     const basePath = `chatImages/${calendarId}/${stamp}_${rand}_${index}`;
-    const originalRef = firebaseStorage.ref(`${basePath}_original.jpg`);
-    const thumbRef = firebaseStorage.ref(`${basePath}_thumb.jpg`);
+    // The byte size is embedded in the filename itself (parsed back out by
+    // getStorageUrlFileSize) so the Lightbox info panel can show it without any extra network
+    // request -- Firebase Storage's download endpoint doesn't send a CORS header by default, so
+    // a plain fetch() to read Content-Length from a different origin (like this app's GitHub
+    // Pages host) is silently blocked by the browser and would never work.
+    const originalRef = firebaseStorage.ref(`${basePath}_original_${compressed.originalBlob.size}b.jpg`);
+    const thumbRef = firebaseStorage.ref(`${basePath}_thumb_${compressed.thumbnailBlob.size}b.jpg`);
 
     // On a flaky mobile connection, a stalled upload can go silent with no error/complete event
     // ever firing (the SDK is still waiting on a dead connection) -- without a bound here, the
@@ -12082,10 +12087,17 @@ function renderChatMessageImages(msg, setActiveLightbox, singleImageStyle = {}) 
 }
 
 // Best-effort per-image metadata for the Lightbox info overlay. Chat images are stored either
-// inline as base64 data: URIs (exact size/type derivable from the string itself here) or as
-// uploaded Firebase Storage URLs (type known from the extension, but the exact byte size needs a
-// network fetch -- see the Lightbox component's lazy imageFileSizes effect, which fills that in
-// once the info panel is opened).
+// inline as base64 data: URIs (exact size/type derivable from the string itself) or as uploaded
+// Firebase Storage URLs -- the latter can't have their size read via a network fetch (Firebase
+// Storage's download endpoint sends no CORS header by default, so the browser silently blocks a
+// cross-origin fetch() from reading the response), so uploadChatImageAssets/uploadMemoImageAssets
+// instead embed the byte size directly in the filename at upload time (e.g. "..._original_
+// 214875b.jpg"), which getStorageUrlFileSize parses back out here with zero extra requests.
+function getStorageUrlFileSize(url) {
+  if (typeof url !== 'string') return null;
+  const match = url.match(/_(\d+)b\.[a-zA-Z0-9]+(?:[?#]|$)/);
+  return match ? Number(match[1]) : null;
+}
 function formatBytes(bytes) {
   const value = Number(bytes);
   if (!isFinite(value) || value < 0) return null;
@@ -12131,10 +12143,11 @@ function buildLightboxImageInfo(url, timestamp) {
     const { dateStr, timeStr } = formatCommentDate(timestamp);
     dateLabel = `${dateStr} ${timeStr}`;
   }
+  const storageSizeBytes = !dataInfo ? getStorageUrlFileSize(url) : null;
   return {
     dateLabel,
     fileName,
-    sizeLabel: dataInfo ? formatBytes(dataInfo.sizeBytes) : null,
+    sizeLabel: dataInfo ? formatBytes(dataInfo.sizeBytes) : (storageSizeBytes != null ? formatBytes(storageSizeBytes) : null),
     typeLabel: ext.toUpperCase()
   };
 }
@@ -12410,7 +12423,6 @@ function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, onPromote
   const [showInfo, setShowInfo] = React.useState(false);
   const [imageUrlModalOpen, setImageUrlModalOpen] = React.useState(false);
   const [imageDimensions, setImageDimensions] = React.useState({});
-  const [imageFileSizes, setImageFileSizes] = React.useState({});
   const [displayUrls, setDisplayUrls] = React.useState(urls);
   const lightboxHistoryRef = React.useRef(false);
   React.useEffect(() => {
@@ -12440,35 +12452,16 @@ function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, onPromote
   React.useEffect(() => { setDisplayUrls(urls); }, [urls]);
   React.useEffect(() => { setShowInfo(false); }, [index]);
   const currentUrl = displayUrls[index] || urls[index];
-  // Storage-hosted images (unlike data: URLs) don't carry their byte size in the URL itself, so
-  // the info panel would otherwise always show '-' for size. Fetch it lazily -- only while the
-  // info panel is open, and only once per URL -- and read the actual Blob size from the response;
-  // this is the one reliable way to get it since Firebase Storage's download response doesn't
-  // expose a CORS-readable Content-Length header for a plain <img> load to hook into.
-  React.useEffect(() => {
-    if (!showInfo || !currentUrl || currentUrl.startsWith('data:') || currentUrl in imageFileSizes) return;
-    let cancelled = false;
-    fetch(currentUrl)
-      .then(res => res.ok ? res.blob() : null)
-      .then(blob => {
-        if (cancelled || !blob) return;
-        setImageFileSizes(prev => prev[currentUrl] ? prev : { ...prev, [currentUrl]: blob.size });
-      })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, [showInfo, currentUrl, imageFileSizes]);
   const currentInfo = React.useMemo(
     () => {
       const base = buildLightboxImageInfo(currentUrl, meta && meta[index] && meta[index].timestamp);
       const size = imageDimensions[currentUrl];
-      const fetchedBytes = imageFileSizes[currentUrl];
       return {
         ...base,
-        sizeLabel: base.sizeLabel || (typeof fetchedBytes === 'number' ? formatBytes(fetchedBytes) : null),
         dimensionLabel: size ? `${size.width} × ${size.height}px` : null
       };
     },
-    [currentUrl, index, meta, imageDimensions, imageFileSizes]
+    [currentUrl, index, meta, imageDimensions]
   );
   // meta is a static snapshot handed in when the Lightbox was opened (built once from
   // chatMessages at click time), so it never reflects a tag save/delete that happens while the
@@ -20163,8 +20156,9 @@ function uploadMemoImageAssets(calendarId, compressed, index, onBytes, timeoutMs
     const stamp = Date.now();
     const rand = Math.random().toString(36).slice(2, 8);
     const basePath = `memoImages/${calendarId}/${stamp}_${rand}_${index}`;
-    const originalRef = firebaseStorage.ref(`${basePath}_original.jpg`);
-    const thumbRef = firebaseStorage.ref(`${basePath}_thumb.jpg`);
+    // Byte size embedded in the filename -- see the matching comment in uploadChatImageAssets.
+    const originalRef = firebaseStorage.ref(`${basePath}_original_${compressed.originalBlob.size}b.jpg`);
+    const thumbRef = firebaseStorage.ref(`${basePath}_thumb_${compressed.thumbnailBlob.size}b.jpg`);
 
     const runUpload = (blob, ref, taskKey) => {
       let settled = false;
