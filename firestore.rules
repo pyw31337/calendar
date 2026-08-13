@@ -194,6 +194,39 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // Shared, service-wide link-preview (OpenGraph) cache. Keyed by a deterministic hash of the
+    // URL (see hashUrlForCache in index.html) rather than the raw URL, since Firestore document
+    // IDs can't contain '/'. Populated once per URL on first fetch from the Peekalink API and
+    // reused by every calendar/user afterwards -- see fetchLinkPreview in index.html. No 'list'
+    // access: any client that already knows a URL can hash it and GET that one doc, but nobody
+    // can enumerate every URL ever shared across every calendar.
+    match /linkPreviews/{urlHash} {
+      allow get: if urlHash is string && urlHash.matches('^[a-f0-9]{1,16}$');
+      allow list: if false;
+      allow create, update: if urlHash is string && urlHash.matches('^[a-f0-9]{1,16}$')
+        && request.resource.data.keys().hasOnly(['url', 'title', 'description', 'image', 'siteName', 'fetchedAt'])
+        && request.resource.data.url is string && request.resource.data.url.size() <= 2000
+        && request.resource.data.title is string && request.resource.data.title.size() <= 300
+        && request.resource.data.description is string && request.resource.data.description.size() <= 500
+        && request.resource.data.image is string && request.resource.data.image.size() <= 2000
+        && request.resource.data.siteName is string && request.resource.data.siteName.size() <= 200
+        && request.resource.data.fetchedAt is number;
+      allow delete: if false;
+    }
+
+    // Aggregate counter for the linkPreviews cache above, read by the admin dashboard's
+    // "외부 서비스 연동 현황" panel so it can show cache size without a costly full-collection
+    // read (list access on linkPreviews itself is intentionally disabled).
+    match /appConfig/linkPreviewStats {
+      allow get: if true;
+      allow list: if false;
+      allow create, update: if request.resource.data.keys().hasOnly(['cachedCount', 'updatedAt'])
+        && request.resource.data.cachedCount is number
+        && request.resource.data.cachedCount >= 0
+        && request.resource.data.updatedAt is number;
+      allow delete: if false;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

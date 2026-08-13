@@ -5928,6 +5928,10 @@ function AdminDashboard({ initialCalendars }) {
   // every entry, not just a recent window, to correctly replay state up to a cutoff.
   const [selectedCalActivityLogs, setSelectedCalActivityLogs] = React.useState([]);
 
+  // Shared link-preview cache stats (통합 링크미리보기), service-wide (not per-calendar) --
+  // see appConfig/linkPreviewStats + hashUrlForCache/fetchLinkPreview.
+  const [linkPreviewStats, setLinkPreviewStats] = React.useState(null);
+
   const lastSyncedRef = React.useRef(null);
 
   const showAdminToast = (message, type = 'success', duration = 3000) => {
@@ -6106,6 +6110,15 @@ function AdminDashboard({ initialCalendars }) {
       });
     }
   }, [calendarsList.map(c => c.id).join(','), firebaseDb]);
+
+  // Shared link-preview cache stats, loaded once (not tied to any single calendar)
+  React.useEffect(() => {
+    if (!firebaseDb) return;
+    const unsub = firebaseDb.collection('appConfig').doc('linkPreviewStats').onSnapshot(snap => {
+      setLinkPreviewStats(snap.exists ? snap.data() : { cachedCount: 0, updatedAt: null });
+    }, () => setLinkPreviewStats(null));
+    return () => unsub && unsub();
+  }, [firebaseDb]);
 
   // Full activity log history for the selected calendar (Tab 2 timeline, Tab 3 PITR replay)
   React.useEffect(() => {
@@ -7026,6 +7039,47 @@ function AdminDashboard({ initialCalendars }) {
               /*#__PURE__*/React.createElement("div", { style: styles.metricValue }, box.val)
             );
           })
+        )
+      ),
+
+      /* External service integration status -- service-wide (통합관리), not per-calendar.
+         Surfaces the Peekalink link-preview dependency's shared cache size and the client-side
+         API key exposure risk, per the admin transparency requirement for external services. */
+      /*#__PURE__*/React.createElement("section", { style: styles.card },
+        /*#__PURE__*/React.createElement("div", { style: styles.cardTitle, "data-collapse-anchor": "true", "data-collapse-key": "metrics-external-services", "data-collapse-label": "외부 서비스 연동 현황" },
+          /*#__PURE__*/React.createElement("span", { style: { display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(ExternalLinkIcon, null), "외부 서비스 연동 현황")
+        ),
+        /*#__PURE__*/React.createElement("div", { style: { border: '1px solid #E2E8F0', borderRadius: '10px', padding: '14px', backgroundColor: '#F8FAFC' } },
+          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' } },
+            /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.9rem', fontWeight: 'bold', color: '#0F172A' } }, "Peekalink (링크 미리보기 / OpenGraph)"),
+            /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.7rem', padding: '2px 8px', borderRadius: '9999px', backgroundColor: '#DCFCE7', color: '#16A34A', fontWeight: 'bold' } }, "통합 캐시 사용 중")
+          ),
+          /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.8rem', color: '#64748B', marginTop: '8px', lineHeight: 1.6 } },
+            "채팅/메모/정산에서 붙여넣은 링크의 제목·설명·이미지를 가져오는 데 사용됩니다. 이제 캘린더별로 각각 요청하지 않고, URL당 한 번만 조회한 뒤 결과를 ",
+            /*#__PURE__*/React.createElement("strong", null, "모든 캘린더가 공유하는 서버 캐시"),
+            "(Firestore linkPreviews 컬렉션)에 저장해 재사용합니다."
+          ),
+          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '16px', marginTop: '12px', flexWrap: 'wrap' } },
+            /*#__PURE__*/React.createElement("div", null,
+              /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.72rem', color: '#94A3B8', fontWeight: 700 } }, "누적 캐시된 링크 수(추정)"),
+              /*#__PURE__*/React.createElement("div", { style: { fontSize: '1.3rem', fontWeight: 900, color: '#0F172A' } },
+                linkPreviewStats ? `${linkPreviewStats.cachedCount || 0}건` : '—'
+              )
+            ),
+            /*#__PURE__*/React.createElement("div", null,
+              /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.72rem', color: '#94A3B8', fontWeight: 700 } }, "최근 갱신"),
+              /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.85rem', color: '#334155', marginTop: '4px' } },
+                linkPreviewStats && linkPreviewStats.updatedAt ? new Date(linkPreviewStats.updatedAt).toLocaleString('ko-KR') : '아직 없음'
+              )
+            )
+          ),
+          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'flex-start', gap: '8px', marginTop: '14px', padding: '10px', borderRadius: '8px', backgroundColor: '#FFFBEB', border: '1px solid #FDE68A' } },
+            /*#__PURE__*/React.createElement(AlertTriangleIcon, null),
+            /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.78rem', color: '#92400E', lineHeight: 1.6 } },
+              /*#__PURE__*/React.createElement("strong", null, "주의: "),
+              "이 서비스는 백엔드 서버가 없는 정적 사이트라 Peekalink API 키가 브라우저 소스에 그대로 노출됩니다(누구나 view-source로 확인 가능). 제3자가 이 키를 추출해 재사용하면 무료 요금제 할당량이 소진되어 링크 미리보기가 중단될 수 있습니다. 위 공유 캐시는 동일 URL에 대한 반복 호출을 없애 이 위험을 줄이지만 완전히 막지는 못하므로, 요청량이 비정상적으로 늘면 peekalink.io 계정에서 키를 교체하는 것을 권장합니다."
+            )
+          )
         )
       ),
 
@@ -10862,15 +10916,66 @@ function setChatLastReadTimestamp(calendarId, timestamp) {
 // re-renders and repeated occurrences of the same link don't refetch, and in-flight requests
 // are deduped across simultaneously-mounting message bubbles.
 // Uses a per-account free-tier API key (dedicated quota, not shared globally like an
-// anonymous/no-key API) -- see https://peekalink.io.
+// anonymous/no-key API) -- see https://peekalink.io. NOTE: this key is visible to anyone who
+// views this file's source (there is no server to hide it behind), so the linkPreviews shared
+// cache below exists in part to minimize how often it actually gets called, not just for speed.
 const PEEKALINK_API_KEY = 'sk_w8czszf1m50xm1pbuknazw60recwmc2q';
 const linkPreviewCache = new Map();
 const linkPreviewInflight = new Map();
+
+// Deterministic, synchronous 64-bit FNV-1a hash used as the Firestore doc ID for the shared
+// linkPreviews cache below (doc IDs can't contain '/', which raw URLs do). Collisions are
+// astronomically unlikely for the number of distinct URLs this app will ever see, and using a
+// plain hash instead of crypto.subtle.digest keeps this working in non-secure contexts too
+// (e.g. file:// during local testing), where Web Crypto isn't available.
+function hashUrlForCache(url) {
+  let hash = 0xcbf29ce484222325n;
+  const prime = 0x100000001b3n;
+  for (let i = 0; i < url.length; i++) {
+    hash ^= BigInt(url.charCodeAt(i));
+    hash = BigInt.asUintN(64, hash * prime);
+  }
+  return hash.toString(16).padStart(16, '0');
+}
+
+// Best-effort counter so the admin dashboard can show shared-cache size without ever needing
+// list access on the linkPreviews collection itself (see firestore.rules).
+async function incrementLinkPreviewStat() {
+  if (!firebaseDb) return;
+  try {
+    await firebaseDb.runTransaction(async (tx) => {
+      const ref = firebaseDb.collection('appConfig').doc('linkPreviewStats');
+      const snap = await tx.get(ref);
+      const current = snap.exists ? (snap.data().cachedCount || 0) : 0;
+      tx.set(ref, { cachedCount: current + 1, updatedAt: Date.now() });
+    });
+  } catch (e) {
+    // Non-critical stat -- ignore failures
+  }
+}
+
 async function fetchLinkPreview(url) {
   if (linkPreviewCache.has(url)) return linkPreviewCache.get(url);
   if (linkPreviewInflight.has(url)) return linkPreviewInflight.get(url);
   const promise = (async () => {
+    const urlHash = hashUrlForCache(url);
     try {
+      // Check the shared, service-wide cache first -- every calendar/user reuses the same
+      // Peekalink fetch for a given URL instead of each calendar re-fetching it independently.
+      if (firebaseDb) {
+        try {
+          const sharedDoc = await firebaseDb.collection('linkPreviews').doc(urlHash).get();
+          if (sharedDoc.exists) {
+            const d = sharedDoc.data();
+            const result = { status: 'success', data: { title: d.title || '', description: d.description || '', image: d.image || '', siteName: d.siteName || '' } };
+            linkPreviewCache.set(url, result);
+            return result;
+          }
+        } catch (e) {
+          // Shared cache read failed (offline, rules mismatch, etc.) -- fall through to a direct fetch.
+        }
+      }
+
       const res = await fetch('https://api.peekalink.io/', {
         method: 'POST',
         headers: {
@@ -10883,17 +10988,27 @@ async function fetchLinkPreview(url) {
       if (!json.ok) throw new Error(json.message || 'peekalink request failed');
       const image = json.image?.medium?.url || json.image?.large?.url || json.image?.thumbnail?.url || json.icon?.url || '';
       const hasContent = !!(json.title || image || json.description);
-      const result = {
-        status: hasContent ? 'success' : 'empty',
-        data: {
-          title: json.title || (json.redirected && json.redirectionUrl ? new URL(json.redirectionUrl).hostname.replace('www.','') : '') || json.domain || '',
-          description: json.description || '',
-          image,
-          siteName: json.siteName || json.domain || ''
-        }
+      const data = {
+        title: json.title || (json.redirected && json.redirectionUrl ? new URL(json.redirectionUrl).hostname.replace('www.','') : '') || json.domain || '',
+        description: json.description || '',
+        image,
+        siteName: json.siteName || json.domain || ''
       };
+      const result = { status: hasContent ? 'success' : 'empty', data };
       // Only cache successful results; let empty/failed results be retried on next render
-      if (hasContent) linkPreviewCache.set(url, result);
+      if (hasContent) {
+        linkPreviewCache.set(url, result);
+        if (firebaseDb) {
+          firebaseDb.collection('linkPreviews').doc(urlHash).set({
+            url: url.slice(0, 2000),
+            title: data.title.slice(0, 300),
+            description: data.description.slice(0, 500),
+            image: data.image.slice(0, 2000),
+            siteName: data.siteName.slice(0, 200),
+            fetchedAt: Date.now()
+          }).then(() => incrementLinkPreviewStat()).catch(() => {});
+        }
+      }
       return result;
     } catch (e) {
       const result = { status: 'error' };
