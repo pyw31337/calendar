@@ -8111,6 +8111,7 @@ function App() {
   const mainHeaderRef = React.useRef(null);
   const calendarSectionRef = React.useRef(null);
   const pollsSectionRef = React.useRef(null);
+  const [pollsExpandSignal, setPollsExpandSignal] = React.useState(0);
   const lastMainScrollTopRef = React.useRef(0);
   React.useEffect(() => {
     const handleMainScroll = () => {
@@ -9757,7 +9758,10 @@ function App() {
   }, /*#__PURE__*/React.createElement("button", {
     type: "button",
     className: "main-menu-item",
-    onClick: () => scrollToSection(pollsSectionRef)
+    onClick: () => {
+      setPollsExpandSignal(prev => prev + 1);
+      scrollToSection(pollsSectionRef);
+    }
   }, /*#__PURE__*/React.createElement("span", { className: "main-menu-icon" }, /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M9 11l3 3l8 -8", "M20 12v6a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h9"] })), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-full" }, "투표"), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-short" }, "투표"), mainMenuPollCount > 0 && /*#__PURE__*/React.createElement("span", {
     className: "main-menu-badge"
   }, mainMenuPollCount)), /*#__PURE__*/React.createElement("div", { className: "main-menu-sep" }), /*#__PURE__*/React.createElement("button", {
@@ -9904,7 +9908,8 @@ function App() {
     onEditPoll: handleOpenPollEdit,
     onVotePoll: handleOpenVoteSheet,
     onCancelVote: handleCancelVote,
-    onRequestConfirm: showConfirmDialog
+    onRequestConfirm: showConfirmDialog,
+    expandSignal: pollsExpandSignal
   })), /*#__PURE__*/React.createElement("div", {
     className: "calendar-card",
     style: {
@@ -10741,8 +10746,7 @@ function CalendarGrid({
           pointerEvents: 'none'
         }
       }, cellAnns.map((ann, aIdx) => {
-        const matchedPart = getActiveParticipants(calendar).find(p => ann.title.includes(p.name));
-        const displayColor = matchedPart ? matchedPart.color : ann.badgeColor;
+        const displayColor = getAnniversaryDisplayColor(ann, calendar);
         return /*#__PURE__*/React.createElement("div", {
           key: ann.id || aIdx,
           style: {
@@ -10779,8 +10783,7 @@ function CalendarGrid({
           flexWrap: 'wrap'
         }
       }, cellAnns.map((ann, aIdx) => {
-        const matchedPart = getActiveParticipants(calendar).find(p => ann.title.includes(p.name));
-        const displayColor = matchedPart ? matchedPart.color : ann.badgeColor;
+        const displayColor = getAnniversaryDisplayColor(ann, calendar);
         return /*#__PURE__*/React.createElement("div", {
           key: ann.id || aIdx,
           title: ann.title,
@@ -15557,22 +15560,25 @@ function DateModal({
     /* Anniversaries banner list inside DateModal body */
     dateAnns.length > 0 && /*#__PURE__*/React.createElement("div", {
       style: { display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '14px' }
-    }, dateAnns.map((ann, aIdx) => /*#__PURE__*/React.createElement("div", {
-      key: ann.id || aIdx,
-      style: {
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px',
-        padding: '10px 14px',
-        backgroundColor: `${ann.badgeColor}12`,
-        color: ann.badgeColor,
-        border: `1px solid ${ann.badgeColor}30`,
-        borderLeft: `4px solid ${ann.badgeColor}`,
-        borderRadius: '8px',
-        fontSize: '0.82rem',
-        fontWeight: 'bold'
-      }
-    }, ann.icon, " ", ann.title))),
+    }, dateAnns.map((ann, aIdx) => {
+      const displayColor = getAnniversaryDisplayColor(ann, calendar);
+      return /*#__PURE__*/React.createElement("div", {
+        key: ann.id || aIdx,
+        style: {
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          padding: '10px 14px',
+          backgroundColor: `${displayColor}12`,
+          color: displayColor,
+          border: `1px solid ${displayColor}30`,
+          borderLeft: `4px solid ${displayColor}`,
+          borderRadius: '8px',
+          fontSize: '0.82rem',
+          fontWeight: 'bold'
+        }
+      }, ann.icon, " ", ann.title);
+    })),
 
     !adminMode && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
     style: {
@@ -19854,6 +19860,17 @@ function getAnniversariesForDate(dateStr, anniversariesList) {
   return results;
 }
 
+// Anniversary badges default to a generic type color, but when the title names an active
+// participant (e.g. "김현석 생일"), use that person's own calendar color instead. Matches
+// against the LONGEST participant name found in the title first, so a short name (e.g. "김현")
+// can't shadow a longer, more specific one (e.g. "김현석") that also appears in the list.
+function getAnniversaryDisplayColor(ann, calendar) {
+  const matched = getActiveParticipants(calendar)
+    .filter(p => p.name && ann.title.includes(p.name))
+    .sort((a, b) => b.name.length - a.name.length)[0];
+  return matched ? matched.color : ann.badgeColor;
+}
+
 // Signed day-count from today to targetDateStr (positive = future, negative = past),
 // local-midnight based to match formatDDayLabel's convention.
 function calculateDday(targetDateStr) {
@@ -21853,7 +21870,7 @@ function SectionToggleButton({ collapsed, onToggle, label }) {
   })));
 }
 
-function PollList({ calendar, onCreatePoll, onEditPoll, onVotePoll, onCancelVote, onRequestConfirm }) {
+function PollList({ calendar, onCreatePoll, onEditPoll, onVotePoll, onCancelVote, onRequestConfirm, expandSignal }) {
   const polls = getCalendarPolls(calendar).filter(poll => !isPollClosed(poll));
   const participants = getActiveParticipants(calendar);
   const participantsMap = participants.reduce((acc, participant) => {
@@ -21862,6 +21879,13 @@ function PollList({ calendar, onCreatePoll, onEditPoll, onVotePoll, onCancelVote
   }, {});
   const [isCollapsed, setIsCollapsed] = React.useState(true); // default closed
   const [openPollIds, setOpenPollIds] = React.useState({});
+
+  // Header's "투표" main-menu button bumps expandSignal to force this section open (and its
+  // poll cards visible) even if the user had collapsed it -- scrolling here without expanding
+  // would otherwise land on an empty-looking, collapsed header.
+  React.useEffect(() => {
+    if (expandSignal) setIsCollapsed(false);
+  }, [expandSignal]);
 
   // A poll can be visually open two ways: the whole section is expanded (!isCollapsed), or
   // it was opened individually while the section stayed collapsed (openPollIds[id]). The
