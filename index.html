@@ -21302,6 +21302,95 @@ function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {
     { label: '현재 잔액', value: displayBalance, color: 'var(--text-main)', icon: React.createElement(PiggyBankIcon, { size: 16 }) }
   ];
 
+  // Shareable result card -- rendered client-side onto an offscreen canvas so it can be saved
+  // as a plain image and pasted into KakaoTalk/문자 without anyone needing app access. Shown in
+  // an overlay (not auto-downloaded) since a direct file download is unreliable on iOS Safari;
+  // long-pressing the image to save works everywhere, and the download link below it covers
+  // desktop/Android.
+  const [shareImageUrl, setShareImageUrl] = React.useState(null);
+  const periodLabel = activeTab === 'total' ? '전체 기간' : `${year}년 ${month + 1}월`;
+  const handleGenerateShareImage = () => {
+    const canvas = document.createElement('canvas');
+    const W = 720, H = 960;
+    canvas.width = W;
+    canvas.height = H;
+    const ctx = canvas.getContext('2d');
+
+    ctx.fillStyle = '#F8FAFC';
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.fillStyle = '#4F46E5';
+    ctx.fillRect(0, 0, W, 160);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = '700 22px sans-serif';
+    ctx.fillText(calendar?.title || '모여라 캘린더', 40, 60);
+    ctx.font = '900 34px sans-serif';
+    ctx.fillText('회비 정산 결과', 40, 105);
+    ctx.font = '500 18px sans-serif';
+    ctx.fillText(periodLabel, 40, 138);
+
+    const rowsStats = [
+      { label: '총 수입', value: displayIncome, color: '#16A34A' },
+      { label: '총 지출', value: displayExpense, color: '#DC2626' },
+      { label: '현재 잔액', value: displayBalance, color: '#0F172A' }
+    ];
+    let y = 230;
+    rowsStats.forEach(stat => {
+      ctx.fillStyle = '#64748B';
+      ctx.font = '600 18px sans-serif';
+      ctx.fillText(stat.label, 40, y);
+      ctx.fillStyle = stat.color;
+      ctx.font = '900 30px sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillText(`${stat.value < 0 ? '-' : ''}${Math.abs(stat.value).toLocaleString()}원`, W - 40, y + 2);
+      ctx.textAlign = 'left';
+      y += 56;
+    });
+
+    y += 16;
+    ctx.strokeStyle = '#E2E8F0';
+    ctx.beginPath();
+    ctx.moveTo(40, y);
+    ctx.lineTo(W - 40, y);
+    ctx.stroke();
+    y += 40;
+
+    ctx.fillStyle = '#0F172A';
+    ctx.font = '800 18px sans-serif';
+    ctx.fillText('카테고리별 지출', 40, y);
+    y += 30;
+
+    const topCategories = categoryTotals.slice().sort((a, b) => b.total - a.total).slice(0, 6);
+    const maxCategoryTotal = Math.max(1, ...topCategories.map(c => c.total));
+    topCategories.forEach(item => {
+      ctx.fillStyle = '#334155';
+      ctx.font = '600 15px sans-serif';
+      ctx.fillText(item.category.name, 40, y);
+      ctx.textAlign = 'right';
+      ctx.fillText(`${item.total.toLocaleString()}원`, W - 40, y);
+      ctx.textAlign = 'left';
+      y += 10;
+      const barW = Math.max(6, Math.round((item.total / maxCategoryTotal) * (W - 80)));
+      ctx.fillStyle = '#E2E8F0';
+      ctx.fillRect(40, y, W - 80, 8);
+      ctx.fillStyle = item.category.color || '#6366F1';
+      ctx.fillRect(40, y, barW, 8);
+      y += 34;
+    });
+    if (topCategories.length === 0) {
+      ctx.fillStyle = '#94A3B8';
+      ctx.font = '500 15px sans-serif';
+      ctx.fillText('등록된 지출 항목이 없습니다.', 40, y);
+      y += 34;
+    }
+
+    ctx.fillStyle = '#94A3B8';
+    ctx.font = '500 13px sans-serif';
+    ctx.fillText(`모여라 캘린더 · ${new Date().toLocaleDateString('ko-KR')} 생성`, 40, H - 30);
+
+    setShareImageUrl(canvas.toDataURL('image/png'));
+  };
+
   const categoryBadge = category => /*#__PURE__*/React.createElement("span", {
     style: {
       display: 'inline-flex',
@@ -21447,7 +21536,17 @@ function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {
       fontSize: '1.05rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '8px', margin: 0, color: 'var(--text-main)',
       position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)'
     }
-  }, /*#__PURE__*/React.createElement(WalletIcon, { size: 20 }), "정산하기")), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(WalletIcon, { size: 20 }), "정산하기"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: handleGenerateShareImage,
+    title: "정산 결과 공유 이미지 생성",
+    style: {
+      position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)',
+      width: '32px', height: '32px', borderRadius: '50%', border: '1px solid var(--border-subtle)',
+      backgroundColor: 'var(--bg-primary)', cursor: 'pointer', display: 'flex',
+      alignItems: 'center', justifyContent: 'center', color: '#64748B', padding: 0
+    }
+  }, /*#__PURE__*/React.createElement(ShareIcon, { size: 16 }))), /*#__PURE__*/React.createElement("div", {
     className: "settlement-page-body",
     onScroll: handleSettlementScroll,
     style: { flex: '1 1 auto', overflowY: 'auto', padding: '72px 16px 16px', display: 'flex', flexDirection: 'column', gap: '14px' }
@@ -21642,7 +21741,34 @@ function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {
       )
     ));
     return sheet && typeof document !== 'undefined' && ReactDOM.createPortal ? ReactDOM.createPortal(sheet, document.body) : sheet;
-  })()
+  })(),
+  /* Generated share-image overlay -- shown instead of auto-downloading since a triggered file
+     download is unreliable on iOS Safari; long-pressing the <img> to save works on every
+     mobile browser, and the explicit 다운로드 link below covers desktop. */
+  shareImageUrl && /*#__PURE__*/React.createElement("div", {
+    className: "modal-overlay",
+    onClick: () => setShareImageUrl(null),
+    style: { zIndex: 12000 }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "modal-container",
+    onClick: e => e.stopPropagation(),
+    style: { width: '90%', maxWidth: '360px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center' }
+  },
+    /*#__PURE__*/React.createElement("img", { src: shareImageUrl, alt: "정산 결과 공유 이미지", style: { width: '100%', borderRadius: '10px', border: '1px solid var(--border-subtle)' } }),
+    /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.76rem', color: 'var(--text-muted)', textAlign: 'center' } }, "이미지를 길게 눌러 저장하거나, 아래 버튼으로 다운로드하세요"),
+    /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px', width: '100%' } },
+      /*#__PURE__*/React.createElement("button", {
+        type: "button", className: "btn btn-secondary", style: { flex: 1 },
+        onClick: () => setShareImageUrl(null)
+      }, "닫기"),
+      /*#__PURE__*/React.createElement("a", {
+        href: shareImageUrl,
+        download: `${calendar?.title || '정산'}_정산결과.png`,
+        className: "btn btn-primary",
+        style: { flex: 1, textAlign: 'center', textDecoration: 'none' }
+      }, "다운로드")
+    )
+  ))
   ));
 }function SunIcon() {
   return /*#__PURE__*/React.createElement("svg", {
@@ -21958,6 +22084,24 @@ function ExternalLinkIcon() {
   }), /*#__PURE__*/React.createElement("path", {
     d: "M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"
   }));
+}
+
+function ShareIcon({ size = 20 } = {}) {
+  return /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: String(size),
+    height: String(size),
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    "stroke-width": "2",
+    "stroke-linecap": "round",
+    "stroke-linejoin": "round"
+  }, /*#__PURE__*/React.createElement("circle", { cx: "18", cy: "5", r: "3" }),
+     /*#__PURE__*/React.createElement("circle", { cx: "6", cy: "12", r: "3" }),
+     /*#__PURE__*/React.createElement("circle", { cx: "18", cy: "19", r: "3" }),
+     /*#__PURE__*/React.createElement("line", { x1: "8.59", y1: "13.51", x2: "15.42", y2: "17.49" }),
+     /*#__PURE__*/React.createElement("line", { x1: "15.41", y1: "6.51", x2: "8.59", y2: "10.49" }));
 }
 
 function WalletIcon({ size = 24 } = {}) {
