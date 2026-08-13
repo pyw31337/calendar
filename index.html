@@ -11429,22 +11429,23 @@ async function compressImageToDataUrls(file, { maxBase64Length = MAX_CHAT_IMAGE_
   // tens of extra KB per image to a fallback batch.
   const thumbnail = encodeWithinBudget(240, [0.72, 0.6, 0.5, 0.4], maxThumbBase64Length, 120);
 
-  // High-quality blob for Firebase Storage (when storage is working, we bypass low-res restrictions
-  // to upload the original file completely untouched if it is under 4MB, preserving 100% original quality and formats).
+  // High-quality blob for Firebase Storage (when storage is working): images already within the
+  // 1920px cap upload completely untouched (100% pixel-perfect, zero compression noise) as long
+  // as they're a reasonable file size; anything larger gets its longest side scaled down to 1920.
   const getHighQualityBlob = () => {
     if (isStorageDisabled) return Promise.resolve(null);
-    
-    // If the original file is already under 4MB, upload it directly.
-    // This guarantees 100% pixel-perfect original quality (PNG or JPG) with ZERO compression noise.
-    if (file.size <= 4 * 1024 * 1024) {
+
+    const maxDimHigh = 1920;
+    const isOversized = img.width > maxDimHigh || img.height > maxDimHigh;
+
+    if (!isOversized && file.size <= 4 * 1024 * 1024) {
       return Promise.resolve(file);
     }
-    
+
     return new Promise(res => {
       let w = img.width, h = img.height;
       const isPng = (file.type === 'image/png' || file.name.toLowerCase().endsWith('.png'));
-      const maxDimHigh = 2560;
-      if (w > maxDimHigh || h > maxDimHigh) {
+      if (isOversized) {
         if (w > h) { h = Math.round(h * maxDimHigh / w); w = maxDimHigh; }
         else { w = Math.round(w * maxDimHigh / h); h = maxDimHigh; }
       }
@@ -11455,7 +11456,7 @@ async function compressImageToDataUrls(file, { maxBase64Length = MAX_CHAT_IMAGE_
       if (isPng) {
         canvas.toBlob(blob => res(blob), 'image/png');
       } else {
-        canvas.toBlob(blob => res(blob), 'image/jpeg', 0.94);
+        canvas.toBlob(blob => res(blob), 'image/jpeg', 0.7);
       }
     });
   };
