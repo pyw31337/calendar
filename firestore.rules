@@ -85,7 +85,10 @@ service cloud.firestore {
           // imageTags holds one free-text tag string per image, parallel-indexed to imageUrls/
           // thumbUrls (see handleSaveImageTags in index.html) -- entered from the Lightbox's
           // image-info panel and searched from GlobalSearchModal.
-          && (!('imageTags' in data) || (data.imageTags is list && data.imageTags.size() <= 50));
+          && (!('imageTags' in data) || (data.imageTags is list && data.imageTags.size() <= 50))
+          // directMediaTags stores the same hashtag text for an image rendered from a pasted
+          // URL in the chat text (no imageUrls/thumbUrls entry exists for that synthetic media).
+          && (!('directMediaTags' in data) || (data.directMediaTags is string && data.directMediaTags.size() <= 100));
       }
 
       match /messages/{messageId} {
@@ -99,7 +102,7 @@ service cloud.firestore {
           && hasValidMessageImages(request.resource.data)
           && hasValidLinkPreview(request.resource.data);
         allow update: if isCalendarDoc(calendarDocId)
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['text', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageShareUrls', 'imageTags', 'participantId', 'linkPreview'])
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['text', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageShareUrls', 'imageTags', 'directMediaTags', 'participantId', 'linkPreview'])
           && hasValidMessageText(request.resource.data)
           && hasValidMessageImages(request.resource.data)
           && hasValidLinkPreview(request.resource.data)
