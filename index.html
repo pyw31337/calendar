@@ -1205,6 +1205,17 @@
       border-radius: var(--radius-md);
       background: var(--bg-primary);
     }
+    .poll-option-row.is-confirmed-winner {
+      border-color: #8B5CF6;
+      background: #F5F3FF;
+      box-shadow: inset 0 0 0 1px rgba(139, 92, 246, 0.08);
+    }
+    :root[data-theme="dark"] .poll-option-row.is-confirmed-winner,
+    :root:not([data-theme="light"]) .poll-option-row.is-confirmed-winner {
+      border-color: #A78BFA;
+      background: rgba(139, 92, 246, 0.16);
+      box-shadow: inset 0 0 0 1px rgba(167, 139, 250, 0.12);
+    }
     .poll-sortable-row {
       border: 1px solid transparent;
       border-radius: var(--radius-md);
@@ -1257,6 +1268,20 @@
     }
     .poll-option-link:hover {
       text-decoration: underline;
+    }
+    .poll-confirmed-badge {
+      background: #8B5CF6;
+      color: #FFFFFF;
+      font-size: 0.68rem;
+      font-weight: 800;
+      padding: 2px 8px;
+      border-radius: 9999px;
+      white-space: nowrap;
+    }
+    :root[data-theme="dark"] .poll-confirmed-badge,
+    :root:not([data-theme="light"]) .poll-confirmed-badge {
+      background: #A78BFA;
+      color: #111827;
     }
     .poll-vote-count {
       font-size: 0.86rem;
@@ -3183,6 +3208,10 @@ function sanitizeText(value, maxLength = 120) {
     .slice(0, maxLength);
 }
 
+function stripUrlEdgePunctuation(value = '') {
+  return String(value || '').replace(/[\s"'“”‘’`)\].,!?]+$/g, '');
+}
+
 // Turns a raw Firestore/Firebase write error into a toast message that hints at *why* it
 // failed instead of a bare "실패", since the most common real-world cause here (a
 // firestore.rules/storage.rules change that hasn't been deployed yet -- `firebase deploy
@@ -3487,13 +3516,13 @@ function extractFirstUrlInfo(value = '') {
   const markdownMatch = source.match(/\[[^\]]*]\(((?:https?:\/\/|www\.)[^)\s]+|(?:[a-z0-9-]+\.)+[a-z]{2,}(?:\/[^)\s]*)?)\)/i);
   if (markdownMatch) {
     const raw = markdownMatch[0];
-    const href = markdownMatch[1].replace(/[.,!?]+$/g, '');
+    const href = stripUrlEdgePunctuation(markdownMatch[1]);
     const url = /^https?:\/\//i.test(href) ? href : `https://${href}`;
     return { raw, url };
   }
   const match = source.match(/(?:https?:\/\/|www\.)[^\s)\]]+|(?:[a-z0-9-]+\.)+[a-z]{2,}(?:\/[^\s)\]]*)?/i);
   if (!match) return { raw: '', url: '' };
-  const raw = match[0].replace(/[)\].,!?]+$/g, '');
+  const raw = stripUrlEdgePunctuation(match[0]);
   if (!raw || !/[a-z0-9]/i.test(raw)) return { raw: '', url: '' };
   const url = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
   return { raw, url };
@@ -11317,6 +11346,17 @@ function hashUrlForCache(url) {
   return hash.toString(16).padStart(16, '0');
 }
 
+function normalizeLinkPreviewData(url, data = {}, fetchedAt = Date.now()) {
+  return {
+    url: sanitizeText(url || data.url || '', 2000),
+    title: sanitizeText(data.title || '', 300),
+    description: sanitizeText(data.description || '', 500),
+    image: sanitizeText(data.image || '', 2000),
+    siteName: sanitizeText(data.siteName || '', 200),
+    fetchedAt: Number(data.fetchedAt || fetchedAt || Date.now())
+  };
+}
+
 // Best-effort counter so the admin dashboard can show shared-cache size without ever needing
 // list access on the linkPreviews collection itself (see firestore.rules).
 // Uses set({merge:true}) since incrementPeekalinkApiCallStat below writes to the same doc --
@@ -11371,7 +11411,7 @@ async function fetchLinkPreview(url) {
           const sharedDoc = await firebaseDb.collection('linkPreviews').doc(urlHash).get();
           if (sharedDoc.exists) {
             const d = sharedDoc.data();
-            const result = { status: 'success', data: { title: d.title || '', description: d.description || '', image: d.image || '', siteName: d.siteName || '' } };
+            const result = { status: 'success', data: normalizeLinkPreviewData(url, d, d.fetchedAt) };
             linkPreviewCache.set(url, result);
             return result;
           }
@@ -11394,25 +11434,18 @@ async function fetchLinkPreview(url) {
       if (!json.ok) throw new Error(json.message || 'peekalink request failed');
       const image = json.image?.medium?.url || json.image?.large?.url || json.image?.thumbnail?.url || json.icon?.url || '';
       const hasContent = !!(json.title || image || json.description);
-      const data = {
+      const data = normalizeLinkPreviewData(url, {
         title: json.title || (json.redirected && json.redirectionUrl ? new URL(json.redirectionUrl).hostname.replace('www.','') : '') || json.domain || '',
         description: json.description || '',
         image,
         siteName: json.siteName || json.domain || ''
-      };
+      });
       const result = { status: hasContent ? 'success' : 'empty', data };
       // Only cache successful results; let empty/failed results be retried on next render
       if (hasContent) {
         linkPreviewCache.set(url, result);
         if (firebaseDb) {
-          firebaseDb.collection('linkPreviews').doc(urlHash).set({
-            url: url.slice(0, 2000),
-            title: data.title.slice(0, 300),
-            description: data.description.slice(0, 500),
-            image: data.image.slice(0, 2000),
-            siteName: data.siteName.slice(0, 200),
-            fetchedAt: Date.now()
-          }).then(() => incrementLinkPreviewStat()).catch(() => {});
+          firebaseDb.collection('linkPreviews').doc(urlHash).set(data).then(() => incrementLinkPreviewStat()).catch(() => {});
         }
       }
       return result;
@@ -23226,17 +23259,13 @@ function PollList({ calendar, onCreatePoll, onEditPoll, onVotePoll, onCancelVote
       const isWinner = winningOptionIds.has(option.id);
       return /*#__PURE__*/React.createElement("div", {
         key: option.id,
-        className: "poll-option-row"
+        className: `poll-option-row${isWinner ? ' is-confirmed-winner' : ''}`
       }, /*#__PURE__*/React.createElement("div", {
         className: "poll-option-main"
       }, /*#__PURE__*/React.createElement("div", {
         style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }
       }, isWinner && /*#__PURE__*/React.createElement("span", {
-        className: "poll-confirmed-badge",
-        style: {
-          fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: '9999px',
-          whiteSpace: 'nowrap', backgroundColor: '#EEF2FF', color: '#4F46E5'
-        }
+        className: "poll-confirmed-badge"
       }, "투표확정"), /*#__PURE__*/React.createElement("span", null, option.text)), option.url && /*#__PURE__*/React.createElement("span", {
         className: "poll-option-link",
         onClick: event => {

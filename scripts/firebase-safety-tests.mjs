@@ -112,6 +112,14 @@ runAppScript(productionContext, `
   if (removeFirstUrl(markdownExpense) !== '추사고택 (도은네 다자녀 혜택 20%)') {
     throw new Error('markdown URL removal failed');
   }
+  const quotedBlogUrl = "https://blog.naver.com/choochoo440/224199076337'";
+  if (extractFirstUrl(quotedBlogUrl) !== 'https://blog.naver.com/choochoo440/224199076337') {
+    throw new Error('quoted URL extraction failed');
+  }
+  const preview = normalizeLinkPreviewData('https://blog.naver.com/choochoo440/224199076337', { title: '블로그', description: null, image: undefined, siteName: 'NAVER Blog' }, 1800000000000);
+  if (preview.url !== 'https://blog.naver.com/choochoo440/224199076337' || preview.description !== '' || preview.image !== '' || preview.fetchedAt !== 1800000000000) {
+    throw new Error('link preview normalization failed');
+  }
   const registeredText = formatRegisteredAt(new Date(2026, 7, 4, 4, 39, 12).getTime());
   if (registeredText !== '26.08.04 (화) 04:39:12') {
     throw new Error('registered timestamp formatter failed');
