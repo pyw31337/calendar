@@ -22601,9 +22601,14 @@ function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom = false
       if (cancelled || !containerRef.current || mapRef.current) return;
       const map = L.map(containerRef.current, { scrollWheelZoom, zoomControl: true, attributionControl: true })
         .setView(PLACE_MAP_DEFAULT_CENTER, PLACE_MAP_DEFAULT_ZOOM);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-        attribution: '&copy; OpenStreetMap contributors'
+      // CartoDB Positron (free, no API key, same OSM data underneath) instead of the standard
+      // OSM tile style -- its muted greyscale/white basemap with minimal labels makes the
+      // colored category pins the only thing that actually pops, unlike the default style's
+      // busy roads/land-use colors competing with them for attention.
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+        maxZoom: 20,
+        subdomains: 'abcd',
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
       }).addTo(map);
       markersLayerRef.current = L.layerGroup().addTo(map);
       mapRef.current = map;
@@ -22890,9 +22895,8 @@ function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, onDelete,
 
 // Main-screen collapsible map preview -- collapsed shows a short 16:9 map, expanded shows a
 // taller 4:3 map (the toggle only resizes the map, it never hides the section like PhotoGallery
-// does, since the map itself is the content). "전체보기" sits immediately before the fold arrow;
-// SectionToggleButton's own marginLeft:auto pushes both trailing controls to the header's right
-// edge as a pair.
+// does, since the map itself is the content). "전체보기" sits immediately before the fold arrow,
+// both wrapped in one group pushed to the header's right edge.
 function PlacesSection({ calendar, onViewAll }) {
   const [collapsed, setCollapsed] = React.useState(true);
   const places = getCalendarPlaces(calendar);
@@ -22905,16 +22909,26 @@ function PlacesSection({ calendar, onViewAll }) {
       /*#__PURE__*/React.createElement(PlaceSectionIcon, null),
       "장소 ",
       /*#__PURE__*/React.createElement(SectionCountBadge, { count: places.length }),
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        onClick: onViewAll,
-        style: { marginLeft: 'auto', background: 'none', border: 'none', color: '#3B82F6', fontSize: '0.78rem', fontWeight: 800, cursor: 'pointer', padding: '4px 6px' }
-      }, "전체보기"),
-      /*#__PURE__*/React.createElement(SectionToggleButton, {
-        collapsed,
-        onToggle: () => setCollapsed(prev => !prev),
-        label: collapsed ? '지도 펼치기' : '지도 접기'
-      })
+      /*#__PURE__*/React.createElement("div", {
+        // SectionToggleButton's own CSS also carries margin-left:auto (fine when it's the only
+        // trailing control, as in every other section) -- pairing it directly with another
+        // auto-margin button here would split the row's free space between the two instead of
+        // pushing them both flush to the right edge as one group. Wrapping them together and
+        // putting the single auto-margin on the wrapper keeps "전체보기" immediately left of the
+        // fold arrow, both hugging the right edge.
+        style: { marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '2px' }
+      },
+        /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          onClick: onViewAll,
+          style: { background: 'none', border: 'none', color: '#3B82F6', fontSize: '0.78rem', fontWeight: 800, cursor: 'pointer', padding: '4px 6px' }
+        }, "전체보기"),
+        /*#__PURE__*/React.createElement(SectionToggleButton, {
+          collapsed,
+          onToggle: () => setCollapsed(prev => !prev),
+          label: collapsed ? '지도 펼치기' : '지도 접기'
+        })
+      )
     ),
     /*#__PURE__*/React.createElement("div", {
       style: {
