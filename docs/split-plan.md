@@ -20,6 +20,7 @@
 - 외부 JS는 모두 `public/assets`에도 미러링한다. Vite 산출물과 GitHub Pages 루트 서빙 방식이 달라져도 파일 누락을 막기 위한 조치다.
 - 각 외부 JS는 `window.GATHER_APP_*` 네임스페이스로만 값을 노출하고, `index.html`에는 기존 값 fallback을 유지한다.
 - `npm run regression:test`에 `check:asset-mirrors`가 포함되어 root/public 미러 불일치, `index.html`의 누락 asset 참조, 외부 데이터 스크립트 로딩 순서, 과거 초기 데모 데이터 재유입을 잡는다.
+- `npm run regression:test`에 `check:size-budget`도 포함되어 `index.html`이 다시 1,050KB를 넘으면 실패한다.
 - `npm run smoke:live`로 GitHub Pages의 주요 진입 URL과 외부 asset 응답을 한 번에 확인한다.
 - 복구 기준 태그: `safe-before-split-20260814-7da2504`
 

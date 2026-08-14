@@ -12,6 +12,7 @@
     "regression:test": "node scripts/regression-check.mjs",
     "safety:test": "node scripts/firebase-safety-tests.mjs",
     "check:asset-mirrors": "node scripts/check-asset-mirrors.mjs",
+    "check:size-budget": "node scripts/check-size-budget.mjs",
     "check:tab-wiring": "node scripts/check-tab-wiring.mjs",
     "stress:firebase": "node scripts/firebase-live-stress-tests.mjs",
     "ops:audit": "node scripts/firebase-ops-audit.mjs",
