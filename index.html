@@ -13011,24 +13011,30 @@ function DateModal({
     setIsSheetOpen(false);
     setIsSubmitting(false);
   }, [calendar?.id, dateStr]);
+  // canvas-confetti injects its own fixed-position canvas at z-index 100 by default, which
+  // sits *behind* .modal-overlay's z-index: 1000 -- since both of these fire while DateModal
+  // itself is open, the burst would otherwise be rendered behind the modal card and barely
+  // visible. zIndex here just needs to clear 1000.
+  const CONFETTI_Z_INDEX = 10000;
   const celebratePositiveAction = () => {
     if (typeof confetti !== 'function') return;
     try {
       confetti({
         particleCount: 80,
         spread: 70,
-        origin: { y: 0.6 }
+        origin: { y: 0.6 },
+        zIndex: CONFETTI_Z_INDEX
       });
     } catch (err) {
       console.warn('Confetti error', err);
     }
   };
-  // Coin-burst micro-animation for money/settlement actions (지출/수입 저장 등) -- reuses the
-  // same canvas-confetti library already loaded for celebratePositiveAction, just with
-  // coin-emoji shaped particles instead of confetti squares. Canvas rendering (not CSS) keeps
-  // it visually consistent across Safari/Chrome/Edge/Firefox/Whale on both desktop and mobile.
-  // originEl (the clicked save button) anchors the burst to that element instead of a fixed
-  // screen position.
+  // Money-burst micro-animation for settlement actions (지출/수입 저장 등), anchored to the
+  // clicked save button instead of a fixed screen position. Previously rendered coin-emoji
+  // shaped particles via confetti.shapeFromText -- dropped that because it silhouettes solid
+  // black on systems whose canvas 2D text rendering has no color-emoji glyph for 🪙 (common on
+  // some Windows/Android setups), so it looked broken instead of festive. Plain confetti in
+  // the library's default multicolor palette renders reliably everywhere.
   const celebrateMoneyBurst = originEl => {
     if (typeof confetti !== 'function') return;
     try {
@@ -13042,9 +13048,6 @@ function DateModal({
           };
         }
       }
-      const coinShape = typeof confetti.shapeFromText === 'function'
-        ? confetti.shapeFromText({ text: '🪙', scalar: 2.4 })
-        : null;
       confetti({
         particleCount: 26,
         spread: 65,
@@ -13052,8 +13055,7 @@ function DateModal({
         gravity: 1.15,
         ticks: 130,
         origin,
-        shapes: coinShape ? [coinShape] : ['circle'],
-        colors: coinShape ? undefined : ['#FBBF24', '#F59E0B', '#EAB308', '#FDE68A']
+        zIndex: CONFETTI_Z_INDEX
       });
     } catch (err) {
       console.warn('Coin burst error', err);
