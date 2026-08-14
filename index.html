@@ -709,28 +709,10 @@ function formatChatHeaderTitle(title) {
   return (title || '').replace(/\s*모여라\s*캘린더\s*$/, '').trim() || (title || '');
 }
 
-function isValidCalendarId(id) {
-  return typeof id === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(id);
-}
-
-function isInternalTestCalendarId(id) {
-  return typeof id === 'string' && /^(stress_|test_)/.test(id);
-}
-
-// Any well-formed id is allowed -- calendar creation isn't restricted to a fixed allowlist
-// anymore. The matching Firestore/Storage security rules must allow the same format (see
-// firestore.rules/storage.rules), or writes from here will still be rejected server-side.
-function isAllowedCalendarId(id) {
-  return isValidCalendarId(id);
-}
-
-function sanitizeText(value, maxLength = 120) {
-  return String(value ?? '')
-    .replace(/[\u0000-\u001F\u007F]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, maxLength);
-}
+const isValidCalendarId = GATHER_APP_UTILS.isValidCalendarId;
+const isInternalTestCalendarId = GATHER_APP_UTILS.isInternalTestCalendarId;
+const isAllowedCalendarId = GATHER_APP_UTILS.isAllowedCalendarId;
+const sanitizeText = GATHER_APP_UTILS.sanitizeText;
 
 const stripUrlEdgePunctuation = GATHER_APP_UTILS.stripUrlEdgePunctuation;
 
@@ -751,17 +733,8 @@ function describeFirebaseWriteError(err, genericLabel) {
   return genericLabel;
 }
 
-function normalizeColorValue(value, fallback = '#64748B') {
-  const color = String(value || '').trim();
-  return /^#[0-9A-Fa-f]{6}$/.test(color) ? color : fallback;
-}
-
-function isValidDateString(value) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(value || ''))) return false;
-  const [year, month, day] = value.split('-').map(Number);
-  const date = new Date(year, month - 1, day);
-  return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
-}
+const normalizeColorValue = GATHER_APP_UTILS.normalizeColorValue;
+const isValidDateString = GATHER_APP_UTILS.isValidDateString;
 
 function getCalendarIdFromURL() {
   const href = window.location.href;

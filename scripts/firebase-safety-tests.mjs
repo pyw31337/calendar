@@ -119,6 +119,18 @@ runAppScript(productionContext, `
   if (removeFirstUrl(markdownExpense) !== '추사고택 (도은네 다자녀 혜택 20%)') {
     throw new Error('markdown URL removal failed');
   }
+  if (!isValidCalendarId('jhair') || !isValidCalendarId('x') || isValidCalendarId('../bad') || isAllowedCalendarId('bad!')) {
+    throw new Error('calendar id utility validation failed');
+  }
+  if (!isInternalTestCalendarId('stress_123') || !isInternalTestCalendarId('test_local') || isInternalTestCalendarId('kkot')) {
+    throw new Error('internal test calendar id detection failed');
+  }
+  if (sanitizeText('  a\\n\\tb  ', 10) !== 'a b' || normalizeColorValue('not-color', '#123456') !== '#123456') {
+    throw new Error('text/color normalization utilities failed');
+  }
+  if (!isValidDateString('2026-08-14') || isValidDateString('2026-02-30')) {
+    throw new Error('date string validation utility failed');
+  }
   const quotedBlogUrl = "https://blog.naver.com/choochoo440/224199076337'";
   if (extractFirstUrl(quotedBlogUrl) !== 'https://blog.naver.com/choochoo440/224199076337') {
     throw new Error('quoted URL extraction failed');

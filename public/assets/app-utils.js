@@ -99,6 +99,18 @@
     return `${value} B`;
   }
 
+  function isValidCalendarId(id) {
+    return typeof id === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(id);
+  }
+
+  function isInternalTestCalendarId(id) {
+    return typeof id === 'string' && /^(stress_|test_)/.test(id);
+  }
+
+  function isAllowedCalendarId(id) {
+    return isValidCalendarId(id);
+  }
+
   function stripUrlEdgePunctuation(value = '') {
     return String(value || '').replace(/[\s"'“”‘’`)\].,!?]+$/g, '');
   }
@@ -141,6 +153,13 @@
   function normalizeColorValue(value, fallback = '#64748B') {
     const color = String(value || '').trim();
     return /^#[0-9A-Fa-f]{6}$/.test(color) ? color : fallback;
+  }
+
+  function isValidDateString(value) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(value || ''))) return false;
+    const [year, month, day] = String(value).split('-').map(Number);
+    const date = new Date(year, month - 1, day);
+    return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
   }
 
   function getDefaultExpenseCategories() {
@@ -273,10 +292,16 @@
     formatChatTime,
     formatChatDividerDate,
     formatBytes,
+    isValidCalendarId,
+    isInternalTestCalendarId,
+    isAllowedCalendarId,
     stripUrlEdgePunctuation,
     extractFirstUrlInfo,
     extractFirstUrl,
     removeFirstUrl,
+    sanitizeText: sanitizeTextValue,
+    normalizeColorValue,
+    isValidDateString,
     normalizeExpenseCategories,
     getExpenseCategories,
     getExpenseCategory,
