@@ -5,6 +5,7 @@ import { spawnSync } from 'node:child_process';
 // trusts today: storage safety, tab reachability, and a production build.
 const CURRENT_REGRESSION_SUITES = [
   ['safety:test', 'Firebase-only storage, URL parsing, merge, log, and sanitizer checks'],
+  ['check:asset-mirrors', 'external root/public asset mirror checks'],
   ['check:tab-wiring', 'reachable tab/mode branch checks'],
   ['build', 'production bundle smoke check']
 ];
