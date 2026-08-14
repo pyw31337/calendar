@@ -8576,10 +8576,14 @@ function getDirectChatMediaInfo(url) {
         const id = path.match(/(?:\/video)?\/(\d+)(?:$|[/?#])/i)?.[1] || path.match(/\/(\d+)(?:$|[/?#])/i)?.[1];
         if (id) return { type: 'embed', provider: 'vimeo', url: `https://player.vimeo.com/video/${encodeURIComponent(id)}`, orientation: 'landscape' };
       }
-      // TikTok deliberately excluded: its embed iframe (tiktok.com/embed/v2/<id>) can render an
-      // "overload protection" placeholder instead of the actual video when loaded from a
-      // third-party page, so a TikTok link stays on the regular link-preview (thumbnail +
-      // title/description card) path below instead of an unreliable inline player.
+      // TikTok's official embed.js widget (see TikTokEmbedWidget below), not a raw hotlinked
+      // tiktok.com/embed/v2/<id> iframe -- that showed an "overload protection" placeholder
+      // instead of real video. Falls back to the link-preview card if the widget doesn't
+      // produce a player within a few seconds.
+      if (host === 'tiktok.com' || host === 'm.tiktok.com') {
+        const videoId = path.match(/\/video\/(\d+)/)?.[1];
+        if (videoId) return { type: 'tiktok-widget', provider: 'tiktok', url: source, videoId };
+      }
     } catch (e) {
       // Keep non-URL and unsupported providers on the regular link-preview path.
     }
@@ -8611,6 +8615,41 @@ function getDirectChatMediaInfo(url) {
     if (type) return { type, url: normalizedUrl };
   }
   return null;
+}
+
+// TikTok's widget scans the DOM once per script load for .tiktok-embed blockquotes and swaps in
+// a real player iframe -- appending a fresh <script> tag per mount makes it rescan for a
+// dynamically-rendered SPA. onFailed fires if no iframe shows up within a few seconds, so the
+// caller can fall back to the link-preview card instead of a dead blockquote.
+function TikTokEmbedWidget({ url, videoId, onFailed }) {
+  const containerRef = React.useRef(null);
+  React.useEffect(() => {
+    let cancelled = false;
+    const script = document.createElement('script');
+    script.src = 'https://www.tiktok.com/embed.js';
+    script.async = true;
+    document.body.appendChild(script);
+    const timeoutId = setTimeout(() => {
+      if (cancelled) return;
+      const hasPlayer = containerRef.current && containerRef.current.querySelector('iframe');
+      if (!hasPlayer) onFailed();
+    }, 6000);
+    return () => {
+      cancelled = true;
+      clearTimeout(timeoutId);
+      if (script.parentNode) script.parentNode.removeChild(script);
+    };
+  }, [url]);
+
+  return /*#__PURE__*/React.createElement('div', {
+    ref: containerRef,
+    style: { width: 'min(88vw, 360px)', maxWidth: '500px', minWidth: '200px', margin: '0 auto' }
+  }, /*#__PURE__*/React.createElement('blockquote', {
+    className: 'tiktok-embed',
+    cite: url,
+    'data-video-id': videoId,
+    style: { maxWidth: '100%', minWidth: '200px', margin: '0 auto' }
+  }, /*#__PURE__*/React.createElement('section', null)));
 }
 
 function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox, linkPreview, style = {}, message = null }) {
@@ -8653,7 +8692,14 @@ function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox, linkPr
   };
 
   return /*#__PURE__*/React.createElement(React.Fragment, null,
-    mediaInfo.type === 'image'
+    mediaInfo.type === 'tiktok-widget'
+      ? /*#__PURE__*/React.createElement(TikTokEmbedWidget, {
+        key: mediaInfo.url,
+        url: mediaInfo.url,
+        videoId: mediaInfo.videoId,
+        onFailed: () => setFailed(true)
+      })
+      : mediaInfo.type === 'image'
       ? /*#__PURE__*/React.createElement('img', {
         src: mediaInfo.url,
         alt: '링크 이미지',
@@ -15407,9 +15453,32 @@ function GlobalSearchModal({
 
   const q = query.trim().toLowerCase();
 
+  // chatMessages/memos as passed in are capped for display performance (chat: last 100 via a
+  // live listener; memos: whatever page has been paginated in), so search would silently miss
+  // older items. First search of the session fetches the full collections once and reuses them.
+  const [fullHistory, setFullHistory] = React.useState(null);
+  const [isLoadingFullHistory, setIsLoadingFullHistory] = React.useState(false);
+  React.useEffect(() => {
+    if (!q || fullHistory || isLoadingFullHistory || !calendar?.id || !firebaseDb) return;
+    setIsLoadingFullHistory(true);
+    Promise.all([
+      firebaseDb.collection('calendars').doc(`cal_${calendar.id}`).collection('messages').get(),
+      firebaseDb.collection('calendars').doc(`cal_${calendar.id}`).collection('memos').get()
+    ]).then(([messagesSnap, memosSnap]) => {
+      setFullHistory({
+        chatMessages: messagesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })),
+        memos: memosSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+      });
+    }).catch(err => {
+      console.warn('Full-history search fetch failed, falling back to already-loaded data:', err);
+    }).finally(() => {
+      setIsLoadingFullHistory(false);
+    });
+  }, [q, fullHistory, isLoadingFullHistory, calendar?.id]);
+
   const matches = React.useMemo(
-    () => computeCalendarSearchMatches(calendar, chatMessages, memos, q, 30),
-    [calendar, chatMessages, memos, q]
+    () => computeCalendarSearchMatches(calendar, fullHistory?.chatMessages || chatMessages, fullHistory?.memos || memos, q, 30),
+    [calendar, fullHistory, chatMessages, memos, q]
   );
 
   const tabDefs = [
@@ -15463,6 +15532,10 @@ function GlobalSearchModal({
         value: query,
         onChange: e => setQuery(e.target.value)
       }),
+
+      isLoadingFullHistory && /*#__PURE__*/React.createElement("div", {
+        style: { fontSize: '0.76rem', color: 'var(--text-muted)', marginTop: '8px' }
+      }, "전체 기록에서 검색 중..."),
 
       q && hasResults && /*#__PURE__*/React.createElement("div", {
         style: { position: 'sticky', top: '-18px', backgroundColor: 'var(--bg-card)', zIndex: 10, marginTop: '10px', marginBottom: '12px' }
@@ -17663,14 +17736,19 @@ function MemoView({ calendar, memos, hasMoreMemos, onLoadMoreMemos, onBack, show
         placeholder: "메모 제목, 내용, 해시태그 검색...",
         value: searchQuery,
         onChange: e => setSearchQuery(e.target.value),
-        style: { flex: 1, height: '34px', fontSize: '0.85rem', border: '1px solid var(--border-subtle)', borderRadius: '20px', padding: '0 12px', backgroundColor: 'var(--bg-primary)', color: 'var(--text-main)', outline: 'none', boxSizing: 'border-box' }
+        // minWidth:0 overrides the flex item default of min-width:auto, which otherwise refuses
+        // to shrink this input below its intrinsic size and pushes the tag chip/close button
+        // off the right edge of the row once a long hashtag is selected on a narrow screen.
+        style: { flex: 1, minWidth: 0, height: '34px', fontSize: '0.85rem', border: '1px solid var(--border-subtle)', borderRadius: '20px', padding: '0 12px', backgroundColor: 'var(--bg-primary)', color: 'var(--text-main)', outline: 'none', boxSizing: 'border-box' }
       }),
       selectedTag && /*#__PURE__*/React.createElement("button", {
         onClick: () => setSelectedTag(''),
+        title: selectedTag,
         style: {
           padding: '6px 12px', borderRadius: '16px', backgroundColor: 'var(--bg-primary)',
           border: '1px solid var(--border-subtle)', color: '#3B82F6', fontSize: '0.75rem',
-          fontWeight: 'bold', cursor: 'pointer', flexShrink: 0
+          fontWeight: 'bold', cursor: 'pointer', flexShrink: 0,
+          maxWidth: '35vw', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
         }
       }, selectedTag, " ✕"),
       /*#__PURE__*/React.createElement("button", {
