@@ -22748,7 +22748,10 @@ function SectionToggleButton({ collapsed, onToggle, label }) {
 }
 
 function PollList({ calendar, onCreatePoll, onEditPoll, onVotePoll, onCancelVote, onRequestConfirm, expandSignal }) {
-  const polls = getCalendarPolls(calendar).filter(poll => !isPollClosed(poll));
+  // Closed (deadline-passed) polls stay in 진행중 투표 rather than disappearing -- they're shown
+  // with a "confirmed" treatment (dimmed card + winning-option badge) instead of being filtered
+  // out, so the group can still see what was decided without having to dig through poll history.
+  const polls = getCalendarPolls(calendar);
   const participants = getActiveParticipants(calendar);
   const participantsMap = participants.reduce((acc, participant) => {
     acc[participant.id] = participant;
@@ -22803,6 +22806,18 @@ function PollList({ calendar, onCreatePoll, onEditPoll, onVotePoll, onCancelVote
     const totalVotes = getPollTotalVoteCount(poll);
     const isOptionsVisible = !isCollapsed || !!openPollIds[poll.id];
     const closed = isPollClosed(poll);
+    // Winning option(s) for a closed poll's [투표확정] badge -- ties show every tied option,
+    // and a poll nobody voted on shows a "참여 결과 없음" fallback instead of an empty label.
+    const winningOptionLabels = (() => {
+      if (!closed) return [];
+      const optionsWithVotes = getActivePollOptions(poll).map(option => ({
+        text: option.text,
+        count: getPollOptionVoterIds(poll, option.id).length
+      }));
+      const maxVotes = optionsWithVotes.reduce((max, o) => Math.max(max, o.count), 0);
+      if (maxVotes <= 0) return [];
+      return optionsWithVotes.filter(o => o.count === maxVotes).map(o => o.text);
+    })();
     // 미참여: active roster members who haven't voted on ANY option of this poll yet (union
     // across options, not per-option) -- who still needs a nudge to vote at all.
     const votedParticipantIds = new Set(
@@ -22834,7 +22849,8 @@ function PollList({ calendar, onCreatePoll, onEditPoll, onVotePoll, onCancelVote
 
     return /*#__PURE__*/React.createElement("section", {
       key: poll.id,
-      className: "poll-card"
+      className: "poll-card",
+      style: closed ? { backgroundColor: 'var(--bg-primary)' } : undefined
     }, /*#__PURE__*/React.createElement("div", {
       className: "poll-header",
       style: {
@@ -22854,7 +22870,14 @@ function PollList({ calendar, onCreatePoll, onEditPoll, onVotePoll, onCancelVote
       }
     }, closed ? '마감됨' : `마감 ${formatPollDeadline(poll.deadline)}`)), poll.description && /*#__PURE__*/React.createElement("div", {
       className: "poll-desc"
-    }, renderTextWithUrlBadge(poll.description))), renderNonVoterBadges('poll-nonvoters-desktop'), /*#__PURE__*/React.createElement("button", {
+    }, renderTextWithUrlBadge(poll.description)), closed && /*#__PURE__*/React.createElement("div", {
+      className: "poll-confirmed-badge",
+      style: {
+        display: 'inline-flex', alignItems: 'center', gap: '6px', marginTop: '8px',
+        fontSize: '0.78rem', fontWeight: 800, padding: '4px 10px', borderRadius: '9999px',
+        backgroundColor: '#EEF2FF', color: '#4F46E5'
+      }
+    }, "[투표확정] ", winningOptionLabels.length > 0 ? winningOptionLabels.join(', ') : '참여 결과 없음')), renderNonVoterBadges('poll-nonvoters-desktop'), /*#__PURE__*/React.createElement("button", {
       type: "button",
       className: "btn btn-secondary",
       title: "\uD22C\uD45C \uC124\uC815",
@@ -23106,6 +23129,10 @@ function DeadlineDateTimePicker({ value, onChange, disabled }) {
 function PollModal({ calendar, poll, onSave, onClose, showToast, onRequestConfirm }) {
   const now = Date.now();
   const isEditing = Boolean(poll?.id);
+  // Once a poll's deadline has passed, adding new candidates no longer makes sense (voting is
+  // already over) -- lock just the add input/button below, leaving the existing option list
+  // viewable/editable so stray typos etc. can still be cleaned up.
+  const isClosed = isPollClosed(poll);
   const createdAtText = isEditing ? formatRegisteredAt(poll?.createdAt) : '';
   const [title, setTitle] = React.useState(poll?.title || '');
   const [description, setDescription] = React.useState(poll?.description || '');
@@ -23134,7 +23161,7 @@ function PollModal({ calendar, poll, onSave, onClose, showToast, onRequestConfir
       e.preventDefault();
       e.stopPropagation();
     }
-    if (isSubmitting) return;
+    if (isSubmitting || isClosed) return;
     const latest = newOptionInputRef.current ? newOptionInputRef.current.value : newOption;
     const parsed = normalizePollOptionInput(latest);
     if (!parsed.text) return;
@@ -23337,9 +23364,9 @@ function PollModal({ calendar, poll, onSave, onClose, showToast, onRequestConfir
     type: "text",
     className: "form-input participant-add-input",
     style: { flex: 1, minWidth: 0 },
-    placeholder: "\uC608: \uCC9C\uC655\uC5ED\uBAA8\uC544\uC5D8\uAC00 https://naver.me/54LbfTLU",
+    placeholder: isClosed ? "\uB9C8\uAC10\uB41C \uD22C\uD45C\uC5D0\uB294 \uD6C4\uBCF4\uB97C \uCD94\uAC00\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4" : "\uC608: \uCC9C\uC655\uC5ED\uBAA8\uC544\uC5D8\uAC00 https://naver.me/54LbfTLU",
     value: newOption,
-    disabled: isSubmitting,
+    disabled: isSubmitting || isClosed,
     maxLength: 220,
     ref: newOptionInputRef,
     onChange: e => setNewOption(e.target.value),
@@ -23353,7 +23380,8 @@ function PollModal({ calendar, poll, onSave, onClose, showToast, onRequestConfir
   }), /*#__PURE__*/React.createElement("button", {
     type: "button",
     className: "btn btn-secondary participant-action-btn",
-    disabled: isSubmitting,
+    disabled: isSubmitting || isClosed,
+    title: isClosed ? "\uB9C8\uAC10\uB41C \uD22C\uD45C\uC5D0\uB294 \uD6C4\uBCF4\uB97C \uCD94\uAC00\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4" : undefined,
     style: { whiteSpace: 'nowrap', minWidth: '52px', flexShrink: 0 },
     onClick: handleAddOption
   }, "\uCD94\uAC00")), options.map(option => isTombstone(option) ? null : /*#__PURE__*/React.createElement("div", {
