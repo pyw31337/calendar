@@ -57,11 +57,15 @@ exports.onMessageCreate = functions.firestore
     
     // 5. Broadcast push notifications to all participants except the sender
     const promises = [];
+    let totalSubscriptions = 0;
+    let skippedSenderSubscriptions = 0;
     subSnap.forEach(doc => {
       const data = doc.data();
+      totalSubscriptions += 1;
       
       // Prevent echoing pushes back to the sender
       if (data.participantId === senderId) {
+        skippedSenderSubscriptions += 1;
         return;
       }
       
@@ -87,6 +91,11 @@ exports.onMessageCreate = functions.firestore
         });
       promises.push(p);
     });
+    console.log(`Push subscription scan for ${calendarDocId}: total=${totalSubscriptions}, skippedSender=${skippedSenderSubscriptions}, targets=${promises.length}`);
+    if (promises.length === 0) {
+      console.log('No push targets after sender filtering:', calendarDocId);
+      return;
+    }
     
     await Promise.all(promises);
   });

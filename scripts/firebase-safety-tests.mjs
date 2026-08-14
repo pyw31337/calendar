@@ -10,6 +10,11 @@ const script = html.match(/<script>([\s\S]*)<\/script>\s*<\/body>/)?.[1];
 assert(script, 'index.html app script block not found');
 assert(!/JSONBlob|jsonblob|localStorage|gather_calendars|FORCE_LOCAL_STORAGE/.test(script), 'app script must not use legacy browser or JSONBlob storage');
 assert(!/8월 여름휴가|여름 휴가|하계휴가|친목 모임|꽃잎반 모임 \(cw\)/.test(script), 'app script must not include obsolete seed calendar copy');
+assert(/async function subscribeUserToPush[\s\S]{0,700}missing-participant/.test(script), 'Web Push subscription must refuse missing participant identity');
+assert(/const handleMainToggleNotifications[\s\S]{0,1800}subscribeUserToPush/.test(script), 'main notification toggle must register a Web Push subscription');
+assert(!/await\s+subscription\.unsubscribe\(/.test(script), 'calendar-level notification mute must not unsubscribe the origin-wide PushSubscription');
+const setChatNotifyPrefBody = script.match(/function setChatNotifyEnabledForCalendar\(calId, enabled\) \{([\s\S]*?)\n\}/)?.[1] || '';
+assert(!setChatNotifyPrefBody.includes('gather_chat_notify_pref_global_v1'), 'new chat notification writes must be calendar-scoped, not global');
 
 function createContext(url) {
   const parsed = new URL(url);

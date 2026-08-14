@@ -2762,10 +2762,9 @@ async function copyTextToClipboard(text) {
   }
 }
 
-// Browser (Web Notifications API) chat alerts. Only works while this tab is open (foreground
-// or background) -- there's no service worker / push backend, so a fully closed tab or
-// terminated app won't receive anything. Requires the user to explicitly grant permission
-// first (see the notification bell toggle in ChatRoomView).
+// Browser chat alerts. Foreground tabs use the Web Notifications API directly, while
+// background/offline delivery is handled by the service worker + onMessageCreate Cloud Function
+// after the browser registers a Web Push subscription in Firestore.
 function isNotificationSupported() {
   return typeof Notification !== 'undefined';
 }
@@ -2791,15 +2790,17 @@ function getChatNotifyPrefKey(calId) {
   return `gather_chat_notify_pref_${calId}_v1`;
 }
 function isChatNotifyEnabledForCalendar(calId) {
-  const globalPref = getLocalStorage().getItem('gather_chat_notify_pref_global_v1');
-  if (globalPref === 'on') return true;
-  if (globalPref === 'off') return false;
   if (!calId) return true;
-  return getLocalStorage().getItem(getChatNotifyPrefKey(calId)) !== 'off';
+  const calPref = getLocalStorage().getItem(getChatNotifyPrefKey(calId));
+  if (calPref === 'on') return true;
+  if (calPref === 'off') return false;
+  const legacyGlobalPref = getLocalStorage().getItem('gather_chat_notify_pref_global_v1');
+  if (legacyGlobalPref === 'on') return true;
+  if (legacyGlobalPref === 'off') return false;
+  return true;
 }
 function setChatNotifyEnabledForCalendar(calId, enabled) {
   const val = enabled ? 'on' : 'off';
-  getLocalStorage().setItem('gather_chat_notify_pref_global_v1', val);
   if (calId) {
     getLocalStorage().setItem(getChatNotifyPrefKey(calId), val);
   }
@@ -2838,12 +2839,22 @@ function getSubscriptionHashId(endpoint) {
 }
 
 async function subscribeUserToPush(calendarId, activeParticipantId) {
-  if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return;
+  if (!calendarId) return { ok: false, reason: 'missing-calendar' };
+  if (!activeParticipantId) return { ok: false, reason: 'missing-participant' };
+  if (typeof window !== 'undefined' && window.isSecureContext === false) {
+    return { ok: false, reason: 'insecure-context' };
+  }
+  if (!isNotificationSupported() || Notification.permission !== 'granted') {
+    return { ok: false, reason: 'permission-not-granted' };
+  }
+  if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) {
+    return { ok: false, reason: 'service-worker-unsupported' };
+  }
   try {
     const registration = await navigator.serviceWorker.ready;
     if (!registration.pushManager) {
       console.warn('Push manager not supported on this browser');
-      return;
+      return { ok: false, reason: 'push-manager-unsupported' };
     }
     let subscription = await registration.pushManager.getSubscription();
     const publicVapidKey = 'BNk35C4KAQy9JdQJ8uzLuzDAc7zUBCznmPFJc194fcWqEtD3EZTnj03ZCwE_P2SxwVILZnDzHsj2UZxIQ0Q-huU';
@@ -2860,7 +2871,7 @@ async function subscribeUserToPush(calendarId, activeParticipantId) {
       // calendar most recently would silently register this calendar's push subscription under
       // the WRONG participant (or 'anonymous' if never set yet), breaking the "don't notify the
       // sender" check server-side and making the admin's subscriber list wrong.
-      const participantId = activeParticipantId || 'anonymous';
+      const participantId = activeParticipantId;
       const subId = getSubscriptionHashId(subscription.endpoint);
       await firebaseDb.collection('calendars').doc('cal_' + calendarId).collection('push_subscriptions').doc(subId).set({
         endpoint: subscription.endpoint,
@@ -2872,14 +2883,20 @@ async function subscribeUserToPush(calendarId, activeParticipantId) {
         createdAt: Date.now()
       });
       console.log('Web Push subscription registered successfully in Firestore.');
+      return { ok: true, subId };
     }
+    return { ok: false, reason: 'firestore-unavailable' };
   } catch (err) {
     console.error('Failed to subscribe user to Web Push:', err);
+    return { ok: false, reason: err?.message || 'subscribe-failed' };
   }
 }
 
 async function unsubscribeUserFromPush(calendarId) {
-  if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return;
+  if (!calendarId) return { ok: false, reason: 'missing-calendar' };
+  if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) {
+    return { ok: false, reason: 'service-worker-unsupported' };
+  }
   try {
     const registration = await navigator.serviceWorker.ready;
     const subscription = await registration.pushManager.getSubscription();
@@ -2888,11 +2905,18 @@ async function unsubscribeUserFromPush(calendarId) {
       if (firebaseDb) {
         await firebaseDb.collection('calendars').doc('cal_' + calendarId).collection('push_subscriptions').doc(subId).delete();
       }
-      await subscription.unsubscribe();
-      console.log('Unsubscribed from Web Push successfully');
+      // PushSubscription is origin-wide, not calendar-wide. Calling subscription.unsubscribe()
+      // while muting a single calendar invalidates the same endpoint used by every other
+      // calendar tab on pyw31337.github.io, leaving stale Firestore subscription docs and
+      // breaking notifications elsewhere. Remove only this calendar's registration; the browser
+      // endpoint can stay alive and be reused by still-enabled calendars.
+      console.log('Removed this calendar Web Push registration successfully');
+      return { ok: true, subId };
     }
+    return { ok: true, reason: 'no-browser-subscription' };
   } catch (err) {
     console.error('Failed to unsubscribe from Web Push:', err);
+    return { ok: false, reason: err?.message || 'unsubscribe-failed' };
   }
 }
 
@@ -8369,6 +8393,13 @@ function App() {
     setMainChatNotifyEnabled(isChatNotifyEnabledForCalendar(activeCalId));
     setMainNotifPermission(isNotificationSupported() ? Notification.permission : 'unsupported');
   }, [activeCalId]);
+  const getCurrentChatParticipantId = () => {
+    if (chatParticipantIdRef.current) return chatParticipantIdRef.current;
+    const cachedId = getLocalStorage().getItem('gather_active_participant_id_v20');
+    const activeIds = getActiveParticipants(activeCal).map(p => p.id);
+    if (cachedId && activeIds.includes(cachedId)) return cachedId;
+    return activeIds[0] || '';
+  };
   const handleMainToggleNotifications = async () => {
     if (!isNotificationSupported()) {
       showToast('알림 미지원 브라우저', 'error');
@@ -8378,6 +8409,18 @@ function App() {
       const next = !mainChatNotifyEnabled;
       setMainChatNotifyEnabled(next);
       setChatNotifyEnabledForCalendar(activeCalId, next);
+      if (next) {
+        const result = await subscribeUserToPush(activeCalId, getCurrentChatParticipantId());
+        if (result && !result.ok) {
+          setMainChatNotifyEnabled(false);
+          setChatNotifyEnabledForCalendar(activeCalId, false);
+          showToast('알림 권한은 켜졌지만 푸시 구독 등록에 실패했습니다.', 'error', 5000);
+          console.warn('Main chat notification subscribe failed:', result.reason);
+          return;
+        }
+      } else {
+        await unsubscribeUserFromPush(activeCalId);
+      }
       showToast(next ? '이 캘린더 채팅 알림 켜짐' : '이 캘린더 채팅 알림 꺼짐', 'success');
       return;
     }
@@ -8393,6 +8436,14 @@ function App() {
     }
     setChatNotifyEnabledForCalendar(activeCalId, true);
     setMainChatNotifyEnabled(true);
+    const subscribeResult = await subscribeUserToPush(activeCalId, getCurrentChatParticipantId());
+    if (subscribeResult && !subscribeResult.ok) {
+      setMainChatNotifyEnabled(false);
+      setChatNotifyEnabledForCalendar(activeCalId, false);
+      showToast('알림 권한은 켜졌지만 푸시 구독 등록에 실패했습니다.', 'error', 5000);
+      console.warn('Main chat notification subscribe failed:', subscribeResult.reason);
+      return;
+    }
     showToast('이 캘린더 채팅 알림 켜짐', 'success');
   };
 
@@ -8479,6 +8530,15 @@ function App() {
   const [chatParticipantId, setChatParticipantId] = React.useState('');
   const chatParticipantIdRef = React.useRef(chatParticipantId);
   React.useEffect(() => { chatParticipantIdRef.current = chatParticipantId; }, [chatParticipantId]);
+  React.useEffect(() => {
+    if (!activeCalId || !chatParticipantId) return;
+    if (!mainChatNotifyEnabled || mainNotifPermission !== 'granted') return;
+    subscribeUserToPush(activeCalId, chatParticipantId).then(result => {
+      if (result && !result.ok) {
+        console.warn('Main chat notification auto-subscribe skipped:', result.reason);
+      }
+    });
+  }, [activeCalId, chatParticipantId, mainChatNotifyEnabled, mainNotifPermission]);
   const [isChatSheetOpen, setIsChatSheetOpen] = React.useState(false);
   const [isChatSubmitting, setIsChatSubmitting] = React.useState(false);
   const [chatUploadProgress, setChatUploadProgress] = React.useState(null);
@@ -10483,6 +10543,7 @@ function App() {
     onClose: () => setIsAdminOpen(false),
     showToast: showToast,
     onDeleteLog: handleDeleteActivityLog,
+    chatParticipantId: chatParticipantId,
     themeChoice: themeChoice,
     toggleTheme: toggleTheme,
     isDarkTheme: isDarkTheme,
@@ -13876,7 +13937,14 @@ function ChatRoomView({
       setChatNotifyEnabled(next);
       setChatNotifyEnabledForCalendar(calendar.id, next);
       if (next) {
-        await subscribeUserToPush(calendar.id, chatParticipantId);
+        const result = await subscribeUserToPush(calendar.id, chatParticipantId);
+        if (result && !result.ok) {
+          setChatNotifyEnabled(false);
+          setChatNotifyEnabledForCalendar(calendar.id, false);
+          if (showToast) showToast('알림 권한은 켜졌지만 푸시 구독 등록에 실패했습니다.', 'error', 5000);
+          console.warn('Chat notification subscribe failed:', result.reason);
+          return;
+        }
       } else {
         await unsubscribeUserFromPush(calendar.id);
       }
@@ -13903,7 +13971,14 @@ function ChatRoomView({
       setNotifPermission('granted');
       setChatNotifyEnabled(true);
       setChatNotifyEnabledForCalendar(calendar.id, true);
-      await subscribeUserToPush(calendar.id, chatParticipantId);
+      const result = await subscribeUserToPush(calendar.id, chatParticipantId);
+      if (result && !result.ok) {
+        setChatNotifyEnabled(false);
+        setChatNotifyEnabledForCalendar(calendar.id, false);
+        if (showToast) showToast('알림 권한은 켜졌지만 푸시 구독 등록에 실패했습니다.', 'error', 5000);
+        console.warn('Chat notification subscribe failed:', result.reason);
+        return;
+      }
       if (showToast) showToast('알림 켜짐', 'success');
     } catch (e) {
       setNotifPermission('unsupported');
@@ -17055,6 +17130,7 @@ function AdminModal({
   onClose,
   showToast,
   onDeleteLog,
+  chatParticipantId,
   themeChoice,
   toggleTheme,
   isDarkTheme,
@@ -17089,6 +17165,18 @@ function AdminModal({
       const next = !chatNotifyEnabled;
       setChatNotifyEnabled(next);
       setChatNotifyEnabledForCalendar(calendar.id, next);
+      if (next) {
+        const result = await subscribeUserToPush(calendar.id, chatParticipantId);
+        if (result && !result.ok) {
+          setChatNotifyEnabled(false);
+          setChatNotifyEnabledForCalendar(calendar.id, false);
+          if (showToast) showToast('알림 권한은 켜졌지만 푸시 구독 등록에 실패했습니다.', 'error', 5000);
+          console.warn('Settings chat notification subscribe failed:', result.reason);
+          return;
+        }
+      } else {
+        await unsubscribeUserFromPush(calendar.id);
+      }
       if (showToast) showToast(next ? '이 캘린더 채팅 알림 켜짐' : '이 캘린더 채팅 알림 꺼짐', 'success');
       return;
     }
@@ -17108,6 +17196,14 @@ function AdminModal({
       setNotifPermission('granted');
       setChatNotifyEnabled(true);
       setChatNotifyEnabledForCalendar(calendar.id, true);
+      const result = await subscribeUserToPush(calendar.id, chatParticipantId);
+      if (result && !result.ok) {
+        setChatNotifyEnabled(false);
+        setChatNotifyEnabledForCalendar(calendar.id, false);
+        if (showToast) showToast('알림 권한은 켜졌지만 푸시 구독 등록에 실패했습니다.', 'error', 5000);
+        console.warn('Settings chat notification subscribe failed:', result.reason);
+        return;
+      }
       if (showToast) showToast('알림 켜짐', 'success');
     } catch (e) {
       setNotifPermission('unsupported');
