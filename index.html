@@ -2874,6 +2874,49 @@ function describePushSubscribeFailure(reason) {
   return map[reason] || reason || '알 수 없는 오류';
 }
 
+function getBrowserLabelForNotifications() {
+  if (typeof navigator === 'undefined') return '현재 브라우저';
+  const ua = navigator.userAgent || '';
+  if (/SamsungBrowser/i.test(ua)) return '삼성 인터넷';
+  if (/Whale/i.test(ua)) return '네이버 웨일';
+  if (/Edg/i.test(ua)) return 'Microsoft Edge';
+  if (/Firefox/i.test(ua)) return 'Firefox';
+  if (/CriOS|Chrome/i.test(ua)) return 'Chrome';
+  if (/Safari/i.test(ua)) return 'Safari';
+  return '현재 브라우저';
+}
+
+function getNotificationPermissionHelpSteps() {
+  const browser = getBrowserLabelForNotifications();
+  if (browser === '삼성 인터넷') {
+    return [
+      '하단 메뉴(≡ 또는 점 3개)를 눌러 주세요.',
+      '설정 > 사이트 및 다운로드 > 알림으로 이동해 주세요.',
+      'pyw31337.github.io 항목을 찾아 알림을 허용으로 변경해 주세요.',
+      '다시 이 화면으로 돌아와 채팅알림 스위치를 한 번 더 켜 주세요.'
+    ];
+  }
+  if (browser === 'Chrome') {
+    return [
+      '주소창 왼쪽 자물쇠 아이콘을 눌러 주세요.',
+      '사이트 설정 > 알림을 허용으로 변경해 주세요.',
+      '페이지를 새로고침한 뒤 채팅알림을 다시 켜 주세요.'
+    ];
+  }
+  if (browser === '네이버 웨일') {
+    return [
+      '주소창 왼쪽 자물쇠 아이콘 또는 브라우저 메뉴를 눌러 주세요.',
+      '사이트 설정에서 알림 권한을 허용으로 변경해 주세요.',
+      '페이지를 새로고침한 뒤 채팅알림을 다시 켜 주세요.'
+    ];
+  }
+  return [
+    '주소창의 자물쇠/사이트 정보 아이콘을 눌러 주세요.',
+    '알림 권한을 허용으로 변경해 주세요.',
+    '페이지를 새로고침한 뒤 채팅알림을 다시 켜 주세요.'
+  ];
+}
+
 function urlBase64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - base64String.length % 4) % 4);
   const base64 = (base64String + padding)
@@ -2963,14 +3006,19 @@ async function subscribeUserToPush(calendarId, activeParticipantId) {
 }
 
 async function subscribeUserToPushWithPermission(calendarId, activeParticipantId) {
-  let result = await subscribeUserToPush(calendarId, activeParticipantId);
-  if (result && result.reason === 'permission-not-granted') {
+  if (!isNotificationSupported()) {
+    return { ok: false, reason: 'permission-not-granted' };
+  }
+  // Mobile browsers (notably Samsung Internet) require the permission prompt to be opened
+  // immediately from the user's tap/click. Trying a PushManager subscription first consumes
+  // that activation and can leave Notification.permission stuck at "default", so ask first.
+  if (Notification.permission !== 'granted') {
     const permission = await ensureChatNotificationPermission();
-    if (permission === 'granted') {
-      result = await subscribeUserToPush(calendarId, activeParticipantId);
+    if (permission !== 'granted') {
+      return { ok: false, reason: 'permission-not-granted', permission };
     }
   }
-  return result;
+  return subscribeUserToPush(calendarId, activeParticipantId);
 }
 
 async function unsubscribeUserFromPush(calendarId) {
@@ -8490,9 +8538,13 @@ function App() {
     if (chatParticipantIdRef.current) return chatParticipantIdRef.current;
     return getStoredChatParticipantId(activeCalId, activeCal);
   };
+  const openNotificationHelp = () => {
+    setIsNotificationHelpOpen(true);
+  };
   const handleMainToggleNotifications = async () => {
     if (!isNotificationSupported()) {
       showToast('알림 미지원 브라우저', 'error');
+      openNotificationHelp();
       return;
     }
     if (Notification.permission === 'granted') {
@@ -8504,6 +8556,9 @@ function App() {
         if (result && !result.ok) {
           setMainChatNotifyEnabled(false);
           setChatNotifyEnabledForCalendar(activeCalId, false);
+          if (result.reason === 'permission-not-granted') {
+            openNotificationHelp();
+          }
           showToast(`푸시 등록 실패: ${describePushSubscribeFailure(result.reason)}`, 'error', 6000);
           console.warn('Main chat notification subscribe failed:', result.reason);
           return;
@@ -8515,13 +8570,15 @@ function App() {
       return;
     }
     if (Notification.permission === 'denied') {
-      showToast('브라우저 설정에서 알림 허용 필요', 'error');
+      openNotificationHelp();
+      showToast('브라우저 설정에서 알림 허용 필요', 'error', 6000);
       return;
     }
     const result = await ensureChatNotificationPermission();
     setMainNotifPermission(result);
     if (result !== 'granted') {
-      showToast('알림 권한 거부됨', 'error');
+      openNotificationHelp();
+      showToast('알림 권한을 허용해야 채팅알림을 받을 수 있습니다.', 'error', 6000);
       return;
     }
     setChatNotifyEnabledForCalendar(activeCalId, true);
@@ -8530,6 +8587,9 @@ function App() {
     if (subscribeResult && !subscribeResult.ok) {
       setMainChatNotifyEnabled(false);
       setChatNotifyEnabledForCalendar(activeCalId, false);
+      if (subscribeResult.reason === 'permission-not-granted') {
+        openNotificationHelp();
+      }
       showToast(`푸시 등록 실패: ${describePushSubscribeFailure(subscribeResult.reason)}`, 'error', 6000);
       console.warn('Main chat notification subscribe failed:', subscribeResult.reason);
       return;
@@ -8541,6 +8601,7 @@ function App() {
   const [isShareOpen, setIsShareOpen] = React.useState(false);
   const [isChatShareOpen, setIsChatShareOpen] = React.useState(false);
   const [isMainSideMenuOpen, setIsMainSideMenuOpen] = React.useState(false);
+  const [isNotificationHelpOpen, setIsNotificationHelpOpen] = React.useState(false);
   const [isPollModalOpen, setIsPollModalOpen] = React.useState(false);
   const [editingPoll, setEditingPoll] = React.useState(null);
   const [voteTarget, setVoteTarget] = React.useState(null);
@@ -10286,7 +10347,11 @@ function App() {
         width: 'max-content',
         boxSizing: 'border-box'
       }
-    }, toast.message), operationProgress && !chatUploadProgress && /*#__PURE__*/React.createElement(OperationProgressOverlay, operationProgress), chatUploadProgress && /*#__PURE__*/React.createElement(ImageUploadOverlay, chatUploadProgress));
+    }, toast.message), isNotificationHelpOpen && /*#__PURE__*/React.createElement(NotificationPermissionHelpModal, {
+      onClose: () => setIsNotificationHelpOpen(false),
+      onRetry: handleMainToggleNotifications,
+      showToast: showToast
+    }), operationProgress && !chatUploadProgress && /*#__PURE__*/React.createElement(OperationProgressOverlay, operationProgress), chatUploadProgress && /*#__PURE__*/React.createElement(ImageUploadOverlay, chatUploadProgress));
   }
 
   if (activeView === 'settlement') {
@@ -10455,6 +10520,10 @@ function App() {
   }), isGuideOpen && /*#__PURE__*/React.createElement(UserManualOverlay, {
     calendar: activeCal,
     onClose: () => setIsGuideOpen(false)
+  }), isNotificationHelpOpen && /*#__PURE__*/React.createElement(NotificationPermissionHelpModal, {
+    onClose: () => setIsNotificationHelpOpen(false),
+    onRetry: handleMainToggleNotifications,
+    showToast: showToast
   }), isAnniversariesOpen && /*#__PURE__*/React.createElement(AnniversaryModal, {
     calendar: activeCal,
     anniversaries: anniversaries,
@@ -10696,7 +10765,8 @@ function App() {
           index: imageIndex
         });
       }, 350);
-    }
+    },
+    onNotificationPermissionBlocked: openNotificationHelp
   }), isShareOpen && /*#__PURE__*/React.createElement(ShareModal, {
     calendar: activeCal,
     showToast: showToast,
@@ -17272,7 +17342,8 @@ function AdminModal({
   setFontScalePercent,
   onSelectDate,
   onOpenChatMessage,
-  onOpenImage
+  onOpenImage,
+  onNotificationPermissionBlocked
 }) {
   const [activeTab, setActiveTab] = React.useState('settings'); // 'settings', 'calendar', 'recovery', 'logs'
 
@@ -17293,6 +17364,7 @@ function AdminModal({
   const handleToggleNotifications = async () => {
     if (!isNotificationSupported()) {
       if (showToast) showToast('알림 미지원 브라우저', 'error');
+      if (onNotificationPermissionBlocked) onNotificationPermissionBlocked();
       return;
     }
     if (Notification.permission === 'granted') {
@@ -17304,6 +17376,7 @@ function AdminModal({
         if (result && !result.ok) {
           setChatNotifyEnabled(false);
           setChatNotifyEnabledForCalendar(calendar.id, false);
+          if (result.reason === 'permission-not-granted' && onNotificationPermissionBlocked) onNotificationPermissionBlocked();
           if (showToast) showToast(`푸시 등록 실패: ${describePushSubscribeFailure(result.reason)}`, 'error', 6000);
           console.warn('Settings chat notification subscribe failed:', result.reason);
           return;
@@ -17315,12 +17388,14 @@ function AdminModal({
       return;
     }
     if (Notification.permission === 'denied') {
+      if (onNotificationPermissionBlocked) onNotificationPermissionBlocked();
       if (showToast) showToast('브라우저 설정에서 알림 허용 필요', 'error');
       return;
     }
     const result = await ensureChatNotificationPermission();
     if (result !== 'granted') {
       setNotifPermission(result);
+      if (onNotificationPermissionBlocked) onNotificationPermissionBlocked();
       if (showToast) showToast('알림 권한 거부됨', 'error');
       return;
     }
@@ -17334,6 +17409,7 @@ function AdminModal({
       if (result && !result.ok) {
         setChatNotifyEnabled(false);
         setChatNotifyEnabledForCalendar(calendar.id, false);
+        if (result.reason === 'permission-not-granted' && onNotificationPermissionBlocked) onNotificationPermissionBlocked();
         if (showToast) showToast(`푸시 등록 실패: ${describePushSubscribeFailure(result.reason)}`, 'error', 6000);
         console.warn('Settings chat notification subscribe failed:', result.reason);
         return;
@@ -17341,6 +17417,7 @@ function AdminModal({
       if (showToast) showToast('알림 켜짐', 'success');
     } catch (e) {
       setNotifPermission('unsupported');
+      if (onNotificationPermissionBlocked) onNotificationPermissionBlocked();
       if (showToast) showToast('이 브라우저에서는 알림을 표시할 수 없습니다 (iOS는 홈 화면 추가 필요)', 'error', 6000);
     }
   };
@@ -18954,6 +19031,77 @@ function UserManualOverlay({ calendar, onClose }) {
   }, step.preview)))), /*#__PURE__*/React.createElement("div", {
     style: { marginTop: '16px', padding: '14px 16px', borderRadius: '18px', background: 'rgba(59, 130, 246, 0.1)', color: '#2563EB', fontSize: '0.88rem', fontWeight: 500, lineHeight: 1.5 }
   }, "팁: 가능한 날짜를 하나만 고르기보다 여러 날짜를 미리 등록해두면, 공통으로 참석 가능한 날짜를 훨씬 빠르게 찾을 수 있습니다."))), document.body);
+}
+
+function NotificationPermissionHelpModal({ onClose, onRetry, showToast }) {
+  const browserLabel = getBrowserLabelForNotifications();
+  const permission = isNotificationSupported() ? Notification.permission : 'unsupported';
+  const steps = getNotificationPermissionHelpSteps();
+  const handleRetry = async () => {
+    if (!isNotificationSupported()) {
+      if (showToast) showToast('이 브라우저는 알림을 지원하지 않습니다.', 'error', 5000);
+      return;
+    }
+    if (Notification.permission === 'denied') {
+      if (showToast) showToast('이미 차단된 권한은 브라우저 설정에서만 해제할 수 있습니다.', 'error', 6000);
+      return;
+    }
+    const result = await requestChatNotificationPermission();
+    if (result === 'granted') {
+      if (showToast) showToast('알림 권한이 허용되었습니다. 채팅알림을 다시 켭니다.', 'success', 3500);
+      if (onRetry) await onRetry();
+    } else if (showToast) {
+      showToast('알림 권한을 허용해야 채팅알림을 받을 수 있습니다.', 'error', 6000);
+    }
+  };
+  const statusLabel = permission === 'granted' ? '허용됨' : permission === 'denied' ? '차단됨' : permission === 'default' ? '아직 선택 안 함' : '미지원';
+  return ReactDOM.createPortal(/*#__PURE__*/React.createElement("div", {
+    className: "modal-overlay",
+    role: "dialog",
+    "aria-modal": "true",
+    "aria-label": "채팅알림 권한 안내",
+    onClick: onClose,
+    style: { zIndex: 10080 }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "modal",
+    onClick: e => e.stopPropagation(),
+    style: { maxWidth: '460px' }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "modal-header"
+  }, /*#__PURE__*/React.createElement("h3", null, "채팅알림 권한 필요"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "btn-icon",
+    onClick: onClose,
+    "aria-label": "닫기"
+  }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 22 }))), /*#__PURE__*/React.createElement("div", {
+    className: "modal-body",
+    style: { display: 'flex', flexDirection: 'column', gap: '14px' }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '14px', borderRadius: '16px', background: 'rgba(59, 130, 246, 0.1)', color: '#1D4ED8' }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: { display: 'inline-flex', width: '34px', height: '34px', borderRadius: '12px', background: '#2563EB', color: '#FFFFFF', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }
+  }, /*#__PURE__*/React.createElement(BellIcon, null)), /*#__PURE__*/React.createElement("div", {
+    style: { fontSize: '0.86rem', lineHeight: 1.55, fontWeight: 700 }
+  }, browserLabel, "에서 현재 알림 권한 상태는 ", /*#__PURE__*/React.createElement("strong", null, statusLabel), "입니다. 채팅알림을 받으려면 이 사이트의 알림 권한이 허용되어야 합니다.")), /*#__PURE__*/React.createElement("div", {
+    style: { display: 'flex', flexDirection: 'column', gap: '8px' }
+  }, steps.map((step, idx) => /*#__PURE__*/React.createElement("div", {
+    key: step,
+    style: { display: 'grid', gridTemplateColumns: '28px minmax(0, 1fr)', gap: '8px', alignItems: 'start', padding: '10px 12px', borderRadius: '12px', background: 'var(--bg-primary)', border: '1px solid var(--border-subtle)', color: 'var(--text-main)', fontSize: '0.86rem', lineHeight: 1.45 }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: { display: 'inline-flex', width: '22px', height: '22px', borderRadius: '50%', background: '#0F172A', color: '#FFFFFF', alignItems: 'center', justifyContent: 'center', fontSize: '0.72rem', fontWeight: 900 }
+  }, idx + 1), /*#__PURE__*/React.createElement("span", null, step)))), /*#__PURE__*/React.createElement("p", {
+    style: { margin: 0, color: 'var(--text-muted)', fontSize: '0.78rem', lineHeight: 1.5 }
+  }, "참고: 브라우저가 이미 알림을 차단한 상태에서는 보안 정책상 웹페이지가 설정을 자동으로 바꿀 수 없습니다. 대신 위 경로로 권한을 허용한 뒤 다시 시도해 주세요.")), /*#__PURE__*/React.createElement("div", {
+    className: "modal-footer"
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "btn btn-secondary",
+    onClick: onClose
+  }, "닫기"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "btn btn-primary",
+    onClick: handleRetry
+  }, permission === 'denied' ? '권한 설정 후 다시 시도' : '권한 다시 요청')))), document.body);
 }
 
 function MainSideMenu({
