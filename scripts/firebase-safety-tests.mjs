@@ -131,6 +131,15 @@ runAppScript(productionContext, `
   if (!isValidDateString('2026-08-14') || isValidDateString('2026-02-30')) {
     throw new Error('date string validation utility failed');
   }
+  if (getItemStamp({ updatedAt: 10, deletedAt: 20, removedAt: 15 }) !== 20 || getItemStamp(null) !== 0) {
+    throw new Error('item stamp utility failed');
+  }
+  if (!isTombstone({ removedAt: 1 }) || isTombstone({ updatedAt: 1 })) {
+    throw new Error('tombstone utility failed');
+  }
+  if (getActivityLogStamp({ updatedAt: 10, timestamp: 20 }) !== 20 || getActivityLogStamp({ updatedAt: 10 }) !== 10) {
+    throw new Error('activity log stamp utility failed');
+  }
   const quotedBlogUrl = "https://blog.naver.com/choochoo440/224199076337'";
   if (extractFirstUrl(quotedBlogUrl) !== 'https://blog.naver.com/choochoo440/224199076337') {
     throw new Error('quoted URL extraction failed');

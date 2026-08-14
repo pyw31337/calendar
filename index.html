@@ -857,18 +857,8 @@ function clonePoll(poll) {
   };
 }
 
-function getItemStamp(item) {
-  if (!item) return 0;
-  const values = [item.updatedAt, item.deletedAt, item.removedAt];
-  return values.reduce((max, value) => {
-    const ts = value ? new Date(value).getTime() : 0;
-    return ts > max ? ts : max;
-  }, 0);
-}
-
-function isTombstone(item) {
-  return Boolean(item && (item.deletedAt || item.removedAt));
-}
+const getItemStamp = GATHER_APP_UTILS.getItemStamp;
+const isTombstone = GATHER_APP_UTILS.isTombstone;
 
 function normalizeParticipantName(calendarId, name) {
   const trimmed = sanitizeText(name, 40);
@@ -923,9 +913,7 @@ function mergeDeletedActivityLogIds(...lists) {
   return normalizeDeletedActivityLogIds(lists.flat());
 }
 
-function getActivityLogStamp(log) {
-  return Number(log?.timestamp || log?.updatedAt || 0) || 0;
-}
+const getActivityLogStamp = GATHER_APP_UTILS.getActivityLogStamp;
 
 const SCHEDULE_ACTIVITY_ACTIONS = Array.isArray(GATHER_APP_CONSTANTS.SCHEDULE_ACTIVITY_ACTIONS) ? GATHER_APP_CONSTANTS.SCHEDULE_ACTIVITY_ACTIONS : ['create', 'update', 'delete'];
 const POLL_ACTIVITY_ACTIONS = Array.isArray(GATHER_APP_CONSTANTS.POLL_ACTIVITY_ACTIONS) ? GATHER_APP_CONSTANTS.POLL_ACTIVITY_ACTIONS : ['poll_create', 'poll_vote', 'poll_cancel'];

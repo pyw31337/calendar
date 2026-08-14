@@ -162,6 +162,23 @@
     return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
   }
 
+  function getItemStamp(item) {
+    if (!item) return 0;
+    const values = [item.updatedAt, item.deletedAt, item.removedAt];
+    return values.reduce((max, value) => {
+      const ts = value ? new Date(value).getTime() : 0;
+      return ts > max ? ts : max;
+    }, 0);
+  }
+
+  function isTombstone(item) {
+    return Boolean(item && (item.deletedAt || item.removedAt));
+  }
+
+  function getActivityLogStamp(log) {
+    return Number(log?.timestamp || log?.updatedAt || 0) || 0;
+  }
+
   function getDefaultExpenseCategories() {
     return Array.isArray(window.GATHER_APP_CONSTANTS?.DEFAULT_EXPENSE_CATEGORIES)
       ? window.GATHER_APP_CONSTANTS.DEFAULT_EXPENSE_CATEGORIES
@@ -302,6 +319,9 @@
     sanitizeText: sanitizeTextValue,
     normalizeColorValue,
     isValidDateString,
+    getItemStamp,
+    isTombstone,
+    getActivityLogStamp,
     normalizeExpenseCategories,
     getExpenseCategories,
     getExpenseCategory,

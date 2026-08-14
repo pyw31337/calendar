@@ -21,6 +21,7 @@
 - 10단계: URL 끝문자 정리, 첫 URL 추출, URL 제거 같은 순수 URL 파싱 유틸을 `assets/app-utils.js`로 분리했다.
 - 11단계: 바로가기 브라우저 판별/안내 유틸과 지출 카테고리 정규화/라벨 유틸을 `assets/app-utils.js`로 분리했다.
 - 12단계: 텍스트 정리, 색상 검증, 날짜 문자열 검증, 캘린더 ID 검증 유틸을 `assets/app-utils.js`로 분리했다.
+- 13단계: 병합 우선순위에 쓰는 항목 스탬프/삭제표시/활동로그 스탬프 유틸을 `assets/app-utils.js`로 분리했다.
 - 외부 JS는 모두 `public/assets`에도 미러링한다. Vite 산출물과 GitHub Pages 루트 서빙 방식이 달라져도 파일 누락을 막기 위한 조치다.
 - 각 외부 JS는 `window.GATHER_APP_*` 네임스페이스로만 값을 노출하고, `index.html`에는 기존 값 fallback을 유지한다.
 - `npm run regression:test`에 `check:asset-mirrors`가 포함되어 root/public 미러 불일치, `index.html`의 누락 asset 참조, 외부 데이터 스크립트 로딩 순서, 과거 초기 데모 데이터 재유입을 잡는다.
@@ -31,7 +32,7 @@
 
 ## 다음 권장 단계
 
-### 13단계: 순수 유틸 함수 추가 분리
+### 14단계: 순수 유틸 함수 추가 분리
 
 대상:
 - 로컬 환경 감지
@@ -44,7 +45,7 @@
 - 한 묶음당 5~10개 함수 이하로만 이동한다.
 - 함수 이동 시 기존 함수명을 바로 삭제하지 말고, 테스트가 있는 순수 함수부터 이동한다.
 
-### 14단계: Firebase 서비스 계층 분리
+### 15단계: Firebase 서비스 계층 분리
 
 대상:
 - 캘린더 구독
@@ -57,7 +58,7 @@
 - Firestore document path 규칙은 기존 코드와 완전히 동일하게 유지한다.
 - `?id=kkot`, `?id=cw`, `?id=jhair` 간 데이터 격리를 회귀 테스트에 포함한다.
 
-### 15단계: UI 컴포넌트 단위 분리
+### 16단계: UI 컴포넌트 단위 분리
 
 대상 우선순위:
 - `ShareModal`, `ConfirmDialog`, `NotificationPermissionHelpModal` 같은 독립 모달
@@ -69,7 +70,7 @@
 - 현재 앱은 CDN React + 인라인 `React.createElement` 실행 구조이므로, 즉시 ES Module JSX 구조로 바꾸면 위험하다.
 - 먼저 전역 컴포넌트 파일로 분리한 뒤, 최종적으로 Vite `src/` 기반 앱으로 전환한다.
 
-### 16단계: Vite 앱 구조 전환
+### 17단계: Vite 앱 구조 전환
 
 대상:
 - `src/`를 실제 라이브 엔트리로 전환
