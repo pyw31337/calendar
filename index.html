@@ -777,7 +777,7 @@ function getCalendarShareUrl(calendarId) {
 // manual-instructions fallback even on an otherwise fully installable browser.
 function buildDynamicManifest(calendar) {
   const base = getAppBaseUrl();
-  const name = calendar.title || '모여라 캘린더';
+  const name = calendar.title ? `${calendar.title} 캘린더` : '모여라 캘린더';
   const startUrl = `${base}?id=${calendar.id}`;
   return {
     id: startUrl,
@@ -5647,7 +5647,7 @@ function App() {
   const activeCal = calendars.find(c => c.id === activeCalId) || createLoadingCalendarShell(activeCalId);
   React.useEffect(() => {
     if (activeCal) {
-      const calTitle = `${activeCal.title} - 모여라 캘린더`;
+      const calTitle = `${activeCal.title} 캘린더`;
       const calDesc = activeCal.description || `${activeCal.title} 사모임 멤버들의 참석 가능 날짜 조율 캘린더입니다.`;
       const currentShareUrl = getCalendarShareUrl(activeCal.id);
       document.title = calTitle;
@@ -7036,8 +7036,6 @@ function App() {
     return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(ChatRoomView, {
       calendar: activeCal,
       chatMessages: chatMessages,
-      onUpdateWeatherLocation: handleUpdateWeatherLocation,
-      onDeleteRecentLocation: handleDeleteRecentWeatherLocation,
       chatInput: chatInput,
       setChatInput: setChatInput,
       chatParticipantId: chatParticipantId,
@@ -8706,7 +8704,10 @@ function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox, linkPr
           className: isMini ? '' : 'chat-media-resizable',
           style: {
             width: isMini ? `min(100%, ${embedWidth})` : `min(88vw, ${embedWidth})`,
-            maxWidth: maxW,
+            // maxWidth also clamps to 100% of the bubble now that bubble-wrapper's min-width:0
+            // lets it actually shrink -- the vw estimate above is only ever a *starting* size;
+            // this is what stops it from overflowing once the real available space is smaller.
+            maxWidth: `min(100%, ${maxW})`,
             minWidth: minW,
             margin: '0 auto',
             marginBottom: linkPreview ? '6px' : marginBottom
@@ -11053,9 +11054,7 @@ function ChatRoomView({
   onDecreaseFont,
   onIncreaseFont,
   isChatNotifyEnabled,
-  onToggleChatNotifications,
-  onUpdateWeatherLocation,
-  onDeleteRecentLocation
+  onToggleChatNotifications
 }) {
   const [viewportBottom, setViewportBottom] = React.useState(0);
   const [isInputFocused, setIsInputFocused] = React.useState(false);
@@ -11595,7 +11594,11 @@ function ChatRoomView({
       )
     ), /*#__PURE__*/React.createElement("div", {
       key: "bubble-wrapper",
-      style: { position: 'relative', maxWidth: chatBubbleMaxWidth, zIndex: 1, alignSelf: 'flex-end' }
+      // minWidth:0 overrides the flex item's default min-width:auto, which otherwise refuses to
+      // shrink the bubble below its content's natural size (the classic flexbox overflow trap) --
+      // without it, an oversized child (e.g. an embed sized by an imprecise vw estimate) can force
+      // this box wider than message-row actually has room for.
+      style: { position: 'relative', maxWidth: chatBubbleMaxWidth, minWidth: 0, zIndex: 1, alignSelf: 'flex-end' }
     }, /*#__PURE__*/React.createElement("div", {
       key: isSearchFocused ? `bubble-focused-${rowId}` : undefined,
       className: isSearchFocused ? 'chat-search-focused-bubble' : (isSearchMatch ? 'chat-search-match-bubble' : ''),
@@ -11612,7 +11615,12 @@ function ChatRoomView({
         wordBreak: 'keep-all',
         overflowWrap: 'break-word',
         whiteSpace: 'pre-wrap',
-        boxShadow: '0 2px 6px rgba(0,0,0,0.06)'
+        boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
+        // Hard guarantee that text/media content never visually escapes the bubble's rounded
+        // border, regardless of any upstream sizing imprecision (e.g. an embed's vw-estimated
+        // width overshooting on a narrow viewport) -- overflow:hidden is spec-basic and behaves
+        // identically across Chrome/Whale/Safari/Firefox, unlike relying purely on width math.
+        overflow: 'hidden'
       }
     }, renderChatMessageBody(msg, setActiveLightbox, chatMediaStyle, searchQuery)), /*#__PURE__*/React.createElement("div", {
       style: {
@@ -11648,7 +11656,7 @@ function ChatRoomView({
       }
     }))] : [/*#__PURE__*/React.createElement("div", {
       key: "bubble-wrapper",
-      style: { position: 'relative', maxWidth: chatBubbleMaxWidth, zIndex: 1 }
+      style: { position: 'relative', maxWidth: chatBubbleMaxWidth, minWidth: 0, zIndex: 1 }
     }, /*#__PURE__*/React.createElement("div", {
       key: isSearchFocused ? `bubble-focused-${rowId}` : undefined,
       className: isSearchFocused ? 'chat-search-focused-bubble' : (isSearchMatch ? 'chat-search-match-bubble' : ''),
@@ -11665,7 +11673,12 @@ function ChatRoomView({
         wordBreak: 'keep-all',
         overflowWrap: 'break-word',
         whiteSpace: 'pre-wrap',
-        boxShadow: '0 2px 6px rgba(0,0,0,0.06)'
+        boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
+        // Hard guarantee that text/media content never visually escapes the bubble's rounded
+        // border, regardless of any upstream sizing imprecision (e.g. an embed's vw-estimated
+        // width overshooting on a narrow viewport) -- overflow:hidden is spec-basic and behaves
+        // identically across Chrome/Whale/Safari/Firefox, unlike relying purely on width math.
+        overflow: 'hidden'
       }
     }, renderChatMessageBody(msg, setActiveLightbox, chatMediaStyle, searchQuery)), /*#__PURE__*/React.createElement("div", {
       style: {
@@ -18503,7 +18516,7 @@ function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onSelectTag, onComm
 
     /* Title if exists */
     memo.title && /*#__PURE__*/React.createElement("div", {
-      style: { fontSize: '0.88rem', fontWeight: 'bold', color: 'var(--text-main)', marginBottom: '8px', paddingRight: '20px', wordBreak: 'break-all' }
+      style: { fontSize: '1rem', fontWeight: 'bold', color: 'var(--text-main)', marginBottom: '8px', paddingRight: '20px', wordBreak: 'break-all' }
     }, memo.title),
 
     /* Images */
@@ -20082,48 +20095,6 @@ function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {
     )
   ))
   ));
-}function SunIcon() {
-  return /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg",
-    width: "24",
-    height: "24",
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
-    className: "icon icon-tabler icons-tabler-outline icon-tabler-sun"
-  }, /*#__PURE__*/React.createElement("path", {
-    stroke: "none",
-    d: "M0 0h24v24H0z",
-    fill: "none"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M12 12m-4 0a4 4 0 1 0 8 0a4 4 0 1 0 -8 0"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M3 12h1m8 -9v1m8 8h1m-9 8v1m-6.4 -15.4l.7 .7m12.1 -.7l-.7 .7m0 11.4l.7 .7m-12.1 -.7l-.7 .7"
-  }));
-}
-
-function MoonIcon() {
-  return /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg",
-    width: "24",
-    height: "24",
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
-    className: "icon icon-tabler icons-tabler-outline icon-tabler-moon"
-  }, /*#__PURE__*/React.createElement("path", {
-    stroke: "none",
-    d: "M0 0h24v24H0z",
-    fill: "none"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z"
-  }));
 }
 
 function MoonStarsIcon() {
@@ -20203,29 +20174,6 @@ function SearchIcon() {
     d: "M10 10m-7 0a7 7 0 1 0 14 0a7 7 0 1 0 -14 0"
   }), /*#__PURE__*/React.createElement("path", {
     d: "M21 21l-6 -6"
-  }));
-}
-
-function SettingsIcon() {
-  return /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg",
-    width: "20",
-    height: "20",
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
-    className: "icon icon-tabler icons-tabler-outline icon-tabler-settings"
-  }, /*#__PURE__*/React.createElement("path", {
-    stroke: "none",
-    d: "M0 0h24v24H0z",
-    fill: "none"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0"
   }));
 }
 
