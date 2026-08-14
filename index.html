@@ -5506,6 +5506,14 @@ function isAdminRestoreRoute() {
   return isAdminDashboardRoute() && params.get('restore') === '1';
 }
 
+// Makes the admin 통합검색결과 page addressable/bookmarkable/back-button-navigable as its own
+// URL (?admin=1&search=<query>) instead of only existing as in-memory component state.
+function getAdminSearchQueryFromUrl() {
+  if (!isAdminDashboardRoute()) return null;
+  const params = new URLSearchParams(window.location.search);
+  return params.get('search') || null;
+}
+
 function createDefaultCalendar(id) {
   const now = Date.now();
   return {
@@ -6029,9 +6037,22 @@ function AdminDashboard({ initialCalendars }) {
   const [isChangePwOpen, setIsChangePwOpen] = React.useState(false);
   const [isHeaderCalPickerOpen, setIsHeaderCalPickerOpen] = React.useState(false);
   const [isAdminMenuOpen, setIsAdminMenuOpen] = React.useState(false);
-  // Unified cross-calendar search: input popup + result page (non-null query -> show results page)
+  // Unified cross-calendar search: input popup + result page (non-null query -> show results page).
+  // Query is mirrored into the URL (?search=) so the results page is its own addressable/
+  // bookmarkable/shareable route rather than only living in component state.
   const [isUnifiedSearchOpen, setIsUnifiedSearchOpen] = React.useState(false);
-  const [unifiedSearchQuery, setUnifiedSearchQuery] = React.useState(null);
+  const [unifiedSearchQuery, setUnifiedSearchQueryState] = React.useState(getAdminSearchQueryFromUrl);
+  const setUnifiedSearchQuery = (query) => {
+    setUnifiedSearchQueryState(query);
+    const params = new URLSearchParams(window.location.search);
+    if (query) params.set('search', query); else params.delete('search');
+    window.history.pushState({}, '', `${window.location.pathname}?${params.toString()}`);
+  };
+  React.useEffect(() => {
+    const handlePop = () => setUnifiedSearchQueryState(getAdminSearchQueryFromUrl());
+    window.addEventListener('popstate', handlePop);
+    return () => window.removeEventListener('popstate', handlePop);
+  }, []);
   const [currentPwInput, setCurrentPwInput] = React.useState('');
   const [newPwInput, setNewPwInput] = React.useState('');
   const [confirmPwInput, setConfirmPwInput] = React.useState('');
@@ -6842,6 +6863,16 @@ function AdminDashboard({ initialCalendars }) {
     }
   };
 
+  // Peekalink free-plan usage this hour, for the 통계 tab's 외부 서비스 연동 현황 gauge. The
+  // stored bucket only reflects the CURRENT hour if it matches now -- an older bucket means no
+  // calls have happened yet this hour, so usage reads as 0 rather than a stale prior count.
+  const peekalinkCurrentBucket = Math.floor(Date.now() / PEEKALINK_HOUR_BUCKET_MS);
+  const peekalinkHourlyUsage = (linkPreviewStats && linkPreviewStats.hourlyUsageBucket === peekalinkCurrentBucket)
+    ? (linkPreviewStats.hourlyUsageCount || 0) : 0;
+  const peekalinkUsagePercent = Math.min(100, Math.round(peekalinkHourlyUsage / PEEKALINK_FREE_HOURLY_LIMIT * 100));
+  const peekalinkRemaining = Math.max(0, PEEKALINK_FREE_HOURLY_LIMIT - peekalinkHourlyUsage);
+  const peekalinkGaugeColor = peekalinkUsagePercent >= 90 ? '#DC2626' : peekalinkUsagePercent >= 60 ? '#D97706' : '#16A34A';
+
   if (unifiedSearchQuery !== null) {
     return /*#__PURE__*/React.createElement(AdminUnifiedSearchResultsView, {
       query: unifiedSearchQuery,
@@ -7161,6 +7192,25 @@ function AdminDashboard({ initialCalendars }) {
               )
             )
           ),
+          /* Peekalink free-plan usage this hour. Free plan is a 50/hour RATE LIMIT, not a fixed
+             lifetime quota -- it resets every clock hour rather than depleting permanently, so
+             this reads "이번 시간 사용량" rather than "총 무료제공량 대비" to stay accurate. */
+          /*#__PURE__*/React.createElement("div", { style: { marginTop: '14px' } },
+            /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' } },
+              /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.72rem', color: '#94A3B8', fontWeight: 700 } }, "무료 요금제 사용량 (이번 시간, 매 정시 초기화)"),
+              /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.78rem', fontWeight: 800, color: peekalinkGaugeColor } },
+                `${peekalinkHourlyUsage} / ${PEEKALINK_FREE_HOURLY_LIMIT}건 · ${peekalinkUsagePercent}% · 잔여 ${peekalinkRemaining}건`
+              )
+            ),
+            /*#__PURE__*/React.createElement("div", {
+              style: { width: '100%', height: '8px', borderRadius: '999px', backgroundColor: '#E2E8F0', overflow: 'hidden', marginTop: '6px' }
+            },
+              /*#__PURE__*/React.createElement("div", { style: { width: `${peekalinkUsagePercent}%`, height: '100%', backgroundColor: peekalinkGaugeColor, transition: 'width 0.3s ease' } })
+            ),
+            /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.7rem', color: '#94A3B8', marginTop: '4px' } },
+              "Peekalink 무료 요금제는 총량이 누적 소진되는 방식이 아니라 시간당 50건으로 매 정시마다 초기화되는 속도 제한(rate limit)입니다. 위 수치는 이 서버가 캐시 미스로 실제 Peekalink API를 호출한 횟수 기준이며, 캐시로 응답한 요청은 포함하지 않습니다."
+            )
+          ),
           /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'flex-start', gap: '8px', marginTop: '14px', padding: '10px', borderRadius: '8px', backgroundColor: '#FFFBEB', border: '1px solid #FDE68A' } },
             /*#__PURE__*/React.createElement(AlertTriangleIcon, null),
             /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.78rem', color: '#92400E', lineHeight: 1.6 } },
@@ -7181,6 +7231,13 @@ function AdminDashboard({ initialCalendars }) {
           dashboard.calendarStats.map(stat => {
             const cal = stat.calendar;
             const width = `${Math.max(4, Math.round(stat.schedules.length / dashboard.maxSchedules * 100))}%`;
+            // Raw array length (including soft-deleted tombstones getActiveAvailabilities
+            // filters out) since that's what actually counts against the 5000 cap enforced by
+            // validateCalendarShape()/firestore.rules -- stat.schedules.length alone would
+            // undercount and mask a calendar quietly approaching the limit.
+            const availabilityCount = Array.isArray(cal.availabilities) ? cal.availabilities.length : 0;
+            const availabilityCapPercent = Math.min(100, Math.round(availabilityCount / 5000 * 100));
+            const availabilityCapColor = availabilityCapPercent >= 90 ? '#DC2626' : availabilityCapPercent >= 60 ? '#D97706' : '#94A3B8';
             return /*#__PURE__*/React.createElement("div", {
               key: cal.id, style: { border: '1px solid #E2E8F0', borderRadius: '10px', padding: '16px', backgroundColor: '#F8FAFC' }
             },
@@ -7208,6 +7265,18 @@ function AdminDashboard({ initialCalendars }) {
                 stat.participants.slice(0, 10).map(p => /*#__PURE__*/React.createElement("span", {
                   key: p.id, style: { backgroundColor: p.color, color: getContrastTextColor(p.color), padding: '2px 8px', borderRadius: '9999px', fontSize: '0.68rem', fontWeight: 'bold' }
                 }, p.name))
+              ),
+              /* 일정 데이터 5000건 캡 사용량 -- 캘린더 문서별로 독립적으로 적용됨 (전체 합산이 아님) */
+              /*#__PURE__*/React.createElement("div", { style: { marginTop: '12px' } },
+                /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', fontSize: '0.68rem', color: '#94A3B8', fontWeight: 700 } },
+                  React.createElement("span", null, "일정 데이터 사용량"),
+                  React.createElement("span", { style: { color: availabilityCapColor, fontWeight: 800 } }, `${availabilityCount.toLocaleString()} / 5,000건 (${availabilityCapPercent}%)`)
+                ),
+                /*#__PURE__*/React.createElement("div", {
+                  style: { width: '100%', height: '4px', borderRadius: '999px', backgroundColor: '#E2E8F0', overflow: 'hidden', marginTop: '4px' }
+                },
+                  /*#__PURE__*/React.createElement("div", { style: { width: `${Math.max(2, availabilityCapPercent)}%`, height: '100%', backgroundColor: availabilityCapColor } })
+                )
               )
             );
           })
@@ -8361,6 +8430,19 @@ function App() {
     return () => window.removeEventListener('popstate', handleUrlChange);
   }, []);
 
+  // Deep-link support: ?date=YYYY-MM-DD auto-opens that date's DateModal on load. Used by the
+  // admin 통합검색결과 page so clicking a 일정/정산 search result can open a new tab that lands
+  // directly on the matched date instead of just the calendar's home screen.
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const dateParam = params.get('date');
+    if (dateParam && isValidDateString(dateParam)) {
+      setSelectedDate(dateParam);
+      setIsModalOpen(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // The header is now position:fixed (full-bleed), so page content needs top padding equal to
   // its rendered height -- measured (not hardcoded) since it varies by title length/wrapping.
   // The header itself unmounts entirely while activeView is 'chat' (ChatRoomView renders its
@@ -8738,6 +8820,39 @@ function App() {
       document.body.classList.remove('no-body-padding');
     };
   }, [activeView]);
+
+  // Deep-link support: ?view=chat&msg=<id>[&img=<index>] switches to chat and scrolls/flashes
+  // the matched message bubble (same DOM hook + animation GlobalSearchModal's in-session click
+  // already uses), optionally opening the lightbox at a specific image for 태그 results. Used by
+  // the admin 통합검색결과 page so 채팅/태그 search results open a new tab landing on the actual
+  // message instead of just the chat room's bottom. Re-runs as chatMessages streams in (the
+  // message may not be in the DOM yet on first paint) but only acts once via the ref guard.
+  const chatDeepLinkHandledRef = React.useRef(false);
+  React.useEffect(() => {
+    if (chatDeepLinkHandledRef.current) return;
+    const params = new URLSearchParams(window.location.search);
+    const msgParam = params.get('msg');
+    if (!msgParam) return;
+    if (activeView !== 'chat') { changeView('chat'); return; }
+    const el = document.querySelector(`[data-msg-row-id="${msgParam}"]`);
+    if (!el) return;
+    chatDeepLinkHandledRef.current = true;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    el.classList.add('search-result-flash');
+    setTimeout(() => el.classList.remove('search-result-flash'), 1700);
+    const imgParam = params.get('img');
+    if (imgParam !== null) {
+      const msg = chatMessages.find(m => m.id === msgParam);
+      if (msg) {
+        const entries = getMessageImageEntries(msg);
+        setActiveLightbox({
+          urls: entries.map(e => e.full),
+          meta: entries.map(e => ({ timestamp: msg.timestamp, messageId: msg.id, imageIndex: e.imageIndex, thumb: e.thumb, tags: e.tags })),
+          index: Number(imgParam) || 0
+        });
+      }
+    }
+  }, [activeView, chatMessages]);
 
   // Full (unbounded) activity log history for the settings modal's PITR tab -- fetched lazily,
   // only while that modal is actually open, since it needs full history rather than a capped feed.
@@ -11128,6 +11243,10 @@ function setChatLastReadTimestamp(calendarId, timestamp) {
 const PEEKALINK_API_KEY = 'sk_w8czszf1m50xm1pbuknazw60recwmc2q';
 const linkPreviewCache = new Map();
 const linkPreviewInflight = new Map();
+// Peekalink's free plan is a 50-request-per-hour rate limit, not a fixed lifetime quota --
+// it resets every clock hour rather than depleting over time. See PEEKALINK_HOUR_BUCKET_MS below.
+const PEEKALINK_FREE_HOURLY_LIMIT = 50;
+const PEEKALINK_HOUR_BUCKET_MS = 3600000;
 
 // Deterministic, synchronous 64-bit FNV-1a hash used as the Firestore doc ID for the shared
 // linkPreviews cache below (doc IDs can't contain '/', which raw URLs do). Collisions are
@@ -11146,6 +11265,8 @@ function hashUrlForCache(url) {
 
 // Best-effort counter so the admin dashboard can show shared-cache size without ever needing
 // list access on the linkPreviews collection itself (see firestore.rules).
+// Uses set({merge:true}) since incrementPeekalinkApiCallStat below writes to the same doc --
+// a plain overwriting set() here would wipe its hourlyUsage fields (and vice versa).
 async function incrementLinkPreviewStat() {
   if (!firebaseDb) return;
   try {
@@ -11153,7 +11274,30 @@ async function incrementLinkPreviewStat() {
       const ref = firebaseDb.collection('appConfig').doc('linkPreviewStats');
       const snap = await tx.get(ref);
       const current = snap.exists ? (snap.data().cachedCount || 0) : 0;
-      tx.set(ref, { cachedCount: current + 1, updatedAt: Date.now() });
+      tx.set(ref, { cachedCount: current + 1, updatedAt: Date.now() }, { merge: true });
+    });
+  } catch (e) {
+    // Non-critical stat -- ignore failures
+  }
+}
+
+// Tracks actual outbound calls to Peekalink's API (cache hits never reach this point) against
+// its 50/hour free-plan rate limit, bucketed by clock hour -- an approximation of the rolling
+// window Peekalink itself enforces, close enough for the admin dashboard's usage gauge. Powers
+// the "외부 서비스 연동 현황" 통계 tab card.
+async function incrementPeekalinkApiCallStat() {
+  if (!firebaseDb) return;
+  try {
+    await firebaseDb.runTransaction(async (tx) => {
+      const ref = firebaseDb.collection('appConfig').doc('linkPreviewStats');
+      const snap = await tx.get(ref);
+      const data = snap.exists ? snap.data() : {};
+      const currentBucket = Math.floor(Date.now() / PEEKALINK_HOUR_BUCKET_MS);
+      const sameBucket = data.hourlyUsageBucket === currentBucket;
+      tx.set(ref, {
+        hourlyUsageBucket: currentBucket,
+        hourlyUsageCount: sameBucket ? (data.hourlyUsageCount || 0) + 1 : 1
+      }, { merge: true });
     });
   } catch (e) {
     // Non-critical stat -- ignore failures
@@ -11191,6 +11335,9 @@ async function fetchLinkPreview(url) {
         body: JSON.stringify({ link: url })
       });
       const json = await res.json();
+      // Counts against the free-plan quota regardless of json.ok -- the request still reached
+      // Peekalink's server and consumed the hourly allowance either way.
+      incrementPeekalinkApiCallStat();
       if (!json.ok) throw new Error(json.message || 'peekalink request failed');
       const image = json.image?.medium?.url || json.image?.large?.url || json.image?.thumbnail?.url || json.icon?.url || '';
       const hasContent = !!(json.title || image || json.description);
@@ -17992,6 +18139,26 @@ function AdminUnifiedSearchModal({ onClose, onSearch }) {
 // (일정/대화/투표/태그). Reuses the same helper functions/matching rules GlobalSearchModal uses
 // per calendar, just looped across every calendar already held in AdminDashboard's memory
 // (serverCalendars/messagesMap) instead of a single one.
+// Builds the citizen-facing calendar URL that actually shows a given search result's real
+// content, so a click can open it in a new tab instead of just linking back to admin state.
+// Mirrors the deep-link params App reads on load (date / view=chat&msg=&img= / view=memo).
+function getAdminSearchResultTargetUrl(type, item) {
+  const params = new URLSearchParams({ id: item.calendarId });
+  if (type === 'schedules' || type === 'expenses') {
+    params.set('date', item.date);
+  } else if (type === 'chat') {
+    params.set('view', 'chat');
+    params.set('msg', item.id);
+  } else if (type === 'tags') {
+    params.set('view', 'chat');
+    params.set('msg', item.messageId);
+    params.set('img', String(item.imageIndex));
+  } else if (type === 'memos') {
+    params.set('view', 'memo');
+  }
+  return `${getAppBaseUrl()}?${params.toString()}`;
+}
+
 function AdminUnifiedSearchResultsView({ query, calendarsList, messagesMap, memosMap, onBack }) {
   const q = (query || '').trim().toLowerCase();
 
@@ -18040,6 +18207,11 @@ function AdminUnifiedSearchResultsView({ query, calendarsList, messagesMap, memo
   }, [q, allMatches]);
 
   return /*#__PURE__*/React.createElement("div", {
+    // admin-scope is what body:has(.admin-scope){padding:0} keys off of -- this view previously
+    // rendered as an early return BEFORE AdminDashboard's own admin-scope wrapper, so that CSS
+    // rule (and the dark-mode-lock rules that also key off .admin-scope) never matched here no
+    // matter how many times the padding fix was reapplied. This class is the actual fix.
+    className: "admin-scope",
     style: { backgroundColor: '#FFFFFF', minHeight: '100vh', width: '100%', maxWidth: '100%', overflowX: 'hidden' }
   },
     /* Chat-room-header-style header: left back arrow, centered title, symmetric right spacer */
@@ -18067,7 +18239,7 @@ function AdminUnifiedSearchResultsView({ query, calendarsList, messagesMap, memo
 
     /*#__PURE__*/React.createElement(SearchCategoryTabs, { tabs: tabDefs, activeKey: activeTab, onSelect: setActiveTab }),
 
-    /*#__PURE__*/React.createElement("div", { style: { padding: 0, display: 'flex', flexDirection: 'column', gap: '8px' } },
+    /*#__PURE__*/React.createElement("div", { style: { padding: '20px', display: 'flex', flexDirection: 'column', gap: '8px' } },
       grandTotal === 0 ? /*#__PURE__*/React.createElement("div", {
         style: { textAlign: 'center', color: '#94A3B8', fontSize: '0.88rem', padding: '40px 0' }
       }, "검색 결과가 없습니다.") : null,
@@ -18075,20 +18247,25 @@ function AdminUnifiedSearchResultsView({ query, calendarsList, messagesMap, memo
       activeTab === 'schedules' && allMatches.schedules.map(item => /*#__PURE__*/React.createElement(SearchResultLogRow, {
         key: `${item.calendarId}_${item.date}_${item.participantId}`,
         badgeName: item.participantName, badgeColor: item.participantColor,
-        calendarLabel: item.calendarLabel, timeStr: formatDateWithDayName(item.date)
+        calendarLabel: item.calendarLabel, timeStr: formatDateWithDayName(item.date),
+        onClick: () => window.open(getAdminSearchResultTargetUrl('schedules', item), '_blank', 'noopener')
       }, highlightKeyword(item.note || '', q))),
 
       activeTab === 'chat' && allMatches.chat.map(msg => /*#__PURE__*/React.createElement(SearchResultLogRow, {
         key: `${msg.calendarId}_${msg.id}`,
         badgeName: msg.participantName, badgeColor: msg.participantColor,
-        calendarLabel: msg.calendarLabel, timeStr: formatLogTimestamp(msg.timestamp)
+        calendarLabel: msg.calendarLabel, timeStr: formatLogTimestamp(msg.timestamp),
+        onClick: () => window.open(getAdminSearchResultTargetUrl('chat', msg), '_blank', 'noopener')
       }, highlightKeyword(msg.text || '', q))),
 
       activeTab === 'tags' && /*#__PURE__*/React.createElement("div", {
         style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(88px, 100%), 1fr))', gap: '8px' }
-      }, allMatches.tags.map((entry, idx) => /*#__PURE__*/React.createElement("div", {
+      }, allMatches.tags.map((entry, idx) => /*#__PURE__*/React.createElement("button", {
         key: `${entry.calendarId}_${entry.messageId}_${entry.imageIndex}_${idx}`,
-        style: { display: 'flex', flexDirection: 'column', gap: '4px' }
+        type: "button",
+        title: entry.tags,
+        onClick: () => window.open(getAdminSearchResultTargetUrl('tags', entry), '_blank', 'noopener'),
+        style: { padding: 0, border: 0, background: 'none', cursor: 'pointer', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '4px', font: 'inherit' }
       },
         /*#__PURE__*/React.createElement("img", { src: entry.thumb, style: { width: '100%', aspectRatio: '1 / 1', objectFit: 'cover', borderRadius: '6px' } }),
         /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.68rem', color: '#94A3B8', fontWeight: 700 } }, entry.calendarLabel),
@@ -18098,7 +18275,8 @@ function AdminUnifiedSearchResultsView({ query, calendarsList, messagesMap, memo
       activeTab === 'expenses' && allMatches.expenses.map(exp => /*#__PURE__*/React.createElement(SearchResultLogRow, {
         key: `${exp.calendarId}_${exp.id}`,
         badgeName: exp.categoryName, badgeColor: exp.categoryColor,
-        calendarLabel: exp.calendarLabel, timeStr: formatDateWithDayName(exp.date)
+        calendarLabel: exp.calendarLabel, timeStr: formatDateWithDayName(exp.date),
+        onClick: () => window.open(getAdminSearchResultTargetUrl('expenses', exp), '_blank', 'noopener')
       }, highlightKeyword(exp.label || exp.url || '', q), ' · ', /*#__PURE__*/React.createElement("span", {
         style: { fontWeight: 800, color: exp.amount < 0 ? '#16A34A' : '#DC2626' }
       }, `${exp.amount < 0 ? '+' : '-'}${Math.abs(Number(exp.amount)).toLocaleString()}원`))),
@@ -18106,7 +18284,8 @@ function AdminUnifiedSearchResultsView({ query, calendarsList, messagesMap, memo
       activeTab === 'memos' && allMatches.memos.map(memo => /*#__PURE__*/React.createElement(SearchResultLogRow, {
         key: `${memo.calendarId}_${memo.id}`,
         badgeName: memo.participantName, badgeColor: memo.participantColor,
-        calendarLabel: memo.calendarLabel, timeStr: formatLogTimestamp(memo.createdAt)
+        calendarLabel: memo.calendarLabel, timeStr: formatLogTimestamp(memo.createdAt),
+        onClick: () => window.open(getAdminSearchResultTargetUrl('memos', memo), '_blank', 'noopener')
       },
         memo.title && /*#__PURE__*/React.createElement("div", { style: { fontWeight: 500, marginBottom: '2px' } }, highlightKeyword(memo.title, q)),
         memo.text && /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.7rem', color: '#94A3B8' } }, highlightKeyword(memo.text.length > 100 ? memo.text.slice(0, 100) + '...' : memo.text, q))
