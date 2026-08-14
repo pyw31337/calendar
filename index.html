@@ -19683,7 +19683,10 @@ function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {
     ? allTimeExpense
     : expenseItems.reduce((sum, item) => sum + Math.abs(item.amount), 0);
 
-  const displayBalance = overallBalance;
+  // 일자별보기(선택된 월)일 때는 그 달의 수입-지출 순액을, 누적보기일 때는 baseBudget까지 포함한
+  // 전체 기간 잔액을 보여준다 -- displayIncome/displayExpense가 이미 탭에 따라 그 값들을 계산해
+  // 두므로 둘의 차만 내면 두 경우 모두 올바른 값이 나온다.
+  const displayBalance = activeTab === 'total' ? overallBalance : (displayIncome - displayExpense);
 
   const allTimeExpenseItems = allTimeItems.filter(item => !item.isIncome);
   const categoryTotals = categories.map(category => ({
@@ -19692,10 +19695,11 @@ function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {
     count: allTimeExpenseItems.filter(item => item.category.id === category.id).length
   })).filter(item => item.total > 0 || item.count > 0);
 
+  const monthLabelPrefix = `${month + 1}월`;
   const metricCards = [
-    { label: '총 수입', value: displayIncome, color: '#16A34A', icon: React.createElement(BanknoteArrowUpIcon, { size: 16 }) },
-    { label: '총 지출', value: displayExpense, color: '#DC2626', icon: React.createElement(BanknoteArrowDownIcon, { size: 16 }) },
-    { label: '현재 잔액', value: displayBalance, color: 'var(--text-main)', icon: React.createElement(PiggyBankIcon, { size: 16 }) }
+    { label: activeTab === 'total' ? '총 수입' : `${monthLabelPrefix} 수입`, value: displayIncome, color: '#16A34A', icon: React.createElement(BanknoteArrowUpIcon, { size: 16 }) },
+    { label: activeTab === 'total' ? '총 지출' : `${monthLabelPrefix} 지출`, value: displayExpense, color: '#DC2626', icon: React.createElement(BanknoteArrowDownIcon, { size: 16 }) },
+    { label: activeTab === 'total' ? '현재 잔액' : `${monthLabelPrefix} 잔액`, value: displayBalance, color: 'var(--text-main)', icon: React.createElement(PiggyBankIcon, { size: 16 }) }
   ];
 
   // Shareable result card -- rendered client-side onto an offscreen canvas so it can be saved
@@ -19726,9 +19730,9 @@ function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {
     ctx.fillText(periodLabel, 40, 138);
 
     const rowsStats = [
-      { label: '총 수입', value: displayIncome, color: '#16A34A' },
-      { label: '총 지출', value: displayExpense, color: '#DC2626' },
-      { label: '현재 잔액', value: displayBalance, color: '#0F172A' }
+      { label: activeTab === 'total' ? '총 수입' : `${monthLabelPrefix} 수입`, value: displayIncome, color: '#16A34A' },
+      { label: activeTab === 'total' ? '총 지출' : `${monthLabelPrefix} 지출`, value: displayExpense, color: '#DC2626' },
+      { label: activeTab === 'total' ? '현재 잔액' : `${monthLabelPrefix} 잔액`, value: displayBalance, color: '#0F172A' }
     ];
     let y = 230;
     rowsStats.forEach(stat => {
