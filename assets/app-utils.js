@@ -99,6 +99,37 @@
     return `${value} B`;
   }
 
+  function stripUrlEdgePunctuation(value = '') {
+    return String(value || '').replace(/[\s"'“”‘’`)\].,!?]+$/g, '');
+  }
+
+  function extractFirstUrlInfo(value = '') {
+    const source = String(value || '');
+    const markdownMatch = source.match(/\[[^\]]*]\(((?:https?:\/\/|www\.)[^)\s]+|(?:[a-z0-9-]+\.)+[a-z]{2,}(?:\/[^)\s]*)?)\)/i);
+    if (markdownMatch) {
+      const raw = markdownMatch[0];
+      const href = stripUrlEdgePunctuation(markdownMatch[1]);
+      const url = /^https?:\/\//i.test(href) ? href : `https://${href}`;
+      return { raw, url };
+    }
+    const match = source.match(/(?:https?:\/\/|www\.)[^\s)\]]+|(?:[a-z0-9-]+\.)+[a-z]{2,}(?:\/[^\s)\]]*)?/i);
+    if (!match) return { raw: '', url: '' };
+    const raw = stripUrlEdgePunctuation(match[0]);
+    if (!raw || !/[a-z0-9]/i.test(raw)) return { raw: '', url: '' };
+    const url = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+    return { raw, url };
+  }
+
+  function extractFirstUrl(value = '') {
+    return extractFirstUrlInfo(value).url;
+  }
+
+  function removeFirstUrl(value = '') {
+    const source = String(value || '');
+    const { raw } = extractFirstUrlInfo(source);
+    return raw ? source.replace(raw, '').trim() : source.trim();
+  }
+
   window.GATHER_APP_UTILS = Object.freeze({
     getContrastTextColor,
     formatDateWithDayName,
@@ -109,6 +140,10 @@
     formatCommentDate,
     formatChatTime,
     formatChatDividerDate,
-    formatBytes
+    formatBytes,
+    stripUrlEdgePunctuation,
+    extractFirstUrlInfo,
+    extractFirstUrl,
+    removeFirstUrl
   });
 })();

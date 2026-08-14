@@ -811,9 +811,7 @@ function sanitizeText(value, maxLength = 120) {
     .slice(0, maxLength);
 }
 
-function stripUrlEdgePunctuation(value = '') {
-  return String(value || '').replace(/[\s"'“”‘’`)\].,!?]+$/g, '');
-}
+const stripUrlEdgePunctuation = GATHER_APP_UTILS.stripUrlEdgePunctuation;
 
 // Turns a raw Firestore/Firebase write error into a toast message that hints at *why* it
 // failed instead of a bare "실패", since the most common real-world cause here (a
@@ -1114,32 +1112,9 @@ function createPollActivityLog(calendarId, action, participantId = '', timestamp
   });
 }
 
-function extractFirstUrlInfo(value = '') {
-  const source = String(value || '');
-  const markdownMatch = source.match(/\[[^\]]*]\(((?:https?:\/\/|www\.)[^)\s]+|(?:[a-z0-9-]+\.)+[a-z]{2,}(?:\/[^)\s]*)?)\)/i);
-  if (markdownMatch) {
-    const raw = markdownMatch[0];
-    const href = stripUrlEdgePunctuation(markdownMatch[1]);
-    const url = /^https?:\/\//i.test(href) ? href : `https://${href}`;
-    return { raw, url };
-  }
-  const match = source.match(/(?:https?:\/\/|www\.)[^\s)\]]+|(?:[a-z0-9-]+\.)+[a-z]{2,}(?:\/[^\s)\]]*)?/i);
-  if (!match) return { raw: '', url: '' };
-  const raw = stripUrlEdgePunctuation(match[0]);
-  if (!raw || !/[a-z0-9]/i.test(raw)) return { raw: '', url: '' };
-  const url = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
-  return { raw, url };
-}
-
-function extractFirstUrl(value = '') {
-  return extractFirstUrlInfo(value).url;
-}
-
-function removeFirstUrl(value = '') {
-  const source = String(value || '');
-  const { raw } = extractFirstUrlInfo(source);
-  return raw ? source.replace(raw, '').trim() : source.trim();
-}
+const extractFirstUrlInfo = GATHER_APP_UTILS.extractFirstUrlInfo;
+const extractFirstUrl = GATHER_APP_UTILS.extractFirstUrl;
+const removeFirstUrl = GATHER_APP_UTILS.removeFirstUrl;
 
 // Shared "URL 뱃지" renderer: splits free text into its plain-text portion plus a clickable
 // gray capsule badge for the first URL found (matches the existing memo/expense/availability
