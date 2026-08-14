@@ -22985,17 +22985,26 @@ function PollList({ calendar, onCreatePoll, onEditPoll, onVotePoll, onCancelVote
     const totalVotes = getPollTotalVoteCount(poll);
     const isOptionsVisible = !isCollapsed || !!openPollIds[poll.id];
     const closed = isPollClosed(poll);
-    // Winning option(s) for a closed poll's [투표확정] badge -- ties show every tied option,
-    // and a poll nobody voted on shows a "참여 결과 없음" fallback instead of an empty label.
-    const winningOptionLabels = (() => {
-      if (!closed) return [];
+    // Winning option(s) for a closed poll -- ties mark every tied option, and a poll nobody
+    // voted on marks none (no (투표확정) badge shown anywhere in that case). Used to both pin
+    // the winning row(s) to the top of the option list and tag them with a badge in place,
+    // rather than a separate summary line under the title/description.
+    const winningOptionIds = (() => {
+      if (!closed) return new Set();
       const optionsWithVotes = getActivePollOptions(poll).map(option => ({
-        text: option.text,
+        id: option.id,
         count: getPollOptionVoterIds(poll, option.id).length
       }));
       const maxVotes = optionsWithVotes.reduce((max, o) => Math.max(max, o.count), 0);
-      if (maxVotes <= 0) return [];
-      return optionsWithVotes.filter(o => o.count === maxVotes).map(o => o.text);
+      if (maxVotes <= 0) return new Set();
+      return new Set(optionsWithVotes.filter(o => o.count === maxVotes).map(o => o.id));
+    })();
+    const orderedOptions = (() => {
+      const active = getActivePollOptions(poll);
+      if (!closed || winningOptionIds.size === 0) return active;
+      const winners = active.filter(option => winningOptionIds.has(option.id));
+      const rest = active.filter(option => !winningOptionIds.has(option.id));
+      return [...winners, ...rest];
     })();
     // 미참여: active roster members who haven't voted on ANY option of this poll yet (union
     // across options, not per-option) -- who still needs a nudge to vote at all.
@@ -23049,14 +23058,7 @@ function PollList({ calendar, onCreatePoll, onEditPoll, onVotePoll, onCancelVote
       }
     }, closed ? '마감됨' : `마감 ${formatPollDeadline(poll.deadline)}`)), poll.description && /*#__PURE__*/React.createElement("div", {
       className: "poll-desc"
-    }, renderTextWithUrlBadge(poll.description)), closed && /*#__PURE__*/React.createElement("div", {
-      className: "poll-confirmed-badge",
-      style: {
-        display: 'inline-flex', alignItems: 'center', gap: '6px', marginTop: '8px',
-        fontSize: '0.78rem', fontWeight: 800, padding: '4px 10px', borderRadius: '9999px',
-        backgroundColor: '#EEF2FF', color: '#4F46E5'
-      }
-    }, "[투표확정] ", winningOptionLabels.length > 0 ? winningOptionLabels.join(', ') : '참여 결과 없음')), renderNonVoterBadges('poll-nonvoters-desktop'), /*#__PURE__*/React.createElement("button", {
+    }, renderTextWithUrlBadge(poll.description))), renderNonVoterBadges('poll-nonvoters-desktop'), /*#__PURE__*/React.createElement("button", {
       type: "button",
       className: "btn btn-secondary",
       title: "\uD22C\uD45C \uC124\uC815",
@@ -23064,16 +23066,24 @@ function PollList({ calendar, onCreatePoll, onEditPoll, onVotePoll, onCancelVote
       onClick: () => onEditPoll(poll)
     }, /*#__PURE__*/React.createElement(SettingsIcon, null))), renderNonVoterBadges('poll-nonvoters-mobile'), isOptionsVisible && /*#__PURE__*/React.createElement("div", {
       className: "poll-option-list"
-    }, getActivePollOptions(poll).map((option, index) => {
+    }, orderedOptions.map((option, index) => {
       const voterIds = getPollOptionVoterIds(poll, option.id).filter(participantId => participantsMap[participantId]);
       const voteCount = voterIds.length;
       const percent = totalVotes > 0 ? Math.round(voteCount / totalVotes * 100) : 0;
+      const isWinner = winningOptionIds.has(option.id);
       return /*#__PURE__*/React.createElement("div", {
         key: option.id,
         className: "poll-option-row"
       }, /*#__PURE__*/React.createElement("div", {
         className: "poll-option-main"
-      }, /*#__PURE__*/React.createElement("span", null, option.text), option.url && /*#__PURE__*/React.createElement("span", {
+      }, /*#__PURE__*/React.createElement("span", null, option.text), isWinner && /*#__PURE__*/React.createElement("span", {
+        className: "poll-confirmed-badge",
+        style: {
+          display: 'inline-flex', alignItems: 'center', marginLeft: '6px',
+          fontSize: '0.7rem', fontWeight: 800, padding: '2px 8px', borderRadius: '9999px',
+          backgroundColor: '#EEF2FF', color: '#4F46E5', whiteSpace: 'nowrap'
+        }
+      }, "(투표확정)"), option.url && /*#__PURE__*/React.createElement("span", {
         className: "poll-option-link",
         onClick: event => {
           event.stopPropagation();
@@ -23107,7 +23117,12 @@ function PollList({ calendar, onCreatePoll, onEditPoll, onVotePoll, onCancelVote
           className: "poll-voter-badge",
           style: {
             backgroundColor: participant.color,
-            color: textColor
+            color: textColor,
+            // .poll-voter-badge's CSS padding is intentionally right-light (3px 4px 3px 8px) to
+            // make room for the 투표 취소 (X) button below -- once that button stops rendering
+            // (closed poll), the smaller right padding alone made the name text look off-center,
+            // hugging the right edge. Restore symmetric padding here when there's no button.
+            ...(closed ? { padding: '3px 8px' } : null)
           }
         }, participant.name, !closed && /*#__PURE__*/React.createElement("button", {
           type: "button",
