@@ -129,6 +129,19 @@ runAppScript(productionContext, `
   if (registeredText !== '26.08.04 (화) 04:39:12') {
     throw new Error('registered timestamp formatter failed');
   }
+  if (describePushSubscribeFailure('push-subscribe-blocked') !== '브라우저가 푸시 구독 차단') {
+    throw new Error('push subscribe failure message mapping failed');
+  }
+  if (classifyPushSubscribeError({ name: 'AbortError', message: '' }) !== 'push-subscribe-blocked') {
+    throw new Error('push subscribe AbortError classification failed');
+  }
+  if (classifyPushSubscribeError({ name: 'NotSupportedError', message: 'Push is not supported' }) !== 'push-manager-unsupported') {
+    throw new Error('push subscribe unsupported classification failed');
+  }
+  const diagnostics = getNotificationDiagnostics();
+  if (!Array.isArray(diagnostics) || diagnostics.length < 5 || !diagnostics.some(row => row.label === 'Web Push')) {
+    throw new Error('notification diagnostics rows failed');
+  }
 `);
 
 const restoreContext = createContext('https://pyw31337.github.io/calendar/?admin=1&restore=1');
