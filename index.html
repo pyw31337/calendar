@@ -1533,7 +1533,7 @@ function mergeCalendarSettingsDelta(serverCalendar, incomingCalendar) {
     participants: Array.from(participantMap.values()),
     availabilities: server.availabilities || [],
     activityLogs: mergeActivityLogs(server.activityLogs || [], incoming.activityLogs || [], calendarId, new Set(Array.from(participantMap.values()).map(participant => participant.id))),
-    polls: server.polls || [],
+    polls: mergePolls(server.polls || [], incoming.polls || [], calendarId, new Set(Array.from(participantMap.values()).map(participant => participant.id))),
     deletedActivityLogIds: mergeDeletedActivityLogIds(server.deletedActivityLogIds || [], incoming.deletedActivityLogIds || []),
     // Explicit rather than relying on the "...incoming" spread above: confirmed-meeting expense
     // edits (category/label/amount) go through this exact saveMode, so an incoming payload that's
@@ -3426,7 +3426,13 @@ function AdminDashboard({ initialCalendars }) {
       if (!targetCal) return;
 
       const now = Date.now();
-      const nextPolls = (targetCal.polls || []).filter(p => p.id !== poll.id);
+      // Tombstone (mark deletedAt) rather than filter the poll out of the array: saveMode
+      // 'polls' merges via mergePolls, which unions this calendar's polls with whatever's
+      // still on the server by ID -- a poll simply missing from the outgoing payload looks
+      // like "no change" to that union, not "delete", so the server's copy survives and
+      // resurrects it. mergePollRecord already carries deletedAt through merges, so marking
+      // it here is what actually sticks.
+      const nextPolls = (targetCal.polls || []).map(p => p.id === poll.id ? { ...p, deletedAt: now, updatedAt: now } : p);
       const updatedCal = {
         ...targetCal,
         polls: nextPolls,
@@ -14460,7 +14466,10 @@ function AdminModal({
   const handleDeletePollFromAdmin = (poll) => {
     onRequestConfirm('투표 삭제', `"${poll.title}" 투표를 삭제하시겠습니까?`, async () => {
       const now = Date.now();
-      const nextPolls = (calendar.polls || []).filter(p => p.id !== poll.id);
+      // Tombstone rather than filter out -- saveMode 'settings' now merges polls via
+      // mergePolls, which unions by ID against the server's copy, so a poll simply absent
+      // from the outgoing payload reads as "no change" and the server's copy survives.
+      const nextPolls = (calendar.polls || []).map(p => p.id === poll.id ? { ...p, deletedAt: now, updatedAt: now } : p);
       const updatedCal = {
         ...calendar,
         polls: nextPolls,
