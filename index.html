@@ -23019,7 +23019,13 @@ function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom = false
 
   return /*#__PURE__*/React.createElement("div", {
     ref: containerRef,
-    style: { width: '100%', height: '100%', backgroundColor: '#E2E8F0', position: 'relative' }
+    // Leaflet's internal panes/controls use z-index values up to 1000, and this div (once
+    // Leaflet turns it into .leaflet-container) has no z-index of its own -- without one, it
+    // never opens its own stacking context, so those high z-indexes compare directly against
+    // sibling elements outside the map (like the map-expand grip button below) and win despite
+    // the button's explicit z-index. Giving the container a z-index here contains Leaflet's
+    // internals inside their own stacking context so the button's z-index actually applies.
+    style: { width: '100%', height: '100%', backgroundColor: '#E2E8F0', position: 'relative', zIndex: 1 }
   }, !ready && /*#__PURE__*/React.createElement("div", {
     style: { width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94A3B8', fontSize: '0.8rem' }
   }, "지도를 불러오는 중..."));
@@ -23481,45 +23487,31 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
         }, /*#__PURE__*/React.createElement(ThreeLinesIcon, { size: 20 }))
       ),
 
+      /* Category filter tabs -- full-bleed, equal-width tab bar matching the admin 통합검색결과
+         page's 일정/채팅/태그/정산/메모 tabs (SearchCategoryTabs), instead of a scrolling pill row. */
+      categories.length > 0 && /*#__PURE__*/React.createElement(SearchCategoryTabs, {
+        tabs: [
+          { key: 'all', label: '전체', count: places.length },
+          ...categories.map(category => ({
+            key: category.id,
+            label: `${getPlaceCategoryIcon(category)} ${category.name}`,
+            count: countsByCategory[category.id] || 0
+          }))
+        ],
+        activeKey: categoryFilter,
+        onSelect: setCategoryFilter
+      }),
+
       /*#__PURE__*/React.createElement("div", {
         style: { padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }
       },
-        /* Category filter tabs */
-        categories.length > 0 && /*#__PURE__*/React.createElement("div", {
-          style: { display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '2px' }
-        },
-          /*#__PURE__*/React.createElement("button", {
-            type: "button",
-            onClick: () => setCategoryFilter('all'),
-            style: {
-              flexShrink: 0, padding: '6px 12px', borderRadius: 'var(--radius-full)', fontSize: '0.78rem', fontWeight: 800,
-              border: categoryFilter === 'all' ? '1px solid var(--accent-primary)' : '1px solid var(--border-subtle)',
-              backgroundColor: categoryFilter === 'all' ? 'var(--accent-primary)' : 'var(--bg-card)',
-              color: categoryFilter === 'all' ? '#FFFFFF' : 'var(--text-muted)',
-              cursor: 'pointer', whiteSpace: 'nowrap'
-            }
-          }, `전체 ${places.length}`),
-          categories.map(category => /*#__PURE__*/React.createElement("button", {
-            key: category.id,
-            type: "button",
-            onClick: () => setCategoryFilter(category.id),
-            style: {
-              flexShrink: 0, padding: '6px 12px', borderRadius: 'var(--radius-full)', fontSize: '0.78rem', fontWeight: 800,
-              border: `1px solid ${categoryFilter === category.id ? category.color : 'var(--border-subtle)'}`,
-              backgroundColor: categoryFilter === category.id ? category.color : 'var(--bg-card)',
-              color: categoryFilter === category.id ? '#FFFFFF' : 'var(--text-muted)',
-              cursor: 'pointer', whiteSpace: 'nowrap'
-            }
-          }, `${getPlaceCategoryIcon(category)} ${category.name} ${countsByCategory[category.id] || 0}`)
-          )
-        ),
-
-        /* Place list -- styled like the 정산하기 지출항목 list (bordered container, one bordered
-           row per item, category/date/visit-status pill row on top). */
+        /* Place list -- styled like the 정산하기 지출항목 list rows (white/card background, no
+           outer border, slight drop shadow so the list reads as a raised card). */
         /*#__PURE__*/React.createElement("div", {
           style: {
             display: 'flex', flexDirection: 'column', gap: '6px', padding: '10px',
-            border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-primary)'
+            border: 'none', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-card)',
+            boxShadow: '0 1px 4px rgba(0,0,0,0.08)'
           }
         },
           filteredPlaces.length === 0 ? /*#__PURE__*/React.createElement("div", {
