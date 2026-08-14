@@ -493,6 +493,68 @@ body:has(.admin-login-gate) {
   max-width: 100% !important;
   min-width: 0 !important;
 }
+/* Main-screen footer: stacked+centered on mobile (copyright, then the FAMILY LINK label, then
+   the buttons -- 3 separate lines), a single space-between row on desktop (copyright on the
+   left, "FAMILY LINK" + buttons grouped together at the right edge). Both layouts fall out of
+   the same DOM order (copyright, then the label+links group) via this one flex-direction flip. */
+.app-footer {
+  margin-top: 32px;
+  padding: 20px 20px 26px;
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+}
+.app-footer-copyright {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin: 0;
+}
+.app-footer-family {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.app-footer-family-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+}
+.app-footer-family-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+.app-footer-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-main);
+  padding: 6px 14px;
+  border-radius: 16px;
+  border: 1px solid var(--border-subtle);
+  background-color: var(--bg-secondary);
+  text-decoration: none;
+}
+@media (min-width: 768px) {
+  .app-footer {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    text-align: left;
+  }
+  .app-footer-family {
+    flex-direction: row;
+    align-items: center;
+  }
+}
 .poll-option-row,
 .recent-log-row,
 .search-result-row,
@@ -1330,7 +1392,7 @@ select.form-select {
 .poll-progress {
   width: 100%;
   min-width: 90px;
-  height: 10px;
+  height: 4px;
   border-radius: var(--radius-full);
   overflow: hidden;
   background: #E2E8F0;
