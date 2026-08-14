@@ -3915,8 +3915,8 @@ function AdminDashboard({ initialCalendars }) {
       style: {
         position: 'fixed', bottom: '32px', left: '50%', transform: 'translateX(-50%)', zIndex: 99999,
         backgroundColor: toast.type === 'error' ? '#EF4444' : '#3ECF8E', color: toast.type === 'error' ? '#FFFFFF' : '#000000',
-        padding: '12px 24px', borderRadius: '8px', fontSize: '0.88rem', fontWeight: 'bold', boxShadow: '0 10px 25px -5px rgba(15,23,42,0.35)',
-        textAlign: 'center', wordBreak: 'break-all', whiteSpace: 'pre-wrap', maxWidth: '90vw', width: 'max-content', boxSizing: 'border-box'
+        padding: '12px 24px', borderRadius: '12px', fontSize: '0.88rem', fontWeight: 'bold', boxShadow: '0 10px 25px -5px rgba(15,23,42,0.35)',
+        textAlign: 'center', wordBreak: 'break-all', whiteSpace: 'pre-wrap', maxWidth: '380px', width: '90%', boxSizing: 'border-box'
       }
     }, toast.message),
 
@@ -7098,7 +7098,7 @@ function App() {
         backgroundColor: toast.type === 'delete' ? '#EF4444' : toast.type === 'success' ? '#10B981' : '#3B82F6',
         color: '#FFFFFF',
         padding: '12px 24px',
-        borderRadius: '30px',
+        borderRadius: '12px',
         boxShadow: '0 12px 32px rgba(0,0,0,0.25)',
         fontSize: '0.95rem',
         fontWeight: '800',
@@ -7109,8 +7109,8 @@ function App() {
         textAlign: 'center',
         wordBreak: 'break-all',
         whiteSpace: 'pre-wrap',
-        maxWidth: '90vw',
-        width: 'max-content',
+        maxWidth: '380px',
+        width: '90%',
         boxSizing: 'border-box'
       }
     }, toast.message), isNotificationHelpOpen && /*#__PURE__*/React.createElement(NotificationPermissionHelpModal, {
@@ -7580,7 +7580,7 @@ function App() {
       backgroundColor: toast.type === 'delete' ? '#EF4444' : toast.type === 'success' ? '#10B981' : '#3B82F6',
       color: '#FFFFFF',
       padding: '12px 24px',
-      borderRadius: '30px',
+      borderRadius: '12px',
       boxShadow: '0 12px 32px rgba(0,0,0,0.25)',
       fontSize: '0.95rem',
       fontWeight: '800',
@@ -7588,8 +7588,8 @@ function App() {
       alignItems: 'center',
       gap: '8px',
       pointerEvents: 'none',
-      maxWidth: '90vw',
-      width: 'max-content',
+      maxWidth: '380px',
+      width: '90%',
       whiteSpace: 'pre-wrap',
       wordBreak: 'break-all',
       justifyContent: 'center',
@@ -22381,33 +22381,36 @@ function UpdateAvailableBanner() {
   return /*#__PURE__*/React.createElement("div", {
     style: {
       position: 'fixed', left: '50%', bottom: '20px', transform: 'translateX(-50%)',
-      zIndex: 100000, display: 'flex', alignItems: 'center', gap: '10px',
-      backgroundColor: '#0F172A', color: '#FFFFFF', padding: '10px 10px 10px 16px',
-      borderRadius: '9999px', boxShadow: '0 12px 32px rgba(0,0,0,0.28)',
-      fontSize: '0.85rem', fontWeight: 700, maxWidth: 'calc(100vw - 32px)'
+      zIndex: 100000, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px',
+      backgroundColor: '#0F172A', color: '#FFFFFF', padding: '10px 12px 10px 16px',
+      borderRadius: '12px', boxShadow: '0 12px 32px rgba(0,0,0,0.28)',
+      fontSize: '0.85rem', fontWeight: 700, width: '90%', maxWidth: '380px',
+      boxSizing: 'border-box'
     }
   },
-    "새 버전이 있어요",
-    /*#__PURE__*/React.createElement("button", {
-      type: "button",
-      onClick: () => window.location.reload(),
-      style: {
-        backgroundColor: '#4F46E5', color: '#FFFFFF', border: 'none', borderRadius: '9999px',
-        padding: '6px 14px', fontSize: '0.82rem', fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap'
-      }
-    }, "새로고침"),
-    /*#__PURE__*/React.createElement("button", {
-      type: "button",
-      "aria-label": "닫기",
-      onClick: () => setDismissed(true),
-      style: {
-        background: 'none', border: 'none', color: 'rgba(255,255,255,0.6)', cursor: 'pointer',
-        padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center'
-      }
-    }, /*#__PURE__*/React.createElement("svg", {
-      xmlns: "http://www.w3.org/2000/svg", width: "16", height: "16", viewBox: "0 0 24 24",
-      fill: "none", stroke: "currentColor", strokeWidth: "2.5", strokeLinecap: "round", strokeLinejoin: "round"
-    }, /*#__PURE__*/React.createElement("line", { x1: "18", y1: "6", x2: "6", y2: "18" }), /*#__PURE__*/React.createElement("line", { x1: "6", y1: "6", x2: "18", y2: "18" })))
+    /*#__PURE__*/React.createElement("span", { style: { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } }, "새 버전이 있어요"),
+    /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 } },
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: () => window.location.reload(),
+        style: {
+          backgroundColor: '#4F46E5', color: '#FFFFFF', border: 'none', borderRadius: '8px',
+          padding: '6px 14px', fontSize: '0.82rem', fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap'
+        }
+      }, "새로고침"),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        "aria-label": "닫기",
+        onClick: () => setDismissed(true),
+        style: {
+          background: 'none', border: 'none', color: 'rgba(255,255,255,0.6)', cursor: 'pointer',
+          padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center'
+        }
+      }, /*#__PURE__*/React.createElement("svg", {
+        xmlns: "http://www.w3.org/2000/svg", width: "16", height: "16", viewBox: "0 0 24 24",
+        fill: "none", stroke: "currentColor", strokeWidth: "2.5", strokeLinecap: "round", strokeLinejoin: "round"
+      }, /*#__PURE__*/React.createElement("line", { x1: "18", y1: "6", x2: "6", y2: "18" }), /*#__PURE__*/React.createElement("line", { x1: "6", y1: "6", x2: "18", y2: "18" })))
+    )
   );
 }
 
