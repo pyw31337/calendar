@@ -211,6 +211,49 @@ exports.sendAnniversaryReminders = functions.pubsub.schedule('0 9 * * *').timeZo
 // Peekalink itself uses, so the client only needs to point at this URL instead.
 const PEEKALINK_API_KEY = 'sk_w8czszf1m50xm1pbuknazw60recwmc2q';
 
+// Peekalink's scraper can't reliably read YouTube's og:meta tags -- video pages are JS-heavy and
+// commonly block/return empty results for generic scrapers, which is why chat messages sharing a
+// YouTube link never got a preview card under it. YouTube's own oEmbed endpoint is purpose-built
+// for exactly this (title/author/thumbnail, no API key, no CORS restriction for a server-to-server
+// call) so it's tried first for youtube.com/youtu.be links, with Peekalink kept as the fallback
+// for anything oEmbed can't resolve (e.g. a private or deleted video).
+function extractYouTubeId(link) {
+  try {
+    const u = new URL(link);
+    const host = u.hostname.replace(/^www\./, '').replace(/^m\./, '');
+    if (host === 'youtu.be') return u.pathname.slice(1).split('/')[0] || null;
+    if (host === 'youtube.com' || host === 'music.youtube.com') {
+      if (u.pathname === '/watch') return u.searchParams.get('v');
+      const shortsMatch = u.pathname.match(/^\/(shorts|live|embed)\/([^/]+)/);
+      if (shortsMatch) return shortsMatch[2];
+    }
+  } catch (e) {
+    // not a valid URL -- let the caller fall through to Peekalink
+  }
+  return null;
+}
+
+async function fetchYouTubeOembedPreview(link) {
+  const youtubeId = extractYouTubeId(link);
+  if (!youtubeId) return null;
+  try {
+    const oembedRes = await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(link)}&format=json`);
+    if (!oembedRes.ok) return null;
+    const oembed = await oembedRes.json();
+    return {
+      ok: true,
+      title: oembed.title || '',
+      description: oembed.author_name ? `${oembed.author_name} · YouTube` : '',
+      image: { medium: { url: oembed.thumbnail_url || '' } },
+      siteName: 'YouTube',
+      domain: 'youtube.com'
+    };
+  } catch (err) {
+    console.error('YouTube oEmbed fetch failed, falling back to Peekalink:', err);
+    return null;
+  }
+}
+
 exports.peekalinkProxy = functions.https.onRequest(async (req, res) => {
   res.set('Access-Control-Allow-Origin', '*');
   res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -226,6 +269,11 @@ exports.peekalinkProxy = functions.https.onRequest(async (req, res) => {
   const link = req.body && req.body.link;
   if (!link || typeof link !== 'string') {
     res.status(400).json({ ok: false, message: 'link is required' });
+    return;
+  }
+  const youtubePreview = await fetchYouTubeOembedPreview(link);
+  if (youtubePreview) {
+    res.status(200).json(youtubePreview);
     return;
   }
   try {

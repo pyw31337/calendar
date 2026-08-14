@@ -8690,17 +8690,16 @@ function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox, linkPr
         style: commonStyle
       })
       : (() => {
-        // The iframe's own width:100% only resolves against a *definite* box. Its ancestors
-        // here (a shrink-to-fit flex item, then a plain block with no explicit width) form an
-        // indeterminate chain, so without this wrapper the percentage falls back to 'auto' --
-        // which for a replaced element like <iframe> means the HTML default intrinsic size
-        // (300x150), not the ~760px this was meant to render at. Giving the wrapper its own
-        // explicit width breaks that chain and anchors the iframe's percentage against it.
-        // The same wrapper doubles as the desktop drag-resize handle (see .chat-media-resizable
-        // in app.css, scoped to .chat-room-container so it's a no-op everywhere else this
-        // renders): resize:horizontal lets width grow while the iframe's aspect-ratio keeps
-        // height in proportion automatically, so no extra logic is needed to scale the video
-        // together with the bubble.
+        // The regular chat-room case uses a viewport-relative (vw) width, not a % of the parent
+        // -- the ancestor chain there (shrink-to-fit flex item, then a plain block) has no
+        // definite width, so a % would resolve to 'auto' and collapse the <iframe> to its
+        // 300x150 default. vw resolves against the viewport directly, giving this div a real
+        // pixel width on its own, which also lets bubble/bubble-wrapper shrink-to-fit around it
+        // instead of stretching wider and leaving empty space beside it. The mini dashboard
+        // preview widget (isMiniChat) already sits in a definite-size container, so it stays
+        // percentage-based to fill it exactly. Also doubles as the desktop drag-resize handle
+        // (.chat-media-resizable in app.css, scoped to .chat-room-container): resize:horizontal
+        // grows the width while the iframe's aspect-ratio keeps height in proportion for free.
         const isMini = !!style.isMiniChat;
         const embedWidth = isMini ? '100%' : (isPortraitEmbed ? (style.portraitEmbedMaxWidth || '360px') : (style.embedMaxWidth || '760px'));
         const minW = isMini ? '0' : (isPortraitEmbed ? '150px' : '180px');
@@ -8708,7 +8707,7 @@ function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox, linkPr
         return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement('div', {
           className: isMini ? '' : 'chat-media-resizable',
           style: {
-            width: `min(100%, ${embedWidth})`,
+            width: isMini ? `min(100%, ${embedWidth})` : `min(88vw, ${embedWidth})`,
             maxWidth: maxW,
             minWidth: minW,
             margin: '0 auto',
@@ -11150,7 +11149,7 @@ function ChatRoomView({
         }
       }
       try {
-        confetti({ particleCount: 36, spread: 60, startVelocity: 26, gravity: 1.1, ticks: 90, origin, scalar: 0.85 });
+        confetti({ particleCount: 36, spread: 60, startVelocity: 26, gravity: 1.1, ticks: 90, origin, scalar: 0.85, zIndex: CONFETTI_Z_INDEX });
       } catch (err) {
         console.warn('Chat confetti error', err);
       }
@@ -11598,12 +11597,7 @@ function ChatRoomView({
       )
     ), /*#__PURE__*/React.createElement("div", {
       key: "bubble-wrapper",
-      // A definite width (not just maxWidth) here, for embed messages, is required -- this
-      // wrapper is a flex item with no other sizing hint, so without it the whole chain below
-      // (percentage-width bubble > percentage-width .chat-media-resizable > percentage-width
-      // iframe) has no definite containing block to resolve against and collapses to the
-      // iframe's HTML-default intrinsic size (300x150) instead of the intended ~760px.
-      style: { position: 'relative', maxWidth: chatBubbleMaxWidth, width: isEmbedMessage ? chatBubbleMaxWidth : undefined, zIndex: 1, alignSelf: 'flex-end' }
+      style: { position: 'relative', maxWidth: chatBubbleMaxWidth, zIndex: 1, alignSelf: 'flex-end' }
     }, /*#__PURE__*/React.createElement("div", {
       key: isSearchFocused ? `bubble-focused-${rowId}` : undefined,
       className: isSearchFocused ? 'chat-search-focused-bubble' : (isSearchMatch ? 'chat-search-match-bubble' : ''),
@@ -11656,7 +11650,7 @@ function ChatRoomView({
       }
     }))] : [/*#__PURE__*/React.createElement("div", {
       key: "bubble-wrapper",
-      style: { position: 'relative', maxWidth: chatBubbleMaxWidth, width: isEmbedMessage ? chatBubbleMaxWidth : undefined, zIndex: 1 }
+      style: { position: 'relative', maxWidth: chatBubbleMaxWidth, zIndex: 1 }
     }, /*#__PURE__*/React.createElement("div", {
       key: isSearchFocused ? `bubble-focused-${rowId}` : undefined,
       className: isSearchFocused ? 'chat-search-focused-bubble' : (isSearchMatch ? 'chat-search-match-bubble' : ''),
@@ -13036,6 +13030,12 @@ function EditMessageModal({
 
 
 
+// canvas-confetti creates ONE shared canvas on the first confetti() call anywhere in the app and
+// bakes that call's zIndex into it permanently -- later calls with a different zIndex are
+// ignored since the canvas is reused, not recreated. So every call site must pass this same
+// value, or an earlier low-zIndex call (e.g. a chat send burst) locks the canvas behind modals.
+const CONFETTI_Z_INDEX = 999999;
+
 function DateModal({
   anniversaries = [],
   dateStr,
@@ -13067,11 +13067,6 @@ function DateModal({
     setIsSheetOpen(false);
     setIsSubmitting(false);
   }, [calendar?.id, dateStr]);
-  // canvas-confetti injects its own fixed-position canvas at z-index 100 by default, which
-  // sits *behind* .modal-overlay's z-index: 1000 -- since both of these fire while DateModal
-  // itself is open, the burst would otherwise be rendered behind the modal card and barely
-  // visible. zIndex here just needs to clear 1000.
-  const CONFETTI_Z_INDEX = 10000;
   const celebratePositiveAction = () => {
     if (typeof confetti !== 'function') return;
     try {
