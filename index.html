@@ -23074,6 +23074,13 @@ function SectionToggleButton({ collapsed, onToggle, label }) {
   })));
 }
 
+// Shared accent for a closed poll's winning-option row and its 투표확정 badge -- the badge is a
+// solid fill of this color with white text, and the row gets a border in the same color plus a
+// tinted wash of it as background, so the two visually read as one unit distinct from the other
+// (non-winning) rows in the same list.
+const POLL_CONFIRMED_ACCENT = '#7C3AED';
+const POLL_CONFIRMED_TINT = '#F5F3FF';
+
 function PollList({ calendar, onCreatePoll, onEditPoll, onVotePoll, onCancelVote, onRequestConfirm, expandSignal }) {
   // Closed (deadline-passed) polls stay in 진행중 투표 rather than disappearing -- they're shown
   // with a "confirmed" treatment (dimmed card + winning-option badge) instead of being filtered
@@ -23226,7 +23233,8 @@ function PollList({ calendar, onCreatePoll, onEditPoll, onVotePoll, onCancelVote
       const isWinner = winningOptionIds.has(option.id);
       return /*#__PURE__*/React.createElement("div", {
         key: option.id,
-        className: "poll-option-row"
+        className: "poll-option-row",
+        style: isWinner ? { border: `1px solid ${POLL_CONFIRMED_ACCENT}`, backgroundColor: POLL_CONFIRMED_TINT } : undefined
       }, /*#__PURE__*/React.createElement("div", {
         className: "poll-option-main"
       }, /*#__PURE__*/React.createElement("div", {
@@ -23235,7 +23243,7 @@ function PollList({ calendar, onCreatePoll, onEditPoll, onVotePoll, onCancelVote
         className: "poll-confirmed-badge",
         style: {
           fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: '9999px',
-          whiteSpace: 'nowrap', backgroundColor: '#EEF2FF', color: '#4F46E5'
+          whiteSpace: 'nowrap', backgroundColor: POLL_CONFIRMED_ACCENT, color: '#FFFFFF'
         }
       }, "투표확정"), /*#__PURE__*/React.createElement("span", null, option.text)), option.url && /*#__PURE__*/React.createElement("span", {
         className: "poll-option-link",
