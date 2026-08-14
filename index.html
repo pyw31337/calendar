@@ -116,10 +116,12 @@
   <!-- Ultra-Fast Cloudflare cdnjs CDN for React 18 & ReactDOM 18 -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js" crossorigin></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="assets/app-constants.js?v=20260814-split2"></script>
 
   <script>
-const PRESET_COLORS = ['#EF4444', '#F97316', '#F59E0B', '#10B981', '#06B6D4', '#3B82F6', '#6366F1', '#8B5CF6', '#EC4899', '#14B8A6'];
-const DEFAULT_EXPENSE_CATEGORIES = [
+const GATHER_APP_CONSTANTS = window.GATHER_APP_CONSTANTS || {};
+const PRESET_COLORS = Array.isArray(GATHER_APP_CONSTANTS.PRESET_COLORS) ? GATHER_APP_CONSTANTS.PRESET_COLORS : ['#EF4444', '#F97316', '#F59E0B', '#10B981', '#06B6D4', '#3B82F6', '#6366F1', '#8B5CF6', '#EC4899', '#14B8A6'];
+const DEFAULT_EXPENSE_CATEGORIES = Array.isArray(GATHER_APP_CONSTANTS.DEFAULT_EXPENSE_CATEGORIES) ? GATHER_APP_CONSTANTS.DEFAULT_EXPENSE_CATEGORIES : [
   { id: 'food', name: '식품', color: '#F97316' },
   { id: 'goods', name: '물품', color: '#3B82F6' },
   { id: 'transport', name: '교통', color: '#10B981' },
@@ -127,7 +129,7 @@ const DEFAULT_EXPENSE_CATEGORIES = [
   { id: 'culture', name: '문화', color: '#EC4899' },
   { id: 'etc', name: '기타', color: '#64748B' }
 ];
-const EXPENSE_CATEGORY_ICONS = {
+const EXPENSE_CATEGORY_ICONS = GATHER_APP_CONSTANTS.EXPENSE_CATEGORY_ICONS || {
   food: '🍜',
   goods: '🧸',
   transport: '🚎',
