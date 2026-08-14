@@ -119,6 +119,7 @@
   <script src="assets/app-constants.js?v=20260814-split4"></script>
   <script src="assets/app-config.js?v=20260814-split3"></script>
   <script src="assets/app-calendar-data.js?v=20260814-split5"></script>
+  <script src="assets/app-chat-data.js?v=20260814-split6"></script>
 
   <script>
 const GATHER_APP_CONSTANTS = window.GATHER_APP_CONSTANTS || {};
@@ -9115,12 +9116,13 @@ function setChatLastReadTimestamp(calendarId, timestamp) {
 // the same link don't refetch, and in-flight requests are deduped across simultaneously-mounting
 // message bubbles.
 const PEEKALINK_PROXY_URL = `https://us-central1-${firebaseConfig.projectId}.cloudfunctions.net/peekalinkProxy`;
+const GATHER_APP_CHAT_DATA = window.GATHER_APP_CHAT_DATA || {};
 const linkPreviewCache = new Map();
 const linkPreviewInflight = new Map();
 // Peekalink's free plan is a 50-request-per-hour rate limit, not a fixed lifetime quota --
 // it resets every clock hour rather than depleting over time. See PEEKALINK_HOUR_BUCKET_MS below.
-const PEEKALINK_FREE_HOURLY_LIMIT = 50;
-const PEEKALINK_HOUR_BUCKET_MS = 3600000;
+const PEEKALINK_FREE_HOURLY_LIMIT = Number.isFinite(GATHER_APP_CHAT_DATA.PEEKALINK_FREE_HOURLY_LIMIT) ? GATHER_APP_CHAT_DATA.PEEKALINK_FREE_HOURLY_LIMIT : 50;
+const PEEKALINK_HOUR_BUCKET_MS = Number.isFinite(GATHER_APP_CHAT_DATA.PEEKALINK_HOUR_BUCKET_MS) ? GATHER_APP_CHAT_DATA.PEEKALINK_HOUR_BUCKET_MS : 3600000;
 
 // Deterministic, synchronous 64-bit FNV-1a hash used as the Firestore doc ID for the shared
 // linkPreviews cache below (doc IDs can't contain '/', which raw URLs do). Collisions are
@@ -9354,7 +9356,7 @@ let heicToLoadPromise = null;
 // it hasn't been updated since 2023, and its own Emscripten build has been unreliable on some
 // mobile browsers in the wild for reasons that never surface a clear error (it's caught and
 // collapsed into one generic failure), which is exactly the profile of this bug report.
-const HEIC_TO_CDN_URLS = [
+const HEIC_TO_CDN_URLS = Array.isArray(GATHER_APP_CHAT_DATA.HEIC_TO_CDN_URLS) ? GATHER_APP_CHAT_DATA.HEIC_TO_CDN_URLS : [
   'https://cdn.jsdelivr.net/npm/heic-to@1.5.2/dist/heic-to.js',
   'https://unpkg.com/heic-to@1.5.2/dist/heic-to.js'
 ];
@@ -9380,7 +9382,7 @@ function loadHeicTo(timeoutMs = 15000) {
 let heic2anyLoadPromise = null;
 // Two independent CDNs -- some mobile carrier/corporate networks block one but not the other,
 // and a single hardcoded host with no fallback turns any CDN hiccup into a hard HEIC failure.
-const HEIC2ANY_CDN_URLS = [
+const HEIC2ANY_CDN_URLS = Array.isArray(GATHER_APP_CHAT_DATA.HEIC2ANY_CDN_URLS) ? GATHER_APP_CHAT_DATA.HEIC2ANY_CDN_URLS : [
   'https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js',
   'https://unpkg.com/heic2any@0.0.4/dist/heic2any.min.js'
 ];
@@ -12914,7 +12916,7 @@ function ChatRoomView({
 // Native emoji rendering looks different on every OS (Apple/Segoe/Noto/etc.), which is exactly
 // what a shared group chat wants to avoid: everyone sees the identical glyph regardless of
 // device or browser (Safari/Chrome/Edge/Firefox, desktop or mobile).
-const TWEMOJI_CDN_BASE = 'https://cdn.jsdelivr.net/gh/jdecked/twemoji@17.0.3/assets/svg/';
+const TWEMOJI_CDN_BASE = typeof GATHER_APP_CHAT_DATA.TWEMOJI_CDN_BASE === 'string' ? GATHER_APP_CHAT_DATA.TWEMOJI_CDN_BASE : 'https://cdn.jsdelivr.net/gh/jdecked/twemoji@17.0.3/assets/svg/';
 function twemojiCodepoint(emoji) {
   const hasZwj = emoji.indexOf('\u200D') !== -1;
   const codepoints = [];
@@ -12929,7 +12931,7 @@ function twemojiImageUrl(emoji) {
   return `${TWEMOJI_CDN_BASE}${twemojiCodepoint(emoji)}.svg`;
 }
 
-const EMOJI_CATEGORIES = [
+const EMOJI_CATEGORIES = Array.isArray(GATHER_APP_CHAT_DATA.EMOJI_CATEGORIES) ? GATHER_APP_CHAT_DATA.EMOJI_CATEGORIES : [
   { label: '표정', emojis: ['😀', '😁', '😂', '🤣', '😊', '😇', '🙂', '🙃', '😉', '😍', '🥰', '😘', '😋', '😜', '🤪', '😎', '🤩', '🥳', '😏', '😢', '😭', '😤', '😡', '🥺', '😱', '😨', '😴', '🤔', '🙄', '😅', '😐', '🤗', '🤭'] },
   { label: '손동작·사람', emojis: ['👍', '👎', '👏', '🙌', '🙏', '👋', '🤝', '💪', '✌️', '🤞', '👌', '🤙', '👊', '🤟', '🖐️', '🙇', '🙇‍♂️', '🙇‍♀️', '🤦', '🤷'] },
   { label: '하트', emojis: ['❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '💕', '💖', '💗', '💘', '💝', '😻'] },
@@ -12939,7 +12941,7 @@ const EMOJI_CATEGORIES = [
   { label: '기호', emojis: ['✨', '💥', '💫', '💦', '💨', '🆗', '🆒', '🔔', '🚫', '❓', '❗', '➕', '➖'] }
 ];
 
-const RECENT_EMOJI_STORAGE_KEY = 'gather_recent_emojis_v1';
+const RECENT_EMOJI_STORAGE_KEY = typeof GATHER_APP_CHAT_DATA.RECENT_EMOJI_STORAGE_KEY === 'string' ? GATHER_APP_CHAT_DATA.RECENT_EMOJI_STORAGE_KEY : 'gather_recent_emojis_v1';
 function getRecentEmojis() {
   try {
     const arr = JSON.parse(getLocalStorage().getItem(RECENT_EMOJI_STORAGE_KEY) || '[]');

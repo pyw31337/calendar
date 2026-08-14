@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 
 const MIRRORED_ASSETS = [
   'app-calendar-data.js',
+  'app-chat-data.js',
   'app-config.js',
   'app-constants.js'
 ];
