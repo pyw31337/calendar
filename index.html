@@ -23006,6 +23006,11 @@ function PollList({ calendar, onCreatePoll, onEditPoll, onVotePoll, onCancelVote
       const rest = active.filter(option => !winningOptionIds.has(option.id));
       return [...winners, ...rest];
     })();
+    // A closed poll's winning row stays visible under the description even while the section/
+    // this poll is collapsed, instead of disappearing along with the rest of the option list --
+    // expanding still shows every option (winner first, per orderedOptions above).
+    const showOptionList = isOptionsVisible || (closed && winningOptionIds.size > 0);
+    const visibleOptions = isOptionsVisible ? orderedOptions : orderedOptions.filter(option => winningOptionIds.has(option.id));
     // 미참여: active roster members who haven't voted on ANY option of this poll yet (union
     // across options, not per-option) -- who still needs a nudge to vote at all.
     const votedParticipantIds = new Set(
@@ -23043,7 +23048,7 @@ function PollList({ calendar, onCreatePoll, onEditPoll, onVotePoll, onCancelVote
       className: "poll-header",
       style: {
         alignItems: 'center',
-        marginBottom: isOptionsVisible ? '12px' : '0'
+        marginBottom: showOptionList ? '12px' : '0'
       }
     }, /*#__PURE__*/React.createElement("div", {
       onClick: togglePollOptions,
@@ -23064,9 +23069,9 @@ function PollList({ calendar, onCreatePoll, onEditPoll, onVotePoll, onCancelVote
       title: "\uD22C\uD45C \uC124\uC815",
       style: { padding: '8px' },
       onClick: () => onEditPoll(poll)
-    }, /*#__PURE__*/React.createElement(SettingsIcon, null))), renderNonVoterBadges('poll-nonvoters-mobile'), isOptionsVisible && /*#__PURE__*/React.createElement("div", {
+    }, /*#__PURE__*/React.createElement(SettingsIcon, null))), renderNonVoterBadges('poll-nonvoters-mobile'), showOptionList && /*#__PURE__*/React.createElement("div", {
       className: "poll-option-list"
-    }, orderedOptions.map((option, index) => {
+    }, visibleOptions.map((option, index) => {
       const voterIds = getPollOptionVoterIds(poll, option.id).filter(participantId => participantsMap[participantId]);
       const voteCount = voterIds.length;
       const percent = totalVotes > 0 ? Math.round(voteCount / totalVotes * 100) : 0;
@@ -23076,14 +23081,15 @@ function PollList({ calendar, onCreatePoll, onEditPoll, onVotePoll, onCancelVote
         className: "poll-option-row"
       }, /*#__PURE__*/React.createElement("div", {
         className: "poll-option-main"
-      }, /*#__PURE__*/React.createElement("span", null, option.text), isWinner && /*#__PURE__*/React.createElement("span", {
+      }, /*#__PURE__*/React.createElement("div", {
+        style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }
+      }, isWinner && /*#__PURE__*/React.createElement("span", {
         className: "poll-confirmed-badge",
         style: {
-          display: 'inline-flex', alignItems: 'center', marginLeft: '6px',
-          fontSize: '0.7rem', fontWeight: 800, padding: '2px 8px', borderRadius: '9999px',
-          backgroundColor: '#EEF2FF', color: '#4F46E5', whiteSpace: 'nowrap'
+          fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: '9999px',
+          whiteSpace: 'nowrap', backgroundColor: '#EEF2FF', color: '#4F46E5'
         }
-      }, "(투표확정)"), option.url && /*#__PURE__*/React.createElement("span", {
+      }, "투표확정"), /*#__PURE__*/React.createElement("span", null, option.text)), option.url && /*#__PURE__*/React.createElement("span", {
         className: "poll-option-link",
         onClick: event => {
           event.stopPropagation();
