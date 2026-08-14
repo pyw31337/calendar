@@ -555,11 +555,13 @@
       .chat-message-image-grid {
         --chat-image-grid-cols: var(--chat-image-grid-mobile-cols) !important;
         --chat-image-grid-max-width: min(100%, 240px) !important;
+        --chat-image-thumb-track: minmax(0, 1fr) !important;
       }
     }
     @media (min-width: 721px) {
       .chat-message-image-grid.is-wide {
-        width: 100%;
+        width: fit-content;
+        max-width: 100%;
       }
     }
     .poll-option-row,
@@ -2281,11 +2283,9 @@
       }
       :root:not([data-theme="light"]) .search-result-row {
         background-color: #1B2540;
-        border-color: #2D3A5A;
       }
       :root:not([data-theme="light"]) .search-result-row:hover {
         background-color: #212D4D;
-        border-color: #6366F1;
       }
     }
 
@@ -2782,10 +2782,29 @@ async function requestChatNotificationPermission() {
     return Notification.permission;
   }
   try {
-    return await Notification.requestPermission();
+    return await new Promise(resolve => {
+      let settled = false;
+      const finish = value => {
+        if (settled) return;
+        settled = true;
+        resolve(value || Notification.permission || 'default');
+      };
+      const result = Notification.requestPermission(finish);
+      if (result && typeof result.then === 'function') {
+        result.then(finish).catch(() => finish(Notification.permission || 'denied'));
+      }
+      setTimeout(() => finish(Notification.permission || 'default'), 12000);
+    });
   } catch (e) {
     return 'denied';
   }
+}
+
+async function ensureChatNotificationPermission() {
+  if (!isNotificationSupported()) return 'unsupported';
+  if (Notification.permission === 'granted') return 'granted';
+  if (Notification.permission === 'denied') return 'denied';
+  return requestChatNotificationPermission();
 }
 
 // Whether to actually show a chat notification is a per-calendar preference layered on top of
@@ -2941,6 +2960,17 @@ async function subscribeUserToPush(calendarId, activeParticipantId) {
     console.error('Failed to subscribe user to Web Push:', err);
     return { ok: false, reason: err?.message || 'subscribe-failed' };
   }
+}
+
+async function subscribeUserToPushWithPermission(calendarId, activeParticipantId) {
+  let result = await subscribeUserToPush(calendarId, activeParticipantId);
+  if (result && result.reason === 'permission-not-granted') {
+    const permission = await ensureChatNotificationPermission();
+    if (permission === 'granted') {
+      result = await subscribeUserToPush(calendarId, activeParticipantId);
+    }
+  }
+  return result;
 }
 
 async function unsubscribeUserFromPush(calendarId) {
@@ -8458,7 +8488,7 @@ function App() {
       setMainChatNotifyEnabled(next);
       setChatNotifyEnabledForCalendar(activeCalId, next);
       if (next) {
-        const result = await subscribeUserToPush(activeCalId, getCurrentChatParticipantId());
+        const result = await subscribeUserToPushWithPermission(activeCalId, getCurrentChatParticipantId());
         if (result && !result.ok) {
           setMainChatNotifyEnabled(false);
           setChatNotifyEnabledForCalendar(activeCalId, false);
@@ -8476,7 +8506,7 @@ function App() {
       showToast('브라우저 설정에서 알림 허용 필요', 'error');
       return;
     }
-    const result = await requestChatNotificationPermission();
+    const result = await ensureChatNotificationPermission();
     setMainNotifPermission(result);
     if (result !== 'granted') {
       showToast('알림 권한 거부됨', 'error');
@@ -8484,7 +8514,7 @@ function App() {
     }
     setChatNotifyEnabledForCalendar(activeCalId, true);
     setMainChatNotifyEnabled(true);
-    const subscribeResult = await subscribeUserToPush(activeCalId, getCurrentChatParticipantId());
+    const subscribeResult = await subscribeUserToPushWithPermission(activeCalId, getCurrentChatParticipantId());
     if (subscribeResult && !subscribeResult.ok) {
       setMainChatNotifyEnabled(false);
       setChatNotifyEnabledForCalendar(activeCalId, false);
@@ -12533,8 +12563,6 @@ function renderChatMessageImages(msg, setActiveLightbox, singleImageStyle = {}) 
   const shouldFillBubble = thumbs.length >= 5;
   const maxW = thumbs.length === 2
     ? '180px'
-    : shouldFillBubble
-    ? '100%'
     : `min(100%, calc(var(--chat-image-grid-cols, ${mobileCols}) * 76px + (var(--chat-image-grid-cols, ${mobileCols}) - 1) * 4px))`;
 
   return /*#__PURE__*/React.createElement('div', {
@@ -12542,12 +12570,13 @@ function renderChatMessageImages(msg, setActiveLightbox, singleImageStyle = {}) 
     style: {
       '--chat-image-grid-cols': desktopCols,
       '--chat-image-grid-mobile-cols': mobileCols,
-      '--chat-image-grid-max-width': maxW
+      '--chat-image-grid-max-width': maxW,
+      '--chat-image-thumb-track': '76px'
     },
   }, /*#__PURE__*/React.createElement('div', {
     style: {
       display: 'grid',
-      gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
+      gridTemplateColumns: `repeat(${cols}, var(--chat-image-thumb-track, 76px))`,
       gap: '4px',
       width: 'var(--chat-image-grid-max-width)',
       maxWidth: '100%',
@@ -13966,6 +13995,26 @@ function ChatRoomView({
     scrollToBottom();
     setHasNewMessageBelow(false);
   };
+  const sendTapLockRef = React.useRef(false);
+  const canSendChatNow = () => !isChatSubmitting && (!!chatInput.trim() || chatImages.length > 0);
+  const triggerChatSend = () => {
+    if (!canSendChatNow() || sendTapLockRef.current) return;
+    sendTapLockRef.current = true;
+    Promise.resolve(onSend && onSend()).finally(() => {
+      setTimeout(() => {
+        sendTapLockRef.current = false;
+      }, 250);
+    });
+  };
+  const handleSendPointerDown = (event) => {
+    if (!canSendChatNow()) return;
+    event.preventDefault();
+    event.stopPropagation();
+    triggerChatSend();
+  };
+  const handleSendClick = () => {
+    triggerChatSend();
+  };
 
   const [notifPermission, setNotifPermission] = React.useState(() => (isNotificationSupported() ? Notification.permission : 'unsupported'));
   const [chatNotifyEnabled, setChatNotifyEnabled] = React.useState(() => isChatNotifyEnabledForCalendar(calendar?.id));
@@ -13993,7 +14042,7 @@ function ChatRoomView({
       setChatNotifyEnabled(next);
       setChatNotifyEnabledForCalendar(calendar.id, next);
       if (next) {
-        const result = await subscribeUserToPush(calendar.id, chatParticipantId);
+        const result = await subscribeUserToPushWithPermission(calendar.id, chatParticipantId);
         if (result && !result.ok) {
           setChatNotifyEnabled(false);
           setChatNotifyEnabledForCalendar(calendar.id, false);
@@ -14011,7 +14060,7 @@ function ChatRoomView({
       if (showToast) showToast('브라우저 설정에서 알림 허용 필요', 'error');
       return;
     }
-    const result = await requestChatNotificationPermission();
+    const result = await ensureChatNotificationPermission();
     if (result !== 'granted') {
       setNotifPermission(result);
       if (showToast) showToast('알림 권한 거부됨', 'error');
@@ -14027,7 +14076,7 @@ function ChatRoomView({
       setNotifPermission('granted');
       setChatNotifyEnabled(true);
       setChatNotifyEnabledForCalendar(calendar.id, true);
-      const result = await subscribeUserToPush(calendar.id, chatParticipantId);
+      const result = await subscribeUserToPushWithPermission(calendar.id, chatParticipantId);
       if (result && !result.ok) {
         setChatNotifyEnabled(false);
         setChatNotifyEnabledForCalendar(calendar.id, false);
@@ -15032,7 +15081,8 @@ function ChatRoomView({
           /*#__PURE__*/React.createElement("button", {
             type: "button",
             disabled: isChatSubmitting || (!chatInput.trim() && chatImages.length === 0),
-            onClick: onSend,
+            onPointerDown: handleSendPointerDown,
+            onClick: handleSendClick,
             style: {
               height: '32px',
               padding: '0 16px',
@@ -17238,7 +17288,7 @@ function AdminModal({
       setChatNotifyEnabled(next);
       setChatNotifyEnabledForCalendar(calendar.id, next);
       if (next) {
-        const result = await subscribeUserToPush(calendar.id, chatParticipantId);
+        const result = await subscribeUserToPushWithPermission(calendar.id, chatParticipantId);
         if (result && !result.ok) {
           setChatNotifyEnabled(false);
           setChatNotifyEnabledForCalendar(calendar.id, false);
@@ -17256,7 +17306,7 @@ function AdminModal({
       if (showToast) showToast('브라우저 설정에서 알림 허용 필요', 'error');
       return;
     }
-    const result = await requestChatNotificationPermission();
+    const result = await ensureChatNotificationPermission();
     if (result !== 'granted') {
       setNotifPermission(result);
       if (showToast) showToast('알림 권한 거부됨', 'error');
@@ -17268,7 +17318,7 @@ function AdminModal({
       setNotifPermission('granted');
       setChatNotifyEnabled(true);
       setChatNotifyEnabledForCalendar(calendar.id, true);
-      const result = await subscribeUserToPush(calendar.id, chatParticipantId);
+      const result = await subscribeUserToPushWithPermission(calendar.id, chatParticipantId);
       if (result && !result.ok) {
         setChatNotifyEnabled(false);
         setChatNotifyEnabledForCalendar(calendar.id, false);
