@@ -551,6 +551,12 @@
       transform: translateY(-1px) scale(1.03);
       filter: saturate(1.08);
     }
+    @media (max-width: 720px) {
+      .chat-message-image-grid {
+        --chat-image-grid-cols: var(--chat-image-grid-mobile-cols) !important;
+        --chat-image-grid-max-width: min(100%, 240px) !important;
+      }
+    }
     .poll-option-row,
     .recent-log-row,
     .search-result-row,
@@ -12483,17 +12489,28 @@ function renderChatMessageImages(msg, setActiveLightbox, singleImageStyle = {}) 
     });
   }
 
-  // Multi-image layout: uses a proportional CSS Grid to cleanly fit the images
-  // without empty right-hand spacing. 2 images = 2 columns, 3+ images = 3 columns.
-  const cols = thumbs.length === 2 ? 2 : 3;
-  const maxW = thumbs.length === 2 ? '180px' : '240px'; // 2 cols slightly narrower, 3 cols wider
+  // Multi-image layout: PC gets denser rows so mixed image+text bubbles do not leave a huge
+  // empty right side. Mobile keeps the compact 2/3-column layout for touch readability.
+  const mobileCols = thumbs.length === 2 ? 2 : 3;
+  const desktopCols = thumbs.length >= 12 ? 6 : thumbs.length >= 5 ? 5 : mobileCols;
+  const cols = `var(--chat-image-grid-cols, ${mobileCols})`;
+  const maxW = thumbs.length === 2
+    ? '180px'
+    : `min(100%, calc(var(--chat-image-grid-cols, ${mobileCols}) * 76px + (var(--chat-image-grid-cols, ${mobileCols}) - 1) * 4px))`;
 
   return /*#__PURE__*/React.createElement('div', {
+    className: 'chat-message-image-grid',
+    style: {
+      '--chat-image-grid-cols': desktopCols,
+      '--chat-image-grid-mobile-cols': mobileCols,
+      '--chat-image-grid-max-width': maxW
+    },
+  }, /*#__PURE__*/React.createElement('div', {
     style: {
       display: 'grid',
-      gridTemplateColumns: `repeat(${cols}, 1fr)`,
+      gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
       gap: '4px',
-      width: maxW,
+      width: 'var(--chat-image-grid-max-width)',
       maxWidth: '100%',
       marginBottom: singleImageStyle.marginBottom || '0'
     }
@@ -12510,7 +12527,7 @@ function renderChatMessageImages(msg, setActiveLightbox, singleImageStyle = {}) 
       cursor: 'pointer',
       objectFit: 'cover'
     }
-  })));
+  }))));
 }
 
 // Best-effort per-image metadata for the Lightbox info overlay. Chat images are stored either
@@ -17075,7 +17092,7 @@ function ColorSwatchPicker({ value, onChange, disabled, title = "색상 선택" 
 // A <select>-replacement styled as a form-select trigger button that opens the same bottom-sheet
 // picker pattern used elsewhere in the app (e.g. the admin header's calendar picker) -- unlike a
 // native <select>, the open dropdown list is entirely CSS-styled and follows dark mode.
-function SimpleBottomSheetPicker({ title, value, options, onSelect, placeholder, disabled, style }) {
+function SimpleBottomSheetPicker({ title, value, options, onSelect, placeholder, disabled, style, className = "form-select" }) {
   const [isOpen, setIsOpen] = React.useState(false);
   const selected = options.find(o => o.value === value);
   const sheet = isOpen && /*#__PURE__*/React.createElement("div", {
@@ -17105,11 +17122,27 @@ function SimpleBottomSheetPicker({ title, value, options, onSelect, placeholder,
   return /*#__PURE__*/React.createElement(React.Fragment, null,
     /*#__PURE__*/React.createElement("button", {
       type: "button",
-      className: "form-select",
+      className,
       disabled,
       style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', cursor: disabled ? 'default' : 'pointer', textAlign: 'left', width: '100%', ...style },
       onClick: () => setIsOpen(true)
-    }, /*#__PURE__*/React.createElement("span", { style: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, selected ? selected.label : placeholder)),
+    },
+      /*#__PURE__*/React.createElement("span", { style: { minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, selected ? selected.label : placeholder),
+      /*#__PURE__*/React.createElement("svg", {
+        xmlns: "http://www.w3.org/2000/svg",
+        width: "18",
+        height: "18",
+        viewBox: "0 0 24 24",
+        fill: "none",
+        stroke: "currentColor",
+        "stroke-width": "2",
+        "stroke-linecap": "round",
+        "stroke-linejoin": "round",
+        className: "icon icon-tabler icons-tabler-outline icon-tabler-chevron-down",
+        style: { flexShrink: 0, color: '#94A3B8' }
+      }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }),
+        /*#__PURE__*/React.createElement("path", { d: "M6 9l6 6l6 -6" }))
+    ),
     sheet && typeof document !== 'undefined' && ReactDOM.createPortal ? ReactDOM.createPortal(sheet, document.body) : sheet
   );
 }
@@ -18054,20 +18087,21 @@ function computeCalendarSearchMatches(cal, chatMessages, memoList, q, limit = 30
 // 일정/채팅/태그/정산/메모 result categories.
 function SearchCategoryTabs({ tabs, activeKey, onSelect }) {
   return /*#__PURE__*/React.createElement("div", {
-    style: { display: 'flex', overflowX: 'auto', borderBottom: '1px solid #E2E8F0' }
+    style: { display: 'grid', gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))`, overflow: 'hidden', borderBottom: '1px solid #E2E8F0' }
   }, tabs.map(tab => /*#__PURE__*/React.createElement("button", {
     key: tab.key,
     type: "button",
     onClick: () => onSelect(tab.key),
     style: {
-      flex: '1 1 0', minWidth: 'fit-content',
+      minWidth: 0,
       display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-      padding: '10px 8px', fontSize: '0.82rem', fontWeight: 800,
+      padding: '10px 4px', fontSize: '0.82rem', fontWeight: 800,
       background: 'none', border: 'none', cursor: 'pointer',
       color: activeKey === tab.key ? '#2563EB' : '#64748B',
       borderBottom: activeKey === tab.key ? '3px solid #2563EB' : '3px solid transparent',
       marginBottom: '-1px',
-      whiteSpace: 'nowrap'
+      whiteSpace: 'nowrap',
+      overflow: 'hidden'
     }
   }, tab.label, /*#__PURE__*/React.createElement("span", {
     style: {
@@ -18348,7 +18382,21 @@ function AdminUnifiedSearchResultsView({
   onBack
 }) {
   const q = (query || '').trim().toLowerCase();
-  const [isFilterPanelOpen, setIsFilterPanelOpen] = React.useState(false);
+  const [isFilterPanelOpen, setIsFilterPanelOpen] = React.useState(true);
+
+  const searchCalendarOptions = React.useMemo(() => {
+    const priority = new Map([['kkot', 1], ['cw', 2], ['jhair', 3]]);
+    const known = [...(calendarsList || [])].sort((a, b) => {
+      const ai = priority.get(a.id) || 99;
+      const bi = priority.get(b.id) || 99;
+      if (ai !== bi) return ai - bi;
+      return (a.title || a.id).localeCompare(b.title || b.id, 'ko');
+    });
+    return [
+      { value: 'all', label: '통합 캘린더' },
+      ...known.map(cal => ({ value: cal.id, label: cal.title || cal.id }))
+    ];
+  }, [calendarsList]);
 
   const filteredCalendarsList = React.useMemo(() => (
     calFilter === 'all' ? (calendarsList || []) : (calendarsList || []).filter(cal => cal.id === calFilter)
@@ -18386,9 +18434,10 @@ function AdminUnifiedSearchResultsView({
       merged.tags = merged.tags.filter(item => item.timestamp >= dateRangeMs.startMs && item.timestamp <= dateRangeMs.endMs);
       merged.memos = merged.memos.filter(item => item.createdAt >= dateRangeMs.startMs && item.createdAt <= dateRangeMs.endMs);
     }
+    merged.schedules.sort((a, b) => b.date.localeCompare(a.date) || (b.updatedAt || 0) - (a.updatedAt || 0));
     merged.chat.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
     merged.tags.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-    merged.expenses.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    merged.expenses.sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt || 0) - (a.createdAt || 0));
     merged.memos.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
     return merged;
   }, [q, filteredCalendarsList, messagesMap, memosMap, dateStart, dateEnd, dateRangeMs]);
@@ -18444,17 +18493,16 @@ function AdminUnifiedSearchResultsView({
         /*#__PURE__*/React.createElement("span", { style: { fontWeight: 800, fontSize: '0.95rem', color: '#0F172A' } }, "통합 검색결과"),
         /*#__PURE__*/React.createElement("span", { style: { fontWeight: 500, marginLeft: '10px', fontSize: '0.78rem', color: '#64748B' } },
           `"${query}" · ${grandTotal}건 · 캘린더 ${calendarCount}개`
-        ),
-        /*#__PURE__*/React.createElement("button", {
-          type: "button", onClick: () => setIsFilterPanelOpen(prev => !prev),
-          "aria-label": "검색 기간/캘린더 필터", title: "검색 기간/캘린더 필터",
-          style: {
-            background: 'none', border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center',
-            marginLeft: '8px', padding: '2px', color: (calFilter !== 'all' || dateStart || dateEnd) ? '#2563EB' : '#64748B'
-          }
-        }, /*#__PURE__*/React.createElement(CalendarCogIcon, null))
+        )
       ),
-      /*#__PURE__*/React.createElement("div", { style: { width: '32px', flexShrink: 0 } })
+      /*#__PURE__*/React.createElement("button", {
+        type: "button", onClick: () => setIsFilterPanelOpen(prev => !prev),
+        "aria-label": "검색 기간/캘린더 필터", title: "검색 기간/캘린더 필터",
+        style: {
+          background: 'none', border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          width: '32px', height: '32px', padding: 0, color: (calFilter !== 'all' || dateStart || dateEnd) ? '#2563EB' : '#64748B', flexShrink: 0
+        }
+      }, /*#__PURE__*/React.createElement(CalendarSearchIcon, { size: 22 }))
     ),
 
     isFilterPanelOpen && /*#__PURE__*/React.createElement("div", {
@@ -18467,9 +18515,11 @@ function AdminUnifiedSearchResultsView({
         /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
           title: "캘린더 선택",
           value: calFilter,
-          options: [{ value: 'all', label: '통합' }, ...(calendarsList || []).map(cal => ({ value: cal.id, label: `${cal.title || cal.id} (${cal.id})` }))],
+          options: searchCalendarOptions,
           onSelect: onCalFilterChange,
-          placeholder: "통합"
+          placeholder: "통합 캘린더",
+          className: "form-select admin-calendar-picker-btn",
+          style: { minHeight: '44px' }
         })
       ),
       /*#__PURE__*/React.createElement("div", { style: { minWidth: '120px', flex: '1 1 120px' } },
@@ -22793,6 +22843,37 @@ function CalendarCogIcon() {
   }));
 }
 
+function CalendarSearchIcon({ size = 20 } = {}) {
+  return /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: String(size),
+    height: String(size),
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    "stroke-width": "2",
+    "stroke-linecap": "round",
+    "stroke-linejoin": "round",
+    className: "icon icon-tabler icons-tabler-outline icon-tabler-calendar-search"
+  }, /*#__PURE__*/React.createElement("path", {
+    stroke: "none",
+    d: "M0 0h24v24H0z",
+    fill: "none"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M11.5 21h-5.5a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4.5"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M16 3v4"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M8 3v4"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M4 11h16"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M15 18a3 3 0 1 0 6 0a3 3 0 1 0 -6 0"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M20.2 20.2l1.8 1.8"
+  }));
+}
+
 function TrophyIcon() {
   return /*#__PURE__*/React.createElement("svg", {
     xmlns: "http://www.w3.org/2000/svg",
@@ -23510,7 +23591,10 @@ function DeadlineDateTimePicker({ value, onChange, disabled, dateOnly = false, p
       disabled,
       style: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', cursor: disabled ? 'default' : 'pointer', textAlign: 'left' },
       onClick: openPicker
-    }, /*#__PURE__*/React.createElement('span', null, displayText)),
+    },
+      /*#__PURE__*/React.createElement('span', { style: { minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, displayText),
+      dateOnly && /*#__PURE__*/React.createElement(CalendarSearchIcon, { size: 18 })
+    ),
     (() => {
       const sheet = isOpen && /*#__PURE__*/React.createElement('div', {
         className: 'bottom-sheet-overlay',
