@@ -130,6 +130,95 @@
     return raw ? source.replace(raw, '').trim() : source.trim();
   }
 
+  function sanitizeTextValue(value, maxLength = 120) {
+    return String(value ?? '')
+      .replace(/[\u0000-\u001F\u007F]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, maxLength);
+  }
+
+  function normalizeColorValue(value, fallback = '#64748B') {
+    const color = String(value || '').trim();
+    return /^#[0-9A-Fa-f]{6}$/.test(color) ? color : fallback;
+  }
+
+  function getDefaultExpenseCategories() {
+    return Array.isArray(window.GATHER_APP_CONSTANTS?.DEFAULT_EXPENSE_CATEGORIES)
+      ? window.GATHER_APP_CONSTANTS.DEFAULT_EXPENSE_CATEGORIES
+      : [
+        { id: 'food', name: '식품', color: '#F97316' },
+        { id: 'goods', name: '물품', color: '#3B82F6' },
+        { id: 'transport', name: '교통', color: '#10B981' },
+        { id: 'lodging', name: '숙박', color: '#8B5CF6' },
+        { id: 'culture', name: '문화', color: '#EC4899' },
+        { id: 'etc', name: '기타', color: '#64748B' }
+      ];
+  }
+
+  function getExpenseCategoryIcons() {
+    return window.GATHER_APP_CONSTANTS?.EXPENSE_CATEGORY_ICONS || {
+      food: '🍜',
+      goods: '🧸',
+      transport: '🚎',
+      lodging: '🏨',
+      culture: '🎟️',
+      etc: '💬'
+    };
+  }
+
+  function normalizeExpenseCategories(categories) {
+    const defaultCategories = getDefaultExpenseCategories();
+    const source = Array.isArray(categories) && categories.length ? categories : defaultCategories;
+    const seen = new Set();
+    const normalized = source.map((category, index) => {
+      const fallback = defaultCategories[index % defaultCategories.length];
+      const rawId = sanitizeTextValue(category?.id || category?.name || fallback.id, 40).toLowerCase().replace(/[^a-z0-9가-힣_-]/g, '') || fallback.id;
+      const id = seen.has(rawId) ? `${rawId}_${index}` : rawId;
+      seen.add(id);
+      return {
+        id,
+        name: sanitizeTextValue(category?.name || fallback.name, 24) || fallback.name,
+        color: normalizeColorValue(category?.color, fallback.color)
+      };
+    }).filter(category => category.name);
+    return normalized.length ? normalized : defaultCategories;
+  }
+
+  function getExpenseCategories(calendar) {
+    return normalizeExpenseCategories(calendar?.expenseCategories);
+  }
+
+  function getExpenseCategory(calendar, categoryId) {
+    const defaultCategories = getDefaultExpenseCategories();
+    const categories = getExpenseCategories(calendar);
+    return categories.find(category => category.id === categoryId) || categories.find(category => category.id === 'etc') || defaultCategories[defaultCategories.length - 1];
+  }
+
+  function getExpenseCategoryIcon(category) {
+    const icons = getExpenseCategoryIcons();
+    if (!category) return icons.etc;
+    const name = String(category.name || '');
+    const hasEmoji = /[\uD800-\uDBFF][\uDC00-\uDFFF]/.test(name) || /\p{Emoji_Presentation}/u.test(name);
+    if (hasEmoji) return '';
+    const id = String(category.id || '').toLowerCase();
+    if (icons[id]) return icons[id];
+    const matchedDefault = getDefaultExpenseCategories().find(item => item.name === name);
+    return matchedDefault ? icons[matchedDefault.id] : icons.etc;
+  }
+
+  function getExpenseCategoryLabel(category) {
+    const name = sanitizeTextValue(category?.name || '기타', 24) || '기타';
+    const icon = getExpenseCategoryIcon(category);
+    return icon ? `${icon}\u00A0\u00A0${name}` : name;
+  }
+
+  function extractExpenseTimePrefix(label) {
+    const text = (label || '').trim();
+    const match = /^(\d{1,2}시)\s+(.*)$/s.exec(text);
+    return match ? { time: match[1], rest: match[2].trim() } : { time: '', rest: text };
+  }
+
   function detectBrowserForShortcutInstructions(navigatorLike = typeof navigator !== 'undefined' ? navigator : {}) {
     const ua = navigatorLike.userAgent || '';
     const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigatorLike.platform === 'MacIntel' && navigatorLike.maxTouchPoints > 1);
@@ -188,6 +277,12 @@
     extractFirstUrlInfo,
     extractFirstUrl,
     removeFirstUrl,
+    normalizeExpenseCategories,
+    getExpenseCategories,
+    getExpenseCategory,
+    getExpenseCategoryIcon,
+    getExpenseCategoryLabel,
+    extractExpenseTimePrefix,
     detectBrowserForShortcutInstructions,
     getShortcutInstructions,
     canUseNativeInstallPrompt

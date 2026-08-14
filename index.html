@@ -143,52 +143,12 @@ const EXPENSE_CATEGORY_ICONS = GATHER_APP_CONSTANTS.EXPENSE_CATEGORY_ICONS || {
   culture: '🎟️',
   etc: '💬'
 };
-function normalizeExpenseCategories(categories) {
-  const source = Array.isArray(categories) && categories.length ? categories : DEFAULT_EXPENSE_CATEGORIES;
-  const seen = new Set();
-  const normalized = source.map((category, index) => {
-    const fallback = DEFAULT_EXPENSE_CATEGORIES[index % DEFAULT_EXPENSE_CATEGORIES.length];
-    const rawId = sanitizeText(category?.id || category?.name || fallback.id, 40).toLowerCase().replace(/[^a-z0-9가-힣_-]/g, '') || fallback.id;
-    const id = seen.has(rawId) ? `${rawId}_${index}` : rawId;
-    seen.add(id);
-    return {
-      id,
-      name: sanitizeText(category?.name || fallback.name, 24) || fallback.name,
-      color: normalizeColorValue(category?.color, fallback.color)
-    };
-  }).filter(category => category.name);
-  return normalized.length ? normalized : DEFAULT_EXPENSE_CATEGORIES;
-}
-function getExpenseCategories(calendar) {
-  return normalizeExpenseCategories(calendar?.expenseCategories);
-}
-function getExpenseCategory(calendar, categoryId) {
-  const categories = getExpenseCategories(calendar);
-  return categories.find(category => category.id === categoryId) || categories.find(category => category.id === 'etc') || DEFAULT_EXPENSE_CATEGORIES[DEFAULT_EXPENSE_CATEGORIES.length - 1];
-}
-function getExpenseCategoryIcon(category) {
-  if (!category) return EXPENSE_CATEGORY_ICONS.etc;
-  const name = String(category.name || '');
-  // If name already contains/starts with an emoji or non-alphanumeric icon, return empty string
-  const hasEmoji = /[\uD800-\uDBFF][\uDC00-\uDFFF]/.test(name) || /\p{Emoji_Presentation}/u.test(name);
-  if (hasEmoji) return '';
-  const id = String(category.id || '').toLowerCase();
-  if (EXPENSE_CATEGORY_ICONS[id]) return EXPENSE_CATEGORY_ICONS[id];
-  const matchedDefault = DEFAULT_EXPENSE_CATEGORIES.find(item => item.name === name);
-  return matchedDefault ? EXPENSE_CATEGORY_ICONS[matchedDefault.id] : EXPENSE_CATEGORY_ICONS.etc;
-}
-function getExpenseCategoryLabel(category) {
-  const name = sanitizeText(category?.name || '기타', 24) || '기타';
-  const icon = getExpenseCategoryIcon(category);
-  return icon ? `${icon}\u00A0\u00A0${name}` : name;
-}
-// A pasted expense label like "19\uC2DC [\uC800\uB141\uC2DD\uC0AC] \uC560\uC290\uB9AC ..." carries a leading time-of-day note
-// meant for display as its own badge, not as part of the item description line.
-function extractExpenseTimePrefix(label) {
-  const text = (label || '').trim();
-  const match = /^(\d{1,2}\uC2DC)\s+(.*)$/s.exec(text);
-  return match ? { time: match[1], rest: match[2].trim() } : { time: '', rest: text };
-}
+const normalizeExpenseCategories = GATHER_APP_UTILS.normalizeExpenseCategories;
+const getExpenseCategories = GATHER_APP_UTILS.getExpenseCategories;
+const getExpenseCategory = GATHER_APP_UTILS.getExpenseCategory;
+const getExpenseCategoryIcon = GATHER_APP_UTILS.getExpenseCategoryIcon;
+const getExpenseCategoryLabel = GATHER_APP_UTILS.getExpenseCategoryLabel;
+const extractExpenseTimePrefix = GATHER_APP_UTILS.extractExpenseTimePrefix;
 const URL_PARAMS = new URLSearchParams(window.location.search);
 const GATHER_APP_CONFIG = window.GATHER_APP_CONFIG || {};
 const readConfigNumber = (key, fallback) => Number.isFinite(GATHER_APP_CONFIG[key]) ? GATHER_APP_CONFIG[key] : fallback;

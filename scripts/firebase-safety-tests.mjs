@@ -150,6 +150,24 @@ runAppScript(productionContext, `
   if (!getShortcutInstructions('ios-safari').includes('홈 화면에 추가') || !canUseNativeInstallPrompt('chrome') || canUseNativeInstallPrompt('firefox')) {
     throw new Error('shortcut instruction helpers failed');
   }
+  const customExpenseCategories = normalizeExpenseCategories([
+    { id: 'food', name: '식품', color: '#F97316' },
+    { id: 'food', name: '식품 중복', color: 'bad-color' },
+    { id: '숙박!', name: '숙박', color: '#8B5CF6' }
+  ]);
+  if (customExpenseCategories.length !== 3 || customExpenseCategories[1].id !== 'food_1' || customExpenseCategories[1].color !== '#3B82F6') {
+    throw new Error('expense category normalization failed');
+  }
+  if (getExpenseCategory({ expenseCategories: customExpenseCategories }, 'missing').name !== '기타') {
+    throw new Error('expense category fallback failed');
+  }
+  if (getExpenseCategoryLabel({ id: 'food', name: '식품', color: '#F97316' }) !== '🍜\u00A0\u00A0식품') {
+    throw new Error('expense category label failed');
+  }
+  const parsedExpenseTime = extractExpenseTimePrefix('19시 [저녁식사] 애슐리');
+  if (parsedExpenseTime.time !== '19시' || parsedExpenseTime.rest !== '[저녁식사] 애슐리') {
+    throw new Error('expense time prefix extraction failed');
+  }
 `);
 
 const restoreContext = createContext('https://pyw31337.github.io/calendar/?admin=1&restore=1');
