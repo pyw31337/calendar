@@ -1050,15 +1050,15 @@ select.form-select {
   margin-bottom: 0;
 }
 .poll-card {
-  background: transparent;
-  border-radius: 0;
-  padding: 18px 0;
+  background: var(--bg-primary);
+  border-radius: var(--radius-md);
+  padding: 22px;
 }
 .poll-card + .poll-card {
   border-top: 1px solid var(--border-subtle);
 }
 @media (min-width: 640px) {
-  .poll-card { padding: 22px 0; }
+  .poll-card { padding: 22px; }
 }
 .poll-header {
   display: flex;
