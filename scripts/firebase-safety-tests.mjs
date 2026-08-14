@@ -144,6 +144,12 @@ runAppScript(productionContext, `
   if (!Array.isArray(diagnostics) || diagnostics.length < 5 || !diagnostics.some(row => row.label === 'Web Push')) {
     throw new Error('notification diagnostics rows failed');
   }
+  if (detectBrowserForShortcutInstructions({ userAgent: 'Mozilla/5.0 Whale/4.0 Chrome/120 Safari/537.36' }) !== 'whale') {
+    throw new Error('Whale shortcut browser detection failed');
+  }
+  if (!getShortcutInstructions('ios-safari').includes('홈 화면에 추가') || !canUseNativeInstallPrompt('chrome') || canUseNativeInstallPrompt('firefox')) {
+    throw new Error('shortcut instruction helpers failed');
+  }
 `);
 
 const restoreContext = createContext('https://pyw31337.github.io/calendar/?admin=1&restore=1');
