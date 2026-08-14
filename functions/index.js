@@ -194,3 +194,44 @@ exports.sendAnniversaryReminders = functions.pubsub.schedule('0 9 * * *').timeZo
   await Promise.all(promises);
   return null;
 });
+
+// Proxies link-preview requests to Peekalink so the API key never ships to the browser. The
+// client (index.html's fetchLinkPreview) is a static site with no backend of its own -- calling
+// Peekalink directly from there meant the key was visible to anyone via view-source. This
+// function holds the key server-side only and forwards the exact same request/response shape
+// Peekalink itself uses, so the client only needs to point at this URL instead.
+const PEEKALINK_API_KEY = 'sk_w8czszf1m50xm1pbuknazw60recwmc2q';
+
+exports.peekalinkProxy = functions.https.onRequest(async (req, res) => {
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.set('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') {
+    res.status(204).send('');
+    return;
+  }
+  if (req.method !== 'POST') {
+    res.status(405).json({ ok: false, message: 'Method not allowed' });
+    return;
+  }
+  const link = req.body && req.body.link;
+  if (!link || typeof link !== 'string') {
+    res.status(400).json({ ok: false, message: 'link is required' });
+    return;
+  }
+  try {
+    const peekalinkRes = await fetch('https://api.peekalink.io/', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${PEEKALINK_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ link })
+    });
+    const json = await peekalinkRes.json();
+    res.status(peekalinkRes.status).json(json);
+  } catch (err) {
+    console.error('Peekalink proxy request failed:', err);
+    res.status(502).json({ ok: false, message: 'Peekalink request failed' });
+  }
+});
