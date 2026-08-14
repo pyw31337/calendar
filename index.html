@@ -21824,14 +21824,91 @@ function ImageShareViewer({ shareId }) {
   ));
 }
 
+// Switching between in-app views (main/chat/admin/memo) is a React state change, not a real
+// page navigation -- a tab left open for a while (very common on mobile: backgrounded,
+// resumed from the home screen, or just never closed) keeps running whatever JS was loaded
+// at the LAST actual page load, even though a fresh reload always gets the latest deploy.
+// Rather than leave that tab silently stuck on old code (missing something like the direct-
+// media-link rendering fix) until the user happens to reload on their own, periodically
+// re-check the page's own ETag with a cache-busting HEAD request and prompt a reload once it
+// changes -- a forced reload mid-typing would be worse than just asking.
+function UpdateAvailableBanner() {
+  const [updateAvailable, setUpdateAvailable] = React.useState(false);
+  const [dismissed, setDismissed] = React.useState(false);
+  React.useEffect(() => {
+    let initialVersionTag = null;
+    let cancelled = false;
+    const checkForUpdate = () => {
+      fetch(location.href, { method: 'HEAD', cache: 'no-store' }).then(res => {
+        const versionTag = res.headers.get('etag') || res.headers.get('last-modified');
+        if (!versionTag || cancelled) return;
+        if (initialVersionTag === null) {
+          initialVersionTag = versionTag;
+          return;
+        }
+        if (versionTag !== initialVersionTag) setUpdateAvailable(true);
+      }).catch(() => {
+        // Offline, or the request was blocked -- just retry on the next interval/visibility tick.
+      });
+    };
+    checkForUpdate();
+    const intervalId = setInterval(checkForUpdate, 10 * 60 * 1000);
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') checkForUpdate();
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      cancelled = true;
+      clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, []);
+
+  if (!updateAvailable || dismissed) return null;
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: 'fixed', left: '50%', bottom: '20px', transform: 'translateX(-50%)',
+      zIndex: 100000, display: 'flex', alignItems: 'center', gap: '10px',
+      backgroundColor: '#0F172A', color: '#FFFFFF', padding: '10px 10px 10px 16px',
+      borderRadius: '9999px', boxShadow: '0 12px 32px rgba(0,0,0,0.28)',
+      fontSize: '0.85rem', fontWeight: 700, maxWidth: 'calc(100vw - 32px)'
+    }
+  },
+    "새 버전이 있어요",
+    /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => window.location.reload(),
+      style: {
+        backgroundColor: '#4F46E5', color: '#FFFFFF', border: 'none', borderRadius: '9999px',
+        padding: '6px 14px', fontSize: '0.82rem', fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap'
+      }
+    }, "새로고침"),
+    /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      "aria-label": "닫기",
+      onClick: () => setDismissed(true),
+      style: {
+        background: 'none', border: 'none', color: 'rgba(255,255,255,0.6)', cursor: 'pointer',
+        padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center'
+      }
+    }, /*#__PURE__*/React.createElement("svg", {
+      xmlns: "http://www.w3.org/2000/svg", width: "16", height: "16", viewBox: "0 0 24 24",
+      fill: "none", stroke: "currentColor", strokeWidth: "2.5", strokeLinecap: "round", strokeLinejoin: "round"
+    }, /*#__PURE__*/React.createElement("line", { x1: "18", y1: "6", x2: "6", y2: "18" }), /*#__PURE__*/React.createElement("line", { x1: "6", y1: "6", x2: "18", y2: "18" })))
+  );
+}
+
 try {
   const rootElement = document.getElementById('root');
   if (rootElement) {
     const root = ReactDOM.createRoot(rootElement);
     const imageShareId = new URLSearchParams(window.location.search).get('image');
-    root.render(imageShareId
-      ? /*#__PURE__*/React.createElement(ImageShareViewer, { shareId: imageShareId })
-      : /*#__PURE__*/React.createElement(App, null));
+    root.render(/*#__PURE__*/React.createElement(React.Fragment, null,
+      imageShareId
+        ? /*#__PURE__*/React.createElement(ImageShareViewer, { shareId: imageShareId })
+        : /*#__PURE__*/React.createElement(App, null),
+      /*#__PURE__*/React.createElement(UpdateAvailableBanner, null)
+    ));
   }
 } catch (e) {
   console.error('App render error:', e);
