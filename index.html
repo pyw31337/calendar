@@ -8576,10 +8576,8 @@ function getDirectChatMediaInfo(url) {
         const id = path.match(/(?:\/video)?\/(\d+)(?:$|[/?#])/i)?.[1] || path.match(/\/(\d+)(?:$|[/?#])/i)?.[1];
         if (id) return { type: 'embed', provider: 'vimeo', url: `https://player.vimeo.com/video/${encodeURIComponent(id)}`, orientation: 'landscape' };
       }
-      // TikTok's official embed.js widget (see TikTokEmbedWidget below), not a raw hotlinked
-      // tiktok.com/embed/v2/<id> iframe -- that showed an "overload protection" placeholder
-      // instead of real video. Falls back to the link-preview card if the widget doesn't
-      // produce a player within a few seconds.
+      // TikTok's official embed.js widget (see TikTokEmbedWidget below). Falls back to the
+      // link-preview card if it doesn't produce a player within a few seconds.
       if (host === 'tiktok.com' || host === 'm.tiktok.com') {
         const videoId = path.match(/\/video\/(\d+)/)?.[1];
         if (videoId) return { type: 'tiktok-widget', provider: 'tiktok', url: source, videoId };
@@ -8617,10 +8615,9 @@ function getDirectChatMediaInfo(url) {
   return null;
 }
 
-// TikTok's widget scans the DOM once per script load for .tiktok-embed blockquotes and swaps in
-// a real player iframe -- appending a fresh <script> tag per mount makes it rescan for a
-// dynamically-rendered SPA. onFailed fires if no iframe shows up within a few seconds, so the
-// caller can fall back to the link-preview card instead of a dead blockquote.
+// Appending a fresh <script> tag per mount makes embed.js rescan the DOM for this blockquote.
+// onFailed fires if no player iframe shows up in time, so the caller can fall back to the
+// link-preview card.
 function TikTokEmbedWidget({ url, videoId, onFailed }) {
   const containerRef = React.useRef(null);
   React.useEffect(() => {
@@ -8749,10 +8746,8 @@ function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox, linkPr
         const embedWidth = isMini ? '100%' : (isPortraitEmbed ? (style.portraitEmbedMaxWidth || '360px') : (style.embedMaxWidth || '760px'));
         const minW = isMini ? '0' : (isPortraitEmbed ? '150px' : '180px');
         const maxW = isMini ? '100%' : (isPortraitEmbed ? '500px' : '1400px');
-        // LinkPreviewCard lives INSIDE this same width-constrained div (not as a sibling) so it
-        // always matches the video's actual rendered width -- including after the user manually
-        // drag-resizes the video via .chat-media-resizable, since that resize only affects this
-        // one element's box and any sibling outside it wouldn't follow along.
+        // LinkPreviewCard lives INSIDE this width-constrained div, not as a sibling, so it
+        // matches the video's rendered width even after a drag-resize via .chat-media-resizable.
         return /*#__PURE__*/React.createElement('div', {
           className: isMini ? '' : 'chat-media-resizable',
           style: {
@@ -15460,9 +15455,8 @@ function GlobalSearchModal({
 
   const q = query.trim().toLowerCase();
 
-  // chatMessages/memos as passed in are capped for display performance (chat: last 100 via a
-  // live listener; memos: whatever page has been paginated in), so search would silently miss
-  // older items. First search of the session fetches the full collections once and reuses them.
+  // chatMessages/memos are capped for display (chat: last 100 live; memos: paginated), so
+  // search would miss older items. First search of the session fetches the full collections.
   const [fullHistory, setFullHistory] = React.useState(null);
   const [isLoadingFullHistory, setIsLoadingFullHistory] = React.useState(false);
   React.useEffect(() => {
@@ -21264,10 +21258,8 @@ function PollList({ calendar, onCreatePoll, onEditPoll, onVotePoll, onCancelVote
     }, visibleOptions.map((option, index) => {
       const voterIds = getPollOptionVoterIds(poll, option.id).filter(participantId => participantsMap[participantId]);
       const voteCount = voterIds.length;
-      // Bar fill is voteCount relative to the full participant roster (not relative to the
-      // sum of votes across every option), so an option every active participant voted for
-      // reads as a fully-filled 100% bar even on a multi-select poll where the total vote
-      // count across options can exceed the roster size.
+      // Relative to the participant roster, not the sum of votes across options, so an option
+      // everyone voted for reads as a full 100% bar even on a multi-select poll.
       const percent = participants.length > 0 ? Math.min(100, Math.round(voteCount / participants.length * 100)) : 0;
       const isWinner = winningOptionIds.has(option.id);
       return /*#__PURE__*/React.createElement("div", {
@@ -22425,18 +22417,13 @@ function DicesIcon({ size = 14 }) {
     /*#__PURE__*/React.createElement('path', { d: 'M18 9h.01' })
   );
 }
-// Shown only on the main calendar screen (freely-scrolling home page) -- chat/memo/settlement
-// are fixed-viewport app-style screens with an input bar pinned to the bottom, where a footer
-// would overlap or crowd that input, so this is intentionally not rendered there.
+// Shown only on the main calendar screen -- chat/memo/settlement have a pinned bottom input bar.
 const FOOTER_FAMILY_LINKS = [
   { label: '밖에 눈오나', url: 'https://pyw31337.github.io/cctv/', Icon: CctvIcon },
   { label: 'Culture Flow', url: 'https://pyw31337.github.io/culture/', Icon: DicesIcon }
 ];
-// .app-footer / .app-footer-family switch flex-direction at the 768px breakpoint (see app.css):
-// stacked+centered (copyright, then FAMILY LINK label, then buttons -- 3 lines) on mobile,
-// a single space-between row (copyright left, "FAMILY LINK" + buttons grouped at the right
-// edge) on desktop. Natural DOM order (copyright, then the label+links group) is what makes
-// both layouts fall out of the same markup with just a flex-direction flip.
+// .app-footer/.app-footer-family flip flex-direction at 768px (see app.css): stacked 3 lines
+// on mobile, a single copyright-left/FAMILY LINK-right row on desktop.
 function Footer() {
   return /*#__PURE__*/React.createElement('footer', { className: 'app-footer' },
     /*#__PURE__*/React.createElement('p', { className: 'app-footer-copyright' }, 'Copyright © 2026 모여라 캘린더. All Rights Reserved.'),
