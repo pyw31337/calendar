@@ -294,6 +294,35 @@ exports.peekalinkProxy = functions.https.onRequest(async (req, res) => {
   }
 });
 
+// Proxies Kakao Local (키워드 검색) requests so the REST API key never ships to the browser --
+// same reasoning as peekalinkProxy above. Used by the 장소등록 search field (PlaceRegisterModal
+// in index.html): Nominatim/OSM has almost no Korean business-name coverage (e.g. searching
+// "스타벅스" only returns Japan branches), so Kakao Local is the primary geocoder for Korean POI
+// search, with Nominatim kept as a fallback for plain addresses/landmarks Kakao doesn't have.
+const KAKAO_REST_API_KEY = '1e932da4b24f87406d6d5204bc95f303';
+exports.kakaoLocalSearchProxy = functions.https.onRequest(async (req, res) => {
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
+  if (req.method !== 'GET') { res.status(405).json({ ok: false, message: 'Method not allowed' }); return; }
+  const query = String(req.query.query || '').trim().slice(0, 200);
+  if (!query) { res.status(400).json({ ok: false, message: 'query is required' }); return; }
+  try {
+    const kakaoRes = await fetch(`https://dapi.kakao.com/v2/local/search/keyword.json?query=${encodeURIComponent(query)}&size=10`, {
+      headers: { Authorization: `KakaoAK ${KAKAO_REST_API_KEY}` }
+    });
+    if (!kakaoRes.ok) {
+      res.status(kakaoRes.status).json({ ok: false, message: 'Kakao local search failed' });
+      return;
+    }
+    const json = await kakaoRes.json();
+    res.status(200).json({ ok: true, documents: json.documents || [] });
+  } catch (err) {
+    console.error('kakaoLocalSearchProxy failed:', err);
+    res.status(502).json({ ok: false, message: 'Kakao local search request failed' });
+  }
+});
+
 // Public, unauthenticated: returns only {id, title, description} for every calendar, for the
 // GitHub Actions "Refresh Calendar OG Pages" job (scripts/generate-og-pages.mjs), which needs to
 // enumerate all calendars to regenerate their public share/OG preview pages. That's the same

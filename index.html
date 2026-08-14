@@ -160,7 +160,7 @@ const DEFAULT_PLACE_CATEGORIES = [
   { id: 'lodging', name: '숙박', color: '#10B981' },
   { id: 'etc', name: '기타', color: '#64748B' }
 ];
-const PLACE_CATEGORY_ICONS = { restaurant: '🍽️', cafe: '☕', play: '🎡', lodging: '🏨', etc: '📍' };
+const PLACE_CATEGORY_ICONS = { restaurant: '🍽️', cafe: '☕', play: '🎡', lodging: '🏨', etc: '💬' };
 function normalizePlaceCategories(categories) {
   const defaultCategories = DEFAULT_PLACE_CATEGORIES;
   const source = Array.isArray(categories) && categories.length ? categories : defaultCategories;
@@ -201,10 +201,12 @@ function getPlaceCategoryLabel(category) {
   return icon ? `${icon}  ${name}` : name;
 }
 
-// A calendar's registered places: { id, name, address, lat, lng, categoryId, memo, createdAt,
-// updatedAt }. lat/lng is the only thing the map actually needs -- name/address exist so a pin
-// found via 업체명 검색(Nominatim) still shows something meaningful, but a place can also be
-// dropped by raw coordinates with no name/address at all.
+// A calendar's registered places: { id, name, address, lat, lng, categoryId, memo, visitStatus,
+// visitDate, createdAt, updatedAt }. lat/lng is the only thing the map actually needs --
+// name/address exist so a pin found via 업체명 검색(Kakao Local/Nominatim) still shows something
+// meaningful, but a place can also be dropped by raw coordinates with no name/address at all.
+// visitStatus distinguishes an already-visited place from one that's only planned; visitDate is
+// only meaningful (and only ever shown) when visitStatus is 'visited'.
 function normalizePlaces(places) {
   return (Array.isArray(places) ? places : [])
     .filter(place => place && Number.isFinite(Number(place.lat)) && Number.isFinite(Number(place.lng)))
@@ -216,12 +218,63 @@ function normalizePlaces(places) {
       lng: Number(place.lng),
       categoryId: sanitizeText(place.categoryId || 'etc', 40),
       memo: sanitizeText(place.memo || '', 300),
+      visitStatus: place.visitStatus === 'planned' ? 'planned' : 'visited',
+      visitDate: isValidDateString(place.visitDate) ? place.visitDate : '',
       createdAt: Number(place.createdAt) || Date.now(),
       updatedAt: Number(place.updatedAt) || Number(place.createdAt) || Date.now()
     }));
 }
 function getCalendarPlaces(calendar) {
   return normalizePlaces(calendar?.places);
+}
+
+// Bulk-imported places (e.g. from a Google My Maps export) often carry their whole visit history
+// jammed into one memo string, one "YY.MM.DD 누구랑 뭐했는지" entry per line, joined with " / ".
+// These two helpers pull that history back out at render time rather than storing it as a
+// separate structured field -- memo stays the single source of truth, and a memo that was never
+// multi-entry in the first place (no leading date, or just one) renders exactly as typed.
+const MEMO_LEADING_DATE_RE = /\d{2}\.\d{2}\.\d{2}/;
+function extractLeadingMemoDate(memo) {
+  const match = String(memo || '').match(MEMO_LEADING_DATE_RE);
+  return match ? match[0] : null;
+}
+// Only treated as a multi-visit history when at least two of the "/"-separated chunks actually
+// start with a date -- an ordinary one-line memo that happens to contain a "/" (a fraction, a
+// slash in an address) should never be reinterpreted as a list.
+function parseVisitEntriesFromMemo(memo) {
+  const text = String(memo || '').trim();
+  if (!text) return [];
+  const chunks = text.split(/\s*\/\s*/).map(chunk => chunk.trim()).filter(Boolean);
+  const dateChunkRe = /^(\d{2}\.\d{2}\.\d{2})\s*(.*)$/;
+  const entries = chunks.map(chunk => {
+    const match = chunk.match(dateChunkRe);
+    return match ? { date: match[1], note: match[2].trim() } : null;
+  }).filter(Boolean);
+  return entries.length >= 2 ? entries : [];
+}
+
+// Normalizes either date shape a place can carry -- the structured 'YYYY-MM-DD' visitDate field,
+// or a memo-embedded 'YY.MM.DD' -- into a single comparable 'YYYY-MM-DD' string so the list can
+// be sorted by actual visit recency regardless of which source the date came from.
+function normalizePlaceDateForSort(dateStr) {
+  if (!dateStr) return null;
+  if (isValidDateString(dateStr)) return dateStr;
+  const match = String(dateStr).match(/^(\d{2})\.(\d{2})\.(\d{2})$/);
+  return match ? `20${match[1]}-${match[2]}-${match[3]}` : null;
+}
+// Picks the most relevant date to sort a place by, in priority order: its own structured
+// visitDate, the most recent entry if its memo turned out to be a multi-visit history, or a
+// single leading date embedded in the memo. Places with no date info at all sort to the bottom
+// (see the comparator in PlacesView) rather than being treated as "most recent".
+function getPlaceSortDateKey(place) {
+  const structured = normalizePlaceDateForSort(place.visitDate);
+  if (structured) return structured;
+  const entries = parseVisitEntriesFromMemo(place.memo);
+  if (entries.length > 0) {
+    const latest = normalizePlaceDateForSort(entries[entries.length - 1].date);
+    if (latest) return latest;
+  }
+  return normalizePlaceDateForSort(extractLeadingMemoDate(place.memo));
 }
 
 const URL_PARAMS = new URLSearchParams(window.location.search);
@@ -6982,9 +7035,11 @@ function App() {
     const cleanCategoryId = categoryIds.has(placeData.categoryId) ? placeData.categoryId : 'etc';
     const cleanAddress = sanitizeText(placeData.address || '', 200);
     const cleanMemo = sanitizeText(placeData.memo || '', 300);
+    const cleanVisitStatus = placeData.visitStatus === 'planned' ? 'planned' : 'visited';
+    const cleanVisitDate = cleanVisitStatus === 'visited' && isValidDateString(placeData.visitDate) ? placeData.visitDate : '';
     const nextPlaces = isEditing
-      ? existingPlaces.map(p => p.id === placeData.id ? { ...p, name: cleanName, address: cleanAddress, lat: placeData.lat, lng: placeData.lng, categoryId: cleanCategoryId, memo: cleanMemo, updatedAt: now } : p)
-      : [...existingPlaces, { id: `place_${activeCal.id}_${now}_${Math.random().toString(36).slice(2, 7)}`, name: cleanName, address: cleanAddress, lat: placeData.lat, lng: placeData.lng, categoryId: cleanCategoryId, memo: cleanMemo, createdAt: now, updatedAt: now }];
+      ? existingPlaces.map(p => p.id === placeData.id ? { ...p, name: cleanName, address: cleanAddress, lat: placeData.lat, lng: placeData.lng, categoryId: cleanCategoryId, memo: cleanMemo, visitStatus: cleanVisitStatus, visitDate: cleanVisitDate, updatedAt: now } : p)
+      : [...existingPlaces, { id: `place_${activeCal.id}_${now}_${Math.random().toString(36).slice(2, 7)}`, name: cleanName, address: cleanAddress, lat: placeData.lat, lng: placeData.lng, categoryId: cleanCategoryId, memo: cleanMemo, visitStatus: cleanVisitStatus, visitDate: cleanVisitDate, createdAt: now, updatedAt: now }];
     const placeActivityLog = createActivityLog(activeCal.id, isEditing ? 'place_update' : 'place_create', '', '', now, cleanName);
     const updatedCal = {
       ...activeCal,
@@ -22622,22 +22677,101 @@ function PlaceSectionIcon({ size = 20 } = {}) {
 // reasonable default since this app is Korean-audience-only.
 const PLACE_MAP_DEFAULT_CENTER = [37.5665, 126.9780];
 const PLACE_MAP_DEFAULT_ZOOM = 11;
+// Rough bounding box for South+North Korea -- used only to decide which registered places count
+// as "domestic" for the main-screen preview map's auto-fit (see preferDomesticBounds below), not
+// as a precise border.
+const KOREA_BBOX = { minLat: 33, maxLat: 39, minLng: 124, maxLng: 132 };
+function isDomesticLatLng(lat, lng) {
+  return lat >= KOREA_BBOX.minLat && lat <= KOREA_BBOX.maxLat && lng >= KOREA_BBOX.minLng && lng <= KOREA_BBOX.maxLng;
+}
+// A calendar built from an imported travel log can have a handful of overseas trips mixed in
+// with a much larger cluster of everyday domestic places -- fitting bounds over literally every
+// pin would zoom the main-screen preview out to "half of Asia" just to include one Da Nang trip.
+// Trimming to the 10th-90th percentile on each axis keeps the view centered on wherever most of
+// the pins actually are, dropping a handful of the most extreme outliers rather than the whole
+// domestic spread when there are enough points for percentiles to be meaningful.
+function trimLatLngOutliers(points) {
+  if (points.length <= 5) return points;
+  const lats = points.map(p => p[0]).slice().sort((a, b) => a - b);
+  const lngs = points.map(p => p[1]).slice().sort((a, b) => a - b);
+  // Index by round(p * (n-1)), not floor(p * n) -- with a small n (a realistic place count),
+  // floor(n * 0.1) resolves to index 0 (the minimum itself) for anything under 10 points, which
+  // means the "10th percentile" bound was just the most extreme outlier all along and nothing
+  // ever got trimmed. Rounding against (n-1) actually steps at least one index in from each end
+  // once n is large enough for percentiles to mean anything.
+  const pct = (arr, p) => arr[Math.min(arr.length - 1, Math.max(0, Math.round(p * (arr.length - 1))))];
+  const latLo = pct(lats, 0.1), latHi = pct(lats, 0.9);
+  const lngLo = pct(lngs, 0.1), lngHi = pct(lngs, 0.9);
+  const trimmed = points.filter(([lat, lng]) => lat >= latLo && lat <= latHi && lng >= lngLo && lng <= lngHi);
+  return trimmed.length >= 3 ? trimmed : points;
+}
 
-// Small monochrome (white, via stroke="#fff") glyph per category id, embedded directly into a
-// divIcon HTML string -- markers are rendered by Leaflet outside React's tree, so this can't be
-// a React icon component like the ones used elsewhere in the app. Only the five built-in
-// category ids get a matching pictogram; any custom category an admin adds beyond those falls
-// back to a plain dot rather than guessing at an icon for an arbitrary name.
+function ThreeLinesIcon({ size = 18 } = {}) {
+  return /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: String(size),
+    height: String(size),
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    "stroke-width": "2",
+    "stroke-linecap": "round"
+  }, /*#__PURE__*/React.createElement("line", { x1: "4", y1: "7", x2: "20", y2: "7" }),
+    /*#__PURE__*/React.createElement("line", { x1: "4", y1: "12", x2: "20", y2: "12" }),
+    /*#__PURE__*/React.createElement("line", { x1: "4", y1: "17", x2: "20", y2: "17" }));
+}
+
+// Small monochrome (white, via stroke="#fff") glyph per category id. Stored as an array of SVG
+// path "d" values (not markup) so this one definition can drive both a Leaflet divIcon HTML
+// string (markers render outside React's tree, so those can't use a React icon component) AND a
+// real React <PlaceCategoryMarkerIcon> element (used inline in the place list, see PlacesView)
+// without keeping two copies of the same path data in sync by hand. Only the four food/lodging/
+// play built-in category ids get a matching pictogram; 기타(etc) and any custom category an
+// admin adds beyond those use the 💬 emoji instead, rather than guessing at an SVG icon for an
+// arbitrary/generic category.
 const PLACE_CATEGORY_MARKER_SVG_PATHS = {
-  restaurant: '<path d="M8 3v7a2 2 0 0 0 4 0V3" /><path d="M10 10v11" /><path d="M16 3c-1.5 2 -2 4 -2 6.5c0 1.5 1 2.5 2 2.5v9" />',
-  cafe: '<path d="M4 8h12v6a4 4 0 0 1 -4 4h-4a4 4 0 0 1 -4 -4v-6z" /><path d="M16 9h2a2 2 0 0 1 0 4h-2" /><path d="M8 2c-.6 1 .6 1.5 0 2.5" /><path d="M12 2c-.6 1 .6 1.5 0 2.5" />',
-  play: '<path d="M12 3a5 5 0 0 1 5 5c0 3 -2 5.3 -3.4 6.3l.6 2.7h-4.4l.6 -2.7c-1.4 -1 -3.4 -3.3 -3.4 -6.3a5 5 0 0 1 5 -5z" /><path d="M11 17l-1 4l2 -1l1 1" />',
-  lodging: '<path d="M3 18v-7a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v7" /><path d="M3 18v2" /><path d="M21 18v2" /><path d="M3 13h18" /><path d="M7 13v-3a1 1 0 0 1 1 -1h3a1 1 0 0 1 1 1v3" />',
-  etc: '<circle cx="12" cy="12" r="4" />'
+  restaurant: ['M8 3v7a2 2 0 0 0 4 0V3', 'M10 10v11', 'M16 3c-1.5 2 -2 4 -2 6.5c0 1.5 1 2.5 2 2.5v9'],
+  cafe: ['M4 8h12v6a4 4 0 0 1 -4 4h-4a4 4 0 0 1 -4 -4v-6z', 'M16 9h2a2 2 0 0 1 0 4h-2', 'M8 2c-.6 1 .6 1.5 0 2.5', 'M12 2c-.6 1 .6 1.5 0 2.5'],
+  play: ['M12 3a5 5 0 0 1 5 5c0 3 -2 5.3 -3.4 6.3l.6 2.7h-4.4l.6 -2.7c-1.4 -1 -3.4 -3.3 -3.4 -6.3a5 5 0 0 1 5 -5z', 'M11 17l-1 4l2 -1l1 1'],
+  lodging: ['M3 18v-7a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v7', 'M3 18v2', 'M21 18v2', 'M3 13h18', 'M7 13v-3a1 1 0 0 1 1 -1h3a1 1 0 0 1 1 1v3']
 };
-function getPlaceCategoryMarkerSvg(category) {
+// Returns the marker's inner content -- either { svgPaths: [...d strings] } for the four
+// pictogram categories, or { emoji: '💬' } for 기타/custom categories.
+function getPlaceCategoryMarkerContent(category) {
   const id = String(category?.id || '').toLowerCase();
-  return PLACE_CATEGORY_MARKER_SVG_PATHS[id] || PLACE_CATEGORY_MARKER_SVG_PATHS.etc;
+  const paths = PLACE_CATEGORY_MARKER_SVG_PATHS[id];
+  return paths ? { svgPaths: paths } : { emoji: '💬' };
+}
+// Shared by both a normal individual marker AND a cluster badge that's collapsed down to a
+// single child (see iconCreateFunction below) -- a cluster with only one marker left inside it
+// should look identical to that marker on its own, not like a numbered cluster.
+function buildPlaceMarkerHtml(category) {
+  const color = category ? category.color : '#64748B';
+  const content = getPlaceCategoryMarkerContent(category);
+  const innerHtml = content.svgPaths
+    ? `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${content.svgPaths.map(d => `<path d="${d}" />`).join('')}</svg>`
+    : `<span style="font-size:13px;line-height:1;">${content.emoji}</span>`;
+  return `<div style="width:26px;height:26px;border-radius:50%;background:${color};border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;">${innerHtml}</div>`;
+}
+// React version of the same badge -- a small solid-color circle with the category's white line
+// icon inside, matching the map marker exactly. Used in the place list (PlacesView) so its
+// category badge looks like a miniature of the actual pin instead of a plain emoji.
+function PlaceCategoryMarkerIcon({ category, size = 14 } = {}) {
+  const content = getPlaceCategoryMarkerContent(category);
+  if (!content.svgPaths) {
+    return /*#__PURE__*/React.createElement("span", { style: { fontSize: `${size}px`, lineHeight: 1 } }, content.emoji);
+  }
+  return /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: String(size),
+    height: String(size),
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "#fff",
+    "stroke-width": "2",
+    "stroke-linecap": "round",
+    "stroke-linejoin": "round"
+  }, content.svgPaths.map((d, i) => /*#__PURE__*/React.createElement("path", { key: i, d })));
 }
 
 // Renders an interactive Leaflet/OSM map with one pin per registered place, auto-fit to bounds
@@ -22646,10 +22780,18 @@ function getPlaceCategoryMarkerSvg(category) {
 // divIcon HTML interpolates category.color (hex-validated by normalizeColorValue) and its icon
 // (a fixed emoji from a controlled lookup table), never raw user text, so that stays safe as a
 // string template.
-function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom = false, resizeSignal }) {
+function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom = false, resizeSignal, preferDomesticBounds = false }) {
   const containerRef = React.useRef(null);
   const mapRef = React.useRef(null);
   const markersLayerRef = React.useRef(null);
+  // getCalendarPlaces(calendar) builds a brand-new array (and place objects) on every call, so
+  // the `places` prop gets a new reference on every parent re-render even when nothing about the
+  // places actually changed -- e.g. clicking a marker opens the edit modal, which re-renders the
+  // parent, which recomputes `places`, which used to re-trigger the marker-rebuild effect below
+  // and reset the map's pan/zoom back to its fitted view mid-interaction. Comparing an actual
+  // content signature (not the array reference) lets that effect skip doing anything at all when
+  // the underlying data hasn't changed.
+  const dataSignatureRef = React.useRef(null);
   const [ready, setReady] = React.useState(false);
   const [loadError, setLoadError] = React.useState(false);
 
@@ -22686,6 +22828,20 @@ function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom = false
         // rest of the app's flat/minimal look rather than pulling in its default CSS theme too.
         iconCreateFunction: cluster => {
           const count = cluster.getChildCount();
+          // Once there's nothing left to merge with (zoomed in far enough that a "cluster" only
+          // has one marker in it, or the plugin momentarily reports a stale/zero count mid-zoom),
+          // show that marker's own category badge instead of a numbered cluster circle -- a
+          // single-marker "cluster" should look exactly like an individual marker, not like a
+          // cluster with nothing in it.
+          if (count <= 1) {
+            const child = cluster.getAllChildMarkers()[0];
+            return L.divIcon({
+              html: buildPlaceMarkerHtml(child?.placeCategory),
+              className: 'place-map-marker',
+              iconSize: [26, 26],
+              iconAnchor: [13, 13]
+            });
+          }
           const size = count < 10 ? 30 : count < 50 ? 36 : 42;
           return L.divIcon({
             html: `<div style="width:100%;height:100%;border-radius:50%;background:#3B82F6;border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:12px;">${count}</div>`,
@@ -22713,24 +22869,29 @@ function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom = false
   React.useEffect(() => {
     if (!ready || !mapRef.current || !window.L) return;
     const L = window.L;
+    const categories = getPlaceCategories(calendar);
+    const signature = JSON.stringify({ places, categories });
+    if (dataSignatureRef.current === signature) return;
+    dataSignatureRef.current = signature;
     const layer = markersLayerRef.current;
     layer.clearLayers();
-    const categoryMap = getPlaceCategories(calendar).reduce((acc, c) => { acc[c.id] = c; return acc; }, {});
+    const categoryMap = categories.reduce((acc, c) => { acc[c.id] = c; return acc; }, {});
     const bounds = [];
     (places || []).forEach(place => {
       const category = categoryMap[place.categoryId] || categoryMap.etc;
-      const color = category ? category.color : '#64748B';
       // Flat circle instead of the earlier rotated-teardrop shape -- simpler to render (no CSS
-      // transform on top of Leaflet's own positioning transform) and a plain white SVG glyph
-      // instead of a colorful emoji reads more clearly at this size against the muted basemap.
+      // transform on top of Leaflet's own positioning transform).
       const icon = L.divIcon({
         className: 'place-map-marker',
-        html: `<div style="width:26px;height:26px;border-radius:50%;background:${color};border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${getPlaceCategoryMarkerSvg(category)}</svg></div>`,
+        html: buildPlaceMarkerHtml(category),
         iconSize: [26, 26],
         iconAnchor: [13, 13],
         popupAnchor: [0, -13]
       });
       const marker = L.marker([place.lat, place.lng], { icon });
+      // Read back by the cluster group's iconCreateFunction above when a cluster collapses down
+      // to just this one marker, so it can render the same category badge instead of a "1".
+      marker.placeCategory = category;
       const popupNode = document.createElement('div');
       popupNode.style.minWidth = '140px';
       popupNode.style.maxWidth = '220px';
@@ -22747,27 +22908,100 @@ function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom = false
         addrEl.textContent = place.address;
         popupNode.appendChild(addrEl);
       }
-      if (place.memo) {
-        const memoEl = document.createElement('div');
-        memoEl.style.fontSize = '0.75rem';
-        memoEl.style.color = '#334155';
-        memoEl.style.marginTop = '4px';
-        memoEl.textContent = place.memo;
-        popupNode.appendChild(memoEl);
+      const visitEntries = parseVisitEntriesFromMemo(place.memo);
+      if (visitEntries.length > 0) {
+        // Bulk-imported places carry their whole visit history in one memo -- show it as an
+        // actual scrollable list of {date, note} rows here instead of one long run-on line.
+        const historyWrap = document.createElement('div');
+        historyWrap.style.marginTop = '4px';
+        historyWrap.style.maxHeight = '160px';
+        historyWrap.style.overflowY = 'auto';
+        historyWrap.style.display = 'flex';
+        historyWrap.style.flexDirection = 'column';
+        historyWrap.style.gap = '4px';
+        visitEntries.slice().reverse().forEach(entry => {
+          const rowEl = document.createElement('div');
+          rowEl.style.fontSize = '0.72rem';
+          rowEl.style.color = '#334155';
+          rowEl.style.display = 'flex';
+          rowEl.style.gap = '5px';
+          rowEl.style.alignItems = 'flex-start';
+          const dateEl = document.createElement('span');
+          dateEl.textContent = entry.date;
+          dateEl.style.flexShrink = '0';
+          dateEl.style.fontWeight = '700';
+          dateEl.style.color = '#64748B';
+          rowEl.appendChild(dateEl);
+          const noteEl = document.createElement('span');
+          noteEl.textContent = entry.note;
+          rowEl.appendChild(noteEl);
+          historyWrap.appendChild(rowEl);
+        });
+        popupNode.appendChild(historyWrap);
+      } else if (place.memo) {
+        // Built via DOM nodes (not innerHTML) since memo is free-text user input -- the URL
+        // portion still gets the same gray capsule badge look as renderTextWithUrlBadge, just
+        // hand-built here since Leaflet popups render outside React's tree.
+        const memoWrap = document.createElement('div');
+        memoWrap.style.fontSize = '0.75rem';
+        memoWrap.style.color = '#334155';
+        memoWrap.style.marginTop = '4px';
+        memoWrap.style.display = 'flex';
+        memoWrap.style.flexWrap = 'wrap';
+        memoWrap.style.alignItems = 'center';
+        memoWrap.style.gap = '4px';
+        const memoUrl = extractFirstUrl(place.memo);
+        const memoText = memoUrl ? removeFirstUrl(place.memo) : place.memo;
+        if (memoText) {
+          const textEl = document.createElement('span');
+          textEl.textContent = memoText;
+          memoWrap.appendChild(textEl);
+        }
+        if (memoUrl) {
+          const urlEl = document.createElement('a');
+          urlEl.href = memoUrl;
+          urlEl.target = '_blank';
+          urlEl.rel = 'noopener noreferrer';
+          urlEl.textContent = memoUrl;
+          urlEl.style.display = 'inline-block';
+          urlEl.style.padding = '2px 8px';
+          urlEl.style.borderRadius = '9999px';
+          urlEl.style.fontSize = '0.68rem';
+          urlEl.style.fontWeight = '600';
+          urlEl.style.backgroundColor = '#E2E8F0';
+          urlEl.style.color = '#475569';
+          urlEl.style.textDecoration = 'none';
+          urlEl.style.wordBreak = 'break-all';
+          memoWrap.appendChild(urlEl);
+        }
+        popupNode.appendChild(memoWrap);
       }
       marker.bindPopup(popupNode);
       if (onSelectPlace) marker.on('click', () => onSelectPlace(place));
       marker.addTo(layer);
       bounds.push([place.lat, place.lng]);
     });
-    if (bounds.length === 1) {
-      mapRef.current.setView(bounds[0], 15);
-    } else if (bounds.length > 1) {
-      mapRef.current.fitBounds(bounds, { padding: [30, 30], maxZoom: 16 });
+    // The main-screen preview map opts into this: an imported travel log can mix a handful of
+    // overseas trips into an otherwise domestic cluster, and fitting bounds over every single pin
+    // would zoom out to "half of Asia" just to include one of them. Restricting to domestic
+    // points (and trimming outliers within Korea) keeps the default view centered on wherever
+    // most of the pins actually are, capped at roughly peninsula-wide as the widest it goes.
+    const fitBoundsPoints = preferDomesticBounds
+      ? (() => {
+          const domestic = bounds.filter(([lat, lng]) => isDomesticLatLng(lat, lng));
+          return domestic.length > 0 ? trimLatLngOutliers(domestic) : bounds;
+        })()
+      : bounds;
+    if (fitBoundsPoints.length === 1) {
+      mapRef.current.setView(fitBoundsPoints[0], 15);
+    } else if (fitBoundsPoints.length > 1) {
+      mapRef.current.fitBounds(fitBoundsPoints, { padding: [30, 30], maxZoom: 16 });
+    } else if (preferDomesticBounds) {
+      mapRef.current.setView([36.5, 127.8], 7); // 한반도 전역이 보이는 기본 시점
     } else {
       mapRef.current.setView(PLACE_MAP_DEFAULT_CENTER, PLACE_MAP_DEFAULT_ZOOM);
     }
-  }, [ready, places, calendar]);
+  }, [ready, places, calendar, preferDomesticBounds]);
 
   // Container size changes (the section's collapse/expand aspect-ratio toggle) don't fire a
   // window resize event, so Leaflet's internal tile grid goes stale until nudged.
@@ -22795,6 +23029,16 @@ function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom = false
 // fallback -- chosen as the PRIMARY geocoder here since it supports POI/business search, unlike
 // Open-Meteo's city-only geocoder) + memo + category select, used for both creating a new place
 // and editing an existing one (editingPlace present).
+// Kakao's category_group_code covers 15 fixed groups; only these four have an obvious match to
+// this app's five place categories (식당/카페/놀이/숙박/기타) -- everything else (마트, 학교, 주차장,
+// 지하철역 등) falls back to 기타 rather than guessing.
+const KAKAO_CATEGORY_GROUP_TO_PLACE_CATEGORY = {
+  FD6: 'restaurant', // 음식점
+  CE7: 'cafe',        // 카페
+  AD5: 'lodging',      // 숙박
+  AT4: 'play'          // 관광명소
+};
+
 function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, onDelete, showToast, onRequestConfirm }) {
   const categories = getPlaceCategories(calendar);
   const [query, setQuery] = React.useState(editingPlace ? (editingPlace.name || '') : '');
@@ -22805,8 +23049,19 @@ function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, onDelete,
   } : null);
   const [memo, setMemo] = React.useState(editingPlace ? (editingPlace.memo || '') : '');
   const [categoryId, setCategoryId] = React.useState(editingPlace ? editingPlace.categoryId : (categories[0]?.id || 'etc'));
+  const [visitStatus, setVisitStatus] = React.useState(editingPlace ? editingPlace.visitStatus : 'visited');
+  const [visitDate, setVisitDate] = React.useState(() => {
+    if (editingPlace) return editingPlace.visitDate || '';
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  });
   const [saving, setSaving] = React.useState(false);
 
+  // Kakao Local (키워드 검색) is tried first -- Nominatim/OSM has almost no Korean business-name
+  // coverage (searching "스타벅스" only returns Japan branches), so it's kept only as a fallback
+  // for plain addresses/landmarks Kakao doesn't have. Kakao also proxies through a Cloud Function
+  // (kakaoLocalSearchProxy) so the REST API key never ships to the browser, same reasoning as the
+  // existing peekalinkProxy for link previews.
   const handleSearch = async e => {
     if (e) e.preventDefault();
     const cleanQuery = query.trim();
@@ -22816,15 +23071,36 @@ function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, onDelete,
     }
     setLoading(true);
     try {
-      const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(cleanQuery)}&format=json&limit=8&accept-language=ko`);
-      const data = res.ok ? await res.json() : [];
-      const mapped = (data || []).map((item, idx) => ({
-        id: `nominatim_${item.place_id || idx}`,
-        name: (item.display_name || '').split(',')[0] || cleanQuery,
-        address: item.display_name || '',
-        lat: parseFloat(item.lat),
-        lng: parseFloat(item.lon)
-      })).filter(r => Number.isFinite(r.lat) && Number.isFinite(r.lng));
+      let mapped = [];
+      try {
+        const kakaoUrl = `https://us-central1-${firebaseConfig.projectId}.cloudfunctions.net/kakaoLocalSearchProxy?query=${encodeURIComponent(cleanQuery)}`;
+        const kakaoRes = await fetch(kakaoUrl);
+        const kakaoJson = kakaoRes.ok ? await kakaoRes.json() : null;
+        if (kakaoJson?.ok && Array.isArray(kakaoJson.documents)) {
+          mapped = kakaoJson.documents.map((doc, idx) => ({
+            id: `kakao_${doc.id || idx}`,
+            name: doc.place_name || cleanQuery,
+            address: doc.road_address_name || doc.address_name || '',
+            lat: parseFloat(doc.y),
+            lng: parseFloat(doc.x),
+            categoryId: KAKAO_CATEGORY_GROUP_TO_PLACE_CATEGORY[doc.category_group_code] || null
+          })).filter(r => Number.isFinite(r.lat) && Number.isFinite(r.lng));
+        }
+      } catch (err) {
+        console.error('Kakao local search failed, falling back to Nominatim:', err);
+      }
+      if (mapped.length === 0) {
+        const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(cleanQuery)}&format=json&limit=8&accept-language=ko`);
+        const data = res.ok ? await res.json() : [];
+        mapped = (data || []).map((item, idx) => ({
+          id: `nominatim_${item.place_id || idx}`,
+          name: (item.display_name || '').split(',')[0] || cleanQuery,
+          address: item.display_name || '',
+          lat: parseFloat(item.lat),
+          lng: parseFloat(item.lon),
+          categoryId: null
+        })).filter(r => Number.isFinite(r.lat) && Number.isFinite(r.lng));
+      }
       setResults(mapped);
       if (mapped.length === 0) showToast('검색 결과가 없습니다.', 'info');
     } catch (err) {
@@ -22839,6 +23115,10 @@ function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, onDelete,
     setSelected({ name: result.name, address: result.address, lat: result.lat, lng: result.lng });
     setQuery(result.name);
     setResults([]);
+    // Kakao's category_group_code lets a search result suggest 식당/카페/놀이/숙박 up front, so the
+    // user usually doesn't have to touch the category picker at all -- only auto-selects when the
+    // result actually carries a mapped category, otherwise leaves whatever was already chosen.
+    if (result.categoryId) setCategoryId(result.categoryId);
   };
 
   const handleSubmit = async () => {
@@ -22854,7 +23134,9 @@ function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, onDelete,
       lat: selected.lat,
       lng: selected.lng,
       categoryId,
-      memo: memo.trim()
+      memo: memo.trim(),
+      visitStatus,
+      visitDate: visitStatus === 'visited' ? visitDate : ''
     });
     setSaving(false);
     if (ok !== false) onClose();
@@ -22933,15 +23215,39 @@ function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, onDelete,
         style: { padding: '10px 12px', borderRadius: '8px', backgroundColor: 'rgba(59, 130, 246, 0.08)', border: '1px solid rgba(59, 130, 246, 0.2)', fontSize: '0.78rem', color: 'var(--text-main)' }
       }, `선택됨: ${selected.name}${selected.address ? ' · ' + selected.address : ''}`),
 
-      /* Category picker */
+      /* Category picker + 방문/예정 toggle */
       /*#__PURE__*/React.createElement("div", null,
         /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#64748B', marginBottom: '4px' } }, "카테고리"),
-        /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
-          title: "카테고리 선택",
-          value: categoryId,
-          options: categoryOptions,
-          onSelect: setCategoryId,
-          placeholder: "카테고리 선택"
+        /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '10px' } },
+          /*#__PURE__*/React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+            /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
+              title: "카테고리 선택",
+              value: categoryId,
+              options: categoryOptions,
+              onSelect: setCategoryId,
+              placeholder: "카테고리 선택"
+            })
+          ),
+          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 } },
+            /*#__PURE__*/React.createElement("span", {
+              style: { fontSize: '0.76rem', fontWeight: visitStatus === 'visited' ? 800 : 500, color: visitStatus === 'visited' ? 'var(--accent-primary)' : 'var(--text-muted)' }
+            }, "방문"),
+            /*#__PURE__*/React.createElement(ToggleSwitch, {
+              checked: visitStatus === 'planned',
+              onChange: () => setVisitStatus(prev => prev === 'visited' ? 'planned' : 'visited'),
+              label: "방문/방문예정 전환"
+            }),
+            /*#__PURE__*/React.createElement("span", {
+              style: { fontSize: '0.76rem', fontWeight: visitStatus === 'planned' ? 800 : 500, color: visitStatus === 'planned' ? 'var(--accent-primary)' : 'var(--text-muted)' }
+            }, "예정")
+          )
+        ),
+        visitStatus === 'visited' && /*#__PURE__*/React.createElement("input", {
+          type: "date",
+          className: "form-input",
+          style: { width: '100%', marginTop: '8px' },
+          value: visitDate,
+          onChange: e => setVisitDate(e.target.value)
         })
       ),
 
@@ -22951,11 +23257,14 @@ function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, onDelete,
         /*#__PURE__*/React.createElement("textarea", {
           className: "form-input",
           style: { width: '100%', minHeight: '60px', resize: 'vertical', fontFamily: 'inherit' },
-          placeholder: "메모를 남겨보세요 (선택)",
+          placeholder: "메모를 남겨보세요 (선택, URL을 입력하면 캡슐 뱃지로 표시됩니다)",
           value: memo,
           maxLength: 300,
           onChange: e => setMemo(e.target.value)
-        })
+        }),
+        extractFirstUrl(memo) && /*#__PURE__*/React.createElement("div", {
+          style: { marginTop: '6px', fontSize: '0.78rem', color: 'var(--text-main)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px' }
+        }, renderTextWithUrlBadge(memo))
       )
     ),
 
@@ -23028,7 +23337,8 @@ function PlacesSection({ calendar, onViewAll }) {
     }, /*#__PURE__*/React.createElement(PlaceMapView, {
       places,
       calendar,
-      resizeSignal: collapsed
+      resizeSignal: collapsed,
+      preferDomesticBounds: true
     }))
   );
 }
@@ -23041,8 +23351,14 @@ function PlacesSection({ calendar, onViewAll }) {
 function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, onRequestConfirm }) {
   const [isRegisterOpen, setIsRegisterOpen] = React.useState(false);
   const [editingPlace, setEditingPlace] = React.useState(null);
+  const [categoryFilter, setCategoryFilter] = React.useState('all');
+  const [mapExpanded, setMapExpanded] = React.useState(false);
+  // Header hides on scroll-down / reappears on scroll-up, matching the chat room / memo page
+  // header exactly (see useScrollHideHeader above).
+  const { isHeaderVisible, onScroll: handlePlacesScroll } = useScrollHideHeader();
   const places = getCalendarPlaces(calendar);
-  const categoryMap = getPlaceCategories(calendar).reduce((acc, c) => { acc[c.id] = c; return acc; }, {});
+  const categories = getPlaceCategories(calendar);
+  const categoryMap = categories.reduce((acc, c) => { acc[c.id] = c; return acc; }, {});
 
   const handleOpenRegister = () => {
     setEditingPlace(null);
@@ -23060,7 +23376,19 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
     onRequestConfirm('장소 삭제', `"${place.name || '이 장소'}"를 삭제하시겠습니까?`, () => onDeletePlace(place.id));
   };
 
-  const sortedPlaces = [...places].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+  // Most recent visit date first, oldest last -- places with no date info at all (never
+  // searched with a visitDate, no dated memo) fall to the very bottom rather than being
+  // mistaken for "most recent" just because they were edited recently.
+  const sortedPlaces = [...places].sort((a, b) => {
+    const dateA = getPlaceSortDateKey(a);
+    const dateB = getPlaceSortDateKey(b);
+    if (dateA && dateB) return dateB.localeCompare(dateA);
+    if (dateA && !dateB) return -1;
+    if (!dateA && dateB) return 1;
+    return (b.updatedAt || 0) - (a.updatedAt || 0);
+  });
+  const countsByCategory = places.reduce((acc, p) => { acc[p.categoryId] = (acc[p.categoryId] || 0) + 1; return acc; }, {});
+  const filteredPlaces = categoryFilter === 'all' ? sortedPlaces : sortedPlaces.filter(p => p.categoryId === categoryFilter);
 
   return /*#__PURE__*/React.createElement("div", {
     className: "places-view-container",
@@ -23071,7 +23399,8 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
       width: '100%', maxWidth: '100%', overflowX: 'hidden'
     }
   },
-    /* Floating back button */
+    /* Floating back button -- gains a shadow once the header itself has scrolled out of view,
+       exactly like the chat room / memo page back button. */
     /*#__PURE__*/React.createElement("button", {
       type: "button",
       onClick: onBack,
@@ -23079,7 +23408,8 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
       style: {
         position: 'fixed', top: '10px', left: '10px', width: '36px', height: '36px',
         borderRadius: '50%', backgroundColor: 'var(--bg-card)', border: 'none',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+        boxShadow: isHeaderVisible ? 'none' : '0 2px 8px rgba(0,0,0,0.12)',
+        transition: 'box-shadow 0.2s ease',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         cursor: 'pointer', color: '#64748B', zIndex: 1020
       }
@@ -23092,7 +23422,9 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
         position: 'fixed', top: 0, left: 0, right: 0, height: '56px',
         backgroundColor: 'var(--bg-card)', borderBottom: '1px solid var(--border-subtle)',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '0 16px', zIndex: 1010
+        padding: '0 16px', zIndex: 1010,
+        transition: 'transform 0.3s ease',
+        transform: isHeaderVisible ? 'translateY(0)' : 'translateY(-100%)'
       }
     },
       /*#__PURE__*/React.createElement("div", { style: { width: '32px', flexShrink: 0 } }),
@@ -23115,54 +23447,146 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
       }, "장소등록")
     ),
 
-    /* Scrollable body: full map + place card list */
+    /* Scrollable body: expandable map + category tabs + place list */
     /*#__PURE__*/React.createElement("div", {
-      style: { flex: 1, overflowY: 'auto', paddingTop: '56px' }
+      onScroll: handlePlacesScroll,
+      style: { flex: 1, overflowY: mapExpanded ? 'hidden' : 'auto', paddingTop: '56px' }
     },
       /*#__PURE__*/React.createElement("div", {
-        style: { width: '100%', height: '46vh', minHeight: '260px' }
-      }, /*#__PURE__*/React.createElement(PlaceMapView, {
-        places,
-        calendar,
-        scrollWheelZoom: true,
-        onSelectPlace: handleEditPlace,
-        resizeSignal: 'full'
-      })),
-      /*#__PURE__*/React.createElement("div", {
-        style: { padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }
+        style: mapExpanded
+          ? { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1005 }
+          : { position: 'relative', width: '100%', height: '46vh', minHeight: '260px' }
       },
-        places.length === 0 ? /*#__PURE__*/React.createElement("div", {
-          style: { padding: '30px 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }
-        }, "등록된 장소가 없습니다. 우측 상단 '장소등록' 버튼을 눌러 추가해 보세요.") :
-        sortedPlaces.map(place => {
-          const category = categoryMap[place.categoryId] || categoryMap.etc;
-          return /*#__PURE__*/React.createElement("div", {
-            key: place.id,
-            className: "summary-card",
-            style: { display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer' },
-            onClick: () => handleEditPlace(place)
-          },
-            /*#__PURE__*/React.createElement("span", {
+        /*#__PURE__*/React.createElement(PlaceMapView, {
+          places,
+          calendar,
+          scrollWheelZoom: true,
+          onSelectPlace: handleEditPlace,
+          resizeSignal: mapExpanded
+        }),
+        /* Wide, centered grip handle -- toggles the map to cover the list area below it so the
+           map itself has much more room, without needing a separate fullscreen route. */
+        /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          onClick: () => setMapExpanded(prev => !prev),
+          "aria-label": mapExpanded ? '지도 축소' : '지도 확대',
+          title: mapExpanded ? '지도 축소' : '지도 확대',
+          style: {
+            position: 'absolute', left: 0, right: 0, bottom: 0, height: '30px',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            border: 'none', cursor: 'pointer', color: '#64748B',
+            background: 'linear-gradient(to top, rgba(255,255,255,0.94), rgba(255,255,255,0))',
+            zIndex: 6
+          }
+        }, /*#__PURE__*/React.createElement(ThreeLinesIcon, { size: 20 }))
+      ),
+
+      /*#__PURE__*/React.createElement("div", {
+        style: { padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }
+      },
+        /* Category filter tabs */
+        categories.length > 0 && /*#__PURE__*/React.createElement("div", {
+          style: { display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '2px' }
+        },
+          /*#__PURE__*/React.createElement("button", {
+            type: "button",
+            onClick: () => setCategoryFilter('all'),
+            style: {
+              flexShrink: 0, padding: '6px 12px', borderRadius: 'var(--radius-full)', fontSize: '0.78rem', fontWeight: 800,
+              border: categoryFilter === 'all' ? '1px solid var(--accent-primary)' : '1px solid var(--border-subtle)',
+              backgroundColor: categoryFilter === 'all' ? 'var(--accent-primary)' : 'var(--bg-card)',
+              color: categoryFilter === 'all' ? '#FFFFFF' : 'var(--text-muted)',
+              cursor: 'pointer', whiteSpace: 'nowrap'
+            }
+          }, `전체 ${places.length}`),
+          categories.map(category => /*#__PURE__*/React.createElement("button", {
+            key: category.id,
+            type: "button",
+            onClick: () => setCategoryFilter(category.id),
+            style: {
+              flexShrink: 0, padding: '6px 12px', borderRadius: 'var(--radius-full)', fontSize: '0.78rem', fontWeight: 800,
+              border: `1px solid ${categoryFilter === category.id ? category.color : 'var(--border-subtle)'}`,
+              backgroundColor: categoryFilter === category.id ? category.color : 'var(--bg-card)',
+              color: categoryFilter === category.id ? '#FFFFFF' : 'var(--text-muted)',
+              cursor: 'pointer', whiteSpace: 'nowrap'
+            }
+          }, `${getPlaceCategoryIcon(category)} ${category.name} ${countsByCategory[category.id] || 0}`)
+          )
+        ),
+
+        /* Place list -- styled like the 정산하기 지출항목 list (bordered container, one bordered
+           row per item, category/date/visit-status pill row on top). */
+        /*#__PURE__*/React.createElement("div", {
+          style: {
+            display: 'flex', flexDirection: 'column', gap: '6px', padding: '10px',
+            border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-primary)'
+          }
+        },
+          filteredPlaces.length === 0 ? /*#__PURE__*/React.createElement("div", {
+            style: { padding: '30px 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }
+          }, places.length === 0 ? "등록된 장소가 없습니다. 우측 상단 '장소등록' 버튼을 눌러 추가해 보세요." : "이 카테고리에 등록된 장소가 없습니다.") :
+          filteredPlaces.map(place => {
+            const category = categoryMap[place.categoryId] || categoryMap.etc;
+            const memoDate = extractLeadingMemoDate(place.memo);
+            const visitEntries = parseVisitEntriesFromMemo(place.memo);
+            const memoWithoutDate = memoDate ? place.memo.replace(memoDate, '').trim() : place.memo;
+            return /*#__PURE__*/React.createElement("div", {
+              key: place.id,
               style: {
-                flexShrink: 0, width: '34px', height: '34px', borderRadius: '50%',
-                backgroundColor: category ? category.color : '#64748B',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: '16px'
-              }
-            }, getPlaceCategoryIcon(category)),
-            /*#__PURE__*/React.createElement("div", { style: { flex: 1, minWidth: 0 } },
-              /*#__PURE__*/React.createElement("div", { style: { fontWeight: 800, fontSize: '0.88rem', color: 'var(--text-main)' } }, place.name || '이름 없음'),
-              place.address && /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: '2px' } }, place.address),
-              place.memo && /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.78rem', color: 'var(--text-main)', marginTop: '4px' } }, place.memo)
-            ),
-            /*#__PURE__*/React.createElement("button", {
-              type: "button",
-              className: "btn btn-danger",
-              style: { padding: '4px 10px', height: '30px', display: 'flex', alignItems: 'center', flexShrink: 0 },
-              onClick: e => { e.stopPropagation(); handleDeleteFromCard(place); }
-            }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 16 }))
-          );
-        })
+                display: 'flex', flexDirection: 'column', gap: '4px',
+                padding: '10px 42px 10px 12px', position: 'relative',
+                border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', cursor: 'pointer'
+              },
+              onClick: () => handleEditPlace(place)
+            },
+              /*#__PURE__*/React.createElement("button", {
+                type: "button",
+                className: "expense-delete-button",
+                onClick: event => { event.stopPropagation(); handleDeleteFromCard(place); },
+                title: "장소 삭제",
+                style: {
+                  position: 'absolute', top: '8px', right: '8px', width: '28px', height: '28px',
+                  background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0
+                }
+              }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 14 })),
+              /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' } },
+                /*#__PURE__*/React.createElement("span", {
+                  style: {
+                    display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '3px 8px 3px 3px', borderRadius: '999px',
+                    backgroundColor: `${category.color}18`, color: category.color, fontSize: '0.68rem', fontWeight: 900
+                  }
+                },
+                  /*#__PURE__*/React.createElement("span", {
+                    style: {
+                      width: '16px', height: '16px', borderRadius: '50%', flexShrink: 0,
+                      backgroundColor: category.color, display: 'flex', alignItems: 'center', justifyContent: 'center'
+                    }
+                  }, /*#__PURE__*/React.createElement(PlaceCategoryMarkerIcon, { category, size: 10 })),
+                  category.name
+                ),
+                /*#__PURE__*/React.createElement("span", {
+                  style: {
+                    fontSize: '0.66rem', fontWeight: 700, padding: '2px 7px', borderRadius: 'var(--radius-full)',
+                    backgroundColor: place.visitStatus === 'planned' ? 'rgba(59, 130, 246, 0.12)' : 'rgba(16, 185, 129, 0.12)',
+                    color: place.visitStatus === 'planned' ? '#2563EB' : '#16A34A'
+                  }
+                }, place.visitStatus === 'planned' ? '방문예정' : (place.visitDate ? `방문 ${place.visitDate}` : '방문'))
+              ),
+              /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' } },
+                /*#__PURE__*/React.createElement("span", { style: { fontWeight: 800, fontSize: '0.88rem', color: 'var(--text-main)' } }, place.name || '이름 없음'),
+                memoDate && /*#__PURE__*/React.createElement("span", { className: "memo-capsule-badge" }, memoDate)
+              ),
+              place.address && /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.74rem', color: 'var(--text-muted)' } }, place.address),
+              visitEntries.length > 0
+                ? /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.78rem', color: 'var(--text-main)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px' } },
+                    /*#__PURE__*/React.createElement("span", null, `최근: ${visitEntries[visitEntries.length - 1].note}`),
+                    /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 700 } }, `총 ${visitEntries.length}회 방문`)
+                  )
+                : memoWithoutDate && /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.78rem', color: 'var(--text-main)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px' } }, renderTextWithUrlBadge(memoWithoutDate))
+            );
+          })
+        )
       )
     ),
 
