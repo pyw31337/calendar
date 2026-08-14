@@ -1046,16 +1046,19 @@ select.form-select {
 .polls-section {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 0;
   margin-bottom: 20px;
 }
 .poll-card {
-  background: var(--bg-card);
-  border-radius: var(--radius-lg);
-  padding: 16px;
+  background: transparent;
+  border-radius: 0;
+  padding: 18px 0;
+}
+.poll-card + .poll-card {
+  border-top: 1px solid var(--border-subtle);
 }
 @media (min-width: 640px) {
-  .poll-card { padding: 22px; }
+  .poll-card { padding: 22px 0; }
 }
 .poll-header {
   display: flex;
