@@ -12301,7 +12301,6 @@ function ChatRoomView({
     onClose: () => setIsEmojiPickerOpen(false)
   }),
   isChatSideMenuOpen && /*#__PURE__*/React.createElement(ChatSideMenu, {
-    calendar: calendar,
     onClose: () => setIsChatSideMenuOpen(false),
     onOpenSearch: () => { setIsSearchOpen(true); setSearchQuery(''); },
     onOpenNoticeSettings: () => {
@@ -12315,10 +12314,7 @@ function ChatRoomView({
     onDecreaseFont: onDecreaseFont,
     onIncreaseFont: onIncreaseFont,
     isChatNotifyEnabled: isChatNotifyEnabled,
-    onToggleChatNotifications: onToggleChatNotifications,
-    onUpdateWeatherLocation: onUpdateWeatherLocation,
-    onDeleteRecentLocation: onDeleteRecentLocation,
-    showToast: showToast
+    onToggleChatNotifications: onToggleChatNotifications
   }),
   isChatGalleryOpen && /*#__PURE__*/React.createElement(ChatGalleryModal, {
     chatMessages: chatMessages,
@@ -15295,9 +15291,10 @@ function computeCalendarSearchMatches(cal, chatMessages, memoList, q, limit = 30
   const expenses = [];
   (cal.confirmedMeeting || []).forEach(meeting => {
     (meeting.expenses || []).forEach(exp => {
-      if ((exp.label || '').toLowerCase().includes(q) || (exp.url || '').toLowerCase().includes(q)) {
-        const category = expenseCategoriesMap[exp.categoryId];
-        expenses.push({ ...exp, date: meeting.date, categoryName: category?.name || '기타', categoryColor: category?.color || '#94A3B8' });
+      const category = expenseCategoriesMap[exp.categoryId];
+      const categoryName = category?.name || '기타';
+      if ((exp.label || '').toLowerCase().includes(q) || (exp.url || '').toLowerCase().includes(q) || categoryName.toLowerCase().includes(q)) {
+        expenses.push({ ...exp, date: meeting.date, categoryName, categoryColor: category?.color || '#94A3B8' });
       }
     });
   });
@@ -16793,7 +16790,6 @@ function MainSideMenu({
 }
 
 function ChatSideMenu({
-  calendar,
   onClose,
   onOpenSearch,
   onOpenNoticeSettings,
@@ -16805,12 +16801,8 @@ function ChatSideMenu({
   onDecreaseFont,
   onIncreaseFont,
   isChatNotifyEnabled,
-  onToggleChatNotifications,
-  onUpdateWeatherLocation,
-  onDeleteRecentLocation,
-  showToast
+  onToggleChatNotifications
 }) {
-  const [isWeatherModalOpen, setIsWeatherModalOpen] = React.useState(false);
   const handle = action => {
     if (typeof action === 'function') action();
   };
@@ -16831,32 +16823,6 @@ function ChatSideMenu({
         /*#__PURE__*/React.createElement("div", {
           style: { display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }
         },
-          /* Weather Badge */
-          /*#__PURE__*/React.createElement(WeatherBadge, { weatherLocation: calendar?.weatherLocation }),
-          /* Weather Settings */
-          /*#__PURE__*/React.createElement("button", {
-            type: "button",
-            className: "admin-side-menu-weather-settings-btn",
-            title: "날씨 지역 설정",
-            style: {
-              width: '28px',
-              height: '28px',
-              border: 'none',
-              borderRadius: '6px',
-              background: 'transparent',
-              color: '#64748B',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              padding: 0,
-              transition: 'background-color 0.16s ease, color 0.16s ease'
-            },
-            onClick: (e) => {
-              e.stopPropagation();
-              setIsWeatherModalOpen(true);
-            }
-          }, /*#__PURE__*/React.createElement(MapCogIcon, { size: 16 })),
           /* Close Button */
           /*#__PURE__*/React.createElement("button", {
             type: "button",
@@ -16980,13 +16946,7 @@ function ChatSideMenu({
         /*#__PURE__*/React.createElement(ToggleSwitch, { checked: !!isChatNotifyEnabled, onChange: onToggleChatNotifications, label: "채팅알림" })
       )
     )
-  )), isWeatherModalOpen && /*#__PURE__*/React.createElement(WeatherLocationModal, {
-    onClose: () => setIsWeatherModalOpen(false),
-    onSelectLocation: onUpdateWeatherLocation,
-    onDeleteRecentLocation: onDeleteRecentLocation,
-    showToast: showToast,
-    recentLocations: calendar?.recentLocations || []
-  }));
+  )));
 }
 
 function ChatGalleryModal({
@@ -19833,7 +19793,13 @@ function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {
     }, /*#__PURE__*/React.createElement(CalendarCheckIcon, null), formatDateWithDayName(row.meeting.date)), /*#__PURE__*/React.createElement("span", {
       style: { display: 'inline-flex', alignItems: 'center', gap: '6px', marginLeft: 'auto', whiteSpace: 'nowrap' }
     }, /*#__PURE__*/React.createElement("span", {
-      style: { fontSize: '0.86rem', fontWeight: 900, color: row.net < 0 ? '#DC2626' : '#16A34A' }
+      // Capsule badge (not plain colored text) so this per-date total reads distinctly from the
+      // plain +/- colored amounts on the expense rows below it.
+      style: {
+        fontSize: '0.8rem', fontWeight: 900, color: '#FFFFFF',
+        backgroundColor: row.net < 0 ? '#DC2626' : '#16A34A',
+        padding: '4px 10px', borderRadius: '999px'
+      }
     }, row.net >= 0 ? '+' : '-', Math.abs(row.net).toLocaleString(), "원"), /*#__PURE__*/React.createElement(SectionToggleButton, {
       collapsed: isCollapsed,
       onToggle: () => toggleDailyRow(row.meeting.date),
