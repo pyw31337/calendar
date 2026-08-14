@@ -240,12 +240,37 @@ runAppScript(productionContext, `
   if (getDirectChatMediaInfo('https://i.aagag.com/o/KpOo5.webp')?.type !== 'image') {
     throw new Error('direct webp chat media detection failed');
   }
+  if (getDirectChatMediaInfo('https://example.com/photo.JPEG?size=large')?.type !== 'image') {
+    throw new Error('direct jpeg chat media detection failed');
+  }
+  if (getDirectChatMediaInfo('https://example.com/animation.gif')?.type !== 'image') {
+    throw new Error('direct gif chat media detection failed');
+  }
   if (getDirectChatMediaInfo('https://i.aagag.com/Kp4wT.mp4')?.type !== 'video') {
     throw new Error('direct mp4 chat media detection failed');
+  }
+  if (getDirectChatMediaInfo('https://cdn.example.com/movie.webm?download=1')?.type !== 'video') {
+    throw new Error('direct webm chat media detection failed');
   }
   const naverProxyImage = 'https://search.pstatic.net/common/?src=https%3A%2F%2Fldb-phinf.pstatic.net%2F20250722_204%2F1753148380144i8qRz_JPEG%2F20250722_093743.jpg';
   if (getDirectChatMediaInfo(naverProxyImage)?.type !== 'image') {
     throw new Error('proxy image URL chat media detection failed');
+  }
+  const youtubeInfo = getDirectChatMediaInfo('https://www.youtube.com/watch?v=dQw4w9WgXcQ');
+  if (youtubeInfo?.type !== 'embed' || youtubeInfo.provider !== 'youtube' || !youtubeInfo.url.includes('/embed/dQw4w9WgXcQ')) {
+    throw new Error('youtube chat embed detection failed');
+  }
+  const youtubeShortsInfo = getDirectChatMediaInfo('https://youtube.com/shorts/abcDEF12345?feature=share');
+  if (youtubeShortsInfo?.type !== 'embed' || youtubeShortsInfo.provider !== 'youtube' || !youtubeShortsInfo.url.includes('/embed/abcDEF12345')) {
+    throw new Error('youtube shorts chat embed detection failed');
+  }
+  const vimeoInfo = getDirectChatMediaInfo('https://vimeo.com/123456789');
+  if (vimeoInfo?.type !== 'embed' || vimeoInfo.provider !== 'vimeo' || !vimeoInfo.url.includes('/video/123456789')) {
+    throw new Error('vimeo chat embed detection failed');
+  }
+  const tiktokInfo = getDirectChatMediaInfo('https://www.tiktok.com/@user/video/7521234567890123456');
+  if (tiktokInfo?.type !== 'embed' || tiktokInfo.provider !== 'tiktok' || !tiktokInfo.url.includes('/embed/v2/7521234567890123456')) {
+    throw new Error('tiktok chat embed detection failed');
   }
   if (getDirectChatMediaInfo('https://blog.naver.com/choochoo440/224199076337') !== null) {
     throw new Error('normal page URL must not be treated as direct chat media');

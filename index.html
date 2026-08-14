@@ -8465,8 +8465,8 @@ function LinkPreviewCard({ url, fallbackTitle, cachedData }) {
 function getDirectChatMediaInfo(url) {
   const normalizedUrl = sanitizeText(url || '', 2000);
   if (!normalizedUrl || !/^https?:\/\//i.test(normalizedUrl)) return null;
-  const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.avif', '.bmp', '.svg'];
-  const videoExtensions = ['.mp4', '.webm', '.ogv', '.m4v', '.mov'];
+  const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.avif', '.bmp', '.svg', '.jfif', '.pjpeg', '.pjp', '.ico'];
+  const videoExtensions = ['.mp4', '.webm', '.ogv', '.ogg', '.m4v', '.mov', '.3gp', '.3g2'];
   const getExtensionType = candidate => {
     try {
       const parsed = new URL(candidate);
@@ -8480,6 +8480,39 @@ function getDirectChatMediaInfo(url) {
     }
     return '';
   };
+  const getEmbedInfo = source => {
+    try {
+      const parsed = new URL(source);
+      const host = parsed.hostname.replace(/^www\./i, '').toLowerCase();
+      const path = parsed.pathname || '';
+      if (host === 'youtu.be') {
+        const id = path.split('/').filter(Boolean)[0];
+        if (id) return { type: 'embed', provider: 'youtube', url: `https://www.youtube-nocookie.com/embed/${encodeURIComponent(id)}` };
+      }
+      if (host === 'youtube.com' || host === 'm.youtube.com' || host === 'music.youtube.com') {
+        const watchId = parsed.searchParams.get('v');
+        const shortsId = path.match(/\/shorts\/([^/?#]+)/i)?.[1];
+        const embedId = path.match(/\/embed\/([^/?#]+)/i)?.[1];
+        const liveId = path.match(/\/live\/([^/?#]+)/i)?.[1];
+        const id = watchId || shortsId || embedId || liveId;
+        if (id) return { type: 'embed', provider: 'youtube', url: `https://www.youtube-nocookie.com/embed/${encodeURIComponent(id)}` };
+      }
+      if (host === 'vimeo.com' || host === 'player.vimeo.com') {
+        const id = path.match(/(?:\/video)?\/(\d+)(?:$|[/?#])/i)?.[1] || path.match(/\/(\d+)(?:$|[/?#])/i)?.[1];
+        if (id) return { type: 'embed', provider: 'vimeo', url: `https://player.vimeo.com/video/${encodeURIComponent(id)}` };
+      }
+      if (host === 'tiktok.com' || host.endsWith('.tiktok.com')) {
+        const id = path.match(/\/video\/(\d+)/i)?.[1];
+        if (id) return { type: 'embed', provider: 'tiktok', url: `https://www.tiktok.com/embed/v2/${encodeURIComponent(id)}` };
+      }
+    } catch (e) {
+      // Keep non-URL and unsupported providers on the regular link-preview path.
+    }
+    return null;
+  };
+
+  const embedInfo = getEmbedInfo(normalizedUrl);
+  if (embedInfo) return embedInfo;
 
   const candidates = [normalizedUrl];
   try {
@@ -8528,6 +8561,11 @@ function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox, linkPr
   const maxWidth = style.maxWidth || '320px';
   const maxHeight = style.maxHeight || '240px';
   const marginBottom = remainingText ? '8px' : (style.marginBottom || '0');
+  const embedTitleMap = {
+    youtube: 'YouTube 영상',
+    vimeo: 'Vimeo 영상',
+    tiktok: 'TikTok 영상'
+  };
   const commonStyle = {
     display: 'block',
     width: '100%',
@@ -8553,7 +8591,8 @@ function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox, linkPr
         }),
         style: { ...commonStyle, cursor: setActiveLightbox ? 'pointer' : 'default' }
       })
-      : /*#__PURE__*/React.createElement('video', {
+      : mediaInfo.type === 'video'
+      ? /*#__PURE__*/React.createElement('video', {
         src: mediaInfo.url,
         muted: true,
         autoPlay: true,
@@ -8563,7 +8602,26 @@ function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox, linkPr
         preload: 'metadata',
         onError: () => setFailed(true),
         style: commonStyle
-      }),
+      })
+      : /*#__PURE__*/React.createElement('iframe', {
+      src: mediaInfo.url,
+      title: embedTitleMap[mediaInfo.provider] || '링크 영상',
+      loading: 'lazy',
+      allow: 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share',
+      allowFullScreen: true,
+      onError: () => setFailed(true),
+      style: {
+        display: 'block',
+        width: '100%',
+        maxWidth: `min(100%, ${style.maxWidth || '420px'})`,
+        aspectRatio: mediaInfo.provider === 'tiktok' ? '9 / 16' : '16 / 9',
+        maxHeight: mediaInfo.provider === 'tiktok' ? '520px' : '260px',
+        border: '0',
+        borderRadius: '10px',
+        backgroundColor: 'var(--bg-primary)',
+        marginBottom
+      }
+    }),
     remainingText ? /*#__PURE__*/React.createElement('div', null, parseTextWithLinks(remainingText, searchQuery)) : null
   );
 }
