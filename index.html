@@ -253,6 +253,30 @@ function parseVisitEntriesFromMemo(memo) {
   return entries.length >= 2 ? entries : [];
 }
 
+// Normalizes either date shape a place can carry -- the structured 'YYYY-MM-DD' visitDate field,
+// or a memo-embedded 'YY.MM.DD' -- into a single comparable 'YYYY-MM-DD' string so the list can
+// be sorted by actual visit recency regardless of which source the date came from.
+function normalizePlaceDateForSort(dateStr) {
+  if (!dateStr) return null;
+  if (isValidDateString(dateStr)) return dateStr;
+  const match = String(dateStr).match(/^(\d{2})\.(\d{2})\.(\d{2})$/);
+  return match ? `20${match[1]}-${match[2]}-${match[3]}` : null;
+}
+// Picks the most relevant date to sort a place by, in priority order: its own structured
+// visitDate, the most recent entry if its memo turned out to be a multi-visit history, or a
+// single leading date embedded in the memo. Places with no date info at all sort to the bottom
+// (see the comparator in PlacesView) rather than being treated as "most recent".
+function getPlaceSortDateKey(place) {
+  const structured = normalizePlaceDateForSort(place.visitDate);
+  if (structured) return structured;
+  const entries = parseVisitEntriesFromMemo(place.memo);
+  if (entries.length > 0) {
+    const latest = normalizePlaceDateForSort(entries[entries.length - 1].date);
+    if (latest) return latest;
+  }
+  return normalizePlaceDateForSort(extractLeadingMemoDate(place.memo));
+}
+
 const URL_PARAMS = new URLSearchParams(window.location.search);
 const GATHER_APP_CONFIG = window.GATHER_APP_CONFIG || {};
 const readConfigNumber = (key, fallback) => Number.isFinite(GATHER_APP_CONFIG[key]) ? GATHER_APP_CONFIG[key] : fallback;
@@ -23295,7 +23319,17 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
     onRequestConfirm('장소 삭제', `"${place.name || '이 장소'}"를 삭제하시겠습니까?`, () => onDeletePlace(place.id));
   };
 
-  const sortedPlaces = [...places].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+  // Most recent visit date first, oldest last -- places with no date info at all (never
+  // searched with a visitDate, no dated memo) fall to the very bottom rather than being
+  // mistaken for "most recent" just because they were edited recently.
+  const sortedPlaces = [...places].sort((a, b) => {
+    const dateA = getPlaceSortDateKey(a);
+    const dateB = getPlaceSortDateKey(b);
+    if (dateA && dateB) return dateB.localeCompare(dateA);
+    if (dateA && !dateB) return -1;
+    if (!dateA && dateB) return 1;
+    return (b.updatedAt || 0) - (a.updatedAt || 0);
+  });
   const countsByCategory = places.reduce((acc, p) => { acc[p.categoryId] = (acc[p.categoryId] || 0) + 1; return acc; }, {});
   const filteredPlaces = categoryFilter === 'all' ? sortedPlaces : sortedPlaces.filter(p => p.categoryId === categoryFilter);
 
