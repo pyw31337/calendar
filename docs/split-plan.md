@@ -17,31 +17,33 @@
 - 6단계: `INITIAL_CALENDARS`에 남아 있던 과거 데모 참여자/일정 데이터를 제거하고, 빈 로딩 셸만 남겼다.
 - 7단계: 라이브 엔트리에 연결되지 않았고 `localStorage` 기반 저장 로직을 포함하던 구형 `src/` React 파일들을 삭제했다. 삭제 전 상태는 Git 커밋 이력으로 복구 가능하다.
 - 8단계: 색상 대비와 핵심 날짜 라벨 포맷 함수 일부를 `assets/app-utils.js`로 분리했다.
+- 9단계: 채팅 알림 권한/진단/브라우저 안내/참여자 알림 설정키 유틸을 `assets/app-notifications.js`로 분리했다.
+- 10단계: URL 끝문자 정리, 첫 URL 추출, URL 제거 같은 순수 URL 파싱 유틸을 `assets/app-utils.js`로 분리했다.
 - 외부 JS는 모두 `public/assets`에도 미러링한다. Vite 산출물과 GitHub Pages 루트 서빙 방식이 달라져도 파일 누락을 막기 위한 조치다.
 - 각 외부 JS는 `window.GATHER_APP_*` 네임스페이스로만 값을 노출하고, `index.html`에는 기존 값 fallback을 유지한다.
 - `npm run regression:test`에 `check:asset-mirrors`가 포함되어 root/public 미러 불일치, `index.html`의 누락 asset 참조, 외부 데이터 스크립트 로딩 순서, 과거 초기 데모 데이터 재유입을 잡는다.
 - `npm run regression:test`에 `check:size-budget`도 포함되어 `index.html`이 다시 1,050KB를 넘으면 실패한다.
 - `npm run smoke:live`로 GitHub Pages의 주요 진입 URL과 외부 asset 응답을 한 번에 확인한다.
 - 복구 기준 태그: `safe-before-split-20260814-7da2504`
+- 최근 안정 태그: `safe-notification-audit-20260814-c20233b`, `safe-notification-split-20260814-dfa42fd`, `safe-url-utils-split-20260814-3974923`
 
 ## 다음 권장 단계
 
-### 9단계: 순수 유틸 함수 추가 분리
+### 11단계: 순수 유틸 함수 추가 분리
 
 대상:
-- 색상/대비 계산
-- 날짜 포맷
-- URL 파싱/정규화
 - 로컬 환경 감지
-- 브라우저 권한 안내 문구
+- 브라우저/디바이스 판별
+- 파일 크기/이미지 메타데이터 처리
+- CSS 클래스명/상태 라벨 계산
 
 방식:
-- `assets/app-utils.js`를 먼저 만들고 `window.GatherUtils`에 노출한다.
-- 기존 `index.html` 안에서는 한 번에 삭제하지 않고, 먼저 `const { ... } = window.GatherUtils` 별칭만 붙여 동작을 확인한다.
+- `assets/app-utils.js`에 `window.GATHER_APP_UTILS`로 노출한다.
+- 기존 `index.html` 안에서는 한 번에 삭제하지 않고, 먼저 `const fn = window.GATHER_APP_UTILS.fn` 별칭만 붙여 동작을 확인한다.
 - 한 묶음당 5~10개 함수 이하로만 이동한다.
-- 함수 이동 시 기존 함수명을 바로 삭제하지 말고, 최소 1단계는 `window.GatherUtils?.fn || fallbackFn` 형태로 유지한다.
+- 함수 이동 시 기존 함수명을 바로 삭제하지 말고, 테스트가 있는 순수 함수부터 이동한다.
 
-### 10단계: Firebase 서비스 계층 분리
+### 12단계: Firebase 서비스 계층 분리
 
 대상:
 - 캘린더 구독
@@ -54,7 +56,7 @@
 - Firestore document path 규칙은 기존 코드와 완전히 동일하게 유지한다.
 - `?id=kkot`, `?id=cw`, `?id=jhair` 간 데이터 격리를 회귀 테스트에 포함한다.
 
-### 11단계: UI 컴포넌트 단위 분리
+### 13단계: UI 컴포넌트 단위 분리
 
 대상 우선순위:
 - `ShareModal`, `ConfirmDialog`, `NotificationPermissionHelpModal` 같은 독립 모달
@@ -66,7 +68,7 @@
 - 현재 앱은 CDN React + 인라인 `React.createElement` 실행 구조이므로, 즉시 ES Module JSX 구조로 바꾸면 위험하다.
 - 먼저 전역 컴포넌트 파일로 분리한 뒤, 최종적으로 Vite `src/` 기반 앱으로 전환한다.
 
-### 12단계: Vite 앱 구조 전환
+### 14단계: Vite 앱 구조 전환
 
 대상:
 - `src/`를 실제 라이브 엔트리로 전환
