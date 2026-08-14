@@ -482,6 +482,17 @@ body:has(.admin-login-gate) {
     max-height: none !important;
   }
 }
+/* TikTok's embed.js widget sets its own inline pixel width (its default is wider than a phone
+   screen) on the iframe it generates inside .tiktok-embed once it loads -- that inline style is
+   applied by TikTok's own script after mount, so it overrides any width we set from React. Only
+   an !important external rule can win over a later inline style, which is what actually keeps
+   the widget from bleeding past the chat bubble on narrow screens. */
+.tiktok-embed,
+.tiktok-embed iframe {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+}
 .poll-option-row,
 .recent-log-row,
 .search-result-row,
