@@ -6980,6 +6980,20 @@ function App() {
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
     return updateCalendars(nextCalendars, '날씨 지역 설정 완료', 'success', updatedCal.id, 'settings');
   };
+  const handleDeleteRecentWeatherLocation = async (location) => {
+    if (!guardLoadedCalendar()) return false;
+    const now = Date.now();
+    const currentRecents = activeCal.recentLocations || [];
+    const updatedRecents = currentRecents.filter(loc => loc.name !== location.name);
+    const updatedCal = {
+      ...activeCal,
+      recentLocations: updatedRecents,
+      updatedAt: now,
+      revision: (activeCal.revision || 0) + 1
+    };
+    const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
+    return updateCalendars(nextCalendars, '자주 찾는 지역이 삭제되었습니다.', 'success', updatedCal.id, 'settings');
+  };
   const handleAddPinnedNotice = (text, authorName) => {
     if (!guardLoadedCalendar()) return false;
     const cleanText = sanitizeText(text || '', 200);
@@ -7023,6 +7037,7 @@ function App() {
       calendar: activeCal,
       chatMessages: chatMessages,
       onUpdateWeatherLocation: handleUpdateWeatherLocation,
+      onDeleteRecentLocation: handleDeleteRecentWeatherLocation,
       chatInput: chatInput,
       setChatInput: setChatInput,
       chatParticipantId: chatParticipantId,
@@ -7284,6 +7299,7 @@ function App() {
     isChatNotifyEnabled: mainNotifPermission === 'granted' && mainChatNotifyEnabled,
     onToggleChatNotifications: handleMainToggleNotifications,
     onUpdateWeatherLocation: handleUpdateWeatherLocation,
+    onDeleteRecentLocation: handleDeleteRecentWeatherLocation,
     showToast: showToast
   }), isGuideOpen && /*#__PURE__*/React.createElement(UserManualOverlay, {
     calendar: activeCal,
@@ -11041,7 +11057,8 @@ function ChatRoomView({
   onIncreaseFont,
   isChatNotifyEnabled,
   onToggleChatNotifications,
-  onUpdateWeatherLocation
+  onUpdateWeatherLocation,
+  onDeleteRecentLocation
 }) {
   const [viewportBottom, setViewportBottom] = React.useState(0);
   const [isInputFocused, setIsInputFocused] = React.useState(false);
@@ -12308,6 +12325,7 @@ function ChatRoomView({
     isChatNotifyEnabled: isChatNotifyEnabled,
     onToggleChatNotifications: onToggleChatNotifications,
     onUpdateWeatherLocation: onUpdateWeatherLocation,
+    onDeleteRecentLocation: onDeleteRecentLocation,
     showToast: showToast
   }),
   isChatGalleryOpen && /*#__PURE__*/React.createElement(ChatGalleryModal, {
@@ -16364,7 +16382,7 @@ function translateKoreanToEnglish(query) {
   return query;
 }
 
-function WeatherLocationModal({ onClose, onSelectLocation, showToast, recentLocations = [] }) {
+function WeatherLocationModal({ onClose, onSelectLocation, onDeleteRecentLocation, showToast, recentLocations = [] }) {
   const [query, setQuery] = React.useState('');
   const [results, setResults] = React.useState([]);
   const [loading, setLoading] = React.useState(false);
@@ -16456,25 +16474,58 @@ function WeatherLocationModal({ onClose, onSelectLocation, showToast, recentLoca
           style: { display: 'flex', flexWrap: 'wrap', gap: '6px' }
         },
           recentLocations.map((loc, idx) => 
-            /*#__PURE__*/React.createElement("button", {
+            /*#__PURE__*/React.createElement("div", {
               key: idx,
-              type: "button",
-              onClick: () => {
-                onSelectLocation(loc);
-                onClose();
-              },
-              style: {
-                padding: '6px 10px',
-                fontSize: '0.74rem',
-                borderRadius: '6px',
-                border: '1px solid var(--border-subtle)',
-                backgroundColor: 'var(--bg-primary)',
-                color: 'var(--text-main)',
-                cursor: 'pointer',
-                transition: 'background-color 0.15s ease'
-              },
-              className: "weather-recent-btn"
-            }, loc.name)
+              style: { position: 'relative', display: 'inline-block' }
+            },
+              /*#__PURE__*/React.createElement("button", {
+                type: "button",
+                onClick: () => {
+                  onSelectLocation(loc);
+                  onClose();
+                },
+                style: {
+                  padding: '6px 20px 6px 10px',
+                  fontSize: '0.74rem',
+                  borderRadius: '6px',
+                  border: '1px solid var(--border-subtle)',
+                  backgroundColor: 'var(--bg-primary)',
+                  color: 'var(--text-main)',
+                  cursor: 'pointer',
+                  transition: 'background-color 0.15s ease'
+                },
+                className: "weather-recent-btn"
+              }, loc.name),
+              /*#__PURE__*/React.createElement("button", {
+                type: "button",
+                onClick: (e) => {
+                  e.stopPropagation();
+                  onDeleteRecentLocation && onDeleteRecentLocation(loc);
+                },
+                "aria-label": `${loc.name} 삭제`,
+                style: {
+                  position: 'absolute',
+                  top: '-4px',
+                  right: '-4px',
+                  width: '14px',
+                  height: '14px',
+                  borderRadius: '50%',
+                  backgroundColor: '#EF4444',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '9px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  zIndex: 2,
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                  padding: 0,
+                  lineHeight: 1
+                }
+              }, "×")
+            )
           )
         )
       ),
@@ -16524,8 +16575,10 @@ function WeatherLocationModal({ onClose, onSelectLocation, showToast, recentLoca
               cursor: 'pointer',
               display: 'flex',
               flexDirection: 'column',
+              alignItems: 'flex-start',
               gap: '2px',
-              boxSizing: 'border-box'
+              boxSizing: 'border-box',
+              flexShrink: 0
             }
           },
             /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.84rem', fontWeight: 'bold', color: 'var(--text-main)' } }, r.name),
@@ -16555,6 +16608,7 @@ function MainSideMenu({
   isChatNotifyEnabled,
   onToggleChatNotifications,
   onUpdateWeatherLocation,
+  onDeleteRecentLocation,
   showToast
 }) {
   const [isWeatherModalOpen, setIsWeatherModalOpen] = React.useState(false);
@@ -16739,6 +16793,7 @@ function MainSideMenu({
   )), isWeatherModalOpen && /*#__PURE__*/React.createElement(WeatherLocationModal, {
     onClose: () => setIsWeatherModalOpen(false),
     onSelectLocation: onUpdateWeatherLocation,
+    onDeleteRecentLocation: onDeleteRecentLocation,
     showToast: showToast,
     recentLocations: calendar?.recentLocations || []
   }));
@@ -16759,6 +16814,7 @@ function ChatSideMenu({
   isChatNotifyEnabled,
   onToggleChatNotifications,
   onUpdateWeatherLocation,
+  onDeleteRecentLocation,
   showToast
 }) {
   const [isWeatherModalOpen, setIsWeatherModalOpen] = React.useState(false);
@@ -16934,6 +16990,7 @@ function ChatSideMenu({
   )), isWeatherModalOpen && /*#__PURE__*/React.createElement(WeatherLocationModal, {
     onClose: () => setIsWeatherModalOpen(false),
     onSelectLocation: onUpdateWeatherLocation,
+    onDeleteRecentLocation: onDeleteRecentLocation,
     showToast: showToast,
     recentLocations: calendar?.recentLocations || []
   }));
