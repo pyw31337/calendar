@@ -8936,6 +8936,70 @@ function describeImageProcessingFailures(failed) {
   return `${failed.length}장 첨부 실패 (${reason} 등)`;
 }
 
+function getImageFilesFromClipboardEvent(event) {
+  const clipboard = event?.clipboardData;
+  if (!clipboard) return [];
+  const files = [];
+  const seen = new Set();
+  const appendFile = file => {
+    if (!file) return;
+    const isImageLike = /^image\//i.test(file.type || '') || isHeicFile(file);
+    if (!isImageLike) return;
+    const key = `${file.name || 'clipboard-image'}:${file.size || 0}:${file.type || ''}:${file.lastModified || 0}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    files.push(file);
+  };
+
+  Array.from(clipboard.items || []).forEach(item => {
+    if (item?.kind === 'file' && /^image\//i.test(item.type || '')) {
+      appendFile(item.getAsFile());
+    }
+  });
+  Array.from(clipboard.files || []).forEach(appendFile);
+  return files;
+}
+
+async function appendChatImageFiles({
+  files,
+  currentCount,
+  setImageProcessing,
+  setChatImages,
+  showToast
+}) {
+  const imageFiles = Array.from(files || []).filter(file => /^image\//i.test(file?.type || '') || isHeicFile(file));
+  if (imageFiles.length === 0) return { handled: false, succeeded: 0, failed: 0 };
+
+  const remainingSlots = 50 - currentCount;
+  if (remainingSlots <= 0) {
+    if (showToast) showToast('사진 최대 50장', 'error');
+    return { handled: true, succeeded: 0, failed: 0 };
+  }
+
+  const filesToProcess = imageFiles.slice(0, remainingSlots);
+  if (imageFiles.length > remainingSlots && showToast) {
+    showToast(`${remainingSlots}장만 추가됨 (최대 50장)`, 'info');
+  }
+
+  setImageProcessing({ current: 0, total: filesToProcess.length });
+  const { succeeded, failed } = await processImageFilesSequentially(
+    filesToProcess,
+    progress => setImageProcessing(progress)
+  );
+
+  if (succeeded.length > 0) {
+    setChatImages(prev => [...prev, ...succeeded]);
+  }
+  if (failed.length > 0) {
+    console.error('Image compression failed for:', failed.map(f => f.fileName));
+    if (showToast) showToast(describeImageProcessingFailures(failed), 'error', 5000);
+  } else if (succeeded.length > 0 && showToast) {
+    showToast(`${succeeded.length}장 첨부완료`, 'success', 3000);
+  }
+
+  return { handled: true, succeeded: succeeded.length, failed: failed.length };
+}
+
 function ImageProcessingOverlay({ current, total, fileName, pct, remainingSec }) {
   if (!total) return null;
   const clamped = typeof pct === 'number' ? Math.max(0, Math.min(100, pct)) : Math.min(100, Math.round((current / total) * 100));
@@ -10238,32 +10302,13 @@ function CommentsSection({
     const files = e.target.files;
     if (!files || files.length === 0) return;
     try {
-      const remainingSlots = 50 - chatImages.length;
-      if (remainingSlots <= 0) {
-        if (showToast) showToast('사진 최대 50장', 'error');
-        return;
-      }
-
-      const filesToProcess = Array.from(files).slice(0, remainingSlots);
-      if (files.length > remainingSlots && showToast) {
-        showToast(`${remainingSlots}장만 추가됨 (최대 50장)`, 'info');
-      }
-
-      setImageProcessing({ current: 0, total: filesToProcess.length });
-      const { succeeded, failed } = await processImageFilesSequentially(
-        filesToProcess,
-        progress => setImageProcessing(progress)
-      );
-
-      if (succeeded.length > 0) {
-        setChatImages(prev => [...prev, ...succeeded]);
-      }
-      if (failed.length > 0) {
-        console.error('Image compression failed for:', failed.map(f => f.fileName));
-        if (showToast) showToast(describeImageProcessingFailures(failed), 'error', 5000);
-      } else if (succeeded.length > 0 && showToast) {
-        showToast(`${succeeded.length}장 첨부완료`, 'success', 3000);
-      }
+      await appendChatImageFiles({
+        files,
+        currentCount: chatImages.length,
+        setImageProcessing,
+        setChatImages,
+        showToast
+      });
     } catch (err) {
       // Belt-and-suspenders: processImageFilesSequentially already isolates per-file
       // failures, but this guards against anything unexpected (a browser/environment
@@ -10273,6 +10318,27 @@ function CommentsSection({
     } finally {
       setImageProcessing(null);
       e.target.value = '';
+    }
+  };
+
+  const handlePasteImages = async (e) => {
+    const pastedFiles = getImageFilesFromClipboardEvent(e);
+    if (pastedFiles.length === 0) return;
+    const pastedText = e.clipboardData?.getData('text/plain') || '';
+    if (!pastedText) e.preventDefault();
+    try {
+      await appendChatImageFiles({
+        files: pastedFiles,
+        currentCount: chatImages.length,
+        setImageProcessing,
+        setChatImages,
+        showToast
+      });
+    } catch (err) {
+      console.error('handlePasteImages unexpected error:', err);
+      if (showToast) showToast('붙여넣은 사진 첨부 중 오류', 'error', 5000);
+    } finally {
+      setImageProcessing(null);
     }
   };
 
@@ -10450,6 +10516,7 @@ function CommentsSection({
         e.target.style.height = 'auto';
         e.target.style.height = `${Math.min(100, e.target.scrollHeight)}px`;
       },
+      onPaste: handlePasteImages,
       onKeyDown: e => {
         if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && !isChatSubmitting) {
           e.preventDefault();
@@ -11011,38 +11078,39 @@ function ChatRoomView({
     const files = e.target.files;
     if (!files || files.length === 0) return;
     try {
-      const remainingSlots = 50 - chatImages.length;
-      if (remainingSlots <= 0) {
-        if (showToast) showToast('사진 최대 50장', 'error');
-        return;
-      }
-
-      const filesToProcess = Array.from(files).slice(0, remainingSlots);
-      if (files.length > remainingSlots && showToast) {
-        showToast(`${remainingSlots}장만 추가됨 (최대 50장)`, 'info');
-      }
-
-      setImageProcessingChat({ current: 0, total: filesToProcess.length });
-      const { succeeded, failed } = await processImageFilesSequentially(
-        filesToProcess,
-        progress => setImageProcessingChat(progress)
-      );
-
-      if (succeeded.length > 0) {
-        setChatImages(prev => [...prev, ...succeeded]);
-      }
-      if (failed.length > 0) {
-        console.error('Image compression failed for:', failed.map(f => f.fileName));
-        if (showToast) showToast(describeImageProcessingFailures(failed), 'error', 5000);
-      } else if (succeeded.length > 0 && showToast) {
-        showToast(`${succeeded.length}장 첨부완료`, 'success', 3000);
-      }
+      await appendChatImageFiles({
+        files,
+        currentCount: chatImages.length,
+        setImageProcessing: setImageProcessingChat,
+        setChatImages,
+        showToast
+      });
     } catch (err) {
       console.error('handleFileChangeChat unexpected error:', err);
       if (showToast) showToast('사진 첨부 중 오류', 'error', 5000);
     } finally {
       setImageProcessingChat(null);
       e.target.value = '';
+    }
+  };
+  const handlePasteImagesChat = async (e) => {
+    const pastedFiles = getImageFilesFromClipboardEvent(e);
+    if (pastedFiles.length === 0) return;
+    const pastedText = e.clipboardData?.getData('text/plain') || '';
+    if (!pastedText) e.preventDefault();
+    try {
+      await appendChatImageFiles({
+        files: pastedFiles,
+        currentCount: chatImages.length,
+        setImageProcessing: setImageProcessingChat,
+        setChatImages,
+        showToast
+      });
+    } catch (err) {
+      console.error('handlePasteImagesChat unexpected error:', err);
+      if (showToast) showToast('붙여넣은 사진 첨부 중 오류', 'error', 5000);
+    } finally {
+      setImageProcessingChat(null);
     }
   };
   const participants = getActiveParticipants(calendar);
@@ -11748,6 +11816,7 @@ function ChatRoomView({
           e.target.style.height = 'auto';
           e.target.style.height = `${Math.min(100, e.target.scrollHeight)}px`;
         },
+        onPaste: handlePasteImagesChat,
         onKeyDown: e => {
           if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && !isChatSubmitting) {
             e.preventDefault();

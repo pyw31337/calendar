@@ -200,6 +200,30 @@ runAppScript(productionContext, `
   if (parsedExpenseTime.time !== '19시' || parsedExpenseTime.rest !== '[저녁식사] 애슐리') {
     throw new Error('expense time prefix extraction failed');
   }
+  const pastedImageFile = { name: 'clipboard.png', type: 'image/png', size: 1234, lastModified: 1 };
+  const pastedImages = getImageFilesFromClipboardEvent({
+    clipboardData: {
+      items: [
+        { kind: 'string', type: 'text/plain' },
+        { kind: 'file', type: 'image/png', getAsFile: () => pastedImageFile }
+      ],
+      files: [],
+      getData: () => ''
+    }
+  });
+  if (pastedImages.length !== 1 || pastedImages[0] !== pastedImageFile) {
+    throw new Error('clipboard image extraction failed');
+  }
+  const pastedTextOnly = getImageFilesFromClipboardEvent({
+    clipboardData: {
+      items: [{ kind: 'string', type: 'text/plain' }],
+      files: [],
+      getData: () => 'hello'
+    }
+  });
+  if (pastedTextOnly.length !== 0) {
+    throw new Error('clipboard text paste must not attach images');
+  }
 `);
 
 const restoreContext = createContext('https://pyw31337.github.io/calendar/?admin=1&restore=1');
