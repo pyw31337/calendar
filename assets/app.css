@@ -1106,6 +1106,14 @@ select.form-select {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  margin-top: 12px;
+}
+@media (min-width: 768px) {
+  /* .poll-nonvoters-mobile above this is hidden at this width (desktop uses
+     .poll-nonvoters-desktop inline in the header instead), so the extra gap has
+     nothing to separate itself from here -- .poll-header's own marginBottom already
+     spaces .poll-option-list from the header on desktop. */
+  .poll-option-list { margin-top: 0; }
 }
 .polls-panel-header {
   display: flex;
