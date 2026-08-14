@@ -6584,13 +6584,12 @@ function App() {
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
     return updateCalendars(nextCalendars, '삭제완료', 'delete', updatedCal.id, 'availability', activityLogs);
   };
-  const handleConfirmMeeting = (dateStr, note, location) => {
+  const handleConfirmMeeting = (dateStr, note) => {
     if (!activeCal || !isValidDateString(dateStr)) return false;
     const now = Date.now();
     const existingMeetings = getConfirmedMeetings(activeCal);
     const meetingIndex = existingMeetings.findIndex(m => m.date === dateStr);
     const isAlreadyConfirmed = meetingIndex >= 0 && existingMeetings[meetingIndex].confirmed !== false;
-    const cleanLocation = sanitizeText(location || '', 200);
     let nextConfirmedMeetings;
     if (isAlreadyConfirmed) {
       // Un-confirming: if the entry also carries settlement data, keep it around as an
@@ -6606,10 +6605,10 @@ function App() {
       // handleSaveExpense below) -- promote it to a real confirmed meeting instead of adding
       // a duplicate entry for the same date.
       nextConfirmedMeetings = existingMeetings.map((m, i) => i === meetingIndex
-        ? { ...m, confirmed: true, note: sanitizeText(note, 120), location: cleanLocation, confirmedAt: now }
+        ? { ...m, confirmed: true, note: sanitizeText(note, 120), confirmedAt: now }
         : m);
     } else {
-      nextConfirmedMeetings = [...existingMeetings, { date: dateStr, note: sanitizeText(note, 120), location: cleanLocation, confirmedAt: now, confirmed: true }];
+      nextConfirmedMeetings = [...existingMeetings, { date: dateStr, note: sanitizeText(note, 120), confirmedAt: now, confirmed: true }];
     }
     const action = isAlreadyConfirmed ? 'meeting_cancel' : 'meeting_confirm';
     const logNote = sanitizeText(note || '', 120) || (isAlreadyConfirmed ? '모임 확정 취소됨' : '모임 확정됨');
@@ -6623,30 +6622,6 @@ function App() {
     };
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
     return updateCalendars(nextCalendars, isAlreadyConfirmed ? '모임 확정 취소' : '모임 확정', 'success', updatedCal.id, 'settings', meetingLog ? [meetingLog] : []);
-  };
-  // Updates just the location on an already-existing confirmedMeeting entry, independent of the
-  // confirm/un-confirm toggle above. handleConfirmMeeting only ever writes note/location as a
-  // side effect of the FIRST confirm (or of promoting a settlement-only placeholder) -- once a
-  // meeting is already confirmed, there was no way to edit its location without first
-  // un-confirming it, and un-confirming itself dropped the edit (it only flips `confirmed`,
-  // spreading the rest of the entry unchanged). This is the dedicated save path DateModal's
-  // 장소 "저장" button uses instead.
-  const handleUpdateMeetingLocation = (dateStr, location) => {
-    if (!activeCal || !isValidDateString(dateStr)) return false;
-    const existingMeetings = getConfirmedMeetings(activeCal);
-    const meetingIndex = existingMeetings.findIndex(m => m.date === dateStr);
-    if (meetingIndex < 0) return false;
-    const now = Date.now();
-    const cleanLocation = sanitizeText(location || '', 200);
-    const nextConfirmedMeetings = existingMeetings.map((m, i) => i === meetingIndex ? { ...m, location: cleanLocation } : m);
-    const updatedCal = {
-      ...activeCal,
-      confirmedMeeting: nextConfirmedMeetings,
-      updatedAt: now,
-      revision: (activeCal.revision || 0) + 1
-    };
-    const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-    return updateCalendars(nextCalendars, '장소 저장', 'success', updatedCal.id, 'settings', []);
   };
   // Saved via saveMode 'settings' like confirmedMeeting itself -- mergeCalendarSettingsDelta
   // does a blind {...server, ...incoming} for fields it doesn't explicitly preserve/merge (see
@@ -7396,7 +7371,6 @@ function App() {
     onDelete: handleDeleteAvailability,
     onDeleteDate: handleDeleteAllForDate,
     onConfirmMeeting: handleConfirmMeeting,
-    onUpdateMeetingLocation: handleUpdateMeetingLocation,
     onSaveExpense: handleSaveExpense,
     onDeleteExpense: handleDeleteExpense,
     onReorderExpenses: handleReorderExpenses,
@@ -10412,16 +10386,15 @@ function CommentsSection({
     onClick: onMore,
     style: {
       width: '100%',
-      backgroundColor: 'var(--bg-primary)',
-      border: '1px solid var(--border-subtle)',
+      backgroundColor: 'color-mix(in srgb, var(--bg-primary) 90%, black)',
+      border: 'none',
       borderRadius: '8px',
       padding: '8px 0',
       fontSize: '0.85rem',
       fontWeight: 'bold',
       color: 'var(--text-main)',
       cursor: 'pointer',
-      textAlign: 'center',
-      marginTop: '10px'
+      textAlign: 'center'
     }
   }, "이전 채팅 더보기")
   )),
@@ -12671,7 +12644,6 @@ function DateModal({
   adminMode = false,
   onSave,
   onConfirmMeeting,
-  onUpdateMeetingLocation,
   onSaveExpense,
   onDeleteExpense,
   onReorderExpenses,
@@ -12791,33 +12763,6 @@ function DateModal({
   const isAllAvailable = totalPartCount > 0 && uniqueActiveParts.size === totalPartCount;
   const isConfirmed = isDateConfirmedMeeting(calendar, dateStr);
   const confirmedMeetingEntry = getConfirmedMeetings(calendar).find(m => m.date === dateStr) || null;
-  const [location, setLocation] = React.useState(confirmedMeetingEntry?.location || '');
-  const locationInputRef = React.useRef(null);
-  const [isSavingLocation, setIsSavingLocation] = React.useState(false);
-  React.useEffect(() => {
-    setLocation(confirmedMeetingEntry?.location || '');
-  }, [calendar?.id, dateStr]);
-  const locationIsUrl = /^https?:\/\//i.test((confirmedMeetingEntry?.location || '').trim());
-  // Independent save path for the 장소 field -- the 확정/확정취소 toggle below only ever writes
-  // location as a side effect of the FIRST confirm, so an already-confirmed meeting had no way
-  // to save an edited location at all (confirmed meetings can't reach that code path again
-  // without un-confirming first, which itself doesn't pick up the new value either). Only shown
-  // once a confirmedMeeting entry actually exists to attach the location to.
-  const handleSaveLocation = async () => {
-    if (isSavingLocation || typeof onUpdateMeetingLocation !== 'function') return;
-    const latestLocation = locationInputRef.current ? locationInputRef.current.value : location;
-    setIsSavingLocation(true);
-    try {
-      const saved = await Promise.resolve(onUpdateMeetingLocation(dateStr, latestLocation));
-      if (saved !== false && showToast) showToast('장소가 저장되었습니다', 'success');
-      else if (saved === false && showToast) showToast('장소 저장 실패', 'error');
-    } catch (err) {
-      console.error('Save location failed:', err);
-      if (showToast) showToast('장소 저장 실패', 'error');
-    } finally {
-      setIsSavingLocation(false);
-    }
-  };
   const expenses = React.useMemo(
     () => (Array.isArray(confirmedMeetingEntry?.expenses) ? confirmedMeetingEntry.expenses : []).slice().sort((a, b) => {
       const aOrder = Number.isFinite(Number(a.order)) ? Number(a.order) : Number.POSITIVE_INFINITY;
@@ -13081,10 +13026,9 @@ function DateModal({
     setIsSubmitting(true);
     const wasConfirmed = isConfirmed;
     const latestNote = noteInputRef.current ? noteInputRef.current.value : note;
-    const latestLocation = locationInputRef.current ? locationInputRef.current.value : location;
     let saved = false;
     try {
-      saved = await Promise.resolve(onConfirmMeeting(dateStr, latestNote, latestLocation));
+      saved = await Promise.resolve(onConfirmMeeting(dateStr, latestNote));
     } catch (err) {
       console.error('Confirm meeting failed:', err);
     }
@@ -13326,42 +13270,7 @@ function DateModal({
     onChange: e => setNote(e.target.value),
     maxLength: 120,
     disabled: isSubmitting
-  })), !adminMode && /*#__PURE__*/React.createElement("div", null,
-    /*#__PURE__*/React.createElement("label", {
-      style: { display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px', color: '#64748B' }
-    }, "장소 (선택)"),
-    /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '6px' } },
-      /*#__PURE__*/React.createElement("input", {
-        ref: locationInputRef,
-        type: "text",
-        className: "form-input",
-        style: { width: '100%' },
-        placeholder: "예: 네이버 지도 링크 또는 장소명",
-        value: location,
-        onChange: e => setLocation(e.target.value),
-        maxLength: 200,
-        disabled: isSubmitting
-      }),
-      // Confirming for the first time already saves whatever's typed here (see 확정 button
-      // below), so this button is only needed once a meeting is already confirmed -- editing
-      // location on an unconfirmed date still gets picked up automatically when you confirm.
-      confirmedMeetingEntry && /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        className: "btn btn-secondary",
-        onClick: handleSaveLocation,
-        disabled: isSubmitting || isSavingLocation,
-        style: { flexShrink: 0, whiteSpace: 'nowrap', fontSize: '0.82rem', padding: '0 14px' }
-      }, isSavingLocation ? '...' : "저장")
-    ),
-    confirmedMeetingEntry?.location && /*#__PURE__*/React.createElement("div", {
-      style: { marginTop: '6px', fontSize: '0.8rem', color: 'var(--text-muted)', wordBreak: 'break-all' }
-    }, locationIsUrl
-      ? /*#__PURE__*/React.createElement("a", {
-          href: confirmedMeetingEntry.location, target: "_blank", rel: "noopener noreferrer",
-          style: { color: 'var(--accent-primary)', fontWeight: 600 }
-        }, "📍 ", confirmedMeetingEntry.location)
-      : `📍 ${confirmedMeetingEntry.location}`)
-  ), dateEntries.length > 0 && /*#__PURE__*/React.createElement("div", {
+  })), dateEntries.length > 0 && /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: '6px'
     }
