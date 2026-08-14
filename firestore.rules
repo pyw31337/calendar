@@ -236,13 +236,17 @@ service cloud.firestore {
     // Aggregate counter for the linkPreviews cache above, read by the admin dashboard's
     // "외부 서비스 연동 현황" panel so it can show cache size without a costly full-collection
     // read (list access on linkPreviews itself is intentionally disabled).
+    // hourlyUsageBucket/hourlyUsageCount track real Peekalink API calls against its 50/hour
+    // free-plan rate limit for the panel's usage gauge -- written via separate merge() calls
+    // from cachedCount/updatedAt, so fields are validated individually rather than all-required.
     match /appConfig/linkPreviewStats {
       allow get: if true;
       allow list: if false;
-      allow create, update: if request.resource.data.keys().hasOnly(['cachedCount', 'updatedAt'])
-        && request.resource.data.cachedCount is number
-        && request.resource.data.cachedCount >= 0
-        && request.resource.data.updatedAt is number;
+      allow create, update: if request.resource.data.keys().hasOnly(['cachedCount', 'updatedAt', 'hourlyUsageBucket', 'hourlyUsageCount'])
+        && (!('cachedCount' in request.resource.data) || (request.resource.data.cachedCount is number && request.resource.data.cachedCount >= 0))
+        && (!('updatedAt' in request.resource.data) || request.resource.data.updatedAt is number)
+        && (!('hourlyUsageBucket' in request.resource.data) || request.resource.data.hourlyUsageBucket is number)
+        && (!('hourlyUsageCount' in request.resource.data) || (request.resource.data.hourlyUsageCount is number && request.resource.data.hourlyUsageCount >= 0));
       allow delete: if false;
     }
 
