@@ -830,32 +830,10 @@ const formatRegisteredAt = typeof GATHER_APP_UTILS.formatRegisteredAt === 'funct
   return `${year}.${month}.${day} (${dayNames[date.getDay()]}) ${hours}:${minutes}:${seconds}`;
 };
 
-function cloneParticipant(participant) {
-  return participant ? { ...participant } : participant;
-}
-
-function cloneAvailability(availability) {
-  return availability ? { ...availability } : availability;
-}
-
-function cloneActivityLog(log) {
-  return log ? { ...log } : log;
-}
-
-function clonePoll(poll) {
-  if (!poll) return poll;
-  const clonedVotes = {};
-  if (poll.votes && typeof poll.votes === 'object') {
-    Object.entries(poll.votes).forEach(([key, value]) => {
-      clonedVotes[key] = Array.isArray(value) ? [...value] : value;
-    });
-  }
-  return {
-    ...poll,
-    options: Array.isArray(poll.options) ? poll.options.map(option => ({ ...option })) : [],
-    votes: clonedVotes
-  };
-}
+const cloneParticipant = GATHER_APP_UTILS.cloneParticipant;
+const cloneAvailability = GATHER_APP_UTILS.cloneAvailability;
+const cloneActivityLog = GATHER_APP_UTILS.cloneActivityLog;
+const clonePoll = GATHER_APP_UTILS.clonePoll;
 
 const getItemStamp = GATHER_APP_UTILS.getItemStamp;
 const isTombstone = GATHER_APP_UTILS.isTombstone;

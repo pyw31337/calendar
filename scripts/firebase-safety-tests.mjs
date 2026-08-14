@@ -140,6 +140,17 @@ runAppScript(productionContext, `
   if (getActivityLogStamp({ updatedAt: 10, timestamp: 20 }) !== 20 || getActivityLogStamp({ updatedAt: 10 }) !== 10) {
     throw new Error('activity log stamp utility failed');
   }
+  const clonedParticipant = cloneParticipant({ id: 'p1', name: '박영우' });
+  if (!clonedParticipant || clonedParticipant.id !== 'p1') {
+    throw new Error('participant clone utility failed');
+  }
+  const originalPoll = { id: 'poll1', options: [{ id: 'o1', text: '장소' }], votes: { o1: ['p1'] } };
+  const clonedPoll = clonePoll(originalPoll);
+  clonedPoll.options[0].text = '변경';
+  clonedPoll.votes.o1.push('p2');
+  if (originalPoll.options[0].text !== '장소' || originalPoll.votes.o1.length !== 1) {
+    throw new Error('poll clone must detach nested options and vote arrays');
+  }
   const quotedBlogUrl = "https://blog.naver.com/choochoo440/224199076337'";
   if (extractFirstUrl(quotedBlogUrl) !== 'https://blog.naver.com/choochoo440/224199076337') {
     throw new Error('quoted URL extraction failed');

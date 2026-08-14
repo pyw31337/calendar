@@ -179,6 +179,33 @@
     return Number(log?.timestamp || log?.updatedAt || 0) || 0;
   }
 
+  function cloneParticipant(participant) {
+    return participant ? { ...participant } : participant;
+  }
+
+  function cloneAvailability(availability) {
+    return availability ? { ...availability } : availability;
+  }
+
+  function cloneActivityLog(log) {
+    return log ? { ...log } : log;
+  }
+
+  function clonePoll(poll) {
+    if (!poll) return poll;
+    const clonedVotes = {};
+    if (poll.votes && typeof poll.votes === 'object') {
+      Object.entries(poll.votes).forEach(([key, value]) => {
+        clonedVotes[key] = Array.isArray(value) ? [...value] : value;
+      });
+    }
+    return {
+      ...poll,
+      options: Array.isArray(poll.options) ? poll.options.map(option => ({ ...option })) : [],
+      votes: clonedVotes
+    };
+  }
+
   function getDefaultExpenseCategories() {
     return Array.isArray(window.GATHER_APP_CONSTANTS?.DEFAULT_EXPENSE_CATEGORIES)
       ? window.GATHER_APP_CONSTANTS.DEFAULT_EXPENSE_CATEGORIES
@@ -322,6 +349,10 @@
     getItemStamp,
     isTombstone,
     getActivityLogStamp,
+    cloneParticipant,
+    cloneAvailability,
+    cloneActivityLog,
+    clonePoll,
     normalizeExpenseCategories,
     getExpenseCategories,
     getExpenseCategory,
