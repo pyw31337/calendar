@@ -8690,16 +8690,14 @@ function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox, linkPr
         style: commonStyle
       })
       : (() => {
-        // The regular chat-room case uses a viewport-relative (vw) width, not a % of the parent
-        // -- the ancestor chain there (shrink-to-fit flex item, then a plain block) has no
-        // definite width, so a % would resolve to 'auto' and collapse the <iframe> to its
-        // 300x150 default. vw resolves against the viewport directly, giving this div a real
-        // pixel width on its own, which also lets bubble/bubble-wrapper shrink-to-fit around it
-        // instead of stretching wider and leaving empty space beside it. The mini dashboard
-        // preview widget (isMiniChat) already sits in a definite-size container, so it stays
-        // percentage-based to fill it exactly. Also doubles as the desktop drag-resize handle
-        // (.chat-media-resizable in app.css, scoped to .chat-room-container): resize:horizontal
-        // grows the width while the iframe's aspect-ratio keeps height in proportion for free.
+        // Chat-room case uses vw (not %) width: the ancestor chain here (shrink-to-fit flex
+        // item, then a plain block) has no definite width, so % would resolve to 'auto' and
+        // collapse the <iframe> to 300x150. vw resolves against the viewport directly, also
+        // letting bubble/bubble-wrapper shrink-to-fit around it instead of stretching wider and
+        // leaving empty space beside it. isMiniChat (dashboard preview) already sits in a
+        // definite-size container so it stays %-based. Doubles as the desktop drag-resize handle
+        // (.chat-media-resizable in app.css): resize:horizontal grows width, aspect-ratio keeps
+        // height proportional for free.
         const isMini = !!style.isMiniChat;
         const embedWidth = isMini ? '100%' : (isPortraitEmbed ? (style.portraitEmbedMaxWidth || '360px') : (style.embedMaxWidth || '760px'));
         const minW = isMini ? '0' : (isPortraitEmbed ? '150px' : '180px');
