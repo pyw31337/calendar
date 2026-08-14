@@ -112,14 +112,16 @@ service cloud.firestore {
       match /push_subscriptions/{subId} {
         allow get, list: if isCalendarDoc(calendarDocId);
         allow create, update: if isCalendarDoc(calendarDocId)
-          && request.resource.data.keys().hasOnly(['endpoint', 'keys', 'participantId', 'createdAt'])
+          && request.resource.data.keys().hasOnly(['endpoint', 'keys', 'participantId', 'createdAt', 'updatedAt', 'userAgent'])
           && request.resource.data.endpoint is string
           && request.resource.data.keys is map
           && request.resource.data.keys.auth is string
           && request.resource.data.keys.p256dh is string
           && request.resource.data.participantId is string
           && request.resource.data.participantId.size() <= 160
-          && request.resource.data.createdAt is number;
+          && request.resource.data.createdAt is number
+          && (!('updatedAt' in request.resource.data) || request.resource.data.updatedAt is number)
+          && (!('userAgent' in request.resource.data) || (request.resource.data.userAgent is string && request.resource.data.userAgent.size() <= 600));
         allow delete: if isCalendarDoc(calendarDocId);
       }
 

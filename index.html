@@ -557,6 +557,11 @@
         --chat-image-grid-max-width: min(100%, 240px) !important;
       }
     }
+    @media (min-width: 721px) {
+      .chat-message-image-grid.is-wide {
+        width: 100%;
+      }
+    }
     .poll-option-row,
     .recent-log-row,
     .search-result-row,
@@ -2812,6 +2817,48 @@ function setChatNotifyEnabledForCalendar(calId, enabled) {
   }
 }
 
+function getChatParticipantPrefKey(calId) {
+  return `gather_active_participant_id_${calId || 'global'}_v1`;
+}
+
+function getStoredChatParticipantId(calId, calendar) {
+  const participants = calendar ? getActiveParticipants(calendar) : [];
+  const activeIds = participants.map(p => p.id);
+  const scopedId = calId ? getLocalStorage().getItem(getChatParticipantPrefKey(calId)) : '';
+  if (scopedId && (activeIds.length === 0 || activeIds.includes(scopedId))) return scopedId;
+
+  // Legacy migration only: older builds stored one participant id for every calendar, which
+  // could register Web Push under the wrong calendar's participant. Use it only when it still
+  // belongs to the current calendar, then immediately promote it into the scoped key.
+  const legacyId = getLocalStorage().getItem('gather_active_participant_id_v20');
+  if (legacyId && activeIds.includes(legacyId)) {
+    if (calId) getLocalStorage().setItem(getChatParticipantPrefKey(calId), legacyId);
+    return legacyId;
+  }
+  return activeIds[0] || '';
+}
+
+function setStoredChatParticipantId(calId, participantId) {
+  if (!participantId) return;
+  if (calId) getLocalStorage().setItem(getChatParticipantPrefKey(calId), participantId);
+  // Keep the legacy key as a compatibility breadcrumb for older tabs, but new reads always
+  // prefer the calendar-scoped key above.
+  getLocalStorage().setItem('gather_active_participant_id_v20', participantId);
+}
+
+function describePushSubscribeFailure(reason) {
+  const map = {
+    'missing-calendar': '캘린더 정보 없음',
+    'missing-participant': '참여자 선택 필요',
+    'insecure-context': '보안 연결 필요',
+    'permission-not-granted': '브라우저 알림 권한 필요',
+    'service-worker-unsupported': '서비스워커 미지원',
+    'push-manager-unsupported': 'Web Push 미지원',
+    'firestore-unavailable': 'Firebase 연결 실패'
+  };
+  return map[reason] || reason || '알 수 없는 오류';
+}
+
 function urlBase64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - base64String.length % 4) % 4);
   const base64 = (base64String + padding)
@@ -2886,8 +2933,10 @@ async function subscribeUserToPush(calendarId, activeParticipantId) {
           p256dh: arrayBufferToBase64(subscription.getKey('p256dh'))
         },
         participantId: participantId,
-        createdAt: Date.now()
-      });
+        createdAt: Date.now(),
+        userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
+        updatedAt: Date.now()
+      }, { merge: true });
       console.log('Web Push subscription registered successfully in Firestore.');
       return { ok: true, subId };
     }
@@ -8401,10 +8450,7 @@ function App() {
   }, [activeCalId]);
   const getCurrentChatParticipantId = () => {
     if (chatParticipantIdRef.current) return chatParticipantIdRef.current;
-    const cachedId = getLocalStorage().getItem('gather_active_participant_id_v20');
-    const activeIds = getActiveParticipants(activeCal).map(p => p.id);
-    if (cachedId && activeIds.includes(cachedId)) return cachedId;
-    return activeIds[0] || '';
+    return getStoredChatParticipantId(activeCalId, activeCal);
   };
   const handleMainToggleNotifications = async () => {
     if (!isNotificationSupported()) {
@@ -8420,7 +8466,7 @@ function App() {
         if (result && !result.ok) {
           setMainChatNotifyEnabled(false);
           setChatNotifyEnabledForCalendar(activeCalId, false);
-          showToast('알림 권한은 켜졌지만 푸시 구독 등록에 실패했습니다.', 'error', 5000);
+          showToast(`푸시 등록 실패: ${describePushSubscribeFailure(result.reason)}`, 'error', 6000);
           console.warn('Main chat notification subscribe failed:', result.reason);
           return;
         }
@@ -8446,7 +8492,7 @@ function App() {
     if (subscribeResult && !subscribeResult.ok) {
       setMainChatNotifyEnabled(false);
       setChatNotifyEnabledForCalendar(activeCalId, false);
-      showToast('알림 권한은 켜졌지만 푸시 구독 등록에 실패했습니다.', 'error', 5000);
+      showToast(`푸시 등록 실패: ${describePushSubscribeFailure(subscribeResult.reason)}`, 'error', 6000);
       console.warn('Main chat notification subscribe failed:', subscribeResult.reason);
       return;
     }
@@ -8785,13 +8831,7 @@ function App() {
   // Synchronize chatParticipantId when activeCal changes (loads cached participant or defaults to first active)
   React.useEffect(() => {
     if (activeCal) {
-      const cachedId = getLocalStorage().getItem('gather_active_participant_id_v20');
-      const activeIds = getActiveParticipants(activeCal).map(p => p.id);
-      if (cachedId && activeIds.includes(cachedId)) {
-        setChatParticipantId(cachedId);
-      } else {
-        setChatParticipantId(activeIds[0] || '');
-      }
+      setChatParticipantId(getStoredChatParticipantId(activeCalId, activeCal));
     }
   }, [activeCalId, calendars]);
 
@@ -10157,7 +10197,7 @@ function App() {
       selectedId: chatParticipantId,
       onSelect: id => {
         setChatParticipantId(id);
-        getLocalStorage().setItem('gather_active_participant_id_v20', id);
+        setStoredChatParticipantId(activeCalId, id);
       },
       onClose: () => setIsChatSheetOpen(false)
     }), isChatShareOpen && /*#__PURE__*/React.createElement(ShareModal, {
@@ -10649,7 +10689,7 @@ function App() {
     selectedId: chatParticipantId,
     onSelect: id => {
       setChatParticipantId(id);
-      getLocalStorage().setItem('gather_active_participant_id_v20', id);
+      setStoredChatParticipantId(activeCalId, id);
     },
     onClose: () => setIsChatSheetOpen(false)
   }), toast && /*#__PURE__*/React.createElement("div", {
@@ -12494,12 +12534,15 @@ function renderChatMessageImages(msg, setActiveLightbox, singleImageStyle = {}) 
   const mobileCols = thumbs.length === 2 ? 2 : 3;
   const desktopCols = thumbs.length >= 12 ? 6 : thumbs.length >= 5 ? 5 : mobileCols;
   const cols = `var(--chat-image-grid-cols, ${mobileCols})`;
+  const shouldFillBubble = thumbs.length >= 5;
   const maxW = thumbs.length === 2
     ? '180px'
+    : shouldFillBubble
+    ? '100%'
     : `min(100%, calc(var(--chat-image-grid-cols, ${mobileCols}) * 76px + (var(--chat-image-grid-cols, ${mobileCols}) - 1) * 4px))`;
 
   return /*#__PURE__*/React.createElement('div', {
-    className: 'chat-message-image-grid',
+    className: `chat-message-image-grid${shouldFillBubble ? ' is-wide' : ''}`,
     style: {
       '--chat-image-grid-cols': desktopCols,
       '--chat-image-grid-mobile-cols': mobileCols,
@@ -13958,7 +14001,7 @@ function ChatRoomView({
         if (result && !result.ok) {
           setChatNotifyEnabled(false);
           setChatNotifyEnabledForCalendar(calendar.id, false);
-          if (showToast) showToast('알림 권한은 켜졌지만 푸시 구독 등록에 실패했습니다.', 'error', 5000);
+          if (showToast) showToast(`푸시 등록 실패: ${describePushSubscribeFailure(result.reason)}`, 'error', 6000);
           console.warn('Chat notification subscribe failed:', result.reason);
           return;
         }
@@ -13992,7 +14035,7 @@ function ChatRoomView({
       if (result && !result.ok) {
         setChatNotifyEnabled(false);
         setChatNotifyEnabledForCalendar(calendar.id, false);
-        if (showToast) showToast('알림 권한은 켜졌지만 푸시 구독 등록에 실패했습니다.', 'error', 5000);
+        if (showToast) showToast(`푸시 등록 실패: ${describePushSubscribeFailure(result.reason)}`, 'error', 6000);
         console.warn('Chat notification subscribe failed:', result.reason);
         return;
       }
@@ -17203,7 +17246,7 @@ function AdminModal({
         if (result && !result.ok) {
           setChatNotifyEnabled(false);
           setChatNotifyEnabledForCalendar(calendar.id, false);
-          if (showToast) showToast('알림 권한은 켜졌지만 푸시 구독 등록에 실패했습니다.', 'error', 5000);
+          if (showToast) showToast(`푸시 등록 실패: ${describePushSubscribeFailure(result.reason)}`, 'error', 6000);
           console.warn('Settings chat notification subscribe failed:', result.reason);
           return;
         }
@@ -17233,7 +17276,7 @@ function AdminModal({
       if (result && !result.ok) {
         setChatNotifyEnabled(false);
         setChatNotifyEnabledForCalendar(calendar.id, false);
-        if (showToast) showToast('알림 권한은 켜졌지만 푸시 구독 등록에 실패했습니다.', 'error', 5000);
+        if (showToast) showToast(`푸시 등록 실패: ${describePushSubscribeFailure(result.reason)}`, 'error', 6000);
         console.warn('Settings chat notification subscribe failed:', result.reason);
         return;
       }
@@ -19357,7 +19400,7 @@ function MemoView({ calendar, memos, hasMoreMemos, onLoadMoreMemos, onBack, show
 
   // Participant Picker States
   const [composerParticipantId, setComposerParticipantId] = React.useState(() => {
-    return getLocalStorage().getItem('gather_active_participant_id_v20') || '';
+    return getStoredChatParticipantId(calendar?.id, calendar);
   });
   const [isComposerPartOpen, setIsComposerPartOpen] = React.useState(false);
   const [editParticipantId, setEditParticipantId] = React.useState('');
@@ -19643,7 +19686,7 @@ function MemoView({ calendar, memos, hasMoreMemos, onLoadMoreMemos, onBack, show
       try {
         const calendarId = calendar.id;
         const stamp = Date.now();
-        const participantId = getLocalStorage().getItem('gather_active_participant_id_v20') || 'anonymous';
+        const participantId = getStoredChatParticipantId(calendarId, calendar) || 'anonymous';
 
         await firebaseDb.collection('calendars').doc('cal_' + calendarId).collection('memos').doc(memo.id).delete();
 
@@ -20614,7 +20657,7 @@ function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onSelectTag, onComm
   const comments = memo.comments || [];
   const [isCommentComposerOpen, setIsCommentComposerOpen] = React.useState(false);
   const [commentText, setCommentText] = React.useState('');
-  const [commentParticipantId, setCommentParticipantId] = React.useState(() => getLocalStorage().getItem('gather_active_participant_id_v20') || '');
+  const [commentParticipantId, setCommentParticipantId] = React.useState(() => getStoredChatParticipantId(calendar?.id, calendar));
   const [isCommentPartOpen, setIsCommentPartOpen] = React.useState(false);
   const [editingCommentId, setEditingCommentId] = React.useState(null);
   const commentPart = (calendar?.participants || []).find(p => p.id === commentParticipantId);
@@ -23528,7 +23571,7 @@ function PollVoterSheet({ calendar, pollId, optionId, onSelect, onClose }) {
     type: "button",
     className: "poll-voter-option",
     onClick: () => {
-      getLocalStorage().setItem('gather_active_participant_id_v20', participant.id);
+      setStoredChatParticipantId(calendar?.id, participant.id);
       onSelect(participant.id);
     }
   }, /*#__PURE__*/React.createElement("span", {
