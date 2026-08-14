@@ -117,6 +117,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js" crossorigin></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js" crossorigin></script>
   <script src="assets/app-constants.js?v=20260814-split2"></script>
+  <script src="assets/app-config.js?v=20260814-split3"></script>
 
   <script>
 const GATHER_APP_CONSTANTS = window.GATHER_APP_CONSTANTS || {};
@@ -184,49 +185,52 @@ function extractExpenseTimePrefix(label) {
   return match ? { time: match[1], rest: match[2].trim() } : { time: '', rest: text };
 }
 const URL_PARAMS = new URLSearchParams(window.location.search);
-const ENABLE_FIRESTORE_SYNC = true; // Firestore is the only production source of truth.
-const ENABLE_FIRESTORE_WRITES = true;
-const PUBLIC_CALENDAR_IDS = ['kkot', 'cw'];
-const FIREBASE_LOAD_TIMEOUT_MS = 10000;
-const FIREBASE_LOAD_MAX_ATTEMPTS = 3;
+const GATHER_APP_CONFIG = window.GATHER_APP_CONFIG || {};
+const readConfigNumber = (key, fallback) => Number.isFinite(GATHER_APP_CONFIG[key]) ? GATHER_APP_CONFIG[key] : fallback;
+const readConfigObject = (key, fallback) => GATHER_APP_CONFIG[key] && typeof GATHER_APP_CONFIG[key] === 'object' ? GATHER_APP_CONFIG[key] : fallback;
+const ENABLE_FIRESTORE_SYNC = GATHER_APP_CONFIG.ENABLE_FIRESTORE_SYNC !== false; // Firestore is the only production source of truth.
+const ENABLE_FIRESTORE_WRITES = GATHER_APP_CONFIG.ENABLE_FIRESTORE_WRITES !== false;
+const PUBLIC_CALENDAR_IDS = Array.isArray(GATHER_APP_CONFIG.PUBLIC_CALENDAR_IDS) ? GATHER_APP_CONFIG.PUBLIC_CALENDAR_IDS : ['kkot', 'cw'];
+const FIREBASE_LOAD_TIMEOUT_MS = readConfigNumber('FIREBASE_LOAD_TIMEOUT_MS', 10000);
+const FIREBASE_LOAD_MAX_ATTEMPTS = readConfigNumber('FIREBASE_LOAD_MAX_ATTEMPTS', 3);
 // Memos load newest-first in pages of this size instead of the whole collection at once, so a
 // calendar with thousands of memos doesn't download/subscribe to all of them on every open.
 // Pinned memos are fetched separately and unbounded (pinning is a deliberate, self-limiting
 // action) so an old pinned memo never silently falls out of view as later pages load.
-const MEMOS_PAGE_SIZE = 60;
-const FIRESTORE_FREE_LIMITS = {
+const MEMOS_PAGE_SIZE = readConfigNumber('MEMOS_PAGE_SIZE', 60);
+const FIRESTORE_FREE_LIMITS = readConfigObject('FIRESTORE_FREE_LIMITS', {
   storageBytes: 1024 * 1024 * 1024,
   documentBytes: 1024 * 1024,
   readsPerDay: 50000,
   writesPerDay: 20000,
   deletesPerDay: 20000,
   outboundBytesPerMonth: 10 * 1024 * 1024 * 1024
-};
-const GITHUB_PAGES_FREE_LIMITS = {
+});
+const GITHUB_PAGES_FREE_LIMITS = readConfigObject('GITHUB_PAGES_FREE_LIMITS', {
   siteBytes: 1024 * 1024 * 1024,
   bandwidthBytesPerMonth: 100 * 1024 * 1024 * 1024,
   buildsPerHour: 10
-};
+});
 // Chat images are stored as base64 directly on their own Firestore message document (no
 // Firebase Storage). Each is still far under the 1MiB/doc limit, but an uncapped photo can
 // balloon well past this on a busy/detailed source image, so cap it and step down JPEG
 // quality instead (see compressImageToDataUrls).
-const MAX_CHAT_IMAGE_BASE64_LENGTH = 350000; // ~350KB
-const MAX_CHAT_THUMB_BASE64_LENGTH = 45000; // ~45KB -- thumbnails were previously unbounded
+const MAX_CHAT_IMAGE_BASE64_LENGTH = readConfigNumber('MAX_CHAT_IMAGE_BASE64_LENGTH', 350000); // ~350KB
+const MAX_CHAT_THUMB_BASE64_LENGTH = readConfigNumber('MAX_CHAT_THUMB_BASE64_LENGTH', 45000); // ~45KB -- thumbnails were previously unbounded
 // A calendar document must stay under Firestore's 1MiB/doc hard limit. Refuse a save before
 // it gets there instead of surfacing Firestore's opaque rejection at the boundary. Compared
 // against the actual Firestore wire-format size (see estimateCalendarDocWireBytes), not a
 // plain JSON.stringify length -- Firestore's typed-value wire format runs ~1.7-1.9x larger
 // than plain JSON for this shape (measured against live production data), so comparing a
 // plain JSON length against the raw 1,048,576 byte limit would under-count by a wide margin.
-const CALENDAR_DOC_SAFE_BYTE_LIMIT = 900000; // ~900KB of estimated wire size, ~150KB headroom
+const CALENDAR_DOC_SAFE_BYTE_LIMIT = readConfigNumber('CALENDAR_DOC_SAFE_BYTE_LIMIT', 900000); // ~900KB of estimated wire size, ~150KB headroom
 
 // Admin dashboard password gate. This is a lightweight deterrent, not real
 // server-side auth: the site is static and Firestore writes are already open
 // to anyone matching the schema, so a determined visitor can still bypass it.
-const ADMIN_SESSION_STORAGE_KEY = 'gather_admin_session_v1';
-const ADMIN_SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000; // Re-authenticate at least once a day.
-const DEFAULT_ADMIN_PASSWORD_HASH = '32625be384ed05129315617a65f0b070e7b35a4257bdd11e0d98185c6f0cecfe'; // sha256("0602")
+const ADMIN_SESSION_STORAGE_KEY = typeof GATHER_APP_CONFIG.ADMIN_SESSION_STORAGE_KEY === 'string' ? GATHER_APP_CONFIG.ADMIN_SESSION_STORAGE_KEY : 'gather_admin_session_v1';
+const ADMIN_SESSION_MAX_AGE_MS = readConfigNumber('ADMIN_SESSION_MAX_AGE_MS', 24 * 60 * 60 * 1000); // Re-authenticate at least once a day.
+const DEFAULT_ADMIN_PASSWORD_HASH = typeof GATHER_APP_CONFIG.DEFAULT_ADMIN_PASSWORD_HASH === 'string' ? GATHER_APP_CONFIG.DEFAULT_ADMIN_PASSWORD_HASH : '32625be384ed05129315617a65f0b070e7b35a4257bdd11e0d98185c6f0cecfe'; // sha256("0602")
 
 async function sha256Hex(text) {
   const encoded = new TextEncoder().encode(text);
