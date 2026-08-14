@@ -3204,9 +3204,11 @@ function AdminDashboard({ initialCalendars }) {
     return () => unsub && unsub();
   }, [firebaseDb]);
 
-  // Full activity log history for the selected calendar (Tab 2 timeline, Tab 3 PITR replay)
+  // Full, unbounded activity log history for the selected calendar -- only unifiedTimeline
+  // (복구 탭's PITR replay) ever reads selectedCalActivityLogs, so this only needs to fetch
+  // while that tab is actually open, not on every calendar switch made from 설정/통계/로그.
   React.useEffect(() => {
-    if (!selectedCalId) {
+    if (!selectedCalId || activeTab !== 'recovery') {
       setSelectedCalActivityLogs([]);
       return;
     }
@@ -3217,7 +3219,7 @@ function AdminDashboard({ initialCalendars }) {
     return () => {
       isMounted = false;
     };
-  }, [selectedCalId]);
+  }, [selectedCalId, activeTab]);
 
   // Sync Tab 2 form values when selectedCalId changes or serverCalendars list updates (avoiding wiping edits)
   React.useEffect(() => {
