@@ -6054,7 +6054,7 @@ function App() {
       let linkPreview = null;
       if (hasText) {
         const url = extractFirstUrl(chatInput);
-        if (url && !getDirectChatMediaInfo(url)) {
+        if (url && shouldFetchLinkPreviewForChatUrl(url)) {
           try {
             const res = await fetchLinkPreview(url);
             if (res && res.status === 'success') {
@@ -6184,7 +6184,7 @@ function App() {
     try {
       let linkPreview = null;
       const url = extractFirstUrl(newText);
-      if (url && !getDirectChatMediaInfo(url)) {
+      if (url && shouldFetchLinkPreviewForChatUrl(url)) {
         const oldUrl = extractFirstUrl(editingMessage.text);
         if (oldUrl === url && editingMessage.linkPreview) {
           linkPreview = editingMessage.linkPreview;
@@ -8496,6 +8496,11 @@ function LinkPreviewCard({ url, fallbackTitle, cachedData }) {
   );
 }
 
+function shouldFetchLinkPreviewForChatUrl(url) {
+  const mediaInfo = getDirectChatMediaInfo(url);
+  return !mediaInfo || mediaInfo.type === 'embed';
+}
+
 function getDirectChatMediaInfo(url) {
   const normalizedUrl = sanitizeText(url || '', 2000);
   if (!normalizedUrl || !/^https?:\/\//i.test(normalizedUrl)) return null;
@@ -8521,7 +8526,7 @@ function getDirectChatMediaInfo(url) {
       const path = parsed.pathname || '';
       if (host === 'youtu.be') {
         const id = path.split('/').filter(Boolean)[0];
-        if (id) return { type: 'embed', provider: 'youtube', url: `https://www.youtube-nocookie.com/embed/${encodeURIComponent(id)}` };
+        if (id) return { type: 'embed', provider: 'youtube', url: `https://www.youtube-nocookie.com/embed/${encodeURIComponent(id)}`, orientation: 'landscape' };
       }
       if (host === 'youtube.com' || host === 'm.youtube.com' || host === 'music.youtube.com') {
         const watchId = parsed.searchParams.get('v');
@@ -8529,15 +8534,11 @@ function getDirectChatMediaInfo(url) {
         const embedId = path.match(/\/embed\/([^/?#]+)/i)?.[1];
         const liveId = path.match(/\/live\/([^/?#]+)/i)?.[1];
         const id = watchId || shortsId || embedId || liveId;
-        if (id) return { type: 'embed', provider: 'youtube', url: `https://www.youtube-nocookie.com/embed/${encodeURIComponent(id)}` };
+        if (id) return { type: 'embed', provider: 'youtube', url: `https://www.youtube-nocookie.com/embed/${encodeURIComponent(id)}`, orientation: shortsId ? 'portrait' : 'landscape' };
       }
       if (host === 'vimeo.com' || host === 'player.vimeo.com') {
         const id = path.match(/(?:\/video)?\/(\d+)(?:$|[/?#])/i)?.[1] || path.match(/\/(\d+)(?:$|[/?#])/i)?.[1];
-        if (id) return { type: 'embed', provider: 'vimeo', url: `https://player.vimeo.com/video/${encodeURIComponent(id)}` };
-      }
-      if (host === 'tiktok.com' || host.endsWith('.tiktok.com')) {
-        const id = path.match(/\/video\/(\d+)/i)?.[1];
-        if (id) return { type: 'embed', provider: 'tiktok', url: `https://www.tiktok.com/embed/v2/${encodeURIComponent(id)}` };
+        if (id) return { type: 'embed', provider: 'vimeo', url: `https://player.vimeo.com/video/${encodeURIComponent(id)}`, orientation: 'landscape' };
       }
     } catch (e) {
       // Keep non-URL and unsupported providers on the regular link-preview path.
@@ -8595,10 +8596,10 @@ function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox, linkPr
   const maxWidth = style.maxWidth || '320px';
   const maxHeight = style.maxHeight || '240px';
   const marginBottom = remainingText ? '8px' : (style.marginBottom || '0');
+  const isPortraitEmbed = mediaInfo.type === 'embed' && mediaInfo.orientation === 'portrait';
   const embedTitleMap = {
     youtube: 'YouTube 영상',
-    vimeo: 'Vimeo 영상',
-    tiktok: 'TikTok 영상'
+    vimeo: 'Vimeo 영상'
   };
   const commonStyle = {
     display: 'block',
@@ -8644,7 +8645,7 @@ function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox, linkPr
         onError: () => setFailed(true),
         style: commonStyle
       })
-      : /*#__PURE__*/React.createElement('iframe', {
+      : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement('iframe', {
       src: mediaInfo.url,
       title: embedTitleMap[mediaInfo.provider] || '링크 영상',
       loading: 'lazy',
@@ -8654,15 +8655,19 @@ function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox, linkPr
       style: {
         display: 'block',
         width: '100%',
-        maxWidth: `min(100%, ${style.maxWidth || '420px'})`,
-        aspectRatio: mediaInfo.provider === 'tiktok' ? '9 / 16' : '16 / 9',
-        maxHeight: mediaInfo.provider === 'tiktok' ? '520px' : '260px',
+        maxWidth: isPortraitEmbed ? `min(100%, ${style.portraitEmbedMaxWidth || '360px'})` : `min(100%, ${style.embedMaxWidth || '760px'})`,
+        aspectRatio: isPortraitEmbed ? '9 / 16' : '16 / 9',
+        maxHeight: isPortraitEmbed ? 'min(72vh, 620px)' : 'min(54vh, 430px)',
         border: '0',
         borderRadius: '10px',
         backgroundColor: 'var(--bg-primary)',
-        marginBottom
+        marginBottom: linkPreview ? '6px' : marginBottom
       }
-    }),
+    }), /*#__PURE__*/React.createElement(LinkPreviewCard, {
+      url: firstUrl,
+      fallbackTitle: text ? removeFirstUrl(text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : '',
+      cachedData: linkPreview
+    })),
     remainingText ? /*#__PURE__*/React.createElement('div', null, parseTextWithLinks(remainingText, searchQuery)) : null
   );
 }
@@ -11397,6 +11402,12 @@ function ChatRoomView({
     const isMe = msg.participantId === chatParticipantId;
     const timeStr = formatChatTime(msg.timestamp);
     const msgHasImages = !!(msg.imageUrl || (Array.isArray(msg.imageUrls) && msg.imageUrls.length > 0));
+    const msgDirectMediaInfo = getDirectChatMediaInfo(extractFirstUrl(msg.text || ''));
+    const isEmbedMessage = msgDirectMediaInfo?.type === 'embed';
+    const chatBubbleMaxWidth = isEmbedMessage ? 'min(92%, 820px)' : '65%';
+    const chatMediaStyle = isEmbedMessage
+      ? { maxWidth: '760px', embedMaxWidth: '760px', portraitEmbedMaxWidth: '360px', maxHeight: '72vh', marginBottom: msg.text ? '10px' : '0' }
+      : { maxWidth: '420px', maxHeight: '62vh', marginBottom: msg.text ? '10px' : '0' };
     const isEmojiOnlyMessage = isEmojiOnlyChatText(msg.text) && !msgHasImages;
     const rowId = msg.id || `msg-${idx}`;
     const isSearchMatch = searchQuery && msg.text && msg.text.toLowerCase().includes(searchQuery.toLowerCase());
@@ -11509,7 +11520,7 @@ function ChatRoomView({
       )
     ), /*#__PURE__*/React.createElement("div", {
       key: "bubble-wrapper",
-      style: { position: 'relative', maxWidth: '65%', zIndex: 1, alignSelf: 'flex-end' }
+      style: { position: 'relative', maxWidth: chatBubbleMaxWidth, zIndex: 1, alignSelf: 'flex-end' }
     }, /*#__PURE__*/React.createElement("div", {
       key: isSearchFocused ? `bubble-focused-${rowId}` : undefined,
       className: isSearchFocused ? 'chat-search-focused-bubble' : (isSearchMatch ? 'chat-search-match-bubble' : ''),
@@ -11528,7 +11539,7 @@ function ChatRoomView({
         whiteSpace: 'pre-wrap',
         boxShadow: '0 2px 6px rgba(0,0,0,0.06)'
       }
-    }, renderChatMessageBody(msg, setActiveLightbox, { maxWidth: '420px', maxHeight: '62vh', marginBottom: msg.text ? '10px' : '0' }, searchQuery)), /*#__PURE__*/React.createElement("div", {
+    }, renderChatMessageBody(msg, setActiveLightbox, chatMediaStyle, searchQuery)), /*#__PURE__*/React.createElement("div", {
       style: {
         position: 'absolute',
         right: '-7px',
@@ -11562,7 +11573,7 @@ function ChatRoomView({
       }
     }))] : [/*#__PURE__*/React.createElement("div", {
       key: "bubble-wrapper",
-      style: { position: 'relative', maxWidth: '65%', zIndex: 1 }
+      style: { position: 'relative', maxWidth: chatBubbleMaxWidth, zIndex: 1 }
     }, /*#__PURE__*/React.createElement("div", {
       key: isSearchFocused ? `bubble-focused-${rowId}` : undefined,
       className: isSearchFocused ? 'chat-search-focused-bubble' : (isSearchMatch ? 'chat-search-match-bubble' : ''),
@@ -11581,7 +11592,7 @@ function ChatRoomView({
         whiteSpace: 'pre-wrap',
         boxShadow: '0 2px 6px rgba(0,0,0,0.06)'
       }
-    }, renderChatMessageBody(msg, setActiveLightbox, { maxWidth: '420px', maxHeight: '62vh', marginBottom: msg.text ? '10px' : '0' }, searchQuery)), /*#__PURE__*/React.createElement("div", {
+    }, renderChatMessageBody(msg, setActiveLightbox, chatMediaStyle, searchQuery)), /*#__PURE__*/React.createElement("div", {
       style: {
         position: 'absolute',
         left: '-7px',
