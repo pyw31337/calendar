@@ -6965,9 +6965,15 @@ function App() {
   const handleUpdateWeatherLocation = async (location) => {
     if (!guardLoadedCalendar()) return false;
     const now = Date.now();
+    const currentRecents = activeCal.recentLocations || [];
+    const updatedRecents = [
+      location,
+      ...currentRecents.filter(loc => loc.name !== location.name)
+    ].slice(0, 8);
     const updatedCal = {
       ...activeCal,
       weatherLocation: location,
+      recentLocations: updatedRecents,
       updatedAt: now,
       revision: (activeCal.revision || 0) + 1
     };
@@ -16302,7 +16308,59 @@ function WeatherBadge({ weatherLocation }) {
   );
 }
 
-function WeatherLocationModal({ onClose, onSelectLocation, showToast }) {
+function translateKoreanToEnglish(query) {
+  const clean = query.trim().toLowerCase();
+  const mapping = {
+    '서울': 'Seoul', '서울특별시': 'Seoul', '서울시': 'Seoul',
+    '인천': 'Incheon', '인천광역시': 'Incheon', '인천시': 'Incheon',
+    '부산': 'Busan', '부산광역시': 'Busan', '부산시': 'Busan',
+    '대구': 'Daegu', '대구광역시': 'Daegu', '대구시': 'Daegu',
+    '대전': 'Daejeon', '대전광역시': 'Daejeon', '대전시': 'Daejeon',
+    '광주': 'Gwangju', '광주광역시': 'Gwangju', '광주시': 'Gwangju',
+    '울산': 'Ulsan', '울산광역시': 'Ulsan', '울산시': 'Ulsan',
+    '세종': 'Sejong', '세종시': 'Sejong', '세종특별자치시': 'Sejong',
+    '경기도': 'Gyeonggi', '경기': 'Gyeonggi',
+    '강원도': 'Gangwon', '강원': 'Gangwon',
+    '충청북도': 'Chungcheongbuk', '충북': 'Chungcheongbuk',
+    '충청남도': 'Chungcheongnam', '충남': 'Chungcheongnam',
+    '전라북도': 'Jeollabuk', '전북': 'Jeollabuk',
+    '전라남도': 'Jeollanam', '전남': 'Jeollanam',
+    '경상북도': 'Gyeongsangbuk', '경북': 'Gyeongsangbuk',
+    '경상남도': 'Gyeongsangnam', '경남': 'Gyeongsangnam',
+    '제주': 'Jeju', '제주도': 'Jeju', '제주시': 'Jeju', '서귀포': 'Seogwipo',
+    '수원': 'Suwon', '성남': 'Seongnam', '분당': 'Bundang', '용인': 'Yongin',
+    '부천': 'Bucheon', '안산': 'Ansan', '화성': 'Hwaseong', '남양주': 'Namyangju',
+    '남양주시': 'Namyangju', '안양': 'Anyang', '평택': 'Pyeongtaek',
+    '의정부': 'Uijeongbu', '파주': 'Paju', '파주시': 'Paju', '시흥': 'Siheung',
+    '김포': 'Gimpo', '광명': 'Gwangmyeong', '군포': 'Gunpo', '오산': 'Osan',
+    '이천': 'Icheon', '양주': 'Yangju', '안성': 'Anseong', '구리': 'Guri',
+    '포천': 'Pocheon', '의왕': 'Uiwang', '하남': 'Hanam', '여주': 'Yeoju',
+    '동두천': 'Dongducheon', '과천': 'Gwacheon',
+    '춘천': 'Chuncheon', '원주': 'Wonju', '강릉': 'Gangneung', '동해': 'Donghae',
+    '태백': 'Taebaek', '속초': 'Sokcho', '삼척': 'Samcheok',
+    '청주': 'Cheongju', '충주': 'Chungju', '제천': 'Jecheon',
+    '천안': 'Cheonan', '공주': 'Gongju', '보령': 'Boryeong', '아산': 'Asan',
+    '서산': 'Seosan', '논산': 'Nonsan', '계룡': 'Gyeryong', '당진': 'Dangjin',
+    '전주': 'Jeonju', '군산': 'Gunsan', '익산': 'Iksan', '정읍': 'Jeongeup',
+    '남원': 'Namwon', '김제': 'Gimje',
+    '목포': 'Mokpo', '여수': 'Yeosu', '순천': 'Suncheon', '나주': 'Naju',
+    '광양': 'Gwangyang',
+    '포항': 'Pohang', '경주': 'Gyeongju', '김천': 'Gimcheon', '안동': 'Andong',
+    '구미': 'Gumi', '영주': 'Yeongju', '영천': 'Yeongcheon', '상주': 'Sangju',
+    '문경': 'Mungyeong', '경산': 'Gyeongsan',
+    '창원': 'Changwon', '진주': 'Jinju', '통영': 'Tongyeong', '사천': 'Sacheon',
+    '김해': 'Gimhae', '밀양': 'Miryang', '거제': 'Geoje', '양산': 'Yangsan',
+    '독도': 'Dokdo', '울릉도': 'Ulleungdo'
+  };
+
+  if (mapping[clean]) return mapping[clean];
+  if (/[ㄱ-ㅎ|ㅏ-ㅣ|가-힣]/.test(query)) {
+    return null; // Fallback to Nominatim
+  }
+  return query;
+}
+
+function WeatherLocationModal({ onClose, onSelectLocation, showToast, recentLocations = [] }) {
   const [query, setQuery] = React.useState('');
   const [results, setResults] = React.useState([]);
   const [loading, setLoading] = React.useState(false);
@@ -16316,11 +16374,34 @@ function WeatherLocationModal({ onClose, onSelectLocation, showToast }) {
     }
     setLoading(true);
     try {
-      const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cleanQuery)}&count=10&language=ko&format=json`);
-      if (!res.ok) throw new Error('검색 실패');
-      const data = await res.json();
-      setResults(data.results || []);
-      if ((data.results || []).length === 0) {
+      const translated = translateKoreanToEnglish(cleanQuery);
+      let searchResults = [];
+
+      if (translated) {
+        const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(translated)}&count=10&language=ko&format=json`);
+        if (res.ok) {
+          const data = await res.json();
+          searchResults = data.results || [];
+        }
+      }
+
+      if (searchResults.length === 0) {
+        const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(cleanQuery)}&format=json&limit=10&accept-language=ko`);
+        if (res.ok) {
+          const data = await res.json();
+          searchResults = (data || []).map((item, idx) => ({
+            id: `nominatim_${item.place_id || idx}`,
+            name: item.name || item.display_name.split(',')[0],
+            latitude: parseFloat(item.lat),
+            longitude: parseFloat(item.lon),
+            country: item.display_name.split(',').pop().trim(),
+            admin1: item.display_name.split(',').slice(-2, -1)[0]?.trim() || ''
+          }));
+        }
+      }
+
+      setResults(searchResults);
+      if (searchResults.length === 0) {
         showToast('일치하는 지역이 없습니다.', 'info');
       }
     } catch (err) {
@@ -16360,18 +16441,52 @@ function WeatherLocationModal({ onClose, onSelectLocation, showToast }) {
     /*#__PURE__*/React.createElement("div", {
       style: { padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }
     },
+      /* Recent / Saved Locations */
+      recentLocations && recentLocations.length > 0 && /*#__PURE__*/React.createElement("div", {
+        style: { display: 'flex', flexDirection: 'column', gap: '6px' }
+      },
+        /*#__PURE__*/React.createElement("span", {
+          style: { fontSize: '0.72rem', fontWeight: 'bold', color: 'var(--text-muted)' }
+        }, "자주 찾는 지역"),
+        /*#__PURE__*/React.createElement("div", {
+          style: { display: 'flex', flexWrap: 'wrap', gap: '6px' }
+        },
+          recentLocations.map((loc, idx) => 
+            /*#__PURE__*/React.createElement("button", {
+              key: idx,
+              type: "button",
+              onClick: () => {
+                onSelectLocation(loc);
+                onClose();
+              },
+              style: {
+                padding: '6px 10px',
+                fontSize: '0.74rem',
+                borderRadius: '6px',
+                border: '1px solid var(--border-subtle)',
+                backgroundColor: 'var(--bg-primary)',
+                color: 'var(--text-main)',
+                cursor: 'pointer',
+                transition: 'background-color 0.15s ease'
+              },
+              className: "weather-recent-btn"
+            }, loc.name)
+          )
+        )
+      ),
+
       /* Search Input Form */
       /*#__PURE__*/React.createElement("form", {
         onSubmit: handleSearch,
-        style: { display: 'flex', gap: '6px' }
+        style: { display: 'flex', gap: '6px', width: '100%', boxSizing: 'border-box' }
       },
         /*#__PURE__*/React.createElement("input", {
           type: "text",
           className: "form-input",
-          placeholder: "지역 이름 입력 (예: 서울, Jeju, Tokyo)",
+          placeholder: "지역 이름 입력 (예: 서울, 파주)",
           value: query,
           onChange: e => setQuery(e.target.value),
-          style: { flex: 1, padding: '8px 12px', fontSize: '0.82rem' }
+          style: { flex: 1, minWidth: 0, padding: '8px 12px', fontSize: '0.82rem', boxSizing: 'border-box' }
         }),
         /*#__PURE__*/React.createElement("button", {
           type: "submit",
@@ -16620,7 +16735,8 @@ function MainSideMenu({
   )), isWeatherModalOpen && /*#__PURE__*/React.createElement(WeatherLocationModal, {
     onClose: () => setIsWeatherModalOpen(false),
     onSelectLocation: onUpdateWeatherLocation,
-    showToast: showToast
+    showToast: showToast,
+    recentLocations: calendar?.recentLocations || []
   }));
 }
 
@@ -16814,7 +16930,8 @@ function ChatSideMenu({
   )), isWeatherModalOpen && /*#__PURE__*/React.createElement(WeatherLocationModal, {
     onClose: () => setIsWeatherModalOpen(false),
     onSelectLocation: onUpdateWeatherLocation,
-    showToast: showToast
+    showToast: showToast,
+    recentLocations: calendar?.recentLocations || []
   }));
 }
 
