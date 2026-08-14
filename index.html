@@ -120,9 +120,11 @@
   <script src="assets/app-config.js?v=20260814-split3"></script>
   <script src="assets/app-calendar-data.js?v=20260814-split5"></script>
   <script src="assets/app-chat-data.js?v=20260814-split6"></script>
+  <script src="assets/app-utils.js?v=20260814-split7"></script>
 
   <script>
 const GATHER_APP_CONSTANTS = window.GATHER_APP_CONSTANTS || {};
+const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
 const PRESET_COLORS = Array.isArray(GATHER_APP_CONSTANTS.PRESET_COLORS) ? GATHER_APP_CONSTANTS.PRESET_COLORS : ['#EF4444', '#F97316', '#F59E0B', '#10B981', '#06B6D4', '#3B82F6', '#6366F1', '#8B5CF6', '#EC4899', '#14B8A6'];
 const DEFAULT_EXPENSE_CATEGORIES = Array.isArray(GATHER_APP_CONSTANTS.DEFAULT_EXPENSE_CATEGORIES) ? GATHER_APP_CONSTANTS.DEFAULT_EXPENSE_CATEGORIES : [
   { id: 'food', name: '식품', color: '#F97316' },
@@ -769,17 +771,17 @@ async function tryCreateShortcut(notify) {
   if (notify) notify(instructions);
 }
 
-function getContrastTextColor(hexColor) {
+const getContrastTextColor = typeof GATHER_APP_UTILS.getContrastTextColor === 'function' ? GATHER_APP_UTILS.getContrastTextColor : function getContrastTextColor(hexColor) {
   if (!hexColor) return '#FFFFFF';
   const hex = hexColor.replace('#', '');
   const r = parseInt(hex.substring(0, 2), 16) || 0;
   const g = parseInt(hex.substring(2, 4), 16) || 0;
   const b = parseInt(hex.substring(4, 6), 16) || 0;
   return (r * 299 + g * 587 + b * 114) / 1000 >= 128 ? '#0F172A' : '#FFFFFF';
-}
+};
 
 // Standard Formatter for Korean Date Display: 2026.09.19 (토)
-function formatDateWithDayName(dateStr) {
+const formatDateWithDayName = typeof GATHER_APP_UTILS.formatDateWithDayName === 'function' ? GATHER_APP_UTILS.formatDateWithDayName : function formatDateWithDayName(dateStr) {
   if (!dateStr) return '';
   const parts = dateStr.split('-');
   if (parts.length === 3) {
@@ -794,33 +796,33 @@ function formatDateWithDayName(dateStr) {
     }
   }
   return dateStr;
-}
+};
 
-function formatShortDateWithDayName(dateStr) {
+const formatShortDateWithDayName = typeof GATHER_APP_UTILS.formatShortDateWithDayName === 'function' ? GATHER_APP_UTILS.formatShortDateWithDayName : function formatShortDateWithDayName(dateStr) {
   const formatted = formatDateWithDayName(dateStr);
   return formatted.replace(/^(\d{2})(\d{2})\./, '$2.');
-}
+};
 
 // "[모임확정] 26.08.08 (토)" -- the confirmed-meeting banner's fixed text format.
-function formatConfirmedMeetingLabel(dateStr) {
+const formatConfirmedMeetingLabel = typeof GATHER_APP_UTILS.formatConfirmedMeetingLabel === 'function' ? GATHER_APP_UTILS.formatConfirmedMeetingLabel : function formatConfirmedMeetingLabel(dateStr) {
   if (!dateStr) return '';
   const [y, m, d] = dateStr.split('-');
   const dateObj = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
   const dayName = ['일', '월', '화', '수', '목', '금', '토'][dateObj.getDay()];
   return `[모임확정] ${y.slice(2)}.${m}.${d} (${dayName})`;
-}
+};
 
 // D-day label for the confirmed-meeting banner -- 'D-DAY' for today, 'D-N' for N days out.
 // Confirmed-meeting banners never show past dates (see visibleConfirmedMeetings' >= today
 // filter), so there's no D+N case to handle here.
-function formatDDayLabel(dateStr) {
+const formatDDayLabel = typeof GATHER_APP_UTILS.formatDDayLabel === 'function' ? GATHER_APP_UTILS.formatDDayLabel : function formatDDayLabel(dateStr) {
   const [y, m, d] = dateStr.split('-').map(Number);
   const target = new Date(y, m - 1, d);
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const diffDays = Math.round((target - today) / 86400000);
   return diffDays <= 0 ? 'D-DAY' : `D-${diffDays}`;
-}
+};
 
 // calendar.confirmedMeeting supports multiple confirmed dates as an array of
 // {date, note, confirmedAt}, but earlier data (and any calendar saved before this

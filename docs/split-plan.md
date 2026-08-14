@@ -16,6 +16,7 @@
 - 5단계: 채팅 이모지/HEIC CDN/링크 미리보기 한도 데이터를 `assets/app-chat-data.js`로 분리했다.
 - 6단계: `INITIAL_CALENDARS`에 남아 있던 과거 데모 참여자/일정 데이터를 제거하고, 빈 로딩 셸만 남겼다.
 - 7단계: 라이브 엔트리에 연결되지 않았고 `localStorage` 기반 저장 로직을 포함하던 구형 `src/` React 파일들을 삭제했다. 삭제 전 상태는 Git 커밋 이력으로 복구 가능하다.
+- 8단계: 색상 대비와 핵심 날짜 라벨 포맷 함수 일부를 `assets/app-utils.js`로 분리했다.
 - 외부 JS는 모두 `public/assets`에도 미러링한다. Vite 산출물과 GitHub Pages 루트 서빙 방식이 달라져도 파일 누락을 막기 위한 조치다.
 - 각 외부 JS는 `window.GATHER_APP_*` 네임스페이스로만 값을 노출하고, `index.html`에는 기존 값 fallback을 유지한다.
 - `npm run regression:test`에 `check:asset-mirrors`가 포함되어 root/public 미러 불일치, `index.html`의 누락 asset 참조, 외부 데이터 스크립트 로딩 순서, 과거 초기 데모 데이터 재유입을 잡는다.
@@ -23,7 +24,7 @@
 
 ## 다음 권장 단계
 
-### 8단계: 순수 유틸 함수 분리
+### 9단계: 순수 유틸 함수 추가 분리
 
 대상:
 - 색상/대비 계산
@@ -38,7 +39,7 @@
 - 한 묶음당 5~10개 함수 이하로만 이동한다.
 - 함수 이동 시 기존 함수명을 바로 삭제하지 말고, 최소 1단계는 `window.GatherUtils?.fn || fallbackFn` 형태로 유지한다.
 
-### 9단계: Firebase 서비스 계층 분리
+### 10단계: Firebase 서비스 계층 분리
 
 대상:
 - 캘린더 구독
@@ -51,7 +52,7 @@
 - Firestore document path 규칙은 기존 코드와 완전히 동일하게 유지한다.
 - `?id=kkot`, `?id=cw`, `?id=jhair` 간 데이터 격리를 회귀 테스트에 포함한다.
 
-### 10단계: UI 컴포넌트 단위 분리
+### 11단계: UI 컴포넌트 단위 분리
 
 대상 우선순위:
 - `ShareModal`, `ConfirmDialog`, `NotificationPermissionHelpModal` 같은 독립 모달
@@ -63,7 +64,7 @@
 - 현재 앱은 CDN React + 인라인 `React.createElement` 실행 구조이므로, 즉시 ES Module JSX 구조로 바꾸면 위험하다.
 - 먼저 전역 컴포넌트 파일로 분리한 뒤, 최종적으로 Vite `src/` 기반 앱으로 전환한다.
 
-### 11단계: Vite 앱 구조 전환
+### 12단계: Vite 앱 구조 전환
 
 대상:
 - `src/`를 실제 라이브 엔트리로 전환

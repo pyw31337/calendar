@@ -5,14 +5,16 @@ const MIRRORED_ASSETS = [
   'app-calendar-data.js',
   'app-chat-data.js',
   'app-config.js',
-  'app-constants.js'
+  'app-constants.js',
+  'app-utils.js'
 ];
 
 const REQUIRED_SCRIPT_ORDER = [
   'assets/app-constants.js',
   'assets/app-config.js',
   'assets/app-calendar-data.js',
-  'assets/app-chat-data.js'
+  'assets/app-chat-data.js',
+  'assets/app-utils.js'
 ];
 
 function hashFile(path) {
