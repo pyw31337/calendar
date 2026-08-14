@@ -15,7 +15,8 @@ const assets = [
   'assets/app-config.js?v=20260814-split3',
   'assets/app-calendar-data.js?v=20260814-split5',
   'assets/app-chat-data.js?v=20260814-split6',
-  'assets/app-utils.js?v=20260814-split7'
+  'assets/app-utils.js?v=20260814-split7',
+  'assets/app-notifications.js?v=20260814-split8'
 ];
 
 function withCacheBust(path) {

@@ -7,6 +7,7 @@ function assert(condition, message) {
 
 const html = fs.readFileSync('index.html', 'utf8');
 const script = html.match(/<script>([\s\S]*)<\/script>\s*<\/body>/)?.[1];
+const notificationScript = fs.readFileSync('assets/app-notifications.js', 'utf8');
 assert(script, 'index.html app script block not found');
 assert(!/JSONBlob|jsonblob|localStorage|gather_calendars|FORCE_LOCAL_STORAGE/.test(script), 'app script must not use legacy browser or JSONBlob storage');
 assert(!/8월 여름휴가|여름 휴가|하계휴가|친목 모임|꽃잎반 모임 \(cw\)/.test(script), 'app script must not include obsolete seed calendar copy');
@@ -87,7 +88,7 @@ function createContext(url) {
 
 function runAppScript(context, extraSource) {
   vm.createContext(context);
-  vm.runInContext(`${script}\n${extraSource}`, context);
+  vm.runInContext(`${notificationScript}\n${script}\n${extraSource}`, context);
 }
 
 const productionContext = createContext('https://pyw31337.github.io/calendar/share/kkot/');
