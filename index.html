@@ -7430,7 +7430,7 @@ function App() {
     onPromoteImageUrl: handlePromoteInlineChatImage,
     onSaveImageTags: handleSaveImageTags,
     onSearchTag: handleSearchTag
-  }), isModalOpen && /*#__PURE__*/React.createElement(DateModal, {
+  }), /*#__PURE__*/React.createElement(Footer, null), isModalOpen && /*#__PURE__*/React.createElement(DateModal, {
     anniversaries: anniversaries,
     dateStr: selectedDate,
     calendar: activeCal,
@@ -22388,6 +22388,44 @@ function ImageShareViewer({ shareId }) {
       style: { fontSize: '0.78rem', color: 'rgba(255,255,255,0.72)', textAlign: 'center' }
     }, "모여라 캘린더 공유 이미지")
   ));
+}
+
+// Shown only on the main calendar screen (freely-scrolling home page) -- chat/memo/settlement
+// are fixed-viewport app-style screens with an input bar pinned to the bottom, where a footer
+// would overlap or crowd that input, so this is intentionally not rendered there.
+const FOOTER_FAMILY_LINKS = [
+  { label: '밖에 눈오나', url: 'https://pyw31337.github.io/cctv/' },
+  { label: 'Culture Flow', url: 'https://pyw31337.github.io/culture/' }
+];
+function Footer() {
+  return /*#__PURE__*/React.createElement('footer', {
+    style: {
+      marginTop: '32px',
+      padding: '22px 20px 28px',
+      borderTop: '1px solid var(--border-subtle)',
+      textAlign: 'center'
+    }
+  },
+    /*#__PURE__*/React.createElement('div', {
+      style: { fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.04em', marginBottom: '10px' }
+    }, 'FAMILY LINK'),
+    /*#__PURE__*/React.createElement('div', {
+      style: { display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '8px', marginBottom: '16px' }
+    }, FOOTER_FAMILY_LINKS.map(link => /*#__PURE__*/React.createElement('a', {
+      key: link.url,
+      href: link.url,
+      target: '_blank',
+      rel: 'noopener noreferrer',
+      style: {
+        fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-main)',
+        padding: '6px 14px', borderRadius: '16px', border: '1px solid var(--border-subtle)',
+        backgroundColor: 'var(--bg-secondary)', textDecoration: 'none'
+      }
+    }, link.label))),
+    /*#__PURE__*/React.createElement('p', {
+      style: { fontSize: '0.7rem', color: 'var(--text-muted)', margin: 0 }
+    }, 'Copyright © 2026 모여라 캘린더. All Rights Reserved.')
+  );
 }
 
 // Switching between in-app views (main/chat/admin/memo) is a React state change, not a real
