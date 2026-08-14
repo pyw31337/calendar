@@ -22721,24 +22721,57 @@ function ThreeLinesIcon({ size = 18 } = {}) {
     /*#__PURE__*/React.createElement("line", { x1: "4", y1: "17", x2: "20", y2: "17" }));
 }
 
-// Small monochrome (white, via stroke="#fff") glyph per category id, embedded directly into a
-// divIcon HTML string -- markers are rendered by Leaflet outside React's tree, so this can't be
-// a React icon component like the ones used elsewhere in the app. Only the four food/lodging/
+// Small monochrome (white, via stroke="#fff") glyph per category id. Stored as an array of SVG
+// path "d" values (not markup) so this one definition can drive both a Leaflet divIcon HTML
+// string (markers render outside React's tree, so those can't use a React icon component) AND a
+// real React <PlaceCategoryMarkerIcon> element (used inline in the place list, see PlacesView)
+// without keeping two copies of the same path data in sync by hand. Only the four food/lodging/
 // play built-in category ids get a matching pictogram; 기타(etc) and any custom category an
 // admin adds beyond those use the 💬 emoji instead, rather than guessing at an SVG icon for an
 // arbitrary/generic category.
 const PLACE_CATEGORY_MARKER_SVG_PATHS = {
-  restaurant: '<path d="M8 3v7a2 2 0 0 0 4 0V3" /><path d="M10 10v11" /><path d="M16 3c-1.5 2 -2 4 -2 6.5c0 1.5 1 2.5 2 2.5v9" />',
-  cafe: '<path d="M4 8h12v6a4 4 0 0 1 -4 4h-4a4 4 0 0 1 -4 -4v-6z" /><path d="M16 9h2a2 2 0 0 1 0 4h-2" /><path d="M8 2c-.6 1 .6 1.5 0 2.5" /><path d="M12 2c-.6 1 .6 1.5 0 2.5" />',
-  play: '<path d="M12 3a5 5 0 0 1 5 5c0 3 -2 5.3 -3.4 6.3l.6 2.7h-4.4l.6 -2.7c-1.4 -1 -3.4 -3.3 -3.4 -6.3a5 5 0 0 1 5 -5z" /><path d="M11 17l-1 4l2 -1l1 1" />',
-  lodging: '<path d="M3 18v-7a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v7" /><path d="M3 18v2" /><path d="M21 18v2" /><path d="M3 13h18" /><path d="M7 13v-3a1 1 0 0 1 1 -1h3a1 1 0 0 1 1 1v3" />'
+  restaurant: ['M8 3v7a2 2 0 0 0 4 0V3', 'M10 10v11', 'M16 3c-1.5 2 -2 4 -2 6.5c0 1.5 1 2.5 2 2.5v9'],
+  cafe: ['M4 8h12v6a4 4 0 0 1 -4 4h-4a4 4 0 0 1 -4 -4v-6z', 'M16 9h2a2 2 0 0 1 0 4h-2', 'M8 2c-.6 1 .6 1.5 0 2.5', 'M12 2c-.6 1 .6 1.5 0 2.5'],
+  play: ['M12 3a5 5 0 0 1 5 5c0 3 -2 5.3 -3.4 6.3l.6 2.7h-4.4l.6 -2.7c-1.4 -1 -3.4 -3.3 -3.4 -6.3a5 5 0 0 1 5 -5z', 'M11 17l-1 4l2 -1l1 1'],
+  lodging: ['M3 18v-7a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v7', 'M3 18v2', 'M21 18v2', 'M3 13h18', 'M7 13v-3a1 1 0 0 1 1 -1h3a1 1 0 0 1 1 1v3']
 };
-// Returns the marker's inner content -- either { svg: <path markup> } for the four pictogram
-// categories, or { emoji: '💬' } for 기타/custom categories.
+// Returns the marker's inner content -- either { svgPaths: [...d strings] } for the four
+// pictogram categories, or { emoji: '💬' } for 기타/custom categories.
 function getPlaceCategoryMarkerContent(category) {
   const id = String(category?.id || '').toLowerCase();
-  const svg = PLACE_CATEGORY_MARKER_SVG_PATHS[id];
-  return svg ? { svg } : { emoji: '💬' };
+  const paths = PLACE_CATEGORY_MARKER_SVG_PATHS[id];
+  return paths ? { svgPaths: paths } : { emoji: '💬' };
+}
+// Shared by both a normal individual marker AND a cluster badge that's collapsed down to a
+// single child (see iconCreateFunction below) -- a cluster with only one marker left inside it
+// should look identical to that marker on its own, not like a numbered cluster.
+function buildPlaceMarkerHtml(category) {
+  const color = category ? category.color : '#64748B';
+  const content = getPlaceCategoryMarkerContent(category);
+  const innerHtml = content.svgPaths
+    ? `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${content.svgPaths.map(d => `<path d="${d}" />`).join('')}</svg>`
+    : `<span style="font-size:13px;line-height:1;">${content.emoji}</span>`;
+  return `<div style="width:26px;height:26px;border-radius:50%;background:${color};border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;">${innerHtml}</div>`;
+}
+// React version of the same badge -- a small solid-color circle with the category's white line
+// icon inside, matching the map marker exactly. Used in the place list (PlacesView) so its
+// category badge looks like a miniature of the actual pin instead of a plain emoji.
+function PlaceCategoryMarkerIcon({ category, size = 14 } = {}) {
+  const content = getPlaceCategoryMarkerContent(category);
+  if (!content.svgPaths) {
+    return /*#__PURE__*/React.createElement("span", { style: { fontSize: `${size}px`, lineHeight: 1 } }, content.emoji);
+  }
+  return /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: String(size),
+    height: String(size),
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "#fff",
+    "stroke-width": "2",
+    "stroke-linecap": "round",
+    "stroke-linejoin": "round"
+  }, content.svgPaths.map((d, i) => /*#__PURE__*/React.createElement("path", { key: i, d })));
 }
 
 // Renders an interactive Leaflet/OSM map with one pin per registered place, auto-fit to bounds
@@ -22751,6 +22784,14 @@ function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom = false
   const containerRef = React.useRef(null);
   const mapRef = React.useRef(null);
   const markersLayerRef = React.useRef(null);
+  // getCalendarPlaces(calendar) builds a brand-new array (and place objects) on every call, so
+  // the `places` prop gets a new reference on every parent re-render even when nothing about the
+  // places actually changed -- e.g. clicking a marker opens the edit modal, which re-renders the
+  // parent, which recomputes `places`, which used to re-trigger the marker-rebuild effect below
+  // and reset the map's pan/zoom back to its fitted view mid-interaction. Comparing an actual
+  // content signature (not the array reference) lets that effect skip doing anything at all when
+  // the underlying data hasn't changed.
+  const dataSignatureRef = React.useRef(null);
   const [ready, setReady] = React.useState(false);
   const [loadError, setLoadError] = React.useState(false);
 
@@ -22787,6 +22828,20 @@ function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom = false
         // rest of the app's flat/minimal look rather than pulling in its default CSS theme too.
         iconCreateFunction: cluster => {
           const count = cluster.getChildCount();
+          // Once there's nothing left to merge with (zoomed in far enough that a "cluster" only
+          // has one marker in it, or the plugin momentarily reports a stale/zero count mid-zoom),
+          // show that marker's own category badge instead of a numbered cluster circle -- a
+          // single-marker "cluster" should look exactly like an individual marker, not like a
+          // cluster with nothing in it.
+          if (count <= 1) {
+            const child = cluster.getAllChildMarkers()[0];
+            return L.divIcon({
+              html: buildPlaceMarkerHtml(child?.placeCategory),
+              className: 'place-map-marker',
+              iconSize: [26, 26],
+              iconAnchor: [13, 13]
+            });
+          }
           const size = count < 10 ? 30 : count < 50 ? 36 : 42;
           return L.divIcon({
             html: `<div style="width:100%;height:100%;border-radius:50%;background:#3B82F6;border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:12px;">${count}</div>`,
@@ -22814,27 +22869,29 @@ function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom = false
   React.useEffect(() => {
     if (!ready || !mapRef.current || !window.L) return;
     const L = window.L;
+    const categories = getPlaceCategories(calendar);
+    const signature = JSON.stringify({ places, categories });
+    if (dataSignatureRef.current === signature) return;
+    dataSignatureRef.current = signature;
     const layer = markersLayerRef.current;
     layer.clearLayers();
-    const categoryMap = getPlaceCategories(calendar).reduce((acc, c) => { acc[c.id] = c; return acc; }, {});
+    const categoryMap = categories.reduce((acc, c) => { acc[c.id] = c; return acc; }, {});
     const bounds = [];
     (places || []).forEach(place => {
       const category = categoryMap[place.categoryId] || categoryMap.etc;
-      const color = category ? category.color : '#64748B';
       // Flat circle instead of the earlier rotated-teardrop shape -- simpler to render (no CSS
       // transform on top of Leaflet's own positioning transform).
-      const markerContent = getPlaceCategoryMarkerContent(category);
-      const innerHtml = markerContent.svg
-        ? `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${markerContent.svg}</svg>`
-        : `<span style="font-size:13px;line-height:1;">${markerContent.emoji}</span>`;
       const icon = L.divIcon({
         className: 'place-map-marker',
-        html: `<div style="width:26px;height:26px;border-radius:50%;background:${color};border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;">${innerHtml}</div>`,
+        html: buildPlaceMarkerHtml(category),
         iconSize: [26, 26],
         iconAnchor: [13, 13],
         popupAnchor: [0, -13]
       });
       const marker = L.marker([place.lat, place.lng], { icon });
+      // Read back by the cluster group's iconCreateFunction above when a cluster collapses down
+      // to just this one marker, so it can render the same category badge instead of a "1".
+      marker.placeCategory = category;
       const popupNode = document.createElement('div');
       popupNode.style.minWidth = '140px';
       popupNode.style.maxWidth = '220px';
@@ -23496,10 +23553,18 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
               /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' } },
                 /*#__PURE__*/React.createElement("span", {
                   style: {
-                    display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '3px 8px', borderRadius: '999px',
+                    display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '3px 8px 3px 3px', borderRadius: '999px',
                     backgroundColor: `${category.color}18`, color: category.color, fontSize: '0.68rem', fontWeight: 900
                   }
-                }, `${getPlaceCategoryIcon(category)} ${category.name}`),
+                },
+                  /*#__PURE__*/React.createElement("span", {
+                    style: {
+                      width: '16px', height: '16px', borderRadius: '50%', flexShrink: 0,
+                      backgroundColor: category.color, display: 'flex', alignItems: 'center', justifyContent: 'center'
+                    }
+                  }, /*#__PURE__*/React.createElement(PlaceCategoryMarkerIcon, { category, size: 10 })),
+                  category.name
+                ),
                 /*#__PURE__*/React.createElement("span", {
                   style: {
                     fontSize: '0.66rem', fontWeight: 700, padding: '2px 7px', borderRadius: 'var(--radius-full)',
