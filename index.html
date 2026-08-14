@@ -9582,19 +9582,19 @@ function renderChatMessageImages(msg, setActiveLightbox, singleImageStyle = {}) 
   const meta = entries.map(e => ({ timestamp: msg.timestamp, messageId: msg.id, imageIndex: e.imageIndex, thumb: e.thumb, tags: e.tags }));
   if (thumbs.length === 1) {
     return /*#__PURE__*/React.createElement('img', {
-      src: thumbs[0],
+      src: displayUrls[0] || thumbs[0],
       alt: '첨부이미지',
       onClick: () => setActiveLightbox && setActiveLightbox({ urls: displayUrls, index: 0, meta }),
       style: { 
         display: 'block', 
         borderRadius: '8px', 
         cursor: 'pointer', 
-        objectFit: 'cover', 
+        objectFit: 'contain',
         width: '100%', 
         height: 'auto', 
         ...singleImageStyle, 
-        maxWidth: 'min(100%, ' + (singleImageStyle.maxWidth || '200px') + ')', 
-        maxHeight: singleImageStyle.maxHeight || '150px' 
+        maxWidth: 'min(100%, ' + (singleImageStyle.maxWidth || '420px') + ')',
+        maxHeight: singleImageStyle.maxHeight || '60vh'
       }
     });
   }
@@ -11471,7 +11471,7 @@ function ChatRoomView({
         whiteSpace: 'pre-wrap',
         boxShadow: '0 2px 6px rgba(0,0,0,0.06)'
       }
-    }, renderChatMessageBody(msg, setActiveLightbox, { maxWidth: '200px', maxHeight: '150px', marginBottom: msg.text ? '10px' : '0' }, searchQuery)), /*#__PURE__*/React.createElement("div", {
+    }, renderChatMessageBody(msg, setActiveLightbox, { maxWidth: '420px', maxHeight: '62vh', marginBottom: msg.text ? '10px' : '0' }, searchQuery)), /*#__PURE__*/React.createElement("div", {
       style: {
         position: 'absolute',
         right: '-7px',
@@ -11524,7 +11524,7 @@ function ChatRoomView({
         whiteSpace: 'pre-wrap',
         boxShadow: '0 2px 6px rgba(0,0,0,0.06)'
       }
-    }, renderChatMessageBody(msg, setActiveLightbox, { maxWidth: '200px', maxHeight: '150px', marginBottom: msg.text ? '10px' : '0' }, searchQuery)), /*#__PURE__*/React.createElement("div", {
+    }, renderChatMessageBody(msg, setActiveLightbox, { maxWidth: '420px', maxHeight: '62vh', marginBottom: msg.text ? '10px' : '0' }, searchQuery)), /*#__PURE__*/React.createElement("div", {
       style: {
         position: 'absolute',
         left: '-7px',

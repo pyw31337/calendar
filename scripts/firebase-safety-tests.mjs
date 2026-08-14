@@ -15,6 +15,8 @@ assert(!/8월 여름휴가|여름 휴가|하계휴가|친목 모임|꽃잎반 �
 assert(/async function subscribeUserToPush[\s\S]{0,700}missing-participant/.test(script), 'Web Push subscription must refuse missing participant identity');
 assert(/const handleMainToggleNotifications[\s\S]{0,1800}subscribeUserToPush/.test(script), 'main notification toggle must register a Web Push subscription');
 assert(!/await\s+subscription\.unsubscribe\(/.test(script), 'calendar-level notification mute must not unsubscribe the origin-wide PushSubscription');
+assert(/if \(thumbs\.length === 1\)[\s\S]{0,260}src: displayUrls\[0\] \|\| thumbs\[0\][\s\S]{0,420}objectFit: 'contain'/.test(script), 'single chat image must render the full media without cropping');
+assert(/thumbs\.map\(\(thumb, idx\)[\s\S]{0,520}objectFit: 'cover'/.test(script), 'multi-image chat grid should keep cropped square thumbnails');
 const setChatNotifyPrefBody = script.match(/function setChatNotifyEnabledForCalendar\(calId, enabled\) \{([\s\S]*?)\n\}/)?.[1] || '';
 assert(!setChatNotifyPrefBody.includes('gather_chat_notify_pref_global_v1'), 'new chat notification writes must be calendar-scoped, not global');
 
