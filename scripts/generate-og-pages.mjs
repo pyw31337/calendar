@@ -17,44 +17,33 @@ function escapeHtml(value) {
     .replaceAll("'", '&#39;');
 }
 
-function firestoreValueToJs(value) {
-  if (!value || typeof value !== 'object') return undefined;
-  if ('stringValue' in value) return value.stringValue;
-  if ('integerValue' in value) return Number(value.integerValue);
-  if ('doubleValue' in value) return Number(value.doubleValue);
-  if ('booleanValue' in value) return Boolean(value.booleanValue);
-  if ('timestampValue' in value) return Date.parse(value.timestampValue);
-  if ('mapValue' in value) {
-    const fields = value.mapValue.fields || {};
-    return Object.fromEntries(Object.entries(fields).map(([key, nested]) => [key, firestoreValueToJs(nested)]));
-  }
-  if ('arrayValue' in value) {
-    return (value.arrayValue.values || []).map(firestoreValueToJs);
-  }
-  return undefined;
-}
-
-function normalizeCalendar(doc) {
-  const fields = doc.fields || {};
-  const calendar = firestoreValueToJs(fields.calendar) || {};
-  const docId = (doc.name || '').split('/').pop() || '';
-  const id = calendar.id || docId.replace(/^cal_/, '');
+function normalizeCalendar(raw) {
+  const id = raw?.id || '';
   if (!id || !/^[A-Za-z0-9_-]{1,64}$/.test(id)) return null;
   return {
     id,
-    title: calendar.title || FALLBACK_TITLE,
-    description: calendar.description || `${calendar.title || FALLBACK_TITLE} 일정 조율 캘린더`
+    title: raw.title || FALLBACK_TITLE,
+    description: raw.description || `${raw.title || FALLBACK_TITLE} 일정 조율 캘린더`
   };
 }
 
+// Goes through the listPublicCalendarSummaries Cloud Function (functions/index.js) rather than a
+// raw Firestore REST `list` on /calendars: that collection's `list` rule was locked down to
+// `if false` (previously `if true` let anyone enumerate every calendar ID and read its full
+// contents, not just the id/title/description this script actually needs) once the admin
+// dashboard's cross-calendar view moved to server-side Cloud Functions instead. This script needs
+// the same enumeration, just scoped to the public fields a share link's OG tags already expose.
 async function fetchCalendars() {
-  const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/calendars`;
+  const url = `https://us-central1-${PROJECT_ID}.cloudfunctions.net/listPublicCalendarSummaries`;
   const res = await fetch(url);
   if (!res.ok) {
-    throw new Error(`Firestore calendar fetch failed: ${res.status}`);
+    throw new Error(`Calendar summary fetch failed: ${res.status}`);
   }
   const json = await res.json();
-  return (json.documents || []).map(normalizeCalendar).filter(Boolean);
+  if (!json.ok) {
+    throw new Error(`Calendar summary fetch returned ok:false: ${json.message || 'unknown error'}`);
+  }
+  return (json.calendars || []).map(normalizeCalendar).filter(Boolean);
 }
 
 // `forwardSearch` keeps any legacy query string (e.g. an old `?view=chat` link generated
