@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 
 const MIRRORED_ASSETS = [
@@ -20,6 +20,17 @@ for (const filename of MIRRORED_ASSETS) {
 
   if (rootHash !== publicHash) {
     console.error(`Asset mirror mismatch: ${rootAsset} and ${publicAsset} differ.`);
+    process.exit(1);
+  }
+}
+
+const indexHtml = readFileSync('index.html', 'utf8');
+const referencedAssets = [...indexHtml.matchAll(/(?:href|src)="(assets\/[^"?]+)(?:\?[^"]*)?"/g)]
+  .map(match => match[1]);
+
+for (const assetPath of referencedAssets) {
+  if (!existsSync(assetPath)) {
+    console.error(`Missing referenced asset: ${assetPath}`);
     process.exit(1);
   }
 }
