@@ -70,4 +70,20 @@ if (inlineAppIndex <= previousIndex) {
   process.exit(1);
 }
 
+const staleInitialCalendarMarkers = [
+  'CW_DEFAULT_CALENDAR',
+  'KKOT_DEFAULT_CALENDAR',
+  '8월 여름휴가 친목 모임',
+  '친구들과 함께 떠나는 여름 휴가',
+  '김민준',
+  '예당호 착한농촌체험세상'
+];
+
+for (const marker of staleInitialCalendarMarkers) {
+  if (indexHtml.includes(marker)) {
+    console.error(`Stale initial calendar/demo data marker found: ${marker}`);
+    process.exit(1);
+  }
+}
+
 console.log('Asset mirror check passed.');
