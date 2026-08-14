@@ -294,6 +294,32 @@ exports.peekalinkProxy = functions.https.onRequest(async (req, res) => {
   }
 });
 
+// Public, unauthenticated: returns only {id, title, description} for every calendar, for the
+// GitHub Actions "Refresh Calendar OG Pages" job (scripts/generate-og-pages.mjs), which needs to
+// enumerate all calendars to regenerate their public share/OG preview pages. That's the same
+// information any share link already exposes via its og:title/og:description meta tags before
+// the recipient even opens the page, so serving it without auth doesn't reopen the enumeration
+// hole listAllCalendars/adminVerifyPassword above were built to close -- this function explicitly
+// never touches participants/messages/expenses/places/polls/etc.
+exports.listPublicCalendarSummaries = functions.https.onRequest(async (req, res) => {
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
+  if (req.method !== 'GET') { res.status(405).json({ ok: false, message: 'Method not allowed' }); return; }
+  try {
+    const snap = await admin.firestore().collection('calendars').get();
+    const calendars = [];
+    snap.forEach(doc => {
+      const cal = doc.data()?.calendar;
+      if (cal?.id) calendars.push({ id: cal.id, title: cal.title || '', description: cal.description || '' });
+    });
+    res.status(200).json({ ok: true, calendars });
+  } catch (err) {
+    console.error('listPublicCalendarSummaries failed:', err);
+    res.status(500).json({ ok: false, message: '캘린더 목록을 불러오지 못했습니다.' });
+  }
+});
+
 // --- Admin auth (listAllCalendars / adminVerifyPassword / adminChangePassword) ---
 //
 // This app has no real user accounts -- individual calendars are protected only by their ID
