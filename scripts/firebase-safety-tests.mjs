@@ -279,6 +279,20 @@ runAppScript(productionContext, `
   }
 `);
 
+const adminCalendarContext = createContext('https://pyw31337.github.io/calendar/?admin=1&id=cw');
+runAppScript(adminCalendarContext, `
+  if (getAdminSelectedCalendarIdFromUrl('kkot') !== 'cw') {
+    throw new Error('admin selected calendar URL id parsing failed');
+  }
+`);
+
+const adminInvalidCalendarContext = createContext('https://pyw31337.github.io/calendar/?admin=1&id=bad/path');
+runAppScript(adminInvalidCalendarContext, `
+  if (getAdminSelectedCalendarIdFromUrl('kkot') !== 'kkot') {
+    throw new Error('admin selected calendar invalid id fallback failed');
+  }
+`);
+
 const restoreContext = createContext('https://pyw31337.github.io/calendar/?admin=1&restore=1');
 runAppScript(restoreContext, `
   if (!isAdminDashboardRoute()) throw new Error('admin route detection failed');

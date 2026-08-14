@@ -2428,6 +2428,13 @@ function isAdminRestoreRoute() {
   return isAdminDashboardRoute() && params.get('restore') === '1';
 }
 
+function getAdminSelectedCalendarIdFromUrl(fallback = 'kkot') {
+  if (!isAdminDashboardRoute()) return fallback;
+  const params = new URLSearchParams(window.location.search);
+  const id = params.get('id') || '';
+  return isValidCalendarId(id) ? id : fallback;
+}
+
 // Makes the admin 통합검색결과 page addressable/bookmarkable/back-button-navigable as its own
 // URL (?admin=1&search=<query>) instead of only existing as in-memory component state.
 function getAdminSearchQueryFromUrl() {
@@ -2907,7 +2914,7 @@ function AdminDashboard({ initialCalendars }) {
   const [activeTab, setActiveTab] = React.useState('settings'); // 'settings' (일반), 'metrics' (통계), 'logs', 'recovery'
 
   // Selected calendar for settings and recovery tabs
-  const [selectedCalId, setSelectedCalId] = React.useState('kkot');
+  const [selectedCalId, setSelectedCalId] = React.useState(() => getAdminSelectedCalendarIdFromUrl('kkot'));
 
   // Calendar profile edit states
   const [calTitle, setCalTitle] = React.useState('');
@@ -2994,6 +3001,19 @@ function AdminDashboard({ initialCalendars }) {
     if (next.to) params.set('to', next.to); else params.delete('to');
     window.history.pushState({}, '', `${window.location.pathname}?${params.toString()}`);
   };
+  const syncSelectedCalendarUrl = (calId, mode = 'replace') => {
+    const params = new URLSearchParams(window.location.search);
+    params.set('admin', '1');
+    if (calId && isValidCalendarId(calId)) params.set('id', calId); else params.delete('id');
+    const nextUrl = `${window.location.pathname}?${params.toString()}`;
+    if (mode === 'push') window.history.pushState({}, '', nextUrl);
+    else window.history.replaceState({}, '', nextUrl);
+  };
+  const selectAdminCalendar = (calId, mode = 'replace') => {
+    if (!isValidCalendarId(calId)) return;
+    setSelectedCalId(calId);
+    syncSelectedCalendarUrl(calId, mode);
+  };
   const setUnifiedSearchQuery = (query) => { setUnifiedSearchQueryState(query); pushSearchUrl({ query }); };
   const setUnifiedSearchCalFilter = (calFilter) => { setUnifiedSearchCalFilterState(calFilter); pushSearchUrl({ calFilter }); };
   const setUnifiedSearchDateStart = (dateStart) => { setUnifiedSearchDateStartState(dateStart); pushSearchUrl({ dateStart }); };
@@ -3005,6 +3025,7 @@ function AdminDashboard({ initialCalendars }) {
       setUnifiedSearchCalFilterState(f.calFilter);
       setUnifiedSearchDateStartState(f.dateStart);
       setUnifiedSearchDateEndState(f.dateEnd);
+      setSelectedCalId(getAdminSelectedCalendarIdFromUrl('kkot'));
     };
     window.addEventListener('popstate', handlePop);
     return () => window.removeEventListener('popstate', handlePop);
@@ -3106,7 +3127,9 @@ function AdminDashboard({ initialCalendars }) {
     if (calendarsList.length > 0) {
       const exists = calendarsList.some(c => c.id === selectedCalId);
       if (!exists) {
-        setSelectedCalId(calendarsList[0].id);
+        selectAdminCalendar(calendarsList[0].id, 'replace');
+      } else {
+        syncSelectedCalendarUrl(selectedCalId, 'replace');
       }
     }
   }, [calendarsList, selectedCalId]);
@@ -3240,7 +3263,7 @@ function AdminDashboard({ initialCalendars }) {
     const saved = await pushSingleCloudCalendar(newCal, now, 18, null, 'replace');
     if (saved) {
       setServerCalendars(prev => [newCal, ...prev]);
-      setSelectedCalId(newCal.id);
+      selectAdminCalendar(newCal.id, 'replace');
       setIsCreateCalModalOpen(false);
       showAdminToast('캘린더 생성완료', 'success');
       return '';
@@ -3964,7 +3987,7 @@ function AdminDashboard({ initialCalendars }) {
                     key: cal.id,
                     type: "button",
                     className: "bottom-sheet-item",
-                    onClick: () => { setSelectedCalId(cal.id); setIsHeaderCalPickerOpen(false); }
+                    onClick: () => { selectAdminCalendar(cal.id, 'replace'); setIsHeaderCalPickerOpen(false); }
                   }, `${cal.title} (${cal.id})`))
                 )
               )
