@@ -101,7 +101,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
 
-  <link rel="stylesheet" href="assets/app.css?v=20260814-split12">
+  <link rel="stylesheet" href="assets/app.css?v=20260814-split13">
 </head>
 <body>
   <div id="root">
@@ -8478,6 +8478,7 @@ function LinkPreviewCard({ url, fallbackTitle, cachedData }) {
     image && /*#__PURE__*/React.createElement('img', {
       src: image,
       alt: '',
+      referrerPolicy: 'no-referrer',
       style: { width: '72px', height: '72px', objectFit: 'cover', flexShrink: 0, backgroundColor: 'var(--bg-primary)' }
     }),
     /*#__PURE__*/React.createElement('div', {
@@ -8540,6 +8541,10 @@ function getDirectChatMediaInfo(url) {
         const id = path.match(/(?:\/video)?\/(\d+)(?:$|[/?#])/i)?.[1] || path.match(/\/(\d+)(?:$|[/?#])/i)?.[1];
         if (id) return { type: 'embed', provider: 'vimeo', url: `https://player.vimeo.com/video/${encodeURIComponent(id)}`, orientation: 'landscape' };
       }
+      // TikTok deliberately excluded: its embed iframe (tiktok.com/embed/v2/<id>) can render an
+      // "overload protection" placeholder instead of the actual video when loaded from a
+      // third-party page, so a TikTok link stays on the regular link-preview (thumbnail +
+      // title/description card) path below instead of an unreliable inline player.
     } catch (e) {
       // Keep non-URL and unsupported providers on the regular link-preview path.
     }
@@ -8618,6 +8623,7 @@ function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox, linkPr
         src: mediaInfo.url,
         alt: '링크 이미지',
         loading: 'lazy',
+        referrerPolicy: 'no-referrer',
         onError: () => setFailed(true),
         onClick: () => setActiveLightbox && setActiveLightbox({
           urls: [mediaInfo.url],
@@ -8642,6 +8648,7 @@ function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox, linkPr
         playsInline: true,
         controls: true,
         preload: 'metadata',
+        referrerPolicy: 'no-referrer',
         onError: () => setFailed(true),
         style: commonStyle
       })
@@ -9646,6 +9653,7 @@ function renderChatMessageImages(msg, setActiveLightbox, singleImageStyle = {}) 
     return /*#__PURE__*/React.createElement('img', {
       src: displayUrls[0] || thumbs[0],
       alt: '첨부이미지',
+      referrerPolicy: 'no-referrer',
       onClick: () => setActiveLightbox && setActiveLightbox({ urls: displayUrls, index: 0, meta }),
       style: { 
         display: 'block', 
@@ -9692,6 +9700,7 @@ function renderChatMessageImages(msg, setActiveLightbox, singleImageStyle = {}) 
     key: idx,
     src: thumb,
     alt: `첨부이미지 ${idx + 1}`,
+    referrerPolicy: 'no-referrer',
     onClick: () => setActiveLightbox && setActiveLightbox({ urls: displayUrls, index: idx, meta }),
     style: {
       display: 'block',
@@ -10253,6 +10262,7 @@ function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, onPromote
     alt: "원본 이미지",
     "data-slide": slot,
     draggable: false,
+    referrerPolicy: 'no-referrer',
     onLoad: e => recordImageDimensions(url, e),
     style: {
       maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: '12px',
@@ -10270,6 +10280,7 @@ function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, onPromote
     alt: "원본 이미지",
     "data-slide": slot,
     draggable: false,
+    referrerPolicy: 'no-referrer',
     onLoad: e => recordImageDimensions(url, e),
     onClick: e => e.stopPropagation(),
     style: {
@@ -10354,6 +10365,7 @@ function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, onPromote
     src: currentUrl,
     alt: "원본 이미지",
     draggable: false,
+    referrerPolicy: 'no-referrer',
     onLoad: e => recordImageDimensions(currentUrl, e),
     style: {
       maxWidth: '92vw', maxHeight: '82vh', borderRadius: '12px', objectFit: 'contain',
@@ -15719,7 +15731,7 @@ function AdminUnifiedSearchResultsView({
         onClick: () => window.open(getAdminSearchResultTargetUrl('tags', entry), '_blank', 'noopener'),
         style: { padding: 0, border: 0, background: 'none', cursor: 'pointer', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '4px', font: 'inherit' }
       },
-        /*#__PURE__*/React.createElement("img", { src: entry.thumb, style: { width: '100%', aspectRatio: '1 / 1', objectFit: 'cover', borderRadius: '6px' } }),
+        /*#__PURE__*/React.createElement("img", { src: entry.thumb, referrerPolicy: 'no-referrer', style: { width: '100%', aspectRatio: '1 / 1', objectFit: 'cover', borderRadius: '6px' } }),
         /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.68rem', color: '#94A3B8', fontWeight: 700 } }, entry.calendarLabel),
         /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.7rem', color: '#0F172A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, highlightKeyword(entry.tags || '', q))
       ))),
@@ -16440,7 +16452,8 @@ function ChatGalleryModal({
   const sharedPhotos = React.useMemo(() => {
     const list = [];
     chatMessages.forEach(msg => {
-      const entries = getMessageImageEntries(msg);
+      const directEntry = getMessageDirectMediaEntry(msg);
+      const entries = directEntry ? [...getMessageImageEntries(msg), directEntry] : getMessageImageEntries(msg);
       list.push(...entries);
     });
     return list.sort((a, b) => b.timestamp - a.timestamp);
@@ -16514,13 +16527,14 @@ function ChatGalleryModal({
     }, "공유된 사진이 없습니다.") : /*#__PURE__*/React.createElement("div", {
       style: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }
     }, sharedPhotos.map((photo, idx) => /*#__PURE__*/React.createElement("img", {
-      key: `${photo.messageId}-${photo.imageIndex}`,
+      key: `${photo.messageId}-${photo.directMediaUrl ? 'direct' : photo.imageIndex}`,
       src: photo.thumb,
       alt: "공유사진",
+      referrerPolicy: 'no-referrer',
       onClick: () => setActiveLightbox && setActiveLightbox({
         urls: sharedPhotos.map(p => p.full),
         index: idx,
-        meta: sharedPhotos.map(p => ({ timestamp: p.timestamp, messageId: p.messageId, imageIndex: p.imageIndex, thumb: p.thumb, tags: p.tags }))
+        meta: sharedPhotos.map(p => ({ timestamp: p.timestamp, messageId: p.messageId, imageIndex: p.imageIndex, thumb: p.thumb, tags: p.tags, directMediaUrl: p.directMediaUrl }))
       }),
       style: { width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: '6px', cursor: 'pointer', backgroundColor: 'var(--bg-primary)' }
     })))
@@ -21729,6 +21743,7 @@ function PhotoGallery({ chatMessages, showToast, onPromoteImageUrl, onSaveImageT
         src: entry.thumb,
         alt: "채팅에 첨부된 사진",
         loading: "lazy",
+        referrerPolicy: 'no-referrer',
         onClick: () => setLightbox({
           urls: photoEntries.map(e => e.full),
           meta: photoEntries.map(e => ({ timestamp: e.timestamp, messageId: e.messageId, imageIndex: e.imageIndex, thumb: e.thumb, tags: e.tags, directMediaUrl: e.directMediaUrl })),
