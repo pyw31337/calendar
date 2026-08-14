@@ -15304,10 +15304,17 @@ function computeCalendarSearchMatches(cal, chatMessages, memoList, q, limit = 30
   const expenses = [];
   (cal.confirmedMeeting || []).forEach(meeting => {
     (meeting.expenses || []).forEach(exp => {
+      // Income entries are stored with categoryId 'etc' as a placeholder (they don't have a
+      // real spending category), so resolving categoryName straight off expenseCategoriesMap
+      // would badge/match them as "기타" like a real misc *expense* -- same fix SettlementPage's
+      // getDisplayCategory already applies for the on-screen badge, mirrored here so search
+      // agrees with what's actually shown.
+      const isIncome = exp.type === 'income' || Number(exp.amount) < 0;
       const category = expenseCategoriesMap[exp.categoryId];
-      const categoryName = category?.name || '기타';
+      const categoryName = isIncome ? '수입' : (category?.name || '기타');
+      const categoryColor = isIncome ? '#16A34A' : (category?.color || '#94A3B8');
       if ((exp.label || '').toLowerCase().includes(q) || (exp.url || '').toLowerCase().includes(q) || categoryName.toLowerCase().includes(q)) {
-        expenses.push({ ...exp, date: meeting.date, categoryName, categoryColor: category?.color || '#94A3B8' });
+        expenses.push({ ...exp, date: meeting.date, categoryName, categoryColor });
       }
     });
   });
