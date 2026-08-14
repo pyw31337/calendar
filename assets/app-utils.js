@@ -48,11 +48,67 @@
     return diffDays <= 0 ? 'D-DAY' : `D-${diffDays}`;
   }
 
+  function formatRegisteredAt(timestamp) {
+    const value = Number(timestamp || 0);
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    const year = String(date.getFullYear()).slice(2);
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const seconds = String(date.getSeconds()).padStart(2, '0');
+    return `${year}.${month}.${day} (${DAY_NAMES_KO[date.getDay()]}) ${hours}:${minutes}:${seconds}`;
+  }
+
+  function formatCommentDate(timestamp) {
+    const date = new Date(timestamp);
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const seconds = String(date.getSeconds()).padStart(2, '0');
+    return {
+      dateStr: `${month}.${day}(${DAY_NAMES_KO[date.getDay()]})`,
+      timeStr: `${hours}:${minutes}:${seconds}`
+    };
+  }
+
+  function formatChatTime(timestamp) {
+    const date = new Date(timestamp);
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${hours}:${minutes}`;
+  }
+
+  function formatChatDividerDate(timestamp) {
+    const date = new Date(timestamp);
+    const year = String(date.getFullYear()).slice(-2);
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}.${month}.${day}(${DAY_NAMES_KO[date.getDay()]})`;
+  }
+
+  function formatBytes(bytes) {
+    const value = Number(bytes);
+    if (!isFinite(value) || value < 0) return null;
+    if (value >= 1024 * 1024 * 1024) return `${(value / 1024 / 1024 / 1024).toFixed(2)} GB`;
+    if (value >= 1024 * 1024) return `${(value / 1024 / 1024).toFixed(1)} MB`;
+    if (value >= 1024) return `${(value / 1024).toFixed(1)} KB`;
+    return `${value} B`;
+  }
+
   window.GATHER_APP_UTILS = Object.freeze({
     getContrastTextColor,
     formatDateWithDayName,
     formatShortDateWithDayName,
     formatConfirmedMeetingLabel,
-    formatDDayLabel
+    formatDDayLabel,
+    formatRegisteredAt,
+    formatCommentDate,
+    formatChatTime,
+    formatChatDividerDate,
+    formatBytes
   });
 })();

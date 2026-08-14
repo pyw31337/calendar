@@ -1051,7 +1051,7 @@ function applyDynamicManifest(calendar) {
   }
 }
 
-function formatRegisteredAt(timestamp) {
+const formatRegisteredAt = typeof GATHER_APP_UTILS.formatRegisteredAt === 'function' ? GATHER_APP_UTILS.formatRegisteredAt : function formatRegisteredAt(timestamp) {
   const value = Number(timestamp || 0);
   if (!value) return '';
   const date = new Date(value);
@@ -1064,7 +1064,7 @@ function formatRegisteredAt(timestamp) {
   const minutes = String(date.getMinutes()).padStart(2, '0');
   const seconds = String(date.getSeconds()).padStart(2, '0');
   return `${year}.${month}.${day} (${dayNames[date.getDay()]}) ${hours}:${minutes}:${seconds}`;
-}
+};
 
 function cloneParticipant(participant) {
   return participant ? { ...participant } : participant;
@@ -9600,7 +9600,7 @@ function isEmojiOnlyChatText(text) {
   }
 }
 
-function formatCommentDate(timestamp) {
+const formatCommentDate = typeof GATHER_APP_UTILS.formatCommentDate === 'function' ? GATHER_APP_UTILS.formatCommentDate : function formatCommentDate(timestamp) {
   const date = new Date(timestamp);
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
@@ -9613,16 +9613,16 @@ function formatCommentDate(timestamp) {
     dateStr: `${month}.${day}(${dayName})`,
     timeStr: `${hours}:${minutes}:${seconds}`
   };
-}
+};
 
-function formatChatTime(timestamp) {
+const formatChatTime = typeof GATHER_APP_UTILS.formatChatTime === 'function' ? GATHER_APP_UTILS.formatChatTime : function formatChatTime(timestamp) {
   const date = new Date(timestamp);
   const hours = String(date.getHours()).padStart(2, '0');
   const minutes = String(date.getMinutes()).padStart(2, '0');
   return `${hours}:${minutes}`;
-}
+};
 
-function formatChatDividerDate(timestamp) {
+const formatChatDividerDate = typeof GATHER_APP_UTILS.formatChatDividerDate === 'function' ? GATHER_APP_UTILS.formatChatDividerDate : function formatChatDividerDate(timestamp) {
   const date = new Date(timestamp);
   const year = String(date.getFullYear()).slice(-2);
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -9630,7 +9630,7 @@ function formatChatDividerDate(timestamp) {
   const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
   const dayName = dayNames[date.getDay()];
   return `${year}.${month}.${day}(${dayName})`;
-}
+};
 
 // Returns paired {full, thumb} entries for a chat message's attached image(s), handling both
 // the legacy single-image fields (imageUrl/thumbUrl) and the imageUrls/thumbUrls arrays used
@@ -9727,14 +9727,14 @@ function getStorageUrlFileSize(url) {
   const match = url.match(/_(\d+)b\.[a-zA-Z0-9]+(?:[?#]|$)/);
   return match ? Number(match[1]) : null;
 }
-function formatBytes(bytes) {
+const formatBytes = typeof GATHER_APP_UTILS.formatBytes === 'function' ? GATHER_APP_UTILS.formatBytes : function formatBytes(bytes) {
   const value = Number(bytes);
   if (!isFinite(value) || value < 0) return null;
   if (value >= 1024 * 1024 * 1024) return `${(value / 1024 / 1024 / 1024).toFixed(2)} GB`;
   if (value >= 1024 * 1024) return `${(value / 1024 / 1024).toFixed(1)} MB`;
   if (value >= 1024) return `${(value / 1024).toFixed(1)} KB`;
   return `${value} B`;
-}
+};
 
 function getDataUrlInfo(url) {
   if (typeof url !== 'string' || !url.startsWith('data:')) return null;
