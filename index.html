@@ -5514,6 +5514,18 @@ function getAdminSearchQueryFromUrl() {
   return params.get('search') || null;
 }
 
+// Same idea as getAdminSearchQueryFromUrl, for the 통합검색결과 page's 캘린더/기간 filters
+// (?cal=<id|all>&from=<YYYY-MM-DD>&to=<YYYY-MM-DD>).
+function getAdminSearchFilterFromUrl() {
+  if (!isAdminDashboardRoute()) return { calFilter: 'all', dateStart: '', dateEnd: '' };
+  const params = new URLSearchParams(window.location.search);
+  return {
+    calFilter: params.get('cal') || 'all',
+    dateStart: params.get('from') || '',
+    dateEnd: params.get('to') || ''
+  };
+}
+
 function createDefaultCalendar(id) {
   const now = Date.now();
   return {
@@ -6038,18 +6050,40 @@ function AdminDashboard({ initialCalendars }) {
   const [isHeaderCalPickerOpen, setIsHeaderCalPickerOpen] = React.useState(false);
   const [isAdminMenuOpen, setIsAdminMenuOpen] = React.useState(false);
   // Unified cross-calendar search: input popup + result page (non-null query -> show results page).
-  // Query is mirrored into the URL (?search=) so the results page is its own addressable/
-  // bookmarkable/shareable route rather than only living in component state.
+  // Query and its 캘린더/기간 filters are all mirrored into the URL (?search=&cal=&from=&to=) so
+  // the results page is its own addressable/bookmarkable/shareable route rather than only living
+  // in component state.
   const [isUnifiedSearchOpen, setIsUnifiedSearchOpen] = React.useState(false);
   const [unifiedSearchQuery, setUnifiedSearchQueryState] = React.useState(getAdminSearchQueryFromUrl);
-  const setUnifiedSearchQuery = (query) => {
-    setUnifiedSearchQueryState(query);
+  const [unifiedSearchCalFilter, setUnifiedSearchCalFilterState] = React.useState(() => getAdminSearchFilterFromUrl().calFilter);
+  const [unifiedSearchDateStart, setUnifiedSearchDateStartState] = React.useState(() => getAdminSearchFilterFromUrl().dateStart);
+  const [unifiedSearchDateEnd, setUnifiedSearchDateEndState] = React.useState(() => getAdminSearchFilterFromUrl().dateEnd);
+  const pushSearchUrl = (overrides) => {
     const params = new URLSearchParams(window.location.search);
-    if (query) params.set('search', query); else params.delete('search');
+    const next = {
+      search: 'query' in overrides ? overrides.query : unifiedSearchQuery,
+      cal: 'calFilter' in overrides ? overrides.calFilter : unifiedSearchCalFilter,
+      from: 'dateStart' in overrides ? overrides.dateStart : unifiedSearchDateStart,
+      to: 'dateEnd' in overrides ? overrides.dateEnd : unifiedSearchDateEnd
+    };
+    if (next.search) params.set('search', next.search); else params.delete('search');
+    if (next.cal && next.cal !== 'all') params.set('cal', next.cal); else params.delete('cal');
+    if (next.from) params.set('from', next.from); else params.delete('from');
+    if (next.to) params.set('to', next.to); else params.delete('to');
     window.history.pushState({}, '', `${window.location.pathname}?${params.toString()}`);
   };
+  const setUnifiedSearchQuery = (query) => { setUnifiedSearchQueryState(query); pushSearchUrl({ query }); };
+  const setUnifiedSearchCalFilter = (calFilter) => { setUnifiedSearchCalFilterState(calFilter); pushSearchUrl({ calFilter }); };
+  const setUnifiedSearchDateStart = (dateStart) => { setUnifiedSearchDateStartState(dateStart); pushSearchUrl({ dateStart }); };
+  const setUnifiedSearchDateEnd = (dateEnd) => { setUnifiedSearchDateEndState(dateEnd); pushSearchUrl({ dateEnd }); };
   React.useEffect(() => {
-    const handlePop = () => setUnifiedSearchQueryState(getAdminSearchQueryFromUrl());
+    const handlePop = () => {
+      setUnifiedSearchQueryState(getAdminSearchQueryFromUrl());
+      const f = getAdminSearchFilterFromUrl();
+      setUnifiedSearchCalFilterState(f.calFilter);
+      setUnifiedSearchDateStartState(f.dateStart);
+      setUnifiedSearchDateEndState(f.dateEnd);
+    };
     window.addEventListener('popstate', handlePop);
     return () => window.removeEventListener('popstate', handlePop);
   }, []);
@@ -6863,15 +6897,46 @@ function AdminDashboard({ initialCalendars }) {
     }
   };
 
-  // Peekalink free-plan usage this hour, for the 통계 tab's 외부 서비스 연동 현황 gauge. The
-  // stored bucket only reflects the CURRENT hour if it matches now -- an older bucket means no
-  // calls have happened yet this hour, so usage reads as 0 rather than a stale prior count.
+  // Peekalink free-plan usage this hour -- surfaced as a 데이터 사용량 card below (alongside
+  // Firestore/GitHub Pages quotas) rather than its own gauge in 외부 서비스 연동 현황, so every
+  // external-limit number lives in one place. The stored bucket only reflects the CURRENT hour
+  // if it matches now -- an older bucket means no calls have happened yet this hour, so usage
+  // reads as 0 rather than a stale prior count.
   const peekalinkCurrentBucket = Math.floor(Date.now() / PEEKALINK_HOUR_BUCKET_MS);
   const peekalinkHourlyUsage = (linkPreviewStats && linkPreviewStats.hourlyUsageBucket === peekalinkCurrentBucket)
     ? (linkPreviewStats.hourlyUsageCount || 0) : 0;
   const peekalinkUsagePercent = Math.min(100, Math.round(peekalinkHourlyUsage / PEEKALINK_FREE_HOURLY_LIMIT * 100));
   const peekalinkRemaining = Math.max(0, PEEKALINK_FREE_HOURLY_LIMIT - peekalinkHourlyUsage);
-  const peekalinkGaugeColor = peekalinkUsagePercent >= 90 ? '#DC2626' : peekalinkUsagePercent >= 60 ? '#D97706' : '#16A34A';
+
+  // 일정 데이터의 5000건 캡은 캘린더 1개 문서당 개별 적용 (전체 합산이 아님) -- 가장 사용량이
+  // 많은 캘린더를 기준으로 하나의 카드에 요약해서 보여주고, 캘린더별 세부 수치는 아래
+  // "캘린더별 세부 통계"에서 확인 가능.
+  const worstAvailabilityStat = dashboard.calendarStats.reduce((worst, stat) => {
+    const count = Array.isArray(stat.calendar.availabilities) ? stat.calendar.availabilities.length : 0;
+    return (!worst || count > worst.count) ? { stat, count } : worst;
+  }, null);
+  const worstAvailabilityCount = worstAvailabilityStat ? worstAvailabilityStat.count : 0;
+  const worstAvailabilityLabel = worstAvailabilityStat ? (worstAvailabilityStat.stat.calendar.title || worstAvailabilityStat.stat.calendar.id) : '';
+
+  const fullServiceUsage = [
+    ...dashboard.serviceUsage,
+    {
+      label: 'Peekalink API (이번 시간)',
+      used: `${peekalinkHourlyUsage}건`,
+      limit: `${PEEKALINK_FREE_HOURLY_LIMIT}건/시간`,
+      remaining: `${peekalinkRemaining}건 (매 정시 초기화)`,
+      percent: peekalinkUsagePercent,
+      note: '무료 요금제는 누적 소진이 아닌 시간당 rate limit이며, 캐시 응답은 집계에서 제외'
+    },
+    {
+      label: '일정 데이터 (5,000건 캡)',
+      used: worstAvailabilityStat ? `${worstAvailabilityCount.toLocaleString()}건 (${worstAvailabilityLabel})` : '0건',
+      limit: '5,000건/캘린더',
+      remaining: `${Math.max(0, 5000 - worstAvailabilityCount).toLocaleString()}건`,
+      percent: Math.min(100, Math.round(worstAvailabilityCount / 5000 * 100)),
+      note: '전체 합산이 아닌 캘린더 1개당 개별 적용되는 캡이며, 가장 사용량이 많은 캘린더 기준 (세부 수치는 캘린더별 세부 통계 참고)'
+    }
+  ];
 
   if (unifiedSearchQuery !== null) {
     return /*#__PURE__*/React.createElement(AdminUnifiedSearchResultsView, {
@@ -6879,6 +6944,12 @@ function AdminDashboard({ initialCalendars }) {
       calendarsList: calendarsList,
       messagesMap: messagesMap,
       memosMap: memosMap,
+      calFilter: unifiedSearchCalFilter,
+      dateStart: unifiedSearchDateStart,
+      dateEnd: unifiedSearchDateEnd,
+      onCalFilterChange: setUnifiedSearchCalFilter,
+      onDateStartChange: setUnifiedSearchDateStart,
+      onDateEndChange: setUnifiedSearchDateEnd,
       onBack: () => setUnifiedSearchQuery(null)
     });
   }
@@ -7192,30 +7263,13 @@ function AdminDashboard({ initialCalendars }) {
               )
             )
           ),
-          /* Peekalink free-plan usage this hour. Free plan is a 50/hour RATE LIMIT, not a fixed
-             lifetime quota -- it resets every clock hour rather than depleting permanently, so
-             this reads "이번 시간 사용량" rather than "총 무료제공량 대비" to stay accurate. */
-          /*#__PURE__*/React.createElement("div", { style: { marginTop: '14px' } },
-            /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' } },
-              /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.72rem', color: '#94A3B8', fontWeight: 700 } }, "무료 요금제 사용량 (이번 시간, 매 정시 초기화)"),
-              /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.78rem', fontWeight: 800, color: peekalinkGaugeColor } },
-                `${peekalinkHourlyUsage} / ${PEEKALINK_FREE_HOURLY_LIMIT}건 · ${peekalinkUsagePercent}% · 잔여 ${peekalinkRemaining}건`
-              )
-            ),
-            /*#__PURE__*/React.createElement("div", {
-              style: { width: '100%', height: '8px', borderRadius: '999px', backgroundColor: '#E2E8F0', overflow: 'hidden', marginTop: '6px' }
-            },
-              /*#__PURE__*/React.createElement("div", { style: { width: `${peekalinkUsagePercent}%`, height: '100%', backgroundColor: peekalinkGaugeColor, transition: 'width 0.3s ease' } })
-            ),
-            /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.7rem', color: '#94A3B8', marginTop: '4px' } },
-              "Peekalink 무료 요금제는 총량이 누적 소진되는 방식이 아니라 시간당 50건으로 매 정시마다 초기화되는 속도 제한(rate limit)입니다. 위 수치는 이 서버가 캐시 미스로 실제 Peekalink API를 호출한 횟수 기준이며, 캐시로 응답한 요청은 포함하지 않습니다."
-            )
-          ),
-          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'flex-start', gap: '8px', marginTop: '14px', padding: '10px', borderRadius: '8px', backgroundColor: '#FFFBEB', border: '1px solid #FDE68A' } },
-            /*#__PURE__*/React.createElement(AlertTriangleIcon, null),
-            /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.78rem', color: '#92400E', lineHeight: 1.6 } },
-              /*#__PURE__*/React.createElement("strong", null, "주의: "),
-              "이 서비스는 백엔드 서버가 없는 정적 사이트라 Peekalink API 키가 브라우저 소스에 그대로 노출됩니다(누구나 view-source로 확인 가능). 제3자가 이 키를 추출해 재사용하면 무료 요금제 할당량이 소진되어 링크 미리보기가 중단될 수 있습니다. 위 공유 캐시는 동일 URL에 대한 반복 호출을 없애 이 위험을 줄이지만 완전히 막지는 못하므로, 요청량이 비정상적으로 늘면 peekalink.io 계정에서 키를 교체하는 것을 권장합니다."
+          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'flex-start', gap: '8px', marginTop: '14px', padding: '10px', borderRadius: '8px', backgroundColor: '#F0FDF4', border: '1px solid #BBF7D0' } },
+            /*#__PURE__*/React.createElement(ShieldCheckIcon, null),
+            /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.78rem', color: '#166534', lineHeight: 1.6 } },
+              /*#__PURE__*/React.createElement("strong", null, "API 키 보호: "),
+              "이 서비스는 백엔드가 없는 정적 사이트라 Peekalink API 키가 브라우저 소스에 그대로 노출되는 문제가 있었습니다. 이제는 Cloud Function 프록시(peekalinkProxy)를 통해서만 Peekalink를 호출하도록 변경되어, 키는 서버(Functions 코드)에만 존재하고 브라우저에는 전혀 전송되지 않습니다. 무료 요금제 사용량(시간당 한도)은 아래 ",
+              /*#__PURE__*/React.createElement("strong", null, "데이터 사용량"),
+              " 섹션에서 확인할 수 있습니다."
             )
           )
         )
@@ -7360,7 +7414,7 @@ function AdminDashboard({ initialCalendars }) {
           /*#__PURE__*/React.createElement("span", { style: { display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(CloudDataConnectionIcon, null), "데이터 사용량")
         ),
         /*#__PURE__*/React.createElement("div", { className: "admin-quota-grid" },
-          dashboard.serviceUsage.map(item => /*#__PURE__*/React.createElement("div", { key: item.label, className: "admin-quota-card" },
+          fullServiceUsage.map(item => /*#__PURE__*/React.createElement("div", { key: item.label, className: "admin-quota-card" },
             /*#__PURE__*/React.createElement("div", { className: "admin-quota-label" }, item.label),
             /*#__PURE__*/React.createElement("div", { className: "admin-quota-value" }, item.used, " / ", item.limit),
             /*#__PURE__*/React.createElement("div", { className: "admin-progress" },
@@ -11232,15 +11286,15 @@ function setChatLastReadTimestamp(calendarId, timestamp) {
   }
 }
 
-// Link preview (OpenGraph via peekalink.io's API, client-side fetch since this is a static
-// site with no backend to crawl links server-side). Cached at module scope (by URL) so
-// re-renders and repeated occurrences of the same link don't refetch, and in-flight requests
-// are deduped across simultaneously-mounting message bubbles.
-// Uses a per-account free-tier API key (dedicated quota, not shared globally like an
-// anonymous/no-key API) -- see https://peekalink.io. NOTE: this key is visible to anyone who
-// views this file's source (there is no server to hide it behind), so the linkPreviews shared
-// cache below exists in part to minimize how often it actually gets called, not just for speed.
-const PEEKALINK_API_KEY = 'sk_w8czszf1m50xm1pbuknazw60recwmc2q';
+// Link preview (OpenGraph via peekalink.io's API), fetched through the peekalinkProxy Cloud
+// Function (functions/index.js) instead of calling api.peekalink.io directly from the browser.
+// This is a static site with no backend of its own, so the Peekalink API key previously had to
+// live in this client-shipped file (visible to anyone via view-source) -- it now lives ONLY in
+// the Cloud Function's source, which never reaches the browser, and the proxy forwards requests
+// server-side with it. Cached at module scope (by URL) so re-renders and repeated occurrences of
+// the same link don't refetch, and in-flight requests are deduped across simultaneously-mounting
+// message bubbles.
+const PEEKALINK_PROXY_URL = `https://us-central1-${firebaseConfig.projectId}.cloudfunctions.net/peekalinkProxy`;
 const linkPreviewCache = new Map();
 const linkPreviewInflight = new Map();
 // Peekalink's free plan is a 50-request-per-hour rate limit, not a fixed lifetime quota --
@@ -11326,10 +11380,9 @@ async function fetchLinkPreview(url) {
         }
       }
 
-      const res = await fetch('https://api.peekalink.io/', {
+      const res = await fetch(PEEKALINK_PROXY_URL, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${PEEKALINK_API_KEY}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({ link: url })
@@ -18159,27 +18212,57 @@ function getAdminSearchResultTargetUrl(type, item) {
   return `${getAppBaseUrl()}?${params.toString()}`;
 }
 
-function AdminUnifiedSearchResultsView({ query, calendarsList, messagesMap, memosMap, onBack }) {
+function AdminUnifiedSearchResultsView({
+  query, calendarsList, messagesMap, memosMap,
+  calFilter = 'all', dateStart = '', dateEnd = '',
+  onCalFilterChange, onDateStartChange, onDateEndChange,
+  onBack
+}) {
   const q = (query || '').trim().toLowerCase();
+  const [isFilterPanelOpen, setIsFilterPanelOpen] = React.useState(false);
+
+  const filteredCalendarsList = React.useMemo(() => (
+    calFilter === 'all' ? (calendarsList || []) : (calendarsList || []).filter(cal => cal.id === calFilter)
+  ), [calendarsList, calFilter]);
+
+  // Timestamp fields (채팅/태그/메모) need epoch bounds derived from the picked YYYY-MM-DD dates;
+  // date-string fields (일정/정산) compare directly since ISO YYYY-MM-DD sorts lexicographically.
+  const dateRangeMs = React.useMemo(() => ({
+    startMs: dateStart ? new Date(`${dateStart}T00:00:00`).getTime() : -Infinity,
+    endMs: dateEnd ? new Date(`${dateEnd}T23:59:59.999`).getTime() : Infinity
+  }), [dateStart, dateEnd]);
 
   // Every calendar's matches, tagged with which calendar they came from (results are grouped by
   // category tab now, not by calendar, so each row needs its own calendar label).
   const allMatches = React.useMemo(() => {
     if (!q) return { schedules: [], chat: [], tags: [], expenses: [], memos: [] };
     const merged = { schedules: [], chat: [], tags: [], expenses: [], memos: [] };
-    (calendarsList || []).forEach(cal => {
+    filteredCalendarsList.forEach(cal => {
       const calLabel = cal.title || cal.id;
       const perCal = computeCalendarSearchMatches(cal, messagesMap?.[cal.id], memosMap?.[cal.id], q, 20);
       Object.keys(merged).forEach(key => {
         perCal[key].forEach(item => merged[key].push({ ...item, calendarId: cal.id, calendarLabel: calLabel }));
       });
     });
+    if (dateStart) {
+      merged.schedules = merged.schedules.filter(item => item.date >= dateStart);
+      merged.expenses = merged.expenses.filter(item => item.date >= dateStart);
+    }
+    if (dateEnd) {
+      merged.schedules = merged.schedules.filter(item => item.date <= dateEnd);
+      merged.expenses = merged.expenses.filter(item => item.date <= dateEnd);
+    }
+    if (dateStart || dateEnd) {
+      merged.chat = merged.chat.filter(item => item.timestamp >= dateRangeMs.startMs && item.timestamp <= dateRangeMs.endMs);
+      merged.tags = merged.tags.filter(item => item.timestamp >= dateRangeMs.startMs && item.timestamp <= dateRangeMs.endMs);
+      merged.memos = merged.memos.filter(item => item.createdAt >= dateRangeMs.startMs && item.createdAt <= dateRangeMs.endMs);
+    }
     merged.chat.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
     merged.tags.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
     merged.expenses.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
     merged.memos.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
     return merged;
-  }, [q, calendarsList, messagesMap, memosMap]);
+  }, [q, filteredCalendarsList, messagesMap, memosMap, dateStart, dateEnd, dateRangeMs]);
 
   const calendarCount = React.useMemo(() => {
     if (!q) return 0;
@@ -18232,9 +18315,51 @@ function AdminUnifiedSearchResultsView({ query, calendarsList, messagesMap, memo
         /*#__PURE__*/React.createElement("span", { style: { fontWeight: 800, fontSize: '0.95rem', color: '#0F172A' } }, "통합 검색결과"),
         /*#__PURE__*/React.createElement("span", { style: { fontWeight: 500, marginLeft: '10px', fontSize: '0.78rem', color: '#64748B' } },
           `"${query}" · ${grandTotal}건 · 캘린더 ${calendarCount}개`
-        )
+        ),
+        /*#__PURE__*/React.createElement("button", {
+          type: "button", onClick: () => setIsFilterPanelOpen(prev => !prev),
+          "aria-label": "검색 기간/캘린더 필터", title: "검색 기간/캘린더 필터",
+          style: {
+            background: 'none', border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center',
+            marginLeft: '8px', padding: '2px', color: (calFilter !== 'all' || dateStart || dateEnd) ? '#2563EB' : '#64748B'
+          }
+        }, /*#__PURE__*/React.createElement(CalendarCogIcon, null))
       ),
       /*#__PURE__*/React.createElement("div", { style: { width: '32px', flexShrink: 0 } })
+    ),
+
+    isFilterPanelOpen && /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px',
+        padding: '12px 20px', borderBottom: '1px solid #E2E8F0', backgroundColor: '#F8FAFC'
+      }
+    },
+      /*#__PURE__*/React.createElement("div", { style: { minWidth: '140px', flex: '1 1 140px' } },
+        /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
+          title: "캘린더 선택",
+          value: calFilter,
+          options: [{ value: 'all', label: '통합' }, ...(calendarsList || []).map(cal => ({ value: cal.id, label: `${cal.title || cal.id} (${cal.id})` }))],
+          onSelect: onCalFilterChange,
+          placeholder: "통합"
+        })
+      ),
+      /*#__PURE__*/React.createElement("div", { style: { minWidth: '120px', flex: '1 1 120px' } },
+        /*#__PURE__*/React.createElement(DeadlineDateTimePicker, {
+          value: dateStart, onChange: onDateStartChange, dateOnly: true, placeholder: "시작일"
+        })
+      ),
+      /*#__PURE__*/React.createElement("span", { style: { color: '#94A3B8', fontWeight: 700 } }, "~"),
+      /*#__PURE__*/React.createElement("div", { style: { minWidth: '120px', flex: '1 1 120px' } },
+        /*#__PURE__*/React.createElement(DeadlineDateTimePicker, {
+          value: dateEnd, onChange: onDateEndChange, dateOnly: true, placeholder: "종료일"
+        })
+      ),
+      (calFilter !== 'all' || dateStart || dateEnd) && /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: () => { onCalFilterChange('all'); onDateStartChange(''); onDateEndChange(''); },
+        className: "btn btn-secondary",
+        style: { padding: '6px 12px', fontSize: '0.78rem', flexShrink: 0 }
+      }, "초기화")
     ),
 
     /*#__PURE__*/React.createElement(SearchCategoryTabs, { tabs: tabDefs, activeKey: activeTab, onSelect: setActiveTab }),
@@ -22689,6 +22814,29 @@ function AlertTriangleIcon() {
   }));
 }
 
+function ShieldCheckIcon() {
+  return /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: "20",
+    height: "20",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    "stroke-width": "2",
+    "stroke-linecap": "round",
+    "stroke-linejoin": "round",
+    className: "icon icon-tabler icons-tabler-outline icon-tabler-shield-check"
+  }, /*#__PURE__*/React.createElement("path", {
+    stroke: "none",
+    d: "M0 0h24v24H0z",
+    fill: "none"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M12 3a12 12 0 0 0 8.5 3a12 12 0 0 1 -8.5 15a12 12 0 0 1 -8.5 -15a12 12 0 0 0 8.5 -3"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M9 12l2 2l4 -4"
+  }));
+}
+
 function CalendarExportIcon() {
   return /*#__PURE__*/React.createElement("svg", {
     xmlns: "http://www.w3.org/2000/svg",
@@ -23191,23 +23339,26 @@ function PollVoterSheet({ calendar, pollId, optionId, onSelect, onClose }) {
 // (which renders with its own OS-styled chrome that doesn't follow the app's dark mode) with a
 // layer-popup matching the main calendar's year/month picker look and feel.
 const DEADLINE_PICKER_MONTH_NAMES = ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월'];
-function DeadlineDateTimePicker({ value, onChange, disabled }) {
+function DeadlineDateTimePicker({ value, onChange, disabled, dateOnly = false, placeholder }) {
   const [isOpen, setIsOpen] = React.useState(false);
   const now = new Date();
-  const parsed = value ? new Date(value) : null;
+  // dateOnly mode stores/reads plain YYYY-MM-DD (no time component) -- append a fixed local
+  // midnight when parsing so Date() doesn't interpret the bare date string as UTC (see
+  // isValidDateString's "always UTC" comment elsewhere in this file for the same pitfall).
+  const parsed = value ? new Date(dateOnly ? `${value}T00:00` : value) : null;
   const isValid = parsed && !Number.isNaN(parsed.getTime());
   const [pYear, setPYear] = React.useState(isValid ? parsed.getFullYear() : now.getFullYear());
   const [pMonth, setPMonth] = React.useState(isValid ? parsed.getMonth() : now.getMonth());
   const [pDay, setPDay] = React.useState(isValid ? parsed.getDate() : now.getDate());
-  const [pTime, setPTime] = React.useState(isValid ? value.slice(11, 16) : '23:59');
+  const [pTime, setPTime] = React.useState(isValid && !dateOnly ? value.slice(11, 16) : '23:59');
 
   const openPicker = () => {
-    const d = value ? new Date(value) : null;
+    const d = value ? new Date(dateOnly ? `${value}T00:00` : value) : null;
     const v = d && !Number.isNaN(d.getTime());
     setPYear(v ? d.getFullYear() : now.getFullYear());
     setPMonth(v ? d.getMonth() : now.getMonth());
     setPDay(v ? d.getDate() : now.getDate());
-    setPTime(v ? value.slice(11, 16) : '23:59');
+    if (!dateOnly) setPTime(v ? value.slice(11, 16) : '23:59');
     setIsOpen(true);
   };
 
@@ -23217,13 +23368,15 @@ function DeadlineDateTimePicker({ value, onChange, disabled }) {
   const handleApply = () => {
     const mm = String(pMonth + 1).padStart(2, '0');
     const dd = String(pDay).padStart(2, '0');
-    onChange(`${pYear}-${mm}-${dd}T${pTime}`);
+    onChange(dateOnly ? `${pYear}-${mm}-${dd}` : `${pYear}-${mm}-${dd}T${pTime}`);
     setIsOpen(false);
   };
 
   const displayText = isValid
-    ? `${parsed.getFullYear()}.${String(parsed.getMonth() + 1).padStart(2, '0')}.${String(parsed.getDate()).padStart(2, '0')} ${value.slice(11, 16)}`
-    : '날짜/시간 선택';
+    ? dateOnly
+      ? `${parsed.getFullYear()}.${String(parsed.getMonth() + 1).padStart(2, '0')}.${String(parsed.getDate()).padStart(2, '0')}`
+      : `${parsed.getFullYear()}.${String(parsed.getMonth() + 1).padStart(2, '0')}.${String(parsed.getDate()).padStart(2, '0')} ${value.slice(11, 16)}`
+    : (placeholder || (dateOnly ? '날짜 선택' : '날짜/시간 선택'));
 
   return /*#__PURE__*/React.createElement('div', { style: { position: 'relative' } },
     /*#__PURE__*/React.createElement('button', {
@@ -23242,7 +23395,7 @@ function DeadlineDateTimePicker({ value, onChange, disabled }) {
         onClick: e => e.stopPropagation()
       },
         /*#__PURE__*/React.createElement('div', { className: 'bottom-sheet-header' },
-          /*#__PURE__*/React.createElement('h4', null, '날짜/시간 선택'),
+          /*#__PURE__*/React.createElement('h4', null, dateOnly ? '날짜 선택' : '날짜/시간 선택'),
           /*#__PURE__*/React.createElement('button', {
             type: 'button',
             style: { background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer' },
@@ -23294,7 +23447,7 @@ function DeadlineDateTimePicker({ value, onChange, disabled }) {
               }, day);
             })
           ),
-          /*#__PURE__*/React.createElement('div', { style: { marginBottom: '14px' } },
+          !dateOnly && /*#__PURE__*/React.createElement('div', { style: { marginBottom: '14px' } },
             /*#__PURE__*/React.createElement('label', { style: { fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '6px' } }, '시간'),
             /*#__PURE__*/React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
               /*#__PURE__*/React.createElement('input', {
