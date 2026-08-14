@@ -181,7 +181,7 @@ const GITHUB_PAGES_FREE_LIMITS = readConfigObject('GITHUB_PAGES_FREE_LIMITS', {
 // balloon well past this on a busy/detailed source image, so cap it and step down JPEG
 // quality instead (see compressImageToDataUrls).
 const MAX_CHAT_IMAGE_BASE64_LENGTH = readConfigNumber('MAX_CHAT_IMAGE_BASE64_LENGTH', 350000); // ~350KB
-const MAX_CHAT_THUMB_BASE64_LENGTH = readConfigNumber('MAX_CHAT_THUMB_BASE64_LENGTH', 45000); // ~45KB -- thumbnails were previously unbounded
+const MAX_CHAT_THUMB_BASE64_LENGTH = readConfigNumber('MAX_CHAT_THUMB_BASE64_LENGTH', 90000); // ~90KB -- higher-DPI thumbnails while still bounded
 // A calendar document must stay under Firestore's 1MiB/doc hard limit. Refuse a save before
 // it gets there instead of surfacing Firestore's opaque rejection at the boundary. Compared
 // against the actual Firestore wire-format size (see estimateCalendarDocWireBytes), not a
@@ -8768,12 +8768,10 @@ async function compressImageToDataUrls(file, { maxBase64Length = MAX_CHAT_IMAGE_
   const minDim = isStorageDisabled ? 320 : 480;
   const original = encodeWithinBudget(maxDim, [0.85, 0.75, 0.65, 0.55, 0.45, 0.35], budget, minDim);
 
-  // 240px @ q0.72 (up from 120px @ q0.5) -- still ~10-15x smaller than the original above, but
-  // sharp enough at the sizes thumbnails actually render at (up to ~200px CSS width for a
-  // single chat image) on a high-DPI phone screen, instead of visibly soft. Bounded the same
-  // way as the original -- previously unbounded, a detailed photo's thumbnail alone could add
-  // tens of extra KB per image to a fallback batch.
-  const thumbnail = encodeWithinBudget(240, [0.72, 0.6, 0.5, 0.4], maxThumbBase64Length, 120);
+  // 360px thumbnails keep chat/gallery previews crisp on high-DPI screens while remaining
+  // bounded. Storage normally serves the sharper 720px Blob below; this base64 thumbnail is the
+  // safe fallback when Storage upload is unavailable or still in progress.
+  const thumbnail = encodeWithinBudget(360, [0.78, 0.68, 0.58, 0.48], maxThumbBase64Length, 180);
 
   // High-quality blob for Firebase Storage (when storage is working): images already within the
   // 1920px cap upload completely untouched (100% pixel-perfect, zero compression noise) as long
@@ -8811,7 +8809,7 @@ async function compressImageToDataUrls(file, { maxBase64Length = MAX_CHAT_IMAGE_
     if (isStorageDisabled) return Promise.resolve(null);
     return new Promise(res => {
       let w = img.width, h = img.height;
-      const maxDimThumb = 480; // Raised to 480px for super sharp high-DPI thumbnails in the chat bubble list
+      const maxDimThumb = 720; // Sharper Storage thumbnails for high-DPI chat and gallery previews
       if (w > maxDimThumb || h > maxDimThumb) {
         if (w > h) { h = Math.round(h * maxDimThumb / w); w = maxDimThumb; }
         else { w = Math.round(w * maxDimThumb / h); h = maxDimThumb; }
@@ -8824,7 +8822,7 @@ async function compressImageToDataUrls(file, { maxBase64Length = MAX_CHAT_IMAGE_
       if (isPng) {
         canvas.toBlob(blob => res(blob), 'image/png');
       } else {
-        canvas.toBlob(blob => res(blob), 'image/jpeg', 0.85); // High quality JPEG thumbnail
+        canvas.toBlob(blob => res(blob), 'image/jpeg', 0.86); // High quality JPEG thumbnail
       }
     });
   };
