@@ -1,5 +1,6 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
+const crypto = require('crypto');
 const webpush = require('web-push');
 const KoreanLunarCalendar = require('korean-lunar-calendar');
 
@@ -290,5 +291,158 @@ exports.peekalinkProxy = functions.https.onRequest(async (req, res) => {
   } catch (err) {
     console.error('Peekalink proxy request failed:', err);
     res.status(502).json({ ok: false, message: 'Peekalink request failed' });
+  }
+});
+
+// --- Admin auth (listAllCalendars / adminVerifyPassword / adminChangePassword) ---
+//
+// This app has no real user accounts -- individual calendars are protected only by their ID
+// being hard to guess (a share-link model), which firestore.rules enforces by scoping every
+// read/write to a caller-supplied calendar ID. The admin dashboard's cross-calendar view broke
+// that model: it needs to enumerate EVERY calendar, and firestore.rules had `allow list: if
+// true` on the calendars collection to let it do that client-side -- which also let anyone
+// (not just an authenticated admin) list every calendar ID and read every calendar's data
+// directly via the Firestore SDK/REST API, bypassing the admin password screen entirely (that
+// screen only ever ran a hash comparison in the browser; it never gated the data itself). The
+// admin password's stored hash was in the same boat: appConfig/adminAuth allowed any
+// correctly-shaped write, so anyone could overwrite it and log in as admin with a password of
+// their choosing, with no need to know the real one.
+//
+// The fix moves both operations behind these three functions, which use the Admin SDK (always
+// bypasses firestore.rules, since only *this* server-side code can invoke it) so the client SDK
+// no longer needs (or is granted) direct list/write access to that data. firestore.rules should
+// have `list` on /calendars and `create`/`update` on appConfig/adminAuth disabled to match.
+const DEFAULT_ADMIN_PASSWORD_HASH = '32625be384ed05129315617a65f0b070e7b35a4257bdd11e0d98185c6f0cecfe'; // sha256("0602")
+
+function sha256Hex(text) {
+  return crypto.createHash('sha256').update(text, 'utf8').digest('hex');
+}
+
+async function getStoredAdminPasswordHash() {
+  const snap = await admin.firestore().collection('appConfig').doc('adminAuth').get();
+  const hash = snap.exists ? snap.data()?.passwordHash : null;
+  return typeof hash === 'string' && /^[a-f0-9]{64}$/.test(hash) ? hash : DEFAULT_ADMIN_PASSWORD_HASH;
+}
+
+// Simple per-IP lockout so the (short, PIN-style) admin password can't be brute-forced online --
+// this doc lives outside anything the client SDK can reach (no matching firestore.rules entry,
+// so the default-deny catch-all applies), and is only ever touched by this Admin-SDK code.
+const ADMIN_AUTH_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
+const ADMIN_AUTH_RATE_LIMIT_MAX_FAILURES = 10;
+
+async function checkAdminAuthRateLimit(ip) {
+  const docId = String(ip || 'unknown').replace(/[^a-zA-Z0-9.:_-]/g, '_').slice(0, 200) || 'unknown';
+  const ref = admin.firestore().collection('adminAuthAttempts').doc(docId);
+  const snap = await ref.get();
+  const now = Date.now();
+  const data = snap.exists ? snap.data() : null;
+  const withinWindow = data && data.windowStart && (now - data.windowStart) < ADMIN_AUTH_RATE_LIMIT_WINDOW_MS;
+  if (withinWindow && (data.failCount || 0) >= ADMIN_AUTH_RATE_LIMIT_MAX_FAILURES) {
+    return { blocked: true, ref, windowStart: data.windowStart, failCount: data.failCount };
+  }
+  return { blocked: false, ref, windowStart: withinWindow ? data.windowStart : now, failCount: withinWindow ? (data.failCount || 0) : 0 };
+}
+
+async function recordAdminAuthResult(rateState, success) {
+  if (success) {
+    await rateState.ref.delete().catch(() => {});
+    return;
+  }
+  await rateState.ref.set({ failCount: rateState.failCount + 1, windowStart: rateState.windowStart }).catch(() => {});
+}
+
+function setAdminCorsHeaders(res) {
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.set('Access-Control-Allow-Headers', 'Content-Type');
+}
+
+// Verifies a submitted password against the stored admin hash, without returning any calendar
+// data -- used by the login screen itself (see AdminLoginGate in index.html), separately from
+// listAllCalendars below so the login check stays cheap even when the dashboard doesn't need
+// a full data reload (e.g. re-validating an existing session).
+exports.adminVerifyPassword = functions.https.onRequest(async (req, res) => {
+  setAdminCorsHeaders(res);
+  if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
+  if (req.method !== 'POST') { res.status(405).json({ ok: false, message: 'Method not allowed' }); return; }
+  const password = req.body && req.body.password;
+  if (!password || typeof password !== 'string') { res.status(400).json({ ok: false, message: 'password is required' }); return; }
+
+  const rateState = await checkAdminAuthRateLimit(req.ip);
+  if (rateState.blocked) { res.status(429).json({ ok: false, message: '너무 많은 시도가 있었습니다. 잠시 후 다시 시도해 주세요.' }); return; }
+
+  const [storedHash] = await Promise.all([getStoredAdminPasswordHash()]);
+  const matches = sha256Hex(password.trim()) === storedHash;
+  await recordAdminAuthResult(rateState, matches);
+  if (!matches) { res.status(401).json({ ok: false, message: '비밀번호가 올바르지 않습니다.' }); return; }
+  res.status(200).json({ ok: true });
+});
+
+// Returns every calendar's document (the admin dashboard's cross-calendar view) after verifying
+// the submitted password server-side -- the only place this data leaves the server now that
+// /calendars no longer allows a client-side `list`.
+exports.listAllCalendars = functions.https.onRequest(async (req, res) => {
+  setAdminCorsHeaders(res);
+  if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
+  if (req.method !== 'POST') { res.status(405).json({ ok: false, message: 'Method not allowed' }); return; }
+  const password = req.body && req.body.password;
+  if (!password || typeof password !== 'string') { res.status(400).json({ ok: false, message: 'password is required' }); return; }
+
+  const rateState = await checkAdminAuthRateLimit(req.ip);
+  if (rateState.blocked) { res.status(429).json({ ok: false, message: '너무 많은 시도가 있었습니다. 잠시 후 다시 시도해 주세요.' }); return; }
+
+  const storedHash = await getStoredAdminPasswordHash();
+  const matches = sha256Hex(password.trim()) === storedHash;
+  await recordAdminAuthResult(rateState, matches);
+  if (!matches) { res.status(401).json({ ok: false, message: '비밀번호가 올바르지 않습니다.' }); return; }
+
+  try {
+    const snap = await admin.firestore().collection('calendars').get();
+    const calendars = [];
+    let lastModified = 0;
+    snap.forEach(doc => {
+      const data = doc.data();
+      if (data?.calendar?.id) {
+        calendars.push(data.calendar);
+        lastModified = Math.max(lastModified, data.lastModified || 0);
+      }
+    });
+    res.status(200).json({ ok: true, calendars, lastModified });
+  } catch (err) {
+    console.error('listAllCalendars failed:', err);
+    res.status(500).json({ ok: false, message: '캘린더 목록을 불러오지 못했습니다.' });
+  }
+});
+
+// Changes the admin password after verifying the current one server-side -- appConfig/adminAuth
+// no longer accepts a direct client write, so this is the only way to change it now.
+exports.adminChangePassword = functions.https.onRequest(async (req, res) => {
+  setAdminCorsHeaders(res);
+  if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
+  if (req.method !== 'POST') { res.status(405).json({ ok: false, message: 'Method not allowed' }); return; }
+  const { oldPassword, newPasswordHash } = req.body || {};
+  if (!oldPassword || typeof oldPassword !== 'string') { res.status(400).json({ ok: false, message: 'oldPassword is required' }); return; }
+  if (!newPasswordHash || typeof newPasswordHash !== 'string' || !/^[a-f0-9]{64}$/.test(newPasswordHash)) {
+    res.status(400).json({ ok: false, message: 'newPasswordHash must be a sha256 hex digest' });
+    return;
+  }
+
+  const rateState = await checkAdminAuthRateLimit(req.ip);
+  if (rateState.blocked) { res.status(429).json({ ok: false, message: '너무 많은 시도가 있었습니다. 잠시 후 다시 시도해 주세요.' }); return; }
+
+  const storedHash = await getStoredAdminPasswordHash();
+  const matches = sha256Hex(oldPassword.trim()) === storedHash;
+  await recordAdminAuthResult(rateState, matches);
+  if (!matches) { res.status(401).json({ ok: false, message: '현재 비밀번호가 올바르지 않습니다.' }); return; }
+
+  try {
+    await admin.firestore().collection('appConfig').doc('adminAuth').set({
+      passwordHash: newPasswordHash,
+      updatedAt: Date.now()
+    });
+    res.status(200).json({ ok: true });
+  } catch (err) {
+    console.error('adminChangePassword failed:', err);
+    res.status(500).json({ ok: false, message: '비밀번호 변경에 실패했습니다.' });
   }
 });

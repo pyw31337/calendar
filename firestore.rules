@@ -40,8 +40,14 @@ service cloud.firestore {
     }
 
     match /calendars/{calendarDocId} {
+      // get (a specific, already-known ID) matches this app's share-link trust model; list does
+      // not -- it would let anyone enumerate every calendar's ID (and, if it can be requested
+      // with sub-collections, their content) without ever being given a link, which defeats
+      // that model entirely. The admin dashboard's cross-calendar view used to rely on this
+      // being open; it now goes through the listAllCalendars Cloud Function instead, which
+      // checks the admin password server-side before returning anything (see functions/index.js).
       allow get: if isCalendarDoc(calendarDocId);
-      allow list: if true;
+      allow list: if false;
       allow create, update: if isCalendarDoc(calendarDocId)
         && hasValidCalendarShell(calendarDocId)
         && hasValidRevision(calendarDocId);
@@ -163,17 +169,16 @@ service cloud.firestore {
       }
     }
 
-    // Stores the hashed admin-dashboard password (see index.html AdminLoginGate).
-    // This is a UI-level deterrent, not real auth: like every other write in this
-    // project, it is only validated by shape, not by who the caller is.
+    // Stores the hashed admin-dashboard password. Used to be readable/writable by shape only
+    // (see index.html AdminLoginGate) -- any client could overwrite passwordHash with one of
+    // their own choosing and log in as admin, no actual password needed. It's now managed
+    // entirely by the adminVerifyPassword/listAllCalendars/adminChangePassword Cloud Functions
+    // (functions/index.js), which use the Admin SDK and so don't need this doc open to clients
+    // at all; the login screen and password-change form both call those functions instead of
+    // touching this document directly.
     match /appConfig/adminAuth {
-      allow get: if true;
-      allow list: if false;
-      allow create, update: if request.resource.data.keys().hasOnly(['passwordHash', 'updatedAt'])
-        && request.resource.data.passwordHash is string
-        && request.resource.data.passwordHash.matches('^[a-f0-9]{64}$')
-        && request.resource.data.updatedAt is number;
-      allow delete: if false;
+      allow get, list: if false;
+      allow create, update, delete: if false;
     }
 
     // Image sharing for /calendar/?image={id}. Two document shapes are written by the client

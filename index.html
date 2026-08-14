@@ -190,12 +190,14 @@ const MAX_CHAT_THUMB_BASE64_LENGTH = readConfigNumber('MAX_CHAT_THUMB_BASE64_LEN
 // plain JSON length against the raw 1,048,576 byte limit would under-count by a wide margin.
 const CALENDAR_DOC_SAFE_BYTE_LIMIT = readConfigNumber('CALENDAR_DOC_SAFE_BYTE_LIMIT', 900000); // ~900KB of estimated wire size, ~150KB headroom
 
-// Admin dashboard password gate. This is a lightweight deterrent, not real
-// server-side auth: the site is static and Firestore writes are already open
-// to anyone matching the schema, so a determined visitor can still bypass it.
+// Admin dashboard password gate. Verification and the cross-calendar data it unlocks both go
+// through Cloud Functions (adminVerifyPassword / listAllCalendars / adminChangePassword in
+// functions/index.js) which check the password server-side via the Admin SDK -- Firestore
+// itself no longer grants the client SDK direct list/write access to this data (see
+// firestore.rules), so a browser can't get either the calendar list or a way to change the
+// admin password without actually passing that check.
 const ADMIN_SESSION_STORAGE_KEY = typeof GATHER_APP_CONFIG.ADMIN_SESSION_STORAGE_KEY === 'string' ? GATHER_APP_CONFIG.ADMIN_SESSION_STORAGE_KEY : 'gather_admin_session_v1';
 const ADMIN_SESSION_MAX_AGE_MS = readConfigNumber('ADMIN_SESSION_MAX_AGE_MS', 24 * 60 * 60 * 1000); // Re-authenticate at least once a day.
-const DEFAULT_ADMIN_PASSWORD_HASH = typeof GATHER_APP_CONFIG.DEFAULT_ADMIN_PASSWORD_HASH === 'string' ? GATHER_APP_CONFIG.DEFAULT_ADMIN_PASSWORD_HASH : '32625be384ed05129315617a65f0b070e7b35a4257bdd11e0d98185c6f0cecfe'; // sha256("0602")
 
 async function sha256Hex(text) {
   const encoded = new TextEncoder().encode(text);
@@ -203,12 +205,17 @@ async function sha256Hex(text) {
   return Array.from(new Uint8Array(digest)).map(byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
+// The session also carries the plaintext password (sessionStorage only -- gone once the tab
+// closes) so an already-unlocked tab can call listAllCalendars/adminChangePassword again later
+// (e.g. a manual refresh, or an actual password change) without re-prompting. A session created
+// before this existed has no `password` field and is treated as invalid by getAdminSession, so
+// it falls back to the login screen instead of failing later Cloud Function calls silently.
 function getAdminSession() {
   try {
     const raw = sessionStorage.getItem(ADMIN_SESSION_STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed.authenticatedAt !== 'number') return null;
+    if (!parsed || typeof parsed.authenticatedAt !== 'number' || typeof parsed.password !== 'string') return null;
     if (Date.now() - parsed.authenticatedAt > ADMIN_SESSION_MAX_AGE_MS) return null;
     return parsed;
   } catch (e) {
@@ -216,9 +223,9 @@ function getAdminSession() {
   }
 }
 
-function setAdminSession() {
+function setAdminSession(password) {
   try {
-    sessionStorage.setItem(ADMIN_SESSION_STORAGE_KEY, JSON.stringify({ authenticatedAt: Date.now() }));
+    sessionStorage.setItem(ADMIN_SESSION_STORAGE_KEY, JSON.stringify({ authenticatedAt: Date.now(), password }));
   } catch (e) {
     console.warn('Unable to persist admin session:', e);
   }
@@ -232,52 +239,35 @@ function clearAdminSession() {
   }
 }
 
-// Reads the current admin password hash from Firestore, falling back to the
-// hardcoded default when no custom password has been set yet (or the
-// document/rules haven't been deployed yet).
-async function fetchAdminPasswordHash() {
+async function callAdminFunction(name, body) {
+  const res = await fetch(`https://us-central1-${firebaseConfig.projectId}.cloudfunctions.net/${name}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  let json = null;
   try {
-    if (firebaseDb) {
-      const snap = await firebaseDb.collection('appConfig').doc('adminAuth').get();
-      const hash = snap.exists ? snap.data()?.passwordHash : null;
-      if (hash) return hash;
-      return DEFAULT_ADMIN_PASSWORD_HASH;
-    }
+    json = await res.json();
   } catch (e) {
-    console.warn('Admin password fetch (SDK) failed, trying REST:', e);
+    // Non-JSON error body (e.g. a 429/500 from Cloud Functions infra itself) -- fall through
+    // to the generic message below rather than throwing on the parse failure.
   }
-  try {
-    const res = await fetch(`https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/appConfig/adminAuth`);
-    if (res.ok) {
-      const doc = await res.json();
-      const hash = doc?.fields?.passwordHash?.stringValue;
-      if (hash) return hash;
-    }
-  } catch (e) {
-    console.warn('Admin password fetch (REST) failed:', e);
-  }
-  return DEFAULT_ADMIN_PASSWORD_HASH;
+  if (!res.ok) throw new Error(json?.message || `요청이 실패했습니다 (${res.status})`);
+  return json;
 }
 
-async function setAdminPasswordHash(newHash) {
-  if (firebaseDb) {
-    await firebaseDb.collection('appConfig').doc('adminAuth').set({
-      passwordHash: newHash,
-      updatedAt: Date.now()
-    });
-    return true;
-  }
-  const res = await fetch(`https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/appConfig/adminAuth`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      fields: {
-        passwordHash: { stringValue: newHash },
-        updatedAt: { integerValue: String(Date.now()) }
-      }
-    })
-  });
-  return res.ok;
+async function verifyAdminPasswordRemote(password) {
+  const result = await callAdminFunction('adminVerifyPassword', { password });
+  return !!result?.ok;
+}
+
+async function listAllCalendarsRemote(password) {
+  const result = await callAdminFunction('listAllCalendars', { password });
+  return { calendars: result?.calendars || [], lastModified: result?.lastModified || 0 };
+}
+
+async function changeAdminPasswordRemote(oldPassword, newPasswordHash) {
+  await callAdminFunction('adminChangePassword', { oldPassword, newPasswordHash });
 }
 
 // Copies text to the clipboard, falling back to the legacy execCommand approach when the
@@ -2488,23 +2478,6 @@ function createDefaultCalendar(id) {
 	  };
 	}
 
-async function fetchAllServerCalendars() {
-  if (firebaseDb) {
-    const snap = await firebaseDb.collection('calendars').get();
-    const calendars = [];
-    let lastModified = 0;
-    snap.forEach(doc => {
-      const data = doc.data();
-      if (data?.calendar?.id) {
-        calendars.push(data.calendar);
-        lastModified = Math.max(lastModified, data.lastModified || 0);
-      }
-    });
-    return { calendars, lastModified };
-  }
-  throw new Error('Firebase 연결이 없어 캘린더 데이터를 불러올 수 없습니다.');
-}
-
 function getMonthKey(dateStr) {
   return isValidDateString(dateStr) ? dateStr.slice(0, 7) : 'unknown';
 }
@@ -3062,30 +3035,32 @@ function AdminDashboard({ initialCalendars }) {
     }
     setIsPwSubmitting(true);
     try {
-      const [currentHash, storedHash] = await Promise.all([sha256Hex(currentPwInput.trim()), fetchAdminPasswordHash()]);
-      if (currentHash !== storedHash) {
-        setPwError('현재 비밀번호가 올바르지 않습니다.');
-        return;
-      }
       const newHash = await sha256Hex(newPwInput.trim());
-      const ok = await setAdminPasswordHash(newHash);
-      if (!ok) {
-        setPwError('비밀번호 저장에 실패했습니다. firestore.rules가 배포되었는지 확인해 주세요.');
-        return;
-      }
-      setAdminSession();
+      const trimmedCurrent = currentPwInput.trim();
+      await changeAdminPasswordRemote(trimmedCurrent, newHash);
+      // The session's cached password (see getAdminSession) is what listAllCalendarsRemote
+      // sends on every later call -- it has to be updated to the new one now, or the very next
+      // dashboard refresh sends the now-stale old password and gets rejected.
+      setAdminSession(newPwInput.trim());
       setIsChangePwOpen(false);
       resetChangePwForm();
       showAdminToast('비밀번호 변경완료', 'success');
     } catch (err) {
       console.warn('Admin password change failed:', err);
-      setPwError('비밀번호 변경 중 오류가 발생했습니다. firestore.rules 배포 여부를 확인해 주세요.');
+      setPwError(err?.message || '비밀번호 변경 중 오류가 발생했습니다.');
     } finally {
       setIsPwSubmitting(false);
     }
   };
 
-  // 1. Live Snapshot Listener for serverCalendars (Firestore)
+  // 1. Cross-calendar list, via listAllCalendars (Cloud Function) instead of a direct Firestore
+  // listener -- /calendars no longer grants the client SDK `list` (see firestore.rules), so this
+  // is now the only way to get every calendar's data, and it requires the admin password the
+  // session was unlocked with. Not a live listener anymore, so it's polled on an interval to
+  // approximate the old real-time behavior, plus refreshTick lets callers (e.g. a manual
+  // refresh action) force an immediate re-fetch.
+  const [refreshTick, setRefreshTick] = React.useState(0);
+  const refreshServerCalendars = () => setRefreshTick(tick => tick + 1);
   React.useEffect(() => {
     let isMounted = true;
     const applyResult = (calendars) => {
@@ -3095,28 +3070,28 @@ function AdminDashboard({ initialCalendars }) {
       setError('');
     };
 
-    if (firebaseDb) {
-      const unsubscribe = firebaseDb.collection('calendars').onSnapshot(snapshot => {
-        const calendars = [];
-        snapshot.forEach(doc => {
-          const data = doc.data();
-          if (data?.calendar?.id) calendars.push(data.calendar);
-        });
-        applyResult(calendars);
-      }, err => {
-        if (isMounted) setError(err.message || '대시보드 데이터를 불러오지 못했습니다.');
-      });
+    const session = getAdminSession();
+    if (!session) {
+      setError('관리자 세션이 만료되었습니다. 다시 로그인해 주세요.');
       return () => {
         isMounted = false;
-        unsubscribe();
       };
     }
 
-    setError('Firebase 연결이 없어 대시보드 데이터를 불러올 수 없습니다.');
+    const load = () => {
+      listAllCalendarsRemote(session.password)
+        .then(({ calendars }) => applyResult(calendars))
+        .catch(err => {
+          if (isMounted) setError(err.message || '대시보드 데이터를 불러오지 못했습니다.');
+        });
+    };
+    load();
+    const intervalId = setInterval(load, 60000);
     return () => {
       isMounted = false;
+      clearInterval(intervalId);
     };
-  }, []);
+  }, [refreshTick]);
 
   const calendarsList = React.useMemo(() => serverCalendars
     .filter(cal => cal && !isInternalTestCalendarId(cal.id))
@@ -4069,6 +4044,21 @@ function AdminDashboard({ initialCalendars }) {
             className: "admin-side-menu-item",
             onClick: () => {
               setIsAdminMenuOpen(false);
+              refreshServerCalendars();
+              showAdminToast('새로고침 중...', 'success', 1500);
+            }
+          },
+            /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement(RefreshIcon, null)),
+            /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
+              /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "새로고침"),
+              /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, `마지막 업데이트: ${adminUpdatedText}`)
+            )
+          ),
+          /*#__PURE__*/React.createElement("button", {
+            type: "button",
+            className: "admin-side-menu-item",
+            onClick: () => {
+              setIsAdminMenuOpen(false);
               resetChangePwForm();
               setIsChangePwOpen(true);
             }
@@ -4978,9 +4968,9 @@ function AdminLoginGate({ children }) {
     setIsSubmitting(true);
     setError('');
     try {
-      const [inputHash, storedHash] = await Promise.all([sha256Hex(trimmed), fetchAdminPasswordHash()]);
-      if (inputHash === storedHash) {
-        setAdminSession();
+      const ok = await verifyAdminPasswordRemote(trimmed);
+      if (ok) {
+        setAdminSession(trimmed);
         setPasswordInput('');
         setStatus('unlocked');
       } else {
@@ -4988,7 +4978,7 @@ function AdminLoginGate({ children }) {
       }
     } catch (err) {
       console.warn('Admin auth check failed:', err);
-      setError('인증 확인 중 오류가 발생했습니다. 다시 시도해 주세요.');
+      setError(err?.message || '인증 확인 중 오류가 발생했습니다. 다시 시도해 주세요.');
     } finally {
       setIsSubmitting(false);
     }
@@ -12739,9 +12729,14 @@ function ConfirmDialog({ title, message, onConfirm, onCancel, showPasswordInput 
         setErrorMsg('비밀번호를 입력하세요.');
         return;
       }
-      const hashed = await sha256Hex(password);
-      const correctHash = await fetchAdminPasswordHash();
-      if (hashed !== correctHash) {
+      let ok;
+      try {
+        ok = await verifyAdminPasswordRemote(password);
+      } catch (err) {
+        setErrorMsg(err?.message || '비밀번호 확인 중 오류가 발생했습니다.');
+        return;
+      }
+      if (!ok) {
         setErrorMsg('비밀번호가 일치하지 않습니다.');
         return;
       }
@@ -20298,27 +20293,6 @@ function CalendarCheckIcon() {
   }));
 }
 
-function BoltIcon() {
-  return /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg",
-    width: "20",
-    height: "20",
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
-    className: "icon icon-tabler icons-tabler-outline icon-tabler-bolt"
-  }, /*#__PURE__*/React.createElement("path", {
-    stroke: "none",
-    d: "M0 0h24v24H0z",
-    fill: "none"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M13 3l0 7l6 0l-8 11l0 -7l-6 0l8 -11"
-  }));
-}
-
 function LockIcon() {
   return /*#__PURE__*/React.createElement("svg", {
     xmlns: "http://www.w3.org/2000/svg",
@@ -20366,6 +20340,29 @@ function LogoutIcon() {
     d: "M9 12h12l-3 -3"
   }), /*#__PURE__*/React.createElement("path", {
     d: "M18 15l3 -3"
+  }));
+}
+
+function RefreshIcon() {
+  return /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: "20",
+    height: "20",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    "stroke-width": "2",
+    "stroke-linecap": "round",
+    "stroke-linejoin": "round",
+    className: "icon icon-tabler icons-tabler-outline icon-tabler-refresh"
+  }, /*#__PURE__*/React.createElement("path", {
+    stroke: "none",
+    d: "M0 0h24v24H0z",
+    fill: "none"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4"
   }));
 }
 
