@@ -106,7 +106,7 @@ function createShareHtml(calendar, { title, description, calendarUrl, shareUrl, 
 
 function createCalendarShareHtml(calendar) {
   return createShareHtml(calendar, {
-    title: `${calendar.title} - 모여라 캘린더`,
+    title: `${calendar.title} 캘린더`,
     description: calendar.description || FALLBACK_DESCRIPTION,
     calendarUrl: `${BASE_URL}/?id=${encodeURIComponent(calendar.id)}`,
     shareUrl: `${BASE_URL}/share/${encodeURIComponent(calendar.id)}/`
@@ -115,7 +115,7 @@ function createCalendarShareHtml(calendar) {
 
 function createChatShareHtml(calendar) {
   return createShareHtml(calendar, {
-    title: `${calendar.title} 채팅방 - 모여라 캘린더`,
+    title: `${calendar.title} 채팅방`,
     description: `${calendar.title} 채팅방에서 대화를 확인해보세요.`,
     calendarUrl: `${BASE_URL}/?id=${encodeURIComponent(calendar.id)}&view=chat`,
     shareUrl: `${BASE_URL}/share/${encodeURIComponent(calendar.id)}/chat/`,
