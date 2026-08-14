@@ -270,8 +270,9 @@ runAppScript(productionContext, `
   if (vimeoInfo?.type !== 'embed' || vimeoInfo.provider !== 'vimeo' || !vimeoInfo.url.includes('/video/123456789')) {
     throw new Error('vimeo chat embed detection failed');
   }
-  if (getDirectChatMediaInfo('https://www.tiktok.com/@user/video/7521234567890123456') !== null) {
-    throw new Error('tiktok URL should stay on link-preview path because its iframe can return overload-protect');
+  const tiktokInfo = getDirectChatMediaInfo('https://www.tiktok.com/@user/video/7521234567890123456');
+  if (tiktokInfo?.type !== 'tiktok-widget' || tiktokInfo.videoId !== '7521234567890123456') {
+    throw new Error('tiktok URL should resolve to a tiktok-widget with the video id extracted');
   }
   if (getDirectChatMediaInfo('https://blog.naver.com/choochoo440/224199076337') !== null) {
     throw new Error('normal page URL must not be treated as direct chat media');
