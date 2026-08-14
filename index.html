@@ -101,7 +101,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
 
-  <link rel="stylesheet" href="assets/app.css?v=20260814-split16">
+  <link rel="stylesheet" href="assets/app.css?v=20260814-split17">
 </head>
 <body>
   <div id="root">
@@ -21173,7 +21173,6 @@ function PollList({ calendar, onCreatePoll, onEditPoll, onVotePoll, onCancelVote
   }, "\uC544\uC9C1 \uC0DD\uC131\uB41C \uD22C\uD45C\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.") : /*#__PURE__*/React.createElement("div", {
     className: "polls-section"
   }, polls.map(poll => {
-    const totalVotes = getPollTotalVoteCount(poll);
     const isOptionsVisible = !isCollapsed || !!openPollIds[poll.id];
     const closed = isPollClosed(poll);
     // Winning option(s) for a closed poll -- ties mark every tied option, and a poll nobody
@@ -21265,7 +21264,11 @@ function PollList({ calendar, onCreatePoll, onEditPoll, onVotePoll, onCancelVote
     }, visibleOptions.map((option, index) => {
       const voterIds = getPollOptionVoterIds(poll, option.id).filter(participantId => participantsMap[participantId]);
       const voteCount = voterIds.length;
-      const percent = totalVotes > 0 ? Math.round(voteCount / totalVotes * 100) : 0;
+      // Bar fill is voteCount relative to the full participant roster (not relative to the
+      // sum of votes across every option), so an option every active participant voted for
+      // reads as a fully-filled 100% bar even on a multi-select poll where the total vote
+      // count across options can exceed the roster size.
+      const percent = participants.length > 0 ? Math.min(100, Math.round(voteCount / participants.length * 100)) : 0;
       const isWinner = winningOptionIds.has(option.id);
       return /*#__PURE__*/React.createElement("div", {
         key: option.id,
@@ -22397,41 +22400,58 @@ function ImageShareViewer({ shareId }) {
   ));
 }
 
+function CctvIcon({ size = 14 }) {
+  return /*#__PURE__*/React.createElement('svg', {
+    xmlns: 'http://www.w3.org/2000/svg', width: size, height: size, viewBox: '0 0 24 24',
+    fill: 'none', stroke: 'currentColor', strokeWidth: '2', strokeLinecap: 'round', strokeLinejoin: 'round'
+  },
+    /*#__PURE__*/React.createElement('path', { d: 'M16.75 12h3.632a1 1 0 0 1 .894 1.447l-2.034 4.069a1 1 0 0 1-1.708.134l-2.124-2.97' }),
+    /*#__PURE__*/React.createElement('path', { d: 'M17.106 9.053a1 1 0 0 1 .447 1.341l-3.106 6.211a1 1 0 0 1-1.342.447L3.61 12.3a2.92 2.92 0 0 1-1.3-3.91L3.69 5.6a2.92 2.92 0 0 1 3.92-1.3z' }),
+    /*#__PURE__*/React.createElement('path', { d: 'M2 19h3.76a2 2 0 0 0 1.8-1.1L9 15' }),
+    /*#__PURE__*/React.createElement('path', { d: 'M2 21v-4' }),
+    /*#__PURE__*/React.createElement('path', { d: 'M7 9h.01' })
+  );
+}
+function DicesIcon({ size = 14 }) {
+  return /*#__PURE__*/React.createElement('svg', {
+    xmlns: 'http://www.w3.org/2000/svg', width: size, height: size, viewBox: '0 0 24 24',
+    fill: 'none', stroke: 'currentColor', strokeWidth: '2', strokeLinecap: 'round', strokeLinejoin: 'round'
+  },
+    /*#__PURE__*/React.createElement('rect', { width: '12', height: '12', x: '2', y: '10', rx: '2', ry: '2' }),
+    /*#__PURE__*/React.createElement('path', { d: 'm17.92 14 3.5-3.5a2.24 2.24 0 0 0 0-3l-5-4.92a2.24 2.24 0 0 0-3 0L10 6' }),
+    /*#__PURE__*/React.createElement('path', { d: 'M6 18h.01' }),
+    /*#__PURE__*/React.createElement('path', { d: 'M10 14h.01' }),
+    /*#__PURE__*/React.createElement('path', { d: 'M15 6h.01' }),
+    /*#__PURE__*/React.createElement('path', { d: 'M18 9h.01' })
+  );
+}
 // Shown only on the main calendar screen (freely-scrolling home page) -- chat/memo/settlement
 // are fixed-viewport app-style screens with an input bar pinned to the bottom, where a footer
 // would overlap or crowd that input, so this is intentionally not rendered there.
 const FOOTER_FAMILY_LINKS = [
-  { label: '밖에 눈오나', url: 'https://pyw31337.github.io/cctv/' },
-  { label: 'Culture Flow', url: 'https://pyw31337.github.io/culture/' }
+  { label: '밖에 눈오나', url: 'https://pyw31337.github.io/cctv/', Icon: CctvIcon },
+  { label: 'Culture Flow', url: 'https://pyw31337.github.io/culture/', Icon: DicesIcon }
 ];
+// .app-footer / .app-footer-family switch flex-direction at the 768px breakpoint (see app.css):
+// stacked+centered (copyright, then FAMILY LINK label, then buttons -- 3 lines) on mobile,
+// a single space-between row (copyright left, "FAMILY LINK" + buttons grouped at the right
+// edge) on desktop. Natural DOM order (copyright, then the label+links group) is what makes
+// both layouts fall out of the same markup with just a flex-direction flip.
 function Footer() {
-  return /*#__PURE__*/React.createElement('footer', {
-    style: {
-      marginTop: '32px',
-      padding: '22px 20px 28px',
-      borderTop: '1px solid var(--border-subtle)',
-      textAlign: 'center'
-    }
-  },
-    /*#__PURE__*/React.createElement('div', {
-      style: { fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.04em', marginBottom: '10px' }
-    }, 'FAMILY LINK'),
-    /*#__PURE__*/React.createElement('div', {
-      style: { display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '8px', marginBottom: '16px' }
-    }, FOOTER_FAMILY_LINKS.map(link => /*#__PURE__*/React.createElement('a', {
-      key: link.url,
-      href: link.url,
-      target: '_blank',
-      rel: 'noopener noreferrer',
-      style: {
-        fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-main)',
-        padding: '6px 14px', borderRadius: '16px', border: '1px solid var(--border-subtle)',
-        backgroundColor: 'var(--bg-secondary)', textDecoration: 'none'
-      }
-    }, link.label))),
-    /*#__PURE__*/React.createElement('p', {
-      style: { fontSize: '0.7rem', color: 'var(--text-muted)', margin: 0 }
-    }, 'Copyright © 2026 모여라 캘린더. All Rights Reserved.')
+  return /*#__PURE__*/React.createElement('footer', { className: 'app-footer' },
+    /*#__PURE__*/React.createElement('p', { className: 'app-footer-copyright' }, 'Copyright © 2026 모여라 캘린더. All Rights Reserved.'),
+    /*#__PURE__*/React.createElement('div', { className: 'app-footer-family' },
+      /*#__PURE__*/React.createElement('span', { className: 'app-footer-family-label' }, 'FAMILY LINK'),
+      /*#__PURE__*/React.createElement('div', { className: 'app-footer-family-links' },
+        FOOTER_FAMILY_LINKS.map(link => /*#__PURE__*/React.createElement('a', {
+          key: link.url,
+          href: link.url,
+          target: '_blank',
+          rel: 'noopener noreferrer',
+          className: 'app-footer-link'
+        }, /*#__PURE__*/React.createElement(link.Icon, { size: 14 }), link.label))
+      )
+    )
   );
 }
 
