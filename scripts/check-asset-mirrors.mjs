@@ -73,6 +73,7 @@ if (inlineAppIndex <= previousIndex) {
 const staleInitialCalendarMarkers = [
   'CW_DEFAULT_CALENDAR',
   'KKOT_DEFAULT_CALENDAR',
+  'gather_calendars_persistent',
   '8월 여름휴가 친목 모임',
   '친구들과 함께 떠나는 여름 휴가',
   '김민준',
