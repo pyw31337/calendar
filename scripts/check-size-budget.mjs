@@ -3,8 +3,8 @@ import { statSync } from 'node:fs';
 const SIZE_BUDGETS = [
   {
     path: 'index.html',
-    maxBytes: 1_050_000,
-    reason: 'Keep the live app shell from regrowing into a fragile single-file bundle.'
+    maxBytes: 1_150_000,
+    reason: 'Keep the live app shell from regrowing into a fragile single-file bundle. Raised from 1,050,000 to fit the 장소(Places) map feature.'
   }
 ];
 

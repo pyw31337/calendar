@@ -149,6 +149,81 @@ const getExpenseCategory = GATHER_APP_UTILS.getExpenseCategory;
 const getExpenseCategoryIcon = GATHER_APP_UTILS.getExpenseCategoryIcon;
 const getExpenseCategoryLabel = GATHER_APP_UTILS.getExpenseCategoryLabel;
 const extractExpenseTimePrefix = GATHER_APP_UTILS.extractExpenseTimePrefix;
+
+// 장소(Places) categories -- same { id, name, color } shape and normalize/lookup pattern as
+// expense categories above, kept as its own set since a place's category (식당/카페/...) is a
+// different taxonomy than an expense's.
+const DEFAULT_PLACE_CATEGORIES = [
+  { id: 'restaurant', name: '식당', color: '#F97316' },
+  { id: 'cafe', name: '카페', color: '#8B5CF6' },
+  { id: 'play', name: '놀이', color: '#3B82F6' },
+  { id: 'lodging', name: '숙박', color: '#10B981' },
+  { id: 'etc', name: '기타', color: '#64748B' }
+];
+const PLACE_CATEGORY_ICONS = { restaurant: '🍽️', cafe: '☕', play: '🎡', lodging: '🏨', etc: '📍' };
+function normalizePlaceCategories(categories) {
+  const defaultCategories = DEFAULT_PLACE_CATEGORIES;
+  const source = Array.isArray(categories) && categories.length ? categories : defaultCategories;
+  const seen = new Set();
+  const normalized = source.map((category, index) => {
+    const fallback = defaultCategories[index % defaultCategories.length];
+    const rawId = sanitizeText(category?.id || category?.name || fallback.id, 40).toLowerCase().replace(/[^a-z0-9가-힣_-]/g, '') || fallback.id;
+    const id = seen.has(rawId) ? `${rawId}_${index}` : rawId;
+    seen.add(id);
+    return {
+      id,
+      name: sanitizeText(category?.name || fallback.name, 24) || fallback.name,
+      color: normalizeColorValue(category?.color, fallback.color)
+    };
+  }).filter(category => category.name);
+  return normalized.length ? normalized : defaultCategories;
+}
+function getPlaceCategories(calendar) {
+  return normalizePlaceCategories(calendar?.placeCategories);
+}
+function getPlaceCategory(calendar, categoryId) {
+  const categories = getPlaceCategories(calendar);
+  return categories.find(category => category.id === categoryId) || categories.find(category => category.id === 'etc') || DEFAULT_PLACE_CATEGORIES[DEFAULT_PLACE_CATEGORIES.length - 1];
+}
+function getPlaceCategoryIcon(category) {
+  if (!category) return PLACE_CATEGORY_ICONS.etc;
+  const name = String(category.name || '');
+  const hasEmoji = /[\uD800-\uDBFF][\uDC00-\uDFFF]/.test(name) || /\p{Emoji_Presentation}/u.test(name);
+  if (hasEmoji) return '';
+  const id = String(category.id || '').toLowerCase();
+  if (PLACE_CATEGORY_ICONS[id]) return PLACE_CATEGORY_ICONS[id];
+  const matchedDefault = DEFAULT_PLACE_CATEGORIES.find(item => item.name === name);
+  return matchedDefault ? PLACE_CATEGORY_ICONS[matchedDefault.id] : PLACE_CATEGORY_ICONS.etc;
+}
+function getPlaceCategoryLabel(category) {
+  const name = sanitizeText(category?.name || '기타', 24) || '기타';
+  const icon = getPlaceCategoryIcon(category);
+  return icon ? `${icon}  ${name}` : name;
+}
+
+// A calendar's registered places: { id, name, address, lat, lng, categoryId, memo, createdAt,
+// updatedAt }. lat/lng is the only thing the map actually needs -- name/address exist so a pin
+// found via 업체명 검색(Nominatim) still shows something meaningful, but a place can also be
+// dropped by raw coordinates with no name/address at all.
+function normalizePlaces(places) {
+  return (Array.isArray(places) ? places : [])
+    .filter(place => place && Number.isFinite(Number(place.lat)) && Number.isFinite(Number(place.lng)))
+    .map(place => ({
+      id: sanitizeText(place.id || '', 80) || `place_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      name: sanitizeText(place.name || '', 80),
+      address: sanitizeText(place.address || '', 200),
+      lat: Number(place.lat),
+      lng: Number(place.lng),
+      categoryId: sanitizeText(place.categoryId || 'etc', 40),
+      memo: sanitizeText(place.memo || '', 300),
+      createdAt: Number(place.createdAt) || Date.now(),
+      updatedAt: Number(place.updatedAt) || Number(place.createdAt) || Date.now()
+    }));
+}
+function getCalendarPlaces(calendar) {
+  return normalizePlaces(calendar?.places);
+}
+
 const URL_PARAMS = new URLSearchParams(window.location.search);
 const GATHER_APP_CONFIG = window.GATHER_APP_CONFIG || {};
 const readConfigNumber = (key, fallback) => Number.isFinite(GATHER_APP_CONFIG[key]) ? GATHER_APP_CONFIG[key] : fallback;
@@ -894,14 +969,17 @@ const EXPENSE_ACTIVITY_ACTIONS = Array.isArray(GATHER_APP_CONSTANTS.EXPENSE_ACTI
 const IMAGE_TAG_ACTIVITY_ACTIONS = Array.isArray(GATHER_APP_CONSTANTS.IMAGE_TAG_ACTIVITY_ACTIONS) ? GATHER_APP_CONSTANTS.IMAGE_TAG_ACTIVITY_ACTIONS : ['tag_add', 'tag_remove'];
 const MEETING_ACTIVITY_ACTIONS = Array.isArray(GATHER_APP_CONSTANTS.MEETING_ACTIVITY_ACTIONS) ? GATHER_APP_CONSTANTS.MEETING_ACTIVITY_ACTIONS : ['meeting_confirm', 'meeting_cancel'];
 const MEMO_ACTIVITY_ACTIONS = Array.isArray(GATHER_APP_CONSTANTS.MEMO_ACTIVITY_ACTIONS) ? GATHER_APP_CONSTANTS.MEMO_ACTIVITY_ACTIONS : ['memo_create', 'memo_update', 'memo_delete'];
-const ACTIVITY_ACTIONS = [...SCHEDULE_ACTIVITY_ACTIONS, ...POLL_ACTIVITY_ACTIONS, ...EXPENSE_ACTIVITY_ACTIONS, ...IMAGE_TAG_ACTIVITY_ACTIONS, ...MEETING_ACTIVITY_ACTIONS, ...MEMO_ACTIVITY_ACTIONS];
+// Places (장소) also have no participant selector of their own -- same participant-optional
+// treatment as expense/poll/memo logs below.
+const PLACE_ACTIVITY_ACTIONS = Array.isArray(GATHER_APP_CONSTANTS.PLACE_ACTIVITY_ACTIONS) ? GATHER_APP_CONSTANTS.PLACE_ACTIVITY_ACTIONS : ['place_create', 'place_update', 'place_delete'];
+const ACTIVITY_ACTIONS = [...SCHEDULE_ACTIVITY_ACTIONS, ...POLL_ACTIVITY_ACTIONS, ...EXPENSE_ACTIVITY_ACTIONS, ...IMAGE_TAG_ACTIVITY_ACTIONS, ...MEETING_ACTIVITY_ACTIONS, ...MEMO_ACTIVITY_ACTIONS, ...PLACE_ACTIVITY_ACTIONS];
 
 function normalizeActivityLog(calendarId, log, participantIds = null, idRedirects = new Map()) {
   if (!log || typeof log !== 'object') return null;
   if (log.calendarId && log.calendarId !== calendarId) return null;
   const participantId = sanitizeText(idRedirects.get(log.participantId) || log.participantId || '', 120);
   const action = ACTIVITY_ACTIONS.includes(log.action) ? log.action : '';
-  const isParticipantOptionalAction = POLL_ACTIVITY_ACTIONS.includes(action) || EXPENSE_ACTIVITY_ACTIONS.includes(action) || IMAGE_TAG_ACTIVITY_ACTIONS.includes(action) || MEETING_ACTIVITY_ACTIONS.includes(action) || MEMO_ACTIVITY_ACTIONS.includes(action);
+  const isParticipantOptionalAction = POLL_ACTIVITY_ACTIONS.includes(action) || EXPENSE_ACTIVITY_ACTIONS.includes(action) || IMAGE_TAG_ACTIVITY_ACTIONS.includes(action) || MEETING_ACTIVITY_ACTIONS.includes(action) || MEMO_ACTIVITY_ACTIONS.includes(action) || PLACE_ACTIVITY_ACTIONS.includes(action);
   const date = sanitizeText(log.date || '', 20);
   const timestamp = Number(log.timestamp || log.updatedAt || 0) || 0;
   if (!action || !timestamp) return null;
@@ -1334,6 +1412,8 @@ function normalizeCalendarForSave(calendar) {
 	    activityLogs: normalizedActivityLogs,
 	    polls: normalizedPolls,
 	    expenseCategories: normalizeExpenseCategories(cloned.expenseCategories),
+	    places: normalizePlaces(cloned.places),
+	    placeCategories: normalizePlaceCategories(cloned.placeCategories),
 	    settlementBaseBudget: Number.isFinite(Number(cloned.settlementBaseBudget)) ? Math.max(0, Math.round(Number(cloned.settlementBaseBudget))) : 0,
 	    deletedActivityLogIds
 	  };
@@ -1530,6 +1610,8 @@ function mergeCalendarSettingsDelta(serverCalendar, incomingCalendar) {
     // missing the field for any reason must not silently fall back to dropping the meeting data.
     confirmedMeeting: incoming.confirmedMeeting !== undefined ? incoming.confirmedMeeting : (server.confirmedMeeting || []),
     expenseCategories: incoming.expenseCategories !== undefined ? incoming.expenseCategories : server.expenseCategories,
+    places: incoming.places !== undefined ? incoming.places : server.places,
+    placeCategories: incoming.placeCategories !== undefined ? incoming.placeCategories : server.placeCategories,
     settlementBaseBudget: incoming.settlementBaseBudget !== undefined ? incoming.settlementBaseBudget : server.settlementBaseBudget
   };
 }
@@ -2473,6 +2555,8 @@ function createDefaultCalendar(id) {
 	    activityLogs: [],
 	    polls: [],
 	    expenseCategories: DEFAULT_EXPENSE_CATEGORIES,
+	    places: [],
+	    placeCategories: DEFAULT_PLACE_CATEGORIES,
 	    settlementBaseBudget: 0,
 	    deletedActivityLogIds: []
 	  };
@@ -2897,6 +2981,8 @@ function AdminDashboard({ initialCalendars }) {
 	  const [calSettlementBaseBudget, setCalSettlementBaseBudget] = React.useState('');
 	  const [calExpenseCategories, setCalExpenseCategories] = React.useState(DEFAULT_EXPENSE_CATEGORIES);
 	  const [newExpenseCategoryName, setNewExpenseCategoryName] = React.useState('');
+	  const [calPlaceCategories, setCalPlaceCategories] = React.useState(DEFAULT_PLACE_CATEGORIES);
+	  const [newPlaceCategoryName, setNewPlaceCategoryName] = React.useState('');
 	  const [newPartName, setNewPartName] = React.useState('');
   const newPartNameRef = React.useRef(null);
 
@@ -3209,6 +3295,8 @@ function AdminDashboard({ initialCalendars }) {
 	        setCalSettlementBaseBudget(Number(cal.settlementBaseBudget || 0).toLocaleString());
 	        setCalExpenseCategories(getExpenseCategories(cal));
 	        setNewExpenseCategoryName('');
+	        setCalPlaceCategories(getPlaceCategories(cal));
+	        setNewPlaceCategoryName('');
 	        setNewPartName('');
         lastSyncedRef.current = key;
       }
@@ -3350,6 +3438,7 @@ function AdminDashboard({ initialCalendars }) {
 	      participants: calParticipants,
 	      settlementBaseBudget: Number((calSettlementBaseBudget || '').replace(/[^0-9]/g, '')) || 0,
 	      expenseCategories: normalizeExpenseCategories(calExpenseCategories),
+	      placeCategories: normalizePlaceCategories(calPlaceCategories),
 	      updatedAt: now,
       revision: (cal.revision || 0) + 1
     };
@@ -3417,6 +3506,42 @@ function AdminDashboard({ initialCalendars }) {
 	      }
 	    );
 	  };
+	  const handleAddPlaceCategory = () => {
+	    const trimmed = sanitizeText(newPlaceCategoryName, 24);
+	    if (!trimmed) return;
+	    const slug = trimmed.toLowerCase().replace(/[^a-z0-9가-힣_-]/g, '').slice(0, 24) || `cat_${Date.now()}`;
+	    const idBase = `custom_${slug}`;
+	    const existingIds = new Set(calPlaceCategories.map(category => category.id));
+	    const id = existingIds.has(idBase) ? `${idBase}_${Date.now().toString(36).slice(-4)}` : idBase;
+	    setCalPlaceCategories(prev => [...prev, {
+	      id,
+	      name: trimmed,
+	      color: normalizeColorValue(PRESET_COLORS[prev.length % PRESET_COLORS.length], '#64748B')
+	    }]);
+	    setNewPlaceCategoryName('');
+	  };
+	  const handleUpdatePlaceCategory = (categoryId, patch) => {
+	    setCalPlaceCategories(prev => prev.map(category => category.id === categoryId ? {
+	      ...category,
+	      ...patch,
+	      name: patch.name != null ? sanitizeText(patch.name, 24) : category.name,
+	      color: patch.color != null ? normalizeColorValue(patch.color, category.color) : category.color
+	    } : category));
+	  };
+	  const handleRemovePlaceCategory = categoryId => {
+	    const target = calPlaceCategories.find(c => c.id === categoryId);
+	    const nameText = target ? target.name : '카테고리';
+	    requestConfirm(
+	      '장소 카테고리 삭제',
+	      `"${nameText}" 장소 카테고리를 삭제하시겠습니까?`,
+	      () => {
+	        setCalPlaceCategories(prev => {
+	          const next = prev.filter(category => category.id !== categoryId);
+	          return next.length ? next : DEFAULT_PLACE_CATEGORIES;
+	        });
+	      }
+	    );
+	  };
 
 	  // Delete Poll from Admin Page
   const handleDeletePollFromAdminPage = (calId, poll) => {
@@ -3473,7 +3598,10 @@ function AdminDashboard({ initialCalendars }) {
                       log.action === 'tag_remove' ? '사진 태그 삭제' :
                       log.action === 'memo_create' ? '메모 추가' :
                       log.action === 'memo_update' ? '메모 변경' :
-                      log.action === 'memo_delete' ? '메모 삭제' : '활동';
+                      log.action === 'memo_delete' ? '메모 삭제' :
+                      log.action === 'place_create' ? '장소 등록' :
+                      log.action === 'place_update' ? '장소 수정' :
+                      log.action === 'place_delete' ? '장소 삭제' : '활동';
 
     const msg = `[${calId}] 시점 데이터 전체 복구 (타겟 로그: [${timeLabel}] [${typeLabel}]) — 이 시점으로 데이터를 복구하시겠습니까? 이 시점 이후 등록된 모든 일정/투표 롤백과 동시에, 이 시간 이후 전송된 모든 채팅 메시지도 서버에서 영구적으로 삭제됩니다.`;
     requestConfirm('시점 데이터 복구', msg, async () => {
@@ -4520,6 +4648,61 @@ function AdminDashboard({ initialCalendars }) {
 	            )
 	          ),
 
+	          /* Place Category Management */
+	          /*#__PURE__*/React.createElement("div", { style: { paddingTop: '14px', marginTop: '14px', borderTop: '1px solid #E2E8F0' } },
+	            /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#64748B', marginBottom: '8px' } }, "장소 카테고리 설정"),
+	            /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px', marginBottom: '10px' } },
+	              /*#__PURE__*/React.createElement("input", {
+	                type: "text",
+	                className: "form-input",
+	                style: { flex: 1, minWidth: 0 },
+	                placeholder: "새 장소 카테고리",
+	                value: newPlaceCategoryName,
+	                maxLength: 24,
+	                onChange: e => setNewPlaceCategoryName(e.target.value),
+	                onKeyDown: e => {
+	                  if (e.key === 'Enter') {
+	                    e.preventDefault();
+	                    if (e.nativeEvent && e.nativeEvent.isComposing) return;
+	                    handleAddPlaceCategory();
+	                  }
+	                }
+	              }),
+	              /*#__PURE__*/React.createElement("button", {
+	                type: "button",
+	                className: "btn btn-poll-create",
+	                style: { height: '44px', whiteSpace: 'nowrap' },
+	                onClick: handleAddPlaceCategory
+	              }, "추가")
+	            ),
+	            /*#__PURE__*/React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(220px, 100%), 1fr))', gap: '8px' } },
+	              calPlaceCategories.map(category => /*#__PURE__*/React.createElement("div", {
+	                key: category.id,
+	                style: { display: 'flex', alignItems: 'center', gap: '8px' }
+	              },
+	                /*#__PURE__*/React.createElement(ColorSwatchPicker, {
+	                  value: category.color,
+	                  onChange: color => handleUpdatePlaceCategory(category.id, { color }),
+	                  title: "장소 카테고리 색상"
+	                }),
+	                /*#__PURE__*/React.createElement("input", {
+	                  type: "text",
+	                  className: "form-input",
+	                  style: { flex: 1, minWidth: 0, height: '30px', fontSize: '0.82rem' },
+	                  value: category.name,
+	                  maxLength: 24,
+	                  onChange: e => handleUpdatePlaceCategory(category.id, { name: e.target.value })
+	                }),
+	                /*#__PURE__*/React.createElement("button", {
+	                  type: "button",
+	                  className: "btn btn-danger",
+	                  style: { padding: '4px 10px', height: '30px', display: 'flex', alignItems: 'center' },
+	                  onClick: () => handleRemovePlaceCategory(category.id)
+	                }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 16 }))
+	              ))
+	            )
+	          ),
+
 	          /* Submit settings button */
 	          /*#__PURE__*/React.createElement("button", {
             type: "button", className: "btn btn-primary", style: { width: '100%', height: '38px', justifyContent: 'center', marginTop: '20px' },
@@ -4603,7 +4786,9 @@ function AdminDashboard({ initialCalendars }) {
                 name: log.type === 'chat' ? '메시지' :
                       EXPENSE_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '정산' :
                       IMAGE_TAG_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '태그' :
-                      POLL_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '투표' : MEETING_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '정산' : '알수없음',
+                      POLL_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '투표' :
+                      PLACE_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '장소' :
+                      MEETING_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '정산' : '알수없음',
                 color: '#94A3B8'
               };
 
@@ -4614,7 +4799,8 @@ function AdminDashboard({ initialCalendars }) {
                                  expense_create: '지출/수입 등록', expense_update: '지출/수입 수정', expense_delete: '지출/수입 삭제',
                                  tag_add: '사진 태그 추가', tag_remove: '사진 태그 삭제',
                                  meeting_confirm: '모임 확정', meeting_cancel: '모임 확정 취소',
-                                 memo_create: '메모 추가', memo_update: '메모 변경', memo_delete: '메모 삭제'
+                                 memo_create: '메모 추가', memo_update: '메모 변경', memo_delete: '메모 삭제',
+                                 place_create: '장소 등록', place_update: '장소 수정', place_delete: '장소 삭제'
                                }[log.action] || '활동';
 
               const badgeBg = log.type === 'chat' ? '#E0F2FE' :
@@ -4624,7 +4810,8 @@ function AdminDashboard({ initialCalendars }) {
                                 expense_create: '#FEF3C7', expense_update: '#FEF3C7', expense_delete: '#FFEDD5',
                                 tag_add: '#E0E7FF', tag_remove: '#FEE2E2',
                                 meeting_confirm: '#F3E8FF', meeting_cancel: '#FEE2E2',
-                                memo_create: '#E0E7FF', memo_update: '#FEF3C7', memo_delete: '#FEE2E2'
+                                memo_create: '#E0E7FF', memo_update: '#FEF3C7', memo_delete: '#FEE2E2',
+                                place_create: '#DCFCE7', place_update: '#DBEAFE', place_delete: '#FEE2E2'
                               }[log.action] || '#F1F5F9';
 
               const badgeColor = log.type === 'chat' ? '#0369A1' :
@@ -4634,7 +4821,8 @@ function AdminDashboard({ initialCalendars }) {
                                    expense_create: '#B45309', expense_update: '#B45309', expense_delete: '#C2410C',
                                    tag_add: '#4338CA', tag_remove: '#B91C1C',
                                    meeting_confirm: '#7E22CE', meeting_cancel: '#B91C1C',
-                                   memo_create: '#4338CA', memo_update: '#B45309', memo_delete: '#B91C1C'
+                                   memo_create: '#4338CA', memo_update: '#B45309', memo_delete: '#B91C1C',
+                                   place_create: '#15803D', place_update: '#1D4ED8', place_delete: '#B91C1C'
                                  }[log.action] || '#64748B';
 
               return /*#__PURE__*/React.createElement("div", {
@@ -6783,6 +6971,49 @@ function App() {
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
     return updateCalendars(nextCalendars, '지출 순서 저장완료', 'success', updatedCal.id, 'settings', []);
   };
+  const handleSavePlace = (placeData) => {
+    if (!activeCal || !Number.isFinite(placeData?.lat) || !Number.isFinite(placeData?.lng)) return false;
+    const cleanName = sanitizeText(placeData?.name || '', 80);
+    if (!cleanName) return false;
+    const now = Date.now();
+    const existingPlaces = getCalendarPlaces(activeCal);
+    const isEditing = !!placeData.id;
+    const categoryIds = new Set(getPlaceCategories(activeCal).map(c => c.id));
+    const cleanCategoryId = categoryIds.has(placeData.categoryId) ? placeData.categoryId : 'etc';
+    const cleanAddress = sanitizeText(placeData.address || '', 200);
+    const cleanMemo = sanitizeText(placeData.memo || '', 300);
+    const nextPlaces = isEditing
+      ? existingPlaces.map(p => p.id === placeData.id ? { ...p, name: cleanName, address: cleanAddress, lat: placeData.lat, lng: placeData.lng, categoryId: cleanCategoryId, memo: cleanMemo, updatedAt: now } : p)
+      : [...existingPlaces, { id: `place_${activeCal.id}_${now}_${Math.random().toString(36).slice(2, 7)}`, name: cleanName, address: cleanAddress, lat: placeData.lat, lng: placeData.lng, categoryId: cleanCategoryId, memo: cleanMemo, createdAt: now, updatedAt: now }];
+    const placeActivityLog = createActivityLog(activeCal.id, isEditing ? 'place_update' : 'place_create', '', '', now, cleanName);
+    const updatedCal = {
+      ...activeCal,
+      places: nextPlaces,
+      updatedAt: now,
+      revision: (activeCal.revision || 0) + 1,
+      activityLogs: placeActivityLog ? [...getCalendarActivityLogs(activeCal), placeActivityLog] : getCalendarActivityLogs(activeCal)
+    };
+    const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
+    return updateCalendars(nextCalendars, isEditing ? '장소 수정완료' : '장소 등록완료', 'success', updatedCal.id, 'settings', placeActivityLog ? [placeActivityLog] : []);
+  };
+  const handleDeletePlace = (placeId) => {
+    if (!activeCal || !placeId) return false;
+    const existingPlaces = getCalendarPlaces(activeCal);
+    const deletedPlace = existingPlaces.find(p => p.id === placeId);
+    if (!deletedPlace) return false;
+    const now = Date.now();
+    const nextPlaces = existingPlaces.filter(p => p.id !== placeId);
+    const placeActivityLog = createActivityLog(activeCal.id, 'place_delete', '', '', now, deletedPlace.name || '장소');
+    const updatedCal = {
+      ...activeCal,
+      places: nextPlaces,
+      updatedAt: now,
+      revision: (activeCal.revision || 0) + 1,
+      activityLogs: placeActivityLog ? [...getCalendarActivityLogs(activeCal), placeActivityLog] : getCalendarActivityLogs(activeCal)
+    };
+    const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
+    return updateCalendars(nextCalendars, '장소 삭제완료', 'delete', updatedCal.id, 'settings', placeActivityLog ? [placeActivityLog] : []);
+  };
   const handleDeleteActivityLog = log => {
     if (!activeCal || !log?.id) return false;
     const logId = sanitizeText(log.id, 160);
@@ -7150,6 +7381,17 @@ function App() {
     });
   }
 
+  if (activeView === 'places') {
+    return /*#__PURE__*/React.createElement(PlacesView, {
+      calendar: activeCal,
+      onBack: () => changeView('calendar'),
+      onSavePlace: handleSavePlace,
+      onDeletePlace: handleDeletePlace,
+      showToast: showToast,
+      onRequestConfirm: showConfirmDialog
+    });
+  }
+
   const mainMenuPollCount = getCalendarPolls(activeCal).filter(poll => !isPollClosed(poll)).length;
   const mainMenuChatCount = chatMessages.length;
   const mainMenuChatLatestTimestamp = mainMenuChatCount > 0 ? chatMessages[mainMenuChatCount - 1].timestamp : 0;
@@ -7422,6 +7664,9 @@ function App() {
     onPromoteImageUrl: handlePromoteInlineChatImage,
     onSaveImageTags: handleSaveImageTags,
     onSearchTag: handleSearchTag
+  }), /*#__PURE__*/React.createElement(PlacesSection, {
+    calendar: activeCal,
+    onViewAll: () => changeView('places')
   }), /*#__PURE__*/React.createElement(Footer, null), isModalOpen && /*#__PURE__*/React.createElement(DateModal, {
     anniversaries: anniversaries,
     dateStr: selectedDate,
@@ -15018,7 +15263,9 @@ function AdminModal({
               const p = participantsMap[log.participantId] || {
                 name: EXPENSE_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '정산' :
                       IMAGE_TAG_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '태그' :
-                      POLL_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '투표' : MEETING_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '정산' : '알수없음',
+                      POLL_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '투표' :
+                      PLACE_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '장소' :
+                      MEETING_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '정산' : '알수없음',
                 color: '#94A3B8'
               };
               const actionLabel = {
@@ -15027,7 +15274,8 @@ function AdminModal({
                 expense_create: '지출/수입 등록', expense_update: '지출/수입 수정', expense_delete: '지출/수입 삭제',
                 tag_add: '사진 태그 추가', tag_remove: '사진 태그 삭제',
                 meeting_confirm: '모임 확정', meeting_cancel: '모임 확정 취소',
-                memo_create: '메모 추가', memo_update: '메모 변경', memo_delete: '메모 삭제'
+                memo_create: '메모 추가', memo_update: '메모 변경', memo_delete: '메모 삭제',
+                place_create: '장소 등록', place_update: '장소 수정', place_delete: '장소 삭제'
               }[log.action] || '활동';
 
               const actionBadgeColor = {
@@ -15036,7 +15284,8 @@ function AdminModal({
                 expense_create: '#F59E0B', expense_update: '#F59E0B', expense_delete: '#DC2626',
                 tag_add: '#6366F1', tag_remove: '#DC2626',
                 meeting_confirm: '#8B5CF6', meeting_cancel: '#EF4444',
-                memo_create: '#6366F1', memo_update: '#F59E0B', memo_delete: '#EF4444'
+                memo_create: '#6366F1', memo_update: '#F59E0B', memo_delete: '#EF4444',
+                place_create: '#10B981', place_update: '#2563EB', place_delete: '#EF4444'
               }[log.action] || '#64748B';
               // A translucent tint of the badge's own color (instead of a fixed pastel hex)
               // stays readable on both light and dark modal backgrounds -- a solid light pastel
@@ -15123,7 +15372,10 @@ function AdminModal({
             meeting_cancel: '모임 확정 취소',
             memo_create: '메모 추가',
             memo_update: '메모 변경',
-            memo_delete: '메모 삭제'
+            memo_delete: '메모 삭제',
+            place_create: '장소 등록',
+            place_update: '장소 수정',
+            place_delete: '장소 삭제'
           };
           const actionColors = {
             create: '#2563EB',
@@ -15141,7 +15393,10 @@ function AdminModal({
             meeting_cancel: '#B91C1C',
             memo_create: '#4338CA',
             memo_update: '#B45309',
-            memo_delete: '#B91C1C'
+            memo_delete: '#B91C1C',
+            place_create: '#2563EB',
+            place_update: '#7C3AED',
+            place_delete: '#DC2626'
           };
           const logs = buildActivityLogsFromAvailabilities(calendar || {});
           if (logs.length === 0) {
@@ -15157,6 +15412,7 @@ function AdminModal({
               name: EXPENSE_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '정산' :
                     IMAGE_TAG_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '태그' :
                     POLL_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '투표' :
+                    PLACE_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '장소' :
                     MEETING_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '정산' : '알 수 없음',
               color: '#94A3B8'
             };
@@ -22254,6 +22510,571 @@ function SummaryList({
       }, memoText);
     })));
   }))));
+}
+
+// Leaflet is a UMD/global-style library (not an ES module), so unlike loadHeicTo's dynamic
+// import(), it has to be lazy-loaded via a plain <script> tag injection -- mirrors the same
+// memoized-promise + multi-CDN-fallback shape though, reusing loadScriptOnce from the HEIC
+// loading code above.
+let leafletLoadPromise = null;
+const LEAFLET_JS_CDN_URLS = [
+  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
+  'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js'
+];
+const LEAFLET_CSS_CDN_URLS = [
+  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
+  'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css'
+];
+function loadLeafletCss() {
+  if (document.getElementById('leaflet-css-link')) return;
+  const link = document.createElement('link');
+  link.id = 'leaflet-css-link';
+  link.rel = 'stylesheet';
+  link.href = LEAFLET_CSS_CDN_URLS[0];
+  document.head.appendChild(link);
+}
+function loadLeaflet(timeoutMs = 15000) {
+  if (window.L) return Promise.resolve(window.L);
+  if (leafletLoadPromise) return leafletLoadPromise;
+  leafletLoadPromise = (async () => {
+    loadLeafletCss();
+    let lastErr = null;
+    for (const src of LEAFLET_JS_CDN_URLS) {
+      try {
+        await loadScriptOnce(src, timeoutMs);
+        if (window.L) return window.L;
+        lastErr = new Error('leaflet script loaded but window.L missing');
+      } catch (err) {
+        lastErr = err;
+      }
+    }
+    leafletLoadPromise = null; // allow retrying on a later call instead of caching the failure forever
+    throw lastErr || new Error('leaflet failed to load from all CDNs');
+  })();
+  return leafletLoadPromise;
+}
+
+function PlaceSectionIcon({ size = 20 } = {}) {
+  return /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: String(size),
+    height: String(size),
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    "stroke-width": "2",
+    "stroke-linecap": "round",
+    "stroke-linejoin": "round",
+    className: "icon icon-tabler icons-tabler-outline icon-tabler-map-pin"
+  }, /*#__PURE__*/React.createElement("path", {
+    stroke: "none",
+    d: "M0 0h24v24H0z",
+    fill: "none"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M9 11a3 3 0 1 0 6 0a3 3 0 0 0 -6 0"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M17.657 16.657l-4.243 4.243a2 2 0 0 1 -2.827 0l-4.244 -4.243a8 8 0 1 1 11.314 0z"
+  }));
+}
+
+// Default center/zoom for a calendar with no places registered yet -- Seoul City Hall, a
+// reasonable default since this app is Korean-audience-only.
+const PLACE_MAP_DEFAULT_CENTER = [37.5665, 126.9780];
+const PLACE_MAP_DEFAULT_ZOOM = 11;
+
+// Renders an interactive Leaflet/OSM map with one pin per registered place, auto-fit to bounds
+// so every pin stays visible. Popup content is built via DOM nodes (not HTML string
+// interpolation) since place name/address/memo are free-text user input -- only the marker's
+// divIcon HTML interpolates category.color (hex-validated by normalizeColorValue) and its icon
+// (a fixed emoji from a controlled lookup table), never raw user text, so that stays safe as a
+// string template.
+function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom = false, resizeSignal }) {
+  const containerRef = React.useRef(null);
+  const mapRef = React.useRef(null);
+  const markersLayerRef = React.useRef(null);
+  const [ready, setReady] = React.useState(false);
+  const [loadError, setLoadError] = React.useState(false);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    loadLeaflet().then(L => {
+      if (cancelled || !containerRef.current || mapRef.current) return;
+      const map = L.map(containerRef.current, { scrollWheelZoom, zoomControl: true, attributionControl: true })
+        .setView(PLACE_MAP_DEFAULT_CENTER, PLACE_MAP_DEFAULT_ZOOM);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap contributors'
+      }).addTo(map);
+      markersLayerRef.current = L.layerGroup().addTo(map);
+      mapRef.current = map;
+      setReady(true);
+    }).catch(err => {
+      console.error('Leaflet load failed:', err);
+      if (!cancelled) setLoadError(true);
+    });
+    return () => {
+      cancelled = true;
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+      }
+    };
+  }, []);
+
+  React.useEffect(() => {
+    if (!ready || !mapRef.current || !window.L) return;
+    const L = window.L;
+    const layer = markersLayerRef.current;
+    layer.clearLayers();
+    const categoryMap = getPlaceCategories(calendar).reduce((acc, c) => { acc[c.id] = c; return acc; }, {});
+    const bounds = [];
+    (places || []).forEach(place => {
+      const category = categoryMap[place.categoryId] || categoryMap.etc;
+      const color = category ? category.color : '#64748B';
+      const icon = L.divIcon({
+        className: 'place-map-marker',
+        html: `<div style="background:${color};width:30px;height:30px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,0.35);border:2px solid #fff;"><span style="transform:rotate(45deg);font-size:14px;line-height:1;">${getPlaceCategoryIcon(category)}</span></div>`,
+        iconSize: [30, 30],
+        iconAnchor: [15, 30],
+        popupAnchor: [0, -30]
+      });
+      const marker = L.marker([place.lat, place.lng], { icon });
+      const popupNode = document.createElement('div');
+      popupNode.style.minWidth = '140px';
+      popupNode.style.maxWidth = '220px';
+      const nameEl = document.createElement('div');
+      nameEl.style.fontWeight = '800';
+      nameEl.style.fontSize = '0.85rem';
+      nameEl.style.marginBottom = '2px';
+      nameEl.textContent = place.name || '이름 없음';
+      popupNode.appendChild(nameEl);
+      if (place.address) {
+        const addrEl = document.createElement('div');
+        addrEl.style.fontSize = '0.75rem';
+        addrEl.style.color = '#64748B';
+        addrEl.textContent = place.address;
+        popupNode.appendChild(addrEl);
+      }
+      if (place.memo) {
+        const memoEl = document.createElement('div');
+        memoEl.style.fontSize = '0.75rem';
+        memoEl.style.color = '#334155';
+        memoEl.style.marginTop = '4px';
+        memoEl.textContent = place.memo;
+        popupNode.appendChild(memoEl);
+      }
+      marker.bindPopup(popupNode);
+      if (onSelectPlace) marker.on('click', () => onSelectPlace(place));
+      marker.addTo(layer);
+      bounds.push([place.lat, place.lng]);
+    });
+    if (bounds.length === 1) {
+      mapRef.current.setView(bounds[0], 15);
+    } else if (bounds.length > 1) {
+      mapRef.current.fitBounds(bounds, { padding: [30, 30], maxZoom: 16 });
+    } else {
+      mapRef.current.setView(PLACE_MAP_DEFAULT_CENTER, PLACE_MAP_DEFAULT_ZOOM);
+    }
+  }, [ready, places, calendar]);
+
+  // Container size changes (the section's collapse/expand aspect-ratio toggle) don't fire a
+  // window resize event, so Leaflet's internal tile grid goes stale until nudged.
+  React.useEffect(() => {
+    if (!ready || !mapRef.current) return;
+    const id = setTimeout(() => mapRef.current && mapRef.current.invalidateSize(), 260);
+    return () => clearTimeout(id);
+  }, [ready, resizeSignal]);
+
+  if (loadError) {
+    return /*#__PURE__*/React.createElement("div", {
+      style: { width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94A3B8', fontSize: '0.8rem', backgroundColor: '#F1F5F9' }
+    }, "지도를 불러오지 못했습니다.");
+  }
+
+  return /*#__PURE__*/React.createElement("div", {
+    ref: containerRef,
+    style: { width: '100%', height: '100%', backgroundColor: '#E2E8F0', position: 'relative' }
+  }, !ready && /*#__PURE__*/React.createElement("div", {
+    style: { width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94A3B8', fontSize: '0.8rem' }
+  }, "지도를 불러오는 중..."));
+}
+
+// Address/업체명 search (Nominatim, same free geocoder the weather feature already uses as a
+// fallback -- chosen as the PRIMARY geocoder here since it supports POI/business search, unlike
+// Open-Meteo's city-only geocoder) + memo + category select, used for both creating a new place
+// and editing an existing one (editingPlace present).
+function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, onDelete, showToast, onRequestConfirm }) {
+  const categories = getPlaceCategories(calendar);
+  const [query, setQuery] = React.useState(editingPlace ? (editingPlace.name || '') : '');
+  const [results, setResults] = React.useState([]);
+  const [loading, setLoading] = React.useState(false);
+  const [selected, setSelected] = React.useState(editingPlace ? {
+    name: editingPlace.name, address: editingPlace.address, lat: editingPlace.lat, lng: editingPlace.lng
+  } : null);
+  const [memo, setMemo] = React.useState(editingPlace ? (editingPlace.memo || '') : '');
+  const [categoryId, setCategoryId] = React.useState(editingPlace ? editingPlace.categoryId : (categories[0]?.id || 'etc'));
+  const [saving, setSaving] = React.useState(false);
+
+  const handleSearch = async e => {
+    if (e) e.preventDefault();
+    const cleanQuery = query.trim();
+    if (!cleanQuery) {
+      showToast('검색할 주소나 업체명을 입력해 주세요.', 'error');
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(cleanQuery)}&format=json&limit=8&accept-language=ko`);
+      const data = res.ok ? await res.json() : [];
+      const mapped = (data || []).map((item, idx) => ({
+        id: `nominatim_${item.place_id || idx}`,
+        name: (item.display_name || '').split(',')[0] || cleanQuery,
+        address: item.display_name || '',
+        lat: parseFloat(item.lat),
+        lng: parseFloat(item.lon)
+      })).filter(r => Number.isFinite(r.lat) && Number.isFinite(r.lng));
+      setResults(mapped);
+      if (mapped.length === 0) showToast('검색 결과가 없습니다.', 'info');
+    } catch (err) {
+      console.error('Place search failed:', err);
+      showToast('장소 검색에 실패했습니다.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSelectResult = result => {
+    setSelected({ name: result.name, address: result.address, lat: result.lat, lng: result.lng });
+    setQuery(result.name);
+    setResults([]);
+  };
+
+  const handleSubmit = async () => {
+    if (!selected || !Number.isFinite(selected.lat) || !Number.isFinite(selected.lng)) {
+      showToast('검색 결과에서 장소를 선택해 주세요.', 'error');
+      return;
+    }
+    setSaving(true);
+    const ok = await onSave({
+      id: editingPlace ? editingPlace.id : undefined,
+      name: selected.name || query.trim(),
+      address: selected.address || '',
+      lat: selected.lat,
+      lng: selected.lng,
+      categoryId,
+      memo: memo.trim()
+    });
+    setSaving(false);
+    if (ok !== false) onClose();
+  };
+
+  const handleDeleteClick = () => {
+    if (!editingPlace) return;
+    onRequestConfirm('장소 삭제', `"${editingPlace.name || '이 장소'}"를 삭제하시겠습니까?`, () => {
+      onDelete(editingPlace.id);
+      onClose();
+    });
+  };
+
+  const categoryOptions = categories.map(c => ({ value: c.id, label: getPlaceCategoryLabel(c) }));
+
+  return /*#__PURE__*/React.createElement("div", {
+    className: "modal-overlay",
+    onClick: onClose,
+    style: { zIndex: 12000 }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "modal-container",
+    style: { maxWidth: '400px', width: '90%', animation: 'modalFadeIn 0.2s ease', backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)' },
+    onClick: e => e.stopPropagation()
+  },
+    /* Header */
+    /*#__PURE__*/React.createElement("div", {
+      style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid var(--border-subtle)' }
+    },
+      /*#__PURE__*/React.createElement("span", {
+        style: { fontSize: '0.92rem', fontWeight: '900', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' }
+      }, /*#__PURE__*/React.createElement(PlaceSectionIcon, { size: 16 }), editingPlace ? '장소 수정' : '장소 등록'),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: onClose,
+        style: { width: '28px', height: '28px', borderRadius: '50%', border: 'none', background: 'var(--border-subtle)', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }
+      }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 14 }))
+    ),
+
+    /* Body */
+    /*#__PURE__*/React.createElement("div", {
+      style: { padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '70vh', overflowY: 'auto' }
+    },
+      /* Search field */
+      /*#__PURE__*/React.createElement("form", { onSubmit: handleSearch, style: { display: 'flex', gap: '8px' } },
+        /*#__PURE__*/React.createElement("input", {
+          type: "text",
+          className: "form-input",
+          style: { flex: 1, minWidth: 0 },
+          placeholder: "주소 또는 업체명 검색",
+          value: query,
+          onChange: e => { setQuery(e.target.value); setSelected(null); }
+        }),
+        /*#__PURE__*/React.createElement("button", {
+          type: "submit",
+          className: "btn btn-poll-create",
+          style: { height: '44px', whiteSpace: 'nowrap' },
+          disabled: loading
+        }, loading ? '검색중' : '검색')
+      ),
+
+      /* Search results */
+      results.length > 0 && /*#__PURE__*/React.createElement("div", {
+        style: { display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '160px', overflowY: 'auto', border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '4px' }
+      }, results.map(r => /*#__PURE__*/React.createElement("button", {
+        key: r.id,
+        type: "button",
+        onClick: () => handleSelectResult(r),
+        style: { textAlign: 'left', padding: '8px 10px', borderRadius: '6px', border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '2px' }
+      },
+        /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-main)' } }, r.name),
+        /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.72rem', color: 'var(--text-muted)' } }, r.address)
+      ))),
+
+      /* Selected place confirmation */
+      selected && /*#__PURE__*/React.createElement("div", {
+        style: { padding: '10px 12px', borderRadius: '8px', backgroundColor: 'rgba(59, 130, 246, 0.08)', border: '1px solid rgba(59, 130, 246, 0.2)', fontSize: '0.78rem', color: 'var(--text-main)' }
+      }, `선택됨: ${selected.name}${selected.address ? ' · ' + selected.address : ''}`),
+
+      /* Category picker */
+      /*#__PURE__*/React.createElement("div", null,
+        /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#64748B', marginBottom: '4px' } }, "카테고리"),
+        /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
+          title: "카테고리 선택",
+          value: categoryId,
+          options: categoryOptions,
+          onSelect: setCategoryId,
+          placeholder: "카테고리 선택"
+        })
+      ),
+
+      /* Memo field */
+      /*#__PURE__*/React.createElement("div", null,
+        /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#64748B', marginBottom: '4px' } }, "메모"),
+        /*#__PURE__*/React.createElement("textarea", {
+          className: "form-input",
+          style: { width: '100%', minHeight: '60px', resize: 'vertical', fontFamily: 'inherit' },
+          placeholder: "메모를 남겨보세요 (선택)",
+          value: memo,
+          maxLength: 300,
+          onChange: e => setMemo(e.target.value)
+        })
+      )
+    ),
+
+    /* Footer */
+    /*#__PURE__*/React.createElement("div", {
+      style: { display: 'flex', gap: '8px', padding: '12px 16px', borderTop: '1px solid var(--border-subtle)' }
+    },
+      editingPlace && /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "btn btn-danger",
+        style: { height: '40px' },
+        onClick: handleDeleteClick
+      }, "삭제"),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "btn btn-primary",
+        style: { flex: 1, height: '40px', justifyContent: 'center' },
+        disabled: saving,
+        onClick: handleSubmit
+      }, saving ? '저장중...' : '저장')
+    )
+  ));
+}
+
+// Main-screen collapsible map preview -- collapsed shows a short 16:9 map, expanded shows a
+// taller 4:3 map (the toggle only resizes the map, it never hides the section like PhotoGallery
+// does, since the map itself is the content). "전체보기" sits immediately before the fold arrow;
+// SectionToggleButton's own marginLeft:auto pushes both trailing controls to the header's right
+// edge as a pair.
+function PlacesSection({ calendar, onViewAll }) {
+  const [collapsed, setCollapsed] = React.useState(true);
+  const places = getCalendarPlaces(calendar);
+
+  return /*#__PURE__*/React.createElement("section", { className: "summary-card" },
+    /*#__PURE__*/React.createElement("div", {
+      className: "summary-title",
+      style: { display: 'flex', alignItems: 'center' }
+    },
+      /*#__PURE__*/React.createElement(PlaceSectionIcon, null),
+      "장소 ",
+      /*#__PURE__*/React.createElement(SectionCountBadge, { count: places.length }),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: onViewAll,
+        style: { marginLeft: 'auto', background: 'none', border: 'none', color: '#3B82F6', fontSize: '0.78rem', fontWeight: 800, cursor: 'pointer', padding: '4px 6px' }
+      }, "전체보기"),
+      /*#__PURE__*/React.createElement(SectionToggleButton, {
+        collapsed,
+        onToggle: () => setCollapsed(prev => !prev),
+        label: collapsed ? '지도 펼치기' : '지도 접기'
+      })
+    ),
+    /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: '100%',
+        aspectRatio: collapsed ? '16 / 9' : '4 / 3',
+        borderRadius: 'var(--radius-sm)',
+        overflow: 'hidden',
+        marginTop: '12px'
+      }
+    }, /*#__PURE__*/React.createElement(PlaceMapView, {
+      places,
+      calendar,
+      resizeSignal: collapsed
+    }))
+  );
+}
+
+// Full-page map view -- header follows the same fixed-back-button + centered-title +
+// right-action-button convention as MemoView, with "장소등록" as the action button. Body is a
+// taller interactive map (marker click opens the register modal pre-filled for editing) plus a
+// scrollable place-card list below it, since editing/deleting via Leaflet popup controls isn't
+// practical to build or to verify structurally -- the card list is plain React DOM instead.
+function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, onRequestConfirm }) {
+  const [isRegisterOpen, setIsRegisterOpen] = React.useState(false);
+  const [editingPlace, setEditingPlace] = React.useState(null);
+  const places = getCalendarPlaces(calendar);
+  const categoryMap = getPlaceCategories(calendar).reduce((acc, c) => { acc[c.id] = c; return acc; }, {});
+
+  const handleOpenRegister = () => {
+    setEditingPlace(null);
+    setIsRegisterOpen(true);
+  };
+  const handleEditPlace = place => {
+    setEditingPlace(place);
+    setIsRegisterOpen(true);
+  };
+  const handleCloseModal = () => {
+    setIsRegisterOpen(false);
+    setEditingPlace(null);
+  };
+  const handleDeleteFromCard = place => {
+    onRequestConfirm('장소 삭제', `"${place.name || '이 장소'}"를 삭제하시겠습니까?`, () => onDeletePlace(place.id));
+  };
+
+  const sortedPlaces = [...places].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+
+  return /*#__PURE__*/React.createElement("div", {
+    className: "places-view-container",
+    style: {
+      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+      backgroundColor: 'var(--bg-primary)',
+      display: 'flex', flexDirection: 'column',
+      width: '100%', maxWidth: '100%', overflowX: 'hidden'
+    }
+  },
+    /* Floating back button */
+    /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: onBack,
+      "aria-label": "뒤로가기",
+      style: {
+        position: 'fixed', top: '10px', left: '10px', width: '36px', height: '36px',
+        borderRadius: '50%', backgroundColor: 'var(--bg-card)', border: 'none',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        cursor: 'pointer', color: '#64748B', zIndex: 1020
+      }
+    }, /*#__PURE__*/React.createElement(BackArrowIcon, { size: 22 })),
+
+    /* Header: left spacer, centered title, right "장소등록" action button */
+    /*#__PURE__*/React.createElement("div", {
+      className: "places-view-header",
+      style: {
+        position: 'fixed', top: 0, left: 0, right: 0, height: '56px',
+        backgroundColor: 'var(--bg-card)', borderBottom: '1px solid var(--border-subtle)',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '0 16px', zIndex: 1010
+      }
+    },
+      /*#__PURE__*/React.createElement("div", { style: { width: '32px', flexShrink: 0 } }),
+      /*#__PURE__*/React.createElement("div", {
+        style: {
+          position: 'absolute', left: '50%', transform: 'translateX(-50%)',
+          display: 'flex', alignItems: 'center', fontWeight: 800, fontSize: '0.95rem',
+          color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden',
+          textOverflow: 'ellipsis', maxWidth: 'calc(100vw - 160px)', pointerEvents: 'none'
+        }
+      }, calendar.title, " 장소"),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: handleOpenRegister,
+        style: {
+          background: 'none', border: 'none', cursor: 'pointer', padding: '6px 8px',
+          color: 'var(--accent-primary)', fontSize: '0.82rem', fontWeight: 800,
+          display: 'flex', alignItems: 'center', gap: '4px'
+        }
+      }, "장소등록")
+    ),
+
+    /* Scrollable body: full map + place card list */
+    /*#__PURE__*/React.createElement("div", {
+      style: { flex: 1, overflowY: 'auto', paddingTop: '56px' }
+    },
+      /*#__PURE__*/React.createElement("div", {
+        style: { width: '100%', height: '46vh', minHeight: '260px' }
+      }, /*#__PURE__*/React.createElement(PlaceMapView, {
+        places,
+        calendar,
+        scrollWheelZoom: true,
+        onSelectPlace: handleEditPlace,
+        resizeSignal: 'full'
+      })),
+      /*#__PURE__*/React.createElement("div", {
+        style: { padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }
+      },
+        places.length === 0 ? /*#__PURE__*/React.createElement("div", {
+          style: { padding: '30px 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }
+        }, "등록된 장소가 없습니다. 우측 상단 '장소등록' 버튼을 눌러 추가해 보세요.") :
+        sortedPlaces.map(place => {
+          const category = categoryMap[place.categoryId] || categoryMap.etc;
+          return /*#__PURE__*/React.createElement("div", {
+            key: place.id,
+            className: "summary-card",
+            style: { display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer' },
+            onClick: () => handleEditPlace(place)
+          },
+            /*#__PURE__*/React.createElement("span", {
+              style: {
+                flexShrink: 0, width: '34px', height: '34px', borderRadius: '50%',
+                backgroundColor: category ? category.color : '#64748B',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '16px'
+              }
+            }, getPlaceCategoryIcon(category)),
+            /*#__PURE__*/React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+              /*#__PURE__*/React.createElement("div", { style: { fontWeight: 800, fontSize: '0.88rem', color: 'var(--text-main)' } }, place.name || '이름 없음'),
+              place.address && /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: '2px' } }, place.address),
+              place.memo && /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.78rem', color: 'var(--text-main)', marginTop: '4px' } }, place.memo)
+            ),
+            /*#__PURE__*/React.createElement("button", {
+              type: "button",
+              className: "btn btn-danger",
+              style: { padding: '4px 10px', height: '30px', display: 'flex', alignItems: 'center', flexShrink: 0 },
+              onClick: e => { e.stopPropagation(); handleDeleteFromCard(place); }
+            }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 16 }))
+          );
+        })
+      )
+    ),
+
+    isRegisterOpen && /*#__PURE__*/React.createElement(PlaceRegisterModal, {
+      calendar,
+      editingPlace,
+      onClose: handleCloseModal,
+      onSave: onSavePlace,
+      onDelete: onDeletePlace,
+      showToast,
+      onRequestConfirm
+    })
+  );
 }
 
 // Aggregates every image sent in this calendar's chat into a single scrollable grid, newest
