@@ -43,6 +43,9 @@ for (const page of pages) {
     if (!html.includes('assets/app-utils.js')) {
       throw new Error(`Missing app-utils script reference: ${url}`);
     }
+    if (!html.includes('assets/app-notifications.js')) {
+      throw new Error(`Missing app-notifications script reference: ${url}`);
+    }
   });
 }
 
