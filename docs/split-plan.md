@@ -7,16 +7,21 @@
 - 분리 전 정상 커밋은 원격 태그로 보존한다.
 - 데이터 저장/읽기 경로는 리팩터링 단계에서 변경하지 않는다. Firestore 스키마 변경은 별도 작업으로만 진행한다.
 
-## 현재 완료된 1단계
+## 현재 완료된 단계
 
-- `index.html`의 대형 인라인 CSS를 `assets/app.css`로 분리했다.
-- HTML은 `<link rel="stylesheet" href="assets/app.css?v=20260814-split1">`로 외부 CSS를 로드한다.
-- JS 실행 순서와 Firebase/React 로딩 순서는 변경하지 않았다.
+- 1단계: `index.html`의 대형 인라인 CSS를 `assets/app.css`로 분리했다.
+- 2단계: 색상/정산 카테고리/도메인 액션 상수를 `assets/app-constants.js`로 분리했다.
+- 3단계: Firebase 로딩 타임아웃, 이미지 제한, admin 세션 같은 런타임 설정을 `assets/app-config.js`로 분리했다.
+- 4단계: 한국 공휴일/24절기/월 이름 데이터를 `assets/app-calendar-data.js`로 분리했다.
+- 5단계: 채팅 이모지/HEIC CDN/링크 미리보기 한도 데이터를 `assets/app-chat-data.js`로 분리했다.
+- 외부 JS는 모두 `public/assets`에도 미러링한다. Vite 산출물과 GitHub Pages 루트 서빙 방식이 달라져도 파일 누락을 막기 위한 조치다.
+- 각 외부 JS는 `window.GATHER_APP_*` 네임스페이스로만 값을 노출하고, `index.html`에는 기존 값 fallback을 유지한다.
+- `npm run regression:test`에 `check:asset-mirrors`가 포함되어 root/public 미러 불일치와 `index.html`의 누락 asset 참조를 잡는다.
 - 복구 기준 태그: `safe-before-split-20260814-7da2504`
 
 ## 다음 권장 단계
 
-### 2단계: 순수 유틸 함수 분리
+### 6단계: 순수 유틸 함수 분리
 
 대상:
 - 색상/대비 계산
@@ -29,8 +34,9 @@
 - `assets/app-utils.js`를 먼저 만들고 `window.GatherUtils`에 노출한다.
 - 기존 `index.html` 안에서는 한 번에 삭제하지 않고, 먼저 `const { ... } = window.GatherUtils` 별칭만 붙여 동작을 확인한다.
 - 한 묶음당 5~10개 함수 이하로만 이동한다.
+- 함수 이동 시 기존 함수명을 바로 삭제하지 말고, 최소 1단계는 `window.GatherUtils?.fn || fallbackFn` 형태로 유지한다.
 
-### 3단계: Firebase 서비스 계층 분리
+### 7단계: Firebase 서비스 계층 분리
 
 대상:
 - 캘린더 구독
@@ -43,7 +49,7 @@
 - Firestore document path 규칙은 기존 코드와 완전히 동일하게 유지한다.
 - `?id=kkot`, `?id=cw`, `?id=jhair` 간 데이터 격리를 회귀 테스트에 포함한다.
 
-### 4단계: UI 컴포넌트 단위 분리
+### 8단계: UI 컴포넌트 단위 분리
 
 대상 우선순위:
 - `ShareModal`, `ConfirmDialog`, `NotificationPermissionHelpModal` 같은 독립 모달
@@ -55,7 +61,7 @@
 - 현재 앱은 CDN React + 인라인 `React.createElement` 실행 구조이므로, 즉시 ES Module JSX 구조로 바꾸면 위험하다.
 - 먼저 전역 컴포넌트 파일로 분리한 뒤, 최종적으로 Vite `src/` 기반 앱으로 전환한다.
 
-### 5단계: Vite 앱 구조 전환
+### 9단계: Vite 앱 구조 전환
 
 대상:
 - `src/`를 실제 라이브 엔트리로 전환
@@ -65,6 +71,12 @@
 - 로컬/라이브 기능 회귀 테스트가 충분히 확보된 뒤 진행한다.
 - 전환 직전 별도 복구 태그를 생성한다.
 - 전환 PR 또는 커밋은 단일 목적이어야 한다.
+
+## 주의해야 할 남은 위험구간
+
+- `INITIAL_CALENDARS`에는 과거 데모 일정 데이터가 남아 있지만, 바로 아래에서 `kkot/cw`의 `participants`와 `availabilities`를 빈 배열로 덮어써 실제 화면 flash를 막고 있다.
+- 이 구간을 정리하면 `index.html`을 약 10KB 줄일 수 있지만, 캘린더 초기 placeholder/fallback 경로와 맞닿아 있으므로 별도 커밋으로만 진행한다.
+- `PEEKALINK_PROXY_URL`은 `firebaseConfig.projectId`에 의존하는 런타임 계산값이라 정적 데이터 파일로 빼지 않았다.
 
 ## 검수 체크리스트
 
@@ -79,4 +91,3 @@
 - PC 폭: 1440px 이상, 1024px, 768px
 - 모바일 폭: 390px, 430px
 - 브라우저: Chrome, Whale, Firefox, Safari 계열은 실제 기기 또는 브라우저별 수동 확인 필요
-
