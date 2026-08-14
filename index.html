@@ -6382,22 +6382,25 @@ function App() {
   // 라이트박스의 이미지정보 패널에서 입력하고, GlobalSearchModal의 태그 검색에서 사용된다.
   // 이전 태그 목록과 비교해 새로 추가/삭제된 토큰마다 활동 로그를 남겨 어드민 페이지에서
   // 언제 어떤 해시태그가 추가/삭제됐는지 확인할 수 있게 한다.
-  const handleSaveImageTags = async (messageId, imageIndex, tagsText) => {
-    if (!messageId || !Number.isInteger(imageIndex) || imageIndex < 0) return false;
+  const handleSaveImageTags = async (messageId, imageIndex, tagsText, meta = {}) => {
+    if (!messageId || !Number.isInteger(imageIndex)) return false;
     const sourceMessage = [...(chatMessages || []), ...(recentMessages || [])].find(msg => msg.id === messageId);
     if (!sourceMessage) return false;
+    const isDirectMedia = !!meta?.directMediaUrl;
     const entryCount = getMessageImageEntries(sourceMessage).length;
-    if (imageIndex >= entryCount) return false;
+    if (!isDirectMedia && (imageIndex < 0 || imageIndex >= entryCount)) return false;
     const parseTagTokens = text => Array.from(new Set(
       String(text || '').split(/[,\s#]+/).map(t => sanitizeText(t.trim(), 30)).filter(Boolean)
     )).slice(0, 10);
-    const prevTokens = parseTagTokens(Array.isArray(sourceMessage.imageTags) ? sourceMessage.imageTags[imageIndex] : '');
+    const prevTokens = parseTagTokens(isDirectMedia ? sourceMessage.directMediaTags : (Array.isArray(sourceMessage.imageTags) ? sourceMessage.imageTags[imageIndex] : ''));
     const nextTokens = parseTagTokens(tagsText);
     const cleanTags = sanitizeText(nextTokens.join(' '), 100);
-    const nextImageTags = Array.isArray(sourceMessage.imageTags) ? [...sourceMessage.imageTags] : [];
-    while (nextImageTags.length < entryCount) nextImageTags.push('');
-    nextImageTags[imageIndex] = cleanTags;
-    const data = { imageTags: nextImageTags };
+    const data = isDirectMedia ? { directMediaTags: cleanTags } : (() => {
+      const nextImageTags = Array.isArray(sourceMessage.imageTags) ? [...sourceMessage.imageTags] : [];
+      while (nextImageTags.length < entryCount) nextImageTags.push('');
+      nextImageTags[imageIndex] = cleanTags;
+      return { imageTags: nextImageTags };
+    })();
     try {
       if (firebaseDb) {
         await withTimeout(firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages').doc(messageId).update(data), 9000, 'image tags write');
@@ -7459,16 +7462,17 @@ function App() {
         setTimeout(() => el.classList.remove('search-result-flash'), 1700);
       }, 350);
     },
-    onOpenImage: (messageId, imageIndex) => {
+    onOpenImage: (messageId, imageIndex, directMediaUrl = '') => {
       changeView('chat');
       setTimeout(() => {
         const msg = chatMessages.find(m => m.id === messageId);
         if (!msg) return;
-        const entries = getMessageImageEntries(msg);
+        const directEntry = getMessageDirectMediaEntry(msg);
+        const entries = directMediaUrl && directEntry ? [directEntry] : getMessageImageEntries(msg);
         setActiveLightbox({
           urls: entries.map(e => e.full),
-          meta: entries.map(e => ({ timestamp: msg.timestamp, messageId: msg.id, imageIndex: e.imageIndex, thumb: e.thumb, tags: e.tags })),
-          index: imageIndex
+          meta: entries.map(e => ({ timestamp: msg.timestamp, messageId: msg.id, imageIndex: e.imageIndex, thumb: e.thumb, tags: e.tags, directMediaUrl: e.directMediaUrl })),
+          index: directMediaUrl ? 0 : imageIndex
         });
       }, 350);
     }
@@ -7496,16 +7500,17 @@ function App() {
         setTimeout(() => el.classList.remove('search-result-flash'), 1700);
       }, 350);
     },
-    onOpenImage: (messageId, imageIndex) => {
+    onOpenImage: (messageId, imageIndex, directMediaUrl = '') => {
       changeView('chat');
       setTimeout(() => {
         const msg = chatMessages.find(m => m.id === messageId);
         if (!msg) return;
-        const entries = getMessageImageEntries(msg);
+        const directEntry = getMessageDirectMediaEntry(msg);
+        const entries = directMediaUrl && directEntry ? [directEntry] : getMessageImageEntries(msg);
         setActiveLightbox({
           urls: entries.map(e => e.full),
-          meta: entries.map(e => ({ timestamp: msg.timestamp, messageId: msg.id, imageIndex: e.imageIndex, thumb: e.thumb, tags: e.tags })),
-          index: imageIndex
+          meta: entries.map(e => ({ timestamp: msg.timestamp, messageId: msg.id, imageIndex: e.imageIndex, thumb: e.thumb, tags: e.tags, directMediaUrl: e.directMediaUrl })),
+          index: directMediaUrl ? 0 : imageIndex
         });
       }, 350);
     },
@@ -8567,7 +8572,7 @@ function getDirectChatMediaInfo(url) {
   return null;
 }
 
-function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox, linkPreview, style = {} }) {
+function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox, linkPreview, style = {}, message = null }) {
   const firstUrl = extractFirstUrl(text);
   const mediaInfo = getDirectChatMediaInfo(firstUrl);
   const [failed, setFailed] = React.useState(false);
@@ -8616,7 +8621,14 @@ function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox, linkPr
         onClick: () => setActiveLightbox && setActiveLightbox({
           urls: [mediaInfo.url],
           index: 0,
-          meta: [{ timestamp: Date.now(), messageId: '', imageIndex: 0, thumb: mediaInfo.url, tags: '' }]
+          meta: [{
+            timestamp: message?.timestamp || Date.now(),
+            messageId: message?.id || '',
+            imageIndex: 0,
+            thumb: mediaInfo.url,
+            tags: message?.directMediaTags || '',
+            directMediaUrl: mediaInfo.url
+          }]
         }),
         style: { ...commonStyle, cursor: setActiveLightbox ? 'pointer' : 'default' }
       })
@@ -8664,7 +8676,8 @@ function renderChatMessageBody(msg, setActiveLightbox, singleImageStyle = {}, se
       searchQuery,
       setActiveLightbox: msgImages ? null : setActiveLightbox,
       linkPreview: msg.linkPreview,
-      style: singleImageStyle
+      style: singleImageStyle,
+      message: msg
     }) : null
   );
 }
@@ -9600,6 +9613,21 @@ function getMessageImageEntries(msg) {
   return thumbs.map((thumb, i) => ({ full: urls[i] || thumb, thumb, imageIndex: i, messageId: msg.id, timestamp: msg.timestamp, tags: tags[i] || '' }));
 }
 
+function getMessageDirectMediaEntry(msg) {
+  const firstUrl = extractFirstUrl(msg?.text || '');
+  const mediaInfo = getDirectChatMediaInfo(firstUrl);
+  if (!mediaInfo || mediaInfo.type !== 'image') return null;
+  return {
+    full: mediaInfo.url,
+    thumb: mediaInfo.url,
+    imageIndex: 0,
+    messageId: msg.id,
+    timestamp: msg.timestamp,
+    tags: msg.directMediaTags || '',
+    directMediaUrl: mediaInfo.url
+  };
+}
+
 // Renders a chat message's attached image(s): a single thumbnail for legacy/one-image
 // messages, or a wrapping grid of thumbnails for messages sent with multiple images
 // (msg.imageUrls/msg.thumbUrls). Returns null when the message has no image at all.
@@ -10054,7 +10082,7 @@ function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, onPromote
   // shows the result immediately instead of only after the Lightbox is closed and reopened.
   const [tagOverrides, setTagOverrides] = React.useState({});
   const currentMeta = meta && meta[index];
-  const tagOverrideKey = currentMeta ? `${currentMeta.messageId}_${currentMeta.imageIndex}` : null;
+  const tagOverrideKey = currentMeta ? `${currentMeta.messageId}_${currentMeta.directMediaUrl ? 'direct' : currentMeta.imageIndex}` : null;
   const currentTags = (tagOverrideKey && tagOverrideKey in tagOverrides) ? tagOverrides[tagOverrideKey] : (currentMeta?.tags || '');
   // Mirrors handleSaveImageTags' own parse/dedupe/limit rules so the optimistic override shown
   // here matches what actually got persisted, without needing the save call to round-trip it.
@@ -10063,7 +10091,7 @@ function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, onPromote
   )).slice(0, 20).join(' ');
   const saveCurrentTags = onSaveImageTags && currentMeta?.messageId != null
     ? async tagsText => {
-        const ok = await onSaveImageTags(currentMeta.messageId, currentMeta.imageIndex, tagsText);
+        const ok = await onSaveImageTags(currentMeta.messageId, currentMeta.imageIndex, tagsText, currentMeta);
         if (ok && tagOverrideKey) setTagOverrides(prev => ({ ...prev, [tagOverrideKey]: normalizeTagsForDisplay(tagsText) }));
         return ok;
       }
@@ -14535,10 +14563,11 @@ function AdminModal({
       const cleanTag = (log.note || '').replace('#', '').trim();
       if (chatMessages && cleanTag) {
         for (const msg of chatMessages) {
-          const entries = getMessageImageEntries(msg);
+          const directEntry = getMessageDirectMediaEntry(msg);
+          const entries = directEntry ? [...getMessageImageEntries(msg), directEntry] : getMessageImageEntries(msg);
           const entry = entries.find(e => (e.tags || '').includes(cleanTag));
           if (entry) {
-            onOpenImage && onOpenImage(msg.id, entry.imageIndex);
+            onOpenImage && onOpenImage(msg.id, entry.imageIndex, entry.directMediaUrl);
             found = true;
             break;
           }
@@ -15161,7 +15190,9 @@ function computeCalendarSearchMatches(cal, chatMessages, memoList, q, limit = 30
 
   const tags = [];
   (chatMessages || []).forEach(msg => {
-    getMessageImageEntries(msg).forEach(entry => {
+    const directEntry = getMessageDirectMediaEntry(msg);
+    const imageEntries = directEntry ? [...getMessageImageEntries(msg), directEntry] : getMessageImageEntries(msg);
+    imageEntries.forEach(entry => {
       if ((entry.tags || '').toLowerCase().includes(q)) {
         tags.push({ ...entry, participantName: participantsMap[msg.participantId]?.name || '알수없음', participantColor: participantsMap[msg.participantId]?.color || '#94A3B8' });
       }
@@ -15355,10 +15386,10 @@ function GlobalSearchModal({
         style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(72px, 100%), 1fr))', gap: '6px' }
       },
         matches.tags.map(entry => /*#__PURE__*/React.createElement("button", {
-          key: `${entry.messageId}_${entry.imageIndex}`,
+          key: `${entry.messageId}_${entry.directMediaUrl ? 'direct' : entry.imageIndex}`,
           type: "button",
           title: entry.tags,
-          onClick: () => { onOpenImage && onOpenImage(entry.messageId, entry.imageIndex); onClose(); },
+          onClick: () => { onOpenImage && onOpenImage(entry.messageId, entry.imageIndex, entry.directMediaUrl); onClose(); },
           style: { padding: 0, border: 0, background: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '4px' }
         },
           /*#__PURE__*/React.createElement("img", {
@@ -21641,11 +21672,15 @@ function PhotoGallery({ chatMessages, showToast, onPromoteImageUrl, onSaveImageT
 
   const photoEntries = React.useMemo(() => {
     const sorted = [...(chatMessages || [])].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-    return sorted.flatMap(msg => getMessageImageEntries(msg).map((entry, i) => ({
+    return sorted.flatMap(msg => {
+      const directEntry = getMessageDirectMediaEntry(msg);
+      const entries = directEntry ? [...getMessageImageEntries(msg), directEntry] : getMessageImageEntries(msg);
+      return entries.map((entry, i) => ({
       ...entry,
-      key: `${msg.id}_${i}`,
+      key: `${msg.id}_${entry.directMediaUrl ? 'direct' : i}`,
       timestamp: msg.timestamp
-    })));
+    }));
+    });
   }, [chatMessages]);
 
   if (photoEntries.length === 0) return null;
@@ -21685,7 +21720,7 @@ function PhotoGallery({ chatMessages, showToast, onPromoteImageUrl, onSaveImageT
         loading: "lazy",
         onClick: () => setLightbox({
           urls: photoEntries.map(e => e.full),
-          meta: photoEntries.map(e => ({ timestamp: e.timestamp, messageId: e.messageId, imageIndex: e.imageIndex, thumb: e.thumb, tags: e.tags })),
+          meta: photoEntries.map(e => ({ timestamp: e.timestamp, messageId: e.messageId, imageIndex: e.imageIndex, thumb: e.thumb, tags: e.tags, directMediaUrl: e.directMediaUrl })),
           index: idx
         }),
         style: { width: '100%', aspectRatio: '1 / 1', objectFit: 'cover', borderRadius: 'var(--radius-sm)', cursor: 'pointer' }
