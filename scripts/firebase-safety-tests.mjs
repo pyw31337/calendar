@@ -214,6 +214,19 @@ runAppScript(productionContext, `
   if (pastedImages.length !== 1 || pastedImages[0] !== pastedImageFile) {
     throw new Error('clipboard image extraction failed');
   }
+  const duplicateClipboardFile = { name: 'image.png', type: 'image/png', size: 1234, lastModified: 999 };
+  const dedupedPastedImages = getImageFilesFromClipboardEvent({
+    clipboardData: {
+      items: [
+        { kind: 'file', type: 'image/png', getAsFile: () => pastedImageFile }
+      ],
+      files: [duplicateClipboardFile],
+      getData: () => ''
+    }
+  });
+  if (dedupedPastedImages.length !== 1) {
+    throw new Error('clipboard duplicate image extraction failed');
+  }
   const pastedTextOnly = getImageFilesFromClipboardEvent({
     clipboardData: {
       items: [{ kind: 'string', type: 'text/plain' }],

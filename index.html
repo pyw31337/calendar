@@ -9037,9 +9037,15 @@ function getImageFilesFromClipboardEvent(event) {
     if (!file) return;
     const isImageLike = /^image\//i.test(file.type || '') || isHeicFile(file);
     if (!isImageLike) return;
-    const key = `${file.name || 'clipboard-image'}:${file.size || 0}:${file.type || ''}:${file.lastModified || 0}`;
-    if (seen.has(key)) return;
+    // Some browsers expose the same pasted screenshot both through clipboard.items and
+    // clipboard.files, but with different transient names/lastModified values. Deduplicate
+    // pasted images by stable binary-ish metadata first so one paste never becomes two previews.
+    const stableKey = `${file.type || 'image'}:${file.size || 0}`;
+    const fallbackKey = `${file.name || 'clipboard-image'}:${file.size || 0}:${file.type || ''}:${file.lastModified || 0}`;
+    const key = file.size ? stableKey : fallbackKey;
+    if (seen.has(key) || seen.has(fallbackKey)) return;
     seen.add(key);
+    seen.add(fallbackKey);
     files.push(file);
   };
 
