@@ -8,6 +8,13 @@ const MIRRORED_ASSETS = [
   'app-constants.js'
 ];
 
+const REQUIRED_SCRIPT_ORDER = [
+  'assets/app-constants.js',
+  'assets/app-config.js',
+  'assets/app-calendar-data.js',
+  'assets/app-chat-data.js'
+];
+
 function hashFile(path) {
   return createHash('sha256').update(readFileSync(path)).digest('hex');
 }
@@ -33,6 +40,34 @@ for (const assetPath of referencedAssets) {
     console.error(`Missing referenced asset: ${assetPath}`);
     process.exit(1);
   }
+}
+
+let previousIndex = -1;
+for (const assetPath of REQUIRED_SCRIPT_ORDER) {
+  const scriptIndex = indexHtml.indexOf(`src="${assetPath}`);
+
+  if (scriptIndex === -1) {
+    console.error(`Missing required script reference: ${assetPath}`);
+    process.exit(1);
+  }
+
+  if (scriptIndex <= previousIndex) {
+    console.error(`Required script order is broken near: ${assetPath}`);
+    process.exit(1);
+  }
+
+  previousIndex = scriptIndex;
+}
+
+const inlineAppIndex = indexHtml.indexOf('const GATHER_APP_CONSTANTS = window.GATHER_APP_CONSTANTS || {};');
+if (inlineAppIndex === -1) {
+  console.error('Missing inline app bootstrap marker: GATHER_APP_CONSTANTS.');
+  process.exit(1);
+}
+
+if (inlineAppIndex <= previousIndex) {
+  console.error('Inline app bootstrap must run after external app data scripts.');
+  process.exit(1);
 }
 
 console.log('Asset mirror check passed.');
