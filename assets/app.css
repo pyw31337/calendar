@@ -1128,7 +1128,7 @@ select.form-select {
   padding: 10px 12px;
   border: 0;
   border-radius: var(--radius-md);
-  background: var(--bg-primary);
+  background: var(--bg-card);
 }
 .poll-option-row.is-confirmed-winner {
   border: 1px solid #8B5CF6;
