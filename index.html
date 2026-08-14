@@ -6025,7 +6025,7 @@ function App() {
       let linkPreview = null;
       if (hasText) {
         const url = extractFirstUrl(chatInput);
-        if (url) {
+        if (url && !getDirectChatMediaInfo(url)) {
           try {
             const res = await fetchLinkPreview(url);
             if (res && res.status === 'success') {
@@ -6155,7 +6155,7 @@ function App() {
     try {
       let linkPreview = null;
       const url = extractFirstUrl(newText);
-      if (url) {
+      if (url && !getDirectChatMediaInfo(url)) {
         const oldUrl = extractFirstUrl(editingMessage.text);
         if (oldUrl === url && editingMessage.linkPreview) {
           linkPreview = editingMessage.linkPreview;
@@ -8462,6 +8462,126 @@ function LinkPreviewCard({ url, fallbackTitle, cachedData }) {
   );
 }
 
+function getDirectChatMediaInfo(url) {
+  const normalizedUrl = sanitizeText(url || '', 2000);
+  if (!normalizedUrl || !/^https?:\/\//i.test(normalizedUrl)) return null;
+  const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.avif', '.bmp', '.svg'];
+  const videoExtensions = ['.mp4', '.webm', '.ogv', '.m4v', '.mov'];
+  const getExtensionType = candidate => {
+    try {
+      const parsed = new URL(candidate);
+      const path = decodeURIComponent(parsed.pathname || '').toLowerCase();
+      if (imageExtensions.some(ext => path.endsWith(ext))) return 'image';
+      if (videoExtensions.some(ext => path.endsWith(ext))) return 'video';
+    } catch (e) {
+      const clean = String(candidate || '').split(/[?#]/)[0].toLowerCase();
+      if (imageExtensions.some(ext => clean.endsWith(ext))) return 'image';
+      if (videoExtensions.some(ext => clean.endsWith(ext))) return 'video';
+    }
+    return '';
+  };
+
+  const candidates = [normalizedUrl];
+  try {
+    const parsed = new URL(normalizedUrl);
+    ['src', 'url', 'u', 'image', 'img', 'media'].forEach(key => {
+      const value = parsed.searchParams.get(key);
+      if (!value) return;
+      candidates.push(value);
+      try {
+        candidates.push(decodeURIComponent(value));
+      } catch (e) {
+        // URLSearchParams usually decodes already; this only covers double-encoded sources.
+      }
+    });
+  } catch (e) {
+    // Invalid URL is rejected by the normalizedUrl guard above; keep this defensive.
+  }
+
+  for (const candidate of candidates) {
+    const type = getExtensionType(candidate);
+    if (type) return { type, url: normalizedUrl };
+  }
+  return null;
+}
+
+function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox, linkPreview, style = {} }) {
+  const firstUrl = extractFirstUrl(text);
+  const mediaInfo = getDirectChatMediaInfo(firstUrl);
+  const [failed, setFailed] = React.useState(false);
+  React.useEffect(() => {
+    setFailed(false);
+  }, [firstUrl]);
+
+  if (!mediaInfo || failed) {
+    return /*#__PURE__*/React.createElement(React.Fragment, null,
+      text ? parseTextWithLinks(text, searchQuery) : null,
+      firstUrl && /*#__PURE__*/React.createElement(LinkPreviewCard, {
+        url: firstUrl,
+        fallbackTitle: text ? removeFirstUrl(text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : '',
+        cachedData: linkPreview
+      })
+    );
+  }
+
+  const remainingText = removeFirstUrl(text);
+  const maxWidth = style.maxWidth || '320px';
+  const maxHeight = style.maxHeight || '240px';
+  const marginBottom = remainingText ? '8px' : (style.marginBottom || '0');
+  const commonStyle = {
+    display: 'block',
+    width: '100%',
+    maxWidth: `min(100%, ${maxWidth})`,
+    maxHeight,
+    borderRadius: '10px',
+    backgroundColor: 'var(--bg-primary)',
+    objectFit: 'contain',
+    marginBottom
+  };
+
+  return /*#__PURE__*/React.createElement(React.Fragment, null,
+    mediaInfo.type === 'image'
+      ? /*#__PURE__*/React.createElement('img', {
+        src: mediaInfo.url,
+        alt: '링크 이미지',
+        loading: 'lazy',
+        onError: () => setFailed(true),
+        onClick: () => setActiveLightbox && setActiveLightbox({
+          urls: [mediaInfo.url],
+          index: 0,
+          meta: [{ timestamp: Date.now(), messageId: '', imageIndex: 0, thumb: mediaInfo.url, tags: '' }]
+        }),
+        style: { ...commonStyle, cursor: setActiveLightbox ? 'pointer' : 'default' }
+      })
+      : /*#__PURE__*/React.createElement('video', {
+        src: mediaInfo.url,
+        muted: true,
+        autoPlay: true,
+        loop: true,
+        playsInline: true,
+        controls: true,
+        preload: 'metadata',
+        onError: () => setFailed(true),
+        style: commonStyle
+      }),
+    remainingText ? /*#__PURE__*/React.createElement('div', null, parseTextWithLinks(remainingText, searchQuery)) : null
+  );
+}
+
+function renderChatMessageBody(msg, setActiveLightbox, singleImageStyle = {}, searchQuery = '') {
+  const msgImages = renderChatMessageImages(msg, setActiveLightbox, singleImageStyle);
+  return /*#__PURE__*/React.createElement(React.Fragment, null,
+    msgImages ? /*#__PURE__*/React.createElement('div', { style: { marginBottom: msg.text ? '8px' : '0' } }, msgImages) : null,
+    msg.text ? /*#__PURE__*/React.createElement(DirectChatMediaText, {
+      text: msg.text,
+      searchQuery,
+      setActiveLightbox: msgImages ? null : setActiveLightbox,
+      linkPreview: msg.linkPreview,
+      style: singleImageStyle
+    }) : null
+  );
+}
+
 // HEIC/HEIF (the default photo format on iPhone) has no native decode support in canvas/Image()
 // on any browser except some Safari versions -- a raw .heic/.heif file (e.g. picked via the
 // Files app, which unlike Safari's usual photo picker doesn't auto-convert to JPEG on select)
@@ -10365,13 +10485,7 @@ function CommentsSection({
     const badgeName = p?.name || '알수없음';
 
     /* === SHARED ELEMENTS === */
-    const msgImages = renderChatMessageImages(msg, setActiveLightbox, { maxWidth: '120px', maxHeight: '90px' });
-    const msgFirstUrl = extractFirstUrl(msg.text);
-    const bubbleContent = /*#__PURE__*/React.createElement(React.Fragment, null,
-      msgImages ? /*#__PURE__*/React.createElement('div', { style: { marginBottom: '8px' } }, msgImages) : null,
-      msg.text ? parseTextWithLinks(msg.text) : null,
-      msgFirstUrl && /*#__PURE__*/React.createElement(LinkPreviewCard, { url: msgFirstUrl, fallbackTitle: msg.text ? removeFirstUrl(msg.text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : '', cachedData: msg.linkPreview })
-    );
+    const bubbleContent = renderChatMessageBody(msg, setActiveLightbox, { maxWidth: '120px', maxHeight: '90px' });
 
     const editSvg = /*#__PURE__*/React.createElement('svg', { xmlns: 'http://www.w3.org/2000/svg', width: '12', height: '12', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '2.5', strokeLinecap: 'round', strokeLinejoin: 'round' },
       /*#__PURE__*/React.createElement('path', { stroke: 'none', d: 'M0 0h24v24H0z', fill: 'none' }),
@@ -11293,7 +11407,7 @@ function ChatRoomView({
         whiteSpace: 'pre-wrap',
         boxShadow: '0 2px 6px rgba(0,0,0,0.06)'
       }
-    }, renderChatMessageImages(msg, setActiveLightbox, { maxWidth: '200px', maxHeight: '150px', marginBottom: msg.text ? '10px' : '0' }), msg.text ? parseTextWithLinks(msg.text, searchQuery) : null, extractFirstUrl(msg.text) && /*#__PURE__*/React.createElement(LinkPreviewCard, { url: extractFirstUrl(msg.text), fallbackTitle: msg.text ? removeFirstUrl(msg.text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : '', cachedData: msg.linkPreview })), /*#__PURE__*/React.createElement("div", {
+    }, renderChatMessageBody(msg, setActiveLightbox, { maxWidth: '200px', maxHeight: '150px', marginBottom: msg.text ? '10px' : '0' }, searchQuery)), /*#__PURE__*/React.createElement("div", {
       style: {
         position: 'absolute',
         right: '-7px',
@@ -11346,7 +11460,7 @@ function ChatRoomView({
         whiteSpace: 'pre-wrap',
         boxShadow: '0 2px 6px rgba(0,0,0,0.06)'
       }
-    }, renderChatMessageImages(msg, setActiveLightbox, { maxWidth: '200px', maxHeight: '150px', marginBottom: msg.text ? '10px' : '0' }), msg.text ? parseTextWithLinks(msg.text, searchQuery) : null, extractFirstUrl(msg.text) && /*#__PURE__*/React.createElement(LinkPreviewCard, { url: extractFirstUrl(msg.text), fallbackTitle: msg.text ? removeFirstUrl(msg.text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : '', cachedData: msg.linkPreview })), /*#__PURE__*/React.createElement("div", {
+    }, renderChatMessageBody(msg, setActiveLightbox, { maxWidth: '200px', maxHeight: '150px', marginBottom: msg.text ? '10px' : '0' }, searchQuery)), /*#__PURE__*/React.createElement("div", {
       style: {
         position: 'absolute',
         left: '-7px',

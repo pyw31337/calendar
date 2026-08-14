@@ -224,6 +224,19 @@ runAppScript(productionContext, `
   if (pastedTextOnly.length !== 0) {
     throw new Error('clipboard text paste must not attach images');
   }
+  if (getDirectChatMediaInfo('https://i.aagag.com/o/KpOo5.webp')?.type !== 'image') {
+    throw new Error('direct webp chat media detection failed');
+  }
+  if (getDirectChatMediaInfo('https://i.aagag.com/Kp4wT.mp4')?.type !== 'video') {
+    throw new Error('direct mp4 chat media detection failed');
+  }
+  const naverProxyImage = 'https://search.pstatic.net/common/?src=https%3A%2F%2Fldb-phinf.pstatic.net%2F20250722_204%2F1753148380144i8qRz_JPEG%2F20250722_093743.jpg';
+  if (getDirectChatMediaInfo(naverProxyImage)?.type !== 'image') {
+    throw new Error('proxy image URL chat media detection failed');
+  }
+  if (getDirectChatMediaInfo('https://blog.naver.com/choochoo440/224199076337') !== null) {
+    throw new Error('normal page URL must not be treated as direct chat media');
+  }
 `);
 
 const restoreContext = createContext('https://pyw31337.github.io/calendar/?admin=1&restore=1');
