@@ -1057,6 +1057,20 @@ select.form-select {
 .poll-card + .poll-card {
   border-top: 1px solid var(--border-subtle);
 }
+/* Grouped list look: adjoining edges between stacked poll cards go square, so the whole
+   .polls-section reads as one rounded container instead of a stack of separate boxes. A
+   single poll (:only-child) is left with its full radius. */
+.poll-card:first-child:not(:only-child) {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.poll-card:last-child:not(:only-child) {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+.poll-card:not(:first-child):not(:last-child) {
+  border-radius: 0;
+}
 @media (min-width: 640px) {
   .poll-card { padding: 22px; }
 }
