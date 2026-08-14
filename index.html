@@ -101,7 +101,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
 
-  <link rel="stylesheet" href="assets/app.css?v=20260814-split13">
+  <link rel="stylesheet" href="assets/app.css?v=20260814-split15">
 </head>
 <body>
   <div id="root">
@@ -8667,29 +8667,49 @@ function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox, linkPr
         onError: () => setFailed(true),
         style: commonStyle
       })
-      : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement('iframe', {
-      src: mediaInfo.url,
-      title: embedTitleMap[mediaInfo.provider] || '링크 영상',
-      loading: 'lazy',
-      allow: 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share',
-      allowFullScreen: true,
-      onError: () => setFailed(true),
-      style: {
-        display: 'block',
-        width: '100%',
-        maxWidth: isPortraitEmbed ? `min(100%, ${style.portraitEmbedMaxWidth || '360px'})` : `min(100%, ${style.embedMaxWidth || '760px'})`,
-        aspectRatio: isPortraitEmbed ? '9 / 16' : '16 / 9',
-        maxHeight: isPortraitEmbed ? 'min(72vh, 620px)' : 'min(54vh, 430px)',
-        border: '0',
-        borderRadius: '10px',
-        backgroundColor: 'var(--bg-primary)',
-        marginBottom: linkPreview ? '6px' : marginBottom
-      }
-    }), /*#__PURE__*/React.createElement(LinkPreviewCard, {
-      url: firstUrl,
-      fallbackTitle: text ? removeFirstUrl(text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : '',
-      cachedData: linkPreview
-    })),
+      : (() => {
+        // The iframe's own width:100% only resolves against a *definite* box. Its ancestors
+        // here (a shrink-to-fit flex item, then a plain block with no explicit width) form an
+        // indeterminate chain, so without this wrapper the percentage falls back to 'auto' --
+        // which for a replaced element like <iframe> means the HTML default intrinsic size
+        // (300x150), not the ~760px this was meant to render at. Giving the wrapper its own
+        // explicit width breaks that chain and anchors the iframe's percentage against it.
+        // The same wrapper doubles as the desktop drag-resize handle (see .chat-media-resizable
+        // in app.css, scoped to .chat-room-container so it's a no-op everywhere else this
+        // renders): resize:horizontal lets width grow while the iframe's aspect-ratio keeps
+        // height in proportion automatically, so no extra logic is needed to scale the video
+        // together with the bubble.
+        const embedWidth = isPortraitEmbed ? (style.portraitEmbedMaxWidth || '360px') : (style.embedMaxWidth || '760px');
+        return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement('div', {
+          className: 'chat-media-resizable',
+          style: {
+            width: `min(100%, ${embedWidth})`,
+            maxWidth: isPortraitEmbed ? '500px' : '1400px',
+            minWidth: isPortraitEmbed ? '200px' : '260px',
+            marginBottom: linkPreview ? '6px' : marginBottom
+          }
+        }, /*#__PURE__*/React.createElement('iframe', {
+          src: mediaInfo.url,
+          title: embedTitleMap[mediaInfo.provider] || '링크 영상',
+          loading: 'lazy',
+          allow: 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share',
+          allowFullScreen: true,
+          onError: () => setFailed(true),
+          style: {
+            display: 'block',
+            width: '100%',
+            aspectRatio: isPortraitEmbed ? '9 / 16' : '16 / 9',
+            maxHeight: isPortraitEmbed ? 'min(72vh, 620px)' : 'min(54vh, 430px)',
+            border: '0',
+            borderRadius: '10px',
+            backgroundColor: 'var(--bg-primary)'
+          }
+        })), /*#__PURE__*/React.createElement(LinkPreviewCard, {
+          url: firstUrl,
+          fallbackTitle: text ? removeFirstUrl(text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : '',
+          cachedData: linkPreview
+        }));
+      })(),
     remainingText ? /*#__PURE__*/React.createElement('div', null, parseTextWithLinks(remainingText, searchQuery)) : null
   );
 }
@@ -11432,7 +11452,10 @@ function ChatRoomView({
     const msgHasImages = !!(msg.imageUrl || (Array.isArray(msg.imageUrls) && msg.imageUrls.length > 0));
     const msgDirectMediaInfo = getDirectChatMediaInfo(extractFirstUrl(msg.text || ''));
     const isEmbedMessage = msgDirectMediaInfo?.type === 'embed';
-    const chatBubbleMaxWidth = isEmbedMessage ? 'min(92%, 820px)' : '65%';
+    // Wide enough that the embed's own .chat-media-resizable wrapper (see DirectChatMediaText)
+    // has real headroom to drag-resize into on desktop, instead of immediately overflowing
+    // this bubble's box the moment the user grows it past the old 820px ceiling.
+    const chatBubbleMaxWidth = isEmbedMessage ? 'min(96%, 1400px)' : '65%';
     const chatMediaStyle = isEmbedMessage
       ? { maxWidth: '760px', embedMaxWidth: '760px', portraitEmbedMaxWidth: '360px', maxHeight: '72vh', marginBottom: msg.text ? '10px' : '0' }
       : { maxWidth: '420px', maxHeight: '62vh', marginBottom: msg.text ? '10px' : '0' };
@@ -11548,7 +11571,12 @@ function ChatRoomView({
       )
     ), /*#__PURE__*/React.createElement("div", {
       key: "bubble-wrapper",
-      style: { position: 'relative', maxWidth: chatBubbleMaxWidth, zIndex: 1, alignSelf: 'flex-end' }
+      // A definite width (not just maxWidth) here, for embed messages, is required -- this
+      // wrapper is a flex item with no other sizing hint, so without it the whole chain below
+      // (percentage-width bubble > percentage-width .chat-media-resizable > percentage-width
+      // iframe) has no definite containing block to resolve against and collapses to the
+      // iframe's HTML-default intrinsic size (300x150) instead of the intended ~760px.
+      style: { position: 'relative', maxWidth: chatBubbleMaxWidth, width: isEmbedMessage ? chatBubbleMaxWidth : undefined, zIndex: 1, alignSelf: 'flex-end' }
     }, /*#__PURE__*/React.createElement("div", {
       key: isSearchFocused ? `bubble-focused-${rowId}` : undefined,
       className: isSearchFocused ? 'chat-search-focused-bubble' : (isSearchMatch ? 'chat-search-match-bubble' : ''),
@@ -11601,7 +11629,7 @@ function ChatRoomView({
       }
     }))] : [/*#__PURE__*/React.createElement("div", {
       key: "bubble-wrapper",
-      style: { position: 'relative', maxWidth: chatBubbleMaxWidth, zIndex: 1 }
+      style: { position: 'relative', maxWidth: chatBubbleMaxWidth, width: isEmbedMessage ? chatBubbleMaxWidth : undefined, zIndex: 1 }
     }, /*#__PURE__*/React.createElement("div", {
       key: isSearchFocused ? `bubble-focused-${rowId}` : undefined,
       className: isSearchFocused ? 'chat-search-focused-bubble' : (isSearchMatch ? 'chat-search-match-bubble' : ''),

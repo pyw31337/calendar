@@ -460,6 +460,28 @@ body:has(.admin-login-gate) {
     max-width: 100%;
   }
 }
+/* Drag-to-resize handle on embedded chat videos (YouTube/Vimeo), desktop only -- native
+   `resize` needs a pointer for its corner/edge handle, so it's not a reasonable target for
+   touch. horizontal-only (not `both`) is deliberate: the iframe inside is `width: 100%` with
+   a locked aspect-ratio, so growing/shrinking the wrapper's width alone already scales the
+   video's height in proportion with zero extra JS -- resize: both would let width and height
+   drift independently and leave dead space. Scoped under .chat-room-container so the same
+   DirectChatMediaText markup used in the main-screen chat preview/memos/search results (all
+   much smaller, fixed-size contexts) isn't affected. */
+@media (min-width: 768px) {
+  .chat-room-container .chat-media-resizable {
+    resize: horizontal;
+    overflow: hidden;
+  }
+  /* The iframe's inline maxHeight (min(54vh,430px) landscape / min(72vh,620px) portrait) exists
+     to keep the un-resized embed compact -- but once the user drags wider than that cap allows
+     at the locked aspect-ratio, it clips height and the box stops being 16:9, breaking the
+     "media grows proportionally with the bubble" behavior the resize handle is for. Lifting the
+     cap only inside the resizable chat-room context lets aspect-ratio alone govern height. */
+  .chat-room-container .chat-media-resizable iframe {
+    max-height: none !important;
+  }
+}
 .poll-option-row,
 .recent-log-row,
 .search-result-row,
