@@ -7440,9 +7440,15 @@ function AdminDashboard({ initialCalendars }) {
                   key: unit + val, style: { fontSize: '0.7rem', padding: '2px 8px', borderRadius: '4px', backgroundColor: '#FFFFFF', border: '1px solid #E2E8F0', color: '#0F172A' }
                 }, val, unit))
               ),
-              /* Progress bar */
+              /* 일정 등록 비중: 가장 일정이 많은 캘린더를 100% 기준으로 비교합니다. */
               /*#__PURE__*/React.createElement("div", {
-                style: { width: '100%', height: '6px', borderRadius: '999px', backgroundColor: '#E2E8F0', overflow: 'hidden' }
+                style: { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '8px', fontSize: '0.68rem', color: '#94A3B8', fontWeight: 700, marginTop: '4px' }
+              },
+                /*#__PURE__*/React.createElement("span", null, "일정 등록 비중"),
+                /*#__PURE__*/React.createElement("span", null, `${stat.schedules.length.toLocaleString()}건 / 최대 ${dashboard.maxSchedules.toLocaleString()}건`)
+              ),
+              /*#__PURE__*/React.createElement("div", {
+                style: { width: '100%', height: '6px', borderRadius: '999px', backgroundColor: '#E2E8F0', overflow: 'hidden', marginTop: '4px' }
               },
                 /*#__PURE__*/React.createElement("div", { style: { width, height: '100%', backgroundColor: '#3ECF8E' } })
               ),
@@ -7567,12 +7573,14 @@ function AdminDashboard({ initialCalendars }) {
       selectedCal ? /*#__PURE__*/React.createElement(React.Fragment, null,
         /* Profile & Participants settings card */
         /*#__PURE__*/React.createElement("section", { style: styles.card },
-          /*#__PURE__*/React.createElement("h4", { style: { ...styles.cardTitle, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }, "data-collapse-anchor": "true", "data-collapse-key": "settings-calendar", "data-collapse-label": "캘린더 설정" },
-            /*#__PURE__*/React.createElement("span", { style: { display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(CalendarCogIcon, null), "캘린더 설정"),
+          /*#__PURE__*/React.createElement("h4", { style: { ...styles.cardTitle, display: 'flex', alignItems: 'center', gap: '10px' }, "data-collapse-anchor": "true", "data-collapse-key": "settings-calendar", "data-collapse-label": "캘린더 설정" },
+            /*#__PURE__*/React.createElement("span", { style: { display: 'flex', alignItems: 'center', gap: '6px', flex: '1 1 auto', minWidth: 0 } }, /*#__PURE__*/React.createElement(CalendarCogIcon, null), "캘린더 설정"),
+            /*#__PURE__*/React.createElement("span", { style: { display: 'inline-flex', alignItems: 'center', gap: '8px', marginLeft: 'auto', flexShrink: 0 } },
             /*#__PURE__*/React.createElement("button", {
               type: "button", className: "btn btn-poll-create",
               onClick: handleCreateNewCalendarFromAdmin
             }, "+ 새 캘린더")
+            )
           ),
 
           /* Title input */
@@ -7714,11 +7722,13 @@ function AdminDashboard({ initialCalendars }) {
         /*#__PURE__*/React.createElement("section", { style: styles.card },
           /* Header */
           /*#__PURE__*/React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '14px', borderBottom: '1px solid #E2E8F0', paddingBottom: '8px' }, "data-collapse-anchor": "true", "data-collapse-key": "settings-polls", "data-collapse-label": "투표 설정" },
-            /*#__PURE__*/React.createElement("h4", { style: { fontSize: '0.96rem', fontWeight: '900', color: '#0F172A', margin: 0, display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' } }, /*#__PURE__*/React.createElement(PollSectionIcon, null), "투표 설정"),
+            /*#__PURE__*/React.createElement("h4", { style: { fontSize: '0.96rem', fontWeight: '900', color: '#0F172A', margin: 0, display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', flex: '1 1 auto', minWidth: 0 } }, /*#__PURE__*/React.createElement(PollSectionIcon, null), "투표 설정"),
+            /*#__PURE__*/React.createElement("span", { style: { display: 'inline-flex', alignItems: 'center', gap: '8px', marginLeft: 'auto', flexShrink: 0 } },
             /*#__PURE__*/React.createElement("button", {
               type: "button", className: "btn btn-poll-create",
               onClick: () => { setEditingPoll(null); setEditingPollCalId(selectedCalId); setIsPollModalOpen(true); }
             }, "+ 새 투표")
+            )
           ),
 
           /* Polls List */
@@ -7893,14 +7903,16 @@ function AdminDashboard({ initialCalendars }) {
       /* Unified Live Chat Logs Section */
       /*#__PURE__*/React.createElement("section", { style: styles.card },
         /* Header & Search */
-        /*#__PURE__*/React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' } },
-          /*#__PURE__*/React.createElement("div", null,
+        /*#__PURE__*/React.createElement("div", {
+          style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' },
+          "data-collapse-anchor": "true", "data-collapse-key": "logs-chat", "data-collapse-label": "채팅 로그"
+        },
+          /*#__PURE__*/React.createElement("div", { style: { flex: '1 1 auto', minWidth: 0 } },
             /*#__PURE__*/React.createElement("h4", { style: { fontSize: '0.96rem', fontWeight: '900', color: '#0F172A', margin: 0, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px' } }, /*#__PURE__*/React.createElement(ChatSectionIcon, null), "채팅 로그"),
             /*#__PURE__*/React.createElement("p", { style: { fontSize: '0.75rem', color: '#64748B', margin: '2px 0 0 0' } }, "각 캘린더별 채팅 메시지 내역을 실시간 모니터링하고 어드민 권한으로 삭제할 수 있습니다.")
           ),
           /*#__PURE__*/React.createElement("div", {
-            style: { display: 'flex', alignItems: 'center', gap: '8px', maxWidth: '100%', flex: '1 1 160px', justifyContent: 'flex-end' },
-            "data-collapse-anchor": "true", "data-collapse-key": "logs-chat", "data-collapse-label": "채팅 로그"
+            style: { display: 'flex', alignItems: 'center', gap: '8px', maxWidth: '100%', flex: '0 1 260px', justifyContent: 'flex-end', marginLeft: 'auto' }
           },
             /*#__PURE__*/React.createElement("input", {
               type: "text", className: "form-input", placeholder: "이름, 메시지 검색...", value: chatSearchQuery,
@@ -20778,7 +20790,7 @@ function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onSelectTag, onComm
     onClick: () => onOpenEdit(memo),
     style: {
       backgroundColor: memo.color || 'var(--bg-card)',
-      border: '1px solid ' + getBorderColor(memo.color || 'var(--bg-card)'),
+      border: '0',
       borderRadius: '12px',
       padding: '12px',
       cursor: 'pointer',
@@ -21772,6 +21784,7 @@ function GiftIcon({ size = 20 } = {}) {
 function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {
   const { isHeaderVisible, onScroll: handleSettlementScroll } = useScrollHideHeader();
   const [activeTab, setActiveTab] = React.useState('total');
+  const [collapsedDailyRows, setCollapsedDailyRows] = React.useState({});
   const categories = getExpenseCategories(calendar);
   const baseBudget = Number.isFinite(Number(calendar?.settlementBaseBudget)) ? Math.max(0, Math.round(Number(calendar.settlementBaseBudget))) : 0;
   // Income entries have no meaningful expense category of their own (their categoryId is
@@ -21825,6 +21838,9 @@ function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {
     setYear(pickerYear);
     setMonth(pickerMonth);
     setIsPickerOpen(false);
+  };
+  const toggleDailyRow = date => {
+    setCollapsedDailyRows(prev => ({ ...prev, [date]: !prev[date] }));
   };
 
   const allTimeRows = getConfirmedMeetings(calendar).slice().sort((a, b) => b.date.localeCompare(a.date))
@@ -22092,18 +22108,27 @@ function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {
 
   const dailyContent = rows.length === 0 ? monthEmptyContent : /*#__PURE__*/React.createElement("div", {
     style: { display: 'flex', flexDirection: 'column', gap: '10px' }
-  }, rows.map(row => /*#__PURE__*/React.createElement("section", {
-    key: row.meeting.date,
-    style: { border: '0', borderRadius: '14px', padding: '12px', backgroundColor: 'var(--bg-primary)' }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', marginBottom: '10px' }
-  }, /*#__PURE__*/React.createElement("strong", {
-    style: { fontSize: '0.92rem', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' }
-  }, /*#__PURE__*/React.createElement(CalendarCheckIcon, null), formatDateWithDayName(row.meeting.date)), /*#__PURE__*/React.createElement("span", {
-    style: { fontSize: '0.86rem', fontWeight: 900, color: row.net < 0 ? '#DC2626' : '#16A34A', whiteSpace: 'nowrap' }
-  }, row.net >= 0 ? '+' : '-', Math.abs(row.net).toLocaleString(), "원")), /*#__PURE__*/React.createElement("div", {
-    style: { display: 'flex', flexDirection: 'column', gap: '8px' }
-  }, row.items.map(item => renderItemRow({ ...item, date: row.meeting.date }, false))))));
+  }, rows.map(row => {
+    const isCollapsed = !!collapsedDailyRows[row.meeting.date];
+    return /*#__PURE__*/React.createElement("section", {
+      key: row.meeting.date,
+      style: { border: '0', borderRadius: '14px', padding: '12px', backgroundColor: 'var(--bg-primary)' }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', marginBottom: isCollapsed ? 0 : '10px' }
+    }, /*#__PURE__*/React.createElement("strong", {
+      style: { fontSize: '0.92rem', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }
+    }, /*#__PURE__*/React.createElement(CalendarCheckIcon, null), formatDateWithDayName(row.meeting.date)), /*#__PURE__*/React.createElement("span", {
+      style: { display: 'inline-flex', alignItems: 'center', gap: '6px', marginLeft: 'auto', whiteSpace: 'nowrap' }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: { fontSize: '0.86rem', fontWeight: 900, color: row.net < 0 ? '#DC2626' : '#16A34A' }
+    }, row.net >= 0 ? '+' : '-', Math.abs(row.net).toLocaleString(), "원"), /*#__PURE__*/React.createElement(SectionToggleButton, {
+      collapsed: isCollapsed,
+      onToggle: () => toggleDailyRow(row.meeting.date),
+      label: `${formatDateWithDayName(row.meeting.date)} 정산`
+    }))), !isCollapsed && /*#__PURE__*/React.createElement("div", {
+      style: { display: 'flex', flexDirection: 'column', gap: '8px' }
+    }, row.items.map(item => renderItemRow({ ...item, date: row.meeting.date }, false))));
+  }));
 
   const bodyContent = allTimeItems.length === 0 && baseBudget === 0 ? emptyContent : activeTab === 'total' ? totalContent : dailyContent;
 
