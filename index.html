@@ -3083,6 +3083,10 @@ function AdminDashboard({ initialCalendars }) {
   // see appConfig/linkPreviewStats + hashUrlForCache/fetchLinkPreview.
   const [linkPreviewStats, setLinkPreviewStats] = React.useState(null);
 
+  // Kakao Local (지도 검색) daily call count, service-wide -- see appConfig/kakaoLocalSearchStats,
+  // written server-side by kakaoLocalSearchProxy (functions/index.js).
+  const [kakaoSearchStats, setKakaoSearchStats] = React.useState(null);
+
   const lastSyncedRef = React.useRef(null);
 
   const showAdminToast = (message, type = 'success', duration = 3000) => {
@@ -3340,6 +3344,15 @@ function AdminDashboard({ initialCalendars }) {
     const unsub = firebaseDb.collection('appConfig').doc('linkPreviewStats').onSnapshot(snap => {
       setLinkPreviewStats(snap.exists ? snap.data() : { cachedCount: 0, updatedAt: null });
     }, () => setLinkPreviewStats(null));
+    return () => unsub && unsub();
+  }, [firebaseDb]);
+
+  // Kakao Local search daily usage, loaded once (not tied to any single calendar)
+  React.useEffect(() => {
+    if (!firebaseDb) return;
+    const unsub = firebaseDb.collection('appConfig').doc('kakaoLocalSearchStats').onSnapshot(snap => {
+      setKakaoSearchStats(snap.exists ? snap.data() : { dailyUsageBucket: null, dailyUsageCount: 0 });
+    }, () => setKakaoSearchStats(null));
     return () => unsub && unsub();
   }, [firebaseDb]);
 
@@ -4052,6 +4065,15 @@ function AdminDashboard({ initialCalendars }) {
   const worstAvailabilityCount = worstAvailabilityStat ? worstAvailabilityStat.count : 0;
   const worstAvailabilityLabel = worstAvailabilityStat ? (worstAvailabilityStat.stat.calendar.title || worstAvailabilityStat.stat.calendar.id) : '';
 
+  // Kakao Local (지도 검색) daily usage -- Kakao's exact free-quota ceiling isn't hardcoded here
+  // (it depends on the connected Kakao Developers app's own plan/quota settings, which can change
+  // independently of this code), so this card shows the raw call count only and points to the
+  // 카카오 콘솔 쿼터 메뉴 for the actual limit rather than risking a stale/wrong number giving a
+  // false sense of safety margin.
+  const kakaoTodayBucket = new Date().toISOString().slice(0, 10);
+  const kakaoDailyUsage = (kakaoSearchStats && kakaoSearchStats.dailyUsageBucket === kakaoTodayBucket)
+    ? (kakaoSearchStats.dailyUsageCount || 0) : 0;
+
   const fullServiceUsage = [
     ...dashboard.serviceUsage,
     {
@@ -4061,6 +4083,14 @@ function AdminDashboard({ initialCalendars }) {
       remaining: `${peekalinkRemaining}건 (매 정시 초기화)`,
       percent: peekalinkUsagePercent,
       note: '무료 요금제는 누적 소진이 아닌 시간당 rate limit이며, 캐시 응답은 집계에서 제외'
+    },
+    {
+      label: '카카오맵 지도 검색 (오늘)',
+      used: `${kakaoDailyUsage}건`,
+      limit: '카카오 콘솔에서 확인',
+      remaining: '자정(UTC) 초기화',
+      percent: null,
+      note: '정확한 무료 한도는 카카오 개발자 콘솔 → 해당 앱 → 쿼터 메뉴에서 확인해 주세요. 성공/실패 요청 모두 집계됩니다.'
     },
     {
       label: '일정 데이터 (5,000건 캡)',
@@ -4572,7 +4602,7 @@ function AdminDashboard({ initialCalendars }) {
           fullServiceUsage.map(item => /*#__PURE__*/React.createElement("div", { key: item.label, className: "admin-quota-card" },
             /*#__PURE__*/React.createElement("div", { className: "admin-quota-label" }, item.label),
             /*#__PURE__*/React.createElement("div", { className: "admin-quota-value" }, item.used, " / ", item.limit),
-            /*#__PURE__*/React.createElement("div", { className: "admin-progress" },
+            item.percent != null && /*#__PURE__*/React.createElement("div", { className: "admin-progress" },
               /*#__PURE__*/React.createElement("div", { className: "admin-progress-fill", style: { width: `${Math.max(2, Math.min(100, item.percent))}%`, background: item.percent >= 75 ? '#F59E0B' : '#3ECF8E' } })
             ),
             /*#__PURE__*/React.createElement("div", { className: "admin-quota-note" }, "잔여: ", item.remaining, /*#__PURE__*/React.createElement("br", null), item.note)

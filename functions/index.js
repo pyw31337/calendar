@@ -299,7 +299,39 @@ exports.peekalinkProxy = functions.https.onRequest(async (req, res) => {
 // in index.html): Nominatim/OSM has almost no Korean business-name coverage (e.g. searching
 // "스타벅스" only returns Japan branches), so Kakao Local is the primary geocoder for Korean POI
 // search, with Nominatim kept as a fallback for plain addresses/landmarks Kakao doesn't have.
-const KAKAO_REST_API_KEY = '1e932da4b24f87406d6d5204bc95f303';
+//
+// This key belongs to a different Kakao Developers app ("Culture Flow") than the one this
+// project was originally set up under ("Metro Live") -- Metro Live's own 카카오맵 product was
+// never activated, and Kakao only grants the one-time free daily quota to the FIRST app that
+// activates it account-wide, so activating it on Metro Live now would require attaching a
+// payment method with no free quota at all. Culture Flow already holds that free quota, so this
+// key reuses it instead -- its REST key must have its IP allowlist cleared (or set to allow-all)
+// in Kakao Developers, since Cloud Functions has no fixed outbound IP to register there.
+const KAKAO_REST_API_KEY = 'e18ee199818819d830c3fe479aa1ca71';
+
+// Tracks daily call volume against Kakao's free quota (see 어드민 통계 탭's 외부 서비스 연동
+// 현황 card) -- incremented here rather than client-side like incrementLinkPreviewStat, since
+// the actual Kakao call happens server-side in this function, not in the browser. Uses the
+// Admin SDK so no firestore.rules write access is needed for this doc.
+async function incrementKakaoLocalSearchStat() {
+  try {
+    const todayBucket = new Date().toISOString().slice(0, 10); // YYYY-MM-DD, resets at UTC midnight
+    const ref = admin.firestore().collection('appConfig').doc('kakaoLocalSearchStats');
+    await admin.firestore().runTransaction(async tx => {
+      const snap = await tx.get(ref);
+      const data = snap.exists ? snap.data() : null;
+      const sameBucket = data && data.dailyUsageBucket === todayBucket;
+      tx.set(ref, {
+        dailyUsageBucket: todayBucket,
+        dailyUsageCount: sameBucket ? (data.dailyUsageCount || 0) + 1 : 1,
+        updatedAt: Date.now()
+      });
+    });
+  } catch (err) {
+    console.warn('incrementKakaoLocalSearchStat failed (non-fatal):', err);
+  }
+}
+
 exports.kakaoLocalSearchProxy = functions.https.onRequest(async (req, res) => {
   res.set('Access-Control-Allow-Origin', '*');
   res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
@@ -311,6 +343,9 @@ exports.kakaoLocalSearchProxy = functions.https.onRequest(async (req, res) => {
     const kakaoRes = await fetch(`https://dapi.kakao.com/v2/local/search/keyword.json?query=${encodeURIComponent(query)}&size=10`, {
       headers: { Authorization: `KakaoAK ${KAKAO_REST_API_KEY}` }
     });
+    // Awaited (rather than fire-and-forget) so the write reliably completes before this HTTP
+    // function's instance is frozen once the response below is sent.
+    await incrementKakaoLocalSearchStat();
     if (!kakaoRes.ok) {
       res.status(kakaoRes.status).json({ ok: false, message: 'Kakao local search failed' });
       return;
