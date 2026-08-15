@@ -276,6 +276,14 @@ function getPlaceSortDateKey(place) {
   }
   return normalizePlaceDateForSort(extractLeadingMemoDate(place.memo));
 }
+// Renders either date shape a place can carry as a "25.03.30 (토)"-style capsule label --
+// formatShortDateWithDayName expects a dash-separated 'YYYY-MM-DD' string, so this normalizes
+// first via normalizePlaceDateForSort (handles both the structured visitDate and memo-embedded
+// 'YY.MM.DD' shapes) before formatting.
+function formatPlaceBadgeDate(dateStr) {
+  const normalized = normalizePlaceDateForSort(dateStr);
+  return normalized ? formatShortDateWithDayName(normalized) : null;
+}
 
 const URL_PARAMS = new URLSearchParams(window.location.search);
 const GATHER_APP_CONFIG = window.GATHER_APP_CONFIG || {};
@@ -22992,10 +23000,18 @@ function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom = false
           return domestic.length > 0 ? trimLatLngOutliers(domestic) : bounds;
         })()
       : bounds;
+    // A narrow phone viewport has much less room than the padding/maxZoom values below assume,
+    // so the same fitBounds fit reads as "too zoomed in" -- pins near the fitted edge end up
+    // hidden under the header/list below the map. Backing off one zoom level and padding out
+    // further on mobile keeps more of the cluster in frame.
+    const isMobileViewport = window.innerWidth <= 720;
     if (fitBoundsPoints.length === 1) {
-      mapRef.current.setView(fitBoundsPoints[0], 15);
+      mapRef.current.setView(fitBoundsPoints[0], isMobileViewport ? 14 : 15);
     } else if (fitBoundsPoints.length > 1) {
-      mapRef.current.fitBounds(fitBoundsPoints, { padding: [30, 30], maxZoom: 16 });
+      mapRef.current.fitBounds(fitBoundsPoints, {
+        padding: isMobileViewport ? [50, 70] : [30, 30],
+        maxZoom: isMobileViewport ? 15 : 16
+      });
     } else if (preferDomesticBounds) {
       mapRef.current.setView([36.5, 127.8], 7); // 한반도 전역이 보이는 기본 시점
     } else {
@@ -23051,7 +23067,8 @@ function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, onDelete,
   const [results, setResults] = React.useState([]);
   const [loading, setLoading] = React.useState(false);
   const [selected, setSelected] = React.useState(editingPlace ? {
-    name: editingPlace.name, address: editingPlace.address, lat: editingPlace.lat, lng: editingPlace.lng
+    name: editingPlace.name, address: editingPlace.address, lat: editingPlace.lat, lng: editingPlace.lng,
+    categoryLabel: '', phone: '', url: ''
   } : null);
   const [memo, setMemo] = React.useState(editingPlace ? (editingPlace.memo || '') : '');
   const [categoryId, setCategoryId] = React.useState(editingPlace ? editingPlace.categoryId : (categories[0]?.id || 'etc'));
@@ -23089,7 +23106,10 @@ function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, onDelete,
             address: doc.road_address_name || doc.address_name || '',
             lat: parseFloat(doc.y),
             lng: parseFloat(doc.x),
-            categoryId: KAKAO_CATEGORY_GROUP_TO_PLACE_CATEGORY[doc.category_group_code] || null
+            categoryId: KAKAO_CATEGORY_GROUP_TO_PLACE_CATEGORY[doc.category_group_code] || null,
+            categoryLabel: doc.category_name || '',
+            phone: doc.phone || '',
+            url: doc.place_url || ''
           })).filter(r => Number.isFinite(r.lat) && Number.isFinite(r.lng));
         }
       } catch (err) {
@@ -23118,7 +23138,10 @@ function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, onDelete,
   };
 
   const handleSelectResult = result => {
-    setSelected({ name: result.name, address: result.address, lat: result.lat, lng: result.lng });
+    setSelected({
+      name: result.name, address: result.address, lat: result.lat, lng: result.lng,
+      categoryLabel: result.categoryLabel || '', phone: result.phone || '', url: result.url || ''
+    });
     setQuery(result.name);
     setResults([]);
     // Kakao's category_group_code lets a search result suggest 식당/카페/놀이/숙박 up front, so the
@@ -23216,10 +23239,32 @@ function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, onDelete,
         /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.72rem', color: 'var(--text-muted)' } }, r.address)
       ))),
 
-      /* Selected place confirmation */
+      /* Selected place confirmation -- shows whatever business info the search result actually
+         carried (주소/전화/URL), not just a bare "선택됨: 이름" line, so the user can confirm
+         they picked the right branch/listing before saving. */
       selected && /*#__PURE__*/React.createElement("div", {
-        style: { padding: '10px 12px', borderRadius: '8px', backgroundColor: 'rgba(59, 130, 246, 0.08)', border: '1px solid rgba(59, 130, 246, 0.2)', fontSize: '0.78rem', color: 'var(--text-main)' }
-      }, `선택됨: ${selected.name}${selected.address ? ' · ' + selected.address : ''}`),
+        style: {
+          padding: '10px 12px', borderRadius: '8px', backgroundColor: 'rgba(59, 130, 246, 0.08)',
+          border: '1px solid rgba(59, 130, 246, 0.2)', display: 'flex', flexDirection: 'column', gap: '4px'
+        }
+      },
+        /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' } },
+          /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.86rem', fontWeight: 800, color: 'var(--text-main)' } }, selected.name),
+          selected.categoryLabel && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.7rem', color: 'var(--text-muted)' } }, selected.categoryLabel)
+        ),
+        selected.address && /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.76rem', color: 'var(--text-muted)' } }, selected.address),
+        selected.phone && /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.76rem', color: 'var(--text-muted)' } }, `☎ ${selected.phone}`),
+        selected.url && /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          title: selected.url,
+          onClick: e => { e.stopPropagation(); window.open(selected.url, '_blank', 'noopener,noreferrer'); },
+          style: {
+            alignSelf: 'flex-start', border: 0, cursor: 'pointer', textAlign: 'left',
+            padding: '3px 10px', borderRadius: '9999px', fontSize: '0.72rem', fontWeight: 400,
+            backgroundColor: 'var(--border-subtle)', color: 'var(--text-muted)', wordBreak: 'break-all', maxWidth: '100%'
+          }
+        }, selected.url)
+      ),
 
       /* Category picker + 방문/예정 toggle */
       /*#__PURE__*/React.createElement("div", null,
@@ -23234,17 +23279,34 @@ function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, onDelete,
               placeholder: "카테고리 선택"
             })
           ),
-          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 } },
-            /*#__PURE__*/React.createElement("span", {
-              style: { fontSize: '0.76rem', fontWeight: visitStatus === 'visited' ? 800 : 500, color: visitStatus === 'visited' ? 'var(--accent-primary)' : 'var(--text-muted)' }
+          /*#__PURE__*/React.createElement("div", {
+            role: "tablist", "aria-label": "방문/방문예정 전환",
+            style: {
+              display: 'flex', alignItems: 'stretch', border: '1px solid var(--border-subtle)',
+              borderRadius: 'var(--radius-full)', overflow: 'hidden', flexShrink: 0
+            }
+          },
+            /*#__PURE__*/React.createElement("button", {
+              type: "button", role: "tab", "aria-selected": visitStatus === 'visited',
+              onClick: () => setVisitStatus('visited'),
+              style: {
+                padding: '7px 14px', border: 'none', background: 'none', cursor: 'pointer',
+                fontSize: '0.78rem', fontWeight: visitStatus === 'visited' ? 900 : 500,
+                color: visitStatus === 'visited' ? 'var(--accent-primary)' : 'var(--text-muted)'
+              }
             }, "방문"),
-            /*#__PURE__*/React.createElement(ToggleSwitch, {
-              checked: visitStatus === 'planned',
-              onChange: () => setVisitStatus(prev => prev === 'visited' ? 'planned' : 'visited'),
-              label: "방문/방문예정 전환"
-            }),
             /*#__PURE__*/React.createElement("span", {
-              style: { fontSize: '0.76rem', fontWeight: visitStatus === 'planned' ? 800 : 500, color: visitStatus === 'planned' ? 'var(--accent-primary)' : 'var(--text-muted)' }
+              "aria-hidden": "true",
+              style: { width: '1px', margin: '6px 0', backgroundColor: 'var(--border-subtle)' }
+            }),
+            /*#__PURE__*/React.createElement("button", {
+              type: "button", role: "tab", "aria-selected": visitStatus === 'planned',
+              onClick: () => setVisitStatus('planned'),
+              style: {
+                padding: '7px 14px', border: 'none', background: 'none', cursor: 'pointer',
+                fontSize: '0.78rem', fontWeight: visitStatus === 'planned' ? 900 : 500,
+                color: visitStatus === 'planned' ? 'var(--accent-primary)' : 'var(--text-muted)'
+              }
             }, "예정")
           )
         ),
@@ -23481,7 +23543,7 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
             position: 'absolute', left: 0, right: 0, bottom: 0, height: '30px',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             border: 'none', cursor: 'pointer', color: '#64748B',
-            background: 'linear-gradient(to top, rgba(255,255,255,0.94), rgba(255,255,255,0))',
+            backgroundColor: '#FFFFFF',
             zIndex: 6
           }
         }, /*#__PURE__*/React.createElement(ThreeLinesIcon, { size: 20 }))
@@ -23522,6 +23584,11 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
             const memoDate = extractLeadingMemoDate(place.memo);
             const visitEntries = parseVisitEntriesFromMemo(place.memo);
             const memoWithoutDate = memoDate ? place.memo.replace(memoDate, '').trim() : place.memo;
+            // The most relevant single date for this place (structured visitDate first, then the
+            // latest parsed visit-history entry, then a leading memo date) shown as its own capsule
+            // next to the category/visit-status badges -- separate from the memoDate badge below,
+            // which always shows the memo's own leading date regardless of which is most recent.
+            const topBadgeDate = formatPlaceBadgeDate(getPlaceSortDateKey(place));
             return /*#__PURE__*/React.createElement("div", {
               key: place.id,
               style: {
@@ -23563,11 +23630,12 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
                     backgroundColor: place.visitStatus === 'planned' ? 'rgba(59, 130, 246, 0.12)' : 'rgba(16, 185, 129, 0.12)',
                     color: place.visitStatus === 'planned' ? '#2563EB' : '#16A34A'
                   }
-                }, place.visitStatus === 'planned' ? '방문예정' : (place.visitDate ? `방문 ${place.visitDate}` : '방문'))
+                }, place.visitStatus === 'planned' ? '방문예정' : '방문'),
+                topBadgeDate && /*#__PURE__*/React.createElement("span", { className: "memo-capsule-badge" }, topBadgeDate)
               ),
               /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' } },
                 /*#__PURE__*/React.createElement("span", { style: { fontWeight: 800, fontSize: '0.88rem', color: 'var(--text-main)' } }, place.name || '이름 없음'),
-                memoDate && /*#__PURE__*/React.createElement("span", { className: "memo-capsule-badge" }, memoDate)
+                memoDate && /*#__PURE__*/React.createElement("span", { className: "memo-capsule-badge" }, formatPlaceBadgeDate(memoDate) || memoDate)
               ),
               place.address && /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.74rem', color: 'var(--text-muted)' } }, place.address),
               visitEntries.length > 0
