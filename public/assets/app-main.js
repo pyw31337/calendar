@@ -4566,12 +4566,12 @@ function AdminDashboard({ initialCalendars }) {
                 }),
                 /* Name input */
                 /*#__PURE__*/React.createElement("input", {
-                  type: "text", className: "form-input", style: { flex: 1, minWidth: 0, height: '30px', fontSize: '0.82rem' }, value: p.name,
+                  type: "text", className: "form-input", style: { flex: 1, minWidth: 0, height: '44px', fontSize: '0.82rem' }, value: p.name,
                   onChange: e => handleUpdatePart(p.id, { name: e.target.value })
                 }),
                 /* Remove trigger */
                 /*#__PURE__*/React.createElement("button", {
-                  type: "button", className: "btn btn-danger", style: { padding: '4px 10px', height: '30px', display: 'flex', alignItems: 'center' },
+                  type: "button", className: "btn btn-danger", style: { padding: '4px 10px', height: '44px', display: 'flex', alignItems: 'center' },
                   onClick: () => requestConfirm('참여자 삭제', `"${p.name}" 참여자를 삭제하시겠습니까?`, () => handleUpdatePart(p.id, { removedAt: Date.now() }))
                 }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 16 }))
               ))
@@ -4618,7 +4618,7 @@ function AdminDashboard({ initialCalendars }) {
 	                /*#__PURE__*/React.createElement("input", {
 	                  type: "text",
 	                  className: "form-input",
-	                  style: { flex: 1, minWidth: 0, height: '30px', fontSize: '0.82rem' },
+	                  style: { flex: 1, minWidth: 0, height: '44px', fontSize: '0.82rem' },
 	                  value: category.name,
 	                  maxLength: 24,
 	                  onChange: e => handleUpdateExpenseCategory(category.id, { name: e.target.value })
@@ -4626,7 +4626,7 @@ function AdminDashboard({ initialCalendars }) {
 	                /*#__PURE__*/React.createElement("button", {
 	                  type: "button",
 	                  className: "btn btn-danger",
-	                  style: { padding: '4px 10px', height: '30px', display: 'flex', alignItems: 'center' },
+	                  style: { padding: '4px 10px', height: '44px', display: 'flex', alignItems: 'center' },
 	                  onClick: () => handleRemoveExpenseCategory(category.id)
 	                }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 16 }))
 	              ))
@@ -4673,7 +4673,7 @@ function AdminDashboard({ initialCalendars }) {
 	                /*#__PURE__*/React.createElement("input", {
 	                  type: "text",
 	                  className: "form-input",
-	                  style: { flex: 1, minWidth: 0, height: '30px', fontSize: '0.82rem' },
+	                  style: { flex: 1, minWidth: 0, height: '44px', fontSize: '0.82rem' },
 	                  value: category.name,
 	                  maxLength: 24,
 	                  onChange: e => handleUpdatePlaceCategory(category.id, { name: e.target.value })
@@ -4681,7 +4681,7 @@ function AdminDashboard({ initialCalendars }) {
 	                /*#__PURE__*/React.createElement("button", {
 	                  type: "button",
 	                  className: "btn btn-danger",
-	                  style: { padding: '4px 10px', height: '30px', display: 'flex', alignItems: 'center' },
+	                  style: { padding: '4px 10px', height: '44px', display: 'flex', alignItems: 'center' },
 	                  onClick: () => handleRemovePlaceCategory(category.id)
 	                }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 16 }))
 	              ))
@@ -4690,7 +4690,7 @@ function AdminDashboard({ initialCalendars }) {
 
 	          /* Submit settings button */
 	          /*#__PURE__*/React.createElement("button", {
-            type: "button", className: "btn btn-primary", style: { width: '100%', height: '38px', justifyContent: 'center', marginTop: '20px' },
+            type: "button", className: "btn btn-primary", style: { width: '100%', height: '44px', justifyContent: 'center', marginTop: '20px' },
             onClick: handleSaveCalendarSettings
           }, "설정 저장")
         ),
@@ -5070,11 +5070,11 @@ function AdminCreateCalendarModal({ onCreate, onClose }) {
       error && /*#__PURE__*/React.createElement("div", { style: { color: '#DC2626', fontSize: '0.82rem' } }, error),
       /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px', marginTop: '4px' } },
         /*#__PURE__*/React.createElement("button", {
-          type: "button", className: "btn btn-secondary", style: { flex: 1, height: '38px' },
+          type: "button", className: "btn btn-secondary", style: { flex: 1, height: '44px' },
           onClick: onClose, disabled: isSubmitting
         }, "취소"),
         /*#__PURE__*/React.createElement("button", {
-          type: "submit", className: "btn btn-primary", style: { flex: 1, height: '38px' },
+          type: "submit", className: "btn btn-primary", style: { flex: 1, height: '44px' },
           disabled: isSubmitting
         }, isSubmitting ? '생성 중...' : '생성')
       )
@@ -5114,10 +5114,10 @@ function AdminRestorePhraseModal({ onConfirm, onClose }) {
       error && /*#__PURE__*/React.createElement("div", { style: { color: '#DC2626', fontSize: '0.82rem' } }, error),
       /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px', marginTop: '4px' } },
         /*#__PURE__*/React.createElement("button", {
-          type: "button", className: "btn btn-secondary", style: { flex: 1, height: '38px' }, onClick: onClose
+          type: "button", className: "btn btn-secondary", style: { flex: 1, height: '44px' }, onClick: onClose
         }, "취소"),
         /*#__PURE__*/React.createElement("button", {
-          type: "submit", className: "btn btn-danger", style: { flex: 1, height: '38px' }
+          type: "submit", className: "btn btn-danger", style: { flex: 1, height: '44px' }
         }, "복구 진행")
       )
     )
@@ -10752,6 +10752,23 @@ function useTapRevealedMsgId() {
   return revealedId;
 }
 
+// De-dupes rapid double-taps / pointerdown+click event duplication firing onSend() twice for the
+// same message -- extracted from ChatRoomView (see its own history of this exact bug) so
+// CommentsSection's independent Send button/Ctrl+Enter shortcut get the same protection instead
+// of quietly missing it.
+function useChatSendGuard(onSend, canSend) {
+  const lockRef = React.useRef(false);
+  return () => {
+    if (!canSend() || lockRef.current) return;
+    lockRef.current = true;
+    Promise.resolve(onSend && onSend()).finally(() => {
+      setTimeout(() => {
+        lockRef.current = false;
+      }, 250);
+    });
+  };
+}
+
 function CommentsSection({
   calendar,
   recentMessages,
@@ -10786,6 +10803,8 @@ function CommentsSection({
   const fileInputRef = React.useRef(null);
   const [isCollapsed, setIsCollapsed] = React.useState(true); // default closed
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = React.useState(false);
+  const canSendChatNow = () => !isChatSubmitting && (!!chatInput.trim() || chatImages.length > 0);
+  const triggerChatSend = useChatSendGuard(onSend, canSendChatNow);
   const insertEmojiIntoChatInput = (emoji) => {
     const textarea = chatTextareaRef.current;
     const start = textarea ? (textarea.selectionStart ?? chatInput.length) : chatInput.length;
@@ -11034,9 +11053,9 @@ function CommentsSection({
       onChange: e => { setChatInput(e.target.value); autoGrowTextarea(e.target, 100); },
       onPaste: handlePasteImages,
       onKeyDown: e => {
-        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && !isChatSubmitting) {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
           e.preventDefault();
-          onSend();
+          triggerChatSend();
         }
       },
       style: {
@@ -11217,7 +11236,7 @@ function CommentsSection({
         /*#__PURE__*/React.createElement("button", {
           type: "button",
           disabled: isChatSubmitting || (!chatInput.trim() && chatImages.length === 0),
-          onClick: onSend,
+          onClick: triggerChatSend,
           style: {
             height: '32px',
             padding: '0 16px',
@@ -11402,17 +11421,8 @@ function ChatRoomView({
     scrollToBottom();
     setHasNewMessageBelow(false);
   };
-  const sendTapLockRef = React.useRef(false);
   const canSendChatNow = () => !isChatSubmitting && (!!chatInput.trim() || chatImages.length > 0);
-  const triggerChatSend = () => {
-    if (!canSendChatNow() || sendTapLockRef.current) return;
-    sendTapLockRef.current = true;
-    Promise.resolve(onSend && onSend()).finally(() => {
-      setTimeout(() => {
-        sendTapLockRef.current = false;
-      }, 250);
-    });
-  };
+  const triggerChatSend = useChatSendGuard(onSend, canSendChatNow);
   const handleSendPointerDown = (event) => {
     if (!canSendChatNow()) return;
     event.preventDefault();
@@ -12353,9 +12363,9 @@ function ChatRoomView({
         onChange: e => { setChatInput(e.target.value); autoGrowTextarea(e.target, 100); },
         onPaste: handlePasteImagesChat,
         onKeyDown: e => {
-          if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && !isChatSubmitting) {
+          if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
             e.preventDefault();
-            onSend();
+            triggerChatSend();
           }
         },
         style: {
@@ -15088,7 +15098,7 @@ function AdminModal({
             /*#__PURE__*/React.createElement("button", {
               type: "button", className: "btn btn-primary", disabled: isSubmitting,
               onClick: handleSubmitSettings,
-              style: { marginTop: '16px', width: '100%', height: '38px', fontWeight: 'bold' }
+              style: { marginTop: '16px', width: '100%', height: '44px', fontWeight: 'bold' }
             }, isSubmitting ? "저장 중..." : "설정 저장")
           ),
 
@@ -23251,13 +23261,13 @@ function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, onDelete,
       editingPlace && /*#__PURE__*/React.createElement("button", {
         type: "button",
         className: "btn btn-danger",
-        style: { height: '40px' },
+        style: { height: '44px' },
         onClick: handleDeleteClick
       }, "삭제"),
       /*#__PURE__*/React.createElement("button", {
         type: "button",
         className: "btn btn-primary",
-        style: { flex: 1, height: '40px', justifyContent: 'center' },
+        style: { flex: 1, height: '44px', justifyContent: 'center' },
         disabled: saving,
         onClick: handleSubmit
       }, saving ? '저장중...' : '저장')
