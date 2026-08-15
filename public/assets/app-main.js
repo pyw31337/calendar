@@ -21311,7 +21311,7 @@ function SegmentedToggle({ options, value, onChange, disabled, style, ariaLabel 
       style: {
         flex: 1, minWidth: 0,
         display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
-        padding: '0 16px', border: 'none', cursor: disabled ? 'default' : 'pointer', borderRadius: 'var(--radius-sm)',
+        padding: '12px 16px', border: 'none', cursor: disabled ? 'default' : 'pointer', borderRadius: 'var(--radius-sm)',
         fontSize: '0.78rem', fontWeight: value === opt.value ? 900 : 500, whiteSpace: 'nowrap',
         backgroundColor: value === opt.value ? (opt.activeColor || 'var(--accent-primary)') : 'transparent',
         color: value === opt.value ? '#FFFFFF' : 'var(--text-muted)'
