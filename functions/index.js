@@ -255,6 +255,39 @@ async function fetchYouTubeOembedPreview(link) {
   }
 }
 
+// Generic per-IP, per-endpoint sliding-window throttle for the public proxy functions below
+// (peekalinkProxy, kakaoLocalSearchProxy). Both proxies are unauthenticated by design (any
+// calendar guest needs to reach them without a login step), which also means anyone who finds
+// the URL can script requests against them directly -- without a per-caller limit, that would
+// burn through Peekalink's shared 50/hour free-plan quota or Kakao's daily free quota for every
+// real user, or run up Cloud Functions billing, with the abuser paying nothing themselves. Unlike
+// checkAdminAuthRateLimit (which permanently locks out after N failures), this is a plain rolling
+// counter with no lockout -- a burst over the limit just gets 429s until the window rolls over.
+async function checkProxyRateLimit(bucketKey, ip, windowMs, maxRequests) {
+  try {
+    const docId = `${bucketKey}_${String(ip || 'unknown').replace(/[^a-zA-Z0-9.:_-]/g, '_').slice(0, 200) || 'unknown'}`;
+    const ref = admin.firestore().collection('proxyRateLimits').doc(docId);
+    const now = Date.now();
+    let allowed = true;
+    await admin.firestore().runTransaction(async tx => {
+      const snap = await tx.get(ref);
+      const data = snap.exists ? snap.data() : null;
+      const withinWindow = data && data.windowStart && (now - data.windowStart) < windowMs;
+      const count = withinWindow ? (data.count || 0) : 0;
+      if (count >= maxRequests) {
+        allowed = false;
+        return;
+      }
+      tx.set(ref, { windowStart: withinWindow ? data.windowStart : now, count: count + 1 });
+    });
+    return allowed;
+  } catch (err) {
+    // Fail open -- a rate-limiter outage shouldn't take down the underlying feature.
+    console.warn(`checkProxyRateLimit(${bucketKey}) failed, allowing request:`, err);
+    return true;
+  }
+}
+
 exports.peekalinkProxy = functions.https.onRequest(async (req, res) => {
   res.set('Access-Control-Allow-Origin', '*');
   res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -270,6 +303,12 @@ exports.peekalinkProxy = functions.https.onRequest(async (req, res) => {
   const link = req.body && req.body.link;
   if (!link || typeof link !== 'string') {
     res.status(400).json({ ok: false, message: 'link is required' });
+    return;
+  }
+  // 20/hour per IP -- comfortably above any single real user's pace, well under the shared
+  // 50/hour Peekalink free-plan ceiling so one abusive caller can't exhaust it for everyone else.
+  if (!(await checkProxyRateLimit('peekalink', req.ip, 60 * 60 * 1000, 20))) {
+    res.status(429).json({ ok: false, message: 'Too many requests' });
     return;
   }
   const youtubePreview = await fetchYouTubeOembedPreview(link);
@@ -343,6 +382,12 @@ exports.kakaoLocalSearchProxy = functions.https.onRequest(async (req, res) => {
   if (req.method !== 'GET') { res.status(405).json({ ok: false, message: 'Method not allowed' }); return; }
   const query = String(req.query.query || '').trim().slice(0, 200);
   if (!query) { res.status(400).json({ ok: false, message: 'query is required' }); return; }
+  // 30/minute per IP -- generous for a real person typing/refining a place search, but stops a
+  // scripted caller from burning through the free daily quota this whole app shares.
+  if (!(await checkProxyRateLimit('kakao', req.ip, 60 * 1000, 30))) {
+    res.status(429).json({ ok: false, message: 'Too many requests' });
+    return;
+  }
   try {
     const kakaoRes = await fetch(`https://dapi.kakao.com/v2/local/search/keyword.json?query=${encodeURIComponent(query)}&size=10`, {
       headers: { Authorization: `KakaoAK ${KAKAO_REST_API_KEY}` }

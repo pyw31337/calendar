@@ -117,9 +117,16 @@ service cloud.firestore {
         allow delete: if isCalendarDoc(calendarDocId);
       }
 
-      // Web Push subscriptions. Allows browsers to register their endpoints for offline/background pushes.
+      // Web Push subscriptions. Allows browsers to register their endpoints for offline/background
+      // pushes -- write-only from the client (index.html never reads this collection, only
+      // .set()/.delete()). Actually sending a push is done server-side via the Admin SDK in
+      // functions/index.js, which bypasses these rules entirely. get/list are denied because
+      // endpoint + keys.auth/keys.p256dh are exactly what's needed to push arbitrary
+      // spoofed-title notifications straight to that participant's browser -- letting every
+      // fellow calendar guest read them would turn a feature meant for the app itself into an
+      // open notification-spoofing vector.
       match /push_subscriptions/{subId} {
-        allow get, list: if isCalendarDoc(calendarDocId);
+        allow get, list: if false;
         allow create, update: if isCalendarDoc(calendarDocId)
           && request.resource.data.keys().hasOnly(['endpoint', 'keys', 'participantId', 'createdAt', 'updatedAt', 'userAgent'])
           && request.resource.data.endpoint is string

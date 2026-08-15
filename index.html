@@ -3277,7 +3277,9 @@ function AdminDashboard({ initialCalendars }) {
     }
   }, [calendarsList, selectedCalId]);
 
-  // 2. Load Messages (Firestore snapshots or REST)
+  // 2. Load Messages (Firestore snapshots or REST) -- capped per calendar (not truly unbounded)
+  // so opening the admin dashboard doesn't download/live-sync a calendar's entire message
+  // history forever; see the matching cap on GlobalSearchModal's own full-history search fetch.
   React.useEffect(() => {
     if (calendarsList.length === 0) return;
 
@@ -3285,6 +3287,7 @@ function AdminDashboard({ initialCalendars }) {
       const unsubscribes = [];
       calendarsList.forEach(cal => {
         const unsub = firebaseDb.collection('calendars').doc(`cal_${cal.id}`).collection('messages')
+          .orderBy('timestamp', 'desc').limit(2000)
           .onSnapshot(snapshot => {
             const list = [];
             snapshot.forEach(doc => {
@@ -3319,11 +3322,13 @@ function AdminDashboard({ initialCalendars }) {
     }
   }, [calendarsList.map(c => c.id).join(','), firebaseDb]);
 
-  // 2b. Load memos (same live-listener pattern as messages above) -- powers the 통합검색 메모 탭
+  // 2b. Load memos (same live-listener pattern as messages above, same 2000 cap) -- powers the
+  // 통합검색 메모 탭
   React.useEffect(() => {
     if (calendarsList.length === 0 || !firebaseDb) return;
     const unsubscribes = calendarsList.map(cal =>
       firebaseDb.collection('calendars').doc(`cal_${cal.id}`).collection('memos')
+        .orderBy('createdAt', 'desc').limit(2000)
         .onSnapshot(snapshot => {
           const list = [];
           snapshot.forEach(doc => {
