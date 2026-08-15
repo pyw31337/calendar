@@ -315,7 +315,11 @@ const KAKAO_REST_API_KEY = 'e18ee199818819d830c3fe479aa1ca71';
 // Admin SDK so no firestore.rules write access is needed for this doc.
 async function incrementKakaoLocalSearchStat() {
   try {
-    const todayBucket = new Date().toISOString().slice(0, 10); // YYYY-MM-DD, resets at UTC midnight
+    // Kakao's own quota window resets at KST midnight (it's a Korean service), and Cloud
+    // Functions run in UTC -- offsetting by +9h before formatting keeps this doc's "today" in
+    // sync with the same day Kakao's own console would show, rather than rolling over 9 hours
+    // early/late relative to it.
+    const todayBucket = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
     const ref = admin.firestore().collection('appConfig').doc('kakaoLocalSearchStats');
     await admin.firestore().runTransaction(async tx => {
       const snap = await tx.get(ref);

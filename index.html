@@ -4070,7 +4070,10 @@ function AdminDashboard({ initialCalendars }) {
   // independently of this code), so this card shows the raw call count only and points to the
   // 카카오 콘솔 쿼터 메뉴 for the actual limit rather than risking a stale/wrong number giving a
   // false sense of safety margin.
-  const kakaoTodayBucket = new Date().toISOString().slice(0, 10);
+  // Must match the +9h KST offset incrementKakaoLocalSearchStat uses server-side (functions/
+  // index.js), or this card would show "0건" for several hours around KST midnight even right
+  // after a real search -- toISOString() alone is UTC regardless of the browser's local timezone.
+  const kakaoTodayBucket = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
   const kakaoDailyUsage = (kakaoSearchStats && kakaoSearchStats.dailyUsageBucket === kakaoTodayBucket)
     ? (kakaoSearchStats.dailyUsageCount || 0) : 0;
 
