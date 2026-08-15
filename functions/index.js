@@ -393,17 +393,35 @@ async function checkAdminAuthRateLimit(ip) {
   const data = snap.exists ? snap.data() : null;
   const withinWindow = data && data.windowStart && (now - data.windowStart) < ADMIN_AUTH_RATE_LIMIT_WINDOW_MS;
   if (withinWindow && (data.failCount || 0) >= ADMIN_AUTH_RATE_LIMIT_MAX_FAILURES) {
-    return { blocked: true, ref, windowStart: data.windowStart, failCount: data.failCount };
+    return { blocked: true, ref };
   }
-  return { blocked: false, ref, windowStart: withinWindow ? data.windowStart : now, failCount: withinWindow ? (data.failCount || 0) : 0 };
+  // Only used as a fast pre-check to skip the sha256 comparison below when a caller is already
+  // over the limit -- the actual count that determines the NEXT request's blocked state is only
+  // ever incremented inside recordAdminAuthResult's transaction, so a stale read here can't
+  // undercount failures.
+  return { blocked: false, ref };
 }
 
+// Wrapped in a transaction (re-reading the doc at increment time) rather than trusting the
+// failCount checkAdminAuthRateLimit read earlier -- a plain read-then-set here would lose
+// increments under concurrent requests from the same IP (each reads the same pre-increment
+// count, so N parallel failed attempts could all land as a single +1 instead of +N), which
+// would let a scripted brute-force attacker bypass the lockout entirely by firing requests in
+// parallel batches instead of serially.
 async function recordAdminAuthResult(rateState, success) {
   if (success) {
     await rateState.ref.delete().catch(() => {});
     return;
   }
-  await rateState.ref.set({ failCount: rateState.failCount + 1, windowStart: rateState.windowStart }).catch(() => {});
+  const now = Date.now();
+  await admin.firestore().runTransaction(async tx => {
+    const snap = await tx.get(rateState.ref);
+    const data = snap.exists ? snap.data() : null;
+    const withinWindow = data && data.windowStart && (now - data.windowStart) < ADMIN_AUTH_RATE_LIMIT_WINDOW_MS;
+    const windowStart = withinWindow ? data.windowStart : now;
+    const failCount = (withinWindow ? (data.failCount || 0) : 0) + 1;
+    tx.set(rateState.ref, { failCount, windowStart });
+  }).catch(() => {});
 }
 
 function setAdminCorsHeaders(res) {
