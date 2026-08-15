@@ -47,7 +47,13 @@ self.addEventListener('fetch', event => {
 
   const url = new URL(req.url);
   const isStaticAsset = url.origin === self.location.origin && STATIC_ASSETS.some(asset => url.pathname.endsWith('/' + asset) || url.pathname.endsWith(asset));
-  if (!isStaticAsset) return;
+  // The app's own CSS/split-JS files (assets/app*.js, assets/app.css) are cache-busted with a
+  // ?v=<date>-splitN query string on every deploy -- a fresh deploy always requests a brand new
+  // URL, so caching them here can never serve stale content the way caching index.html would
+  // (see the note at the top of this file for why index.html itself stays excluded). Matched by
+  // pathname so it covers each split file without hardcoding all six names.
+  const isVersionedAppAsset = url.origin === self.location.origin && /\/assets\/app[\w-]*\.(?:js|css)$/.test(url.pathname);
+  if (!isStaticAsset && !isVersionedAppAsset) return;
 
   // Cache-first for the static set, with a background revalidation so an icon/manifest update
   // still reaches users on their next load rather than being stuck forever.

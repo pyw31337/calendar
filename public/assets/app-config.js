@@ -20,7 +20,11 @@
       buildsPerHour: 10
     }),
     MAX_CHAT_IMAGE_BASE64_LENGTH: 350000,
-    MAX_CHAT_THUMB_BASE64_LENGTH: 90000,
+    // Firestore's messages/{id} rule caps the singular thumbUrl field at 50,000 chars (see
+    // firestore.rules hasValidMessageImages) -- this is the base64-fallback thumbnail budget used
+    // when Storage upload fails, so it must stay safely under that cap or the fallback write gets
+    // rejected exactly when it's needed most (Storage outage/network failure).
+    MAX_CHAT_THUMB_BASE64_LENGTH: 48000,
     CALENDAR_DOC_SAFE_BYTE_LIMIT: 900000,
     ADMIN_SESSION_STORAGE_KEY: 'gather_admin_session_v1',
     ADMIN_SESSION_MAX_AGE_MS: 24 * 60 * 60 * 1000,

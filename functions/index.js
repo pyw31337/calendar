@@ -419,6 +419,14 @@ exports.listPublicCalendarSummaries = functions.https.onRequest(async (req, res)
   res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
   if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
   if (req.method !== 'GET') { res.status(405).json({ ok: false, message: 'Method not allowed' }); return; }
+  // 30/hour per IP -- comfortably above the legitimate caller's pace (the OG-refresh GitHub
+  // Action hits this every 15 minutes, i.e. 4/hour) while stopping a scripted caller from forcing
+  // repeated full-collection scans at no cost to themselves, same reasoning as peekalinkProxy/
+  // kakaoLocalSearchProxy above.
+  if (!(await checkProxyRateLimit('publicSummaries', req.ip, 60 * 60 * 1000, 30))) {
+    res.status(429).json({ ok: false, message: 'Too many requests' });
+    return;
+  }
   try {
     const snap = await admin.firestore().collection('calendars').get();
     const calendars = [];

@@ -367,7 +367,7 @@ const GITHUB_PAGES_FREE_LIMITS = readConfigObject('GITHUB_PAGES_FREE_LIMITS', {
 // balloon well past this on a busy/detailed source image, so cap it and step down JPEG
 // quality instead (see compressImageToDataUrls).
 const MAX_CHAT_IMAGE_BASE64_LENGTH = readConfigNumber('MAX_CHAT_IMAGE_BASE64_LENGTH', 350000); // ~350KB
-const MAX_CHAT_THUMB_BASE64_LENGTH = readConfigNumber('MAX_CHAT_THUMB_BASE64_LENGTH', 90000); // ~90KB -- higher-DPI thumbnails while still bounded
+const MAX_CHAT_THUMB_BASE64_LENGTH = readConfigNumber('MAX_CHAT_THUMB_BASE64_LENGTH', 48000); // ~48KB -- must stay under firestore.rules' 50,000-char thumbUrl cap
 // A calendar document must stay under Firestore's 1MiB/doc hard limit. Refuse a save before
 // it gets there instead of surfacing Firestore's opaque rejection at the boundary. Compared
 // against the actual Firestore wire-format size (see estimateCalendarDocWireBytes), not a
@@ -5757,8 +5757,12 @@ function App() {
     window.scrollTo({ top, behavior: 'smooth' });
   };
   // Chat-related states
-  const [recentMessages, setRecentMessages] = React.useState([]);
   const [chatMessages, setChatMessages] = React.useState([]);
+  // recentMessages (last 5, newest-first) used to be its own separate onSnapshot listener --
+  // it's always a strict subset of chatMessages (same collection/order, just a smaller window),
+  // so deriving it client-side removes a redundant Firestore listener + read on every incoming
+  // message without changing any consumer's behavior.
+  const recentMessages = React.useMemo(() => chatMessages.slice(-5).reverse(), [chatMessages]);
   const [memos, setMemos] = React.useState([]);
   const [memosLimit, setMemosLimit] = React.useState(MEMOS_PAGE_SIZE);
   const [hasMoreMemos, setHasMoreMemos] = React.useState(false);
@@ -6040,37 +6044,17 @@ function App() {
   // Real-time messages listener
   React.useEffect(() => {
     if (!activeCalId) {
-      setRecentMessages([]);
       setChatMessages([]);
       return;
     }
     if (!firebaseDb) {
       // REST fallback: load messages once
-      fetchRecentMessagesRest(activeCalId).then(list => setRecentMessages(list));
       fetchChatMessagesRest(activeCalId).then(list => setChatMessages(list));
       return;
     }
     let isMounted = true;
 
-    // 1. Subscribe to recent 5 messages (descending for comments block)
-    const unsubscribeRecent = firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages')
-      .orderBy('timestamp', 'desc')
-      .limit(5)
-      .onSnapshot(snapshot => {
-        if (!isMounted) return;
-        const list = [];
-        snapshot.forEach(doc => {
-          list.push({ id: doc.id, ...doc.data() });
-        });
-        setRecentMessages(list);
-      }, err => {
-        console.warn(`Firestore messages subscription error for cal_${activeCalId}:`, err);
-        fetchRecentMessagesRest(activeCalId).then(list => {
-          if (isMounted) setRecentMessages(list);
-        });
-      });
-
-    // 2. Subscribe to chat room history. Queried newest-first + limit so the window
+    // Subscribe to chat room history. Queried newest-first + limit so the window
     // tracks the most recent 100 messages as new ones arrive, then reversed back to
     // ascending order for rendering -- querying oldest-first + limit would instead pin
     // the window to the first 100 messages ever sent, silently hiding anything newer
@@ -6125,7 +6109,6 @@ function App() {
 
     return () => {
       isMounted = false;
-      if (unsubscribeRecent) unsubscribeRecent();
       if (unsubscribeChat) unsubscribeChat();
       if (unsubscribeAnniversaries) unsubscribeAnniversaries();
     };
@@ -6456,7 +6439,6 @@ function App() {
           chatTextareaRef.current.style.height = '34px';
         }
         if (!firebaseDb) {
-          fetchRecentMessagesRest(activeCalId).then(list => setRecentMessages(list));
           fetchChatMessagesRest(activeCalId).then(list => setChatMessages(list));
         }
         // No success toast here -- the new message is immediately visible in the chat feed.
@@ -6490,7 +6472,6 @@ function App() {
       if (ok) {
         deleteAllChatImagesFromStorage(deletingMessage);
         if (!firebaseDb) {
-          fetchRecentMessagesRest(calId).then(list => setRecentMessages(list));
           fetchChatMessagesRest(calId).then(list => setChatMessages(list));
         }
         showToast('삭제완료', 'success', 3000);
@@ -6608,7 +6589,6 @@ function App() {
           });
         }
         if (!firebaseDb) {
-          fetchRecentMessagesRest(calId).then(list => setRecentMessages(list));
           fetchChatMessagesRest(calId).then(list => setChatMessages(list));
         }
         showToast('수정완료', 'success', 3000);
@@ -6629,7 +6609,7 @@ function App() {
 
     const messageId = meta?.messageId;
     const sourceMessage = messageId
-      ? [...(chatMessages || []), ...(recentMessages || [])].find(msg => msg.id === messageId)
+      ? (chatMessages || []).find(msg => msg.id === messageId)
       : null;
     const progressMap = new Map();
     const updateProgress = (taskKey, transferred, total) => {
@@ -6684,7 +6664,6 @@ function App() {
         }
         const patchMessage = msg => msg.id === sourceMessage.id ? { ...msg, ...data } : msg;
         setChatMessages(prev => prev.map(patchMessage));
-        setRecentMessages(prev => prev.map(patchMessage));
         setChatUploadProgress({ pct: 100, remainingSec: 0, label: 'URL 생성완료' });
         return { shareUrl, imageUrl: null };
       }
@@ -6718,7 +6697,7 @@ function App() {
   // 언제 어떤 해시태그가 추가/삭제됐는지 확인할 수 있게 한다.
   const handleSaveImageTags = async (messageId, imageIndex, tagsText, meta = {}) => {
     if (!messageId || !Number.isInteger(imageIndex)) return false;
-    const sourceMessage = [...(chatMessages || []), ...(recentMessages || [])].find(msg => msg.id === messageId);
+    const sourceMessage = (chatMessages || []).find(msg => msg.id === messageId);
     if (!sourceMessage) return false;
     const isDirectMedia = !!meta?.directMediaUrl;
     const entryCount = getMessageImageEntries(sourceMessage).length;
@@ -6757,7 +6736,6 @@ function App() {
     }
     const patchMessage = msg => msg.id === messageId ? { ...msg, ...data } : msg;
     setChatMessages(prev => prev.map(patchMessage));
-    setRecentMessages(prev => prev.map(patchMessage));
     showToast('태그 저장완료', 'success');
     return true;
   };
@@ -7412,7 +7390,7 @@ function App() {
     );
   };
   if (activeView === 'chat') {
-    return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(ChatRoomView, {
+    return /*#__PURE__*/React.createElement("div", { className: "chat-view-container" }, /*#__PURE__*/React.createElement(ChatRoomView, {
       calendar: activeCal,
       chatMessages: chatMessages,
       chatInput: chatInput,
@@ -9444,7 +9422,12 @@ async function compressImageToDataUrls(file, { maxBase64Length = MAX_CHAT_IMAGE_
   // photo, which -- multiplied across a multi-image batch that falls back to inline base64 --
   // could push the whole Firestore document over its 1MiB hard limit and get the write rejected
   // outright instead of degrading gracefully.
-  const encodeWithinBudget = (maxDimStart, qualitySteps, budget, minDim) => {
+  // Yields to the event loop (setTimeout over rAF -- this can run while the tab is backgrounded/
+  // hidden between images in a multi-attach batch, where rAF would simply stall) between each
+  // resize/quality attempt so a detailed photo's full step-ladder doesn't block the main thread
+  // (and the ImageProcessingOverlay progress UI) for one long unbroken stretch.
+  const yieldToMain = () => new Promise(r => setTimeout(r, 0));
+  const encodeWithinBudget = async (maxDimStart, qualitySteps, budget, minDim) => {
     let maxDim = maxDimStart;
     let best = null;
     while (true) {
@@ -9461,6 +9444,7 @@ async function compressImageToDataUrls(file, { maxBase64Length = MAX_CHAT_IMAGE_
         const base64 = canvas.toDataURL('image/jpeg', quality);
         best = { base64, canvas, quality };
         if (base64.length <= budget) return best;
+        await yieldToMain();
       }
       if (maxDim <= minDim) return best; // best effort: smallest size / lowest quality tried
       maxDim = Math.max(minDim, Math.round(maxDim * 0.75));
@@ -9472,12 +9456,12 @@ async function compressImageToDataUrls(file, { maxBase64Length = MAX_CHAT_IMAGE_
   const maxDim = isStorageDisabled ? 600 : 1200;
   const budget = isStorageDisabled ? (48 * 1024) : maxBase64Length;
   const minDim = isStorageDisabled ? 320 : 480;
-  const original = encodeWithinBudget(maxDim, [0.85, 0.75, 0.65, 0.55, 0.45, 0.35], budget, minDim);
+  const original = await encodeWithinBudget(maxDim, [0.85, 0.75, 0.65, 0.55, 0.45, 0.35], budget, minDim);
 
   // 360px thumbnails keep chat/gallery previews crisp on high-DPI screens while remaining
   // bounded. Storage normally serves the sharper 720px Blob below; this base64 thumbnail is the
   // safe fallback when Storage upload is unavailable or still in progress.
-  const thumbnail = encodeWithinBudget(360, [0.78, 0.68, 0.58, 0.48], maxThumbBase64Length, 180);
+  const thumbnail = await encodeWithinBudget(360, [0.78, 0.68, 0.58, 0.48], maxThumbBase64Length, 180);
 
   // High-quality blob for Firebase Storage (when storage is working): images already within the
   // 1920px cap upload completely untouched (100% pixel-perfect, zero compression noise) as long
@@ -17506,6 +17490,7 @@ function ChatGalleryModal({
       key: `${photo.messageId}-${photo.directMediaUrl ? 'direct' : photo.imageIndex}`,
       src: photo.thumb,
       alt: "공유사진",
+      loading: "lazy",
       referrerPolicy: 'no-referrer',
       onClick: () => setActiveLightbox && setActiveLightbox({
         urls: sharedPhotos.map(p => p.full),
@@ -18920,6 +18905,9 @@ function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onSelectTag, onComm
 
   return /*#__PURE__*/React.createElement("div", {
     onClick: () => onOpenEdit(memo),
+    role: "button",
+    tabIndex: 0,
+    onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenEdit(memo); } },
     style: {
       backgroundColor: memo.color || 'var(--bg-card)',
       border: '0',
@@ -23695,6 +23683,10 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
             const topBadgeDate = formatPlaceBadgeDate(getPlaceSortDateKey(place));
             return /*#__PURE__*/React.createElement("div", {
               key: place.id,
+              className: "place-card-row",
+              role: "button",
+              tabIndex: 0,
+              onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleEditPlace(place); } },
               style: {
                 display: 'flex', flexDirection: 'column', gap: '4px',
                 padding: '10px 42px 10px 12px', position: 'relative',
