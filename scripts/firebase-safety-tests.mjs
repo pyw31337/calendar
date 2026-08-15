@@ -5,11 +5,12 @@ function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
-const html = fs.readFileSync('index.html', 'utf8');
-const script = html.match(/<script>([\s\S]*)<\/script>\s*<\/body>/)?.[1];
+// The app's main logic lives in assets/app-main.js (externalized from index.html's inline
+// <script> -- see check-tab-wiring.mjs for the rationale).
+const script = fs.readFileSync('assets/app-main.js', 'utf8');
 const utilsScript = fs.readFileSync('assets/app-utils.js', 'utf8');
 const notificationScript = fs.readFileSync('assets/app-notifications.js', 'utf8');
-assert(script, 'index.html app script block not found');
+assert(script, 'assets/app-main.js not found');
 assert(!/JSONBlob|jsonblob|localStorage|gather_calendars|FORCE_LOCAL_STORAGE/.test(script), 'app script must not use legacy browser or JSONBlob storage');
 assert(!/8월 여름휴가|여름 휴가|하계휴가|친목 모임|꽃잎반 모임 \(cw\)/.test(script), 'app script must not include obsolete seed calendar copy');
 assert(/async function subscribeUserToPush[\s\S]{0,700}missing-participant/.test(script), 'Web Push subscription must refuse missing participant identity');

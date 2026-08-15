@@ -8,9 +8,10 @@ function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
-const html = fs.readFileSync('index.html', 'utf8');
-const script = html.match(/<script>([\s\S]*)<\/script>\s*<\/body>/)?.[1];
-assert(script, 'index.html app script block not found');
+// The app's main logic lives in assets/app-main.js (externalized from index.html's inline
+// <script> -- see check-tab-wiring.mjs for the rationale).
+const script = fs.readFileSync('assets/app-main.js', 'utf8');
+assert(script, 'assets/app-main.js not found');
 
 function createContext(url) {
   const parsed = new URL(url);
