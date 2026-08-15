@@ -92,14 +92,26 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/korean-lunar-calendar/dist/korean-lunar-calendar.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@2.0.4/dist/qrcode.js"></script>
 
-  <!-- Firebase SDK for Realtime Multi-User Firestore Sync -->
+  <!-- Warm up the CDN connections Firebase/React/confetti etc. need (DNS + TLS ahead of time)
+       so the actual script fetches below don't each pay that setup cost serially. -->
+  <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+
+  <!-- Firebase SDK for Realtime Multi-User Firestore Sync -- loaded first and left blocking so
+       the app's core data path starts as early as possible. -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
+
+  <!-- Confetti/lunar calendar/QR code are only used from user-triggered interactions or after
+       async data has loaded (never at initial script-parse time -- see the typeof guards around
+       their call sites), so `defer` lets them fetch in the background instead of delaying
+       Firebase/React, which are on the critical path to first render. -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/korean-lunar-calendar/dist/korean-lunar-calendar.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@2.0.4/dist/qrcode.js" defer></script>
 
   <link rel="stylesheet" href="assets/app.css?v=20260814-split17">
 </head>
@@ -1864,13 +1876,26 @@ setTimeout(() => {
 // until a full page reload re-creates everything from scratch. Cycling disableNetwork() then
 // enableNetwork() on visibility-return forces the SDK to drop and re-establish its streams,
 // which reliably clears this up without requiring a reload.
+//
+// Only worth doing after a real background stretch, though: a brief glance away (checking a
+// notification, switching apps for a couple seconds) is well within what Firestore's own
+// connection handles fine on its own, and forcing every single listener (calendar doc, chat,
+// memos, anniversaries, ...) to fully reconnect on EVERY foreground event makes the app look
+// like it's reloading from scratch each time the user comes back -- which given how often mobile
+// tabs get backgrounded/foregrounded is the more noticeable cost in practice.
+const VISIBILITY_RECONNECT_THRESHOLD_MS = 30000;
+let lastHiddenAt = 0;
 if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && firebaseDb) {
-      firebaseDb.disableNetwork().then(() => firebaseDb.enableNetwork()).catch(e => {
-        console.warn('Firestore reconnect notice:', e);
-      });
+    if (document.visibilityState === 'hidden') {
+      lastHiddenAt = Date.now();
+      return;
     }
+    if (document.visibilityState !== 'visible' || !firebaseDb) return;
+    if (!lastHiddenAt || (Date.now() - lastHiddenAt) < VISIBILITY_RECONNECT_THRESHOLD_MS) return;
+    firebaseDb.disableNetwork().then(() => firebaseDb.enableNetwork()).catch(e => {
+      console.warn('Firestore reconnect notice:', e);
+    });
   });
 }
 
@@ -5865,9 +5890,19 @@ function App() {
       console.warn(`Firestore realtime sync notice for cal_${activeCalId}:`, err);
     });
 
-    runInitialLoad();
+    // The onSnapshot listener above already delivers the initial load (from cache first, then
+    // server) the vast majority of the time, so firing runInitialLoad's separate get()+retry
+    // path immediately as well would just duplicate that same request. Give onSnapshot a head
+    // start and only fall back to the explicit fetch/retry loop if it hasn't come through yet --
+    // this keeps the retry safety net for a genuinely stuck listener without doubling up network
+    // calls on every normal calendar open.
+    const fallbackTimeoutId = setTimeout(() => {
+      if (isMounted && !hasLoadedCloudCalendar) runInitialLoad();
+    }, 2500);
+
     return () => {
       isMounted = false;
+      clearTimeout(fallbackTimeoutId);
       if (unsubscribe) unsubscribe();
     };
   }, [activeCalId]);
