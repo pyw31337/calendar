@@ -260,6 +260,16 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // Daily Kakao Local (지도 검색) API call count, for the admin dashboard's usage panel.
+    // Written only by kakaoLocalSearchProxy via the Admin SDK (see functions/index.js), which
+    // bypasses these rules entirely -- so unlike linkPreviewStats above, no client write path is
+    // needed here at all; this only ever needs to be read.
+    match /appConfig/kakaoLocalSearchStats {
+      allow get: if true;
+      allow list: if false;
+      allow create, update, delete: if false;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }
