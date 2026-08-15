@@ -182,10 +182,6 @@ function normalizePlaceCategories(categories) {
 function getPlaceCategories(calendar) {
   return normalizePlaceCategories(calendar?.placeCategories);
 }
-function getPlaceCategory(calendar, categoryId) {
-  const categories = getPlaceCategories(calendar);
-  return categories.find(category => category.id === categoryId) || categories.find(category => category.id === 'etc') || DEFAULT_PLACE_CATEGORIES[DEFAULT_PLACE_CATEGORIES.length - 1];
-}
 function getPlaceCategoryIcon(category) {
   if (!category) return PLACE_CATEGORY_ICONS.etc;
   const name = String(category.name || '');
@@ -732,58 +728,16 @@ async function tryCreateShortcut(notify) {
   if (notify) notify(instructions);
 }
 
-const getContrastTextColor = typeof GATHER_APP_UTILS.getContrastTextColor === 'function' ? GATHER_APP_UTILS.getContrastTextColor : function getContrastTextColor(hexColor) {
-  if (!hexColor) return '#FFFFFF';
-  const hex = hexColor.replace('#', '');
-  const r = parseInt(hex.substring(0, 2), 16) || 0;
-  const g = parseInt(hex.substring(2, 4), 16) || 0;
-  const b = parseInt(hex.substring(4, 6), 16) || 0;
-  return (r * 299 + g * 587 + b * 114) / 1000 >= 128 ? '#0F172A' : '#FFFFFF';
-};
-
+const getContrastTextColor = GATHER_APP_UTILS.getContrastTextColor;
 // Standard Formatter for Korean Date Display: 2026.09.19 (토)
-const formatDateWithDayName = typeof GATHER_APP_UTILS.formatDateWithDayName === 'function' ? GATHER_APP_UTILS.formatDateWithDayName : function formatDateWithDayName(dateStr) {
-  if (!dateStr) return '';
-  const parts = dateStr.split('-');
-  if (parts.length === 3) {
-    const y = parts[0];
-    const m = parts[1];
-    const d = parts[2];
-    const dateObj = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
-    if (!isNaN(dateObj.getTime())) {
-      const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
-      const dayName = dayNames[dateObj.getDay()];
-      return `${y}.${m}.${d} (${dayName})`;
-    }
-  }
-  return dateStr;
-};
-
-const formatShortDateWithDayName = typeof GATHER_APP_UTILS.formatShortDateWithDayName === 'function' ? GATHER_APP_UTILS.formatShortDateWithDayName : function formatShortDateWithDayName(dateStr) {
-  const formatted = formatDateWithDayName(dateStr);
-  return formatted.replace(/^(\d{2})(\d{2})\./, '$2.');
-};
-
+const formatDateWithDayName = GATHER_APP_UTILS.formatDateWithDayName;
+const formatShortDateWithDayName = GATHER_APP_UTILS.formatShortDateWithDayName;
 // "[모임확정] 26.08.08 (토)" -- the confirmed-meeting banner's fixed text format.
-const formatConfirmedMeetingLabel = typeof GATHER_APP_UTILS.formatConfirmedMeetingLabel === 'function' ? GATHER_APP_UTILS.formatConfirmedMeetingLabel : function formatConfirmedMeetingLabel(dateStr) {
-  if (!dateStr) return '';
-  const [y, m, d] = dateStr.split('-');
-  const dateObj = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
-  const dayName = ['일', '월', '화', '수', '목', '금', '토'][dateObj.getDay()];
-  return `[모임확정] ${y.slice(2)}.${m}.${d} (${dayName})`;
-};
-
+const formatConfirmedMeetingLabel = GATHER_APP_UTILS.formatConfirmedMeetingLabel;
 // D-day label for the confirmed-meeting banner -- 'D-DAY' for today, 'D-N' for N days out.
 // Confirmed-meeting banners never show past dates (see visibleConfirmedMeetings' >= today
 // filter), so there's no D+N case to handle here.
-const formatDDayLabel = typeof GATHER_APP_UTILS.formatDDayLabel === 'function' ? GATHER_APP_UTILS.formatDDayLabel : function formatDDayLabel(dateStr) {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  const target = new Date(y, m - 1, d);
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const diffDays = Math.round((target - today) / 86400000);
-  return diffDays <= 0 ? 'D-DAY' : `D-${diffDays}`;
-};
+const formatDDayLabel = GATHER_APP_UTILS.formatDDayLabel;
 
 // calendar.confirmedMeeting supports multiple confirmed dates as an array of
 // {date, note, confirmedAt}, but earlier data (and any calendar saved before this
@@ -983,20 +937,7 @@ function applyDynamicManifest(calendar) {
   }
 }
 
-const formatRegisteredAt = typeof GATHER_APP_UTILS.formatRegisteredAt === 'function' ? GATHER_APP_UTILS.formatRegisteredAt : function formatRegisteredAt(timestamp) {
-  const value = Number(timestamp || 0);
-  if (!value) return '';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
-  const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
-  const year = String(date.getFullYear()).slice(2);
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  const hours = String(date.getHours()).padStart(2, '0');
-  const minutes = String(date.getMinutes()).padStart(2, '0');
-  const seconds = String(date.getSeconds()).padStart(2, '0');
-  return `${year}.${month}.${day} (${dayNames[date.getDay()]}) ${hours}:${minutes}:${seconds}`;
-};
+const formatRegisteredAt = GATHER_APP_UTILS.formatRegisteredAt;
 
 const cloneParticipant = GATHER_APP_UTILS.cloneParticipant;
 const cloneAvailability = GATHER_APP_UTILS.cloneAvailability;
@@ -10039,37 +9980,9 @@ function isEmojiOnlyChatText(text) {
   }
 }
 
-const formatCommentDate = typeof GATHER_APP_UTILS.formatCommentDate === 'function' ? GATHER_APP_UTILS.formatCommentDate : function formatCommentDate(timestamp) {
-  const date = new Date(timestamp);
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  const hours = String(date.getHours()).padStart(2, '0');
-  const minutes = String(date.getMinutes()).padStart(2, '0');
-  const seconds = String(date.getSeconds()).padStart(2, '0');
-  const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
-  const dayName = dayNames[date.getDay()];
-  return {
-    dateStr: `${month}.${day}(${dayName})`,
-    timeStr: `${hours}:${minutes}:${seconds}`
-  };
-};
-
-const formatChatTime = typeof GATHER_APP_UTILS.formatChatTime === 'function' ? GATHER_APP_UTILS.formatChatTime : function formatChatTime(timestamp) {
-  const date = new Date(timestamp);
-  const hours = String(date.getHours()).padStart(2, '0');
-  const minutes = String(date.getMinutes()).padStart(2, '0');
-  return `${hours}:${minutes}`;
-};
-
-const formatChatDividerDate = typeof GATHER_APP_UTILS.formatChatDividerDate === 'function' ? GATHER_APP_UTILS.formatChatDividerDate : function formatChatDividerDate(timestamp) {
-  const date = new Date(timestamp);
-  const year = String(date.getFullYear()).slice(-2);
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
-  const dayName = dayNames[date.getDay()];
-  return `${year}.${month}.${day}(${dayName})`;
-};
+const formatCommentDate = GATHER_APP_UTILS.formatCommentDate;
+const formatChatTime = GATHER_APP_UTILS.formatChatTime;
+const formatChatDividerDate = GATHER_APP_UTILS.formatChatDividerDate;
 
 // Returns paired {full, thumb} entries for a chat message's attached image(s), handling both
 // the legacy single-image fields (imageUrl/thumbUrl) and the imageUrls/thumbUrls arrays used
@@ -10183,14 +10096,7 @@ function getStorageUrlFileSize(url) {
   const match = url.match(/_(\d+)b\.[a-zA-Z0-9]+(?:[?#]|$)/);
   return match ? Number(match[1]) : null;
 }
-const formatBytes = typeof GATHER_APP_UTILS.formatBytes === 'function' ? GATHER_APP_UTILS.formatBytes : function formatBytes(bytes) {
-  const value = Number(bytes);
-  if (!isFinite(value) || value < 0) return null;
-  if (value >= 1024 * 1024 * 1024) return `${(value / 1024 / 1024 / 1024).toFixed(2)} GB`;
-  if (value >= 1024 * 1024) return `${(value / 1024 / 1024).toFixed(1)} MB`;
-  if (value >= 1024) return `${(value / 1024).toFixed(1)} KB`;
-  return `${value} B`;
-};
+const formatBytes = GATHER_APP_UTILS.formatBytes;
 
 function getDataUrlInfo(url) {
   if (typeof url !== 'string' || !url.startsWith('data:')) return null;
