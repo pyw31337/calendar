@@ -1151,6 +1151,15 @@ const removeFirstUrl = GATHER_APP_UTILS.removeFirstUrl;
 // gray capsule badge for the first URL found (matches the existing memo/expense/availability
 // badge styling elsewhere in the app). Returns a plain string when there's no URL so callers
 // that don't need JSX (titles, etc.) can still use it directly.
+// Grows a <textarea> to fit its content as the user types, instead of showing an inner scrollbar
+// inside a fixed-height box. Resets to 'auto' first so shrinking text (e.g. deleting a pasted
+// paragraph) shrinks the box back down too, not just grows it. maxHeight keeps a very long paste
+// from pushing the rest of the form off-screen -- past that point it scrolls internally as before.
+function autoGrowTextarea(el, maxHeight = 300) {
+  if (!el) return;
+  el.style.height = 'auto';
+  el.style.height = `${Math.min(maxHeight, el.scrollHeight)}px`;
+}
 function renderTextWithUrlBadge(text) {
   const source = String(text || '');
   const url = extractFirstUrl(source);
@@ -11183,11 +11192,7 @@ function CommentsSection({
       placeholder: "채팅을 입력하세요...",
       value: chatInput,
       maxLength: 5000,
-      onChange: e => {
-        setChatInput(e.target.value);
-        e.target.style.height = 'auto';
-        e.target.style.height = `${Math.min(100, e.target.scrollHeight)}px`;
-      },
+      onChange: e => { setChatInput(e.target.value); autoGrowTextarea(e.target, 100); },
       onPaste: handlePasteImages,
       onKeyDown: e => {
         if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && !isChatSubmitting) {
@@ -12324,7 +12329,7 @@ function ChatRoomView({
       maxLength: 200,
       autoFocus: true,
       placeholder: "채팅방 상단에 고정할 공지를 입력하세요",
-      onChange: e => setNoticeInput(e.target.value)
+      onChange: e => { setNoticeInput(e.target.value); autoGrowTextarea(e.target, 200); }
     }),
     /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px' } },
       /*#__PURE__*/React.createElement("button", {
@@ -12506,11 +12511,7 @@ function ChatRoomView({
         placeholder: "메시지를 입력하세요...",
         value: chatInput,
         maxLength: 5000,
-        onChange: e => {
-          setChatInput(e.target.value);
-          e.target.style.height = 'auto';
-          e.target.style.height = `${Math.min(100, e.target.scrollHeight)}px`;
-        },
+        onChange: e => { setChatInput(e.target.value); autoGrowTextarea(e.target, 100); },
         onPaste: handlePasteImagesChat,
         onKeyDown: e => {
           if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && !isChatSubmitting) {
@@ -13222,12 +13223,7 @@ function EditMessageModal({
   const fileInputRefEdit = React.useRef(null);
   const [imageProcessingEdit, setImageProcessingEdit] = React.useState(null);
   const editTextareaRef = React.useRef(null);
-  React.useEffect(() => {
-    const el = editTextareaRef.current;
-    if (!el) return;
-    el.style.height = 'auto';
-    el.style.height = `${Math.min(240, el.scrollHeight)}px`;
-  }, []);
+  React.useEffect(() => autoGrowTextarea(editTextareaRef.current, 240), []);
 
   const handleFileChangeEdit = async (e) => {
     const files = e.target.files;
@@ -14163,30 +14159,16 @@ function DateModal({
 		    !isSettlementCollapsed && /*#__PURE__*/React.createElement(React.Fragment, null,
 		      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
 		        /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
-		          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '4px', flexShrink: 0 } },
-		            /*#__PURE__*/React.createElement("button", {
-		              type: "button",
-		              disabled: isSavingExpense,
-		              onClick: () => setExpenseIsIncome(true),
-		              style: {
-		                padding: '10px 12px', borderRadius: 'var(--radius-md)', fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer', whiteSpace: 'nowrap',
-		                border: `1px solid ${expenseIsIncome ? '#16A34A' : 'var(--border-subtle)'}`,
-		                background: expenseIsIncome ? '#DCFCE7' : 'var(--bg-card)',
-		                color: expenseIsIncome ? '#16A34A' : 'var(--text-muted)'
-		              }
-		            }, "+ 수입"),
-		            /*#__PURE__*/React.createElement("button", {
-		              type: "button",
-		              disabled: isSavingExpense,
-		              onClick: () => setExpenseIsIncome(false),
-		              style: {
-		                padding: '10px 12px', borderRadius: 'var(--radius-md)', fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer', whiteSpace: 'nowrap',
-		                border: `1px solid ${!expenseIsIncome ? '#DC2626' : 'var(--border-subtle)'}`,
-		                background: !expenseIsIncome ? '#FEF2F2' : 'var(--bg-card)',
-		                color: !expenseIsIncome ? '#DC2626' : 'var(--text-muted)'
-		              }
-		            }, "- 지출")
-		          ),
+		          /*#__PURE__*/React.createElement(SegmentedToggle, {
+		            ariaLabel: "수입/지출 전환",
+		            disabled: isSavingExpense,
+		            value: expenseIsIncome ? 'income' : 'expense',
+		            onChange: v => setExpenseIsIncome(v === 'income'),
+		            options: [
+		              { value: 'income', label: '+ 수입', activeColor: '#16A34A' },
+		              { value: 'expense', label: '- 지출', activeColor: '#DC2626' }
+		            ]
+		          }),
 		          !expenseIsIncome && /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
 		            title: "지출 카테고리 선택",
 		            placeholder: "지출 카테고리 선택",
@@ -17577,6 +17559,10 @@ function MemoView({ calendar, memos, hasMoreMemos, onLoadMoreMemos, onBack, show
   const [editingMemo, setEditingMemo] = React.useState(null);
   const [editTitle, setEditTitle] = React.useState('');
   const [editText, setEditText] = React.useState('');
+  const editMemoTextareaRef = React.useRef(null);
+  // editText gets set from an existing memo's text when 수정 is clicked (not just from typing),
+  // so sizing needs to run on every editText change, not just once on mount.
+  React.useEffect(() => autoGrowTextarea(editMemoTextareaRef.current, 400), [editText]);
   const [editColor, setEditColor] = React.useState('');
   const [editIsPinned, setEditIsPinned] = React.useState(false);
   const [editTags, setEditTags] = React.useState([]); // array of strings (tag tokens)
@@ -18216,7 +18202,7 @@ function MemoView({ calendar, memos, hasMoreMemos, onLoadMoreMemos, onBack, show
               /*#__PURE__*/React.createElement("textarea", {
                 placeholder: "메모 입력...",
                 value: newText,
-                onChange: e => setNewText(e.target.value),
+                onChange: e => { setNewText(e.target.value); autoGrowTextarea(e.target, 400); },
                 rows: "4",
                 style: {
                   padding: '8px 4px',
@@ -18571,6 +18557,7 @@ function MemoView({ calendar, memos, hasMoreMemos, onLoadMoreMemos, onBack, show
         },
           /* Body Textarea */
           /*#__PURE__*/React.createElement("textarea", {
+            ref: editMemoTextareaRef,
             placeholder: "메모 입력...",
             value: editText,
             onChange: e => setEditText(e.target.value),
@@ -20337,22 +20324,13 @@ function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {
   }, /*#__PURE__*/React.createElement("span", { style: { color: card.color, display: 'inline-flex' } }, card.icon), card.label), /*#__PURE__*/React.createElement("div", {
     className: "settlement-metric-card-value",
     style: { color: card.color }
-  }, card.value.toLocaleString(), "원")))), /*#__PURE__*/React.createElement("div", {
-    style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', padding: '4px', borderRadius: '14px', background: 'var(--bg-primary)', border: '1px solid var(--border-subtle)', flexShrink: 0 }
-  }, [['total', '누적보기'], ['daily', '일자별보기']].map(tab => /*#__PURE__*/React.createElement("button", {
-    key: tab[0],
-    type: "button",
-    onClick: () => setActiveTab(tab[0]),
-    style: {
-      border: 'none',
-      borderRadius: '11px',
-      padding: '10px',
-      background: activeTab === tab[0] ? '#0F172A' : 'transparent',
-      color: activeTab === tab[0] ? '#FFFFFF' : 'var(--text-muted)',
-      fontWeight: 900,
-      cursor: 'pointer'
-    }
-  }, tab[1]))), 
+  }, card.value.toLocaleString(), "원")))), /*#__PURE__*/React.createElement(SegmentedToggle, {
+    ariaLabel: "누적보기/일자별보기 전환",
+    value: activeTab,
+    onChange: v => setActiveTab(v),
+    style: { width: '100%', flexShrink: 0 },
+    options: [{ value: 'total', label: '누적보기' }, { value: 'daily', label: '일자별보기' }]
+  }),
   activeTab === 'daily' && /*#__PURE__*/React.createElement("div", {
     className: "calendar-nav",
     style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '6px', marginBottom: '2px', flexShrink: 0 }
@@ -21439,6 +21417,43 @@ function ToggleSwitch({ checked, onChange, label }) {
       transition: 'left 0.2s ease', boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
     }
   }));
+}
+
+// Standard 2(+)-way exclusive-choice control: a single bordered rounded-box container (not a
+// capsule/pill -- see PlaceRegisterModal 방문/예정) holding each option as its own segment, thin
+// divider between segments, selected segment filled with its own color + white text. Each option
+// can carry its own activeColor (e.g. green for 수입, red for 지출) instead of defaulting to the
+// app's purple accent, so this covers both neutral toggles (방문/예정, 누적보기/일자별보기) and
+// semantically-colored ones (수입/지출) with one shared component.
+function SegmentedToggle({ options, value, onChange, disabled, style, ariaLabel }) {
+  return /*#__PURE__*/React.createElement("div", {
+    role: "tablist",
+    "aria-label": ariaLabel,
+    style: {
+      display: 'flex', alignItems: 'stretch', padding: '3px', boxSizing: 'border-box',
+      border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', flexShrink: 0,
+      ...style
+    }
+  }, options.flatMap((opt, i) => [
+    i > 0 ? /*#__PURE__*/React.createElement("span", {
+      key: `div-${opt.value}`, "aria-hidden": "true",
+      style: { width: '1px', margin: '6px 2px', backgroundColor: 'var(--border-subtle)' }
+    }) : null,
+    /*#__PURE__*/React.createElement("button", {
+      key: opt.value,
+      type: "button", role: "tab", "aria-selected": value === opt.value,
+      disabled,
+      onClick: () => onChange(opt.value),
+      style: {
+        flex: 1, minWidth: 0,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
+        padding: '0 16px', border: 'none', cursor: disabled ? 'default' : 'pointer', borderRadius: 'var(--radius-sm)',
+        fontSize: '0.78rem', fontWeight: value === opt.value ? 900 : 500, whiteSpace: 'nowrap',
+        backgroundColor: value === opt.value ? (opt.activeColor || 'var(--accent-primary)') : 'transparent',
+        color: value === opt.value ? '#FFFFFF' : 'var(--text-muted)'
+      }
+    }, opt.label)
+  ]).filter(Boolean));
 }
 
 // Shared numeric badge for section-title counts (진행중 투표, 모임 확정, 전원 참석 가능, 갤러리 등) --
@@ -23119,6 +23134,10 @@ function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, onDelete,
     categoryLabel: '', phone: '', url: ''
   } : null);
   const [memo, setMemo] = React.useState(editingPlace ? (editingPlace.memo || '') : '');
+  const memoTextareaRef = React.useRef(null);
+  // This modal remounts fresh each time it opens (isRegisterOpen && <PlaceRegisterModal .../>),
+  // so a mount-only effect is enough to size an existing place's memo correctly on open.
+  React.useEffect(() => autoGrowTextarea(memoTextareaRef.current, 300), []);
   const [categoryId, setCategoryId] = React.useState(editingPlace ? editingPlace.categoryId : (categories[0]?.id || 'etc'));
   const [visitStatus, setVisitStatus] = React.useState(editingPlace ? editingPlace.visitStatus : 'visited');
   const [visitDate, setVisitDate] = React.useState(() => {
@@ -23233,6 +23252,7 @@ function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, onDelete,
   const handleMemoChange = e => {
     const value = e.target.value;
     setMemo(value);
+    autoGrowTextarea(e.target, 300);
     const detectedDate = normalizePlaceDateForSort(extractLeadingMemoDate(value));
     if (detectedDate) {
       setVisitDate(detectedDate);
@@ -23340,40 +23360,12 @@ function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, onDelete,
               placeholder: "카테고리 선택"
             })
           ),
-          /*#__PURE__*/React.createElement("div", {
-            role: "tablist", "aria-label": "방문/방문예정 전환",
-            style: {
-              display: 'flex', alignItems: 'stretch', padding: '3px', boxSizing: 'border-box',
-              border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-full)', flexShrink: 0
-            }
-          },
-            /*#__PURE__*/React.createElement("button", {
-              type: "button", role: "tab", "aria-selected": visitStatus === 'visited',
-              onClick: () => setVisitStatus('visited'),
-              style: {
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                padding: '0 16px', border: 'none', cursor: 'pointer', borderRadius: 'var(--radius-full)',
-                fontSize: '0.78rem', fontWeight: visitStatus === 'visited' ? 900 : 500,
-                backgroundColor: visitStatus === 'visited' ? 'var(--accent-primary)' : 'transparent',
-                color: visitStatus === 'visited' ? '#FFFFFF' : 'var(--text-muted)'
-              }
-            }, "방문"),
-            /*#__PURE__*/React.createElement("span", {
-              "aria-hidden": "true",
-              style: { width: '1px', margin: '6px 2px', backgroundColor: 'var(--border-subtle)' }
-            }),
-            /*#__PURE__*/React.createElement("button", {
-              type: "button", role: "tab", "aria-selected": visitStatus === 'planned',
-              onClick: () => setVisitStatus('planned'),
-              style: {
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                padding: '0 16px', border: 'none', cursor: 'pointer', borderRadius: 'var(--radius-full)',
-                fontSize: '0.78rem', fontWeight: visitStatus === 'planned' ? 900 : 500,
-                backgroundColor: visitStatus === 'planned' ? 'var(--accent-primary)' : 'transparent',
-                color: visitStatus === 'planned' ? '#FFFFFF' : 'var(--text-muted)'
-              }
-            }, "예정")
-          )
+          /*#__PURE__*/React.createElement(SegmentedToggle, {
+            ariaLabel: "방문/방문예정 전환",
+            value: visitStatus,
+            onChange: v => setVisitStatus(v),
+            options: [{ value: 'visited', label: '방문' }, { value: 'planned', label: '예정' }]
+          })
         ),
         visitStatus === 'visited' && /*#__PURE__*/React.createElement("input", {
           type: "date",
@@ -23388,6 +23380,7 @@ function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, onDelete,
       /*#__PURE__*/React.createElement("div", null,
         /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#64748B', marginBottom: '4px' } }, "메모"),
         /*#__PURE__*/React.createElement("textarea", {
+          ref: memoTextareaRef,
           className: "form-input",
           style: { width: '100%', minHeight: '60px', resize: 'vertical', fontFamily: 'inherit' },
           placeholder: "메모를 남겨보세요 (선택, URL을 입력하면 캡슐 뱃지로 표시됩니다. '26.02.12'처럼 날짜를 적으면 방문일자에 자동 반영됩니다)",
