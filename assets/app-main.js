@@ -1663,20 +1663,6 @@ try {
       firebase.initializeApp(firebaseConfig);
     }
     firebaseDb = firebase.firestore();
-    // IndexedDB-backed offline cache: on a REPEAT visit this lets onSnapshot fire near-instantly
-    // with the last synced state (still real Firestore data, correctly superseded the moment the
-    // live listener reconnects and the server confirms/updates it -- same mechanism already
-    // driving every update today, just with a warm starting point instead of the empty
-    // createLoadingCalendarShell() placeholder every single load). This is a different thing from
-    // the loadLocalCache()/saveLocalCache() no-ops above (a now-removed hand-rolled cache that
-    // used to flash stale seed/demo data before Firestore's own listener caught up) -- this is
-    // Firestore's own well-tested cache of real previously-synced documents, not placeholder data.
-    // enablePersistence() rejects if more than one tab has it open at once; that's fine, the
-    // second tab just falls back to today's always-network-first behavior.
-    firebaseDb.enablePersistence({ synchronizeTabs: false }).catch(e => {
-      if (e && (e.code === 'failed-precondition' || e.code === 'unimplemented')) return;
-      console.warn('Firestore offline persistence notice:', e);
-    });
   }
 } catch (e) {
   console.warn('Firebase init notice:', e);
