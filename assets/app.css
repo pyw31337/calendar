@@ -337,7 +337,14 @@ body:has(.admin-login-gate) {
 }
 .calendar-card,
 .summary-card,
-.poll-card {
+.poll-card,
+.memo-card-hover,
+.place-card-row,
+.app-container,
+.chat-view-container,
+.memo-view-container,
+.places-view-container,
+.settlement-page-container {
   animation: motion-fade-up var(--motion-slow) var(--motion-ease-out) both;
   will-change: transform, opacity;
 }
@@ -365,7 +372,9 @@ body:has(.admin-login-gate) {
 .bottom-sheet-item,
 .poll-voter-option,
 .section-toggle-btn,
-.main-menu-item {
+.main-menu-item,
+.memo-card-hover,
+.place-card-row {
   position: relative;
   isolation: isolate;
   -webkit-tap-highlight-color: transparent;
@@ -384,13 +393,17 @@ body:has(.admin-login-gate) {
 .search-result-row,
 .bottom-sheet-item,
 .poll-voter-option,
-.main-menu-item {
+.main-menu-item,
+.memo-card-hover,
+.place-card-row {
   overflow: hidden;
 }
 .btn:hover,
 .bottom-sheet-item:hover,
 .poll-voter-option:hover,
-.search-result-row:hover {
+.search-result-row:hover,
+.memo-card-hover:hover,
+.place-card-row:hover {
   transform: translate3d(0, -1px, 0);
 }
 .btn.is-pressing,
