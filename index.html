@@ -5913,6 +5913,13 @@ function App() {
   }, []);
   const activeCalLoaded = calendars.some(c => c.id === activeCalId);
   const activeCal = calendars.find(c => c.id === activeCalId) || createLoadingCalendarShell(activeCalId);
+  // The chat message listener below only re-subscribes on [activeCalId], so without this ref it
+  // would keep using the activeCal snapshot from whenever that effect last ran -- meaning a
+  // participant added (or the calendar renamed) mid-session wouldn't be reflected in incoming
+  // chat notifications (sender shows "알수없음", title stays the old name) until activeCalId
+  // itself changes. Mirrors the chatParticipantIdRef pattern used the same way above.
+  const activeCalRef = React.useRef(activeCal);
+  React.useEffect(() => { activeCalRef.current = activeCal; }, [activeCal]);
   React.useEffect(() => {
     if (activeCal) {
       const calTitle = `${activeCal.title} 캘린더`;
@@ -6029,8 +6036,8 @@ function App() {
         const latest = list[list.length - 1];
         if (hasSeenInitialChatSnapshot && latest && latest.id !== lastNotifiedMessageId
           && latest.participantId !== chatParticipantIdRef.current) {
-          const sender = getActiveParticipants(activeCal).find(p => p.id === latest.participantId);
-          notifyNewChatMessage(activeCal, latest, sender?.name || '알수없음');
+          const sender = getActiveParticipants(activeCalRef.current).find(p => p.id === latest.participantId);
+          notifyNewChatMessage(activeCalRef.current, latest, sender?.name || '알수없음');
         }
         hasSeenInitialChatSnapshot = true;
         if (latest) lastNotifiedMessageId = latest.id;
@@ -15741,15 +15748,19 @@ function GlobalSearchModal({
   const q = query.trim().toLowerCase();
 
   // chatMessages/memos are capped for display (chat: last 100 live; memos: paginated), so
-  // search would miss older items. First search of the session fetches the full collections.
+  // search would miss older items. First search of the session fetches a much deeper (but still
+  // bounded) history -- a truly unbounded .get() here would re-download every message/memo a
+  // calendar has ever had on every session's first search, which only gets more expensive as a
+  // calendar accumulates history. 2000 of each is comfortably beyond what any of this app's
+  // calendars have ever had, while still capping the worst case.
   const [fullHistory, setFullHistory] = React.useState(null);
   const [isLoadingFullHistory, setIsLoadingFullHistory] = React.useState(false);
   React.useEffect(() => {
     if (!q || fullHistory || isLoadingFullHistory || !calendar?.id || !firebaseDb) return;
     setIsLoadingFullHistory(true);
     Promise.all([
-      firebaseDb.collection('calendars').doc(`cal_${calendar.id}`).collection('messages').get(),
-      firebaseDb.collection('calendars').doc(`cal_${calendar.id}`).collection('memos').get()
+      firebaseDb.collection('calendars').doc(`cal_${calendar.id}`).collection('messages').orderBy('timestamp', 'desc').limit(2000).get(),
+      firebaseDb.collection('calendars').doc(`cal_${calendar.id}`).collection('memos').orderBy('createdAt', 'desc').limit(2000).get()
     ]).then(([messagesSnap, memosSnap]) => {
       setFullHistory({
         chatMessages: messagesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })),
@@ -19044,7 +19055,10 @@ function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onSelectTag, onComm
 
 // Activity Log generator function for memos
 function createMemoActivityLog(calendarId, action, participantId = '', timestamp = Date.now(), note = '') {
-  const dateStr = new Date(timestamp).toISOString().split('T')[0];
+  // toISOString() is UTC, not local time -- a memo logged between midnight and 9am KST would
+  // otherwise get attributed to the previous day in the activity log's date field.
+  const d = new Date(timestamp);
+  const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   const participantPart = sanitizeText(participantId || 'system', 120);
   return normalizeActivityLog(calendarId, {
     id: `${calendarId}_memo_${participantPart}_${action}_${timestamp}_${Math.random().toString(36).slice(2, 8)}`,
