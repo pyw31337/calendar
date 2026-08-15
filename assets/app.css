@@ -2589,3 +2589,20 @@ select.form-select {
     background: rgba(255, 255, 255, 0.7);
   }
 }
+
+/* Places list category filter -- a full-width equal-column tab bar reads fine on desktop, but
+   with 6+ categories (전체/식당/카페/놀이/숙박/쇼핑/기타) a narrow phone can't give each tab enough
+   room to stay legible, so it swaps for a select-box style picker instead. */
+.place-category-select-mobile-only {
+  display: none;
+  padding: 14px 16px 0;
+  border-top: 1px solid var(--border-subtle);
+}
+@media (max-width: 720px) {
+  .place-category-tabs-desktop-only {
+    display: none;
+  }
+  .place-category-select-mobile-only {
+    display: block;
+  }
+}

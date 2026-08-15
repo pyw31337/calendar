@@ -158,9 +158,10 @@ const DEFAULT_PLACE_CATEGORIES = [
   { id: 'cafe', name: '카페', color: '#8B5CF6' },
   { id: 'play', name: '놀이', color: '#3B82F6' },
   { id: 'lodging', name: '숙박', color: '#10B981' },
+  { id: 'shopping', name: '쇼핑', color: '#EC4899' },
   { id: 'etc', name: '기타', color: '#64748B' }
 ];
-const PLACE_CATEGORY_ICONS = { restaurant: '🍽️', cafe: '☕', play: '🎡', lodging: '🏨', etc: '💬' };
+const PLACE_CATEGORY_ICONS = { restaurant: '🍽️', cafe: '☕', play: '🎡', lodging: '🏨', shopping: '🛍️', etc: '💬' };
 function normalizePlaceCategories(categories) {
   const defaultCategories = DEFAULT_PLACE_CATEGORIES;
   const source = Array.isArray(categories) && categories.length ? categories : defaultCategories;
@@ -15695,9 +15696,9 @@ function computeCalendarSearchMatches(cal, chatMessages, memoList, q, limit = 30
 
 // Underlined tab bar with count badges, used by both search surfaces to switch between the
 // 일정/채팅/태그/정산/메모 result categories.
-function SearchCategoryTabs({ tabs, activeKey, onSelect }) {
+function SearchCategoryTabs({ tabs, activeKey, onSelect, containerStyle, tabPadding, countBadgeStyle }) {
   return /*#__PURE__*/React.createElement("div", {
-    style: { display: 'grid', gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))`, overflow: 'hidden', borderBottom: '1px solid #E2E8F0' }
+    style: { display: 'grid', gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))`, overflow: 'hidden', borderBottom: '1px solid #E2E8F0', ...containerStyle }
   }, tabs.map(tab => /*#__PURE__*/React.createElement("button", {
     key: tab.key,
     type: "button",
@@ -15705,7 +15706,7 @@ function SearchCategoryTabs({ tabs, activeKey, onSelect }) {
     style: {
       minWidth: 0,
       display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-      padding: '10px 4px', fontSize: '0.82rem', fontWeight: 800,
+      padding: tabPadding || '10px 4px', fontSize: '0.82rem', fontWeight: 800,
       background: 'none', border: 'none', cursor: 'pointer',
       color: activeKey === tab.key ? '#2563EB' : '#64748B',
       borderBottom: activeKey === tab.key ? '3px solid #2563EB' : '3px solid transparent',
@@ -15717,7 +15718,8 @@ function SearchCategoryTabs({ tabs, activeKey, onSelect }) {
     style: {
       display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '18px', height: '18px',
       borderRadius: '50%', backgroundColor: activeKey === tab.key ? '#2563EB' : '#E2E8F0',
-      color: activeKey === tab.key ? '#FFFFFF' : '#475569', fontSize: '0.68rem', fontWeight: 'bold', padding: '0 4px'
+      color: activeKey === tab.key ? '#FFFFFF' : '#475569', fontSize: '0.68rem', fontWeight: 'bold', padding: '0 4px',
+      ...countBadgeStyle
     }
   }, tab.count))));
 }
@@ -22741,9 +22743,10 @@ const PLACE_CATEGORY_MARKER_SVG_PATHS = {
   restaurant: ['M8 3v7a2 2 0 0 0 4 0V3', 'M10 10v11', 'M16 3c-1.5 2 -2 4 -2 6.5c0 1.5 1 2.5 2 2.5v9'],
   cafe: ['M4 8h12v6a4 4 0 0 1 -4 4h-4a4 4 0 0 1 -4 -4v-6z', 'M16 9h2a2 2 0 0 1 0 4h-2', 'M8 2c-.6 1 .6 1.5 0 2.5', 'M12 2c-.6 1 .6 1.5 0 2.5'],
   play: ['M12 3a5 5 0 0 1 5 5c0 3 -2 5.3 -3.4 6.3l.6 2.7h-4.4l.6 -2.7c-1.4 -1 -3.4 -3.3 -3.4 -6.3a5 5 0 0 1 5 -5z', 'M11 17l-1 4l2 -1l1 1'],
-  lodging: ['M3 18v-7a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v7', 'M3 18v2', 'M21 18v2', 'M3 13h18', 'M7 13v-3a1 1 0 0 1 1 -1h3a1 1 0 0 1 1 1v3']
+  lodging: ['M3 18v-7a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v7', 'M3 18v2', 'M21 18v2', 'M3 13h18', 'M7 13v-3a1 1 0 0 1 1 -1h3a1 1 0 0 1 1 1v3'],
+  shopping: ['M6.331 8h11.339a2 2 0 0 1 1.977 2.304l-1.255 8.152a3 3 0 0 1 -2.966 2.544h-6.852a3 3 0 0 1 -2.965 -2.544l-1.255 -8.152a2 2 0 0 1 1.977 -2.304z', 'M9 11v-5a3 3 0 0 1 6 0v5']
 };
-// Returns the marker's inner content -- either { svgPaths: [...d strings] } for the four
+// Returns the marker's inner content -- either { svgPaths: [...d strings] } for the five
 // pictogram categories, or { emoji: '💬' } for 기타/custom categories.
 function getPlaceCategoryMarkerContent(category) {
   const id = String(category?.id || '').toLowerCase();
@@ -23013,7 +23016,7 @@ function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom = false
         maxZoom: isMobileViewport ? 15 : 16
       });
     } else if (preferDomesticBounds) {
-      mapRef.current.setView([36.5, 127.8], 7); // 한반도 전역이 보이는 기본 시점
+      mapRef.current.setView(PLACE_MAP_DEFAULT_CENTER, 10); // 등록된 장소가 없을 때는 서울 중심으로 표시
     } else {
       mapRef.current.setView(PLACE_MAP_DEFAULT_CENTER, PLACE_MAP_DEFAULT_ZOOM);
     }
@@ -23051,14 +23054,15 @@ function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom = false
 // fallback -- chosen as the PRIMARY geocoder here since it supports POI/business search, unlike
 // Open-Meteo's city-only geocoder) + memo + category select, used for both creating a new place
 // and editing an existing one (editingPlace present).
-// Kakao's category_group_code covers 15 fixed groups; only these four have an obvious match to
-// this app's five place categories (식당/카페/놀이/숙박/기타) -- everything else (마트, 학교, 주차장,
-// 지하철역 등) falls back to 기타 rather than guessing.
+// Kakao's category_group_code covers 15 fixed groups; only these have an obvious match to this
+// app's six place categories (식당/카페/놀이/숙박/쇼핑/기타) -- everything else (학교, 주차장, 지하철역
+// 등) falls back to 기타 rather than guessing.
 const KAKAO_CATEGORY_GROUP_TO_PLACE_CATEGORY = {
   FD6: 'restaurant', // 음식점
   CE7: 'cafe',        // 카페
   AD5: 'lodging',      // 숙박
-  AT4: 'play'          // 관광명소
+  AT4: 'play',         // 관광명소
+  MT1: 'shopping'      // 대형마트
 };
 
 function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, onDelete, showToast, onRequestConfirm }) {
@@ -23179,6 +23183,19 @@ function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, onDelete,
     });
   };
 
+  // Bulk-imported places carry their memo written as "YY.MM.DD 누구랑 뭐했는지" -- typing that same
+  // shorthand here auto-fills the 방문일자 field (and flips the toggle to 방문 if it was left on
+  // 예정) instead of making the user re-enter the same date twice in two different fields.
+  const handleMemoChange = e => {
+    const value = e.target.value;
+    setMemo(value);
+    const detectedDate = normalizePlaceDateForSort(extractLeadingMemoDate(value));
+    if (detectedDate) {
+      setVisitDate(detectedDate);
+      setVisitStatus('visited');
+    }
+  };
+
   const categoryOptions = categories.map(c => ({ value: c.id, label: getPlaceCategoryLabel(c) }));
 
   return /*#__PURE__*/React.createElement("div", {
@@ -23269,7 +23286,7 @@ function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, onDelete,
       /* Category picker + 방문/예정 toggle */
       /*#__PURE__*/React.createElement("div", null,
         /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#64748B', marginBottom: '4px' } }, "카테고리"),
-        /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '10px' } },
+        /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'stretch', gap: '10px' } },
           /*#__PURE__*/React.createElement("div", { style: { flex: 1, minWidth: 0 } },
             /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
               title: "카테고리 선택",
@@ -23282,30 +23299,34 @@ function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, onDelete,
           /*#__PURE__*/React.createElement("div", {
             role: "tablist", "aria-label": "방문/방문예정 전환",
             style: {
-              display: 'flex', alignItems: 'stretch', border: '1px solid var(--border-subtle)',
-              borderRadius: 'var(--radius-full)', overflow: 'hidden', flexShrink: 0
+              display: 'flex', alignItems: 'stretch', padding: '3px', boxSizing: 'border-box',
+              border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-full)', flexShrink: 0
             }
           },
             /*#__PURE__*/React.createElement("button", {
               type: "button", role: "tab", "aria-selected": visitStatus === 'visited',
               onClick: () => setVisitStatus('visited'),
               style: {
-                padding: '7px 14px', border: 'none', background: 'none', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                padding: '0 16px', border: 'none', cursor: 'pointer', borderRadius: 'var(--radius-full)',
                 fontSize: '0.78rem', fontWeight: visitStatus === 'visited' ? 900 : 500,
-                color: visitStatus === 'visited' ? 'var(--accent-primary)' : 'var(--text-muted)'
+                backgroundColor: visitStatus === 'visited' ? 'var(--accent-primary)' : 'transparent',
+                color: visitStatus === 'visited' ? '#FFFFFF' : 'var(--text-muted)'
               }
             }, "방문"),
             /*#__PURE__*/React.createElement("span", {
               "aria-hidden": "true",
-              style: { width: '1px', margin: '6px 0', backgroundColor: 'var(--border-subtle)' }
+              style: { width: '1px', margin: '6px 2px', backgroundColor: 'var(--border-subtle)' }
             }),
             /*#__PURE__*/React.createElement("button", {
               type: "button", role: "tab", "aria-selected": visitStatus === 'planned',
               onClick: () => setVisitStatus('planned'),
               style: {
-                padding: '7px 14px', border: 'none', background: 'none', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                padding: '0 16px', border: 'none', cursor: 'pointer', borderRadius: 'var(--radius-full)',
                 fontSize: '0.78rem', fontWeight: visitStatus === 'planned' ? 900 : 500,
-                color: visitStatus === 'planned' ? 'var(--accent-primary)' : 'var(--text-muted)'
+                backgroundColor: visitStatus === 'planned' ? 'var(--accent-primary)' : 'transparent',
+                color: visitStatus === 'planned' ? '#FFFFFF' : 'var(--text-muted)'
               }
             }, "예정")
           )
@@ -23325,10 +23346,10 @@ function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, onDelete,
         /*#__PURE__*/React.createElement("textarea", {
           className: "form-input",
           style: { width: '100%', minHeight: '60px', resize: 'vertical', fontFamily: 'inherit' },
-          placeholder: "메모를 남겨보세요 (선택, URL을 입력하면 캡슐 뱃지로 표시됩니다)",
+          placeholder: "메모를 남겨보세요 (선택, URL을 입력하면 캡슐 뱃지로 표시됩니다. '26.02.12'처럼 날짜를 적으면 방문일자에 자동 반영됩니다)",
           value: memo,
           maxLength: 300,
-          onChange: e => setMemo(e.target.value)
+          onChange: handleMemoChange
         }),
         extractFirstUrl(memo) && /*#__PURE__*/React.createElement("div", {
           style: { marginTop: '6px', fontSize: '0.78rem', color: 'var(--text-main)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px' }
@@ -23549,20 +23570,43 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
         }, /*#__PURE__*/React.createElement(ThreeLinesIcon, { size: 20 }))
       ),
 
-      /* Category filter tabs -- full-bleed, equal-width tab bar matching the admin 통합검색결과
-         page's 일정/채팅/태그/정산/메모 tabs (SearchCategoryTabs), instead of a scrolling pill row. */
-      categories.length > 0 && /*#__PURE__*/React.createElement(SearchCategoryTabs, {
-        tabs: [
-          { key: 'all', label: '전체', count: places.length },
-          ...categories.map(category => ({
-            key: category.id,
-            label: `${getPlaceCategoryIcon(category)} ${category.name}`,
-            count: countsByCategory[category.id] || 0
-          }))
-        ],
-        activeKey: categoryFilter,
-        onSelect: setCategoryFilter
-      }),
+      /* Category filter -- full-bleed, equal-width tab bar matching the admin 통합검색결과 page's
+         일정/채팅/태그/정산/메모 tabs (SearchCategoryTabs) on wider screens; a narrow phone doesn't
+         have room for 6+ equal-width tabs to stay legible, so that width swaps for a select-box
+         picker instead (same CSS-breakpoint swap pattern as elsewhere in the app). */
+      categories.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null,
+        /*#__PURE__*/React.createElement("div", { className: "place-category-tabs-desktop-only" },
+          /*#__PURE__*/React.createElement(SearchCategoryTabs, {
+            tabs: [
+              { key: 'all', label: '전체', count: places.length },
+              ...categories.map(category => ({
+                key: category.id,
+                label: `${getPlaceCategoryIcon(category)} ${category.name}`,
+                count: countsByCategory[category.id] || 0
+              }))
+            ],
+            activeKey: categoryFilter,
+            onSelect: setCategoryFilter,
+            containerStyle: { backgroundColor: 'var(--bg-card)', borderTop: '1px solid var(--border-subtle)' },
+            tabPadding: '16px 4px',
+            countBadgeStyle: { minWidth: 'auto', height: 'auto', borderRadius: 'var(--radius-full)', padding: '2px 7px' }
+          })
+        ),
+        /*#__PURE__*/React.createElement("div", { className: "place-category-select-mobile-only" },
+          /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
+            title: "카테고리 선택",
+            value: categoryFilter,
+            options: [
+              { value: 'all', label: `전체 ${places.length}` },
+              ...categories.map(category => ({
+                value: category.id,
+                label: `${getPlaceCategoryIcon(category)} ${category.name} ${countsByCategory[category.id] || 0}`
+              }))
+            ],
+            onSelect: setCategoryFilter
+          })
+        )
+      ),
 
       /*#__PURE__*/React.createElement("div", {
         style: { padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }
@@ -23631,17 +23675,16 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
                     color: place.visitStatus === 'planned' ? '#2563EB' : '#16A34A'
                   }
                 }, place.visitStatus === 'planned' ? '방문예정' : '방문'),
-                topBadgeDate && /*#__PURE__*/React.createElement("span", { className: "memo-capsule-badge" }, topBadgeDate)
+                topBadgeDate && /*#__PURE__*/React.createElement("span", { className: "memo-capsule-badge" }, `최근방문 ${topBadgeDate}`),
+                visitEntries.length > 0 && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 700 } }, `총 ${visitEntries.length}회 방문`)
               ),
               /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' } },
-                /*#__PURE__*/React.createElement("span", { style: { fontWeight: 800, fontSize: '0.88rem', color: 'var(--text-main)' } }, place.name || '이름 없음'),
-                memoDate && /*#__PURE__*/React.createElement("span", { className: "memo-capsule-badge" }, formatPlaceBadgeDate(memoDate) || memoDate)
+                /*#__PURE__*/React.createElement("span", { style: { fontWeight: 800, fontSize: '0.88rem', color: 'var(--text-main)' } }, place.name || '이름 없음')
               ),
               place.address && /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.74rem', color: 'var(--text-muted)' } }, place.address),
               visitEntries.length > 0
                 ? /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.78rem', color: 'var(--text-main)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px' } },
-                    /*#__PURE__*/React.createElement("span", null, `최근: ${visitEntries[visitEntries.length - 1].note}`),
-                    /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 700 } }, `총 ${visitEntries.length}회 방문`)
+                    /*#__PURE__*/React.createElement("span", null, `최근: ${visitEntries[visitEntries.length - 1].note}`)
                   )
                 : memoWithoutDate && /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.78rem', color: 'var(--text-main)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px' } }, renderTextWithUrlBadge(memoWithoutDate))
             );
