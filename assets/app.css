@@ -339,12 +339,7 @@ body:has(.admin-login-gate) {
 .summary-card,
 .poll-card,
 .memo-card-hover,
-.place-card-row,
-.app-container,
-.chat-view-container,
-.memo-view-container,
-.places-view-container,
-.settlement-page-container {
+.place-card-row {
   animation: motion-fade-up var(--motion-slow) var(--motion-ease-out) both;
   will-change: transform, opacity;
 }
