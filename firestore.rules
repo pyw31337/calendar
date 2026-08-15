@@ -29,6 +29,16 @@ service cloud.firestore {
         && (!('activityLogs' in request.resource.data.calendar) || request.resource.data.calendar.activityLogs.size() <= 5000)
         && (!('polls' in request.resource.data.calendar) || request.resource.data.calendar.polls is list)
         && (!('polls' in request.resource.data.calendar) || request.resource.data.calendar.polls.size() <= 100)
+        // places/confirmedMeeting get a count cap only (not a full field-by-field lock like the
+        // collections above) -- their shapes have grown new optional fields multiple times this
+        // project's life (장소 categories, expense linkPreview, ...) without ever needing a rules
+        // deploy, which is deliberate (see memos/anniversaries below for the same reasoning). The
+        // cap alone still closes the actual risk audited here: an unbounded array pushing the
+        // 1MiB document limit or racking up storage cost, which a shape-mismatch wouldn't do.
+        && (!('places' in request.resource.data.calendar) || request.resource.data.calendar.places is list)
+        && (!('places' in request.resource.data.calendar) || request.resource.data.calendar.places.size() <= 500)
+        && (!('confirmedMeeting' in request.resource.data.calendar) || request.resource.data.calendar.confirmedMeeting is list)
+        && (!('confirmedMeeting' in request.resource.data.calendar) || request.resource.data.calendar.confirmedMeeting.size() <= 500)
         && request.resource.data.lastModified is number
         && request.resource.data.revision is number;
     }

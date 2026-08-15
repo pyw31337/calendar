@@ -603,3 +603,23 @@ exports.adminChangePassword = functions.https.onRequest(async (req, res) => {
     res.status(500).json({ ok: false, message: '비밀번호 변경에 실패했습니다.' });
   }
 });
+
+// adminAuthAttempts (one doc per IP that's ever failed an admin login) and proxyRateLimits (one
+// doc per IP+endpoint that's ever called peekalinkProxy/kakaoLocalSearchProxy) both accumulate
+// permanently -- nothing ever deletes an old doc once its lockout/rate-limit window has passed.
+// Both windows are well under a day (15 minutes and 1 hour respectively), so anything with a
+// windowStart older than 24h is unambiguously stale and safe to prune. Runs daily alongside the
+// existing sendAnniversaryReminders schedule.
+exports.pruneStaleRateLimitDocs = functions.pubsub.schedule('30 9 * * *').timeZone('Asia/Seoul').onRun(async () => {
+  const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+  const db = admin.firestore();
+  for (const collectionName of ['adminAuthAttempts', 'proxyRateLimits']) {
+    const snap = await db.collection(collectionName).where('windowStart', '<', cutoff).get();
+    if (snap.empty) continue;
+    const batch = db.batch();
+    snap.forEach(doc => batch.delete(doc.ref));
+    await batch.commit();
+    console.log(`Pruned ${snap.size} stale doc(s) from ${collectionName}`);
+  }
+  return null;
+});

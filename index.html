@@ -2497,11 +2497,18 @@ async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 18,
   if (!ENABLE_FIRESTORE_SYNC) return false;
   if (firebaseDb) {
     let legacyActivityLogs = [];
+    // Set the instant the 8s timeout below fires, so a transaction that's still stuck on a slow
+    // tx.get() (rather than genuinely offline) bails out cleanly instead of committing anyway
+    // sometime after we've already moved on to the REST fallback below -- without this, both
+    // writes could land (an orphaned transaction has no way to be cancelled once started), each
+    // independently bumping revision and racing the other's optimistic-concurrency check.
+    let raceLost = false;
     try {
       const ref = firebaseDb.collection('calendars').doc(`cal_${normalizedCal.id}`);
       await Promise.race([
 	        firebaseDb.runTransaction(async tx => {
 	          const snap = await tx.get(ref);
+	          if (raceLost) throw new Error('Superseded by REST fallback after Firestore push timeout');
 	          const currentData = snap.exists && snap.data() ? snap.data() : null;
 	          const serverCalendar = currentData ? currentData.calendar : null;
 	          let nextCalendar;
@@ -2544,7 +2551,7 @@ async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 18,
 	            revision: nextDocRevision
 	          });
 	        }),
-	        new Promise((_, reject) => setTimeout(() => reject(new Error('Firestore push timeout')), 8000))
+	        new Promise((_, reject) => setTimeout(() => { raceLost = true; reject(new Error('Firestore push timeout')); }, 8000))
 	      ]);
 	      const logsToPersist = [...legacyActivityLogs, ...(Array.isArray(newActivityLogs) ? newActivityLogs : [])];
 	      if (logsToPersist.length) {
