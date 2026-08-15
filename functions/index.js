@@ -6,19 +6,26 @@ const KoreanLunarCalendar = require('korean-lunar-calendar');
 
 admin.initializeApp();
 
-// VAPID keys for Web Push authentication
+// Public VAPID key is meant to be public (also embedded client-side in index.html, where the
+// browser's pushManager.subscribe() needs it) -- only the private key is a secret. Configuring
+// web-push happens lazily inside ensureVapidConfigured() rather than here at module scope,
+// because this file's module-level code runs once per cold start for EVERY exported function
+// below, but Secret Manager only injects VAPID_PRIVATE_KEY into the process.env of the specific
+// functions that declare it (onMessageCreate, sendAnniversaryReminders via runWith({secrets})) --
+// calling webpush.setVapidDetails with an undefined private key at module load would throw and
+// break cold starts for unrelated functions like kakaoLocalSearchProxy that never send push.
 const publicVapidKey = 'BNk35C4KAQy9JdQJ8uzLuzDAc7zUBCznmPFJc194fcWqEtD3EZTnj03ZCwE_P2SxwVILZnDzHsj2UZxIQ0Q-huU';
-const privateVapidKey = '6tfgyZUb3MoTEhjaM1Nrssss8DrPFVoWUKJlsjOpRm8';
+let vapidConfigured = false;
+function ensureVapidConfigured() {
+  if (vapidConfigured) return;
+  webpush.setVapidDetails('mailto:partyboat1111@gmail.com', publicVapidKey, process.env.VAPID_PRIVATE_KEY);
+  vapidConfigured = true;
+}
 
-webpush.setVapidDetails(
-  'mailto:partyboat1111@gmail.com',
-  publicVapidKey,
-  privateVapidKey
-);
-
-exports.onMessageCreate = functions.firestore
+exports.onMessageCreate = functions.runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).firestore
   .document('calendars/{calendarDocId}/messages/{messageId}')
   .onCreate(async (snapshot, context) => {
+    ensureVapidConfigured();
     const calendarDocId = context.params.calendarDocId;
     const message = snapshot.data();
     
@@ -136,7 +143,8 @@ function isAnniversaryToday(ann, y, m, d) {
 // and pushes to every subscriber of a calendar with a match today. New Cloud Function; requires
 // `firebase deploy --only functions` to go live (unlike the rest of this app, which redeploys
 // automatically via GitHub Pages on merge to main).
-exports.sendAnniversaryReminders = functions.pubsub.schedule('0 9 * * *').timeZone('Asia/Seoul').onRun(async () => {
+exports.sendAnniversaryReminders = functions.runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).pubsub.schedule('0 9 * * *').timeZone('Asia/Seoul').onRun(async () => {
+  ensureVapidConfigured();
   const kstParts = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit'
   }).formatToParts(new Date());
@@ -210,7 +218,9 @@ exports.sendAnniversaryReminders = functions.pubsub.schedule('0 9 * * *').timeZo
 // Peekalink directly from there meant the key was visible to anyone via view-source. This
 // function holds the key server-side only and forwards the exact same request/response shape
 // Peekalink itself uses, so the client only needs to point at this URL instead.
-const PEEKALINK_API_KEY = 'sk_w8czszf1m50xm1pbuknazw60recwmc2q';
+// Value lives in Firebase Secret Manager (see firebase functions:secrets:set PEEKALINK_API_KEY),
+// injected into process.env only for functions that declare it via runWith({secrets}) below.
+const PEEKALINK_API_KEY = process.env.PEEKALINK_API_KEY;
 
 // Peekalink's scraper can't reliably read YouTube's og:meta tags -- video pages are JS-heavy and
 // commonly block/return empty results for generic scrapers, which is why chat messages sharing a
@@ -288,7 +298,7 @@ async function checkProxyRateLimit(bucketKey, ip, windowMs, maxRequests) {
   }
 }
 
-exports.peekalinkProxy = functions.https.onRequest(async (req, res) => {
+exports.peekalinkProxy = functions.runWith({ secrets: ['PEEKALINK_API_KEY'] }).https.onRequest(async (req, res) => {
   res.set('Access-Control-Allow-Origin', '*');
   res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.set('Access-Control-Allow-Headers', 'Content-Type');
@@ -346,7 +356,9 @@ exports.peekalinkProxy = functions.https.onRequest(async (req, res) => {
 // payment method with no free quota at all. Culture Flow already holds that free quota, so this
 // key reuses it instead -- its REST key must have its IP allowlist cleared (or set to allow-all)
 // in Kakao Developers, since Cloud Functions has no fixed outbound IP to register there.
-const KAKAO_REST_API_KEY = 'e18ee199818819d830c3fe479aa1ca71';
+// Value lives in Firebase Secret Manager (see firebase functions:secrets:set KAKAO_REST_API_KEY),
+// injected into process.env only for kakaoLocalSearchProxy via runWith({secrets}) below.
+const KAKAO_REST_API_KEY = process.env.KAKAO_REST_API_KEY;
 
 // Tracks daily call volume against Kakao's free quota (see 어드민 통계 탭's 외부 서비스 연동
 // 현황 card) -- incremented here rather than client-side like incrementLinkPreviewStat, since
@@ -375,7 +387,7 @@ async function incrementKakaoLocalSearchStat() {
   }
 }
 
-exports.kakaoLocalSearchProxy = functions.https.onRequest(async (req, res) => {
+exports.kakaoLocalSearchProxy = functions.runWith({ secrets: ['KAKAO_REST_API_KEY'] }).https.onRequest(async (req, res) => {
   res.set('Access-Control-Allow-Origin', '*');
   res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
   if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
