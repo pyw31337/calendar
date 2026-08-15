@@ -254,6 +254,47 @@ function parseVisitEntriesFromMemo(memo) {
   return entries.length >= 2 ? entries : [];
 }
 
+// A bulk-imported memo mixes real names with non-name tags in the same "/"-separated shape (e.g.
+// "영우 유리 서준 / 꽃잎반 / C동 올데이" -- 영우/유리/서준/꽃잎반 are people, "C동 올데이" is a
+// site/plan label), so there's no reliable way to tell them apart from formatting alone. Matching
+// against this app's actual participant list (each participant's given name, with the single
+// leading surname character stripped -- "박영우" -> "영우", the shape every memo in this data set
+// uses) plus the full household name list the user confirmed explicitly is the only dependable
+// signal. The explicit list is kept in full (not trimmed to just the "extra" names) because a
+// person can be registered as a chat participant on one calendar but not another -- e.g. 서준 is
+// a jhair participant but 펀앤펀캠프 lives on the kkot calendar, which has no 서준 participant to
+// derive the name from, so relying on per-calendar participant lookup alone would miss him there.
+const KNOWN_PLACE_PARTICIPANT_NAME_TAGS = [
+  '영우', '유리', '서준', '광석', '수진', '아윤', '현석', '효진',
+  '장용', '희경', '리아', '지아', '꽃잎반', '엄마', '만식', '도은', '은혜'
+];
+function getKnownPlaceParticipantNames(calendar) {
+  const fromParticipants = getActiveParticipants(calendar).map(p => {
+    const name = String(p?.name || '').trim();
+    return name.length > 2 ? name.slice(1) : name;
+  });
+  return Array.from(new Set([...fromParticipants, ...KNOWN_PLACE_PARTICIPANT_NAME_TAGS].filter(Boolean)));
+}
+// Tokenizes the whole memo (not just parsed visit-entry notes, since a name can sit in its own
+// "/"-separated chunk with no date at all -- see 꽃잎반 above) and keeps only tokens that exactly
+// match a known name, so an unrelated word that happens to contain a name as a substring (or a
+// name fused into a parenthetical aside like "(현석불참)") is never mistaken for a tag.
+function extractKnownParticipantNames(memo, knownNames) {
+  const text = String(memo || '');
+  if (!text || !knownNames.length) return [];
+  const knownSet = new Set(knownNames);
+  const seen = new Set();
+  const result = [];
+  text.split(/[\s/,()·-]+/).forEach(token => {
+    const trimmed = token.trim();
+    if (trimmed && knownSet.has(trimmed) && !seen.has(trimmed)) {
+      seen.add(trimmed);
+      result.push(trimmed);
+    }
+  });
+  return result;
+}
+
 // Normalizes either date shape a place can carry -- the structured 'YYYY-MM-DD' visitDate field,
 // or a memo-embedded 'YY.MM.DD' -- into a single comparable 'YYYY-MM-DD' string so the list can
 // be sorted by actual visit recency regardless of which source the date came from.
@@ -23478,6 +23519,7 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
   });
   const countsByCategory = places.reduce((acc, p) => { acc[p.categoryId] = (acc[p.categoryId] || 0) + 1; return acc; }, {});
   const filteredPlaces = categoryFilter === 'all' ? sortedPlaces : sortedPlaces.filter(p => p.categoryId === categoryFilter);
+  const knownParticipantNames = getKnownPlaceParticipantNames(calendar);
 
   return /*#__PURE__*/React.createElement("div", {
     className: "places-view-container",
@@ -23628,6 +23670,7 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
             const memoDate = extractLeadingMemoDate(place.memo);
             const visitEntries = parseVisitEntriesFromMemo(place.memo);
             const memoWithoutDate = memoDate ? place.memo.replace(memoDate, '').trim() : place.memo;
+            const participantNames = extractKnownParticipantNames(place.memo, knownParticipantNames);
             // The most relevant single date for this place (structured visitDate first, then the
             // latest parsed visit-history entry, then a leading memo date) shown as its own capsule
             // next to the category/visit-status badges -- separate from the memoDate badge below,
@@ -23686,7 +23729,20 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
                 ? /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.78rem', color: 'var(--text-main)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px' } },
                     /*#__PURE__*/React.createElement("span", null, `최근: ${visitEntries[visitEntries.length - 1].note}`)
                   )
-                : memoWithoutDate && /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.78rem', color: 'var(--text-main)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px' } }, renderTextWithUrlBadge(memoWithoutDate))
+                : memoWithoutDate && /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.78rem', color: 'var(--text-main)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px' } }, renderTextWithUrlBadge(memoWithoutDate)),
+              participantNames.length > 0 && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '2px' } },
+                participantNames.map(name => /*#__PURE__*/React.createElement("button", {
+                  key: name,
+                  type: "button",
+                  title: "메모에서 참여자 이름을 수정하려면 눌러주세요",
+                  onClick: event => { event.stopPropagation(); handleEditPlace(place); },
+                  style: {
+                    border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-full)',
+                    padding: '2px 9px', fontSize: '0.7rem', fontWeight: 700, cursor: 'pointer',
+                    backgroundColor: 'var(--bg-primary)', color: 'var(--text-main)'
+                  }
+                }, name))
+              )
             );
           })
         )
