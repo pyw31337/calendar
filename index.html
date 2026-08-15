@@ -15737,7 +15737,7 @@ function computeCalendarSearchMatches(cal, chatMessages, memoList, q, limit = 30
 
 // Underlined tab bar with count badges, used by both search surfaces to switch between the
 // 일정/채팅/태그/정산/메모 result categories.
-function SearchCategoryTabs({ tabs, activeKey, onSelect, containerStyle, tabPadding, countBadgeStyle }) {
+function SearchCategoryTabs({ tabs, activeKey, onSelect, containerStyle, tabPadding, tabTextStyle, countBadgeClassName, countBadgeStyle }) {
   return /*#__PURE__*/React.createElement("div", {
     style: { display: 'grid', gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))`, overflow: 'hidden', borderBottom: '1px solid #E2E8F0', ...containerStyle }
   }, tabs.map(tab => /*#__PURE__*/React.createElement("button", {
@@ -15753,16 +15753,19 @@ function SearchCategoryTabs({ tabs, activeKey, onSelect, containerStyle, tabPadd
       borderBottom: activeKey === tab.key ? '3px solid #2563EB' : '3px solid transparent',
       marginBottom: '-1px',
       whiteSpace: 'nowrap',
-      overflow: 'hidden'
+      overflow: 'hidden',
+      ...tabTextStyle
     }
-  }, tab.label, /*#__PURE__*/React.createElement("span", {
-    style: {
-      display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '18px', height: '18px',
-      borderRadius: '50%', backgroundColor: activeKey === tab.key ? '#2563EB' : '#E2E8F0',
-      color: activeKey === tab.key ? '#FFFFFF' : '#475569', fontSize: '0.68rem', fontWeight: 'bold', padding: '0 4px',
-      ...countBadgeStyle
-    }
-  }, tab.count))));
+  }, tab.label, countBadgeClassName
+    ? /*#__PURE__*/React.createElement("span", { className: countBadgeClassName, style: countBadgeStyle }, tab.count)
+    : /*#__PURE__*/React.createElement("span", {
+        style: {
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '18px', height: '18px',
+          borderRadius: '50%', backgroundColor: activeKey === tab.key ? '#2563EB' : '#E2E8F0',
+          color: activeKey === tab.key ? '#FFFFFF' : '#475569', fontSize: '0.68rem', fontWeight: 'bold', padding: '0 4px',
+          ...countBadgeStyle
+        }
+      }, tab.count))));
 }
 
 // Admin-로그-tab-style result row: colorful name/category badge on top, matched content in the
@@ -23631,7 +23634,8 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
             onSelect: setCategoryFilter,
             containerStyle: { backgroundColor: 'var(--bg-card)', borderTop: '1px solid var(--border-subtle)' },
             tabPadding: '16px 4px',
-            countBadgeStyle: { minWidth: 'auto', height: 'auto', borderRadius: 'var(--radius-full)', padding: '2px 7px' }
+            tabTextStyle: { fontSize: '0.85rem', fontWeight: 700 },
+            countBadgeClassName: "section-count-badge"
           })
         ),
         /*#__PURE__*/React.createElement("div", { className: "place-category-select-mobile-only" },
@@ -23639,10 +23643,16 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
             title: "카테고리 선택",
             value: categoryFilter,
             options: [
-              { value: 'all', label: `전체 ${places.length}` },
+              {
+                value: 'all',
+                label: /*#__PURE__*/React.createElement(React.Fragment, null, "전체 ", /*#__PURE__*/React.createElement("span", { className: "section-count-badge" }, places.length))
+              },
               ...categories.map(category => ({
                 value: category.id,
-                label: `${getPlaceCategoryIcon(category)} ${category.name} ${countsByCategory[category.id] || 0}`
+                label: /*#__PURE__*/React.createElement(React.Fragment, null,
+                  `${getPlaceCategoryIcon(category)} ${category.name} `,
+                  /*#__PURE__*/React.createElement("span", { className: "section-count-badge" }, countsByCategory[category.id] || 0)
+                )
               }))
             ],
             onSelect: setCategoryFilter
@@ -23718,7 +23728,12 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
                     color: place.visitStatus === 'planned' ? '#2563EB' : '#16A34A'
                   }
                 }, place.visitStatus === 'planned' ? '방문예정' : '방문'),
-                topBadgeDate && /*#__PURE__*/React.createElement("span", { className: "memo-capsule-badge" }, `최근방문 ${topBadgeDate}`),
+                topBadgeDate && /*#__PURE__*/React.createElement("span", {
+                  style: {
+                    fontSize: '0.66rem', fontWeight: 700, padding: '2px 7px', borderRadius: 'var(--radius-full)',
+                    backgroundColor: 'rgba(100, 116, 139, 0.12)', color: 'var(--text-muted)'
+                  }
+                }, `최근방문 ${topBadgeDate}`),
                 visitEntries.length > 0 && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 700 } }, `총 ${visitEntries.length}회 방문`)
               ),
               /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' } },
@@ -23726,9 +23741,18 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
               ),
               place.address && /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.74rem', color: 'var(--text-muted)' } }, place.address),
               visitEntries.length > 0
-                ? /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.78rem', color: 'var(--text-main)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px' } },
-                    /*#__PURE__*/React.createElement("span", null, `최근: ${visitEntries[visitEntries.length - 1].note}`)
-                  )
+                ? /*#__PURE__*/React.createElement("div", {
+                    style: {
+                      display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '2px',
+                      backgroundColor: 'var(--bg-primary)', borderRadius: 'var(--radius-md)', padding: '8px 10px'
+                    }
+                  }, visitEntries.slice().reverse().map((entry, idx) => /*#__PURE__*/React.createElement("div", {
+                    key: idx,
+                    style: { display: 'flex', alignItems: 'flex-start', gap: '6px', fontSize: '0.78rem', color: 'var(--text-main)' }
+                  },
+                    /*#__PURE__*/React.createElement("span", { style: { flexShrink: 0, fontWeight: 700, color: 'var(--text-muted)' } }, entry.date),
+                    /*#__PURE__*/React.createElement("span", null, entry.note)
+                  )))
                 : memoWithoutDate && /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.78rem', color: 'var(--text-main)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px' } }, renderTextWithUrlBadge(memoWithoutDate)),
               participantNames.length > 0 && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '2px' } },
                 participantNames.map(name => /*#__PURE__*/React.createElement("button", {
