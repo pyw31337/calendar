@@ -6,6 +6,7 @@ const MIRRORED_ASSETS = [
   'app-chat-data.js',
   'app-config.js',
   'app-constants.js',
+  'app-main.js',
   'app-notifications.js',
   'app-utils.js'
 ];
@@ -16,7 +17,8 @@ const REQUIRED_SCRIPT_ORDER = [
   'assets/app-calendar-data.js',
   'assets/app-chat-data.js',
   'assets/app-utils.js',
-  'assets/app-notifications.js'
+  'assets/app-notifications.js',
+  'assets/app-main.js'
 ];
 
 function hashFile(path) {
@@ -63,14 +65,14 @@ for (const assetPath of REQUIRED_SCRIPT_ORDER) {
   previousIndex = scriptIndex;
 }
 
-const inlineAppIndex = indexHtml.indexOf('const GATHER_APP_CONSTANTS = window.GATHER_APP_CONSTANTS || {};');
-if (inlineAppIndex === -1) {
-  console.error('Missing inline app bootstrap marker: GATHER_APP_CONSTANTS.');
-  process.exit(1);
-}
-
-if (inlineAppIndex <= previousIndex) {
-  console.error('Inline app bootstrap must run after external app data scripts.');
+// The app's main logic used to be an inline <script> in index.html itself; it's now the last
+// entry in REQUIRED_SCRIPT_ORDER (assets/app-main.js), so the ordering check above already
+// guarantees it loads after its data-script dependencies. This just confirms the extracted file
+// still starts with its expected bootstrap line rather than, say, an accidental empty/truncated
+// extraction.
+const appMainScript = readFileSync('assets/app-main.js', 'utf8');
+if (!appMainScript.startsWith('const GATHER_APP_CONSTANTS = window.GATHER_APP_CONSTANTS || {};')) {
+  console.error('assets/app-main.js is missing its expected bootstrap marker: GATHER_APP_CONSTANTS.');
   process.exit(1);
 }
 

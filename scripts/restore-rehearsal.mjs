@@ -5,9 +5,13 @@ function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
-const html = fs.readFileSync('index.html', 'utf8');
-const script = html.match(/<script>([\s\S]*)<\/script>\s*<\/body>/)?.[1];
-assert(script, 'index.html app script block not found');
+// The app's main logic lives in assets/app-main.js (externalized from index.html's inline
+// <script> -- see check-tab-wiring.mjs for the rationale). It reads helpers off the
+// window.GATHER_APP_UTILS global that assets/app-utils.js populates in the real page, so that
+// script has to run first here too (mirrors firebase-safety-tests.mjs's setup).
+const script = fs.readFileSync('assets/app-main.js', 'utf8');
+const utilsScript = fs.readFileSync('assets/app-utils.js', 'utf8');
+assert(script, 'assets/app-main.js not found');
 
 const context = {
   console,
@@ -74,7 +78,8 @@ const context = {
 
 vm.createContext(context);
 
-vm.runInContext(`${script}
+vm.runInContext(`${utilsScript}
+${script}
   const rehearsalClock = Date.UTC(2026, 7, 4, 0, 0, 0);
   const existingCalendar = {
     id: 'kkot',

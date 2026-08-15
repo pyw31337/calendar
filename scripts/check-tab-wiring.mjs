@@ -6,10 +6,13 @@
 // values compared against x with `x === '...'` inside that same function body.
 import fs from 'node:fs';
 
-const html = fs.readFileSync('index.html', 'utf8');
-const script = html.match(/<script>([\s\S]*)<\/script>\s*<\/body>/)?.[1];
+// The app's main logic lives in assets/app-main.js (externalized from index.html's inline
+// <script> so repeat visits can serve it from HTTP/service-worker cache instead of re-downloading
+// it inside the never-cached index.html shell every time -- see index.html's own no-cache
+// Cache-Control comment for why the shell itself stays uncached).
+const script = fs.readFileSync('assets/app-main.js', 'utf8');
 if (!script) {
-  console.error('index.html app script block not found');
+  console.error('assets/app-main.js not found');
   process.exit(1);
 }
 
