@@ -2572,3 +2572,20 @@ select.form-select {
   background-color: rgba(96, 165, 250, 0.15) !important;
   border-color: rgba(96, 165, 250, 0.28) !important;
 }
+
+/* Place map (Leaflet) attribution control -- shrunk rather than removed on narrow phone
+   viewports. OpenStreetMap/CARTO's free tile usage terms require attribution to stay visible,
+   so this keeps it present but as small and unobtrusive as their guidelines allow, instead of
+   fully hiding it, to leave more visual room for pins on small screens. */
+@media (max-width: 720px) {
+  .leaflet-control-attribution {
+    font-size: 8px;
+    line-height: 1.2;
+    padding: 0 4px;
+    max-width: 60vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    background: rgba(255, 255, 255, 0.7);
+  }
+}
