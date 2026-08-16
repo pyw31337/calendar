@@ -98,6 +98,16 @@ function normalizePlaces(places) {
 function getCalendarPlaces(calendar) {
   return normalizePlaces(calendar?.places);
 }
+// Unions the calendar document's own embedded places (legacy entries, and anything not yet
+// backfilled into the subcollection) with places fetched from the places subcollection -- same
+// reasoning as unionActivityLogs, since a places array built as just
+// { ...calendar, places: subcollectionPlaces } would silently drop pre-migration entries.
+function unionPlaces(calendar, subcollectionPlaces) {
+  const byId = new Map();
+  getCalendarPlaces(calendar).forEach(p => { if (p?.id) byId.set(p.id, p); });
+  (Array.isArray(subcollectionPlaces) ? subcollectionPlaces : []).forEach(p => { if (p?.id) byId.set(p.id, p); });
+  return Array.from(byId.values());
+}
 
 // Bulk-imported places (e.g. from a Google My Maps export) often carry their whole visit history
 // jammed into one memo string, one "YY.MM.DD 누구랑 뭐했는지" entry per line, joined with " / ".
@@ -202,6 +212,15 @@ const readConfigNumber = (key, fallback) => Number.isFinite(GATHER_APP_CONFIG[ke
 const readConfigObject = (key, fallback) => GATHER_APP_CONFIG[key] && typeof GATHER_APP_CONFIG[key] === 'object' ? GATHER_APP_CONFIG[key] : fallback;
 const ENABLE_FIRESTORE_SYNC = GATHER_APP_CONFIG.ENABLE_FIRESTORE_SYNC !== false; // Firestore is the only production source of truth.
 const ENABLE_FIRESTORE_WRITES = GATHER_APP_CONFIG.ENABLE_FIRESTORE_WRITES !== false;
+// Off by default until firestore.rules' places/confirmedMeetings subcollection rules are actually
+// deployed (`firebase deploy --only firestore:rules`) -- flip to true in assets/app-config.js only
+// after confirming that deploy, never before. While off, places/confirmedMeeting keep working
+// exactly as they always have (embedded on the calendar document, read/written as one array) --
+// see stripEmbeddedPlacesField/stripEmbeddedConfirmedMeetingField's call sites in
+// pushSingleCloudCalendar/pushSingleCalendarWithRest. The read-side union (unionPlaces/
+// unionConfirmedMeetings, feeding activeCal) stays active either way since it's a safe no-op
+// while the subcollections are empty.
+const ENABLE_PLACES_SUBCOLLECTION_MIGRATION = GATHER_APP_CONFIG.ENABLE_PLACES_SUBCOLLECTION_MIGRATION === true;
 const PUBLIC_CALENDAR_IDS = Array.isArray(GATHER_APP_CONFIG.PUBLIC_CALENDAR_IDS) ? GATHER_APP_CONFIG.PUBLIC_CALENDAR_IDS : ['kkot', 'cw'];
 const FIREBASE_LOAD_TIMEOUT_MS = readConfigNumber('FIREBASE_LOAD_TIMEOUT_MS', 10000);
 const FIREBASE_LOAD_MAX_ATTEMPTS = readConfigNumber('FIREBASE_LOAD_MAX_ATTEMPTS', 3);
@@ -621,6 +640,16 @@ function getConfirmedMeetings(calendar) {
   const cm = calendar?.confirmedMeeting;
   if (!cm) return [];
   return (Array.isArray(cm) ? cm : [cm]).filter(m => m && m.date);
+}
+// Unions the calendar document's own embedded confirmedMeeting entries (legacy, not-yet-migrated)
+// with entries fetched from the confirmedMeetings subcollection -- same reasoning as
+// unionActivityLogs/unionPlaces. Keyed by `date` (already the unique key this whole feature uses)
+// rather than a generated id.
+function unionConfirmedMeetings(calendar, subcollectionMeetings) {
+  const byDate = new Map();
+  getConfirmedMeetings(calendar).forEach(m => { if (m?.date) byDate.set(m.date, m); });
+  (Array.isArray(subcollectionMeetings) ? subcollectionMeetings : []).forEach(m => { if (m?.date) byDate.set(m.date, m); });
+  return Array.from(byDate.values());
 }
 
 // An entry can exist purely to hold 회비 정산 (settlement) data for a date that was never
@@ -2231,6 +2260,137 @@ async function deleteActivityLogsAfterTimestamp(calendarId, logs, cutoffTimestam
   }
 }
 
+// --- Places subcollection (calendars/cal_{id}/places/{placeId}) ---
+// Same migration reasoning as activityLogs above: `places` used to be an embedded array on the
+// calendar document (still count-capped at 500 there for calendars not yet migrated -- see
+// firestore.rules), so every registered place was re-downloaded on every single realtime update
+// to the calendar doc, for every connected client, regardless of relevance. Moved to its own
+// subcollection, one document per place, keyed by the place's own client-generated `id` (same
+// keyed-by-own-id pattern as memos).
+function stripEmbeddedPlacesField(calendar) {
+  if (!calendar || typeof calendar !== 'object') return calendar;
+  const { places, ...rest } = calendar;
+  return rest;
+}
+async function writePlacesToFirestore(calendarId, places) {
+  const validPlaces = Array.isArray(places) ? places.filter(p => p && typeof p.id === 'string' && p.id) : [];
+  if (!validPlaces.length) return true;
+  if (firebaseDb) {
+    try {
+      const colRef = firebaseDb.collection('calendars').doc(`cal_${calendarId}`).collection('places');
+      const batch = firebaseDb.batch();
+      validPlaces.forEach(place => batch.set(colRef.doc(place.id), place));
+      await batch.commit();
+      return true;
+    } catch (e) {
+      console.warn(`Failed to write places for ${calendarId} via SDK, trying REST:`, e);
+    }
+  }
+  try {
+    const writes = validPlaces.map(place => ({
+      update: {
+        name: `projects/metro-live-2918e/databases/(default)/documents/calendars/cal_${calendarId}/places/${place.id}`,
+        fields: Object.fromEntries(Object.entries(place).map(([key, value]) => [key, jsToFirestoreValue(value)]))
+      }
+    }));
+    const res = await fetch('https://firestore.googleapis.com/v1/projects/metro-live-2918e/databases/(default)/documents:commit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ writes })
+    });
+    if (!res.ok) console.warn(`Places REST write failed for ${calendarId}:`, await res.text());
+    return res.ok;
+  } catch (e) {
+    console.warn(`Failed to write places for ${calendarId} via REST:`, e);
+    return false;
+  }
+}
+async function fetchPlacesFromFirestore(calendarId) {
+  const basePath = `calendars/cal_${calendarId}/places`;
+  try {
+    if (firebaseDb) {
+      const snap = await firebaseDb.collection('calendars').doc(`cal_${calendarId}`).collection('places').get();
+      return snap.docs.map(doc => doc.data());
+    }
+  } catch (e) {
+    console.warn(`Failed to fetch places for ${calendarId} via SDK, trying REST:`, e);
+  }
+  try {
+    const res = await fetch(`https://firestore.googleapis.com/v1/projects/metro-live-2918e/databases/(default)/documents/${basePath}?pageSize=500`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    const docs = data.documents || [];
+    return docs.map(doc => firestoreDocumentToJs(doc));
+  } catch (e) {
+    console.warn(`Failed to fetch places for ${calendarId} via REST:`, e);
+    return [];
+  }
+}
+
+// --- Confirmed meetings subcollection (calendars/cal_{id}/confirmedMeetings/{date}) ---
+// Same migration reasoning, keyed by the entry's own `date` string (already the unique key
+// getConfirmedMeetings/handleConfirmMeeting use to find/update/delete an entry) rather than a
+// generated id.
+function stripEmbeddedConfirmedMeetingField(calendar) {
+  if (!calendar || typeof calendar !== 'object') return calendar;
+  const { confirmedMeeting, ...rest } = calendar;
+  return rest;
+}
+async function writeConfirmedMeetingsToFirestore(calendarId, meetings) {
+  const validMeetings = Array.isArray(meetings) ? meetings.filter(m => m && typeof m.date === 'string' && m.date) : [];
+  if (!validMeetings.length) return true;
+  if (firebaseDb) {
+    try {
+      const colRef = firebaseDb.collection('calendars').doc(`cal_${calendarId}`).collection('confirmedMeetings');
+      const batch = firebaseDb.batch();
+      validMeetings.forEach(meeting => batch.set(colRef.doc(meeting.date), meeting));
+      await batch.commit();
+      return true;
+    } catch (e) {
+      console.warn(`Failed to write confirmed meetings for ${calendarId} via SDK, trying REST:`, e);
+    }
+  }
+  try {
+    const writes = validMeetings.map(meeting => ({
+      update: {
+        name: `projects/metro-live-2918e/databases/(default)/documents/calendars/cal_${calendarId}/confirmedMeetings/${meeting.date}`,
+        fields: Object.fromEntries(Object.entries(meeting).map(([key, value]) => [key, jsToFirestoreValue(value)]))
+      }
+    }));
+    const res = await fetch('https://firestore.googleapis.com/v1/projects/metro-live-2918e/databases/(default)/documents:commit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ writes })
+    });
+    if (!res.ok) console.warn(`Confirmed meetings REST write failed for ${calendarId}:`, await res.text());
+    return res.ok;
+  } catch (e) {
+    console.warn(`Failed to write confirmed meetings for ${calendarId} via REST:`, e);
+    return false;
+  }
+}
+async function fetchConfirmedMeetingsFromFirestore(calendarId) {
+  const basePath = `calendars/cal_${calendarId}/confirmedMeetings`;
+  try {
+    if (firebaseDb) {
+      const snap = await firebaseDb.collection('calendars').doc(`cal_${calendarId}`).collection('confirmedMeetings').get();
+      return snap.docs.map(doc => doc.data());
+    }
+  } catch (e) {
+    console.warn(`Failed to fetch confirmed meetings for ${calendarId} via SDK, trying REST:`, e);
+  }
+  try {
+    const res = await fetch(`https://firestore.googleapis.com/v1/projects/metro-live-2918e/databases/(default)/documents/${basePath}?pageSize=500`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    const docs = data.documents || [];
+    return docs.map(doc => firestoreDocumentToJs(doc));
+  } catch (e) {
+    console.warn(`Failed to fetch confirmed meetings for ${calendarId} via REST:`, e);
+    return [];
+  }
+}
+
 function isRetryableFirestoreConflict(errorText) {
   return /ABORTED|FAILED_PRECONDITION|409|stored version|base version/i.test(String(errorText || ''));
 }
@@ -2281,7 +2441,26 @@ async function pushSingleCalendarWithRest(normalizedCal, lastModified, saveMode,
         ...(Array.isArray(serverCalendar?.activityLogs) ? serverCalendar.activityLogs : []),
         ...(Array.isArray(normalizedCal?.activityLogs) ? normalizedCal.activityLogs : [])
       ];
-      const docCalendar = stripEmbeddedActivityLogsField(mergedCalendar);
+      // places/confirmedMeeting get the exact same self-healing subcollection migration as
+      // activityLogs above, but gated behind ENABLE_PLACES_SUBCOLLECTION_MIGRATION (off by
+      // default -- see its declaration) since it depends on firestore.rules' places/
+      // confirmedMeetings subcollection rules actually being deployed first. Deduped by their own
+      // key (id for places, date for meetings) since serverCalendar/normalizedCal can both still
+      // carry legacy-embedded copies of an entry already migrated on a previous save.
+      let legacyPlaces = [];
+      let legacyConfirmedMeetings = [];
+      let docCalendar = stripEmbeddedActivityLogsField(mergedCalendar);
+      if (ENABLE_PLACES_SUBCOLLECTION_MIGRATION) {
+        const legacyPlacesById = new Map();
+        [...(Array.isArray(serverCalendar?.places) ? serverCalendar.places : []), ...(Array.isArray(normalizedCal?.places) ? normalizedCal.places : [])]
+          .forEach(p => { if (p?.id) legacyPlacesById.set(p.id, p); });
+        legacyPlaces = Array.from(legacyPlacesById.values());
+        const legacyMeetingsByDate = new Map();
+        [...(Array.isArray(serverCalendar?.confirmedMeeting) ? serverCalendar.confirmedMeeting : []), ...(Array.isArray(normalizedCal?.confirmedMeeting) ? normalizedCal.confirmedMeeting : [])]
+          .forEach(m => { if (m?.date) legacyMeetingsByDate.set(m.date, m); });
+        legacyConfirmedMeetings = Array.from(legacyMeetingsByDate.values());
+        docCalendar = stripEmbeddedConfirmedMeetingField(stripEmbeddedPlacesField(docCalendar));
+      }
       const validationError = validateCalendarShape(docCalendar);
       if (validationError) {
         const err = new Error(validationError);
@@ -2315,6 +2494,12 @@ async function pushSingleCalendarWithRest(normalizedCal, lastModified, saveMode,
         if (logsToPersist.length) {
           writeActivityLogsToFirestore(normalizedCal.id, logsToPersist).catch(e => console.warn('Activity log persist failed:', e));
         }
+        if (legacyPlaces.length) {
+          writePlacesToFirestore(normalizedCal.id, legacyPlaces).catch(e => console.warn('Places persist failed:', e));
+        }
+        if (legacyConfirmedMeetings.length) {
+          writeConfirmedMeetingsToFirestore(normalizedCal.id, legacyConfirmedMeetings).catch(e => console.warn('Confirmed meetings persist failed:', e));
+        }
         return true;
       }
       const errorText = await commitRes.text();
@@ -2345,6 +2530,8 @@ async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 18,
   if (!ENABLE_FIRESTORE_SYNC) return false;
   if (firebaseDb) {
     let legacyActivityLogs = [];
+    let legacyPlaces = [];
+    let legacyConfirmedMeetings = [];
     // Set the instant the 8s timeout below fires, so a transaction that's still stuck on a slow
     // tx.get() (rather than genuinely offline) bails out cleanly instead of committing anyway
     // sometime after we've already moved on to the REST fallback below -- without this, both
@@ -2387,7 +2574,22 @@ async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 18,
 	            ...(Array.isArray(serverCalendar?.activityLogs) ? serverCalendar.activityLogs : []),
 	            ...(Array.isArray(normalizedCal?.activityLogs) ? normalizedCal.activityLogs : [])
 	          ];
-	          const docCalendar = stripEmbeddedActivityLogsField(mergedCalendar);
+	          // places/confirmedMeeting get the same self-healing subcollection migration as
+	          // activityLogs above, gated behind ENABLE_PLACES_SUBCOLLECTION_MIGRATION (see its
+	          // declaration) -- deduped by their own key since server/normalized can both still
+	          // carry legacy-embedded copies of an entry already migrated on a prior save.
+	          let docCalendar = stripEmbeddedActivityLogsField(mergedCalendar);
+	          if (ENABLE_PLACES_SUBCOLLECTION_MIGRATION) {
+	            const legacyPlacesById = new Map();
+	            [...(Array.isArray(serverCalendar?.places) ? serverCalendar.places : []), ...(Array.isArray(normalizedCal?.places) ? normalizedCal.places : [])]
+	              .forEach(p => { if (p?.id) legacyPlacesById.set(p.id, p); });
+	            legacyPlaces = Array.from(legacyPlacesById.values());
+	            const legacyMeetingsByDate = new Map();
+	            [...(Array.isArray(serverCalendar?.confirmedMeeting) ? serverCalendar.confirmedMeeting : []), ...(Array.isArray(normalizedCal?.confirmedMeeting) ? normalizedCal.confirmedMeeting : [])]
+	              .forEach(m => { if (m?.date) legacyMeetingsByDate.set(m.date, m); });
+	            legacyConfirmedMeetings = Array.from(legacyMeetingsByDate.values());
+	            docCalendar = stripEmbeddedConfirmedMeetingField(stripEmbeddedPlacesField(docCalendar));
+	          }
 	          const validationError = validateCalendarShape(docCalendar);
 	          if (validationError) throw new Error(validationError);
 	          if (estimateCalendarDocWireBytes(docCalendar) > CALENDAR_DOC_SAFE_BYTE_LIMIT) {
@@ -2404,6 +2606,12 @@ async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 18,
 	      const logsToPersist = [...legacyActivityLogs, ...(Array.isArray(newActivityLogs) ? newActivityLogs : [])];
 	      if (logsToPersist.length) {
 	        writeActivityLogsToFirestore(normalizedCal.id, logsToPersist).catch(e => console.warn('Activity log persist failed:', e));
+	      }
+	      if (legacyPlaces.length) {
+	        writePlacesToFirestore(normalizedCal.id, legacyPlaces).catch(e => console.warn('Places persist failed:', e));
+	      }
+	      if (legacyConfirmedMeetings.length) {
+	        writeConfirmedMeetingsToFirestore(normalizedCal.id, legacyConfirmedMeetings).catch(e => console.warn('Confirmed meetings persist failed:', e));
 	      }
 	      return true;
     } catch (e) {
@@ -5615,6 +5823,13 @@ function App() {
   const [memosLimit, setMemosLimit] = React.useState(MEMOS_PAGE_SIZE);
   const [hasMoreMemos, setHasMoreMemos] = React.useState(false);
   const [anniversaries, setAnniversaries] = React.useState([]);
+  // Live subcollection state for places/confirmedMeeting (see unionPlaces/unionConfirmedMeetings
+  // and the effect below) -- unlike activityLogs (only fetched on-demand for the recovery UI),
+  // these two feed many always-visible surfaces (calendar grid badges, summary banners, place
+  // map, settlement), so they need a live listener merged into activeCal itself, not a
+  // fetch-on-open pattern.
+  const [placesSubcollection, setPlacesSubcollection] = React.useState([]);
+  const [confirmedMeetingsSubcollection, setConfirmedMeetingsSubcollection] = React.useState([]);
   const [chatInput, setChatInput] = React.useState('');
   const [chatParticipantId, setChatParticipantId] = React.useState('');
   const chatParticipantIdRef = React.useRef(chatParticipantId);
@@ -5823,7 +6038,19 @@ function App() {
     showToast('연결 오류', 'error', 5000);
   }, []);
   const activeCalLoaded = calendars.some(c => c.id === activeCalId);
-  const activeCal = calendars.find(c => c.id === activeCalId) || createLoadingCalendarShell(activeCalId);
+  const rawActiveCal = calendars.find(c => c.id === activeCalId) || createLoadingCalendarShell(activeCalId);
+  // Merges the live places/confirmedMeetings subcollections into whatever's still embedded on
+  // the calendar document itself (legacy entries not yet migrated -- see unionPlaces/
+  // unionConfirmedMeetings and the self-healing migration in pushSingleCloudCalendar/
+  // pushSingleCalendarWithRest). Every consumer of `activeCal` below -- rendering AND the
+  // handleSavePlace/handleConfirmMeeting-family handlers' own "existing entries" lookups --
+  // sees the merged view for free from this single point, rather than needing every call site
+  // updated individually.
+  const activeCal = React.useMemo(() => ({
+    ...rawActiveCal,
+    places: unionPlaces(rawActiveCal, placesSubcollection),
+    confirmedMeeting: unionConfirmedMeetings(rawActiveCal, confirmedMeetingsSubcollection)
+  }), [rawActiveCal, placesSubcollection, confirmedMeetingsSubcollection]);
   // The chat message listener below only re-subscribes on [activeCalId], so without this ref it
   // would keep using the activeCal snapshot from whenever that effect last ran -- meaning a
   // participant added (or the calendar renamed) mid-session wouldn't be reflected in incoming
@@ -5955,10 +6182,39 @@ function App() {
         });
       });
 
+    // Places/confirmedMeetings subcollections -- see the state declarations above. No `.limit()`
+    // needed (both count-capped at 500, same as their still-supported legacy embedded arrays).
+    const unsubscribePlaces = firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('places')
+      .onSnapshot(snapshot => {
+        if (!isMounted) return;
+        const list = [];
+        snapshot.forEach(doc => list.push(doc.data()));
+        setPlacesSubcollection(list);
+      }, err => {
+        console.warn(`Firestore places subscription error:`, err);
+        fetchPlacesFromFirestore(activeCalId).then(list => {
+          if (isMounted) setPlacesSubcollection(list);
+        });
+      });
+    const unsubscribeConfirmedMeetings = firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('confirmedMeetings')
+      .onSnapshot(snapshot => {
+        if (!isMounted) return;
+        const list = [];
+        snapshot.forEach(doc => list.push(doc.data()));
+        setConfirmedMeetingsSubcollection(list);
+      }, err => {
+        console.warn(`Firestore confirmedMeetings subscription error:`, err);
+        fetchConfirmedMeetingsFromFirestore(activeCalId).then(list => {
+          if (isMounted) setConfirmedMeetingsSubcollection(list);
+        });
+      });
+
     return () => {
       isMounted = false;
       if (unsubscribeChat) unsubscribeChat();
       if (unsubscribeAnniversaries) unsubscribeAnniversaries();
+      if (unsubscribePlaces) unsubscribePlaces();
+      if (unsubscribeConfirmedMeetings) unsubscribeConfirmedMeetings();
     };
   }, [activeCalId]);
 

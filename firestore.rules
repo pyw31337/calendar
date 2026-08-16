@@ -191,6 +191,46 @@ service cloud.firestore {
         allow delete: if isCalendarDoc(calendarDocId);
       }
 
+      // Registered places (장소 지도). Migrated out of the calendar document's embedded `places`
+      // array for the same reason activityLogs was (see below): an unbounded-growth array on the
+      // calendar doc gets re-downloaded on every single realtime update to that doc, for every
+      // connected client, regardless of relevance. The embedded field still exists on the
+      // calendar document (count-capped at 500, see hasValidCalendarShell) for calendars not yet
+      // self-migrated -- see unionPlaces/getCalendarPlaces in assets/app-main.js. Doc ID is the
+      // place's own `id` (client-generated, see normalizePlaces), same keyed-by-own-id pattern as
+      // memos. No hasOnly() lock, same reasoning as memos/anniversaries above.
+      function hasValidPlaceShape(data) {
+        return (!('id' in data) || (data.id is string && data.id.size() <= 200))
+          && (!('name' in data) || (data.name is string && data.name.size() <= 200))
+          && (!('address' in data) || (data.address is string && data.address.size() <= 300))
+          && (!('memo' in data) || (data.memo is string && data.memo.size() <= 2000))
+          && (!('categoryId' in data) || (data.categoryId is string && data.categoryId.size() <= 100));
+      }
+      match /places/{placeId} {
+        allow read: if isCalendarDoc(calendarDocId);
+        allow create, update: if isCalendarDoc(calendarDocId) && hasValidPlaceShape(request.resource.data);
+        allow delete: if isCalendarDoc(calendarDocId);
+      }
+
+      // Confirmed meeting dates + their 회비 정산 (settlement) data. Same migration reasoning as
+      // places above. Doc ID is the entry's own `date` string (unique per calendar already, since
+      // getConfirmedMeetings/handleConfirmMeeting key off date) rather than a generated id.
+      function isValidConfirmedMeetingDocId(id) {
+        return id is string && id.matches('^\\d{4}-\\d{2}-\\d{2}$');
+      }
+      function hasValidConfirmedMeetingShape(data) {
+        return (!('date' in data) || (data.date is string && data.date.size() <= 20))
+          && (!('note' in data) || (data.note is string && data.note.size() <= 1000))
+          && (!('expenses' in data) || (data.expenses is list && data.expenses.size() <= 200));
+      }
+      match /confirmedMeetings/{meetingId} {
+        allow read: if isCalendarDoc(calendarDocId);
+        allow create, update: if isCalendarDoc(calendarDocId)
+          && isValidConfirmedMeetingDocId(meetingId)
+          && hasValidConfirmedMeetingShape(request.resource.data);
+        allow delete: if isCalendarDoc(calendarDocId);
+      }
+
       // Activity log audit trail. Used to embed as a growing array on the calendar document
       // itself, which had no de-duplication and was the single biggest long-term threat to the
       // document's 1MiB size limit -- moved to its own subcollection (one document per entry,
