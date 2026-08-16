@@ -11724,92 +11724,13 @@ function ChatRoomView({
     triggerChatSend();
   };
 
-  const [notifPermission, setNotifPermission] = React.useState(() => (isNotificationSupported() ? Notification.permission : 'unsupported'));
-  const [chatNotifyEnabled, setChatNotifyEnabled] = React.useState(() => isChatNotifyEnabledForCalendar(calendar?.id));
-  React.useEffect(() => {
-    setChatNotifyEnabled(isChatNotifyEnabledForCalendar(calendar?.id));
-  }, [calendar?.id]);
-
-  // Synchronize Web Push subscription automatically whenever notifications are enabled -- also
-  // re-runs when chatParticipantId changes, so switching which participant this browser is
-  // acting as re-registers the subscription under the correct identity instead of leaving it
-  // stuck on whichever one (or none) was active the first time this fired.
-  React.useEffect(() => {
-    if (chatNotifyEnabled && calendar?.id && notifPermission === 'granted' && chatParticipantId) {
-      subscribeUserToPush(calendar.id, chatParticipantId);
-    }
-  }, [chatNotifyEnabled, calendar?.id, notifPermission, chatParticipantId]);
-
-  const handleToggleNotifications = async () => {
-    if (!isNotificationSupported()) {
-      if (showToast) showToast('알림 미지원 브라우저', 'error');
-      return;
-    }
-    if (Notification.permission === 'granted') {
-      const next = !chatNotifyEnabled;
-      if (next) {
-        // iOS reports Notification.permission as 'granted' even in a regular (non-installed)
-        // browser tab, where push can never actually arrive -- probe before trusting that flag.
-        // The probe below (ensureChatNotificationPermission path) already caught this the first
-        // time permission was requested; this branch is for a return visit where permission was
-        // already granted from an earlier session, which used to skip the check entirely.
-        const capability = await probeNotificationCapability();
-        if (!capability.ok) {
-          setNotifPermission('unsupported');
-          if (showToast) showToast(capability.reason === 'ios-not-installed' ? '이 브라우저에서는 알림을 표시할 수 없습니다 (iOS는 홈 화면 추가 필요)' : '이 환경에서는 알림을 받을 수 없습니다.', 'error', 6000);
-          return;
-        }
-      }
-      setChatNotifyEnabled(next);
-      setChatNotifyEnabledForCalendar(calendar.id, next);
-      if (next) {
-        const result = await subscribeUserToPushWithPermission(calendar.id, chatParticipantId);
-        if (result && !result.ok) {
-          setChatNotifyEnabled(false);
-          setChatNotifyEnabledForCalendar(calendar.id, false);
-          if (showToast) showToast(`푸시 등록 실패: ${describePushSubscribeFailure(result.reason)}`, 'error', 6000);
-          console.warn('Chat notification subscribe failed:', result.reason);
-          return;
-        }
-      } else {
-        await unsubscribeUserFromPush(calendar.id);
-      }
-      if (showToast) showToast(next ? '이 캘린더 채팅 알림 켜짐' : '이 캘린더 채팅 알림 꺼짐', 'success');
-      return;
-    }
-    if (Notification.permission === 'denied') {
-      if (showToast) showToast('브라우저 설정에서 알림 허용 필요', 'error');
-      return;
-    }
-    const result = await ensureChatNotificationPermission();
-    if (result !== 'granted') {
-      setNotifPermission(result);
-      if (showToast) showToast('알림 권한 거부됨', 'error');
-      return;
-    }
-    // Some mobile browsers (notably iOS Safari and iOS-based in-app browsers/webviews, when the
-    // page isn't installed to the home screen) report permission as granted yet still throw when
-    // actually constructing a Notification -- probe it immediately so the user gets an honest
-    // explanation now instead of silently never seeing a real notification later.
-    const capability = await probeNotificationCapability();
-    if (!capability.ok) {
-      setNotifPermission('unsupported');
-      if (showToast) showToast(capability.reason === 'ios-not-installed' ? '이 브라우저에서는 알림을 표시할 수 없습니다 (iOS는 홈 화면 추가 필요)' : '이 브라우저에서는 알림을 표시할 수 없습니다.', 'error', 6000);
-      return;
-    }
-    setNotifPermission('granted');
-    setChatNotifyEnabled(true);
-    setChatNotifyEnabledForCalendar(calendar.id, true);
-    const subscribeResult = await subscribeUserToPushWithPermission(calendar.id, chatParticipantId);
-    if (subscribeResult && !subscribeResult.ok) {
-      setChatNotifyEnabled(false);
-      setChatNotifyEnabledForCalendar(calendar.id, false);
-      if (showToast) showToast(`푸시 등록 실패: ${describePushSubscribeFailure(subscribeResult.reason)}`, 'error', 6000);
-      console.warn('Chat notification subscribe failed:', subscribeResult.reason);
-      return;
-    }
-    if (showToast) showToast('알림 켜짐', 'success');
-  };
+  // Note: chat notification on/off is fully owned by the App-level handleMainToggleNotifications,
+  // reached here via the isChatNotifyEnabled/onToggleChatNotifications props (passed straight
+  // through to ChatSideMenu) -- including the iOS false-positive-permission probe and the
+  // NotificationPermissionHelpModal popup. A parallel local copy of this same state/handler/
+  // auto-subscribe-effect used to live here too (pre-dating that unification) but was never
+  // actually wired to anything -- removed as dead code that only duplicated App's own
+  // subscribeUserToPush effect on every ChatRoomView mount.
 
   // Monitor visualViewport to shift layout above virtual keyboard on mobile devices.
   // Cross-browser notes:

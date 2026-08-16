@@ -2,6 +2,12 @@
   window.GATHER_APP_CONFIG = Object.freeze({
     ENABLE_FIRESTORE_SYNC: true,
     ENABLE_FIRESTORE_WRITES: true,
+    // firestore.rules' places/{placeId} and confirmedMeetings/{date} subcollection rules were
+    // deployed on 2026-08-16 (firebase deploy --only firestore:rules) -- safe to turn the
+    // migration on now that the subcollection writes it performs will actually be accepted
+    // instead of failing closed with a silent-data-loss 403 (see assets/app-main.js's
+    // stripEmbeddedPlacesField/stripEmbeddedConfirmedMeetingField call sites).
+    ENABLE_PLACES_SUBCOLLECTION_MIGRATION: true,
     PUBLIC_CALENDAR_IDS: Object.freeze(['kkot', 'cw']),
     FIREBASE_LOAD_TIMEOUT_MS: 10000,
     FIREBASE_LOAD_MAX_ATTEMPTS: 3,
