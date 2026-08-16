@@ -380,6 +380,9 @@ const getNotificationDiagnostics = GATHER_APP_NOTIFICATIONS.getNotificationDiagn
 const classifyPushSubscribeError = GATHER_APP_NOTIFICATIONS.classifyPushSubscribeError;
 const getBrowserLabelForNotifications = GATHER_APP_NOTIFICATIONS.getBrowserLabelForNotifications;
 const getNotificationPermissionHelpSteps = GATHER_APP_NOTIFICATIONS.getNotificationPermissionHelpSteps;
+const isIOSDevice = GATHER_APP_NOTIFICATIONS.isIOSDevice;
+const isInstalledStandalonePwa = GATHER_APP_NOTIFICATIONS.isInstalledStandalonePwa;
+const probeNotificationCapability = GATHER_APP_NOTIFICATIONS.probeNotificationCapability;
 
 function urlBase64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - base64String.length % 4) % 4);
@@ -5691,6 +5694,22 @@ function App() {
     }
     if (Notification.permission === 'granted') {
       const next = !mainChatNotifyEnabled;
+      if (next) {
+        // iOS reports Notification.permission as 'granted' even in a regular (non-installed)
+        // Safari/Chrome/Firefox tab, where push can never actually arrive -- probe before
+        // trusting that flag, same as the other two chat-notification toggles in this app
+        // already do (ChatRoomView/CommentsSection, AdminModal 일반 tab). This one was the odd
+        // one out, missing the probe entirely -- which is exactly the side-menu switch most
+        // people reach for first, and exactly why "I turned it on but nothing ever arrives"
+        // reports kept coming from iPhone/iPad users regardless of what they toggled.
+        const capability = await probeNotificationCapability();
+        if (!capability.ok) {
+          setMainNotifPermission('unsupported');
+          openNotificationHelp();
+          showToast(capability.reason === 'ios-not-installed' ? 'iOS는 홈 화면에 추가한 앱에서만 채팅알림을 받을 수 있습니다.' : '이 환경에서는 채팅알림을 받을 수 없습니다.', 'error', 6000);
+          return;
+        }
+      }
       setMainChatNotifyEnabled(next);
       setChatNotifyEnabledForCalendar(activeCalId, next);
       if (next) {
@@ -5721,6 +5740,13 @@ function App() {
     if (result !== 'granted') {
       openNotificationHelp();
       showToast('알림 권한을 허용해야 채팅알림을 받을 수 있습니다.', 'error', 6000);
+      return;
+    }
+    const capability = await probeNotificationCapability();
+    if (!capability.ok) {
+      setMainNotifPermission('unsupported');
+      openNotificationHelp();
+      showToast(capability.reason === 'ios-not-installed' ? 'iOS는 홈 화면에 추가한 앱에서만 채팅알림을 받을 수 있습니다.' : '이 브라우저에서는 알림을 표시할 수 없습니다.', 'error', 6000);
       return;
     }
     setChatNotifyEnabledForCalendar(activeCalId, true);
@@ -11721,6 +11747,19 @@ function ChatRoomView({
     }
     if (Notification.permission === 'granted') {
       const next = !chatNotifyEnabled;
+      if (next) {
+        // iOS reports Notification.permission as 'granted' even in a regular (non-installed)
+        // browser tab, where push can never actually arrive -- probe before trusting that flag.
+        // The probe below (ensureChatNotificationPermission path) already caught this the first
+        // time permission was requested; this branch is for a return visit where permission was
+        // already granted from an earlier session, which used to skip the check entirely.
+        const capability = await probeNotificationCapability();
+        if (!capability.ok) {
+          setNotifPermission('unsupported');
+          if (showToast) showToast(capability.reason === 'ios-not-installed' ? '이 브라우저에서는 알림을 표시할 수 없습니다 (iOS는 홈 화면 추가 필요)' : '이 환경에서는 알림을 받을 수 없습니다.', 'error', 6000);
+          return;
+        }
+      }
       setChatNotifyEnabled(next);
       setChatNotifyEnabledForCalendar(calendar.id, next);
       if (next) {
@@ -11752,25 +11791,24 @@ function ChatRoomView({
     // page isn't installed to the home screen) report permission as granted yet still throw when
     // actually constructing a Notification -- probe it immediately so the user gets an honest
     // explanation now instead of silently never seeing a real notification later.
-    try {
-      const probe = new Notification(' ', { silent: true, tag: 'notif-probe' });
-      probe.close();
-      setNotifPermission('granted');
-      setChatNotifyEnabled(true);
-      setChatNotifyEnabledForCalendar(calendar.id, true);
-      const result = await subscribeUserToPushWithPermission(calendar.id, chatParticipantId);
-      if (result && !result.ok) {
-        setChatNotifyEnabled(false);
-        setChatNotifyEnabledForCalendar(calendar.id, false);
-        if (showToast) showToast(`푸시 등록 실패: ${describePushSubscribeFailure(result.reason)}`, 'error', 6000);
-        console.warn('Chat notification subscribe failed:', result.reason);
-        return;
-      }
-      if (showToast) showToast('알림 켜짐', 'success');
-    } catch (e) {
+    const capability = await probeNotificationCapability();
+    if (!capability.ok) {
       setNotifPermission('unsupported');
-      if (showToast) showToast('이 브라우저에서는 알림을 표시할 수 없습니다 (iOS는 홈 화면 추가 필요)', 'error', 6000);
+      if (showToast) showToast(capability.reason === 'ios-not-installed' ? '이 브라우저에서는 알림을 표시할 수 없습니다 (iOS는 홈 화면 추가 필요)' : '이 브라우저에서는 알림을 표시할 수 없습니다.', 'error', 6000);
+      return;
     }
+    setNotifPermission('granted');
+    setChatNotifyEnabled(true);
+    setChatNotifyEnabledForCalendar(calendar.id, true);
+    const subscribeResult = await subscribeUserToPushWithPermission(calendar.id, chatParticipantId);
+    if (subscribeResult && !subscribeResult.ok) {
+      setChatNotifyEnabled(false);
+      setChatNotifyEnabledForCalendar(calendar.id, false);
+      if (showToast) showToast(`푸시 등록 실패: ${describePushSubscribeFailure(subscribeResult.reason)}`, 'error', 6000);
+      console.warn('Chat notification subscribe failed:', subscribeResult.reason);
+      return;
+    }
+    if (showToast) showToast('알림 켜짐', 'success');
   };
 
   // Monitor visualViewport to shift layout above virtual keyboard on mobile devices.
@@ -14914,6 +14952,19 @@ function AdminModal({
     }
     if (Notification.permission === 'granted') {
       const next = !chatNotifyEnabled;
+      if (next) {
+        // iOS reports Notification.permission as 'granted' even in a regular (non-installed)
+        // browser tab, where push can never actually arrive -- probe before trusting that flag
+        // (this branch used to skip straight to subscribe, unlike the "not yet decided" branch
+        // below which already had this check).
+        const capability = await probeNotificationCapability();
+        if (!capability.ok) {
+          setNotifPermission('unsupported');
+          if (onNotificationPermissionBlocked) onNotificationPermissionBlocked();
+          if (showToast) showToast(capability.reason === 'ios-not-installed' ? '이 브라우저에서는 알림을 표시할 수 없습니다 (iOS는 홈 화면 추가 필요)' : '이 환경에서는 알림을 받을 수 없습니다.', 'error', 6000);
+          return;
+        }
+      }
       setChatNotifyEnabled(next);
       setChatNotifyEnabledForCalendar(calendar.id, next);
       if (next) {
@@ -14944,27 +14995,26 @@ function AdminModal({
       if (showToast) showToast('알림 권한 거부됨', 'error');
       return;
     }
-    try {
-      const probe = new Notification(' ', { silent: true, tag: 'notif-probe' });
-      probe.close();
-      setNotifPermission('granted');
-      setChatNotifyEnabled(true);
-      setChatNotifyEnabledForCalendar(calendar.id, true);
-      const result = await subscribeUserToPushWithPermission(calendar.id, chatParticipantId);
-      if (result && !result.ok) {
-        setChatNotifyEnabled(false);
-        setChatNotifyEnabledForCalendar(calendar.id, false);
-        if (result.reason === 'permission-not-granted' && onNotificationPermissionBlocked) onNotificationPermissionBlocked();
-        if (showToast) showToast(`푸시 등록 실패: ${describePushSubscribeFailure(result.reason)}`, 'error', 6000);
-        console.warn('Settings chat notification subscribe failed:', result.reason);
-        return;
-      }
-      if (showToast) showToast('알림 켜짐', 'success');
-    } catch (e) {
+    const capability = await probeNotificationCapability();
+    if (!capability.ok) {
       setNotifPermission('unsupported');
       if (onNotificationPermissionBlocked) onNotificationPermissionBlocked();
-      if (showToast) showToast('이 브라우저에서는 알림을 표시할 수 없습니다 (iOS는 홈 화면 추가 필요)', 'error', 6000);
+      if (showToast) showToast(capability.reason === 'ios-not-installed' ? '이 브라우저에서는 알림을 표시할 수 없습니다 (iOS는 홈 화면 추가 필요)' : '이 브라우저에서는 알림을 표시할 수 없습니다.', 'error', 6000);
+      return;
     }
+    setNotifPermission('granted');
+    setChatNotifyEnabled(true);
+    setChatNotifyEnabledForCalendar(calendar.id, true);
+    const subscribeResult = await subscribeUserToPushWithPermission(calendar.id, chatParticipantId);
+    if (subscribeResult && !subscribeResult.ok) {
+      setChatNotifyEnabled(false);
+      setChatNotifyEnabledForCalendar(calendar.id, false);
+      if (subscribeResult.reason === 'permission-not-granted' && onNotificationPermissionBlocked) onNotificationPermissionBlocked();
+      if (showToast) showToast(`푸시 등록 실패: ${describePushSubscribeFailure(subscribeResult.reason)}`, 'error', 6000);
+      console.warn('Settings chat notification subscribe failed:', subscribeResult.reason);
+      return;
+    }
+    if (showToast) showToast('알림 켜짐', 'success');
   };
 
   // Calendar tab: browse dates and delete schedules -- reuses DateModal in adminMode, which
@@ -16642,7 +16692,12 @@ function UserManualOverlay({ calendar, onClose }) {
 
 function NotificationPermissionHelpModal({ onClose, onRetry, showToast }) {
   const browserLabel = getBrowserLabelForNotifications();
-  const permission = isNotificationSupported() ? Notification.permission : 'unsupported';
+  const isIosBlocked = isIOSDevice() && !isInstalledStandalonePwa();
+  // Notification.permission can read 'granted' on iOS even in a regular browser tab, where push
+  // is architecturally impossible until the site is added to the Home Screen -- treat that case
+  // as its own status rather than trusting the raw permission value, so the headline sentence
+  // doesn't tell the user everything is already "허용됨" (allowed) when it isn't actually usable.
+  const permission = isIosBlocked ? 'ios-not-installed' : (isNotificationSupported() ? Notification.permission : 'unsupported');
   const steps = getNotificationPermissionHelpSteps();
   const diagnostics = getNotificationDiagnostics();
   const handleRetry = async () => {
@@ -16650,19 +16705,28 @@ function NotificationPermissionHelpModal({ onClose, onRetry, showToast }) {
       if (showToast) showToast('이 브라우저는 알림을 지원하지 않습니다.', 'error', 5000);
       return;
     }
+    if (isIosBlocked) {
+      if (showToast) showToast('iOS는 홈 화면에 추가한 앱에서만 채팅알림을 받을 수 있습니다.', 'error', 6000);
+      return;
+    }
     if (Notification.permission === 'denied') {
       if (showToast) showToast('이미 차단된 권한은 브라우저 설정에서만 해제할 수 있습니다.', 'error', 6000);
       return;
     }
     const result = await requestChatNotificationPermission();
-    if (result === 'granted') {
-      if (showToast) showToast('알림 권한이 허용되었습니다. 채팅알림을 다시 켭니다.', 'success', 3500);
-      if (onRetry) await onRetry();
-    } else if (showToast) {
-      showToast('알림 권한을 허용해야 채팅알림을 받을 수 있습니다.', 'error', 6000);
+    if (result !== 'granted') {
+      if (showToast) showToast('알림 권한을 허용해야 채팅알림을 받을 수 있습니다.', 'error', 6000);
+      return;
     }
+    const capability = await probeNotificationCapability();
+    if (!capability.ok) {
+      if (showToast) showToast(capability.reason === 'ios-not-installed' ? 'iOS는 홈 화면에 추가한 앱에서만 채팅알림을 받을 수 있습니다.' : '이 환경에서는 알림을 받을 수 없습니다.', 'error', 6000);
+      return;
+    }
+    if (showToast) showToast('알림 권한이 허용되었습니다. 채팅알림을 다시 켭니다.', 'success', 3500);
+    if (onRetry) await onRetry();
   };
-  const statusLabel = permission === 'granted' ? '허용됨' : permission === 'denied' ? '차단됨' : permission === 'default' ? '아직 선택 안 함' : '미지원';
+  const statusLabel = permission === 'granted' ? '허용됨' : permission === 'denied' ? '차단됨' : permission === 'default' ? '아직 선택 안 함' : permission === 'ios-not-installed' ? 'iOS 홈 화면 추가 필요' : '미지원';
   return ReactDOM.createPortal(/*#__PURE__*/React.createElement("div", {
     className: "modal-overlay",
     role: "dialog",
@@ -16722,7 +16786,7 @@ function NotificationPermissionHelpModal({ onClose, onRetry, showToast }) {
     type: "button",
     className: "btn btn-primary",
     onClick: handleRetry
-  }, permission === 'denied' ? '권한 설정 후 다시 시도' : '권한 다시 요청')))), document.body);
+  }, permission === 'ios-not-installed' ? '홈 화면 추가 방법 확인' : permission === 'denied' ? '권한 설정 후 다시 시도' : '권한 다시 요청')))), document.body);
 }
 
 
