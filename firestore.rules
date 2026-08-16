@@ -66,8 +66,11 @@ service cloud.firestore {
       // Chat/opinion messages. Unlike the calendar document above, this collection has no
       // per-calendar document-count cap (Firestore doesn't support one in rules), so the
       // per-field size caps below are the only thing standing between this collection and
-      // unbounded storage/quota growth -- keep them in sync with MAX_CHAT_IMAGE_BASE64_LENGTH
-      // in index.html if that constant changes.
+      // unbounded storage/quota growth. imageUrl's 400,000-char cap is a hard safety ceiling
+      // (Firestore's 1MiB/doc limit), not the app's normal target -- assets/app-main.js's
+      // compressImageToDataUrls keeps the base64-fallback-if-Storage-upload-fails path around
+      // 48KB in the common case, since a message this large sits in every visitor's live "last
+      // 100 messages" listener download on every future page load until it ages out.
       function hasValidMessageText(data) {
         return data.text is string && data.text.size() <= 5000;
       }

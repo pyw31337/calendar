@@ -19,7 +19,6 @@
       bandwidthBytesPerMonth: 100 * 1024 * 1024 * 1024,
       buildsPerHour: 10
     }),
-    MAX_CHAT_IMAGE_BASE64_LENGTH: 350000,
     // Firestore's messages/{id} rule caps the singular thumbUrl field at 50,000 chars (see
     // firestore.rules hasValidMessageImages) -- this is the base64-fallback thumbnail budget used
     // when Storage upload fails, so it must stay safely under that cap or the fallback write gets
