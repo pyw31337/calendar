@@ -9,8 +9,13 @@ function assert(condition, message) {
 }
 
 // The app's main logic lives in assets/app-main.js (externalized from index.html's inline
-// <script> -- see check-tab-wiring.mjs for the rationale).
+// <script> -- see check-tab-wiring.mjs for the rationale). It reads helpers off the
+// window.GATHER_APP_UTILS global that assets/app-utils.js populates in the real page, so that
+// script has to run first here too (mirrors restore-rehearsal.mjs/firebase-safety-tests.mjs's
+// setup) -- without it, GATHER_APP_UTILS resolves to {} and any cloneCalendar()/cloneActivityLog()
+// call site throws "undefined is not a function" the first time a save actually exercises it.
 const script = fs.readFileSync('assets/app-main.js', 'utf8');
+const utilsScript = fs.readFileSync('assets/app-utils.js', 'utf8');
 assert(script, 'assets/app-main.js not found');
 
 function createContext(url) {
@@ -81,7 +86,7 @@ function createContext(url) {
 
 function runAppScript(context, extraSource = '') {
   vm.createContext(context);
-  vm.runInContext(`${script}\n${extraSource}`, context);
+  vm.runInContext(`${utilsScript}\n${script}\n${extraSource}`, context);
 }
 
 async function fetchCalendarDoc(calendarId) {
