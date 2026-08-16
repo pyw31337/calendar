@@ -4298,7 +4298,7 @@ function AdminDashboard({ initialCalendars }) {
         /*#__PURE__*/React.createElement("div", { style: { border: '1px solid #E2E8F0', borderRadius: '10px', padding: '14px', backgroundColor: '#F8FAFC' } },
           /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' } },
             /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.9rem', fontWeight: 'bold', color: '#0F172A' } }, "Peekalink (링크 미리보기 / OpenGraph)"),
-            /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.7rem', padding: '2px 8px', borderRadius: '9999px', backgroundColor: '#DCFCE7', color: '#16A34A', fontWeight: 'bold' } }, "통합 캐시 사용 중")
+            /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.7rem', padding: '2px 8px', borderRadius: 'var(--radius-full)', backgroundColor: '#DCFCE7', color: '#16A34A', fontWeight: 'bold' } }, "통합 캐시 사용 중")
           ),
           /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.8rem', color: '#64748B', marginTop: '8px', lineHeight: 1.6 } },
             "채팅/메모/정산에서 붙여넣은 링크의 제목·설명·이미지를 가져오는 데 사용됩니다. 이제 캘린더별로 각각 요청하지 않고, URL당 한 번만 조회한 뒤 결과를 ",
@@ -4379,7 +4379,7 @@ function AdminDashboard({ initialCalendars }) {
                 style: { display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '12px' }
               },
                 stat.participants.slice(0, 10).map(p => /*#__PURE__*/React.createElement("span", {
-                  key: p.id, style: { backgroundColor: p.color, color: getContrastTextColor(p.color), padding: '2px 8px', borderRadius: '9999px', fontSize: '0.68rem', fontWeight: 'bold' }
+                  key: p.id, style: { backgroundColor: p.color, color: getContrastTextColor(p.color), padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: '0.68rem', fontWeight: 'bold' }
                 }, p.name))
               ),
               /* 일정 데이터 5000건 캡 사용량 -- 캘린더 문서별로 독립적으로 적용됨 (전체 합산이 아님) */
@@ -4441,7 +4441,7 @@ function AdminDashboard({ initialCalendars }) {
                 style: { marginBottom: '16px', paddingLeft: '10px', borderLeft: `3px solid ${accent}` }
               },
               /*#__PURE__*/React.createElement("span", {
-                style: { display: 'inline-block', fontWeight: 900, marginBottom: '8px', color: accent, fontSize: '0.8rem', backgroundColor: `${accent}1A`, padding: '2px 10px', borderRadius: '9999px' }
+                style: { display: 'inline-block', fontWeight: 900, marginBottom: '8px', color: accent, fontSize: '0.8rem', backgroundColor: `${accent}1A`, padding: '2px 10px', borderRadius: 'var(--radius-full)' }
               }, stat.calendar.id),
               stat.participantStats.map(participant => {
                 const pct = `${Math.max(4, Math.round(participant.count / Math.max(1, stat.schedules.length) * 100))}%`;
@@ -4455,7 +4455,7 @@ function AdminDashboard({ initialCalendars }) {
                     /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px' } },
                       /*#__PURE__*/React.createElement("span", { style: { color: '#64748B' } }, participant.count, "건"),
                       /*#__PURE__*/React.createElement("span", {
-                        style: { fontSize: '0.68rem', fontWeight: 700, padding: '1px 7px', borderRadius: '9999px', backgroundColor: '#EEF2FF', color: '#4338CA' }
+                        style: { fontSize: '0.68rem', fontWeight: 700, padding: '1px 7px', borderRadius: 'var(--radius-full)', backgroundColor: '#EEF2FF', color: '#4338CA' }
                       }, "참석률 ", attendanceRate, "%")
                     )
                   ),
@@ -4820,7 +4820,7 @@ function AdminDashboard({ initialCalendars }) {
                     style: { fontSize: '0.68rem', fontWeight: 'bold', padding: '2px 6px', borderRadius: '4px', backgroundColor: badgeBg, color: badgeColor, border: `1px solid ${badgeColor}30`, whiteSpace: 'nowrap' }
                   }, actLabel),
                   /*#__PURE__*/React.createElement("span", {
-                    style: { backgroundColor: p.color, color: getContrastTextColor(p.color), padding: '2px 8px', borderRadius: '9999px', fontSize: '0.7rem', fontWeight: 'bold', whiteSpace: 'nowrap' }
+                    style: { backgroundColor: p.color, color: getContrastTextColor(p.color), padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: '0.7rem', fontWeight: 'bold', whiteSpace: 'nowrap' }
                   }, p.name),
                   log.date && /*#__PURE__*/React.createElement("span", {
                     style: { fontSize: '0.8rem', fontWeight: 'bold', color: '#475569' }
@@ -4923,7 +4923,7 @@ function AdminDashboard({ initialCalendars }) {
               /*#__PURE__*/React.createElement("div", { className: "admin-chat-header" },
                 /* Participant badge */
                 /*#__PURE__*/React.createElement("span", {
-                  style: { backgroundColor: p.color, color: getContrastTextColor(p.color), padding: '2px 8px', borderRadius: '9999px', fontSize: '0.72rem', fontWeight: 'bold', whiteSpace: 'nowrap' }
+                  style: { backgroundColor: p.color, color: getContrastTextColor(p.color), padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: '0.72rem', fontWeight: 'bold', whiteSpace: 'nowrap' }
                 }, p.name)
               ),
               /* Line 2: full message text, wrapped rather than truncated on narrow screens */
@@ -9553,8 +9553,8 @@ function ImageProcessingOverlay({ current, total, fileName, pct, remainingSec })
     /*#__PURE__*/React.createElement('div', { style: { fontWeight: 800, fontSize: '0.95rem', color: 'var(--text-main)', marginBottom: '4px' } }, '사진 변환 중...'),
     /*#__PURE__*/React.createElement('div', { style: { fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '14px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } },
       `${current}/${total}${fileName ? ` · ${fileName}` : ''} · ${clamped}%${typeof remainingSec === 'number' ? ` · 약 ${remainingSec}초 남음` : ''}`),
-    /*#__PURE__*/React.createElement('div', { style: { height: '8px', borderRadius: '9999px', backgroundColor: 'var(--border-subtle)', overflow: 'hidden' } },
-      /*#__PURE__*/React.createElement('div', { style: { height: '100%', width: `${clamped}%`, backgroundColor: '#4F46E5', transition: 'width 0.2s ease', borderRadius: '9999px' } })
+    /*#__PURE__*/React.createElement('div', { style: { height: '8px', borderRadius: 'var(--radius-full)', backgroundColor: 'var(--border-subtle)', overflow: 'hidden' } },
+      /*#__PURE__*/React.createElement('div', { style: { height: '100%', width: `${clamped}%`, backgroundColor: '#4F46E5', transition: 'width 0.2s ease', borderRadius: 'var(--radius-full)' } })
     )
   ));
 }
@@ -9572,8 +9572,8 @@ function ImageUploadOverlay({ pct, remainingSec, label, current, total }) {
     /*#__PURE__*/React.createElement('div', { style: { fontWeight: 800, fontSize: '0.95rem', color: 'var(--text-main)', marginBottom: '4px' } }, `${label || '사진 전송 중...'}${countSuffix}`),
     /*#__PURE__*/React.createElement('div', { style: { fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '14px' } },
       `${clamped}%${typeof remainingSec === 'number' ? ` · 약 ${remainingSec}초 남음` : ''}`),
-    /*#__PURE__*/React.createElement('div', { style: { height: '8px', borderRadius: '9999px', backgroundColor: 'var(--border-subtle)', overflow: 'hidden' } },
-      /*#__PURE__*/React.createElement('div', { style: { height: '100%', width: `${clamped}%`, backgroundColor: '#4F46E5', transition: 'width 0.2s ease', borderRadius: '9999px' } })
+    /*#__PURE__*/React.createElement('div', { style: { height: '8px', borderRadius: 'var(--radius-full)', backgroundColor: 'var(--border-subtle)', overflow: 'hidden' } },
+      /*#__PURE__*/React.createElement('div', { style: { height: '100%', width: `${clamped}%`, backgroundColor: '#4F46E5', transition: 'width 0.2s ease', borderRadius: 'var(--radius-full)' } })
     )
   ));
 }
@@ -9587,8 +9587,8 @@ function OperationProgressOverlay({ title, detail, pct }) {
   },
     /*#__PURE__*/React.createElement('div', { style: { fontWeight: 900, fontSize: '1rem', color: 'var(--text-main)', marginBottom: '6px' } }, title || '작업 처리 중...'),
     /*#__PURE__*/React.createElement('div', { style: { fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '14px', lineHeight: 1.45 } }, detail || '서버 응답을 기다리고 있습니다.'),
-    /*#__PURE__*/React.createElement('div', { style: { height: '9px', borderRadius: '9999px', backgroundColor: 'var(--border-subtle)', overflow: 'hidden' } },
-      /*#__PURE__*/React.createElement('div', { style: { height: '100%', width: `${clamped}%`, background: 'linear-gradient(90deg, #4F46E5, #EC4899)', transition: 'width 0.35s ease', borderRadius: '9999px' } })
+    /*#__PURE__*/React.createElement('div', { style: { height: '9px', borderRadius: 'var(--radius-full)', backgroundColor: 'var(--border-subtle)', overflow: 'hidden' } },
+      /*#__PURE__*/React.createElement('div', { style: { height: '100%', width: `${clamped}%`, background: 'linear-gradient(90deg, #4F46E5, #EC4899)', transition: 'width 0.35s ease', borderRadius: 'var(--radius-full)' } })
     ),
     /*#__PURE__*/React.createElement('div', { style: { marginTop: '8px', color: 'var(--text-muted)', fontSize: '0.72rem', fontWeight: 800 } }, `${Math.round(clamped)}%`)
   ));
@@ -10164,7 +10164,7 @@ function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSearchTag
       /*#__PURE__*/React.createElement("span", { style: labelStyle }, "파일정보"),
       /*#__PURE__*/React.createElement("span", {
         style: {
-          display: 'inline-flex', alignItems: 'center', padding: '1px 8px', borderRadius: '9999px',
+          display: 'inline-flex', alignItems: 'center', padding: '1px 8px', borderRadius: 'var(--radius-full)',
           border: '1px solid #FFFFFF', color: '#FFFFFF', fontSize: '0.68rem', fontWeight: 800
         }
       }, info.typeLabel),
@@ -10181,7 +10181,7 @@ function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSearchTag
           className: "lightbox-tag-badge",
           onClick: () => onSearchTag && onSearchTag(tag),
           style: {
-            display: 'inline-flex', alignItems: 'center', gap: '6px', borderRadius: '9999px',
+            display: 'inline-flex', alignItems: 'center', gap: '6px', borderRadius: 'var(--radius-full)',
             padding: '3px 4px 3px 10px', fontSize: '0.72rem', fontWeight: 900, lineHeight: 1,
             border: '1px solid #FFFFFF', color: '#FFFFFF', background: 'transparent',
             cursor: onSearchTag ? 'pointer' : 'default'
@@ -10203,7 +10203,7 @@ function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSearchTag
         className: "lightbox-url-btn",
         onClick: () => onOpenUrl && onOpenUrl(),
         style: {
-          flexShrink: 0, height: '30px', padding: '0 10px', borderRadius: '9999px',
+          flexShrink: 0, height: '30px', padding: '0 10px', borderRadius: 'var(--radius-full)',
           border: '1px solid rgba(255,255,255,0.32)', background: 'rgba(255,255,255,0.14)',
           color: '#FFFFFF', display: 'inline-flex', alignItems: 'center', gap: '5px',
           cursor: 'pointer', fontSize: '0.72rem', fontWeight: 800, backdropFilter: 'blur(6px)'
@@ -10970,7 +10970,7 @@ function CommentsSection({
         style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }
       },
         /*#__PURE__*/React.createElement('span', {
-          style: { backgroundColor: badgeColor, color: '#FFFFFF', padding: '3px 10px', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 'bold', whiteSpace: 'nowrap' }
+          style: { backgroundColor: badgeColor, color: '#FFFFFF', padding: '3px 10px', borderRadius: 'var(--radius-full)', fontSize: '0.75rem', fontWeight: 'bold', whiteSpace: 'nowrap' }
         }, badgeName),
         /*#__PURE__*/React.createElement('div', {
           style: { display: 'flex', alignItems: 'center', gap: '6px' }
@@ -11153,7 +11153,7 @@ function CommentsSection({
           backgroundColor: selectedParticipant?.color || '#94A3B8',
           color: '#FFFFFF',
           border: 'none',
-          borderRadius: '9999px',
+          borderRadius: 'var(--radius-full)',
           padding: '6px 14px',
           fontSize: '0.8rem',
           fontWeight: 'bold',
@@ -12301,7 +12301,7 @@ function ChatRoomView({
       alignItems: 'center',
       gap: '6px',
       padding: '8px 16px',
-      borderRadius: '9999px',
+      borderRadius: 'var(--radius-full)',
       backgroundColor: '#4F46E5',
       color: '#FFFFFF',
       border: 'none',
@@ -12436,7 +12436,7 @@ function ChatRoomView({
             backgroundColor: selectedParticipant?.color || '#94A3B8',
             color: '#FFFFFF',
             border: 'none',
-            borderRadius: '9999px',
+            borderRadius: 'var(--radius-full)',
             padding: '6px 14px',
             fontSize: '0.8rem',
             fontWeight: 'bold',
@@ -12806,7 +12806,7 @@ function ParticipantPickerButton({ participant, onClick }) {
       backgroundColor: participant?.color || '#94A3B8',
       color: '#FFFFFF',
       border: 'none',
-      borderRadius: '9999px',
+      borderRadius: 'var(--radius-full)',
       padding: '6px 14px',
       fontSize: '0.8rem',
       fontWeight: 'bold',
@@ -13857,7 +13857,7 @@ function DateModal({
       textAlign: 'left',
       background: 'var(--bg-card)',
       cursor: 'pointer',
-      borderRadius: '9999px'
+      borderRadius: 'var(--radius-full)'
     },
     disabled: isSubmitting,
     onClick: () => {
@@ -15250,7 +15250,7 @@ function AdminModal({
                   }, actionLabel),
                   /* User */
                   /*#__PURE__*/React.createElement("span", {
-                    style: { backgroundColor: p.color, color: getContrastTextColor(p.color), padding: '2px 8px', borderRadius: '9999px', fontSize: '0.7rem', fontWeight: 'bold', whiteSpace: 'nowrap' }
+                    style: { backgroundColor: p.color, color: getContrastTextColor(p.color), padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: '0.7rem', fontWeight: 'bold', whiteSpace: 'nowrap' }
                   }, p.name),
                   log.date && /*#__PURE__*/React.createElement("span", {
                     className: "recent-log-date",
@@ -15615,7 +15615,7 @@ function SearchResultLogRow({ badgeName, badgeColor, timeStr, calendarLabel, onC
   },
     /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px', flexWrap: 'wrap' } },
       badgeName && /*#__PURE__*/React.createElement("span", {
-        style: { backgroundColor: badgeColor || '#94A3B8', color: getContrastTextColor(badgeColor || '#94A3B8'), padding: '2px 8px', borderRadius: '9999px', fontSize: '0.7rem', fontWeight: 'bold', whiteSpace: 'nowrap' }
+        style: { backgroundColor: badgeColor || '#94A3B8', color: getContrastTextColor(badgeColor || '#94A3B8'), padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: '0.7rem', fontWeight: 'bold', whiteSpace: 'nowrap' }
       }, badgeName),
       calendarLabel && /*#__PURE__*/React.createElement("span", {
         style: { fontSize: '0.68rem', color: '#94A3B8', fontWeight: 700 }
@@ -18194,7 +18194,7 @@ function MemoView({ calendar, memos, hasMoreMemos, onLoadMoreMemos, onBack, show
                 newTags.map(tag => /*#__PURE__*/React.createElement("span", {
                   key: tag,
                   style: {
-                    display: 'inline-flex', alignItems: 'center', gap: '6px', borderRadius: '9999px',
+                    display: 'inline-flex', alignItems: 'center', gap: '6px', borderRadius: 'var(--radius-full)',
                     padding: '3px 4px 3px 10px', fontSize: '0.72rem', fontWeight: 900, lineHeight: 1,
                     border: '1px solid var(--border-subtle)', color: 'var(--text-main)', background: 'var(--bg-primary)'
                   }
@@ -18557,7 +18557,7 @@ function MemoView({ calendar, memos, hasMoreMemos, onLoadMoreMemos, onBack, show
             editTags.map(tag => /*#__PURE__*/React.createElement("span", {
               key: tag,
               style: {
-                display: 'inline-flex', alignItems: 'center', gap: '6px', borderRadius: '9999px',
+                display: 'inline-flex', alignItems: 'center', gap: '6px', borderRadius: 'var(--radius-full)',
                 padding: '3px 4px 3px 10px', fontSize: '0.72rem', fontWeight: 900, lineHeight: 1,
                 border: '1px solid var(--border-subtle)', color: 'var(--text-main)', background: 'var(--bg-primary)'
               }
@@ -18839,7 +18839,7 @@ function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onSelectTag, onComm
           style: {
             backgroundColor: writer.color || '#94A3B8',
             color: '#FFFFFF',
-            borderRadius: '9999px',
+            borderRadius: 'var(--radius-full)',
             padding: '3px 8px',
             fontSize: '0.68rem',
             fontWeight: 'bold',
@@ -19568,7 +19568,7 @@ function AnniversaryModal({
                 className: "form-input",
                 value: yearlyMonth,
                 onChange: e => setYearlyMonth(Number(e.target.value)),
-                style: { width: '100%', padding: '6px 8px' }
+                style: { width: '100%' }
               }, months.map(m => /*#__PURE__*/React.createElement("option", { key: m, value: m }, `${m}월`)))
             ),
             /* Day */
@@ -19578,32 +19578,37 @@ function AnniversaryModal({
                 className: "form-input",
                 value: yearlyDay,
                 onChange: e => setYearlyDay(Number(e.target.value)),
-                style: { width: '100%', padding: '6px 8px' }
+                style: { width: '100%' }
               }, days.map(d => /*#__PURE__*/React.createElement("option", { key: d, value: d }, `${d}일`)))
             )
           ),
           /* Lunar / Leap month settings */
           /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '14px', marginTop: '4px', flexWrap: 'wrap' } },
-            /* Lunar toggle */
-            /*#__PURE__*/React.createElement("label", { style: { display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.76rem', cursor: 'pointer', userSelect: 'none' } },
-              /*#__PURE__*/React.createElement("input", {
-                type: "checkbox",
-                checked: isLunar,
-                onChange: e => setIsLunar(e.target.checked),
-                style: { margin: 0 }
-              }),
-              "음력으로 계산"
-            ),
-            /* Leap month toggle (shows only if Lunar) */
-            isLunar && /*#__PURE__*/React.createElement("label", { style: { display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.76rem', cursor: 'pointer', userSelect: 'none', color: '#6366F1' } },
-              /*#__PURE__*/React.createElement("input", {
-                type: "checkbox",
-                checked: isLeap,
-                onChange: e => setIsLeap(e.target.checked),
-                style: { margin: 0 }
-              }),
-              "윤달 여부"
-            )
+            /* Solar/lunar toggle -- same SegmentedToggle used for 방문/예정 (PlaceRegisterModal) rather
+               than a native checkbox, so this is an exclusive A/B choice styled consistently with the
+               rest of the app instead of the odd-one-out checkbox it used to be. */
+            /*#__PURE__*/React.createElement(SegmentedToggle, {
+              ariaLabel: "양력/음력 전환",
+              value: isLunar ? 'lunar' : 'solar',
+              onChange: v => setIsLunar(v === 'lunar'),
+              options: [{ value: 'solar', label: '양력' }, { value: 'lunar', label: '음력' }]
+            }),
+            /* Leap month toggle (shows only if Lunar) -- standalone on/off button matching
+               SegmentedToggle's own per-segment sizing/style (padding, font, border-radius) rather
+               than a native checkbox, since this one has no second option to pair it with. */
+            isLunar && /*#__PURE__*/React.createElement("button", {
+              type: "button",
+              role: "switch",
+              "aria-checked": isLeap,
+              onClick: () => setIsLeap(!isLeap),
+              style: {
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
+                padding: '12px 16px', border: '1px solid var(--border-subtle)', cursor: 'pointer',
+                borderRadius: 'var(--radius-sm)', fontSize: '0.78rem', fontWeight: isLeap ? 900 : 500,
+                whiteSpace: 'nowrap', backgroundColor: isLeap ? 'var(--accent-primary)' : 'transparent',
+                color: isLeap ? '#FFFFFF' : 'var(--text-muted)'
+              }
+            }, "윤달")
           )
         ),
 
@@ -20040,7 +20045,7 @@ function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {
       display: 'inline-flex',
       alignItems: 'center',
       padding: '3px 10px',
-      borderRadius: '9999px',
+      borderRadius: 'var(--radius-full)',
       fontSize: '0.72rem',
       fontWeight: 400,
       backgroundColor: 'var(--border-subtle)',
@@ -21266,7 +21271,7 @@ function ToggleSwitch({ checked, onChange, label }) {
     "aria-label": label,
     onClick: onChange,
     style: {
-      width: '44px', height: '24px', borderRadius: '9999px', border: 'none', cursor: 'pointer',
+      width: '44px', height: '24px', borderRadius: 'var(--radius-full)', border: 'none', cursor: 'pointer',
       backgroundColor: checked ? 'var(--accent-primary)' : '#CBD5E1',
       position: 'relative', transition: 'background-color 0.2s ease', padding: 0, flexShrink: 0
     }
@@ -21485,7 +21490,7 @@ function PollList({ calendar, onCreatePoll, onEditPoll, onVotePoll, onCancelVote
       style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }
     }, poll.title, poll.deadline && /*#__PURE__*/React.createElement("span", {
       style: {
-        fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: '9999px', whiteSpace: 'nowrap',
+        fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: 'var(--radius-full)', whiteSpace: 'nowrap',
         backgroundColor: closed ? '#FEE2E2' : '#EFF6FF', color: closed ? '#DC2626' : '#2563EB'
       }
     }, closed ? '마감됨' : `마감 ${formatPollDeadline(poll.deadline)}`)), poll.description && /*#__PURE__*/React.createElement("div", {
@@ -22895,7 +22900,7 @@ function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom = false
           urlEl.textContent = memoUrl;
           urlEl.style.display = 'inline-block';
           urlEl.style.padding = '2px 8px';
-          urlEl.style.borderRadius = '9999px';
+          urlEl.style.borderRadius = 'var(--radius-full)';
           urlEl.style.fontSize = '0.68rem';
           urlEl.style.fontWeight = '600';
           urlEl.style.backgroundColor = '#E2E8F0';
@@ -23201,7 +23206,7 @@ function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, onDelete,
           onClick: e => { e.stopPropagation(); window.open(selected.url, '_blank', 'noopener,noreferrer'); },
           style: {
             alignSelf: 'flex-start', border: 0, cursor: 'pointer', textAlign: 'left',
-            padding: '3px 10px', borderRadius: '9999px', fontSize: '0.72rem', fontWeight: 400,
+            padding: '3px 10px', borderRadius: 'var(--radius-full)', fontSize: '0.72rem', fontWeight: 400,
             backgroundColor: 'var(--border-subtle)', color: 'var(--text-muted)', wordBreak: 'break-all', maxWidth: '100%'
           }
         }, selected.url)
