@@ -3,6 +3,46 @@
     return typeof Notification !== 'undefined';
   }
 
+  // iOS Safari -- and every other iOS browser (Chrome/Firefox/Edge on iOS all run on Apple's
+  // required WebKit engine, so they inherit the exact same restriction) -- only delivers Web
+  // Push to a site that's been added to the Home Screen. In a regular browser tab,
+  // Notification.permission can still report 'granted' (the permission API itself works fine),
+  // which is exactly what makes this so easy to miss: the toggle, the permission prompt, and
+  // even a successful pushManager.subscribe() call can all appear to work, yet no push will ever
+  // actually arrive. detectBrowserForShortcutInstructions (assets/app-utils.js) already does
+  // this same iOS/platform sniff for the "add to home screen" instructions -- mirrored here
+  // rather than shared across files since app-utils.js and app-notifications.js are independent
+  // globals with no import between them.
+  function isIOSDevice() {
+    if (typeof navigator === 'undefined') return false;
+    const ua = navigator.userAgent || '';
+    return /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  }
+
+  function isInstalledStandalonePwa() {
+    if (typeof window === 'undefined') return false;
+    if (window.navigator && window.navigator.standalone === true) return true; // iOS Safari's own legacy flag
+    return typeof window.matchMedia === 'function' && window.matchMedia('(display-mode: standalone)').matches;
+  }
+
+  // The one reliable way to catch the iOS false-positive-permission case before the user
+  // believes notifications are on: actually try to construct a Notification. A regular
+  // (non-installed) iOS browser tab throws here even when Notification.permission says
+  // 'granted'. Every "turn notifications on" code path should probe with this before
+  // subscribing, not just check Notification.permission.
+  async function probeNotificationCapability() {
+    if (!isNotificationSupported()) return { ok: false, reason: 'unsupported' };
+    if (Notification.permission !== 'granted') return { ok: false, reason: 'permission-not-granted' };
+    if (isIOSDevice() && !isInstalledStandalonePwa()) return { ok: false, reason: 'ios-not-installed' };
+    try {
+      const probe = new Notification(' ', { silent: true, tag: 'notif-probe' });
+      probe.close();
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, reason: isIOSDevice() ? 'ios-not-installed' : 'probe-failed' };
+    }
+  }
+
   async function requestChatNotificationPermission() {
     if (!isNotificationSupported()) return 'unsupported';
     if (Notification.permission === 'granted' || Notification.permission === 'denied') {
@@ -105,6 +145,13 @@
     add('보안 연결', typeof window === 'undefined' || window.isSecureContext !== false, 'HTTPS 또는 localhost 필요');
     add('서비스워커', typeof navigator !== 'undefined' && 'serviceWorker' in navigator, typeof navigator !== 'undefined' && 'serviceWorker' in navigator ? '지원됨' : '미지원');
     add('Web Push', typeof window !== 'undefined' && 'PushManager' in window, typeof window !== 'undefined' && 'PushManager' in window ? '지원됨' : '미지원');
+    // The four checks above can all show green on a non-installed iOS browser tab -- iOS exposes
+    // these APIs regardless, but never actually delivers a push unless the site is running from
+    // its Home Screen icon. This is the row that actually explains most "I turned it on but
+    // nothing ever arrives" reports on iPhone/iPad.
+    if (isIOSDevice()) {
+      add('iOS 홈 화면 설치', isInstalledStandalonePwa(), isInstalledStandalonePwa() ? '홈 화면 앱으로 실행 중' : 'Safari 탭에서 실행 중 (알림 불가)');
+    }
     return rows;
   }
 
@@ -132,6 +179,18 @@
 
   function getNotificationPermissionHelpSteps() {
     const browser = getBrowserLabelForNotifications();
+    // Checked first, ahead of every browser-specific branch below -- on iOS, none of those
+    // "check your browser's notification settings" steps are the actual fix (iOS has no per-site
+    // browser notification setting for a non-installed tab at all), so showing them here would
+    // send the user down a dead end.
+    if (isIOSDevice() && !isInstalledStandalonePwa()) {
+      return [
+        'iOS(아이폰/아이패드)는 Safari 브라우저 탭에서는 채팅알림을 받을 수 없습니다 -- Apple 정책상 홈 화면에 추가된 앱에서만 가능합니다.',
+        'Safari 하단(또는 상단) 공유 버튼( ⬆️ )을 눌러 주세요.',
+        '"홈 화면에 추가"를 선택해 주세요.',
+        '홈 화면에 생긴 아이콘으로 앱을 다시 실행한 뒤, 채팅알림을 켜 주세요.'
+      ];
+    }
     if (browser === '삼성 인터넷') {
       return [
         '하단 메뉴(≡ 또는 점 3개)를 눌러 주세요.',
@@ -175,6 +234,9 @@
     getNotificationDiagnostics,
     classifyPushSubscribeError,
     getBrowserLabelForNotifications,
-    getNotificationPermissionHelpSteps
+    getNotificationPermissionHelpSteps,
+    isIOSDevice,
+    isInstalledStandalonePwa,
+    probeNotificationCapability
   });
 })();
