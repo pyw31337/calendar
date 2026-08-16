@@ -197,7 +197,6 @@ function formatPlaceBadgeDate(dateStr) {
   return normalized ? formatShortDateWithDayName(normalized) : null;
 }
 
-const URL_PARAMS = new URLSearchParams(window.location.search);
 const GATHER_APP_CONFIG = window.GATHER_APP_CONFIG || {};
 const readConfigNumber = (key, fallback) => Number.isFinite(GATHER_APP_CONFIG[key]) ? GATHER_APP_CONFIG[key] : fallback;
 const readConfigObject = (key, fallback) => GATHER_APP_CONFIG[key] && typeof GATHER_APP_CONFIG[key] === 'object' ? GATHER_APP_CONFIG[key] : fallback;
@@ -3062,8 +3061,8 @@ function AdminDashboard({ initialCalendars }) {
     e.preventDefault();
     if (isPwSubmitting) return;
     setPwError('');
-    if (newPwInput.length < 4) {
-      setPwError('새 비밀번호는 4자 이상이어야 합니다.');
+    if (newPwInput.length < 6) {
+      setPwError('새 비밀번호는 6자 이상이어야 합니다.');
       return;
     }
     if (newPwInput !== confirmPwInput) {
@@ -4221,7 +4220,7 @@ function AdminDashboard({ initialCalendars }) {
           value: currentPwInput, onChange: e => setCurrentPwInput(e.target.value)
         }),
         /*#__PURE__*/React.createElement("input", {
-          type: "password", className: "form-input", style: { width: '100%' }, placeholder: "새 비밀번호 (4자 이상)",
+          type: "password", className: "form-input", style: { width: '100%' }, placeholder: "새 비밀번호 (6자 이상)",
           value: newPwInput, onChange: e => setNewPwInput(e.target.value)
         }),
         /*#__PURE__*/React.createElement("input", {
@@ -8097,16 +8096,16 @@ function CalendarGrid({
       isCurrentMonth: false
     });
   }
-  const availMap = getActiveAvailabilities(calendar).reduce((acc, entry) => {
+  const availMap = React.useMemo(() => getActiveAvailabilities(calendar).reduce((acc, entry) => {
     if (!acc[entry.date]) acc[entry.date] = [];
     acc[entry.date].push(entry);
     return acc;
-  }, {});
-  const participantsMap = getActiveParticipants(calendar).reduce((acc, p) => {
+  }, {}), [calendar.availabilities]);
+  const participantsMap = React.useMemo(() => getActiveParticipants(calendar).reduce((acc, p) => {
     acc[p.id] = p;
     return acc;
-  }, {});
-  const totalPartCount = getActiveParticipants(calendar).length || 0;
+  }, {}), [calendar.participants]);
+  const totalPartCount = Object.keys(participantsMap).length;
   const holidayMap = React.useMemo(() => {
     const map = {};
     [year - 1, year, year + 1].forEach(y => {
@@ -14914,7 +14913,10 @@ function AdminModal({
     return acc;
   }, {});
 
-  const activityLogsSorted = [...getCalendarActivityLogs(calendar)].sort((a, b) => b.timestamp - a.timestamp);
+  const activityLogsSorted = React.useMemo(
+    () => [...getCalendarActivityLogs(calendar)].sort((a, b) => b.timestamp - a.timestamp),
+    [calendar.activityLogs]
+  );
 
   return /*#__PURE__*/React.createElement("div", {
     className: "modal-overlay",
@@ -17772,6 +17774,24 @@ function MemoView({ calendar, memos, hasMoreMemos, onLoadMoreMemos, onBack, show
     setEditParticipantId(memo.participantId || '');
   };
 
+  const handleTogglePin = async (memo) => {
+    try {
+      await firebaseDb.collection('calendars').doc('cal_' + calendar.id).collection('memos').doc(memo.id).update({ isPinned: !memo.isPinned });
+    } catch (err) {
+      console.error('Failed to toggle memo pin:', err);
+      showToast('고정 상태 변경 실패', 'error');
+    }
+  };
+
+  const handleMemoCommentsChange = async (memo, nextComments) => {
+    try {
+      await firebaseDb.collection('calendars').doc('cal_' + calendar.id).collection('memos').doc(memo.id).update({ comments: nextComments });
+    } catch (err) {
+      console.error('Failed to update memo comments:', err);
+      showToast('댓글 저장 실패', 'error');
+    }
+  };
+
   const removeComposerImage = (idx) => {
     setNewImages(prev => prev.filter((_, i) => i !== idx));
   };
@@ -18269,14 +18289,9 @@ function MemoView({ calendar, memos, hasMoreMemos, onLoadMoreMemos, onBack, show
           memo: memo,
           calendar: calendar,
           onOpenEdit: handleOpenEdit,
-          onTogglePin: async () => {
-            const nextPinned = !memo.isPinned;
-            await firebaseDb.collection('calendars').doc('cal_' + calendar.id).collection('memos').doc(memo.id).update({ isPinned: nextPinned });
-          },
+          onTogglePin: () => handleTogglePin(memo),
           onSelectTag: (tag) => { setSelectedTag(tag); setIsSearchOpen(true); },
-          onCommentsChange: async (nextComments) => {
-            await firebaseDb.collection('calendars').doc('cal_' + calendar.id).collection('memos').doc(memo.id).update({ comments: nextComments });
-          },
+          onCommentsChange: (nextComments) => handleMemoCommentsChange(memo, nextComments),
           getBorderColor: getBorderColor
         })))
       ),
@@ -18301,14 +18316,9 @@ function MemoView({ calendar, memos, hasMoreMemos, onLoadMoreMemos, onBack, show
           memo: memo,
           calendar: calendar,
           onOpenEdit: handleOpenEdit,
-          onTogglePin: async () => {
-            const nextPinned = !memo.isPinned;
-            await firebaseDb.collection('calendars').doc('cal_' + calendar.id).collection('memos').doc(memo.id).update({ isPinned: nextPinned });
-          },
+          onTogglePin: () => handleTogglePin(memo),
           onSelectTag: (tag) => { setSelectedTag(tag); setIsSearchOpen(true); },
-          onCommentsChange: async (nextComments) => {
-            await firebaseDb.collection('calendars').doc('cal_' + calendar.id).collection('memos').doc(memo.id).update({ comments: nextComments });
-          },
+          onCommentsChange: (nextComments) => handleMemoCommentsChange(memo, nextComments),
           getBorderColor: getBorderColor
         })))
       ),
@@ -18685,8 +18695,9 @@ function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onSelectTag, onComm
   const imageUrls = memo.imageUrls || [];
   const thumbUrls = memo.thumbUrls || [];
 
-  // Comments: stored inline on the memo doc (memos collection has no per-field schema, so no
-  // firestore.rules change needed). Composer mirrors the tag-input module's pattern.
+  // Comments: stored inline on the memo doc as a size-capped array (see hasValidMemoShape in
+  // firestore.rules -- comments.size() <= 200, no per-comment shape lock). Composer mirrors the
+  // tag-input module's pattern.
   const comments = memo.comments || [];
   const [isCommentComposerOpen, setIsCommentComposerOpen] = React.useState(false);
   const [commentText, setCommentText] = React.useState('');

@@ -151,14 +151,41 @@ service cloud.firestore {
         allow delete: if isCalendarDoc(calendarDocId);
       }
 
-      // Collaborative memos. Allows participants to create, update, delete, and read notes in the calendar.
+      // Collaborative memos. Allows participants to create, update, delete, and read notes in the
+      // calendar. No keys().hasOnly() lock (the shape has grown new optional fields multiple
+      // times -- tags, linkPreview, comments -- without ever needing a rules deploy, same
+      // reasoning as places/confirmedMeeting above), but every field that holds free-form or
+      // repeated client input gets a size cap so a single write can't be used to balloon this
+      // per-entry subcollection (uncapped document count, like messages/activityLogs) with
+      // oversized documents.
+      function hasValidMemoShape(data) {
+        return (!('id' in data) || (data.id is string && data.id.size() <= 200))
+          && (!('participantId' in data) || (data.participantId is string && data.participantId.size() <= 160))
+          && (!('title' in data) || (data.title is string && data.title.size() <= 200))
+          && (!('text' in data) || (data.text is string && data.text.size() <= 5000))
+          && (!('imageUrls' in data) || (data.imageUrls is list && data.imageUrls.size() <= 50))
+          && (!('thumbUrls' in data) || (data.thumbUrls is list && data.thumbUrls.size() <= 50))
+          && (!('tags' in data) || (data.tags is list && data.tags.size() <= 50))
+          && (!('comments' in data) || (data.comments is list && data.comments.size() <= 200));
+      }
       match /memos/{memoId} {
-        allow read, write: if isCalendarDoc(calendarDocId);
+        allow read: if isCalendarDoc(calendarDocId);
+        allow create, update: if isCalendarDoc(calendarDocId) && hasValidMemoShape(request.resource.data);
+        allow delete: if isCalendarDoc(calendarDocId);
       }
 
-      // Collaborative anniversaries (Yearly repeating solar/lunar events & D-days).
+      // Collaborative anniversaries (Yearly repeating solar/lunar events & D-days). Same
+      // no-hasOnly-but-size-capped reasoning as memos above.
+      function hasValidAnniversaryShape(data) {
+        return (!('id' in data) || (data.id is string && data.id.size() <= 200))
+          && (!('title' in data) || (data.title is string && data.title.size() <= 200))
+          && (!('date' in data) || (data.date is string && data.date.size() <= 20))
+          && (!('targetDate' in data) || (data.targetDate is string && data.targetDate.size() <= 20));
+      }
       match /anniversaries/{anniversaryId} {
-        allow read, write: if isCalendarDoc(calendarDocId);
+        allow read: if isCalendarDoc(calendarDocId);
+        allow create, update: if isCalendarDoc(calendarDocId) && hasValidAnniversaryShape(request.resource.data);
+        allow delete: if isCalendarDoc(calendarDocId);
       }
 
       // Activity log audit trail. Used to embed as a growing array on the calendar document
