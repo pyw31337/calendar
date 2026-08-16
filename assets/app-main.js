@@ -223,11 +223,12 @@ const GITHUB_PAGES_FREE_LIMITS = readConfigObject('GITHUB_PAGES_FREE_LIMITS', {
   bandwidthBytesPerMonth: 100 * 1024 * 1024 * 1024,
   buildsPerHour: 10
 });
-// Chat images are stored as base64 directly on their own Firestore message document (no
-// Firebase Storage). Each is still far under the 1MiB/doc limit, but an uncapped photo can
-// balloon well past this on a busy/detailed source image, so cap it and step down JPEG
-// quality instead (see compressImageToDataUrls).
-const MAX_CHAT_IMAGE_BASE64_LENGTH = readConfigNumber('MAX_CHAT_IMAGE_BASE64_LENGTH', 350000); // ~350KB
+// Chat/memo images normally upload to Firebase Storage (short download URL stored on the
+// message/memo document); base64 is only the fallback embedded directly in the document when
+// that upload fails (see compressImageToDataUrls/resolveImageUrls). That fallback is always kept
+// small -- a live "last N messages" listener re-downloads and re-parses every matching document
+// on every page load, so a single oversized embedded image taxes every future visitor's load
+// forever, not just the one degraded send.
 const MAX_CHAT_THUMB_BASE64_LENGTH = readConfigNumber('MAX_CHAT_THUMB_BASE64_LENGTH', 48000); // ~48KB -- must stay under firestore.rules' 50,000-char thumbUrl cap
 // A calendar document must stay under Firestore's 1MiB/doc hard limit. Refuse a save before
 // it gets there instead of surfacing Firestore's opaque rejection at the boundary. Compared
@@ -9163,7 +9164,7 @@ function loadImageElement(objectUrl, timeoutMs = 20000) {
   });
 }
 
-async function compressImageToDataUrls(file, { maxBase64Length = MAX_CHAT_IMAGE_BASE64_LENGTH, maxThumbBase64Length = MAX_CHAT_THUMB_BASE64_LENGTH } = {}) {
+async function compressImageToDataUrls(file, { maxThumbBase64Length = MAX_CHAT_THUMB_BASE64_LENGTH } = {}) {
   let sourceBlob = file;
   let img = null;
 
@@ -9262,9 +9263,9 @@ async function compressImageToDataUrls(file, { maxBase64Length = MAX_CHAT_IMAGE_
     }
   }
 
-  // Encodes `img` as a JPEG data URL guaranteed to fit within `maxBase64Length`: steps down
-  // through `qualitySteps` at the current size first, and only if the lowest quality still
-  // doesn't fit does it shrink the longest side and retry from the top of the quality list.
+  // Encodes `img` as a JPEG data URL guaranteed to fit within `budget`: steps down through
+  // `qualitySteps` at the current size first, and only if the lowest quality still doesn't fit
+  // does it shrink the longest side and retry from the top of the quality list.
   // Quality-only stepping (the previous approach) could still exceed the cap on a busy/detailed
   // photo, which -- multiplied across a multi-image batch that falls back to inline base64 --
   // could push the whole Firestore document over its 1MiB hard limit and get the write rejected
@@ -9298,12 +9299,21 @@ async function compressImageToDataUrls(file, { maxBase64Length = MAX_CHAT_IMAGE_
     }
   };
 
-  // High resolution spec (1200px instead of 720px), stepping down to as low as 480px only if
-  // quality-stepping alone can't hit the byte budget.
-  const maxDim = isStorageDisabled ? 600 : 1200;
-  const budget = isStorageDisabled ? (48 * 1024) : maxBase64Length;
-  const minDim = isStorageDisabled ? 320 : 480;
-  const original = await encodeWithinBudget(maxDim, [0.85, 0.75, 0.65, 0.55, 0.45, 0.35], budget, minDim);
+  // This base64 (`original`) is discarded unread whenever the Storage upload below succeeds
+  // (the normal case) -- it only ever becomes the persisted imageUrl when that upload fails (see
+  // resolveImageUrls). It used to be compressed at a much larger budget (1200px / ~350KB) whenever
+  // Storage looked healthy going in, on the theory that upload would probably succeed -- but a
+  // single transient upload failure (slow mobile connection, brief Storage hiccup) would then
+  // permanently embed that huge base64 directly in the message document. Because chat's live
+  // "last 100 messages" listener (see the Real-time messages listener effect) downloads and
+  // re-parses every matching document on every page load for every visitor, one such message
+  // taxes everyone's load forever -- multiple of these accumulating in a single calendar's history
+  // measurably slowed chat loading for every user. So the fallback is always compressed at the
+  // same small, cheap-to-store budget the isStorageDisabled path already used, regardless of
+  // whether Storage looks reachable right now: if the upload does succeed, this is thrown away and
+  // the full-quality Storage blob is what actually gets used, so nothing is lost in the common
+  // case; if it fails, the degraded fallback is small enough to never become a load-time liability.
+  const original = await encodeWithinBudget(600, [0.85, 0.75, 0.65, 0.55, 0.45, 0.35], 48 * 1024, 320);
 
   // 360px thumbnails keep chat/gallery previews crisp on high-DPI screens while remaining
   // bounded. Storage normally serves the sharper 720px Blob below; this base64 thumbnail is the
