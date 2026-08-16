@@ -99,11 +99,18 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 
-  <!-- Firebase SDK for Realtime Multi-User Firestore Sync -- loaded first and left blocking so
-       the app's core data path starts as early as possible. -->
-  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
+  <!-- Firebase SDK for Realtime Multi-User Firestore Sync. `defer` (not left blocking) --
+       these sit in <head>, ABOVE the loading skeleton markup in <body> below, so without defer
+       the browser can't paint anything at all, not even that skeleton, until all three finish
+       downloading AND executing (~400KB combined) -- the exact opposite of what the skeleton
+       exists for. `defer` lets the browser paint the skeleton immediately while these download
+       in the background, then run them (still in this exact order, before the body scripts
+       below) once parsing finishes. The app's own data-loading logic already awaits
+       firebase.apps.length/firebaseDb being ready, so nothing here depends on these executing
+       synchronously during head-parse. -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js" defer></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js" defer></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js" defer></script>
 
   <!-- Confetti/lunar calendar/QR code are only used from user-triggered interactions or after
        async data has loaded (never at initial script-parse time -- see the typeof guards around
@@ -125,16 +132,21 @@
     </div>
   </div>
 
-  <!-- Ultra-Fast Cloudflare cdnjs CDN for React 18 & ReactDOM 18 -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js" crossorigin></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js" crossorigin></script>
-  <script src="assets/app-constants.js?v=20260814-split4"></script>
-  <script src="assets/app-config.js?v=20260814-split3b"></script>
-  <script src="assets/app-calendar-data.js?v=20260814-split5"></script>
-  <script src="assets/app-chat-data.js?v=20260814-split6"></script>
-  <script src="assets/app-utils.js?v=20260814-split7"></script>
-  <script src="assets/app-notifications.js?v=20260814-split8"></script>
+  <!-- Ultra-Fast Cloudflare cdnjs CDN for React 18 & ReactDOM 18. `defer` on all of these
+       (matching the Firebase SDK scripts in <head> above) lets the browser fetch this entire
+       chain in parallel from the moment it first parses the HTML, instead of only starting each
+       download after the previous script has finished executing -- execution still happens in
+       this exact document order (defer guarantees that), so nothing about load sequencing
+       changes, only how much of it can overlap. -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js" crossorigin defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js" crossorigin defer></script>
+  <script src="assets/app-constants.js?v=20260814-split4" defer></script>
+  <script src="assets/app-config.js?v=20260814-split3b" defer></script>
+  <script src="assets/app-calendar-data.js?v=20260814-split5" defer></script>
+  <script src="assets/app-chat-data.js?v=20260814-split6" defer></script>
+  <script src="assets/app-utils.js?v=20260814-split7" defer></script>
+  <script src="assets/app-notifications.js?v=20260814-split8" defer></script>
 
-  <script src="assets/app-main.js?v=20260815-split9g"></script>
+  <script src="assets/app-main.js?v=20260815-split9g" defer></script>
 </body>
 </html>
