@@ -79,8 +79,7 @@
   :root:not([data-theme="light"]) .btn-danger { background: #2D1518; border-color: #7F1D1D; color: #F87171; }
   :root:not([data-theme="light"]) .btn-danger:hover { background: #3A1A1E; }
   :root:not([data-theme="light"]) .form-select,
-  :root:not([data-theme="light"]) .form-input,
-  :root:not([data-theme="light"]) .form-textarea { background: #1B2540; }
+  :root:not([data-theme="light"]) .form-input { background: #1B2540; }
   :root:not([data-theme="light"]) .poll-progress { background: #1B2540; }
   :root:not([data-theme="light"]) .modal-header.is-confirmed-theme,
   :root:not([data-theme="light"]) .modal-footer.is-confirmed-theme { background-color: #241B3D; }
@@ -98,8 +97,7 @@
 :root[data-theme="dark"] .btn-danger { background: #2D1518; border-color: #7F1D1D; color: #F87171; }
 :root[data-theme="dark"] .btn-danger:hover { background: #3A1A1E; }
 :root[data-theme="dark"] .form-select,
-:root[data-theme="dark"] .form-input,
-:root[data-theme="dark"] .form-textarea { background: #1B2540; }
+:root[data-theme="dark"] .form-input { background: #1B2540; }
 :root[data-theme="dark"] .poll-progress { background: #1B2540; }
 :root[data-theme="dark"] .modal-header.is-confirmed-theme,
 :root[data-theme="dark"] .modal-footer.is-confirmed-theme { background-color: #241B3D; }
@@ -196,10 +194,8 @@
 :root:not([data-theme="light"]) .admin-scope .btn-danger:hover { background: #FEE2E2; }
 :root[data-theme="dark"] .admin-scope .form-select,
 :root[data-theme="dark"] .admin-scope .form-input,
-:root[data-theme="dark"] .admin-scope .form-textarea,
 :root:not([data-theme="light"]) .admin-scope .form-select,
-:root:not([data-theme="light"]) .admin-scope .form-input,
-:root:not([data-theme="light"]) .admin-scope .form-textarea { background: #FFFFFF; }
+:root:not([data-theme="light"]) .admin-scope .form-input { background: #FFFFFF; }
 :root[data-theme="dark"] .admin-scope .status-badge,
 :root[data-theme="dark"] .admin-scope .date-item-badge,
 :root:not([data-theme="light"]) .admin-scope .status-badge,
@@ -676,7 +672,6 @@ button, input, textarea, select {
   flex-shrink: 0;
 }
 .header-search-btn,
-.header-theme-btn,
 .header-settings-btn {
   background: none;
   border: none;
@@ -826,14 +821,14 @@ button, input, textarea, select {
 .btn-danger { background: #FEF2F2; border-color: #FCA5A5; color: #DC2626; }
 .btn-danger:hover { background: #FEE2E2; }
 
-.form-select, .form-input, .form-textarea {
+.form-select, .form-input {
   padding: 10px 14px; background: #FFFFFF; border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md); color: var(--text-main); font-size: 0.9rem; font-family: inherit; outline: none;
   transition: border-color 0.2s ease;
   word-break: keep-all;
   min-height: 44px;
 }
-.form-select:focus, .form-input:focus, .form-textarea:focus { border-color: var(--accent-primary); box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15); }
+.form-select:focus, .form-input:focus { border-color: var(--accent-primary); box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15); }
 
 /* Native <select> elements: replace the browser's default OS-styled dropdown arrow with the
    same chevron-down icon used everywhere else in the app (e.g. the admin header's calendar
@@ -995,7 +990,6 @@ select.form-select {
   .modal-header .holiday-label { font-size: 0.82rem !important; }
   .modal-header .status-badge { font-size: 0.7rem !important; padding: 2px 4px !important; }
   .modal-header .btn { padding: 4px 6px !important; font-size: 0.72rem !important; }
-  .modal-header .btn-header-text { display: none; }
 }
 
 .day-cell {
@@ -1123,14 +1117,6 @@ select.form-select {
 .msg-actions-group-inline { max-width: 0; opacity: 0; overflow: hidden; pointer-events: none; transition: max-width 0.15s ease, opacity 0.15s ease; }
 .msg-row-hover:hover .msg-actions-group-inline,
 .msg-row-hover.msg-actions-revealed .msg-actions-group-inline { max-width: 50px; opacity: 1; pointer-events: auto; }
-.registered-participant-main {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
-  min-width: 0;
-  padding-right: 8px;
-}
 .registered-at-text {
   color: #A7B0BF;
   font-size: 0.6rem;
@@ -1138,13 +1124,6 @@ select.form-select {
   letter-spacing: -0.02em;
   line-height: 1.25;
   white-space: nowrap;
-}
-.calendar-action-row {
-  display: flex;
-  justify-content: center;
-  padding-top: 16px;
-  margin-top: 16px;
-  border-top: 1px solid var(--border-subtle);
 }
 .polls-section {
   display: flex;
@@ -1371,13 +1350,6 @@ select.form-select {
   width: 12px;
   height: 12px;
 }
-.poll-option-number {
-  width: 28px;
-  min-width: 28px;
-  color: var(--text-muted);
-  font-weight: 900;
-  text-align: center;
-}
 .poll-drag-handle {
   width: 28px;
   min-width: 28px;
@@ -1482,12 +1454,10 @@ select.form-select {
     border-radius: 50%;
     box-shadow: none;
   }
-  .days-grid .badge-name, .days-grid .badge-dot {
+  .days-grid .badge-name {
     display: none;
   }
 }
-
-.badge-dot { width: 5px; height: 5px; border-radius: 50%; }
 
 /* Summary Card */
 .summary-card {
@@ -1975,12 +1945,6 @@ select.form-select {
   min-width: 0;
   width: 100%;
 }
-.admin-card {
-  padding-top: 14px !important;
-}
-.admin-card-title {
-  margin-top: 0 !important;
-}
 .admin-poll-row {
   display: flex;
   align-items: center;
@@ -2264,20 +2228,6 @@ select.form-select {
 :root[data-theme="dark"] .search-result-row:hover {
   background-color: #212D4D;
 }
-.search-result-date {
-  font-size: 0.78rem;
-  font-weight: 700;
-  color: var(--text-main);
-  white-space: nowrap;
-}
-.search-result-text {
-  font-size: 0.8rem;
-  color: var(--text-muted);
-  text-overflow: ellipsis;
-  overflow: hidden;
-  white-space: nowrap;
-  flex: 1;
-}
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .date-item-badge.is-past {
     background: #1B2540 !important;
@@ -2368,18 +2318,6 @@ select.form-select {
   margin-left: auto;
   flex: 0 0 auto;
 }
-.recent-log-delete-btn {
-  width: 19.2px;
-  min-width: 19.2px;
-  height: 19.2px;
-  padding: 0 !important;
-  border-radius: 7px;
-  flex: 0 0 19.2px;
-}
-.recent-log-delete-btn svg {
-  width: 10.8px;
-  height: 10.8px;
-}
 @media (max-width: 640px) {
   .recent-log-row {
     align-items: flex-start;
@@ -2402,18 +2340,6 @@ select.form-select {
   }
   .recent-log-note {
     flex-basis: 100%;
-  }
-  .schedule-result-row {
-    flex-direction: column;
-    align-items: flex-start !important;
-    gap: 6px !important;
-  }
-  .schedule-result-row .search-result-text {
-    white-space: normal !important;
-    overflow: visible !important;
-    text-overflow: clip !important;
-    width: 100%;
-    word-break: break-all;
   }
 }
 
