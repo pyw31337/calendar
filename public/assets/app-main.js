@@ -134,29 +134,54 @@ function normalizeMemoDateMatch(match) {
 function extractLeadingMemoDate(memo) {
   return normalizeMemoDateMatch(String(memo || '').match(MEMO_DATE_RE));
 }
-// Only treated as a multi-visit history when at least two of the "/"-separated chunks actually
-// start with a date -- an ordinary one-line memo that happens to contain a "/" (a fraction, a
-// slash in an address) should never be reinterpreted as a list. Any chunk that ISN'T itself a
-// new dated entry (e.g. "꽃잎반", "C동 올데이") is folded into the note of whichever dated entry
-// came right before it, so an entry's note is the full text up to (not including) the next
-// date -- not just whatever happened to share its exact "/"-chunk with the date.
+// Only treated as a multi-visit history when at least two valid dates are actually found in the
+// text -- an ordinary one-line memo that happens to contain a "/" (a fraction, a slash in an
+// address) should never be reinterpreted as a list. Entry boundaries are found by locating every
+// valid date MATCH's position in the raw text (not by splitting on "/" first) -- real memos mix
+// both styles of separator between entries ("... / 26.07.11 ...", but just as often "...10시
+// 26.07.11..." with no "/" at all, since "/" is also used *within* an entry to separate
+// 참석자/장소/시간), so anchoring on the date pattern itself is the only boundary that's actually
+// reliable. Each entry's note is everything from right after its own date match up to (not
+// including) the start of the next date match, with any leftover "/" separator at either edge
+// trimmed off.
 function parseVisitEntriesFromMemo(memo) {
   const text = String(memo || '').trim();
   if (!text) return [];
-  const chunks = text.split(/\s*\/\s*/).map(chunk => chunk.trim()).filter(Boolean);
-  const dateChunkRe = /^(\d{4}|\d{2})[.\-](\d{2})[.\-](\d{2})\s*(.*)$/;
-  const rawEntries = [];
-  chunks.forEach(chunk => {
-    const match = chunk.match(dateChunkRe);
-    const normalizedDate = match ? normalizeMemoDateMatch(match) : null;
-    if (normalizedDate) {
-      rawEntries.push({ date: normalizedDate, noteParts: match[4].trim() ? [match[4].trim()] : [] });
-    } else if (rawEntries.length > 0) {
-      rawEntries[rawEntries.length - 1].noteParts.push(chunk);
-    }
+  const dateMatches = [...text.matchAll(new RegExp(MEMO_DATE_RE, 'g'))]
+    .filter(match => normalizeMemoDateMatch(match));
+  if (dateMatches.length < 2) return [];
+  const entries = dateMatches.map((match, idx) => {
+    const segmentEnd = idx + 1 < dateMatches.length ? dateMatches[idx + 1].index : text.length;
+    const note = text.slice(match.index + match[0].length, segmentEnd)
+      .trim()
+      .replace(/^\/\s*/, '')
+      .replace(/\s*\/\s*$/, '');
+    return { date: normalizeMemoDateMatch(match), note };
   });
-  const entries = rawEntries.map(e => ({ date: e.date, note: e.noteParts.join(' / ') }));
-  return entries.length >= 2 ? entries : [];
+  return entries;
+}
+
+// Rebuilds a memo string as one line per parsed visit entry ("YY.MM.DD 내용"), so opening 장소
+// 수정 on an old bulk-imported memo (or pasting a fresh run-on block, see the textarea's onPaste
+// below) immediately shows something readable to edit instead of one long unbroken line. A memo
+// that parseVisitEntriesFromMemo doesn't recognize as multi-entry (plain free-text, or already
+// one visit per line) is returned untouched.
+function reformatMemoIntoDateLines(memo) {
+  const entries = parseVisitEntriesFromMemo(memo);
+  if (entries.length === 0) return String(memo || '');
+  return entries.map(entry => (entry.note ? `${entry.date} ${entry.note}` : entry.date)).join('\n');
+}
+
+// Most-recent-first display order for a place's visit history -- sorts by the entry's own parsed
+// date rather than assuming entries were typed in chronological order (parseVisitEntriesFromMemo
+// itself preserves left-to-right text order, which getPlaceSortDateKey above still relies on, so
+// this reordering only ever happens at render time in the two places entries are actually listed).
+function sortVisitEntriesRecentFirst(entries) {
+  return entries.slice().sort((a, b) => {
+    const dateA = normalizePlaceDateForSort(a.date) || '';
+    const dateB = normalizePlaceDateForSort(b.date) || '';
+    return dateB.localeCompare(dateA);
+  });
 }
 
 // A bulk-imported memo mixes real names with non-name tags in the same "/"-separated shape (e.g.
@@ -23359,7 +23384,7 @@ function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom = false
         historyWrap.style.display = 'flex';
         historyWrap.style.flexDirection = 'column';
         historyWrap.style.gap = '4px';
-        visitEntries.slice().reverse().forEach(entry => {
+        sortVisitEntriesRecentFirst(visitEntries).forEach(entry => {
           const rowEl = document.createElement('div');
           rowEl.style.fontSize = '0.72rem';
           rowEl.style.color = '#334155';
@@ -23518,7 +23543,10 @@ function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, onDelete,
     name: editingPlace.name, address: editingPlace.address, lat: editingPlace.lat, lng: editingPlace.lng,
     categoryLabel: '', phone: '', url: ''
   } : null);
-  const [memo, setMemo] = React.useState(editingPlace ? (editingPlace.memo || '') : '');
+  // Reformats an existing multi-visit memo into one line per date entry on open (see
+  // reformatMemoIntoDateLines) -- a bulk-imported memo saved as one long run-on line otherwise
+  // shows up exactly that way here, making it hard to find/edit any one visit's note.
+  const [memo, setMemo] = React.useState(editingPlace ? reformatMemoIntoDateLines(editingPlace.memo || '') : '');
   const memoTextareaRef = React.useRef(null);
   // This modal remounts fresh each time it opens (isRegisterOpen && <PlaceRegisterModal .../>),
   // so a mount-only effect is enough to size an existing place's memo correctly on open.
@@ -23703,6 +23731,35 @@ function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, onDelete,
     }
   };
 
+  // Pasting a fresh bulk export (another Google My Maps-style run-on block) hits the same
+  // one-long-line problem the mount-time reformat above fixes for existing places -- reformat
+  // just the pasted chunk before splicing it in, so it's readable immediately instead of only
+  // after the next save+reopen. Left alone (native paste proceeds) when the pasted text doesn't
+  // look like a multi-visit block, so pasting a single URL/sentence isn't affected.
+  const handleMemoPaste = e => {
+    const pasted = e.clipboardData.getData('text');
+    if (!pasted) return;
+    const reformatted = reformatMemoIntoDateLines(pasted);
+    if (reformatted === pasted) return;
+    e.preventDefault();
+    const el = e.target;
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const nextValue = memo.slice(0, start) + reformatted + memo.slice(end);
+    setMemo(nextValue);
+    const cursorPos = start + reformatted.length;
+    requestAnimationFrame(() => {
+      if (!memoTextareaRef.current) return;
+      memoTextareaRef.current.setSelectionRange(cursorPos, cursorPos);
+      autoGrowTextarea(memoTextareaRef.current, 480);
+    });
+    const detectedDate = normalizePlaceDateForSort(extractLeadingMemoDate(nextValue));
+    if (detectedDate) {
+      setVisitDate(detectedDate);
+      setVisitStatus('visited');
+    }
+  };
+
   const categoryOptions = categories.map(c => ({ value: c.id, label: getPlaceCategoryLabel(c) }));
 
   return /*#__PURE__*/React.createElement("div", {
@@ -23840,7 +23897,8 @@ function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, onDelete,
           // lines in one memo, and the old 300-char limit cut that off well before the field's
           // actual backend ceiling.
           maxLength: 2000,
-          onChange: handleMemoChange
+          onChange: handleMemoChange,
+          onPaste: handleMemoPaste
         }),
         extractFirstUrl(memo) && /*#__PURE__*/React.createElement("div", {
           style: { marginTop: '6px', fontSize: '0.78rem', color: 'var(--text-main)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px' }
@@ -24224,7 +24282,7 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
                       display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '2px',
                       backgroundColor: 'var(--bg-primary)', borderRadius: 'var(--radius-md)', padding: '8px 10px'
                     }
-                  }, visitEntries.slice().reverse().map((entry, idx) => /*#__PURE__*/React.createElement("div", {
+                  }, sortVisitEntriesRecentFirst(visitEntries).map((entry, idx) => /*#__PURE__*/React.createElement("div", {
                     key: idx,
                     style: { display: 'flex', alignItems: 'flex-start', gap: '6px', fontSize: '0.78rem', color: 'var(--text-main)' }
                   },
