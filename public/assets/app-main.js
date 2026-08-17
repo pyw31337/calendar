@@ -7257,14 +7257,24 @@ function App() {
     const isAlreadyConfirmed = meetingIndex >= 0 && existingMeetings[meetingIndex].confirmed !== false;
     let nextConfirmedMeetings;
     if (isAlreadyConfirmed) {
-      // Un-confirming: if the entry also carries settlement data, keep it around as an
-      // unconfirmed placeholder instead of deleting it outright, so previously entered
-      // 회비 정산 expenses/income for the date survive the toggle.
-      const meeting = existingMeetings[meetingIndex];
-      const hasSettlementData = Array.isArray(meeting.expenses) && meeting.expenses.length > 0;
-      nextConfirmedMeetings = hasSettlementData
-        ? existingMeetings.map((m, i) => i === meetingIndex ? { ...m, confirmed: false } : m)
-        : existingMeetings.filter(m => m.date !== dateStr);
+      // Un-confirming always keeps the entry around (marked confirmed:false) rather than ever
+      // deleting it outright -- this used to only apply when the entry also carried settlement
+      // data (Array.isArray(meeting.expenses) && meeting.expenses.length > 0), dropping it via
+      // .filter() otherwise. That filtered-out case is exactly the one
+      // ENABLE_PLACES_SUBCOLLECTION_MIGRATION can't represent: once a date's confirmedMeeting
+      // entry has migrated out to its own calendars/{id}/confirmedMeetings/{date} doc (see
+      // stripEmbeddedConfirmedMeetingField), the only way this write path knows to touch that doc
+      // again is by that date still being present in nextConfirmedMeetings when
+      // writeConfirmedMeetingsToFirestore's caller rebuilds legacyConfirmedMeetings from the
+      // current embedded array -- an entry that gets deleted from the array here is simply never
+      // written anywhere, so the old confirmed:true subcollection doc is left behind forever and
+      // keeps getting unioned back in (unionConfirmedMeetings) as though 확정취소 never happened.
+      // Keeping the entry (now confirmed:false, no settlement data) is otherwise inert --
+      // getTrulyConfirmedMeetings already filters confirmed:false entries out of every "is this
+      // date actually confirmed" caller (badges, reminders, ICS export, stats, summary lists), and
+      // an entry with an empty/absent expenses array renders nothing in the settlement views
+      // either, so it never becomes visible clutter.
+      nextConfirmedMeetings = existingMeetings.map((m, i) => i === meetingIndex ? { ...m, confirmed: false } : m);
     } else if (meetingIndex >= 0) {
       // A settlement-only placeholder already exists for this date (created by
       // handleSaveExpense below) -- promote it to a real confirmed meeting instead of adding
