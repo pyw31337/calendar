@@ -23266,14 +23266,18 @@ function placeMarkerShapeToHtml(shape) {
   if (shape.tag === 'circle') return `<circle cx="${shape.cx}" cy="${shape.cy}" r="${shape.r}" />`;
   return `<path d="${shape.d}" />`;
 }
+// Marker circle/icon dimensions, shared by buildPlaceMarkerHtml and every L.divIcon iconSize
+// below them so the two never drift out of sync with each other.
+const PLACE_MARKER_SIZE = 34;
+const PLACE_MARKER_ICON_SIZE = 18;
 // Shared by both a normal individual marker AND a cluster badge that's collapsed down to a
 // single child (see iconCreateFunction below) -- a cluster with only one marker left inside it
 // should look identical to that marker on its own, not like a numbered cluster.
 function buildPlaceMarkerHtml(category) {
   const color = category ? category.color : '#64748B';
   const content = getPlaceCategoryMarkerContent(category);
-  const innerHtml = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${content.shapes.map(placeMarkerShapeToHtml).join('')}</svg>`;
-  return `<div style="width:26px;height:26px;border-radius:50%;background:${color};border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;">${innerHtml}</div>`;
+  const innerHtml = `<svg xmlns="http://www.w3.org/2000/svg" width="${PLACE_MARKER_ICON_SIZE}" height="${PLACE_MARKER_ICON_SIZE}" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${content.shapes.map(placeMarkerShapeToHtml).join('')}</svg>`;
+  return `<div style="width:${PLACE_MARKER_SIZE}px;height:${PLACE_MARKER_SIZE}px;border-radius:50%;background:${color};border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;">${innerHtml}</div>`;
 }
 // React version of the same badge -- a small solid-color circle with the category's white line
 // icon inside, matching the map marker exactly. Used in the place list (PlacesView) so its
@@ -23360,8 +23364,8 @@ function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom = false
             return L.divIcon({
               html: buildPlaceMarkerHtml(child?.placeCategory),
               className: 'place-map-marker',
-              iconSize: [26, 26],
-              iconAnchor: [13, 13]
+              iconSize: [PLACE_MARKER_SIZE, PLACE_MARKER_SIZE],
+              iconAnchor: [PLACE_MARKER_SIZE / 2, PLACE_MARKER_SIZE / 2]
             });
           }
           const size = count < 10 ? 30 : count < 50 ? 36 : 42;
@@ -23407,32 +23411,92 @@ function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom = false
       const icon = L.divIcon({
         className: 'place-map-marker',
         html: buildPlaceMarkerHtml(category),
-        iconSize: [26, 26],
-        iconAnchor: [13, 13],
-        popupAnchor: [0, -13]
+        iconSize: [PLACE_MARKER_SIZE, PLACE_MARKER_SIZE],
+        iconAnchor: [PLACE_MARKER_SIZE / 2, PLACE_MARKER_SIZE / 2],
+        popupAnchor: [0, -PLACE_MARKER_SIZE / 2]
       });
       const marker = L.marker([place.lat, place.lng], { icon });
       if (place.id) markersByIdRef.current.set(place.id, marker);
       // Read back by the cluster group's iconCreateFunction above when a cluster collapses down
       // to just this one marker, so it can render the same category badge instead of a "1".
       marker.placeCategory = category;
+      const isMobileViewport = window.innerWidth <= 720;
       const popupNode = document.createElement('div');
-      popupNode.style.minWidth = '140px';
-      popupNode.style.maxWidth = '220px';
+      popupNode.style.minWidth = '220px';
+
+      // Header: name+address on the left, a 업체정보(external map) button and a custom close
+      // button on the right -- Leaflet's own default close glyph doesn't share this app's
+      // stroke-based icon styling, so closeButton is disabled below and both buttons are built
+      // here instead, matching each other's size/weight/color exactly.
+      const headerEl = document.createElement('div');
+      headerEl.style.display = 'flex';
+      headerEl.style.alignItems = 'flex-start';
+      headerEl.style.justifyContent = 'space-between';
+      headerEl.style.gap = '8px';
+      const infoEl = document.createElement('div');
+      infoEl.style.minWidth = '0';
       const nameEl = document.createElement('div');
       nameEl.style.fontWeight = '800';
       nameEl.style.fontSize = '0.85rem';
       nameEl.style.marginBottom = '2px';
       nameEl.textContent = place.name || '이름 없음';
-      popupNode.appendChild(nameEl);
+      infoEl.appendChild(nameEl);
       if (place.address) {
         const addrEl = document.createElement('div');
         addrEl.style.fontSize = '0.75rem';
         addrEl.style.color = '#64748B';
-        addrEl.textContent = place.address;
-        popupNode.appendChild(addrEl);
+        // A domestic address routinely comes back "대한민국 서울특별시 ..." from the geocoder --
+        // redundant for a place the user already knows is in Korea, so only the overseas case
+        // needs the country name to stay legible.
+        addrEl.textContent = isDomesticLatLng(place.lat, place.lng)
+          ? place.address.replace(/^대한민국\s*/, '')
+          : place.address;
+        infoEl.appendChild(addrEl);
       }
+      headerEl.appendChild(infoEl);
+
+      const actionsEl = document.createElement('div');
+      actionsEl.style.display = 'flex';
+      actionsEl.style.alignItems = 'center';
+      actionsEl.style.gap = '2px';
+      actionsEl.style.flexShrink = '0';
+      const popupActionBtnStyle = { width: '22px', height: '22px', border: 'none', background: 'none', cursor: 'pointer', color: '#94A3B8', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0' };
+
+      const businessInfoBtn = document.createElement('button');
+      businessInfoBtn.type = 'button';
+      businessInfoBtn.title = '지도에서 업체정보 보기';
+      Object.assign(businessInfoBtn.style, popupActionBtnStyle);
+      // Fixed, controlled markup (not user text) -- same reasoning as buildPlaceMarkerHtml's own
+      // innerHTML use above.
+      businessInfoBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 12h4"/><path d="M10 8h4"/><path d="M14 21v-3a2 2 0 0 0-4 0v3"/><path d="M6 10H4a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-2"/><path d="M6 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16"/></svg>';
+      businessInfoBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        window.open(getPlaceExternalMapUrl(place), '_blank', 'noopener,noreferrer');
+      });
+      actionsEl.appendChild(businessInfoBtn);
+
+      const popupCloseBtn = document.createElement('button');
+      popupCloseBtn.type = 'button';
+      popupCloseBtn.title = '닫기';
+      Object.assign(popupCloseBtn.style, popupActionBtnStyle);
+      popupCloseBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6l-12 12"/><path d="M6 6l12 12"/></svg>';
+      popupCloseBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        marker.closePopup();
+      });
+      actionsEl.appendChild(popupCloseBtn);
+
+      headerEl.appendChild(actionsEl);
+      popupNode.appendChild(headerEl);
+
       const visitEntries = parseVisitEntriesFromMemo(place.memo);
+      if (visitEntries.length > 0 || place.memo) {
+        const dividerEl = document.createElement('hr');
+        dividerEl.style.border = 'none';
+        dividerEl.style.borderTop = '1px solid #E2E8F0';
+        dividerEl.style.margin = '6px 0';
+        popupNode.appendChild(dividerEl);
+      }
       if (visitEntries.length > 0) {
         // Bulk-imported places carry their whole visit history in one memo -- show it as an
         // actual scrollable list of {date, note} rows here instead of one long run-on line.
@@ -23500,7 +23564,15 @@ function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom = false
         }
         popupNode.appendChild(memoWrap);
       }
-      marker.bindPopup(popupNode);
+      // closeButton disabled -- popupCloseBtn above replaces it with one that matches this app's
+      // own icon styling. maxWidth wider on desktop (PC 가로폭 확장 요청) and capped at ~80% of
+      // the viewport on mobile instead of a fixed pixel width, matching the isMobileViewport
+      // pattern already used for fitBounds below.
+      marker.bindPopup(popupNode, {
+        closeButton: false,
+        minWidth: 220,
+        maxWidth: isMobileViewport ? Math.round(window.innerWidth * 0.8) : 360
+      });
       if (onSelectPlace) marker.on('click', () => onSelectPlace(place));
       marker.addTo(layer);
       bounds.push([place.lat, place.lng]);
@@ -24196,7 +24268,6 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
           places,
           calendar,
           scrollWheelZoom: true,
-          onSelectPlace: handleEditPlace,
           resizeSignal: mapExpanded,
           focusPlace
         }),
@@ -24293,25 +24364,41 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
               className: "place-card-row",
               role: "button",
               tabIndex: 0,
-              onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleSelectPlaceOnMap(place); handleEditPlace(place); } },
+              // Row click/Enter only focuses this place on the map above -- the edit layer-popup
+              // now opens exclusively via the pencil button below, never from the row itself.
+              onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleSelectPlaceOnMap(place); } },
               style: {
                 display: 'flex', flexDirection: 'column', gap: '4px',
-                padding: '10px 42px 10px 12px', position: 'relative',
+                padding: '10px 76px 10px 12px', position: 'relative',
                 border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', cursor: 'pointer'
               },
-              onClick: () => { handleSelectPlaceOnMap(place); handleEditPlace(place); }
+              onClick: () => handleSelectPlaceOnMap(place)
             },
-              /*#__PURE__*/React.createElement("button", {
-                type: "button",
-                className: "expense-delete-button",
-                onClick: event => { event.stopPropagation(); handleDeleteFromCard(place); },
-                title: "장소 삭제",
-                style: {
-                  position: 'absolute', top: '8px', right: '8px', width: '28px', height: '28px',
-                  background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0
-                }
-              }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 14 })),
+              /*#__PURE__*/React.createElement("div", {
+                style: { position: 'absolute', top: '8px', right: '8px', display: 'flex', alignItems: 'center', gap: '4px' }
+              },
+                /*#__PURE__*/React.createElement("button", {
+                  type: "button",
+                  onClick: event => { event.stopPropagation(); handleEditPlace(place); },
+                  title: "장소 수정",
+                  style: {
+                    width: '28px', height: '28px',
+                    background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0
+                  }
+                }, /*#__PURE__*/React.createElement(PencilIcon, { size: 14 })),
+                /*#__PURE__*/React.createElement("button", {
+                  type: "button",
+                  className: "expense-delete-button",
+                  onClick: event => { event.stopPropagation(); handleDeleteFromCard(place); },
+                  title: "장소 삭제",
+                  style: {
+                    width: '28px', height: '28px',
+                    background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0
+                  }
+                }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 14 }))
+              ),
               /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' } },
                 /*#__PURE__*/React.createElement("span", {
                   style: {
@@ -24360,9 +24447,9 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
                     window.open(getPlaceExternalMapUrl(place), '_blank', 'noopener,noreferrer');
                   },
                   style: {
-                    flexShrink: 0, border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-full)',
-                    padding: '4px 10px', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer',
-                    backgroundColor: 'var(--bg-primary)', color: 'var(--text-main)'
+                    flexShrink: 0, border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)',
+                    padding: '10px 14px', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer',
+                    backgroundColor: '#FFFFFF', color: 'var(--text-main)'
                   }
                 }, "업체보기")
               ),
