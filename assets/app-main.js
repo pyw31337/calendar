@@ -111,26 +111,51 @@ function unionPlaces(calendar, subcollectionPlaces) {
 
 // Bulk-imported places (e.g. from a Google My Maps export) often carry their whole visit history
 // jammed into one memo string, one "YY.MM.DD 누구랑 뭐했는지" entry per line, joined with " / ".
-// These two helpers pull that history back out at render time rather than storing it as a
-// separate structured field -- memo stays the single source of truth, and a memo that was never
+// These helpers pull that history back out at render time rather than storing it as a separate
+// structured field -- memo stays the single source of truth, and a memo that was never
 // multi-entry in the first place (no leading date, or just one) renders exactly as typed.
-const MEMO_LEADING_DATE_RE = /\d{2}\.\d{2}\.\d{2}/;
+//
+// Dates are recognized in any of YY.MM.DD / YYYY.MM.DD / YY-MM-DD / YYYY-MM-DD (2 or 4 digit
+// year, "." or "-" separator) since real memos in the wild mix all of these -- the match is
+// always normalized back to the canonical 'YY.MM.DD' shape below so every other place-date
+// helper (normalizePlaceDateForSort, formatPlaceBadgeDate, the sort comparator in PlacesView)
+// keeps working against the one shape they already expect, without having to touch them.
+const MEMO_DATE_RE = /(\d{4}|\d{2})[.\-](\d{2})[.\-](\d{2})/;
+// Rejects a syntactic match that isn't a real calendar date (month 13, day 32, ...) -- without
+// this, a stray "010-1234-5678"-shaped run of digits could get misread as a visit date.
+function normalizeMemoDateMatch(match) {
+  if (!match) return null;
+  let [, y, m, d] = match;
+  const mm = Number(m), dd = Number(d);
+  if (mm < 1 || mm > 12 || dd < 1 || dd > 31) return null;
+  if (y.length === 4) y = y.slice(2);
+  return `${y}.${m}.${d}`;
+}
 function extractLeadingMemoDate(memo) {
-  const match = String(memo || '').match(MEMO_LEADING_DATE_RE);
-  return match ? match[0] : null;
+  return normalizeMemoDateMatch(String(memo || '').match(MEMO_DATE_RE));
 }
 // Only treated as a multi-visit history when at least two of the "/"-separated chunks actually
 // start with a date -- an ordinary one-line memo that happens to contain a "/" (a fraction, a
-// slash in an address) should never be reinterpreted as a list.
+// slash in an address) should never be reinterpreted as a list. Any chunk that ISN'T itself a
+// new dated entry (e.g. "꽃잎반", "C동 올데이") is folded into the note of whichever dated entry
+// came right before it, so an entry's note is the full text up to (not including) the next
+// date -- not just whatever happened to share its exact "/"-chunk with the date.
 function parseVisitEntriesFromMemo(memo) {
   const text = String(memo || '').trim();
   if (!text) return [];
   const chunks = text.split(/\s*\/\s*/).map(chunk => chunk.trim()).filter(Boolean);
-  const dateChunkRe = /^(\d{2}\.\d{2}\.\d{2})\s*(.*)$/;
-  const entries = chunks.map(chunk => {
+  const dateChunkRe = /^(\d{4}|\d{2})[.\-](\d{2})[.\-](\d{2})\s*(.*)$/;
+  const rawEntries = [];
+  chunks.forEach(chunk => {
     const match = chunk.match(dateChunkRe);
-    return match ? { date: match[1], note: match[2].trim() } : null;
-  }).filter(Boolean);
+    const normalizedDate = match ? normalizeMemoDateMatch(match) : null;
+    if (normalizedDate) {
+      rawEntries.push({ date: normalizedDate, noteParts: match[4].trim() ? [match[4].trim()] : [] });
+    } else if (rawEntries.length > 0) {
+      rawEntries[rawEntries.length - 1].noteParts.push(chunk);
+    }
+  });
+  const entries = rawEntries.map(e => ({ date: e.date, note: e.noteParts.join(' / ') }));
   return entries.length >= 2 ? entries : [];
 }
 
@@ -205,6 +230,16 @@ function getPlaceSortDateKey(place) {
 function formatPlaceBadgeDate(dateStr) {
   const normalized = normalizePlaceDateForSort(dateStr);
   return normalized ? formatShortDateWithDayName(normalized) : null;
+}
+
+// Kakao Map's official "link/map" deep link -- centers the map on the given coordinates with a
+// marker, and (unlike a plain text search) can't land on the wrong branch of a chain business.
+// Works as a plain https: link on both desktop (opens map.kakao.com) and mobile (opens the Kakao
+// Map app via universal link if installed, the mobile web map otherwise), so no separate
+// app-scheme fallback is needed.
+function getKakaoMapPlaceUrl(place) {
+  const label = encodeURIComponent(place?.name || '장소');
+  return `https://map.kakao.com/link/map/${label},${place.lat},${place.lng}`;
 }
 
 const GATHER_APP_CONFIG = window.GATHER_APP_CONFIG || {};
@@ -15786,6 +15821,15 @@ function BackArrowIcon({ size = 24 } = {}) {
   }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), /*#__PURE__*/React.createElement("path", { d: "M6 9l6 6l6 -6" }));
 }
 
+// Same chevron glyph as BackArrowIcon, rotated the other way -- "›" instead of "‹".
+function ChevronRightIcon({ size = 16 } = {}) {
+  return /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg", width: String(size), height: String(size), viewBox: "0 0 24 24",
+    fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round",
+    style: { transform: 'rotate(-90deg)', display: 'inline-block' }
+  }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), /*#__PURE__*/React.createElement("path", { d: "M6 9l6 6l6 -6" }));
+}
+
 // One keyword-search pass over a single calendar's 일정/채팅/태그/정산/메모 data. Shared by
 // GlobalSearchModal (single active calendar) and AdminUnifiedSearchResultsView (looped across
 // every calendar) so the two search surfaces can never drift out of sync on matching rules.
@@ -23289,7 +23333,7 @@ function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom = false
           rowEl.style.gap = '5px';
           rowEl.style.alignItems = 'flex-start';
           const dateEl = document.createElement('span');
-          dateEl.textContent = entry.date;
+          dateEl.textContent = formatPlaceBadgeDate(entry.date) || entry.date;
           dateEl.style.flexShrink = '0';
           dateEl.style.fontWeight = '700';
           dateEl.style.color = '#64748B';
@@ -23429,7 +23473,7 @@ function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, onDelete,
   const memoTextareaRef = React.useRef(null);
   // This modal remounts fresh each time it opens (isRegisterOpen && <PlaceRegisterModal .../>),
   // so a mount-only effect is enough to size an existing place's memo correctly on open.
-  React.useEffect(() => autoGrowTextarea(memoTextareaRef.current, 300), []);
+  React.useEffect(() => autoGrowTextarea(memoTextareaRef.current, 480), []);
   const [categoryId, setCategoryId] = React.useState(editingPlace ? editingPlace.categoryId : (categories[0]?.id || 'etc'));
   const [visitStatus, setVisitStatus] = React.useState(editingPlace ? editingPlace.visitStatus : 'visited');
   const [visitDate, setVisitDate] = React.useState(() => {
@@ -23444,11 +23488,14 @@ function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, onDelete,
   // for plain addresses/landmarks Kakao doesn't have. Kakao also proxies through a Cloud Function
   // (kakaoLocalSearchProxy) so the REST API key never ships to the browser, same reasoning as the
   // existing peekalinkProxy for link previews.
-  const handleSearch = async e => {
+  // `auto` distinguishes a debounced as-you-type search (see the effect below) from an explicit
+  // button/Enter submit -- an auto search stays quiet on empty query / no-results instead of
+  // popping a toast on every keystroke that doesn't happen to match anything yet.
+  const handleSearch = async (e, auto = false) => {
     if (e) e.preventDefault();
     const cleanQuery = query.trim();
     if (!cleanQuery) {
-      showToast('검색할 주소나 업체명을 입력해 주세요.', 'error');
+      if (!auto) showToast('검색할 주소나 업체명을 입력해 주세요.', 'error');
       return;
     }
     setLoading(true);
@@ -23474,7 +23521,10 @@ function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, onDelete,
       } catch (err) {
         console.error('Kakao local search failed, falling back to Nominatim:', err);
       }
-      if (mapped.length === 0) {
+      if (mapped.length === 0 && !auto) {
+        // The as-you-type path skips the Nominatim fallback -- it's meant for addresses/landmarks
+        // typed out in full, not partial business-name fragments, so firing it on every keystroke
+        // would mostly just add latency without turning up anything Kakao didn't already cover.
         const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(cleanQuery)}&format=json&limit=8&accept-language=ko`);
         const data = res.ok ? await res.json() : [];
         mapped = (data || []).map((item, idx) => ({
@@ -23487,14 +23537,30 @@ function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, onDelete,
         })).filter(r => Number.isFinite(r.lat) && Number.isFinite(r.lng));
       }
       setResults(mapped);
-      if (mapped.length === 0) showToast('검색 결과가 없습니다.', 'info');
+      if (mapped.length === 0 && !auto) showToast('검색 결과가 없습니다.', 'info');
     } catch (err) {
       console.error('Place search failed:', err);
-      showToast('장소 검색에 실패했습니다.', 'error');
+      if (!auto) showToast('장소 검색에 실패했습니다.', 'error');
     } finally {
       setLoading(false);
     }
   };
+
+  // Live-search-as-you-type, matching how Naver/Kakao map search behaves, instead of requiring an
+  // explicit "검색" submit for every query change. Debounced so a fast typist doesn't fire one
+  // request per keystroke, skipped entirely right after handleSelectResult fills the field with
+  // the chosen result's own name (nothing new to search for at that point).
+  React.useEffect(() => {
+    const trimmed = query.trim();
+    if (selected && selected.name === trimmed) return undefined;
+    if (trimmed.length < 2) {
+      setResults([]);
+      return undefined;
+    }
+    const timer = setTimeout(() => { handleSearch(null, true); }, 380);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query]);
 
   const handleSelectResult = result => {
     setSelected({
@@ -23544,7 +23610,7 @@ function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, onDelete,
   const handleMemoChange = e => {
     const value = e.target.value;
     setMemo(value);
-    autoGrowTextarea(e.target, 300);
+    autoGrowTextarea(e.target, 480);
     const detectedDate = normalizePlaceDateForSort(extractLeadingMemoDate(value));
     if (detectedDate) {
       setVisitDate(detectedDate);
@@ -23658,14 +23724,11 @@ function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, onDelete,
             onChange: v => setVisitStatus(v),
             options: [{ value: 'visited', label: '방문' }, { value: 'planned', label: '예정' }]
           })
-        ),
-        visitStatus === 'visited' && /*#__PURE__*/React.createElement("input", {
-          type: "date",
-          className: "form-input",
-          style: { width: '100%', marginTop: '8px' },
-          value: visitDate,
-          onChange: e => setVisitDate(e.target.value)
-        })
+        )
+        // The separate 방문일자 date input used to live here -- removed now that visitDate is
+        // derived automatically from whatever date the memo text itself contains (see
+        // handleMemoChange below), so there was nothing left for it to let the user set that
+        // typing the date into the memo doesn't already cover.
       ),
 
       /* Memo field */
@@ -23677,7 +23740,11 @@ function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, onDelete,
           style: { width: '100%', minHeight: '60px', resize: 'vertical', fontFamily: 'inherit' },
           placeholder: "메모를 남겨보세요 (선택, URL을 입력하면 캡슐 뱃지로 표시됩니다. '26.02.12'처럼 날짜를 적으면 방문일자에 자동 반영됩니다)",
           value: memo,
-          maxLength: 300,
+          // Matches firestore.rules' hasValidPlaceShape memo cap (places/{placeId}.memo <= 2000
+          // chars) exactly -- bulk-imported places can carry many "YY.MM.DD 방문내용" history
+          // lines in one memo, and the old 300-char limit cut that off well before the field's
+          // actual backend ceiling.
+          maxLength: 2000,
           onChange: handleMemoChange
         }),
         extractFirstUrl(memo) && /*#__PURE__*/React.createElement("div", {
@@ -24025,10 +24092,37 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
                 }, `최근방문 ${topBadgeDate}`),
                 visitEntries.length > 0 && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 700 } }, `총 ${visitEntries.length}회 방문`)
               ),
-              /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' } },
-                /*#__PURE__*/React.createElement("span", { style: { fontWeight: 800, fontSize: '0.88rem', color: 'var(--text-main)' } }, place.name || '이름 없음')
+              /* Name + address row doubles as a link out to Kakao Map, centered on this place's
+                 own coordinates -- stopPropagation so it opens the map instead of also
+                 triggering the card's own onClick (which opens the edit modal). */
+              /*#__PURE__*/React.createElement("div", {
+                role: "button",
+                tabIndex: 0,
+                title: "지도에서 보기",
+                onClick: event => {
+                  event.stopPropagation();
+                  window.open(getKakaoMapPlaceUrl(place), '_blank', 'noopener,noreferrer');
+                },
+                onKeyDown: event => {
+                  if (event.key !== 'Enter' && event.key !== ' ') return;
+                  event.preventDefault();
+                  event.stopPropagation();
+                  window.open(getKakaoMapPlaceUrl(place), '_blank', 'noopener,noreferrer');
+                },
+                style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', cursor: 'pointer' }
+              },
+                /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 } },
+                  /*#__PURE__*/React.createElement("span", { style: { fontWeight: 800, fontSize: '0.88rem', color: 'var(--text-main)' } }, place.name || '이름 없음'),
+                  place.address && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.74rem', color: 'var(--text-muted)' } }, place.address)
+                ),
+                /*#__PURE__*/React.createElement("span", {
+                  style: {
+                    width: '22px', height: '22px', borderRadius: '50%', flexShrink: 0,
+                    backgroundColor: '#FFFFFF', border: '1px solid var(--border-subtle)', color: '#94A3B8',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                  }
+                }, /*#__PURE__*/React.createElement(ChevronRightIcon, { size: 14 }))
               ),
-              place.address && /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.74rem', color: 'var(--text-muted)' } }, place.address),
               visitEntries.length > 0
                 ? /*#__PURE__*/React.createElement("div", {
                     style: {
@@ -24039,7 +24133,7 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
                     key: idx,
                     style: { display: 'flex', alignItems: 'flex-start', gap: '6px', fontSize: '0.78rem', color: 'var(--text-main)' }
                   },
-                    /*#__PURE__*/React.createElement("span", { style: { flexShrink: 0, fontWeight: 700, color: 'var(--text-muted)' } }, entry.date),
+                    /*#__PURE__*/React.createElement("span", { style: { flexShrink: 0, fontWeight: 700, color: 'var(--text-muted)' } }, formatPlaceBadgeDate(entry.date) || entry.date),
                     /*#__PURE__*/React.createElement("span", null, entry.note)
                   )))
                 : memoWithoutDate && /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.78rem', color: 'var(--text-main)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px' } }, renderTextWithUrlBadge(memoWithoutDate)),
