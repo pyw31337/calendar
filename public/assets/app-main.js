@@ -3291,6 +3291,13 @@ function AdminDashboard({ initialCalendars }) {
   // every entry, not just a recent window, to correctly replay state up to a cutoff.
   const [selectedCalActivityLogs, setSelectedCalActivityLogs] = React.useState([]);
 
+  // Timeline filters and pagination for Tab 4 (Recovery logs)
+  const [timelineSearchQuery, setTimelineSearchQuery] = React.useState('');
+  const [timelineTypeFilter, setTimelineTypeFilter] = React.useState('all');
+  const [timelineStartDate, setTimelineStartDate] = React.useState('');
+  const [timelineEndDate, setTimelineEndDate] = React.useState('');
+  const [timelineLimit, setTimelineLimit] = React.useState(100);
+
   // Shared link-preview cache stats (통합 링크미리보기), service-wide (not per-calendar) --
   // see appConfig/linkPreviewStats + hashUrlForCache/fetchLinkPreview.
   const [linkPreviewStats, setLinkPreviewStats] = React.useState(null);
@@ -3605,6 +3612,14 @@ function AdminDashboard({ initialCalendars }) {
       isMounted = false;
     };
   }, [selectedCalId, activeTab]);
+
+  React.useEffect(() => {
+    setTimelineSearchQuery('');
+    setTimelineTypeFilter('all');
+    setTimelineStartDate('');
+    setTimelineEndDate('');
+    setTimelineLimit(100);
+  }, [selectedCalId]);
 
   // Sync Tab 2 form values when selectedCalId changes or serverCalendars list updates (avoiding wiping edits)
   React.useEffect(() => {
@@ -4064,6 +4079,62 @@ function AdminDashboard({ initialCalendars }) {
     // Sort chronologically descending
     return [...calLogs, ...chatLogs].sort((a, b) => b.timestamp - a.timestamp);
   }, [selectedCal, selectedCalAllActivityLogs, messagesMap[selectedCalId]]);
+
+  // Filtered timeline based on user inputs
+  const filteredTimeline = React.useMemo(() => {
+    return unifiedTimeline.filter(log => {
+      // 1. Type Filter
+      if (timelineTypeFilter !== 'all' && log.type !== timelineTypeFilter) {
+        return false;
+      }
+
+      // 2. Date Range Filter
+      if (timelineStartDate) {
+        const startMs = new Date(timelineStartDate + 'T00:00:00').getTime();
+        if (log.timestamp < startMs) return false;
+      }
+      if (timelineEndDate) {
+        const endMs = new Date(timelineEndDate + 'T23:59:59').getTime();
+        if (log.timestamp > endMs) return false;
+      }
+
+      // 3. Keyword Search
+      if (timelineSearchQuery.trim()) {
+        const query = timelineSearchQuery.toLowerCase().trim();
+        
+        // Find participant name
+        const pMap = (selectedCal?.participants || []).reduce((acc, p) => { acc[p.id] = p; return acc; }, {});
+        const p = pMap[log.participantId] || {
+          name: log.type === 'chat' ? '메시지' :
+                EXPENSE_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '정산' :
+                IMAGE_TAG_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '태그' :
+                POLL_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '투표' :
+                PLACE_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '장소' :
+                MEETING_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '정산' : '알수없음'
+        };
+        const participantName = (p.name || '').toLowerCase();
+        const note = (log.note || '').toLowerCase();
+        
+        const actLabel = log.type === 'chat' ? '채팅 전송' :
+                         {
+                           create: '일정 등록', update: '일정 수정', delete: '일정 삭제',
+                           poll_create: '투표 생성', poll_vote: '투표 진행', poll_cancel: '투표 취소',
+                           expense_create: '지출/수입 등록', expense_update: '지출/수입 수정', expense_delete: '지출/수입 삭제',
+                           tag_add: '사진 태그 추가', tag_remove: '사진 태그 삭제',
+                           meeting_confirm: '모임 확정', meeting_cancel: '모임 확정 취소',
+                           memo_create: '메모 추가', memo_update: '메모 변경', memo_delete: '메모 삭제',
+                           place_create: '장소 등록', place_update: '장소 수정', place_delete: '장소 삭제'
+                         }[log.action] || '활동';
+        const actionText = actLabel.toLowerCase();
+
+        if (!participantName.includes(query) && !note.includes(query) && !actionText.includes(query)) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [unifiedTimeline, timelineTypeFilter, timelineStartDate, timelineEndDate, timelineSearchQuery, selectedCal]);
 
   React.useEffect(() => {
     try {
@@ -5131,92 +5202,175 @@ function AdminDashboard({ initialCalendars }) {
 
           /* Title */
           /*#__PURE__*/React.createElement("h4", { style: styles.cardTitle, "data-collapse-anchor": "true", "data-collapse-key": "recovery-timeline", "data-collapse-label": "타임라인 복구" },
-            /*#__PURE__*/React.createElement("span", { style: { display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(HourglassIcon, null), `타임라인 복구 (${unifiedTimeline.length}건)`)
+            /*#__PURE__*/React.createElement("span", { style: { display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(HourglassIcon, null), `타임라인 복구 (${filteredTimeline.length}건 / 전체 ${unifiedTimeline.length}건)`)
+          ),
+
+          /* Filter controls for Timeline */
+          /*#__PURE__*/React.createElement("div", {
+            style: {
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+              gap: '10px',
+              marginBottom: '12px',
+              padding: '12px',
+              backgroundColor: '#F1F5F9',
+              borderRadius: '8px',
+              border: '1px solid #E2E8F0'
+            }
+          },
+            /* Keyword Search */
+            /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '4px' } },
+              /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.72rem', fontWeight: 'bold', color: '#475569' } }, "검색어 (이름, 내용, 활동)"),
+              /*#__PURE__*/React.createElement("input", {
+                type: "text",
+                className: "form-input",
+                placeholder: "검색어 입력...",
+                value: timelineSearchQuery,
+                onChange: e => { setTimelineSearchQuery(e.target.value); setTimelineLimit(100); },
+                style: { fontSize: '0.8rem', padding: '6px 10px', height: '34px', minHeight: '34px' }
+              })
+            ),
+            /* Type Filter (All / Activity / Chat) */
+            /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '4px' } },
+              /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.72rem', fontWeight: 'bold', color: '#475569' } }, "로그 구분"),
+              /*#__PURE__*/React.createElement("select", {
+                className: "form-select",
+                value: timelineTypeFilter,
+                onChange: e => { setTimelineTypeFilter(e.target.value); setTimelineLimit(100); },
+                style: { fontSize: '0.8rem', padding: '6px 10px', height: '34px', minHeight: '34px' }
+              },
+                /*#__PURE__*/React.createElement("option", { value: "all" }, "전체 로그"),
+                /*#__PURE__*/React.createElement("option", { value: "activity" }, "활동 로그만"),
+                /*#__PURE__*/React.createElement("option", { value: "chat" }, "채팅 로그만")
+              )
+            ),
+            /* Date range (Start Date) */
+            /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '4px' } },
+              /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.72rem', fontWeight: 'bold', color: '#475569' } }, "시작일"),
+              /*#__PURE__*/React.createElement("input", {
+                type: "date",
+                className: "form-input",
+                value: timelineStartDate,
+                onChange: e => { setTimelineStartDate(e.target.value); setTimelineLimit(100); },
+                style: { fontSize: '0.8rem', padding: '6px 10px', height: '34px', minHeight: '34px' }
+              })
+            ),
+            /* Date range (End Date) */
+            /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '4px' } },
+              /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.72rem', fontWeight: 'bold', color: '#475569' } }, "종료일"),
+              /*#__PURE__*/React.createElement("input", {
+                type: "date",
+                className: "form-input",
+                value: timelineEndDate,
+                onChange: e => { setTimelineEndDate(e.target.value); setTimelineLimit(100); },
+                style: { fontSize: '0.8rem', padding: '6px 10px', height: '34px', minHeight: '34px' }
+              })
+            )
           ),
 
           /* Log list -- the page itself scrolls, so this doesn't need its own scrollbox */
           /*#__PURE__*/React.createElement("div", {
             style: { border: '1px solid #E2E8F0', borderRadius: '8px', padding: '8px', backgroundColor: '#F8FAFC' }
           },
-            unifiedTimeline.length === 0 ?
-            /*#__PURE__*/React.createElement("div", { style: { padding: '30px', color: '#64748B', fontSize: '0.82rem', textAlign: 'center' } }, "통합 타임라인 로그가 존재하지 않습니다.") :
-            unifiedTimeline.map(log => {
-              const pMap = (selectedCal.participants || []).reduce((acc, p) => { acc[p.id] = p; return acc; }, {});
-              const p = pMap[log.participantId] || {
-                name: log.type === 'chat' ? '메시지' :
-                      EXPENSE_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '정산' :
-                      IMAGE_TAG_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '태그' :
-                      POLL_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '투표' :
-                      PLACE_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '장소' :
-                      MEETING_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '정산' : '알수없음',
-                color: '#94A3B8'
-              };
+            filteredTimeline.length === 0 ?
+            /*#__PURE__*/React.createElement("div", { style: { padding: '30px', color: '#64748B', fontSize: '0.82rem', textAlign: 'center' } }, "조건에 맞는 타임라인 로그가 존재하지 않습니다.") :
+            /*#__PURE__*/React.createElement(React.Fragment, null,
+              filteredTimeline.slice(0, timelineLimit).map(log => {
+                const pMap = (selectedCal.participants || []).reduce((acc, p) => { acc[p.id] = p; return acc; }, {});
+                const p = pMap[log.participantId] || {
+                  name: log.type === 'chat' ? '메시지' :
+                        EXPENSE_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '정산' :
+                        IMAGE_TAG_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '태그' :
+                        POLL_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '투표' :
+                        PLACE_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '장소' :
+                        MEETING_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '정산' : '알수없음',
+                  color: '#94A3B8'
+                };
 
-              const actLabel = log.type === 'chat' ? '채팅 전송' :
-                               {
-                                 create: '일정 등록', update: '일정 수정', delete: '일정 삭제',
-                                 poll_create: '투표 생성', poll_vote: '투표 진행', poll_cancel: '투표 취소',
-                                 expense_create: '지출/수입 등록', expense_update: '지출/수입 수정', expense_delete: '지출/수입 삭제',
-                                 tag_add: '사진 태그 추가', tag_remove: '사진 태그 삭제',
-                                 meeting_confirm: '모임 확정', meeting_cancel: '모임 확정 취소',
-                                 memo_create: '메모 추가', memo_update: '메모 변경', memo_delete: '메모 삭제',
-                                 place_create: '장소 등록', place_update: '장소 수정', place_delete: '장소 삭제'
-                               }[log.action] || '활동';
-
-              const badgeBg = log.type === 'chat' ? '#E0F2FE' :
-                              {
-                                create: '#DCFCE7', update: '#DBEAFE', delete: '#FEE2E2',
-                                poll_create: '#F3E8FF', poll_vote: '#FCE7F3', poll_cancel: '#FFEDD5',
-                                expense_create: '#FEF3C7', expense_update: '#FEF3C7', expense_delete: '#FFEDD5',
-                                tag_add: '#E0E7FF', tag_remove: '#FEE2E2',
-                                meeting_confirm: '#F3E8FF', meeting_cancel: '#FEE2E2',
-                                memo_create: '#E0E7FF', memo_update: '#FEF3C7', memo_delete: '#FEE2E2',
-                                place_create: '#DCFCE7', place_update: '#DBEAFE', place_delete: '#FEE2E2'
-                              }[log.action] || '#F1F5F9';
-
-              const badgeColor = log.type === 'chat' ? '#0369A1' :
+                const actLabel = log.type === 'chat' ? '채팅 전송' :
                                  {
-                                   create: '#15803D', update: '#1D4ED8', delete: '#B91C1C',
-                                   poll_create: '#7E22CE', poll_vote: '#BE185D', poll_cancel: '#C2410C',
-                                   expense_create: '#B45309', expense_update: '#B45309', expense_delete: '#C2410C',
-                                   tag_add: '#4338CA', tag_remove: '#B91C1C',
-                                   meeting_confirm: '#7E22CE', meeting_cancel: '#B91C1C',
-                                   memo_create: '#4338CA', memo_update: '#B45309', memo_delete: '#B91C1C',
-                                   place_create: '#15803D', place_update: '#1D4ED8', place_delete: '#B91C1C'
-                                 }[log.action] || '#64748B';
+                                   create: '일정 등록', update: '일정 수정', delete: '일정 삭제',
+                                   poll_create: '투표 생성', poll_vote: '투표 진행', poll_cancel: '투표 취소',
+                                   expense_create: '지출/수입 등록', expense_update: '지출/수입 수정', expense_delete: '지출/수입 삭제',
+                                   tag_add: '사진 태그 추가', tag_remove: '사진 태그 삭제',
+                                   meeting_confirm: '모임 확정', meeting_cancel: '모임 확정 취소',
+                                   memo_create: '메모 추가', memo_update: '메모 변경', memo_delete: '메모 삭제',
+                                   place_create: '장소 등록', place_update: '장소 수정', place_delete: '장소 삭제'
+                                 }[log.action] || '활동';
 
-              return /*#__PURE__*/React.createElement("div", {
-                key: log.id,
-                className: "admin-chat-row"
+                const badgeBg = log.type === 'chat' ? '#E0F2FE' :
+                                {
+                                  create: '#DCFCE7', update: '#DBEAFE', delete: '#FEE2E2',
+                                  poll_create: '#F3E8FF', poll_vote: '#FCE7F3', poll_cancel: '#FFEDD5',
+                                  expense_create: '#FEF3C7', expense_update: '#FEF3C7', expense_delete: '#FFEDD5',
+                                  tag_add: '#E0E7FF', tag_remove: '#FEE2E2',
+                                  meeting_confirm: '#F3E8FF', meeting_cancel: '#FEE2E2',
+                                  memo_create: '#E0E7FF', memo_update: '#FEF3C7', memo_delete: '#FEE2E2',
+                                  place_create: '#DCFCE7', place_update: '#DBEAFE', place_delete: '#FEE2E2'
+                                }[log.action] || '#F1F5F9';
+
+                const badgeColor = log.type === 'chat' ? '#0369A1' :
+                                   {
+                                     create: '#15803D', update: '#1D4ED8', delete: '#B91C1C',
+                                     poll_create: '#7E22CE', poll_vote: '#BE185D', poll_cancel: '#C2410C',
+                                     expense_create: '#B45309', expense_update: '#B45309', expense_delete: '#C2410C',
+                                     tag_add: '#4338CA', tag_remove: '#B91C1C',
+                                     meeting_confirm: '#7E22CE', meeting_cancel: '#B91C1C',
+                                     memo_create: '#4338CA', memo_update: '#B45309', memo_delete: '#B91C1C',
+                                     place_create: '#15803D', place_update: '#1D4ED8', place_delete: '#B91C1C'
+                                   }[log.action] || '#64748B';
+
+                return /*#__PURE__*/React.createElement("div", {
+                  key: log.id,
+                  className: "admin-chat-row"
+                },
+                  /* Left: action + participant badges + date */
+                  /*#__PURE__*/React.createElement("div", { className: "admin-chat-header", style: { display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' } },
+                    /*#__PURE__*/React.createElement("span", {
+                      style: { fontSize: '0.68rem', fontWeight: 'bold', padding: '2px 6px', borderRadius: '4px', backgroundColor: badgeBg, color: badgeColor, border: `1px solid ${badgeColor}30`, whiteSpace: 'nowrap' }
+                    }, actLabel),
+                    /*#__PURE__*/React.createElement("span", {
+                      style: { backgroundColor: p.color, color: getContrastTextColor(p.color), padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: '0.7rem', fontWeight: 'bold', whiteSpace: 'nowrap' }
+                    }, p.name),
+                    log.date && /*#__PURE__*/React.createElement("span", {
+                      style: { fontSize: '0.8rem', fontWeight: 'bold', color: '#475569' }
+                    }, formatShortDateWithDayName(log.date))
+                  ),
+
+                  /* Middle: memo, ellipsized on wide screens like admin-chat-text, wraps on narrow */
+                  log.note && log.note !== (log.date ? formatShortDateWithDayName(log.date) : '') && /*#__PURE__*/React.createElement("span", { className: "admin-chat-text", title: log.note || '' }, log.note || ''),
+
+                  /* Right: timestamp + restore button -- the button drops to its own full-width
+                     row on mobile (recovery-restore-footer) rather than squeezing onto the
+                     timestamp's line like the shared admin-chat-footer layout normally does. */
+                  /*#__PURE__*/React.createElement("div", { className: "admin-chat-footer recovery-restore-footer" },
+                    /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.72rem', color: '#64748B', fontWeight: '500', whiteSpace: 'nowrap' } }, formatRegisteredAt(log.timestamp)),
+                    /*#__PURE__*/React.createElement("button", {
+                      type: "button", className: "btn btn-secondary recovery-restore-btn", style: { fontSize: '0.76rem', padding: '4px 10px', whiteSpace: 'nowrap' },
+                      onClick: () => handleRestoreToLogTimestamp(selectedCalId, log)
+                    }, "이 시점으로 복구")
+                  )
+                );
+              }),
+              filteredTimeline.length > timelineLimit && /*#__PURE__*/React.createElement("div", {
+                style: { display: 'flex', justifyContent: 'center', marginTop: '12px', paddingBottom: '4px' }
               },
-                /* Left: action + participant badges + date */
-                /*#__PURE__*/React.createElement("div", { className: "admin-chat-header", style: { display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' } },
-                  /*#__PURE__*/React.createElement("span", {
-                    style: { fontSize: '0.68rem', fontWeight: 'bold', padding: '2px 6px', borderRadius: '4px', backgroundColor: badgeBg, color: badgeColor, border: `1px solid ${badgeColor}30`, whiteSpace: 'nowrap' }
-                  }, actLabel),
-                  /*#__PURE__*/React.createElement("span", {
-                    style: { backgroundColor: p.color, color: getContrastTextColor(p.color), padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: '0.7rem', fontWeight: 'bold', whiteSpace: 'nowrap' }
-                  }, p.name),
-                  log.date && /*#__PURE__*/React.createElement("span", {
-                    style: { fontSize: '0.8rem', fontWeight: 'bold', color: '#475569' }
-                  }, formatShortDateWithDayName(log.date))
-                ),
-
-                /* Middle: memo, ellipsized on wide screens like admin-chat-text, wraps on narrow */
-                log.note && log.note !== (log.date ? formatShortDateWithDayName(log.date) : '') && /*#__PURE__*/React.createElement("span", { className: "admin-chat-text", title: log.note || '' }, log.note || ''),
-
-                /* Right: timestamp + restore button -- the button drops to its own full-width
-                   row on mobile (recovery-restore-footer) rather than squeezing onto the
-                   timestamp's line like the shared admin-chat-footer layout normally does. */
-                /*#__PURE__*/React.createElement("div", { className: "admin-chat-footer recovery-restore-footer" },
-                  /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.72rem', color: '#64748B', fontWeight: '500', whiteSpace: 'nowrap' } }, formatRegisteredAt(log.timestamp)),
-                  /*#__PURE__*/React.createElement("button", {
-                    type: "button", className: "btn btn-secondary recovery-restore-btn", style: { fontSize: '0.76rem', padding: '4px 10px', whiteSpace: 'nowrap' },
-                    onClick: () => handleRestoreToLogTimestamp(selectedCalId, log)
-                  }, "이 시점으로 복구")
-                )
-              );
-            })
+                /*#__PURE__*/React.createElement("button", {
+                  type: "button",
+                  className: "btn btn-secondary",
+                  onClick: () => setTimelineLimit(prev => prev + 100),
+                  style: {
+                    width: '100%',
+                    fontSize: '0.8rem',
+                    padding: '8px 16px',
+                    backgroundColor: '#EFF6FF',
+                    borderColor: '#BFDBFE',
+                    color: '#1D4ED8',
+                    fontWeight: 'bold'
+                  }
+                }, `로그 100개 더 보기 (전체 ${filteredTimeline.length}개 중 ${timelineLimit}개 표시 중)`)
+              )
+            )
           )
         )
       ) : null,
