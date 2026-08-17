@@ -8332,6 +8332,8 @@ function App() {
     onSaveExpense: handleSaveExpense,
     onDeleteExpense: handleDeleteExpense,
     onReorderExpenses: handleReorderExpenses,
+    onSavePlace: handleSavePlace,
+    onDeletePlace: handleDeletePlace,
     showToast: showToast,
     onRequestConfirm: showConfirmDialog,
     onClose: () => setIsModalOpen(false)
@@ -14070,6 +14072,8 @@ function DateModal({
   onSaveExpense,
   onDeleteExpense,
   onReorderExpenses,
+  onSavePlace,
+  onDeletePlace,
   onDelete,
   onDeleteDate,
   onRequestConfirm,
@@ -14085,12 +14089,181 @@ function DateModal({
   const dateEntries = getActiveAvailabilities(calendar).filter(e => e.date === dateStr);
   const dateAnns = getAnniversariesForDate(dateStr, anniversaries);
   const getExistingNoteForParticipant = id => (dateEntries.find(entry => entry.participantId === id)?.note || '');
+
+  // Place state
+  const [placeQuery, setPlaceQuery] = React.useState('');
+  const [placeResults, setPlaceResults] = React.useState([]);
+  const [selectedPlace, setSelectedPlace] = React.useState(null);
+  const [placeMemo, setPlaceMemo] = React.useState('');
+  const [isPlaceLoading, setIsPlaceLoading] = React.useState(false);
+  const [isPlaceCollapsed, setIsPlaceCollapsed] = React.useState(true);
+  const [placeSearchStage, setPlaceSearchStage] = React.useState(null);
+  const [isSavingPlace, setIsSavingPlace] = React.useState(false);
+
+  // Sync place memo and selected place with existing entries
   React.useEffect(() => {
     setParticipantId('');
     setNote('');
     setIsSheetOpen(false);
     setIsSubmitting(false);
+
+    // Look for existing place associated with this date
+    const confirmedMeetings = getConfirmedMeetings(calendar);
+    const meeting = confirmedMeetings.find(m => m.date === dateStr);
+    const places = getCalendarPlaces(calendar);
+    
+    let initialPlace = null;
+    if (meeting?.placeId) {
+      initialPlace = places.find(p => p.id === meeting.placeId);
+    }
+    if (!initialPlace) {
+      initialPlace = places.find(p => p.visitDate === dateStr && p.visitStatus === 'visited');
+    }
+    
+    if (initialPlace) {
+      setSelectedPlace(initialPlace);
+      setPlaceMemo(initialPlace.memo || '');
+      setPlaceQuery(initialPlace.name || '');
+      setIsPlaceCollapsed(false); // Expand when place exists
+    } else {
+      setSelectedPlace(null);
+      setPlaceMemo('');
+      setPlaceQuery('');
+      setIsPlaceCollapsed(true);
+    }
+    setPlaceResults([]);
   }, [calendar?.id, dateStr]);
+
+  // Debounced live typing search
+  React.useEffect(() => {
+    const trimmed = placeQuery.trim();
+    if (selectedPlace && selectedPlace.name === trimmed) return undefined;
+    if (trimmed.length < 2) {
+      setPlaceResults([]);
+      return undefined;
+    }
+    const timer = setTimeout(() => { handlePlaceSearch(null, true); }, 380);
+    return () => clearTimeout(timer);
+  }, [placeQuery, selectedPlace]);
+
+  const handlePlaceSearch = async (e, auto = false) => {
+    if (e) e.preventDefault();
+    const cleanQuery = placeQuery.trim();
+    if (!cleanQuery) {
+      if (!auto) showToast('검색할 주소나 업체명을 입력해 주세요.', 'error');
+      return;
+    }
+    setIsPlaceLoading(true);
+    if (!auto) setPlaceSearchStage('kakao');
+    try {
+      let mapped = [];
+      try {
+        const kakaoUrl = `https://us-central1-${firebaseConfig.projectId}.cloudfunctions.net/kakaoLocalSearchProxy?query=${encodeURIComponent(cleanQuery)}`;
+        const kakaoRes = await fetchWithTimeout(kakaoUrl, 6000);
+        const kakaoJson = kakaoRes.ok ? await kakaoRes.json() : null;
+        if (kakaoJson?.ok && Array.isArray(kakaoJson.documents)) {
+          mapped = kakaoJson.documents.map((doc, idx) => ({
+            id: `kakao_${doc.id || idx}`,
+            name: doc.place_name || cleanQuery,
+            address: doc.road_address_name || doc.address_name || '',
+            lat: parseFloat(doc.y),
+            lng: parseFloat(doc.x),
+            categoryId: KAKAO_CATEGORY_GROUP_TO_PLACE_CATEGORY[doc.category_group_code] || null,
+            categoryLabel: doc.category_name || '',
+            phone: doc.phone || '',
+            url: doc.place_url || ''
+          })).filter(r => Number.isFinite(r.lat) && Number.isFinite(r.lng));
+        }
+      } catch (err) {
+        console.error('Kakao local search failed, falling back to Google Places:', err);
+      }
+      if (mapped.length === 0 && !auto) {
+        setPlaceSearchStage('google');
+        try {
+          const googleUrl = `https://us-central1-${firebaseConfig.projectId}.cloudfunctions.net/googlePlacesSearchProxy?query=${encodeURIComponent(cleanQuery)}`;
+          const googleRes = await fetchWithTimeout(googleUrl, 6000);
+          const googleJson = googleRes.ok ? await googleRes.json() : null;
+          if (googleJson?.ok && Array.isArray(googleJson.places)) {
+            mapped = googleJson.places.map((p, idx) => ({
+              id: `google_${p.id || idx}`,
+              name: p.displayName?.text || cleanQuery,
+              address: p.formattedAddress || '',
+              lat: parseFloat(p.location?.latitude),
+              lng: parseFloat(p.location?.longitude),
+              categoryId: null,
+              categoryLabel: '', phone: '', url: ''
+            })).filter(r => Number.isFinite(r.lat) && Number.isFinite(r.lng));
+          }
+        } catch (err) {
+          console.error('Google Places search failed, falling back to Nominatim:', err);
+        }
+      }
+      if (mapped.length === 0 && !auto) {
+        setPlaceSearchStage('nominatim');
+        const res = await fetchWithTimeout(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(cleanQuery)}&format=json&limit=8&accept-language=ko`, 6000);
+        const data = res.ok ? await res.json() : [];
+        mapped = data.map((doc, idx) => ({
+          id: `osm_${doc.place_id || idx}`,
+          name: doc.display_name?.split(',')[0] || cleanQuery,
+          address: doc.display_name || '',
+          lat: parseFloat(doc.lat),
+          lng: parseFloat(doc.lon),
+          categoryId: null,
+          categoryLabel: '', phone: '', url: ''
+        })).filter(r => Number.isFinite(r.lat) && Number.isFinite(r.lng));
+      }
+      setPlaceResults(mapped);
+      if (mapped.length === 0 && !auto) {
+        showToast('검색 결과가 없습니다.', 'info');
+      }
+    } catch (err) {
+      console.error('Place search error:', err);
+      showToast('장소 검색 중 오류가 발생했습니다.', 'error');
+    } finally {
+      setIsPlaceLoading(false);
+      setPlaceSearchStage(null);
+    }
+  };
+
+  const handleSavePlaceClick = async () => {
+    if (!onSavePlace) return;
+    setIsSavingPlace(true);
+    try {
+      const isConfirmed = isDateConfirmedMeeting(calendar, dateStr);
+      if (!selectedPlace) {
+        await Promise.resolve(onConfirmMeeting(dateStr, note, '', isConfirmed));
+        showToast('장소 링크가 해제되었습니다.', 'success');
+        setIsSavingPlace(false);
+        return;
+      }
+      
+      const placeId = selectedPlace.id && !selectedPlace.id.startsWith('kakao_') && !selectedPlace.id.startsWith('google_') && !selectedPlace.id.startsWith('osm_')
+        ? selectedPlace.id
+        : `place_${calendar.id}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+      
+      const newPlaceData = {
+        id: placeId,
+        name: selectedPlace.name,
+        address: selectedPlace.address,
+        lat: selectedPlace.lat,
+        lng: selectedPlace.lng,
+        categoryId: selectedPlace.categoryId || 'etc',
+        memo: placeMemo,
+        visitStatus: 'visited',
+        visitDate: dateStr
+      };
+      
+      await Promise.resolve(onSavePlace(newPlaceData));
+      await Promise.resolve(onConfirmMeeting(dateStr, note, placeId, isConfirmed));
+      showToast('장소 및 메모가 저장되었습니다.', 'success');
+      setSelectedPlace(newPlaceData);
+    } catch (err) {
+      console.error('Save place failed:', err);
+      showToast('장소 저장 중 오류가 발생했습니다.', 'error');
+    } finally {
+      setIsSavingPlace(false);
+    }
+  };
   const celebratePositiveAction = () => {
     if (typeof confetti !== 'function') return;
     try {
@@ -14791,6 +14964,170 @@ function DateModal({
       gap: '8px'
     }
   }, dateEntries.map(entry => renderAvailabilityEntry(entry, false)))), !adminMode && /*#__PURE__*/React.createElement("div", null,
+    /*#__PURE__*/React.createElement("div", {
+      style: { marginBottom: '14px', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '14px' }
+    },
+      /*#__PURE__*/React.createElement("div", {
+        onClick: () => setIsPlaceCollapsed(prev => !prev),
+        style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', cursor: 'pointer', marginBottom: isPlaceCollapsed ? 0 : '10px' }
+      },
+        /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.85rem', fontWeight: 700, color: '#64748B' } }, "모임 장소"),
+        /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
+          /*#__PURE__*/React.createElement("span", {
+            style: {
+              fontSize: '0.78rem',
+              fontWeight: 600,
+              padding: '3px 9px',
+              borderRadius: '999px',
+              backgroundColor: selectedPlace ? '#EEF2FF' : 'var(--bg-card)',
+              border: `1px solid ${selectedPlace ? '#C7D2FE' : 'var(--border-subtle)'}`,
+              color: selectedPlace ? '#4F46E5' : 'var(--text-muted)',
+              whiteSpace: 'nowrap',
+              maxWidth: '120px',
+              textOverflow: 'ellipsis',
+              overflow: 'hidden'
+            }
+          }, selectedPlace ? selectedPlace.name : '없음'),
+          /*#__PURE__*/React.createElement(SectionToggleButton, {
+            collapsed: isPlaceCollapsed,
+            onToggle: () => setIsPlaceCollapsed(prev => !prev),
+            label: isPlaceCollapsed ? "장소 펼치기" : "장소 접기"
+          })
+        )
+      ),
+      !isPlaceCollapsed && /*#__PURE__*/React.createElement(React.Fragment, null,
+        /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
+          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '6px' } },
+            /*#__PURE__*/React.createElement("input", {
+              type: "text",
+              className: "form-input",
+              style: { flex: '1 1 0%', minWidth: 0 },
+              placeholder: "장소명이나 주소 검색...",
+              value: placeQuery,
+              disabled: isSavingPlace || isPlaceLoading,
+              onChange: e => setPlaceQuery(e.target.value),
+              onKeyDown: e => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handlePlaceSearch(e, false);
+                }
+              }
+            }),
+            /*#__PURE__*/React.createElement("button", {
+              type: "button",
+              className: "btn btn-secondary",
+              style: { flexShrink: 0 },
+              disabled: isSavingPlace || isPlaceLoading,
+              onClick: e => handlePlaceSearch(e, false)
+            }, isPlaceLoading ? (placeSearchStage ? SEARCH_TIER_LABELS[placeSearchStage] : '검색 중...') : "검색")
+          ),
+          placeResults.length > 0 && /*#__PURE__*/React.createElement("div", {
+            className: "place-search-results-list",
+            style: {
+              maxHeight: '180px',
+              overflowY: 'auto',
+              border: '1px solid var(--border-subtle)',
+              borderRadius: '6px',
+              backgroundColor: 'var(--bg-card)',
+              marginTop: '4px',
+              zIndex: 10,
+              position: 'relative'
+            }
+          },
+            placeResults.map(res => /*#__PURE__*/React.createElement("div", {
+              key: res.id,
+              className: "place-result-item",
+              style: {
+                padding: '8px 12px',
+                cursor: 'pointer',
+                borderBottom: '1px solid var(--border-subtle)',
+                fontSize: '0.8rem'
+              },
+              onClick: () => {
+                setSelectedPlace(res);
+                setPlaceQuery(res.name);
+                setPlaceResults([]);
+              }
+            },
+              /*#__PURE__*/React.createElement("div", { style: { fontWeight: 700, color: 'var(--text-main)' } }, res.name),
+              /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.72rem', color: 'var(--text-muted)' } }, res.address)
+            ))
+          ),
+          selectedPlace && /*#__PURE__*/React.createElement("div", {
+            className: "place-preview-card",
+            style: {
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '12px',
+              borderRadius: '8px',
+              border: '1px solid var(--border-subtle)',
+              backgroundColor: 'var(--bg-primary)',
+              marginTop: '8px',
+              gap: '12px'
+            }
+          }, 
+            /*#__PURE__*/React.createElement("div", {
+              style: { display: 'flex', flexDirection: 'column', gap: '3px', flex: 1, minWidth: 0 }
+            },
+              /*#__PURE__*/React.createElement("div", {
+                style: { fontSize: '0.88rem', fontWeight: 700, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' }
+              }, 
+                /*#__PURE__*/React.createElement("span", {
+                  style: {
+                    padding: '2px 6px',
+                    borderRadius: '4px',
+                    fontSize: '0.68rem',
+                    fontWeight: 700,
+                    backgroundColor: '#EEF2FF',
+                    color: '#4F46E5',
+                    flexShrink: 0
+                  }
+                }, selectedPlace.categoryLabel || '장소'),
+                /*#__PURE__*/React.createElement("span", {
+                  style: { textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }
+                }, selectedPlace.name)
+              ),
+              /*#__PURE__*/React.createElement("div", {
+                style: { fontSize: '0.76rem', color: 'var(--text-muted)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' },
+                title: selectedPlace.address
+              }, selectedPlace.address)
+            ),
+            /*#__PURE__*/React.createElement("button", {
+              type: "button",
+              className: "btn btn-danger",
+              title: "장소 해제",
+              style: { width: '28px', height: '28px', padding: 0, flexShrink: 0 },
+              onClick: () => { setSelectedPlace(null); setPlaceQuery(''); setPlaceResults([]); }
+            }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 14 }))
+          ),
+          /*#__PURE__*/React.createElement("textarea", {
+            className: "form-input",
+            style: { width: '100%', marginTop: '6px', resize: 'vertical', minHeight: '52px', fontSize: '0.8rem' },
+            placeholder: "장소 관련 메모를 입력해 주세요 (예: 2번 출구 앞, 예약번호, 주문 메뉴 등)",
+            value: placeMemo,
+            disabled: isSavingPlace,
+            onChange: e => setPlaceMemo(e.target.value)
+          }),
+          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', justifyContent: 'flex-end', marginTop: '4px' } },
+            /*#__PURE__*/React.createElement("button", {
+              type: "button",
+              className: "btn btn-secondary",
+              style: {
+                backgroundColor: '#0F172A',
+                borderColor: '#0F172A',
+                color: '#FFFFFF',
+                padding: '6px 14px',
+                fontSize: '0.78rem',
+                fontWeight: 600
+              },
+              disabled: isSavingPlace,
+              onClick: handleSavePlaceClick
+            }, isSavingPlace ? "저장 중..." : "장소 및 메모 저장")
+          )
+        )
+      )
+    ),
     /*#__PURE__*/React.createElement("div", {
       onClick: () => setIsSettlementCollapsed(prev => !prev),
       style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', cursor: 'pointer', marginBottom: isSettlementCollapsed ? 0 : '10px' }

@@ -2890,3 +2890,15 @@ select.form-select {
   89% { opacity: 1; transform: scale(1.1) rotate(0deg); }
   91% { opacity: 0; transform: scale(0); }
 }
+
+/* Date Details Modal Place Search & Preview card styling */
+.place-result-item:hover {
+  background-color: var(--bg-hover) !important;
+}
+.place-preview-card {
+  transition: all 0.2s ease;
+}
+.place-preview-card:hover {
+  border-color: rgba(79, 70, 229, 0.3) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04), inset 0 0 5px rgba(79, 70, 229, 0.05);
+}
