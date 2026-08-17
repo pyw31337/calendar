@@ -232,14 +232,16 @@ function formatPlaceBadgeDate(dateStr) {
   return normalized ? formatShortDateWithDayName(normalized) : null;
 }
 
-// Kakao Map's official "link/map" deep link -- centers the map on the given coordinates with a
-// marker, and (unlike a plain text search) can't land on the wrong branch of a chain business.
-// Works as a plain https: link on both desktop (opens map.kakao.com) and mobile (opens the Kakao
-// Map app via universal link if installed, the mobile web map otherwise), so no separate
-// app-scheme fallback is needed.
-function getKakaoMapPlaceUrl(place) {
+// Naver Map's "p" deep link -- centers the map on the given coordinates with a labeled marker,
+// and (unlike a plain text search) can't land on the wrong branch of a chain business. Works as
+// a plain https: link on both desktop (opens map.naver.com) and mobile (opens the Naver Map app
+// via universal link if installed, the mobile web map otherwise), so no separate app-scheme
+// fallback is needed. Business-name/address search itself stays on Kakao Local (see
+// PlaceRegisterModal.handleSearch) -- only where the user is sent to view the map on the place
+// card switches to Naver.
+function getNaverMapPlaceUrl(place) {
   const label = encodeURIComponent(place?.name || '장소');
-  return `https://map.kakao.com/link/map/${label},${place.lat},${place.lng}`;
+  return `https://map.naver.com/p?title=${label}&lat=${place.lat}&lng=${place.lng}`;
 }
 
 const GATHER_APP_CONFIG = window.GATHER_APP_CONFIG || {};
@@ -3207,6 +3209,13 @@ function AdminDashboard({ initialCalendars }) {
   // written server-side by kakaoLocalSearchProxy (functions/index.js).
   const [kakaoSearchStats, setKakaoSearchStats] = React.useState(null);
 
+  // Google Places (해외 장소 검색 폴백) monthly call count, service-wide -- see
+  // appConfig/googlePlacesSearchStats, written server-side by googlePlacesSearchProxy
+  // (functions/index.js). Unlike Kakao (free at this app's scale), Google Places is billed past
+  // its free monthly SKU threshold, so this is tracked monthly (matching how Google's own free
+  // tier resets) rather than daily.
+  const [googlePlacesStats, setGooglePlacesStats] = React.useState(null);
+
   const lastSyncedRef = React.useRef(null);
 
   const showAdminToast = (message, type = 'success', duration = 3000) => {
@@ -3478,6 +3487,15 @@ function AdminDashboard({ initialCalendars }) {
     const unsub = firebaseDb.collection('appConfig').doc('kakaoLocalSearchStats').onSnapshot(snap => {
       setKakaoSearchStats(snap.exists ? snap.data() : { dailyUsageBucket: null, dailyUsageCount: 0 });
     }, () => setKakaoSearchStats(null));
+    return () => unsub && unsub();
+  }, [firebaseDb]);
+
+  // Google Places search monthly usage, loaded once (not tied to any single calendar)
+  React.useEffect(() => {
+    if (!firebaseDb) return;
+    const unsub = firebaseDb.collection('appConfig').doc('googlePlacesSearchStats').onSnapshot(snap => {
+      setGooglePlacesStats(snap.exists ? snap.data() : { monthlyUsageBucket: null, monthlyUsageCount: 0 });
+    }, () => setGooglePlacesStats(null));
     return () => unsub && unsub();
   }, [firebaseDb]);
 
@@ -4202,6 +4220,14 @@ function AdminDashboard({ initialCalendars }) {
   const kakaoDailyUsage = (kakaoSearchStats && kakaoSearchStats.dailyUsageBucket === kakaoTodayBucket)
     ? (kakaoSearchStats.dailyUsageCount || 0) : 0;
 
+  // Google Places (해외 장소 검색 폴백, 카카오 검색이 0건일 때만 호출) monthly usage -- unlike
+  // Kakao this is a genuinely paid API past its free SKU threshold, so this card exists mainly as
+  // an early-warning signal rather than a hard limit display (the real number lives in Google
+  // Cloud 콘솔's billing view, which can change independently of this code).
+  const googlePlacesThisMonthBucket = new Date().toISOString().slice(0, 7);
+  const googlePlacesMonthlyUsage = (googlePlacesStats && googlePlacesStats.monthlyUsageBucket === googlePlacesThisMonthBucket)
+    ? (googlePlacesStats.monthlyUsageCount || 0) : 0;
+
   const fullServiceUsage = [
     ...dashboard.serviceUsage,
     {
@@ -4219,6 +4245,14 @@ function AdminDashboard({ initialCalendars }) {
       remaining: '자정(UTC) 초기화',
       percent: null,
       note: '정확한 무료 한도는 카카오 개발자 콘솔 → 해당 앱 → 쿼터 메뉴에서 확인해 주세요. 성공/실패 요청 모두 집계됩니다.'
+    },
+    {
+      label: '구글 플레이스 검색 (이번 달, 해외 장소 폴백)',
+      used: `${googlePlacesMonthlyUsage}건`,
+      limit: '유료 API - Google Cloud 콘솔에서 확인',
+      remaining: '매월 1일 초기화',
+      percent: null,
+      note: '카카오 검색이 0건일 때만 호출되는 해외 장소 폴백입니다. 월 무료 호출 한도를 넘으면 과금되니, 정확한 한도/비용은 Google Cloud 콘솔 → Places API 청구 내역에서 확인해 주세요.'
     },
     {
       label: '일정 데이터 (5,000건 캡)',
@@ -23483,14 +23517,20 @@ function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, onDelete,
   });
   const [saving, setSaving] = React.useState(false);
 
-  // Kakao Local (키워드 검색) is tried first -- Nominatim/OSM has almost no Korean business-name
-  // coverage (searching "스타벅스" only returns Japan branches), so it's kept only as a fallback
-  // for plain addresses/landmarks Kakao doesn't have. Kakao also proxies through a Cloud Function
-  // (kakaoLocalSearchProxy) so the REST API key never ships to the browser, same reasoning as the
-  // existing peekalinkProxy for link previews.
+  // Three-tier fallback chain, cheapest/most-reliable first: Kakao Local (키워드 검색) covers
+  // domestic businesses very well and is effectively free at this app's scale, so it's tried
+  // first for every search. Kakao is Korea-only, so an empty result there usually means either a
+  // typo or (increasingly relevant now that 장소 등록 covers overseas trips too) a place outside
+  // Korea -- Google Places picks up that case, since its POI coverage abroad (e.g. Vietnam) is
+  // far better than Kakao's or Nominatim's. Nominatim/OSM stays as the last, always-free safety
+  // net in case Google Places itself errors or comes up empty too. Kakao and Google both proxy
+  // through a Cloud Function (kakaoLocalSearchProxy / googlePlacesSearchProxy) so neither API key
+  // ships to the browser, same reasoning as the existing peekalinkProxy for link previews.
   // `auto` distinguishes a debounced as-you-type search (see the effect below) from an explicit
-  // button/Enter submit -- an auto search stays quiet on empty query / no-results instead of
-  // popping a toast on every keystroke that doesn't happen to match anything yet.
+  // button/Enter submit -- an auto search only ever tries Kakao (fast, free, safe to fire on
+  // every keystroke pause) and stays quiet on empty query / no-results, since the Google/Nominatim
+  // tiers add real latency (and, for Google, real cost) that a live-typing dropdown shouldn't pay
+  // on every partial fragment. Explicit submits get the full chain.
   const handleSearch = async (e, auto = false) => {
     if (e) e.preventDefault();
     const cleanQuery = query.trim();
@@ -23519,12 +23559,31 @@ function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, onDelete,
           })).filter(r => Number.isFinite(r.lat) && Number.isFinite(r.lng));
         }
       } catch (err) {
-        console.error('Kakao local search failed, falling back to Nominatim:', err);
+        console.error('Kakao local search failed, falling back to Google Places:', err);
       }
       if (mapped.length === 0 && !auto) {
-        // The as-you-type path skips the Nominatim fallback -- it's meant for addresses/landmarks
-        // typed out in full, not partial business-name fragments, so firing it on every keystroke
-        // would mostly just add latency without turning up anything Kakao didn't already cover.
+        try {
+          const googleUrl = `https://us-central1-${firebaseConfig.projectId}.cloudfunctions.net/googlePlacesSearchProxy?query=${encodeURIComponent(cleanQuery)}`;
+          const googleRes = await fetch(googleUrl);
+          const googleJson = googleRes.ok ? await googleRes.json() : null;
+          if (googleJson?.ok && Array.isArray(googleJson.places)) {
+            mapped = googleJson.places.map((p, idx) => ({
+              id: `google_${p.id || idx}`,
+              name: p.displayName?.text || cleanQuery,
+              address: p.formattedAddress || '',
+              lat: parseFloat(p.location?.latitude),
+              lng: parseFloat(p.location?.longitude),
+              categoryId: null
+            })).filter(r => Number.isFinite(r.lat) && Number.isFinite(r.lng));
+          }
+        } catch (err) {
+          console.error('Google Places search failed, falling back to Nominatim:', err);
+        }
+      }
+      if (mapped.length === 0 && !auto) {
+        // The as-you-type path skips this Nominatim fallback too -- it's meant as a last resort
+        // for addresses/landmarks neither Kakao nor Google Places turned up, not for partial
+        // business-name fragments typed mid-search.
         const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(cleanQuery)}&format=json&limit=8&accept-language=ko`);
         const data = res.ok ? await res.json() : [];
         mapped = (data || []).map((item, idx) => ({
@@ -24092,7 +24151,7 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
                 }, `최근방문 ${topBadgeDate}`),
                 visitEntries.length > 0 && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 700 } }, `총 ${visitEntries.length}회 방문`)
               ),
-              /* Name + address row doubles as a link out to Kakao Map, centered on this place's
+              /* Name + address row doubles as a link out to Naver Map, centered on this place's
                  own coordinates -- stopPropagation so it opens the map instead of also
                  triggering the card's own onClick (which opens the edit modal). */
               /*#__PURE__*/React.createElement("div", {
@@ -24101,13 +24160,13 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
                 title: "지도에서 보기",
                 onClick: event => {
                   event.stopPropagation();
-                  window.open(getKakaoMapPlaceUrl(place), '_blank', 'noopener,noreferrer');
+                  window.open(getNaverMapPlaceUrl(place), '_blank', 'noopener,noreferrer');
                 },
                 onKeyDown: event => {
                   if (event.key !== 'Enter' && event.key !== ' ') return;
                   event.preventDefault();
                   event.stopPropagation();
-                  window.open(getKakaoMapPlaceUrl(place), '_blank', 'noopener,noreferrer');
+                  window.open(getNaverMapPlaceUrl(place), '_blank', 'noopener,noreferrer');
                 },
                 style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', cursor: 'pointer' }
               },

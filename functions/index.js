@@ -419,6 +419,81 @@ exports.kakaoLocalSearchProxy = functions.runWith({ secrets: ['KAKAO_REST_API_KE
   }
 });
 
+// Overseas 장소 검색 폴백 -- Kakao Local is Korea-only, so PlaceRegisterModal.handleSearch only
+// calls this when a Kakao search comes back empty (see assets/app-main.js), which in practice
+// means either a typo or a place outside Korea. Google Places (New) has far better POI coverage
+// abroad than Nominatim/OSM, at the cost of being a genuinely billed API past its free monthly
+// SKU threshold -- see incrementGooglePlacesSearchStat below and the matching 통계 탭 card.
+// Value lives in Firebase Secret Manager (see firebase functions:secrets:set
+// GOOGLE_PLACES_API_KEY), injected into process.env only for googlePlacesSearchProxy via
+// runWith({secrets}) below.
+const GOOGLE_PLACES_API_KEY = process.env.GOOGLE_PLACES_API_KEY;
+
+// Tracks monthly call volume against Google Places' free SKU threshold (see 어드민 통계 탭's
+// 외부 서비스 연동 현황 card) -- unlike Kakao's daily bucket, this is monthly since that's how
+// Google's own free tier resets, and because this API can actually incur real cost past it.
+async function incrementGooglePlacesSearchStat() {
+  try {
+    const monthBucket = new Date().toISOString().slice(0, 7); // YYYY-MM (UTC)
+    const ref = admin.firestore().collection('appConfig').doc('googlePlacesSearchStats');
+    await admin.firestore().runTransaction(async tx => {
+      const snap = await tx.get(ref);
+      const data = snap.exists ? snap.data() : null;
+      const sameBucket = data && data.monthlyUsageBucket === monthBucket;
+      tx.set(ref, {
+        monthlyUsageBucket: monthBucket,
+        monthlyUsageCount: sameBucket ? (data.monthlyUsageCount || 0) + 1 : 1,
+        updatedAt: Date.now()
+      });
+    });
+  } catch (err) {
+    console.warn('incrementGooglePlacesSearchStat failed (non-fatal):', err);
+  }
+}
+
+exports.googlePlacesSearchProxy = functions.runWith({ secrets: ['GOOGLE_PLACES_API_KEY'] }).https.onRequest(async (req, res) => {
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
+  if (req.method !== 'GET') { res.status(405).json({ ok: false, message: 'Method not allowed' }); return; }
+  const query = String(req.query.query || '').trim().slice(0, 200);
+  if (!query) { res.status(400).json({ ok: false, message: 'query is required' }); return; }
+  // 30/minute per IP -- same ceiling as kakaoLocalSearchProxy. This proxy is only ever reached
+  // after a Kakao search already came back empty (see handleSearch's fallback chain), so real
+  // traffic here is inherently lower than Kakao's, but the cap still exists to stop a scripted
+  // caller from running up billing on a genuinely paid API.
+  if (!(await checkProxyRateLimit('googlePlaces', req.ip, 60 * 1000, 30))) {
+    res.status(429).json({ ok: false, message: 'Too many requests' });
+    return;
+  }
+  try {
+    // FieldMask is deliberately limited to Essentials/Pro-tier fields (id/name/address/location)
+    // -- requesting Enterprise-tier fields (phone, website, opening hours, etc.) would bump every
+    // call to a more expensive SKU for data this feature doesn't even use.
+    const googleRes = await fetch('https://places.googleapis.com/v1/places:searchText', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Goog-Api-Key': GOOGLE_PLACES_API_KEY,
+        'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location'
+      },
+      body: JSON.stringify({ textQuery: query, languageCode: 'ko' })
+    });
+    // Awaited (rather than fire-and-forget) so the write reliably completes before this HTTP
+    // function's instance is frozen once the response below is sent.
+    await incrementGooglePlacesSearchStat();
+    if (!googleRes.ok) {
+      res.status(googleRes.status).json({ ok: false, message: 'Google Places search failed' });
+      return;
+    }
+    const json = await googleRes.json();
+    res.status(200).json({ ok: true, places: json.places || [] });
+  } catch (err) {
+    console.error('googlePlacesSearchProxy failed:', err);
+    res.status(502).json({ ok: false, message: 'Google Places search request failed' });
+  }
+});
+
 // Public, unauthenticated: returns only {id, title, description} for every calendar, for the
 // GitHub Actions "Refresh Calendar OG Pages" job (scripts/generate-og-pages.mjs), which needs to
 // enumerate all calendars to regenerate their public share/OG preview pages. That's the same
