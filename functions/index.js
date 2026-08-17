@@ -85,7 +85,14 @@ exports.onMessageCreate = functions.runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).
         }
       };
       
-      const p = webpush.sendNotification(pushSubscription, payload)
+      // urgency: 'high' tells the push service (FCM under the hood for Chrome/Android) this is
+      // worth waking the device for immediately -- without it, web-push sends no Urgency header
+      // at all, which FCM treats as normal priority and can defer for a long stretch under
+      // Android's battery-saving throttling even while the device has general connectivity
+      // elsewhere (e.g. the recipient actively using this same app in a foreground tab doesn't by
+      // itself flush a queued *background* push -- that's a separate OS-managed channel). A chat
+      // message notification is exactly the time-sensitive case high urgency exists for.
+      const p = webpush.sendNotification(pushSubscription, payload, { urgency: 'high' })
         .then(() => {
           console.log(`Push sent successfully to subscription: ${doc.id}`);
         })
@@ -193,7 +200,9 @@ exports.sendAnniversaryReminders = functions.runWith({ secrets: ['VAPID_PRIVATE_
           endpoint: data.endpoint,
           keys: { auth: data.keys?.auth, p256dh: data.keys?.p256dh }
         };
-        const p = webpush.sendNotification(pushSubscription, payload)
+        // Same urgency: 'high' reasoning as onMessageCreate above -- a same-day anniversary
+        // reminder is only useful if it actually arrives that day.
+        const p = webpush.sendNotification(pushSubscription, payload, { urgency: 'high' })
           .then(() => {
             console.log(`Anniversary push sent to subscription: ${subDoc.id}`);
           })
