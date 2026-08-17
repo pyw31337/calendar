@@ -2608,6 +2608,7 @@ select.form-select {
   overflow: visible !important; /* To let sparks pop out of bounds */
   transform-origin: center center !important;
   z-index: 1; /* Pushes content above pseudo-element */
+  --btn-scale: 1; /* Custom CSS variable for hover/active scale to prevent keyframe conflict */
 }
 
 /* Flashy, fast animated gradient background layer using pseudo-element */
@@ -2634,7 +2635,7 @@ select.form-select {
 }
 
 .btn-gamified-confirm:hover {
-  transform: scale(1.03) !important;
+  --btn-scale: 1.03; /* Modifies CSS variable value without overriding the keyframe transform property */
 }
 
 .btn-gamified-confirm:hover::before {
@@ -2642,7 +2643,7 @@ select.form-select {
 }
 
 .btn-gamified-confirm:active {
-  transform: translateY(2px) scale(0.98) !important;
+  --btn-scale: 0.98;
   border-bottom-width: 2px !important;
 }
 
@@ -2656,13 +2657,13 @@ select.form-select {
   100% { background-position: -300% 0%; }
 }
 
-/* Constant intense shaking relative to true center coordinates */
+/* Constant intense shaking rotating strictly around the center anchor point (50%, 50%) */
 @keyframes gamified-shake {
-  0%, 100% { transform: translate(0, 0) rotate(0deg) scale(1); }
-  20% { transform: translate(-1.5px, 1px) rotate(-2deg); }
-  40% { transform: translate(1.5px, -1px) rotate(2deg); }
-  60% { transform: translate(-1px, 1.5px) rotate(-1.5deg); }
-  80% { transform: translate(1px, -1.5px) rotate(1.5deg); }
+  0%, 100% { transform: scale(var(--btn-scale)) rotate(0deg); }
+  20% { transform: scale(var(--btn-scale)) rotate(-2.5deg); }
+  40% { transform: scale(var(--btn-scale)) rotate(2.5deg); }
+  60% { transform: scale(var(--btn-scale)) rotate(-1.5deg); }
+  80% { transform: scale(var(--btn-scale)) rotate(1.5deg); }
 }
 
 /* Shiny gloss effect wrapper to constrain the sheen inside the button borders */
