@@ -5853,6 +5853,33 @@ function App() {
   const [memos, setMemos] = React.useState([]);
   const [memosLimit, setMemosLimit] = React.useState(MEMOS_PAGE_SIZE);
   const [hasMoreMemos, setHasMoreMemos] = React.useState(false);
+  // A memo shared via its own ?view=memo&memo=<id> link (see MemoShareModal) may be older than
+  // the paginated `memos` window above, so it needs its own direct-by-id fetch rather than
+  // relying on it already being present in that list.
+  const [sharedMemo, setSharedMemo] = React.useState(null);
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const memoParam = params.get('memo');
+    if (!memoParam || !activeCalId) {
+      setSharedMemo(null);
+      return;
+    }
+    let isMounted = true;
+    (async () => {
+      try {
+        if (firebaseDb) {
+          const doc = await firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('memos').doc(memoParam).get();
+          if (isMounted && doc.exists) setSharedMemo({ id: doc.id, ...doc.data() });
+        } else {
+          const res = await fetch(`https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/calendars/cal_${activeCalId}/memos/${memoParam}`);
+          if (res.ok && isMounted) setSharedMemo({ id: memoParam, ...firestoreDocumentToJs(await res.json()) });
+        }
+      } catch (e) {
+        console.warn('Failed to fetch shared memo:', e);
+      }
+    })();
+    return () => { isMounted = false; };
+  }, [activeCalId, firebaseDb]);
   const [anniversaries, setAnniversaries] = React.useState([]);
   // Live subcollection state for places/confirmedMeeting (see unionPlaces/unionConfirmedMeetings
   // and the effect below) -- unlike activityLogs (only fetched on-demand for the recovery UI),
@@ -7646,7 +7673,14 @@ function App() {
       onBack: () => changeView('calendar'),
       showToast: showToast,
       isDarkTheme: isDarkTheme,
-      onRequestConfirm: showConfirmDialog
+      onRequestConfirm: showConfirmDialog,
+      sharedMemo: sharedMemo,
+      onDismissSharedMemo: () => {
+        setSharedMemo(null);
+        const url = new URL(window.location.href);
+        url.searchParams.delete('memo');
+        window.history.replaceState({}, '', url);
+      }
     });
   }
 
@@ -17642,7 +17676,7 @@ function useScrollHideHeader() {
   return { isHeaderVisible, onScroll };
 }
 
-function MemoView({ calendar, memos, hasMoreMemos, onLoadMoreMemos, onBack, showToast, isDarkTheme, onRequestConfirm }) {
+function MemoView({ calendar, memos, hasMoreMemos, onLoadMoreMemos, onBack, showToast, isDarkTheme, onRequestConfirm, sharedMemo, onDismissSharedMemo }) {
   const [searchQuery, setSearchQuery] = React.useState('');
   const [selectedTag, setSelectedTag] = React.useState('');
   // Header hides on scroll-down / reappears on scroll-up, matching the chat room header exactly.
@@ -18050,6 +18084,11 @@ function MemoView({ calendar, memos, hasMoreMemos, onLoadMoreMemos, onBack, show
     }
   };
 
+  // Layer-popup share link for a single memo -- opens MemoShareModal, which builds the
+  // ?id=<calendar>&view=memo&memo=<id> URL (same deep-link convention chat/tag search results
+  // already use) and offers a one-tap copy.
+  const [sharingMemo, setSharingMemo] = React.useState(null);
+
   const removeComposerImage = (idx) => {
     setNewImages(prev => prev.filter((_, i) => i !== idx));
   };
@@ -18246,6 +18285,45 @@ function MemoView({ calendar, memos, hasMoreMemos, onLoadMoreMemos, onBack, show
       onScroll: handleMemoScroll,
       style: { position: 'absolute', inset: 0, overflowY: 'auto', padding: '16px', paddingTop: isSearchOpen ? '116px' : '72px', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: '20px' }
     },
+      /* Shared-memo banner -- when this page was opened via a memo's own share link
+         (?view=memo&memo=<id>), show that memo prominently as a single full-width row above
+         everything else (composer included), then the normal composer/list continue exactly
+         as before below it. The memo may be older than the paginated `memos` window, hence the
+         separate direct-by-id fetch (see sharedMemo in App()) rather than searching the list. */
+      sharedMemo && /*#__PURE__*/React.createElement("div", {
+        onClick: () => handleOpenEdit(sharedMemo),
+        role: "button",
+        tabIndex: 0,
+        onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleOpenEdit(sharedMemo); } },
+        style: {
+          width: '100%', maxWidth: '520px', margin: '0 auto', boxSizing: 'border-box',
+          backgroundColor: sharedMemo.color || 'var(--bg-card)',
+          border: '2px solid #4F46E5', borderRadius: '14px', padding: '16px',
+          cursor: 'pointer', boxShadow: '0 6px 18px rgba(79, 70, 229, 0.14)',
+          display: 'flex', flexDirection: 'column', gap: '4px'
+        }
+      },
+        /*#__PURE__*/React.createElement("div", {
+          style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }
+        },
+          /*#__PURE__*/React.createElement("span", {
+            style: { fontSize: '0.72rem', fontWeight: 800, color: '#4F46E5', letterSpacing: '0.05em', textTransform: 'uppercase' }
+          }, "공유된 메모"),
+          /*#__PURE__*/React.createElement("button", {
+            type: "button",
+            onClick: (e) => { e.stopPropagation(); if (onDismissSharedMemo) onDismissSharedMemo(); },
+            title: "닫기",
+            style: { background: 'none', border: 'none', cursor: 'pointer', color: '#64748B', display: 'flex', alignItems: 'center', flexShrink: 0 }
+          }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 18 }))
+        ),
+        /*#__PURE__*/React.createElement("div", {
+          style: {
+            fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-main)',
+            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+          }
+        }, sharedMemo.title || sharedMemo.text || '(내용 없음)')
+      ),
+
       /* Rich Memo Input Composer (Google Keep style) */
       /*#__PURE__*/React.createElement("div", {
         style: {
@@ -18548,6 +18626,7 @@ function MemoView({ calendar, memos, hasMoreMemos, onLoadMoreMemos, onBack, show
           calendar: calendar,
           onOpenEdit: handleOpenEdit,
           onTogglePin: () => handleTogglePin(memo),
+          onShare: () => setSharingMemo(memo),
           onSelectTag: (tag) => { setSelectedTag(tag); setIsSearchOpen(true); },
           onCommentsChange: (nextComments) => handleMemoCommentsChange(memo, nextComments),
           getBorderColor: getBorderColor
@@ -18575,6 +18654,7 @@ function MemoView({ calendar, memos, hasMoreMemos, onLoadMoreMemos, onBack, show
           calendar: calendar,
           onOpenEdit: handleOpenEdit,
           onTogglePin: () => handleTogglePin(memo),
+          onShare: () => setSharingMemo(memo),
           onSelectTag: (tag) => { setSelectedTag(tag); setIsSearchOpen(true); },
           onCommentsChange: (nextComments) => handleMemoCommentsChange(memo, nextComments),
           getBorderColor: getBorderColor
@@ -18943,13 +19023,61 @@ function MemoView({ calendar, memos, hasMoreMemos, onLoadMoreMemos, onBack, show
     imageProcessingNew && /*#__PURE__*/React.createElement(ImageProcessingOverlay, imageProcessingNew),
     newUploadProgress && /*#__PURE__*/React.createElement(ImageUploadOverlay, newUploadProgress),
     imageProcessingEdit && /*#__PURE__*/React.createElement(ImageProcessingOverlay, imageProcessingEdit),
-    editUploadProgress && /*#__PURE__*/React.createElement(ImageUploadOverlay, editUploadProgress)
+    editUploadProgress && /*#__PURE__*/React.createElement(ImageUploadOverlay, editUploadProgress),
+
+    sharingMemo && /*#__PURE__*/React.createElement(MemoShareModal, {
+      memo: sharingMemo,
+      calendarId: calendar.id,
+      onClose: () => setSharingMemo(null),
+      showToast: showToast
+    })
   );
+}
+
+function MemoShareModal({ memo, calendarId, onClose, showToast }) {
+  const shareUrl = React.useMemo(() => {
+    const params = new URLSearchParams({ id: calendarId, view: 'memo', memo: memo.id });
+    return `${getAppBaseUrl()}?${params.toString()}`;
+  }, [calendarId, memo.id]);
+  return ReactDOM.createPortal(/*#__PURE__*/React.createElement("div", {
+    className: "modal-overlay",
+    onClick: onClose,
+    style: { zIndex: 11000 }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "modal-container",
+    onClick: e => e.stopPropagation()
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "modal-header",
+    style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' }
+  }, /*#__PURE__*/React.createElement("h3", {
+    style: { fontSize: '1.1rem', fontWeight: 800 }
+  }, "메모 공유 URL"), /*#__PURE__*/React.createElement("button", {
+    onClick: onClose,
+    style: { background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer', display: 'flex', alignItems: 'center' }
+  }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }))), /*#__PURE__*/React.createElement("div", {
+    className: "modal-body"
+  }, /*#__PURE__*/React.createElement("label", {
+    style: { fontSize: '0.85rem', fontWeight: 700, color: '#64748B' }
+  }, memo.title ? `"${memo.title}" 메모 전용 공유 URL` : '이 메모 전용 공유 URL'), /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    className: "form-input",
+    style: { width: '100%' },
+    value: shareUrl,
+    readOnly: true
+  }), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-primary",
+    onClick: async () => {
+      const ok = await copyTextToClipboard(shareUrl);
+      const message = ok ? 'URL이 복사되었습니다!' : '복사에 실패했습니다. URL을 직접 선택해 복사해 주세요.';
+      if (showToast) showToast(message, ok ? 'success' : 'error');
+      else alert(message);
+    }
+  }, "URL 복사하기")))), document.body);
 }
 
 
 // Memo Card component for clean grid layout separation
-function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onSelectTag, onCommentsChange, getBorderColor }) {
+function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onSelectTag, onCommentsChange, getBorderColor }) {
   const imageUrls = memo.imageUrls || [];
   const thumbUrls = memo.thumbUrls || [];
 
@@ -19050,6 +19178,26 @@ function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onSelectTag, onComm
     },
     className: "memo-card-hover"
   },
+    /* Share button -- sits immediately left of the pin toggle, same absolute-positioned/
+       unstyled-button pattern, same 16px icon size and stroke weight, so the two read as a
+       matched pair in the card's top-right corner. Unlike the pin toggle it has no on/off
+       state, so it stays at the pin's neutral ("off") color/weight rather than the amber
+       "pinned" treatment, and at full opacity since it's always an available action rather
+       than a state indicator. */
+    /*#__PURE__*/React.createElement("button", {
+      onClick: (e) => {
+        e.stopPropagation();
+        if (onShare) onShare(memo);
+      },
+      title: "메모 공유",
+      style: {
+        position: 'absolute', top: '10px', right: '34px',
+        background: 'none', border: 'none', cursor: 'pointer',
+        color: '#64748B',
+        display: 'flex', alignItems: 'center'
+      },
+      className: "memo-card-share-btn"
+    }, /*#__PURE__*/React.createElement(ShareIcon, { size: 16 })),
     /* Pin action toggle button (stops click propagation so it doesn't open edit modal!) */
     /*#__PURE__*/React.createElement("button", {
       onClick: (e) => {
@@ -19075,9 +19223,9 @@ function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onSelectTag, onComm
       }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), /*#__PURE__*/React.createElement("path", { d: "M15 4.5l-4 4l-4 1.5l-1.5 1.5l7 7l1.5 -1.5l1.5 -4l4 -4" }), /*#__PURE__*/React.createElement("path", { d: "M9 15l-4.5 4.5" }), /*#__PURE__*/React.createElement("path", { d: "M14.5 4l5.5 5.5" }))
     ),
 
-    /* Title if exists */
+    /* Title if exists -- paddingRight now clears both the share and pin icons (44px) */
     memo.title && /*#__PURE__*/React.createElement("div", {
-      style: { fontSize: '1rem', fontWeight: 'bold', color: 'var(--text-main)', marginBottom: '8px', paddingRight: '20px', wordBreak: 'break-all' }
+      style: { fontSize: '1rem', fontWeight: 'bold', color: 'var(--text-main)', marginBottom: '8px', paddingRight: '44px', wordBreak: 'break-all' }
     }, memo.title),
 
     /* Images */
