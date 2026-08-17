@@ -23494,6 +23494,21 @@ const KAKAO_CATEGORY_GROUP_TO_PLACE_CATEGORY = {
   MT1: 'shopping'      // 대형마트
 };
 
+// Caps how long any single search tier (Kakao/Google Places/Nominatim) is allowed to hang before
+// PlaceRegisterModal.handleSearch gives up on it and moves to the next fallback -- googlePlacesSearchProxy
+// in particular is a 1st-gen Cloud Function that's called rarely (only when Kakao comes up empty),
+// so a cold start there can otherwise stall the whole 3-tier chain far longer than any one search
+// step should reasonably take.
+async function fetchWithTimeout(url, timeoutMs) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { signal: controller.signal });
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, onDelete, showToast, onRequestConfirm }) {
   const categories = getPlaceCategories(calendar);
   const [query, setQuery] = React.useState(editingPlace ? (editingPlace.name || '') : '');
@@ -23516,6 +23531,11 @@ function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, onDelete,
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   });
   const [saving, setSaving] = React.useState(false);
+  // Which tier of the fallback chain a manual (non-auto) search is currently waiting on --
+  // null outside of a manual search. Drives the progress indicator below the search field so a
+  // slow tier (e.g. a cold-started googlePlacesSearchProxy) reads as "still working", not frozen.
+  const [searchStage, setSearchStage] = React.useState(null);
+  const SEARCH_TIER_LABELS = { kakao: '카카오에서 검색 중...', google: '해외 장소 데이터베이스 확인 중...', nominatim: '지도 데이터에서 주소 확인 중...' };
 
   // Three-tier fallback chain, cheapest/most-reliable first: Kakao Local (키워드 검색) covers
   // domestic businesses very well and is effectively free at this app's scale, so it's tried
@@ -23539,11 +23559,14 @@ function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, onDelete,
       return;
     }
     setLoading(true);
+    if (!auto) setSearchStage('kakao');
     try {
       let mapped = [];
       try {
         const kakaoUrl = `https://us-central1-${firebaseConfig.projectId}.cloudfunctions.net/kakaoLocalSearchProxy?query=${encodeURIComponent(cleanQuery)}`;
-        const kakaoRes = await fetch(kakaoUrl);
+        // 6s cap -- generous for a warm call, but stops a slow/cold hop from stalling the whole
+        // fallback chain far longer than any one tier should reasonably take (see fetchWithTimeout).
+        const kakaoRes = await fetchWithTimeout(kakaoUrl, 6000);
         const kakaoJson = kakaoRes.ok ? await kakaoRes.json() : null;
         if (kakaoJson?.ok && Array.isArray(kakaoJson.documents)) {
           mapped = kakaoJson.documents.map((doc, idx) => ({
@@ -23562,9 +23585,10 @@ function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, onDelete,
         console.error('Kakao local search failed, falling back to Google Places:', err);
       }
       if (mapped.length === 0 && !auto) {
+        setSearchStage('google');
         try {
           const googleUrl = `https://us-central1-${firebaseConfig.projectId}.cloudfunctions.net/googlePlacesSearchProxy?query=${encodeURIComponent(cleanQuery)}`;
-          const googleRes = await fetch(googleUrl);
+          const googleRes = await fetchWithTimeout(googleUrl, 6000);
           const googleJson = googleRes.ok ? await googleRes.json() : null;
           if (googleJson?.ok && Array.isArray(googleJson.places)) {
             mapped = googleJson.places.map((p, idx) => ({
@@ -23584,7 +23608,8 @@ function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, onDelete,
         // The as-you-type path skips this Nominatim fallback too -- it's meant as a last resort
         // for addresses/landmarks neither Kakao nor Google Places turned up, not for partial
         // business-name fragments typed mid-search.
-        const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(cleanQuery)}&format=json&limit=8&accept-language=ko`);
+        setSearchStage('nominatim');
+        const res = await fetchWithTimeout(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(cleanQuery)}&format=json&limit=8&accept-language=ko`, 6000);
         const data = res.ok ? await res.json() : [];
         mapped = (data || []).map((item, idx) => ({
           id: `nominatim_${item.place_id || idx}`,
@@ -23602,6 +23627,7 @@ function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, onDelete,
       if (!auto) showToast('장소 검색에 실패했습니다.', 'error');
     } finally {
       setLoading(false);
+      setSearchStage(null);
     }
   };
 
@@ -23722,6 +23748,16 @@ function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, onDelete,
           style: { height: '44px', whiteSpace: 'nowrap' },
           disabled: loading
         }, loading ? '검색중' : '검색')
+      ),
+
+      /* Search progress -- only for a manual (non-auto) submit, see searchStage above. Google
+         Places in particular can take several seconds on a cold start, so this exists to make
+         that wait read as "still working" instead of a frozen button label. */
+      searchStage && /*#__PURE__*/React.createElement("div", {
+        style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', borderRadius: '8px', backgroundColor: 'rgba(59, 130, 246, 0.06)' }
+      },
+        /*#__PURE__*/React.createElement("span", { className: "calendar-spinner", style: { flexShrink: 0 } }),
+        /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.8rem', color: 'var(--text-muted)' } }, SEARCH_TIER_LABELS[searchStage] || '검색 중...')
       ),
 
       /* Search results */
