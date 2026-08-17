@@ -2596,43 +2596,64 @@ select.form-select {
 
 /* Gamified Confirm Meeting Button Style */
 .btn-gamified-confirm {
-  background: linear-gradient(135deg, 
-    #EC4899 0%, 
-    #D946EF 20%, 
-    #A21CAF 40%, 
-    #8B5CF6 60%, 
-    #6366F1 80%, 
-    #EC4899 100%
-  ) !important;
-  background-size: 300% 300% !important;
+  position: relative !important;
+  background: transparent !important; /* Made transparent to let the animated pseudo-element background shine through */
   color: #FFFFFF !important;
   font-weight: 800 !important;
-  text-shadow: 0 1.5px 2px rgba(0, 0, 0, 0.4) !important;
+  text-shadow: 0 1.5px 2px rgba(0, 0, 0, 0.5) !important;
   border: 2px solid #FBCFE8 !important;
   border-bottom: 4px solid #4C1D95 !important;
-  box-shadow: 0 4px 15px rgba(236, 72, 153, 0.5), inset 0 2.5px 2px rgba(255, 255, 255, 0.6) !important;
-  animation: gamified-bg-pan 0.8s linear infinite, gamified-shake 0.35s ease-in-out infinite !important;
-  position: relative !important;
+  box-shadow: 0 4px 15px rgba(236, 72, 153, 0.5) !important;
+  animation: gamified-shake 0.35s ease-in-out infinite !important;
   overflow: visible !important; /* To let sparks pop out of bounds */
   transform-origin: center center !important;
+  z-index: 1; /* Pushes content above pseudo-element */
+}
+
+/* Flashy, fast animated gradient background layer using pseudo-element */
+.btn-gamified-confirm::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, 
+    #EC4899 0%,   /* Hot Pink */
+    #D946EF 20%,  /* Fuchsia */
+    #8B5CF6 40%,  /* Deep Purple */
+    #3B82F6 60%,  /* Electric Blue */
+    #00FFFF 80%,  /* Vibrant Cyan */
+    #EC4899 100%  /* Loop back to Hot Pink */
+  ) !important;
+  background-size: 300% 100% !important;
+  border-radius: var(--radius-md) !important;
+  animation: gamified-bg-pan 0.8s linear infinite !important;
+  z-index: -1;
+  pointer-events: none;
 }
 
 .btn-gamified-confirm:hover {
-  filter: brightness(1.15) !important;
   transform: scale(1.03) !important;
+}
+
+.btn-gamified-confirm:hover::before {
+  filter: brightness(1.2) !important;
 }
 
 .btn-gamified-confirm:active {
   transform: translateY(2px) scale(0.98) !important;
   border-bottom-width: 2px !important;
-  box-shadow: 0 2px 6px rgba(236, 72, 153, 0.6) !important;
 }
 
-/* Background panning animation */
+.btn-gamified-confirm:active::before {
+  filter: brightness(0.9) !important;
+}
+
+/* Seamless infinite horizontal color-flowing animation */
 @keyframes gamified-bg-pan {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
+  0% { background-position: 0% 0%; }
+  100% { background-position: -300% 0%; }
 }
 
 /* Constant intense shaking relative to true center coordinates */
