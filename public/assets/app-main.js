@@ -18291,37 +18291,39 @@ function MemoView({ calendar, memos, hasMoreMemos, onLoadMoreMemos, onBack, show
          as before below it. The memo may be older than the paginated `memos` window, hence the
          separate direct-by-id fetch (see sharedMemo in App()) rather than searching the list. */
       sharedMemo && /*#__PURE__*/React.createElement("div", {
-        onClick: () => handleOpenEdit(sharedMemo),
-        role: "button",
-        tabIndex: 0,
-        onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleOpenEdit(sharedMemo); } },
         style: {
           width: '100%', maxWidth: '520px', margin: '0 auto', boxSizing: 'border-box',
-          backgroundColor: sharedMemo.color || 'var(--bg-card)',
-          border: '2px solid #4F46E5', borderRadius: '14px', padding: '16px',
-          cursor: 'pointer', boxShadow: '0 6px 18px rgba(79, 70, 229, 0.14)',
-          display: 'flex', flexDirection: 'column', gap: '4px'
+          border: '2px solid #4F46E5', borderRadius: '16px', padding: '10px',
+          boxShadow: '0 6px 18px rgba(79, 70, 229, 0.14)',
+          display: 'flex', flexDirection: 'column', gap: '8px'
         }
       },
         /*#__PURE__*/React.createElement("div", {
-          style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }
+          style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', padding: '0 4px' }
         },
           /*#__PURE__*/React.createElement("span", {
             style: { fontSize: '0.72rem', fontWeight: 800, color: '#4F46E5', letterSpacing: '0.05em', textTransform: 'uppercase' }
           }, "공유된 메모"),
           /*#__PURE__*/React.createElement("button", {
             type: "button",
-            onClick: (e) => { e.stopPropagation(); if (onDismissSharedMemo) onDismissSharedMemo(); },
+            onClick: () => { if (onDismissSharedMemo) onDismissSharedMemo(); },
             title: "닫기",
             style: { background: 'none', border: 'none', cursor: 'pointer', color: '#64748B', display: 'flex', alignItems: 'center', flexShrink: 0 }
           }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 18 }))
         ),
-        /*#__PURE__*/React.createElement("div", {
-          style: {
-            fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-main)',
-            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
-          }
-        }, sharedMemo.title || sharedMemo.text || '(내용 없음)')
+        /* Reuses MemoCard itself (same images/link-preview/text/pin/comments rendering as the
+           normal grid below) instead of a bespoke one-line teaser -- "크게" (prominently) here
+           means full-width and its own row, not a stripped-down summary. */
+        /*#__PURE__*/React.createElement(MemoCard, {
+          memo: sharedMemo,
+          calendar: calendar,
+          onOpenEdit: handleOpenEdit,
+          onTogglePin: () => handleTogglePin(sharedMemo),
+          onShare: () => setSharingMemo(sharedMemo),
+          onSelectTag: (tag) => { setSelectedTag(tag); setIsSearchOpen(true); },
+          onCommentsChange: (nextComments) => handleMemoCommentsChange(sharedMemo, nextComments),
+          getBorderColor: getBorderColor
+        })
       ),
 
       /* Rich Memo Input Composer (Google Keep style) */
@@ -19179,11 +19181,10 @@ function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onSelectTa
     className: "memo-card-hover"
   },
     /* Share button -- sits immediately left of the pin toggle, same absolute-positioned/
-       unstyled-button pattern, same 16px icon size and stroke weight, so the two read as a
-       matched pair in the card's top-right corner. Unlike the pin toggle it has no on/off
-       state, so it stays at the pin's neutral ("off") color/weight rather than the amber
-       "pinned" treatment, and at full opacity since it's always an available action rather
-       than a state indicator. */
+       unstyled-button pattern, same 16px icon size, stroke weight and color as the pin's
+       neutral ("off") state -- including its 0.2 opacity, which is what actually reads as
+       "weight" at a glance (the stroke-width/color values were already identical; the visual
+       mismatch was the pin's off-state being much fainter than a full-opacity share icon). */
     /*#__PURE__*/React.createElement("button", {
       onClick: (e) => {
         e.stopPropagation();
@@ -19193,7 +19194,7 @@ function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onSelectTa
       style: {
         position: 'absolute', top: '10px', right: '34px',
         background: 'none', border: 'none', cursor: 'pointer',
-        color: '#64748B',
+        color: '#64748B', opacity: 0.2,
         display: 'flex', alignItems: 'center'
       },
       className: "memo-card-share-btn"
