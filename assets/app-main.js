@@ -6239,6 +6239,11 @@ function App() {
     return params.get('view') || 'calendar';
   };
   const [activeView, setActiveView] = React.useState(getActiveViewFromURL);
+  // The chat embed the user tapped just before navigating away from chat, kept alive as a
+  // floating mini player instead of being unmounted along with the rest of ChatRoomView --
+  // { key, embedUrl, provider, orientation, title } | null. See changeView below for the
+  // promotion trigger and StickyVideoBox for the persistent portal that actually renders it.
+  const [stickyVideo, setStickyVideo] = React.useState(null);
 
   React.useEffect(() => {
     const handleUrlChange = () => {
@@ -6309,6 +6314,14 @@ function App() {
   }, []);
 
   const changeView = (view) => {
+    // Leaving chat with a video the user had tapped -> keep it alive as a floating mini player
+    // instead of letting it get torn down along with the rest of ChatRoomView. Only fires on the
+    // chat -> elsewhere transition, never the reverse: returning to chat is exactly what the
+    // mini player's own "채팅으로 이동" button already does (see StickyVideoBox), and that path
+    // intentionally releases sticky mode so the video goes back to playing inline in its message.
+    if (activeView === 'chat' && view !== 'chat' && lastFocusedChatVideo) {
+      setStickyVideo(lastFocusedChatVideo);
+    }
     setActiveView(view);
     if (view !== 'chat') {
       setIsMainHeaderVisible(true);
@@ -7874,8 +7887,21 @@ function App() {
       }
     );
   };
+  // App() early-returns a completely different tree per activeView (see the 5 branches below),
+  // so the sticky mini player can't just live inline in one of them -- it has to be included as
+  // a stable sibling in every branch's return, wrapped in the SAME portal element shape each
+  // time, or React would unmount/remount (and restart) it on every tab switch. See StickyVideoBox
+  // for the actual floating player and changeView above for how a video gets promoted into it.
+  const withStickyVideo = (content) => /*#__PURE__*/React.createElement(React.Fragment, null,
+    content,
+    /*#__PURE__*/React.createElement(StickyVideoBox, {
+      stickyVideo: stickyVideo,
+      onClose: () => setStickyVideo(null),
+      onGoToChat: () => { changeView('chat'); setStickyVideo(null); }
+    })
+  );
   if (activeView === 'chat') {
-    return /*#__PURE__*/React.createElement("div", { className: "chat-view-container" }, /*#__PURE__*/React.createElement(ChatRoomView, {
+    return withStickyVideo(/*#__PURE__*/React.createElement("div", { className: "chat-view-container" }, /*#__PURE__*/React.createElement(ChatRoomView, {
       calendar: activeCal,
       chatMessages: chatMessages,
       chatInput: chatInput,
@@ -7911,7 +7937,9 @@ function App() {
       onDecreaseFont: () => setFontScalePercent(prev => Math.max(80, prev - 10)),
       onIncreaseFont: () => setFontScalePercent(prev => Math.min(130, prev + 10)),
       isChatNotifyEnabled: mainNotifPermission === 'granted' && mainChatNotifyEnabled,
-      onToggleChatNotifications: handleMainToggleNotifications
+      onToggleChatNotifications: handleMainToggleNotifications,
+      stickyVideoKey: stickyVideo ? stickyVideo.key : null,
+      onReleaseSticky: () => setStickyVideo(null)
     }), isChatSheetOpen && /*#__PURE__*/React.createElement(ChatParticipantSheet, {
       calendar: activeCal,
       selectedId: chatParticipantId,
@@ -7972,11 +8000,11 @@ function App() {
       onClose: () => setIsNotificationHelpOpen(false),
       onRetry: handleMainToggleNotifications,
       showToast: showToast
-    }), operationProgress && !chatUploadProgress && /*#__PURE__*/React.createElement(OperationProgressOverlay, operationProgress), chatUploadProgress && /*#__PURE__*/React.createElement(ImageUploadOverlay, chatUploadProgress));
+    }), operationProgress && !chatUploadProgress && /*#__PURE__*/React.createElement(OperationProgressOverlay, operationProgress), chatUploadProgress && /*#__PURE__*/React.createElement(ImageUploadOverlay, chatUploadProgress)));
   }
 
   if (activeView === 'settlement') {
-    return /*#__PURE__*/React.createElement(SettlementSummaryModal, {
+    return withStickyVideo(/*#__PURE__*/React.createElement(SettlementSummaryModal, {
       calendar: activeCal,
       onBack: () => changeView('calendar'),
       onSelectDate: d => {
@@ -7984,11 +8012,11 @@ function App() {
         setIsModalOpen(true);
         changeView('calendar');
       }
-    });
+    }));
   }
 
   if (activeView === 'memo') {
-    return /*#__PURE__*/React.createElement(MemoView, {
+    return withStickyVideo(/*#__PURE__*/React.createElement(MemoView, {
       calendar: activeCal,
       memos: memos,
       hasMoreMemos: hasMoreMemos,
@@ -8004,18 +8032,18 @@ function App() {
         url.searchParams.delete('memo');
         window.history.replaceState({}, '', url);
       }
-    });
+    }));
   }
 
   if (activeView === 'places') {
-    return /*#__PURE__*/React.createElement(PlacesView, {
+    return withStickyVideo(/*#__PURE__*/React.createElement(PlacesView, {
       calendar: activeCal,
       onBack: () => changeView('calendar'),
       onSavePlace: handleSavePlace,
       onDeletePlace: handleDeletePlace,
       showToast: showToast,
       onRequestConfirm: showConfirmDialog
-    });
+    }));
   }
 
   const mainMenuPollCount = getCalendarPolls(activeCal).filter(poll => !isPollClosed(poll)).length;
@@ -8033,7 +8061,7 @@ function App() {
     .filter(m => m.date >= todayDateStrForBanner)
     .sort((a, b) => a.date.localeCompare(b.date));
 
-  return /*#__PURE__*/React.createElement("div", {
+  return withStickyVideo(/*#__PURE__*/React.createElement("div", {
     className: "app-container",
     style: { paddingTop: `${mainHeaderHeight}px` }
   }, /*#__PURE__*/React.createElement("header", {
@@ -8473,7 +8501,7 @@ function App() {
       textAlign: 'center',
       boxSizing: 'border-box'
     }
-  }, /*#__PURE__*/React.createElement("span", null, toast.message)), operationProgress && !chatUploadProgress && /*#__PURE__*/React.createElement(OperationProgressOverlay, operationProgress), chatUploadProgress && /*#__PURE__*/React.createElement(ImageUploadOverlay, chatUploadProgress));
+  }, /*#__PURE__*/React.createElement("span", null, toast.message)), operationProgress && !chatUploadProgress && /*#__PURE__*/React.createElement(OperationProgressOverlay, operationProgress), chatUploadProgress && /*#__PURE__*/React.createElement(ImageUploadOverlay, chatUploadProgress)));
 }
 
 // ---- Korean public holidays, substitute holidays, and 24 solar terms ----
@@ -9189,6 +9217,13 @@ const PEEKALINK_PROXY_URL = `https://us-central1-${firebaseConfig.projectId}.clo
 const GATHER_APP_CHAT_DATA = window.GATHER_APP_CHAT_DATA || {};
 const linkPreviewCache = new Map();
 const linkPreviewInflight = new Map();
+// Single mutable slot (not React state -- nothing needs to re-render when this changes) recording
+// the last embedded chat video the user actually tapped/interacted with. Read once, at the moment
+// the user navigates away from the chat tab (see changeView's sticky-video promotion), to decide
+// which video -- if any -- should keep playing as the floating mini player. A module-level
+// singleton is safe here the same way linkPreviewCache above is: this app only ever mounts one
+// <App/> instance.
+let lastFocusedChatVideo = null;
 // Peekalink's free plan is a 50-request-per-hour rate limit, not a fixed lifetime quota --
 // it resets every clock hour rather than depleting over time. See PEEKALINK_HOUR_BUCKET_MS below.
 const PEEKALINK_FREE_HOURLY_LIMIT = Number.isFinite(GATHER_APP_CHAT_DATA.PEEKALINK_FREE_HOURLY_LIMIT) ? GATHER_APP_CHAT_DATA.PEEKALINK_FREE_HOURLY_LIMIT : 50;
@@ -9515,13 +9550,110 @@ function TikTokEmbedWidget({ url, videoId, onFailed }) {
   }, /*#__PURE__*/React.createElement('section', null)));
 }
 
-function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox, linkPreview, style = {}, message = null }) {
+// Floating video player kept alive via a document.body portal so it survives App()'s
+// activeView-based tab switches without unmounting (see the withStickyVideo wrapper around
+// every one of App()'s 5 return branches). zIndex 40000 sits above regular modals (up to
+// ~30000) so it stays visible while browsing other tabs, but below toast (99999) and confirm
+// dialogs (100000) so those never get obscured by it.
+function StickyVideoBox({ stickyVideo, onClose, onGoToChat }) {
+  if (!stickyVideo || typeof document === 'undefined' || !ReactDOM.createPortal) return null;
+  const isPortrait = stickyVideo.orientation === 'portrait';
+  const width = isPortrait ? 172 : 260;
+  const height = isPortrait ? Math.round(width * 16 / 9) : Math.round(width * 9 / 16);
+  return ReactDOM.createPortal(/*#__PURE__*/React.createElement('div', {
+    style: {
+      position: 'fixed',
+      right: '14px',
+      bottom: 'calc(14px + env(safe-area-inset-bottom, 0px))',
+      width: `${width}px`,
+      zIndex: 40000,
+      borderRadius: '12px',
+      overflow: 'hidden',
+      boxShadow: '0 12px 32px rgba(0,0,0,0.4)',
+      backgroundColor: '#000'
+    }
+  }, /*#__PURE__*/React.createElement('iframe', {
+    key: stickyVideo.key,
+    src: stickyVideo.embedUrl,
+    title: stickyVideo.title || '미니플레이어',
+    allow: 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share',
+    allowFullScreen: true,
+    style: { display: 'block', width: '100%', height: `${height}px`, border: '0' }
+  }), /*#__PURE__*/React.createElement('div', {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '6px',
+      padding: '6px',
+      backgroundColor: 'rgba(15,23,42,0.94)'
+    }
+  }, /*#__PURE__*/React.createElement('button', {
+    type: 'button',
+    onClick: onGoToChat,
+    style: {
+      flex: 1,
+      padding: '6px 8px',
+      fontSize: '0.72rem',
+      fontWeight: '700',
+      color: '#FFFFFF',
+      backgroundColor: 'rgba(255,255,255,0.14)',
+      border: 'none',
+      borderRadius: '8px',
+      cursor: 'pointer'
+    }
+  }, '채팅으로 이동'), /*#__PURE__*/React.createElement('button', {
+    type: 'button',
+    onClick: onClose,
+    'aria-label': '미니플레이어 닫기',
+    style: {
+      width: '26px',
+      height: '26px',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      fontSize: '0.85rem',
+      color: '#FFFFFF',
+      backgroundColor: 'rgba(255,255,255,0.14)',
+      border: 'none',
+      borderRadius: '8px',
+      cursor: 'pointer'
+    }
+  }, '✕'))), document.body);
+}
+
+function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox, linkPreview, style = {}, message = null, stickyVideoKey = null, onReleaseSticky = null }) {
   const firstUrl = extractFirstUrl(text);
   const mediaInfo = getDirectChatMediaInfo(firstUrl);
   const [failed, setFailed] = React.useState(false);
   React.useEffect(() => {
     setFailed(false);
   }, [firstUrl]);
+
+  // Tracks which embed the user actually played, so navigating away from chat knows which
+  // video (if any) to keep alive as the floating mini player -- see changeView's sticky-video
+  // promotion. Clicks inside a cross-origin iframe never bubble out to this parent div, so a
+  // plain onClick handler can't see them; a window 'blur' event fires when focus moves INTO the
+  // iframe (e.g. the user hit play), and document.activeElement then correctly identifies which
+  // of possibly many embeds in the chat history received it.
+  const embedIframeRef = React.useRef(null);
+  const isEmbedVideo = mediaInfo && mediaInfo.type === 'embed';
+  React.useEffect(() => {
+    if (!isEmbedVideo) return;
+    const handleWindowBlur = () => {
+      if (document.activeElement === embedIframeRef.current) {
+        lastFocusedChatVideo = {
+          key: message ? message.id : null,
+          embedUrl: mediaInfo.url,
+          provider: mediaInfo.provider,
+          orientation: mediaInfo.orientation,
+          title: mediaInfo.provider === 'youtube' ? 'YouTube 영상' : mediaInfo.provider === 'vimeo' ? 'Vimeo 영상' : '링크 영상'
+        };
+      }
+    };
+    window.addEventListener('blur', handleWindowBlur);
+    return () => window.removeEventListener('blur', handleWindowBlur);
+  }, [isEmbedVideo, mediaInfo && mediaInfo.url, message && message.id]);
+  const isThisSticky = isEmbedVideo && stickyVideoKey && message && message.id === stickyVideoKey;
 
   if (!mediaInfo || failed) {
     return /*#__PURE__*/React.createElement(React.Fragment, null,
@@ -9611,19 +9743,56 @@ function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox, linkPr
         const maxW = isMini ? '100%' : (isPortraitEmbed ? '500px' : '1400px');
         // LinkPreviewCard lives INSIDE this width-constrained div, not as a sibling, so it
         // matches the video's rendered width even after a drag-resize via .chat-media-resizable.
+        const embedBoxStyle = {
+          width: isMini ? `min(100%, ${embedWidth})` : `min(88vw, ${embedWidth})`,
+          // maxWidth also clamps to 100% of the bubble now that bubble-wrapper's min-width:0
+          // lets it actually shrink -- the vw estimate above is only ever a *starting* size;
+          // this is what stops it from overflowing once the real available space is smaller.
+          maxWidth: `min(100%, ${maxW})`,
+          minWidth: minW,
+          margin: '0 auto',
+          marginBottom
+        };
+        // Playing in the mini player already -- show a placeholder instead of a second live
+        // iframe (two iframes racing the same YouTube video is worse than one; the actual
+        // playback lives in the floating StickyVideoBox portal, kept mounted independently).
+        if (isThisSticky) {
+          return /*#__PURE__*/React.createElement('div', {
+            style: {
+              ...embedBoxStyle,
+              aspectRatio: isPortraitEmbed ? '9 / 16' : '16 / 9',
+              maxHeight: isPortraitEmbed ? 'min(72vh, 620px)' : 'min(54vh, 430px)',
+              borderRadius: '10px',
+              backgroundColor: 'var(--bg-secondary, #1E293B)',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              padding: '16px',
+              textAlign: 'center'
+            }
+          }, /*#__PURE__*/React.createElement('div', { style: { fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-secondary, #CBD5E1)' } }, '🎬 미니플레이어에서 재생 중'),
+            /*#__PURE__*/React.createElement('button', {
+              type: 'button',
+              onClick: () => onReleaseSticky && onReleaseSticky(),
+              style: {
+                padding: '6px 12px',
+                fontSize: '0.78rem',
+                fontWeight: '700',
+                color: '#FFFFFF',
+                backgroundColor: '#57606F',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer'
+              }
+            }, '여기서 다시 보기'));
+        }
         return /*#__PURE__*/React.createElement('div', {
           className: isMini ? '' : 'chat-media-resizable',
-          style: {
-            width: isMini ? `min(100%, ${embedWidth})` : `min(88vw, ${embedWidth})`,
-            // maxWidth also clamps to 100% of the bubble now that bubble-wrapper's min-width:0
-            // lets it actually shrink -- the vw estimate above is only ever a *starting* size;
-            // this is what stops it from overflowing once the real available space is smaller.
-            maxWidth: `min(100%, ${maxW})`,
-            minWidth: minW,
-            margin: '0 auto',
-            marginBottom
-          }
+          style: embedBoxStyle
         }, /*#__PURE__*/React.createElement('iframe', {
+          ref: embedIframeRef,
           src: mediaInfo.url,
           title: embedTitleMap[mediaInfo.provider] || '링크 영상',
           loading: 'lazy',
@@ -9649,7 +9818,7 @@ function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox, linkPr
   );
 }
 
-function renderChatMessageBody(msg, setActiveLightbox, singleImageStyle = {}, searchQuery = '') {
+function renderChatMessageBody(msg, setActiveLightbox, singleImageStyle = {}, searchQuery = '', stickyVideoKey = null, onReleaseSticky = null) {
   const msgImages = renderChatMessageImages(msg, setActiveLightbox, singleImageStyle);
   return /*#__PURE__*/React.createElement(React.Fragment, null,
     msgImages ? /*#__PURE__*/React.createElement('div', { style: { marginBottom: msg.text ? '8px' : '0' } }, msgImages) : null,
@@ -9659,7 +9828,9 @@ function renderChatMessageBody(msg, setActiveLightbox, singleImageStyle = {}, se
       setActiveLightbox: msgImages ? null : setActiveLightbox,
       linkPreview: msg.linkPreview,
       style: singleImageStyle,
-      message: msg
+      message: msg,
+      stickyVideoKey,
+      onReleaseSticky
     }) : null
   );
 }
@@ -11962,7 +12133,9 @@ function ChatRoomView({
   onDecreaseFont,
   onIncreaseFont,
   isChatNotifyEnabled,
-  onToggleChatNotifications
+  onToggleChatNotifications,
+  stickyVideoKey,
+  onReleaseSticky
 }) {
   const [viewportBottom, setViewportBottom] = React.useState(0);
   const [isInputFocused, setIsInputFocused] = React.useState(false);
@@ -12454,7 +12627,7 @@ function ChatRoomView({
         // identically across Chrome/Whale/Safari/Firefox, unlike relying purely on width math.
         overflow: 'hidden'
       }
-    }, renderChatMessageBody(msg, setActiveLightbox, chatMediaStyle, searchQuery)), /*#__PURE__*/React.createElement("div", {
+    }, renderChatMessageBody(msg, setActiveLightbox, chatMediaStyle, searchQuery, stickyVideoKey, onReleaseSticky)), /*#__PURE__*/React.createElement("div", {
       style: {
         position: 'absolute',
         right: '-7px',
@@ -12512,7 +12685,7 @@ function ChatRoomView({
         // identically across Chrome/Whale/Safari/Firefox, unlike relying purely on width math.
         overflow: 'hidden'
       }
-    }, renderChatMessageBody(msg, setActiveLightbox, chatMediaStyle, searchQuery)), /*#__PURE__*/React.createElement("div", {
+    }, renderChatMessageBody(msg, setActiveLightbox, chatMediaStyle, searchQuery, stickyVideoKey, onReleaseSticky)), /*#__PURE__*/React.createElement("div", {
       style: {
         position: 'absolute',
         left: '-7px',
