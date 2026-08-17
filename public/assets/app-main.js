@@ -14677,18 +14677,35 @@ function DateModal({
     }
   }, /*#__PURE__*/React.createElement("button", {
     type: "button",
-    className: "btn btn-secondary",
+    className: `btn btn-secondary ${!isConfirmed && isAllAvailable ? 'btn-gamified-confirm' : ''}`,
     disabled: isSubmitting,
     onClick: handleConfirmMeeting,
     style: {
-      color: isConfirmed ? 'var(--text-muted)' : '#4F46E5',
-      border: isConfirmed ? 'none' : '1px solid rgba(79, 70, 229, 0.35)',
-      backgroundColor: isConfirmed ? 'transparent' : 'rgba(79, 70, 229, 0.12)',
+      color: isConfirmed ? 'var(--text-muted)' : isAllAvailable ? '#FFFFFF' : '#4F46E5',
+      border: isConfirmed ? 'none' : isAllAvailable ? 'none' : '1px solid rgba(79, 70, 229, 0.35)',
+      backgroundColor: isConfirmed ? 'transparent' : isAllAvailable ? 'transparent' : 'rgba(79, 70, 229, 0.12)',
       whiteSpace: 'nowrap',
       opacity: isSubmitting ? 0.75 : 1,
-      cursor: isSubmitting ? 'wait' : 'pointer'
+      cursor: isSubmitting ? 'wait' : 'pointer',
+      position: 'relative'
     }
-  }, isConfirmed ? "확정취소" : "모임확정"), /*#__PURE__*/React.createElement("div", {
+  }, !isConfirmed && isAllAvailable && /*#__PURE__*/React.createElement("span", {
+    className: "gamified-shiny-glow"
+  }), !isConfirmed && isAllAvailable && /*#__PURE__*/React.createElement("span", {
+    className: "gamified-sparks-container"
+  }, [1, 2, 3, 4, 5, 6].map(i => /*#__PURE__*/React.createElement("span", {
+    key: i,
+    className: `gamified-spark gamified-spark-${i}`
+  }, /*#__PURE__*/React.createElement("svg", {
+    viewBox: "0 0 10 16",
+    style: {
+      width: '100%',
+      height: '100%',
+      fill: 'currentColor'
+    }
+  }, /*#__PURE__*/React.createElement("path", {
+    d: "M6 0L0 8H4L2 16L10 6H5.5L6 0Z"
+  }))))), isConfirmed ? "확정취소" : "모임확정"), /*#__PURE__*/React.createElement("div", {
     style: { display: 'flex', gap: '8px' }
   }, /*#__PURE__*/React.createElement("button", {
     type: "button",

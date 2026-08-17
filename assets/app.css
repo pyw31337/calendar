@@ -2593,3 +2593,136 @@ select.form-select {
     display: block;
   }
 }
+
+/* Gamified Confirm Meeting Button Style */
+.btn-gamified-confirm {
+  background: linear-gradient(135deg, #FBBF24 0%, #F59E0B 50%, #D97706 100%) !important;
+  background-size: 200% 200% !important;
+  color: #FFFFFF !important;
+  font-weight: 800 !important;
+  text-shadow: 0 1.5px 2px rgba(0, 0, 0, 0.4) !important;
+  border: 2px solid #FFE066 !important;
+  border-bottom: 4px solid #B45309 !important;
+  box-shadow: 0 4px 15px rgba(245, 158, 11, 0.5), inset 0 2.5px 2px rgba(255, 255, 255, 0.6) !important;
+  animation: gamified-bg-pan 3s ease infinite, gamified-shake 1.5s ease-in-out infinite !important;
+  position: relative !important;
+  overflow: visible !important; /* To let sparks pop out of bounds */
+  transform-origin: center !important;
+}
+
+.btn-gamified-confirm:hover {
+  filter: brightness(1.15) !important;
+  transform: scale(1.03) !important;
+}
+
+.btn-gamified-confirm:active {
+  transform: translateY(2px) scale(0.98) !important;
+  border-bottom-width: 2px !important;
+  box-shadow: 0 2px 6px rgba(245, 158, 11, 0.6) !important;
+}
+
+/* Background panning animation */
+@keyframes gamified-bg-pan {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* Constant subtle shake */
+@keyframes gamified-shake {
+  0%, 100% { transform: rotate(0deg) scale(1); }
+  3%, 9%, 15%, 21%, 27% { transform: rotate(-1deg) translateY(-0.5px); }
+  6%, 12%, 18%, 24%, 30% { transform: rotate(1deg) translateY(0.5px); }
+  33%, 97% { transform: rotate(0deg) translateY(0); }
+}
+
+/* Shiny gloss effect (sliding white glare) */
+.gamified-shiny-glow {
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.65) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  transform: skewX(-25deg);
+  animation: gamified-sheen 3s infinite ease-in-out;
+  pointer-events: none;
+  z-index: 1;
+}
+
+@keyframes gamified-sheen {
+  0% { left: -100%; }
+  40% { left: 180%; }
+  100% { left: 180%; }
+}
+
+/* Sparks container and elements */
+.gamified-sparks-container {
+  position: absolute;
+  top: -6px;
+  left: -6px;
+  right: -6px;
+  bottom: -6px;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 2;
+}
+
+.gamified-spark {
+  position: absolute;
+  width: 11px;
+  height: 15px;
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(0);
+}
+
+/* Sparks positions and individual animations */
+.gamified-spark-1 { top: -6px; left: 15%; animation: spark-pop-1 2.2s infinite; color: #FFE066; filter: drop-shadow(0 0 3px #FBBF24) drop-shadow(0 0 6px #F59E0B); }
+.gamified-spark-2 { top: 30%; right: -6px; animation: spark-pop-2 2.6s infinite 0.4s; color: #22D3EE; filter: drop-shadow(0 0 3px #06B6D4) drop-shadow(0 0 6px #0891B2); }
+.gamified-spark-3 { bottom: -6px; left: 40%; animation: spark-pop-3 2s infinite 0.8s; color: #FFE066; filter: drop-shadow(0 0 3px #FBBF24) drop-shadow(0 0 6px #F59E0B); }
+.gamified-spark-4 { bottom: 25%; left: -6px; animation: spark-pop-4 2.4s infinite 0.2s; color: #22D3EE; filter: drop-shadow(0 0 3px #06B6D4) drop-shadow(0 0 6px #0891B2); }
+.gamified-spark-5 { top: -8px; right: 25%; animation: spark-pop-5 2.1s infinite 0.6s; color: #FFE066; filter: drop-shadow(0 0 3px #FBBF24) drop-shadow(0 0 6px #F59E0B); }
+.gamified-spark-6 { bottom: -4px; right: 15%; animation: spark-pop-6 2.8s infinite 1.1s; color: #22D3EE; filter: drop-shadow(0 0 3px #06B6D4) drop-shadow(0 0 6px #0891B2); }
+
+@keyframes spark-pop-1 {
+  0%, 75%, 100% { opacity: 0; transform: scale(0) translateY(0) rotate(0deg); }
+  80% { opacity: 1; transform: scale(1.3) translateY(-4px) rotate(15deg); }
+  85% { opacity: 1; transform: scale(1.1) translateY(-8px) rotate(-10deg); }
+  90% { opacity: 0; transform: scale(0.5) translateY(-12px); }
+}
+@keyframes spark-pop-2 {
+  0%, 75%, 100% { opacity: 0; transform: scale(0) translateX(0) rotate(0deg); }
+  80% { opacity: 1; transform: scale(1.4) translateX(4px) rotate(-20deg); }
+  85% { opacity: 1; transform: scale(1.1) translateX(8px) rotate(15deg); }
+  90% { opacity: 0; transform: scale(0.5) translateX(12px); }
+}
+@keyframes spark-pop-3 {
+  0%, 75%, 100% { opacity: 0; transform: scale(0) translateY(0) rotate(0deg); }
+  80% { opacity: 1; transform: scale(1.3) translateY(4px) rotate(5deg); }
+  85% { opacity: 1; transform: scale(1.1) translateY(8px) rotate(-15deg); }
+  90% { opacity: 0; transform: scale(0.5) translateY(12px); }
+}
+@keyframes spark-pop-4 {
+  0%, 75%, 100% { opacity: 0; transform: scale(0) translateX(0) rotate(0deg); }
+  80% { opacity: 1; transform: scale(1.4) translateX(-4px) rotate(25deg); }
+  85% { opacity: 1; transform: scale(1.1) translateX(-8px) rotate(-15deg); }
+  90% { opacity: 0; transform: scale(0.5) translateX(-12px); }
+}
+@keyframes spark-pop-5 {
+  0%, 75%, 100% { opacity: 0; transform: scale(0) translateY(0) rotate(0deg); }
+  80% { opacity: 1; transform: scale(1.3) translateY(-3px) rotate(-15deg); }
+  85% { opacity: 1; transform: scale(1.1) translateY(-6px) rotate(10deg); }
+  90% { opacity: 0; transform: scale(0.5) translateY(-9px); }
+}
+@keyframes spark-pop-6 {
+  0%, 75%, 100% { opacity: 0; transform: scale(0) translateY(0) rotate(0deg); }
+  80% { opacity: 1; transform: scale(1.3) translateY(3px) rotate(20deg); }
+  85% { opacity: 1; transform: scale(1.1) translateY(6px) rotate(-5deg); }
+  90% { opacity: 0; transform: scale(0.5) translateY(9px); }
+}
