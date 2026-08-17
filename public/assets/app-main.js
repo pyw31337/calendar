@@ -15046,7 +15046,10 @@ function DateModal({
     d: "M8 38 L16 34 L20 40",
     strokeWidth: 1.5,
     opacity: 0.8
-  }))))), isConfirmed ? "확정취소" : "모임확정"), /*#__PURE__*/React.createElement("div", {
+  })))), [1, 2, 3, 4, 5, 6].map(i => /*#__PURE__*/React.createElement("span", {
+    key: `part-${i}`,
+    className: `gamified-particle gamified-particle-${i}`
+  }))), isConfirmed ? "확정취소" : "모임확정"), /*#__PURE__*/React.createElement("div", {
     style: { display: 'flex', gap: '8px' }
   }, /*#__PURE__*/React.createElement("button", {
     type: "button",
