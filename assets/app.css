@@ -452,10 +452,21 @@ body:has(.admin-login-gate) {
   filter: saturate(1.08);
 }
 @media (max-width: 720px) {
+  /* Column COUNT is safe to override (a plain number in a custom property has no effect on
+     intrinsic sizing), but track size and grid width must NOT be swapped to `1fr`/percentage
+     values here -- Chromium cannot correctly compute the shrink-to-fit (max-content) size of the
+     ancestor chat bubble through a `minmax(0, 1fr)` track or a `%`-based grid width, since neither
+     has a definite size outside of actual layout. The bubble's flex-item auto-sizing falls back to
+     the images' raw natural pixel dimensions when measuring "how wide do I want to be", which is
+     enormous -- so the bubble balloons out to its max-width (65% of the row) while the grid itself
+     still renders at its correctly-computed (much smaller) size, leaving a large empty gap to the
+     right of the thumbnails. Confirmed via isolated reproduction: literal, non-relative track/width
+     values (matching the desktop default) shrink-wrap correctly with zero gap; `1fr` tracks do not,
+     regardless of any additional width/fit-content styling on the ancestors. See the thumbnail
+     grid's own JS-computed max-width (via calc(), no `%`/`fr`) for why that one stays safe.
+  */
   .chat-message-image-grid {
     --chat-image-grid-cols: var(--chat-image-grid-mobile-cols) !important;
-    --chat-image-grid-max-width: min(100%, 240px) !important;
-    --chat-image-thumb-track: minmax(0, 1fr) !important;
   }
 }
 @media (min-width: 721px) {
