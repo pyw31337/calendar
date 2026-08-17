@@ -205,19 +205,30 @@ function getKnownPlaceParticipantNames(calendar) {
   });
   return Array.from(new Set([...fromParticipants, ...KNOWN_PLACE_PARTICIPANT_NAME_TAGS].filter(Boolean)));
 }
+// A bare "OO네" token (e.g. "도은네", "채연네", "리아아빠네") reads as "so-and-so's household" in
+// every real memo that uses this shape -- checked against all 75 production place memos, every
+// token ending in 네 across the whole set is a household reference with zero false positives, so
+// this doesn't need the explicit KNOWN_PLACE_PARTICIPANT_NAME_TAGS whitelist the way an exact name
+// match does. Capped at a 5-syllable root so it still can't accidentally swallow an unrelated
+// sentence that happens to end in the same syllable.
+function isHouseholdNameToken(token) {
+  return /^[가-힣]{1,5}네$/.test(token);
+}
 // Tokenizes the whole memo (not just parsed visit-entry notes, since a name can sit in its own
 // "/"-separated chunk with no date at all -- see 꽃잎반 above) and keeps only tokens that exactly
-// match a known name, so an unrelated word that happens to contain a name as a substring (or a
-// name fused into a parenthetical aside like "(현석불참)") is never mistaken for a tag.
+// match a known name (or look like a "OO네" household reference), so an unrelated word that
+// happens to contain a name as a substring (or a name fused into a parenthetical aside like
+// "(현석불참)") is never mistaken for a tag.
 function extractKnownParticipantNames(memo, knownNames) {
   const text = String(memo || '');
-  if (!text || !knownNames.length) return [];
-  const knownSet = new Set(knownNames);
+  if (!text) return [];
+  const knownSet = new Set(knownNames || []);
   const seen = new Set();
   const result = [];
   text.split(/[\s/,()·-]+/).forEach(token => {
     const trimmed = token.trim();
-    if (trimmed && knownSet.has(trimmed) && !seen.has(trimmed)) {
+    if (!trimmed || seen.has(trimmed)) return;
+    if (knownSet.has(trimmed) || isHouseholdNameToken(trimmed)) {
       seen.add(trimmed);
       result.push(trimmed);
     }
@@ -257,16 +268,38 @@ function formatPlaceBadgeDate(dateStr) {
   return normalized ? formatShortDateWithDayName(normalized) : null;
 }
 
-// Naver Map's "p" deep link -- centers the map on the given coordinates with a labeled marker,
-// and (unlike a plain text search) can't land on the wrong branch of a chain business. Works as
-// a plain https: link on both desktop (opens map.naver.com) and mobile (opens the Naver Map app
-// via universal link if installed, the mobile web map otherwise), so no separate app-scheme
-// fallback is needed. Business-name/address search itself stays on Kakao Local (see
+// Naver Map's keyword-search deep link (map.naver.com/p/search/{query}) -- the same experience
+// as typing into the Naver Map search box, which drops straight into the real place entry page
+// (photos/reviews/clips) when there's a strong match. This deliberately replaces an earlier
+// "p?title=&lat=&lng=" coordinate-pin version: that format turned out to just quietly ignore the
+// given lat/lng and fall back to a title-only search anyway (confirmed against production data,
+// which also surfaced a separate stored-coordinate/address mismatch on at least one place -- the
+// coordinate itself needs a look, tracked separately from this URL-format fix), so it bought no
+// real accuracy over a plain search while showing only a small map-preview popup instead of the
+// actual entry page the search flow reaches. Anchoring the query with the address's 구/군/시
+// (getNaverMapSearchRegionHint) trades a little of the "can't land on the wrong chain branch"
+// protection a bare coordinate would have given for actually reaching the right page most of the
+// time. Business-name search itself still stays on Kakao Local (see
 // PlaceRegisterModal.handleSearch) -- only where the user is sent to view the map on the place
-// card switches to Naver.
+// card uses Naver.
+// Only the 구/군/시 (기초자치단체) token right after the 시/도 prefix -- e.g. "구로구" out of
+// "대한민국 서울특별시 구로구 고척동 316-9". Deliberately doesn't also try to grab the following
+// 동/읍/면 -- "시" ambiguously suffixes both a 시/도 ("서울특별시") and a 기초자치단체 ("파주시"),
+// and there's no reliable way to tell those apart with a suffix-only pattern, so a single regex
+// spanning both levels mismatched on real production data (returned "서울특별시" alone, swallowing
+// "구로구" entirely). Stripping the 시/도 prefix as its own explicit step first removes that
+// ambiguity, at the cost of not reaching down to the 동/읍/면 level.
+function getNaverMapSearchRegionHint(address) {
+  const stripped = String(address || '')
+    .replace(/^대한민국\s*/, '')
+    .replace(/^(서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주)(?:특별시|광역시|특별자치시|특별자치도|도)?\s*/, '');
+  const firstToken = stripped.trim().split(/\s+/)[0] || '';
+  return /^[가-힣]+(?:시|군|구)$/.test(firstToken) ? firstToken : '';
+}
 function getNaverMapPlaceUrl(place) {
-  const label = encodeURIComponent(place?.name || '장소');
-  return `https://map.naver.com/p?title=${label}&lat=${place.lat}&lng=${place.lng}`;
+  const regionHint = getNaverMapSearchRegionHint(place?.address);
+  const query = [place?.name, regionHint].filter(Boolean).join(' ') || place?.name || '장소';
+  return `https://map.naver.com/p/search/${encodeURIComponent(query)}`;
 }
 
 // Google Maps' "search" deep link, pinned to the exact coordinate rather than a text query --
@@ -23156,6 +23189,13 @@ const KOREA_BBOX = { minLat: 33, maxLat: 39, minLng: 124, maxLng: 132 };
 function isDomesticLatLng(lat, lng) {
   return lat >= KOREA_BBOX.minLat && lat <= KOREA_BBOX.maxLat && lng >= KOREA_BBOX.minLng && lng <= KOREA_BBOX.maxLng;
 }
+// A domestic address routinely comes back "대한민국 서울특별시 ..." from the geocoder -- redundant
+// for a place the user already knows is in Korea, so only the overseas case needs the country
+// name to stay legible. Shared by both the list row and the map popup so the two never drift.
+function getDisplayPlaceAddress(place) {
+  if (!place?.address) return place?.address || '';
+  return isDomesticLatLng(place.lat, place.lng) ? place.address.replace(/^대한민국\s*/, '') : place.address;
+}
 // A calendar built from an imported travel log can have a handful of overseas trips mixed in
 // with a much larger cluster of everyday domestic places -- fitting bounds over literally every
 // pin would zoom the main-screen preview out to "half of Asia" just to include one Da Nang trip.
@@ -23445,12 +23485,7 @@ function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom = false
         const addrEl = document.createElement('div');
         addrEl.style.fontSize = '0.75rem';
         addrEl.style.color = '#64748B';
-        // A domestic address routinely comes back "대한민국 서울특별시 ..." from the geocoder --
-        // redundant for a place the user already knows is in Korea, so only the overseas case
-        // needs the country name to stay legible.
-        addrEl.textContent = isDomesticLatLng(place.lat, place.lng)
-          ? place.address.replace(/^대한민국\s*/, '')
-          : place.address;
+        addrEl.textContent = getDisplayPlaceAddress(place);
         infoEl.appendChild(addrEl);
       }
       headerEl.appendChild(infoEl);
@@ -24438,7 +24473,7 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
               },
                 /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 } },
                   /*#__PURE__*/React.createElement("span", { style: { fontWeight: 800, fontSize: '0.88rem', color: 'var(--text-main)' } }, place.name || '이름 없음'),
-                  place.address && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.74rem', color: 'var(--text-muted)' } }, place.address)
+                  place.address && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.74rem', color: 'var(--text-muted)' } }, getDisplayPlaceAddress(place))
                 ),
                 /*#__PURE__*/React.createElement("button", {
                   type: "button",
