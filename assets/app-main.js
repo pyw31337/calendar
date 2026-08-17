@@ -14094,12 +14094,51 @@ function DateModal({
   const celebratePositiveAction = () => {
     if (typeof confetti !== 'function') return;
     try {
+      const colors = ['#EC4899', '#D946EF', '#8B5CF6', '#3B82F6', '#00FFFF', '#FFFF00', '#FFFFFF'];
+      
+      // 1. Center massive blast
       confetti({
-        particleCount: 80,
-        spread: 70,
-        origin: { y: 0.6 },
+        particleCount: 140,
+        spread: 85,
+        origin: { y: 0.55 },
+        colors: colors,
         zIndex: CONFETTI_Z_INDEX
       });
+      
+      // 2. Left side cannon (pointing inwards/upwards)
+      setTimeout(() => {
+        confetti({
+          particleCount: 80,
+          angle: 60,
+          spread: 60,
+          origin: { x: 0, y: 0.8 },
+          colors: colors,
+          zIndex: CONFETTI_Z_INDEX
+        });
+      }, 150);
+
+      // 3. Right side cannon (pointing inwards/upwards)
+      setTimeout(() => {
+        confetti({
+          particleCount: 80,
+          angle: 120,
+          spread: 60,
+          origin: { x: 1, y: 0.8 },
+          colors: colors,
+          zIndex: CONFETTI_Z_INDEX
+        });
+      }, 300);
+
+      // 4. Final sparkle showers from top-center
+      setTimeout(() => {
+        confetti({
+          particleCount: 60,
+          spread: 120,
+          origin: { x: 0.5, y: 0.35 },
+          colors: colors,
+          zIndex: CONFETTI_Z_INDEX
+        });
+      }, 500);
     } catch (err) {
       console.warn('Confetti error', err);
     }
