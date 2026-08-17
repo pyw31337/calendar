@@ -269,6 +269,23 @@ function getNaverMapPlaceUrl(place) {
   return `https://map.naver.com/p?title=${label}&lat=${place.lat}&lng=${place.lng}`;
 }
 
+// Google Maps' "search" deep link, pinned to the exact coordinate rather than a text query --
+// Naver/Kakao have essentially no POI coverage outside Korea (see googlePlacesSearchProxy's own
+// reasoning), so an overseas place's "업체보기" link needs a service that actually has the data.
+// Coordinate-only (not name+coordinate) for the same reason getNaverMapPlaceUrl centers on
+// coordinates: a text query can land on the wrong branch of a chain business, a bare lat/lng
+// can't.
+function getGoogleMapPlaceUrl(place) {
+  return `https://www.google.com/maps/search/?api=1&query=${place.lat},${place.lng}`;
+}
+// Picks which external map service "업체보기" opens: Naver for anything inside Korea (isDomesticLatLng,
+// same bounding box PlaceMapView already uses for its own domestic/overseas split), Google Maps
+// otherwise. Kakao stays reserved for business-name search only (PlaceRegisterModal.handleSearch)
+// -- this is only about where the user gets sent to look at the place afterward.
+function getPlaceExternalMapUrl(place) {
+  return isDomesticLatLng(place?.lat, place?.lng) ? getNaverMapPlaceUrl(place) : getGoogleMapPlaceUrl(place);
+}
+
 const GATHER_APP_CONFIG = window.GATHER_APP_CONFIG || {};
 const readConfigNumber = (key, fallback) => Number.isFinite(GATHER_APP_CONFIG[key]) ? GATHER_APP_CONFIG[key] : fallback;
 const readConfigObject = (key, fallback) => GATHER_APP_CONFIG[key] && typeof GATHER_APP_CONFIG[key] === 'object' ? GATHER_APP_CONFIG[key] : fallback;
@@ -15880,15 +15897,6 @@ function BackArrowIcon({ size = 24 } = {}) {
   }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), /*#__PURE__*/React.createElement("path", { d: "M6 9l6 6l6 -6" }));
 }
 
-// Same chevron glyph as BackArrowIcon, rotated the other way -- "›" instead of "‹".
-function ChevronRightIcon({ size = 16 } = {}) {
-  return /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg", width: String(size), height: String(size), viewBox: "0 0 24 24",
-    fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round",
-    style: { transform: 'rotate(-90deg)', display: 'inline-block' }
-  }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), /*#__PURE__*/React.createElement("path", { d: "M6 9l6 6l6 -6" }));
-}
-
 // One keyword-search pass over a single calendar's 일정/채팅/태그/정산/메모 data. Shared by
 // GlobalSearchModal (single active calendar) and AdminUnifiedSearchResultsView (looped across
 // every calendar) so the two search surfaces can never drift out of sync on matching rules.
@@ -23185,27 +23193,78 @@ function ThreeLinesIcon({ size = 18 } = {}) {
     /*#__PURE__*/React.createElement("line", { x1: "4", y1: "17", x2: "20", y2: "17" }));
 }
 
-// Small monochrome (white, via stroke="#fff") glyph per category id. Stored as an array of SVG
-// path "d" values (not markup) so this one definition can drive both a Leaflet divIcon HTML
-// string (markers render outside React's tree, so those can't use a React icon component) AND a
-// real React <PlaceCategoryMarkerIcon> element (used inline in the place list, see PlacesView)
-// without keeping two copies of the same path data in sync by hand. Only the four food/lodging/
-// play built-in category ids get a matching pictogram; 기타(etc) and any custom category an
-// admin adds beyond those use the 💬 emoji instead, rather than guessing at an SVG icon for an
-// arbitrary/generic category.
-const PLACE_CATEGORY_MARKER_SVG_PATHS = {
-  restaurant: ['M8 3v7a2 2 0 0 0 4 0V3', 'M10 10v11', 'M16 3c-1.5 2 -2 4 -2 6.5c0 1.5 1 2.5 2 2.5v9'],
-  cafe: ['M4 8h12v6a4 4 0 0 1 -4 4h-4a4 4 0 0 1 -4 -4v-6z', 'M16 9h2a2 2 0 0 1 0 4h-2', 'M8 2c-.6 1 .6 1.5 0 2.5', 'M12 2c-.6 1 .6 1.5 0 2.5'],
-  play: ['M12 3a5 5 0 0 1 5 5c0 3 -2 5.3 -3.4 6.3l.6 2.7h-4.4l.6 -2.7c-1.4 -1 -3.4 -3.3 -3.4 -6.3a5 5 0 0 1 5 -5z', 'M11 17l-1 4l2 -1l1 1'],
-  lodging: ['M3 18v-7a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v7', 'M3 18v2', 'M21 18v2', 'M3 13h18', 'M7 13v-3a1 1 0 0 1 1 -1h3a1 1 0 0 1 1 1v3'],
-  shopping: ['M6.331 8h11.339a2 2 0 0 1 1.977 2.304l-1.255 8.152a3 3 0 0 1 -2.966 2.544h-6.852a3 3 0 0 1 -2.965 -2.544l-1.255 -8.152a2 2 0 0 1 1.977 -2.304z', 'M9 11v-5a3 3 0 0 1 6 0v5']
+// Small monochrome (white, via stroke="#fff") lucide-style glyph per category id. Each icon is
+// stored as an array of shape descriptors -- { tag: 'path', d } / { tag: 'rect', ... } /
+// { tag: 'circle', ... } -- rather than just path "d" strings, since several of these icons (예:
+// dices, hotel, shopping-cart) mix <rect>/<circle> primitives with <path>. One shared definition
+// drives both a Leaflet divIcon HTML string (markers render outside React's tree, so those can't
+// use a React icon component) AND a real React <PlaceCategoryMarkerIcon> element (used inline in
+// the place list, see PlacesView) without keeping two copies in sync by hand. Every built-in
+// category id (including 기타/etc) has its own pictogram now; a custom category id an admin adds
+// beyond these falls back to the 기타 icon rather than guessing at one.
+const PLACE_CATEGORY_MARKER_SHAPES = {
+  // Soup (lucide "soup") -- 식당/restaurant
+  restaurant: [
+    { tag: 'path', d: 'M12 21a9 9 0 0 0 9-9H3a9 9 0 0 0 9 9Z' },
+    { tag: 'path', d: 'M7 21h10' },
+    { tag: 'path', d: 'M19.5 12 22 6' },
+    { tag: 'path', d: 'M16.25 3c.27.1.8.53.75 1.36-.06.83-.93 1.2-1 2.02-.05.78.34 1.24.73 1.62' },
+    { tag: 'path', d: 'M11.25 3c.27.1.8.53.74 1.36-.05.83-.93 1.2-.98 2.02-.06.78.33 1.24.72 1.62' },
+    { tag: 'path', d: 'M6.25 3c.27.1.8.53.75 1.36-.06.83-.93 1.2-1 2.02-.05.78.34 1.24.74 1.62' }
+  ],
+  cafe: [
+    { tag: 'path', d: 'M4 8h12v6a4 4 0 0 1 -4 4h-4a4 4 0 0 1 -4 -4v-6z' },
+    { tag: 'path', d: 'M16 9h2a2 2 0 0 1 0 4h-2' },
+    { tag: 'path', d: 'M8 2c-.6 1 .6 1.5 0 2.5' },
+    { tag: 'path', d: 'M12 2c-.6 1 .6 1.5 0 2.5' }
+  ],
+  // Dices (lucide "dices") -- 놀이/play
+  play: [
+    { tag: 'rect', width: '12', height: '12', x: '2', y: '10', rx: '2', ry: '2' },
+    { tag: 'path', d: 'm17.92 14 3.5-3.5a2.24 2.24 0 0 0 0-3l-5-4.92a2.24 2.24 0 0 0-3 0L10 6' },
+    { tag: 'path', d: 'M6 18h.01' },
+    { tag: 'path', d: 'M10 14h.01' },
+    { tag: 'path', d: 'M15 6h.01' },
+    { tag: 'path', d: 'M18 9h.01' }
+  ],
+  // Hotel (lucide "hotel") -- 숙박/lodging
+  lodging: [
+    { tag: 'path', d: 'M10 22v-6.57' },
+    { tag: 'path', d: 'M12 11h.01' },
+    { tag: 'path', d: 'M12 7h.01' },
+    { tag: 'path', d: 'M14 15.43V22' },
+    { tag: 'path', d: 'M15 16a5 5 0 0 0-6 0' },
+    { tag: 'path', d: 'M16 11h.01' },
+    { tag: 'path', d: 'M16 7h.01' },
+    { tag: 'path', d: 'M8 11h.01' },
+    { tag: 'path', d: 'M8 7h.01' },
+    { tag: 'rect', x: '4', y: '2', width: '16', height: '20', rx: '2' }
+  ],
+  // ShoppingCart (lucide "shopping-cart") -- 쇼핑/shopping
+  shopping: [
+    { tag: 'circle', cx: '8', cy: '21', r: '1' },
+    { tag: 'circle', cx: '19', cy: '21', r: '1' },
+    { tag: 'path', d: 'M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12' }
+  ],
+  // MessageCircleMore (lucide "message-circle-more") -- 기타/etc, and the fallback for any
+  // custom category id that doesn't match one of the above.
+  etc: [
+    { tag: 'path', d: 'M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719' },
+    { tag: 'path', d: 'M8 12h.01' },
+    { tag: 'path', d: 'M12 12h.01' },
+    { tag: 'path', d: 'M16 12h.01' }
+  ]
 };
-// Returns the marker's inner content -- either { svgPaths: [...d strings] } for the five
-// pictogram categories, or { emoji: '💬' } for 기타/custom categories.
+// Returns { shapes: [...] } for the marker's inner content -- an unrecognized/custom category id
+// falls back to the 기타 pictogram rather than a plain emoji.
 function getPlaceCategoryMarkerContent(category) {
   const id = String(category?.id || '').toLowerCase();
-  const paths = PLACE_CATEGORY_MARKER_SVG_PATHS[id];
-  return paths ? { svgPaths: paths } : { emoji: '💬' };
+  return { shapes: PLACE_CATEGORY_MARKER_SHAPES[id] || PLACE_CATEGORY_MARKER_SHAPES.etc };
+}
+function placeMarkerShapeToHtml(shape) {
+  if (shape.tag === 'rect') return `<rect x="${shape.x}" y="${shape.y}" width="${shape.width}" height="${shape.height}"${shape.rx ? ` rx="${shape.rx}"` : ''}${shape.ry ? ` ry="${shape.ry}"` : ''} />`;
+  if (shape.tag === 'circle') return `<circle cx="${shape.cx}" cy="${shape.cy}" r="${shape.r}" />`;
+  return `<path d="${shape.d}" />`;
 }
 // Shared by both a normal individual marker AND a cluster badge that's collapsed down to a
 // single child (see iconCreateFunction below) -- a cluster with only one marker left inside it
@@ -23213,9 +23272,7 @@ function getPlaceCategoryMarkerContent(category) {
 function buildPlaceMarkerHtml(category) {
   const color = category ? category.color : '#64748B';
   const content = getPlaceCategoryMarkerContent(category);
-  const innerHtml = content.svgPaths
-    ? `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${content.svgPaths.map(d => `<path d="${d}" />`).join('')}</svg>`
-    : `<span style="font-size:13px;line-height:1;">${content.emoji}</span>`;
+  const innerHtml = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${content.shapes.map(placeMarkerShapeToHtml).join('')}</svg>`;
   return `<div style="width:26px;height:26px;border-radius:50%;background:${color};border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;">${innerHtml}</div>`;
 }
 // React version of the same badge -- a small solid-color circle with the category's white line
@@ -23223,9 +23280,6 @@ function buildPlaceMarkerHtml(category) {
 // category badge looks like a miniature of the actual pin instead of a plain emoji.
 function PlaceCategoryMarkerIcon({ category, size = 14 } = {}) {
   const content = getPlaceCategoryMarkerContent(category);
-  if (!content.svgPaths) {
-    return /*#__PURE__*/React.createElement("span", { style: { fontSize: `${size}px`, lineHeight: 1 } }, content.emoji);
-  }
   return /*#__PURE__*/React.createElement("svg", {
     xmlns: "http://www.w3.org/2000/svg",
     width: String(size),
@@ -23236,7 +23290,7 @@ function PlaceCategoryMarkerIcon({ category, size = 14 } = {}) {
     "stroke-width": "2",
     "stroke-linecap": "round",
     "stroke-linejoin": "round"
-  }, content.svgPaths.map((d, i) => /*#__PURE__*/React.createElement("path", { key: i, d })));
+  }, content.shapes.map((shape, i) => /*#__PURE__*/React.createElement(shape.tag, { key: i, ...(shape.tag === 'rect' ? { x: shape.x, y: shape.y, width: shape.width, height: shape.height, rx: shape.rx, ry: shape.ry } : shape.tag === 'circle' ? { cx: shape.cx, cy: shape.cy, r: shape.r } : { d: shape.d }) })));
 }
 
 // Renders an interactive Leaflet/OSM map with one pin per registered place, auto-fit to bounds
@@ -23245,10 +23299,13 @@ function PlaceCategoryMarkerIcon({ category, size = 14 } = {}) {
 // divIcon HTML interpolates category.color (hex-validated by normalizeColorValue) and its icon
 // (a fixed emoji from a controlled lookup table), never raw user text, so that stays safe as a
 // string template.
-function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom = false, resizeSignal, preferDomesticBounds = false }) {
+function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom = false, resizeSignal, preferDomesticBounds = false, focusPlace = null }) {
   const containerRef = React.useRef(null);
   const mapRef = React.useRef(null);
   const markersLayerRef = React.useRef(null);
+  // Keyed by place.id so the focusPlace effect below can look up and pan/zoom to a specific
+  // marker (and open its popup) without needing to re-walk `places` or rebuild the marker layer.
+  const markersByIdRef = React.useRef(new Map());
   // getCalendarPlaces(calendar) builds a brand-new array (and place objects) on every call, so
   // the `places` prop gets a new reference on every parent re-render even when nothing about the
   // places actually changed -- e.g. clicking a marker opens the edit modal, which re-renders the
@@ -23340,6 +23397,7 @@ function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom = false
     dataSignatureRef.current = signature;
     const layer = markersLayerRef.current;
     layer.clearLayers();
+    markersByIdRef.current = new Map();
     const categoryMap = categories.reduce((acc, c) => { acc[c.id] = c; return acc; }, {});
     const bounds = [];
     (places || []).forEach(place => {
@@ -23354,6 +23412,7 @@ function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom = false
         popupAnchor: [0, -13]
       });
       const marker = L.marker([place.lat, place.lng], { icon });
+      if (place.id) markersByIdRef.current.set(place.id, marker);
       // Read back by the cluster group's iconCreateFunction above when a cluster collapses down
       // to just this one marker, so it can render the same category badge instead of a "1".
       marker.placeCategory = category;
@@ -23475,6 +23534,29 @@ function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom = false
       mapRef.current.setView(PLACE_MAP_DEFAULT_CENTER, PLACE_MAP_DEFAULT_ZOOM);
     }
   }, [ready, places, calendar, preferDomesticBounds]);
+
+  // Pans/zooms straight to a single place's marker and opens its popup -- driven by PlacesView's
+  // list rows (clicking one focuses that place's pin here) rather than by anything inside this
+  // component itself. `focusPlace` carries a monotonic `token` alongside the place id so clicking
+  // the SAME row twice in a row still re-triggers the pan even though the id didn't change.
+  const lastFocusTokenRef = React.useRef(null);
+  React.useEffect(() => {
+    if (!ready || !mapRef.current || !focusPlace || !focusPlace.id) return;
+    if (lastFocusTokenRef.current === focusPlace.token) return;
+    lastFocusTokenRef.current = focusPlace.token;
+    const marker = markersByIdRef.current.get(focusPlace.id);
+    if (!marker) return;
+    const isMobileViewport = window.innerWidth <= 720;
+    mapRef.current.setView(marker.getLatLng(), isMobileViewport ? 16 : 17, { animate: true });
+    // markerClusterGroup can have this marker tucked inside a collapsed cluster at the map's
+    // current zoom -- zoomToShowLayer expands/pans through whatever cluster hierarchy is needed
+    // before opening the popup, which a plain marker.openPopup() call can't do on its own.
+    if (typeof markersLayerRef.current.zoomToShowLayer === 'function') {
+      markersLayerRef.current.zoomToShowLayer(marker, () => marker.openPopup());
+    } else {
+      marker.openPopup();
+    }
+  }, [ready, focusPlace]);
 
   // Container size changes (the section's collapse/expand aspect-ratio toggle) don't fire a
   // window resize event, so Leaflet's internal tile grid goes stale until nudged.
@@ -23991,6 +24073,11 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
   const [editingPlace, setEditingPlace] = React.useState(null);
   const [categoryFilter, setCategoryFilter] = React.useState('all');
   const [mapExpanded, setMapExpanded] = React.useState(false);
+  // { id, token } for PlaceMapView's focus effect -- token increments on every select so clicking
+  // the same list row twice in a row still re-triggers the pan/zoom even though id didn't change.
+  const [focusPlace, setFocusPlace] = React.useState(null);
+  const focusTokenRef = React.useRef(0);
+  const scrollBodyRef = React.useRef(null);
   // Header hides on scroll-down / reappears on scroll-up, matching the chat room / memo page
   // header exactly (see useScrollHideHeader above).
   const { isHeaderVisible, onScroll: handlePlacesScroll } = useScrollHideHeader();
@@ -24005,6 +24092,14 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
   const handleEditPlace = place => {
     setEditingPlace(place);
     setIsRegisterOpen(true);
+  };
+  // A list row click pans/zooms the map above to that place's marker (and opens its popup) so
+  // its location is visible right away, without leaving the list. Scrolls the body back up first
+  // in case the map has scrolled out of view under a long list.
+  const handleSelectPlaceOnMap = place => {
+    focusTokenRef.current += 1;
+    setFocusPlace({ id: place.id, token: focusTokenRef.current });
+    if (scrollBodyRef.current) scrollBodyRef.current.scrollTo({ top: 0, behavior: 'smooth' });
   };
   const handleCloseModal = () => {
     setIsRegisterOpen(false);
@@ -24088,6 +24183,7 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
 
     /* Scrollable body: expandable map + category tabs + place list */
     /*#__PURE__*/React.createElement("div", {
+      ref: scrollBodyRef,
       onScroll: handlePlacesScroll,
       style: { flex: 1, overflowY: mapExpanded ? 'hidden' : 'auto', paddingTop: '56px' }
     },
@@ -24101,7 +24197,8 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
           calendar,
           scrollWheelZoom: true,
           onSelectPlace: handleEditPlace,
-          resizeSignal: mapExpanded
+          resizeSignal: mapExpanded,
+          focusPlace
         }),
         /* Wide, centered grip handle -- toggles the map to cover the list area below it so the
            map itself has much more room, without needing a separate fullscreen route. */
@@ -24196,13 +24293,13 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
               className: "place-card-row",
               role: "button",
               tabIndex: 0,
-              onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleEditPlace(place); } },
+              onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleSelectPlaceOnMap(place); handleEditPlace(place); } },
               style: {
                 display: 'flex', flexDirection: 'column', gap: '4px',
                 padding: '10px 42px 10px 12px', position: 'relative',
                 border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', cursor: 'pointer'
               },
-              onClick: () => handleEditPlace(place)
+              onClick: () => { handleSelectPlaceOnMap(place); handleEditPlace(place); }
             },
               /*#__PURE__*/React.createElement("button", {
                 type: "button",
@@ -24245,36 +24342,29 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
                 }, `최근방문 ${topBadgeDate}`),
                 visitEntries.length > 0 && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 700 } }, `총 ${visitEntries.length}회 방문`)
               ),
-              /* Name + address row doubles as a link out to Naver Map, centered on this place's
-                 own coordinates -- stopPropagation so it opens the map instead of also
-                 triggering the card's own onClick (which opens the edit modal). */
+              /* Name + address row, with an explicit "업체보기" button that opens this place in
+                 an external map service -- Naver for a domestic coordinate, Google Maps for an
+                 overseas one (getPlaceExternalMapUrl), since Naver/Kakao have no real POI data
+                 outside Korea. stopPropagation so it doesn't also trigger the card's own onClick. */
               /*#__PURE__*/React.createElement("div", {
-                role: "button",
-                tabIndex: 0,
-                title: "지도에서 보기",
-                onClick: event => {
-                  event.stopPropagation();
-                  window.open(getNaverMapPlaceUrl(place), '_blank', 'noopener,noreferrer');
-                },
-                onKeyDown: event => {
-                  if (event.key !== 'Enter' && event.key !== ' ') return;
-                  event.preventDefault();
-                  event.stopPropagation();
-                  window.open(getNaverMapPlaceUrl(place), '_blank', 'noopener,noreferrer');
-                },
-                style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', cursor: 'pointer' }
+                style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }
               },
                 /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 } },
                   /*#__PURE__*/React.createElement("span", { style: { fontWeight: 800, fontSize: '0.88rem', color: 'var(--text-main)' } }, place.name || '이름 없음'),
                   place.address && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.74rem', color: 'var(--text-muted)' } }, place.address)
                 ),
-                /*#__PURE__*/React.createElement("span", {
+                /*#__PURE__*/React.createElement("button", {
+                  type: "button",
+                  onClick: event => {
+                    event.stopPropagation();
+                    window.open(getPlaceExternalMapUrl(place), '_blank', 'noopener,noreferrer');
+                  },
                   style: {
-                    width: '22px', height: '22px', borderRadius: '50%', flexShrink: 0,
-                    backgroundColor: '#FFFFFF', border: '1px solid var(--border-subtle)', color: '#94A3B8',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                    flexShrink: 0, border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-full)',
+                    padding: '4px 10px', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer',
+                    backgroundColor: 'var(--bg-primary)', color: 'var(--text-main)'
                   }
-                }, /*#__PURE__*/React.createElement(ChevronRightIcon, { size: 14 }))
+                }, "업체보기")
               ),
               visitEntries.length > 0
                 ? /*#__PURE__*/React.createElement("div", {
