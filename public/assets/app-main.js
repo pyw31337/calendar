@@ -14843,22 +14843,36 @@ function DateModal({
       cursor: isSubmitting ? 'wait' : 'pointer',
       position: 'relative'
     }
-  }, !isConfirmed && isAllAvailable && /*#__PURE__*/React.createElement("span", {
+  }, !isConfirmed && isAllAvailable && /*#__PURE__*/React.createElement("div", {
+    className: "gamified-shiny-glow-wrapper"
+  }, /*#__PURE__*/React.createElement("span", {
     className: "gamified-shiny-glow"
-  }), !isConfirmed && isAllAvailable && /*#__PURE__*/React.createElement("span", {
+  })), !isConfirmed && isAllAvailable && /*#__PURE__*/React.createElement("span", {
     className: "gamified-sparks-container"
   }, [1, 2, 3, 4, 5, 6].map(i => /*#__PURE__*/React.createElement("span", {
     key: i,
     className: `gamified-spark gamified-spark-${i}`
   }, /*#__PURE__*/React.createElement("svg", {
-    viewBox: "0 0 10 16",
+    viewBox: "0 0 30 60",
     style: {
       width: '100%',
       height: '100%',
-      fill: 'currentColor'
+      fill: 'none',
+      stroke: 'currentColor',
+      strokeWidth: 2,
+      strokeLinecap: 'round',
+      strokeLinejoin: 'round'
     }
   }, /*#__PURE__*/React.createElement("path", {
-    d: "M6 0L0 8H4L2 16L10 6H5.5L6 0Z"
+    d: "M15 2 L12 14 L22 22 L8 38 L24 46 L10 58"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M12 14 L5 24 L8 30",
+    strokeWidth: 1.5,
+    opacity: 0.8
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M8 38 L16 34 L20 40",
+    strokeWidth: 1.5,
+    opacity: 0.8
   }))))), isConfirmed ? "확정취소" : "모임확정"), /*#__PURE__*/React.createElement("div", {
     style: { display: 'flex', gap: '8px' }
   }, /*#__PURE__*/React.createElement("button", {
