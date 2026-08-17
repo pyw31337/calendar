@@ -23,6 +23,21 @@ const getExpenseCategory = GATHER_APP_UTILS.getExpenseCategory;
 const getExpenseCategoryIcon = GATHER_APP_UTILS.getExpenseCategoryIcon;
 const getExpenseCategoryLabel = GATHER_APP_UTILS.getExpenseCategoryLabel;
 const extractExpenseTimePrefix = GATHER_APP_UTILS.extractExpenseTimePrefix;
+// Income entries are saved with categoryId 'etc' as a placeholder -- they don't have a real
+// spending category (see handleSaveExpenseClick), so any UI that badges an expense by resolving
+// getExpenseCategory(calendar, expense.categoryId) straight off the stored id will show income as
+// a plain "기타" expense unless it explicitly checks isExpenseIncomeEntry first and swaps in this
+// instead. Centralized here (rather than each screen redefining its own isIncome/INCOME_CATEGORY
+// pair) after a DateModal 회비정산 row was found still doing the raw lookup while every other
+// settlement surface (AdminDashboard's SettlementPage, the global search index) had already been
+// fixed to check for income -- same fix skipped in one more place is the same bug again.
+const INCOME_EXPENSE_CATEGORY = { id: 'income', name: '수입', color: '#16A34A' };
+function isExpenseIncomeEntry(expense) {
+  return expense?.type === 'income' || Number(expense?.amount) < 0;
+}
+function getDisplayExpenseCategory(calendar, expense) {
+  return isExpenseIncomeEntry(expense) ? INCOME_EXPENSE_CATEGORY : getExpenseCategory(calendar, expense?.categoryId);
+}
 
 // 장소(Places) categories -- same { id, name, color } shape and normalize/lookup pattern as
 // expense categories above, kept as its own set since a place's category (식당/카페/...) is a
@@ -797,7 +812,7 @@ function calculateSettlementBalance(calendar) {
     expenses.forEach(exp => {
       const amount = Number(exp.amount || 0);
       if (Number.isFinite(amount) && amount !== 0) {
-        const isIncome = exp.type === 'income' || amount < 0;
+        const isIncome = isExpenseIncomeEntry(exp);
         if (isIncome) {
           incomeTotal += Math.abs(amount);
         } else {
@@ -13891,7 +13906,7 @@ function DateModal({
     setEditingExpenseId(expense.id);
     const displayLabel = getExpenseLabel(expense);
     const displayUrl = getExpenseUrl(expense);
-    const isIncome = Number(expense.amount) < 0;
+    const isIncome = isExpenseIncomeEntry(expense);
 	    setExpenseLabelInput([displayLabel, displayUrl].filter(Boolean).join(' '));
 	    setExpenseAmountInput(`${isIncome ? '+' : '-'}${Math.abs(expense.amount).toLocaleString()}`);
 	    setExpenseCategoryInput(getExpenseCategory(calendar, expense.categoryId).id);
@@ -14494,7 +14509,7 @@ function DateModal({
 	            expenses.map(expense => {
 	          const { time: expenseTime, rest: expenseLabel } = extractExpenseTimePrefix(getExpenseLabel(expense));
 	          const expenseUrl = getExpenseUrl(expense);
-	          const expenseCategory = getExpenseCategory(calendar, expense.categoryId);
+	          const expenseCategory = getDisplayExpenseCategory(calendar, expense);
 	          return /*#__PURE__*/React.createElement("div", {
             key: expense.id,
             "data-expense-id": expense.id,
@@ -15970,7 +15985,7 @@ function computeCalendarSearchMatches(cal, chatMessages, memoList, q, limit = 30
       // would badge/match them as "기타" like a real misc *expense* -- same fix SettlementPage's
       // getDisplayCategory already applies for the on-screen badge, mirrored here so search
       // agrees with what's actually shown.
-      const isIncome = exp.type === 'income' || Number(exp.amount) < 0;
+      const isIncome = isExpenseIncomeEntry(exp);
       const category = expenseCategoriesMap[exp.categoryId];
       const categoryName = isIncome ? '수입' : (category?.name || '기타');
       const categoryColor = isIncome ? '#16A34A' : (category?.color || '#94A3B8');
@@ -20338,9 +20353,9 @@ function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {
   // Income entries have no meaningful expense category of their own (their categoryId is
   // whatever was selected/defaulted at entry time, usually '기타') -- badge them as 수입 instead
   // of showing a misleading expense category, and keep them out of "카테고리별 지출" entirely
-  // since that section is specifically about expense breakdown, not income.
-  const INCOME_CATEGORY = { id: 'income', name: '수입', color: '#16A34A' };
-  const getDisplayCategory = item => (item.isIncome ? INCOME_CATEGORY : item.category);
+  // since that section is specifically about expense breakdown, not income. INCOME_EXPENSE_CATEGORY
+  // is the shared module-level constant (see isExpenseIncomeEntry/getDisplayExpenseCategory).
+  const getDisplayCategory = item => (item.isIncome ? INCOME_EXPENSE_CATEGORY : item.category);
   const getExpenseUrl = expense => sanitizeText(expense?.url || extractFirstUrl(expense?.label || ''), 220);
   const getExpenseLabel = expense => {
     const label = sanitizeText(expense?.label || '', 120);
@@ -20397,7 +20412,7 @@ function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {
         .filter(expense => Number.isFinite(Number(expense.amount)) && Number(expense.amount) !== 0)
         .map(expense => {
           const amount = Number(expense.amount || 0);
-          const isIncome = expense.type === 'income' || amount < 0;
+          const isIncome = isExpenseIncomeEntry(expense);
           return {
             ...expense,
             amount,
@@ -20431,7 +20446,7 @@ function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {
         })
         .map(expense => {
           const amount = Number(expense.amount || 0);
-          const isIncome = expense.type === 'income' || amount < 0;
+          const isIncome = isExpenseIncomeEntry(expense);
           return {
             ...expense,
             amount,
