@@ -14100,6 +14100,68 @@ function DateModal({
   const [placeSearchStage, setPlaceSearchStage] = React.useState(null);
   const [isSavingPlace, setIsSavingPlace] = React.useState(false);
 
+  // Search progress simulation states
+  const [searchProgress, setSearchProgress] = React.useState(0);
+  const [estRemainingSeconds, setEstRemainingSeconds] = React.useState(5);
+
+  React.useEffect(() => {
+    if (!isPlaceLoading) {
+      setSearchProgress(0);
+      setEstRemainingSeconds(5);
+      return;
+    }
+    setSearchProgress(5);
+    setEstRemainingSeconds(5);
+    const startTime = Date.now();
+    const targetDuration = 5000;
+    const interval = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      const displayPercent = Math.min(Math.round(98 * (1 - Math.exp(-elapsed / 2200))), 98);
+      setSearchProgress(displayPercent);
+      const remaining = Math.max(1, Math.round((targetDuration - elapsed) / 1000));
+      setEstRemainingSeconds(remaining);
+    }, 100);
+    return () => clearInterval(interval);
+  }, [isPlaceLoading]);
+
+  const renderPlaceSearchProgress = () => {
+    if (!isPlaceLoading) return null;
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        padding: '12px 14px',
+        border: '1px solid var(--border-subtle)',
+        borderRadius: '8px',
+        backgroundColor: 'var(--bg-primary)',
+        marginTop: '6px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '6px'
+      }
+    },
+      /*#__PURE__*/React.createElement("div", {
+        style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.74rem', fontWeight: 700 }
+      },
+        /*#__PURE__*/React.createElement("span", { style: { color: 'var(--text-muted)' } }, 
+          placeSearchStage ? SEARCH_TIER_LABELS[placeSearchStage] : '장소 검색 중...'
+        ),
+        /*#__PURE__*/React.createElement("span", { style: { color: 'var(--accent-primary)' } }, `${searchProgress}% (약 ${estRemainingSeconds}초 남음)`)
+      ),
+      /*#__PURE__*/React.createElement("div", {
+        style: { width: '100%', height: '8px', backgroundColor: 'var(--border-subtle)', borderRadius: '999px', overflow: 'hidden' }
+      },
+        /*#__PURE__*/React.createElement("div", {
+          style: {
+            width: `${searchProgress}%`,
+            height: '100%',
+            background: 'linear-gradient(90deg, var(--accent-primary), #A78BFA)',
+            borderRadius: '999px',
+            transition: 'width 0.15s linear'
+          }
+        })
+      )
+    );
+  };
+
   // Sync place memo and selected place with existing entries
   React.useEffect(() => {
     setParticipantId('');
@@ -15004,7 +15066,7 @@ function DateModal({
               style: { flex: '1 1 0%', minWidth: 0 },
               placeholder: "장소명이나 주소 검색...",
               value: placeQuery,
-              disabled: isSavingPlace || isPlaceLoading,
+              disabled: isSavingPlace,
               onChange: e => setPlaceQuery(e.target.value),
               onKeyDown: e => {
                 if (e.key === 'Enter') {
@@ -15021,7 +15083,7 @@ function DateModal({
               onClick: e => handlePlaceSearch(e, false)
             }, isPlaceLoading ? (placeSearchStage ? SEARCH_TIER_LABELS[placeSearchStage] : '검색 중...') : "검색")
           ),
-          placeResults.length > 0 && /*#__PURE__*/React.createElement("div", {
+          isPlaceLoading ? renderPlaceSearchProgress() : (placeResults.length > 0 && /*#__PURE__*/React.createElement("div", {
             className: "place-search-results-list",
             style: {
               maxHeight: '180px',
@@ -15052,7 +15114,7 @@ function DateModal({
               /*#__PURE__*/React.createElement("div", { style: { fontWeight: 700, color: 'var(--text-main)' } }, res.name),
               /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.72rem', color: 'var(--text-muted)' } }, res.address)
             ))
-          ),
+          )),
           selectedPlace && /*#__PURE__*/React.createElement("div", {
             className: "place-preview-card",
             style: {
@@ -24312,14 +24374,20 @@ function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom = false
       popupNode.appendChild(headerEl);
 
       const visitEntries = parseVisitEntriesFromMemo(place.memo);
-      if (visitEntries.length > 0 || place.memo) {
+      const memoDate = extractLeadingMemoDate(place.memo);
+      const memoWithoutDate = memoDate ? place.memo.replace(memoDate, '').trim() : place.memo;
+      const displayVisitEntries = visitEntries.length > 0
+        ? sortVisitEntriesRecentFirst(visitEntries)
+        : (memoDate ? [{ date: memoDate, note: memoWithoutDate }] : []);
+
+      if (displayVisitEntries.length > 0 || place.memo) {
         const dividerEl = document.createElement('hr');
         dividerEl.style.border = 'none';
         dividerEl.style.borderTop = '1px solid #E2E8F0';
         dividerEl.style.margin = '6px 0';
         popupNode.appendChild(dividerEl);
       }
-      if (visitEntries.length > 0) {
+      if (displayVisitEntries.length > 0) {
         // Bulk-imported places carry their whole visit history in one memo -- show it as an
         // actual scrollable list of {date, note} rows here instead of one long run-on line.
         const historyWrap = document.createElement('div');
@@ -24329,26 +24397,53 @@ function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom = false
         historyWrap.style.display = 'flex';
         historyWrap.style.flexDirection = 'column';
         historyWrap.style.gap = '4px';
-        sortVisitEntriesRecentFirst(visitEntries).forEach(entry => {
+        displayVisitEntries.forEach((entry, idx) => {
           const rowEl = document.createElement('div');
           rowEl.style.fontSize = '0.72rem';
           rowEl.style.color = '#334155';
-          rowEl.style.display = 'flex';
-          rowEl.style.gap = '5px';
-          rowEl.style.alignItems = 'flex-start';
-          const dateEl = document.createElement('span');
-          dateEl.textContent = formatPlaceBadgeDate(entry.date) || entry.date;
-          dateEl.style.flexShrink = '0';
-          dateEl.style.fontWeight = '700';
-          dateEl.style.color = '#64748B';
-          rowEl.appendChild(dateEl);
-          const noteEl = document.createElement('span');
-          noteEl.textContent = entry.note;
-          rowEl.appendChild(noteEl);
+          rowEl.style.padding = '4px 0';
+
+          if (isMobileViewport) {
+            // Mobile layout: Date one line, note next line, separator line at the bottom
+            const dateEl = document.createElement('div');
+            dateEl.textContent = formatPlaceBadgeDate(entry.date) || entry.date;
+            dateEl.style.fontWeight = '700';
+            dateEl.style.color = '#64748B';
+            dateEl.style.marginBottom = '2px';
+            rowEl.appendChild(dateEl);
+
+            const noteEl = document.createElement('div');
+            noteEl.textContent = entry.note;
+            noteEl.style.color = '#334155';
+            rowEl.appendChild(noteEl);
+
+            if (idx < displayVisitEntries.length - 1) {
+              const divider = document.createElement('div');
+              divider.style.borderTop = '1px solid #E2E8F0';
+              divider.style.margin = '6px 0 2px 0';
+              rowEl.appendChild(divider);
+            }
+          } else {
+            // PC layout: Side-by-side (flex)
+            rowEl.style.display = 'flex';
+            rowEl.style.gap = '8px';
+            rowEl.style.alignItems = 'flex-start';
+
+            const dateEl = document.createElement('span');
+            dateEl.textContent = formatPlaceBadgeDate(entry.date) || entry.date;
+            dateEl.style.flexShrink = '0';
+            dateEl.style.fontWeight = '700';
+            dateEl.style.color = '#64748B';
+            rowEl.appendChild(dateEl);
+
+            const noteEl = document.createElement('span');
+            noteEl.textContent = entry.note;
+            rowEl.appendChild(noteEl);
+          }
           historyWrap.appendChild(rowEl);
         });
         popupNode.appendChild(historyWrap);
-      } else if (place.memo) {
+      } else if (memoWithoutDate) {
         // Built via DOM nodes (not innerHTML) since memo is free-text user input -- the URL
         // portion still gets the same gray capsule badge look as renderTextWithUrlBadge, just
         // hand-built here since Leaflet popups render outside React's tree.
@@ -24360,8 +24455,8 @@ function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom = false
         memoWrap.style.flexWrap = 'wrap';
         memoWrap.style.alignItems = 'center';
         memoWrap.style.gap = '4px';
-        const memoUrl = extractFirstUrl(place.memo);
-        const memoText = memoUrl ? removeFirstUrl(place.memo) : place.memo;
+        const memoUrl = extractFirstUrl(memoWithoutDate);
+        const memoText = memoUrl ? removeFirstUrl(memoWithoutDate) : memoWithoutDate;
         if (memoText) {
           const textEl = document.createElement('span');
           textEl.textContent = memoText;
@@ -24393,7 +24488,7 @@ function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom = false
       marker.bindPopup(popupNode, {
         closeButton: false,
         minWidth: 220,
-        maxWidth: isMobileViewport ? Math.round(window.innerWidth * 0.8) : 360
+        maxWidth: isMobileViewport ? Math.round(window.innerWidth * 0.8) : 480
       });
       if (onSelectPlace) marker.on('click', () => onSelectPlace(place));
       marker.addTo(layer);
@@ -24441,14 +24536,19 @@ function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom = false
     const marker = markersByIdRef.current.get(focusPlace.id);
     if (!marker) return;
     const isMobileViewport = window.innerWidth <= 720;
-    mapRef.current.setView(marker.getLatLng(), isMobileViewport ? 16 : 17, { animate: true });
+    
+    const performFocus = () => {
+      mapRef.current.setView(marker.getLatLng(), isMobileViewport ? 16 : 17, { animate: true });
+      marker.openPopup();
+    };
+    
     // markerClusterGroup can have this marker tucked inside a collapsed cluster at the map's
     // current zoom -- zoomToShowLayer expands/pans through whatever cluster hierarchy is needed
     // before opening the popup, which a plain marker.openPopup() call can't do on its own.
     if (typeof markersLayerRef.current.zoomToShowLayer === 'function') {
-      markersLayerRef.current.zoomToShowLayer(marker, () => marker.openPopup());
+      markersLayerRef.current.zoomToShowLayer(marker, performFocus);
     } else {
-      marker.openPopup();
+      performFocus();
     }
   }, [ready, focusPlace]);
 
