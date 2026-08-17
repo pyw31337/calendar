@@ -1853,9 +1853,14 @@ async function fetchChatMessagesRest(calId) {
   }
 }
 
-async function fetchMemosRest(calId) {
+// recentLimit mirrors fetchActivityLogsFromFirestore's own param -- both call sites always pass
+// memosLimit now, so this REST fallback (used when the Firestore SDK listener itself errors out)
+// downloads the same bounded page the SDK path would have, instead of the entire memos
+// collection every time a calendar with thousands of memos falls back to REST.
+async function fetchMemosRest(calId, recentLimit = null) {
   try {
-    const url = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/calendars/cal_${calId}/memos?orderBy=createdAt%20desc`;
+    const pageSizePart = recentLimit ? `&pageSize=${recentLimit}` : '';
+    const url = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/calendars/cal_${calId}/memos?orderBy=createdAt%20desc${pageSizePart}`;
     const res = await fetch(url);
     if (!res.ok) return [];
     const data = await res.json();
@@ -6260,9 +6265,9 @@ function App() {
       return;
     }
     if (!firebaseDb) {
-      fetchMemosRest(activeCalId).then(list => {
-        setMemos(list.slice(0, memosLimit));
-        setHasMoreMemos(list.length > memosLimit);
+      fetchMemosRest(activeCalId, memosLimit).then(list => {
+        setMemos(list);
+        setHasMoreMemos(list.length >= memosLimit);
       });
       return;
     }
@@ -6298,10 +6303,10 @@ function App() {
         applyMerged();
       }, err => {
         console.warn(`Firestore memos subscription error:`, err);
-        fetchMemosRest(activeCalId).then(list => {
+        fetchMemosRest(activeCalId, memosLimit).then(list => {
           if (!isMounted) return;
-          recentList = list.slice(0, memosLimit);
-          setHasMoreMemos(list.length > memosLimit);
+          recentList = list;
+          setHasMoreMemos(list.length >= memosLimit);
           applyMerged();
         });
       });
