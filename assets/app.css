@@ -228,6 +228,17 @@ html {
 
 body {
   font-family: var(--font-sans);
+  /* Every digit renders at the same fixed width instead of each glyph's natural (proportional)
+     width, so any two date/time strings of the same shape -- "11.11.11" vs "99.99.99", "1:05" vs
+     "9:45" -- always take up exactly the same amount of horizontal space. Applied once here (an
+     inherited property, so it reaches every date/time string on the site automatically) rather
+     than on individual date-rendering call sites, since a per-component fix would need to be
+     copy-pasted into every place a date or time is ever displayed and would silently stop covering
+     new ones added later. font-feature-settings is the older syntax some engines still need
+     alongside the standard font-variant-numeric property.
+  */
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1, "lnum" 1;
   background-color: var(--bg-primary);
   background-image:
     radial-gradient(at 10% 10%, rgba(79, 70, 229, 0.05) 0px, transparent 40%),
@@ -396,6 +407,37 @@ body:has(.admin-login-gate) {
 .memo-card-hover:hover,
 .place-card-row:hover {
   transform: translate3d(0, -1px, 0);
+}
+/* A place's visit-history entry (date + note). Desktop keeps them side by side; narrow viewports
+   stack the date onto its own line above the note, since "25.06.27 (금) 영우 유리 서준 / 꽃잎반
+   다낭여행 / 씨푸드플래터..." sharing one line with the date left no room for the note to wrap
+   sensibly. The border-top only applies via the adjacent-sibling selector, so it never shows above
+   the first entry in a place with several visits. */
+.place-visit-entry {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 0.78rem;
+  color: var(--text-main);
+}
+.place-visit-entry-date {
+  flex-shrink: 0;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+.place-visit-entry-note {
+  min-width: 0;
+}
+@media (max-width: 640px) {
+  .place-visit-entry {
+    flex-direction: column;
+    gap: 2px;
+  }
+  .place-visit-entry + .place-visit-entry {
+    margin-top: 6px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border-subtle);
+  }
 }
 .btn.is-pressing,
 .day-cell.is-pressing,

@@ -13272,6 +13272,22 @@ function PencilIcon({ size = 12 } = {}) {
   );
 }
 
+// "building-2" icon -- same path data as the raw SVG string PlaceMapView's Leaflet popup builds
+// for its "지도에서 업체정보 보기" button (see businessInfoBtn.innerHTML), so the place list's icon
+// version of 업체보기 looks identical to the map popup's.
+function BuildingIcon({ size = 14 } = {}) {
+  return /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg", width: String(size), height: String(size), viewBox: "0 0 24 24",
+    fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
+  },
+    /*#__PURE__*/React.createElement("path", { d: "M10 12h4" }),
+    /*#__PURE__*/React.createElement("path", { d: "M10 8h4" }),
+    /*#__PURE__*/React.createElement("path", { d: "M14 21v-3a2 2 0 0 0-4 0v3" }),
+    /*#__PURE__*/React.createElement("path", { d: "M6 10H4a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-2" }),
+    /*#__PURE__*/React.createElement("path", { d: "M6 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16" })
+  );
+}
+
 function ChatParticipantSheet({ calendar, selectedId, onSelect, onClose }) {
   const participants = getActiveParticipants(calendar);
   return /*#__PURE__*/React.createElement(React.Fragment, null,
@@ -24227,9 +24243,6 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
     setIsRegisterOpen(false);
     setEditingPlace(null);
   };
-  const handleDeleteFromCard = place => {
-    onRequestConfirm('장소 삭제', `"${place.name || '이 장소'}"를 삭제하시겠습니까?`, () => onDeletePlace(place.id));
-  };
 
   // Most recent visit date first, oldest last -- places with no date info at all (never
   // searched with a visitDate, no dated memo) fall to the very bottom rather than being
@@ -24404,11 +24417,12 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
             const visitEntries = parseVisitEntriesFromMemo(place.memo);
             const memoWithoutDate = memoDate ? place.memo.replace(memoDate, '').trim() : place.memo;
             const participantNames = extractKnownParticipantNames(place.memo, knownParticipantNames);
-            // The most relevant single date for this place (structured visitDate first, then the
-            // latest parsed visit-history entry, then a leading memo date) shown as its own capsule
-            // next to the category/visit-status badges -- separate from the memoDate badge below,
-            // which always shows the memo's own leading date regardless of which is most recent.
-            const topBadgeDate = formatPlaceBadgeDate(getPlaceSortDateKey(place));
+            // A single-visit memo (just one leading date, no "/"-delimited history) still gets the
+            // same date-left/note-right treatment as a real multi-entry visit history, instead of
+            // silently dropping the date the way a bare memoWithoutDate paragraph used to.
+            const displayVisitEntries = visitEntries.length > 0
+              ? sortVisitEntriesRecentFirst(visitEntries)
+              : (memoDate ? [{ date: memoDate, note: memoWithoutDate }] : []);
             return /*#__PURE__*/React.createElement("div", {
               key: place.id,
               className: "place-card-row",
@@ -24419,7 +24433,10 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
               onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleSelectPlaceOnMap(place); } },
               style: {
                 display: 'flex', flexDirection: 'column', gap: '4px',
-                padding: '10px 76px 10px 12px', position: 'relative',
+                // Symmetric -- the top-right icon buttons are position:absolute (out of flow), so
+                // they don't need padding reserved for them on every row, only on the badge row
+                // right below them (see its own paddingRight).
+                padding: '10px 12px', position: 'relative',
                 border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', cursor: 'pointer'
               },
               onClick: () => handleSelectPlaceOnMap(place)
@@ -24429,6 +24446,19 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
               },
                 /*#__PURE__*/React.createElement("button", {
                   type: "button",
+                  onClick: event => {
+                    event.stopPropagation();
+                    window.open(getPlaceExternalMapUrl(place), '_blank', 'noopener,noreferrer');
+                  },
+                  title: "업체보기",
+                  style: {
+                    width: '28px', height: '28px',
+                    background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0
+                  }
+                }, /*#__PURE__*/React.createElement(BuildingIcon, { size: 14 })),
+                /*#__PURE__*/React.createElement("button", {
+                  type: "button",
                   onClick: event => { event.stopPropagation(); handleEditPlace(place); },
                   title: "장소 수정",
                   style: {
@@ -24436,20 +24466,12 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
                     background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8',
                     display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0
                   }
-                }, /*#__PURE__*/React.createElement(PencilIcon, { size: 14 })),
-                /*#__PURE__*/React.createElement("button", {
-                  type: "button",
-                  className: "expense-delete-button",
-                  onClick: event => { event.stopPropagation(); handleDeleteFromCard(place); },
-                  title: "장소 삭제",
-                  style: {
-                    width: '28px', height: '28px',
-                    background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0
-                  }
-                }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 14 }))
+                }, /*#__PURE__*/React.createElement(PencilIcon, { size: 14 }))
               ),
-              /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' } },
+              /* paddingRight clears the two absolutely-positioned icon buttons above (2 x 28px +
+                 4px gap) -- only this row sits in the same vertical band as them, every row below
+                 it is already clear of them without needing any padding reserved. */
+              /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', paddingRight: '64px' } },
                 /*#__PURE__*/React.createElement("span", {
                   style: {
                     display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '3px 8px 3px 3px', borderRadius: '999px',
@@ -24471,50 +24493,24 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
                     color: place.visitStatus === 'planned' ? '#2563EB' : '#16A34A'
                   }
                 }, place.visitStatus === 'planned' ? '방문예정' : '방문'),
-                topBadgeDate && /*#__PURE__*/React.createElement("span", {
-                  style: {
-                    fontSize: '0.66rem', fontWeight: 700, padding: '2px 7px', borderRadius: 'var(--radius-full)',
-                    backgroundColor: 'rgba(100, 116, 139, 0.12)', color: 'var(--text-muted)'
-                  }
-                }, `최근방문 ${topBadgeDate}`),
                 visitEntries.length > 0 && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 700 } }, `총 ${visitEntries.length}회 방문`)
               ),
-              /* Name + address row, with an explicit "업체보기" button that opens this place in
-                 an external map service -- Naver for a domestic coordinate, Google Maps for an
-                 overseas one (getPlaceExternalMapUrl), since Naver/Kakao have no real POI data
-                 outside Korea. stopPropagation so it doesn't also trigger the card's own onClick. */
-              /*#__PURE__*/React.createElement("div", {
-                style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }
-              },
-                /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 } },
-                  /*#__PURE__*/React.createElement("span", { style: { fontWeight: 800, fontSize: '0.88rem', color: 'var(--text-main)' } }, place.name || '이름 없음'),
-                  place.address && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.74rem', color: 'var(--text-muted)' } }, getDisplayPlaceAddress(place))
-                ),
-                /*#__PURE__*/React.createElement("button", {
-                  type: "button",
-                  onClick: event => {
-                    event.stopPropagation();
-                    window.open(getPlaceExternalMapUrl(place), '_blank', 'noopener,noreferrer');
-                  },
-                  style: {
-                    flexShrink: 0, border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)',
-                    padding: '10px 14px', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer',
-                    backgroundColor: '#FFFFFF', color: 'var(--text-main)'
-                  }
-                }, "업체보기")
+              /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 } },
+                /*#__PURE__*/React.createElement("span", { style: { fontWeight: 800, fontSize: '0.88rem', color: 'var(--text-main)' } }, place.name || '이름 없음'),
+                place.address && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.74rem', color: 'var(--text-muted)' } }, getDisplayPlaceAddress(place))
               ),
-              visitEntries.length > 0
+              displayVisitEntries.length > 0
                 ? /*#__PURE__*/React.createElement("div", {
                     style: {
-                      display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '2px',
+                      display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '2px',
                       backgroundColor: 'var(--bg-primary)', borderRadius: 'var(--radius-md)', padding: '8px 10px'
                     }
-                  }, sortVisitEntriesRecentFirst(visitEntries).map((entry, idx) => /*#__PURE__*/React.createElement("div", {
+                  }, displayVisitEntries.map((entry, idx) => /*#__PURE__*/React.createElement("div", {
                     key: idx,
-                    style: { display: 'flex', alignItems: 'flex-start', gap: '6px', fontSize: '0.78rem', color: 'var(--text-main)' }
+                    className: "place-visit-entry"
                   },
-                    /*#__PURE__*/React.createElement("span", { style: { flexShrink: 0, fontWeight: 700, color: 'var(--text-muted)' } }, formatPlaceBadgeDate(entry.date) || entry.date),
-                    /*#__PURE__*/React.createElement("span", null, entry.note)
+                    /*#__PURE__*/React.createElement("span", { className: "place-visit-entry-date" }, formatPlaceBadgeDate(entry.date) || entry.date),
+                    /*#__PURE__*/React.createElement("span", { className: "place-visit-entry-note" }, entry.note)
                   )))
                 : memoWithoutDate && /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.78rem', color: 'var(--text-main)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px' } }, renderTextWithUrlBadge(memoWithoutDate)),
               participantNames.length > 0 && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '2px' } },
