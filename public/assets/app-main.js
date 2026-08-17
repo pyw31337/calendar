@@ -15047,9 +15047,18 @@ function DateModal({
     strokeWidth: 1.5,
     opacity: 0.8
   })))), [1, 2, 3, 4, 5, 6].map(i => /*#__PURE__*/React.createElement("span", {
-    key: `part-${i}`,
-    className: `gamified-particle gamified-particle-${i}`
-  }))), isConfirmed ? "확정취소" : "모임확정"), /*#__PURE__*/React.createElement("div", {
+    key: `sparklet-${i}`,
+    className: `gamified-sparklet gamified-sparklet-${i}`
+  }, /*#__PURE__*/React.createElement("svg", {
+    viewBox: "0 0 24 24",
+    style: {
+      width: '100%',
+      height: '100%',
+      fill: 'currentColor'
+    }
+  }, /*#__PURE__*/React.createElement("path", {
+    d: "M12 0 L14 10 L24 12 L14 14 L12 24 L10 14 L0 12 L10 10 Z"
+  }))))), isConfirmed ? "확정취소" : "모임확정"), /*#__PURE__*/React.createElement("div", {
     style: { display: 'flex', gap: '8px' }
   }, /*#__PURE__*/React.createElement("button", {
     type: "button",
