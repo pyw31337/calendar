@@ -22160,7 +22160,15 @@ function PollModal({ calendar, poll, onSave, onClose, showToast, onRequestConfir
     if (isSubmitting) return;
     const cleanTitle = sanitizeText(title, 80);
     const cleanDescription = sanitizeText(description, 160);
-    const activeOptions = options.map(option => {
+    // Deleted options must still be SENT to onSave with their removedAt tombstone intact, not
+    // dropped from the array -- mergePollRecord (see its definition) merges this calendar's
+    // saved poll against whatever the server currently has by unioning option IDs from both
+    // sides, keyed by whichever copy has the newer timestamp. If a deleted option is simply
+    // omitted here instead of tombstoned, the merge has no way to tell "this option was removed"
+    // apart from "this save just never mentioned it" -- the server's still-existing copy of that
+    // option ID wins the union and the deletion silently reverts on the next merge (which is
+    // exactly what a concurrent-edit-safe merge needs to do for options nobody touched).
+    const normalizedOptions = options.map(option => {
       if (isTombstone(option)) return option;
       const inputValue = option.inputValue ?? `${option.text}${option.url ? ' ' + option.url : ''}`;
       const parsed = normalizePollOptionInput(inputValue);
@@ -22169,8 +22177,9 @@ function PollModal({ calendar, poll, onSave, onClose, showToast, onRequestConfir
         text: parsed.text,
         url: parsed.url
       };
-    }).filter(option => !isTombstone(option) && sanitizeText(option.text, 120));
-    if (!cleanTitle || activeOptions.length === 0) {
+    }).filter(option => isTombstone(option) || sanitizeText(option.text, 120));
+    const activeOptionCount = normalizedOptions.filter(option => !isTombstone(option)).length;
+    if (!cleanTitle || activeOptionCount === 0) {
       if (showToast) showToast('투표명·옵션 필요', 'error'); else alert('투표명·옵션 필요');
       return;
     }
@@ -22184,7 +22193,7 @@ function PollModal({ calendar, poll, onSave, onClose, showToast, onRequestConfir
         title: cleanTitle,
         description: cleanDescription,
         deadline: deadlineInput ? new Date(deadlineInput).getTime() : null,
-        options: activeOptions,
+        options: normalizedOptions,
         votes: poll?.votes || {},
         createdAt: poll?.createdAt || now,
         updatedAt: Date.now()
