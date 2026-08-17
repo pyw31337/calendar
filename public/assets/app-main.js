@@ -10270,9 +10270,11 @@ function renderChatMessageImages(msg, setActiveLightbox, singleImageStyle = {}) 
   const desktopCols = thumbs.length >= 12 ? 6 : thumbs.length >= 5 ? 5 : mobileCols;
   const cols = `var(--chat-image-grid-cols, ${mobileCols})`;
   const shouldFillBubble = thumbs.length >= 5;
-  const maxW = thumbs.length === 2
-    ? '180px'
-    : `min(100%, calc(var(--chat-image-grid-cols, ${mobileCols}) * 76px + (var(--chat-image-grid-cols, ${mobileCols}) - 1) * 4px))`;
+  // Must match the grid's own actual rendered width (cols * 76px track + gaps) exactly -- a
+  // 2-image message previously hardcoded '180px' here instead of the true 156px, leaving a real
+  // 24px gap to the right of the thumbnails even independent of the mobile shrink-to-fit bug
+  // above (see the CSS media query comment for that one).
+  const maxW = `min(100%, calc(var(--chat-image-grid-cols, ${mobileCols}) * 76px + (var(--chat-image-grid-cols, ${mobileCols}) - 1) * 4px))`;
 
   return /*#__PURE__*/React.createElement('div', {
     className: `chat-message-image-grid${shouldFillBubble ? ' is-wide' : ''}`,
