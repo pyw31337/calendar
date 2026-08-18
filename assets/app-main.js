@@ -103,7 +103,7 @@ function normalizePlaces(places) {
       lat: Number(place.lat),
       lng: Number(place.lng),
       categoryId: sanitizeText(place.categoryId || 'etc', 40),
-      memo: sanitizeText(place.memo || '', 300),
+      memo: sanitizeText(place.memo || '', 2000),
       visitStatus: place.visitStatus === 'planned' ? 'planned' : 'visited',
       visitDate: isValidDateString(place.visitDate) ? place.visitDate : '',
       createdAt: Number(place.createdAt) || Date.now(),
@@ -7694,7 +7694,7 @@ function App() {
     const categoryIds = new Set(getPlaceCategories(activeCal).map(c => c.id));
     const cleanCategoryId = categoryIds.has(placeData.categoryId) ? placeData.categoryId : 'etc';
     const cleanAddress = sanitizeText(placeData.address || '', 200);
-    const cleanMemo = sanitizeText(placeData.memo || '', 300);
+    const cleanMemo = sanitizeText(placeData.memo || '', 2000);
     const cleanVisitStatus = placeData.visitStatus === 'planned' ? 'planned' : 'visited';
     const cleanVisitDate = cleanVisitStatus === 'visited' && isValidDateString(placeData.visitDate) ? placeData.visitDate : '';
     const nextPlaces = isEditing
@@ -14331,7 +14331,7 @@ function DateModal({
       const isConfirmed = isDateConfirmedMeeting(calendar, dateStr);
       const cleanName = sanitizeText(selectedPlace.name || '', 80);
       const cleanAddress = sanitizeText(selectedPlace.address || '', 200);
-      const cleanMemo = sanitizeText(placeMemo.trim() || '', 300);
+      const cleanMemo = sanitizeText(placeMemo.trim() || '', 2000);
       
       const newPlaceData = {
         name: cleanName,
@@ -15050,7 +15050,7 @@ function DateModal({
               className: "form-input",
               style: { flex: 1, minHeight: '44px', height: '44px', resize: 'none', fontFamily: 'inherit', padding: '8px 12px', boxSizing: 'border-box' },
               placeholder: "메모 입력 (선택, '26.02.12' 또는 URL 입력 가능)",
-              maxLength: 300,
+              maxLength: 2000,
               value: placeMemo,
               disabled: isSavingPlace,
               onChange: e => setPlaceMemo(e.target.value)
