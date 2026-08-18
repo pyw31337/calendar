@@ -8255,6 +8255,8 @@ function App() {
       isDarkTheme: isDarkTheme,
       onRequestConfirm: showConfirmDialog,
       sharedMemo: sharedMemo,
+      chatMessages: chatMessages,
+      setActiveLightbox: setActiveLightbox,
       onDismissSharedMemo: () => {
         setSharedMemo(null);
         const url = new URL(window.location.href);
@@ -14144,6 +14146,18 @@ function EditMessageModal({
 // value, or an earlier low-zIndex call (e.g. a chat send burst) locks the canvas behind modals.
 const CONFETTI_Z_INDEX = 999999;
 
+function getShortTitleParts(dateStr) {
+  if (!dateStr) return { year: '', rest: '' };
+  const [year, month, day] = dateStr.split('-');
+  const dateObj = new Date(year, month - 1, day);
+  const dayOfWeek = ['일', '월', '화', '수', '목', '금', '토'][dateObj.getDay()];
+  const shortYear = year.slice(2);
+  return {
+    year: `${shortYear}.`,
+    rest: `${month}.${day}(${dayOfWeek})`
+  };
+}
+
 function DateModal({
   anniversaries = [],
   dateStr,
@@ -18741,7 +18755,7 @@ function useScrollHideHeader() {
   return { isHeaderVisible, onScroll };
 }
 
-function MemoView({ calendar, memos, hasMoreMemos, onLoadMoreMemos, onBack, showToast, isDarkTheme, onRequestConfirm, sharedMemo, onDismissSharedMemo }) {
+function MemoView({ calendar, memos, hasMoreMemos, onLoadMoreMemos, onBack, showToast, isDarkTheme, onRequestConfirm, sharedMemo, onDismissSharedMemo, chatMessages, setActiveLightbox }) {
   const [searchQuery, setSearchQuery] = React.useState('');
   const [selectedTag, setSelectedTag] = React.useState('');
   // Header hides on scroll-down / reappears on scroll-up, matching the chat room header exactly.
