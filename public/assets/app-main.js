@@ -19200,6 +19200,15 @@ function MemoView({ calendar, memos, hasMoreMemos, onLoadMoreMemos, onBack, show
   // already use) and offers a one-tap copy.
   const [sharingMemo, setSharingMemo] = React.useState(null);
 
+  // Gallery modal state -- opens the ChatGalleryModal (photo grid) from this view's own
+  // header gallery icon or side-menu entry. Previously these variables were only declared
+  // in App scope and were never in scope inside MemoView, causing a ReferenceError crash.
+  const [isGalleryOpen, setIsGalleryOpen] = React.useState(false);
+
+  // Link-preview progress overlay state -- shown while a memo link-preview is being fetched.
+  // Same crash root cause as isGalleryOpen above (declared only in App, used here).
+  const [linkPreviewProgressState, setLinkPreviewProgressState] = React.useState(null);
+
   const removeComposerImage = (idx) => {
     setNewImages(prev => prev.filter((_, i) => i !== idx));
   };
@@ -19330,20 +19339,40 @@ function MemoView({ calendar, memos, hasMoreMemos, onLoadMoreMemos, onBack, show
           textOverflow: 'ellipsis', maxWidth: 'calc(100vw - 160px)', pointerEvents: 'none'
         }
       }, calendar.title, " 메모"),
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        onClick: () => setIsSearchOpen(v => !v),
-        title: "검색",
-        "aria-label": "메모 검색",
-        style: {
-          background: 'none', border: 'none', cursor: 'pointer', padding: '6px',
-          color: isSearchOpen ? 'var(--accent-primary)' : 'var(--text-muted)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '8px'
-        }
-      }, /*#__PURE__*/React.createElement("svg", {
-        xmlns: "http://www.w3.org/2000/svg", width: "22", height: "22", viewBox: "0 0 24 24",
-        fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
-      }, /*#__PURE__*/React.createElement("circle", { cx: "11", cy: "11", r: "8" }), /*#__PURE__*/React.createElement("path", { d: "m21 21-4.3-4.3" })))
+      /*#__PURE__*/React.createElement("div", {
+        style: { display: 'flex', alignItems: 'center', gap: '2px', flexShrink: 0 }
+      },
+        /* Gallery button */
+        chatMessages && chatMessages.length > 0 && /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          onClick: () => setIsGalleryOpen(true),
+          title: "갤러리",
+          "aria-label": "채팅방 갤러리",
+          style: {
+            background: 'none', border: 'none', cursor: 'pointer', padding: '6px',
+            color: 'var(--text-muted)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '8px'
+          }
+        }, /*#__PURE__*/React.createElement("svg", {
+          xmlns: "http://www.w3.org/2000/svg", width: "22", height: "22", viewBox: "0 0 24 24",
+          fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
+        }, /*#__PURE__*/React.createElement("rect", { width: "18", height: "18", x: "3", y: "3", rx: "2", ry: "2" }), /*#__PURE__*/React.createElement("circle", { cx: "9", cy: "9", r: "2" }), /*#__PURE__*/React.createElement("path", { d: "m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" }))),
+        /* Search button */
+        /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          onClick: () => setIsSearchOpen(v => !v),
+          title: "검색",
+          "aria-label": "메모 검색",
+          style: {
+            background: 'none', border: 'none', cursor: 'pointer', padding: '6px',
+            color: isSearchOpen ? 'var(--accent-primary)' : 'var(--text-muted)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '8px'
+          }
+        }, /*#__PURE__*/React.createElement("svg", {
+          xmlns: "http://www.w3.org/2000/svg", width: "22", height: "22", viewBox: "0 0 24 24",
+          fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
+        }, /*#__PURE__*/React.createElement("circle", { cx: "11", cy: "11", r: "8" }), /*#__PURE__*/React.createElement("path", { d: "m21 21-4.3-4.3" })))
+      )
     ),
 
     /* Search bar -- hidden by default, slides in below the header when the search button is
