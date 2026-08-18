@@ -6222,6 +6222,7 @@ function App() {
   const [activeLightbox, setActiveLightbox] = React.useState(null); // { urls: string[], index: number } | null
   const [linkPreviewProgressState, setLinkPreviewProgressState] = React.useState(null);
   const [isGalleryOpen, setIsGalleryOpen] = React.useState(false);
+  const [placesInitialQuery, setPlacesInitialQuery] = React.useState('');
   // Clicking a #해시태그 in the lightbox's image-info panel closes the lightbox and opens the
   // global search prefilled with that tag -- shared by every Lightbox instance in the app.
   // GlobalSearchModal is only mounted in the default (calendar) tree, not in the separate
@@ -6232,6 +6233,11 @@ function App() {
     setGlobalSearchInitialQuery(tagText);
     setIsGlobalSearchOpen(true);
     changeView('calendar');
+  };
+  const handleParticipantClick = name => {
+    setIsModalOpen(false);
+    setPlacesInitialQuery(name);
+    changeView('places');
   };
   const [deletingMessage, setDeletingMessage] = React.useState(null); // {id, participantId, text, calId}
   const [editingMessage, setEditingMessage] = React.useState(null); // {id, participantId, text, imageUrl, thumbUrl, calId}
@@ -8004,7 +8010,8 @@ function App() {
       onDeletePlace: handleDeletePlace,
       showToast: showToast,
       onRequestConfirm: showConfirmDialog,
-      onClose: () => setIsModalOpen(false)
+      onClose: () => setIsModalOpen(false),
+      onParticipantClick: handleParticipantClick
     }),
     confirmDialog && /*#__PURE__*/React.createElement(ConfirmDialog, {
       title: confirmDialog.title,
@@ -8273,7 +8280,9 @@ function App() {
       onSavePlace: handleSavePlace,
       onDeletePlace: handleDeletePlace,
       showToast: showToast,
-      onRequestConfirm: showConfirmDialog
+      onRequestConfirm: showConfirmDialog,
+      placesInitialQuery: placesInitialQuery,
+      setPlacesInitialQuery: setPlacesInitialQuery
     }));
   }
 
@@ -8491,7 +8500,8 @@ function App() {
       setSelectedDate(d);
       setIsModalOpen(true);
     },
-    onMoveAvailability: handleMoveAvailability
+    onMoveAvailability: handleMoveAvailability,
+    onParticipantClick: handleParticipantClick
   })), /*#__PURE__*/React.createElement("div", {
     ref: pollsSectionRef,
     className: "calendar-card",
@@ -8765,7 +8775,8 @@ function CalendarGrid({
   onJumpToMonth,
   onSelectDate,
   compact = false,
-  onMoveAvailability
+  onMoveAvailability,
+  onParticipantClick
 }) {
   const year = monthDate.getFullYear();
   const month = monthDate.getMonth();
@@ -9173,7 +9184,7 @@ function CalendarGrid({
           style: {
             backgroundColor: p.color,
             color: getContrastTextColor(p.color),
-            cursor: 'grab'
+            cursor: 'pointer'
           },
           draggable: true,
           onDragStart: event => {
@@ -9184,6 +9195,12 @@ function CalendarGrid({
               participantId: e.participantId,
               participantName: p.name
             }));
+          },
+          onClick: event => {
+            event.stopPropagation();
+            if (typeof onParticipantClick === 'function') {
+              onParticipantClick(p.name);
+            }
           },
           title: e.note ? `${p.name}: ${e.note}` : p.name
         }, /*#__PURE__*/React.createElement("span", {
@@ -14174,7 +14191,8 @@ function DateModal({
   onDeleteDate,
   onRequestConfirm,
   onClose,
-  showToast
+  showToast,
+  onParticipantClick
 }) {
   const [activeTab, setActiveTab] = React.useState('participant'); // 'participant' | 'meeting' | 'settlement'
   const [participantId, setParticipantId] = React.useState('');
@@ -14943,7 +14961,21 @@ function DateModal({
               /*#__PURE__*/React.createElement("span", {
                 style: { width: '8px', height: '8px', borderRadius: '50%', backgroundColor: part.color, flexShrink: 0 }
               }),
-              /*#__PURE__*/React.createElement("span", { style: { fontWeight: 800, fontSize: '0.85rem', color: 'var(--text-main)', flexShrink: 0 } }, part.name),
+              /*#__PURE__*/React.createElement("span", {
+                style: {
+                  fontWeight: 800,
+                  fontSize: '0.85rem',
+                  color: 'var(--text-main)',
+                  flexShrink: 0,
+                  cursor: 'pointer'
+                },
+                title: `${part.name}의 등록 장소 검색`,
+                onClick: () => {
+                  if (typeof onParticipantClick === 'function') {
+                    onParticipantClick(part.name);
+                  }
+                }
+              }, part.name),
               entry.note && /*#__PURE__*/React.createElement("span", {
                 style: {
                   fontSize: '0.78rem',
@@ -25206,7 +25238,7 @@ function PlacesSection({ calendar, onViewAll }) {
 // taller interactive map (marker click opens the register modal pre-filled for editing) plus a
 // scrollable place-card list below it, since editing/deleting via Leaflet popup controls isn't
 // practical to build or to verify structurally -- the card list is plain React DOM instead.
-function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, onRequestConfirm }) {
+function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, onRequestConfirm, placesInitialQuery, setPlacesInitialQuery }) {
   const [isRegisterOpen, setIsRegisterOpen] = React.useState(false);
   const [editingPlace, setEditingPlace] = React.useState(null);
   const [categoryFilter, setCategoryFilter] = React.useState('all');
@@ -25220,6 +25252,15 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
   // Refined: Header search and Map drag height states
   const [listSearchQuery, setListSearchQuery] = React.useState('');
   const [isSearchOpen, setIsSearchOpen] = React.useState(false);
+
+  React.useEffect(() => {
+    if (placesInitialQuery) {
+      setListSearchQuery(placesInitialQuery);
+      setIsSearchOpen(true);
+      setCategoryFilter('all');
+      setPlacesInitialQuery('');
+    }
+  }, [placesInitialQuery, setPlacesInitialQuery]);
   const [mapHeight, setMapHeight] = React.useState(Math.round(window.innerHeight * 0.4));
   
   const isDraggingRef = React.useRef(false);
@@ -25305,13 +25346,29 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
     return (b.updatedAt || 0) - (a.updatedAt || 0);
   });
   
-  const countsByCategory = places.reduce((acc, p) => { acc[p.categoryId] = (acc[p.categoryId] || 0) + 1; return acc; }, {});
+  const searchedPlaces = React.useMemo(() => {
+    if (!listSearchQuery.trim()) return places;
+    const queryLower = listSearchQuery.toLowerCase().trim();
+    return places.filter(p => {
+      const matchName = p.name && p.name.toLowerCase().includes(queryLower);
+      const matchAddress = p.address && p.address.toLowerCase().includes(queryLower);
+      const matchMemo = p.memo && p.memo.toLowerCase().includes(queryLower);
+      return matchName || matchAddress || matchMemo;
+    });
+  }, [places, listSearchQuery]);
+
+  const countsByCategory = React.useMemo(() => {
+    return searchedPlaces.reduce((acc, p) => {
+      acc[p.categoryId] = (acc[p.categoryId] || 0) + 1;
+      return acc;
+    }, {});
+  }, [searchedPlaces]);
   
   // Filter by category filter AND listSearchQuery query!
   const filteredPlaces = sortedPlaces.filter(p => {
     if (categoryFilter !== 'all' && p.categoryId !== categoryFilter) return false;
     if (listSearchQuery.trim()) {
-      const queryLower = listSearchQuery.toLowerCase();
+      const queryLower = listSearchQuery.toLowerCase().trim();
       const matchName = p.name && p.name.toLowerCase().includes(queryLower);
       const matchAddress = p.address && p.address.toLowerCase().includes(queryLower);
       const matchMemo = p.memo && p.memo.toLowerCase().includes(queryLower);
@@ -25446,7 +25503,13 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
         className: "form-input",
         placeholder: "등록된 장소명 또는 주소 검색...",
         value: listSearchQuery,
-        onChange: e => setListSearchQuery(e.target.value),
+        onChange: e => {
+          const val = e.target.value;
+          setListSearchQuery(val);
+          if (val.trim()) {
+            setCategoryFilter('all');
+          }
+        },
         autoFocus: true,
         style: { flex: 1, minWidth: 0, height: '32px', fontSize: '0.82rem', padding: '0 8px' }
       }),
@@ -25535,7 +25598,7 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
       /*#__PURE__*/React.createElement("div", { className: "place-category-tabs-desktop-only" },
         /*#__PURE__*/React.createElement(SearchCategoryTabs, {
           tabs: [
-            { key: 'all', label: '전체', count: places.length },
+            { key: 'all', label: '전체', count: searchedPlaces.length },
             ...categories.map(category => ({
               key: category.id,
               label: `${getPlaceCategoryIcon(category)} ${category.name}`,
@@ -25557,7 +25620,7 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
           options: [
             {
               value: 'all',
-              label: /*#__PURE__*/React.createElement(React.Fragment, null, "전체 ", /*#__PURE__*/React.createElement("span", { className: "section-count-badge" }, places.length))
+              label: /*#__PURE__*/React.createElement(React.Fragment, null, "전체 ", /*#__PURE__*/React.createElement("span", { className: "section-count-badge" }, searchedPlaces.length))
             },
             ...categories.map(category => ({
               value: category.id,
@@ -25692,22 +25755,7 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
                   /*#__PURE__*/React.createElement("span", { className: "place-visit-entry-date" }, formatPlaceBadgeDate(entry.date) || entry.date),
                   /*#__PURE__*/React.createElement("span", { className: "place-visit-entry-note" }, entry.note)
                 )))
-              : memoWithoutDate && /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.78rem', color: 'var(--text-main)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px' } }, renderTextWithUrlBadge(memoWithoutDate)),
-            
-            /* Participant Names */
-            participantNames.length > 0 && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '2px' } },
-              participantNames.map(name => /*#__PURE__*/React.createElement("button", {
-                key: name,
-                type: "button",
-                title: "메모에서 참여자 이름을 수정하려면 눌러주세요",
-                onClick: event => { event.stopPropagation(); handleEditPlace(place); },
-                style: {
-                  border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-full)',
-                  padding: '2px 9px', fontSize: '0.7rem', fontWeight: 700, cursor: 'pointer',
-                  backgroundColor: 'var(--bg-primary)', color: 'var(--text-main)'
-                }
-              }, name))
-            )
+              : memoWithoutDate && /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.78rem', color: 'var(--text-main)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px' } }, renderTextWithUrlBadge(memoWithoutDate))
           );
         })
       )
