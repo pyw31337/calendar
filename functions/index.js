@@ -307,6 +307,83 @@ async function checkProxyRateLimit(bucketKey, ip, windowMs, maxRequests) {
   }
 }
 
+async function fetchFallbackPreview(link) {
+  try {
+    const url = new URL(link);
+    const domain = url.hostname.replace(/^www\./i, '');
+    
+    // 1. Check for Instagram specifically
+    if (domain.includes('instagram.com')) {
+      const isReel = url.pathname.includes('/reel/');
+      return {
+        ok: true,
+        title: isReel ? "Instagram 릴스" : "Instagram 포스트",
+        description: "Instagram 사진, 동영상 및 게시물 공유 링크입니다.",
+        image: { medium: { url: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a5/Instagram_icon.png/120px-Instagram_icon.png" } },
+        siteName: 'Instagram',
+        domain: 'instagram.com'
+      };
+    }
+    
+    // 2. Try fetching the page to parse open graph tags
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 4000);
+      const pageRes = await fetch(link, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36'
+        },
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      
+      if (pageRes.ok) {
+        const html = await pageRes.text();
+        
+        // simple regex parsing for og:title, og:description, og:image, og:site_name
+        const getMetaContent = (property) => {
+          const re1 = new RegExp(`<meta[^>]*property=["']${property}["'][^>]*content=["']([^"']*)["']`, 'i');
+          const re2 = new RegExp(`<meta[^>]*content=["']([^"']*)["'][^>]*property=["']${property}["']`, 'i');
+          const re3 = new RegExp(`<meta[^>]*name=["']${property}["'][^>]*content=["']([^"']*)["']`, 'i');
+          const m1 = html.match(re1) || html.match(re2) || html.match(re3);
+          return m1 ? m1[1] : null;
+        };
+        
+        const title = getMetaContent('og:title') || html.match(/<title>([^<]*)<\/title>/i)?.[1] || '';
+        const description = getMetaContent('og:description') || getMetaContent('description') || '';
+        const image = getMetaContent('og:image') || '';
+        const siteName = getMetaContent('og:site_name') || domain;
+        
+        if (title || image || description) {
+          return {
+            ok: true,
+            title: title.trim(),
+            description: description.trim(),
+            image: image ? { medium: { url: image } } : null,
+            siteName: siteName.trim(),
+            domain
+          };
+        }
+      }
+    } catch (e) {
+      console.warn('Fallback HTML scraping failed for:', link, e);
+    }
+    
+    // 3. Absolute generic fallback so ANY url shows a link preview!
+    return {
+      ok: true,
+      title: domain,
+      description: "공유된 링크입니다. 클릭하여 상세 내용을 확인하세요.",
+      image: { medium: { url: `https://www.google.com/s2/favicons?sz=128&domain=${domain}` } },
+      siteName: domain,
+      domain
+    };
+  } catch (err) {
+    console.error('fetchFallbackPreview failed:', err);
+    return null;
+  }
+}
+
 exports.peekalinkProxy = functions.runWith({ secrets: ['PEEKALINK_API_KEY'] }).https.onRequest(async (req, res) => {
   res.set('Access-Control-Allow-Origin', '*');
   res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -344,11 +421,23 @@ exports.peekalinkProxy = functions.runWith({ secrets: ['PEEKALINK_API_KEY'] }).h
       },
       body: JSON.stringify({ link })
     });
-    const json = await peekalinkRes.json();
-    res.status(peekalinkRes.status).json(json);
+    if (peekalinkRes.ok) {
+      const json = await peekalinkRes.json();
+      if (json && json.ok && json.title) {
+        res.status(200).json(json);
+        return;
+      }
+    }
   } catch (err) {
     console.error('Peekalink proxy request failed:', err);
-    res.status(502).json({ ok: false, message: 'Peekalink request failed' });
+  }
+
+  // If Peekalink failed or did not return valid title, fall back to our custom implementation
+  const fallback = await fetchFallbackPreview(link);
+  if (fallback) {
+    res.status(200).json(fallback);
+  } else {
+    res.status(502).json({ ok: false, message: 'Link preview failed' });
   }
 });
 
