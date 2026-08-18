@@ -13422,7 +13422,7 @@ function ChatRoomView({
     onOpenNoticeSettings: () => {
       if (pinnedNotices.length > 0) { setNoticePanelMode('list'); } else { setNoticeInput(''); setNoticePanelMode('add'); }
     },
-    onOpenGallery: onOpenGallery || (() => setIsChatGalleryOpen(true)),
+    onOpenGallery: () => setIsChatGalleryOpen(true),
     onOpenShare: onShare,
     isDarkTheme: isDarkTheme,
     onChangeView: onChangeView,
