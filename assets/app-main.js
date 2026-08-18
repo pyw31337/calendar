@@ -19272,18 +19272,22 @@ function MemoView({ calendar, memos, hasMoreMemos, onLoadMoreMemos, onBack, show
     setEditTagInput('');
   };
 
-  const filteredMemos = memos.filter(memo => {
+  const filteredMemos = (memos || []).filter(memo => {
     const query = searchQuery.trim().toLowerCase();
     
     // Live Search Matcher
-    const titleMatch = memo.title ? memo.title.toLowerCase().includes(query) : false;
-    const textMatch = memo.text ? memo.text.toLowerCase().includes(query) : false;
-    const tagsMatch = memo.tags ? memo.tags.some(tag => tag.toLowerCase().includes(query)) : false;
+    let searchMatch = true;
+    if (query) {
+      const titleMatch = memo.title ? memo.title.toLowerCase().includes(query) : false;
+      const textMatch = memo.text ? memo.text.toLowerCase().includes(query) : false;
+      const tagsMatch = memo.tags ? memo.tags.some(tag => tag.toLowerCase().includes(query)) : false;
+      searchMatch = titleMatch || textMatch || tagsMatch;
+    }
 
     // Filter by Tag Clicked Matcher
     const filterTagMatch = selectedTag ? (memo.tags || []).includes(selectedTag) : true;
 
-    return (titleMatch || textMatch || tagsMatch) && filterTagMatch;
+    return searchMatch && filterTagMatch;
   });
 
   const pinnedMemos = filteredMemos.filter(m => m.isPinned);
