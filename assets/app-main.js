@@ -14638,9 +14638,24 @@ function DateModal({
     }
   };
 
+  const [hasInteracted, setHasInteracted] = React.useState(false);
+  const markDirty = React.useCallback(() => setHasInteracted(true), []);
+  const requestClose = () => {
+    if (isSubmitting) return;
+    const dirty = hasInteracted || !!participantId || !!String(note || '').trim() || !!selectedPlace || !!String(placeMemo || '').trim() || !!String(expenseLabelInput || '').trim() || !!String(expenseAmountInput || '').trim() || !!editingExpenseId;
+    if (dirty && typeof onRequestConfirm === 'function') {
+      onRequestConfirm('닫기 확인', '수정 내용이 있는데 닫으시겠습니까?', () => onClose());
+      return;
+    }
+    onClose();
+  };
+
   const portalContent = /*#__PURE__*/React.createElement("div", {
     className: "modal-overlay",
-    onClick: onClose,
+    onClick: e => {
+      if (e.target !== e.currentTarget) return;
+      requestClose();
+    },
     style: { zIndex: 11000 }
   }, /*#__PURE__*/React.createElement(ResizableModalContainer, {
     className: "modal-container",
@@ -14689,24 +14704,10 @@ function DateModal({
       alignItems: 'center',
       gap: '12px'
     }
-  }, !adminMode && /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    className: "btn-clear-date",
-    style: {
-      background: 'none',
-      border: 'none',
-      color: '#EF4444',
-      fontSize: '0.8rem',
-      fontWeight: 'bold',
-      cursor: 'pointer',
-      padding: '4px 8px',
-      borderRadius: '6px'
-    },
-    onClick: handleClearAllDate
-  }, "날짜초기화"), /*#__PURE__*/React.createElement("button", {
+  }, /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: () => {
-      if (!isSubmitting) onClose();
+      if (!isSubmitting) requestClose();
     },
     style: {
       background: 'none',
@@ -14739,7 +14740,7 @@ function DateModal({
       /* Tab 1: 참여자 */
       /*#__PURE__*/React.createElement("button", {
         type: "button",
-        onClick: () => setActiveTab('participant'),
+        onClick: e => { e.preventDefault(); e.stopPropagation(); setActiveTab('participant'); },
         style: {
           border: 'none',
           borderRadius: '8px',
@@ -14770,7 +14771,7 @@ function DateModal({
       /* Tab 2: 모임 */
       /*#__PURE__*/React.createElement("button", {
         type: "button",
-        onClick: () => setActiveTab('meeting'),
+        onClick: e => { e.preventDefault(); e.stopPropagation(); setActiveTab('meeting'); },
         style: {
           border: 'none',
           borderRadius: '8px',
@@ -14801,7 +14802,7 @@ function DateModal({
       /* Tab 3: 정산 */
       /*#__PURE__*/React.createElement("button", {
         type: "button",
-        onClick: () => setActiveTab('settlement'),
+        onClick: e => { e.preventDefault(); e.stopPropagation(); setActiveTab('settlement'); },
         style: {
           border: 'none',
           borderRadius: '8px',
@@ -14879,7 +14880,7 @@ function DateModal({
             },
             disabled: isSubmitting,
             onClick: () => {
-              if (!isSubmitting) setIsSheetOpen(true);
+              if (!isSubmitting) { markDirty(); setIsSheetOpen(true); }
             }
           },
             /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
@@ -14909,7 +14910,7 @@ function DateModal({
               maxLength: 60,
               value: note,
               disabled: isSubmitting,
-              onChange: e => setNote(e.target.value)
+              onChange: e => { markDirty(); setNote(e.target.value); }
             }),
             /*#__PURE__*/React.createElement("button", {
               type: "button",
@@ -15412,65 +15413,52 @@ function DateModal({
         })
       )
     )
-  )), isSheetOpen && /*#__PURE__*/React.createElement(React.Fragment, null,
+  )), isSheetOpen && /*#__PURE__*/React.createElement("div", {
+    className: "bottom-sheet-overlay",
+    style: { zIndex: 20050 },
+    onClick: () => setIsSheetOpen(false)
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bottom-sheet",
+    style: { maxHeight: '70vh' },
+    onClick: e => e.stopPropagation()
+  },
     /*#__PURE__*/React.createElement("div", {
-      className: "bottom-sheet-overlay",
-      onClick: () => setIsSheetOpen(false)
-    }),
-    /*#__PURE__*/React.createElement("div", {
-      className: "bottom-sheet-container",
-      style: {
-        maxHeight: '400px'
-      }
+      className: "bottom-sheet-header"
     },
-      /*#__PURE__*/React.createElement("div", {
-        className: "bottom-sheet-header"
-      },
-        /*#__PURE__*/React.createElement("span", {
-          style: {
-            fontSize: '0.95rem',
-            fontWeight: 900,
-            color: 'var(--text-main)'
-          }
-        }, "참여자 선택"),
-        /*#__PURE__*/React.createElement("button", {
-          type: "button",
-          className: "bottom-sheet-close-btn",
-          onClick: () => setIsSheetOpen(false)
-        }, "✕")
-      ),
-      /*#__PURE__*/React.createElement("div", {
-        className: "bottom-sheet-body"
-      },
-        /*#__PURE__*/React.createElement("div", {
-          style: {
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '8px'
-          }
-        }, activeParticipants.map(p => /*#__PURE__*/React.createElement("button", {
-          key: p.id,
-          type: "button",
-          className: "bottom-sheet-item",
-          disabled: isSubmitting,
-          onClick: () => {
-            if (isSubmitting) return;
-            setParticipantId(p.id);
-            setNote(getExistingNoteForParticipant(p.id));
-            setIsSheetOpen(false);
-          }
-        }, /*#__PURE__*/React.createElement("span", {
-          className: "color-dot",
-          style: {
-            backgroundColor: p.color,
-            width: '12px',
-            height: '12px'
-          }
-        }), /*#__PURE__*/React.createElement("span", {
-          style: {
-            fontWeight: 700
-          }
-        }, p.name))))))));
+      /*#__PURE__*/React.createElement("h4", null, "참여자 선택"),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        style: { background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer' },
+        onClick: () => setIsSheetOpen(false)
+      }, "✕")
+    ),
+    /*#__PURE__*/React.createElement("div", {
+      className: "bottom-sheet-body"
+    },
+      activeParticipants.map(p => /*#__PURE__*/React.createElement("button", {
+        key: p.id,
+        type: "button",
+        className: "bottom-sheet-item",
+        disabled: isSubmitting,
+        onClick: () => {
+          if (isSubmitting) return;
+          markDirty();
+          setParticipantId(p.id);
+          setNote(getExistingNoteForParticipant(p.id));
+          setIsSheetOpen(false);
+        }
+      }, /*#__PURE__*/React.createElement("span", {
+        className: "color-dot",
+        style: {
+          backgroundColor: p.color,
+          width: '12px',
+          height: '12px'
+        }
+      }), /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontWeight: 700
+        }
+      }, p.name)))))));
   return typeof document !== 'undefined' && ReactDOM.createPortal ? ReactDOM.createPortal(portalContent, document.body) : portalContent;
 }
 
@@ -26118,12 +26106,26 @@ function ResizableModalContainer({ className, style, children, ...props }) {
     isDraggingRef.current = false;
     document.removeEventListener('mousemove', handleMouseMove);
     document.removeEventListener('mouseup', handleMouseUp);
+    const blockClick = ev => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      document.removeEventListener('click', blockClick, true);
+    };
+    document.addEventListener('click', blockClick, true);
+    setTimeout(() => document.removeEventListener('click', blockClick, true), 0);
   };
 
   const handleTouchEnd = () => {
     isDraggingRef.current = false;
     document.removeEventListener('touchmove', handleTouchMove);
     document.removeEventListener('touchend', handleTouchEnd);
+    const blockClick = ev => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      document.removeEventListener('click', blockClick, true);
+    };
+    document.addEventListener('click', blockClick, true);
+    setTimeout(() => document.removeEventListener('click', blockClick, true), 0);
   };
 
   React.useEffect(() => {
@@ -26150,8 +26152,9 @@ function ResizableModalContainer({ className, style, children, ...props }) {
     children,
     /* Resize handle at bottom right */
     /*#__PURE__*/React.createElement("div", {
-      onMouseDown: handleMouseDown,
-      onTouchStart: handleTouchStart,
+      onMouseDown: e => { e.preventDefault(); e.stopPropagation(); handleMouseDown(e); },
+      onTouchStart: e => { e.stopPropagation(); handleTouchStart(e); },
+      onClick: e => { e.preventDefault(); e.stopPropagation(); },
       style: {
         position: 'absolute',
         right: '4px',
