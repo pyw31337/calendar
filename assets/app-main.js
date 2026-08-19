@@ -1292,17 +1292,113 @@ function UrlCapsuleBadge({ url, style = null }) {
   }, href);
 }
 
-function renderTextWithUrlBadge(text) {
+function DateCapsuleBadge({ date, style = null }) {
+  const label = String(date || '').trim();
+  if (!label) return null;
+  return /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: 'inline-flex',
+      alignItems: 'center',
+      padding: '2px 8px',
+      borderRadius: 'var(--radius-full)',
+      fontSize: '0.72rem',
+      fontWeight: 700,
+      backgroundColor: 'rgba(99, 102, 241, 0.12)',
+      color: '#4338CA',
+      whiteSpace: 'nowrap',
+      ...(style || {})
+    }
+  }, label);
+}
+
+// 입력필드 표시 규칙: 일반 텍스트 / YY.MM.DD 날짜 / URL 분리
+function tokenizeRichFieldText(text) {
   const source = String(text || '');
-  const url = extractFirstUrl(source);
-  const textOnly = url ? removeFirstUrl(source) : source.trim();
-  if (!url) return textOnly;
-  return /*#__PURE__*/React.createElement(React.Fragment, null,
-    textOnly && /*#__PURE__*/React.createElement("span", { style: { wordBreak: 'break-word' } }, textOnly),
-    /*#__PURE__*/React.createElement(UrlCapsuleBadge, {
-      url: url,
-      style: { marginLeft: textOnly ? '6px' : 0 }
-    })
+  if (!source.trim()) return [];
+  const urlRe = /https?:\/\/[^\s<>"'\]]+/gi;
+  const chunks = [];
+  let last = 0;
+  let match;
+  while ((match = urlRe.exec(source)) !== null) {
+    if (match.index > last) chunks.push({ type: 'raw', value: source.slice(last, match.index) });
+    let href = match[0].replace(/[.,);\]\}]+$/g, '');
+    chunks.push({ type: 'url', value: href });
+    last = match.index + match[0].length;
+  }
+  if (last < source.length) chunks.push({ type: 'raw', value: source.slice(last) });
+  if (chunks.length === 0) chunks.push({ type: 'raw', value: source });
+
+  const tokens = [];
+  chunks.forEach(chunk => {
+    if (chunk.type === 'url') { tokens.push(chunk); return; }
+    const s = chunk.value;
+    const dateRe = /(\d{2,4}[./-]\d{1,2}[./-]\d{1,2})/g;
+    let dLast = 0, dm;
+    while ((dm = dateRe.exec(s)) !== null) {
+      if (dm.index > dLast) {
+        const piece = s.slice(dLast, dm.index);
+        if (piece) tokens.push({ type: 'text', value: piece });
+      }
+      tokens.push({ type: 'date', value: dm[1] || dm[0] });
+      dLast = dm.index + dm[0].length;
+    }
+    if (dLast < s.length) {
+      const piece = s.slice(dLast);
+      if (piece) tokens.push({ type: 'text', value: piece });
+    }
+  });
+  return tokens;
+}
+
+function renderTextWithUrlBadge(text, options = null) {
+  const tokens = tokenizeRichFieldText(text);
+  if (tokens.length === 0) return null;
+  const stackUrl = !options || options.stackUrl !== false;
+  const textRow = [];
+  const urlRow = [];
+  tokens.forEach((tok, idx) => {
+    if (tok.type === 'url') {
+      urlRow.push(/*#__PURE__*/React.createElement(UrlCapsuleBadge, {
+        key: `u-${idx}-${tok.value}`,
+        url: tok.value,
+        style: stackUrl ? { alignSelf: 'flex-start' } : { marginLeft: '4px' }
+      }));
+    } else if (tok.type === 'date') {
+      textRow.push(/*#__PURE__*/React.createElement(DateCapsuleBadge, {
+        key: `d-${idx}-${tok.value}`,
+        date: tok.value,
+        style: { marginRight: '4px' }
+      }));
+    } else {
+      const v = tok.value;
+      if (!v || !String(v).trim()) return;
+      textRow.push(/*#__PURE__*/React.createElement("span", {
+        key: `t-${idx}`,
+        style: { wordBreak: 'break-word' }
+      }, v));
+    }
+  });
+  if (!stackUrl) {
+    return /*#__PURE__*/React.createElement("span", {
+      style: { display: 'inline-flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px' }
+    }, textRow, urlRow);
+  }
+  if (urlRow.length === 0) {
+    if (textRow.length === 0) return null;
+    if (textRow.length === 1 && tokens.every(t => t.type === 'text')) return textRow[0];
+    return /*#__PURE__*/React.createElement("span", {
+      style: { display: 'inline-flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px' }
+    }, textRow);
+  }
+  return /*#__PURE__*/React.createElement("div", {
+    style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '4px', minWidth: 0 }
+  },
+    textRow.length > 0 && /*#__PURE__*/React.createElement("span", {
+      style: { display: 'inline-flex', flexWrap: 'wrap', alignItems: 'center', gap: '2px', wordBreak: 'break-word' }
+    }, textRow),
+    /*#__PURE__*/React.createElement("div", {
+      style: { display: 'flex', flexDirection: 'column', gap: '4px', maxWidth: '100%' }
+    }, urlRow)
   );
 }
 
@@ -15318,9 +15414,9 @@ function DateModal({
               borderRadius: '8px'
             }
           },
-            /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 } },
+            /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'flex-start', gap: '8px', minWidth: 0, flex: 1 } },
               /*#__PURE__*/React.createElement("span", {
-                style: { width: '8px', height: '8px', borderRadius: '50%', backgroundColor: part.color, flexShrink: 0 }
+                style: { width: '8px', height: '8px', borderRadius: '50%', backgroundColor: part.color, flexShrink: 0, marginTop: '6px' }
               }),
               /*#__PURE__*/React.createElement("span", {
                 style: {
@@ -15328,21 +15424,21 @@ function DateModal({
                   fontSize: '0.85rem',
                   color: 'var(--text-main)',
                   flexShrink: 0,
-                  cursor: 'pointer'
+                  cursor: 'pointer',
+                  marginTop: '2px'
                 },
                 title: '눌러서 수정 (참여자·메모 불러오기)',
                 onClick: () => handleEditClick(entry)
               }, part.name),
-              entry.note && /*#__PURE__*/React.createElement("span", {
+              entry.note && /*#__PURE__*/React.createElement("div", {
                 style: {
                   fontSize: '0.78rem',
                   color: 'var(--text-main)',
                   marginLeft: '4px',
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis'
+                  minWidth: 0,
+                  flex: 1
                 }
-              }, entry.note)
+              }, renderTextWithUrlBadge(entry.note))
             ),
             !adminMode && /*#__PURE__*/React.createElement(ItemEditDeleteActions, {
               onEdit: () => handleEditClick(entry),
