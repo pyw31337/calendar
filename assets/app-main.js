@@ -1085,7 +1085,7 @@ function normalizeActivityLog(calendarId, log, participantIds = null, idRedirect
   const idDatePart = date || 'poll';
   const idParticipantPart = participantId || 'system';
   const id = sanitizeText(log.id || `${calendarId}_${idDatePart}_${idParticipantPart}_${action}_${timestamp}`, 160);
-  const note = sanitizeText(log.note || '', 120);
+  const note = sanitizeText(log.note || '', 320);
   return {
     id,
     calendarId,
@@ -1108,6 +1108,19 @@ function mergeActivityLogs(existingLogs = [], incomingLogs = [], calendarId = ''
     }
   });
   return Array.from(map.values()).sort((a, b) => getActivityLogStamp(b) - getActivityLogStamp(a));
+}
+
+function buildFieldChangeNote(label, changes, maxLen = 300) {
+  const parts = [];
+  for (const c of changes) {
+    const b = sanitizeText(String(c.before ?? '').trim(), 60) || '-';
+    const a = sanitizeText(String(c.after ?? '').trim(), 60) || '-';
+    if (b === a) continue;
+    parts.push(`${c.key} ${b}→${a}`);
+  }
+  const head = sanitizeText(label || '', 40);
+  if (!parts.length) return head;
+  return sanitizeText(head ? `${head} · ${parts.join(' · ')}` : parts.join(' · '), maxLen);
 }
 
 function createActivityLog(calendarId, action, dateStr, participantId, timestamp = Date.now(), note = '') {
@@ -3533,70 +3546,58 @@ function AdminDashboard({ initialCalendars }) {
   // 2. Load Messages (Firestore snapshots or REST) -- capped per calendar (not truly unbounded)
   // so opening the admin dashboard doesn't download/live-sync a calendar's entire message
   // history forever; see the matching cap on GlobalSearchModal's own full-history search fetch.
+  // Chat messages: only selected calendar while 채팅 tab is open
   React.useEffect(() => {
-    if (calendarsList.length === 0) return;
-    if (activeTab !== 'logs') return;
+    if (activeTab !== 'logs' || !selectedCalId) return;
 
     if (firebaseDb) {
-      const unsubscribes = [];
-      calendarsList.forEach(cal => {
-        const unsub = firebaseDb.collection('calendars').doc(`cal_${cal.id}`).collection('messages')
-          .orderBy('timestamp', 'desc').limit(500)
-          .onSnapshot(snapshot => {
-            const list = [];
-            snapshot.forEach(doc => {
-              const data = doc.data();
-              if (data) list.push({ id: doc.id, ...data });
-            });
-            setMessagesMap(prev => ({
-              ...prev,
-              [cal.id]: list.sort((a, b) => b.timestamp - a.timestamp)
-            }));
-          }, err => {
-            console.error(`Failed to load messages for ${cal.id}:`, err);
-          });
-        unsubscribes.push(unsub);
-      });
-      return () => unsubscribes.forEach(unsub => unsub());
-    } else {
-      // REST fallback load
-      calendarsList.forEach(async (cal) => {
-        try {
-          const recent = await fetchRecentMessagesRest(cal.id);
-          const chat = await fetchChatMessagesRest(cal.id);
-          const combined = [...recent, ...chat].sort((a, b) => b.timestamp - a.timestamp);
-          setMessagesMap(prev => ({
-            ...prev,
-            [cal.id]: combined
-          }));
-        } catch (e) {
-          console.error(`Failed REST message fetch for ${cal.id}:`, e);
-        }
-      });
-    }
-  }, [calendarsList.map(c => c.id).join(','), firebaseDb, activeTab]);
-
-  // 2b. Load memos (same live-listener pattern as messages above, same 2000 cap) -- powers the
-  // 통합검색 메모 탭
-  React.useEffect(() => {
-    if (calendarsList.length === 0 || !firebaseDb) return;
-    if (activeTab !== 'logs') return;
-    const unsubscribes = calendarsList.map(cal =>
-      firebaseDb.collection('calendars').doc(`cal_${cal.id}`).collection('memos')
-        .orderBy('createdAt', 'desc').limit(500)
+      const unsub = firebaseDb.collection('calendars').doc(`cal_${selectedCalId}`).collection('messages')
+        .orderBy('timestamp', 'desc').limit(300)
         .onSnapshot(snapshot => {
           const list = [];
           snapshot.forEach(doc => {
             const data = doc.data();
             if (data) list.push({ id: doc.id, ...data });
           });
-          setMemosMap(prev => ({ ...prev, [cal.id]: list }));
+          setMessagesMap(prev => ({
+            ...prev,
+            [selectedCalId]: list.sort((a, b) => b.timestamp - a.timestamp)
+          }));
         }, err => {
-          console.error(`Failed to load memos for ${cal.id}:`, err);
-        })
-    );
-    return () => unsubscribes.forEach(unsub => unsub());
-  }, [calendarsList.map(c => c.id).join(','), firebaseDb, activeTab]);
+          console.error(`Failed to load messages for ${selectedCalId}:`, err);
+        });
+      return () => unsub();
+    }
+    (async () => {
+      try {
+        const recent = await fetchRecentMessagesRest(selectedCalId);
+        const chat = await fetchChatMessagesRest(selectedCalId);
+        const combined = [...recent, ...chat].sort((a, b) => b.timestamp - a.timestamp);
+        setMessagesMap(prev => ({ ...prev, [selectedCalId]: combined }));
+      } catch (e) {
+        console.error(`Failed REST message fetch for ${selectedCalId}:`, e);
+      }
+    })();
+  }, [selectedCalId, firebaseDb, activeTab]);
+
+  // 2b. Load memos (same live-listener pattern as messages above, same 2000 cap) -- powers the
+  // 통합검색 메모 탭
+  React.useEffect(() => {
+    if (activeTab !== 'logs' || !selectedCalId || !firebaseDb) return;
+    const unsub = firebaseDb.collection('calendars').doc(`cal_${selectedCalId}`).collection('memos')
+      .orderBy('createdAt', 'desc').limit(300)
+      .onSnapshot(snapshot => {
+        const list = [];
+        snapshot.forEach(doc => {
+          const data = doc.data();
+          if (data) list.push({ id: doc.id, ...data });
+        });
+        setMemosMap(prev => ({ ...prev, [selectedCalId]: list }));
+      }, err => {
+        console.error(`Failed to load memos for ${selectedCalId}:`, err);
+      });
+    return () => unsub();
+  }, [selectedCalId, firebaseDb, activeTab]);
 
   // Shared link-preview cache stats, loaded once (not tied to any single calendar)
   React.useEffect(() => {
@@ -3628,18 +3629,24 @@ function AdminDashboard({ initialCalendars }) {
   // Full, unbounded activity log history for the selected calendar -- only unifiedTimeline
   // (복구 탭's PITR replay) ever reads selectedCalActivityLogs, so this only needs to fetch
   // while that tab is actually open, not on every calendar switch made from 설정/통계/로그.
+  const activityLogsCacheRef = React.useRef({});
   React.useEffect(() => {
     if (!selectedCalId || activeTab !== 'recovery') {
-      setSelectedCalActivityLogs([]);
+      if (activeTab !== 'recovery') setSelectedCalActivityLogs([]);
+      return;
+    }
+    const cached = activityLogsCacheRef.current[selectedCalId];
+    if (Array.isArray(cached)) {
+      setSelectedCalActivityLogs(cached);
       return;
     }
     let isMounted = true;
+    setSelectedCalActivityLogs([]);
     fetchActivityLogsFromFirestore(selectedCalId).then(list => {
+      activityLogsCacheRef.current[selectedCalId] = list;
       if (isMounted) setSelectedCalActivityLogs(list);
     });
-    return () => {
-      isMounted = false;
-    };
+    return () => { isMounted = false; };
   }, [selectedCalId, activeTab]);
 
   React.useEffect(() => {
@@ -7650,7 +7657,20 @@ function App() {
     // Expense/income entries have no participant selector of their own, so these logs carry an
     // empty participantId (matching how poll activity logs already handle system-level actions)
     // -- the admin log UI falls back to a generic '정산' label for that case.
-    const expenseLogNote = sanitizeText(`${cleanAmount < 0 ? '+' : '-'}${Math.abs(cleanAmount).toLocaleString()}원 ${cleanLabel || cleanUrl}`, 120);
+    const fmtAmt = n => `${Number(n) < 0 ? '+' : '-'}${Math.abs(Number(n) || 0).toLocaleString()}원`;
+    const expCats = getExpenseCategories(activeCal);
+    const expCatName = id => (expCats.find(c => c.id === id) || {}).name || id || '-';
+    const prevExp = isEditing ? existingExpenses.find(e => e.id === expense.id) : null;
+    let expenseLogNote;
+    if (isEditing && prevExp) {
+      expenseLogNote = buildFieldChangeNote(cleanLabel || cleanUrl || '정산', [
+        { key: '금액', before: fmtAmt(prevExp.amount), after: fmtAmt(cleanAmount) },
+        { key: '명목', before: prevExp.label || prevExp.url || '', after: cleanLabel || cleanUrl },
+        { key: '카테고리', before: expCatName(prevExp.categoryId), after: expCatName(cleanCategoryId) }
+      ]);
+    } else {
+      expenseLogNote = sanitizeText(`${fmtAmt(cleanAmount)} ${cleanLabel || cleanUrl} · ${expCatName(cleanCategoryId)}`, 300);
+    }
     const expenseActivityLog = createActivityLog(activeCal.id, isEditing ? 'expense_update' : 'expense_create', dateStr, '', now, expenseLogNote);
     const updatedCal = {
       ...activeCal,
@@ -7756,16 +7776,27 @@ function App() {
     }
     const prevPlace = isEditing ? existingPlaces.find(p => p.id === placeData.id) : null;
     const displayLabel = cleanAlias || cleanName || '장소';
-    const changeParts = [];
+    const placeCats = getPlaceCategories(activeCal);
+    const catName = id => (placeCats.find(c => c.id === id) || {}).name || id || '-';
+    let placeLogNote = displayLabel;
     if (isEditing && prevPlace) {
-      if ((prevPlace.alias || '') !== cleanAlias) changeParts.push(`별칭 ${prevPlace.alias || '-'}→${cleanAlias || '-'}`);
-      if ((prevPlace.name || '') !== cleanName) changeParts.push(`이름→${cleanName}`);
-      if ((prevPlace.memo || '') !== cleanMemo) changeParts.push('메모변경');
-      if ((prevPlace.categoryId || '') !== cleanCategoryId) changeParts.push('카테고리변경');
-      if ((prevPlace.visitStatus || '') !== cleanVisitStatus) changeParts.push(cleanVisitStatus === 'planned' ? '예정' : '방문');
-      if ((prevPlace.visitDate || '') !== cleanVisitDate) changeParts.push(`일자 ${cleanVisitDate || '-'}`);
+      placeLogNote = buildFieldChangeNote(displayLabel, [
+        { key: '별칭', before: prevPlace.alias || '', after: cleanAlias },
+        { key: '이름', before: prevPlace.name || '', after: cleanName },
+        { key: '메모', before: prevPlace.memo || '', after: cleanMemo },
+        { key: '카테고리', before: catName(prevPlace.categoryId), after: catName(cleanCategoryId) },
+        { key: '주소', before: prevPlace.address || '', after: cleanAddress },
+        { key: '방문', before: prevPlace.visitStatus === 'planned' ? '예정' : '방문', after: cleanVisitStatus === 'planned' ? '예정' : '방문' },
+        { key: '일자', before: prevPlace.visitDate || '', after: cleanVisitDate }
+      ]);
+    } else if (!isEditing) {
+      const bits = [displayLabel];
+      if (cleanAlias && cleanAlias !== cleanName) bits.push(`별칭 ${cleanAlias}`);
+      if (cleanMemo) bits.push(`메모 ${sanitizeText(cleanMemo, 40)}`);
+      if (cleanCategoryId && cleanCategoryId !== 'etc') bits.push(`카테고리 ${catName(cleanCategoryId)}`);
+      if (cleanVisitDate) bits.push(`일자 ${cleanVisitDate}`);
+      placeLogNote = sanitizeText(bits.join(' · '), 300);
     }
-    const placeLogNote = sanitizeText(changeParts.length ? `${displayLabel} · ${changeParts.join(', ')}` : displayLabel, 120);
     const placeActivityLog = createActivityLog(activeCal.id, isEditing ? 'place_update' : 'place_create', '', '', now, placeLogNote);
     const updatedCal = {
       ...activeCal,
@@ -19458,8 +19489,13 @@ function MemoView({ calendar, memos, hasMoreMemos, onLoadMoreMemos, onBack, show
 
       await firebaseDb.collection('calendars').doc('cal_' + calendarId).collection('memos').doc(editingMemo.id).set(memoData);
 
-      // Log Memo Update
-      const logNote = editTitle.trim() ? `제목: ${editTitle.trim()}` : (editText.trim().slice(0, 30) + '...');
+      // Log Memo Update — before→after detail
+      const logNote = buildFieldChangeNote(editTitle.trim() || '메모', [
+        { key: '제목', before: editingMemo.title || '', after: editTitle.trim() },
+        { key: '내용', before: editingMemo.text || '', after: editText.trim() },
+        { key: '색상', before: editingMemo.color || '', after: editColor || '' },
+        { key: '고정', before: editingMemo.isPinned ? 'Y' : 'N', after: editIsPinned ? 'Y' : 'N' }
+      ]) || (editTitle.trim() || (editText.trim().slice(0, 40) + '...'));
       const activityLog = createMemoActivityLog(calendarId, 'memo_update', participantId, stamp, logNote);
       if (activityLog) {
         await firebaseDb.collection('calendars').doc('cal_' + calendarId).collection('activityLogs').doc(activityLog.id).set(activityLog);
