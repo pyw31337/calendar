@@ -15613,17 +15613,43 @@ function DateModal({
               disabled: isSavingPlace,
               onChange: e => setPlaceMemo(e.target.value)
             }),
+            editingLinkedPlaceId && /*#__PURE__*/React.createElement("button", {
+              type: "button",
+              className: "btn btn-secondary",
+              style: { flexShrink: 0, alignSelf: 'flex-start', height: '44px', minHeight: '44px' },
+              disabled: isSavingPlace,
+              onClick: e => {
+                e.preventDefault();
+                e.stopPropagation();
+                setEditingLinkedPlaceId(null);
+                setSelectedPlace(null);
+                setPlaceQuery('');
+                setPlaceAlias('');
+                setPlaceMemo('');
+                setPlaceCategoryId(getPlaceCategories(calendar)[0]?.id || 'etc');
+                setPlaceVisitStatus('visited');
+              }
+            }, "취소"),
             /*#__PURE__*/React.createElement("button", {
               type: "button",
-              className: "btn btn-poll-create btn-action btn-action-dark",
-              style: {
-                padding: '0 16px', fontWeight: 800, height: '44px', minHeight: '44px',
-                whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                alignSelf: 'flex-start'
+              className: "btn btn-secondary",
+              style: editingLinkedPlaceId ? {
+                flexShrink: 0,
+                alignSelf: 'flex-start',
+                height: '44px',
+                minHeight: '44px',
+                backgroundColor: '#0F172A',
+                borderColor: '#0F172A',
+                color: '#FFFFFF'
+              } : {
+                flexShrink: 0,
+                alignSelf: 'flex-start',
+                height: '44px',
+                minHeight: '44px'
               },
               disabled: isSavingPlace || !selectedPlace,
               onClick: e => { e.preventDefault(); e.stopPropagation(); handleSavePlaceClick(); }
-            }, isSavingPlace ? '...' : (editingLinkedPlaceId ? '수정' : '추가'))
+            }, isSavingPlace ? '저장 중...' : (editingLinkedPlaceId ? '수정' : '추가'))
           )
         )
       ),
