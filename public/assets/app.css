@@ -900,13 +900,46 @@ button, input, textarea, select {
 .btn-danger { background: #FEF2F2; border-color: #FCA5A5; color: #DC2626; }
 .btn-danger:hover { background: #FEE2E2; }
 
+
+/* 셀렉트박스 규칙: 일정 팝업 카테고리와 동일 (Rounded 사각형, Capsule 금지) */
 .form-select, .form-input {
-  padding: 10px 14px; background: #FFFFFF; border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md); color: var(--text-main); font-size: 0.9rem; font-family: inherit; outline: none;
-  transition: border-color 0.2s ease;
+  width: 100%;
+  padding: 10px 14px;
+  background: var(--bg-card, #FFFFFF);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px !important;
+  color: var(--text-main);
+  font-size: 0.9rem;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
   word-break: keep-all;
   min-height: 44px;
+  box-sizing: border-box;
 }
+button.form-select {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  text-align: left;
+  cursor: pointer;
+  font-weight: 700;
+}
+.form-select-color-indicator {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: inline-block;
+}
+.form-select-chevron {
+  flex-shrink: 0;
+  color: #94A3B8;
+  width: 18px;
+  height: 18px;
+}
+
 .form-select:focus, .form-input:focus { border-color: var(--accent-primary); box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15); }
 
 /* Native <select> elements: replace the browser's default OS-styled dropdown arrow with the
