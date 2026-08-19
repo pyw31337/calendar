@@ -25536,7 +25536,7 @@ function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom = false
         autoPanPadding: isMobileViewport ? [28, 56] : [48, 80],
         autoPanPaddingTopLeft: isMobileViewport ? [24, 48] : [40, 72],
         autoPanPaddingBottomRight: isMobileViewport ? [24, 40] : [40, 56],
-        keepInView: true
+        keepInView: false
       });
       if (onSelectPlace) marker.on('click', () => onSelectPlace(place));
       marker.addTo(layer);
@@ -25558,21 +25558,12 @@ function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom = false
     // hidden under the header/list below the map. Backing off one zoom level and padding out
     // further on mobile keeps more of the cluster in frame.
     const isMobileViewport = window.innerWidth <= 720;
-    // When a list row has focused a place, do NOT fitBounds -- that re-collapses clusters.
+    // Focused place: do not re-center on marker rebuild (lets user drag after select).
     if (focusPlace && focusPlace.id) {
       const focused = markersByIdRef.current.get(focusPlace.id);
-      if (focused && mapRef.current) {
-        const map = mapRef.current;
-        const zoom = 16;
-        const latlng = focused.getLatLng();
-        const size = map.getSize();
-        const targetPoint = map.project(latlng, zoom);
-        const offsetY = Math.min(Math.round(size.y * 0.28), isMobileViewport ? 90 : 140);
-        targetPoint.y += offsetY;
-        map.setView(map.unproject(targetPoint, zoom), zoom, { animate: false });
+      if (focused) {
         requestAnimationFrame(() => {
           try { focused.openPopup(); } catch (e) {}
-          panMapToFitMarkerPopup(map, focused, { pad: isMobileViewport ? 20 : 28, animate: false });
         });
       }
     } else if (fitBoundsPoints.length === 1) {
@@ -25595,7 +25586,12 @@ function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom = false
   // the SAME row twice in a row still re-triggers the pan even though the id didn't change.
   const lastFocusTokenRef = React.useRef(null);
   React.useEffect(() => {
-    if (!ready || !mapRef.current || !focusPlace || !focusPlace.id) return;
+    if (!ready || !mapRef.current) return;
+    if (!focusPlace || !focusPlace.id) {
+      try { mapRef.current.closePopup(); } catch (e) {}
+      lastFocusTokenRef.current = null;
+      return;
+    }
     if (lastFocusTokenRef.current === focusPlace.token) return;
     lastFocusTokenRef.current = focusPlace.token;
     const marker = markersByIdRef.current.get(focusPlace.id);
@@ -26281,6 +26277,10 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
   // now, scrolling is focused on list container or we can ignore scrolling if map is fixed!
   // Wait, let's keep the smooth scroll to top of list container if list scrolls.
   const handleSelectPlaceOnMap = place => {
+    if (focusPlace && focusPlace.id === place.id) {
+      setFocusPlace(null);
+      return;
+    }
     focusTokenRef.current += 1;
     setFocusPlace({ id: place.id, token: focusTokenRef.current });
     // Keep list scroll position -- do not jump to top when focusing a marker.
