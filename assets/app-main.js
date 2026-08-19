@@ -3755,7 +3755,7 @@ function AdminDashboard({ initialCalendars }) {
         });
     };
     load();
-    const intervalId = setInterval(load, 60000);
+    const intervalId = setInterval(load, 120000); // 2min — admin list refresh; manual refresh still available
     return () => {
       isMounted = false;
       clearInterval(intervalId);
@@ -7005,18 +7005,23 @@ function App() {
     }
   }, [activeView, chatMessages]);
 
-  // Full (unbounded) activity log history for the settings modal's PITR tab -- fetched lazily,
-  // only while that modal is actually open, since it needs full history rather than a capped feed.
-  React.useEffect(() => {
-    if (!isAdminOpen || !activeCalId) return;
-    let isMounted = true;
-    fetchActivityLogsFromFirestore(activeCalId).then(list => {
-      if (isMounted) setAdminActivityLogs(list);
+  // Activity logs only when settings AdminModal opens recovery/logs tabs (not on every settings open).
+  const adminActivityLogsLoadedForRef = React.useRef(null);
+  const loadAdminActivityLogs = React.useCallback(() => {
+    if (!activeCalId) return;
+    if (adminActivityLogsLoadedForRef.current === activeCalId && adminActivityLogs.length > 0) return;
+    const calId = activeCalId;
+    fetchActivityLogsFromFirestore(calId, 400).then(list => {
+      adminActivityLogsLoadedForRef.current = calId;
+      setAdminActivityLogs(Array.isArray(list) ? list : []);
     });
-    return () => {
-      isMounted = false;
-    };
-  }, [isAdminOpen, activeCalId]);
+  }, [activeCalId, adminActivityLogs.length]);
+  React.useEffect(() => {
+    if (!isAdminOpen) {
+      setAdminActivityLogs([]);
+      adminActivityLogsLoadedForRef.current = null;
+    }
+  }, [isAdminOpen]);
 
   // Scroll to bottom of chat container
   const chatMessagesContainerRef = React.useRef(null);
@@ -8363,6 +8368,7 @@ function App() {
       calendar: { ...activeCal, activityLogs: unionActivityLogs(activeCal, adminActivityLogs) },
       allCalendars: calendars,
       onSelectCalendar: handleSelectCalendar,
+      onLoadActivityLogs: loadAdminActivityLogs,
       onSave: handleSaveAdmin,
       recentMessages: recentMessages,
       chatMessages: chatMessages,
@@ -16409,6 +16415,7 @@ function AdminModal({
   calendar,
   allCalendars,
   onSelectCalendar,
+  onLoadActivityLogs,
   onSave,
   recentMessages = [],
   chatMessages = [],
@@ -16432,6 +16439,13 @@ function AdminModal({
   onNotificationPermissionBlocked
 }) {
   const [activeTab, setActiveTab] = React.useState('settings'); // 'settings', 'calendar', 'recovery', 'logs'
+
+  // recovery/logs only — avoid loading full activityLogs when opening 일반/설정
+  React.useEffect(() => {
+    if (activeTab === 'recovery' || activeTab === 'logs') {
+      if (typeof onLoadActivityLogs === 'function') onLoadActivityLogs();
+    }
+  }, [activeTab, onLoadActivityLogs, calendar && calendar.id]);
 
   // Chat notification permission -- mirrors ChatRoomView's own bell toggle logic (kept as an
   // independent local read of the same browser-level Notification.permission rather than shared
