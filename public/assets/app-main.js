@@ -14523,33 +14523,14 @@ function GamifiedConfirmButtonContent({ label }) {
     /*#__PURE__*/React.createElement("span", { className: "gamified-shiny-glow-wrapper", "aria-hidden": true },
       /*#__PURE__*/React.createElement("span", { className: "gamified-shiny-glow" })
     ),
-    /*#__PURE__*/React.createElement("svg", {
+    /*#__PURE__*/React.createElement("span", {
       className: "gamified-border-electric",
-      viewBox: "0 0 100 40",
-      preserveAspectRatio: "none",
       "aria-hidden": true
-    },
-      /*#__PURE__*/React.createElement("defs", null,
-        /*#__PURE__*/React.createElement("linearGradient", { id: "gamifiedElectricGrad", x1: "0%", y1: "0%", x2: "100%", y2: "0%" },
-          /*#__PURE__*/React.createElement("stop", { offset: "0%", stopColor: "#A5F3FC" }),
-          /*#__PURE__*/React.createElement("stop", { offset: "40%", stopColor: "#FFFFFF" }),
-          /*#__PURE__*/React.createElement("stop", { offset: "70%", stopColor: "#C4B5FD" }),
-          /*#__PURE__*/React.createElement("stop", { offset: "100%", stopColor: "#67E8F9" })
-        )
-      ),
-      /*#__PURE__*/React.createElement("rect", {
-        className: "gamified-electric-track",
-        x: "1.2", y: "1.2", width: "97.6", height: "37.6", rx: "10", ry: "10",
-        fill: "none", stroke: "url(#gamifiedElectricGrad)", strokeWidth: "2.4",
-        pathLength: "100"
-      }),
-      /*#__PURE__*/React.createElement("rect", {
-        className: "gamified-electric-track gamified-electric-track-2",
-        x: "1.2", y: "1.2", width: "97.6", height: "37.6", rx: "10", ry: "10",
-        fill: "none", stroke: "#E0F2FE", strokeWidth: "1.2",
-        pathLength: "100"
-      })
-    ),
+    }),
+    /*#__PURE__*/React.createElement("span", {
+      className: "gamified-border-electric gamified-border-electric-secondary",
+      "aria-hidden": true
+    }),
     /*#__PURE__*/React.createElement("span", { className: "gamified-sparks-container", "aria-hidden": true },
       [1,2,3,4,5,6].map(n => /*#__PURE__*/React.createElement("span", {
         key: "sp"+n, className: "gamified-spark gamified-spark-" + n
