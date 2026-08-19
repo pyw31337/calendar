@@ -112,6 +112,36 @@ function createChatShareHtml(calendar) {
   });
 }
 
+function createPlacesShareHtml(calendar) {
+  return createShareHtml(calendar, {
+    title: `${calendar.title} 장소`,
+    description: `${calendar.title}에 등록된 장소를 지도에서 확인해보세요.`,
+    calendarUrl: `${BASE_URL}/?id=${encodeURIComponent(calendar.id)}&view=places`,
+    shareUrl: `${BASE_URL}/share/${encodeURIComponent(calendar.id)}/places/`,
+    forwardSearch: false
+  });
+}
+
+function createMemoShareHtml(calendar) {
+  return createShareHtml(calendar, {
+    title: `${calendar.title} 메모`,
+    description: `${calendar.title} 메모를 확인해보세요.`,
+    calendarUrl: `${BASE_URL}/?id=${encodeURIComponent(calendar.id)}&view=memo`,
+    shareUrl: `${BASE_URL}/share/${encodeURIComponent(calendar.id)}/memo/`,
+    forwardSearch: false
+  });
+}
+
+function createGalleryShareHtml(calendar) {
+  return createShareHtml(calendar, {
+    title: `${calendar.title} 갤러리`,
+    description: `${calendar.title} 사진과 링크 갤러리를 확인해보세요.`,
+    calendarUrl: `${BASE_URL}/?id=${encodeURIComponent(calendar.id)}&view=gallery`,
+    shareUrl: `${BASE_URL}/share/${encodeURIComponent(calendar.id)}/gallery/`,
+    forwardSearch: false
+  });
+}
+
 async function main() {
   const calendars = await fetchCalendars();
   await rm(OUT_DIR, { recursive: true, force: true });
@@ -120,10 +150,18 @@ async function main() {
 
   await Promise.all(calendars.map(async (calendar) => {
     const targetDir = path.join(OUT_DIR, calendar.id);
-    const chatDir = path.join(targetDir, 'chat');
-    await mkdir(chatDir, { recursive: true });
-    await writeFile(path.join(targetDir, 'index.html'), createCalendarShareHtml(calendar));
-    await writeFile(path.join(chatDir, 'index.html'), createChatShareHtml(calendar));
+    const views = [
+      ['', createCalendarShareHtml],
+      ['chat', createChatShareHtml],
+      ['places', createPlacesShareHtml],
+      ['memo', createMemoShareHtml],
+      ['gallery', createGalleryShareHtml],
+    ];
+    for (const [seg, fn] of views) {
+      const dir = seg ? path.join(targetDir, seg) : targetDir;
+      await mkdir(dir, { recursive: true });
+      await writeFile(path.join(dir, 'index.html'), fn(calendar));
+    }
   }));
 
   const indexHtml = `<!DOCTYPE html>

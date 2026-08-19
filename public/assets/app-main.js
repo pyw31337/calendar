@@ -938,12 +938,30 @@ function describeFirebaseWriteError(err, genericLabel) {
 const normalizeColorValue = GATHER_APP_UTILS.normalizeColorValue;
 const isValidDateString = GATHER_APP_UTILS.isValidDateString;
 
+// 공유 URL 규칙: 항상 /share/{calId}/[view]/[itemId]/ 슬래시 경로 (OG 크롤러용)
+function parseSharePathFromLocation(pathname = window.location.pathname) {
+  const m = String(pathname || '').match(/\/share\/([A-Za-z0-9_-]+)(?:\/([A-Za-z0-9_-]+))?(?:\/([A-Za-z0-9_.-]+))?\/?$/);
+  if (!m) return null;
+  const calendarId = m[1];
+  const seg2 = m[2] || '';
+  const seg3 = m[3] || '';
+  const viewSet = { chat: 1, memo: 1, places: 1, gallery: 1, settlement: 1 };
+  if (!seg2) return { calendarId, view: 'calendar', memoId: null };
+  if (viewSet[seg2]) {
+    if (seg2 === 'memo' && seg3) return { calendarId, view: 'memo', memoId: seg3 };
+    return { calendarId, view: seg2, memoId: null };
+  }
+  return { calendarId, view: 'calendar', memoId: null };
+}
+
 function getCalendarIdFromURL() {
   const href = window.location.href;
   const urlParams = new URLSearchParams(window.location.search);
   if (isValidCalendarId(urlParams.get('id'))) return urlParams.get('id');
   if (isValidCalendarId(urlParams.get('cal'))) return urlParams.get('cal');
-  const shareMatch = window.location.pathname.match(/\/share\/([A-Za-z0-9_-]+)\/?$/);
+  const share = parseSharePathFromLocation();
+  if (share && isValidCalendarId(share.calendarId)) return share.calendarId;
+  const shareMatch = window.location.pathname.match(/\/share\/([A-Za-z0-9_-]+)/);
   if (shareMatch && isValidCalendarId(shareMatch[1])) return shareMatch[1];
   const match = href.match(/[?&#/]id=([a-zA-Z0-9_-]+)/);
   if (match && isValidCalendarId(match[1])) return match[1];
@@ -952,16 +970,28 @@ function getCalendarIdFromURL() {
 
 function getRawCalendarIdFromURL() {
   const urlParams = new URLSearchParams(window.location.search);
-  return urlParams.get('id') || urlParams.get('cal') || '';
+  const share = parseSharePathFromLocation();
+  return urlParams.get('id') || urlParams.get('cal') || (share && share.calendarId) || '';
 }
 
 function getAppBaseUrl() {
-  const basePath = window.location.pathname.replace(/\/share\/[^/]+\/?$/, '/').replace(/\/(?:index\.html)?$/, '/');
+  let basePath = window.location.pathname.replace(/\/share(?:\/.*)?$/, '/').replace(/\/(?:index\.html)?$/, '/');
+  if (!basePath.endsWith('/')) basePath += '/';
   return `${window.location.origin}${basePath}`;
 }
 
 function getCalendarShareUrl(calendarId) {
   return `${getAppBaseUrl()}share/${encodeURIComponent(calendarId)}/`;
+}
+
+function getViewShareUrl(calendarId, view) {
+  const base = getCalendarShareUrl(calendarId);
+  if (!view || view === 'calendar') return base;
+  return `${base}${encodeURIComponent(view)}/`;
+}
+
+function getMemoItemShareUrl(calendarId, memoId) {
+  return `${getCalendarShareUrl(calendarId)}memo/${encodeURIComponent(memoId)}/`;
 }
 
 // Builds a per-calendar Web App Manifest at runtime. Static manifest-<id>.json files only
@@ -6280,7 +6310,8 @@ function App() {
   const [sharedMemo, setSharedMemo] = React.useState(null);
   React.useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const memoParam = params.get('memo');
+    const share = parseSharePathFromLocation();
+    const memoParam = (share && share.memoId) || params.get('memo');
     if (!memoParam || !activeCalId) {
       setSharedMemo(null);
       return;
@@ -6357,6 +6388,8 @@ function App() {
   const [editingMessage, setEditingMessage] = React.useState(null); // {id, participantId, text, imageUrl, thumbUrl, calId}
 
   const getActiveViewFromURL = () => {
+    const share = parseSharePathFromLocation();
+    if (share && share.view && share.view !== 'calendar') return share.view;
     const params = new URLSearchParams(window.location.search);
     return params.get('view') || 'calendar';
   };
@@ -17789,17 +17822,10 @@ function ShareModal({
   // Site-wide share rule: URL field + copy button + QR code in one modal.
   const shareUrl = React.useMemo(() => {
     if (customUrl) return customUrl;
-    if (shareType === 'chat') return `${getCalendarShareUrl(calendar.id)}chat/`;
-    if (shareType === 'places') {
-      try {
-        const u = new URL(getAppBaseUrl());
-        u.searchParams.set('id', calendar.id);
-        u.searchParams.set('view', 'places');
-        return u.toString();
-      } catch (e) {
-        return `${getAppBaseUrl()}?id=${encodeURIComponent(calendar.id)}&view=places`;
-      }
-    }
+    if (shareType === 'chat') return getViewShareUrl(calendar.id, 'chat');
+    if (shareType === 'places') return getViewShareUrl(calendar.id, 'places');
+    if (shareType === 'memo') return getViewShareUrl(calendar.id, 'memo');
+    if (shareType === 'gallery') return getViewShareUrl(calendar.id, 'gallery');
     return getCalendarShareUrl(calendar.id);
   }, [calendar, shareType, customUrl]);
   const shareTitle = shareType === 'chat' ? '채팅방 공유 URL'
@@ -20706,8 +20732,7 @@ function MemoView({ calendar, memos, hasMoreMemos, onLoadMoreMemos, onBack, show
 
 function MemoShareModal({ memo, calendarId, onClose, showToast }) {
   const shareUrl = React.useMemo(() => {
-    const params = new URLSearchParams({ id: calendarId, view: 'memo', memo: memo.id });
-    return `${getAppBaseUrl()}?${params.toString()}`;
+    return getMemoItemShareUrl(calendarId, memo.id);
   }, [calendarId, memo.id]);
   const qrDataUrl = React.useMemo(() => {
     if (typeof qrcode === 'undefined') return null;
