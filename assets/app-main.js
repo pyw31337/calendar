@@ -14977,12 +14977,8 @@ function DateModal({
                   flexShrink: 0,
                   cursor: 'pointer'
                 },
-                title: `${part.name}의 등록 플레이스 검색`,
-                onClick: () => {
-                  if (typeof onParticipantClick === 'function') {
-                    onParticipantClick(part.name);
-                  }
-                }
+                title: '눌러서 수정 (참여자·메모 불러오기)',
+                onClick: () => handleEditClick(entry)
               }, part.name),
               entry.note && /*#__PURE__*/React.createElement("span", {
                 style: {
@@ -18306,7 +18302,8 @@ function MainSideMenu({
 	        /*#__PURE__*/React.createElement(ToggleSwitch, { checked: !!isChatNotifyEnabled, onChange: onToggleChatNotifications, label: "채팅알림" })
 	      )
     ),
-    /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-list", style: { marginTop: 'auto', borderTop: '1px solid #E2E8F0', borderBottom: 'none' } },
+    /* Gallery + Places — right under 채팅알림 */
+    /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-list", style: { borderTop: '1px solid #E2E8F0', borderBottom: 'none', paddingTop: '14px' } },
       /*#__PURE__*/React.createElement("button", {
         type: "button",
         className: "admin-side-menu-item",
@@ -18332,7 +18329,10 @@ function MainSideMenu({
           /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "플레이스"),
           /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "플레이스 페이지로 이동")
         )
-      ),
+      )
+    ),
+    /* Admin alone at bottom */
+    /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-list", style: { marginTop: 'auto', borderTop: '1px solid #E2E8F0', borderBottom: 'none' } },
       /*#__PURE__*/React.createElement("button", {
         type: "button",
         className: "admin-side-menu-item",
