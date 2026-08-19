@@ -24699,7 +24699,10 @@ function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom = false
       marker.bindPopup(popupNode, {
         closeButton: false,
         minWidth: 220,
-        maxWidth: isMobileViewport ? Math.round(window.innerWidth * 0.8) : 480
+        maxWidth: isMobileViewport ? Math.round(window.innerWidth * 0.8) : 480,
+        autoPan: true,
+        autoPanPadding: isMobileViewport ? [24, 48] : [40, 60],
+        keepInView: true
       });
       if (onSelectPlace) marker.on('click', () => onSelectPlace(place));
       marker.addTo(layer);
@@ -24763,8 +24766,22 @@ function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom = false
     const isMobileViewport = window.innerWidth <= 720;
     
     const performFocus = () => {
-      mapRef.current.setView(marker.getLatLng(), isMobileViewport ? 16 : 17, { animate: true });
+      const zoom = isMobileViewport ? 16 : 17;
+      mapRef.current.setView(marker.getLatLng(), zoom, { animate: true });
       marker.openPopup();
+      const panForPopup = () => {
+        if (!mapRef.current) return;
+        const popup = marker.getPopup && marker.getPopup();
+        const el = popup && popup.getElement && popup.getElement();
+        if (!el) return;
+        const popupH = el.offsetHeight || 0;
+        if (popupH <= 0) return;
+        const mapH = mapRef.current.getSize().y;
+        const shiftY = Math.min(Math.round(popupH * 0.55) + 12, Math.round(mapH * 0.38));
+        mapRef.current.panBy([0, -shiftY], { animate: true });
+      };
+      requestAnimationFrame(() => requestAnimationFrame(panForPopup));
+      setTimeout(panForPopup, 280);
     };
     
     // markerClusterGroup can have this marker tucked inside a collapsed cluster at the map's
@@ -25522,11 +25539,11 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
           color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden',
           textOverflow: 'ellipsis', maxWidth: 'calc(100vw - 160px)', pointerEvents: 'none'
         }
-      }, calendar.title, " 장소"),
+      }, calendar.title, " 플레이스"),
       
       /* Right actions: register (map-plus icon), search (magnifying glass) */
       /*#__PURE__*/React.createElement("div", {
-        style: { display: 'flex', alignItems: 'center', gap: '8px' }
+        style: { display: 'flex', alignItems: 'center', gap: '2px' }
       },
         /* Map Plus Button (icon-only, no text) */
         /*#__PURE__*/React.createElement("button", {
@@ -25534,8 +25551,8 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
           onClick: handleOpenRegister,
           title: "플레이스등록",
           style: {
-            background: 'none', border: 'none', cursor: 'pointer', padding: '6px 8px',
-            color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center'
+            background: 'none', border: 'none', cursor: 'pointer', padding: '6px',
+            color: '#64748B', display: 'flex', alignItems: 'center', justifyContent: 'center'
           }
         }, 
           /* Custom SVG provided by the user */
@@ -25564,8 +25581,8 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
           onClick: () => setIsSearchOpen(prev => !prev),
           title: "플레이스 검색",
           style: {
-            background: 'none', border: 'none', cursor: 'pointer', padding: '6px 8px',
-            color: isSearchOpen ? 'var(--accent-primary)' : 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center'
+            background: 'none', border: 'none', cursor: 'pointer', padding: '6px',
+            color: isSearchOpen ? 'var(--text-main)' : '#64748B', display: 'flex', alignItems: 'center', justifyContent: 'center'
           }
         }, /*#__PURE__*/React.createElement(SearchIcon, null))
       )
@@ -25573,17 +25590,18 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
 
     /* Slide-down search input bar */
     isSearchOpen && /*#__PURE__*/React.createElement("div", {
+      className: "places-list-search-bar",
       style: {
-        height: '48px',
+        minHeight: '48px',
         display: 'flex',
         alignItems: 'center',
-        gap: '8px',
-        padding: '0 16px',
+        gap: '10px',
+        padding: '10px 16px',
         backgroundColor: 'var(--bg-card)',
         borderBottom: '1px solid var(--border-subtle)',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
         flexShrink: 0,
-        zIndex: 1008
+        zIndex: 1008,
+        boxSizing: 'border-box'
       }
     },
       /*#__PURE__*/React.createElement("svg", {
@@ -25603,7 +25621,7 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
       ),
       /*#__PURE__*/React.createElement("input", {
         type: "text",
-        className: "form-input",
+        className: "places-list-search-input",
         placeholder: "등록된 플레이스명 또는 주소 검색...",
         value: listSearchQuery,
         onChange: e => {
@@ -25614,7 +25632,11 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
           }
         },
         autoFocus: true,
-        style: { flex: 1, minWidth: 0, height: '32px', fontSize: '0.82rem', padding: '0 8px' }
+        style: {
+          flex: 1, minWidth: 0, height: '36px', fontSize: '0.88rem',
+          padding: '0 4px', border: 'none', outline: 'none',
+          background: 'transparent', color: 'var(--text-main)', boxShadow: 'none'
+        }
       }),
       listSearchQuery && /*#__PURE__*/React.createElement("button", {
         type: "button",
