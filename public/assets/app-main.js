@@ -7921,6 +7921,7 @@ function App() {
     return updateCalendars(nextCalendars, '지출 저장완료', 'success', updatedCal.id, 'settings', expenseActivityLog ? [expenseActivityLog] : []);
   };
   const handleDeleteExpense = (dateStr, expenseId) => {
+    // Confirm rule: UI layer (DateModal) shows confirm once. Do not confirm again here.
     if (!activeCal || !isValidDateString(dateStr)) return false;
     const existingMeetings = getConfirmedMeetings(activeCal);
     const meetingIndex = existingMeetings.findIndex(m => m.date === dateStr);
@@ -7929,32 +7930,25 @@ function App() {
     const deletedExpense = (Array.isArray(meeting.expenses) ? meeting.expenses : []).find(e => e.id === expenseId);
     if (!deletedExpense) return false;
 
-    const labelText = deletedExpense.label || deletedExpense.url || '지출 내역';
-    const shortText = labelText.length > 20 ? labelText.substring(0, 20) + '...' : labelText;
-
-    showConfirmDialog(
-      '지출 내역 삭제',
-      `"${shortText}" 지출 내역을 삭제하시겠습니까?`,
-      () => {
-        const nextExpenses = (Array.isArray(meeting.expenses) ? meeting.expenses : []).filter(e => e.id !== expenseId);
-        const now = Date.now();
-        const nextConfirmedMeetings = existingMeetings.map((m, i) => i === meetingIndex ? { ...m, expenses: nextExpenses } : m);
-        const expenseLogNote = deletedExpense
-          ? sanitizeText(`${deletedExpense.amount < 0 ? '+' : '-'}${Math.abs(deletedExpense.amount).toLocaleString()}원 ${deletedExpense.label || deletedExpense.url || ''}`, 120)
-          : '';
-        const expenseActivityLog = deletedExpense ? createActivityLog(activeCal.id, 'expense_delete', dateStr, '', now, expenseLogNote) : null;
-        const updatedCal = {
-          ...activeCal,
-          confirmedMeeting: nextConfirmedMeetings,
-          updatedAt: now,
-          revision: (activeCal.revision || 0) + 1,
-          activityLogs: expenseActivityLog ? [...getCalendarActivityLogs(activeCal), expenseActivityLog] : getCalendarActivityLogs(activeCal)
-        };
-        const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-        updateCalendars(nextCalendars, '지출 삭제완료', 'success', updatedCal.id, 'settings', expenseActivityLog ? [expenseActivityLog] : []);
-      }
+    const nextExpenses = (Array.isArray(meeting.expenses) ? meeting.expenses : []).filter(e => e.id !== expenseId);
+    const now = Date.now();
+    const nextConfirmedMeetings = existingMeetings.map((m, i) => i === meetingIndex ? { ...m, expenses: nextExpenses } : m);
+    const expenseLogNote = sanitizeText(
+      `${deletedExpense.amount < 0 ? '+' : '-'}${Math.abs(Number(deletedExpense.amount) || 0).toLocaleString()}원 ${deletedExpense.label || deletedExpense.url || ''}`,
+      120
     );
+    const expenseActivityLog = createActivityLog(activeCal.id, 'expense_delete', dateStr, '', now, expenseLogNote);
+    const updatedCal = {
+      ...activeCal,
+      confirmedMeeting: nextConfirmedMeetings,
+      updatedAt: now,
+      revision: (activeCal.revision || 0) + 1,
+      activityLogs: expenseActivityLog ? [...getCalendarActivityLogs(activeCal), expenseActivityLog] : getCalendarActivityLogs(activeCal)
+    };
+    const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
+    return updateCalendars(nextCalendars, '지출 삭제완료', 'success', updatedCal.id, 'settings', expenseActivityLog ? [expenseActivityLog] : []);
   };
+
   const handleReorderExpenses = (dateStr, orderedExpenseIds) => {
     if (!activeCal || !isValidDateString(dateStr) || !Array.isArray(orderedExpenseIds) || orderedExpenseIds.length < 2) return false;
     const existingMeetings = getConfirmedMeetings(activeCal);
@@ -14936,10 +14930,22 @@ function DateModal({
   const handleDeleteExpenseClick = (e, expenseId) => {
     e.stopPropagation();
     if (!onDeleteExpense) return;
-    onRequestConfirm('정산 내역 삭제', '이 정산 내역을 삭제하시겠습니까?', async () => {
+    const target = expenses.find(exp => exp.id === expenseId);
+    const rawLabel = String(target?.label || target?.url || '').trim();
+    const shortLabel = rawLabel.length > 24 ? rawLabel.slice(0, 24) + '…' : rawLabel;
+    const kind = Number(target?.amount) < 0 ? '수입' : '지출';
+    const message = shortLabel
+      ? `"${shortLabel}" ${kind} 내역을 삭제하시겠습니까?`
+      : `이 ${kind} 내역을 삭제하시겠습니까?`;
+    // Confirm once only — parent handler must not show another dialog.
+    onRequestConfirm('정산 내역 삭제', message, async () => {
       setIsSavingExpense(true);
-      await onDeleteExpense(dateStr, expenseId);
+      const ok = await onDeleteExpense(dateStr, expenseId);
       setIsSavingExpense(false);
+      if (ok === false) {
+        showToast('삭제에 실패했습니다.', 'error');
+        return;
+      }
       showToast('정산 내역이 삭제되었습니다.', 'success');
       if (editingExpenseId === expenseId) {
         setEditingExpenseId(null);
