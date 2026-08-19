@@ -678,7 +678,6 @@ async function subscribeUserToPush(calendarId, activeParticipantId) {
         userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
         updatedAt: Date.now()
       }, { merge: true });
-      console.log('Web Push subscription registered successfully in Firestore.');
       return { ok: true, subId };
     }
     return { ok: false, reason: 'firestore-unavailable' };
@@ -722,7 +721,6 @@ async function unsubscribeUserFromPush(calendarId) {
       // calendar tab on pyw31337.github.io, leaving stale Firestore subscription docs and
       // breaking notifications elsewhere. Remove only this calendar's registration; the browser
       // endpoint can stay alive and be reused by still-enabled calendars.
-      console.log('Removed this calendar Web Push registration successfully');
       return { ok: true, subId };
     }
     return { ok: true, reason: 'no-browser-subscription' };

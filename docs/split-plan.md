@@ -31,6 +31,15 @@
 - 복구 기준 태그: `safe-before-split-20260814-7da2504`
 - 최근 안정 태그: `safe-notification-audit-20260814-c20233b`, `safe-notification-split-20260814-dfa42fd`, `safe-url-utils-split-20260814-3974923`, `safe-shortcut-utils-split-20260814-7c0d5a8`
 
+## 2026-08-19 성능·보안 진행 메모
+
+- 화면별 Firestore 구독 분리: 메모/장소/기념일은 해당 뷰에서만 구독
+- 채팅 창: chat/gallery=30, 그 외=10
+- app-config 한도 정렬 (MEMOS 30, thumb 8k, CHAT 30 등)
+- 클라이언트 DEFAULT_ADMIN_PASSWORD_HASH 제거 (검증은 Cloud Functions only)
+- 성공성 console.log 제거
+- 참여자 클릭 → 날짜 있으면 DateModal, 없으면 장소 검색 프리필 (구현됨)
+
 ## 다음 권장 단계
 
 ### 15단계: 순수 유틸 함수 추가 분리
