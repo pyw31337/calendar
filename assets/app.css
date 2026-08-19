@@ -2517,13 +2517,39 @@ select.form-select {
 .bottom-sheet-body {
   padding: 12px 20px 24px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;
 }
+/* 백드롭 규칙: 항목 글자는 참여자 선택과 같이 굵고 진하게 */
 .bottom-sheet-item {
-  width: 100%; display: flex; align-items: center; gap: 12px; padding: 14px 16px;
-  background: var(--bg-primary); border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
-  cursor: pointer; text-align: left; transition: all 0.2s ease; font-family: inherit; font-size: 0.95rem;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s ease;
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 700;
   color: var(--text-main);
 }
-.bottom-sheet-item:hover { background: #EEF2FF; border-color: var(--accent-primary); }
+.bottom-sheet-item:hover {
+  background: #EEF2FF;
+  border-color: var(--accent-primary);
+  color: var(--text-main);
+}
+.bottom-sheet-item span {
+  color: var(--text-main);
+  font-weight: 700;
+}
+.bottom-sheet-header h4 {
+  font-size: 1rem;
+  font-weight: 800;
+  margin: 0;
+  color: var(--text-main);
+}
 
 .desktop-only { display: block; }
 .mobile-only { display: none; }
