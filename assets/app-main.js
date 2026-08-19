@@ -14188,25 +14188,53 @@ function getShortTitleParts(dateStr) {
 
 
 function GamifiedConfirmButtonContent({ label }) {
-  const bolt = /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg", viewBox: "0 0 24 24", width: "100%", height: "100%",
-    fill: "currentColor", "aria-hidden": true
-  }, /*#__PURE__*/React.createElement("path", { d: "M13 2 3 14h8l-1 8 10-12h-8l1-8z" }));
-  const star = /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg", viewBox: "0 0 24 24", width: "100%", height: "100%",
-    fill: "currentColor", "aria-hidden": true
-  }, /*#__PURE__*/React.createElement("path", { d: "M12 2l2.4 7.2H22l-6 4.8 2.3 7.2L12 16.8 5.7 21.2 8 14 2 9.2h7.6z" }));
   return /*#__PURE__*/React.createElement(React.Fragment, null,
     /*#__PURE__*/React.createElement("span", { className: "gamified-shiny-glow-wrapper", "aria-hidden": true },
       /*#__PURE__*/React.createElement("span", { className: "gamified-shiny-glow" })
     ),
+    /*#__PURE__*/React.createElement("svg", {
+      className: "gamified-border-lightning",
+      viewBox: "0 0 100 40",
+      preserveAspectRatio: "none",
+      "aria-hidden": true
+    },
+      /*#__PURE__*/React.createElement("defs", null,
+        /*#__PURE__*/React.createElement("linearGradient", { id: "gamifiedBoltGrad", x1: "0%", y1: "0%", x2: "100%", y2: "0%" },
+          /*#__PURE__*/React.createElement("stop", { offset: "0%", stopColor: "#A5F3FC" }),
+          /*#__PURE__*/React.createElement("stop", { offset: "35%", stopColor: "#FFFFFF" }),
+          /*#__PURE__*/React.createElement("stop", { offset: "65%", stopColor: "#C4B5FD" }),
+          /*#__PURE__*/React.createElement("stop", { offset: "100%", stopColor: "#67E8F9" })
+        ),
+        /*#__PURE__*/React.createElement("filter", { id: "gamifiedBoltGlow", x: "-50%", y: "-50%", width: "200%", height: "200%" },
+          /*#__PURE__*/React.createElement("feGaussianBlur", { stdDeviation: "1.2", result: "b" }),
+          /*#__PURE__*/React.createElement("feMerge", null,
+            /*#__PURE__*/React.createElement("feMergeNode", { in: "b" }),
+            /*#__PURE__*/React.createElement("feMergeNode", { in: "SourceGraphic" })
+          )
+        )
+      ),
+      /*#__PURE__*/React.createElement("rect", {
+        className: "gamified-border-track",
+        x: "1.5", y: "1.5", width: "97", height: "37", rx: "10", ry: "10",
+        fill: "none", stroke: "url(#gamifiedBoltGrad)", strokeWidth: "2.2",
+        pathLength: "100", filter: "url(#gamifiedBoltGlow)"
+      }),
+      /*#__PURE__*/React.createElement("rect", {
+        className: "gamified-border-track gamified-border-track-2",
+        x: "1.5", y: "1.5", width: "97", height: "37", rx: "10", ry: "10",
+        fill: "none", stroke: "#E0F2FE", strokeWidth: "1.2",
+        pathLength: "100", filter: "url(#gamifiedBoltGlow)"
+      })
+    ),
     /*#__PURE__*/React.createElement("span", { className: "gamified-sparks-container", "aria-hidden": true },
-      [1,2,3,4,5,6].map(n => /*#__PURE__*/React.createElement("span", {
-        key: "sp"+n, className: "gamified-spark gamified-spark-" + n
-      }, bolt)),
-      [1,2,3,4,5,6].map(n => /*#__PURE__*/React.createElement("span", {
-        key: "sl"+n, className: "gamified-sparklet gamified-sparklet-" + n
-      }, star))
+      [1,2,3,4].map(n => /*#__PURE__*/React.createElement("span", {
+        key: "bolt"+n, className: "gamified-edge-bolt gamified-edge-bolt-" + n
+      }, /*#__PURE__*/React.createElement("svg", {
+        viewBox: "0 0 24 48", width: "100%", height: "100%", fill: "none"
+      }, /*#__PURE__*/React.createElement("path", {
+        d: "M12 2 L8 18 L14 18 L10 46 L18 20 L12 20 Z",
+        fill: "currentColor"
+      }))))
     ),
     /*#__PURE__*/React.createElement("span", { className: "gamified-confirm-label" }, label)
   );
@@ -15233,11 +15261,15 @@ function DateModal({
             }),
             /*#__PURE__*/React.createElement("button", {
               type: "button",
-              className: "btn btn-primary",
-              style: { padding: '0 20px', fontWeight: 800, borderRadius: 'var(--radius-full)', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+              className: editingLinkedPlaceId ? 'btn btn-poll-create' : 'btn btn-primary',
+              style: {
+                padding: '0 20px', fontWeight: 800, borderRadius: 'var(--radius-full)', whiteSpace: 'nowrap',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                ...(editingLinkedPlaceId ? { backgroundColor: '#0F172A', borderColor: '#0F172A', color: '#FFFFFF' } : {})
+              },
               disabled: isSavingPlace || !selectedPlace,
               onClick: e => { e.preventDefault(); e.stopPropagation(); handleSavePlaceClick(); }
-            }, isSavingPlace ? '...' : '추가')
+            }, isSavingPlace ? '...' : (editingLinkedPlaceId ? '수정' : '추가'))
           )
         )
       ),
@@ -15290,7 +15322,9 @@ function DateModal({
             },
               /*#__PURE__*/React.createElement("button", {
                 type: "button",
-                onClick: () => {
+                onClick: e => {
+                  e.preventDefault();
+                  e.stopPropagation();
                   setEditingLinkedPlaceId(place.id);
                   setSelectedPlace({ name: place.name, address: place.address || '', lat: place.lat, lng: place.lng, categoryId: place.categoryId || 'etc' });
                   setPlaceQuery(place.name || '');
@@ -15304,12 +15338,59 @@ function DateModal({
               }, "수정"),
               /*#__PURE__*/React.createElement("button", {
                 type: "button",
-                onClick: () => {
+                onClick: e => {
+                  e.preventDefault();
+                  e.stopPropagation();
                   onRequestConfirm('장소 삭제', `"${place.alias || place.name}" 장소를 이 날짜에서 해제하시겠습니까?`, async () => {
-                    if (onDeletePlace) {
-                      await Promise.resolve(onDeletePlace(place.id));
-                      showToast('장소가 삭제되었습니다.', 'success');
-                    }
+                    setIsSavingPlace(true);
+                    try {
+                      const targetNorm = normalizePlaceDateForSort(dateStr) || dateStr;
+                      let nextVisitDate = place.visitDate || '';
+                      if (nextVisitDate === dateStr || normalizePlaceDateForSort(nextVisitDate) === targetNorm) nextVisitDate = '';
+                      let nextMemo = String(place.memo || '');
+                      const entries = parseVisitEntriesFromMemo(nextMemo);
+                      if (entries.length >= 2) {
+                        nextMemo = entries
+                          .filter(en => normalizePlaceDateForSort(en.date) !== targetNorm)
+                          .map(en => en.note ? `${en.date} ${en.note}` : en.date)
+                          .join(' / ');
+                      } else {
+                        const leading = extractLeadingMemoDate(nextMemo);
+                        if (leading && normalizePlaceDateForSort(leading) === targetNorm) {
+                          nextMemo = nextMemo.replace(/^\s*\d{2,4}[.-]\d{2}[.-]\d{2}\s*/, '').replace(/^\/\s*/, '').trim();
+                        }
+                      }
+                      if (typeof onSavePlace === 'function') {
+                        const ok = await Promise.resolve(onSavePlace({
+                          id: place.id,
+                          name: place.name,
+                          alias: place.alias || '',
+                          address: place.address || '',
+                          lat: place.lat,
+                          lng: place.lng,
+                          categoryId: place.categoryId || 'etc',
+                          memo: nextMemo,
+                          visitStatus: place.visitStatus === 'planned' ? 'planned' : 'visited',
+                          visitDate: nextVisitDate
+                        }));
+                        if (ok !== false) {
+                          showToast('이 날짜에서 장소가 해제되었습니다.', 'success');
+                          if (editingLinkedPlaceId === place.id) {
+                            setEditingLinkedPlaceId(null);
+                            setSelectedPlace(null);
+                            setPlaceQuery('');
+                            setPlaceAlias('');
+                            setPlaceMemo('');
+                          }
+                        } else if (onDeletePlace) {
+                          await Promise.resolve(onDeletePlace(place.id));
+                          showToast('장소가 삭제되었습니다.', 'success');
+                        }
+                      } else if (onDeletePlace) {
+                        await Promise.resolve(onDeletePlace(place.id));
+                        showToast('장소가 삭제되었습니다.', 'success');
+                      }
+                    } finally { setIsSavingPlace(false); }
                   });
                 },
                 style: { border: 'none', background: 'none', color: '#EF4444', fontSize: '0.74rem', fontWeight: 800, cursor: 'pointer', padding: '2px 4px' }
