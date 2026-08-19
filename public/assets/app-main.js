@@ -13726,6 +13726,36 @@ function PencilIcon({ size = 12 } = {}) {
 // "building-2" icon -- same path data as the raw SVG string PlaceMapView's Leaflet popup builds
 // for its "지도에서 업체정보 보기" button (see businessInfoBtn.innerHTML), so the place list's icon
 // version of 업체보기 looks identical to the map popup's.
+
+function ItemEditDeleteActions({ onEdit, onDelete, editTitle = '수정', deleteTitle = '삭제', showEdit = true, showDelete = true }) {
+  return /*#__PURE__*/React.createElement("div", {
+    className: "item-edit-delete-actions",
+    style: { display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }
+  },
+    showEdit && typeof onEdit === 'function' && /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: e => { e.preventDefault(); e.stopPropagation(); onEdit(e); },
+      title: editTitle, "aria-label": editTitle,
+      style: {
+        width: '22px', height: '22px', border: '1px solid var(--border-subtle)',
+        backgroundColor: 'var(--bg-card)', borderRadius: '6px',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        cursor: 'pointer', padding: 0, color: '#64748B'
+      }
+    }, /*#__PURE__*/React.createElement(PencilIcon, { size: 12 })),
+    showDelete && typeof onDelete === 'function' && /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: e => { e.preventDefault(); e.stopPropagation(); onDelete(e); },
+      title: deleteTitle, "aria-label": deleteTitle,
+      style: {
+        width: '22px', height: '22px', border: 'none', background: 'none',
+        padding: 0, cursor: 'pointer', color: '#94A3B8',
+        display: 'flex', alignItems: 'center', justifyContent: 'center'
+      }
+    }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 14 }))
+  );
+}
+
 function BuildingIcon({ size = 14 } = {}) {
   return /*#__PURE__*/React.createElement("svg", {
     xmlns: "http://www.w3.org/2000/svg", width: String(size), height: String(size), viewBox: "0 0 24 24",
@@ -15081,20 +15111,10 @@ function DateModal({
                 }
               }, entry.note)
             ),
-            !adminMode && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '6px' } },
-              /* 수정 */
-              /*#__PURE__*/React.createElement("button", {
-                type: "button",
-                onClick: () => handleEditClick(entry),
-                style: { border: 'none', background: 'none', color: '#3B82F6', fontSize: '0.74rem', cursor: 'pointer', padding: '2px 4px' }
-              }, "수정"),
-              /* 삭제 */
-              /*#__PURE__*/React.createElement("button", {
-                type: "button",
-                onClick: () => handleDeleteClick(entry),
-                style: { border: 'none', background: 'none', color: '#EF4444', fontSize: '0.74rem', cursor: 'pointer', padding: '2px 4px' }
-              }, "삭제")
-            )
+            !adminMode && /*#__PURE__*/React.createElement(ItemEditDeleteActions, {
+              onEdit: () => handleEditClick(entry),
+              onDelete: () => handleDeleteClick(entry)
+            })
           );
         })
       ),
@@ -15283,7 +15303,8 @@ function DateModal({
         registeredPlaces.length === 0 ? /*#__PURE__*/React.createElement("div", {
           style: { textAlign: 'center', color: 'var(--text-muted)', padding: '24px 0', fontSize: '0.82rem', border: '1px dashed var(--border-subtle)', borderRadius: '12px' }
         }, "등록된 장소가 없습니다.") : /*#__PURE__*/React.createElement("div", {
-          style: { display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '240px', overflowY: 'auto' }
+          className: "date-modal-places-list",
+          style: { display: 'flex', flexDirection: 'column', gap: '8px', flex: '1 1 auto', minHeight: '80px', overflowY: 'auto' }
         }, registeredPlaces.map(place => {
           const category = getPlaceCategoryById(calendar, place.categoryId) || { id: 'etc', name: '기타', color: '#64748B' };
           const catColor = category.color || '#64748B';
@@ -15501,10 +15522,10 @@ function DateModal({
 
       /* Expenses list */
       expenses.length > 0 && /*#__PURE__*/React.createElement("div", {
+        className: "date-modal-settlement-list",
         style: {
-          display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '10px', padding: '10px',
-          border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-primary)',
-          maxHeight: '240px', overflowY: 'auto'
+          display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '10px',
+          flex: '1 1 auto', minHeight: '120px', overflowY: 'auto'
         }
       },
         expenses.map(expense => {
@@ -15543,62 +15564,39 @@ function DateModal({
               display: 'flex',
               flexDirection: 'column',
               gap: '4px',
-              padding: `10px ${expenses.length > 1 ? '74px' : '42px'} 10px 12px`,
+              padding: '12px 48px 12px 12px',
               position: 'relative',
-              backgroundColor: editingExpenseId === expense.id ? 'var(--bg-card)' : 'transparent',
+              backgroundColor: 'var(--bg-card)',
               border: `1px solid ${editingExpenseId === expense.id ? 'var(--accent-primary)' : 'var(--border-subtle)'}`,
-              borderRadius: 'var(--radius-md)', cursor: 'pointer'
+              borderRadius: '12px',
+              cursor: 'pointer'
             }
           },
-            expenses.length > 1 && /*#__PURE__*/React.createElement("button", {
-              type: "button",
-              className: "poll-drag-handle",
-              disabled: isSavingExpense,
-              draggable: !isSavingExpense,
-              title: "드래그하여 지출 순서 변경",
-              style: { position: 'absolute', top: '8px', right: '38px' },
-              onClick: event => {
-                event.stopPropagation();
-              },
-              onPointerDown: event => beginExpensePointerSort(event, expense.id),
-              onPointerMove: updateExpensePointerSort,
-              onPointerUp: finishExpensePointerSort,
-              onPointerCancel: resetExpensePointerSort,
-              onDragStart: event => {
-                if (isSavingExpense) return;
-                event.stopPropagation();
-                setDraggingExpenseId(expense.id);
-                event.dataTransfer.effectAllowed = 'move';
-                event.dataTransfer.setData('text/plain', expense.id);
-                const row = event.currentTarget.closest('.expense-sortable-row');
-                if (row && event.dataTransfer.setDragImage) {
-                  const rect = row.getBoundingClientRect();
-                  event.dataTransfer.setDragImage(row, Math.min(rect.width - 12, Math.max(24, event.clientX - rect.left)), Math.max(16, event.clientY - rect.top));
-                }
-              },
-              onDragEnd: resetExpensePointerSort
-            }, /*#__PURE__*/React.createElement(LineHeightIcon, { size: 14 })),
-            /*#__PURE__*/React.createElement("button", {
-              type: "button",
-              className: "expense-delete-button",
-              onClick: event => handleDeleteExpenseClick(event, expense.id),
-              title: "지출 삭제",
-              style: {
-                position: 'absolute',
-                top: '8px',
-                right: '8px',
-                width: '28px',
-                height: '28px',
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                color: '#94A3B8',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                padding: 0
-              }
-            }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 14 })),
+            /*#__PURE__*/React.createElement("div", {
+              style: { position: 'absolute', top: '10px', right: '10px', display: 'flex', alignItems: 'center', gap: '4px' }
+            },
+              expenses.length > 1 && /*#__PURE__*/React.createElement("button", {
+                type: "button",
+                className: "poll-drag-handle",
+                disabled: isSavingExpense,
+                title: "드래그하여 순서 변경",
+                style: {
+                  width: '22px', height: '22px', border: '1px solid var(--border-subtle)',
+                  backgroundColor: 'var(--bg-card)', borderRadius: '6px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'grab', padding: 0, color: '#64748B'
+                },
+                onClick: event => event.stopPropagation(),
+                onPointerDown: event => beginExpensePointerSort(event, expense.id),
+                onPointerMove: updateExpensePointerSort,
+                onPointerUp: finishExpensePointerSort,
+                onPointerCancel: resetExpensePointerSort
+              }, /*#__PURE__*/React.createElement(LineHeightIcon, { size: 12 })),
+              /*#__PURE__*/React.createElement(ItemEditDeleteActions, {
+                onEdit: () => handleExpenseItemClick(expense),
+                onDelete: event => handleDeleteExpenseClick(event || { stopPropagation() {} }, expense.id)
+              })
+            ),
             /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '4px', minWidth: 0 } },
               /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' } },
                 /*#__PURE__*/React.createElement("span", {
