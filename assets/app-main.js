@@ -8326,7 +8326,18 @@ function App() {
       onDecreaseFont: () => setFontScalePercent(prev => Math.max(80, prev - 10)),
       onIncreaseFont: () => setFontScalePercent(prev => Math.min(130, prev + 10)),
       isChatNotifyEnabled: mainNotifPermission === 'granted' && mainChatNotifyEnabled,
-      onToggleChatNotifications: handleMainToggleNotifications
+      onToggleChatNotifications: handleMainToggleNotifications,
+      onSharePlaces: async () => {
+        try {
+          const url = new URL(window.location.href);
+          url.searchParams.set('view', 'places');
+          if (activeCalId) url.searchParams.set('id', activeCalId);
+          const ok = await copyTextToClipboard(url.toString());
+          showToast(ok ? '플레이스 페이지 링크가 복사되었습니다.' : '링크 복사에 실패했습니다.', ok ? 'success' : 'error');
+        } catch (e) {
+          showToast('링크 복사에 실패했습니다.', 'error');
+        }
+      }
     }));
   }
 
@@ -18726,7 +18737,6 @@ function ChatGalleryModal({
     }
   }, [['photos', '사진'], ['links', '링크']].map(tab => {
     const count = tab[0] === 'photos' ? filteredPhotos.length : filteredLinks.length;
-    const showBadge = true;
     return /*#__PURE__*/React.createElement("button", {
       key: tab[0],
       type: "button",
@@ -18746,8 +18756,8 @@ function ChatGalleryModal({
         gap: '6px'
       }
     },
-      tab[1],
-      showBadge && /*#__PURE__*/React.createElement("span", {
+      tab[1] + '(' + String(count) + ')',
+      /*#__PURE__*/React.createElement("span", {
         style: {
           fontSize: '0.7rem',
           fontWeight: 800,
@@ -24524,7 +24534,8 @@ function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom = false
         chunkedLoading: true,
         showCoverageOnHover: false,
         spiderfyOnMaxZoom: true,
-        maxClusterRadius: 60,
+        disableClusteringAtZoom: 15,
+        maxClusterRadius: 50,
         // Flat solid-color badge instead of the plugin's default ripple-ring style, to match the
         // rest of the app's flat/minimal look rather than pulling in its default CSS theme too.
         iconCreateFunction: cluster => {
@@ -24807,26 +24818,19 @@ function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom = false
     // When a list row has focused a place, do NOT fitBounds -- that re-collapses clusters.
     if (focusPlace && focusPlace.id) {
       const focused = markersByIdRef.current.get(focusPlace.id);
-      if (focused) {
-        const layer = markersLayerRef.current;
-        const openFocused = () => {
-          if (!mapRef.current) return;
-          const map = mapRef.current;
-          const zoom = isMobileViewport ? 16 : 16;
-          const latlng = focused.getLatLng();
-          const size = map.getSize();
-          const targetPoint = map.project(latlng, zoom);
-          const offsetY = Math.min(Math.round(size.y * 0.28), isMobileViewport ? 90 : 140);
-          targetPoint.y += offsetY;
-          map.setView(map.unproject(targetPoint, zoom), zoom, { animate: false });
-          focused.openPopup();
+      if (focused && mapRef.current) {
+        const map = mapRef.current;
+        const zoom = 16;
+        const latlng = focused.getLatLng();
+        const size = map.getSize();
+        const targetPoint = map.project(latlng, zoom);
+        const offsetY = Math.min(Math.round(size.y * 0.28), isMobileViewport ? 90 : 140);
+        targetPoint.y += offsetY;
+        map.setView(map.unproject(targetPoint, zoom), zoom, { animate: false });
+        requestAnimationFrame(() => {
+          try { focused.openPopup(); } catch (e) {}
           panMapToFitMarkerPopup(map, focused, { pad: isMobileViewport ? 20 : 28, animate: false });
-        };
-        if (layer && typeof layer.zoomToShowLayer === 'function') {
-          layer.zoomToShowLayer(focused, openFocused);
-        } else {
-          openFocused();
-        }
+        });
       }
     } else if (fitBoundsPoints.length === 1) {
       mapRef.current.setView(fitBoundsPoints[0], isMobileViewport ? 14 : 15);
@@ -24857,27 +24861,29 @@ function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom = false
     
     const performFocus = () => {
       if (!mapRef.current) return;
-      const zoom = isMobileViewport ? 16 : 16;
       const map = mapRef.current;
+      const zoom = 16;
       const latlng = marker.getLatLng();
       const size = map.getSize();
       const targetPoint = map.project(latlng, zoom);
       const offsetY = Math.min(Math.round(size.y * 0.28), isMobileViewport ? 90 : 140);
       targetPoint.y += offsetY;
-      const targetLatLng = map.unproject(targetPoint, zoom);
-      map.setView(targetLatLng, zoom, { animate: true });
-      marker.openPopup();
-      panMapToFitMarkerPopup(map, marker, { pad: isMobileViewport ? 20 : 28, animate: true });
+      map.setView(map.unproject(targetPoint, zoom), zoom, { animate: false });
+      requestAnimationFrame(() => {
+        try { marker.openPopup(); } catch (e) {}
+        panMapToFitMarkerPopup(map, marker, { pad: isMobileViewport ? 20 : 28, animate: true });
+      });
     };
-    
-    // markerClusterGroup can have this marker tucked inside a collapsed cluster at the map's
-    // current zoom -- zoomToShowLayer expands/pans through whatever cluster hierarchy is needed
-    // before opening the popup, which a plain marker.openPopup() call can't do on its own.
-    if (typeof markersLayerRef.current.zoomToShowLayer === 'function') {
-      markersLayerRef.current.zoomToShowLayer(marker, performFocus);
-    } else {
-      performFocus();
+
+    const layer = markersLayerRef.current;
+    if (layer && typeof layer.getVisibleParent === 'function') {
+      const parent = layer.getVisibleParent(marker);
+      if (parent && parent !== marker && typeof layer.zoomToShowLayer === 'function') {
+        layer.zoomToShowLayer(marker, performFocus);
+        return;
+      }
     }
+    performFocus();
   }, [ready, focusPlace]);
 
   // Container size changes (the section's collapse/expand aspect-ratio toggle) don't fire a
@@ -25443,7 +25449,7 @@ function PlacesSection({ calendar, onViewAll }) {
 // taller interactive map (marker click opens the register modal pre-filled for editing) plus a
 // scrollable place-card list below it, since editing/deleting via Leaflet popup controls isn't
 // practical to build or to verify structurally -- the card list is plain React DOM instead.
-function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, onRequestConfirm, placesInitialQuery, setPlacesInitialQuery, isDarkTheme, onToggleTheme, fontScalePercent, onDecreaseFont, onIncreaseFont, isChatNotifyEnabled, onToggleChatNotifications }) {
+function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, onRequestConfirm, placesInitialQuery, setPlacesInitialQuery, isDarkTheme, onToggleTheme, fontScalePercent, onDecreaseFont, onIncreaseFont, isChatNotifyEnabled, onToggleChatNotifications, onSharePlaces }) {
   const [isRegisterOpen, setIsRegisterOpen] = React.useState(false);
   const [editingPlace, setEditingPlace] = React.useState(null);
   const [categoryFilter, setCategoryFilter] = React.useState('all');
@@ -25947,6 +25953,21 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
           /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
             /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "플레이스 등록"),
             /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "새 장소 추가하기")
+          )
+        ),
+        /*#__PURE__*/React.createElement("button", {
+          type: "button", className: "admin-side-menu-item",
+          onClick: () => {
+            setIsPlacesMenuOpen(false);
+            if (typeof onSharePlaces === 'function') onSharePlaces();
+          }
+        },
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", {
+            xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
+          }, /*#__PURE__*/React.createElement("path", { d: "M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" }), /*#__PURE__*/React.createElement("polyline", { points: "16 6 12 2 8 6" }), /*#__PURE__*/React.createElement("line", { x1: "12", x2: "12", y1: "2", y2: "15" }))),
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
+            /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "공유하기"),
+            /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "플레이스 페이지 URL 복사")
           )
         )
       ),
