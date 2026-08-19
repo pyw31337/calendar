@@ -374,7 +374,7 @@ const FIREBASE_LOAD_MAX_ATTEMPTS = readConfigNumber('FIREBASE_LOAD_MAX_ATTEMPTS'
 // calendar with thousands of memos doesn't download/subscribe to all of them on every open.
 // Pinned memos are fetched separately and unbounded (pinning is a deliberate, self-limiting
 // action) so an old pinned memo never silently falls out of view as later pages load.
-const MEMOS_PAGE_SIZE = readConfigNumber('MEMOS_PAGE_SIZE', 60);
+const MEMOS_PAGE_SIZE = readConfigNumber('MEMOS_PAGE_SIZE', 30);
 const FIRESTORE_FREE_LIMITS = readConfigObject('FIRESTORE_FREE_LIMITS', {
   storageBytes: 1024 * 1024 * 1024,
   documentBytes: 1024 * 1024,
@@ -6845,7 +6845,7 @@ function App() {
     let isMounted = true;
 
     // Subscribe to chat room history. Queried newest-first + limit so the window
-    // tracks the most recent 100 messages as new ones arrive, then reversed back to
+    // tracks the most recent CHAT_LIVE_MESSAGE_LIMIT messages as new ones arrive, then reversed back to
     // ascending order for rendering -- querying oldest-first + limit would instead pin
     // the window to the first 100 messages ever sent, silently hiding anything newer
     // once a calendar passes that many total messages.
@@ -6881,14 +6881,23 @@ function App() {
         });
       });
 
-    const unsubscribeAnniversaries = firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('anniversaries')
+    return () => {
+      isMounted = false;
+      if (unsubscribeChat) unsubscribeChat();
+    };
+  }, [activeCalId]);
+
+  // Anniversaries: only while calendar view needs them
+  React.useEffect(() => {
+    if (!activeCalId || !firebaseDb) return;
+    if (activeView !== 'calendar') return;
+    let isMounted = true;
+    const unsub = firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('anniversaries')
       .orderBy('createdAt', 'desc')
       .onSnapshot(snapshot => {
         if (!isMounted) return;
         const list = [];
-        snapshot.forEach(doc => {
-          list.push(slimMessageForClient({ id: doc.id, ...doc.data() }));
-        });
+        snapshot.forEach(doc => list.push({ id: doc.id, ...doc.data() }));
         setAnniversaries(list);
       }, err => {
         console.warn(`Firestore anniversaries subscription error:`, err);
@@ -6896,10 +6905,15 @@ function App() {
           if (isMounted) setAnniversaries(list);
         });
       });
+    return () => { isMounted = false; unsub(); };
+  }, [activeCalId, activeView, firebaseDb]);
 
-    // Places/confirmedMeetings subcollections -- see the state declarations above. No `.limit()`
-    // needed (both count-capped at 500, same as their still-supported legacy embedded arrays).
-    const unsubscribePlaces = firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('places')
+  // Places + confirmed meetings: calendar / places / settlement only
+  React.useEffect(() => {
+    if (!activeCalId || !firebaseDb) return;
+    if (activeView !== 'calendar' && activeView !== 'places' && activeView !== 'settlement') return;
+    let isMounted = true;
+    const unsubPlaces = firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('places')
       .onSnapshot(snapshot => {
         if (!isMounted) return;
         const list = [];
@@ -6911,7 +6925,7 @@ function App() {
           if (isMounted) setPlacesSubcollection(list);
         });
       });
-    const unsubscribeConfirmedMeetings = firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('confirmedMeetings')
+    const unsubMeetings = firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('confirmedMeetings')
       .onSnapshot(snapshot => {
         if (!isMounted) return;
         const list = [];
@@ -6923,15 +6937,12 @@ function App() {
           if (isMounted) setConfirmedMeetingsSubcollection(list);
         });
       });
-
     return () => {
       isMounted = false;
-      if (unsubscribeChat) unsubscribeChat();
-      if (unsubscribeAnniversaries) unsubscribeAnniversaries();
-      if (unsubscribePlaces) unsubscribePlaces();
-      if (unsubscribeConfirmedMeetings) unsubscribeConfirmedMeetings();
+      unsubPlaces();
+      unsubMeetings();
     };
-  }, [activeCalId]);
+  }, [activeCalId, activeView, firebaseDb]);
 
   // Memos: paginated newest-first load (rather than subscribing to the entire collection at
   // once, which would download/re-sync thousands of memos on every open as a calendar grows).
@@ -6946,6 +6957,10 @@ function App() {
     if (!activeCalId) {
       setMemos([]);
       setHasMoreMemos(false);
+      return;
+    }
+    // Memos only while memo view is open
+    if (activeView !== 'memo') {
       return;
     }
     if (!firebaseDb) {
@@ -7000,7 +7015,7 @@ function App() {
       unsubscribePinned();
       unsubscribeRecent();
     };
-  }, [activeCalId, memosLimit]);
+  }, [activeCalId, memosLimit, activeView, firebaseDb]);
 
   // Dynamic body padding override for full-screen subviews (chat, settlement, memo)
   React.useEffect(() => {
