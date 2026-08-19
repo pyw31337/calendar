@@ -8238,7 +8238,7 @@ function App() {
       onShare: () => setIsChatShareOpen(true),
       isDarkTheme: isDarkTheme,
       onToggleTheme: toggleTheme,
-      onOpenGallery: () => setIsGalleryOpen(true),
+      onOpenGallery: () => changeView('gallery'),
       onChangeView: changeView,
       fontScalePercent: fontScalePercent,
       onDecreaseFont: () => setFontScalePercent(prev => Math.max(80, prev - 10)),
@@ -8281,6 +8281,17 @@ function App() {
         url.searchParams.delete('memo');
         window.history.replaceState({}, '', url);
       }
+    }));
+  }
+
+  if (activeView === 'gallery') {
+    return withStickyVideo(/*#__PURE__*/React.createElement(ChatGalleryModal, {
+      calendar: activeCal,
+      chatMessages: chatMessages,
+      memos: memos,
+      asPage: true,
+      onClose: () => changeView('calendar'),
+      setActiveLightbox: setActiveLightbox
     }));
   }
 
@@ -8428,7 +8439,7 @@ function App() {
       tryCreateShortcut(msg => showToast(msg, 'info', 5000));
     },
     onOpenAdmin: () => window.open(`${window.location.pathname}?admin=1`, '_blank', 'noopener,noreferrer'),
-    onOpenGallery: () => setIsGalleryOpen(true),
+    onOpenGallery: () => changeView('gallery'),
     onChangeView: changeView,
     isDarkTheme: isDarkTheme,
     onToggleTheme: toggleTheme,
@@ -13002,7 +13013,7 @@ function ChatRoomView({
     }
   }, /*#__PURE__*/React.createElement("span", {
     style: { overflow: 'hidden', textOverflow: 'ellipsis' }
-  }, formatChatHeaderTitle(calendar?.title))), /*#__PURE__*/React.createElement("div", {
+  }, formatChatHeaderTitle(calendar?.title), " 채팅")), /*#__PURE__*/React.createElement("div", {
     style: { display: 'flex', alignItems: 'center', gap: '2px' }
   }, /*#__PURE__*/React.createElement("button", {
     type: "button",
@@ -18334,14 +18345,14 @@ function MainSideMenu({
       /*#__PURE__*/React.createElement("button", {
         type: "button",
         className: "admin-side-menu-item",
-        onClick: () => { onClose && onClose(); handle(onOpenGallery); }
+        onClick: () => { onClose && onClose(); if (onChangeView) onChangeView('gallery'); else handle(onOpenGallery); }
       },
         /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", {
           xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2"
         }, /*#__PURE__*/React.createElement("rect", { width: "18", height: "18", x: "3", y: "3", rx: "2", ry: "2" }), /*#__PURE__*/React.createElement("circle", { cx: "9", cy: "9", r: "2" }), /*#__PURE__*/React.createElement("path", { d: "m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" }))),
         /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
           /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "갤러리"),
-          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "공유된 사진 및 링크 모아보기")
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "채팅·메모 사진 및 링크")
         )
       ),
       /*#__PURE__*/React.createElement("button", {
@@ -18537,6 +18548,9 @@ function ChatSideMenu({
 
 function ChatGalleryModal({
   chatMessages,
+  memos = [],
+  calendar = null,
+  asPage = false,
   onClose,
   setActiveLightbox
 }) {
@@ -18556,39 +18570,49 @@ function ChatGalleryModal({
   const sharedLinks = React.useMemo(() => {
     const list = [];
     const seen = new Set();
-    chatMessages.forEach(msg => {
+    (chatMessages || []).forEach(msg => {
       if (!msg.text) return;
       const url = extractFirstUrl(msg.text);
       if (url && !seen.has(url)) {
         seen.add(url);
-        list.push({
-          url,
-          timestamp: msg.timestamp,
-          messageId: msg.id,
-          text: msg.text,
-          linkPreview: msg.linkPreview
-        });
+        list.push({ url, timestamp: msg.timestamp, messageId: msg.id, text: msg.text, linkPreview: msg.linkPreview, source: 'chat' });
+      }
+    });
+    (memos || []).forEach(memo => {
+      const body = memo?.text || memo?.content || memo?.body || '';
+      if (!body) return;
+      const url = extractFirstUrl(body);
+      if (url && !seen.has(url)) {
+        seen.add(url);
+        list.push({ url, timestamp: memo.updatedAt || memo.createdAt || 0, messageId: memo.id, text: body, linkPreview: memo.linkPreview || null, source: 'memo' });
       }
     });
     return list.sort((a, b) => b.timestamp - a.timestamp);
-  }, [chatMessages]);
+  }, [chatMessages, memos]);
 
   const sharedPhotos = React.useMemo(() => {
     const list = [];
-    chatMessages.forEach(msg => {
+    (chatMessages || []).forEach(msg => {
       const directEntry = getMessageDirectMediaEntry(msg);
       const entries = directEntry ? [...getMessageImageEntries(msg), directEntry] : getMessageImageEntries(msg);
-      // Attach parent message text so gallery search can match caption/body, not only tags.
       entries.forEach(entry => {
-        list.push({
-          ...entry,
-          text: msg.text || '',
-          participantId: msg.participantId || ''
-        });
+        list.push({ ...entry, text: msg.text || '', participantId: msg.participantId || '', source: 'chat' });
+      });
+    });
+    (memos || []).forEach(memo => {
+      const asMsg = {
+        id: memo.id, text: memo.text || memo.content || memo.body || '',
+        imageUrl: memo.imageUrl, imageUrls: memo.imageUrls, thumbUrl: memo.thumbUrl, thumbUrls: memo.thumbUrls,
+        timestamp: memo.updatedAt || memo.createdAt || 0, participantId: memo.participantId || ''
+      };
+      const directEntry = getMessageDirectMediaEntry(asMsg);
+      const entries = directEntry ? [...getMessageImageEntries(asMsg), directEntry] : getMessageImageEntries(asMsg);
+      entries.forEach(entry => {
+        list.push({ ...entry, text: asMsg.text || '', participantId: asMsg.participantId || '', source: 'memo' });
       });
     });
     return list.sort((a, b) => b.timestamp - a.timestamp);
-  }, [chatMessages]);
+  }, [chatMessages, memos]);
 
   const filteredLinks = React.useMemo(() => {
     if (!searchQuery.trim()) return sharedLinks;
@@ -18617,31 +18641,39 @@ function ChatGalleryModal({
     });
   }, [sharedPhotos, searchQuery]);
 
+  const galleryShellStyle = asPage ? {
+    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1005,
+    backgroundColor: 'var(--bg-primary)', display: 'flex', flexDirection: 'column',
+    width: '100%', maxWidth: '100%', overflow: 'hidden'
+  } : { zIndex: 11000 };
+  const galleryInnerStyle = asPage ? {
+    width: '100%', height: '100%', display: 'flex', flexDirection: 'column',
+    backgroundColor: 'var(--bg-card)', borderRadius: 0, maxWidth: '100%'
+  } : {
+    maxWidth: window.innerWidth >= 768 ? '960px' : '520px',
+    width: '95%', height: '80vh', display: 'flex', flexDirection: 'column'
+  };
+  const galleryHeaderStyle = asPage ? {
+    height: '56px', padding: '0 16px', borderBottom: '1px solid var(--border-subtle)',
+    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+    position: 'relative', overflow: 'hidden', flexShrink: 0, backgroundColor: 'var(--bg-card)'
+  } : {
+    padding: '16px 20px 12px 20px', borderBottom: '1px solid var(--border-subtle)',
+    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+    position: 'relative', overflow: 'hidden'
+  };
+
   return /*#__PURE__*/React.createElement("div", {
-    className: "modal-overlay",
-    onClick: onClose,
-    style: { zIndex: 11000 }
-  }, /*#__PURE__*/React.createElement(ResizableModalContainer, {
-    className: "modal-container",
-    onClick: e => e.stopPropagation(),
-    style: {
-      maxWidth: window.innerWidth >= 768 ? '960px' : '520px',
-      width: '95%',
-      height: '80vh',
-      display: 'flex',
-      flexDirection: 'column'
-    }
+    className: asPage ? "gallery-page-container" : "modal-overlay",
+    onClick: asPage ? undefined : onClose,
+    style: galleryShellStyle
+  }, /*#__PURE__*/React.createElement(asPage ? "div" : ResizableModalContainer, asPage ? {
+    className: "gallery-page-inner", style: galleryInnerStyle
+  } : {
+    className: "modal-container", onClick: e => e.stopPropagation(), style: galleryInnerStyle
   }, /*#__PURE__*/React.createElement("div", {
-    className: "modal-header",
-    style: {
-      padding: '16px 20px 12px 20px',
-      borderBottom: '1px solid var(--border-subtle)',
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      position: 'relative',
-      overflow: 'hidden'
-    }
+    className: asPage ? "gallery-page-header" : "modal-header",
+    style: galleryHeaderStyle
   },
     /* Search button and slide-out input field */
     /*#__PURE__*/React.createElement("div", {
@@ -18658,7 +18690,7 @@ function ChatGalleryModal({
         style: { fontSize: '1.05rem', fontWeight: 900, color: 'var(--text-main)', margin: 0, display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap' }
       }, /*#__PURE__*/React.createElement("svg", {
         xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2"
-      }, /*#__PURE__*/React.createElement("rect", { width: "18", height: "18", x: "3", y: "3", rx: "2", ry: "2" }), /*#__PURE__*/React.createElement("circle", { cx: "9", cy: "9", r: "2" }), /*#__PURE__*/React.createElement("path", { d: "m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" })), "채팅방 갤러리"),
+      }, /*#__PURE__*/React.createElement("rect", { width: "18", height: "18", x: "3", y: "3", rx: "2", ry: "2" }), /*#__PURE__*/React.createElement("circle", { cx: "9", cy: "9", r: "2" }), /*#__PURE__*/React.createElement("path", { d: "m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" })), (formatChatHeaderTitle(calendar?.title) ? formatChatHeaderTitle(calendar?.title) + " 갤러리" : "갤러리")),
       isSearchOpen && /*#__PURE__*/React.createElement("div", {
         style: {
           display: 'flex',
@@ -18714,13 +18746,14 @@ function ChatGalleryModal({
       }, /*#__PURE__*/React.createElement("svg", {
         xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.5"
       }, /*#__PURE__*/React.createElement("circle", { cx: "11", cy: "11", r: "8" }), /*#__PURE__*/React.createElement("path", { d: "m21 21-4.3-4.3" }))),
-      /* Close button */
+      /* Close / Back */
       /*#__PURE__*/React.createElement("button", {
         type: "button",
-        className: "modal-close-btn",
+        className: asPage ? "gallery-back-btn" : "modal-close-btn",
         onClick: onClose,
+        "aria-label": asPage ? "뒤로가기" : "닫기",
         style: { display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px', border: 0, background: 'none', cursor: 'pointer', color: 'var(--text-muted)' }
-      }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }))
+      }, asPage ? /*#__PURE__*/React.createElement(BackArrowIcon, { size: 22 }) : /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }))
     )
   ), /*#__PURE__*/React.createElement("div", {
     style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', padding: '12px 20px 8px 20px', borderBottom: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)' }
@@ -19371,21 +19404,6 @@ function MemoView({ calendar, memos, hasMoreMemos, onLoadMoreMemos, onBack, show
       /*#__PURE__*/React.createElement("div", {
         style: { display: 'flex', alignItems: 'center', gap: '2px', flexShrink: 0 }
       },
-        /* Gallery button */
-        chatMessages && chatMessages.length > 0 && /*#__PURE__*/React.createElement("button", {
-          type: "button",
-          onClick: () => setIsGalleryOpen(true),
-          title: "갤러리",
-          "aria-label": "채팅방 갤러리",
-          style: {
-            background: 'none', border: 'none', cursor: 'pointer', padding: '6px',
-            color: 'var(--text-muted)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '8px'
-          }
-        }, /*#__PURE__*/React.createElement("svg", {
-          xmlns: "http://www.w3.org/2000/svg", width: "22", height: "22", viewBox: "0 0 24 24",
-          fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
-        }, /*#__PURE__*/React.createElement("rect", { width: "18", height: "18", x: "3", y: "3", rx: "2", ry: "2" }), /*#__PURE__*/React.createElement("circle", { cx: "9", cy: "9", r: "2" }), /*#__PURE__*/React.createElement("path", { d: "m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" }))),
         /* Search button */
         /*#__PURE__*/React.createElement("button", {
           type: "button",
@@ -21781,7 +21799,7 @@ function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {
       fontSize: '1.05rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '8px', margin: 0, color: 'var(--text-main)',
       position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)'
     }
-  }, /*#__PURE__*/React.createElement(WalletIcon, { size: 20 }), "정산하기"), /*#__PURE__*/React.createElement("button", {
+  }, formatChatHeaderTitle(calendar?.title), " 정산"), /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: handleGenerateShareImage,
     title: "정산 결과 공유 이미지 생성",
@@ -25370,6 +25388,7 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
   
   // Refined: Header search and Map drag height states
   const [listSearchQuery, setListSearchQuery] = React.useState('');
+  const [isPlacesMenuOpen, setIsPlacesMenuOpen] = React.useState(false);
   const [isSearchOpen, setIsSearchOpen] = React.useState(false);
 
   React.useEffect(() => {
@@ -25541,51 +25560,17 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
         }
       }, calendar.title, " 플레이스"),
       
-      /* Right actions: register (map-plus icon), search (magnifying glass) */
-      /*#__PURE__*/React.createElement("div", {
-        style: { display: 'flex', alignItems: 'center', gap: '2px' }
-      },
-        /* Map Plus Button (icon-only, no text) */
-        /*#__PURE__*/React.createElement("button", {
-          type: "button",
-          onClick: handleOpenRegister,
-          title: "플레이스등록",
-          style: {
-            background: 'none', border: 'none', cursor: 'pointer', padding: '6px',
-            color: '#64748B', display: 'flex', alignItems: 'center', justifyContent: 'center'
-          }
-        }, 
-          /* Custom SVG provided by the user */
-          /*#__PURE__*/React.createElement("svg", {
-            xmlns: "http://www.w3.org/2000/svg",
-            width: "22",
-            height: "22",
-            viewBox: "0 0 24 24",
-            fill: "none",
-            stroke: "currentColor",
-            strokeWidth: "2",
-            strokeLinecap: "round",
-            strokeLinejoin: "round",
-            className: "lucide lucide-map-plus-icon lucide-map-plus"
-          },
-            /*#__PURE__*/React.createElement("path", { d: "m11 19-1.106-.552a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0l4.212 2.106a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619V12" }),
-            /*#__PURE__*/React.createElement("path", { d: "M15 5.764V12" }),
-            /*#__PURE__*/React.createElement("path", { d: "M18 15v6" }),
-            /*#__PURE__*/React.createElement("path", { d: "M21 18h-6" }),
-            /*#__PURE__*/React.createElement("path", { d: "M9 3.236v15" })
-          )
-        ),
-        /* Search trigger button */
-        /*#__PURE__*/React.createElement("button", {
-          type: "button",
-          onClick: () => setIsSearchOpen(prev => !prev),
-          title: "플레이스 검색",
-          style: {
-            background: 'none', border: 'none', cursor: 'pointer', padding: '6px',
-            color: isSearchOpen ? 'var(--text-main)' : '#64748B', display: 'flex', alignItems: 'center', justifyContent: 'center'
-          }
-        }, /*#__PURE__*/React.createElement(SearchIcon, null))
-      )
+      /* Right: 3-line menu (등록/검색) */
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: () => setIsPlacesMenuOpen(true),
+        title: "메뉴",
+        "aria-label": "플레이스 메뉴",
+        style: {
+          background: 'none', border: 'none', cursor: 'pointer', padding: '6px',
+          color: '#64748B', display: 'flex', alignItems: 'center', justifyContent: 'center'
+        }
+      }, /*#__PURE__*/React.createElement(ThreeLinesIcon, { size: 22 }))
     ),
 
     /* Slide-down search input bar */
@@ -25892,6 +25877,30 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
       )
     ),
 
+    isPlacesMenuOpen && /*#__PURE__*/React.createElement("div", {
+      className: "bottom-sheet-overlay", style: { zIndex: 12000 }, onClick: () => setIsPlacesMenuOpen(false)
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "bottom-sheet", style: { maxHeight: '50vh' }, onClick: e => e.stopPropagation()
+    },
+      /*#__PURE__*/React.createElement("div", { className: "bottom-sheet-header" },
+        /*#__PURE__*/React.createElement("h4", null, "플레이스 메뉴"),
+        /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          style: { background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer' },
+          onClick: () => setIsPlacesMenuOpen(false)
+        }, "✕")
+      ),
+      /*#__PURE__*/React.createElement("div", { className: "bottom-sheet-body" },
+        /*#__PURE__*/React.createElement("button", {
+          type: "button", className: "bottom-sheet-item",
+          onClick: () => { setIsPlacesMenuOpen(false); handleOpenRegister(); }
+        }, "플레이스 등록"),
+        /*#__PURE__*/React.createElement("button", {
+          type: "button", className: "bottom-sheet-item",
+          onClick: () => { setIsPlacesMenuOpen(false); setIsSearchOpen(true); }
+        }, "플레이스 검색")
+      )
+    )),
     isRegisterOpen && /*#__PURE__*/React.createElement(PlaceRegisterModal, {
       calendar,
       editingPlace,
