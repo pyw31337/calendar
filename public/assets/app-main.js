@@ -13055,17 +13055,7 @@ function ChatRoomView({
       justifyContent: 'center',
       borderRadius: '8px'
     }
-  }, /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg",
-    width: "22",
-    height: "22",
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    strokeWidth: "2",
-    strokeLinecap: "round",
-    strokeLinejoin: "round"
-  }, /*#__PURE__*/React.createElement("line", { x1: "4", x2: "20", y1: "6", y2: "6" }), /*#__PURE__*/React.createElement("line", { x1: "4", x2: "20", y1: "12", y2: "12" }), /*#__PURE__*/React.createElement("line", { x1: "4", x2: "20", y1: "18", y2: "18" }))))), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(ThreeLinesIcon, { size: 22 })))), /*#__PURE__*/React.createElement("div", {
     style: { flex: 1, position: 'relative', minHeight: 0 }
   }, /*#__PURE__*/React.createElement("div", {
     ref: chatMessagesContainerRef,
@@ -18536,6 +18526,7 @@ function ChatGalleryModal({
   const [searchQuery, setSearchQuery] = React.useState('');
   const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   const [gridCols, setGridCols] = React.useState(() => window.innerWidth >= 768 ? 6 : 3);
+  const { isHeaderVisible, onScroll: handleGalleryScroll } = useScrollHideHeader();
 
   React.useEffect(() => {
     const handleResize = () => {
@@ -18634,7 +18625,10 @@ function ChatGalleryModal({
   const galleryHeaderStyle = asPage ? {
     height: '56px', padding: '0 16px', borderBottom: '1px solid var(--border-subtle)',
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-    position: 'relative', overflow: 'hidden', flexShrink: 0, backgroundColor: 'var(--bg-card)'
+    position: 'fixed', top: 0, left: 0, right: 0, zIndex: 1010, overflow: 'hidden', flexShrink: 0,
+    backgroundColor: 'var(--bg-card)',
+    transition: 'transform 0.3s ease',
+    transform: isHeaderVisible ? 'translateY(0)' : 'translateY(-100%)'
   } : {
     padding: '16px 20px 12px 20px', borderBottom: '1px solid var(--border-subtle)',
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
@@ -18708,16 +18702,31 @@ function ChatGalleryModal({
     value: searchQuery,
     placeholder: "사진·링크 통합 검색 (태그, 텍스트, URL)",
     onChange: e => setSearchQuery(e.target.value),
+    fixed: !!asPage,
+    style: asPage ? {
+      transition: 'transform 0.3s ease',
+      transform: isHeaderVisible ? 'translateY(0)' : 'translateY(-100%)'
+    } : null,
     trailing: /*#__PURE__*/React.createElement("button", {
       type: "button",
       onClick: () => { setIsSearchOpen(false); setSearchQuery(''); },
       style: { border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '4px 6px', fontSize: '0.8rem', fontWeight: 700, flexShrink: 0 }
     }, "닫기")
   }), /*#__PURE__*/React.createElement("div", {
-    style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', padding: '12px 20px 8px 20px', borderBottom: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)' }
+    className: asPage ? "gallery-page-tabs" : undefined,
+    style: {
+      display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', padding: '12px 20px 8px 20px',
+      borderBottom: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)',
+      flexShrink: 0,
+      ...(asPage ? {
+        position: 'fixed', top: isSearchOpen ? '104px' : '56px', left: 0, right: 0, zIndex: 1009,
+        transition: 'transform 0.3s ease, top 0.3s ease',
+        transform: isHeaderVisible ? 'translateY(0)' : 'translateY(calc(-100% - 56px))'
+      } : {})
+    }
   }, [['photos', '사진'], ['links', '링크']].map(tab => {
     const count = tab[0] === 'photos' ? filteredPhotos.length : filteredLinks.length;
-    const showBadge = !!searchQuery.trim();
+    const showBadge = true;
     return /*#__PURE__*/React.createElement("button", {
       key: tab[0],
       type: "button",
@@ -18752,7 +18761,14 @@ function ChatGalleryModal({
       }, String(count))
     );
   })), /*#__PURE__*/React.createElement("div", {
-    style: { flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '12px' }
+    onScroll: asPage ? handleGalleryScroll : undefined,
+    style: {
+      flex: 1, overflowY: 'auto',
+      padding: asPage
+        ? ((isSearchOpen ? '168px' : '120px') + ' 20px 16px 20px')
+        : '16px 20px',
+      display: 'flex', flexDirection: 'column', gap: '12px', boxSizing: 'border-box'
+    }
   }, activeTab === 'links' ? (
     filteredLinks.length === 0 ? /*#__PURE__*/React.createElement("div", {
       style: { textAlign: 'center', color: 'var(--text-muted)', padding: '40px 0', fontSize: '0.88rem' }
@@ -25913,6 +25929,16 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
       /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-list" },
         /*#__PURE__*/React.createElement("button", {
           type: "button", className: "admin-side-menu-item",
+          onClick: () => { setIsPlacesMenuOpen(false); setIsSearchOpen(true); }
+        },
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement(SearchIcon, null)),
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
+            /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "플레이스 검색"),
+            /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "등록된 장소명·주소 검색")
+          )
+        ),
+        /*#__PURE__*/React.createElement("button", {
+          type: "button", className: "admin-side-menu-item",
           onClick: () => { setIsPlacesMenuOpen(false); handleOpenRegister(); }
         },
           /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", {
@@ -25921,16 +25947,6 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
           /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
             /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "플레이스 등록"),
             /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "새 장소 추가하기")
-          )
-        ),
-        /*#__PURE__*/React.createElement("button", {
-          type: "button", className: "admin-side-menu-item",
-          onClick: () => { setIsPlacesMenuOpen(false); setIsSearchOpen(true); }
-        },
-          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement(SearchIcon, null)),
-          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
-            /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "플레이스 검색"),
-            /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "등록된 장소명·주소 검색")
           )
         )
       ),
