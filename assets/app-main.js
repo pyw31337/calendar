@@ -14553,9 +14553,8 @@ function DateModal({
     }
     setIsSavingExpense(true);
     const finalAmount = expenseIsIncome ? -cleanAmount : cleanAmount;
-    const ok = await onSaveExpense({
+    const ok = await onSaveExpense(dateStr, {
       id: editingExpenseId || undefined,
-      date: dateStr,
       label,
       amount: finalAmount,
       categoryId: expenseCategoryInput
@@ -15066,7 +15065,7 @@ function DateModal({
 
     /* Tab 2 Content: 장소 */
     activeTab === 'meeting' && /*#__PURE__*/React.createElement(React.Fragment, null,
-      !adminMode && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '10px' } },
+      !adminMode && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '12px' } },
         /* Search Field */
         /*#__PURE__*/React.createElement("div", null,
           /*#__PURE__*/React.createElement("label", {
@@ -15142,40 +15141,39 @@ function DateModal({
           selectedPlace.phone && /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.76rem', color: 'var(--text-muted)' } }, `☎ ${selectedPlace.phone}`)
         ),
 
-        /* Memo field + "추가" button in one row */
+        selectedPlace && /*#__PURE__*/React.createElement("div", null,
+          /*#__PURE__*/React.createElement("label", {
+            style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#64748B', marginBottom: '6px' }
+          }, "별칭 (선택)"),
+          /*#__PURE__*/React.createElement("input", {
+            type: "text", className: "form-input", placeholder: "목록에 표시할 별칭 (예: 도은네 집)",
+            maxLength: 80, value: placeAlias, onChange: e => setPlaceAlias(e.target.value),
+            style: { width: '100%', boxSizing: 'border-box' }
+          })
+        ),
         /*#__PURE__*/React.createElement("div", null,
-          selectedPlace && /*#__PURE__*/React.createElement("div", null,
-            /*#__PURE__*/React.createElement("label", {
-              style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#64748B', marginBottom: '4px' }
-            }, "별칭 (선택)"),
-            /*#__PURE__*/React.createElement("input", {
-              type: "text", className: "form-input", placeholder: "목록에 표시할 별칭 (예: 도은네 집)",
-              maxLength: 80, value: placeAlias, onChange: e => setPlaceAlias(e.target.value),
-              style: { width: '100%', boxSizing: 'border-box' }
-            })
-          ),
-          /*#__PURE__*/React.createElement("div", null,
-            /*#__PURE__*/React.createElement("label", {
-              style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#64748B', marginBottom: '4px' }
-            }, "카테고리"),
-            /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'stretch', gap: '10px' } },
-              /*#__PURE__*/React.createElement("div", { style: { flex: 1, minWidth: 0 } },
-                /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
-                  title: "카테고리 선택",
-                  value: placeCategoryId,
-                  options: getPlaceCategories(calendar).map(c => ({ value: c.id, label: getPlaceCategoryLabel(c) })),
-                  onSelect: setPlaceCategoryId,
-                  placeholder: "카테고리 선택"
-                })
-              ),
-              /*#__PURE__*/React.createElement(SegmentedToggle, {
-                ariaLabel: "방문/방문예정 전환",
-                value: placeVisitStatus,
-                onChange: v => setPlaceVisitStatus(v),
-                options: [{ value: 'visited', label: '방문' }, { value: 'planned', label: '예정' }]
+          /*#__PURE__*/React.createElement("label", {
+            style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#64748B', marginBottom: '6px' }
+          }, "카테고리"),
+          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'stretch', gap: '10px' } },
+            /*#__PURE__*/React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+              /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
+                title: "카테고리 선택",
+                value: placeCategoryId,
+                options: getPlaceCategories(calendar).map(c => ({ value: c.id, label: getPlaceCategoryLabel(c) })),
+                onSelect: setPlaceCategoryId,
+                placeholder: "카테고리 선택"
               })
-            )
-          ),
+            ),
+            /*#__PURE__*/React.createElement(SegmentedToggle, {
+              ariaLabel: "방문/방문예정 전환",
+              value: placeVisitStatus,
+              onChange: v => setPlaceVisitStatus(v),
+              options: [{ value: 'visited', label: '방문' }, { value: 'planned', label: '예정' }]
+            })
+          )
+        ),
+        /*#__PURE__*/React.createElement("div", null,
           /*#__PURE__*/React.createElement("label", {
             style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#64748B', marginBottom: '6px' }
           }, "장소 메모 입력"),
@@ -15196,7 +15194,7 @@ function DateModal({
               className: "btn btn-primary",
               style: { padding: '0 20px', fontWeight: 800, borderRadius: 'var(--radius-full)', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', justifyContent: 'center' },
               disabled: isSavingPlace || !selectedPlace,
-              onClick: handleSavePlaceClick
+              onClick: e => { e.preventDefault(); e.stopPropagation(); handleSavePlaceClick(); }
             }, isSavingPlace ? '...' : '추가')
           )
         )
@@ -15373,7 +15371,7 @@ function DateModal({
               color: '#FFFFFF'
             } : { flexShrink: 0 },
             disabled: isSavingExpense,
-            onClick: handleSaveExpenseClick
+            onClick: e => { e.preventDefault(); e.stopPropagation(); handleSaveExpenseClick(); }
           }, isSavingExpense ? "저장 중..." : editingExpenseId ? "수정" : "추가")
         )
       ),
