@@ -278,7 +278,7 @@
 
   function extractExpenseTimePrefix(label) {
     const text = (label || '').trim();
-    const match = /^(\d{1,2}시)\s+(.*)$/s.exec(text);
+    const match = /^(\d{1,2}시)\s+([\s\S]*)$/.exec(text);
     return match ? { time: match[1], rest: match[2].trim() } : { time: '', rest: text };
   }
 

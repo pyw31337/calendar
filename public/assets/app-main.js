@@ -36,7 +36,8 @@ function isExpenseIncomeEntry(expense) {
   return expense?.type === 'income' || Number(expense?.amount) < 0;
 }
 function getDisplayExpenseCategory(calendar, expense) {
-  return isExpenseIncomeEntry(expense) ? INCOME_EXPENSE_CATEGORY : getExpenseCategory(calendar, expense?.categoryId);
+  const resolved = isExpenseIncomeEntry(expense) ? INCOME_EXPENSE_CATEGORY : getExpenseCategory(calendar, expense?.categoryId);
+  return resolved && resolved.name ? resolved : { id: 'etc', name: '기타', color: '#64748B' };
 }
 
 // 장소(Places) categories -- same { id, name, color } shape and normalize/lookup pattern as
@@ -14744,7 +14745,7 @@ function DateModal({
     },
     title: "닫기"
   }, "✕"))), /*#__PURE__*/React.createElement("form", {
-    onSubmit: handleSubmit
+    onSubmit: e => { e.preventDefault(); handleSubmit(e); }
   }, /*#__PURE__*/React.createElement("div", {
     className: "modal-body"
   },
@@ -15302,7 +15303,9 @@ function DateModal({
         expenses.map(expense => {
           const { time: expenseTime, rest: expenseLabel } = extractExpenseTimePrefix(getExpenseLabel(expense));
           const expenseUrl = getExpenseUrl(expense);
-          const expenseCategory = getDisplayExpenseCategory(calendar, expense);
+          const expenseCategory = getDisplayExpenseCategory(calendar, expense) || { id: 'etc', name: '기타', color: '#64748B' };
+          const categoryColor = expenseCategory.color || '#64748B';
+          const categoryName = expenseCategory.name || '기타';
           return /*#__PURE__*/React.createElement("div", {
             key: expense.id,
             "data-expense-id": expense.id,
@@ -15398,8 +15401,8 @@ function DateModal({
                     gap: '5px',
                     padding: '3px 8px',
                     borderRadius: '999px',
-                    backgroundColor: `${expenseCategory.color}18`,
-                    color: expenseCategory.color,
+                    backgroundColor: `${categoryColor}18`,
+                    color: categoryColor,
                     fontSize: '0.68rem',
                     fontWeight: 900
                   }
@@ -18317,8 +18320,8 @@ function MainSideMenu({
 	        /*#__PURE__*/React.createElement(ToggleSwitch, { checked: !!isChatNotifyEnabled, onChange: onToggleChatNotifications, label: "채팅알림" })
 	      )
     ),
-    /* Gallery + Places — right under 채팅알림 */
-    /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-list", style: { borderTop: '1px solid #E2E8F0', borderBottom: 'none', paddingTop: '14px' } },
+    /* Gallery + Places — right under 채팅알림 (no extra top border: settings section already has bottom border) */
+    /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-list", style: { borderTop: 'none', borderBottom: 'none', paddingTop: '8px' } },
       /*#__PURE__*/React.createElement("button", {
         type: "button",
         className: "admin-side-menu-item",
