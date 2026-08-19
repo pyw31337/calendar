@@ -72,6 +72,13 @@ function normalizePlaceCategories(categories) {
 function getPlaceCategories(calendar) {
   return normalizePlaceCategories(calendar?.placeCategories);
 }
+function getPlaceCategoryById(calendar, categoryId) {
+  const categories = getPlaceCategories(calendar);
+  const id = String(categoryId || '').trim();
+  const found = id ? categories.find(c => c && c.id === id) : null;
+  if (found) return found;
+  return categories.find(c => c && c.id === 'etc') || { id: 'etc', name: '기타', color: '#64748B' };
+}
 function getPlaceCategoryIcon(category) {
   if (!category) return PLACE_CATEGORY_ICONS.etc;
   const name = String(category.name || '');
@@ -14702,7 +14709,7 @@ function DateModal({
     }
   }, titleParts.year, /*#__PURE__*/React.createElement("span", {
     style: {
-      color: isAllAvailable ? '#10B981' : 'var(--text-muted)',
+      color: isConfirmed ? '#7C3AED' : (isAllAvailable ? '#10B981' : 'var(--text-muted)'),
       marginLeft: '4px'
     }
   }, titleParts.rest)), holidayLabelText && /*#__PURE__*/React.createElement("span", {
@@ -15019,7 +15026,30 @@ function DateModal({
             )
           );
         })
-      )
+      ),
+      !adminMode && typeof onConfirmMeeting === 'function' && /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: !isConfirmed && isAllAvailable ? 'btn-gamified-confirm' : '',
+        disabled: isSubmitting,
+        onClick: async () => {
+          if (isSubmitting) return;
+          setIsSubmitting(true);
+          try { await Promise.resolve(onConfirmMeeting(dateStr, '')); }
+          finally { setIsSubmitting(false); }
+        },
+        style: isConfirmed ? {
+          width: '100%', marginTop: '12px', padding: '12px 16px', borderRadius: '12px',
+          border: '1.5px solid #A78BFA', backgroundColor: 'rgba(124, 58, 237, 0.06)',
+          color: '#7C3AED', fontWeight: 800, fontSize: '0.92rem', cursor: 'pointer'
+        } : isAllAvailable ? {
+          width: '100%', marginTop: '12px', padding: '12px 16px', borderRadius: '12px',
+          border: 'none', fontWeight: 800, fontSize: '0.92rem', cursor: 'pointer'
+        } : {
+          width: '100%', marginTop: '12px', padding: '12px 16px', borderRadius: '12px',
+          border: '1.5px solid #C4B5FD', backgroundColor: 'rgba(124, 58, 237, 0.08)',
+          color: '#7C3AED', fontWeight: 800, fontSize: '0.92rem', cursor: 'pointer'
+        }
+      }, isConfirmed ? '모임 취소' : '모임 확정')
     )),
 
     /* Tab 2 Content: 모임 */
@@ -15042,8 +15072,8 @@ function DateModal({
             /*#__PURE__*/React.createElement("button", {
               type: "button",
               className: "btn btn-primary",
-              style: { padding: '0 16px', fontWeight: 800, borderRadius: 'var(--radius-full)' },
-              onClick: e => handlePlaceSearch(e, false)
+              style: { padding: '0 16px', fontWeight: 800, borderRadius: 'var(--radius-full)', flexShrink: 0 },
+              onClick: e => { e.preventDefault(); e.stopPropagation(); handlePlaceSearch(e, false); }
             }, "검색")
           )
         ),
@@ -15139,7 +15169,9 @@ function DateModal({
         }, "등록된 플레이스가 없습니다.") : /*#__PURE__*/React.createElement("div", {
           style: { display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '240px', overflowY: 'auto' }
         }, registeredPlaces.map(place => {
-          const category = getPlaceCategoryById(calendar, place.categoryId);
+          const category = getPlaceCategoryById(calendar, place.categoryId) || { id: 'etc', name: '기타', color: '#64748B' };
+          const catColor = category.color || '#64748B';
+          const catName = category.name || '기타';
           return /*#__PURE__*/React.createElement("div", {
             key: place.id,
             style: {
@@ -15158,9 +15190,9 @@ function DateModal({
               /*#__PURE__*/React.createElement("span", {
                 style: {
                   fontSize: '0.64rem', fontWeight: 900, padding: '2px 8px', borderRadius: '999px',
-                  backgroundColor: `${category.color}18`, color: category.color
+                  backgroundColor: `${catColor}18`, color: catColor
                 }
-              }, category.name)
+              }, catName)
             ),
             /* Name & Address */
             /*#__PURE__*/React.createElement("span", { style: { fontWeight: 800, fontSize: '0.88rem', color: 'var(--text-main)' } }, place.name),
