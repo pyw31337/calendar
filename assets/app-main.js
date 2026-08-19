@@ -20847,10 +20847,24 @@ function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onSelectTa
   };
 
   return /*#__PURE__*/React.createElement("div", {
-    onClick: () => onOpenEdit(memo),
+    onClick: (e) => {
+      const t = e.target;
+      if (t && t.closest && t.closest('input, textarea, select, button, a, [data-stop-card-open]')) return;
+      onOpenEdit(memo);
+    },
     role: "button",
     tabIndex: 0,
-    onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenEdit(memo); } },
+    onKeyDown: (e) => {
+      // 댓글 등 입력 중 Space/Enter는 카드 열기로 처리하지 않음
+      const t = e.target;
+      const tag = (t && t.tagName || '').toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select' || (t && t.isContentEditable)) return;
+      if (t && t.closest && t.closest('input, textarea, select, button, a, [data-stop-card-open]')) return;
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        onOpenEdit(memo);
+      }
+    },
     style: {
       backgroundColor: memo.color || 'var(--bg-card)',
       border: '0',
@@ -21031,7 +21045,9 @@ function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onSelectTa
         type: "text",
         value: commentText,
         onChange: e => setCommentText(e.target.value),
+        onClick: e => e.stopPropagation(),
         onKeyDown: e => {
+          e.stopPropagation();
           if (e.key === 'Enter') {
             if (e.nativeEvent && e.nativeEvent.isComposing) return;
             e.preventDefault();
