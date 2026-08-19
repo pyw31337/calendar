@@ -108,6 +108,17 @@ const getPlaceCategoryLabel = GATHER_APP_UTILS.getPlaceCategoryLabel || function
   return icon ? icon + '\u00a0\u00a0' + name : name;
 };
 
+const KOREA_BBOX = GATHER_APP_UTILS.KOREA_BBOX || { minLat: 33, maxLat: 39, minLng: 124, maxLng: 132 };
+const isDomesticLatLng = GATHER_APP_UTILS.isDomesticLatLng || function isDomesticLatLng(lat, lng) {
+  return Number(lat) >= KOREA_BBOX.minLat && Number(lat) <= KOREA_BBOX.maxLat && Number(lng) >= KOREA_BBOX.minLng && Number(lng) <= KOREA_BBOX.maxLng;
+};
+const normalizePlaceAddressForSave = GATHER_APP_UTILS.normalizePlaceAddressForSave || function normalizePlaceAddressForSave(address) {
+  return String(address || '').trim();
+};
+const getDisplayPlaceAddress = GATHER_APP_UTILS.getDisplayPlaceAddress || function getDisplayPlaceAddress(place) {
+  return normalizePlaceAddressForSave(place && place.address || '', place && place.lat, place && place.lng);
+};
+
 // A calendar's registered places: { id, name, address, lat, lng, categoryId, memo, visitStatus,
 // visitDate, createdAt, updatedAt }. lat/lng is the only thing the map actually needs --
 // name/address exist so a pin found via 업체명 검색(Kakao Local/Nominatim) still shows something
@@ -287,6 +298,18 @@ const formatPlaceBadgeDate = GATHER_APP_UTILS.formatPlaceBadgeDate || function f
   const normalized = normalizePlaceDateForSort(dateStr);
   return normalized ? formatShortDateWithDayName(normalized) : null;
 };
+
+function getPlaceSortDateKey(place) {
+  const structured = normalizePlaceDateForSort(place && place.visitDate);
+  if (structured) return structured;
+  const entries = parseVisitEntriesFromMemo(place && place.memo);
+  if (entries.length > 0) {
+    const latest = normalizePlaceDateForSort(entries[entries.length - 1].date);
+    if (latest) return latest;
+  }
+  return normalizePlaceDateForSort(extractLeadingMemoDate(place && place.memo));
+}
+
 
 // Naver Map's keyword-search deep link (map.naver.com/p/search/{query}) -- the same experience
 // as typing into the Naver Map search box, which drops straight into the real place entry page
@@ -25033,12 +25056,8 @@ const PLACE_MAP_DEFAULT_ZOOM = 11;
 // Rough bounding box for South+North Korea -- used only to decide which registered places count
 // as "domestic" for the main-screen preview map's auto-fit (see preferDomesticBounds below), not
 // as a precise border.
-const KOREA_BBOX = GATHER_APP_UTILS.KOREA_BBOX || { minLat: 33, maxLat: 39, minLng: 124, maxLng: 132 };
-const isDomesticLatLng = GATHER_APP_UTILS.isDomesticLatLng;
 const stripKoreaCountryPrefix = GATHER_APP_UTILS.stripKoreaCountryPrefix;
 const normalizeDomesticKoreanAddress = GATHER_APP_UTILS.normalizeDomesticKoreanAddress;
-const normalizePlaceAddressForSave = GATHER_APP_UTILS.normalizePlaceAddressForSave;
-const getDisplayPlaceAddress = GATHER_APP_UTILS.getDisplayPlaceAddress;
 
 function trimLatLngOutliers(points) {
   if (points.length <= 5) return points;
