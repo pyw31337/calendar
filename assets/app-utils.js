@@ -551,6 +551,18 @@
     });
   }
 
+
+  function trimLatLngOutliers(points) {
+    if (!Array.isArray(points) || points.length <= 5) return points || [];
+    const lats = points.map(p => p[0]).slice().sort((a, b) => a - b);
+    const lngs = points.map(p => p[1]).slice().sort((a, b) => a - b);
+    const pct = (arr, p) => arr[Math.min(arr.length - 1, Math.max(0, Math.round(p * (arr.length - 1))))];
+    const latLo = pct(lats, 0.1), latHi = pct(lats, 0.9);
+    const lngLo = pct(lngs, 0.1), lngHi = pct(lngs, 0.9);
+    const trimmed = points.filter(([lat, lng]) => lat >= latLo && lat <= latHi && lng >= lngLo && lng <= lngHi);
+    return trimmed.length >= 3 ? trimmed : points;
+  }
+
   window.GATHER_APP_UTILS = Object.freeze({
     getContrastTextColor,
     formatDateWithDayName,
@@ -619,6 +631,7 @@
     extractLeadingMemoDate,
     parseVisitEntriesFromMemo,
     reformatMemoIntoDateLines,
-    sortVisitEntriesRecentFirst
+    sortVisitEntriesRecentFirst,
+    trimLatLngOutliers
   });
 })();

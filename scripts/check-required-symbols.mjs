@@ -23,7 +23,8 @@ const requiredInMain = [
   'getPlaceCategories',
   'AdminLoginGate',
   'PlacesView',
-  'DateModal'
+  'DateModal',
+  'trimLatLngOutliers'
 ];
 
 const requiredInUtils = [

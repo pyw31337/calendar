@@ -25021,21 +25021,16 @@ const PLACE_MAP_DEFAULT_ZOOM = 11;
 const stripKoreaCountryPrefix = GATHER_APP_UTILS.stripKoreaCountryPrefix;
 const normalizeDomesticKoreanAddress = GATHER_APP_UTILS.normalizeDomesticKoreanAddress;
 
-function trimLatLngOutliers(points) {
-  if (points.length <= 5) return points;
+const trimLatLngOutliers = GATHER_APP_UTILS.trimLatLngOutliers || function trimLatLngOutliers(points) {
+  if (!Array.isArray(points) || points.length <= 5) return points || [];
   const lats = points.map(p => p[0]).slice().sort((a, b) => a - b);
   const lngs = points.map(p => p[1]).slice().sort((a, b) => a - b);
-  // Index by round(p * (n-1)), not floor(p * n) -- with a small n (a realistic place count),
-  // floor(n * 0.1) resolves to index 0 (the minimum itself) for anything under 10 points, which
-  // means the "10th percentile" bound was just the most extreme outlier all along and nothing
-  // ever got trimmed. Rounding against (n-1) actually steps at least one index in from each end
-  // once n is large enough for percentiles to mean anything.
   const pct = (arr, p) => arr[Math.min(arr.length - 1, Math.max(0, Math.round(p * (arr.length - 1))))];
   const latLo = pct(lats, 0.1), latHi = pct(lats, 0.9);
   const lngLo = pct(lngs, 0.1), lngHi = pct(lngs, 0.9);
   const trimmed = points.filter(([lat, lng]) => lat >= latLo && lat <= latHi && lng >= lngLo && lng <= lngHi);
   return trimmed.length >= 3 ? trimmed : points;
-}
+};
 
 function ThreeLinesIcon({ size = 18 } = {}) {
   return /*#__PURE__*/React.createElement("svg", {
