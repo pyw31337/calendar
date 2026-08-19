@@ -1403,13 +1403,15 @@ function renderTextWithUrlBadge(text, options = null) {
 }
 
 // Shared add/edit action row: 추가 | (edit) 취소 + 수정 — DateModal 참여자/장소/정산 공통 모듈
-function FormAddEditActionButtons({ isEditing, isSaving, onCancel, onSubmit, disabled = false, savingLabel = '저장 중...', alignSelf = null }) {
+function FormAddEditActionButtons({ isEditing, isSaving, onCancel, onSubmit, disabled = false, savingLabel = '저장 중...', alignSelf = null, flexGrow = false }) {
   const base = {
-    flexShrink: 0,
+    flexShrink: flexGrow ? 1 : 0,
     height: '44px',
     minHeight: '44px',
-    whiteSpace: 'nowrap'
+    whiteSpace: 'nowrap',
+    justifyContent: 'center'
   };
+  if (flexGrow) base.flex = 1;
   if (alignSelf) base.alignSelf = alignSelf;
   const primaryStyle = isEditing
     ? { ...base, backgroundColor: '#0F172A', borderColor: '#0F172A', color: '#FFFFFF' }
@@ -13403,7 +13405,8 @@ function ChatRoomView({
         onClick: () => setNoticePanelMode(pinnedNotices.length > 0 ? 'list' : 'closed')
       }, "취소"),
       /*#__PURE__*/React.createElement("button", {
-        type: "button", className: "btn btn-primary", style: { flex: 1 },
+        type: "button", className: "btn btn-secondary",
+        style: { flex: 1, height: '44px', minHeight: '44px', backgroundColor: '#0F172A', borderColor: '#0F172A', color: '#FFFFFF', justifyContent: 'center' },
         onClick: () => {
           const trimmed = noticeInput.trim();
           if (!trimmed) { if (showToast) showToast('공지 내용을 입력해 주세요', 'error'); return; }
@@ -26082,23 +26085,25 @@ function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, onDelete,
       )
     ),
 
-    /* Footer */
+    /* Footer — 추가/취소·수정 공통 모듈 (FormAddEditActionButtons) */
     /*#__PURE__*/React.createElement("div", {
       style: { display: 'flex', gap: '8px', padding: '12px 16px', borderTop: '1px solid var(--border-subtle)' }
     },
       editingPlace && /*#__PURE__*/React.createElement("button", {
         type: "button",
         className: "btn btn-danger",
-        style: { height: '44px' },
-        onClick: handleDeleteClick
+        style: { height: '44px', minHeight: '44px', flexShrink: 0 },
+        onClick: handleDeleteClick,
+        disabled: saving
       }, "삭제"),
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        className: "btn btn-action btn-action-dark",
-        style: { flex: 1, height: '44px', justifyContent: 'center' },
-        disabled: saving,
-        onClick: handleSubmit
-      }, saving ? '저장중...' : '저장')
+      /*#__PURE__*/React.createElement(FormAddEditActionButtons, {
+        isEditing: !!editingPlace,
+        isSaving: saving,
+        disabled: !selected,
+        flexGrow: true,
+        onCancel: onClose,
+        onSubmit: handleSubmit
+      })
     )
   ));
 }
