@@ -24417,6 +24417,41 @@ function PlaceCategoryMarkerIcon({ category, size = 14, strokeColor = "#fff" } =
 // divIcon HTML interpolates category.color (hex-validated by normalizeColorValue) and its icon
 // (a fixed emoji from a controlled lookup table), never raw user text, so that stays safe as a
 // string template.
+
+// After opening a Leaflet popup, pan so the full popup+marker stays inside the map pane.
+// Previous panBy([0, -h]) pushed the pin toward the bottom edge on desktop, clipping tall
+// visit-history popups under the map grip / category tabs.
+function panMapToFitMarkerPopup(map, marker, opts) {
+  if (!map || !marker) return;
+  const pad = (opts && opts.pad) || 16;
+  const tryPan = () => {
+    if (!map) return;
+    const popup = marker.getPopup && marker.getPopup();
+    const el = popup && popup.getElement && popup.getElement();
+    if (!el) return;
+    const mapRect = map.getContainer().getBoundingClientRect();
+    const popupRect = el.getBoundingClientRect();
+    let dx = 0;
+    let dy = 0;
+    if (popupRect.top < mapRect.top + pad) {
+      dy = popupRect.top - (mapRect.top + pad);
+    } else if (popupRect.bottom > mapRect.bottom - pad) {
+      dy = popupRect.bottom - (mapRect.bottom - pad);
+    }
+    if (popupRect.left < mapRect.left + pad) {
+      dx = popupRect.left - (mapRect.left + pad);
+    } else if (popupRect.right > mapRect.right - pad) {
+      dx = popupRect.right - (mapRect.right - pad);
+    }
+    if (dx !== 0 || dy !== 0) {
+      map.panBy([dx, dy], { animate: opts && opts.animate !== false });
+    }
+  };
+  requestAnimationFrame(() => requestAnimationFrame(tryPan));
+  setTimeout(tryPan, 120);
+  setTimeout(tryPan, 320);
+}
+
 function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom = false, resizeSignal, preferDomesticBounds = false, focusPlace = null }) {
   const containerRef = React.useRef(null);
   const mapRef = React.useRef(null);
@@ -24718,7 +24753,9 @@ function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom = false
         minWidth: 220,
         maxWidth: isMobileViewport ? Math.round(window.innerWidth * 0.8) : 480,
         autoPan: true,
-        autoPanPadding: isMobileViewport ? [24, 48] : [40, 60],
+        autoPanPadding: isMobileViewport ? [28, 56] : [48, 80],
+        autoPanPaddingTopLeft: isMobileViewport ? [24, 48] : [40, 72],
+        autoPanPaddingBottomRight: isMobileViewport ? [24, 40] : [40, 56],
         keepInView: true
       });
       if (onSelectPlace) marker.on('click', () => onSelectPlace(place));
@@ -24748,8 +24785,16 @@ function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom = false
         const layer = markersLayerRef.current;
         const openFocused = () => {
           if (!mapRef.current) return;
-          mapRef.current.setView(focused.getLatLng(), isMobileViewport ? 16 : 17, { animate: false });
+          const map = mapRef.current;
+          const zoom = isMobileViewport ? 16 : 16;
+          const latlng = focused.getLatLng();
+          const size = map.getSize();
+          const targetPoint = map.project(latlng, zoom);
+          const offsetY = Math.min(Math.round(size.y * 0.28), isMobileViewport ? 90 : 140);
+          targetPoint.y += offsetY;
+          map.setView(map.unproject(targetPoint, zoom), zoom, { animate: false });
           focused.openPopup();
+          panMapToFitMarkerPopup(map, focused, { pad: isMobileViewport ? 20 : 28, animate: false });
         };
         if (layer && typeof layer.zoomToShowLayer === 'function') {
           layer.zoomToShowLayer(focused, openFocused);
@@ -24785,22 +24830,18 @@ function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom = false
     const isMobileViewport = window.innerWidth <= 720;
     
     const performFocus = () => {
-      const zoom = isMobileViewport ? 16 : 17;
-      mapRef.current.setView(marker.getLatLng(), zoom, { animate: true });
+      if (!mapRef.current) return;
+      const zoom = isMobileViewport ? 16 : 16;
+      const map = mapRef.current;
+      const latlng = marker.getLatLng();
+      const size = map.getSize();
+      const targetPoint = map.project(latlng, zoom);
+      const offsetY = Math.min(Math.round(size.y * 0.28), isMobileViewport ? 90 : 140);
+      targetPoint.y += offsetY;
+      const targetLatLng = map.unproject(targetPoint, zoom);
+      map.setView(targetLatLng, zoom, { animate: true });
       marker.openPopup();
-      const panForPopup = () => {
-        if (!mapRef.current) return;
-        const popup = marker.getPopup && marker.getPopup();
-        const el = popup && popup.getElement && popup.getElement();
-        if (!el) return;
-        const popupH = el.offsetHeight || 0;
-        if (popupH <= 0) return;
-        const mapH = mapRef.current.getSize().y;
-        const shiftY = Math.min(Math.round(popupH * 0.55) + 12, Math.round(mapH * 0.38));
-        mapRef.current.panBy([0, -shiftY], { animate: true });
-      };
-      requestAnimationFrame(() => requestAnimationFrame(panForPopup));
-      setTimeout(panForPopup, 280);
+      panMapToFitMarkerPopup(map, marker, { pad: isMobileViewport ? 20 : 28, animate: true });
     };
     
     // markerClusterGroup can have this marker tucked inside a collapsed cluster at the map's
