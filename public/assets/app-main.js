@@ -394,12 +394,12 @@ const GITHUB_PAGES_FREE_LIMITS = readConfigObject('GITHUB_PAGES_FREE_LIMITS', {
 // small -- a live "last N messages" listener re-downloads and re-parses every matching document
 // on every page load, so a single oversized embedded image taxes every future visitor's load
 // forever, not just the one degraded send.
-const MAX_CHAT_THUMB_BASE64_LENGTH = readConfigNumber('MAX_CHAT_THUMB_BASE64_LENGTH', 12000);
-const CHAT_LIVE_MESSAGE_LIMIT = readConfigNumber('CHAT_LIVE_MESSAGE_LIMIT', 40);
-const ADMIN_MESSAGE_LIVE_LIMIT = readConfigNumber('ADMIN_MESSAGE_LIVE_LIMIT', 80);
-const ADMIN_MEMO_LIVE_LIMIT = readConfigNumber('ADMIN_MEMO_LIVE_LIMIT', 80);
-const GLOBAL_SEARCH_HISTORY_LIMIT = readConfigNumber('GLOBAL_SEARCH_HISTORY_LIMIT', 150);
-const MAX_FIRESTORE_DATA_URL_CHARS = readConfigNumber('MAX_FIRESTORE_DATA_URL_CHARS', 8000);
+const MAX_CHAT_THUMB_BASE64_LENGTH = readConfigNumber('MAX_CHAT_THUMB_BASE64_LENGTH', 8000);
+const CHAT_LIVE_MESSAGE_LIMIT = readConfigNumber('CHAT_LIVE_MESSAGE_LIMIT', 30);
+const ADMIN_MESSAGE_LIVE_LIMIT = readConfigNumber('ADMIN_MESSAGE_LIVE_LIMIT', 50);
+const ADMIN_MEMO_LIVE_LIMIT = readConfigNumber('ADMIN_MEMO_LIVE_LIMIT', 50);
+const GLOBAL_SEARCH_HISTORY_LIMIT = readConfigNumber('GLOBAL_SEARCH_HISTORY_LIMIT', 100);
+const MAX_FIRESTORE_DATA_URL_CHARS = readConfigNumber('MAX_FIRESTORE_DATA_URL_CHARS', 6000);
 
 function sanitizeMessageForFirestore(messageData) {
   if (!messageData || typeof messageData !== 'object') return messageData;
@@ -415,10 +415,49 @@ function sanitizeMessageForFirestore(messageData) {
     out.thumbUrls = out.thumbUrls.filter(u => typeof u === 'string' && !tooBig(u));
     if (out.thumbUrls.length === 0) delete out.thumbUrls;
   }
+  if (out.linkPreview && typeof out.linkPreview === 'object') {
+    const lp = { ...out.linkPreview };
+    if (typeof lp.description === 'string' && lp.description.length > 280) lp.description = lp.description.slice(0, 280);
+    if (typeof lp.title === 'string' && lp.title.length > 120) lp.title = lp.title.slice(0, 120);
+    if (typeof lp.html === 'string') delete lp.html;
+    if (typeof lp.content === 'string') delete lp.content;
+    if (typeof lp.image === 'string' && lp.image.startsWith('data:') && lp.image.length > 2000) delete lp.image;
+    out.linkPreview = lp;
+  }
   return out;
 }
 function sanitizeMemoForFirestore(memoData) {
   return sanitizeMessageForFirestore(memoData);
+}
+
+function slimMessageForClient(message) {
+  if (!message || typeof message !== 'object') return message;
+  const out = { ...message };
+  const dropHugeData = (v) => {
+    if (typeof v !== 'string') return v;
+    if (v.startsWith('data:') && v.length > MAX_FIRESTORE_DATA_URL_CHARS) return undefined;
+    return v;
+  };
+  const iu = dropHugeData(out.imageUrl);
+  if (iu === undefined) delete out.imageUrl; else out.imageUrl = iu;
+  const tu = dropHugeData(out.thumbUrl);
+  if (tu === undefined) delete out.thumbUrl; else out.thumbUrl = tu;
+  if (Array.isArray(out.imageUrls)) {
+    out.imageUrls = out.imageUrls.map(dropHugeData).filter(Boolean);
+    if (out.imageUrls.length === 0) delete out.imageUrls;
+  }
+  if (Array.isArray(out.thumbUrls)) {
+    out.thumbUrls = out.thumbUrls.map(dropHugeData).filter(Boolean);
+    if (out.thumbUrls.length === 0) delete out.thumbUrls;
+  }
+  if (out.linkPreview && typeof out.linkPreview === 'object') {
+    const lp = { ...out.linkPreview };
+    if (typeof lp.html === 'string') delete lp.html;
+    if (typeof lp.content === 'string') delete lp.content;
+    if (typeof lp.description === 'string' && lp.description.length > 280) lp.description = lp.description.slice(0, 280);
+    out.linkPreview = lp;
+  }
+  return out;
 }
 
 
@@ -2245,7 +2284,7 @@ async function fetchChatMessagesRest(calId) {
     if (!res.ok) return [];
     const data = await res.json();
     const docs = data.documents || [];
-    return docs.map(doc => ({
+    return docs.map(doc => slimMessageForClient({
       id: doc.name.split('/').pop(),
       ...firestoreDocumentToJs(doc)
     })).reverse();
@@ -3834,32 +3873,35 @@ function AdminDashboard({ initialCalendars }) {
     return () => unsub();
   }, [selectedCalId, firebaseDb, activeTab]);
 
-  // Shared link-preview cache stats, loaded once (not tied to any single calendar)
+  // Link-preview cache stats only on metrics tab (egress rule)
   React.useEffect(() => {
     if (!firebaseDb) return;
+    if (activeTab !== 'metrics') return;
     const unsub = firebaseDb.collection('appConfig').doc('linkPreviewStats').onSnapshot(snap => {
       setLinkPreviewStats(snap.exists ? snap.data() : { cachedCount: 0, updatedAt: null });
     }, () => setLinkPreviewStats(null));
     return () => unsub && unsub();
-  }, [firebaseDb]);
+  }, [firebaseDb, activeTab]);
 
   // Kakao Local search daily usage, loaded once (not tied to any single calendar)
   React.useEffect(() => {
     if (!firebaseDb) return;
+    if (activeTab !== 'metrics') return;
     const unsub = firebaseDb.collection('appConfig').doc('kakaoLocalSearchStats').onSnapshot(snap => {
       setKakaoSearchStats(snap.exists ? snap.data() : { dailyUsageBucket: null, dailyUsageCount: 0 });
     }, () => setKakaoSearchStats(null));
     return () => unsub && unsub();
-  }, [firebaseDb]);
+  }, [firebaseDb, activeTab]);
 
   // Google Places search monthly usage, loaded once (not tied to any single calendar)
   React.useEffect(() => {
     if (!firebaseDb) return;
+    if (activeTab !== 'metrics') return;
     const unsub = firebaseDb.collection('appConfig').doc('googlePlacesSearchStats').onSnapshot(snap => {
       setGooglePlacesStats(snap.exists ? snap.data() : { monthlyUsageBucket: null, monthlyUsageCount: 0 });
     }, () => setGooglePlacesStats(null));
     return () => unsub && unsub();
-  }, [firebaseDb]);
+  }, [firebaseDb, activeTab]);
 
   // Full, unbounded activity log history for the selected calendar -- only unifiedTimeline
   // (복구 탭's PITR replay) ever reads selectedCalActivityLogs, so this only needs to fetch
@@ -6816,7 +6858,7 @@ function App() {
         if (!isMounted) return;
         const list = [];
         snapshot.forEach(doc => {
-          list.push({ id: doc.id, ...doc.data() });
+          list.push(slimMessageForClient({ id: doc.id, ...doc.data() }));
         });
         list.reverse();
         setChatMessages(list);
@@ -6845,7 +6887,7 @@ function App() {
         if (!isMounted) return;
         const list = [];
         snapshot.forEach(doc => {
-          list.push({ id: doc.id, ...doc.data() });
+          list.push(slimMessageForClient({ id: doc.id, ...doc.data() }));
         });
         setAnniversaries(list);
       }, err => {
