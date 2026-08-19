@@ -54,10 +54,8 @@ const isHttpUrl = GATHER_APP_UTILS.isHttpUrl || function isHttpUrl(value) {
   return typeof value === 'string' && /^https?:\/\//i.test(value);
 };
 
-// 장소(Places) categories -- same { id, name, color } shape and normalize/lookup pattern as
-// expense categories above, kept as its own set since a place's category (식당/카페/...) is a
-// different taxonomy than an expense's.
-const DEFAULT_PLACE_CATEGORIES = [
+// 장소(Places) categories -- from GATHER_APP_UTILS (step 15b) with local fallbacks.
+const DEFAULT_PLACE_CATEGORIES = GATHER_APP_UTILS.DEFAULT_PLACE_CATEGORIES || [
   { id: 'restaurant', name: '식당', color: '#F97316' },
   { id: 'cafe', name: '카페', color: '#8B5CF6' },
   { id: 'play', name: '놀이', color: '#3B82F6' },
@@ -65,8 +63,8 @@ const DEFAULT_PLACE_CATEGORIES = [
   { id: 'shopping', name: '쇼핑', color: '#EC4899' },
   { id: 'etc', name: '기타', color: '#64748B' }
 ];
-const PLACE_CATEGORY_ICONS = { restaurant: '🍽️', cafe: '☕', play: '🎡', lodging: '🏨', shopping: '🛍️', etc: '💬' };
-function normalizePlaceCategories(categories) {
+const PLACE_CATEGORY_ICONS = GATHER_APP_UTILS.PLACE_CATEGORY_ICONS || { restaurant: '🍽️', cafe: '☕', play: '🎡', lodging: '🏨', shopping: '🛍️', etc: '💬' };
+const normalizePlaceCategories = GATHER_APP_UTILS.normalizePlaceCategories || function normalizePlaceCategories(categories) {
   const defaultCategories = DEFAULT_PLACE_CATEGORIES;
   const source = Array.isArray(categories) && categories.length ? categories : defaultCategories;
   const seen = new Set();
@@ -82,32 +80,33 @@ function normalizePlaceCategories(categories) {
     };
   }).filter(category => category.name);
   return normalized.length ? normalized : defaultCategories;
-}
-function getPlaceCategories(calendar) {
+};
+const getPlaceCategories = GATHER_APP_UTILS.getPlaceCategories || function getPlaceCategories(calendar) {
   return normalizePlaceCategories(calendar?.placeCategories);
-}
-function getPlaceCategoryById(calendar, categoryId) {
+};
+const getPlaceCategoryById = GATHER_APP_UTILS.getPlaceCategoryById || function getPlaceCategoryById(calendar, categoryId) {
   const categories = getPlaceCategories(calendar);
   const id = String(categoryId || '').trim();
   const found = id ? categories.find(c => c && c.id === id) : null;
   if (found) return found;
   return categories.find(c => c && c.id === 'etc') || { id: 'etc', name: '기타', color: '#64748B' };
-}
-function getPlaceCategoryIcon(category) {
+};
+const getPlaceCategoryIcon = GATHER_APP_UTILS.getPlaceCategoryIcon || function getPlaceCategoryIcon(category) {
   if (!category) return PLACE_CATEGORY_ICONS.etc;
   const name = String(category.name || '');
-  const hasEmoji = /[\uD800-\uDBFF][\uDC00-\uDFFF]/.test(name) || /\p{Emoji_Presentation}/u.test(name);
+  let hasEmoji = false;
+  try { hasEmoji = /\p{Extended_Pictographic}/u.test(name); } catch (e) { hasEmoji = false; }
   if (hasEmoji) return '';
   const id = String(category.id || '').toLowerCase();
   if (PLACE_CATEGORY_ICONS[id]) return PLACE_CATEGORY_ICONS[id];
   const matchedDefault = DEFAULT_PLACE_CATEGORIES.find(item => item.name === name);
   return matchedDefault ? PLACE_CATEGORY_ICONS[matchedDefault.id] : PLACE_CATEGORY_ICONS.etc;
-}
-function getPlaceCategoryLabel(category) {
+};
+const getPlaceCategoryLabel = GATHER_APP_UTILS.getPlaceCategoryLabel || function getPlaceCategoryLabel(category) {
   const name = sanitizeText(category?.name || '기타', 24) || '기타';
   const icon = getPlaceCategoryIcon(category);
-  return icon ? `${icon}  ${name}` : name;
-}
+  return icon ? icon + '\u00a0\u00a0' + name : name;
+};
 
 // A calendar's registered places: { id, name, address, lat, lng, categoryId, memo, visitStatus,
 // visitDate, createdAt, updatedAt }. lat/lng is the only thing the map actually needs --

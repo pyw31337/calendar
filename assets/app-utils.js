@@ -357,6 +357,64 @@
     return typeof value === 'string' && /^https?:\/\//i.test(value);
   }
 
+  const DEFAULT_PLACE_CATEGORIES = [
+    { id: 'restaurant', name: '식당', color: '#F97316' },
+    { id: 'cafe', name: '카페', color: '#8B5CF6' },
+    { id: 'play', name: '놀이', color: '#3B82F6' },
+    { id: 'lodging', name: '숙박', color: '#10B981' },
+    { id: 'shopping', name: '쇼핑', color: '#EC4899' },
+    { id: 'etc', name: '기타', color: '#64748B' }
+  ];
+  const PLACE_CATEGORY_ICONS = { restaurant: '🍽️', cafe: '☕', play: '🎡', lodging: '🏨', shopping: '🛍️', etc: '💬' };
+
+  function normalizePlaceCategories(categories) {
+    const defaultCategories = DEFAULT_PLACE_CATEGORIES;
+    const source = Array.isArray(categories) && categories.length ? categories : defaultCategories;
+    const seen = new Set();
+    const normalized = source.map((category, index) => {
+      const fallback = defaultCategories[index % defaultCategories.length];
+      const rawId = sanitizeTextValue(category?.id || category?.name || fallback.id, 40).toLowerCase().replace(/[^a-z0-9가-힣_-]/g, '') || fallback.id;
+      const id = seen.has(rawId) ? `${rawId}_${index}` : rawId;
+      seen.add(id);
+      return {
+        id,
+        name: sanitizeTextValue(category?.name || fallback.name, 24) || fallback.name,
+        color: normalizeColorValue(category?.color, fallback.color)
+      };
+    }).filter(category => category.name);
+    return normalized.length ? normalized : defaultCategories;
+  }
+
+  function getPlaceCategories(calendar) {
+    return normalizePlaceCategories(calendar?.placeCategories);
+  }
+
+  function getPlaceCategoryById(calendar, categoryId) {
+    const categories = getPlaceCategories(calendar);
+    const id = String(categoryId || '').trim();
+    const found = id ? categories.find(c => c && c.id === id) : null;
+    if (found) return found;
+    return categories.find(c => c && c.id === 'etc') || { id: 'etc', name: '기타', color: '#64748B' };
+  }
+
+  function getPlaceCategoryIcon(category) {
+    if (!category) return PLACE_CATEGORY_ICONS.etc;
+    const name = String(category.name || '');
+    let hasEmoji = false;
+    try { hasEmoji = /\p{Extended_Pictographic}/u.test(name); } catch (e) { hasEmoji = false; }
+    if (hasEmoji) return '';
+    const id = String(category.id || '').toLowerCase();
+    if (PLACE_CATEGORY_ICONS[id]) return PLACE_CATEGORY_ICONS[id];
+    const matchedDefault = DEFAULT_PLACE_CATEGORIES.find(item => item.name === name);
+    return matchedDefault ? PLACE_CATEGORY_ICONS[matchedDefault.id] : PLACE_CATEGORY_ICONS.etc;
+  }
+
+  function getPlaceCategoryLabel(category) {
+    const name = sanitizeTextValue(category?.name || '기타', 24) || '기타';
+    const icon = getPlaceCategoryIcon(category);
+    return icon ? icon + '\u00a0\u00a0' + name : name;
+  }
+
   window.GATHER_APP_UTILS = Object.freeze({
     getContrastTextColor,
     formatDateWithDayName,
@@ -400,6 +458,13 @@
     clampNumber,
     pad2,
     isDataUrl,
-    isHttpUrl
+    isHttpUrl,
+    DEFAULT_PLACE_CATEGORIES,
+    PLACE_CATEGORY_ICONS,
+    normalizePlaceCategories,
+    getPlaceCategories,
+    getPlaceCategoryById,
+    getPlaceCategoryIcon,
+    getPlaceCategoryLabel
   });
 })();
