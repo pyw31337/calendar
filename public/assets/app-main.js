@@ -14478,9 +14478,10 @@ function DateModal({
     const nameLabel = part ? part.name : '참여자';
     onRequestConfirm('참석 삭제', `"${nameLabel}"님의 참석 기록을 삭제하시겠습니까?`, async () => {
       setIsSubmitting(true);
-      await onDelete(entry.id);
+      const ok = await onDelete(dateStr, entry.participantId);
       setIsSubmitting(false);
-      showToast('참석 기록이 삭제되었습니다.', 'success');
+      if (ok !== false) showToast('참석 기록이 삭제되었습니다.', 'success');
+      else showToast('삭제에 실패했습니다.', 'error');
     });
   };
 
@@ -14617,19 +14618,21 @@ function DateModal({
     const nextExpenses = [...expenses];
     const [moved] = nextExpenses.splice(sourceIdx, 1);
     nextExpenses.splice(targetIdx, 0, moved);
-    const updated = nextExpenses.map((exp, idx) => ({ ...exp, order: idx }));
-    await onReorderExpenses(dateStr, updated);
+    const orderedIds = nextExpenses.map(exp => exp.id);
+    await onReorderExpenses(dateStr, orderedIds);
   };
   const beginExpensePointerSort = (e, expenseId) => {
     if (isSavingExpense || expenses.length <= 1) return;
     e.preventDefault();
+    e.stopPropagation();
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) {}
     const row = e.currentTarget.closest('.expense-sortable-row');
     if (!row) return;
     row.style.zIndex = '1000';
     row.style.boxShadow = '0 8px 20px rgba(0,0,0,0.12)';
     row.style.transform = 'scale(1.02)';
     row.style.transition = 'none';
-    expensePointerSortRef.current = { sourceId: expenseId, targetId: '', startX: e.clientX, startY: e.clientY, active: true };
+    expensePointerSortRef.current = { sourceId: expenseId, targetId: '', startX: e.clientX, startY: e.clientY, active: true, pointerId: e.pointerId };
     document.addEventListener('pointermove', updateExpensePointerSort);
     document.addEventListener('pointerup', finishExpensePointerSort);
     document.addEventListener('pointercancel', resetExpensePointerSort);
@@ -14785,7 +14788,10 @@ function DateModal({
     },
     title: "닫기"
   }, "✕"))), /*#__PURE__*/React.createElement("form", {
-    onSubmit: e => { e.preventDefault(); handleSubmit(e); }
+    onSubmit: e => {
+      e.preventDefault();
+      if (activeTab === 'participant') handleSubmit(e);
+    }
   }, /*#__PURE__*/React.createElement("div", {
     className: "modal-body"
   },
@@ -15080,7 +15086,9 @@ function DateModal({
           width: '100%', marginTop: '12px', padding: '12px 16px', borderRadius: '12px',
           fontWeight: 800, fontSize: '0.92rem', cursor: isSubmitting ? 'wait' : 'pointer',
           ...((!isConfirmed && isAllAvailable) ? {} : isConfirmed ? {
-            border: '1.5px solid #A78BFA', backgroundColor: 'rgba(124, 58, 237, 0.06)', color: '#7C3AED'
+            border: '1.5px solid rgb(239, 68, 68)',
+            backgroundColor: 'rgba(239, 68, 68, 0.06)',
+            color: 'rgb(239, 68, 68)'
           } : {
             border: '1.5px solid #C4B5FD', backgroundColor: 'rgba(124, 58, 237, 0.08)', color: '#7C3AED'
           })
@@ -15105,7 +15113,14 @@ function DateModal({
               style: { flex: 1 },
               placeholder: "지명, 도로명 주소, 또는 업체명 검색",
               value: placeQuery,
-              onChange: e => setPlaceQuery(e.target.value)
+              onChange: e => setPlaceQuery(e.target.value),
+              onKeyDown: e => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handlePlaceSearch(e, false);
+                }
+              }
             }),
             /*#__PURE__*/React.createElement("button", {
               type: "button",
