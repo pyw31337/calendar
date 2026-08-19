@@ -79,8 +79,13 @@
     (function () {
       try {
         var params = new URLSearchParams(window.location.search);
-        var id = params.get('id') || params.get('cal') || 'kkot';
-        var saved = window['local' + 'Storage'].getItem('gather_theme_preference_global_v1') || window['local' + 'Storage'].getItem('gather_theme_preference_' + id + '_v1');
+        if (params.get('admin') === '1') {
+          document.documentElement.setAttribute('data-theme', 'light');
+          return;
+        }
+        var id = params.get('id') || params.get('cal') || '';
+        if (!id) return;
+        var saved = window['local' + 'Storage'].getItem('gather_theme_preference_' + id + '_v1');
         if (saved === 'dark' || saved === 'light') {
           document.documentElement.setAttribute('data-theme', saved);
         }
@@ -145,8 +150,8 @@
   <script src="assets/app-calendar-data.js?v=20260814-split5" defer></script>
   <script src="assets/app-chat-data.js?v=20260814-split6" defer></script>
   <script src="assets/app-utils.js?v=20260819-utils-step15a" defer></script>
-  <script src="assets/app-notifications.js?v=20260814-split8b" defer></script>
+  <script src="assets/app-notifications.js?v=20260819-pref-per-cal" defer></script>
 
-  <script src="assets/app-main.js?v=20260819-utils-step15a" defer></script>
+  <script src="assets/app-main.js?v=20260819-pref-per-cal" defer></script>
 </body>
 </html>

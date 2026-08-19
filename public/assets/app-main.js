@@ -5985,6 +5985,8 @@ function AdminLoginGate({ children }) {
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
   React.useEffect(() => {
+    document.documentElement.setAttribute('data-theme', 'light');
+    document.documentElement.style.fontSize = '';
     setStatus(getAdminSession() ? 'unlocked' : 'locked');
   }, []);
 
@@ -6253,67 +6255,81 @@ function App() {
   // Theme toggle -- mirrors the choice the early <head> theme-init script already applied
   // before first paint, so this state starts in sync with whatever's on <html> rather than
   // flashing to a default and then correcting itself.
-  const [themeChoice, setThemeChoice] = React.useState(() => {
+  const readThemeForCalendar = (calId) => {
+    if (!calId) return 'system';
     try {
-      return getLocalStorage().getItem('gather_theme_preference_global_v1') || document.documentElement.getAttribute('data-theme') || 'system';
+      const saved = getLocalStorage().getItem(`gather_theme_preference_${calId}_v1`);
+      return saved === 'dark' || saved === 'light' ? saved : 'system';
     } catch (e) {
       return 'system';
     }
+  };
+  const applyThemeChoice = (choice) => {
+    if (choice === 'dark' || choice === 'light') {
+      document.documentElement.setAttribute('data-theme', choice);
+    } else {
+      document.documentElement.removeAttribute('data-theme');
+    }
+  };
+  const [themeChoice, setThemeChoice] = React.useState(() => {
+    if (isAdminDashboardRoute()) return 'light';
+    return readThemeForCalendar(activeCalId);
   });
   const toggleTheme = () => {
+    if (isAdminDashboardRoute() || !activeCalId) return;
     const isDark = themeChoice === 'dark' || (themeChoice === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
     const next = isDark ? 'light' : 'dark';
-    document.documentElement.setAttribute('data-theme', next);
-    getLocalStorage().setItem('gather_theme_preference_global_v1', next);
     getLocalStorage().setItem(`gather_theme_preference_${activeCalId}_v1`, next);
+    applyThemeChoice(next);
     setThemeChoice(next);
   };
-  const isDarkTheme = themeChoice === 'dark' || (themeChoice === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  const isDarkTheme = !isAdminDashboardRoute() && (themeChoice === 'dark' || (themeChoice === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches));
   const isFirstCalIdRenderRef = React.useRef(true);
   React.useEffect(() => {
-    // Skip on first mount
-    if (isFirstCalIdRenderRef.current) {
-      isFirstCalIdRenderRef.current = false;
+    if (isAdminDashboardRoute()) {
+      applyThemeChoice('light');
+      setThemeChoice('light');
       return;
     }
-    const saved = getLocalStorage().getItem('gather_theme_preference_global_v1') || getLocalStorage().getItem(`gather_theme_preference_${activeCalId}_v1`);
-    const next = saved === 'dark' || saved === 'light' ? saved : 'system';
-    if (next === 'system') {
-      document.documentElement.removeAttribute('data-theme');
-    } else {
-      document.documentElement.setAttribute('data-theme', next);
-    }
+    const next = readThemeForCalendar(activeCalId);
+    applyThemeChoice(next);
     setThemeChoice(next);
+    isFirstCalIdRenderRef.current = false;
   }, [activeCalId]);
 
   // Text-size preference, relative to the browser's own default (100%).
-  const [fontScalePercent, setFontScalePercent] = React.useState(() => {
-    const globalScale = getLocalStorage().getItem('gather_font_scale_global_v1');
-    if (globalScale) return Number(globalScale);
-    const calScale = getLocalStorage().getItem(`gather_font_scale_${activeCalId}_v1`);
-    if (calScale) return Number(calScale);
+  const readFontScaleForCalendar = (calId) => {
+    if (!calId) return 100;
+    const calScale = getLocalStorage().getItem(`gather_font_scale_${calId}_v1`);
+    if (calScale) return Number(calScale) || 100;
     return 100;
+  };
+  const [fontScalePercent, setFontScalePercent] = React.useState(() => {
+    if (isAdminDashboardRoute()) return 100;
+    return readFontScaleForCalendar(activeCalId);
   });
   const skipNextFontWriteRef = React.useRef(false);
   React.useEffect(() => {
+    if (isAdminDashboardRoute()) {
+      document.documentElement.style.fontSize = '';
+      return;
+    }
     document.documentElement.style.fontSize = `${fontScalePercent}%`;
     if (skipNextFontWriteRef.current) {
       skipNextFontWriteRef.current = false;
       return;
     }
-    getLocalStorage().setItem('gather_font_scale_global_v1', String(fontScalePercent));
+    if (!activeCalId) return;
     getLocalStorage().setItem(`gather_font_scale_${activeCalId}_v1`, String(fontScalePercent));
-  }, [fontScalePercent]);
-  const isFirstFontCalIdRenderRef = React.useRef(true);
+  }, [fontScalePercent, activeCalId]);
   React.useEffect(() => {
-    if (isFirstFontCalIdRenderRef.current) {
-      isFirstFontCalIdRenderRef.current = false;
+    if (isAdminDashboardRoute()) {
+      document.documentElement.style.fontSize = '';
+      setFontScalePercent(100);
       return;
     }
     skipNextFontWriteRef.current = true;
-    const globalScale = getLocalStorage().getItem('gather_font_scale_global_v1');
-    const calScale = getLocalStorage().getItem(`gather_font_scale_${activeCalId}_v1`);
-    setFontScalePercent(Number(globalScale || calScale) || 100);
+    setFontScalePercent(readFontScaleForCalendar(activeCalId));
   }, [activeCalId]);
 
   const [mainNotifPermission, setMainNotifPermission] = React.useState(() => (isNotificationSupported() ? Notification.permission : 'unsupported'));

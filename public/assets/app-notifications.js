@@ -84,8 +84,10 @@
     if (calPref === 'on') return true;
     if (calPref === 'off') return false;
     const legacyGlobalPref = getLocalStorage().getItem('gather_chat_notify_pref_global_v1');
-    if (legacyGlobalPref === 'on') return true;
-    if (legacyGlobalPref === 'off') return false;
+    if (legacyGlobalPref === 'on' || legacyGlobalPref === 'off') {
+      getLocalStorage().setItem(getChatNotifyPrefKey(calId), legacyGlobalPref);
+      return legacyGlobalPref === 'on';
+    }
     return true;
   }
 
