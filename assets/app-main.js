@@ -24548,7 +24548,9 @@ function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom = false
     if (!ready || !mapRef.current || !window.L) return;
     const L = window.L;
     const categories = getPlaceCategories(calendar);
-    const signature = JSON.stringify({ places, categories });
+    const placesKey = (places || []).map(p => `${p.id}|${p.lat}|${p.lng}|${p.updatedAt || 0}|${p.categoryId || ''}|${p.visitStatus || ''}`).join(';');
+    const categoriesKey = (categories || []).map(c => `${c.id}|${c.color || ''}`).join(';');
+    const signature = placesKey + '::' + categoriesKey;
     if (dataSignatureRef.current === signature) return;
     dataSignatureRef.current = signature;
     const layer = markersLayerRef.current;
@@ -24777,19 +24779,21 @@ function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom = false
     // hidden under the header/list below the map. Backing off one zoom level and padding out
     // further on mobile keeps more of the cluster in frame.
     const isMobileViewport = window.innerWidth <= 720;
-    // When a list row has focused a place, do NOT fitBounds -- that re-collapses clusters and
-    // closes the popup the focus effect just opened (places is a new array every parent render).
-    if (focusPlace && focusPlace.id && markersByIdRef.current.get(focusPlace.id)) {
+    // When a list row has focused a place, do NOT fitBounds -- that re-collapses clusters.
+    if (focusPlace && focusPlace.id) {
       const focused = markersByIdRef.current.get(focusPlace.id);
-      const layer = markersLayerRef.current;
-      const openFocused = () => {
-        mapRef.current.setView(focused.getLatLng(), isMobileViewport ? 16 : 17, { animate: false });
-        focused.openPopup();
-      };
-      if (layer && typeof layer.zoomToShowLayer === 'function') {
-        layer.zoomToShowLayer(focused, openFocused);
-      } else {
-        openFocused();
+      if (focused) {
+        const layer = markersLayerRef.current;
+        const openFocused = () => {
+          if (!mapRef.current) return;
+          mapRef.current.setView(focused.getLatLng(), isMobileViewport ? 16 : 17, { animate: false });
+          focused.openPopup();
+        };
+        if (layer && typeof layer.zoomToShowLayer === 'function') {
+          layer.zoomToShowLayer(focused, openFocused);
+        } else {
+          openFocused();
+        }
       }
     } else if (fitBoundsPoints.length === 1) {
       mapRef.current.setView(fitBoundsPoints[0], isMobileViewport ? 14 : 15);
@@ -24803,7 +24807,7 @@ function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom = false
     } else {
       mapRef.current.setView(PLACE_MAP_DEFAULT_CENTER, PLACE_MAP_DEFAULT_ZOOM);
     }
-  }, [ready, places, calendar, preferDomesticBounds, focusPlace]);
+  }, [ready, places, calendar, preferDomesticBounds]);
 
   // Pans/zooms straight to a single place's marker and opens its popup -- driven by PlacesView's
   // list rows (clicking one focuses that place's pin here) rather than by anything inside this
