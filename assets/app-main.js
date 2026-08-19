@@ -99,6 +99,7 @@ function normalizePlaces(places) {
     .map(place => ({
       id: sanitizeText(place.id || '', 80) || `place_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
       name: sanitizeText(place.name || '', 80),
+      alias: sanitizeText(place.alias || '', 80),
       address: sanitizeText(place.address || '', 200),
       lat: Number(place.lat),
       lng: Number(place.lng),
@@ -24801,6 +24802,8 @@ function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, onDelete,
     name: editingPlace.name, address: editingPlace.address, lat: editingPlace.lat, lng: editingPlace.lng,
     categoryLabel: '', phone: '', url: ''
   } : null);
+  // Display alias (별칭) -- optional nickname shown in lists while official search name stays on the place record.
+  const [alias, setAlias] = React.useState(editingPlace ? (editingPlace.alias || '') : '');
   // Reformats an existing multi-visit memo into one line per date entry on open (see
   // reformatMemoIntoDateLines) -- a bulk-imported memo saved as one long run-on line otherwise
   // shows up exactly that way here, making it hard to find/edit any one visit's note.
@@ -24955,6 +24958,7 @@ function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, onDelete,
     const ok = await onSave({
       id: editingPlace ? editingPlace.id : undefined,
       name: selected.name || query.trim(),
+      alias: sanitizeText(alias.trim(), 80),
       address: selected.address || '',
       lat: selected.lat,
       lng: selected.lng,
@@ -25120,6 +25124,24 @@ function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, onDelete,
             backgroundColor: 'var(--border-subtle)', color: 'var(--text-muted)', wordBreak: 'break-all', maxWidth: '100%'
           }
         }, selected.url)
+      ),
+
+      /* Alias (별칭) -- optional nickname; official search name stays as place.name */
+      selected && /*#__PURE__*/React.createElement("div", null,
+        /*#__PURE__*/React.createElement("label", {
+          style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#64748B', marginBottom: '4px' }
+        }, "별칭 (선택)"),
+        /*#__PURE__*/React.createElement("input", {
+          type: "text",
+          className: "form-input",
+          placeholder: "목록에 표시할 별칭 (예: 도은네 집)",
+          maxLength: 80,
+          value: alias,
+          onChange: e => setAlias(e.target.value)
+        }),
+        /*#__PURE__*/React.createElement("div", {
+          style: { marginTop: '4px', fontSize: '0.72rem', color: 'var(--text-muted)' }
+        }, "비우면 검색된 공식 명칭이 그대로 표시됩니다.")
       ),
 
       /* Category picker + 방문/예정 toggle */
@@ -25359,7 +25381,7 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
   const handleSelectPlaceOnMap = place => {
     focusTokenRef.current += 1;
     setFocusPlace({ id: place.id, token: focusTokenRef.current });
-    if (scrollBodyRef.current) scrollBodyRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+    // Keep list scroll position -- do not jump to top when focusing a marker.
   };
   const handleCloseModal = () => {
     setIsRegisterOpen(false);
@@ -25381,9 +25403,10 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
     const queryLower = listSearchQuery.toLowerCase().trim();
     return places.filter(p => {
       const matchName = p.name && p.name.toLowerCase().includes(queryLower);
+      const matchAlias = p.alias && p.alias.toLowerCase().includes(queryLower);
       const matchAddress = p.address && p.address.toLowerCase().includes(queryLower);
       const matchMemo = p.memo && p.memo.toLowerCase().includes(queryLower);
-      return matchName || matchAddress || matchMemo;
+      return matchName || matchAlias || matchAddress || matchMemo;
     });
   }, [places, listSearchQuery]);
 
@@ -25765,9 +25788,10 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
               visitEntries.length > 0 && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 700 } }, `총 ${visitEntries.length}회 방문`)
             ),
             
-            /* Name & Address */
+            /* Name & Address -- alias is the list display name when set; official name shown underneath */
             /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 } },
-              /*#__PURE__*/React.createElement("span", { style: { fontWeight: 800, fontSize: '0.88rem', color: 'var(--text-main)' } }, place.name || '이름 없음'),
+              /*#__PURE__*/React.createElement("span", { style: { fontWeight: 800, fontSize: '0.88rem', color: 'var(--text-main)' } }, (place.alias || place.name || '이름 없음')),
+              place.alias && place.name && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.72rem', color: 'var(--text-muted)' } }, place.name),
               place.address && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.74rem', color: 'var(--text-muted)' } }, getDisplayPlaceAddress(place))
             ),
             
