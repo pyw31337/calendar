@@ -169,80 +169,42 @@ function unionPlaces(calendar, subcollectionPlaces) {
 // always normalized back to the canonical 'YY.MM.DD' shape below so every other place-date
 // helper (normalizePlaceDateForSort, formatPlaceBadgeDate, the sort comparator in PlacesView)
 // keeps working against the one shape they already expect, without having to touch them.
-const MEMO_DATE_RE = /(\d{4}|\d{2})[.\-](\d{2})[.\-](\d{2})/;
-// Rejects a syntactic match that isn't a real calendar date (month 13, day 32, ...) -- without
-// this, a stray "010-1234-5678"-shaped run of digits could get misread as a visit date.
-function normalizeMemoDateMatch(match) {
+const MEMO_DATE_RE = GATHER_APP_UTILS.MEMO_DATE_RE || /(\d{4}|\d{2})[.\-](\d{2})[.\-](\d{2})/;
+const normalizeMemoDateMatch = GATHER_APP_UTILS.normalizeMemoDateMatch || function normalizeMemoDateMatch(match) {
   if (!match) return null;
   let [, y, m, d] = match;
   const mm = Number(m), dd = Number(d);
   if (mm < 1 || mm > 12 || dd < 1 || dd > 31) return null;
   if (y.length === 4) y = y.slice(2);
   return `${y}.${m}.${d}`;
-}
-function extractLeadingMemoDate(memo) {
-  return normalizeMemoDateMatch(String(memo || '').match(MEMO_DATE_RE));
-}
-// Only treated as a multi-visit history when at least two valid dates are actually found in the
-// text -- an ordinary one-line memo that happens to contain a "/" (a fraction, a slash in an
-// address) should never be reinterpreted as a list. Entry boundaries are found by locating every
-// valid date MATCH's position in the raw text (not by splitting on "/" first) -- real memos mix
-// both styles of separator between entries ("... / 26.07.11 ...", but just as often "...10시
-// 26.07.11..." with no "/" at all, since "/" is also used *within* an entry to separate
-// 참석자/장소/시간), so anchoring on the date pattern itself is the only boundary that's actually
-// reliable. Each entry's note is everything from right after its own date match up to (not
-// including) the start of the next date match, with any leftover "/" separator at either edge
-// trimmed off.
-function parseVisitEntriesFromMemo(memo) {
-  const text = String(memo || '').trim();
+};
+const extractLeadingMemoDate = GATHER_APP_UTILS.extractLeadingMemoDate || function extractLeadingMemoDate(memo) {
+  return normalizeMemoDateMatch(String(memo || "").match(MEMO_DATE_RE));
+};
+const parseVisitEntriesFromMemo = GATHER_APP_UTILS.parseVisitEntriesFromMemo || function parseVisitEntriesFromMemo(memo) {
+  const text = String(memo || "").trim();
   if (!text) return [];
-  const dateMatches = [...text.matchAll(new RegExp(MEMO_DATE_RE, 'g'))]
-    .filter(match => normalizeMemoDateMatch(match));
+  const dateMatches = [...text.matchAll(new RegExp(MEMO_DATE_RE, "g"))].filter(m => normalizeMemoDateMatch(m));
   if (dateMatches.length < 2) return [];
-  const entries = dateMatches.map((match, idx) => {
+  return dateMatches.map((match, idx) => {
     const segmentEnd = idx + 1 < dateMatches.length ? dateMatches[idx + 1].index : text.length;
-    const note = text.slice(match.index + match[0].length, segmentEnd)
-      .trim()
-      .replace(/^\/\s*/, '')
-      .replace(/\s*\/\s*$/, '');
+    const note = text.slice(match.index + match[0].length, segmentEnd).trim().replace(/^\/\s*/, "").replace(/\s*\/\s*$/, "");
     return { date: normalizeMemoDateMatch(match), note };
   });
-  return entries;
-}
-
-// Rebuilds a memo string as one line per parsed visit entry ("YY.MM.DD 내용"), so opening 장소
-// 수정 on an old bulk-imported memo (or pasting a fresh run-on block, see the textarea's onPaste
-// below) immediately shows something readable to edit instead of one long unbroken line. A memo
-// that parseVisitEntriesFromMemo doesn't recognize as multi-entry (plain free-text, or already
-// one visit per line) is returned untouched.
-function reformatMemoIntoDateLines(memo) {
+};
+const reformatMemoIntoDateLines = GATHER_APP_UTILS.reformatMemoIntoDateLines || function reformatMemoIntoDateLines(memo) {
   const entries = parseVisitEntriesFromMemo(memo);
-  if (entries.length === 0) return String(memo || '');
-  return entries.map(entry => (entry.note ? `${entry.date} ${entry.note}` : entry.date)).join('\n');
-}
-
-// Most-recent-first display order for a place's visit history -- sorts by the entry's own parsed
-// date rather than assuming entries were typed in chronological order (parseVisitEntriesFromMemo
-// itself preserves left-to-right text order, which getPlaceSortDateKey above still relies on, so
-// this reordering only ever happens at render time in the two places entries are actually listed).
-function sortVisitEntriesRecentFirst(entries) {
-  return entries.slice().sort((a, b) => {
-    const dateA = normalizePlaceDateForSort(a.date) || '';
-    const dateB = normalizePlaceDateForSort(b.date) || '';
+  if (entries.length === 0) return String(memo || "");
+  return entries.map(entry => (entry.note ? `${entry.date} ${entry.note}` : entry.date)).join("\n");
+};
+const sortVisitEntriesRecentFirst = GATHER_APP_UTILS.sortVisitEntriesRecentFirst || function sortVisitEntriesRecentFirst(entries) {
+  return (entries || []).slice().sort((a, b) => {
+    const dateA = normalizePlaceDateForSort(a.date) || "";
+    const dateB = normalizePlaceDateForSort(b.date) || "";
     return dateB.localeCompare(dateA);
   });
-}
+};
 
-// A bulk-imported memo mixes real names with non-name tags in the same "/"-separated shape (e.g.
-// "영우 유리 서준 / 꽃잎반 / C동 올데이" -- 영우/유리/서준/꽃잎반 are people, "C동 올데이" is a
-// site/plan label), so there's no reliable way to tell them apart from formatting alone. Matching
-// against this app's actual participant list (each participant's given name, with the single
-// leading surname character stripped -- "박영우" -> "영우", the shape every memo in this data set
-// uses) plus the full household name list the user confirmed explicitly is the only dependable
-// signal. The explicit list is kept in full (not trimmed to just the "extra" names) because a
-// person can be registered as a chat participant on one calendar but not another -- e.g. 서준 is
-// a jhair participant but 펀앤펀캠프 lives on the kkot calendar, which has no 서준 participant to
-// derive the name from, so relying on per-calendar participant lookup alone would miss him there.
 const KNOWN_PLACE_PARTICIPANT_NAME_TAGS = [
   '영우', '유리', '서준', '광석', '수진', '아윤', '현석', '효진',
   '장용', '희경', '리아', '지아', '꽃잎반', '엄마', '만식', '도은', '은혜'

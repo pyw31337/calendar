@@ -505,6 +505,52 @@
     return isDomesticLatLng(place?.lat, place?.lng) ? getNaverMapPlaceUrl(place) : getGoogleMapPlaceUrl(place);
   }
 
+
+  const MEMO_DATE_RE = /(\d{4}|\d{2})[.\-](\d{2})[.\-](\d{2})/;
+
+  function normalizeMemoDateMatch(match) {
+    if (!match) return null;
+    let [, y, m, d] = match;
+    const mm = Number(m), dd = Number(d);
+    if (mm < 1 || mm > 12 || dd < 1 || dd > 31) return null;
+    if (y.length === 4) y = y.slice(2);
+    return `${y}.${m}.${d}`;
+  }
+
+  function extractLeadingMemoDate(memo) {
+    return normalizeMemoDateMatch(String(memo || '').match(MEMO_DATE_RE));
+  }
+
+  function parseVisitEntriesFromMemo(memo) {
+    const text = String(memo || '').trim();
+    if (!text) return [];
+    const dateMatches = [...text.matchAll(new RegExp(MEMO_DATE_RE, 'g'))]
+      .filter(match => normalizeMemoDateMatch(match));
+    if (dateMatches.length < 2) return [];
+    return dateMatches.map((match, idx) => {
+      const segmentEnd = idx + 1 < dateMatches.length ? dateMatches[idx + 1].index : text.length;
+      const note = text.slice(match.index + match[0].length, segmentEnd)
+        .trim()
+        .replace(/^\/\s*/, '')
+        .replace(/\s*\/\s*$/, '');
+      return { date: normalizeMemoDateMatch(match), note };
+    });
+  }
+
+  function reformatMemoIntoDateLines(memo) {
+    const entries = parseVisitEntriesFromMemo(memo);
+    if (entries.length === 0) return String(memo || '');
+    return entries.map(entry => (entry.note ? `${entry.date} ${entry.note}` : entry.date)).join('\n');
+  }
+
+  function sortVisitEntriesRecentFirst(entries) {
+    return (entries || []).slice().sort((a, b) => {
+      const dateA = normalizePlaceDateForSort(a.date) || '';
+      const dateB = normalizePlaceDateForSort(b.date) || '';
+      return dateB.localeCompare(dateA);
+    });
+  }
+
   window.GATHER_APP_UTILS = Object.freeze({
     getContrastTextColor,
     formatDateWithDayName,
@@ -567,6 +613,12 @@
     getNaverMapSearchRegionHint,
     getNaverMapPlaceUrl,
     getGoogleMapPlaceUrl,
-    getPlaceExternalMapUrl
+    getPlaceExternalMapUrl,
+    MEMO_DATE_RE,
+    normalizeMemoDateMatch,
+    extractLeadingMemoDate,
+    parseVisitEntriesFromMemo,
+    reformatMemoIntoDateLines,
+    sortVisitEntriesRecentFirst
   });
 })();

@@ -27,7 +27,7 @@
 - P0-3 safe 태그
 
 ### P1 utils 15 마무리
-- P1-1 방문 메모 파싱 → utils
+- P1-1 방문 메모 파싱 → utils ✅ 2026-08-20
 - P1-2 trimLatLngOutliers → utils
 - P1-3 공유 경로 파서 → utils
 - P1-4 getActiveParticipants 등 소형 pure
