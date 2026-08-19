@@ -18964,19 +18964,28 @@ function ChatGalleryModal({
   const [activeTab, setActiveTab] = React.useState('photos'); // 'photos' | 'links'
   const [searchQuery, setSearchQuery] = React.useState('');
   const [isSearchOpen, setIsSearchOpen] = React.useState(false);
-  const [gridCols, setGridCols] = React.useState(() => window.innerWidth >= 768 ? 6 : 3);
+  // 창이 넓어지면 썸네일을 키우지 않고 단 수(2~12)를 늘린다. 셀 목표 너비 ~108px.
+  const [gridCols, setGridCols] = React.useState(() => {
+    const w = typeof window !== 'undefined' ? window.innerWidth : 400;
+    const gap = 6;
+    const target = 108;
+    return Math.max(2, Math.min(12, Math.floor((w + gap) / (target + gap)) || 2));
+  });
   const gridHostRef = React.useRef(null);
   const { isHeaderVisible, onScroll: handleGalleryScroll } = useScrollHideHeader();
 
   React.useEffect(() => {
     const computeCols = width => {
-      if (width >= 900) return 6;
-      if (width >= 720) return 5;
-      if (width >= 560) return 4;
-      if (width >= 400) return 3;
-      return 2;
+      const gap = 6;
+      const targetCell = 108;
+      const usable = Math.max(0, Number(width) || 0);
+      const cols = Math.floor((usable + gap) / (targetCell + gap));
+      return Math.max(2, Math.min(12, cols || 2));
     };
-    const apply = width => setGridCols(computeCols(Math.max(0, width || 0)));
+    const apply = width => setGridCols(prev => {
+      const next = computeCols(Math.max(0, width || 0));
+      return prev === next ? prev : next;
+    });
     const el = gridHostRef.current;
     if (el && typeof ResizeObserver !== 'undefined') {
       const ro = new ResizeObserver(entries => {
@@ -19241,7 +19250,13 @@ function ChatGalleryModal({
     filteredPhotos.length === 0 ? /*#__PURE__*/React.createElement("div", {
       style: { textAlign: 'center', color: 'var(--text-muted)', padding: '40px 0', fontSize: '0.88rem' }
     }, searchQuery ? "검색 결과가 없습니다." : "공유된 사진이 없습니다.") : /*#__PURE__*/React.createElement("div", {
-      style: { display: 'grid', gridTemplateColumns: `repeat(${gridCols}, 1fr)`, gap: '6px' }
+      style: {
+        display: 'grid',
+        gridTemplateColumns: `repeat(${gridCols}, minmax(0, 1fr))`,
+        gap: '6px',
+        width: '100%',
+        alignContent: 'start'
+      }
     }, filteredPhotos.map((photo, idx) => /*#__PURE__*/React.createElement("img", {
       key: `${photo.messageId}-${photo.directMediaUrl ? 'direct' : photo.imageIndex}`,
       src: photo.thumb,
@@ -19253,7 +19268,16 @@ function ChatGalleryModal({
         index: idx,
         meta: filteredPhotos.map(p => ({ timestamp: p.timestamp, messageId: p.messageId, imageIndex: p.imageIndex, thumb: p.thumb, tags: p.tags, directMediaUrl: p.directMediaUrl }))
       }),
-      style: { width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: '6px', cursor: 'pointer', backgroundColor: 'var(--bg-primary)' }
+      style: {
+        width: '100%',
+        maxWidth: '100%',
+        aspectRatio: '1 / 1',
+        objectFit: 'cover',
+        borderRadius: '6px',
+        cursor: 'pointer',
+        backgroundColor: 'var(--bg-primary)',
+        display: 'block'
+      }
     })))
   ))));
 }
