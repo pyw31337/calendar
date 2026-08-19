@@ -1402,6 +1402,42 @@ function renderTextWithUrlBadge(text, options = null) {
   );
 }
 
+// Shared add/edit action row: 추가 | (edit) 취소 + 수정 — DateModal 참여자/장소/정산 공통 모듈
+function FormAddEditActionButtons({ isEditing, isSaving, onCancel, onSubmit, disabled = false, savingLabel = '저장 중...', alignSelf = null }) {
+  const base = {
+    flexShrink: 0,
+    height: '44px',
+    minHeight: '44px',
+    whiteSpace: 'nowrap'
+  };
+  if (alignSelf) base.alignSelf = alignSelf;
+  const primaryStyle = isEditing
+    ? { ...base, backgroundColor: '#0F172A', borderColor: '#0F172A', color: '#FFFFFF' }
+    : base;
+  return /*#__PURE__*/React.createElement(React.Fragment, null,
+    isEditing && /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      className: "btn btn-secondary",
+      style: base,
+      disabled: !!isSaving,
+      onClick: e => {
+        if (e) { e.preventDefault(); e.stopPropagation(); }
+        if (typeof onCancel === 'function') onCancel(e);
+      }
+    }, "취소"),
+    /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      className: "btn btn-secondary",
+      style: primaryStyle,
+      disabled: !!isSaving || !!disabled,
+      onClick: e => {
+        if (e) { e.preventDefault(); e.stopPropagation(); }
+        if (typeof onSubmit === 'function') onSubmit(e);
+      }
+    }, isSaving ? savingLabel : (isEditing ? '수정' : '추가'))
+  );
+}
+
 function normalizePollOptionInput(value = '') {
   const source = sanitizeText(value, 220);
   const url = extractFirstUrl(source);
@@ -14775,7 +14811,8 @@ function DateModal({
     const ok = await onSave(dateStr, participantId, cleanNote);
     setIsSubmitting(false);
     if (ok !== false) {
-      showToast('참석 여부가 저장되었습니다.', 'success');
+      const wasEdit = dateEntries.some(en => en.participantId === participantId);
+      showToast(wasEdit ? '참석 정보가 수정되었습니다.' : '참석이 추가되었습니다.', 'success');
       setParticipantId('');
       setNote('');
     }
@@ -15368,13 +15405,16 @@ function DateModal({
               disabled: isSubmitting,
               onChange: e => { markDirty(); setNote(e.target.value); }
             }),
-            /*#__PURE__*/React.createElement("button", {
-              type: "button",
-              className: "btn btn-poll-create btn-action btn-action-dark",
-              style: { padding: '0 16px', fontWeight: 800, height: '44px', minHeight: '44px' },
-              disabled: isSubmitting,
-              onClick: handleSubmit
-            }, isSubmitting ? '...' : '저장')
+            /*#__PURE__*/React.createElement(FormAddEditActionButtons, {
+              isEditing: !!participantId && dateEntries.some(en => en.participantId === participantId),
+              isSaving: isSubmitting,
+              disabled: !participantId,
+              onCancel: () => {
+                setParticipantId('');
+                setNote('');
+              },
+              onSubmit: handleSubmit
+            })
           )
         )
       ),
@@ -15613,14 +15653,12 @@ function DateModal({
               disabled: isSavingPlace,
               onChange: e => setPlaceMemo(e.target.value)
             }),
-            editingLinkedPlaceId && /*#__PURE__*/React.createElement("button", {
-              type: "button",
-              className: "btn btn-secondary",
-              style: { flexShrink: 0, alignSelf: 'flex-start', height: '44px', minHeight: '44px' },
-              disabled: isSavingPlace,
-              onClick: e => {
-                e.preventDefault();
-                e.stopPropagation();
+            /*#__PURE__*/React.createElement(FormAddEditActionButtons, {
+              isEditing: !!editingLinkedPlaceId,
+              isSaving: isSavingPlace,
+              disabled: !selectedPlace,
+              alignSelf: 'flex-start',
+              onCancel: () => {
                 setEditingLinkedPlaceId(null);
                 setSelectedPlace(null);
                 setPlaceQuery('');
@@ -15628,28 +15666,9 @@ function DateModal({
                 setPlaceMemo('');
                 setPlaceCategoryId(getPlaceCategories(calendar)[0]?.id || 'etc');
                 setPlaceVisitStatus('visited');
-              }
-            }, "취소"),
-            /*#__PURE__*/React.createElement("button", {
-              type: "button",
-              className: "btn btn-secondary",
-              style: editingLinkedPlaceId ? {
-                flexShrink: 0,
-                alignSelf: 'flex-start',
-                height: '44px',
-                minHeight: '44px',
-                backgroundColor: '#0F172A',
-                borderColor: '#0F172A',
-                color: '#FFFFFF'
-              } : {
-                flexShrink: 0,
-                alignSelf: 'flex-start',
-                height: '44px',
-                minHeight: '44px'
               },
-              disabled: isSavingPlace || !selectedPlace,
-              onClick: e => { e.preventDefault(); e.stopPropagation(); handleSavePlaceClick(); }
-            }, isSavingPlace ? '저장 중...' : (editingLinkedPlaceId ? '수정' : '추가'))
+              onSubmit: handleSavePlaceClick
+            })
           )
         )
       ),
@@ -15874,25 +15893,17 @@ function DateModal({
               setExpenseAmountInput(formatted ? `${expenseIsIncome ? '+' : '-'}${formatted}` : '');
             }
           }),
-          editingExpenseId && /*#__PURE__*/React.createElement("button", {
-            type: "button",
-            className: "btn btn-secondary",
-            style: { flexShrink: 0 },
-            disabled: isSavingExpense,
-            onClick: () => { setEditingExpenseId(null); setExpenseLabelInput(''); setExpenseAmountInput(''); setExpenseIsIncome(false); }
-          }, "취소"),
-          /*#__PURE__*/React.createElement("button", {
-            type: "button",
-            className: "btn btn-secondary",
-            style: editingExpenseId ? {
-              flexShrink: 0,
-              backgroundColor: '#0F172A',
-              borderColor: '#0F172A',
-              color: '#FFFFFF'
-            } : { flexShrink: 0 },
-            disabled: isSavingExpense,
-            onClick: e => { e.preventDefault(); e.stopPropagation(); handleSaveExpenseClick(); }
-          }, isSavingExpense ? "저장 중..." : editingExpenseId ? "수정" : "추가")
+          /*#__PURE__*/React.createElement(FormAddEditActionButtons, {
+            isEditing: !!editingExpenseId,
+            isSaving: isSavingExpense,
+            onCancel: () => {
+              setEditingExpenseId(null);
+              setExpenseLabelInput('');
+              setExpenseAmountInput('');
+              setExpenseIsIncome(false);
+            },
+            onSubmit: handleSaveExpenseClick
+          })
           )
         )
       ),
