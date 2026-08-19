@@ -2250,6 +2250,65 @@ async function fetchChatMessagesRest(calId) {
 
 const CHAT_OLDER_PAGE_SIZE = readConfigNumber('CHAT_OLDER_PAGE_SIZE', 40);
 
+async function fetchSubcollectionCount(calId, subName) {
+  if (!calId || !firebaseDb || !subName) return null;
+  try {
+    const ref = firebaseDb.collection('calendars').doc(`cal_${calId}`).collection(subName);
+    if (ref && typeof ref.count === 'function') {
+      const snap = await ref.count().get();
+      return Number(snap.data().count) || 0;
+    }
+  } catch (err) {
+    console.warn('fetchSubcollectionCount', subName, err);
+  }
+  return null;
+}
+
+async function fetchOlderChatMessages(calId, beforeTimestamp, pageSize = CHAT_OLDER_PAGE_SIZE) {
+  if (!calId || !beforeTimestamp || !firebaseDb) return [];
+  try {
+    const snap = await firebaseDb.collection('calendars').doc(`cal_${calId}`).collection('messages')
+      .orderBy('timestamp', 'desc').startAfter(beforeTimestamp).limit(pageSize).get();
+    const list = [];
+    snap.forEach(doc => list.push(slimMessageForClient({ id: doc.id, ...doc.data() })));
+    return list.reverse();
+  } catch (err) {
+    console.warn('fetchOlderChatMessages', err);
+    return [];
+  }
+}
+
+async function fetchGalleryItemCount(calId, maxPages = 25) {
+  if (!calId || !firebaseDb) return null;
+  try {
+    let total = 0, lastDoc = null;
+    for (let page = 0; page < maxPages; page++) {
+      let q = firebaseDb.collection('calendars').doc(`cal_${calId}`).collection('messages')
+        .orderBy('timestamp', 'desc').limit(100);
+      if (lastDoc) q = q.startAfter(lastDoc);
+      const snap = await q.get();
+      if (snap.empty) break;
+      snap.forEach(doc => {
+        const msg = { id: doc.id, ...doc.data() };
+        const imgN = typeof getMessageImageEntries === 'function' ? getMessageImageEntries(msg).length : 0;
+        total += imgN;
+        const direct = typeof getMessageDirectMediaEntry === 'function' ? getMessageDirectMediaEntry(msg) : null;
+        if (direct) total += 1;
+        const textUrl = typeof extractFirstUrl === 'function' ? extractFirstUrl(msg.text || '') : '';
+        if (textUrl && !direct && imgN === 0) total += 1;
+      });
+      lastDoc = snap.docs[snap.docs.length - 1];
+      if (snap.size < 100) break;
+    }
+    return total;
+  } catch (err) {
+    console.warn('fetchGalleryItemCount', err);
+    return null;
+  }
+}
+
+const CHAT_OLDER_PAGE_SIZE = readConfigNumber('CHAT_OLDER_PAGE_SIZE', 40);
+
 async function fetchOlderChatMessages(calId, beforeTimestamp, pageSize = CHAT_OLDER_PAGE_SIZE) {
   if (!calId || !beforeTimestamp) return [];
   try {
@@ -3617,6 +3676,10 @@ function AdminDashboard({ initialCalendars }) {
 
   // Unified chat log states
   const [messagesMap, setMessagesMap] = React.useState({});
+  const [adminMessageLimit, setAdminMessageLimit] = React.useState(ADMIN_MESSAGE_LIVE_LIMIT);
+  const [adminMemoLimit, setAdminMemoLimit] = React.useState(ADMIN_MEMO_LIVE_LIMIT);
+  const [adminMsgTotal, setAdminMsgTotal] = React.useState({});
+  const [adminMemoTotal, setAdminMemoTotal] = React.useState({});
   const [chatSearchQuery, setChatSearchQuery] = React.useState('');
   // Per-calendar memos, loaded the same way as messagesMap -- powers the 통합검색 메모 tab.
   const [memosMap, setMemosMap] = React.useState({});
@@ -3840,13 +3903,30 @@ function AdminDashboard({ initialCalendars }) {
   // 2. Load Messages (Firestore snapshots or REST) -- capped per calendar (not truly unbounded)
   // so opening the admin dashboard doesn't download/live-sync a calendar's entire message
   // history forever; see the matching cap on GlobalSearchModal's own full-history search fetch.
+  React.useEffect(() => {
+    if (!selectedCalId || !firebaseDb) return;
+    setAdminMessageLimit(ADMIN_MESSAGE_LIVE_LIMIT);
+    setAdminMemoLimit(ADMIN_MEMO_LIVE_LIMIT);
+    let cancelled = false;
+    (async () => {
+      const [mc, mm] = await Promise.all([
+        fetchSubcollectionCount(selectedCalId, 'messages'),
+        fetchSubcollectionCount(selectedCalId, 'memos')
+      ]);
+      if (cancelled) return;
+      if (mc != null) setAdminMsgTotal(prev => ({ ...prev, [selectedCalId]: mc }));
+      if (mm != null) setAdminMemoTotal(prev => ({ ...prev, [selectedCalId]: mm }));
+    })();
+    return () => { cancelled = true; };
+  }, [selectedCalId]);
+
   // Chat messages: only selected calendar while 채팅 tab is open
   React.useEffect(() => {
     if (activeTab !== 'logs' || !selectedCalId) return;
 
     if (firebaseDb) {
       const unsub = firebaseDb.collection('calendars').doc(`cal_${selectedCalId}`).collection('messages')
-        .orderBy('timestamp', 'desc').limit(ADMIN_MESSAGE_LIVE_LIMIT)
+        .orderBy('timestamp', 'desc').limit(adminMessageLimit)
         .onSnapshot(snapshot => {
           const list = [];
           snapshot.forEach(doc => {
@@ -3872,14 +3952,14 @@ function AdminDashboard({ initialCalendars }) {
         console.error(`Failed REST message fetch for ${selectedCalId}:`, e);
       }
     })();
-  }, [selectedCalId, firebaseDb, activeTab]);
+  }, [selectedCalId, firebaseDb, activeTab, adminMessageLimit]);
 
   // 2b. Load memos (same live-listener pattern as messages above, same 2000 cap) -- powers the
   // 통합검색 메모 탭
   React.useEffect(() => {
     if (activeTab !== 'logs' || !selectedCalId || !firebaseDb) return;
     const unsub = firebaseDb.collection('calendars').doc(`cal_${selectedCalId}`).collection('memos')
-      .orderBy('createdAt', 'desc').limit(ADMIN_MEMO_LIVE_LIMIT)
+      .orderBy('createdAt', 'desc').limit(adminMemoLimit)
       .onSnapshot(snapshot => {
         const list = [];
         snapshot.forEach(doc => {
@@ -3891,7 +3971,7 @@ function AdminDashboard({ initialCalendars }) {
         console.error(`Failed to load memos for ${selectedCalId}:`, err);
       });
     return () => unsub();
-  }, [selectedCalId, firebaseDb, activeTab]);
+  }, [selectedCalId, firebaseDb, activeTab, adminMemoLimit]);
 
   // Link-preview cache stats only on metrics tab (egress rule)
   React.useEffect(() => {
@@ -5045,7 +5125,7 @@ function AdminDashboard({ initialCalendars }) {
             { key: 'upcoming', label: '예정 일정 수', val: dashboard.upcomingCount, perCal: stat => stat.upcomingCount, unit: '건' },
             { key: 'memo', label: '메모 일정 수', val: dashboard.memoCount, perCal: stat => stat.memoCount, unit: '건' },
             { key: 'confirmed', label: '확정 모임 수', val: dashboard.totalConfirmedMeetings, perCal: stat => stat.confirmedCount, unit: '건' },
-            { key: 'chatMessages', label: '총 채팅 메시지', val: dashboard.calendarStats.reduce((sum, stat) => sum + (messagesMap[stat.calendar.id] || []).length, 0), perCal: stat => (messagesMap[stat.calendar.id] || []).length, unit: '건' },
+            { key: 'chatMessages', label: '총 채팅 메시지', val: dashboard.calendarStats.reduce((sum, stat) => sum + (adminMsgTotal[stat.calendar.id] != null ? adminMsgTotal[stat.calendar.id] : (messagesMap[stat.calendar.id] || []).length), 0), perCal: stat => (adminMsgTotal[stat.calendar.id] != null ? adminMsgTotal[stat.calendar.id] : (messagesMap[stat.calendar.id] || []).length), unit: '건' },
             { key: 'polls', label: '총 투표 수', val: dashboard.totalPolls, perCal: stat => stat.pollCount, unit: '건' },
             { key: 'pollVotes', label: '총 투표자 수', val: dashboard.totalPollVotes, perCal: stat => stat.pollVoteCount, unit: '명' }
           ].map(box => {
@@ -5752,7 +5832,7 @@ function AdminDashboard({ initialCalendars }) {
           "data-collapse-anchor": "true", "data-collapse-key": "logs-chat", "data-collapse-label": "채팅 로그"
         },
           /*#__PURE__*/React.createElement("div", { style: { flex: '1 1 auto', minWidth: 0 } },
-            /*#__PURE__*/React.createElement("h4", { style: { fontSize: '0.96rem', fontWeight: '900', color: '#0F172A', margin: 0, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px' } }, /*#__PURE__*/React.createElement(ChatSectionIcon, null), "채팅 로그"),
+            /*#__PURE__*/React.createElement("h4", { style: { fontSize: '0.96rem', fontWeight: '900', color: '#0F172A', margin: 0, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px' } }, /*#__PURE__*/React.createElement(ChatSectionIcon, null), "채팅 로그", (adminMsgTotal[selectedCalId] || 0) > 0 && /*#__PURE__*/React.createElement("span", { className: "main-menu-badge" }, adminMsgTotal[selectedCalId])),
             /*#__PURE__*/React.createElement("p", { style: { fontSize: '0.75rem', color: '#64748B', margin: '2px 0 0 0' } }, "각 캘린더별 채팅 메시지 내역을 실시간 모니터링하고 어드민 권한으로 삭제할 수 있습니다.")
           ),
           /*#__PURE__*/React.createElement("div", {
@@ -5762,7 +5842,11 @@ function AdminDashboard({ initialCalendars }) {
               type: "text", className: "form-input", placeholder: "이름, 메시지 검색...", value: chatSearchQuery,
               onChange: e => setChatSearchQuery(e.target.value),
               style: { maxWidth: '240px', width: '100%', minWidth: 0 }
-            })
+            }),
+            /*#__PURE__*/React.createElement("button", {
+              type: "button", className: "btn btn-secondary", style: { whiteSpace: 'nowrap', height: '36px' },
+              onClick: () => setAdminMessageLimit(prev => prev + ADMIN_MESSAGE_LIVE_LIMIT)
+            }, "이전 로그 더 보기")
           )
         ),
 
@@ -8747,6 +8831,7 @@ function App() {
       calendar: activeCal,
       memos: memos,
       hasMoreMemos: hasMoreMemos,
+      totalMemoCount: totalMemoCount,
       onLoadMoreMemos: () => setMemosLimit(prev => prev + MEMOS_PAGE_SIZE),
       onBack: () => changeView('calendar'),
       showToast: showToast,
@@ -8908,9 +8993,9 @@ function App() {
     onClick: () => {
       if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 메모 정보를 확인해 주세요.')) changeView('memo');
     }
-  }, /*#__PURE__*/React.createElement("span", { className: "main-menu-icon" }, /*#__PURE__*/React.createElement(NotepadTextIcon, null)), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-full" }, "메모"), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-short" }, "메모"), activeCal && memos.length > 0 && /*#__PURE__*/React.createElement("span", {
+  }, /*#__PURE__*/React.createElement("span", { className: "main-menu-icon" }, /*#__PURE__*/React.createElement(NotepadTextIcon, null)), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-full" }, "메모"), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-short" }, "메모"), activeCal && mainMenuMemoCount > 0 && /*#__PURE__*/React.createElement("span", {
     className: "main-menu-badge"
-  }, memos.length))))), isMainSideMenuOpen && /*#__PURE__*/React.createElement(MainSideMenu, {
+  }, mainMenuMemoCount))))), isMainSideMenuOpen && /*#__PURE__*/React.createElement(MainSideMenu, {
     calendar: activeCal,
     anniversaries: anniversaries,
     onClose: () => setIsMainSideMenuOpen(false),
@@ -12730,6 +12815,9 @@ function CommentsSection({
 function ChatRoomView({
   calendar,
   chatMessages,
+  loadingOlderChat,
+  hasMoreOlderChat,
+  onLoadOlderChat,
   loadingOlderChat,
   hasMoreOlderChat,
   chatInput,
@@ -19660,7 +19748,7 @@ function useScrollHideHeader() {
   return { isHeaderVisible, onScroll };
 }
 
-function MemoView({ calendar, memos, hasMoreMemos, onLoadMoreMemos, onBack, showToast, isDarkTheme, onRequestConfirm, sharedMemo, onDismissSharedMemo, chatMessages, setActiveLightbox }) {
+function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoadMoreMemos, onBack, showToast, isDarkTheme, onRequestConfirm, sharedMemo, onDismissSharedMemo, chatMessages, setActiveLightbox }) {
   const [searchQuery, setSearchQuery] = React.useState('');
   const [selectedTag, setSelectedTag] = React.useState('');
   // Header hides on scroll-down / reappears on scroll-up, matching the chat room header exactly.
