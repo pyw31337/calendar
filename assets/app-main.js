@@ -14720,7 +14720,7 @@ function DateModal({
       marginLeft: '4px'
     },
     title: "닫기"
-  }, "✕")), /*#__PURE__*/React.createElement("form", {
+  }, "✕"))), /*#__PURE__*/React.createElement("form", {
     onSubmit: handleSubmit
   }, /*#__PURE__*/React.createElement("div", {
     className: "modal-body"
@@ -15412,7 +15412,7 @@ function DateModal({
         })
       )
     )
-  ))), isSheetOpen && /*#__PURE__*/React.createElement(React.Fragment, null,
+  )), isSheetOpen && /*#__PURE__*/React.createElement(React.Fragment, null,
     /*#__PURE__*/React.createElement("div", {
       className: "bottom-sheet-overlay",
       onClick: () => setIsSheetOpen(false)
