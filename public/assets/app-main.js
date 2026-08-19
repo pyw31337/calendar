@@ -20101,7 +20101,9 @@ function MemoView({ calendar, memos, hasMoreMemos, onLoadMoreMemos, onBack, show
           onShare: () => setSharingMemo(sharedMemo),
           onSelectTag: (tag) => { setSelectedTag(tag); setIsSearchOpen(true); },
           onCommentsChange: (nextComments) => handleMemoCommentsChange(sharedMemo, nextComments),
-          getBorderColor: getBorderColor
+          getBorderColor: getBorderColor,
+          onRequestConfirm: onRequestConfirm,
+          showToast: showToast
         })
       ),
 
@@ -20410,7 +20412,9 @@ function MemoView({ calendar, memos, hasMoreMemos, onLoadMoreMemos, onBack, show
           onShare: () => setSharingMemo(memo),
           onSelectTag: (tag) => { setSelectedTag(tag); setIsSearchOpen(true); },
           onCommentsChange: (nextComments) => handleMemoCommentsChange(memo, nextComments),
-          getBorderColor: getBorderColor
+          getBorderColor: getBorderColor,
+          onRequestConfirm: onRequestConfirm,
+          showToast: showToast
         })))
       ),
 
@@ -20438,7 +20442,9 @@ function MemoView({ calendar, memos, hasMoreMemos, onLoadMoreMemos, onBack, show
           onShare: () => setSharingMemo(memo),
           onSelectTag: (tag) => { setSelectedTag(tag); setIsSearchOpen(true); },
           onCommentsChange: (nextComments) => handleMemoCommentsChange(memo, nextComments),
-          getBorderColor: getBorderColor
+          getBorderColor: getBorderColor,
+          onRequestConfirm: onRequestConfirm,
+          showToast: showToast
         })))
       ),
 
@@ -20886,7 +20892,7 @@ function MemoShareModal({ memo, calendarId, onClose, showToast }) {
 
 
 // Memo Card component for clean grid layout separation
-function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onSelectTag, onCommentsChange, getBorderColor }) {
+function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onSelectTag, onCommentsChange, getBorderColor, onRequestConfirm, showToast }) {
   const imageUrls = memo.imageUrls || [];
   const thumbUrls = memo.thumbUrls || [];
 
@@ -20906,6 +20912,7 @@ function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onSelectTa
     const text = commentText.trim();
     if (!text || !commentParticipantId) return;
     const now = Date.now();
+    const wasEditing = !!editingCommentId;
     const nextComments = editingCommentId
       ? comments.map(c => c.id === editingCommentId ? { ...c, text, participantId: commentParticipantId, updatedAt: now } : c)
       : [...comments, { id: `cmt_${now}_${Math.random().toString(36).slice(2, 8)}`, participantId: commentParticipantId, text, createdAt: now }];
@@ -20913,6 +20920,9 @@ function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onSelectTa
     setCommentText('');
     setEditingCommentId(null);
     setIsCommentComposerOpen(false);
+    if (typeof showToast === 'function') {
+      showToast(wasEditing ? '댓글이 수정되었습니다' : '댓글이 등록되었습니다', 'success');
+    }
   };
 
   const handleStartEditComment = (e, comment) => {
@@ -20923,13 +20933,30 @@ function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onSelectTa
     setIsCommentComposerOpen(true);
   };
 
-  const handleDeleteComment = (e, commentId) => {
+  const handleDeleteComment = (e, comment) => {
     e.stopPropagation();
-    onCommentsChange(comments.filter(c => c.id !== commentId));
-    if (editingCommentId === commentId) {
-      setEditingCommentId(null);
-      setCommentText('');
-      setIsCommentComposerOpen(false);
+    const commentId = typeof comment === 'string' ? comment : comment?.id;
+    if (!commentId) return;
+    const target = typeof comment === 'object' && comment ? comment : comments.find(c => c.id === commentId);
+    const author = (calendar?.participants || []).find(p => p.id === (target?.participantId || ''));
+    const authorName = author?.name || '참여자';
+    const snippet = sanitizeText(String(target?.text || ''), 40);
+    const message = snippet
+      ? `${authorName}님의 '${snippet}' 댓글을 삭제하시겠습니까?`
+      : `${authorName}님의 댓글을 삭제하시겠습니까?`;
+    const doDelete = () => {
+      onCommentsChange(comments.filter(c => c.id !== commentId));
+      if (editingCommentId === commentId) {
+        setEditingCommentId(null);
+        setCommentText('');
+        setIsCommentComposerOpen(false);
+      }
+      if (typeof showToast === 'function') showToast('댓글이 삭제되었습니다', 'success');
+    };
+    if (typeof onRequestConfirm === 'function') {
+      onRequestConfirm('댓글 삭제', message, doDelete);
+    } else if (window.confirm(message)) {
+      doDelete();
     }
   };
 
@@ -21147,7 +21174,7 @@ function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onSelectTa
           style: { background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', color: '#64748B', flexShrink: 0 }
         }, /*#__PURE__*/React.createElement(PencilIcon, { size: 12 })),
         /*#__PURE__*/React.createElement("button", {
-          type: "button", onClick: e => handleDeleteComment(e, comment.id), title: "삭제", "aria-label": "댓글 삭제",
+          type: "button", onClick: e => handleDeleteComment(e, comment), title: "삭제", "aria-label": "댓글 삭제",
           style: { background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', color: '#64748B', flexShrink: 0 }
         }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 12 }))
       );
