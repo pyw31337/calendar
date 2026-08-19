@@ -25256,7 +25256,17 @@ function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom = false
     let cancelled = false;
     loadLeaflet().then(async L => {
       if (cancelled || !containerRef.current || mapRef.current) return;
-      const map = L.map(containerRef.current, { scrollWheelZoom, zoomControl: true, attributionControl: true })
+      const map = L.map(containerRef.current, {
+          scrollWheelZoom,
+          zoomControl: true,
+          attributionControl: true,
+          touchZoom: true,
+          dragging: true,
+          doubleClickZoom: true,
+          boxZoom: false,
+          keyboard: true,
+          tapTolerance: 15
+        })
         .setView(PLACE_MAP_DEFAULT_CENTER, PLACE_MAP_DEFAULT_ZOOM);
       // CartoDB Positron (free, no API key, same OSM data underneath) instead of the standard
       // OSM tile style -- its muted greyscale/white basemap with minimal labels makes the

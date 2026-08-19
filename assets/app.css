@@ -901,6 +901,34 @@ button, input, textarea, select {
 .btn-danger:hover { background: #FEE2E2; }
 
 
+
+/* Mobile rule: iOS Safari zooms focused inputs under 16px — keep form controls at 16px */
+@media (max-width: 720px) {
+  input.form-input,
+  textarea.form-input,
+  select.form-select,
+  button.form-select,
+  .form-input,
+  .form-select,
+  .inline-search-input,
+  .places-list-search-input,
+  input[type="text"],
+  input[type="search"],
+  input[type="number"],
+  textarea {
+    font-size: 16px !important;
+  }
+}
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+@supports (min-height: 100dvh) {
+  body, #root {
+    min-height: 100dvh;
+  }
+}
+
 /* 셀렉트박스 규칙: 일정 팝업 카테고리와 동일 (Rounded 사각형, Capsule 금지) */
 .form-select, .form-input {
   width: 100%;
@@ -3074,32 +3102,16 @@ select.form-select {
 .btn-gamified-confirm .gamified-confirm-label { position: relative; z-index: 3; }
 .btn-meeting-confirm-plain { background: transparent; }
 
-/* Uniform electric border — CSS conic beam (no SVG stroke stretch) */
-@property --gamified-electric-angle {
-  syntax: '<angle>';
-  inherits: false;
-  initial-value: 0deg;
-}
+/* Uniform electric border — transform-rotate conic (works without @property; Safari/Firefox/Whale) */
 .gamified-border-electric {
   position: absolute;
   inset: -3px;
   border-radius: 15px;
   pointer-events: none;
   z-index: 2;
+  overflow: hidden;
   padding: 2.5px;
   box-sizing: border-box;
-  background:
-    conic-gradient(
-      from var(--gamified-electric-angle),
-      transparent 0deg,
-      transparent 200deg,
-      #67E8F9 225deg,
-      #FFFFFF 250deg,
-      #C4B5FD 275deg,
-      #F0ABFC 300deg,
-      transparent 330deg,
-      transparent 360deg
-    );
   -webkit-mask:
     linear-gradient(#000 0 0) content-box,
     linear-gradient(#000 0 0);
@@ -3108,33 +3120,62 @@ select.form-select {
     linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
-  animation: gamified-electric-spin 1.35s linear infinite;
   filter:
     drop-shadow(0 0 3px rgba(103, 232, 249, 0.95))
     drop-shadow(0 0 10px rgba(192, 132, 252, 0.7));
 }
+.gamified-border-electric::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 220%;
+  height: 220%;
+  transform: translate(-50%, -50%);
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    transparent 200deg,
+    #67E8F9 225deg,
+    #FFFFFF 250deg,
+    #C4B5FD 275deg,
+    #F0ABFC 300deg,
+    transparent 330deg,
+    transparent 360deg
+  );
+  animation: gamified-electric-spin 1.35s linear infinite;
+}
 .gamified-border-electric-secondary {
   padding: 2px;
   opacity: 0.9;
-  animation-duration: 2s;
-  animation-direction: reverse;
   filter:
     drop-shadow(0 0 2px rgba(255, 255, 255, 0.85))
     drop-shadow(0 0 8px rgba(236, 72, 153, 0.6));
-  background:
-    conic-gradient(
-      from var(--gamified-electric-angle),
-      transparent 0deg,
-      transparent 30deg,
-      #F9A8D4 50deg,
-      #FFFFFF 70deg,
-      #A5F3FC 95deg,
-      transparent 125deg,
-      transparent 360deg
-    );
+}
+.gamified-border-electric-secondary::before {
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    transparent 30deg,
+    #F9A8D4 50deg,
+    #FFFFFF 70deg,
+    #A5F3FC 95deg,
+    transparent 125deg,
+    transparent 360deg
+  );
+  animation-duration: 2s;
+  animation-direction: reverse;
 }
 @keyframes gamified-electric-spin {
-  to { --gamified-electric-angle: 360deg; }
+  to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gamified-border-electric::before,
+  .gamified-border-electric-secondary::before,
+  .btn-gamified-confirm,
+  .btn-gamified-confirm::before {
+    animation: none !important;
+  }
 }
 .btn-gamified-confirm .gamified-confirm-label {
   position: relative;
@@ -3184,4 +3225,10 @@ textarea {
 textarea.form-input {
   min-height: 44px;
   max-height: 480px;
+}
+
+/* Leaflet: allow one-finger pan on mobile without browser gesture conflicts */
+.leaflet-container {
+  touch-action: pan-x pan-y;
+  -webkit-tap-highlight-color: transparent;
 }
