@@ -31,14 +31,28 @@ const extractExpenseTimePrefix = GATHER_APP_UTILS.extractExpenseTimePrefix;
 // pair) after a DateModal 회비정산 row was found still doing the raw lookup while every other
 // settlement surface (AdminDashboard's SettlementPage, the global search index) had already been
 // fixed to check for income -- same fix skipped in one more place is the same bug again.
-const INCOME_EXPENSE_CATEGORY = { id: 'income', name: '수입', color: '#16A34A' };
-function isExpenseIncomeEntry(expense) {
+const INCOME_EXPENSE_CATEGORY = GATHER_APP_UTILS.INCOME_EXPENSE_CATEGORY || { id: 'income', name: '수입', color: '#16A34A' };
+const isExpenseIncomeEntry = GATHER_APP_UTILS.isExpenseIncomeEntry || function isExpenseIncomeEntry(expense) {
   return expense?.type === 'income' || Number(expense?.amount) < 0;
-}
-function getDisplayExpenseCategory(calendar, expense) {
+};
+const getDisplayExpenseCategory = GATHER_APP_UTILS.getDisplayExpenseCategory || function getDisplayExpenseCategory(calendar, expense) {
   const resolved = isExpenseIncomeEntry(expense) ? INCOME_EXPENSE_CATEGORY : getExpenseCategory(calendar, expense?.categoryId);
   return resolved && resolved.name ? resolved : { id: 'etc', name: '기타', color: '#64748B' };
-}
+};
+const clampNumber = GATHER_APP_UTILS.clampNumber || function clampNumber(value, min, max) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return min;
+  return Math.min(max, Math.max(min, n));
+};
+const pad2 = GATHER_APP_UTILS.pad2 || function pad2(value) {
+  return String(value).padStart(2, '0');
+};
+const isDataUrl = GATHER_APP_UTILS.isDataUrl || function isDataUrl(value) {
+  return typeof value === 'string' && value.startsWith('data:');
+};
+const isHttpUrl = GATHER_APP_UTILS.isHttpUrl || function isHttpUrl(value) {
+  return typeof value === 'string' && /^https?:\/\//i.test(value);
+};
 
 // 장소(Places) categories -- same { id, name, color } shape and normalize/lookup pattern as
 // expense categories above, kept as its own set since a place's category (식당/카페/...) is a

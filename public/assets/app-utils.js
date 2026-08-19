@@ -325,6 +325,38 @@
     return kind === 'chrome' || kind === 'edge' || kind === 'other';
   }
 
+
+  const INCOME_EXPENSE_CATEGORY = { id: 'income', name: '수입', color: '#16A34A' };
+
+  function isExpenseIncomeEntry(expense) {
+    return expense?.type === 'income' || Number(expense?.amount) < 0;
+  }
+
+  function getDisplayExpenseCategory(calendar, expense) {
+    const resolved = isExpenseIncomeEntry(expense)
+      ? INCOME_EXPENSE_CATEGORY
+      : getExpenseCategory(calendar, expense?.categoryId);
+    return resolved && resolved.name ? resolved : { id: 'etc', name: '기타', color: '#64748B' };
+  }
+
+  function clampNumber(value, min, max) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return min;
+    return Math.min(max, Math.max(min, n));
+  }
+
+  function pad2(value) {
+    return String(value).padStart(2, '0');
+  }
+
+  function isDataUrl(value) {
+    return typeof value === 'string' && value.startsWith('data:');
+  }
+
+  function isHttpUrl(value) {
+    return typeof value === 'string' && /^https?:\/\//i.test(value);
+  }
+
   window.GATHER_APP_UTILS = Object.freeze({
     getContrastTextColor,
     formatDateWithDayName,
@@ -361,6 +393,13 @@
     extractExpenseTimePrefix,
     detectBrowserForShortcutInstructions,
     getShortcutInstructions,
-    canUseNativeInstallPrompt
+    canUseNativeInstallPrompt,
+    INCOME_EXPENSE_CATEGORY,
+    isExpenseIncomeEntry,
+    getDisplayExpenseCategory,
+    clampNumber,
+    pad2,
+    isDataUrl,
+    isHttpUrl
   });
 })();

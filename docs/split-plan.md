@@ -44,6 +44,10 @@
 
 ### 15단계: 순수 유틸 함수 추가 분리
 
+**진행 (2026-08-19):** `isExpenseIncomeEntry`, `getDisplayExpenseCategory`, `clampNumber`, `pad2`, `isDataUrl`, `isHttpUrl` 를 `app-utils.js`로 이동하고 main은 별칭+fallback 유지.
+
+### 15단계 (계속): 순수 유틸 함수 추가 분리
+
 대상:
 - 로컬 환경 감지
 - 파일 크기/이미지 메타데이터 처리
