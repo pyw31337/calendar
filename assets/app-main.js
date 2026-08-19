@@ -15552,7 +15552,8 @@ function DateModal({
                 setSelectedPlace({ name: place.name, address: place.address || '', lat: place.lat, lng: place.lng, categoryId: place.categoryId || 'etc' });
                 setPlaceQuery(place.name || '');
                 setPlaceAlias(place.alias || '');
-                setPlaceMemo(place.memo || '');
+                // 장소리스트와 동일: 날짜 방문기록은 한 줄씩
+                setPlaceMemo(reformatMemoIntoDateLines(place.memo || ''));
                 setPlaceCategoryId(place.categoryId || 'etc');
                 setPlaceVisitStatus(place.visitStatus === 'planned' ? 'planned' : 'visited');
                 setPlaceResults([]);
