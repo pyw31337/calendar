@@ -393,7 +393,35 @@ const GITHUB_PAGES_FREE_LIMITS = readConfigObject('GITHUB_PAGES_FREE_LIMITS', {
 // small -- a live "last N messages" listener re-downloads and re-parses every matching document
 // on every page load, so a single oversized embedded image taxes every future visitor's load
 // forever, not just the one degraded send.
-const MAX_CHAT_THUMB_BASE64_LENGTH = readConfigNumber('MAX_CHAT_THUMB_BASE64_LENGTH', 48000); // ~48KB -- must stay under firestore.rules' 50,000-char thumbUrl cap
+const MAX_CHAT_THUMB_BASE64_LENGTH = readConfigNumber('MAX_CHAT_THUMB_BASE64_LENGTH', 12000);
+const CHAT_LIVE_MESSAGE_LIMIT = readConfigNumber('CHAT_LIVE_MESSAGE_LIMIT', 40);
+const ADMIN_MESSAGE_LIVE_LIMIT = readConfigNumber('ADMIN_MESSAGE_LIVE_LIMIT', 80);
+const ADMIN_MEMO_LIVE_LIMIT = readConfigNumber('ADMIN_MEMO_LIVE_LIMIT', 80);
+const GLOBAL_SEARCH_HISTORY_LIMIT = readConfigNumber('GLOBAL_SEARCH_HISTORY_LIMIT', 150);
+const MAX_FIRESTORE_DATA_URL_CHARS = readConfigNumber('MAX_FIRESTORE_DATA_URL_CHARS', 8000);
+
+function sanitizeMessageForFirestore(messageData) {
+  if (!messageData || typeof messageData !== 'object') return messageData;
+  const out = { ...messageData };
+  const tooBig = (v) => typeof v === 'string' && v.startsWith('data:') && v.length > MAX_FIRESTORE_DATA_URL_CHARS;
+  if (tooBig(out.imageUrl)) delete out.imageUrl;
+  if (tooBig(out.thumbUrl)) delete out.thumbUrl;
+  if (Array.isArray(out.imageUrls)) {
+    out.imageUrls = out.imageUrls.filter(u => typeof u === 'string' && !tooBig(u));
+    if (out.imageUrls.length === 0) delete out.imageUrls;
+  }
+  if (Array.isArray(out.thumbUrls)) {
+    out.thumbUrls = out.thumbUrls.filter(u => typeof u === 'string' && !tooBig(u));
+    if (out.thumbUrls.length === 0) delete out.thumbUrls;
+  }
+  return out;
+}
+function sanitizeMemoForFirestore(memoData) {
+  return sanitizeMessageForFirestore(memoData);
+}
+
+
+
 // A calendar document must stay under Firestore's 1MiB/doc hard limit. Refuse a save before
 // it gets there instead of surfacing Firestore's opaque rejection at the boundary. Compared
 // against the actual Firestore wire-format size (see estimateCalendarDocWireBytes), not a
@@ -2005,7 +2033,7 @@ async function fetchChatMessagesRest(calId) {
     // always captures the most recent messages rather than relying on the Firestore REST
     // List Documents endpoint's undocumented default page size, which could otherwise cap
     // an unordered/ascending fetch at the OLDEST messages once a calendar grows large.
-    const url = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/calendars/cal_${calId}/messages?orderBy=timestamp%20desc&pageSize=100`;
+    const url = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/calendars/cal_${calId}/messages?orderBy=timestamp%20desc&pageSize=${CHAT_LIVE_MESSAGE_LIMIT}`;
     const res = await fetch(url);
     if (!res.ok) return [];
     const data = await res.json();
@@ -3552,7 +3580,7 @@ function AdminDashboard({ initialCalendars }) {
 
     if (firebaseDb) {
       const unsub = firebaseDb.collection('calendars').doc(`cal_${selectedCalId}`).collection('messages')
-        .orderBy('timestamp', 'desc').limit(300)
+        .orderBy('timestamp', 'desc').limit(ADMIN_MESSAGE_LIVE_LIMIT)
         .onSnapshot(snapshot => {
           const list = [];
           snapshot.forEach(doc => {
@@ -3585,7 +3613,7 @@ function AdminDashboard({ initialCalendars }) {
   React.useEffect(() => {
     if (activeTab !== 'logs' || !selectedCalId || !firebaseDb) return;
     const unsub = firebaseDb.collection('calendars').doc(`cal_${selectedCalId}`).collection('memos')
-      .orderBy('createdAt', 'desc').limit(300)
+      .orderBy('createdAt', 'desc').limit(ADMIN_MEMO_LIVE_LIMIT)
       .onSnapshot(snapshot => {
         const list = [];
         snapshot.forEach(doc => {
@@ -3642,7 +3670,7 @@ function AdminDashboard({ initialCalendars }) {
     }
     let isMounted = true;
     setSelectedCalActivityLogs([]);
-    fetchActivityLogsFromFirestore(selectedCalId).then(list => {
+    fetchActivityLogsFromFirestore(selectedCalId, 500).then(list => {
       activityLogsCacheRef.current[selectedCalId] = list;
       if (isMounted) setSelectedCalActivityLogs(list);
     });
@@ -6573,7 +6601,7 @@ function App() {
     let lastNotifiedMessageId = null;
     const unsubscribeChat = firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages')
       .orderBy('timestamp', 'desc')
-      .limit(100)
+      .limit(CHAT_LIVE_MESSAGE_LIMIT)
       .onSnapshot(snapshot => {
         if (!isMounted) return;
         const list = [];
@@ -6947,7 +6975,7 @@ function App() {
           detail: '메시지를 Firebase에 저장하고 있습니다.'
         }, async () => {
           if (firebaseDb) {
-            await firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages').add(messageData);
+            await firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages').add(sanitizeMessageForFirestore(messageData));
             return true;
           }
           return sendChatMessageRest(activeCalId, messageData);
@@ -6974,7 +7002,7 @@ function App() {
           };
           if (i === 0 && linkPreview) messageData.linkPreview = linkPreview;
           if (firebaseDb) {
-            await firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages').add(messageData);
+            await firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages').add(sanitizeMessageForFirestore(messageData));
           } else {
             const sent = await sendChatMessageRest(activeCalId, messageData);
             if (!sent) throw new Error(`REST chat send failed for chunk ${i + 1}/${chunks.length}`);
@@ -7111,7 +7139,7 @@ function App() {
           const baseTimestamp = (editingMessage.timestamp || Date.now()) + 1;
           for (let i = 0; i < extraChunks.length; i++) {
             const chunkImages = extraChunks[i];
-            await firebaseDb.collection('calendars').doc(`cal_${calId}`).collection('messages').add({
+            await firebaseDb.collection('calendars').doc(`cal_${calId}`).collection('messages').add(sanitizeMessageForFirestore({
               participantId: resolvedParticipantId,
               text: '',
               imageUrl: chunkImages[0].imageUrl,
@@ -7119,7 +7147,7 @@ function App() {
               imageUrls: chunkImages.map(r => r.imageUrl),
               thumbUrls: chunkImages.map(r => r.thumbUrl),
               timestamp: baseTimestamp + i
-            });
+            }));
           }
         }
         ok = true;
@@ -10490,7 +10518,7 @@ async function processImageFilesSequentially(files, onProgress) {
 // how many photos were sent. Only when images fall back to inline base64 (Storage unavailable)
 // can a batch grow large enough to need more than one chunk -- and even then, each image keeps
 // its full quality; only the number of chat messages sent scales, never the image quality.
-const CHAT_MESSAGE_SAFE_BYTE_BUDGET = 900000; // headroom under the 1MiB/doc hard limit
+const CHAT_MESSAGE_SAFE_BYTE_BUDGET = 120000; // large images must use Storage URLs, not Firestore
 function chunkResolvedImagesForMessages(resolvedImages) {
   const chunks = [];
   let current = [];
@@ -17231,8 +17259,8 @@ function GlobalSearchModal({
     if (!q || fullHistory || isLoadingFullHistory || !calendar?.id || !firebaseDb) return;
     setIsLoadingFullHistory(true);
     Promise.all([
-      firebaseDb.collection('calendars').doc(`cal_${calendar.id}`).collection('messages').orderBy('timestamp', 'desc').limit(2000).get(),
-      firebaseDb.collection('calendars').doc(`cal_${calendar.id}`).collection('memos').orderBy('createdAt', 'desc').limit(2000).get()
+      firebaseDb.collection('calendars').doc(`cal_${calendar.id}`).collection('messages').orderBy('timestamp', 'desc').limit(GLOBAL_SEARCH_HISTORY_LIMIT).get(),
+      firebaseDb.collection('calendars').doc(`cal_${calendar.id}`).collection('memos').orderBy('createdAt', 'desc').limit(GLOBAL_SEARCH_HISTORY_LIMIT).get()
     ]).then(([messagesSnap, memosSnap]) => {
       setFullHistory({
         chatMessages: messagesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })),
@@ -19415,7 +19443,7 @@ function MemoView({ calendar, memos, hasMoreMemos, onLoadMoreMemos, onBack, show
       };
       if (linkPreview) memoData.linkPreview = linkPreview;
 
-      await firebaseDb.collection('calendars').doc('cal_' + calendarId).collection('memos').doc(memoId).set(memoData);
+      await firebaseDb.collection('calendars').doc('cal_' + calendarId).collection('memos').doc(memoId).set(sanitizeMemoForFirestore(memoData));
 
       // 3. Write Activity Log
       const logNote = newTitle.trim() ? `제목: ${newTitle.trim()}` : (newText.trim() ? newText.trim().slice(0, 30) + '...' : '사진 첨부');
@@ -19509,7 +19537,7 @@ function MemoView({ calendar, memos, hasMoreMemos, onLoadMoreMemos, onBack, show
         linkPreview: linkPreview || null
       };
 
-      await firebaseDb.collection('calendars').doc('cal_' + calendarId).collection('memos').doc(editingMemo.id).set(memoData);
+      await firebaseDb.collection('calendars').doc('cal_' + calendarId).collection('memos').doc(editingMemo.id).set(sanitizeMemoForFirestore(memoData));
 
       // Log Memo Update — before→after detail
       const logNote = buildFieldChangeNote(editTitle.trim() || '메모', [
