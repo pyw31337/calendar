@@ -11,7 +11,12 @@
     PUBLIC_CALENDAR_IDS: Object.freeze(['kkot', 'cw']),
     FIREBASE_LOAD_TIMEOUT_MS: 10000,
     FIREBASE_LOAD_MAX_ATTEMPTS: 3,
-    MEMOS_PAGE_SIZE: 60,
+    MEMOS_PAGE_SIZE: 30,
+    CHAT_LIVE_MESSAGE_LIMIT: 30,
+    ADMIN_MESSAGE_LIVE_LIMIT: 50,
+    ADMIN_MEMO_LIVE_LIMIT: 50,
+    GLOBAL_SEARCH_HISTORY_LIMIT: 100,
+    MAX_FIRESTORE_DATA_URL_CHARS: 6000,
     FIRESTORE_FREE_LIMITS: Object.freeze({
       storageBytes: 1024 * 1024 * 1024,
       documentBytes: 1024 * 1024,
@@ -29,7 +34,7 @@
     // firestore.rules hasValidMessageImages) -- this is the base64-fallback thumbnail budget used
     // when Storage upload fails, so it must stay safely under that cap or the fallback write gets
     // rejected exactly when it's needed most (Storage outage/network failure).
-    MAX_CHAT_THUMB_BASE64_LENGTH: 12000,
+    MAX_CHAT_THUMB_BASE64_LENGTH: 8000,
     CALENDAR_DOC_SAFE_BYTE_LIMIT: 900000,
     ADMIN_SESSION_STORAGE_KEY: 'gather_admin_session_v1',
     ADMIN_SESSION_MAX_AGE_MS: 24 * 60 * 60 * 1000,

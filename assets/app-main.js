@@ -2218,7 +2218,7 @@ setTimeout(() => {
 // memos, anniversaries, ...) to fully reconnect on EVERY foreground event makes the app look
 // like it's reloading from scratch each time the user comes back -- which given how often mobile
 // tabs get backgrounded/foregrounded is the more noticeable cost in practice.
-const VISIBILITY_RECONNECT_THRESHOLD_MS = 30000;
+const VISIBILITY_RECONNECT_THRESHOLD_MS = 60000;
 let lastHiddenAt = 0;
 if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
   document.addEventListener('visibilitychange', () => {
@@ -6832,28 +6832,29 @@ function App() {
   }, [activeCalId, calendars]);
 
   // Real-time messages listener
+  // Full window on chat/gallery; compact window elsewhere (main CommentsSection only needs ~5).
   React.useEffect(() => {
     if (!activeCalId) {
       setChatMessages([]);
       return;
     }
+    const chatLimit = (activeView === 'chat' || activeView === 'gallery')
+      ? CHAT_LIVE_MESSAGE_LIMIT
+      : Math.min(10, CHAT_LIVE_MESSAGE_LIMIT);
     if (!firebaseDb) {
-      // REST fallback: load messages once
-      fetchChatMessagesRest(activeCalId).then(list => setChatMessages(list));
+      fetchChatMessagesRest(activeCalId).then(list => setChatMessages(list.slice(-chatLimit)));
       return;
     }
     let isMounted = true;
 
     // Subscribe to chat room history. Queried newest-first + limit so the window
-    // tracks the most recent CHAT_LIVE_MESSAGE_LIMIT messages as new ones arrive, then reversed back to
-    // ascending order for rendering -- querying oldest-first + limit would instead pin
-    // the window to the first 100 messages ever sent, silently hiding anything newer
-    // once a calendar passes that many total messages.
+    // tracks the most recent messages as new ones arrive, then reversed back to
+    // ascending order for rendering.
     let hasSeenInitialChatSnapshot = false;
     let lastNotifiedMessageId = null;
     const unsubscribeChat = firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages')
       .orderBy('timestamp', 'desc')
-      .limit(CHAT_LIVE_MESSAGE_LIMIT)
+      .limit(chatLimit)
       .onSnapshot(snapshot => {
         if (!isMounted) return;
         const list = [];
@@ -6885,7 +6886,7 @@ function App() {
       isMounted = false;
       if (unsubscribeChat) unsubscribeChat();
     };
-  }, [activeCalId]);
+  }, [activeCalId, activeView, firebaseDb]);
 
   // Anniversaries: only while calendar view needs them
   React.useEffect(() => {
