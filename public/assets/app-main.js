@@ -7698,7 +7698,7 @@ function App() {
     );
   };
   const handleReorderExpenses = (dateStr, orderedExpenseIds) => {
-    if (!activeCal || !isValidDateString(dateStr) || !Array.isArray(orderedExpenseIds)) return false;
+    if (!activeCal || !isValidDateString(dateStr) || !Array.isArray(orderedExpenseIds) || orderedExpenseIds.length < 2) return false;
     const existingMeetings = getConfirmedMeetings(activeCal);
     const meetingIndex = existingMeetings.findIndex(m => m.date === dateStr);
     if (meetingIndex < 0) return false;
@@ -7706,15 +7706,19 @@ function App() {
     const existingExpenses = Array.isArray(meeting.expenses) ? meeting.expenses : [];
     if (existingExpenses.length < 2) return false;
     const expenseById = new Map(existingExpenses.map(expense => [expense.id, expense]));
-    const nextExpenses = orderedExpenseIds
-      .filter(id => expenseById.has(id))
-      .map((id, index) => ({ ...expenseById.get(id), order: index }));
-    existingExpenses.forEach(expense => {
-      if (!orderedExpenseIds.includes(expense.id)) {
-        nextExpenses.push({ ...expense, order: nextExpenses.length });
+    const nextExpenses = [];
+    orderedExpenseIds.forEach(id => {
+      if (expenseById.has(id)) {
+        nextExpenses.push({ ...expenseById.get(id), order: nextExpenses.length });
+        expenseById.delete(id);
       }
     });
+    expenseById.forEach(expense => {
+      nextExpenses.push({ ...expense, order: nextExpenses.length });
+    });
     if (nextExpenses.length !== existingExpenses.length) return false;
+    const same = existingExpenses.every((e, i) => e.id === nextExpenses[i].id);
+    if (same) return true;
     const now = Date.now();
     const nextConfirmedMeetings = existingMeetings.map((m, i) => i === meetingIndex ? { ...m, expenses: nextExpenses } : m);
     const updatedCal = {
@@ -14691,19 +14695,129 @@ function DateModal({
       }
     });
   };
-  const moveExpense = async (sourceId, targetId) => {
-    if (!onReorderExpenses || !sourceId || !targetId || sourceId === targetId) return;
+    const moveExpense = async (sourceId, targetId) => {
+    if (!onReorderExpenses || !sourceId || !targetId || sourceId === targetId) return false;
     const sourceIdx = expenses.findIndex(e => e.id === sourceId);
     const targetIdx = expenses.findIndex(e => e.id === targetId);
-    if (sourceIdx < 0 || targetIdx < 0) return;
+    if (sourceIdx < 0 || targetIdx < 0) return false;
     const nextExpenses = [...expenses];
     const [moved] = nextExpenses.splice(sourceIdx, 1);
     nextExpenses.splice(targetIdx, 0, moved);
     const orderedIds = nextExpenses.map(exp => exp.id);
-    await onReorderExpenses(dateStr, orderedIds);
+    const result = await Promise.resolve(onReorderExpenses(dateStr, orderedIds));
+    return result !== false;
   };
+
+  const expensesOrderRef = React.useRef(expenses);
+  expensesOrderRef.current = expenses;
+  const expenseDragHandlersRef = React.useRef({});
+
+  expenseDragHandlersRef.current.update = e => {
+    const ref = expensePointerSortRef.current;
+    if (!ref.active) return;
+    if (e.cancelable) e.preventDefault();
+    const deltaY = e.clientY - ref.startY;
+    const row = document.querySelector(`.expense-sortable-row[data-expense-id="${ref.sourceId}"]`);
+    if (row) {
+      row.style.transform = `translateY(${deltaY}px) scale(1.02)`;
+      row.style.pointerEvents = 'none';
+    }
+    // elementFromPoint 대신 각 행의 세로 영역으로 타겟 판정
+    const rows = Array.from(document.querySelectorAll('.date-modal-settlement-list .expense-sortable-row'));
+    let nextTargetId = '';
+    for (const r of rows) {
+      const id = r.getAttribute('data-expense-id');
+      if (!id || id === ref.sourceId) continue;
+      const rect = r.getBoundingClientRect();
+      if (e.clientY >= rect.top && e.clientY <= rect.bottom) {
+        nextTargetId = id;
+        break;
+      }
+    }
+    if (nextTargetId !== ref.targetId) {
+      if (ref.targetId) {
+        const prev = document.querySelector(`.expense-sortable-row[data-expense-id="${ref.targetId}"]`);
+        if (prev) prev.style.borderColor = '';
+      }
+      ref.targetId = nextTargetId;
+      if (nextTargetId) {
+        const next = document.querySelector(`.expense-sortable-row[data-expense-id="${nextTargetId}"]`);
+        if (next) next.style.borderColor = 'var(--accent-primary)';
+      }
+      setDragOverExpenseId(nextTargetId || '');
+    }
+  };
+
+  expenseDragHandlersRef.current.finish = async () => {
+    const ref = expensePointerSortRef.current;
+    if (!ref.active) return;
+    const sourceId = ref.sourceId;
+    const targetId = ref.targetId;
+    document.removeEventListener('pointermove', expenseDragHandlersRef.current.onMove);
+    document.removeEventListener('pointerup', expenseDragHandlersRef.current.onUp);
+    document.removeEventListener('pointercancel', expenseDragHandlersRef.current.onCancel);
+    ref.active = false;
+    const row = document.querySelector(`.expense-sortable-row[data-expense-id="${sourceId}"]`);
+    if (row) {
+      row.style.zIndex = '';
+      row.style.boxShadow = '';
+      row.style.transform = '';
+      row.style.transition = '';
+      row.style.pointerEvents = '';
+      row.style.opacity = '';
+    }
+    if (targetId) {
+      const targetRow = document.querySelector(`.expense-sortable-row[data-expense-id="${targetId}"]`);
+      if (targetRow) targetRow.style.borderColor = '';
+    }
+    setDraggingExpenseId('');
+    setDragOverExpenseId('');
+    expensePointerSortRef.current = { sourceId: '', targetId: '', startX: 0, startY: 0, active: false };
+    if (sourceId && targetId && sourceId !== targetId) {
+      setIsSavingExpense(true);
+      try {
+        const ok = await moveExpense(sourceId, targetId);
+        if (ok === false) showToast('순서 변경에 실패했습니다.', 'error');
+        else showToast('순서가 변경되었습니다.', 'success');
+      } finally {
+        setIsSavingExpense(false);
+      }
+    }
+  };
+
+  expenseDragHandlersRef.current.reset = () => {
+    const ref = expensePointerSortRef.current;
+    document.removeEventListener('pointermove', expenseDragHandlersRef.current.onMove);
+    document.removeEventListener('pointerup', expenseDragHandlersRef.current.onUp);
+    document.removeEventListener('pointercancel', expenseDragHandlersRef.current.onCancel);
+    const sourceId = ref.sourceId;
+    const targetId = ref.targetId;
+    ref.active = false;
+    const row = document.querySelector(`.expense-sortable-row[data-expense-id="${sourceId}"]`);
+    if (row) {
+      row.style.zIndex = '';
+      row.style.boxShadow = '';
+      row.style.transform = '';
+      row.style.transition = '';
+      row.style.pointerEvents = '';
+      row.style.opacity = '';
+    }
+    if (targetId) {
+      const targetRow = document.querySelector(`.expense-sortable-row[data-expense-id="${targetId}"]`);
+      if (targetRow) targetRow.style.borderColor = '';
+    }
+    setDraggingExpenseId('');
+    setDragOverExpenseId('');
+    expensePointerSortRef.current = { sourceId: '', targetId: '', startX: 0, startY: 0, active: false };
+  };
+
+  expenseDragHandlersRef.current.onMove = e => expenseDragHandlersRef.current.update(e);
+  expenseDragHandlersRef.current.onUp = e => expenseDragHandlersRef.current.finish(e);
+  expenseDragHandlersRef.current.onCancel = () => expenseDragHandlersRef.current.reset();
+
   const beginExpensePointerSort = (e, expenseId) => {
     if (isSavingExpense || expenses.length <= 1) return;
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
     e.preventDefault();
     e.stopPropagation();
     try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) {}
@@ -14713,77 +14827,20 @@ function DateModal({
     row.style.boxShadow = '0 8px 20px rgba(0,0,0,0.12)';
     row.style.transform = 'scale(1.02)';
     row.style.transition = 'none';
-    expensePointerSortRef.current = { sourceId: expenseId, targetId: '', startX: e.clientX, startY: e.clientY, active: true, pointerId: e.pointerId };
-    document.addEventListener('pointermove', updateExpensePointerSort);
-    document.addEventListener('pointerup', finishExpensePointerSort);
-    document.addEventListener('pointercancel', resetExpensePointerSort);
+    row.style.pointerEvents = 'none';
+    row.style.opacity = '0.92';
+    expensePointerSortRef.current = {
+      sourceId: expenseId, targetId: '', startX: e.clientX, startY: e.clientY, active: true, pointerId: e.pointerId
+    };
+    setDraggingExpenseId(expenseId);
+    setDragOverExpenseId('');
+    document.addEventListener('pointermove', expenseDragHandlersRef.current.onMove, { passive: false });
+    document.addEventListener('pointerup', expenseDragHandlersRef.current.onUp);
+    document.addEventListener('pointercancel', expenseDragHandlersRef.current.onCancel);
   };
-  const updateExpensePointerSort = e => {
-    const ref = expensePointerSortRef.current;
-    if (!ref.active) return;
-    const deltaY = e.clientY - ref.startY;
-    const row = document.querySelector(`[data-expense-id="${ref.sourceId}"]`);
-    if (row) row.style.transform = `translateY(${deltaY}px) scale(1.02)`;
-    const hovered = document.elementFromPoint(e.clientX, e.clientY);
-    const targetRow = hovered ? hovered.closest('.expense-sortable-row') : null;
-    const targetId = targetRow ? targetRow.getAttribute('data-expense-id') : '';
-    if (targetId && targetId !== ref.sourceId) {
-      if (ref.targetId !== targetId) {
-        if (ref.targetId) {
-          const prevTarget = document.querySelector(`[data-expense-id="${ref.targetId}"]`);
-          if (prevTarget) prevTarget.style.borderColor = 'var(--border-subtle)';
-        }
-        ref.targetId = targetId;
-        targetRow.style.borderColor = 'var(--accent-primary)';
-      }
-    } else {
-      if (ref.targetId) {
-        const prevTarget = document.querySelector(`[data-expense-id="${ref.targetId}"]`);
-        if (prevTarget) prevTarget.style.borderColor = 'var(--border-subtle)';
-        ref.targetId = '';
-      }
-    }
-  };
-  const finishExpensePointerSort = async () => {
-    const ref = expensePointerSortRef.current;
-    if (!ref.active) return;
-    document.removeEventListener('pointermove', updateExpensePointerSort);
-    document.removeEventListener('pointerup', finishExpensePointerSort);
-    document.removeEventListener('pointercancel', resetExpensePointerSort);
-    ref.active = false;
-    const row = document.querySelector(`[data-expense-id="${ref.sourceId}"]`);
-    if (row) {
-      row.style.zIndex = '';
-      row.style.boxShadow = '';
-      row.style.transform = '';
-      row.style.transition = '';
-    }
-    if (ref.targetId) {
-      const targetRow = document.querySelector(`[data-expense-id="${ref.targetId}"]`);
-      if (targetRow) targetRow.style.borderColor = 'var(--border-subtle)';
-      setIsSavingExpense(true);
-      await moveExpense(ref.sourceId, ref.targetId);
-      setIsSavingExpense(false);
-    }
-  };
-  const resetExpensePointerSort = () => {
-    const ref = expensePointerSortRef.current;
-    document.removeEventListener('pointermove', updateExpensePointerSort);
-    document.removeEventListener('pointerup', finishExpensePointerSort);
-    document.removeEventListener('pointercancel', resetExpensePointerSort);
-    ref.active = false;
-    const row = document.querySelector(`[data-expense-id="${ref.sourceId}"]`);
-    if (row) {
-      row.style.zIndex = '';
-      row.style.boxShadow = '';
-      row.style.transform = '';
-      row.style.transition = '';
-    }
-    if (ref.targetId) {
-      const targetRow = document.querySelector(`[data-expense-id="${ref.targetId}"]`);
-      if (targetRow) targetRow.style.borderColor = 'var(--border-subtle)';
-    }
-  };
+  const updateExpensePointerSort = e => expenseDragHandlersRef.current.update(e);
+  const finishExpensePointerSort = e => expenseDragHandlersRef.current.finish(e);
+  const resetExpensePointerSort = () => expenseDragHandlersRef.current.reset();
 
   const [hasInteracted, setHasInteracted] = React.useState(false);
   const markDirty = React.useCallback(() => setHasInteracted(true), []);
@@ -15606,13 +15663,11 @@ function DateModal({
                   width: '22px', height: '22px', border: '1px solid var(--border-subtle)',
                   backgroundColor: 'var(--bg-card)', borderRadius: '6px',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  cursor: 'grab', padding: 0, color: '#64748B'
+                  cursor: 'grab', padding: 0, color: '#64748B',
+                  touchAction: 'none', userSelect: 'none'
                 },
-                onClick: event => event.stopPropagation(),
-                onPointerDown: event => beginExpensePointerSort(event, expense.id),
-                onPointerMove: updateExpensePointerSort,
-                onPointerUp: finishExpensePointerSort,
-                onPointerCancel: resetExpensePointerSort
+                onClick: event => { event.preventDefault(); event.stopPropagation(); },
+                onPointerDown: event => beginExpensePointerSort(event, expense.id)
               }, /*#__PURE__*/React.createElement(LineHeightIcon, { size: 12 })),
               /*#__PURE__*/React.createElement(ItemEditDeleteActions, {
                 onEdit: () => handleExpenseItemClick(expense),

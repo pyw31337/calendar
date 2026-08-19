@@ -3016,3 +3016,10 @@ select.form-select {
 }
 .modal-body { overflow-x: hidden !important; }
 .modal-container { overflow-x: hidden !important; }
+
+.expense-sortable-row.is-dragging { opacity: 0.9; z-index: 20; }
+.expense-sortable-row .poll-drag-handle {
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
