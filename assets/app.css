@@ -2645,7 +2645,7 @@ select.form-select {
   border-bottom: 4px solid #4C1D95 !important;
   box-shadow: 0 4px 15px rgba(236, 72, 153, 0.5) !important;
   animation: gamified-shake 2.5s ease-in-out infinite !important;
-  overflow: visible !important; /* To let sparks pop out of bounds */
+  overflow: hidden !important; /* clip effects so modal scrollbar does not flicker */
   transform-origin: center center !important;
   z-index: 1; /* Pushes content above pseudo-element */
   --btn-scale: 1; /* Custom CSS variable for hover/active scale to prevent keyframe conflict */
@@ -3008,3 +3008,11 @@ select.form-select {
   100% { stroke-dashoffset: -100; }
 }
 .btn-gamified-confirm .gamified-confirm-label { position: relative; z-index: 3; }
+
+.gamified-confirm-wrap {
+  overflow: hidden !important;
+  border-radius: 14px;
+  contain: paint;
+}
+.modal-body { overflow-x: hidden !important; }
+.modal-container { overflow-x: hidden !important; }

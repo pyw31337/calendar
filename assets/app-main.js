@@ -3535,12 +3535,13 @@ function AdminDashboard({ initialCalendars }) {
   // history forever; see the matching cap on GlobalSearchModal's own full-history search fetch.
   React.useEffect(() => {
     if (calendarsList.length === 0) return;
+    if (activeTab !== 'logs') return;
 
     if (firebaseDb) {
       const unsubscribes = [];
       calendarsList.forEach(cal => {
         const unsub = firebaseDb.collection('calendars').doc(`cal_${cal.id}`).collection('messages')
-          .orderBy('timestamp', 'desc').limit(2000)
+          .orderBy('timestamp', 'desc').limit(500)
           .onSnapshot(snapshot => {
             const list = [];
             snapshot.forEach(doc => {
@@ -3573,15 +3574,16 @@ function AdminDashboard({ initialCalendars }) {
         }
       });
     }
-  }, [calendarsList.map(c => c.id).join(','), firebaseDb]);
+  }, [calendarsList.map(c => c.id).join(','), firebaseDb, activeTab]);
 
   // 2b. Load memos (same live-listener pattern as messages above, same 2000 cap) -- powers the
   // 통합검색 메모 탭
   React.useEffect(() => {
     if (calendarsList.length === 0 || !firebaseDb) return;
+    if (activeTab !== 'logs') return;
     const unsubscribes = calendarsList.map(cal =>
       firebaseDb.collection('calendars').doc(`cal_${cal.id}`).collection('memos')
-        .orderBy('createdAt', 'desc').limit(2000)
+        .orderBy('createdAt', 'desc').limit(500)
         .onSnapshot(snapshot => {
           const list = [];
           snapshot.forEach(doc => {
@@ -3594,7 +3596,7 @@ function AdminDashboard({ initialCalendars }) {
         })
     );
     return () => unsubscribes.forEach(unsub => unsub());
-  }, [calendarsList.map(c => c.id).join(','), firebaseDb]);
+  }, [calendarsList.map(c => c.id).join(','), firebaseDb, activeTab]);
 
   // Shared link-preview cache stats, loaded once (not tied to any single calendar)
   React.useEffect(() => {
@@ -7748,7 +7750,19 @@ function App() {
     } else {
       nextPlaces = [...existingPlaces, { id: `place_${activeCal.id}_${now}_${Math.random().toString(36).slice(2, 7)}`, ...editedFields, createdAt: now }];
     }
-    const placeActivityLog = createActivityLog(activeCal.id, isEditing ? 'place_update' : 'place_create', '', '', now, cleanName);
+    const prevPlace = isEditing ? existingPlaces.find(p => p.id === placeData.id) : null;
+    const displayLabel = cleanAlias || cleanName || '장소';
+    const changeParts = [];
+    if (isEditing && prevPlace) {
+      if ((prevPlace.alias || '') !== cleanAlias) changeParts.push(`별칭 ${prevPlace.alias || '-'}→${cleanAlias || '-'}`);
+      if ((prevPlace.name || '') !== cleanName) changeParts.push(`이름→${cleanName}`);
+      if ((prevPlace.memo || '') !== cleanMemo) changeParts.push('메모변경');
+      if ((prevPlace.categoryId || '') !== cleanCategoryId) changeParts.push('카테고리변경');
+      if ((prevPlace.visitStatus || '') !== cleanVisitStatus) changeParts.push(cleanVisitStatus === 'planned' ? '예정' : '방문');
+      if ((prevPlace.visitDate || '') !== cleanVisitDate) changeParts.push(`일자 ${cleanVisitDate || '-'}`);
+    }
+    const placeLogNote = sanitizeText(changeParts.length ? `${displayLabel} · ${changeParts.join(', ')}` : displayLabel, 120);
+    const placeActivityLog = createActivityLog(activeCal.id, isEditing ? 'place_update' : 'place_create', '', '', now, placeLogNote);
     const updatedCal = {
       ...activeCal,
       places: nextPlaces,
@@ -15127,7 +15141,10 @@ function DateModal({
           );
         })
       ),
-      !adminMode && typeof onConfirmMeeting === 'function' && /*#__PURE__*/React.createElement("button", {
+      !adminMode && typeof onConfirmMeeting === 'function' && /*#__PURE__*/React.createElement("div", {
+        className: "gamified-confirm-wrap",
+        style: { marginTop: '4px', overflow: 'hidden', borderRadius: '14px' }
+      }, /*#__PURE__*/React.createElement("button", {
         type: "button",
         className: !isConfirmed && isAllAvailable ? 'btn-gamified-confirm' : 'btn-meeting-confirm-plain',
         disabled: isSubmitting,
@@ -15152,7 +15169,7 @@ function DateModal({
         }
       }, (!isConfirmed && isAllAvailable)
         ? /*#__PURE__*/React.createElement(GamifiedConfirmButtonContent, { label: "모임 확정" })
-        : (isConfirmed ? '모임 취소' : '모임 확정'))
+        : (isConfirmed ? '모임 취소' : '모임 확정')))
     )),
 
     /* Tab 2 Content: 장소 */
