@@ -14768,7 +14768,7 @@ function DateModal({
     if (nextTargetId !== ref.targetId) {
       if (ref.targetId) {
         const prev = document.querySelector(`.expense-sortable-row[data-expense-id="${ref.targetId}"]`);
-        if (prev) prev.style.borderColor = '';
+        if (prev) prev.style.borderColor = 'var(--border-subtle)';
       }
       ref.targetId = nextTargetId;
       if (nextTargetId) {
@@ -14799,7 +14799,7 @@ function DateModal({
     }
     if (targetId) {
       const targetRow = document.querySelector(`.expense-sortable-row[data-expense-id="${targetId}"]`);
-      if (targetRow) targetRow.style.borderColor = '';
+      if (targetRow) targetRow.style.borderColor = 'var(--border-subtle)';
     }
     setDraggingExpenseId('');
     setDragOverExpenseId('');
@@ -14835,7 +14835,7 @@ function DateModal({
     }
     if (targetId) {
       const targetRow = document.querySelector(`.expense-sortable-row[data-expense-id="${targetId}"]`);
-      if (targetRow) targetRow.style.borderColor = '';
+      if (targetRow) targetRow.style.borderColor = 'var(--border-subtle)';
     }
     setDraggingExpenseId('');
     setDragOverExpenseId('');
@@ -15418,7 +15418,7 @@ function DateModal({
           style: { textAlign: 'center', color: 'var(--text-muted)', padding: '24px 0', fontSize: '0.82rem', border: '1px dashed var(--border-subtle)', borderRadius: '12px' }
         }, "등록된 장소가 없습니다.") : /*#__PURE__*/React.createElement("div", {
           className: "date-modal-places-list",
-          style: { display: 'flex', flexDirection: 'column', gap: '8px', flex: '1 1 auto', minHeight: '80px', overflowY: 'auto' }
+          style: { display: 'flex', flexDirection: 'column', gap: '8px', flex: '1 1 auto', minHeight: '80px', overflow: 'visible' }
         }, registeredPlaces.map(place => {
           const category = getPlaceCategoryById(calendar, place.categoryId) || { id: 'etc', name: '기타', color: '#64748B' };
           const catColor = category.color || '#64748B';
@@ -15449,10 +15449,30 @@ function DateModal({
             /*#__PURE__*/React.createElement("span", { style: { fontWeight: 800, fontSize: '0.88rem', color: 'var(--text-main)' } }, place.alias || place.name),
             place.alias && place.name && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.72rem', color: 'var(--text-muted)' } }, place.name),
             place.address && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.74rem', color: 'var(--text-muted)' } }, place.address),
-            /* Memo or Url */
-            place.memo && /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.78rem', color: 'var(--text-main)' } },
-              renderTextWithUrlBadge(place.memo)
-            ),
+            /* Memo — one line per visit date entry */
+            place.memo && (() => {
+              let entries = parseVisitEntriesFromMemo(place.memo);
+              if (entries.length === 0) {
+                const leading = typeof extractLeadingMemoDate === 'function' ? extractLeadingMemoDate(place.memo) : '';
+                if (leading) {
+                  const rest = String(place.memo).replace(String(leading), '').replace(/^\s*\/?\s*/, '').trim();
+                  entries = [{ date: leading, note: rest }];
+                }
+              } else if (typeof sortVisitEntriesRecentFirst === 'function') {
+                entries = sortVisitEntriesRecentFirst(entries);
+              }
+              if (entries.length > 0) {
+                return /*#__PURE__*/React.createElement("div", {
+                  style: { display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '0.78rem', color: 'var(--text-main)', lineHeight: 1.45 }
+                }, entries.map((en, idx) => /*#__PURE__*/React.createElement("div", {
+                  key: `${en.date}_${idx}`,
+                  style: { wordBreak: 'break-word' }
+                }, renderTextWithUrlBadge(en.note ? `${en.date} ${en.note}` : en.date))));
+              }
+              return /*#__PURE__*/React.createElement("div", {
+                style: { fontSize: '0.78rem', color: 'var(--text-main)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.45 }
+              }, renderTextWithUrlBadge(place.memo));
+            })(),
             !adminMode && /*#__PURE__*/React.createElement("div", {
               style: { position: 'absolute', top: '10px', right: '10px' }
             }, /*#__PURE__*/React.createElement(ItemEditDeleteActions, {
@@ -15635,7 +15655,7 @@ function DateModal({
         className: "date-modal-settlement-list",
         style: {
           display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '10px',
-          flex: '1 1 auto', minHeight: '120px', overflowY: 'auto'
+          flex: '1 1 auto', minHeight: '80px', overflow: 'visible'
         }
       },
         expenses.map(expense => {
@@ -15677,9 +15697,11 @@ function DateModal({
               padding: '12px 48px 12px 12px',
               position: 'relative',
               backgroundColor: 'var(--bg-card)',
-              border: `1px solid ${editingExpenseId === expense.id ? 'var(--accent-primary)' : 'var(--border-subtle)'}`,
+              border: '1px solid var(--border-subtle)',
+              borderColor: editingExpenseId === expense.id ? 'var(--accent-primary)' : (dragOverExpenseId === expense.id ? 'var(--accent-primary)' : 'var(--border-subtle)'),
               borderRadius: '12px',
-              cursor: 'pointer'
+              cursor: 'pointer',
+              boxSizing: 'border-box'
             }
           },
             /*#__PURE__*/React.createElement("div", {

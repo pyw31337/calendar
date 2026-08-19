@@ -3023,3 +3023,15 @@ select.form-select {
   -webkit-user-select: none;
   user-select: none;
 }
+
+.date-modal-places-list,
+.date-modal-settlement-list {
+  overflow: visible !important;
+}
+.expense-sortable-row {
+  border: 1px solid var(--border-subtle) !important;
+  box-sizing: border-box;
+}
+.expense-sortable-row.is-drop-target {
+  border-color: var(--accent-primary) !important;
+}
