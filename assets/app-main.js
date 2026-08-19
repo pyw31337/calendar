@@ -313,7 +313,7 @@ function getNaverMapSearchRegionHint(address) {
 }
 function getNaverMapPlaceUrl(place) {
   const regionHint = getNaverMapSearchRegionHint(place?.address);
-  const query = [place?.name, regionHint].filter(Boolean).join(' ') || place?.name || '장소';
+  const query = [place?.name, regionHint].filter(Boolean).join(' ') || place?.name || '플레이스';
   return `https://map.naver.com/p/search/${encodeURIComponent(query)}`;
 }
 
@@ -3306,7 +3306,7 @@ function AdminDashboard({ initialCalendars }) {
   // written server-side by kakaoLocalSearchProxy (functions/index.js).
   const [kakaoSearchStats, setKakaoSearchStats] = React.useState(null);
 
-  // Google Places (해외 장소 검색 폴백) monthly call count, service-wide -- see
+  // Google Places (해외 플레이스 검색 폴백) monthly call count, service-wide -- see
   // appConfig/googlePlacesSearchStats, written server-side by googlePlacesSearchProxy
   // (functions/index.js). Unlike Kakao (free at this app's scale), Google Places is billed past
   // its free monthly SKU threshold, so this is tracked monthly (matching how Google's own free
@@ -3871,8 +3871,8 @@ function AdminDashboard({ initialCalendars }) {
 	    const target = calPlaceCategories.find(c => c.id === categoryId);
 	    const nameText = target ? target.name : '카테고리';
 	    requestConfirm(
-	      '장소 카테고리 삭제',
-	      `"${nameText}" 장소 카테고리를 삭제하시겠습니까?`,
+	      '플레이스 카테고리 삭제',
+	      `"${nameText}" 플레이스 카테고리를 삭제하시겠습니까?`,
 	      () => {
 	        setCalPlaceCategories(prev => {
 	          const next = prev.filter(category => category.id !== categoryId);
@@ -3938,9 +3938,9 @@ function AdminDashboard({ initialCalendars }) {
                       log.action === 'memo_create' ? '메모 추가' :
                       log.action === 'memo_update' ? '메모 변경' :
                       log.action === 'memo_delete' ? '메모 삭제' :
-                      log.action === 'place_create' ? '장소 등록' :
-                      log.action === 'place_update' ? '장소 수정' :
-                      log.action === 'place_delete' ? '장소 삭제' : '활동';
+                      log.action === 'place_create' ? '플레이스 등록' :
+                      log.action === 'place_update' ? '플레이스 수정' :
+                      log.action === 'place_delete' ? '플레이스 삭제' : '활동';
 
     const msg = `[${calId}] 시점 데이터 전체 복구 (타겟 로그: [${timeLabel}] [${typeLabel}]) — 이 시점으로 데이터를 복구하시겠습니까? 이 시점 이후 등록된 모든 일정/투표 롤백과 동시에, 이 시간 이후 전송된 모든 채팅 메시지도 서버에서 영구적으로 삭제됩니다.`;
     requestConfirm('시점 데이터 복구', msg, async () => {
@@ -4109,7 +4109,7 @@ function AdminDashboard({ initialCalendars }) {
                 EXPENSE_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '정산' :
                 IMAGE_TAG_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '태그' :
                 POLL_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '투표' :
-                PLACE_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '장소' :
+                PLACE_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '플레이스' :
                 MEETING_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '정산' : '알수없음'
         };
         const participantName = (p.name || '').toLowerCase();
@@ -4123,7 +4123,7 @@ function AdminDashboard({ initialCalendars }) {
                            tag_add: '사진 태그 추가', tag_remove: '사진 태그 삭제',
                            meeting_confirm: '모임 확정', meeting_cancel: '모임 확정 취소',
                            memo_create: '메모 추가', memo_update: '메모 변경', memo_delete: '메모 삭제',
-                           place_create: '장소 등록', place_update: '장소 수정', place_delete: '장소 삭제'
+                           place_create: '플레이스 등록', place_update: '플레이스 수정', place_delete: '플레이스 삭제'
                          }[log.action] || '활동';
         const actionText = actLabel.toLowerCase();
 
@@ -4381,7 +4381,7 @@ function AdminDashboard({ initialCalendars }) {
   const kakaoDailyUsage = (kakaoSearchStats && kakaoSearchStats.dailyUsageBucket === kakaoTodayBucket)
     ? (kakaoSearchStats.dailyUsageCount || 0) : 0;
 
-  // Google Places (해외 장소 검색 폴백, 카카오 검색이 0건일 때만 호출) monthly usage -- unlike
+  // Google Places (해외 플레이스 검색 폴백, 카카오 검색이 0건일 때만 호출) monthly usage -- unlike
   // Kakao this is a genuinely paid API past its free SKU threshold, so this card exists mainly as
   // an early-warning signal rather than a hard limit display (the real number lives in Google
   // Cloud 콘솔's billing view, which can change independently of this code).
@@ -5081,13 +5081,13 @@ function AdminDashboard({ initialCalendars }) {
 
 	          /* Place Category Management */
 	          /*#__PURE__*/React.createElement("div", { style: { paddingTop: '14px', marginTop: '14px', borderTop: '1px solid #E2E8F0' } },
-	            /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#64748B', marginBottom: '8px' } }, "장소 카테고리 설정"),
+	            /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#64748B', marginBottom: '8px' } }, "플레이스 카테고리 설정"),
 	            /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px', marginBottom: '10px' } },
 	              /*#__PURE__*/React.createElement("input", {
 	                type: "text",
 	                className: "form-input",
 	                style: { flex: 1, minWidth: 0 },
-	                placeholder: "새 장소 카테고리",
+	                placeholder: "새 플레이스 카테고리",
 	                value: newPlaceCategoryName,
 	                maxLength: 24,
 	                onChange: e => setNewPlaceCategoryName(e.target.value),
@@ -5114,7 +5114,7 @@ function AdminDashboard({ initialCalendars }) {
 	                /*#__PURE__*/React.createElement(ColorSwatchPicker, {
 	                  value: category.color,
 	                  onChange: color => handleUpdatePlaceCategory(category.id, { color }),
-	                  title: "장소 카테고리 색상"
+	                  title: "플레이스 카테고리 색상"
 	                }),
 	                /*#__PURE__*/React.createElement("input", {
 	                  type: "text",
@@ -5282,7 +5282,7 @@ function AdminDashboard({ initialCalendars }) {
                         EXPENSE_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '정산' :
                         IMAGE_TAG_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '태그' :
                         POLL_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '투표' :
-                        PLACE_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '장소' :
+                        PLACE_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '플레이스' :
                         MEETING_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '정산' : '알수없음',
                   color: '#94A3B8'
                 };
@@ -5295,7 +5295,7 @@ function AdminDashboard({ initialCalendars }) {
                                    tag_add: '사진 태그 추가', tag_remove: '사진 태그 삭제',
                                    meeting_confirm: '모임 확정', meeting_cancel: '모임 확정 취소',
                                    memo_create: '메모 추가', memo_update: '메모 변경', memo_delete: '메모 삭제',
-                                   place_create: '장소 등록', place_update: '장소 수정', place_delete: '장소 삭제'
+                                   place_create: '플레이스 등록', place_update: '플레이스 수정', place_delete: '플레이스 삭제'
                                  }[log.action] || '활동';
 
                 const badgeBg = log.type === 'chat' ? '#E0F2FE' :
@@ -7715,7 +7715,7 @@ function App() {
       activityLogs: placeActivityLog ? [...getCalendarActivityLogs(activeCal), placeActivityLog] : getCalendarActivityLogs(activeCal)
     };
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-    return updateCalendars(nextCalendars, isEditing ? '장소 수정완료' : '장소 등록완료', 'success', updatedCal.id, 'settings', placeActivityLog ? [placeActivityLog] : []);
+    return updateCalendars(nextCalendars, isEditing ? '플레이스 수정완료' : '플레이스 등록완료', 'success', updatedCal.id, 'settings', placeActivityLog ? [placeActivityLog] : []);
   };
   const handleDeletePlace = (placeId) => {
     if (!activeCal || !placeId) return false;
@@ -7731,7 +7731,7 @@ function App() {
     if (!deletedPlace) return false;
     const now = Date.now();
     const nextPlaces = existingPlaces.filter(p => p.id !== placeId);
-    const placeActivityLog = createActivityLog(activeCal.id, 'place_delete', '', '', now, deletedPlace.name || '장소');
+    const placeActivityLog = createActivityLog(activeCal.id, 'place_delete', '', '', now, deletedPlace.name || '플레이스');
     const updatedCal = {
       ...activeCal,
       places: nextPlaces,
@@ -7740,7 +7740,7 @@ function App() {
       activityLogs: placeActivityLog ? [...getCalendarActivityLogs(activeCal), placeActivityLog] : getCalendarActivityLogs(activeCal)
     };
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-    return updateCalendars(nextCalendars, '장소 삭제완료', 'delete', updatedCal.id, 'settings', placeActivityLog ? [placeActivityLog] : []);
+    return updateCalendars(nextCalendars, '플레이스 삭제완료', 'delete', updatedCal.id, 'settings', placeActivityLog ? [placeActivityLog] : []);
   };
   const handleDeleteActivityLog = log => {
     if (!activeCal || !log?.id) return false;
@@ -8417,6 +8417,8 @@ function App() {
       tryCreateShortcut(msg => showToast(msg, 'info', 5000));
     },
     onOpenAdmin: () => window.open(`${window.location.pathname}?admin=1`, '_blank', 'noopener,noreferrer'),
+    onOpenGallery: () => setIsGalleryOpen(true),
+    onChangeView: changeView,
     isDarkTheme: isDarkTheme,
     onToggleTheme: toggleTheme,
     fontScalePercent: fontScalePercent,
@@ -8427,6 +8429,10 @@ function App() {
     onUpdateWeatherLocation: handleUpdateWeatherLocation,
     onDeleteRecentLocation: handleDeleteRecentWeatherLocation,
     showToast: showToast
+  }), isGalleryOpen && /*#__PURE__*/React.createElement(ChatGalleryModal, {
+    chatMessages: chatMessages,
+    onClose: () => setIsGalleryOpen(false),
+    setActiveLightbox: setActiveLightbox
   }), isGuideOpen && /*#__PURE__*/React.createElement(UserManualOverlay, {
     calendar: activeCal,
     onClose: () => setIsGuideOpen(false)
@@ -14345,7 +14351,7 @@ function DateModal({
       }
     } catch (err) {
       console.error('Place search error:', err);
-      showToast('장소 검색 중 오류가 발생했습니다.', 'error');
+      showToast('플레이스 검색 중 오류가 발생했습니다.', 'error');
     } finally {
       setIsPlaceLoading(false);
       setPlaceSearchStage(null);
@@ -14355,7 +14361,7 @@ function DateModal({
   const handleSavePlaceClick = async () => {
     if (!onSavePlace) return;
     if (!selectedPlace) {
-      showToast('추가할 장소를 선택해 주세요.', 'error');
+      showToast('추가할 플레이스를 선택해 주세요.', 'error');
       return;
     }
     setIsSavingPlace(true);
@@ -14377,7 +14383,7 @@ function DateModal({
       };
 
       await Promise.resolve(onSavePlace(newPlaceData));
-      showToast('장소가 추가되었습니다.', 'success');
+      showToast('플레이스가 추가되었습니다.', 'success');
       
       // Clear inputs
       setSelectedPlace(null);
@@ -14385,7 +14391,7 @@ function DateModal({
       setPlaceQuery('');
     } catch (err) {
       console.error('Save place error:', err);
-      showToast('장소 추가 실패', 'error');
+      showToast('플레이스 추가 실패', 'error');
     } finally {
       setIsSavingPlace(false);
     }
@@ -14436,7 +14442,7 @@ function DateModal({
 
   const handleClearAllDate = () => {
     if (!onDeleteDate) return;
-    onRequestConfirm('날짜 초기화', `${getDeleteDateLabel(dateStr)}의 모든 참석/장소/정산 내역을 삭제하고 선택 가능 날짜에서 제외하시겠습니까?`, async () => {
+    onRequestConfirm('날짜 초기화', `${getDeleteDateLabel(dateStr)}의 모든 참석/플레이스/정산 내역을 삭제하고 선택 가능 날짜에서 제외하시겠습니까?`, async () => {
       setIsSubmitting(true);
       await onDeleteDate(dateStr);
       setIsSubmitting(false);
@@ -14970,7 +14976,7 @@ function DateModal({
                   flexShrink: 0,
                   cursor: 'pointer'
                 },
-                title: `${part.name}의 등록 장소 검색`,
+                title: `${part.name}의 등록 플레이스 검색`,
                 onClick: () => {
                   if (typeof onParticipantClick === 'function') {
                     onParticipantClick(part.name);
@@ -15014,7 +15020,7 @@ function DateModal({
         /*#__PURE__*/React.createElement("div", null,
           /*#__PURE__*/React.createElement("label", {
             style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '6px', color: '#64748B' }
-          }, "모임 장소 검색"),
+          }, "모임 플레이스 검색"),
           /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px' } },
             /*#__PURE__*/React.createElement("input", {
               type: "text",
@@ -15089,7 +15095,7 @@ function DateModal({
         /*#__PURE__*/React.createElement("div", null,
           /*#__PURE__*/React.createElement("label", {
             style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#64748B', marginBottom: '6px' }
-          }, "장소 메모 입력"),
+          }, "플레이스 메모 입력"),
           /*#__PURE__*/React.createElement("div", {
             style: { display: 'flex', gap: '8px', alignItems: 'stretch' }
           },
@@ -15117,11 +15123,11 @@ function DateModal({
       /*#__PURE__*/React.createElement("div", { style: { marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '6px' } },
         /*#__PURE__*/React.createElement("label", {
           style: { fontSize: '0.82rem', fontWeight: 700, color: '#64748B', marginBottom: '2px' }
-        }, `등록된 장소 (${registeredPlaces.length}곳)`),
+        }, `등록된 플레이스 (${registeredPlaces.length}곳)`),
         /* List */
         registeredPlaces.length === 0 ? /*#__PURE__*/React.createElement("div", {
           style: { textAlign: 'center', color: 'var(--text-muted)', padding: '24px 0', fontSize: '0.82rem', border: '1px dashed var(--border-subtle)', borderRadius: '12px' }
-        }, "등록된 장소가 없습니다.") : /*#__PURE__*/React.createElement("div", {
+        }, "등록된 플레이스가 없습니다.") : /*#__PURE__*/React.createElement("div", {
           style: { display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '240px', overflowY: 'auto' }
         }, registeredPlaces.map(place => {
           const category = getPlaceCategoryById(calendar, place.categoryId);
@@ -15158,10 +15164,10 @@ function DateModal({
             !adminMode && /*#__PURE__*/React.createElement("button", {
               type: "button",
               onClick: () => {
-                onRequestConfirm('장소 삭제', `"${place.name}" 장소를 이 날짜에서 해제하시겠습니까?`, async () => {
+                onRequestConfirm('플레이스 삭제', `"${place.name}" 플레이스를 이 날짜에서 해제하시겠습니까?`, async () => {
                   if (onDeletePlace) {
                     await Promise.resolve(onDeletePlace(place.id));
-                    showToast('장소가 삭제되었습니다.', 'success');
+                    showToast('플레이스가 삭제되었습니다.', 'success');
                   }
                 });
               },
@@ -15173,7 +15179,7 @@ function DateModal({
           );
         }))
       )
-    )),
+    ),
 
     /* Tab 3 Content: 정산 */
     activeTab === 'settlement' && /*#__PURE__*/React.createElement(React.Fragment, null,
@@ -15458,7 +15464,7 @@ function DateModal({
         style: {
           fontWeight: 700
         }
-      }, p.name)))))));
+      }, p.name))))))));
   return typeof document !== 'undefined' && ReactDOM.createPortal ? ReactDOM.createPortal(portalContent, document.body) : portalContent;
 }
 
@@ -16416,7 +16422,7 @@ function AdminModal({
                 name: EXPENSE_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '정산' :
                       IMAGE_TAG_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '태그' :
                       POLL_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '투표' :
-                      PLACE_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '장소' :
+                      PLACE_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '플레이스' :
                       MEETING_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '정산' : '알수없음',
                 color: '#94A3B8'
               };
@@ -16427,7 +16433,7 @@ function AdminModal({
                 tag_add: '사진 태그 추가', tag_remove: '사진 태그 삭제',
                 meeting_confirm: '모임 확정', meeting_cancel: '모임 확정 취소',
                 memo_create: '메모 추가', memo_update: '메모 변경', memo_delete: '메모 삭제',
-                place_create: '장소 등록', place_update: '장소 수정', place_delete: '장소 삭제'
+                place_create: '플레이스 등록', place_update: '플레이스 수정', place_delete: '플레이스 삭제'
               }[log.action] || '활동';
 
               const actionBadgeColor = {
@@ -16525,9 +16531,9 @@ function AdminModal({
             memo_create: '메모 추가',
             memo_update: '메모 변경',
             memo_delete: '메모 삭제',
-            place_create: '장소 등록',
-            place_update: '장소 수정',
-            place_delete: '장소 삭제'
+            place_create: '플레이스 등록',
+            place_update: '플레이스 수정',
+            place_delete: '플레이스 삭제'
           };
           const actionColors = {
             create: '#2563EB',
@@ -16564,7 +16570,7 @@ function AdminModal({
               name: EXPENSE_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '정산' :
                     IMAGE_TAG_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '태그' :
                     POLL_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '투표' :
-                    PLACE_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '장소' :
+                    PLACE_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '플레이스' :
                     MEETING_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '정산' : '알 수 없음',
               color: '#94A3B8'
             };
@@ -17489,7 +17495,7 @@ function UserManualOverlay({ calendar, onClose }) {
     },
     {
       title: '2. 참여자와 메모를 등록해요',
-      desc: '일정 팝업에서 참여자(본인)를 선택하면 메모 입력칸이 열립니다. 시간, 장소, 차량 여부처럼 같이 보면 좋은 내용을 적고 등록하면 바로 저장됩니다.',
+      desc: '일정 팝업에서 참여자(본인)를 선택하면 메모 입력칸이 열립니다. 시간, 플레이스, 차량 여부처럼 같이 보면 좋은 내용을 적고 등록하면 바로 저장됩니다.',
       icon: /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0", "M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2"] }),
       preview: /*#__PURE__*/React.createElement("div", {
         style: { border: '1px solid var(--border-subtle)', borderRadius: '18px', overflow: 'hidden', background: 'var(--bg-card)' }
@@ -18303,6 +18309,32 @@ function MainSideMenu({
       /*#__PURE__*/React.createElement("button", {
         type: "button",
         className: "admin-side-menu-item",
+        onClick: () => { onClose && onClose(); handle(onOpenGallery); }
+      },
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", {
+          xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2"
+        }, /*#__PURE__*/React.createElement("rect", { width: "18", height: "18", x: "3", y: "3", rx: "2", ry: "2" }), /*#__PURE__*/React.createElement("circle", { cx: "9", cy: "9", r: "2" }), /*#__PURE__*/React.createElement("path", { d: "m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" }))),
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "갤러리"),
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "공유된 사진 및 링크 모아보기")
+        )
+      ),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "admin-side-menu-item",
+        onClick: () => { onClose && onClose(); if (onChangeView) onChangeView('places'); }
+      },
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", {
+          xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2"
+        }, /*#__PURE__*/React.createElement("path", { d: "M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" }), /*#__PURE__*/React.createElement("circle", { cx: "12", cy: "10", r: "3" }))),
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "플레이스"),
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "플레이스 페이지로 이동")
+        )
+      ),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "admin-side-menu-item",
         onClick: () => {
           onClose && onClose();
           handle(onOpenAdmin);
@@ -18416,27 +18448,6 @@ function ChatSideMenu({
       /*#__PURE__*/React.createElement("button", {
         type: "button",
         className: "admin-side-menu-item",
-        onClick: () => { onClose(); handle(onOpenGallery); }
-      },
-        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", {
-          xmlns: "http://www.w3.org/2000/svg",
-          width: "20",
-          height: "20",
-          viewBox: "0 0 24 24",
-          fill: "none",
-          stroke: "currentColor",
-          strokeWidth: "2",
-          strokeLinecap: "round",
-          strokeLinejoin: "round"
-        }, /*#__PURE__*/React.createElement("rect", { width: "18", height: "18", x: "3", y: "3", rx: "2", ry: "2" }), /*#__PURE__*/React.createElement("circle", { cx: "9", cy: "9", r: "2" }), /*#__PURE__*/React.createElement("path", { d: "m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" }))),
-        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
-          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "갤러리"),
-          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "공유된 사진 및 링크 모아보기")
-        )
-      ),
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        className: "admin-side-menu-item",
         onClick: () => { onClose(); handle(onOpenShare); }
       },
         /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", {
@@ -18493,37 +18504,6 @@ function ChatSideMenu({
         /*#__PURE__*/React.createElement(ToggleSwitch, { checked: !!isChatNotifyEnabled, onChange: onToggleChatNotifications, label: "채팅알림" })
       )
     ),
-    /* Divider and bottom menus: 갤러리 and 장소 */
-    /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-list", style: { borderTop: '1px solid #E2E8F0', paddingTop: '14px' } },
-      /* 갤러리 */
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        className: "admin-side-menu-item",
-        onClick: () => { onClose(); if (onOpenGallery) onOpenGallery(); }
-      },
-        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", {
-          xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2"
-        }, /*#__PURE__*/React.createElement("rect", { width: "18", height: "18", x: "3", y: "3", rx: "2", ry: "2" }), /*#__PURE__*/React.createElement("circle", { cx: "9", cy: "9", r: "2" }), /*#__PURE__*/React.createElement("path", { d: "m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" }))),
-        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
-          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "갤러리"),
-          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "공유된 사진 및 링크 모아보기")
-        )
-      ),
-      /* 장소 */
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        className: "admin-side-menu-item",
-        onClick: () => { onClose(); if (onChangeView) onChangeView('places'); }
-      },
-        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", {
-          xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2"
-        }, /*#__PURE__*/React.createElement("path", { d: "M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" }), /*#__PURE__*/React.createElement("circle", { cx: "12", cy: "10", r: "3" }))),
-        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
-          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "장소"),
-          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "장소 페이지로 이동")
-        )
-      )
-    )
   )));
 }
 
@@ -24720,7 +24700,7 @@ function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom = false
         maxZoom: isMobileViewport ? 15 : 16
       });
     } else if (preferDomesticBounds) {
-      mapRef.current.setView(PLACE_MAP_DEFAULT_CENTER, 10); // 등록된 장소가 없을 때는 서울 중심으로 표시
+      mapRef.current.setView(PLACE_MAP_DEFAULT_CENTER, 10); // 등록된 플레이스가 없을 때는 서울 중심으로 표시
     } else {
       mapRef.current.setView(PLACE_MAP_DEFAULT_CENTER, PLACE_MAP_DEFAULT_ZOOM);
     }
@@ -24846,7 +24826,7 @@ function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, onDelete,
   // Three-tier fallback chain, cheapest/most-reliable first: Kakao Local (키워드 검색) covers
   // domestic businesses very well and is effectively free at this app's scale, so it's tried
   // first for every search. Kakao is Korea-only, so an empty result there usually means either a
-  // typo or (increasingly relevant now that 장소 등록 covers overseas trips too) a place outside
+  // typo or (increasingly relevant now that 플레이스 등록 covers overseas trips too) a place outside
   // Korea -- Google Places picks up that case, since its POI coverage abroad (e.g. Vietnam) is
   // far better than Kakao's or Nominatim's. Nominatim/OSM stays as the last, always-free safety
   // net in case Google Places itself errors or comes up empty too. Kakao and Google both proxy
@@ -24930,7 +24910,7 @@ function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, onDelete,
       if (mapped.length === 0 && !auto) showToast('검색 결과가 없습니다.', 'info');
     } catch (err) {
       console.error('Place search failed:', err);
-      if (!auto) showToast('장소 검색에 실패했습니다.', 'error');
+      if (!auto) showToast('플레이스 검색에 실패했습니다.', 'error');
     } finally {
       setLoading(false);
       setSearchStage(null);
@@ -24968,7 +24948,7 @@ function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, onDelete,
 
   const handleSubmit = async () => {
     if (!selected || !Number.isFinite(selected.lat) || !Number.isFinite(selected.lng)) {
-      showToast('검색 결과에서 장소를 선택해 주세요.', 'error');
+      showToast('검색 결과에서 플레이스를 선택해 주세요.', 'error');
       return;
     }
     setSaving(true);
@@ -24990,12 +24970,12 @@ function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, onDelete,
   const handleDeleteClick = () => {
     if (!editingPlace) return;
     if (typeof onRequestConfirm === 'function') {
-      onRequestConfirm('장소 삭제', `"${editingPlace.name || '이 장소'}"를 삭제하시겠습니까?`, () => {
+      onRequestConfirm('플레이스 삭제', `"${editingPlace.name || '이 플레이스'}"를 삭제하시겠습니까?`, () => {
         onDelete(editingPlace.id);
         onClose();
       });
     } else {
-      if (confirm(`"${editingPlace.name || '이 장소'}"를 삭제하시겠습니까?`)) {
+      if (confirm(`"${editingPlace.name || '이 플레이스'}"를 삭제하시겠습니까?`)) {
         onDelete(editingPlace.id);
         onClose();
       }
@@ -25062,7 +25042,7 @@ function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, onDelete,
     },
       /*#__PURE__*/React.createElement("span", {
         style: { fontSize: '0.92rem', fontWeight: '900', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' }
-      }, /*#__PURE__*/React.createElement(PlaceSectionIcon, { size: 16 }), editingPlace ? '장소 수정' : '장소 등록'),
+      }, /*#__PURE__*/React.createElement(PlaceSectionIcon, { size: 16 }), editingPlace ? '플레이스 수정' : '플레이스 등록'),
       /*#__PURE__*/React.createElement("button", {
         type: "button",
         onClick: onClose,
@@ -25279,12 +25259,12 @@ function PlacesSection({ calendar, onViewAll }) {
         textAlign: 'center',
         marginTop: '12px'
       }
-    }, "장소 더보기")
+    }, "플레이스 더보기")
   );
 }
 
 // Full-page map view -- header follows the same fixed-back-button + centered-title +
-// right-action-button convention as MemoView, with "장소등록" as the action button. Body is a
+// right-action-button convention as MemoView, with "플레이스등록" as the action button. Body is a
 // taller interactive map (marker click opens the register modal pre-filled for editing) plus a
 // scrollable place-card list below it, since editing/deleting via Leaflet popup controls isn't
 // practical to build or to verify structurally -- the card list is plain React DOM instead.
@@ -25479,7 +25459,7 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
         /*#__PURE__*/React.createElement("button", {
           type: "button",
           onClick: handleOpenRegister,
-          title: "장소등록",
+          title: "플레이스등록",
           style: {
             background: 'none', border: 'none', cursor: 'pointer', padding: '6px 8px',
             color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center'
@@ -25509,7 +25489,7 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
         /*#__PURE__*/React.createElement("button", {
           type: "button",
           onClick: () => setIsSearchOpen(prev => !prev),
-          title: "장소 검색",
+          title: "플레이스 검색",
           style: {
             background: 'none', border: 'none', cursor: 'pointer', padding: '6px 8px',
             color: isSearchOpen ? 'var(--accent-primary)' : 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center'
@@ -25551,7 +25531,7 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
       /*#__PURE__*/React.createElement("input", {
         type: "text",
         className: "form-input",
-        placeholder: "등록된 장소명 또는 주소 검색...",
+        placeholder: "등록된 플레이스명 또는 주소 검색...",
         value: listSearchQuery,
         onChange: e => {
           const val = e.target.value;
@@ -25700,7 +25680,7 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
       },
         filteredPlaces.length === 0 ? /*#__PURE__*/React.createElement("div", {
           style: { padding: '30px 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }
-        }, places.length === 0 ? "등록된 장소가 없습니다. 우측 상단 아이콘을 눌러 추가해 보세요." : "검색 조건에 맞는 장소가 없습니다.") :
+        }, places.length === 0 ? "등록된 플레이스가 없습니다. 우측 상단 아이콘을 눌러 추가해 보세요." : "검색 조건에 맞는 플레이스가 없습니다.") :
         filteredPlaces.map(place => {
           const category = categoryMap[place.categoryId] || categoryMap.etc;
           const memoDate = extractLeadingMemoDate(place.memo);
@@ -25743,7 +25723,7 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
               /*#__PURE__*/React.createElement("button", {
                 type: "button",
                 onClick: event => { event.stopPropagation(); handleEditPlace(place); },
-                title: "장소 수정",
+                title: "플레이스 수정",
                 style: {
                   width: '28px', height: '28px',
                   background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8',
