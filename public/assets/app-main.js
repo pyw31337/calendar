@@ -18334,8 +18334,8 @@ function MainSideMenu({
       isChatNotifyEnabled: isChatNotifyEnabled,
       onToggleChatNotifications: onToggleChatNotifications
     }),
-    /* Gallery + Places — right under 채팅알림 (no extra top border: settings section already has bottom border) */
-    /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-list", style: { borderTop: 'none', borderBottom: 'none', paddingTop: '8px' } },
+    /* Gallery + Places — divider under 채팅알림 */
+    /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-list", style: { borderTop: '1px solid #E2E8F0', borderBottom: 'none', paddingTop: '8px' } },
       /*#__PURE__*/React.createElement("button", {
         type: "button",
         className: "admin-side-menu-item",
@@ -18634,7 +18634,8 @@ function ChatGalleryModal({
     width: '95%', height: '80vh', display: 'flex', flexDirection: 'column'
   };
   const galleryHeaderStyle = asPage ? {
-    height: '56px', padding: '0 16px', borderBottom: '1px solid var(--border-subtle)',
+    height: '56px', padding: '0 16px',
+    borderBottom: isSearchOpen ? 'none' : '1px solid var(--border-subtle)',
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
     position: 'fixed', top: 0, left: 0, right: 0, zIndex: 1010, overflow: 'hidden', flexShrink: 0,
     backgroundColor: 'var(--bg-card)',
@@ -18715,9 +18716,11 @@ function ChatGalleryModal({
     onChange: e => setSearchQuery(e.target.value),
     fixed: !!asPage,
     style: asPage ? {
+      borderBottom: 'none',
+      boxShadow: 'none',
       transition: 'transform 0.3s ease',
       transform: isHeaderVisible ? 'translateY(0)' : 'translateY(-100%)'
-    } : null,
+    } : { borderBottom: '1px solid var(--border-subtle)' },
     trailing: /*#__PURE__*/React.createElement("button", {
       type: "button",
       onClick: () => { setIsSearchOpen(false); setSearchQuery(''); },
@@ -18756,7 +18759,7 @@ function ChatGalleryModal({
         gap: '6px'
       }
     },
-      tab[1] + '(' + String(count) + ')',
+      tab[1],
       /*#__PURE__*/React.createElement("span", {
         style: {
           fontSize: '0.7rem',

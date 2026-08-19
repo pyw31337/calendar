@@ -2943,3 +2943,12 @@ select.form-select {
 .admin-side-menu.scroll-active::-webkit-scrollbar-thumb {
   background: rgba(100, 116, 139, 0.4);
 }
+
+/* Gallery page: fixed search under header — tabs own the single bottom hairline */
+.gallery-page-container .inline-search-bar.is-fixed {
+  border-bottom: none !important;
+  box-shadow: none !important;
+}
+.gallery-page-container .gallery-page-tabs {
+  border-top: none;
+}
