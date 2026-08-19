@@ -6113,6 +6113,7 @@ function App() {
   const [adminActivityLogs, setAdminActivityLogs] = React.useState([]);
   const [isShareOpen, setIsShareOpen] = React.useState(false);
   const [isChatShareOpen, setIsChatShareOpen] = React.useState(false);
+  const [isPlacesShareOpen, setIsPlacesShareOpen] = React.useState(false);
   const [isMainSideMenuOpen, setIsMainSideMenuOpen] = React.useState(false);
   const [isNotificationHelpOpen, setIsNotificationHelpOpen] = React.useState(false);
   const [isPollModalOpen, setIsPollModalOpen] = React.useState(false);
@@ -8319,34 +8320,32 @@ function App() {
   }
 
   if (activeView === 'places') {
-    return withStickyVideo(/*#__PURE__*/React.createElement(PlacesView, {
-      calendar: activeCal,
-      onBack: () => changeView('calendar'),
-      onSavePlace: handleSavePlace,
-      onDeletePlace: handleDeletePlace,
-      showToast: showToast,
-      onRequestConfirm: showConfirmDialog,
-      placesInitialQuery: placesInitialQuery,
-      setPlacesInitialQuery: setPlacesInitialQuery,
-      isDarkTheme: isDarkTheme,
-      onToggleTheme: toggleTheme,
-      fontScalePercent: fontScalePercent,
-      onDecreaseFont: () => setFontScalePercent(prev => Math.max(80, prev - 10)),
-      onIncreaseFont: () => setFontScalePercent(prev => Math.min(130, prev + 10)),
-      isChatNotifyEnabled: mainNotifPermission === 'granted' && mainChatNotifyEnabled,
-      onToggleChatNotifications: handleMainToggleNotifications,
-      onSharePlaces: async () => {
-        try {
-          const url = new URL(window.location.href);
-          url.searchParams.set('view', 'places');
-          if (activeCalId) url.searchParams.set('id', activeCalId);
-          const ok = await copyTextToClipboard(url.toString());
-          showToast(ok ? '플레이스 페이지 링크가 복사되었습니다.' : '링크 복사에 실패했습니다.', ok ? 'success' : 'error');
-        } catch (e) {
-          showToast('링크 복사에 실패했습니다.', 'error');
-        }
-      }
-    }));
+    return withStickyVideo(/*#__PURE__*/React.createElement(React.Fragment, null,
+      /*#__PURE__*/React.createElement(PlacesView, {
+        calendar: activeCal,
+        onBack: () => changeView('calendar'),
+        onSavePlace: handleSavePlace,
+        onDeletePlace: handleDeletePlace,
+        showToast: showToast,
+        onRequestConfirm: showConfirmDialog,
+        placesInitialQuery: placesInitialQuery,
+        setPlacesInitialQuery: setPlacesInitialQuery,
+        isDarkTheme: isDarkTheme,
+        onToggleTheme: toggleTheme,
+        fontScalePercent: fontScalePercent,
+        onDecreaseFont: () => setFontScalePercent(prev => Math.max(80, prev - 10)),
+        onIncreaseFont: () => setFontScalePercent(prev => Math.min(130, prev + 10)),
+        isChatNotifyEnabled: mainNotifPermission === 'granted' && mainChatNotifyEnabled,
+        onToggleChatNotifications: handleMainToggleNotifications,
+        onSharePlaces: () => setIsPlacesShareOpen(true)
+      }),
+      isPlacesShareOpen && activeCal && /*#__PURE__*/React.createElement(ShareModal, {
+        calendar: activeCal,
+        shareType: "places",
+        showToast: showToast,
+        onClose: () => setIsPlacesShareOpen(false)
+      })
+    ));
   }
 
   const mainMenuPollCount = getCalendarPolls(activeCal).filter(poll => !isPollClosed(poll)).length;
@@ -17387,11 +17386,31 @@ function ShareModal({
   calendar,
   onClose,
   shareType = 'calendar',
-  showToast
+  showToast,
+  customUrl = null
 }) {
-  const shareUrl = shareType === 'chat'
-    ? `${getCalendarShareUrl(calendar.id)}chat/`
-    : getCalendarShareUrl(calendar.id);
+  // Site-wide share rule: URL field + copy button + QR code in one modal.
+  const shareUrl = React.useMemo(() => {
+    if (customUrl) return customUrl;
+    if (shareType === 'chat') return `${getCalendarShareUrl(calendar.id)}chat/`;
+    if (shareType === 'places') {
+      try {
+        const u = new URL(getAppBaseUrl());
+        u.searchParams.set('id', calendar.id);
+        u.searchParams.set('view', 'places');
+        return u.toString();
+      } catch (e) {
+        return `${getAppBaseUrl()}?id=${encodeURIComponent(calendar.id)}&view=places`;
+      }
+    }
+    return getCalendarShareUrl(calendar.id);
+  }, [calendar, shareType, customUrl]);
+  const shareTitle = shareType === 'chat' ? '채팅방 공유 URL'
+    : shareType === 'places' ? '플레이스 공유 URL'
+    : '캘린더 공유 URL';
+  const shareLabel = shareType === 'chat' ? `현재 채팅방 (${calendar.id}) 전용 공유 URL`
+    : shareType === 'places' ? `현재 플레이스 (${calendar.id}) 전용 공유 URL`
+    : `현재 캘린더 (${calendar.id}) 전용 공유 URL`;
   const qrDataUrl = React.useMemo(() => {
     if (typeof qrcode === 'undefined') return null;
     try {
@@ -17423,7 +17442,7 @@ function ShareModal({
       fontSize: '1.1rem',
       fontWeight: 800
     }
-  }, shareType === 'chat' ? "채팅방 공유 URL" : "캘린더 공유 URL"), /*#__PURE__*/React.createElement("button", {
+  }, shareTitle), /*#__PURE__*/React.createElement("button", {
     onClick: onClose,
     style: {
       background: 'none',
@@ -17442,7 +17461,7 @@ function ShareModal({
       fontWeight: 700,
       color: '#64748B'
     }
-  }, shareType === 'chat' ? `현재 채팅방 (${calendar.id}) 전용 공유 URL` : `현재 캘린더 (${calendar.id}) 전용 공유 URL`), /*#__PURE__*/React.createElement("input", {
+  }, shareLabel), /*#__PURE__*/React.createElement("input", {
     type: "text",
     className: "form-input",
     style: {
@@ -18570,15 +18589,33 @@ function ChatGalleryModal({
   const [searchQuery, setSearchQuery] = React.useState('');
   const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   const [gridCols, setGridCols] = React.useState(() => window.innerWidth >= 768 ? 6 : 3);
+  const gridHostRef = React.useRef(null);
   const { isHeaderVisible, onScroll: handleGalleryScroll } = useScrollHideHeader();
 
   React.useEffect(() => {
-    const handleResize = () => {
-      setGridCols(window.innerWidth >= 768 ? 6 : 3);
+    const computeCols = width => {
+      if (width >= 900) return 6;
+      if (width >= 720) return 5;
+      if (width >= 560) return 4;
+      if (width >= 400) return 3;
+      return 2;
     };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+    const apply = width => setGridCols(computeCols(Math.max(0, width || 0)));
+    const el = gridHostRef.current;
+    if (el && typeof ResizeObserver !== 'undefined') {
+      const ro = new ResizeObserver(entries => {
+        const w = entries[0]?.contentRect?.width;
+        apply(w || el.clientWidth || window.innerWidth);
+      });
+      ro.observe(el);
+      apply(el.clientWidth || window.innerWidth);
+      return () => ro.disconnect();
+    }
+    const onWin = () => apply(window.innerWidth);
+    onWin();
+    window.addEventListener('resize', onWin);
+    return () => window.removeEventListener('resize', onWin);
+  }, [asPage, activeTab]);
 
   const sharedLinks = React.useMemo(() => {
     const list = [];
@@ -18807,13 +18844,15 @@ function ChatGalleryModal({
       }, String(count))
     );
   })), /*#__PURE__*/React.createElement("div", {
+    ref: gridHostRef,
     onScroll: asPage ? handleGalleryScroll : undefined,
     style: {
       flex: 1, overflowY: 'auto',
       padding: asPage
         ? ((isSearchOpen ? '168px' : '120px') + ' 20px 16px 20px')
         : '16px 20px',
-      display: 'flex', flexDirection: 'column', gap: '12px', boxSizing: 'border-box'
+      display: 'flex', flexDirection: 'column', gap: '12px', boxSizing: 'border-box',
+      minWidth: 0
     }
   }, activeTab === 'links' ? (
     filteredLinks.length === 0 ? /*#__PURE__*/React.createElement("div", {
