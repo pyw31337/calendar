@@ -7738,9 +7738,16 @@ function App() {
     const cleanMemo = sanitizeText(placeData.memo || '', 2000);
     const cleanVisitStatus = placeData.visitStatus === 'planned' ? 'planned' : 'visited';
     const cleanVisitDate = cleanVisitStatus === 'visited' && isValidDateString(placeData.visitDate) ? placeData.visitDate : '';
-    const nextPlaces = isEditing
-      ? existingPlaces.map(p => p.id === placeData.id ? { ...p, name: cleanName, alias: cleanAlias, address: cleanAddress, lat: placeData.lat, lng: placeData.lng, categoryId: cleanCategoryId, memo: cleanMemo, visitStatus: cleanVisitStatus, visitDate: cleanVisitDate, updatedAt: now } : p)
-      : [...existingPlaces, { id: `place_${activeCal.id}_${now}_${Math.random().toString(36).slice(2, 7)}`, name: cleanName, alias: cleanAlias, address: cleanAddress, lat: placeData.lat, lng: placeData.lng, categoryId: cleanCategoryId, memo: cleanMemo, visitStatus: cleanVisitStatus, visitDate: cleanVisitDate, createdAt: now, updatedAt: now }];
+    const editedFields = { name: cleanName, alias: cleanAlias, address: cleanAddress, lat: placeData.lat, lng: placeData.lng, categoryId: cleanCategoryId, memo: cleanMemo, visitStatus: cleanVisitStatus, visitDate: cleanVisitDate, updatedAt: now };
+    let nextPlaces;
+    if (isEditing) {
+      const found = existingPlaces.some(p => p.id === placeData.id);
+      nextPlaces = found
+        ? existingPlaces.map(p => p.id === placeData.id ? { ...p, ...editedFields } : p)
+        : [...existingPlaces, { id: placeData.id, ...editedFields, createdAt: now }];
+    } else {
+      nextPlaces = [...existingPlaces, { id: `place_${activeCal.id}_${now}_${Math.random().toString(36).slice(2, 7)}`, ...editedFields, createdAt: now }];
+    }
     const placeActivityLog = createActivityLog(activeCal.id, isEditing ? 'place_update' : 'place_create', '', '', now, cleanName);
     const updatedCal = {
       ...activeCal,
@@ -14218,53 +14225,25 @@ function getShortTitleParts(dateStr) {
 
 
 function GamifiedConfirmButtonContent({ label }) {
+  const bolt = /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg", viewBox: "0 0 24 24", width: "100%", height: "100%",
+    fill: "currentColor", "aria-hidden": true
+  }, /*#__PURE__*/React.createElement("path", { d: "M13 2 3 14h8l-1 8 10-12h-8l1-8z" }));
+  const star = /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg", viewBox: "0 0 24 24", width: "100%", height: "100%",
+    fill: "currentColor", "aria-hidden": true
+  }, /*#__PURE__*/React.createElement("path", { d: "M12 2l2.4 7.2H22l-6 4.8 2.3 7.2L12 16.8 5.7 21.2 8 14 2 9.2h7.6z" }));
   return /*#__PURE__*/React.createElement(React.Fragment, null,
     /*#__PURE__*/React.createElement("span", { className: "gamified-shiny-glow-wrapper", "aria-hidden": true },
       /*#__PURE__*/React.createElement("span", { className: "gamified-shiny-glow" })
     ),
-    /*#__PURE__*/React.createElement("svg", {
-      className: "gamified-border-lightning",
-      viewBox: "0 0 100 40",
-      preserveAspectRatio: "none",
-      "aria-hidden": true
-    },
-      /*#__PURE__*/React.createElement("defs", null,
-        /*#__PURE__*/React.createElement("linearGradient", { id: "gamifiedBoltGrad", x1: "0%", y1: "0%", x2: "100%", y2: "0%" },
-          /*#__PURE__*/React.createElement("stop", { offset: "0%", stopColor: "#A5F3FC" }),
-          /*#__PURE__*/React.createElement("stop", { offset: "35%", stopColor: "#FFFFFF" }),
-          /*#__PURE__*/React.createElement("stop", { offset: "65%", stopColor: "#C4B5FD" }),
-          /*#__PURE__*/React.createElement("stop", { offset: "100%", stopColor: "#67E8F9" })
-        ),
-        /*#__PURE__*/React.createElement("filter", { id: "gamifiedBoltGlow", x: "-50%", y: "-50%", width: "200%", height: "200%" },
-          /*#__PURE__*/React.createElement("feGaussianBlur", { stdDeviation: "1.2", result: "b" }),
-          /*#__PURE__*/React.createElement("feMerge", null,
-            /*#__PURE__*/React.createElement("feMergeNode", { in: "b" }),
-            /*#__PURE__*/React.createElement("feMergeNode", { in: "SourceGraphic" })
-          )
-        )
-      ),
-      /*#__PURE__*/React.createElement("rect", {
-        className: "gamified-border-track",
-        x: "1.5", y: "1.5", width: "97", height: "37", rx: "10", ry: "10",
-        fill: "none", stroke: "url(#gamifiedBoltGrad)", strokeWidth: "2.2",
-        pathLength: "100", filter: "url(#gamifiedBoltGlow)"
-      }),
-      /*#__PURE__*/React.createElement("rect", {
-        className: "gamified-border-track gamified-border-track-2",
-        x: "1.5", y: "1.5", width: "97", height: "37", rx: "10", ry: "10",
-        fill: "none", stroke: "#E0F2FE", strokeWidth: "1.2",
-        pathLength: "100", filter: "url(#gamifiedBoltGlow)"
-      })
-    ),
     /*#__PURE__*/React.createElement("span", { className: "gamified-sparks-container", "aria-hidden": true },
-      [1,2,3,4].map(n => /*#__PURE__*/React.createElement("span", {
-        key: "bolt"+n, className: "gamified-edge-bolt gamified-edge-bolt-" + n
-      }, /*#__PURE__*/React.createElement("svg", {
-        viewBox: "0 0 24 48", width: "100%", height: "100%", fill: "none"
-      }, /*#__PURE__*/React.createElement("path", {
-        d: "M12 2 L8 18 L14 18 L10 46 L18 20 L12 20 Z",
-        fill: "currentColor"
-      }))))
+      [1,2,3,4,5,6].map(n => /*#__PURE__*/React.createElement("span", {
+        key: "sp"+n, className: "gamified-spark gamified-spark-" + n
+      }, bolt)),
+      [1,2,3,4,5,6].map(n => /*#__PURE__*/React.createElement("span", {
+        key: "sl"+n, className: "gamified-sparklet gamified-sparklet-" + n
+      }, star))
     ),
     /*#__PURE__*/React.createElement("span", { className: "gamified-confirm-label" }, label)
   );
@@ -14481,9 +14460,12 @@ function DateModal({
         visitDate: dateStr
       };
 
-      await Promise.resolve(onSavePlace(newPlaceData));
+      const ok = await Promise.resolve(onSavePlace(newPlaceData));
+      if (ok === false) {
+        showToast(editingLinkedPlaceId ? '장소 수정에 실패했습니다.' : '장소 추가에 실패했습니다.', 'error');
+        return;
+      }
       showToast(editingLinkedPlaceId ? '장소가 수정되었습니다.' : '장소가 추가되었습니다.', 'success');
-      
       setSelectedPlace(null);
       setPlaceMemo('');
       setPlaceAlias('');
@@ -15331,8 +15313,9 @@ function DateModal({
                 }
               }, catName)
             ),
-            /* Name & Address */
-            /*#__PURE__*/React.createElement("span", { style: { fontWeight: 800, fontSize: '0.88rem', color: 'var(--text-main)' } }, place.name),
+            /* Name & Address — prefer alias when set */
+            /*#__PURE__*/React.createElement("span", { style: { fontWeight: 800, fontSize: '0.88rem', color: 'var(--text-main)' } }, place.alias || place.name),
+            place.alias && place.name && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.72rem', color: 'var(--text-muted)' } }, place.name),
             place.address && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.74rem', color: 'var(--text-muted)' } }, place.address),
             /* Memo or Url */
             place.memo && /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.78rem', color: 'var(--text-main)' } },

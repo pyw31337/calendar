@@ -2643,7 +2643,7 @@ select.form-select {
   text-shadow: 0 1.5px 2px rgba(0, 0, 0, 0.5) !important;
   border: 2px solid #FBCFE8 !important;
   border-bottom: 4px solid #4C1D95 !important;
-  box-shadow: 0 2px 8px rgba(124, 58, 237, 0.28) !important;
+  box-shadow: 0 4px 15px rgba(236, 72, 153, 0.5) !important;
   animation: gamified-shake 0.35s ease-in-out infinite !important;
   overflow: visible !important; /* To let sparks pop out of bounds */
   transform-origin: center center !important;
@@ -2697,7 +2697,14 @@ select.form-select {
   100% { background-position: -300% 0%; }
 }
 
-/* old shake removed */
+/* Constant intense shaking rotating strictly around the center anchor point (50%, 50%) */
+@keyframes gamified-shake {
+  0%, 100% { transform: scale(var(--btn-scale)) rotate(0deg); }
+  20% { transform: scale(var(--btn-scale)) rotate(-2.5deg); }
+  40% { transform: scale(var(--btn-scale)) rotate(2.5deg); }
+  60% { transform: scale(var(--btn-scale)) rotate(-1.5deg); }
+  80% { transform: scale(var(--btn-scale)) rotate(1.5deg); }
+}
 
 /* Shiny gloss effect wrapper to constrain the sheen inside the button borders */
 .gamified-shiny-glow-wrapper {
@@ -2721,7 +2728,7 @@ select.form-select {
   background: linear-gradient(
     90deg,
     rgba(255, 255, 255, 0) 0%,
-    rgba(255, 255, 255, 0.28) 50%,
+    rgba(255, 255, 255, 0.65) 50%,
     rgba(255, 255, 255, 0) 100%
   );
   transform: skewX(-25deg);
@@ -2909,6 +2916,7 @@ select.form-select {
 }
 
 /* Date Details Modal Place Search & Preview card styling */
+
 .place-result-item:hover {
   background-color: var(--bg-hover) !important;
 }
@@ -2961,62 +2969,12 @@ select.form-select {
   border-radius: 20px 20px 0 0 !important;
 }
 
-.btn-gamified-confirm::after { content: none !important; display: none !important; }
-.btn-gamified-confirm .gamified-confirm-label {
-  position: relative;
-  z-index: 3;
-  letter-spacing: 0.02em;
-}
-@keyframes gamified-shake {
-  0%, 8% { transform: translate3d(0, 0, 0) rotate(0deg) scale(var(--btn-scale, 1)); }
-  10% { transform: translate3d(-1px, 0, 0) rotate(-0.4deg) scale(var(--btn-scale, 1)); }
-  12% { transform: translate3d(1px, 0, 0) rotate(0.4deg) scale(var(--btn-scale, 1)); }
-  14% { transform: translate3d(-0.6px, 0, 0) rotate(-0.25deg) scale(var(--btn-scale, 1)); }
-  16% { transform: translate3d(0.6px, 0, 0) rotate(0.25deg) scale(var(--btn-scale, 1)); }
-  18%, 100% { transform: translate3d(0, 0, 0) rotate(0deg) scale(var(--btn-scale, 1)); }
-}
-.btn-gamified-confirm {
-  animation: gamified-shake 2.6s ease-in-out infinite !important;
-  transform-origin: 50% 50% !important;
-  isolation: isolate;
-  box-shadow: 0 2px 8px rgba(124, 58, 237, 0.28) !important;
-}
+
+
+
 .btn-meeting-confirm-plain { background: transparent; }
 
-.gamified-border-lightning {
-  position: absolute; inset: -2px;
-  width: calc(100% + 4px); height: calc(100% + 4px);
-  pointer-events: none; z-index: 2; overflow: visible;
-}
-.gamified-border-track {
-  stroke-dasharray: 14 86; stroke-dashoffset: 0;
-  animation: gamified-border-race 2.2s linear infinite;
-}
-.gamified-border-track-2 {
-  stroke-dasharray: 8 92; animation-duration: 2.8s;
-  animation-direction: reverse; opacity: 0.7;
-}
-@keyframes gamified-border-race {
-  0% { stroke-dashoffset: 0; }
-  100% { stroke-dashoffset: -100; }
-}
-.gamified-edge-bolt {
-  position: absolute; width: 14px; height: 28px; opacity: 0;
-  color: #E0F2FE;
-  filter: drop-shadow(0 0 3px #67E8F9) drop-shadow(0 0 6px #A78BFA);
-  pointer-events: none;
-}
-.gamified-edge-bolt-1 { top: -12px; left: 18%; animation: edge-bolt-flash 2.4s ease-in-out infinite; }
-.gamified-edge-bolt-2 { top: 20%; right: -8px; animation: edge-bolt-flash 2.4s ease-in-out infinite 0.6s; }
-.gamified-edge-bolt-3 { bottom: -12px; right: 22%; animation: edge-bolt-flash 2.4s ease-in-out infinite 1.2s; }
-.gamified-edge-bolt-4 { bottom: 18%; left: -8px; animation: edge-bolt-flash 2.4s ease-in-out infinite 1.8s; }
-@keyframes edge-bolt-flash {
-  0%, 78%, 100% { opacity: 0; transform: scale(0.4); }
-  82% { opacity: 1; transform: scale(1.15); }
-  88% { opacity: 0.35; transform: scale(0.85); }
-  92% { opacity: 1; transform: scale(1.05); }
-  96% { opacity: 0; transform: scale(0.5); }
-}
+
 
 .date-modal-settlement-list,
 .date-modal-places-list {
@@ -3026,3 +2984,6 @@ select.form-select {
   overscroll-behavior: contain;
 }
 .item-edit-delete-actions button:hover { color: var(--text-main); }
+
+.btn-gamified-confirm .gamified-confirm-label { position: relative; z-index: 3; }
+.btn-meeting-confirm-plain { background: transparent; }
