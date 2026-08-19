@@ -2248,6 +2248,72 @@ async function fetchChatMessagesRest(calId) {
   }
 }
 
+const CHAT_OLDER_PAGE_SIZE = readConfigNumber('CHAT_OLDER_PAGE_SIZE', 40);
+
+async function fetchOlderChatMessages(calId, beforeTimestamp, pageSize = CHAT_OLDER_PAGE_SIZE) {
+  if (!calId || !beforeTimestamp) return [];
+  try {
+    if (firebaseDb) {
+      const snap = await firebaseDb.collection('calendars').doc(`cal_${calId}`).collection('messages')
+        .orderBy('timestamp', 'desc')
+        .startAfter(beforeTimestamp)
+        .limit(pageSize)
+        .get();
+      const list = [];
+      snap.forEach(doc => list.push(slimMessageForClient({ id: doc.id, ...doc.data() })));
+      return list.reverse();
+    }
+  } catch (err) {
+    console.warn('fetchOlderChatMessages error:', err);
+  }
+  return [];
+}
+
+async function fetchMessagesCollectionCount(calId) {
+  if (!calId || !firebaseDb) return null;
+  try {
+    const ref = firebaseDb.collection('calendars').doc(`cal_${calId}`).collection('messages');
+    if (ref && typeof ref.count === 'function') {
+      const snap = await ref.count().get();
+      return Number(snap.data().count) || 0;
+    }
+  } catch (err) {
+    console.warn('fetchMessagesCollectionCount error:', err);
+  }
+  return null;
+}
+
+async function fetchGalleryItemCount(calId, maxPages = 25) {
+  if (!calId || !firebaseDb) return null;
+  try {
+    let total = 0;
+    let lastDoc = null;
+    for (let page = 0; page < maxPages; page++) {
+      let q = firebaseDb.collection('calendars').doc(`cal_${calId}`).collection('messages')
+        .orderBy('timestamp', 'desc')
+        .limit(100);
+      if (lastDoc) q = q.startAfter(lastDoc);
+      const snap = await q.get();
+      if (snap.empty) break;
+      snap.forEach(doc => {
+        const msg = { id: doc.id, ...doc.data() };
+        const imgN = getMessageImageEntries(msg).length;
+        total += imgN;
+        const direct = getMessageDirectMediaEntry(msg);
+        if (direct) total += 1;
+        const textUrl = extractFirstUrl(msg.text || '');
+        if (textUrl && !direct && imgN === 0) total += 1;
+      });
+      lastDoc = snap.docs[snap.docs.length - 1];
+      if (snap.size < 100) break;
+    }
+    return total;
+  } catch (err) {
+    console.warn('fetchGalleryItemCount error:', err);
+  }
+  return null;
+}
+
 // recentLimit mirrors fetchActivityLogsFromFirestore's own param -- both call sites always pass
 // memosLimit now, so this REST fallback (used when the Firestore SDK listener itself errors out)
 // downloads the same bounded page the SDK path would have, instead of the entire memos
@@ -6442,11 +6508,19 @@ function App() {
   };
   // Chat-related states
   const [chatMessages, setChatMessages] = React.useState([]);
-  // recentMessages (last 5, newest-first) used to be its own separate onSnapshot listener --
-  // it's always a strict subset of chatMessages (same collection/order, just a smaller window),
-  // so deriving it client-side removes a redundant Firestore listener + read on every incoming
-  // message without changing any consumer's behavior.
-  const recentMessages = React.useMemo(() => chatMessages.slice(-5).reverse(), [chatMessages]);
+  const [olderChatMessages, setOlderChatMessages] = React.useState([]);
+  const [hasMoreOlderChat, setHasMoreOlderChat] = React.useState(true);
+  const [loadingOlderChat, setLoadingOlderChat] = React.useState(false);
+  const [totalChatCount, setTotalChatCount] = React.useState(0);
+  const [totalGalleryCount, setTotalGalleryCount] = React.useState(0);
+  const loadingOlderChatRef = React.useRef(false);
+  const allChatMessages = React.useMemo(() => {
+    const byId = new Map();
+    (olderChatMessages || []).forEach(m => { if (m && m.id) byId.set(m.id, m); });
+    (chatMessages || []).forEach(m => { if (m && m.id) byId.set(m.id, m); });
+    return Array.from(byId.values()).sort((a, b) => Number(a.timestamp || 0) - Number(b.timestamp || 0));
+  }, [olderChatMessages, chatMessages]);
+  const recentMessages = React.useMemo(() => allChatMessages.slice(-5).reverse(), [allChatMessages]);
   const [memos, setMemos] = React.useState([]);
   const [memosLimit, setMemosLimit] = React.useState(MEMOS_PAGE_SIZE);
   const [hasMoreMemos, setHasMoreMemos] = React.useState(false);
@@ -7054,11 +7128,64 @@ function App() {
   // Scroll to bottom of chat container
   const chatMessagesContainerRef = React.useRef(null);
   React.useEffect(() => {
+    setOlderChatMessages([]);
+    setHasMoreOlderChat(true);
+    setLoadingOlderChat(false);
+    loadingOlderChatRef.current = false;
+    setTotalChatCount(0);
+    setTotalGalleryCount(0);
+    if (!activeCalId) return;
+    let cancelled = false;
+    (async () => {
+      const msgCount = await fetchMessagesCollectionCount(activeCalId);
+      if (!cancelled && msgCount != null) setTotalChatCount(msgCount);
+      const galCount = await fetchGalleryItemCount(activeCalId);
+      if (!cancelled && galCount != null) setTotalGalleryCount(galCount);
+    })();
+    return () => { cancelled = true; };
+  }, [activeCalId]);
+
+  const loadOlderChatMessages = React.useCallback(async () => {
+    if (!activeCalId || loadingOlderChatRef.current || !hasMoreOlderChat) return;
+    const oldest = allChatMessages[0];
+    const beforeTs = oldest && oldest.timestamp;
+    if (!beforeTs) return;
+    loadingOlderChatRef.current = true;
+    setLoadingOlderChat(true);
+    const container = chatMessagesContainerRef.current;
+    const prevHeight = container ? container.scrollHeight : 0;
+    const prevTop = container ? container.scrollTop : 0;
+    try {
+      const older = await fetchOlderChatMessages(activeCalId, beforeTs, CHAT_OLDER_PAGE_SIZE);
+      if (!older.length) {
+        setHasMoreOlderChat(false);
+        return;
+      }
+      if (older.length < CHAT_OLDER_PAGE_SIZE) setHasMoreOlderChat(false);
+      setOlderChatMessages(prev => {
+        const seen = new Set((prev || []).map(m => m.id));
+        (chatMessages || []).forEach(m => { if (m && m.id) seen.add(m.id); });
+        const add = older.filter(m => m && m.id && !seen.has(m.id));
+        return add.length ? [...add, ...(prev || [])] : prev;
+      });
+      requestAnimationFrame(() => {
+        const el = chatMessagesContainerRef.current;
+        if (!el || !prevHeight) return;
+        el.scrollTop = prevTop + (el.scrollHeight - prevHeight);
+      });
+    } finally {
+      loadingOlderChatRef.current = false;
+      setLoadingOlderChat(false);
+    }
+  }, [activeCalId, hasMoreOlderChat, allChatMessages, chatMessages]);
+
+  React.useEffect(() => {
     if (activeView === 'chat' && chatMessagesContainerRef.current) {
       const container = chatMessagesContainerRef.current;
+      if (loadingOlderChatRef.current) return;
       container.scrollTop = container.scrollHeight;
       const t = setTimeout(() => {
-        container.scrollTop = container.scrollHeight;
+        if (!loadingOlderChatRef.current) container.scrollTop = container.scrollHeight;
       }, 50);
       return () => clearTimeout(t);
     }
@@ -7159,6 +7286,9 @@ function App() {
     // downward scrolling (when keyboard is closed) should hide the composer.
     if (isKeyboardOpenRef.current) return;
     const scrollTop = e.target.scrollTop;
+    if (scrollTop < 120 && hasMoreOlderChat && !loadingOlderChatRef.current) {
+      loadOlderChatMessages();
+    }
     const lastScrollTop = lastScrollTopRef.current;
     if (scrollTop < 10) {
       setIsHeaderVisible(true);
@@ -8556,7 +8686,9 @@ function App() {
   if (activeView === 'chat') {
     return withStickyVideo(/*#__PURE__*/React.createElement("div", { className: "chat-view-container" }, /*#__PURE__*/React.createElement(ChatRoomView, {
       calendar: activeCal,
-      chatMessages: chatMessages,
+      chatMessages: allChatMessages,
+      loadingOlderChat: loadingOlderChat,
+      hasMoreOlderChat: hasMoreOlderChat,
       chatInput: chatInput,
       setChatInput: setChatInput,
       chatParticipantId: chatParticipantId,
@@ -8635,7 +8767,7 @@ function App() {
   if (activeView === 'gallery') {
     return withStickyVideo(/*#__PURE__*/React.createElement(ChatGalleryModal, {
       calendar: activeCal,
-      chatMessages: chatMessages,
+      chatMessages: allChatMessages,
       memos: memos,
       asPage: true,
       onClose: () => changeView('calendar'),
@@ -8673,8 +8805,8 @@ function App() {
   }
 
   const mainMenuPollCount = getCalendarPolls(activeCal).filter(poll => !isPollClosed(poll)).length;
-  const mainMenuChatCount = chatMessages.length;
-  const mainMenuChatLatestTimestamp = mainMenuChatCount > 0 ? chatMessages[mainMenuChatCount - 1].timestamp : 0;
+  const mainMenuChatCount = totalChatCount > 0 ? totalChatCount : allChatMessages.length;
+  const mainMenuChatLatestTimestamp = allChatMessages.length > 0 ? allChatMessages[allChatMessages.length - 1].timestamp : 0;
   const mainMenuChatHasUnread = mainMenuChatLatestTimestamp > getChatLastReadTimestamp(activeCalId);
 
   // Each confirmed meeting gets its own banner bubble on the calendar, and stays up through
@@ -8918,7 +9050,8 @@ function App() {
   }, /*#__PURE__*/React.createElement(CommentsSection, {
     calendar: activeCal,
     recentMessages: recentMessages,
-    chatMessages: chatMessages,
+    chatMessages: allChatMessages,
+    totalChatCount: totalChatCount,
     chatInput: chatInput,
     setChatInput: setChatInput,
     chatParticipantId: chatParticipantId,
@@ -8947,7 +9080,8 @@ function App() {
       setIsModalOpen(true);
     }
   }), /*#__PURE__*/React.createElement(PhotoGallery, {
-    chatMessages: chatMessages,
+    chatMessages: allChatMessages,
+    totalGalleryCount: totalGalleryCount,
     showToast: showToast,
     onPromoteImageUrl: handlePromoteInlineChatImage,
     onSaveImageTags: handleSaveImageTags,
@@ -12092,6 +12226,7 @@ function CommentsSection({
   calendar,
   recentMessages,
   chatMessages = [],
+  totalChatCount: totalChatCountProp,
   chatInput,
   setChatInput,
   chatParticipantId,
@@ -12143,8 +12278,10 @@ function CommentsSection({
   // Total chat count + read/unread badge, tracked locally per calendar (no server-side
   // read state). chatMessages holds the most recent up to 100 messages, so its length is
   // an accurate total as long as a calendar hasn't exceeded that many messages ever sent.
-  const totalChatCount = chatMessages.length;
-  const latestChatTimestamp = totalChatCount > 0 ? chatMessages[totalChatCount - 1].timestamp : 0;
+  const totalChatCount = (typeof totalChatCountProp === 'number' && totalChatCountProp > 0)
+    ? totalChatCountProp
+    : chatMessages.length;
+  const latestChatTimestamp = chatMessages.length > 0 ? chatMessages[chatMessages.length - 1].timestamp : 0;
   const [lastReadTimestamp, setLastReadTimestamp] = React.useState(() => getChatLastReadTimestamp(calendar.id));
   React.useEffect(() => {
     setLastReadTimestamp(getChatLastReadTimestamp(calendar.id));
@@ -12593,6 +12730,8 @@ function CommentsSection({
 function ChatRoomView({
   calendar,
   chatMessages,
+  loadingOlderChat,
+  hasMoreOlderChat,
   chatInput,
   setChatInput,
   chatParticipantId,
@@ -13410,7 +13549,9 @@ function ChatRoomView({
       paddingTop: isSearchOpen ? '124px' : '72px',
       paddingBottom: '152px'
     }
-  }, noticePanelMode === 'add' && /*#__PURE__*/React.createElement("div", {
+  }, (loadingOlderChat || hasMoreOlderChat) && /*#__PURE__*/React.createElement("div", {
+    style: { textAlign: 'center', fontSize: '0.75rem', color: 'var(--text-muted)', padding: '8px 0 12px' }
+  }, loadingOlderChat ? '이전 대화를 불러오는 중…' : (hasMoreOlderChat ? '위로 스크롤하면 이전 대화가 로드됩니다' : '')), noticePanelMode === 'add' && /*#__PURE__*/React.createElement("div", {
     style: {
       position: 'sticky', top: 0, zIndex: 6,
       display: 'flex', flexDirection: 'column', gap: '8px',
@@ -26722,7 +26863,7 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
   );
 }
 
-function PhotoGallery({ chatMessages, showToast, onPromoteImageUrl, onSaveImageTags, onSearchTag }) {
+function PhotoGallery({ chatMessages, totalGalleryCount, showToast, onPromoteImageUrl, onSaveImageTags, onSearchTag }) {
   const [collapsed, setCollapsed] = React.useState(true); // Closed initially by default
   const [lightbox, setLightbox] = React.useState(null); // { urls: string[], index: number } | null
 
@@ -26759,7 +26900,7 @@ function PhotoGallery({ chatMessages, showToast, onPromoteImageUrl, onSaveImageT
     },
       /*#__PURE__*/React.createElement(GalleryIcon, null),
       "갤러리 ",
-      /*#__PURE__*/React.createElement(SectionCountBadge, { count: photoEntries.length }),
+      /*#__PURE__*/React.createElement(SectionCountBadge, { count: (typeof totalGalleryCount === 'number' && totalGalleryCount > photoEntries.length) ? totalGalleryCount : photoEntries.length }),
       /*#__PURE__*/React.createElement(SectionToggleButton, {
         collapsed,
         onToggle: () => setCollapsed(prev => !prev),
