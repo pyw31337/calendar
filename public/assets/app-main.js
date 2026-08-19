@@ -108,7 +108,8 @@ function normalizePlaces(places) {
       id: sanitizeText(place.id || '', 80) || `place_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
       name: sanitizeText(place.name || '', 80),
       alias: sanitizeText(place.alias || '', 80),
-      address: sanitizeText(place.address || '', 200),
+      // 표시·저장 포맷 통일. 병합 키로 쓰지 않음(id만).
+      address: normalizePlaceAddressForSave(place.address || '', place.lat, place.lng),
       lat: Number(place.lat),
       lng: Number(place.lng),
       categoryId: sanitizeText(place.categoryId || 'etc', 40),
@@ -7842,6 +7843,8 @@ function App() {
         ? existingPlaces.map(p => p.id === placeData.id ? { ...p, ...editedFields } : p)
         : [...existingPlaces, { id: placeData.id, ...editedFields, createdAt: now }];
     } else {
+      // RULE: 주소/좌표/이름으로 기존 장소와 합치지 않음.
+      // 같은 단지에 도은네·은우네·서준네처럼 별칭·메모가 다른 장소는 각각 별도 문서.
       nextPlaces = [...existingPlaces, { id: `place_${activeCal.id}_${now}_${Math.random().toString(36).slice(2, 7)}`, ...editedFields, createdAt: now }];
     }
     const prevPlace = isEditing ? existingPlaces.find(p => p.id === placeData.id) : null;
@@ -24786,25 +24789,60 @@ function stripKoreaCountryPrefix(address) {
     .trim();
 }
 
-// 국내: 앞의 "대한민국" 제거 / 해외(베트남 등): 국가명 포함 전체 주소 유지
+// Kakao 스타일로 통일: 짧은 시/도 + 도로명·번지까지만. Nominatim POI 꼬리 제거.
+function normalizeDomesticKoreanAddress(address) {
+  let s = stripKoreaCountryPrefix(address);
+  if (!s) return '';
+  const regionPairs = [
+    [/^서울특별시(?=\s|$)/, '서울'],
+    [/^부산광역시(?=\s|$)/, '부산'],
+    [/^대구광역시(?=\s|$)/, '대구'],
+    [/^인천광역시(?=\s|$)/, '인천'],
+    [/^광주광역시(?=\s|$)/, '광주'],
+    [/^대전광역시(?=\s|$)/, '대전'],
+    [/^울산광역시(?=\s|$)/, '울산'],
+    [/^세종특별자치시(?=\s|$)/, '세종'],
+    [/^제주특별자치도(?=\s|$)/, '제주'],
+    [/^강원특별자치도(?=\s|$)/, '강원'],
+    [/^전북특별자치도(?=\s|$)/, '전북'],
+    [/^전라북도(?=\s|$)/, '전북'],
+    [/^전라남도(?=\s|$)/, '전남'],
+    [/^충청북도(?=\s|$)/, '충북'],
+    [/^충청남도(?=\s|$)/, '충남'],
+    [/^경상북도(?=\s|$)/, '경북'],
+    [/^경상남도(?=\s|$)/, '경남'],
+    [/^경기도(?=\s|$)/, '경기'],
+    [/^강원도(?=\s|$)/, '강원']
+  ];
+  for (let i = 0; i < regionPairs.length; i++) {
+    s = s.replace(regionPairs[i][0], regionPairs[i][1]);
+  }
+  s = s.replace(/\s+/g, ' ').trim();
+  const roadCut = s.match(/^(.+?(?:로|길)\s*\d+(?:-\d+)?(?:번지)?)/);
+  if (roadCut) return roadCut[1].trim();
+  const lotCut = s.match(/^(.+?(?:동|리|가)\s*\d+(?:-\d+)?)/);
+  if (lotCut) return lotCut[1].trim();
+  return s;
+}
+
+// RULE: 같은 주소/좌표라도 별칭·메모가 다르면 절대 합치지 않음. 장소 식별은 id만 사용.
+// 국내: 통일 포맷 / 해외: 국가명 포함 원문 유지.
 function getDisplayPlaceAddress(place) {
-  const raw = String(place?.address || '').trim();
-  if (!raw) return '';
-  const hasCoords = Number.isFinite(Number(place?.lat)) && Number.isFinite(Number(place?.lng));
-  const domestic = hasCoords
-    ? isDomesticLatLng(Number(place.lat), Number(place.lng))
-    : /^(대한민국|남한|South\s*Korea|Korea,?\s*Republic\s+of|Republic\s+of\s+Korea|ROK)\b/i.test(raw);
-  return domestic ? stripKoreaCountryPrefix(raw) : raw;
+  return normalizePlaceAddressForSave(place?.address || '', place?.lat, place?.lng);
 }
 
 function normalizePlaceAddressForSave(address, lat, lng) {
   const raw = sanitizeText(address || '', 200);
   if (!raw) return '';
   const hasCoords = Number.isFinite(Number(lat)) && Number.isFinite(Number(lng));
-  if (hasCoords && isDomesticLatLng(Number(lat), Number(lng))) return stripKoreaCountryPrefix(raw);
-  if (/^(대한민국|남한)\b/u.test(raw)) return stripKoreaCountryPrefix(raw);
-  return raw;
+  const domestic = hasCoords
+    ? isDomesticLatLng(Number(lat), Number(lng))
+    : /^(대한민국|남한|South\s*Korea|Korea,?\s*Republic\s+of|Republic\s+of\s+Korea|ROK)\b/i.test(raw)
+      || /^(서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주)/.test(raw);
+  if (domestic) return sanitizeText(normalizeDomesticKoreanAddress(raw), 200);
+  return sanitizeText(raw.replace(/\s+/g, ' ').trim(), 200);
 }
+
 // A calendar built from an imported travel log can have a handful of overseas trips mixed in
 // with a much larger cluster of everyday domestic places -- fitting bounds over literally every
 // pin would zoom the main-screen preview out to "half of Asia" just to include one Da Nang trip.
