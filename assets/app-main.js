@@ -18570,7 +18570,14 @@ function ChatGalleryModal({
     chatMessages.forEach(msg => {
       const directEntry = getMessageDirectMediaEntry(msg);
       const entries = directEntry ? [...getMessageImageEntries(msg), directEntry] : getMessageImageEntries(msg);
-      list.push(...entries);
+      // Attach parent message text so gallery search can match caption/body, not only tags.
+      entries.forEach(entry => {
+        list.push({
+          ...entry,
+          text: msg.text || '',
+          participantId: msg.participantId || ''
+        });
+      });
     });
     return list.sort((a, b) => b.timestamp - a.timestamp);
   }, [chatMessages]);
@@ -18578,11 +18585,12 @@ function ChatGalleryModal({
   const filteredLinks = React.useMemo(() => {
     if (!searchQuery.trim()) return sharedLinks;
     const q = searchQuery.toLowerCase().trim();
+    const qNoHash = q.replace(/^#/, '');
     return sharedLinks.filter(item => {
-      const matchText = (item.text || '').toLowerCase().includes(q);
-      const matchUrl = (item.url || '').toLowerCase().includes(q);
-      const matchTitle = (item.linkPreview?.title || '').toLowerCase().includes(q);
-      const matchDesc = (item.linkPreview?.description || '').toLowerCase().includes(q);
+      const matchText = (item.text || '').toLowerCase().includes(q) || (item.text || '').toLowerCase().includes(qNoHash);
+      const matchUrl = (item.url || '').toLowerCase().includes(q) || (item.url || '').toLowerCase().includes(qNoHash);
+      const matchTitle = (item.linkPreview?.title || '').toLowerCase().includes(q) || (item.linkPreview?.title || '').toLowerCase().includes(qNoHash);
+      const matchDesc = (item.linkPreview?.description || '').toLowerCase().includes(q) || (item.linkPreview?.description || '').toLowerCase().includes(qNoHash);
       return matchText || matchUrl || matchTitle || matchDesc;
     });
   }, [sharedLinks, searchQuery]);
@@ -18590,10 +18598,13 @@ function ChatGalleryModal({
   const filteredPhotos = React.useMemo(() => {
     if (!searchQuery.trim()) return sharedPhotos;
     const q = searchQuery.toLowerCase().trim();
+    const qNoHash = q.replace(/^#/, '');
     return sharedPhotos.filter(item => {
-      const tags = Array.isArray(item.tags) ? item.tags : [];
-      const matchTags = tags.some(tag => tag.toLowerCase().includes(q));
-      const matchText = (item.text || '').toLowerCase().includes(q);
+      // tags is stored as a space-separated string (e.g. "#영우생일 #말복"), not an array
+      const tagsRaw = Array.isArray(item.tags) ? item.tags.join(' ') : String(item.tags || '');
+      const tagsLower = tagsRaw.toLowerCase();
+      const matchTags = tagsLower.includes(q) || tagsLower.includes(qNoHash) || tagsLower.replace(/#/g, '').includes(qNoHash);
+      const matchText = (item.text || '').toLowerCase().includes(q) || (item.text || '').toLowerCase().includes(qNoHash);
       return matchTags || matchText;
     });
   }, [sharedPhotos, searchQuery]);
@@ -18659,7 +18670,7 @@ function ChatGalleryModal({
         /*#__PURE__*/React.createElement("input", {
           type: "text",
           className: "search-input",
-          placeholder: activeTab === 'photos' ? "태그 또는 텍스트 검색" : "텍스트, URL, 제목 검색",
+          placeholder: "사진·링크 통합 검색 (태그, 텍스트, URL)",
           value: searchQuery,
           onChange: e => setSearchQuery(e.target.value),
           autoFocus: true,
@@ -18705,25 +18716,43 @@ function ChatGalleryModal({
     )
   ), /*#__PURE__*/React.createElement("div", {
     style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', padding: '12px 20px 8px 20px', borderBottom: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)' }
-  }, [['photos', '사진'], ['links', '링크']].map(tab => /*#__PURE__*/React.createElement("button", {
-    key: tab[0],
-    type: "button",
-    onClick: () => { setActiveTab(tab[0]); setSearchQuery(''); },
-    style: {
-      border: 'none',
-      borderRadius: '8px',
-      padding: '8px 10px',
-      background: activeTab === tab[0] ? 'var(--accent-primary)' : 'transparent',
-      color: activeTab === tab[0] ? '#FFFFFF' : 'var(--text-muted)',
-      fontWeight: 900,
-      fontSize: '0.86rem',
-      cursor: 'pointer',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: '6px'
-    }
-  }, tab[1]))), /*#__PURE__*/React.createElement("div", {
+  }, [['photos', '사진'], ['links', '링크']].map(tab => {
+    const count = tab[0] === 'photos' ? filteredPhotos.length : filteredLinks.length;
+    const showBadge = !!searchQuery.trim();
+    return /*#__PURE__*/React.createElement("button", {
+      key: tab[0],
+      type: "button",
+      onClick: () => setActiveTab(tab[0]),
+      style: {
+        border: 'none',
+        borderRadius: '8px',
+        padding: '8px 10px',
+        background: activeTab === tab[0] ? 'var(--accent-primary)' : 'transparent',
+        color: activeTab === tab[0] ? '#FFFFFF' : 'var(--text-muted)',
+        fontWeight: 900,
+        fontSize: '0.86rem',
+        cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '6px'
+      }
+    },
+      tab[1],
+      showBadge && /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: '0.7rem',
+          fontWeight: 800,
+          padding: '1px 7px',
+          borderRadius: '999px',
+          backgroundColor: activeTab === tab[0] ? 'rgba(255,255,255,0.22)' : 'var(--border-subtle)',
+          color: activeTab === tab[0] ? '#FFFFFF' : 'var(--text-muted)',
+          minWidth: '18px',
+          textAlign: 'center'
+        }
+      }, String(count))
+    );
+  })), /*#__PURE__*/React.createElement("div", {
     style: { flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '12px' }
   }, activeTab === 'links' ? (
     filteredLinks.length === 0 ? /*#__PURE__*/React.createElement("div", {
