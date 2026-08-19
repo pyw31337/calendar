@@ -31,6 +31,12 @@
 - 복구 기준 태그: `safe-before-split-20260814-7da2504`
 - 최근 안정 태그: `safe-notification-audit-20260814-c20233b`, `safe-notification-split-20260814-dfa42fd`, `safe-url-utils-split-20260814-3974923`, `safe-shortcut-utils-split-20260814-7c0d5a8`
 
+
+## 2026-08-19 추가 메모
+
+- 15c 후 getPlaceSortDateKey 누락 → places 크래시 후 복구
+- 상세 백로그: docs/upgrade-backlog.md
+
 ## 2026-08-19 성능·보안 진행 메모
 
 - 화면별 Firestore 구독 분리: 메모/장소/기념일은 해당 뷰에서만 구독

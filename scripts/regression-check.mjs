@@ -8,6 +8,7 @@ const CURRENT_REGRESSION_SUITES = [
   ['check:asset-mirrors', 'external root/public asset mirror checks'],
   ['check:size-budget', 'single-file app shell size budget checks'],
   ['check:tab-wiring', 'reachable tab/mode branch checks'],
+  ['check:required-symbols', 'critical runtime symbol presence after util splits'],
   ['build', 'production bundle smoke check']
 ];
 

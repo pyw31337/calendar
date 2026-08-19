@@ -5,7 +5,11 @@ const cacheBust = process.env.CALENDAR_LIVE_CACHE_BUST || Date.now().toString(36
 const pages = [
   '?id=kkot',
   '?id=jhair',
+  '?id=cw',
   '?id=cw&view=chat',
+  '?id=cw&view=memo',
+  '?id=cw&view=places',
+  '?id=kkot&view=places',
   '?admin=1',
   '?admin=1&restore=1'
 ];
@@ -49,7 +53,18 @@ for (const page of pages) {
   });
 }
 
-for (const asset of assets) {
+let assetPaths = assets;
+try {
+  const indexUrl = new URL('.', baseUrl).toString() + `?_v=${cacheBust}`;
+  const indexRes = await fetch(indexUrl, { redirect: 'follow' });
+  const indexText = await indexRes.text();
+  const found = [...indexText.matchAll(/assets\/(app-[a-z0-9.-]+\.js)\?v=([^"']+)/g)].map(m => `assets/${m[1]}?v=${m[2]}`);
+  if (found.length) assetPaths = [...new Set(found)];
+} catch (e) {
+  console.warn('[live-smoke] could not parse index assets, using defaults', e && e.message);
+}
+
+for (const asset of assetPaths) {
   await checkUrl(withCacheBust(asset), (text, url) => {
     if (!text.trim()) {
       throw new Error(`Empty asset response: ${url}`);
