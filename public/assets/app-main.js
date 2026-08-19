@@ -314,24 +314,18 @@ function getNaverMapSearchRegionHint(address) {
   return /^[가-힣]+(?:시|군|구)$/.test(firstToken) ? firstToken : '';
 }
 function getNaverMapPlaceUrl(place) {
-  // Prefer official name + as much address as we have. Region-only hints (e.g. "시흥시") often
-  // fail to match Naver POI when the business name is slightly different; full road address
-  // recovers matches and still lands near the right block when POI is missing.
-  const name = String(place?.name || '').trim();
-  const address = String(place?.address || '').trim()
-    .replace(/^대한민국\s*/, '');
-  const regionHint = getNaverMapSearchRegionHint(place?.address);
-  const parts = [];
-  if (name) parts.push(name);
-  if (address) parts.push(address);
-  else if (regionHint) parts.push(regionHint);
-  const query = parts.join(' ') || name || '플레이스';
+  // Keyword search on Naver often returns "조건에 맞는 업체가 없습니다" when the stored name
+  // differs slightly from Naver's POI title. Prefer Kakao map pin with exact lat/lng (same
+  // coordinates Kakao Local search used at registration) so 업체보기 always lands on the pin.
+  const name = String(place?.name || place?.alias || '플레이스').trim() || '플레이스';
   const lat = Number(place?.lat);
   const lng = Number(place?.lng);
   if (Number.isFinite(lat) && Number.isFinite(lng)) {
-    return `https://map.naver.com/p/search/${encodeURIComponent(query)}?c=${lng},${lat},15,0,0,0,dh`;
+    return `https://map.kakao.com/link/map/${encodeURIComponent(name)},${lat},${lng}`;
   }
-  return `https://map.naver.com/p/search/${encodeURIComponent(query)}`;
+  const address = String(place?.address || '').trim().replace(/^대한민국\s*/, '');
+  const query = [name, address].filter(Boolean).join(' ') || name;
+  return `https://map.kakao.com/link/search/${encodeURIComponent(query)}`;
 }
 
 // Google Maps' "search" deep link, pinned to the exact coordinate rather than a text query --
@@ -14478,7 +14472,10 @@ function DateModal({
   const isConfirmed = isDateConfirmedMeeting(calendar, dateStr);
   const confirmedMeetingEntry = getConfirmedMeetings(calendar).find(m => m.date === dateStr) || null;
   const expenses = React.useMemo(
-    () => (Array.isArray(confirmedMeetingEntry?.expenses) ? confirmedMeetingEntry.expenses : []).slice().sort((a, b) => {
+    () => (Array.isArray(confirmedMeetingEntry?.expenses) ? confirmedMeetingEntry.expenses : [])
+      .filter(e => e && typeof e === 'object' && e.id)
+      .slice()
+      .sort((a, b) => {
       const aOrder = Number.isFinite(Number(a.order)) ? Number(a.order) : Number.POSITIVE_INFINITY;
       const bOrder = Number.isFinite(Number(b.order)) ? Number(b.order) : Number.POSITIVE_INFINITY;
       if (aOrder !== bOrder) return aOrder - bOrder;
@@ -14508,13 +14505,24 @@ function DateModal({
     expensePointerSortRef.current = { sourceId: '', targetId: '', startX: 0, startY: 0, active: false };
   }, [calendar?.id, dateStr]);
 
-  const expenseTotal = expenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
-  const expenseCategories = getExpenseCategories(calendar);
-  const getExpenseUrl = expense => sanitizeText(expense?.url || extractFirstUrl(expense?.label || ''), 220);
+  const expenseTotal = expenses.reduce((sum, e) => sum + (Number(e?.amount) || 0), 0);
+  const expenseCategories = getExpenseCategories(calendar) || [];
+  const getExpenseUrl = expense => {
+    try {
+      const labelStr = typeof expense?.label === 'string' ? expense.label : String(expense?.label || '');
+      return sanitizeText(expense?.url || extractFirstUrl(labelStr) || '', 220);
+    } catch (_) {
+      return '';
+    }
+  };
   const getExpenseLabel = expense => {
-    const raw = expense?.label || '';
-    const url = getExpenseUrl(expense);
-    return url ? raw.replace(url, '').trim() : raw;
+    try {
+      const raw = typeof expense?.label === 'string' ? expense.label : String(expense?.label || '');
+      const url = getExpenseUrl(expense);
+      return url ? raw.replace(url, '').trim() : raw;
+    } catch (_) {
+      return String(expense?.label || '');
+    }
   };
   const handleExpenseItemClick = expense => {
     if (isSavingExpense) return;
@@ -15406,7 +15414,7 @@ function DateModal({
                     fontSize: '0.68rem',
                     fontWeight: 900
                   }
-                }, getExpenseCategoryIcon(expenseCategory), getExpenseCategoryIcon(expenseCategory) ? '\u00A0' : '', expenseCategory.name),
+                }, getExpenseCategoryIcon(expenseCategory), getExpenseCategoryIcon(expenseCategory) ? '\u00A0' : '', categoryName),
                 expenseTime && /*#__PURE__*/React.createElement("span", {
                   style: {
                     display: 'inline-flex',
@@ -15767,7 +15775,8 @@ function ColorSwatchPicker({ value, onChange, disabled, title = "색상 선택" 
 // native <select>, the open dropdown list is entirely CSS-styled and follows dark mode.
 function SimpleBottomSheetPicker({ title, value, options, onSelect, placeholder, disabled, style, className = "form-select" }) {
   const [isOpen, setIsOpen] = React.useState(false);
-  const selected = options.find(o => o.value === value);
+  const safeOptions = Array.isArray(options) ? options : [];
+  const selected = safeOptions.find(o => o.value === value);
   const sheet = isOpen && /*#__PURE__*/React.createElement("div", {
     className: "bottom-sheet-overlay",
     onClick: () => setIsOpen(false)
@@ -15784,7 +15793,7 @@ function SimpleBottomSheetPicker({ title, value, options, onSelect, placeholder,
       }, "✕")
     ),
     /*#__PURE__*/React.createElement("div", { className: "bottom-sheet-body" },
-      options.map(opt => /*#__PURE__*/React.createElement("button", {
+      safeOptions.map(opt => /*#__PURE__*/React.createElement("button", {
         key: opt.value,
         type: "button",
         className: "bottom-sheet-item",
@@ -22898,6 +22907,7 @@ function ToggleSwitch({ checked, onChange, label }) {
 // app's purple accent, so this covers both neutral toggles (방문/예정, 누적보기/일자별보기) and
 // semantically-colored ones (수입/지출) with one shared component.
 function SegmentedToggle({ options, value, onChange, disabled, style, ariaLabel }) {
+  const safeOptions = Array.isArray(options) ? options : [];
   return /*#__PURE__*/React.createElement("div", {
     role: "tablist",
     "aria-label": ariaLabel,
@@ -22906,7 +22916,7 @@ function SegmentedToggle({ options, value, onChange, disabled, style, ariaLabel 
       border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', flexShrink: 0,
       ...style
     }
-  }, options.flatMap((opt, i) => [
+  }, safeOptions.flatMap((opt, i) => [
     i > 0 ? /*#__PURE__*/React.createElement("span", {
       key: `div-${opt.value}`, "aria-hidden": "true",
       style: { width: '1px', margin: '6px 2px', backgroundColor: 'var(--border-subtle)' }
@@ -24711,7 +24721,21 @@ function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom = false
     // hidden under the header/list below the map. Backing off one zoom level and padding out
     // further on mobile keeps more of the cluster in frame.
     const isMobileViewport = window.innerWidth <= 720;
-    if (fitBoundsPoints.length === 1) {
+    // When a list row has focused a place, do NOT fitBounds -- that re-collapses clusters and
+    // closes the popup the focus effect just opened (places is a new array every parent render).
+    if (focusPlace && focusPlace.id && markersByIdRef.current.get(focusPlace.id)) {
+      const focused = markersByIdRef.current.get(focusPlace.id);
+      const layer = markersLayerRef.current;
+      const openFocused = () => {
+        mapRef.current.setView(focused.getLatLng(), isMobileViewport ? 16 : 17, { animate: false });
+        focused.openPopup();
+      };
+      if (layer && typeof layer.zoomToShowLayer === 'function') {
+        layer.zoomToShowLayer(focused, openFocused);
+      } else {
+        openFocused();
+      }
+    } else if (fitBoundsPoints.length === 1) {
       mapRef.current.setView(fitBoundsPoints[0], isMobileViewport ? 14 : 15);
     } else if (fitBoundsPoints.length > 1) {
       mapRef.current.fitBounds(fitBoundsPoints, {
@@ -24723,7 +24747,7 @@ function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom = false
     } else {
       mapRef.current.setView(PLACE_MAP_DEFAULT_CENTER, PLACE_MAP_DEFAULT_ZOOM);
     }
-  }, [ready, places, calendar, preferDomesticBounds]);
+  }, [ready, places, calendar, preferDomesticBounds, focusPlace]);
 
   // Pans/zooms straight to a single place's marker and opens its popup -- driven by PlacesView's
   // list rows (clicking one focuses that place's pin here) rather than by anything inside this
