@@ -7726,12 +7726,13 @@ function App() {
     const categoryIds = new Set(getPlaceCategories(activeCal).map(c => c.id));
     const cleanCategoryId = categoryIds.has(placeData.categoryId) ? placeData.categoryId : 'etc';
     const cleanAddress = sanitizeText(placeData.address || '', 200);
+    const cleanAlias = sanitizeText(placeData.alias || '', 80);
     const cleanMemo = sanitizeText(placeData.memo || '', 2000);
     const cleanVisitStatus = placeData.visitStatus === 'planned' ? 'planned' : 'visited';
     const cleanVisitDate = cleanVisitStatus === 'visited' && isValidDateString(placeData.visitDate) ? placeData.visitDate : '';
     const nextPlaces = isEditing
-      ? existingPlaces.map(p => p.id === placeData.id ? { ...p, name: cleanName, address: cleanAddress, lat: placeData.lat, lng: placeData.lng, categoryId: cleanCategoryId, memo: cleanMemo, visitStatus: cleanVisitStatus, visitDate: cleanVisitDate, updatedAt: now } : p)
-      : [...existingPlaces, { id: `place_${activeCal.id}_${now}_${Math.random().toString(36).slice(2, 7)}`, name: cleanName, address: cleanAddress, lat: placeData.lat, lng: placeData.lng, categoryId: cleanCategoryId, memo: cleanMemo, visitStatus: cleanVisitStatus, visitDate: cleanVisitDate, createdAt: now, updatedAt: now }];
+      ? existingPlaces.map(p => p.id === placeData.id ? { ...p, name: cleanName, alias: cleanAlias, address: cleanAddress, lat: placeData.lat, lng: placeData.lng, categoryId: cleanCategoryId, memo: cleanMemo, visitStatus: cleanVisitStatus, visitDate: cleanVisitDate, updatedAt: now } : p)
+      : [...existingPlaces, { id: `place_${activeCal.id}_${now}_${Math.random().toString(36).slice(2, 7)}`, name: cleanName, alias: cleanAlias, address: cleanAddress, lat: placeData.lat, lng: placeData.lng, categoryId: cleanCategoryId, memo: cleanMemo, visitStatus: cleanVisitStatus, visitDate: cleanVisitDate, createdAt: now, updatedAt: now }];
     const placeActivityLog = createActivityLog(activeCal.id, isEditing ? 'place_update' : 'place_create', '', '', now, cleanName);
     const updatedCal = {
       ...activeCal,
@@ -25291,7 +25292,8 @@ function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, onDelete,
           placeholder: "목록에 표시할 별칭 (예: 도은네 집)",
           maxLength: 80,
           value: alias,
-          onChange: e => setAlias(e.target.value)
+          onChange: e => setAlias(e.target.value),
+          style: { width: '100%', boxSizing: 'border-box' }
         }),
         /*#__PURE__*/React.createElement("div", {
           style: { marginTop: '4px', fontSize: '0.72rem', color: 'var(--text-muted)' }
