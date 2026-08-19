@@ -8319,7 +8319,14 @@ function App() {
       showToast: showToast,
       onRequestConfirm: showConfirmDialog,
       placesInitialQuery: placesInitialQuery,
-      setPlacesInitialQuery: setPlacesInitialQuery
+      setPlacesInitialQuery: setPlacesInitialQuery,
+      isDarkTheme: isDarkTheme,
+      onToggleTheme: toggleTheme,
+      fontScalePercent: fontScalePercent,
+      onDecreaseFont: () => setFontScalePercent(prev => Math.max(80, prev - 10)),
+      onIncreaseFont: () => setFontScalePercent(prev => Math.min(130, prev + 10)),
+      isChatNotifyEnabled: mainNotifPermission === 'granted' && mainChatNotifyEnabled,
+      onToggleChatNotifications: handleMainToggleNotifications
     }));
   }
 
@@ -18111,6 +18118,52 @@ function WeatherLocationModal({ onClose, onSelectLocation, onDeleteRecentLocatio
   ));
 }
 
+
+function SharedSideMenuSettings({
+  isDarkTheme,
+  onToggleTheme,
+  fontScalePercent,
+  onDecreaseFont,
+  onIncreaseFont,
+  isChatNotifyEnabled,
+  onToggleChatNotifications
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    className: "admin-side-menu-list shared-side-menu-settings",
+    style: { borderTop: 'none', borderBottom: 'none', paddingTop: '14px' }
+  },
+    /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-setting-row" },
+      /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-label" },
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-icon", "aria-hidden": "true" }, /*#__PURE__*/React.createElement(MoonStarsIcon, null)),
+        "다크모드"
+      ),
+      /*#__PURE__*/React.createElement(ToggleSwitch, { checked: !!isDarkTheme, onChange: onToggleTheme, label: "다크모드" })
+    ),
+    /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-setting-row" },
+      /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-label" },
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-icon", "aria-hidden": "true" }, /*#__PURE__*/React.createElement(TextResizeIcon, null)),
+        "글자크기"
+      ),
+      /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-font-controls" },
+        /*#__PURE__*/React.createElement("button", {
+          type: "button", onClick: onDecreaseFont, "aria-label": "글자 크기 줄이기", className: "admin-side-menu-font-btn"
+        }, "−"),
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-font-value" }, `${fontScalePercent || 100}%`),
+        /*#__PURE__*/React.createElement("button", {
+          type: "button", onClick: onIncreaseFont, "aria-label": "글자 크기 늘리기", className: "admin-side-menu-font-btn"
+        }, "+")
+      )
+    ),
+    /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-setting-row" },
+      /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-label" },
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-icon", "aria-hidden": "true" }, /*#__PURE__*/React.createElement(BellIcon, null)),
+        "채팅알림"
+      ),
+      /*#__PURE__*/React.createElement(ToggleSwitch, { checked: !!isChatNotifyEnabled, onChange: onToggleChatNotifications, label: "채팅알림" })
+    )
+  );
+}
+
 function MainSideMenu({
   calendar,
   anniversaries = [],
@@ -18271,43 +18324,15 @@ function MainSideMenu({
         )
       )
     ),
-    /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-list", style: { borderTop: 'none', borderBottom: '1px solid #E2E8F0', paddingTop: '14px' } },
-	      /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-setting-row" },
-	        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-label" },
-	          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-icon", "aria-hidden": "true" }, /*#__PURE__*/React.createElement(MoonStarsIcon, null)),
-	          "다크모드"
-	        ),
-	        /*#__PURE__*/React.createElement(ToggleSwitch, { checked: !!isDarkTheme, onChange: onToggleTheme, label: "다크모드" })
-	      ),
-	      /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-setting-row" },
-	        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-label" },
-	          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-icon", "aria-hidden": "true" }, /*#__PURE__*/React.createElement(TextResizeIcon, null)),
-	          "글자크기"
-	        ),
-	        /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-font-controls" },
-          /*#__PURE__*/React.createElement("button", {
-            type: "button",
-            onClick: onDecreaseFont,
-            "aria-label": "글자 크기 줄이기",
-            className: "admin-side-menu-font-btn"
-          }, "−"),
-          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-font-value" }, `${fontScalePercent || 100}%`),
-          /*#__PURE__*/React.createElement("button", {
-            type: "button",
-            onClick: onIncreaseFont,
-            "aria-label": "글자 크기 늘리기",
-            className: "admin-side-menu-font-btn"
-          }, "+")
-        )
-	      ),
-	      /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-setting-row" },
-	        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-label" },
-	          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-icon", "aria-hidden": "true" }, /*#__PURE__*/React.createElement(BellIcon, null)),
-	          "채팅알림"
-	        ),
-	        /*#__PURE__*/React.createElement(ToggleSwitch, { checked: !!isChatNotifyEnabled, onChange: onToggleChatNotifications, label: "채팅알림" })
-	      )
-    ),
+    /*#__PURE__*/React.createElement(SharedSideMenuSettings, {
+      isDarkTheme: isDarkTheme,
+      onToggleTheme: onToggleTheme,
+      fontScalePercent: fontScalePercent,
+      onDecreaseFont: onDecreaseFont,
+      onIncreaseFont: onIncreaseFont,
+      isChatNotifyEnabled: isChatNotifyEnabled,
+      onToggleChatNotifications: onToggleChatNotifications
+    }),
     /* Gallery + Places — right under 채팅알림 (no extra top border: settings section already has bottom border) */
     /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-list", style: { borderTop: 'none', borderBottom: 'none', paddingTop: '8px' } },
       /*#__PURE__*/React.createElement("button", {
@@ -18444,6 +18469,19 @@ function ChatSideMenu({
       /*#__PURE__*/React.createElement("button", {
         type: "button",
         className: "admin-side-menu-item",
+        onClick: () => { onClose(); handle(onOpenGallery); }
+      },
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", {
+          xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2"
+        }, /*#__PURE__*/React.createElement("rect", { width: "18", height: "18", x: "3", y: "3", rx: "2", ry: "2" }), /*#__PURE__*/React.createElement("circle", { cx: "9", cy: "9", r: "2" }), /*#__PURE__*/React.createElement("path", { d: "m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" }))),
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "갤러리"),
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "채팅 사진 및 링크")
+        )
+      ),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "admin-side-menu-item",
         onClick: () => { onClose(); handle(onOpenNoticeSettings); }
       },
         /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement(MegaphoneIcon, { size: 20 })),
@@ -18474,43 +18512,15 @@ function ChatSideMenu({
         )
       )
     ),
-    /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-list", style: { borderTop: 'none', borderBottom: 'none', paddingTop: '14px' } },
-      /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-setting-row" },
-        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-label" },
-          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-icon", "aria-hidden": "true" }, /*#__PURE__*/React.createElement(MoonStarsIcon, null)),
-          "다크모드"
-        ),
-        /*#__PURE__*/React.createElement(ToggleSwitch, { checked: !!isDarkTheme, onChange: onToggleTheme, label: "다크모드" })
-      ),
-      /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-setting-row" },
-        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-label" },
-          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-icon", "aria-hidden": "true" }, /*#__PURE__*/React.createElement(TextResizeIcon, null)),
-          "글자크기"
-        ),
-        /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-font-controls" },
-          /*#__PURE__*/React.createElement("button", {
-            type: "button",
-            onClick: onDecreaseFont,
-            "aria-label": "글자 크기 줄이기",
-            className: "admin-side-menu-font-btn"
-          }, "−"),
-          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-font-value" }, `${fontScalePercent || 100}%`),
-          /*#__PURE__*/React.createElement("button", {
-            type: "button",
-            onClick: onIncreaseFont,
-            "aria-label": "글자 크기 늘리기",
-            className: "admin-side-menu-font-btn"
-          }, "+")
-        )
-      ),
-      /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-setting-row" },
-        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-label" },
-          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-icon", "aria-hidden": "true" }, /*#__PURE__*/React.createElement(BellIcon, null)),
-          "채팅알림"
-        ),
-        /*#__PURE__*/React.createElement(ToggleSwitch, { checked: !!isChatNotifyEnabled, onChange: onToggleChatNotifications, label: "채팅알림" })
-      )
-    ),
+    /*#__PURE__*/React.createElement(SharedSideMenuSettings, {
+      isDarkTheme: isDarkTheme,
+      onToggleTheme: onToggleTheme,
+      fontScalePercent: fontScalePercent,
+      onDecreaseFont: onDecreaseFont,
+      onIncreaseFont: onIncreaseFont,
+      isChatNotifyEnabled: isChatNotifyEnabled,
+      onToggleChatNotifications: onToggleChatNotifications
+    }),
   )));
 }
 
@@ -25417,7 +25427,7 @@ function PlacesSection({ calendar, onViewAll }) {
 // taller interactive map (marker click opens the register modal pre-filled for editing) plus a
 // scrollable place-card list below it, since editing/deleting via Leaflet popup controls isn't
 // practical to build or to verify structurally -- the card list is plain React DOM instead.
-function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, onRequestConfirm, placesInitialQuery, setPlacesInitialQuery }) {
+function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, onRequestConfirm, placesInitialQuery, setPlacesInitialQuery, isDarkTheme, onToggleTheme, fontScalePercent, onDecreaseFont, onIncreaseFont, isChatNotifyEnabled, onToggleChatNotifications }) {
   const [isRegisterOpen, setIsRegisterOpen] = React.useState(false);
   const [editingPlace, setEditingPlace] = React.useState(null);
   const [categoryFilter, setCategoryFilter] = React.useState('all');
@@ -25890,10 +25900,8 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
     },
       /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-header" },
         /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-brand" },
-          /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-logo", "aria-hidden": "true" }, "📍"),
           /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-copy" },
-            /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-title" }, "플레이스 메뉴"),
-            /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-subtitle" }, "등록 · 검색")
+            /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-title" }, "플레이스 메뉴")
           )
         ),
         /*#__PURE__*/React.createElement("button", {
@@ -25925,7 +25933,16 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
             /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "등록된 장소명·주소 검색")
           )
         )
-      )
+      ),
+      /*#__PURE__*/React.createElement(SharedSideMenuSettings, {
+        isDarkTheme: isDarkTheme,
+        onToggleTheme: onToggleTheme,
+        fontScalePercent: fontScalePercent,
+        onDecreaseFont: onDecreaseFont,
+        onIncreaseFont: onIncreaseFont,
+        isChatNotifyEnabled: isChatNotifyEnabled,
+        onToggleChatNotifications: onToggleChatNotifications
+      })
     )),
     isRegisterOpen && /*#__PURE__*/React.createElement(PlaceRegisterModal, {
       calendar,
