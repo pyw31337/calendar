@@ -18639,91 +18639,71 @@ function ChatGalleryModal({
     className: "gallery-page-inner", style: galleryInnerStyle
   } : {
     className: "modal-container", onClick: e => e.stopPropagation(), style: galleryInnerStyle
-  }, /*#__PURE__*/React.createElement("div", {
+  },
+  /*#__PURE__*/React.createElement("div", {
     className: asPage ? "gallery-page-header" : "modal-header",
     style: galleryHeaderStyle
   },
-    /* Search button and slide-out input field */
-    /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px',
-        flex: 1,
-        minWidth: 0,
-        marginRight: '12px'
-      }
-    },
-      !isSearchOpen && /*#__PURE__*/React.createElement("h3", {
-        style: { fontSize: '1.05rem', fontWeight: 900, color: 'var(--text-main)', margin: 0, display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap' }
-      }, /*#__PURE__*/React.createElement("svg", {
-        xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2"
-      }, /*#__PURE__*/React.createElement("rect", { width: "18", height: "18", x: "3", y: "3", rx: "2", ry: "2" }), /*#__PURE__*/React.createElement("circle", { cx: "9", cy: "9", r: "2" }), /*#__PURE__*/React.createElement("path", { d: "m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" })), (formatChatHeaderTitle(calendar?.title) ? formatChatHeaderTitle(calendar?.title) + " 갤러리" : "갤러리")),
-      isSearchOpen && /*#__PURE__*/React.createElement("div", {
-        style: {
-          display: 'flex',
-          alignItems: 'center',
-          flex: 1,
-          animation: 'slideInRight 0.2s ease',
-          backgroundColor: 'var(--bg-primary)',
-          borderRadius: '20px',
-          padding: '4px 12px',
-          border: '1px solid var(--border-subtle)',
-          minWidth: 0
-        }
-      },
-        /*#__PURE__*/React.createElement("svg", {
-          xmlns: "http://www.w3.org/2000/svg", width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.5", style: { color: 'var(--text-muted)', marginRight: '6px', flexShrink: 0 }
-        }, /*#__PURE__*/React.createElement("circle", { cx: "11", cy: "11", r: "8" }), /*#__PURE__*/React.createElement("path", { d: "m21 21-4.3-4.3" })),
-        /*#__PURE__*/React.createElement("input", {
-          type: "text",
-          className: "search-input",
-          placeholder: "사진·링크 통합 검색 (태그, 텍스트, URL)",
-          value: searchQuery,
-          onChange: e => setSearchQuery(e.target.value),
-          autoFocus: true,
-          style: {
-            border: 'none',
-            background: 'none',
-            fontSize: '0.82rem',
-            color: 'var(--text-main)',
-            width: '100%',
-            outline: 'none',
-            padding: '2px 0'
-          }
-        }),
-        searchQuery && /*#__PURE__*/React.createElement("button", {
-          type: "button",
-          onClick: () => setSearchQuery(''),
-          style: { border: 0, background: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '2px', display: 'flex', alignItems: 'center' }
-        }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 14 }))
-      )
-    ),
-    /* Header action buttons: Search trigger + Close modal */
-    /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 } },
-      /* Search button */
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        onClick: () => {
-          setIsSearchOpen(prev => {
-            if (prev) setSearchQuery('');
-            return !prev;
-          });
-        },
-        style: { display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '6px', border: 0, background: 'none', cursor: 'pointer', color: 'var(--text-muted)' }
-      }, /*#__PURE__*/React.createElement("svg", {
-        xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.5"
-      }, /*#__PURE__*/React.createElement("circle", { cx: "11", cy: "11", r: "8" }), /*#__PURE__*/React.createElement("path", { d: "m21 21-4.3-4.3" }))),
-      /* Close / Back */
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        className: asPage ? "gallery-back-btn" : "modal-close-btn",
-        onClick: onClose,
-        "aria-label": asPage ? "뒤로가기" : "닫기",
-        style: { display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px', border: 0, background: 'none', cursor: 'pointer', color: 'var(--text-muted)' }
-      }, asPage ? /*#__PURE__*/React.createElement(BackArrowIcon, { size: 22 }) : /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }))
-    )
-  ), /*#__PURE__*/React.createElement("div", {
+    asPage
+      ? /*#__PURE__*/React.createElement(React.Fragment, null,
+          /*#__PURE__*/React.createElement("button", {
+            type: "button", onClick: onClose, "aria-label": "뒤로가기",
+            style: {
+              width: '36px', height: '36px', borderRadius: '50%', background: 'transparent', border: 'none',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748B', flexShrink: 0
+            }
+          }, /*#__PURE__*/React.createElement(BackArrowIcon, { size: 22 })),
+          /*#__PURE__*/React.createElement("div", {
+            style: {
+              position: 'absolute', left: '50%', transform: 'translateX(-50%)',
+              display: 'flex', alignItems: 'center', fontWeight: 800, fontSize: '0.95rem',
+              color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden',
+              textOverflow: 'ellipsis', maxWidth: 'calc(100vw - 120px)', pointerEvents: 'none'
+            }
+          }, formatChatHeaderTitle(calendar?.title) ? formatChatHeaderTitle(calendar?.title) + " 갤러리" : "갤러리"),
+          /*#__PURE__*/React.createElement("button", {
+            type: "button",
+            onClick: () => setIsSearchOpen(prev => { if (prev) setSearchQuery(''); return !prev; }),
+            title: "검색", "aria-label": "갤러리 검색",
+            style: {
+              background: 'none', border: 'none', cursor: 'pointer', padding: '6px',
+              color: isSearchOpen ? 'var(--text-main)' : '#64748B',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+            }
+          }, /*#__PURE__*/React.createElement("svg", {
+            xmlns: "http://www.w3.org/2000/svg", width: "22", height: "22", viewBox: "0 0 24 24",
+            fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
+          }, /*#__PURE__*/React.createElement("circle", { cx: "11", cy: "11", r: "8" }), /*#__PURE__*/React.createElement("path", { d: "m21 21-4.3-4.3" })))
+        )
+      : /*#__PURE__*/React.createElement(React.Fragment, null,
+          /*#__PURE__*/React.createElement("h3", {
+            style: { fontSize: '1.05rem', fontWeight: 900, color: 'var(--text-main)', margin: 0, display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap', flex: 1 }
+          }, "갤러리"),
+          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 } },
+            /*#__PURE__*/React.createElement("button", {
+              type: "button",
+              onClick: () => setIsSearchOpen(prev => { if (prev) setSearchQuery(''); return !prev; }),
+              style: { display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '6px', border: 0, background: 'none', cursor: 'pointer', color: 'var(--text-muted)' }
+            }, /*#__PURE__*/React.createElement("svg", {
+              xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.5"
+            }, /*#__PURE__*/React.createElement("circle", { cx: "11", cy: "11", r: "8" }), /*#__PURE__*/React.createElement("path", { d: "m21 21-4.3-4.3" }))),
+            /*#__PURE__*/React.createElement("button", {
+              type: "button", className: "modal-close-btn", onClick: onClose, "aria-label": "닫기",
+              style: { display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px', border: 0, background: 'none', cursor: 'pointer', color: 'var(--text-muted)' }
+            }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }))
+          )
+        )
+  ),
+  isSearchOpen && /*#__PURE__*/React.createElement(InlineSearchBar, {
+    value: searchQuery,
+    placeholder: "사진·링크 통합 검색 (태그, 텍스트, URL)",
+    onChange: e => setSearchQuery(e.target.value),
+    trailing: /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => { setIsSearchOpen(false); setSearchQuery(''); },
+      style: { border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '4px 6px', fontSize: '0.8rem', fontWeight: 700, flexShrink: 0 }
+    }, "닫기")
+  }), /*#__PURE__*/React.createElement("div", {
     style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', padding: '12px 20px 8px 20px', borderBottom: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)' }
   }, [['photos', '사진'], ['links', '링크']].map(tab => {
     const count = tab[0] === 'photos' ? filteredPhotos.length : filteredLinks.length;
@@ -22055,68 +22035,50 @@ function InlineSearchBar({
     minHeight: '48px',
     display: 'flex',
     alignItems: 'center',
-    gap: '10px',
-    padding: '10px 16px',
+    gap: '8px',
+    padding: '8px 12px',
     backgroundColor: 'var(--bg-card)',
     borderBottom: '1px solid var(--border-subtle)',
     boxSizing: 'border-box',
     ...(fixed ? {
-      position: 'fixed',
-      top: '56px',
-      left: 0,
-      right: 0,
-      zIndex: 1008,
-      flexShrink: 0
-    } : {
-      flexShrink: 0,
-      zIndex: 1008
-    }),
+      position: 'fixed', top: '56px', left: 0, right: 0, zIndex: 1008, flexShrink: 0
+    } : { flexShrink: 0, zIndex: 1008 }),
     ...(style || {})
   };
   return /*#__PURE__*/React.createElement("div", {
     className: `inline-search-bar${fixed ? ' is-fixed' : ''}${className ? ' ' + className : ''}`,
     style: barStyle
   },
-    /*#__PURE__*/React.createElement("svg", {
-      xmlns: "http://www.w3.org/2000/svg",
-      width: "16",
-      height: "16",
-      viewBox: "0 0 24 24",
-      fill: "none",
-      stroke: "currentColor",
-      strokeWidth: "2",
-      strokeLinecap: "round",
-      strokeLinejoin: "round",
-      style: { color: 'var(--text-muted)', flexShrink: 0 },
-      "aria-hidden": true
-    },
-      /*#__PURE__*/React.createElement("circle", { cx: "11", cy: "11", r: "8" }),
-      /*#__PURE__*/React.createElement("path", { d: "m21 21-4.3-4.3" })
-    ),
-    /*#__PURE__*/React.createElement("input", {
-      ref: inputRef,
-      type: "text",
-      className: "inline-search-input",
-      placeholder: placeholder,
-      value: value,
-      onChange: onChange,
-      autoFocus: autoFocus,
+    /*#__PURE__*/React.createElement("div", {
+      className: "inline-search-capsule",
       style: {
-        flex: 1,
-        minWidth: 0,
-        height: '36px',
-        fontSize: '0.88rem',
-        padding: '0 4px',
-        border: 'none',
-        outline: 'none',
-        background: 'transparent',
-        color: 'var(--text-main)',
-        boxShadow: 'none'
+        flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: '8px',
+        height: '36px', padding: '0 12px', borderRadius: '999px', border: 'none',
+        backgroundColor: 'var(--bg-primary)', boxSizing: 'border-box'
       }
-    }),
+    },
+      /*#__PURE__*/React.createElement("svg", {
+        xmlns: "http://www.w3.org/2000/svg", width: "16", height: "16", viewBox: "0 0 24 24",
+        fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round",
+        style: { color: 'var(--text-muted)', flexShrink: 0 }, "aria-hidden": true
+      },
+        /*#__PURE__*/React.createElement("circle", { cx: "11", cy: "11", r: "8" }),
+        /*#__PURE__*/React.createElement("path", { d: "m21 21-4.3-4.3" })
+      ),
+      /*#__PURE__*/React.createElement("input", {
+        ref: inputRef, type: "text", className: "inline-search-input",
+        placeholder: placeholder, value: value, onChange: onChange, autoFocus: autoFocus,
+        style: {
+          flex: 1, minWidth: 0, height: '100%', fontSize: '0.88rem', padding: 0,
+          border: 'none', outline: 'none', background: 'transparent',
+          color: 'var(--text-main)', boxShadow: 'none'
+        }
+      })
+    ),
     trailing
   );
 }
+
 
 function SearchIcon() {
   return /*#__PURE__*/React.createElement("svg", {
@@ -25876,27 +25838,52 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
     ),
 
     isPlacesMenuOpen && /*#__PURE__*/React.createElement("div", {
-      className: "bottom-sheet-overlay", style: { zIndex: 12000 }, onClick: () => setIsPlacesMenuOpen(false)
+      className: "admin-side-menu-overlay",
+      style: { zIndex: 12000 },
+      onClick: () => setIsPlacesMenuOpen(false)
     }, /*#__PURE__*/React.createElement("div", {
-      className: "bottom-sheet", style: { maxHeight: '50vh' }, onClick: e => e.stopPropagation()
+      className: "admin-side-menu",
+      onClick: e => e.stopPropagation(),
+      role: "dialog",
+      "aria-label": "플레이스 메뉴"
     },
-      /*#__PURE__*/React.createElement("div", { className: "bottom-sheet-header" },
-        /*#__PURE__*/React.createElement("h4", null, "플레이스 메뉴"),
+      /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-header" },
+        /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-brand" },
+          /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-logo", "aria-hidden": "true" }, "📍"),
+          /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-copy" },
+            /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-title" }, "플레이스 메뉴"),
+            /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-subtitle" }, "등록 · 검색")
+          )
+        ),
         /*#__PURE__*/React.createElement("button", {
-          type: "button",
-          style: { background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer' },
+          type: "button", className: "admin-side-menu-close-btn",
+          title: "메뉴 닫기", "aria-label": "메뉴 닫기",
           onClick: () => setIsPlacesMenuOpen(false)
-        }, "✕")
+        }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }))
       ),
-      /*#__PURE__*/React.createElement("div", { className: "bottom-sheet-body" },
+      /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-list" },
         /*#__PURE__*/React.createElement("button", {
-          type: "button", className: "bottom-sheet-item",
+          type: "button", className: "admin-side-menu-item",
           onClick: () => { setIsPlacesMenuOpen(false); handleOpenRegister(); }
-        }, "플레이스 등록"),
+        },
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", {
+            xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
+          }, /*#__PURE__*/React.createElement("path", { d: "M5 12h14" }), /*#__PURE__*/React.createElement("path", { d: "M12 5v14" }))),
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
+            /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "플레이스 등록"),
+            /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "새 장소 추가하기")
+          )
+        ),
         /*#__PURE__*/React.createElement("button", {
-          type: "button", className: "bottom-sheet-item",
+          type: "button", className: "admin-side-menu-item",
           onClick: () => { setIsPlacesMenuOpen(false); setIsSearchOpen(true); }
-        }, "플레이스 검색")
+        },
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement(SearchIcon, null)),
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
+            /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "플레이스 검색"),
+            /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "등록된 장소명·주소 검색")
+          )
+        )
       )
     )),
     isRegisterOpen && /*#__PURE__*/React.createElement(PlaceRegisterModal, {

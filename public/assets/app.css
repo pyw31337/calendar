@@ -2606,6 +2606,10 @@ select.form-select {
   border-top: 1px solid var(--border-subtle);
   box-sizing: border-box;
 }
+.inline-search-capsule {
+  border: none !important;
+  box-shadow: none !important;
+}
 .places-list-search-input,
 .inline-search-input {
   border: none !important;
