@@ -14237,6 +14237,33 @@ function GamifiedConfirmButtonContent({ label }) {
     /*#__PURE__*/React.createElement("span", { className: "gamified-shiny-glow-wrapper", "aria-hidden": true },
       /*#__PURE__*/React.createElement("span", { className: "gamified-shiny-glow" })
     ),
+    /*#__PURE__*/React.createElement("svg", {
+      className: "gamified-border-electric",
+      viewBox: "0 0 100 40",
+      preserveAspectRatio: "none",
+      "aria-hidden": true
+    },
+      /*#__PURE__*/React.createElement("defs", null,
+        /*#__PURE__*/React.createElement("linearGradient", { id: "gamifiedElectricGrad", x1: "0%", y1: "0%", x2: "100%", y2: "0%" },
+          /*#__PURE__*/React.createElement("stop", { offset: "0%", stopColor: "#A5F3FC" }),
+          /*#__PURE__*/React.createElement("stop", { offset: "40%", stopColor: "#FFFFFF" }),
+          /*#__PURE__*/React.createElement("stop", { offset: "70%", stopColor: "#C4B5FD" }),
+          /*#__PURE__*/React.createElement("stop", { offset: "100%", stopColor: "#67E8F9" })
+        )
+      ),
+      /*#__PURE__*/React.createElement("rect", {
+        className: "gamified-electric-track",
+        x: "1.2", y: "1.2", width: "97.6", height: "37.6", rx: "10", ry: "10",
+        fill: "none", stroke: "url(#gamifiedElectricGrad)", strokeWidth: "2.4",
+        pathLength: "100"
+      }),
+      /*#__PURE__*/React.createElement("rect", {
+        className: "gamified-electric-track gamified-electric-track-2",
+        x: "1.2", y: "1.2", width: "97.6", height: "37.6", rx: "10", ry: "10",
+        fill: "none", stroke: "#E0F2FE", strokeWidth: "1.2",
+        pathLength: "100"
+      })
+    ),
     /*#__PURE__*/React.createElement("span", { className: "gamified-sparks-container", "aria-hidden": true },
       [1,2,3,4,5,6].map(n => /*#__PURE__*/React.createElement("span", {
         key: "sp"+n, className: "gamified-spark gamified-spark-" + n
@@ -15322,84 +15349,64 @@ function DateModal({
               renderTextWithUrlBadge(place.memo)
             ),
             !adminMode && /*#__PURE__*/React.createElement("div", {
-              style: { position: 'absolute', top: '10px', right: '10px', display: 'flex', gap: '8px' }
-            },
-              /*#__PURE__*/React.createElement("button", {
-                type: "button",
-                onClick: e => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setEditingLinkedPlaceId(place.id);
-                  setSelectedPlace({ name: place.name, address: place.address || '', lat: place.lat, lng: place.lng, categoryId: place.categoryId || 'etc' });
-                  setPlaceQuery(place.name || '');
-                  setPlaceAlias(place.alias || '');
-                  setPlaceMemo(place.memo || '');
-                  setPlaceCategoryId(place.categoryId || 'etc');
-                  setPlaceVisitStatus(place.visitStatus === 'planned' ? 'planned' : 'visited');
-                  setPlaceResults([]);
-                },
-                style: { border: 'none', background: 'none', color: '#3B82F6', fontSize: '0.74rem', fontWeight: 800, cursor: 'pointer', padding: '2px 4px' }
-              }, "수정"),
-              /*#__PURE__*/React.createElement("button", {
-                type: "button",
-                onClick: e => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  onRequestConfirm('장소 삭제', `"${place.alias || place.name}" 장소를 이 날짜에서 해제하시겠습니까?`, async () => {
-                    setIsSavingPlace(true);
-                    try {
-                      const targetNorm = normalizePlaceDateForSort(dateStr) || dateStr;
-                      let nextVisitDate = place.visitDate || '';
-                      if (nextVisitDate === dateStr || normalizePlaceDateForSort(nextVisitDate) === targetNorm) nextVisitDate = '';
-                      let nextMemo = String(place.memo || '');
-                      const entries = parseVisitEntriesFromMemo(nextMemo);
-                      if (entries.length >= 2) {
-                        nextMemo = entries
-                          .filter(en => normalizePlaceDateForSort(en.date) !== targetNorm)
-                          .map(en => en.note ? `${en.date} ${en.note}` : en.date)
-                          .join(' / ');
-                      } else {
-                        const leading = extractLeadingMemoDate(nextMemo);
-                        if (leading && normalizePlaceDateForSort(leading) === targetNorm) {
-                          nextMemo = nextMemo.replace(/^\s*\d{2,4}[.-]\d{2}[.-]\d{2}\s*/, '').replace(/^\/\s*/, '').trim();
-                        }
+              style: { position: 'absolute', top: '10px', right: '10px' }
+            }, /*#__PURE__*/React.createElement(ItemEditDeleteActions, {
+              onEdit: () => {
+                setEditingLinkedPlaceId(place.id);
+                setSelectedPlace({ name: place.name, address: place.address || '', lat: place.lat, lng: place.lng, categoryId: place.categoryId || 'etc' });
+                setPlaceQuery(place.name || '');
+                setPlaceAlias(place.alias || '');
+                setPlaceMemo(place.memo || '');
+                setPlaceCategoryId(place.categoryId || 'etc');
+                setPlaceVisitStatus(place.visitStatus === 'planned' ? 'planned' : 'visited');
+                setPlaceResults([]);
+              },
+              onDelete: () => {
+                onRequestConfirm('장소 삭제', `"${place.alias || place.name}" 장소를 이 날짜에서 해제하시겠습니까?`, async () => {
+                  setIsSavingPlace(true);
+                  try {
+                    const targetNorm = normalizePlaceDateForSort(dateStr) || dateStr;
+                    let nextVisitDate = place.visitDate || '';
+                    if (nextVisitDate === dateStr || normalizePlaceDateForSort(nextVisitDate) === targetNorm) nextVisitDate = '';
+                    let nextMemo = String(place.memo || '');
+                    const entries = parseVisitEntriesFromMemo(nextMemo);
+                    if (entries.length >= 2) {
+                      nextMemo = entries
+                        .filter(en => normalizePlaceDateForSort(en.date) !== targetNorm)
+                        .map(en => en.note ? `${en.date} ${en.note}` : en.date)
+                        .join(' / ');
+                    } else {
+                      const leading = extractLeadingMemoDate(nextMemo);
+                      if (leading && normalizePlaceDateForSort(leading) === targetNorm) {
+                        nextMemo = nextMemo.replace(/^\s*\d{2,4}[.-]\d{2}[.-]\d{2}\s*/, '').replace(/^\/\s*/, '').trim();
                       }
-                      if (typeof onSavePlace === 'function') {
-                        const ok = await Promise.resolve(onSavePlace({
-                          id: place.id,
-                          name: place.name,
-                          alias: place.alias || '',
-                          address: place.address || '',
-                          lat: place.lat,
-                          lng: place.lng,
-                          categoryId: place.categoryId || 'etc',
-                          memo: nextMemo,
-                          visitStatus: place.visitStatus === 'planned' ? 'planned' : 'visited',
-                          visitDate: nextVisitDate
-                        }));
-                        if (ok !== false) {
-                          showToast('이 날짜에서 장소가 해제되었습니다.', 'success');
-                          if (editingLinkedPlaceId === place.id) {
-                            setEditingLinkedPlaceId(null);
-                            setSelectedPlace(null);
-                            setPlaceQuery('');
-                            setPlaceAlias('');
-                            setPlaceMemo('');
-                          }
-                        } else if (onDeletePlace) {
-                          await Promise.resolve(onDeletePlace(place.id));
-                          showToast('장소가 삭제되었습니다.', 'success');
+                    }
+                    if (typeof onSavePlace === 'function') {
+                      const ok = await Promise.resolve(onSavePlace({
+                        id: place.id, name: place.name, alias: place.alias || '',
+                        address: place.address || '', lat: place.lat, lng: place.lng,
+                        categoryId: place.categoryId || 'etc', memo: nextMemo,
+                        visitStatus: place.visitStatus === 'planned' ? 'planned' : 'visited',
+                        visitDate: nextVisitDate
+                      }));
+                      if (ok !== false) {
+                        showToast('이 날짜에서 장소가 해제되었습니다.', 'success');
+                        if (editingLinkedPlaceId === place.id) {
+                          setEditingLinkedPlaceId(null); setSelectedPlace(null);
+                          setPlaceQuery(''); setPlaceAlias(''); setPlaceMemo('');
                         }
                       } else if (onDeletePlace) {
                         await Promise.resolve(onDeletePlace(place.id));
                         showToast('장소가 삭제되었습니다.', 'success');
                       }
-                    } finally { setIsSavingPlace(false); }
-                  });
-                },
-                style: { border: 'none', background: 'none', color: '#EF4444', fontSize: '0.74rem', fontWeight: 800, cursor: 'pointer', padding: '2px 4px' }
-              }, "삭제")
-            )
+                    } else if (onDeletePlace) {
+                      await Promise.resolve(onDeletePlace(place.id));
+                      showToast('장소가 삭제되었습니다.', 'success');
+                    }
+                  } finally { setIsSavingPlace(false); }
+                });
+              }
+            }))
           );
         }))
       )
@@ -15432,42 +15439,56 @@ function DateModal({
       ),
 
       /* Input Forms */
-      !adminMode && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
-        /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
-          /*#__PURE__*/React.createElement(SegmentedToggle, {
-            ariaLabel: "수입/지출 전환",
+      !adminMode && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '12px' } },
+        /*#__PURE__*/React.createElement("div", null,
+          /*#__PURE__*/React.createElement("label", {
+            style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#64748B', marginBottom: '6px' }
+          }, "구분 / 카테고리"),
+          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
+            /*#__PURE__*/React.createElement(SegmentedToggle, {
+              ariaLabel: "수입/지출 전환",
+              disabled: isSavingExpense,
+              value: expenseIsIncome ? 'income' : 'expense',
+              onChange: v => setExpenseIsIncome(v === 'income'),
+              options: [
+                { value: 'income', label: '+ 수입', activeColor: '#16A34A' },
+                { value: 'expense', label: '- 지출', activeColor: '#DC2626' }
+              ]
+            }),
+            !expenseIsIncome && /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
+              title: "지출 카테고리 선택",
+              placeholder: "지출 카테고리 선택",
+              value: expenseCategoryInput,
+              disabled: isSavingExpense,
+              onSelect: setExpenseCategoryInput,
+              options: expenseCategories.map(category => ({
+                value: category.id,
+                label: getExpenseCategoryLabel(category)
+              })),
+              style: { flex: '1 1 0%', minWidth: 0, height: '42px' }
+            })
+          )
+        ),
+        /*#__PURE__*/React.createElement("div", null,
+          /*#__PURE__*/React.createElement("label", {
+            style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#64748B', marginBottom: '6px' }
+          }, expenseIsIncome ? "수입 명목" : "지출 명목"),
+          /*#__PURE__*/React.createElement("input", {
+            type: "text",
+            className: "form-input",
+            style: { width: '100%' },
+            placeholder: expenseIsIncome ? "수입명목 (예: 회비 입금, URL 첨부 가능)" : "지출명목 (예: 식당 예약금, URL 첨부 가능)",
+            maxLength: 220,
+            value: expenseLabelInput,
             disabled: isSavingExpense,
-            value: expenseIsIncome ? 'income' : 'expense',
-            onChange: v => setExpenseIsIncome(v === 'income'),
-            options: [
-              { value: 'income', label: '+ 수입', activeColor: '#16A34A' },
-              { value: 'expense', label: '- 지출', activeColor: '#DC2626' }
-            ]
-          }),
-          !expenseIsIncome && /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
-            title: "지출 카테고리 선택",
-            placeholder: "지출 카테고리 선택",
-            value: expenseCategoryInput,
-            disabled: isSavingExpense,
-            onSelect: setExpenseCategoryInput,
-            options: expenseCategories.map(category => ({
-              value: category.id,
-              label: getExpenseCategoryLabel(category)
-            })),
-            style: { flex: '1 1 0%', minWidth: 0, height: '42px' }
+            onChange: e => setExpenseLabelInput(e.target.value)
           })
         ),
-        /*#__PURE__*/React.createElement("input", {
-          type: "text",
-          className: "form-input",
-          style: { width: '100%' },
-          placeholder: expenseIsIncome ? "수입명목 (예: 회비 입금, URL 첨부 가능)" : "지출명목 (예: 식당 예약금, URL 첨부 가능)",
-          maxLength: 220,
-          value: expenseLabelInput,
-          disabled: isSavingExpense,
-          onChange: e => setExpenseLabelInput(e.target.value)
-        }),
-        /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px' } },
+        /*#__PURE__*/React.createElement("div", null,
+          /*#__PURE__*/React.createElement("label", {
+            style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#64748B', marginBottom: '6px' }
+          }, expenseIsIncome ? "수입 금액" : "지출 금액"),
+          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px' } },
           /*#__PURE__*/React.createElement("input", {
             type: "text",
             className: "form-input",
@@ -15500,6 +15521,7 @@ function DateModal({
             disabled: isSavingExpense,
             onClick: e => { e.preventDefault(); e.stopPropagation(); handleSaveExpenseClick(); }
           }, isSavingExpense ? "저장 중..." : editingExpenseId ? "수정" : "추가")
+          )
         )
       ),
 
