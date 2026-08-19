@@ -7829,7 +7829,7 @@ function App() {
     const isEditing = !!placeData.id;
     const categoryIds = new Set(getPlaceCategories(activeCal).map(c => c.id));
     const cleanCategoryId = categoryIds.has(placeData.categoryId) ? placeData.categoryId : 'etc';
-    const cleanAddress = sanitizeText(placeData.address || '', 200);
+    const cleanAddress = normalizePlaceAddressForSave(placeData.address || '', placeData.lat, placeData.lng);
     const cleanAlias = sanitizeText(placeData.alias || '', 80);
     const cleanMemo = sanitizeText(placeData.memo || '', 2000);
     const cleanVisitStatus = placeData.visitStatus === 'planned' ? 'planned' : 'visited';
@@ -14589,7 +14589,7 @@ function DateModal({
     try {
       const isConfirmed = isDateConfirmedMeeting(calendar, dateStr);
       const cleanName = sanitizeText(selectedPlace.name || '', 80);
-      const cleanAddress = sanitizeText(selectedPlace.address || '', 200);
+      const cleanAddress = normalizePlaceAddressForSave(selectedPlace.address || '', selectedPlace.lat, selectedPlace.lng);
       const cleanMemo = sanitizeText(placeMemo.trim() || '', 2000);
       
       const newPlaceData = {
@@ -15396,7 +15396,7 @@ function DateModal({
           className: "place-result-item"
         },
           /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-main)' } }, r.name),
-          /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.72rem', color: 'var(--text-muted)' } }, r.address)
+          /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.72rem', color: 'var(--text-muted)' } }, getDisplayPlaceAddress(r))
         ))),
 
         /* Selected place preview card */
@@ -15410,7 +15410,7 @@ function DateModal({
             /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.86rem', fontWeight: 800, color: 'var(--text-main)' } }, selectedPlace.name),
             selectedPlace.categoryLabel && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.7rem', color: 'var(--text-muted)' } }, selectedPlace.categoryLabel)
           ),
-          selectedPlace.address && /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.76rem', color: 'var(--text-muted)' } }, selectedPlace.address),
+          selectedPlace.address && /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.76rem', color: 'var(--text-muted)' } }, getDisplayPlaceAddress(selectedPlace)),
           selectedPlace.phone && /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.76rem', color: 'var(--text-muted)' } }, `☎ ${selectedPlace.phone}`)
         ),
 
@@ -15519,7 +15519,7 @@ function DateModal({
             /* Name & Address — prefer alias when set */
             /*#__PURE__*/React.createElement("span", { style: { fontWeight: 800, fontSize: '0.88rem', color: 'var(--text-main)' } }, place.alias || place.name),
             place.alias && place.name && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.72rem', color: 'var(--text-muted)' } }, place.name),
-            place.address && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.74rem', color: 'var(--text-muted)' } }, place.address),
+            place.address && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.74rem', color: 'var(--text-muted)' } }, getDisplayPlaceAddress(place)),
             /* Memo — one line per visit date entry */
             place.memo && (() => {
               let entries = parseVisitEntriesFromMemo(place.memo);
@@ -24754,9 +24754,31 @@ function isDomesticLatLng(lat, lng) {
 // A domestic address routinely comes back "대한민국 서울특별시 ..." from the geocoder -- redundant
 // for a place the user already knows is in Korea, so only the overseas case needs the country
 // name to stay legible. Shared by both the list row and the map popup so the two never drift.
+function stripKoreaCountryPrefix(address) {
+  return String(address || '')
+    .replace(/^(대한민국|남한)\s*,?\s*/u, '')
+    .replace(/^(South\s*Korea|Korea,?\s*Republic\s+of|Republic\s+of\s+Korea|ROK)\s*,?\s*/i, '')
+    .trim();
+}
+
+// 국내: 앞의 "대한민국" 제거 / 해외(베트남 등): 국가명 포함 전체 주소 유지
 function getDisplayPlaceAddress(place) {
-  if (!place?.address) return place?.address || '';
-  return isDomesticLatLng(place.lat, place.lng) ? place.address.replace(/^대한민국\s*/, '') : place.address;
+  const raw = String(place?.address || '').trim();
+  if (!raw) return '';
+  const hasCoords = Number.isFinite(Number(place?.lat)) && Number.isFinite(Number(place?.lng));
+  const domestic = hasCoords
+    ? isDomesticLatLng(Number(place.lat), Number(place.lng))
+    : /^(대한민국|남한|South\s*Korea|Korea,?\s*Republic\s+of|Republic\s+of\s+Korea|ROK)\b/i.test(raw);
+  return domestic ? stripKoreaCountryPrefix(raw) : raw;
+}
+
+function normalizePlaceAddressForSave(address, lat, lng) {
+  const raw = sanitizeText(address || '', 200);
+  if (!raw) return '';
+  const hasCoords = Number.isFinite(Number(lat)) && Number.isFinite(Number(lng));
+  if (hasCoords && isDomesticLatLng(Number(lat), Number(lng))) return stripKoreaCountryPrefix(raw);
+  if (/^(대한민국|남한)\b/u.test(raw)) return stripKoreaCountryPrefix(raw);
+  return raw;
 }
 // A calendar built from an imported travel log can have a handful of overseas trips mixed in
 // with a much larger cluster of everyday domestic places -- fitting bounds over literally every
