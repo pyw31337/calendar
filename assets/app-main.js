@@ -25246,7 +25246,7 @@ function PlacesSection({ calendar, onViewAll }) {
       style: { display: 'flex', alignItems: 'center' }
     },
       /*#__PURE__*/React.createElement(PlaceSectionIcon, null),
-      "장소 ",
+      "플레이스 ",
       /*#__PURE__*/React.createElement(SectionCountBadge, { count: places.length }),
       /*#__PURE__*/React.createElement("div", {
         // SectionToggleButton's own CSS also carries margin-left:auto (fine when it's the only
@@ -25269,37 +25269,45 @@ function PlacesSection({ calendar, onViewAll }) {
         })
       )
     ),
+    /* Map frame: relative so "플레이스 더보기" sits on the bottom edge */
     /*#__PURE__*/React.createElement("div", {
       style: {
+        position: 'relative',
         width: '100%',
         aspectRatio: collapsed ? '16 / 9' : '4 / 3',
         borderRadius: 'var(--radius-sm)',
         overflow: 'hidden',
         marginTop: '12px'
       }
-    }, /*#__PURE__*/React.createElement(PlaceMapView, {
-      places,
-      calendar,
-      resizeSignal: collapsed,
-      preferDomesticBounds: true
-    })),
-    places.length > 0 && /*#__PURE__*/React.createElement("button", {
-      type: "button",
-      onClick: onViewAll,
-      style: {
-        width: '100%',
-        backgroundColor: 'color-mix(in srgb, var(--bg-primary) 96%, black)',
-        border: 'none',
-        borderRadius: '8px',
-        padding: '8px 0',
-        fontSize: '0.85rem',
-        fontWeight: 'bold',
-        color: 'var(--text-main)',
-        cursor: 'pointer',
-        textAlign: 'center',
-        marginTop: '12px'
-      }
-    }, "플레이스 더보기")
+    },
+      /*#__PURE__*/React.createElement(PlaceMapView, {
+        places,
+        calendar,
+        resizeSignal: collapsed,
+        preferDomesticBounds: true
+      }),
+      places.length > 0 && /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: onViewAll,
+        style: {
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 500,
+          width: '100%',
+          backgroundColor: 'color-mix(in srgb, var(--bg-primary) 96%, black)',
+          border: 'none',
+          borderRadius: '0 0 8px 8px',
+          padding: '8px 0',
+          fontSize: '0.85rem',
+          fontWeight: 'bold',
+          color: 'var(--text-main)',
+          cursor: 'pointer',
+          textAlign: 'center'
+        }
+      }, "플레이스 더보기")
+    )
   );
 }
 
