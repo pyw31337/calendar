@@ -6526,6 +6526,7 @@ function App() {
   const [hasMoreOlderChat, setHasMoreOlderChat] = React.useState(true);
   const [loadingOlderChat, setLoadingOlderChat] = React.useState(false);
   const [totalChatCount, setTotalChatCount] = React.useState(0);
+  const [totalMemoCount, setTotalMemoCount] = React.useState(0);
   const [totalGalleryCount, setTotalGalleryCount] = React.useState(0);
   const loadingOlderChatRef = React.useRef(false);
   const allChatMessages = React.useMemo(() => {
@@ -7147,14 +7148,20 @@ function App() {
     setLoadingOlderChat(false);
     loadingOlderChatRef.current = false;
     setTotalChatCount(0);
+    setTotalMemoCount(0);
     setTotalGalleryCount(0);
     if (!activeCalId) return;
     let cancelled = false;
     (async () => {
-      const msgCount = await fetchMessagesCollectionCount(activeCalId);
-      if (!cancelled && msgCount != null) setTotalChatCount(msgCount);
-      const galCount = await fetchGalleryItemCount(activeCalId);
-      if (!cancelled && galCount != null) setTotalGalleryCount(galCount);
+      const [msgCount, memoCount, galCount] = await Promise.all([
+        fetchSubcollectionCount(activeCalId, 'messages'),
+        fetchSubcollectionCount(activeCalId, 'memos'),
+        fetchGalleryItemCount(activeCalId)
+      ]);
+      if (cancelled) return;
+      if (msgCount != null) setTotalChatCount(msgCount);
+      if (memoCount != null) setTotalMemoCount(memoCount);
+      if (galCount != null) setTotalGalleryCount(galCount);
     })();
     return () => { cancelled = true; };
   }, [activeCalId]);
@@ -8824,6 +8831,7 @@ function App() {
   const mainMenuChatCount = totalChatCount > 0 ? totalChatCount : allChatMessages.length;
   const mainMenuChatLatestTimestamp = allChatMessages.length > 0 ? allChatMessages[allChatMessages.length - 1].timestamp : 0;
   const mainMenuChatHasUnread = mainMenuChatLatestTimestamp > getChatLastReadTimestamp(activeCalId);
+  const mainMenuMemoCount = totalMemoCount > 0 ? totalMemoCount : (memos || []).length;
 
   // Each confirmed meeting gets its own banner bubble on the calendar, and stays up through
   // the day of the meeting itself -- only today-or-future confirmations show.
