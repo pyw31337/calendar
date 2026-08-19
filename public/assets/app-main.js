@@ -15454,9 +15454,9 @@ function DateModal({
               borderRadius: '8px'
             }
           },
-            /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'flex-start', gap: '8px', minWidth: 0, flex: 1 } },
+            /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 } },
               /*#__PURE__*/React.createElement("span", {
-                style: { width: '8px', height: '8px', borderRadius: '50%', backgroundColor: part.color, flexShrink: 0, marginTop: '6px' }
+                style: { width: '8px', height: '8px', borderRadius: '50%', backgroundColor: part.color, flexShrink: 0 }
               }),
               /*#__PURE__*/React.createElement("span", {
                 style: {
@@ -15465,7 +15465,7 @@ function DateModal({
                   color: 'var(--text-main)',
                   flexShrink: 0,
                   cursor: 'pointer',
-                  marginTop: '2px'
+                  lineHeight: 1.35
                 },
                 title: '눌러서 수정 (참여자·메모 불러오기)',
                 onClick: () => handleEditClick(entry)
@@ -15476,7 +15476,10 @@ function DateModal({
                   color: 'var(--text-main)',
                   marginLeft: '4px',
                   minWidth: 0,
-                  flex: 1
+                  flex: 1,
+                  lineHeight: 1.35,
+                  display: 'flex',
+                  alignItems: 'center'
                 }
               }, renderTextWithUrlBadge(entry.note))
             ),
