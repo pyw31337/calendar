@@ -3035,3 +3035,13 @@ select.form-select {
 .expense-sortable-row.is-drop-target {
   border-color: var(--accent-primary) !important;
 }
+
+textarea.form-input,
+textarea {
+  field-sizing: content;
+  overflow-x: hidden;
+}
+textarea.form-input {
+  min-height: 44px;
+  max-height: 480px;
+}

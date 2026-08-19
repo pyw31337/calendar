@@ -1188,10 +1188,52 @@ const removeFirstUrl = GATHER_APP_UTILS.removeFirstUrl;
 // inside a fixed-height box. Resets to 'auto' first so shrinking text (e.g. deleting a pasted
 // paragraph) shrinks the box back down too, not just grows it. maxHeight keeps a very long paste
 // from pushing the rest of the form off-screen -- past that point it scrolls internally as before.
-function autoGrowTextarea(el, maxHeight = 300) {
+function autoGrowTextarea(el, maxHeight = 480) {
   if (!el) return;
+  el.style.overflow = 'hidden';
   el.style.height = 'auto';
-  el.style.height = `${Math.min(maxHeight, el.scrollHeight)}px`;
+  const next = Math.min(maxHeight, Math.max(el.scrollHeight, el.offsetHeight || 0));
+  el.style.height = `${next}px`;
+}
+
+// 입력필드 규칙: 멀티라인 텍스트는 값(로드/입력/붙여넣기)에 맞춰 세로로 자동 확장
+function AutoGrowTextarea({
+  maxHeight = 480,
+  value,
+  onChange,
+  style = null,
+  className = 'form-input',
+  minHeight = 44,
+  textareaRef = null,
+  ...rest
+}) {
+  const innerRef = React.useRef(null);
+  const setRefs = React.useCallback(el => {
+    innerRef.current = el;
+    if (typeof textareaRef === 'function') textareaRef(el);
+    else if (textareaRef && typeof textareaRef === 'object') textareaRef.current = el;
+  }, [textareaRef]);
+  React.useLayoutEffect(() => {
+    autoGrowTextarea(innerRef.current, maxHeight);
+  }, [value, maxHeight]);
+  return /*#__PURE__*/React.createElement("textarea", Object.assign({
+    ref: setRefs,
+    className: className,
+    value: value,
+    onChange: e => {
+      if (typeof onChange === 'function') onChange(e);
+      autoGrowTextarea(e.target, maxHeight);
+    },
+    onInput: e => autoGrowTextarea(e.target, maxHeight),
+    style: Object.assign({
+      resize: 'none',
+      overflow: 'hidden',
+      boxSizing: 'border-box',
+      minHeight: typeof minHeight === 'number' ? `${minHeight}px` : minHeight,
+      fontFamily: 'inherit',
+      lineHeight: 1.45
+    }, style || {})
+  }, rest));
 }
 function UrlCapsuleBadge({ url, style = null }) {
   const href = sanitizeText(url || '', 500);
@@ -14194,8 +14236,7 @@ function EditMessageModal({
     value: text,
     onChange: e => {
       setText(e.target.value);
-      e.target.style.height = 'auto';
-      e.target.style.height = `${Math.min(240, e.target.scrollHeight)}px`;
+      autoGrowTextarea(e.target, 240);
     },
     style: {
       flex: 1,
@@ -15410,11 +15451,13 @@ function DateModal({
             style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#64748B', marginBottom: '6px' }
           }, "장소 메모 입력"),
           /*#__PURE__*/React.createElement("div", {
-            style: { display: 'flex', gap: '8px', alignItems: 'stretch' }
+            style: { display: 'flex', gap: '8px', alignItems: 'flex-start' }
           },
-            /*#__PURE__*/React.createElement("textarea", {
+            /*#__PURE__*/React.createElement(AutoGrowTextarea, {
               className: "form-input",
-              style: { flex: 1, minHeight: '44px', height: '44px', resize: 'none', fontFamily: 'inherit', padding: '8px 12px', boxSizing: 'border-box' },
+              style: { flex: 1, padding: '8px 12px' },
+              minHeight: 44,
+              maxHeight: 480,
               placeholder: "메모 입력 (선택, '26.02.12' 또는 URL 입력 가능)",
               maxLength: 2000,
               value: placeMemo,
@@ -20342,7 +20385,7 @@ function MemoView({ calendar, memos, hasMoreMemos, onLoadMoreMemos, onBack, show
             ref: editMemoTextareaRef,
             placeholder: "메모 입력...",
             value: editText,
-            onChange: e => setEditText(e.target.value),
+            onChange: e => { setEditText(e.target.value); autoGrowTextarea(e.target, 480); },
             rows: "6",
             style: {
               padding: '8px 4px',
@@ -25738,16 +25781,14 @@ function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, onDelete,
       /* Memo field */
       /*#__PURE__*/React.createElement("div", null,
         /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#64748B', marginBottom: '4px' } }, "메모"),
-        /*#__PURE__*/React.createElement("textarea", {
-          ref: memoTextareaRef,
+        /*#__PURE__*/React.createElement(AutoGrowTextarea, {
+          textareaRef: memoTextareaRef,
           className: "form-input",
-          style: { width: '100%', minHeight: '60px', resize: 'vertical', fontFamily: 'inherit' },
+          style: { width: '100%' },
+          minHeight: 60,
+          maxHeight: 480,
           placeholder: "메모를 남겨보세요 (선택, URL을 입력하면 캡슐 뱃지로 표시됩니다. '26.02.12'처럼 날짜를 적으면 방문일자에 자동 반영됩니다)",
           value: memo,
-          // Matches firestore.rules' hasValidPlaceShape memo cap (places/{placeId}.memo <= 2000
-          // chars) exactly -- bulk-imported places can carry many "YY.MM.DD 방문내용" history
-          // lines in one memo, and the old 300-char limit cut that off well before the field's
-          // actual backend ceiling.
           maxLength: 2000,
           onChange: handleMemoChange,
           onPaste: handleMemoPaste
