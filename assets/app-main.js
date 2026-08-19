@@ -15224,11 +15224,11 @@ function DateModal({
             }),
             /*#__PURE__*/React.createElement("button", {
               type: "button",
-              className: "btn btn-primary",
-              style: { padding: '0 18px', fontWeight: 800, borderRadius: 'var(--radius-full)' },
+              className: "btn btn-poll-create btn-action btn-action-dark",
+              style: { padding: '0 16px', fontWeight: 800, height: '44px', minHeight: '44px' },
               disabled: isSubmitting,
               onClick: handleSubmit
-            }, isSubmitting ? '...' : '확인')
+            }, isSubmitting ? '...' : '저장')
           )
         )
       ),
@@ -15358,8 +15358,8 @@ function DateModal({
             }),
             /*#__PURE__*/React.createElement("button", {
               type: "button",
-              className: "btn btn-poll-create",
-              style: { padding: '0 16px', fontWeight: 800, borderRadius: 'var(--radius-full)', height: '44px' },
+              className: "btn btn-poll-create btn-action btn-action-dark",
+              style: { padding: '0 16px', fontWeight: 800, height: '44px' },
               onClick: e => { e.preventDefault(); e.stopPropagation(); handlePlaceSearch(e, false); }
             }, "검색")
           )
@@ -15469,11 +15469,11 @@ function DateModal({
             }),
             /*#__PURE__*/React.createElement("button", {
               type: "button",
-              className: editingLinkedPlaceId ? 'btn btn-poll-create' : 'btn btn-primary',
+              className: "btn btn-poll-create btn-action btn-action-dark",
               style: {
-                padding: '0 20px', fontWeight: 800, borderRadius: 'var(--radius-full)', whiteSpace: 'nowrap',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                ...(editingLinkedPlaceId ? { backgroundColor: '#0F172A', borderColor: '#0F172A', color: '#FFFFFF' } : {})
+                padding: '0 16px', fontWeight: 800, height: '44px', minHeight: '44px',
+                whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                alignSelf: 'flex-start'
               },
               disabled: isSavingPlace || !selectedPlace,
               onClick: e => { e.preventDefault(); e.stopPropagation(); handleSavePlaceClick(); }
@@ -25896,7 +25896,7 @@ function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, onDelete,
       }, "삭제"),
       /*#__PURE__*/React.createElement("button", {
         type: "button",
-        className: "btn btn-primary",
+        className: "btn btn-action btn-action-dark",
         style: { flex: 1, height: '44px', justifyContent: 'center' },
         disabled: saving,
         onClick: handleSubmit

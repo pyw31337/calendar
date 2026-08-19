@@ -857,6 +857,32 @@ button, input, textarea, select {
   transform: translateY(-1px);
 }
 
+/* 버튼 규칙: 검색/추가/수정/저장 = Rounded 사각형(캡슐 X), 높이 44px */
+.btn-action,
+.btn-poll-create {
+  border-radius: 12px !important;
+  height: 44px;
+  min-height: 44px;
+  padding: 0 16px;
+  font-weight: 800;
+  white-space: nowrap;
+  box-sizing: border-box;
+}
+.btn-action-dark,
+.btn.btn-action-dark {
+  background: #0F172A !important;
+  border-color: #0F172A !important;
+  color: #FFFFFF !important;
+  box-shadow: none;
+}
+.btn-action-dark:hover,
+.btn.btn-action-dark:hover {
+  background: #020617 !important;
+  border-color: #020617 !important;
+  transform: translateY(-1px);
+}
+
+
 .btn-secondary { background: #F1F5F9; border-color: var(--border-subtle); color: var(--text-main); }
 .btn-secondary:hover { background: #E2E8F0; border-color: var(--border-hover); }
 .calendar-month-nav-btn,
