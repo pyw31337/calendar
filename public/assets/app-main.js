@@ -2307,76 +2307,6 @@ async function fetchGalleryItemCount(calId, maxPages = 25) {
   }
 }
 
-const CHAT_OLDER_PAGE_SIZE = readConfigNumber('CHAT_OLDER_PAGE_SIZE', 40);
-
-async function fetchOlderChatMessages(calId, beforeTimestamp, pageSize = CHAT_OLDER_PAGE_SIZE) {
-  if (!calId || !beforeTimestamp) return [];
-  try {
-    if (firebaseDb) {
-      const snap = await firebaseDb.collection('calendars').doc(`cal_${calId}`).collection('messages')
-        .orderBy('timestamp', 'desc')
-        .startAfter(beforeTimestamp)
-        .limit(pageSize)
-        .get();
-      const list = [];
-      snap.forEach(doc => list.push(slimMessageForClient({ id: doc.id, ...doc.data() })));
-      return list.reverse();
-    }
-  } catch (err) {
-    console.warn('fetchOlderChatMessages error:', err);
-  }
-  return [];
-}
-
-async function fetchMessagesCollectionCount(calId) {
-  if (!calId || !firebaseDb) return null;
-  try {
-    const ref = firebaseDb.collection('calendars').doc(`cal_${calId}`).collection('messages');
-    if (ref && typeof ref.count === 'function') {
-      const snap = await ref.count().get();
-      return Number(snap.data().count) || 0;
-    }
-  } catch (err) {
-    console.warn('fetchMessagesCollectionCount error:', err);
-  }
-  return null;
-}
-
-async function fetchGalleryItemCount(calId, maxPages = 25) {
-  if (!calId || !firebaseDb) return null;
-  try {
-    let total = 0;
-    let lastDoc = null;
-    for (let page = 0; page < maxPages; page++) {
-      let q = firebaseDb.collection('calendars').doc(`cal_${calId}`).collection('messages')
-        .orderBy('timestamp', 'desc')
-        .limit(100);
-      if (lastDoc) q = q.startAfter(lastDoc);
-      const snap = await q.get();
-      if (snap.empty) break;
-      snap.forEach(doc => {
-        const msg = { id: doc.id, ...doc.data() };
-        const imgN = getMessageImageEntries(msg).length;
-        total += imgN;
-        const direct = getMessageDirectMediaEntry(msg);
-        if (direct) total += 1;
-        const textUrl = extractFirstUrl(msg.text || '');
-        if (textUrl && !direct && imgN === 0) total += 1;
-      });
-      lastDoc = snap.docs[snap.docs.length - 1];
-      if (snap.size < 100) break;
-    }
-    return total;
-  } catch (err) {
-    console.warn('fetchGalleryItemCount error:', err);
-  }
-  return null;
-}
-
-// recentLimit mirrors fetchActivityLogsFromFirestore's own param -- both call sites always pass
-// memosLimit now, so this REST fallback (used when the Firestore SDK listener itself errors out)
-// downloads the same bounded page the SDK path would have, instead of the entire memos
-// collection every time a calendar with thousands of memos falls back to REST.
 async function fetchMemosRest(calId, recentLimit = null) {
   try {
     const pageSizePart = recentLimit ? `&pageSize=${recentLimit}` : '';
@@ -8773,6 +8703,7 @@ function App() {
       chatMessages: allChatMessages,
       loadingOlderChat: loadingOlderChat,
       hasMoreOlderChat: hasMoreOlderChat,
+      onLoadOlderChat: loadOlderChatMessages,
       chatInput: chatInput,
       setChatInput: setChatInput,
       chatParticipantId: chatParticipantId,
@@ -12818,8 +12749,6 @@ function ChatRoomView({
   loadingOlderChat,
   hasMoreOlderChat,
   onLoadOlderChat,
-  loadingOlderChat,
-  hasMoreOlderChat,
   chatInput,
   setChatInput,
   chatParticipantId,
