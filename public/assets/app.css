@@ -2606,7 +2606,8 @@ select.form-select {
   border-top: 1px solid var(--border-subtle);
   box-sizing: border-box;
 }
-.places-list-search-input {
+.places-list-search-input,
+.inline-search-input {
   border: none !important;
   outline: none !important;
   box-shadow: none !important;
@@ -2614,7 +2615,8 @@ select.form-select {
   -webkit-appearance: none;
   appearance: none;
 }
-.places-list-search-input:focus {
+.places-list-search-input:focus,
+.inline-search-input:focus {
   border: none !important;
   outline: none !important;
   box-shadow: none !important;

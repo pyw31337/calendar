@@ -13466,118 +13466,69 @@ function ChatRoomView({
     onClose: () => setIsChatGalleryOpen(false),
     setActiveLightbox: setActiveLightbox
   }),
-  isSearchOpen && /*#__PURE__*/React.createElement("div", {
-    style: {
-      position: 'fixed',
-      top: '56px',
-      left: 0,
-      right: 0,
-      zIndex: 1008,
-      display: 'flex',
-      alignItems: 'center',
-      gap: '6px',
-      padding: '7px 10px',
-      backgroundColor: 'var(--bg-card)',
-      borderBottom: '1px solid var(--border-subtle)',
-      boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
-    }
-  },
-    /*#__PURE__*/React.createElement("svg", {
-      xmlns: "http://www.w3.org/2000/svg",
-      width: "17",
-      height: "17",
-      viewBox: "0 0 24 24",
-      fill: "none",
-      stroke: "currentColor",
-      strokeWidth: "2",
-      strokeLinecap: "round",
-      strokeLinejoin: "round",
-      style: { color: 'var(--text-muted)', flexShrink: 0 }
-    }, /*#__PURE__*/React.createElement("circle", { cx: "11", cy: "11", r: "8" }), /*#__PURE__*/React.createElement("path", { d: "m21 21-4.3-4.3" })),
-    /*#__PURE__*/React.createElement("input", {
-      type: "text",
-      className: "form-input",
-      placeholder: "검색할 메시지를 입력하세요...",
-      value: searchQuery,
-      onChange: e => { setSearchQuery(e.target.value); setSearchFocusIndex(Number.MAX_SAFE_INTEGER); },
-      autoFocus: true,
-      style: { flex: 1, minWidth: 0, height: '34px', fontSize: '0.88rem' }
-    }),
-    searchQuery && /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: '0.76rem',
-        color: 'var(--text-muted)',
-        flexShrink: 0,
-        minWidth: '36px',
-        textAlign: 'center',
-        fontVariantNumeric: 'tabular-nums'
-      }
-    }, searchMatchIds.length > 0 ? `${clampedFocusIdx + 1}/${searchMatchIds.length}` : '0/0'),
-    /*#__PURE__*/React.createElement("button", {
-      type: "button",
-      disabled: searchMatchIds.length === 0,
-      onClick: () => setSearchFocusIndex(i => {
-        const currentIdx = i >= searchMatchIds.length ? searchMatchIds.length - 1 : i;
-        const next = currentIdx - 1;
-        return next < 0 ? searchMatchIds.length - 1 : next;
-      }),
-      title: "이전 결과",
-      style: {
-        border: 'none',
-        background: 'none',
-        cursor: searchMatchIds.length > 0 ? 'pointer' : 'default',
-        color: searchMatchIds.length > 0 ? 'var(--text-main)' : 'var(--text-muted)',
-        padding: '4px',
-        display: 'flex',
-        alignItems: 'center',
-        flexShrink: 0,
-        opacity: searchMatchIds.length > 0 ? 1 : 0.4
-      }
-    }, /*#__PURE__*/React.createElement("svg", {
-      xmlns: "http://www.w3.org/2000/svg", width: "18", height: "18",
-      viewBox: "0 0 24 24", fill: "none", stroke: "currentColor",
-      strokeWidth: "2.5", strokeLinecap: "round", strokeLinejoin: "round"
-    }, /*#__PURE__*/React.createElement("path", { d: "m18 15-6-6-6 6" }))),
-    /*#__PURE__*/React.createElement("button", {
-      type: "button",
-      disabled: searchMatchIds.length === 0,
-      onClick: () => setSearchFocusIndex(i => {
-        const currentIdx = i >= searchMatchIds.length ? searchMatchIds.length - 1 : i;
-        const next = currentIdx + 1;
-        return next >= searchMatchIds.length ? 0 : next;
-      }),
-      title: "다음 결과",
-      style: {
-        border: 'none',
-        background: 'none',
-        cursor: searchMatchIds.length > 0 ? 'pointer' : 'default',
-        color: searchMatchIds.length > 0 ? 'var(--text-main)' : 'var(--text-muted)',
-        padding: '4px',
-        display: 'flex',
-        alignItems: 'center',
-        flexShrink: 0,
-        opacity: searchMatchIds.length > 0 ? 1 : 0.4
-      }
-    }, /*#__PURE__*/React.createElement("svg", {
-      xmlns: "http://www.w3.org/2000/svg", width: "18", height: "18",
-      viewBox: "0 0 24 24", fill: "none", stroke: "currentColor",
-      strokeWidth: "2.5", strokeLinecap: "round", strokeLinejoin: "round"
-    }, /*#__PURE__*/React.createElement("path", { d: "m6 9 6 6 6-6" }))),
-    /*#__PURE__*/React.createElement("button", {
-      type: "button",
-      onClick: () => { setIsSearchOpen(false); setSearchQuery(''); setSearchFocusIndex(0); },
-      style: {
-        border: 'none',
-        background: 'none',
-        cursor: 'pointer',
-        color: 'var(--text-muted)',
-        padding: '4px 6px',
-        fontSize: '0.8rem',
-        fontWeight: 700,
-        flexShrink: 0
-      }
-    }, "닫기")
-  ));
+  isSearchOpen && /*#__PURE__*/React.createElement(InlineSearchBar, {
+    fixed: true,
+    value: searchQuery,
+    placeholder: "검색할 메시지를 입력하세요...",
+    onChange: e => { setSearchQuery(e.target.value); setSearchFocusIndex(Number.MAX_SAFE_INTEGER); },
+    trailing: /*#__PURE__*/React.createElement(React.Fragment, null,
+      searchQuery && /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: '0.76rem', color: 'var(--text-muted)', flexShrink: 0,
+          minWidth: '36px', textAlign: 'center', fontVariantNumeric: 'tabular-nums'
+        }
+      }, searchMatchIds.length > 0 ? `${clampedFocusIdx + 1}/${searchMatchIds.length}` : '0/0'),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button", disabled: searchMatchIds.length === 0,
+        onClick: () => setSearchFocusIndex(i => {
+          const currentIdx = i >= searchMatchIds.length ? searchMatchIds.length - 1 : i;
+          const next = currentIdx - 1;
+          return next < 0 ? searchMatchIds.length - 1 : next;
+        }),
+        title: "이전 결과",
+        style: {
+          border: 'none', background: 'none',
+          cursor: searchMatchIds.length > 0 ? 'pointer' : 'default',
+          color: searchMatchIds.length > 0 ? 'var(--text-main)' : 'var(--text-muted)',
+          padding: '4px', display: 'flex', alignItems: 'center', flexShrink: 0,
+          opacity: searchMatchIds.length > 0 ? 1 : 0.4
+        }
+      }, /*#__PURE__*/React.createElement("svg", {
+        xmlns: "http://www.w3.org/2000/svg", width: "18", height: "18",
+        viewBox: "0 0 24 24", fill: "none", stroke: "currentColor",
+        strokeWidth: "2.5", strokeLinecap: "round", strokeLinejoin: "round"
+      }, /*#__PURE__*/React.createElement("path", { d: "m18 15-6-6-6 6" }))),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button", disabled: searchMatchIds.length === 0,
+        onClick: () => setSearchFocusIndex(i => {
+          const currentIdx = i >= searchMatchIds.length ? searchMatchIds.length - 1 : i;
+          const next = currentIdx + 1;
+          return next >= searchMatchIds.length ? 0 : next;
+        }),
+        title: "다음 결과",
+        style: {
+          border: 'none', background: 'none',
+          cursor: searchMatchIds.length > 0 ? 'pointer' : 'default',
+          color: searchMatchIds.length > 0 ? 'var(--text-main)' : 'var(--text-muted)',
+          padding: '4px', display: 'flex', alignItems: 'center', flexShrink: 0,
+          opacity: searchMatchIds.length > 0 ? 1 : 0.4
+        }
+      }, /*#__PURE__*/React.createElement("svg", {
+        xmlns: "http://www.w3.org/2000/svg", width: "18", height: "18",
+        viewBox: "0 0 24 24", fill: "none", stroke: "currentColor",
+        strokeWidth: "2.5", strokeLinecap: "round", strokeLinejoin: "round"
+      }, /*#__PURE__*/React.createElement("path", { d: "m6 9 6 6 6-6" }))),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: () => { setIsSearchOpen(false); setSearchQuery(''); setSearchFocusIndex(0); },
+        style: {
+          border: 'none', background: 'none', cursor: 'pointer',
+          color: 'var(--text-muted)', padding: '4px 6px', fontSize: '0.8rem',
+          fontWeight: 700, flexShrink: 0
+        }
+      }, "닫기")
+    )
+  })
 }
 
 // A curated, cross-platform-consistent emoji set (Twemoji, the same flat-design set used by
@@ -19424,46 +19375,31 @@ function MemoView({ calendar, memos, hasMoreMemos, onLoadMoreMemos, onBack, show
 
     /* Search bar -- hidden by default, slides in below the header when the search button is
        tapped (same slot/z-index the chat room's own search bar uses). */
-    isSearchOpen && /*#__PURE__*/React.createElement("div", {
-      style: {
-        position: 'fixed', top: '56px', left: 0, right: 0, zIndex: 1008,
-        display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 10px',
-        backgroundColor: 'var(--bg-card)', borderBottom: '1px solid var(--border-subtle)',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
-      }
-    },
-      /*#__PURE__*/React.createElement("svg", {
-        xmlns: "http://www.w3.org/2000/svg", width: "17", height: "17", viewBox: "0 0 24 24",
-        fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round",
-        style: { color: 'var(--text-muted)', flexShrink: 0 }
-      }, /*#__PURE__*/React.createElement("circle", { cx: "11", cy: "11", r: "8" }), /*#__PURE__*/React.createElement("path", { d: "m21 21-4.3-4.3" })),
-      /*#__PURE__*/React.createElement("input", {
-        ref: memoSearchInputRef,
-        type: "text",
-        placeholder: "메모 제목, 내용, 해시태그 검색...",
-        value: searchQuery,
-        onChange: e => setSearchQuery(e.target.value),
-        // minWidth:0 overrides the flex item default of min-width:auto, which otherwise refuses
-        // to shrink this input below its intrinsic size and pushes the tag chip/close button
-        // off the right edge of the row once a long hashtag is selected on a narrow screen.
-        style: { flex: 1, minWidth: 0, height: '34px', fontSize: '0.85rem', border: '1px solid var(--border-subtle)', borderRadius: '20px', padding: '0 12px', backgroundColor: 'var(--bg-primary)', color: 'var(--text-main)', outline: 'none', boxSizing: 'border-box' }
-      }),
-      selectedTag && /*#__PURE__*/React.createElement("button", {
-        onClick: () => setSelectedTag(''),
-        title: selectedTag,
-        style: {
-          padding: '6px 12px', borderRadius: '16px', backgroundColor: 'var(--bg-primary)',
-          border: '1px solid var(--border-subtle)', color: '#3B82F6', fontSize: '0.75rem',
-          fontWeight: 'bold', cursor: 'pointer', flexShrink: 0,
-          maxWidth: '35vw', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
-        }
-      }, selectedTag, " ✕"),
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        onClick: () => { setIsSearchOpen(false); setSearchQuery(''); setSelectedTag(''); },
-        style: { border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '4px 6px', fontSize: '0.8rem', fontWeight: 700, flexShrink: 0 }
-      }, "닫기")
-    ),
+    isSearchOpen && /*#__PURE__*/React.createElement(InlineSearchBar, {
+      fixed: true,
+      inputRef: memoSearchInputRef,
+      value: searchQuery,
+      placeholder: "메모 제목, 내용, 해시태그 검색...",
+      onChange: e => setSearchQuery(e.target.value),
+      trailing: /*#__PURE__*/React.createElement(React.Fragment, null,
+        selectedTag && /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          onClick: () => setSelectedTag(''),
+          title: selectedTag,
+          style: {
+            padding: '6px 12px', borderRadius: '16px', backgroundColor: 'var(--bg-primary)',
+            border: '1px solid var(--border-subtle)', color: '#3B82F6', fontSize: '0.75rem',
+            fontWeight: 'bold', cursor: 'pointer', flexShrink: 0,
+            maxWidth: '35vw', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+          }
+        }, selectedTag, " ✕"),
+        /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          onClick: () => { setIsSearchOpen(false); setSearchQuery(''); setSelectedTag(''); },
+          style: { border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '4px 6px', fontSize: '0.8rem', fontWeight: 700, flexShrink: 0 }
+        }, "닫기")
+      )
+    }),
 
     /* Main Scrollable Body */
     /*#__PURE__*/React.createElement("div", {
@@ -22081,6 +22017,88 @@ function BellIcon() {
   }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }),
     /*#__PURE__*/React.createElement("path", { d: "M10 5a2 2 0 1 1 4 0a7 7 0 0 1 4 6v3a4 4 0 0 0 2 3h-16a4 4 0 0 0 2 -3v-3a7 7 0 0 1 4 -6" }),
     /*#__PURE__*/React.createElement("path", { d: "M9 17v1a3 3 0 0 0 6 0v-1" }));
+}
+
+
+// Shared slide-down search row used by chat / memo / places (and gallery). Visual baseline is
+// the places search field: left magnifier, borderless transparent input, optional trailing
+// actions (prev/next/close, clear, etc.) stay page-specific.
+function InlineSearchBar({
+  value,
+  onChange,
+  placeholder,
+  autoFocus = true,
+  fixed = false,
+  inputRef = null,
+  trailing = null,
+  className = '',
+  style = null
+}) {
+  const barStyle = {
+    minHeight: '48px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+    padding: '10px 16px',
+    backgroundColor: 'var(--bg-card)',
+    borderBottom: '1px solid var(--border-subtle)',
+    boxSizing: 'border-box',
+    ...(fixed ? {
+      position: 'fixed',
+      top: '56px',
+      left: 0,
+      right: 0,
+      zIndex: 1008,
+      flexShrink: 0
+    } : {
+      flexShrink: 0,
+      zIndex: 1008
+    }),
+    ...(style || {})
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    className: `inline-search-bar${fixed ? ' is-fixed' : ''}${className ? ' ' + className : ''}`,
+    style: barStyle
+  },
+    /*#__PURE__*/React.createElement("svg", {
+      xmlns: "http://www.w3.org/2000/svg",
+      width: "16",
+      height: "16",
+      viewBox: "0 0 24 24",
+      fill: "none",
+      stroke: "currentColor",
+      strokeWidth: "2",
+      strokeLinecap: "round",
+      strokeLinejoin: "round",
+      style: { color: 'var(--text-muted)', flexShrink: 0 },
+      "aria-hidden": true
+    },
+      /*#__PURE__*/React.createElement("circle", { cx: "11", cy: "11", r: "8" }),
+      /*#__PURE__*/React.createElement("path", { d: "m21 21-4.3-4.3" })
+    ),
+    /*#__PURE__*/React.createElement("input", {
+      ref: inputRef,
+      type: "text",
+      className: "inline-search-input",
+      placeholder: placeholder,
+      value: value,
+      onChange: onChange,
+      autoFocus: autoFocus,
+      style: {
+        flex: 1,
+        minWidth: 0,
+        height: '36px',
+        fontSize: '0.88rem',
+        padding: '0 4px',
+        border: 'none',
+        outline: 'none',
+        background: 'transparent',
+        color: 'var(--text-main)',
+        boxShadow: 'none'
+      }
+    }),
+    trailing
+  );
 }
 
 function SearchIcon() {
@@ -25573,62 +25591,21 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
       }, /*#__PURE__*/React.createElement(ThreeLinesIcon, { size: 22 }))
     ),
 
-    /* Slide-down search input bar */
-    isSearchOpen && /*#__PURE__*/React.createElement("div", {
-      className: "places-list-search-bar",
-      style: {
-        minHeight: '48px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '10px',
-        padding: '10px 16px',
-        backgroundColor: 'var(--bg-card)',
-        borderBottom: '1px solid var(--border-subtle)',
-        flexShrink: 0,
-        zIndex: 1008,
-        boxSizing: 'border-box'
-      }
-    },
-      /*#__PURE__*/React.createElement("svg", {
-        xmlns: "http://www.w3.org/2000/svg",
-        width: "16",
-        height: "16",
-        viewBox: "0 0 24 24",
-        fill: "none",
-        stroke: "currentColor",
-        strokeWidth: "2",
-        strokeLinecap: "round",
-        strokeLinejoin: "round",
-        style: { color: 'var(--text-muted)', flexShrink: 0 }
+    /* Slide-down search input bar (shared InlineSearchBar) */
+    isSearchOpen && /*#__PURE__*/React.createElement(InlineSearchBar, {
+      value: listSearchQuery,
+      placeholder: "등록된 플레이스명 또는 주소 검색...",
+      onChange: e => {
+        const val = e.target.value;
+        setListSearchQuery(val);
+        if (val.trim()) setCategoryFilter('all');
       },
-        /*#__PURE__*/React.createElement("circle", { cx: "11", cy: "11", r: "8" }),
-        /*#__PURE__*/React.createElement("path", { d: "m21 21-4.3-4.3" })
-      ),
-      /*#__PURE__*/React.createElement("input", {
-        type: "text",
-        className: "places-list-search-input",
-        placeholder: "등록된 플레이스명 또는 주소 검색...",
-        value: listSearchQuery,
-        onChange: e => {
-          const val = e.target.value;
-          setListSearchQuery(val);
-          if (val.trim()) {
-            setCategoryFilter('all');
-          }
-        },
-        autoFocus: true,
-        style: {
-          flex: 1, minWidth: 0, height: '36px', fontSize: '0.88rem',
-          padding: '0 4px', border: 'none', outline: 'none',
-          background: 'transparent', color: 'var(--text-main)', boxShadow: 'none'
-        }
-      }),
-      listSearchQuery && /*#__PURE__*/React.createElement("button", {
+      trailing: listSearchQuery ? /*#__PURE__*/React.createElement("button", {
         type: "button",
         onClick: () => setListSearchQuery(''),
-        style: { border: 'none', background: 'none', color: 'var(--text-muted)', fontSize: '0.8rem', cursor: 'pointer', fontWeight: 600 }
-      }, "초기화")
-    ),
+        style: { border: 'none', background: 'none', color: 'var(--text-muted)', fontSize: '0.8rem', cursor: 'pointer', fontWeight: 600, flexShrink: 0 }
+      }, "초기화") : null
+    }),
 
     /* Sticky Map Area */
     /*#__PURE__*/React.createElement("div", {
