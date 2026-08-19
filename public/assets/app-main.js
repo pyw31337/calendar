@@ -313,8 +313,23 @@ function getNaverMapSearchRegionHint(address) {
   return /^[가-힣]+(?:시|군|구)$/.test(firstToken) ? firstToken : '';
 }
 function getNaverMapPlaceUrl(place) {
+  // Prefer official name + as much address as we have. Region-only hints (e.g. "시흥시") often
+  // fail to match Naver POI when the business name is slightly different; full road address
+  // recovers matches and still lands near the right block when POI is missing.
+  const name = String(place?.name || '').trim();
+  const address = String(place?.address || '').trim()
+    .replace(/^대한민국\s*/, '');
   const regionHint = getNaverMapSearchRegionHint(place?.address);
-  const query = [place?.name, regionHint].filter(Boolean).join(' ') || place?.name || '플레이스';
+  const parts = [];
+  if (name) parts.push(name);
+  if (address) parts.push(address);
+  else if (regionHint) parts.push(regionHint);
+  const query = parts.join(' ') || name || '플레이스';
+  const lat = Number(place?.lat);
+  const lng = Number(place?.lng);
+  if (Number.isFinite(lat) && Number.isFinite(lng)) {
+    return `https://map.naver.com/p/search/${encodeURIComponent(query)}?c=${lng},${lat},15,0,0,0,dh`;
+  }
   return `https://map.naver.com/p/search/${encodeURIComponent(query)}`;
 }
 
@@ -25722,7 +25737,12 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
             style: {
               display: 'flex', flexDirection: 'column', gap: '4px',
               padding: '10px 12px', position: 'relative',
-              border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', cursor: 'pointer'
+              border: focusPlace && focusPlace.id === place.id ? '1.5px solid var(--accent-primary)' : '1px solid var(--border-subtle)',
+              borderRadius: 'var(--radius-md)',
+              cursor: 'pointer',
+              backgroundColor: focusPlace && focusPlace.id === place.id ? 'rgba(79, 70, 229, 0.08)' : 'var(--bg-card)',
+              boxShadow: focusPlace && focusPlace.id === place.id ? '0 0 0 3px rgba(79, 70, 229, 0.12)' : 'none',
+              transition: 'border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease'
             },
             onClick: () => handleSelectPlaceOnMap(place)
           },
