@@ -1145,6 +1145,32 @@ function autoGrowTextarea(el, maxHeight = 300) {
   el.style.height = 'auto';
   el.style.height = `${Math.min(maxHeight, el.scrollHeight)}px`;
 }
+function UrlCapsuleBadge({ url, style = null }) {
+  const href = sanitizeText(url || '', 500);
+  if (!href) return null;
+  return /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    title: href,
+    onClick: e => { e.stopPropagation(); window.open(href, '_blank', 'noopener,noreferrer'); },
+    style: {
+      display: 'inline-flex',
+      alignItems: 'center',
+      padding: '3px 10px',
+      borderRadius: 'var(--radius-full)',
+      fontSize: '0.72rem',
+      fontWeight: 600,
+      border: 0,
+      backgroundColor: '#E2E8F0',
+      color: '#475569',
+      cursor: 'pointer',
+      wordBreak: 'break-all',
+      maxWidth: '100%',
+      textAlign: 'left',
+      ...(style || {})
+    }
+  }, href);
+}
+
 function renderTextWithUrlBadge(text) {
   const source = String(text || '');
   const url = extractFirstUrl(source);
@@ -1152,27 +1178,10 @@ function renderTextWithUrlBadge(text) {
   if (!url) return textOnly;
   return /*#__PURE__*/React.createElement(React.Fragment, null,
     textOnly && /*#__PURE__*/React.createElement("span", { style: { wordBreak: 'break-word' } }, textOnly),
-    /*#__PURE__*/React.createElement("button", {
-      type: "button",
-      title: url,
-      onClick: e => { e.stopPropagation(); window.open(url, '_blank', 'noopener,noreferrer'); },
-      style: {
-        display: 'inline-flex',
-        alignItems: 'center',
-        marginLeft: textOnly ? '6px' : 0,
-        padding: '3px 10px',
-        borderRadius: 'var(--radius-full)',
-        fontSize: '0.72rem',
-        fontWeight: 600,
-        border: 0,
-        backgroundColor: '#E2E8F0',
-        color: '#475569',
-        cursor: 'pointer',
-        wordBreak: 'break-all',
-        maxWidth: '100%',
-        textAlign: 'left'
-      }
-    }, url)
+    /*#__PURE__*/React.createElement(UrlCapsuleBadge, {
+      url: url,
+      style: { marginLeft: textOnly ? '6px' : 0 }
+    })
   );
 }
 
@@ -6245,10 +6254,16 @@ function App() {
     setIsGlobalSearchOpen(true);
     changeView('calendar');
   };
-  const handleParticipantClick = name => {
-    setIsModalOpen(false);
-    setPlacesInitialQuery(name);
-    changeView('places');
+  const handleParticipantClick = (name, dateStr) => {
+    if (dateStr) {
+      setSelectedDate(dateStr);
+      setIsModalOpen(true);
+      return;
+    }
+    if (name) {
+      setPlacesInitialQuery(name);
+      changeView('places');
+    }
   };
   const [deletingMessage, setDeletingMessage] = React.useState(null); // {id, participantId, text, calId}
   const [editingMessage, setEditingMessage] = React.useState(null); // {id, participantId, text, imageUrl, thumbUrl, calId}
@@ -9227,7 +9242,9 @@ function CalendarGrid({
           onClick: event => {
             event.stopPropagation();
             if (typeof onParticipantClick === 'function') {
-              onParticipantClick(p.name);
+              onParticipantClick(p.name, dateStr);
+            } else if (typeof onSelectDate === 'function') {
+              onSelectDate(dateStr);
             }
           },
           title: e.note ? `${p.name}: ${e.note}` : p.name
@@ -13528,7 +13545,7 @@ function ChatRoomView({
         }
       }, "닫기")
     )
-  })
+  }));
 }
 
 // A curated, cross-platform-consistent emoji set (Twemoji, the same flat-design set used by
