@@ -563,6 +563,44 @@
     return trimmed.length >= 3 ? trimmed : points;
   }
 
+
+  function parseSharePathFromLocation(pathname) {
+    const m = String(pathname || '').match(/\/share\/([A-Za-z0-9_-]+)(?:\/([A-Za-z0-9_-]+))?(?:\/([A-Za-z0-9_.-]+))?\/?$/);
+    if (!m) return null;
+    const calendarId = m[1];
+    const seg2 = m[2] || '';
+    const seg3 = m[3] || '';
+    const viewSet = { chat: 1, memo: 1, places: 1, gallery: 1, settlement: 1 };
+    if (!seg2) return { calendarId, view: 'calendar', memoId: null };
+    if (viewSet[seg2]) {
+      if (seg2 === 'memo' && seg3) return { calendarId, view: 'memo', memoId: seg3 };
+      return { calendarId, view: seg2, memoId: null };
+    }
+    return { calendarId, view: 'calendar', memoId: null };
+  }
+
+  function getAppBaseUrl(locationLike) {
+    const loc = locationLike || (typeof window !== 'undefined' ? window.location : null);
+    if (!loc) return '/';
+    let basePath = String(loc.pathname || '/').replace(/\/share(?:\/.*)?$/, '/').replace(/\/(?:index\.html)?$/, '/');
+    if (!basePath.endsWith('/')) basePath += '/';
+    return `${loc.origin || ''}${basePath}`;
+  }
+
+  function getCalendarShareUrl(calendarId, locationLike) {
+    return `${getAppBaseUrl(locationLike)}share/${encodeURIComponent(calendarId)}/`;
+  }
+
+  function getViewShareUrl(calendarId, view, locationLike) {
+    const base = getCalendarShareUrl(calendarId, locationLike);
+    if (!view || view === 'calendar') return base;
+    return `${base}${encodeURIComponent(view)}/`;
+  }
+
+  function getMemoItemShareUrl(calendarId, memoId, locationLike) {
+    return `${getCalendarShareUrl(calendarId, locationLike)}memo/${encodeURIComponent(memoId)}/`;
+  }
+
   window.GATHER_APP_UTILS = Object.freeze({
     getContrastTextColor,
     formatDateWithDayName,
@@ -632,6 +670,11 @@
     parseVisitEntriesFromMemo,
     reformatMemoIntoDateLines,
     sortVisitEntriesRecentFirst,
-    trimLatLngOutliers
+    trimLatLngOutliers,
+    parseSharePathFromLocation,
+    getAppBaseUrl,
+    getCalendarShareUrl,
+    getViewShareUrl,
+    getMemoItemShareUrl
   });
 })();

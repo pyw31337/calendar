@@ -24,7 +24,10 @@ const requiredInMain = [
   'AdminLoginGate',
   'PlacesView',
   'DateModal',
-  'trimLatLngOutliers'
+  'trimLatLngOutliers',
+  'parseSharePathFromLocation',
+  'getCalendarShareUrl',
+  'getViewShareUrl'
 ];
 
 const requiredInUtils = [

@@ -922,20 +922,22 @@ const normalizeColorValue = GATHER_APP_UTILS.normalizeColorValue;
 const isValidDateString = GATHER_APP_UTILS.isValidDateString;
 
 // 공유 URL 규칙: 항상 /share/{calId}/[view]/[itemId]/ 슬래시 경로 (OG 크롤러용)
-function parseSharePathFromLocation(pathname = window.location.pathname) {
-  const m = String(pathname || '').match(/\/share\/([A-Za-z0-9_-]+)(?:\/([A-Za-z0-9_-]+))?(?:\/([A-Za-z0-9_.-]+))?\/?$/);
-  if (!m) return null;
-  const calendarId = m[1];
-  const seg2 = m[2] || '';
-  const seg3 = m[3] || '';
-  const viewSet = { chat: 1, memo: 1, places: 1, gallery: 1, settlement: 1 };
-  if (!seg2) return { calendarId, view: 'calendar', memoId: null };
-  if (viewSet[seg2]) {
-    if (seg2 === 'memo' && seg3) return { calendarId, view: 'memo', memoId: seg3 };
-    return { calendarId, view: seg2, memoId: null };
-  }
-  return { calendarId, view: 'calendar', memoId: null };
-}
+const parseSharePathFromLocation = GATHER_APP_UTILS.parseSharePathFromLocation
+  ? (pathname = window.location.pathname) => GATHER_APP_UTILS.parseSharePathFromLocation(pathname)
+  : function parseSharePathFromLocation(pathname = window.location.pathname) {
+    const m = String(pathname || '').match(/\/share\/([A-Za-z0-9_-]+)(?:\/([A-Za-z0-9_-]+))?(?:\/([A-Za-z0-9_.-]+))?\/?$/);
+    if (!m) return null;
+    const calendarId = m[1];
+    const seg2 = m[2] || '';
+    const seg3 = m[3] || '';
+    const viewSet = { chat: 1, memo: 1, places: 1, gallery: 1, settlement: 1 };
+    if (!seg2) return { calendarId, view: 'calendar', memoId: null };
+    if (viewSet[seg2]) {
+      if (seg2 === 'memo' && seg3) return { calendarId, view: 'memo', memoId: seg3 };
+      return { calendarId, view: seg2, memoId: null };
+    }
+    return { calendarId, view: 'calendar', memoId: null };
+  };
 
 function getCalendarIdFromURL() {
   const href = window.location.href;
@@ -957,25 +959,33 @@ function getRawCalendarIdFromURL() {
   return urlParams.get('id') || urlParams.get('cal') || (share && share.calendarId) || '';
 }
 
-function getAppBaseUrl() {
-  let basePath = window.location.pathname.replace(/\/share(?:\/.*)?$/, '/').replace(/\/(?:index\.html)?$/, '/');
-  if (!basePath.endsWith('/')) basePath += '/';
-  return `${window.location.origin}${basePath}`;
-}
+const getAppBaseUrl = GATHER_APP_UTILS.getAppBaseUrl
+  ? () => GATHER_APP_UTILS.getAppBaseUrl(window.location)
+  : function getAppBaseUrl() {
+    let basePath = window.location.pathname.replace(/\/share(?:\/.*)?$/, '/').replace(/\/(?:index\.html)?$/, '/');
+    if (!basePath.endsWith('/')) basePath += '/';
+    return `${window.location.origin}${basePath}`;
+  };
 
-function getCalendarShareUrl(calendarId) {
-  return `${getAppBaseUrl()}share/${encodeURIComponent(calendarId)}/`;
-}
+const getCalendarShareUrl = GATHER_APP_UTILS.getCalendarShareUrl
+  ? (calendarId) => GATHER_APP_UTILS.getCalendarShareUrl(calendarId, window.location)
+  : function getCalendarShareUrl(calendarId) {
+    return `${getAppBaseUrl()}share/${encodeURIComponent(calendarId)}/`;
+  };
 
-function getViewShareUrl(calendarId, view) {
-  const base = getCalendarShareUrl(calendarId);
-  if (!view || view === 'calendar') return base;
-  return `${base}${encodeURIComponent(view)}/`;
-}
+const getViewShareUrl = GATHER_APP_UTILS.getViewShareUrl
+  ? (calendarId, view) => GATHER_APP_UTILS.getViewShareUrl(calendarId, view, window.location)
+  : function getViewShareUrl(calendarId, view) {
+    const base = getCalendarShareUrl(calendarId);
+    if (!view || view === 'calendar') return base;
+    return `${base}${encodeURIComponent(view)}/`;
+  };
 
-function getMemoItemShareUrl(calendarId, memoId) {
-  return `${getCalendarShareUrl(calendarId)}memo/${encodeURIComponent(memoId)}/`;
-}
+const getMemoItemShareUrl = GATHER_APP_UTILS.getMemoItemShareUrl
+  ? (calendarId, memoId) => GATHER_APP_UTILS.getMemoItemShareUrl(calendarId, memoId, window.location)
+  : function getMemoItemShareUrl(calendarId, memoId) {
+    return `${getCalendarShareUrl(calendarId)}memo/${encodeURIComponent(memoId)}/`;
+  };
 
 // Builds a per-calendar Web App Manifest at runtime. Static manifest-<id>.json files only
 // ever covered kkot/cw (see the pwa-manifest-switch bootstrap script in <head>) -- any
