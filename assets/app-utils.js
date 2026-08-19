@@ -415,6 +415,96 @@
     return icon ? icon + '\u00a0\u00a0' + name : name;
   }
 
+
+  const KOREA_BBOX = { minLat: 33, maxLat: 39, minLng: 124, maxLng: 132 };
+
+  function isDomesticLatLng(lat, lng) {
+    const la = Number(lat), ln = Number(lng);
+    return la >= KOREA_BBOX.minLat && la <= KOREA_BBOX.maxLat && ln >= KOREA_BBOX.minLng && ln <= KOREA_BBOX.maxLng;
+  }
+
+  function stripKoreaCountryPrefix(address) {
+    return String(address || '')
+      .replace(/^(대한민국|남한)\s*,?\s*/u, '')
+      .replace(/^(South\s*Korea|Korea,?\s*Republic\s+of|Republic\s+of\s+Korea|ROK)\s*,?\s*/i, '')
+      .trim();
+  }
+
+  function normalizeDomesticKoreanAddress(address) {
+    let s = stripKoreaCountryPrefix(address);
+    if (!s) return '';
+    const regionPairs = [
+      [/^서울특별시(?=\s|$)/, '서울'], [/^부산광역시(?=\s|$)/, '부산'], [/^대구광역시(?=\s|$)/, '대구'],
+      [/^인천광역시(?=\s|$)/, '인천'], [/^광주광역시(?=\s|$)/, '광주'], [/^대전광역시(?=\s|$)/, '대전'],
+      [/^울산광역시(?=\s|$)/, '울산'], [/^세종특별자치시(?=\s|$)/, '세종'], [/^제주특별자치도(?=\s|$)/, '제주'],
+      [/^강원특별자치도(?=\s|$)/, '강원'], [/^전북특별자치도(?=\s|$)/, '전북'], [/^전라북도(?=\s|$)/, '전북'],
+      [/^전라남도(?=\s|$)/, '전남'], [/^충청북도(?=\s|$)/, '충북'], [/^충청남도(?=\s|$)/, '충남'],
+      [/^경상북도(?=\s|$)/, '경북'], [/^경상남도(?=\s|$)/, '경남'], [/^경기도(?=\s|$)/, '경기'], [/^강원도(?=\s|$)/, '강원']
+    ];
+    for (let i = 0; i < regionPairs.length; i++) s = s.replace(regionPairs[i][0], regionPairs[i][1]);
+    s = s.replace(/\s+/g, ' ').trim();
+    const roadCut = s.match(/^(.+?(?:로|길)\s*\d+(?:-\d+)?(?:번지)?)/);
+    if (roadCut) return roadCut[1].trim();
+    const lotCut = s.match(/^(.+?(?:동|리|가)\s*\d+(?:-\d+)?)/);
+    if (lotCut) return lotCut[1].trim();
+    return s;
+  }
+
+  function normalizePlaceAddressForSave(address, lat, lng) {
+    const raw = sanitizeTextValue(address || '', 200);
+    if (!raw) return '';
+    const hasCoords = Number.isFinite(Number(lat)) && Number.isFinite(Number(lng));
+    const domestic = hasCoords
+      ? isDomesticLatLng(Number(lat), Number(lng))
+      : /^(대한민국|남한|South\s*Korea|Korea,?\s*Republic\s+of|Republic\s+of\s+Korea|ROK)\b/i.test(raw)
+        || /^(서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주)/.test(raw);
+    if (domestic) return sanitizeTextValue(normalizeDomesticKoreanAddress(raw), 200);
+    return sanitizeTextValue(raw.replace(/\s+/g, ' ').trim(), 200);
+  }
+
+  function getDisplayPlaceAddress(place) {
+    return normalizePlaceAddressForSave(place?.address || '', place?.lat, place?.lng);
+  }
+
+  function normalizePlaceDateForSort(dateStr) {
+    if (!dateStr) return null;
+    if (isValidDateString(dateStr)) return dateStr;
+    const match = String(dateStr).match(/^(\d{2})\.(\d{2})\.(\d{2})$/);
+    return match ? `20${match[1]}-${match[2]}-${match[3]}` : null;
+  }
+
+  function formatPlaceBadgeDate(dateStr) {
+    const normalized = normalizePlaceDateForSort(dateStr);
+    return normalized ? formatShortDateWithDayName(normalized) : null;
+  }
+
+  function getNaverMapSearchRegionHint(address) {
+    const stripped = String(address || '')
+      .replace(/^대한민국\s*/, '')
+      .replace(/^(서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주)(?:특별시|광역시|특별자치시|특별자치도|도)?\s*/, '');
+    const firstToken = stripped.trim().split(/\s+/)[0] || '';
+    return /^[가-힣]+(?:시|군|구)$/.test(firstToken) ? firstToken : '';
+  }
+
+  function getNaverMapPlaceUrl(place) {
+    const name = String(place?.name || place?.alias || '장소').trim() || '장소';
+    const lat = Number(place?.lat), lng = Number(place?.lng);
+    if (Number.isFinite(lat) && Number.isFinite(lng)) {
+      return `https://map.kakao.com/link/map/${encodeURIComponent(name)},${lat},${lng}`;
+    }
+    const address = String(place?.address || '').trim().replace(/^대한민국\s*/, '');
+    const query = [name, address].filter(Boolean).join(' ') || name;
+    return `https://map.kakao.com/link/search/${encodeURIComponent(query)}`;
+  }
+
+  function getGoogleMapPlaceUrl(place) {
+    return `https://www.google.com/maps/search/?api=1&query=${place.lat},${place.lng}`;
+  }
+
+  function getPlaceExternalMapUrl(place) {
+    return isDomesticLatLng(place?.lat, place?.lng) ? getNaverMapPlaceUrl(place) : getGoogleMapPlaceUrl(place);
+  }
+
   window.GATHER_APP_UTILS = Object.freeze({
     getContrastTextColor,
     formatDateWithDayName,
@@ -465,6 +555,18 @@
     getPlaceCategories,
     getPlaceCategoryById,
     getPlaceCategoryIcon,
-    getPlaceCategoryLabel
+    getPlaceCategoryLabel,
+    KOREA_BBOX,
+    isDomesticLatLng,
+    stripKoreaCountryPrefix,
+    normalizeDomesticKoreanAddress,
+    normalizePlaceAddressForSave,
+    getDisplayPlaceAddress,
+    normalizePlaceDateForSort,
+    formatPlaceBadgeDate,
+    getNaverMapSearchRegionHint,
+    getNaverMapPlaceUrl,
+    getGoogleMapPlaceUrl,
+    getPlaceExternalMapUrl
   });
 })();

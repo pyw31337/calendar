@@ -277,34 +277,16 @@ function extractKnownParticipantNames(memo, knownNames) {
 // Normalizes either date shape a place can carry -- the structured 'YYYY-MM-DD' visitDate field,
 // or a memo-embedded 'YY.MM.DD' -- into a single comparable 'YYYY-MM-DD' string so the list can
 // be sorted by actual visit recency regardless of which source the date came from.
-function normalizePlaceDateForSort(dateStr) {
+const normalizePlaceDateForSort = GATHER_APP_UTILS.normalizePlaceDateForSort || function normalizePlaceDateForSort(dateStr) {
   if (!dateStr) return null;
   if (isValidDateString(dateStr)) return dateStr;
   const match = String(dateStr).match(/^(\d{2})\.(\d{2})\.(\d{2})$/);
   return match ? `20${match[1]}-${match[2]}-${match[3]}` : null;
-}
-// Picks the most relevant date to sort a place by, in priority order: its own structured
-// visitDate, the most recent entry if its memo turned out to be a multi-visit history, or a
-// single leading date embedded in the memo. Places with no date info at all sort to the bottom
-// (see the comparator in PlacesView) rather than being treated as "most recent".
-function getPlaceSortDateKey(place) {
-  const structured = normalizePlaceDateForSort(place.visitDate);
-  if (structured) return structured;
-  const entries = parseVisitEntriesFromMemo(place.memo);
-  if (entries.length > 0) {
-    const latest = normalizePlaceDateForSort(entries[entries.length - 1].date);
-    if (latest) return latest;
-  }
-  return normalizePlaceDateForSort(extractLeadingMemoDate(place.memo));
-}
-// Renders either date shape a place can carry as a "25.03.30 (토)"-style capsule label --
-// formatShortDateWithDayName expects a dash-separated 'YYYY-MM-DD' string, so this normalizes
-// first via normalizePlaceDateForSort (handles both the structured visitDate and memo-embedded
-// 'YY.MM.DD' shapes) before formatting.
-function formatPlaceBadgeDate(dateStr) {
+};
+const formatPlaceBadgeDate = GATHER_APP_UTILS.formatPlaceBadgeDate || function formatPlaceBadgeDate(dateStr) {
   const normalized = normalizePlaceDateForSort(dateStr);
   return normalized ? formatShortDateWithDayName(normalized) : null;
-}
+};
 
 // Naver Map's keyword-search deep link (map.naver.com/p/search/{query}) -- the same experience
 // as typing into the Naver Map search box, which drops straight into the real place entry page
@@ -327,44 +309,10 @@ function formatPlaceBadgeDate(dateStr) {
 // spanning both levels mismatched on real production data (returned "서울특별시" alone, swallowing
 // "구로구" entirely). Stripping the 시/도 prefix as its own explicit step first removes that
 // ambiguity, at the cost of not reaching down to the 동/읍/면 level.
-function getNaverMapSearchRegionHint(address) {
-  const stripped = String(address || '')
-    .replace(/^대한민국\s*/, '')
-    .replace(/^(서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주)(?:특별시|광역시|특별자치시|특별자치도|도)?\s*/, '');
-  const firstToken = stripped.trim().split(/\s+/)[0] || '';
-  return /^[가-힣]+(?:시|군|구)$/.test(firstToken) ? firstToken : '';
-}
-function getNaverMapPlaceUrl(place) {
-  // Keyword search on Naver often returns "조건에 맞는 업체가 없습니다" when the stored name
-  // differs slightly from Naver's POI title. Prefer Kakao map pin with exact lat/lng (same
-  // coordinates Kakao Local search used at registration) so 업체보기 always lands on the pin.
-  const name = String(place?.name || place?.alias || '장소').trim() || '장소';
-  const lat = Number(place?.lat);
-  const lng = Number(place?.lng);
-  if (Number.isFinite(lat) && Number.isFinite(lng)) {
-    return `https://map.kakao.com/link/map/${encodeURIComponent(name)},${lat},${lng}`;
-  }
-  const address = String(place?.address || '').trim().replace(/^대한민국\s*/, '');
-  const query = [name, address].filter(Boolean).join(' ') || name;
-  return `https://map.kakao.com/link/search/${encodeURIComponent(query)}`;
-}
-
-// Google Maps' "search" deep link, pinned to the exact coordinate rather than a text query --
-// Naver/Kakao have essentially no POI coverage outside Korea (see googlePlacesSearchProxy's own
-// reasoning), so an overseas place's "업체보기" link needs a service that actually has the data.
-// Coordinate-only (not name+coordinate) for the same reason getNaverMapPlaceUrl centers on
-// coordinates: a text query can land on the wrong branch of a chain business, a bare lat/lng
-// can't.
-function getGoogleMapPlaceUrl(place) {
-  return `https://www.google.com/maps/search/?api=1&query=${place.lat},${place.lng}`;
-}
-// Picks which external map service "업체보기" opens: Naver for anything inside Korea (isDomesticLatLng,
-// same bounding box PlaceMapView already uses for its own domestic/overseas split), Google Maps
-// otherwise. Kakao stays reserved for business-name search only (PlaceRegisterModal.handleSearch)
-// -- this is only about where the user gets sent to look at the place afterward.
-function getPlaceExternalMapUrl(place) {
-  return isDomesticLatLng(place?.lat, place?.lng) ? getNaverMapPlaceUrl(place) : getGoogleMapPlaceUrl(place);
-}
+const getNaverMapSearchRegionHint = GATHER_APP_UTILS.getNaverMapSearchRegionHint;
+const getNaverMapPlaceUrl = GATHER_APP_UTILS.getNaverMapPlaceUrl;
+const getGoogleMapPlaceUrl = GATHER_APP_UTILS.getGoogleMapPlaceUrl;
+const getPlaceExternalMapUrl = GATHER_APP_UTILS.getPlaceExternalMapUrl;
 
 const GATHER_APP_CONFIG = window.GATHER_APP_CONFIG || {};
 const readConfigNumber = (key, fallback) => Number.isFinite(GATHER_APP_CONFIG[key]) ? GATHER_APP_CONFIG[key] : fallback;
@@ -25085,80 +25033,13 @@ const PLACE_MAP_DEFAULT_ZOOM = 11;
 // Rough bounding box for South+North Korea -- used only to decide which registered places count
 // as "domestic" for the main-screen preview map's auto-fit (see preferDomesticBounds below), not
 // as a precise border.
-const KOREA_BBOX = { minLat: 33, maxLat: 39, minLng: 124, maxLng: 132 };
-function isDomesticLatLng(lat, lng) {
-  return lat >= KOREA_BBOX.minLat && lat <= KOREA_BBOX.maxLat && lng >= KOREA_BBOX.minLng && lng <= KOREA_BBOX.maxLng;
-}
-// A domestic address routinely comes back "대한민국 서울특별시 ..." from the geocoder -- redundant
-// for a place the user already knows is in Korea, so only the overseas case needs the country
-// name to stay legible. Shared by both the list row and the map popup so the two never drift.
-function stripKoreaCountryPrefix(address) {
-  return String(address || '')
-    .replace(/^(대한민국|남한)\s*,?\s*/u, '')
-    .replace(/^(South\s*Korea|Korea,?\s*Republic\s+of|Republic\s+of\s+Korea|ROK)\s*,?\s*/i, '')
-    .trim();
-}
+const KOREA_BBOX = GATHER_APP_UTILS.KOREA_BBOX || { minLat: 33, maxLat: 39, minLng: 124, maxLng: 132 };
+const isDomesticLatLng = GATHER_APP_UTILS.isDomesticLatLng;
+const stripKoreaCountryPrefix = GATHER_APP_UTILS.stripKoreaCountryPrefix;
+const normalizeDomesticKoreanAddress = GATHER_APP_UTILS.normalizeDomesticKoreanAddress;
+const normalizePlaceAddressForSave = GATHER_APP_UTILS.normalizePlaceAddressForSave;
+const getDisplayPlaceAddress = GATHER_APP_UTILS.getDisplayPlaceAddress;
 
-// Kakao 스타일로 통일: 짧은 시/도 + 도로명·번지까지만. Nominatim POI 꼬리 제거.
-function normalizeDomesticKoreanAddress(address) {
-  let s = stripKoreaCountryPrefix(address);
-  if (!s) return '';
-  const regionPairs = [
-    [/^서울특별시(?=\s|$)/, '서울'],
-    [/^부산광역시(?=\s|$)/, '부산'],
-    [/^대구광역시(?=\s|$)/, '대구'],
-    [/^인천광역시(?=\s|$)/, '인천'],
-    [/^광주광역시(?=\s|$)/, '광주'],
-    [/^대전광역시(?=\s|$)/, '대전'],
-    [/^울산광역시(?=\s|$)/, '울산'],
-    [/^세종특별자치시(?=\s|$)/, '세종'],
-    [/^제주특별자치도(?=\s|$)/, '제주'],
-    [/^강원특별자치도(?=\s|$)/, '강원'],
-    [/^전북특별자치도(?=\s|$)/, '전북'],
-    [/^전라북도(?=\s|$)/, '전북'],
-    [/^전라남도(?=\s|$)/, '전남'],
-    [/^충청북도(?=\s|$)/, '충북'],
-    [/^충청남도(?=\s|$)/, '충남'],
-    [/^경상북도(?=\s|$)/, '경북'],
-    [/^경상남도(?=\s|$)/, '경남'],
-    [/^경기도(?=\s|$)/, '경기'],
-    [/^강원도(?=\s|$)/, '강원']
-  ];
-  for (let i = 0; i < regionPairs.length; i++) {
-    s = s.replace(regionPairs[i][0], regionPairs[i][1]);
-  }
-  s = s.replace(/\s+/g, ' ').trim();
-  const roadCut = s.match(/^(.+?(?:로|길)\s*\d+(?:-\d+)?(?:번지)?)/);
-  if (roadCut) return roadCut[1].trim();
-  const lotCut = s.match(/^(.+?(?:동|리|가)\s*\d+(?:-\d+)?)/);
-  if (lotCut) return lotCut[1].trim();
-  return s;
-}
-
-// RULE: 같은 주소/좌표라도 별칭·메모가 다르면 절대 합치지 않음. 장소 식별은 id만 사용.
-// 국내: 통일 포맷 / 해외: 국가명 포함 원문 유지.
-function getDisplayPlaceAddress(place) {
-  return normalizePlaceAddressForSave(place?.address || '', place?.lat, place?.lng);
-}
-
-function normalizePlaceAddressForSave(address, lat, lng) {
-  const raw = sanitizeText(address || '', 200);
-  if (!raw) return '';
-  const hasCoords = Number.isFinite(Number(lat)) && Number.isFinite(Number(lng));
-  const domestic = hasCoords
-    ? isDomesticLatLng(Number(lat), Number(lng))
-    : /^(대한민국|남한|South\s*Korea|Korea,?\s*Republic\s+of|Republic\s+of\s+Korea|ROK)\b/i.test(raw)
-      || /^(서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주)/.test(raw);
-  if (domestic) return sanitizeText(normalizeDomesticKoreanAddress(raw), 200);
-  return sanitizeText(raw.replace(/\s+/g, ' ').trim(), 200);
-}
-
-// A calendar built from an imported travel log can have a handful of overseas trips mixed in
-// with a much larger cluster of everyday domestic places -- fitting bounds over literally every
-// pin would zoom the main-screen preview out to "half of Asia" just to include one Da Nang trip.
-// Trimming to the 10th-90th percentile on each axis keeps the view centered on wherever most of
-// the pins actually are, dropping a handful of the most extreme outliers rather than the whole
-// domestic spread when there are enough points for percentiles to be meaningful.
 function trimLatLngOutliers(points) {
   if (points.length <= 5) return points;
   const lats = points.map(p => p[0]).slice().sort((a, b) => a - b);
