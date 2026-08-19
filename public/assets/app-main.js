@@ -14186,6 +14186,32 @@ function getShortTitleParts(dateStr) {
   };
 }
 
+
+function GamifiedConfirmButtonContent({ label }) {
+  const bolt = /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg", viewBox: "0 0 24 24", width: "100%", height: "100%",
+    fill: "currentColor", "aria-hidden": true
+  }, /*#__PURE__*/React.createElement("path", { d: "M13 2 3 14h8l-1 8 10-12h-8l1-8z" }));
+  const star = /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg", viewBox: "0 0 24 24", width: "100%", height: "100%",
+    fill: "currentColor", "aria-hidden": true
+  }, /*#__PURE__*/React.createElement("path", { d: "M12 2l2.4 7.2H22l-6 4.8 2.3 7.2L12 16.8 5.7 21.2 8 14 2 9.2h7.6z" }));
+  return /*#__PURE__*/React.createElement(React.Fragment, null,
+    /*#__PURE__*/React.createElement("span", { className: "gamified-shiny-glow-wrapper", "aria-hidden": true },
+      /*#__PURE__*/React.createElement("span", { className: "gamified-shiny-glow" })
+    ),
+    /*#__PURE__*/React.createElement("span", { className: "gamified-sparks-container", "aria-hidden": true },
+      [1,2,3,4,5,6].map(n => /*#__PURE__*/React.createElement("span", {
+        key: "sp"+n, className: "gamified-spark gamified-spark-" + n
+      }, bolt)),
+      [1,2,3,4,5,6].map(n => /*#__PURE__*/React.createElement("span", {
+        key: "sl"+n, className: "gamified-sparklet gamified-sparklet-" + n
+      }, star))
+    ),
+    /*#__PURE__*/React.createElement("span", { className: "gamified-confirm-label" }, label)
+  );
+}
+
 function DateModal({
   anniversaries = [],
   dateStr,
@@ -15040,27 +15066,28 @@ function DateModal({
       ),
       !adminMode && typeof onConfirmMeeting === 'function' && /*#__PURE__*/React.createElement("button", {
         type: "button",
-        className: !isConfirmed && isAllAvailable ? 'btn-gamified-confirm' : '',
+        className: !isConfirmed && isAllAvailable ? 'btn-gamified-confirm' : 'btn-meeting-confirm-plain',
         disabled: isSubmitting,
-        onClick: async () => {
+        onClick: async e => {
+          e.preventDefault();
+          e.stopPropagation();
           if (isSubmitting) return;
           setIsSubmitting(true);
           try { await Promise.resolve(onConfirmMeeting(dateStr, '')); }
           finally { setIsSubmitting(false); }
         },
-        style: isConfirmed ? {
+        style: {
           width: '100%', marginTop: '12px', padding: '12px 16px', borderRadius: '12px',
-          border: '1.5px solid #A78BFA', backgroundColor: 'rgba(124, 58, 237, 0.06)',
-          color: '#7C3AED', fontWeight: 800, fontSize: '0.92rem', cursor: 'pointer'
-        } : isAllAvailable ? {
-          width: '100%', marginTop: '12px', padding: '12px 16px', borderRadius: '12px',
-          border: 'none', fontWeight: 800, fontSize: '0.92rem', cursor: 'pointer'
-        } : {
-          width: '100%', marginTop: '12px', padding: '12px 16px', borderRadius: '12px',
-          border: '1.5px solid #C4B5FD', backgroundColor: 'rgba(124, 58, 237, 0.08)',
-          color: '#7C3AED', fontWeight: 800, fontSize: '0.92rem', cursor: 'pointer'
+          fontWeight: 800, fontSize: '0.92rem', cursor: isSubmitting ? 'wait' : 'pointer',
+          ...((!isConfirmed && isAllAvailable) ? {} : isConfirmed ? {
+            border: '1.5px solid #A78BFA', backgroundColor: 'rgba(124, 58, 237, 0.06)', color: '#7C3AED'
+          } : {
+            border: '1.5px solid #C4B5FD', backgroundColor: 'rgba(124, 58, 237, 0.08)', color: '#7C3AED'
+          })
         }
-      }, isConfirmed ? '모임 취소' : '모임 확정')
+      }, (!isConfirmed && isAllAvailable)
+        ? /*#__PURE__*/React.createElement(GamifiedConfirmButtonContent, { label: "모임 확정" })
+        : (isConfirmed ? '모임 취소' : '모임 확정'))
     )),
 
     /* Tab 2 Content: 장소 */
