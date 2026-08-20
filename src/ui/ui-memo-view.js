@@ -1,6 +1,43 @@
 /**
  * Memo view page (P4-15)
  */
+
+/* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
+const GATHER_APP_CALENDAR_DATA = window.GATHER_APP_CALENDAR_DATA || {};
+const GATHER_APP_CHAT_DATA = window.GATHER_APP_CHAT_DATA || {};
+const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
+const GATHER_APP_CONSTANTS = window.GATHER_APP_CONSTANTS || {};
+const GATHER_APP_CONFIG = window.GATHER_APP_CONFIG || {};
+function __gatherUiDeps() { return window.GATHER_UI_DEPS || {}; }
+function getActiveAvailabilities(calendar) {
+  const f = __gatherUiDeps().getActiveAvailabilities || GATHER_APP_UTILS.getActiveAvailabilities;
+  return typeof f === 'function' ? f(calendar) : [];
+}
+function getActiveParticipants(calendar) {
+  const f = __gatherUiDeps().getActiveParticipants || GATHER_APP_UTILS.getActiveParticipants;
+  return typeof f === 'function' ? f(calendar) : [];
+}
+function getCalendarPolls(calendar) {
+  const f = __gatherUiDeps().getCalendarPolls || GATHER_APP_UTILS.getCalendarPolls;
+  return typeof f === 'function' ? f(calendar) : [];
+}
+function getCalendarPlaces(calendar) {
+  const f = __gatherUiDeps().getCalendarPlaces || GATHER_APP_UTILS.getCalendarPlaces;
+  return typeof f === 'function' ? f(calendar) : [];
+}
+function useChatSendGuard(onSend, canSend) {
+  const f = __gatherUiDeps().useChatSendGuard;
+  return typeof f === 'function' ? f(onSend, canSend) : onSend;
+}
+function computeKoreanHolidaysForYear(year) {
+  const f = __gatherUiDeps().computeKoreanHolidaysForYear;
+  return typeof f === 'function' ? f(year) : [];
+}
+function getFooterFamilyLinks() {
+  return __gatherUiDeps().FOOTER_FAMILY_LINKS || [];
+}
+
+
 export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoadMoreMemos, onBack, showToast, isDarkTheme, onRequestConfirm, sharedMemo, onDismissSharedMemo, chatMessages, setActiveLightbox }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};

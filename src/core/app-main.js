@@ -10123,7 +10123,11 @@ function bindGatherUiDeps() {
     SearchCategoryTabs: typeof SearchCategoryTabs === 'function' ? SearchCategoryTabs : null,
     SimpleBottomSheetPicker: typeof SimpleBottomSheetPicker === 'function' ? SimpleBottomSheetPicker : null,
     PhotoGallery: typeof PhotoGallery === 'function' ? PhotoGallery : null,
-    SummaryList: typeof SummaryList === 'function' ? SummaryList : null
+    SummaryList: typeof SummaryList === 'function' ? SummaryList : null,
+    getActiveAvailabilities: typeof getActiveAvailabilities === 'function' ? getActiveAvailabilities : null,
+    getCalendarPolls: typeof getCalendarPolls === 'function' ? getCalendarPolls : null,
+    computeKoreanHolidaysForYear: typeof computeKoreanHolidaysForYear === 'function' ? computeKoreanHolidaysForYear : null,
+    FOOTER_FAMILY_LINKS: typeof FOOTER_FAMILY_LINKS !== 'undefined' ? FOOTER_FAMILY_LINKS : []
   });
 }
 bindGatherUiDeps();

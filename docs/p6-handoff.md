@@ -263,3 +263,8 @@ zsh 에서 줄 시작 `#` 주석은 쓰지 말 것.
 - Vite 프로브: getLocalStorage is not defined (app-notifications)
 - 원인: 클래식 스크립트 공유 스코프 vs ESM 모듈 스코프
 - src/core/app-notifications.js 에 로컬 getLocalStorage 헬퍼 추가 (assets/ 미변경)
+
+## P6-37 진행 (2026-08-20)
+- Vite 프로브: getActiveAvailabilities 등 classic 전역이 ESM에서 ReferenceError
+- src/ui/* 에 classic-compat 심 추가 (assets/ 미변경)
+- src/core/app-main bindGatherUiDeps 에 getActiveAvailabilities/getCalendarPolls/computeKoreanHolidays/FOOTER_FAMILY_LINKS 보강
