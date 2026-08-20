@@ -57,3 +57,8 @@ P4 완료 후 기능 동결. P6 Vite 작업만 진행.
 ### P6-2 구역 지도 (2026-08-20)
 - docs/p6-2-app-main-map.md 추가
 - src/core/app-main.js 코드는 아직 수정하지 않음
+
+### P6-2 준비 반영 (2026-08-20)
+- app-main 구역 지도 + src/core/app-main.js 구역 주석만 추가
+- 라이브 assets/ 미변경
+- p6-2-app-split-prep → main 머지
