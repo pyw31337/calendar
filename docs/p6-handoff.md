@@ -247,3 +247,9 @@ zsh 에서 줄 시작 `#` 주석은 쓰지 말 것.
 - src/main.jsx: import './app.css'
 - 라이브 루트 index.html / assets/ 미변경. Pages 전환 아직 금지.
 - 로컬 확인: npm run dev 후 http://localhost:5173/?id=kkot
+
+## P6-34 진행 (2026-08-20)
+- vite.config: root=src → dist/index.html 평탄화 (Pages 전환 준비)
+- src/index.html 엔트리 /main.jsx
+- 라이브 루트 index.html / assets/ 미변경. Pages 소스 전환 아직 금지.
+- 참고: public/ 복사로 dist/assets 에 구형 파일도 같이 들어감 (전환 시 정리 가능)
