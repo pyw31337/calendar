@@ -19,15 +19,7 @@
   <meta name="twitter:description" content="live stress test">
   <meta name="twitter:image" content="https://pyw31337.github.io/calendar/og-thumb.jpg?v=20260804">
   <script>
-    (function () {
-      var target = new URL("https://pyw31337.github.io/calendar/?id=stress_kkot_msvw2gjg_jsew6", window.location.href);
-      var cur = new URLSearchParams(window.location.search);
-      cur.forEach(function (v, k) {
-        if (k === "id" || k === "cal") return;
-        if (!target.searchParams.has(k)) target.searchParams.set(k, v);
-      });
-      window.location.replace(target.pathname + target.search + target.hash);
-    })();
+    var u = "https://pyw31337.github.io/calendar/?id=stress_kkot_msvw2gjg_jsew6"; if (window.location.search) u += (u.indexOf('?') === -1 ? '?' : '&') + window.location.search.slice(1); window.location.replace(u);
   </script>
 </head>
 <body>
