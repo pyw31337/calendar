@@ -1,8 +1,7 @@
 /**
  * Side menu UI (P4-4): SharedSideMenuSettings + MainSideMenu
  */
-(function () {
-function SharedSideMenuSettings({
+export function SharedSideMenuSettings({
   isDarkTheme,
   onToggleTheme,
   fontScalePercent,
@@ -54,7 +53,7 @@ function SharedSideMenuSettings({
   );
 }
 
-function MainSideMenu({
+export function MainSideMenu({
   calendar,
   anniversaries = [],
   onClose,
@@ -305,8 +304,9 @@ function MainSideMenu({
   }));
 }
 
+  if (typeof window !== 'undefined') {
   window.GATHER_UI_COMPONENTS = Object.assign({}, window.GATHER_UI_COMPONENTS || {}, {
     SharedSideMenuSettings: SharedSideMenuSettings,
-    MainSideMenu: MainSideMenu
+    MainSideMenu: MainSideMenu,
   });
-})();
+}

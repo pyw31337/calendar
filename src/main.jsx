@@ -27,14 +27,13 @@ import {
 } from './ui/ui-chat-sheets.js';
 import { UserManualOverlay } from './ui/ui-user-manual.js';
 import { WeatherBadge, WeatherLocationModal } from './ui/ui-weather.js';
+import { SharedSideMenuSettings, MainSideMenu } from './ui/ui-side-menu.js';
 
 console.log('[P6] Vite entry loaded', {
   constants: !!GATHER_APP_CONSTANTS,
   config: !!GATHER_APP_CONFIG,
   utils: !!GATHER_APP_UTILS,
-  ConfirmDialog: typeof ConfirmDialog,
-  ShareModal: typeof ShareModal,
-  UserManualOverlay: typeof UserManualOverlay,
+  MainSideMenu: typeof MainSideMenu,
   WeatherBadge: typeof WeatherBadge,
   publicCalendarIds: GATHER_APP_CONFIG.PUBLIC_CALENDAR_IDS
 });
