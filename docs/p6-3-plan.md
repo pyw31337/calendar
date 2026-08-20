@@ -44,3 +44,7 @@ Vite 빌드 결과물(dist)을 Pages에 배포하는 경로를 만들기.
 - 라이브 index.html 은 그대로 둠
 - Vite 빌드 입력: src/index.html → src/main.jsx
 - dist 는 아직 Pages 배포에 사용하지 않음
+
+## Vite 빌드 전용 CI (2026-08-20)
+- .github/workflows/vite-build-only.yml 추가
+- 배포 안 함. Pages 경로는 기존 유지.
