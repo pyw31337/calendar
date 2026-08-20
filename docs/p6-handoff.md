@@ -203,3 +203,9 @@ zsh 에서 줄 시작 `#` 주석은 쓰지 말 것.
 - ChatRoomView
 - 라이브 경로 유지. Pages 전환 아직 금지.
 - 다음: ui-date-modal / ui-event-modals / ui-calendar-core
+
+## P6-27 진행 (2026-08-20)
+- src/ui/ui-date-modal.js 를 ESM export (assets/ 미변경)
+- DateModal
+- 라이브 경로 유지. Pages 전환 아직 금지.
+- 다음: ui-event-modals

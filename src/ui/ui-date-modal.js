@@ -1,8 +1,7 @@
 /**
  * Date modal (schedule popup) (P4-14)
  */
-(function () {
-function DateModal({
+export function DateModal({
   anniversaries = [],
   dateStr,
   calendar,
@@ -1557,7 +1556,8 @@ function DateModal({
     : portaled;
 }
 
+  if (typeof window !== 'undefined') {
   window.GATHER_UI_COMPONENTS = Object.assign({}, window.GATHER_UI_COMPONENTS || {}, {
-    DateModal: DateModal
+    DateModal: DateModal,
   });
-})();
+}
