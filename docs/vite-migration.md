@@ -53,3 +53,7 @@ P4 완료 후 기능 동결. P6 Vite 작업만 진행.
 - 브랜치: p6-2-app-split-prep
 - src/README.md 및 docs/p6-2-plan.md 작성
 - 실제 코드 분리는 아직 시작하지 않음
+
+### P6-2 구역 지도 (2026-08-20)
+- docs/p6-2-app-main-map.md 추가
+- src/core/app-main.js 코드는 아직 수정하지 않음
