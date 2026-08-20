@@ -268,3 +268,7 @@ zsh 에서 줄 시작 `#` 주석은 쓰지 말 것.
 - Vite 프로브: getActiveAvailabilities 등 classic 전역이 ESM에서 ReferenceError
 - src/ui/* 에 classic-compat 심 추가 (assets/ 미변경)
 - src/core/app-main bindGatherUiDeps 에 getActiveAvailabilities/getCalendarPolls/computeKoreanHolidays/FOOTER_FAMILY_LINKS 보강
+
+## P6-38 진행 (2026-08-20)
+- getKoreanSolarTermsForYear / useTapRevealedMsgId / getTrulyConfirmedMeetings 등 추가 심
+- bindGatherUiDeps 키 보강 (src only)
