@@ -18320,107 +18320,10 @@ function AdminUnifiedSearchResultsView({
 }
 
 // Share Modal
-function ShareModal({
-  calendar,
-  onClose,
-  shareType = 'calendar',
-  showToast,
-  customUrl = null
-}) {
-  // Site-wide share rule: URL field + copy button + QR code in one modal.
-  const shareUrl = React.useMemo(() => {
-    if (customUrl) return customUrl;
-    if (shareType === 'chat') return getViewShareUrl(calendar.id, 'chat');
-    if (shareType === 'places') return getViewShareUrl(calendar.id, 'places');
-    if (shareType === 'memo') return getViewShareUrl(calendar.id, 'memo');
-    if (shareType === 'gallery') return getViewShareUrl(calendar.id, 'gallery');
-    return getCalendarShareUrl(calendar.id);
-  }, [calendar, shareType, customUrl]);
-  const shareTitle = shareType === 'chat' ? '채팅방 공유 URL'
-    : shareType === 'places' ? '장소 공유 URL'
-    : '캘린더 공유 URL';
-  const shareLabel = shareType === 'chat' ? `현재 채팅방 (${calendar.id}) 전용 공유 URL`
-    : shareType === 'places' ? `현재 장소 (${calendar.id}) 전용 공유 URL`
-    : `현재 캘린더 (${calendar.id}) 전용 공유 URL`;
-  const qrDataUrl = React.useMemo(() => {
-    if (typeof qrcode === 'undefined') return null;
-    try {
-      const qr = qrcode(0, 'M'); // typeNumber 0 = auto-select smallest size that fits the data
-      qr.addData(shareUrl);
-      qr.make();
-      return qr.createDataURL(6, 8);
-    } catch (e) {
-      console.warn('QR code render failed:', e);
-      return null;
-    }
-  }, [shareUrl]);
-  return /*#__PURE__*/React.createElement("div", {
-    className: "modal-overlay",
-    onClick: onClose,
-    style: { zIndex: 11000 }
-  }, /*#__PURE__*/React.createElement(ResizableModalContainer, {
-    className: "modal-container",
-    onClick: e => e.stopPropagation()
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "modal-header",
-    style: {
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center'
-    }
-  }, /*#__PURE__*/React.createElement("h3", {
-    style: {
-      fontSize: '1.1rem',
-      fontWeight: 800
-    }
-  }, shareTitle), /*#__PURE__*/React.createElement("button", {
-    onClick: onClose,
-    style: {
-      background: 'none',
-      border: 'none',
-      color: '#64748B',
-      fontSize: '1.2rem',
-      cursor: 'pointer',
-      display: 'flex',
-      alignItems: 'center'
-    }
-  }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }))), /*#__PURE__*/React.createElement("div", {
-    className: "modal-body"
-  }, /*#__PURE__*/React.createElement("label", {
-    style: {
-      fontSize: '0.85rem',
-      fontWeight: 700,
-      color: '#64748B'
-    }
-  }, shareLabel), /*#__PURE__*/React.createElement("input", {
-    type: "text",
-    className: "form-input",
-    style: {
-      width: '100%'
-    },
-    value: shareUrl,
-    readOnly: true
-  }), /*#__PURE__*/React.createElement("button", {
-    className: "btn btn-primary",
-    onClick: async () => {
-      const ok = await copyTextToClipboard(shareUrl);
-      const message = ok ? 'URL이 복사되었습니다!' : '복사에 실패했습니다. URL을 직접 선택해 복사해 주세요.';
-      if (showToast) showToast(message, ok ? 'success' : 'error');
-      else alert(message);
-    }
-  }, "URL \uBCF5\uC0AC\uD558\uAE30"),
-  /* QR code -- lets an in-person meetup invite happen with a phone camera scan instead of
-     retyping or messaging the URL. Generated entirely client-side as a data: URL (the
-     qrcode.js library itself needs one network fetch to load, but encoding the URL into a QR
-     code never sends the URL anywhere) and just hidden if that library failed to load -- the
-     URL/\uBCF5\uC0AC button above still works either way. */
-  qrDataUrl && /*#__PURE__*/React.createElement("div", {
-    style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', marginTop: '16px' }
-  },
-    /*#__PURE__*/React.createElement("img", { src: qrDataUrl, alt: "\uCE98\uB9B0\uB354 \uCD08\uB300 QR\uCF54\uB4DC", style: { borderRadius: '8px', border: '1px solid var(--border-subtle)' } }),
-    /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.76rem', color: 'var(--text-muted)' } }, "QR\uCF54\uB4DC\uB97C \uCE74\uBA54\uB77C\uB85C \uC2A4\uCE94\uD574 \uC811\uC18D\uD558\uC138\uC694")
-  ))));
-}
+const ShareModal = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ShareModal)
+  ? window.GATHER_UI_COMPONENTS.ShareModal
+  : function ShareModalFallback() { return null; };
+
 
 function UserManualOverlay({ calendar, onClose }) {
   const participants = getActiveParticipants(calendar || {});
@@ -27599,7 +27502,11 @@ function ResizableModalContainer({ className, style, children, ...props }) {
 function bindGatherUiDeps() {
   window.GATHER_UI_DEPS = Object.assign({}, window.GATHER_UI_DEPS || {}, {
     ResizableModalContainer: typeof ResizableModalContainer === 'function' ? ResizableModalContainer : null,
-    verifyAdminPasswordRemote: typeof verifyAdminPasswordRemote === 'function' ? verifyAdminPasswordRemote : null
+    verifyAdminPasswordRemote: typeof verifyAdminPasswordRemote === 'function' ? verifyAdminPasswordRemote : null,
+    SmallXIcon: typeof SmallXIcon === 'function' ? SmallXIcon : null,
+    copyTextToClipboard: typeof copyTextToClipboard === 'function' ? copyTextToClipboard : null,
+    getCalendarShareUrl: typeof getCalendarShareUrl === 'function' ? getCalendarShareUrl : null,
+    getViewShareUrl: typeof getViewShareUrl === 'function' ? getViewShareUrl : null
   });
 }
 bindGatherUiDeps();
