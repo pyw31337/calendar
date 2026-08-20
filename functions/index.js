@@ -717,6 +717,7 @@ exports.adminVerifyPassword = functions.https.onRequest(async (req, res) => {
   if (req.method !== 'POST') { res.status(405).json({ ok: false, message: 'Method not allowed' }); return; }
   const password = req.body && req.body.password;
   if (!password || typeof password !== 'string') { res.status(400).json({ ok: false, message: 'password is required' }); return; }
+  const mode = (req.body && req.body.mode === 'full') ? 'full' : 'summary';
 
   const rateState = await checkAdminAuthRateLimit(req.ip);
   if (rateState.blocked) { res.status(429).json({ ok: false, message: '너무 많은 시도가 있었습니다. 잠시 후 다시 시도해 주세요.' }); return; }
@@ -732,18 +733,25 @@ exports.adminVerifyPassword = functions.https.onRequest(async (req, res) => {
 // the submitted password server-side -- the only place this data leaves the server now that
 // /calendars no longer allows a client-side `list`.
 
-function slimCalendarForAdminList(cal) {
+function slimCalendarForAdminList(cal, mode) {
   if (!cal || typeof cal !== 'object') return cal;
   const places = Array.isArray(cal.places) ? cal.places : [];
   const activityLogs = Array.isArray(cal.activityLogs) ? cal.activityLogs : [];
+  const availabilities = Array.isArray(cal.availabilities) ? cal.availabilities : [];
+  if (mode === 'summary') {
+    return {
+      id: cal.id, title: cal.title || '', description: cal.description || '',
+      accentColor: cal.accentColor || '', revision: cal.revision || 0, updatedAt: cal.updatedAt || 0,
+      participants: Array.isArray(cal.participants) ? cal.participants : [],
+      settlementBaseBudget: cal.settlementBaseBudget || 0,
+      expenseCategories: cal.expenseCategories || null, placeCategories: cal.placeCategories || null,
+      polls: Array.isArray(cal.polls) ? cal.polls : [],
+      places: [], activityLogs: [], availabilities: [],
+      _placesCount: places.length, _activityLogsCount: activityLogs.length, _availabilitiesCount: availabilities.length
+    };
+  }
   const { places: _p, activityLogs: _a, ...rest } = cal;
-  return {
-    ...rest,
-    places: [],
-    activityLogs: [],
-    _placesCount: places.length,
-    _activityLogsCount: activityLogs.length
-  };
+  return { ...rest, places: [], activityLogs: [], _placesCount: places.length, _activityLogsCount: activityLogs.length };
 }
 
 exports.listAllCalendars = functions.https.onRequest(async (req, res) => {
@@ -768,11 +776,11 @@ exports.listAllCalendars = functions.https.onRequest(async (req, res) => {
     snap.forEach(doc => {
       const data = doc.data();
       if (data?.calendar?.id) {
-        calendars.push(slimCalendarForAdminList(data.calendar));
+        calendars.push(slimCalendarForAdminList(data.calendar, mode));
         lastModified = Math.max(lastModified, data.lastModified || 0);
       }
     });
-    res.status(200).json({ ok: true, calendars, lastModified });
+    res.status(200).json({ ok: true, calendars, lastModified, mode });
   } catch (err) {
     console.error('listAllCalendars failed:', err);
     res.status(500).json({ ok: false, message: '캘린더 목록을 불러오지 못했습니다.' });

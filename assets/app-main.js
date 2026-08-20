@@ -473,9 +473,10 @@ async function verifyAdminPasswordRemote(password) {
   return !!result?.ok;
 }
 
-async function listAllCalendarsRemote(password) {
-  const result = await callAdminFunction('listAllCalendars', { password });
-  return { calendars: result?.calendars || [], lastModified: result?.lastModified || 0 };
+async function listAllCalendarsRemote(password, options = {}) {
+  const mode = options.mode === 'full' ? 'full' : 'summary';
+  const result = await callAdminFunction('listAllCalendars', { password, mode });
+  return { calendars: result?.calendars || [], lastModified: result?.lastModified || 0, mode: result?.mode || mode };
 }
 
 async function changeAdminPasswordRemote(oldPassword, newPasswordHash) {
@@ -3782,61 +3783,80 @@ function AdminDashboard({ initialCalendars }) {
   const refreshServerCalendars = () => setRefreshTick(tick => tick + 1);
   const [isAdminListLoading, setIsAdminListLoading] = React.useState(true);
   const adminListLastModifiedRef = React.useRef(0);
+  const adminListModeRef = React.useRef('none');
+  const selectedCalIdRef = React.useRef(selectedCalId);
+  selectedCalIdRef.current = selectedCalId;
   React.useEffect(() => {
     let isMounted = true;
     let intervalId = null;
-    const applyResult = (calendars, lastModified) => {
-      if (!isMounted) return;
-      const lm = Number(lastModified) || 0;
-      if (lm > 0 && lm === adminListLastModifiedRef.current && (calendars || []).length > 0) {
-        setIsAdminListLoading(false);
-        return;
-      }
-      if (lm > 0) adminListLastModifiedRef.current = lm;
-      setServerCalendars(cloneCalendarList(calendars || []).map(normalizeCalendarForSave));
-      setLoadedAt(new Date());
-      setError('');
-      setIsAdminListLoading(false);
-    };
-
     const session = getAdminSession();
     if (!session) {
       setError('관리자 세션이 만료되었습니다. 다시 로그인해 주세요.');
       setIsAdminListLoading(false);
       return () => { isMounted = false; };
     }
-
-    const load = () => {
-      listAllCalendarsRemote(session.password)
-        .then((result) => applyResult(result.calendars, result.lastModified))
-        .catch(err => {
-          if (isMounted) {
-            setError(err.message || '대시보드 데이터를 불러오지 못했습니다.');
-            setIsAdminListLoading(false);
-          }
-        });
+    const applyList = (calendars, lastModified, mode) => {
+      if (!isMounted) return;
+      const lm = Number(lastModified) || 0;
+      if (lm > 0) adminListLastModifiedRef.current = lm;
+      adminListModeRef.current = mode || 'summary';
+      setServerCalendars(cloneCalendarList(calendars || []).map(normalizeCalendarForSave));
+      setLoadedAt(new Date());
+      setError('');
+      setIsAdminListLoading(false);
     };
-    load();
+    const preferId = selectedCalIdRef.current || getAdminSelectedCalendarIdFromUrl('kkot');
+    const fast = (preferId ? fetchSingleCalendarWithRest(preferId, 6000) : Promise.resolve(null))
+      .then(one => {
+        if (!isMounted || !one || !one.id) return;
+        if (adminListModeRef.current !== 'none') return;
+        setServerCalendars([normalizeCalendarForSave(one)]);
+        setIsAdminListLoading(false);
+        setError('');
+      }).catch(() => {});
+    const loadSummary = () => listAllCalendarsRemote(session.password, { mode: 'summary' })
+      .then(result => applyList(result.calendars, result.lastModified, 'summary'));
+    loadSummary().catch(err => {
+      if (isMounted && adminListModeRef.current === 'none') {
+        setError(err.message || '대시보드 데이터를 불러오지 못했습니다.');
+        setIsAdminListLoading(false);
+      }
+    });
+    void fast;
     const startPoll = () => {
       if (intervalId) return;
-      intervalId = setInterval(load, 120000);
+      intervalId = setInterval(() => { loadSummary().catch(() => {}); }, 180000);
     };
-    const stopPoll = () => {
-      if (intervalId) { clearInterval(intervalId); intervalId = null; }
-    };
+    const stopPoll = () => { if (intervalId) { clearInterval(intervalId); intervalId = null; } };
     startPoll();
     const onVis = () => {
       if (typeof document === 'undefined') return;
       if (document.visibilityState === 'hidden') stopPoll();
-      else { load(); startPoll(); }
+      else { loadSummary().catch(() => {}); startPoll(); }
     };
     if (typeof document !== 'undefined') document.addEventListener('visibilitychange', onVis);
     return () => {
-      isMounted = false;
-      stopPoll();
+      isMounted = false; stopPoll();
       if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', onVis);
     };
   }, [refreshTick]);
+
+  React.useEffect(() => {
+    if (activeTab !== 'metrics' && activeTab !== 'recovery') return;
+    if (adminListModeRef.current === 'full') return;
+    const session = getAdminSession();
+    if (!session) return;
+    let cancelled = false;
+    listAllCalendarsRemote(session.password, { mode: 'full' })
+      .then(result => {
+        if (cancelled) return;
+        adminListModeRef.current = 'full';
+        if (result.lastModified) adminListLastModifiedRef.current = Number(result.lastModified) || 0;
+        setServerCalendars(cloneCalendarList(result.calendars || []).map(normalizeCalendarForSave));
+        setLoadedAt(new Date());
+      }).catch(err => console.warn('admin full list', err));
+    return () => { cancelled = true; };
+  }, [activeTab, refreshTick]);
 
   const calendarsList = React.useMemo(() => serverCalendars
     .filter(cal => cal && !isInternalTestCalendarId(cal.id))
@@ -3858,21 +3878,37 @@ function AdminDashboard({ initialCalendars }) {
   // so opening the admin dashboard doesn't download/live-sync a calendar's entire message
   // history forever; see the matching cap on GlobalSearchModal's own full-history search fetch.
   React.useEffect(() => {
-    if (!selectedCalId || !firebaseDb) return;
+    if (!selectedCalId) return;
     setAdminMessageLimit(ADMIN_MESSAGE_LIVE_LIMIT);
     setAdminMemoLimit(ADMIN_MEMO_LIVE_LIMIT);
+  }, [selectedCalId]);
+
+  React.useEffect(() => {
+    if (!firebaseDb || !calendarsList.length) return;
     let cancelled = false;
+    const ids = calendarsList.map(c => c.id).filter(Boolean);
     (async () => {
-      const [mc, mm] = await Promise.all([
-        fetchSubcollectionCount(selectedCalId, 'messages'),
-        fetchSubcollectionCount(selectedCalId, 'memos')
-      ]);
+      const rows = await Promise.all(ids.map(async id => {
+        const [mc, mm] = await Promise.all([
+          fetchSubcollectionCount(id, 'messages'),
+          fetchSubcollectionCount(id, 'memos')
+        ]);
+        return { id, mc, mm };
+      }));
       if (cancelled) return;
-      if (mc != null) setAdminMsgTotal(prev => ({ ...prev, [selectedCalId]: mc }));
-      if (mm != null) setAdminMemoTotal(prev => ({ ...prev, [selectedCalId]: mm }));
+      setAdminMsgTotal(prev => {
+        const next = { ...prev };
+        rows.forEach(({ id, mc }) => { if (mc != null) next[id] = mc; });
+        return next;
+      });
+      setAdminMemoTotal(prev => {
+        const next = { ...prev };
+        rows.forEach(({ id, mm }) => { if (mm != null) next[id] = mm; });
+        return next;
+      });
     })();
     return () => { cancelled = true; };
-  }, [selectedCalId]);
+  }, [firebaseDb, calendarsList.map(c => c.id).join('|')]);
 
   // Chat messages: only selected calendar while 채팅 tab is open
   React.useEffect(() => {
@@ -5843,11 +5879,13 @@ function AdminDashboard({ initialCalendars }) {
           }),
           (() => {
             const loadedCount = (messagesMap[selectedCalId] || []).length;
-            const totalCount = (adminMsgTotal[selectedCalId] != null && adminMsgTotal[selectedCalId] > 0)
-              ? adminMsgTotal[selectedCalId]
-              : loadedCount;
-            if (!(totalCount > loadedCount)) return null;
+            const totalKnown = adminMsgTotal[selectedCalId];
+            const totalCount = (totalKnown != null && totalKnown >= 0) ? totalKnown : null;
+            const hasMore = (totalCount != null && totalCount > loadedCount)
+              || (loadedCount > 0 && loadedCount >= adminMessageLimit);
+            if (!hasMore) return null;
             const step = ADMIN_MESSAGE_LIVE_LIMIT;
+            const totalLabel = totalCount != null ? String(totalCount) : (loadedCount + '+');
             return /*#__PURE__*/React.createElement("div", {
               style: { display: 'flex', justifyContent: 'center', marginTop: '12px', paddingBottom: '4px' }
             },
@@ -5864,7 +5902,7 @@ function AdminDashboard({ initialCalendars }) {
                   color: '#1D4ED8',
                   fontWeight: 'bold'
                 }
-              }, `채팅 ${step}개 더 보기 (전체 ${totalCount}개 중 ${loadedCount}개 표시 중)`)
+              }, `채팅 ${step}개 더 보기 (전체 ${totalLabel}개 중 ${loadedCount}개 표시 중)`)
             );
           })()
         )
