@@ -3,6 +3,13 @@ function getLocalStorage() {
   return window['local' + 'Storage'];
 }
 
+function getActiveParticipants(calendar) {
+  const utils = window.GATHER_APP_UTILS || {};
+  const f = utils.getActiveParticipants;
+  return typeof f === 'function' ? f(calendar) : [];
+}
+
+
 function isNotificationSupported() {
     return typeof Notification !== 'undefined';
   }

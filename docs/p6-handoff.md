@@ -275,3 +275,6 @@ zsh 에서 줄 시작 `#` 주석은 쓰지 말 것.
 
 ## P6-39 진행 (2026-08-20)
 - KOREAN_LUNAR_HOLIDAY_DATES 등 calendar 상수 ESM 심 추가 (src/ui only)
+
+## P6-40 진행 (2026-08-20)
+- app-notifications ESM: getActiveParticipants → GATHER_APP_UTILS 브리지
