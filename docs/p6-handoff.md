@@ -319,3 +319,10 @@ zsh 에서 줄 시작 `#` 주석은 쓰지 말 것.
 - memo/admin 라이브 확인됨 (어드민 초기 로딩 느림은 단일 번들 ~900KB)
 - 태그: safe-20260820-p6-vite-live
 - 다음 후보: 코드 스플리팅으로 초기 로딩 개선, favicon, classic assets 정리
+
+## P6-50 진행 (2026-08-20)
+- publicDir → public-vite (classic assets 배포 제외, dist 2.6MB→~1.1MB)
+- main.jsx 경로별 dynamic import: admin은 ui-views(~225KB) 제외
+- manualChunks: vendor-react / ui-admin / ui-views / app-main
+- 부트 로딩 문구 표시
+- main push 시 Deploy Vite Pages 자동 (수동 불필요)

@@ -1,112 +1,91 @@
 import './react-globals.js';
 import './app.css';
-// P6 Vite entry — core + UI + app-main (live still uses index.html + assets/)
-import { GATHER_APP_CONSTANTS } from './core/app-constants.js';
-import { GATHER_APP_CONFIG } from './core/app-config.js';
-import { GATHER_APP_CALENDAR_DATA } from './core/app-calendar-data.js';
-import { GATHER_APP_CHAT_DATA } from './core/app-chat-data.js';
-import { GATHER_APP_UTILS } from './core/app-utils.js';
-import { GATHER_APP_NOTIFICATIONS } from './core/app-notifications.js';
-import { GATHER_FIREBASE_SERVICES } from './core/firebase-services.js';
 
-import { ConfirmDialog } from './ui/ui-confirm-dialog.js';
-import { ShareModal } from './ui/ui-share-modal.js';
-import {
-  ImageUploadOverlay,
-  ImageProcessingOverlay,
-  EmojiGridButton,
-  EmojiPickerSheet
-} from './ui/ui-overlays.js';
-import {
-  SearchResultLogRow,
-  TikTokEmbedWidget,
-  UrlCapsuleBadge,
-  ParticipantPickerButton,
-  DateCapsuleBadge
-} from './ui/ui-widgets.js';
-import {
-  ChatParticipantSheet,
-  NotificationPermissionHelpModal
-} from './ui/ui-chat-sheets.js';
-import { UserManualOverlay } from './ui/ui-user-manual.js';
-import { WeatherBadge, WeatherLocationModal } from './ui/ui-weather.js';
-import { SharedSideMenuSettings, MainSideMenu } from './ui/ui-side-menu.js';
-import {
-  UpdateAvailableBanner,
-  ImageShareViewer,
-  ImageThumbRemoveButton,
-  InlineSearchBar,
-  MemoShareModal,
-  ChatSideMenu
-} from './ui/ui-misc.js';
-import { PlaceRegisterModal } from './ui/ui-place-register.js';
-import { LightboxInfoPanel, Lightbox } from './ui/ui-lightbox.js';
-import { ChatGalleryModal } from './ui/ui-chat-gallery.js';
-import {
-  DirectChatMediaText,
-  DeadlineDateTimePicker,
-  PlacesSection,
-  ImageUrlModal
-} from './ui/ui-remaining.js';
-import {
-  SectionCountBadge,
-  SectionToggleButton,
-  SearchCategoryTabs,
-  SimpleBottomSheetPicker,
-  PhotoGallery,
-  SummaryList
-} from './ui/ui-summary-gallery.js';
-import {
-  ResizableModalContainer,
-  AutoGrowTextarea,
-  FormAddEditActionButtons,
-  SegmentedToggle,
-  ItemEditDeleteActions,
-  GamifiedConfirmButtonContent,
-  LinkPreviewCard,
-  LinkPreviewProgressOverlay,
-  DeleteConfirmModal,
-  AdminLoginGate,
-  DonutChart,
-  ColorSwatchPicker,
-  StickyVideoBox,
-  PollVoterSheet,
-  OperationProgressOverlay,
-  ToggleSwitch,
-  Footer
-} from './ui/ui-shared.js';
-import * as UiIcons from './ui/ui-icons.js';
-import { PlaceMapView, PlacesView } from './ui/ui-places.js';
-import { MemoView } from './ui/ui-memo-view.js';
-import { ChatRoomView } from './ui/ui-chat-room.js';
-import { DateModal } from './ui/ui-date-modal.js';
-import { AnniversaryModal, SettlementSummaryModal, PollModal } from './ui/ui-event-modals.js';
-import {
-  CalendarGrid,
-  CommentsSection,
-  MemoCard,
-  PollList,
-  GlobalSearchModal,
-  EditMessageModal
-} from './ui/ui-calendar-core.js';
-import {
-  AdminModal,
-  AdminUnifiedSearchResultsView,
-  AdminCreateCalendarModal,
-  AdminRestorePhraseModal,
-  AdminUnifiedSearchModal
-} from './ui/ui-admin-modals.js';
-import { AdminDashboard } from './ui/ui-admin-dashboard.js';
+function showBootStatus(msg) {
+  const root = document.getElementById('root');
+  if (!root || root.dataset.booted === '1') return;
+  root.innerHTML = `<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;font-family:system-ui,sans-serif;color:#64748B;font-size:14px;">${msg}</div>`;
+}
 
-import './core/app-main.js';
+function isAdminRoute() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get('admin') === '1' || params.get('mode') === 'admin';
+}
 
-console.log('[P6] Vite entry loaded with app-main', {
-  constants: !!GATHER_APP_CONSTANTS,
-  config: !!GATHER_APP_CONFIG,
-  utils: !!GATHER_APP_UTILS,
-  firebaseServices: !!GATHER_FIREBASE_SERVICES,
-  iconCount: Object.keys(UiIcons).length,
-  PlacesView: typeof PlacesView,
-  AdminDashboard: typeof AdminDashboard,
-  publicCalendarIds: GATHER_APP_CONFIG.PUBLIC_CALENDAR_IDS
-});
+async function loadCore() {
+  await Promise.all([
+    import('./core/app-constants.js'),
+    import('./core/app-config.js'),
+    import('./core/app-calendar-data.js'),
+    import('./core/app-chat-data.js'),
+    import('./core/app-utils.js'),
+    import('./core/app-notifications.js'),
+    import('./core/firebase-services.js')
+  ]);
+}
+
+async function loadSharedShell() {
+  await Promise.all([
+    import('./ui/ui-icons.js'),
+    import('./ui/ui-confirm-dialog.js'),
+    import('./ui/ui-share-modal.js'),
+    import('./ui/ui-overlays.js'),
+    import('./ui/ui-widgets.js'),
+    import('./ui/ui-shared.js'),
+    import('./ui/ui-side-menu.js'),
+    import('./ui/ui-misc.js')
+  ]);
+}
+
+async function loadAdminModules() {
+  await Promise.all([
+    import('./ui/ui-admin-modals.js'),
+    import('./ui/ui-admin-dashboard.js'),
+    import('./ui/ui-summary-gallery.js'),
+    import('./ui/ui-lightbox.js')
+  ]);
+}
+
+async function loadCalendarModules() {
+  await Promise.all([
+    import('./ui/ui-chat-sheets.js'),
+    import('./ui/ui-user-manual.js'),
+    import('./ui/ui-weather.js'),
+    import('./ui/ui-place-register.js'),
+    import('./ui/ui-lightbox.js'),
+    import('./ui/ui-chat-gallery.js'),
+    import('./ui/ui-remaining.js'),
+    import('./ui/ui-summary-gallery.js'),
+    import('./ui/ui-places.js'),
+    import('./ui/ui-memo-view.js'),
+    import('./ui/ui-chat-room.js'),
+    import('./ui/ui-date-modal.js'),
+    import('./ui/ui-event-modals.js'),
+    import('./ui/ui-calendar-core.js'),
+    import('./ui/ui-admin-modals.js'),
+    import('./ui/ui-admin-dashboard.js')
+  ]);
+}
+
+async function boot() {
+  try {
+    showBootStatus('모여라 캘린더 불러오는 중…');
+    await loadCore();
+    await loadSharedShell();
+    if (isAdminRoute()) {
+      showBootStatus('관리자 화면 불러오는 중…');
+      await loadAdminModules();
+    } else {
+      showBootStatus('캘린더 불러오는 중…');
+      await loadCalendarModules();
+    }
+    const root = document.getElementById('root');
+    if (root) root.dataset.booted = '1';
+    await import('./core/app-main.js');
+  } catch (err) {
+    console.error('[P6] boot failed', err);
+    showBootStatus('로딩 실패. 새로고침 해주세요.');
+  }
+}
+
+boot();
