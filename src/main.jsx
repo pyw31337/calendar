@@ -78,6 +78,14 @@ import { MemoView } from './ui/ui-memo-view.js';
 import { ChatRoomView } from './ui/ui-chat-room.js';
 import { DateModal } from './ui/ui-date-modal.js';
 import { AnniversaryModal, SettlementSummaryModal, PollModal } from './ui/ui-event-modals.js';
+import {
+  CalendarGrid,
+  CommentsSection,
+  MemoCard,
+  PollList,
+  GlobalSearchModal,
+  EditMessageModal
+} from './ui/ui-calendar-core.js';
 
 console.log('[P6] Vite entry loaded', {
   constants: !!GATHER_APP_CONSTANTS,
@@ -89,5 +97,6 @@ console.log('[P6] Vite entry loaded', {
   ChatRoomView: typeof ChatRoomView,
   DateModal: typeof DateModal,
   AnniversaryModal: typeof AnniversaryModal,
+  CalendarGrid: typeof CalendarGrid,
   publicCalendarIds: GATHER_APP_CONFIG.PUBLIC_CALENDAR_IDS
 });

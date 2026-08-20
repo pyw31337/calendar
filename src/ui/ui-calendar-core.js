@@ -1,8 +1,7 @@
 /**
  * Calendar grid, comments, memo card, polls, search (P4-19)
  */
-(function () {
-function CalendarGrid({
+export function CalendarGrid({
   anniversaries = [],
   calendar,
   isLoading = false,
@@ -526,7 +525,7 @@ function CalendarGrid({
   })));
 }
 
-function CommentsSection({
+export function CommentsSection({
   calendar,
   recentMessages,
   chatMessages = [],
@@ -1043,7 +1042,7 @@ function CommentsSection({
   }));
 }
 
-function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onSelectTag, onCommentsChange, getBorderColor, onRequestConfirm, showToast }) {
+export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onSelectTag, onCommentsChange, getBorderColor, onRequestConfirm, showToast }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -1390,7 +1389,7 @@ function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onSelectTa
   );
 }
 
-function PollList({ calendar, onCreatePoll, onEditPoll, onVotePoll, onCancelVote, onRequestConfirm, expandSignal }) {
+export function PollList({ calendar, onCreatePoll, onEditPoll, onVotePoll, onCancelVote, onRequestConfirm, expandSignal }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -1618,7 +1617,7 @@ function PollList({ calendar, onCreatePoll, onEditPoll, onVotePoll, onCancelVote
   })));
 }
 
-function GlobalSearchModal({
+export function GlobalSearchModal({
   calendar,
   chatMessages,
   memos,
@@ -1808,7 +1807,7 @@ function GlobalSearchModal({
   ));
 }
 
-function EditMessageModal({
+export function EditMessageModal({
   message,
   calendar,
   onSave,
@@ -2045,12 +2044,13 @@ function EditMessageModal({
   }), imageProcessingEdit && /*#__PURE__*/React.createElement(ImageProcessingOverlay, imageProcessingEdit));
 }
 
+  if (typeof window !== 'undefined') {
   window.GATHER_UI_COMPONENTS = Object.assign({}, window.GATHER_UI_COMPONENTS || {}, {
     CalendarGrid: CalendarGrid,
     CommentsSection: CommentsSection,
     MemoCard: MemoCard,
     PollList: PollList,
     GlobalSearchModal: GlobalSearchModal,
-    EditMessageModal: EditMessageModal
+    EditMessageModal: EditMessageModal,
   });
-})();
+}
