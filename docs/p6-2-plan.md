@@ -29,3 +29,5 @@
 - 라이브 assets/app-main.js 는 아직 원본을 사용
 
 - 4단계 계속: src/core/subscriptions.js 에 구독 헬퍼 복사 (원본 유지)
+
+- 4단계 계속: src/core/cache-and-deps.js (loadLocalCache, saveLocalCache, bindGatherFirebaseDeps) 복사
