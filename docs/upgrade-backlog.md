@@ -51,6 +51,7 @@
 - SideMenu ✅ 2026-08-20 (assets/ui-side-menu.js)
 - Overlays/Emoji ✅ 2026-08-20 (assets/ui-overlays.js)
 - UserManualOverlay ✅ 2026-08-20 (assets/ui-user-manual.js)
+- ChatParticipantSheet + NotificationHelp ✅ 2026-08-20 (assets/ui-chat-sheets.js)
 
 ### P5 UX 잔여
 - P5-1 공유 URL/OG ✅ 2026-08-20 (ShareModal 뷰 타이틀, settlement OG, check:share-urls)
