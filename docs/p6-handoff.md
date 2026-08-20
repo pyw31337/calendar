@@ -330,3 +330,7 @@ zsh 에서 줄 시작 `#` 주석은 쓰지 말 것.
 ## P6-51 진행 (2026-08-20)
 - admin 전용 partial load 롤백 (의존성 누락 → $e is not a function)
 - 전체 UI 병렬 import 유지 + manualChunks/slim publicDir 유지
+
+## P6-52 진행 (2026-08-20)
+- isValidCalendarId 등 GATHER_APP_UTILS 별칭을 호출 시 resolve (admin $e is not a function)
+- live-smoke: code-split 엔트리 작은 크기 허용, 청크 합산 검증

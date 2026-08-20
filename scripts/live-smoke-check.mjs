@@ -91,16 +91,34 @@ if (mode === 'vite') {
   const cssUrl = new URL(cssMatch[1], baseUrl).toString();
 
   const jsBody = await checkUrl(jsUrl, (text, url) => {
-    if (!text.trim()) throw new Error(`Empty JS bundle: ${url}`);
-    if (text.length < 100000) throw new Error(`JS bundle too small (${text.length}): ${url}`);
+    if (!text.trim()) throw new Error(`Empty JS entry: ${url}`);
   });
   await checkUrl(cssUrl, (text, url) => {
     if (!text.trim()) throw new Error(`Empty CSS bundle: ${url}`);
   });
 
+  const chunkUrls = [...new Set([
+    ...[...indexText.matchAll(/["']([^"']*assets\/[^"']+\.js)["']/g)].map(m => new URL(m[1], baseUrl).toString()),
+    ...[...jsBody.matchAll(/["']([^"']*assets\/[^"']+\.js)["']/g)].map(m => new URL(m[1], jsUrl).toString())
+  ])];
+  let combined = jsBody;
+  let totalBytes = jsBody.length;
+  for (const cu of chunkUrls.slice(0, 40)) {
+    try {
+      const body = await (await fetch(cu, { redirect: 'follow' })).text();
+      if (body && body.length) {
+        combined += body;
+        totalBytes += body.length;
+        console.log(`[live-smoke] chunk ${cu.split('/').pop()} bytes=${body.length}`);
+      }
+    } catch (e) {
+      console.log(`[live-smoke] chunk skip ${cu}: ${e.message}`);
+    }
+  }
+  if (totalBytes < 100000) throw new Error(`Vite JS chunks too small total=${totalBytes}`);
   for (const needle of ['AdminDashboard', 'MemoView', 'ChatRoomView', 'GATHER_APP_CONSTANTS', 'createRoot']) {
-    if (!jsBody.includes(needle)) throw new Error(`Marker "${needle}" missing in Vite JS bundle`);
-    console.log(`[live-smoke] marker ok ${needle} @ vite-bundle`);
+    if (!combined.includes(needle)) throw new Error(`Marker "${needle}" missing across Vite chunks`);
+    console.log(`[live-smoke] marker ok ${needle} @ vite-chunks`);
   }
 } else {
   for (const marker of CLASSIC_REQUIRED_SCRIPT_MARKERS) {

@@ -25,12 +25,30 @@ const EXPENSE_CATEGORY_ICONS = GATHER_APP_CONSTANTS.EXPENSE_CATEGORY_ICONS || {
   culture: '🎟️',
   etc: '💬'
 };
-const normalizeExpenseCategories = GATHER_APP_UTILS.normalizeExpenseCategories;
-const getExpenseCategories = GATHER_APP_UTILS.getExpenseCategories;
-const getExpenseCategory = GATHER_APP_UTILS.getExpenseCategory;
-const getExpenseCategoryIcon = GATHER_APP_UTILS.getExpenseCategoryIcon;
-const getExpenseCategoryLabel = GATHER_APP_UTILS.getExpenseCategoryLabel;
-const extractExpenseTimePrefix = GATHER_APP_UTILS.extractExpenseTimePrefix;
+function normalizeExpenseCategories(...args) {
+  const f = (window.GATHER_APP_UTILS || {}).normalizeExpenseCategories;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getExpenseCategories(...args) {
+  const f = (window.GATHER_APP_UTILS || {}).getExpenseCategories;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getExpenseCategory(...args) {
+  const f = (window.GATHER_APP_UTILS || {}).getExpenseCategory;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getExpenseCategoryIcon(...args) {
+  const f = (window.GATHER_APP_UTILS || {}).getExpenseCategoryIcon;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getExpenseCategoryLabel(...args) {
+  const f = (window.GATHER_APP_UTILS || {}).getExpenseCategoryLabel;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function extractExpenseTimePrefix(...args) {
+  const f = (window.GATHER_APP_UTILS || {}).extractExpenseTimePrefix;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
 // Income entries are saved with categoryId 'etc' as a placeholder -- they don't have a real
 // spending category (see handleSaveExpenseClick), so any UI that badges an expense by resolving
 // getExpenseCategory(calendar, expense.categoryId) straight off the stored id will show income as
@@ -302,11 +320,22 @@ function getPlaceSortDateKey(place) {
 // spanning both levels mismatched on real production data (returned "서울특별시" alone, swallowing
 // "구로구" entirely). Stripping the 시/도 prefix as its own explicit step first removes that
 // ambiguity, at the cost of not reaching down to the 동/읍/면 level.
-const getNaverMapSearchRegionHint = GATHER_APP_UTILS.getNaverMapSearchRegionHint;
-const getNaverMapPlaceUrl = GATHER_APP_UTILS.getNaverMapPlaceUrl;
-const getGoogleMapPlaceUrl = GATHER_APP_UTILS.getGoogleMapPlaceUrl;
-const getPlaceExternalMapUrl = GATHER_APP_UTILS.getPlaceExternalMapUrl;
-
+function getNaverMapSearchRegionHint(...args) {
+  const f = (window.GATHER_APP_UTILS || {}).getNaverMapSearchRegionHint;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getNaverMapPlaceUrl(...args) {
+  const f = (window.GATHER_APP_UTILS || {}).getNaverMapPlaceUrl;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getGoogleMapPlaceUrl(...args) {
+  const f = (window.GATHER_APP_UTILS || {}).getGoogleMapPlaceUrl;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getPlaceExternalMapUrl(...args) {
+  const f = (window.GATHER_APP_UTILS || {}).getPlaceExternalMapUrl;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
 const GATHER_APP_CONFIG = window.GATHER_APP_CONFIG || {};
 const readConfigNumber = (key, fallback) => Number.isFinite(GATHER_APP_CONFIG[key]) ? GATHER_APP_CONFIG[key] : fallback;
 const readConfigObject = (key, fallback) => GATHER_APP_CONFIG[key] && typeof GATHER_APP_CONFIG[key] === 'object' ? GATHER_APP_CONFIG[key] : fallback;
@@ -783,10 +812,18 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
   });
 }
 
-const detectBrowserForShortcutInstructions = GATHER_APP_UTILS.detectBrowserForShortcutInstructions;
-const getShortcutInstructions = GATHER_APP_UTILS.getShortcutInstructions;
-const canUseNativeInstallPrompt = GATHER_APP_UTILS.canUseNativeInstallPrompt;
-
+function detectBrowserForShortcutInstructions(...args) {
+  const f = (window.GATHER_APP_UTILS || {}).detectBrowserForShortcutInstructions;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getShortcutInstructions(...args) {
+  const f = (window.GATHER_APP_UTILS || {}).getShortcutInstructions;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function canUseNativeInstallPrompt(...args) {
+  const f = (window.GATHER_APP_UTILS || {}).canUseNativeInstallPrompt;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
 function waitForDeferredInstallPrompt(timeoutMs = 1800) {
   if (window.__deferredInstallPrompt) return Promise.resolve(window.__deferredInstallPrompt);
   return new Promise(resolve => {
@@ -830,17 +867,31 @@ async function tryCreateShortcut(notify) {
   if (notify) notify(instructions);
 }
 
-const getContrastTextColor = GATHER_APP_UTILS.getContrastTextColor;
+function getContrastTextColor(...args) {
+  const f = (window.GATHER_APP_UTILS || {}).getContrastTextColor;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
 // Standard Formatter for Korean Date Display: 2026.09.19 (토)
-const formatDateWithDayName = GATHER_APP_UTILS.formatDateWithDayName;
-const formatShortDateWithDayName = GATHER_APP_UTILS.formatShortDateWithDayName;
+function formatDateWithDayName(...args) {
+  const f = (window.GATHER_APP_UTILS || {}).formatDateWithDayName;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function formatShortDateWithDayName(...args) {
+  const f = (window.GATHER_APP_UTILS || {}).formatShortDateWithDayName;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
 // "[모임확정] 26.08.08 (토)" -- the confirmed-meeting banner's fixed text format.
-const formatConfirmedMeetingLabel = GATHER_APP_UTILS.formatConfirmedMeetingLabel;
+function formatConfirmedMeetingLabel(...args) {
+  const f = (window.GATHER_APP_UTILS || {}).formatConfirmedMeetingLabel;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
 // D-day label for the confirmed-meeting banner -- 'D-DAY' for today, 'D-N' for N days out.
 // Confirmed-meeting banners never show past dates (see visibleConfirmedMeetings' >= today
 // filter), so there's no D+N case to handle here.
-const formatDDayLabel = GATHER_APP_UTILS.formatDDayLabel;
-
+function formatDDayLabel(...args) {
+  const f = (window.GATHER_APP_UTILS || {}).formatDDayLabel;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
 // calendar.confirmedMeeting supports multiple confirmed dates as an array of
 // {date, note, confirmedAt}, but earlier data (and any calendar saved before this
 // change) may still carry a single {date, note, confirmedAt} object -- normalize
@@ -943,13 +994,27 @@ function formatChatHeaderTitle(title) {
   return (title || '').replace(/\s*모여라\s*캘린더\s*$/, '').trim() || (title || '');
 }
 
-const isValidCalendarId = GATHER_APP_UTILS.isValidCalendarId;
-const isInternalTestCalendarId = GATHER_APP_UTILS.isInternalTestCalendarId;
-const isAllowedCalendarId = GATHER_APP_UTILS.isAllowedCalendarId;
-const sanitizeText = GATHER_APP_UTILS.sanitizeText;
-
-const stripUrlEdgePunctuation = GATHER_APP_UTILS.stripUrlEdgePunctuation;
-
+function isValidCalendarId(id) {
+  const f = (window.GATHER_APP_UTILS || {}).isValidCalendarId;
+  if (typeof f === 'function') return f(id);
+  return typeof id === 'string' && id.length > 0 && id.length < 64;
+}
+function isInternalTestCalendarId(...args) {
+  const f = (window.GATHER_APP_UTILS || {}).isInternalTestCalendarId;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function isAllowedCalendarId(...args) {
+  const f = (window.GATHER_APP_UTILS || {}).isAllowedCalendarId;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function sanitizeText(...args) {
+  const f = (window.GATHER_APP_UTILS || {}).sanitizeText;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function stripUrlEdgePunctuation(...args) {
+  const f = (window.GATHER_APP_UTILS || {}).stripUrlEdgePunctuation;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
 // Turns a raw Firestore/Firebase write error into a toast message that hints at *why* it
 // failed instead of a bare "실패", since the most common real-world cause here (a
 // firestore.rules/storage.rules change that hasn't been deployed yet -- `firebase deploy
@@ -967,9 +1032,14 @@ function describeFirebaseWriteError(err, genericLabel) {
   return genericLabel;
 }
 
-const normalizeColorValue = GATHER_APP_UTILS.normalizeColorValue;
-const isValidDateString = GATHER_APP_UTILS.isValidDateString;
-
+function normalizeColorValue(...args) {
+  const f = (window.GATHER_APP_UTILS || {}).normalizeColorValue;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function isValidDateString(...args) {
+  const f = (window.GATHER_APP_UTILS || {}).isValidDateString;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
 // 공유 URL 규칙: 항상 /share/{calId}/[view]/[itemId]/ 슬래시 경로 (OG 크롤러용)
 const parseSharePathFromLocation = GATHER_APP_UTILS.parseSharePathFromLocation
   ? (pathname = window.location.pathname) => GATHER_APP_UTILS.parseSharePathFromLocation(pathname)
@@ -1089,16 +1159,34 @@ function applyDynamicManifest(calendar) {
   }
 }
 
-const formatRegisteredAt = GATHER_APP_UTILS.formatRegisteredAt;
-
-const cloneParticipant = GATHER_APP_UTILS.cloneParticipant;
-const cloneAvailability = GATHER_APP_UTILS.cloneAvailability;
-const cloneActivityLog = GATHER_APP_UTILS.cloneActivityLog;
-const clonePoll = GATHER_APP_UTILS.clonePoll;
-
-const getItemStamp = GATHER_APP_UTILS.getItemStamp;
-const isTombstone = GATHER_APP_UTILS.isTombstone;
-
+function formatRegisteredAt(...args) {
+  const f = (window.GATHER_APP_UTILS || {}).formatRegisteredAt;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function cloneParticipant(...args) {
+  const f = (window.GATHER_APP_UTILS || {}).cloneParticipant;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function cloneAvailability(...args) {
+  const f = (window.GATHER_APP_UTILS || {}).cloneAvailability;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function cloneActivityLog(...args) {
+  const f = (window.GATHER_APP_UTILS || {}).cloneActivityLog;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function clonePoll(...args) {
+  const f = (window.GATHER_APP_UTILS || {}).clonePoll;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getItemStamp(...args) {
+  const f = (window.GATHER_APP_UTILS || {}).getItemStamp;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function isTombstone(...args) {
+  const f = (window.GATHER_APP_UTILS || {}).isTombstone;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
 function normalizeParticipantName(calendarId, name) {
   const trimmed = sanitizeText(name, 40);
   if (calendarId === 'kkot' && trimmed === '김료진') return '김효진';
@@ -1160,8 +1248,10 @@ function mergeDeletedActivityLogIds(...lists) {
   return normalizeDeletedActivityLogIds(lists.flat());
 }
 
-const getActivityLogStamp = GATHER_APP_UTILS.getActivityLogStamp;
-
+function getActivityLogStamp(...args) {
+  const f = (window.GATHER_APP_UTILS || {}).getActivityLogStamp;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
 const SCHEDULE_ACTIVITY_ACTIONS = Array.isArray(GATHER_APP_CONSTANTS.SCHEDULE_ACTIVITY_ACTIONS) ? GATHER_APP_CONSTANTS.SCHEDULE_ACTIVITY_ACTIONS : ['create', 'update', 'delete'];
 const POLL_ACTIVITY_ACTIONS = Array.isArray(GATHER_APP_CONSTANTS.POLL_ACTIVITY_ACTIONS) ? GATHER_APP_CONSTANTS.POLL_ACTIVITY_ACTIONS : ['poll_create', 'poll_vote', 'poll_cancel'];
 // Expense/income entries (회비정산) have no participant selector of their own -- these logs
@@ -1257,10 +1347,18 @@ function createPollActivityLog(calendarId, action, participantId = '', timestamp
   });
 }
 
-const extractFirstUrlInfo = GATHER_APP_UTILS.extractFirstUrlInfo;
-const extractFirstUrl = GATHER_APP_UTILS.extractFirstUrl;
-const removeFirstUrl = GATHER_APP_UTILS.removeFirstUrl;
-
+function extractFirstUrlInfo(...args) {
+  const f = (window.GATHER_APP_UTILS || {}).extractFirstUrlInfo;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function extractFirstUrl(...args) {
+  const f = (window.GATHER_APP_UTILS || {}).extractFirstUrl;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function removeFirstUrl(...args) {
+  const f = (window.GATHER_APP_UTILS || {}).removeFirstUrl;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
 // Shared "URL 뱃지" renderer: splits free text into its plain-text portion plus a clickable
 // gray capsule badge for the first URL found (matches the existing memo/expense/availability
 // badge styling elsewhere in the app). Returns a plain string when there's no URL so callers
@@ -8401,10 +8499,18 @@ function isEmojiOnlyChatText(text) {
   }
 }
 
-const formatCommentDate = GATHER_APP_UTILS.formatCommentDate;
-const formatChatTime = GATHER_APP_UTILS.formatChatTime;
-const formatChatDividerDate = GATHER_APP_UTILS.formatChatDividerDate;
-
+function formatCommentDate(...args) {
+  const f = (window.GATHER_APP_UTILS || {}).formatCommentDate;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function formatChatTime(...args) {
+  const f = (window.GATHER_APP_UTILS || {}).formatChatTime;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function formatChatDividerDate(...args) {
+  const f = (window.GATHER_APP_UTILS || {}).formatChatDividerDate;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
 // Returns paired {full, thumb} entries for a chat message's attached image(s), handling both
 // the legacy single-image fields (imageUrl/thumbUrl) and the imageUrls/thumbUrls arrays used
 // by multi-image messages. Empty array when the message has no image at all. Shared by the
@@ -8541,8 +8647,10 @@ function getStorageUrlFileSize(url) {
   const match = url.match(/_(\d+)b\.[a-zA-Z0-9]+(?:[?#]|$)/);
   return match ? Number(match[1]) : null;
 }
-const formatBytes = GATHER_APP_UTILS.formatBytes;
-
+function formatBytes(...args) {
+  const f = (window.GATHER_APP_UTILS || {}).formatBytes;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
 function getDataUrlInfo(url) {
   if (typeof url !== 'string' || !url.startsWith('data:')) return null;
   const match = url.match(/^data:([^;,]*)(;base64)?,/);
@@ -9778,9 +9886,14 @@ const PLACE_MAP_DEFAULT_ZOOM = 11;
 // Rough bounding box for South+North Korea -- used only to decide which registered places count
 // as "domestic" for the main-screen preview map's auto-fit (see preferDomesticBounds below), not
 // as a precise border.
-const stripKoreaCountryPrefix = GATHER_APP_UTILS.stripKoreaCountryPrefix;
-const normalizeDomesticKoreanAddress = GATHER_APP_UTILS.normalizeDomesticKoreanAddress;
-
+function stripKoreaCountryPrefix(...args) {
+  const f = (window.GATHER_APP_UTILS || {}).stripKoreaCountryPrefix;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function normalizeDomesticKoreanAddress(...args) {
+  const f = (window.GATHER_APP_UTILS || {}).normalizeDomesticKoreanAddress;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
 const trimLatLngOutliers = GATHER_APP_UTILS.trimLatLngOutliers || function trimLatLngOutliers(points) {
   if (!Array.isArray(points) || points.length <= 5) return points || [];
   const lats = points.map(p => p[0]).slice().sort((a, b) => a - b);
