@@ -33,3 +33,15 @@
 - 4단계 계속: src/core/cache-and-deps.js (loadLocalCache, saveLocalCache, bindGatherFirebaseDeps) 복사
 
 - 4단계 계속: src/core/cache-and-deps.js (loadLocalCache, saveLocalCache, bindGatherFirebaseDeps) 복사
+
+## 4단계 복사 사이클 완료 (2026-08-20)
+복사만 하고 원본은 유지한 파일:
+- src/core/admin-routes.js
+- src/core/subscriptions.js
+- src/core/cache-and-deps.js
+
+다음에 하지 말 것:
+- assets/app-main.js 에서 함수 삭제
+- index.html 을 Vite 엔트리로 바꾸기 (P6-3)
+
+다음 스프린트: P6-3 (Vite 빌드 산출물을 Pages에 배포) — 별도 안전 태그 후 진행
