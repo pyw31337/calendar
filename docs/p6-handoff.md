@@ -301,3 +301,6 @@ zsh 에서 줄 시작 `#` 주석은 쓰지 말 것.
 ## P6-45 진행 (2026-08-20)
 - getStoredChatParticipantId: notifications 를 호출 시 window에서 resolve
 - ADMIN_MESSAGE_LIVE_LIMIT / ADMIN_MEMO_LIVE_LIMIT UI 심 + deps
+
+## P6-46 진행 (2026-08-20)
+- live-smoke-check: Vite/classic 이중 모드 지원 (Vite index-*.js 마커)

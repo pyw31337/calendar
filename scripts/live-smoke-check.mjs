@@ -12,12 +12,13 @@ const pages = [
   '?id=cw&view=gallery',
   '?id=kkot&view=places',
   '?id=kkot&view=gallery',
+  '?id=kkot&view=memo',
   '?id=jhair&view=chat',
   '?admin=1',
   '?admin=1&restore=1'
 ];
 
-const REQUIRED_SCRIPT_MARKERS = [
+const CLASSIC_REQUIRED_SCRIPT_MARKERS = [
   'assets/app-main.js',
   'assets/app-utils.js',
   'assets/app-notifications.js',
@@ -33,7 +34,9 @@ const REQUIRED_SCRIPT_MARKERS = [
 ];
 
 function withCacheBust(path) {
-  if (path.startsWith('assets/')) return new URL(path, baseUrl).toString();
+  if (path.startsWith('assets/') || path.startsWith('/')) {
+    return new URL(path.replace(/^\//, ''), baseUrl).toString();
+  }
   const sep = path.includes('?') ? '&' : '?';
   return new URL(`${path}${sep}_v=${cacheBust}`, baseUrl).toString();
 }
@@ -47,45 +50,85 @@ async function checkUrl(url, validate) {
   return text;
 }
 
-for (const page of pages) {
-  await checkUrl(withCacheBust(page), (html, url) => {
-    if (!html.includes('<div id="root">')) throw new Error(`Missing root element: ${url}`);
-    if (!html.includes('assets/app-utils.js')) throw new Error(`Missing app-utils: ${url}`);
-    if (!html.includes('assets/app-notifications.js')) throw new Error(`Missing app-notifications: ${url}`);
-  });
+function isViteHtml(html) {
+  return html.includes('type="module"') && /assets\/index-[^"]+\.js/.test(html);
+}
+
+function isClassicHtml(html) {
+  return html.includes('assets/app-main.js') && html.includes('assets/app-utils.js');
 }
 
 const indexUrl = new URL('.', baseUrl).toString() + `?_v=${cacheBust}`;
-const indexText = await checkUrl(indexUrl, (html) => {
-  for (const marker of REQUIRED_SCRIPT_MARKERS) {
-    if (!html.includes(marker)) throw new Error(`index.html missing required script: ${marker}`);
+const indexText = await checkUrl(indexUrl, (html, url) => {
+  if (!html.includes('<div id="root">')) throw new Error(`Missing root element: ${url}`);
+  if (!isViteHtml(html) && !isClassicHtml(html)) {
+    throw new Error(`Unrecognized deployment HTML (neither Vite nor classic): ${url}`);
   }
 });
 
-const assetPaths = [...new Set(
-  [...indexText.matchAll(/src="(assets\/(?:app|ui|firebase)[^"]+\.js(?:\?v=[^"]+)?)"/g)].map(m => m[1])
-)];
-if (assetPaths.length < 10) throw new Error(`Too few asset scripts parsed (${assetPaths.length})`);
-console.log(`[live-smoke] parsed ${assetPaths.length} asset scripts from index`);
+const mode = isViteHtml(indexText) ? 'vite' : 'classic';
+console.log(`[live-smoke] deployment mode: ${mode}`);
 
-for (const asset of assetPaths) {
-  await checkUrl(withCacheBust(asset), (text, url) => {
-    if (!text.trim()) throw new Error(`Empty asset response: ${url}`);
+for (const page of pages) {
+  await checkUrl(withCacheBust(page), (html, url) => {
+    if (!html.includes('<div id="root">')) throw new Error(`Missing root element: ${url}`);
+    if (mode === 'vite') {
+      if (!isViteHtml(html)) throw new Error(`Expected Vite module bundle on ${url}`);
+    } else {
+      if (!html.includes('assets/app-utils.js')) throw new Error(`Missing app-utils: ${url}`);
+      if (!html.includes('assets/app-notifications.js')) throw new Error(`Missing app-notifications: ${url}`);
+    }
   });
 }
 
-const criticalChecks = [
-  ['ui-side-menu.js', 'MainSideMenu'],
-  ['ui-icons.js', 'GATHER_UI_COMPONENTS'],
-  ['ui-widgets.js', 'UrlCapsuleBadge'],
-  ['app-main.js', 'GATHER_APP_CONSTANTS']
-];
-for (const [file, needle] of criticalChecks) {
-  const fromIndex = assetPaths.find(p => p.includes(file));
-  const finalUrl = withCacheBust(fromIndex || `assets/${file}`);
-  const body = await (await fetch(finalUrl, { redirect: 'follow' })).text();
-  if (!body.includes(needle)) throw new Error(`Marker "${needle}" missing in ${finalUrl}`);
-  console.log(`[live-smoke] marker ok ${needle} @ ${fromIndex || file}`);
+if (mode === 'vite') {
+  const jsMatch = indexText.match(/src="([^"]*assets\/index-[^"]+\.js)"/);
+  const cssMatch = indexText.match(/href="([^"]*assets\/index-[^"]+\.css)"/);
+  if (!jsMatch) throw new Error('Vite index missing assets/index-*.js');
+  if (!cssMatch) throw new Error('Vite index missing assets/index-*.css');
+
+  const jsUrl = new URL(jsMatch[1], baseUrl).toString();
+  const cssUrl = new URL(cssMatch[1], baseUrl).toString();
+
+  const jsBody = await checkUrl(jsUrl, (text, url) => {
+    if (!text.trim()) throw new Error(`Empty JS bundle: ${url}`);
+    if (text.length < 100000) throw new Error(`JS bundle too small (${text.length}): ${url}`);
+  });
+  await checkUrl(cssUrl, (text, url) => {
+    if (!text.trim()) throw new Error(`Empty CSS bundle: ${url}`);
+  });
+
+  for (const needle of ['AdminDashboard', 'MemoView', 'ChatRoomView', 'GATHER_APP_CONSTANTS', 'createRoot']) {
+    if (!jsBody.includes(needle)) throw new Error(`Marker "${needle}" missing in Vite JS bundle`);
+    console.log(`[live-smoke] marker ok ${needle} @ vite-bundle`);
+  }
+} else {
+  for (const marker of CLASSIC_REQUIRED_SCRIPT_MARKERS) {
+    if (!indexText.includes(marker)) throw new Error(`index.html missing required script: ${marker}`);
+  }
+  const assetPaths = [...new Set(
+    [...indexText.matchAll(/src="(assets\/(?:app|ui|firebase)[^"]+\.js(?:\?v=[^"]+)?)"/g)].map(m => m[1])
+  )];
+  if (assetPaths.length < 10) throw new Error(`Too few asset scripts parsed (${assetPaths.length})`);
+  console.log(`[live-smoke] parsed ${assetPaths.length} asset scripts from index`);
+  for (const asset of assetPaths) {
+    await checkUrl(withCacheBust(asset), (text, url) => {
+      if (!text.trim()) throw new Error(`Empty asset response: ${url}`);
+    });
+  }
+  const criticalChecks = [
+    ['ui-side-menu.js', 'MainSideMenu'],
+    ['ui-icons.js', 'GATHER_UI_COMPONENTS'],
+    ['ui-widgets.js', 'UrlCapsuleBadge'],
+    ['app-main.js', 'GATHER_APP_CONSTANTS']
+  ];
+  for (const [file, needle] of criticalChecks) {
+    const fromIndex = assetPaths.find(p => p.includes(file));
+    const finalUrl = withCacheBust(fromIndex || `assets/${file}`);
+    const body = await (await fetch(finalUrl, { redirect: 'follow' })).text();
+    if (!body.includes(needle)) throw new Error(`Marker "${needle}" missing in ${finalUrl}`);
+    console.log(`[live-smoke] marker ok ${needle} @ ${fromIndex || file}`);
+  }
 }
 
 console.log('Live smoke check passed.');
