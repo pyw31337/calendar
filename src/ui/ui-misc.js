@@ -1,8 +1,7 @@
 /**
  * Misc chat/share UI (P4-9)
  */
-(function () {
-function UpdateAvailableBanner() {
+export function UpdateAvailableBanner() {
   const React = window.React;
 
   const [updateAvailable, setUpdateAvailable] = React.useState(false);
@@ -73,7 +72,7 @@ function UpdateAvailableBanner() {
   );
 }
 
-function ImageShareViewer({ shareId }) {
+export function ImageShareViewer({ shareId }) {
   const React = window.React;
 
   const [state, setState] = React.useState({ loading: true, share: null, error: '' });
@@ -133,7 +132,7 @@ function ImageShareViewer({ shareId }) {
   ));
 }
 
-function ImageThumbRemoveButton({ onClick, title = '삭제' }) {
+export function ImageThumbRemoveButton({ onClick, title = '삭제' }) {
   const React = window.React;
 
   return /*#__PURE__*/React.createElement("button", {
@@ -154,7 +153,7 @@ function ImageThumbRemoveButton({ onClick, title = '삭제' }) {
   }, /*#__PURE__*/React.createElement("line", { x1: "18", y1: "6", x2: "6", y2: "18" }), /*#__PURE__*/React.createElement("line", { x1: "6", y1: "6", x2: "18", y2: "18" })));
 }
 
-function InlineSearchBar({
+export function InlineSearchBar({
   value,
   onChange,
   placeholder,
@@ -215,7 +214,7 @@ function InlineSearchBar({
   );
 }
 
-function MemoShareModal({ memo, calendarId, onClose, showToast }) {
+export function MemoShareModal({ memo, calendarId, onClose, showToast }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const ResizableModalContainer = __deps.ResizableModalContainer;
@@ -280,7 +279,7 @@ function MemoShareModal({ memo, calendarId, onClose, showToast }) {
   )))), document.body);
 }
 
-function ChatSideMenu({
+export function ChatSideMenu({
   onClose,
   onOpenSearch,
   onOpenNoticeSettings,
@@ -422,12 +421,13 @@ function ChatSideMenu({
   )));
 }
 
+  if (typeof window !== 'undefined') {
   window.GATHER_UI_COMPONENTS = Object.assign({}, window.GATHER_UI_COMPONENTS || {}, {
     UpdateAvailableBanner: UpdateAvailableBanner,
     ImageShareViewer: ImageShareViewer,
     ImageThumbRemoveButton: ImageThumbRemoveButton,
     InlineSearchBar: InlineSearchBar,
     MemoShareModal: MemoShareModal,
-    ChatSideMenu: ChatSideMenu
+    ChatSideMenu: ChatSideMenu,
   });
-})();
+}

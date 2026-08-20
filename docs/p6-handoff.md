@@ -137,3 +137,9 @@ zsh 에서 줄 시작 `#` 주석은 쓰지 말 것.
 - SharedSideMenuSettings, MainSideMenu
 - 라이브 경로 유지. Pages 전환 아직 금지.
 - 다음: ui-misc
+
+## P6-16 진행 (2026-08-20)
+- src/ui/ui-misc.js 를 ESM export (assets/ 미변경)
+- UpdateAvailableBanner, ImageShareViewer, ImageThumbRemoveButton, InlineSearchBar, MemoShareModal, ChatSideMenu
+- 라이브 경로 유지. Pages 전환 아직 금지.
+- 다음: ui-place-register 또는 ui-lightbox

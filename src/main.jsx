@@ -28,12 +28,19 @@ import {
 import { UserManualOverlay } from './ui/ui-user-manual.js';
 import { WeatherBadge, WeatherLocationModal } from './ui/ui-weather.js';
 import { SharedSideMenuSettings, MainSideMenu } from './ui/ui-side-menu.js';
+import {
+  UpdateAvailableBanner,
+  ImageShareViewer,
+  ImageThumbRemoveButton,
+  InlineSearchBar,
+  MemoShareModal,
+  ChatSideMenu
+} from './ui/ui-misc.js';
 
 console.log('[P6] Vite entry loaded', {
   constants: !!GATHER_APP_CONSTANTS,
   config: !!GATHER_APP_CONFIG,
-  utils: !!GATHER_APP_UTILS,
   MainSideMenu: typeof MainSideMenu,
-  WeatherBadge: typeof WeatherBadge,
+  ChatSideMenu: typeof ChatSideMenu,
   publicCalendarIds: GATHER_APP_CONFIG.PUBLIC_CALENDAR_IDS
 });
