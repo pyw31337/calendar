@@ -1,5 +1,4 @@
-(function () {
-  function isNotificationSupported() {
+function isNotificationSupported() {
     return typeof Notification !== 'undefined';
   }
 
@@ -222,7 +221,7 @@
     ];
   }
 
-  window.GATHER_APP_NOTIFICATIONS = Object.freeze({
+  export const GATHER_APP_NOTIFICATIONS = Object.freeze({
     isNotificationSupported,
     requestChatNotificationPermission,
     ensureChatNotificationPermission,
@@ -241,4 +240,7 @@
     isInstalledStandalonePwa,
     probeNotificationCapability
   });
-})();
+
+if (typeof window !== 'undefined') {
+  window.GATHER_APP_NOTIFICATIONS = GATHER_APP_NOTIFICATIONS;
+}
