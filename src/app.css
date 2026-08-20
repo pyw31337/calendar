@@ -1770,7 +1770,7 @@ select.form-select {
 }
 .admin-top-bar {
   background-color: #FFFFFF;
-  border-bottom: 1px solid #E2E8F0;
+  border-bottom: 1px solid var(--border-subtle);
   margin: -24px 0 0;
   padding-top: 24px;
   box-sizing: border-box;
@@ -1910,8 +1910,8 @@ select.form-select {
   flex-direction: column;
   gap: 0;
   padding: 8px 0;
-  border-top: 1px solid #E2E8F0;
-  border-bottom: 1px solid #E2E8F0;
+  border-top: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
 }
 .admin-side-menu-item {
   width: 100%;
@@ -2046,7 +2046,7 @@ select.form-select {
   width: 30px;
   height: 30px;
   border-radius: 50%;
-  border: 1px solid #E2E8F0;
+  border: 1px solid var(--border-subtle);
   background: #F8FAFC;
   color: #0F172A;
   display: inline-flex;
@@ -2095,7 +2095,7 @@ select.form-select {
 .admin-tab-bar {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  border-top: 1px solid #E2E8F0;
+  border-top: 1px solid var(--border-subtle);
   padding: 6px 12px 0;
   gap: 0;
   min-width: 0;
@@ -2641,7 +2641,7 @@ select.form-select {
    screens so the message never needs to truncate. */
 .admin-chat-row {
   display: flex; align-items: center; gap: 8px 12px;
-  border-bottom: 1px solid #E2E8F0; padding: 10px 6px;
+  border-bottom: 1px solid var(--border-subtle); padding: 10px 6px;
 }
 .admin-chat-header { display: flex; align-items: center; gap: 8px; flex-shrink: 0; flex-wrap: wrap; }
 .admin-chat-text {
@@ -3367,7 +3367,7 @@ textarea.form-input {
 
 /* SharedSideMenuSettings: divider above 다크모드 on every side menu */
 .admin-side-menu .shared-side-menu-settings {
-  border-top: 1px solid var(--border-subtle, #E2E8F0) !important;
+  border-top: 1px solid var(--border-subtle) !important;
   margin-top: 2px;
   padding-top: 8px !important;
 }
@@ -3546,4 +3546,29 @@ textarea.form-input {
   display: block;
   line-height: 1;
   transform: translateY(-0.5px);
+}
+
+
+/* ===== P6-59 dark dividers ===== */
+:root[data-theme="dark"] .admin-side-menu-list,
+:root:not([data-theme="light"]) .admin-side-menu-list,
+:root[data-theme="dark"] .admin-side-menu .shared-side-menu-settings,
+:root:not([data-theme="light"]) .admin-side-menu .shared-side-menu-settings {
+  border-top-color: var(--border-subtle) !important;
+  border-bottom-color: var(--border-subtle) !important;
+}
+:root[data-theme="dark"] .admin-side-menu,
+:root:not([data-theme="light"]) .admin-side-menu {
+  --border-subtle: #232F49;
+}
+:root[data-theme="dark"] .summary-section-divider,
+:root:not([data-theme="light"]) .summary-section-divider,
+:root[data-theme="dark"] .admin-tab-bar,
+:root:not([data-theme="light"]) .admin-tab-bar {
+  border-color: var(--border-subtle) !important;
+}
+:root[data-theme="dark"] .admin-poll-row,
+:root:not([data-theme="light"]) .admin-poll-row {
+  border-color: var(--border-subtle) !important;
+  background-color: var(--bg-primary) !important;
 }
