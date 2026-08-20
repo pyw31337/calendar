@@ -173,3 +173,9 @@ zsh 에서 줄 시작 `#` 주석은 쓰지 말 것.
 - SectionCountBadge, SectionToggleButton, SearchCategoryTabs, SimpleBottomSheetPicker, PhotoGallery, SummaryList
 - 라이브 경로 유지. Pages 전환 아직 금지.
 - 다음: ui-shared
+
+## P6-22 진행 (2026-08-20)
+- src/ui/ui-shared.js 를 ESM export (assets/ 미변경)
+- 공유 UI 17개 컴포넌트 export
+- 라이브 경로 유지. Pages 전환 아직 금지.
+- 다음: ui-icons (아이콘 묶음)

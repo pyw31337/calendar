@@ -53,13 +53,31 @@ import {
   PhotoGallery,
   SummaryList
 } from './ui/ui-summary-gallery.js';
+import {
+  ResizableModalContainer,
+  AutoGrowTextarea,
+  FormAddEditActionButtons,
+  SegmentedToggle,
+  ItemEditDeleteActions,
+  GamifiedConfirmButtonContent,
+  LinkPreviewCard,
+  LinkPreviewProgressOverlay,
+  DeleteConfirmModal,
+  AdminLoginGate,
+  DonutChart,
+  ColorSwatchPicker,
+  StickyVideoBox,
+  PollVoterSheet,
+  OperationProgressOverlay,
+  ToggleSwitch,
+  Footer
+} from './ui/ui-shared.js';
 
 console.log('[P6] Vite entry loaded', {
   constants: !!GATHER_APP_CONSTANTS,
   config: !!GATHER_APP_CONFIG,
   MainSideMenu: typeof MainSideMenu,
-  Lightbox: typeof Lightbox,
-  PhotoGallery: typeof PhotoGallery,
-  SummaryList: typeof SummaryList,
+  AdminLoginGate: typeof AdminLoginGate,
+  Footer: typeof Footer,
   publicCalendarIds: GATHER_APP_CONFIG.PUBLIC_CALENDAR_IDS
 });

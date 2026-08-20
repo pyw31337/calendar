@@ -1,8 +1,7 @@
 /**
  * Shared UI primitives (P4-22)
  */
-(function () {
-function ResizableModalContainer({ className, style, children, ...props }) {
+export function ResizableModalContainer({ className, style, children, ...props }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -136,7 +135,7 @@ function ResizableModalContainer({ className, style, children, ...props }) {
   );
 }
 
-function AutoGrowTextarea({
+export function AutoGrowTextarea({
   maxHeight = 480,
   value,
   onChange,
@@ -180,7 +179,7 @@ function AutoGrowTextarea({
   }, rest));
 }
 
-function FormAddEditActionButtons({ isEditing, isSaving, onCancel, onSubmit, disabled = false, savingLabel = '저장 중...', alignSelf = null, flexGrow = false }) {
+export function FormAddEditActionButtons({ isEditing, isSaving, onCancel, onSubmit, disabled = false, savingLabel = '저장 중...', alignSelf = null, flexGrow = false }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -221,7 +220,7 @@ function FormAddEditActionButtons({ isEditing, isSaving, onCancel, onSubmit, dis
   );
 }
 
-function SegmentedToggle({ options, value, onChange, disabled, style, ariaLabel }) {
+export function SegmentedToggle({ options, value, onChange, disabled, style, ariaLabel }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -257,7 +256,7 @@ function SegmentedToggle({ options, value, onChange, disabled, style, ariaLabel 
   ]).filter(Boolean));
 }
 
-function ItemEditDeleteActions({ onEdit, onDelete, editTitle = '수정', deleteTitle = '삭제', showEdit = true, showDelete = true }) {
+export function ItemEditDeleteActions({ onEdit, onDelete, editTitle = '수정', deleteTitle = '삭제', showEdit = true, showDelete = true }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -292,7 +291,7 @@ function ItemEditDeleteActions({ onEdit, onDelete, editTitle = '수정', deleteT
   );
 }
 
-function GamifiedConfirmButtonContent({ label }) {
+export function GamifiedConfirmButtonContent({ label }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -329,7 +328,7 @@ function GamifiedConfirmButtonContent({ label }) {
   );
 }
 
-function LinkPreviewCard({ url, fallbackTitle, cachedData }) {
+export function LinkPreviewCard({ url, fallbackTitle, cachedData }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -378,7 +377,7 @@ function LinkPreviewCard({ url, fallbackTitle, cachedData }) {
   );
 }
 
-function LinkPreviewProgressOverlay({ progress, remainingSec }) {
+export function LinkPreviewProgressOverlay({ progress, remainingSec }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -419,7 +418,7 @@ function LinkPreviewProgressOverlay({ progress, remainingSec }) {
   );
 }
 
-function DeleteConfirmModal({
+export function DeleteConfirmModal({
   message,
   calendar,
   onConfirm,
@@ -470,7 +469,7 @@ function DeleteConfirmModal({
   }, "확인"))));
 }
 
-function AdminLoginGate({ children }) {
+export function AdminLoginGate({ children }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -547,7 +546,7 @@ function AdminLoginGate({ children }) {
   );
 }
 
-function DonutChart({ segments, size = 84, strokeWidth = 14 }) {
+export function DonutChart({ segments, size = 84, strokeWidth = 14 }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -601,7 +600,7 @@ function DonutChart({ segments, size = 84, strokeWidth = 14 }) {
   );
 }
 
-function ColorSwatchPicker({ value, onChange, disabled, title = "색상 선택" }) {
+export function ColorSwatchPicker({ value, onChange, disabled, title = "색상 선택" }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -660,7 +659,7 @@ function ColorSwatchPicker({ value, onChange, disabled, title = "색상 선택" 
   );
 }
 
-function StickyVideoBox({ stickyVideo, onClose, onGoToChat }) {
+export function StickyVideoBox({ stickyVideo, onClose, onGoToChat }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -730,7 +729,7 @@ function StickyVideoBox({ stickyVideo, onClose, onGoToChat }) {
   }, '✕'))), document.body);
 }
 
-function PollVoterSheet({ calendar, pollId, optionId, onSelect, onClose }) {
+export function PollVoterSheet({ calendar, pollId, optionId, onSelect, onClose }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -776,7 +775,7 @@ function PollVoterSheet({ calendar, pollId, optionId, onSelect, onClose }) {
   }, "\u2713"))))));
 }
 
-function OperationProgressOverlay({ title, detail, pct }) {
+export function OperationProgressOverlay({ title, detail, pct }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -796,7 +795,7 @@ function OperationProgressOverlay({ title, detail, pct }) {
   ));
 }
 
-function ToggleSwitch({ checked, onChange, label }) {
+export function ToggleSwitch({ checked, onChange, label }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -821,7 +820,7 @@ function ToggleSwitch({ checked, onChange, label }) {
   }));
 }
 
-function Footer() {
+export function Footer() {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -843,6 +842,7 @@ function Footer() {
   );
 }
 
+  if (typeof window !== 'undefined') {
   window.GATHER_UI_COMPONENTS = Object.assign({}, window.GATHER_UI_COMPONENTS || {}, {
     ResizableModalContainer: ResizableModalContainer,
     AutoGrowTextarea: AutoGrowTextarea,
@@ -860,6 +860,6 @@ function Footer() {
     PollVoterSheet: PollVoterSheet,
     OperationProgressOverlay: OperationProgressOverlay,
     ToggleSwitch: ToggleSwitch,
-    Footer: Footer
+    Footer: Footer,
   });
-})();
+}
