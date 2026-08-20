@@ -2,8 +2,7 @@
  * Firebase data access helpers (P3-2).
  * Loaded before app-main.js. Runtime deps: window.GATHER_FIREBASE_DEPS
  */
-(function () {
-  function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
+function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
   function isValidCalId(calId) {
     return typeof calId === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(calId);
   }
@@ -283,7 +282,7 @@
     );
   }
 
-  window.GATHER_FIREBASE_SERVICES = Object.freeze({
+  export const GATHER_FIREBASE_SERVICES = Object.freeze({
     version: '0.3.1-p3-4',
     ready: true,
     isScaffold: false,
@@ -298,4 +297,7 @@
     subscribeMemos: subscribeMemos,
     subscribeAnniversaries: subscribeAnniversaries
   });
-})();
+
+if (typeof window !== 'undefined') {
+  window.GATHER_FIREBASE_SERVICES = GATHER_FIREBASE_SERVICES;
+}

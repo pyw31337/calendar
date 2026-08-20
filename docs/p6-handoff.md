@@ -78,3 +78,11 @@ zsh 에서 줄 시작 `#` 주석은 쓰지 말 것.
 - npm run build: 모듈 9개, dist JS ~29KB (이전 ~23KB)
 - 라이브 경로 유지. Pages 전환 아직 금지.
 - 다음: firebase-services
+
+## P6-7 진행 (2026-08-20)
+- src/core/firebase-services.js 를 ESM으로 전환 (assets/ 미변경)
+- src/main.jsx 가 firebase-services까지 import
+- npm run build: 모듈 10개, dist JS ~35KB (이전 ~29KB)
+- 라이브 경로 유지. Pages 전환 아직 금지.
+- core 데이터/유틸/알림/파이어베이스 연결 완료
+- 다음: UI 모듈 또는 app-main 브리지 (한 파일씩)
