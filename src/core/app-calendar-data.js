@@ -1,5 +1,4 @@
-(function () {
-  const KOREAN_LUNAR_HOLIDAY_DATES = Object.freeze({
+const KOREAN_LUNAR_HOLIDAY_DATES = Object.freeze({
     2021: Object.freeze({ seollal: '2021-02-12', chuseok: '2021-09-21', buddha: '2021-05-19' }),
     2022: Object.freeze({ seollal: '2022-02-01', chuseok: '2022-09-10', buddha: '2022-05-08' }),
     2023: Object.freeze({ seollal: '2023-01-22', chuseok: '2023-09-29', buddha: '2023-05-27' }),
@@ -45,11 +44,14 @@
 
   const MONTH_NAMES = Object.freeze(['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월']);
 
-  window.GATHER_APP_CALENDAR_DATA = Object.freeze({
+  export const GATHER_APP_CALENDAR_DATA = Object.freeze({
     KOREAN_LUNAR_HOLIDAY_DATES,
     KOREAN_TEMPORARY_HOLIDAYS,
     KOREAN_FIXED_HOLIDAYS,
     KOREAN_SOLAR_TERMS,
     MONTH_NAMES
   });
-})();
+
+if (typeof window !== 'undefined') {
+  window.GATHER_APP_CALENDAR_DATA = GATHER_APP_CALENDAR_DATA;
+}

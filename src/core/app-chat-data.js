@@ -1,5 +1,4 @@
-(function () {
-  const HEIC_TO_CDN_URLS = Object.freeze([
+const HEIC_TO_CDN_URLS = Object.freeze([
     'https://cdn.jsdelivr.net/npm/heic-to@1.5.2/dist/heic-to.js',
     'https://unpkg.com/heic-to@1.5.2/dist/heic-to.js'
   ]);
@@ -19,7 +18,7 @@
     Object.freeze({ label: '기호', emojis: Object.freeze(['✨', '💥', '💫', '💦', '💨', '🆗', '🆒', '🔔', '🚫', '❓', '❗', '➕', '➖']) })
   ]);
 
-  window.GATHER_APP_CHAT_DATA = Object.freeze({
+  export const GATHER_APP_CHAT_DATA = Object.freeze({
     PEEKALINK_FREE_HOURLY_LIMIT: 50,
     PEEKALINK_HOUR_BUCKET_MS: 3600000,
     HEIC_TO_CDN_URLS,
@@ -28,4 +27,7 @@
     EMOJI_CATEGORIES,
     RECENT_EMOJI_STORAGE_KEY: 'gather_recent_emojis_v1'
   });
-})();
+
+if (typeof window !== 'undefined') {
+  window.GATHER_APP_CHAT_DATA = GATHER_APP_CHAT_DATA;
+}

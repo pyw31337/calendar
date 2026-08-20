@@ -53,3 +53,14 @@ zsh 에서 줄 시작 `#` 주석은 쓰지 말 것.
 라이브 URL:
 - https://pyw31337.github.io/calendar/?id=kkot&view=places
 - https://pyw31337.github.io/calendar/?admin=1&id=cw
+
+## P6-4 진행 (2026-08-20)
+- src/core 데이터 모듈 4개를 ESM으로 전환 (assets/ 미변경)
+  - app-constants.js
+  - app-config.js
+  - app-calendar-data.js
+  - app-chat-data.js
+- src/main.jsx 가 위 4개를 import → Vite 번들에 실제 앱 JS 포함
+- npm run build: 모듈 7개, dist JS ~7.5KB (이전 스텁 0.78KB)
+- 라이브 index.html + assets/ 경로 유지. Pages 전환 아직 금지.
+- 다음: app-utils / app-notifications / firebase-services 를 한 파일씩 ESM 연결
