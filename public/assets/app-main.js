@@ -25395,7 +25395,7 @@ function SummaryList({
           width: '100%', marginTop: '4px', marginBottom: '6px', padding: '10px 0',
           border: 'none', borderRadius: '8px',
           backgroundColor: 'color-mix(in srgb, var(--bg-primary) 96%, black)',
-          color: '#059669', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer', textAlign: 'center'
+          color: 'var(--text-main)', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer', textAlign: 'center'
         }
       }, `더보기 (총 ${total}개 중 ${shown}개)`);
     })())))), anyBeforeConfirmed && isConfirmedVisible && /*#__PURE__*/React.createElement("div", {
@@ -25508,7 +25508,7 @@ function SummaryList({
           width: '100%', marginTop: '4px', marginBottom: '6px', padding: '10px 0',
           border: 'none', borderRadius: '8px',
           backgroundColor: 'color-mix(in srgb, var(--bg-primary) 96%, black)',
-          color: '#7C3AED', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer', textAlign: 'center'
+          color: 'var(--text-main)', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer', textAlign: 'center'
         }
       }, `더보기 (총 ${total}개 중 ${shown}개)`);
     })()))));
