@@ -326,3 +326,7 @@ zsh 에서 줄 시작 `#` 주석은 쓰지 말 것.
 - manualChunks: vendor-react / ui-admin / ui-views / app-main
 - 부트 로딩 문구 표시
 - main push 시 Deploy Vite Pages 자동 (수동 불필요)
+
+## P6-51 진행 (2026-08-20)
+- admin 전용 partial load 롤백 (의존성 누락 → $e is not a function)
+- 전체 UI 병렬 import 유지 + manualChunks/slim publicDir 유지
