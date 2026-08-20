@@ -3,7 +3,7 @@
 최종 갱신: 2026-08-20 (P4 UI 분리 완료)
 
 ## 1. 배포
-1. 로컬 검증: npm run check:all && npm run safety:test && npm run check:size-budget
+1. 로컬 검증: npm run predeploy   # check:all(size-budget·tab-wiring 포함) + safety
 2. main push → GitHub Pages + Verify Calendar
 3. 배포 후: npm run smoke:live
 

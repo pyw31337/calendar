@@ -87,6 +87,8 @@
 
 - Live smoke covers ui-* modules + markers ✅ 2026-08-20
 
+- check:all includes size-budget + tab-wiring; npm run predeploy ✅ 2026-08-20
+
 ### P6 Vite (별도 일정)
 - P6-0 준비 ✅ 2026-08-20 (docs/vite-migration.md) — Vite src/ 전환은 기능 동결 후 별도 스프린트
 

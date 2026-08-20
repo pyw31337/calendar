@@ -25,7 +25,8 @@
     "check:isolation": "node scripts/check-calendar-isolation.mjs",
     "check:share-urls": "node scripts/check-share-urls.mjs",
     "check:design-rules": "node scripts/check-design-rules.mjs",
-    "check:all": "npm run check:required-symbols && npm run check:asset-mirrors && npm run check:isolation && npm run check:share-urls && npm run check:design-rules"
+    "check:all": "npm run check:required-symbols && npm run check:asset-mirrors && npm run check:isolation && npm run check:share-urls && npm run check:design-rules && npm run check:size-budget && npm run check:tab-wiring",
+    "predeploy": "npm run check:all && npm run safety:test"
   },
   "dependencies": {
     "canvas-confetti": "^1.9.2",
