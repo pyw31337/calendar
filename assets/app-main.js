@@ -7470,13 +7470,22 @@ function App() {
   }, []);
 
   const handleChatScroll = (e) => {
-    // IMPORTANT: When the virtual keyboard is open, programmatic scrollTop changes triggered
-    // by the keyboard resize should NOT hide the header/input bar. Only user-initiated
-    // downward scrolling (when keyboard is closed) should hide the composer.
-    if (isKeyboardOpenRef.current) return;
+    // Keep composer while keyboard is open OR chat textarea is focused (typing).
+    const active = document.activeElement;
+    const chatInputFocused = !!(
+      active &&
+      (active.tagName === 'TEXTAREA' || active.tagName === 'INPUT') &&
+      active.closest &&
+      (active.closest('.chat-composer') || active.closest('.chat-room-container'))
+    );
     const scrollTop = e.target.scrollTop;
     if (scrollTop < 120 && hasMoreOlderChat && !loadingOlderChatRef.current) {
       loadOlderChatMessages();
+    }
+    if (isKeyboardOpenRef.current || chatInputFocused) {
+      setIsHeaderVisible(true);
+      lastScrollTopRef.current = scrollTop;
+      return;
     }
     const lastScrollTop = lastScrollTopRef.current;
     if (scrollTop < 10) {
@@ -12682,8 +12691,20 @@ function ChatRoomView({
     const onBlur = (e) => {
       const t = e.target;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA') && t.closest && t.closest('.chat-room-container')) {
-        setIsInputFocused(false);
-        setTimeout(updateViewport, 300);
+        const related = e.relatedTarget;
+        if (related && related.closest && related.closest('.chat-composer')) {
+          return;
+        }
+        setTimeout(() => {
+          const a = document.activeElement;
+          if (a && (a.tagName === 'TEXTAREA' || a.tagName === 'INPUT') && a.closest &&
+              (a.closest('.chat-composer') || a.closest('.chat-room-container'))) {
+            setIsInputFocused(true);
+            return;
+          }
+          setIsInputFocused(false);
+          setTimeout(updateViewport, 300);
+        }, 50);
       }
     };
 
@@ -13489,6 +13510,17 @@ function ChatRoomView({
         placeholder: "메시지를 입력하세요...",
         value: chatInput,
         maxLength: 5000,
+        onFocus: () => setIsInputFocused(true),
+        onBlur: () => {
+          setTimeout(() => {
+            const a = document.activeElement;
+            if (a && a.closest && a.closest('.chat-composer')) {
+              setIsInputFocused(true);
+              return;
+            }
+            setIsInputFocused(false);
+          }, 50);
+        },
         onChange: e => { setChatInput(e.target.value); autoGrowTextarea(e.target, 100); },
         onPaste: handlePasteImagesChat,
         onKeyDown: e => {
