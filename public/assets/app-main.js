@@ -7148,6 +7148,14 @@ function App() {
       if (msgCount != null) setTotalChatCount(msgCount);
       if (memoCount != null) setTotalMemoCount(memoCount);
       if (galCount != null) setTotalGalleryCount(galCount);
+      try {
+        const flagKey = `gather_b64_mig_v1_${activeCalId}`;
+        if (typeof localStorage !== 'undefined' && localStorage.getItem(flagKey) !== 'done') {
+          const result = await migrateBase64ChatImagesForCalendar(activeCalId, { maxMessages: 20 });
+          if (!cancelled && result && (result.failed || 0) === 0) localStorage.setItem(flagKey, 'done');
+          if (result && result.migrated > 0) console.info('base64→Storage migrated', activeCalId, result);
+        }
+      } catch (e) { console.warn('base64 migration skipped', e); }
     })();
     return () => { cancelled = true; };
   }, [activeCalId]);
@@ -11112,7 +11120,7 @@ function uploadChatImageAssets(calendarId, compressed, index, onBytes, timeoutMs
     ]).then(([imageUrl, thumbUrl]) => {
       if (imageUrl && thumbUrl) resolve({ imageUrl, thumbUrl });
       else {
-        console.warn('Chat image Storage upload failed, falling back to inline base64');
+        console.warn('Chat image Storage upload failed (no base64 fallback)');
         resolve(null);
       }
     });
@@ -11138,13 +11146,68 @@ async function uploadInlineChatImageToStorage(calendarId, imageUrl, thumbUrl, in
   }, `share_${index}`, onBytes, timeoutMs);
 }
 
+async function migrateBase64ChatImagesForCalendar(calId, { maxMessages = 40 } = {}) {
+  if (!calId || !firebaseDb || !firebaseStorage) return { migrated: 0, failed: 0, scanned: 0 };
+  const storageOk = await checkFirebaseStorageHealth();
+  if (!storageOk) return { migrated: 0, failed: 0, scanned: 0, reason: 'storage-unavailable' };
+  let migrated = 0, failed = 0, scanned = 0;
+  try {
+    const snap = await firebaseDb.collection('calendars').doc(`cal_${calId}`).collection('messages')
+      .orderBy('timestamp', 'asc').limit(200).get();
+    const docs = [];
+    snap.forEach(doc => docs.push({ id: doc.id, ...doc.data() }));
+    for (const msg of docs) {
+      if (migrated + failed >= maxMessages) break;
+      scanned += 1;
+      const urls = Array.isArray(msg.imageUrls) && msg.imageUrls.length ? msg.imageUrls : (msg.imageUrl ? [msg.imageUrl] : []);
+      const thumbs = Array.isArray(msg.thumbUrls) && msg.thumbUrls.length ? msg.thumbUrls : (msg.thumbUrl ? [msg.thumbUrl] : []);
+      if (!urls.some(u => typeof u === 'string' && u.startsWith('data:image'))) continue;
+      const newUrls = [], newThumbs = [];
+      let anyFail = false;
+      for (let i = 0; i < urls.length; i++) {
+        const u = urls[i], t = thumbs[i] || u;
+        if (typeof u === 'string' && u.startsWith('http')) {
+          newUrls.push(u);
+          newThumbs.push(typeof t === 'string' && t.startsWith('http') ? t : u);
+          continue;
+        }
+        if (typeof u !== 'string' || !u.startsWith('data:image')) { anyFail = true; break; }
+        try {
+          const uploaded = await uploadInlineChatImageToStorage(calId, u, t, i);
+          if (!uploaded || !uploaded.imageUrl) { anyFail = true; break; }
+          newUrls.push(uploaded.imageUrl);
+          newThumbs.push(uploaded.thumbUrl || uploaded.imageUrl);
+        } catch (e) {
+          console.warn('migrate image failed', msg.id, e);
+          anyFail = true; break;
+        }
+      }
+      if (anyFail || !newUrls.length) { failed += 1; continue; }
+      try {
+        await firebaseDb.collection('calendars').doc(`cal_${calId}`).collection('messages').doc(msg.id).update({
+          imageUrl: newUrls[0] || '', thumbUrl: newThumbs[0] || '', imageUrls: newUrls, thumbUrls: newThumbs
+        });
+        migrated += 1;
+      } catch (e) {
+        console.warn('migrate update failed', msg.id, e);
+        failed += 1;
+      }
+    }
+  } catch (e) {
+    console.warn('migrateBase64ChatImagesForCalendar', e);
+    return { migrated, failed, scanned, reason: String(e && e.message || e) };
+  }
+  return { migrated, failed, scanned };
+}
+
+
 // Resolves the {imageUrl, thumbUrl} pair a message/memo should store: uploaded Storage
 // download URLs when possible, the original compressed base64 data URLs otherwise. uploadFn
 // is uploadChatImageAssets or uploadMemoImageAssets, keeping each feature's Storage path.
 async function resolveImageUrls(calendarId, compressed, index, onBytes, uploadFn) {
   const uploaded = await uploadFn(calendarId, compressed, index, onBytes);
   if (uploaded) return uploaded;
-  return { imageUrl: compressed.original, thumbUrl: compressed.thumbnail };
+  throw new Error('이미지 업로드에 실패했습니다. 네트워크 상태를 확인한 뒤 다시 시도해 주세요.');
 }
 
 // Resolves a whole batch of images (upload + fallback per image, same as resolveImageUrls)
@@ -11157,13 +11220,14 @@ async function resolveImageBatch(calendarId, compressedList, onProgress, uploadF
     .filter(({ c }) => !c.isExisting);
 
   const isStorageWorking = await checkFirebaseStorageHealth();
-  if (uploadIndexes.length === 0 || !firebaseStorage || !isStorageWorking) {
+  if (uploadIndexes.length === 0) {
     if (onProgress) onProgress({ pct: 100, remainingSec: 0, current: compressedList.length, total: compressedList.length });
-    return Promise.all(compressedList.map((c, idx) =>
-      c.isExisting
-        ? Promise.resolve({ imageUrl: c.original, thumbUrl: c.thumbnail })
-        : Promise.resolve({ imageUrl: c.original, thumbUrl: c.thumbnail })
+    return Promise.all(compressedList.map((c) =>
+      Promise.resolve({ imageUrl: c.original, thumbUrl: c.thumbnail })
     ));
+  }
+  if (!firebaseStorage || !isStorageWorking) {
+    throw new Error('이미지 저장소를 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.');
   }
 
   // Progress split: compression = 0~45%, upload = 45~99%
