@@ -64,3 +64,10 @@ zsh 에서 줄 시작 `#` 주석은 쓰지 말 것.
 - npm run build: 모듈 7개, dist JS ~7.5KB (이전 스텁 0.78KB)
 - 라이브 index.html + assets/ 경로 유지. Pages 전환 아직 금지.
 - 다음: app-utils / app-notifications / firebase-services 를 한 파일씩 ESM 연결
+
+## P6-5 진행 (2026-08-20)
+- src/core/app-utils.js 를 ESM으로 전환 (assets/ 미변경)
+- src/main.jsx 가 utils까지 import
+- npm run build: 모듈 8개, dist JS ~23KB (이전 ~7.5KB)
+- 라이브 경로 유지. Pages 전환 아직 금지.
+- 다음: app-notifications → firebase-services 한 파일씩

@@ -1,5 +1,4 @@
-(function () {
-  const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
+const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
 
   function getContrastTextColor(hexColor) {
     if (!hexColor) return '#FFFFFF';
@@ -637,7 +636,7 @@
     return m + '/' + d + ' (' + dayNames[date.getDay()] + ') ' + hh + ':' + mm;
   }
 
-  window.GATHER_APP_UTILS = Object.freeze({
+  export const GATHER_APP_UTILS = Object.freeze({
     getContrastTextColor,
     formatDateWithDayName,
     formatShortDateWithDayName,
@@ -719,4 +718,7 @@
     formatPollDeadline,
     getMemoItemShareUrl
   });
-})();
+
+if (typeof window !== 'undefined') {
+  window.GATHER_APP_UTILS = GATHER_APP_UTILS;
+}
