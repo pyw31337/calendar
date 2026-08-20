@@ -24,3 +24,6 @@
 
 - 3단계 완료: 뷰 분기(chat/memo/places/gallery/settlement/admin) 주석 표시
 - 다음: 실제 파일 분리는 별도 브랜치에서 아주 작은 단위로만 진행
+
+- 4단계 시작: src/core/admin-routes.js 에 어드민 라우트 함수 복사 (원본 유지)
+- 라이브 assets/app-main.js 는 아직 원본을 사용

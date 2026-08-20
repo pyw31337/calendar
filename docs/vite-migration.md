@@ -67,3 +67,7 @@ P4 완료 후 기능 동결. P6 Vite 작업만 진행.
 - src/core/app-main.js 에 chat/memo/places/gallery/settlement/admin 주석 추가
 - 라이브 assets/ 미변경
 - p6-2-view-markers → main 머지
+
+### P6-2 첫 파일 복사 (2026-08-20)
+- src/core/admin-routes.js 추가 (원본 함수는 app-main에 유지)
+- p6-2-copy-admin-routes → main 머지
