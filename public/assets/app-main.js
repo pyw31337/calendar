@@ -8828,10 +8828,10 @@ function App() {
   }
 
   const mainMenuPollCount = getCalendarPolls(activeCal).filter(poll => !isPollClosed(poll)).length;
-  const mainMenuChatCount = totalChatCount > 0 ? totalChatCount : allChatMessages.length;
+  const mainMenuChatCount = (typeof totalChatCount === 'number' && totalChatCount >= allChatMessages.length) ? totalChatCount : allChatMessages.length;
   const mainMenuChatLatestTimestamp = allChatMessages.length > 0 ? allChatMessages[allChatMessages.length - 1].timestamp : 0;
   const mainMenuChatHasUnread = mainMenuChatLatestTimestamp > getChatLastReadTimestamp(activeCalId);
-  const mainMenuMemoCount = totalMemoCount > 0 ? totalMemoCount : (memos || []).length;
+  const mainMenuMemoCount = (typeof totalMemoCount === 'number' && totalMemoCount >= (memos || []).length) ? totalMemoCount : (memos || []).length;
 
   // Each confirmed meeting gets its own banner bubble on the calendar, and stays up through
   // the day of the meeting itself -- only today-or-future confirmations show.
@@ -9106,6 +9106,7 @@ function App() {
   }), /*#__PURE__*/React.createElement(PhotoGallery, {
     chatMessages: allChatMessages,
     totalGalleryCount: totalGalleryCount,
+    onViewAll: () => changeView('gallery'),
     showToast: showToast,
     onPromoteImageUrl: handlePromoteInlineChatImage,
     onSaveImageTags: handleSaveImageTags,
@@ -12302,9 +12303,9 @@ function CommentsSection({
   // Total chat count + read/unread badge, tracked locally per calendar (no server-side
   // read state). chatMessages holds the most recent up to 100 messages, so its length is
   // an accurate total as long as a calendar hasn't exceeded that many messages ever sent.
-  const totalChatCount = (typeof totalChatCountProp === 'number' && totalChatCountProp > 0)
+  const totalChatCount = (typeof totalChatCountProp === 'number' && totalChatCountProp >= chatMessages.length)
     ? totalChatCountProp
-    : chatMessages.length;
+    : Math.max(chatMessages.length, typeof totalChatCountProp === 'number' ? totalChatCountProp : 0);
   const latestChatTimestamp = chatMessages.length > 0 ? chatMessages[chatMessages.length - 1].timestamp : 0;
   const [lastReadTimestamp, setLastReadTimestamp] = React.useState(() => getChatLastReadTimestamp(calendar.id));
   React.useEffect(() => {
@@ -26888,9 +26889,9 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
   );
 }
 
-function PhotoGallery({ chatMessages, totalGalleryCount, showToast, onPromoteImageUrl, onSaveImageTags, onSearchTag }) {
-  const [collapsed, setCollapsed] = React.useState(true); // Closed initially by default
-  const [lightbox, setLightbox] = React.useState(null); // { urls: string[], index: number } | null
+function PhotoGallery({ chatMessages, totalGalleryCount, onViewAll, showToast, onPromoteImageUrl, onSaveImageTags, onSearchTag }) {
+  const [collapsed, setCollapsed] = React.useState(false);
+  const [lightbox, setLightbox] = React.useState(null);
 
   const photoEntries = React.useMemo(() => {
     const sorted = [...(chatMessages || [])].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
@@ -26898,56 +26899,82 @@ function PhotoGallery({ chatMessages, totalGalleryCount, showToast, onPromoteIma
       const directEntry = getMessageDirectMediaEntry(msg);
       const entries = directEntry ? [...getMessageImageEntries(msg), directEntry] : getMessageImageEntries(msg);
       return entries.map((entry, i) => ({
-      ...entry,
-      key: `${msg.id}_${entry.directMediaUrl ? 'direct' : i}`,
-      timestamp: msg.timestamp
-    }));
+        ...entry,
+        key: `${msg.id}_${entry.directMediaUrl ? 'direct' : i}`,
+        timestamp: msg.timestamp
+      }));
     });
   }, [chatMessages]);
 
-  if (photoEntries.length === 0) return null;
+  const badgeCount = (typeof totalGalleryCount === 'number' && totalGalleryCount > 0)
+    ? totalGalleryCount
+    : photoEntries.length;
+  const displayedEntries = photoEntries.slice(0, 12);
+  const openGalleryPage = () => { if (typeof onViewAll === 'function') onViewAll(); };
 
-  // Show only recent 12 images when collapsed, and all images when expanded
-  const displayedEntries = collapsed ? photoEntries.slice(0, 12) : photoEntries;
+  if (photoEntries.length === 0 && !(typeof totalGalleryCount === 'number' && totalGalleryCount > 0)) return null;
 
   return /*#__PURE__*/React.createElement("section", { className: "summary-card" },
     /*#__PURE__*/React.createElement("div", {
-      className: `summary-title is-toggleable${collapsed ? ' is-collapsed' : ''}`,
-      role: "button",
-      tabIndex: 0,
-      "aria-expanded": !collapsed,
-      onClick: () => setCollapsed(prev => !prev),
-      onKeyDown: event => {
-        if (event.key !== 'Enter' && event.key !== ' ') return;
-        event.preventDefault();
-        setCollapsed(prev => !prev);
-      }
+      className: `summary-title${collapsed ? ' is-collapsed' : ''}`,
+      style: { display: 'flex', alignItems: 'center', gap: '6px', width: '100%' }
     },
-      /*#__PURE__*/React.createElement(GalleryIcon, null),
-      "갤러리 ",
-      /*#__PURE__*/React.createElement(SectionCountBadge, { count: (typeof totalGalleryCount === 'number' && totalGalleryCount > photoEntries.length) ? totalGalleryCount : photoEntries.length }),
+      /*#__PURE__*/React.createElement("div", {
+        style: { display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0 }
+      },
+        /*#__PURE__*/React.createElement(GalleryIcon, null),
+        /*#__PURE__*/React.createElement("span", null, "갤러리"),
+        badgeCount > 0 && /*#__PURE__*/React.createElement(SectionCountBadge, { count: badgeCount })
+      ),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: e => { e.stopPropagation(); openGalleryPage(); },
+        style: {
+          border: 'none', background: 'transparent', cursor: 'pointer',
+          color: '#3B82F6', fontSize: '0.82rem', fontWeight: 700, padding: '4px 6px', flexShrink: 0
+        }
+      }, "전체보기"),
       /*#__PURE__*/React.createElement(SectionToggleButton, {
         collapsed,
         onToggle: () => setCollapsed(prev => !prev),
         label: collapsed ? '갤러리 펼치기' : '갤러리 접기'
       })
     ),
-    /*#__PURE__*/React.createElement("div", {
-      style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(80px, 100%), 1fr))', gap: '6px', marginTop: '12px' }
-    },
-      displayedEntries.map((entry, idx) => /*#__PURE__*/React.createElement("img", {
-        key: entry.key,
-        src: entry.thumb,
-        alt: "채팅에 첨부된 사진",
-        loading: "lazy",
-        referrerPolicy: 'no-referrer',
-        onClick: () => setLightbox({
-          urls: photoEntries.map(e => e.full),
-          meta: photoEntries.map(e => ({ timestamp: e.timestamp, messageId: e.messageId, imageIndex: e.imageIndex, thumb: e.thumb, tags: e.tags, directMediaUrl: e.directMediaUrl })),
-          index: idx
-        }),
-        style: { width: '100%', aspectRatio: '1 / 1', objectFit: 'cover', borderRadius: 'var(--radius-sm)', cursor: 'pointer' }
-      }))
+    !collapsed && displayedEntries.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null,
+      /*#__PURE__*/React.createElement("div", {
+        style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(80px, 100%), 1fr))', gap: '6px', marginTop: '12px' }
+      },
+        displayedEntries.map((entry, idx) => /*#__PURE__*/React.createElement("img", {
+          key: entry.key,
+          src: entry.thumb,
+          alt: "채팅에 첨부된 사진",
+          loading: "lazy",
+          referrerPolicy: 'no-referrer',
+          onClick: () => setLightbox({
+            urls: displayedEntries.map(e => e.full),
+            meta: displayedEntries.map(e => ({ timestamp: e.timestamp, messageId: e.messageId, imageIndex: e.imageIndex, thumb: e.thumb, tags: e.tags, directMediaUrl: e.directMediaUrl })),
+            index: idx
+          }),
+          style: { width: '100%', aspectRatio: '1 / 1', objectFit: 'cover', borderRadius: 'var(--radius-sm)', cursor: 'pointer' }
+        }))
+      ),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: openGalleryPage,
+        style: {
+          width: '100%',
+          backgroundColor: 'color-mix(in srgb, var(--bg-primary) 96%, black)',
+          border: 'none',
+          borderRadius: '8px',
+          padding: '8px 0',
+          marginTop: '10px',
+          fontSize: '0.85rem',
+          fontWeight: 'bold',
+          color: 'var(--text-main)',
+          cursor: 'pointer',
+          textAlign: 'center'
+        }
+      }, "갤러리 더보기")
     ),
     lightbox && /*#__PURE__*/React.createElement(Lightbox, {
       urls: lightbox.urls,
