@@ -26262,25 +26262,24 @@ function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, onDelete,
 // does, since the map itself is the content). "전체보기" sits immediately before the fold arrow,
 // both wrapped in one group pushed to the header's right edge.
 function PlacesSection({ calendar, onViewAll }) {
-  const [collapsed, setCollapsed] = React.useState(true);
+  // Expanded by default (4:3 map). Fold arrow collapses to title row only.
+  const [collapsed, setCollapsed] = React.useState(false);
   const places = getCalendarPlaces(calendar);
 
   return /*#__PURE__*/React.createElement("section", { className: "summary-card" },
     /*#__PURE__*/React.createElement("div", {
-      className: "summary-title",
-      style: { display: 'flex', alignItems: 'center' }
+      className: `summary-title${collapsed ? ' is-collapsed' : ''}`,
+      style: { display: 'flex', alignItems: 'center', gap: '6px', width: '100%' }
     },
-      /*#__PURE__*/React.createElement(PlaceSectionIcon, null),
-      "장소 ",
-      /*#__PURE__*/React.createElement(SectionCountBadge, { count: places.length }),
       /*#__PURE__*/React.createElement("div", {
-        // SectionToggleButton's own CSS also carries margin-left:auto (fine when it's the only
-        // trailing control, as in every other section) -- pairing it directly with another
-        // auto-margin button here would split the row's free space between the two instead of
-        // pushing them both flush to the right edge as one group. Wrapping them together and
-        // putting the single auto-margin on the wrapper keeps "전체보기" immediately left of the
-        // fold arrow, both hugging the right edge.
-        style: { marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '2px' }
+        style: { display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0 }
+      },
+        /*#__PURE__*/React.createElement(PlaceSectionIcon, null),
+        /*#__PURE__*/React.createElement("span", null, "장소"),
+        places.length > 0 && /*#__PURE__*/React.createElement(SectionCountBadge, { count: places.length })
+      ),
+      /*#__PURE__*/React.createElement("div", {
+        style: { marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '2px', flexShrink: 0 }
       },
         /*#__PURE__*/React.createElement("button", {
           type: "button",
@@ -26294,12 +26293,11 @@ function PlacesSection({ calendar, onViewAll }) {
         })
       )
     ),
-    /* Map frame: relative so "장소 더보기" sits on the bottom edge */
-    /*#__PURE__*/React.createElement("div", {
+    !collapsed && /*#__PURE__*/React.createElement("div", {
       style: {
         position: 'relative',
         width: '100%',
-        aspectRatio: collapsed ? '16 / 9' : '4 / 3',
+        aspectRatio: '4 / 3',
         borderRadius: 'var(--radius-sm)',
         overflow: 'hidden',
         marginTop: '12px'
