@@ -37,3 +37,9 @@
 
 ## 기능 동결 선언 (2026-08-20)
 P4 완료 후 기능 동결. P6 Vite 작업만 진행.
+
+### P6-1 완료 (2026-08-20)
+- assets → src/core + src/ui 복사 완료
+- src/main.jsx 스텁 생성
+- 라이브(index.html + assets/) 동작 동일 유지
+- 다음: P6-2 (App 분리 + dynamic import) 준비
