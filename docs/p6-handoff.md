@@ -278,3 +278,6 @@ zsh 에서 줄 시작 `#` 주석은 쓰지 말 것.
 
 ## P6-40 진행 (2026-08-20)
 - app-notifications ESM: getActiveParticipants → GATHER_APP_UTILS 브리지
+
+## P6-41 진행 (2026-08-20)
+- getContrastTextColor / isPollClosed / formatCommentDate 포함 utils 40개 ESM 심 추가
