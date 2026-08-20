@@ -227,21 +227,12 @@ function MainSideMenu({
         )
       )
     ),
-    /*#__PURE__*/React.createElement(SharedSideMenuSettings, {
-      isDarkTheme: isDarkTheme,
-      onToggleTheme: onToggleTheme,
-      fontScalePercent: fontScalePercent,
-      onDecreaseFont: onDecreaseFont,
-      onIncreaseFont: onIncreaseFont,
-      isChatNotifyEnabled: isChatNotifyEnabled,
-      onToggleChatNotifications: onToggleChatNotifications
-    }),
-    /* Gallery + Places — divider under 채팅알림 */
+    /* Gallery + Places after 기념일/공유 group */
     /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-list", style: { borderTop: '1px solid #E2E8F0', borderBottom: 'none', paddingTop: '8px' } },
       /*#__PURE__*/React.createElement("button", {
         type: "button",
         className: "admin-side-menu-item",
-        onClick: () => { onClose && onClose(); if (onChangeView) onChangeView('gallery'); else handle(onOpenGallery); }
+        onClick: () => { onClose && onClose(); if (onChangeView) onChangeView('gallery'); }
       },
         /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", {
           xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2"
@@ -265,7 +256,19 @@ function MainSideMenu({
         )
       )
     ),
-    /* Admin alone at bottom */
+    /* Theme / font / chat notify */
+    /*#__PURE__*/React.createElement("div", { style: { borderTop: '1px solid #E2E8F0', borderBottom: 'none', paddingTop: '4px' } },
+      /*#__PURE__*/React.createElement(SharedSideMenuSettings, {
+        isDarkTheme: isDarkTheme,
+        onToggleTheme: onToggleTheme,
+        fontScalePercent: fontScalePercent,
+        onDecreaseFont: onDecreaseFont,
+        onIncreaseFont: onIncreaseFont,
+        isChatNotifyEnabled: isChatNotifyEnabled,
+        onToggleChatNotifications: onToggleChatNotifications
+      })
+    ),
+        /* Admin alone at bottom */
     /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-list", style: { marginTop: 'auto', borderTop: '1px solid #E2E8F0', borderBottom: 'none' } },
       /*#__PURE__*/React.createElement("button", {
         type: "button",
