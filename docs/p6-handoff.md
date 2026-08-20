@@ -308,3 +308,7 @@ zsh 에서 줄 시작 `#` 주석은 쓰지 말 것.
 ## P6-47 진행 (2026-08-20)
 - getStoredChatParticipantId: UI 심 + app-main 호출을 window.GATHER_APP_NOTIFICATIONS로
 - firebaseDb: window.__gatherFirebaseDb + UI __fb() 브리지 (admin/memo)
+
+## P6-48 진행 (2026-08-20)
+- memo 정상 확인
+- admin: PEEKALINK_HOUR_BUCKET_MS 등 상수 ESM 심 추가
