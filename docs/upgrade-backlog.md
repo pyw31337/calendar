@@ -78,6 +78,9 @@
 - 갤러리: 페이지에서 Lightbox 렌더
 - 채팅: 입력 초안 있을 때 스크롤해도 composer 유지
 
+- Icons ✅ 2026-08-20 (assets/ui-icons.js)
+- Size budget tracks assets/app-main.js ✅ 2026-08-20
+
 ### P6 Vite (별도 일정)
 - P6-0 준비 ✅ 2026-08-20 (docs/vite-migration.md) — Vite src/ 전환은 기능 동결 후 별도 스프린트
 

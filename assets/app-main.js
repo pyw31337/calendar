@@ -8056,62 +8056,181 @@ function deleteAllChatImagesFromStorage(msg) {
 
 // Small line-icon for the main header's menu bar (Tabler-style outline icons, matching the
 // existing icon set used elsewhere in the header/popovers).
-function MenuIcon({ paths }) {
-  return /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg",
-    width: "16",
-    height: "16",
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    strokeWidth: "2",
-    strokeLinecap: "round",
-    strokeLinejoin: "round",
-    style: { flexShrink: 0 }
-  }, paths.map((d, i) => /*#__PURE__*/React.createElement("path", { key: i, d })));
-}
+const MenuIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MenuIcon)
+  ? window.GATHER_UI_COMPONENTS.MenuIcon
+  : function MenuIconFallback() { return null; };
+const NotepadTextIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.NotepadTextIcon)
+  ? window.GATHER_UI_COMPONENTS.NotepadTextIcon
+  : function NotepadTextIconFallback() { return null; };
+const ChatSectionIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ChatSectionIcon)
+  ? window.GATHER_UI_COMPONENTS.ChatSectionIcon
+  : function ChatSectionIconFallback() { return null; };
+const LinkIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LinkIcon)
+  ? window.GATHER_UI_COMPONENTS.LinkIcon
+  : function LinkIconFallback() { return null; };
+const MessageCommentIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MessageCommentIcon)
+  ? window.GATHER_UI_COMPONENTS.MessageCommentIcon
+  : function MessageCommentIconFallback() { return null; };
+const PencilIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PencilIcon)
+  ? window.GATHER_UI_COMPONENTS.PencilIcon
+  : function PencilIconFallback() { return null; };
+const BuildingIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.BuildingIcon)
+  ? window.GATHER_UI_COMPONENTS.BuildingIcon
+  : function BuildingIconFallback() { return null; };
+const BackArrowIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.BackArrowIcon)
+  ? window.GATHER_UI_COMPONENTS.BackArrowIcon
+  : function BackArrowIconFallback() { return null; };
+const SunIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SunIcon)
+  ? window.GATHER_UI_COMPONENTS.SunIcon
+  : function SunIconFallback() { return null; };
+const CloudIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CloudIcon)
+  ? window.GATHER_UI_COMPONENTS.CloudIcon
+  : function CloudIconFallback() { return null; };
+const MistIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MistIcon)
+  ? window.GATHER_UI_COMPONENTS.MistIcon
+  : function MistIconFallback() { return null; };
+const CloudRainIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CloudRainIcon)
+  ? window.GATHER_UI_COMPONENTS.CloudRainIcon
+  : function CloudRainIconFallback() { return null; };
+const SnowflakeIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SnowflakeIcon)
+  ? window.GATHER_UI_COMPONENTS.SnowflakeIcon
+  : function SnowflakeIconFallback() { return null; };
+const CloudLightningIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CloudLightningIcon)
+  ? window.GATHER_UI_COMPONENTS.CloudLightningIcon
+  : function CloudLightningIconFallback() { return null; };
+const SettingsIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SettingsIcon)
+  ? window.GATHER_UI_COMPONENTS.SettingsIcon
+  : function SettingsIconFallback() { return null; };
+const MapCogIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MapCogIcon)
+  ? window.GATHER_UI_COMPONENTS.MapCogIcon
+  : function MapCogIconFallback() { return null; };
+const GiftIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.GiftIcon)
+  ? window.GATHER_UI_COMPONENTS.GiftIcon
+  : function GiftIconFallback() { return null; };
+const MoonStarsIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MoonStarsIcon)
+  ? window.GATHER_UI_COMPONENTS.MoonStarsIcon
+  : function MoonStarsIconFallback() { return null; };
+const TextResizeIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.TextResizeIcon)
+  ? window.GATHER_UI_COMPONENTS.TextResizeIcon
+  : function TextResizeIconFallback() { return null; };
+const BellIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.BellIcon)
+  ? window.GATHER_UI_COMPONENTS.BellIcon
+  : function BellIconFallback() { return null; };
+const SearchIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SearchIcon)
+  ? window.GATHER_UI_COMPONENTS.SearchIcon
+  : function SearchIconFallback() { return null; };
+const CalendarCheckIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CalendarCheckIcon)
+  ? window.GATHER_UI_COMPONENTS.CalendarCheckIcon
+  : function CalendarCheckIconFallback() { return null; };
+const LockIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LockIcon)
+  ? window.GATHER_UI_COMPONENTS.LockIcon
+  : function LockIconFallback() { return null; };
+const LogoutIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LogoutIcon)
+  ? window.GATHER_UI_COMPONENTS.LogoutIcon
+  : function LogoutIconFallback() { return null; };
+const RefreshIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.RefreshIcon)
+  ? window.GATHER_UI_COMPONENTS.RefreshIcon
+  : function RefreshIconFallback() { return null; };
+const AdminFilledMenuIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AdminFilledMenuIcon)
+  ? window.GATHER_UI_COMPONENTS.AdminFilledMenuIcon
+  : function AdminFilledMenuIconFallback() { return null; };
+const EmojiPickerIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.EmojiPickerIcon)
+  ? window.GATHER_UI_COMPONENTS.EmojiPickerIcon
+  : function EmojiPickerIconFallback() { return null; };
+const ExternalLinkIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ExternalLinkIcon)
+  ? window.GATHER_UI_COMPONENTS.ExternalLinkIcon
+  : function ExternalLinkIconFallback() { return null; };
+const ShareIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ShareIcon)
+  ? window.GATHER_UI_COMPONENTS.ShareIcon
+  : function ShareIconFallback() { return null; };
+const WalletIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.WalletIcon)
+  ? window.GATHER_UI_COMPONENTS.WalletIcon
+  : function WalletIconFallback() { return null; };
+const CoinIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CoinIcon)
+  ? window.GATHER_UI_COMPONENTS.CoinIcon
+  : function CoinIconFallback() { return null; };
+const BanknoteArrowUpIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.BanknoteArrowUpIcon)
+  ? window.GATHER_UI_COMPONENTS.BanknoteArrowUpIcon
+  : function BanknoteArrowUpIconFallback() { return null; };
+const BanknoteArrowDownIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.BanknoteArrowDownIcon)
+  ? window.GATHER_UI_COMPONENTS.BanknoteArrowDownIcon
+  : function BanknoteArrowDownIconFallback() { return null; };
+const PiggyBankIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PiggyBankIcon)
+  ? window.GATHER_UI_COMPONENTS.PiggyBankIcon
+  : function PiggyBankIconFallback() { return null; };
+const ChartBarIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ChartBarIcon)
+  ? window.GATHER_UI_COMPONENTS.ChartBarIcon
+  : function ChartBarIconFallback() { return null; };
+const ChartPieIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ChartPieIcon)
+  ? window.GATHER_UI_COMPONENTS.ChartPieIcon
+  : function ChartPieIconFallback() { return null; };
+const CalendarCogIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CalendarCogIcon)
+  ? window.GATHER_UI_COMPONENTS.CalendarCogIcon
+  : function CalendarCogIconFallback() { return null; };
+const CalendarSearchIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CalendarSearchIcon)
+  ? window.GATHER_UI_COMPONENTS.CalendarSearchIcon
+  : function CalendarSearchIconFallback() { return null; };
+const TrophyIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.TrophyIcon)
+  ? window.GATHER_UI_COMPONENTS.TrophyIcon
+  : function TrophyIconFallback() { return null; };
+const PodiumIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PodiumIcon)
+  ? window.GATHER_UI_COMPONENTS.PodiumIcon
+  : function PodiumIconFallback() { return null; };
+const CloudDataConnectionIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CloudDataConnectionIcon)
+  ? window.GATHER_UI_COMPONENTS.CloudDataConnectionIcon
+  : function CloudDataConnectionIconFallback() { return null; };
+const LogIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LogIcon)
+  ? window.GATHER_UI_COMPONENTS.LogIcon
+  : function LogIconFallback() { return null; };
+const HourglassIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.HourglassIcon)
+  ? window.GATHER_UI_COMPONENTS.HourglassIcon
+  : function HourglassIconFallback() { return null; };
+const AlertTriangleIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AlertTriangleIcon)
+  ? window.GATHER_UI_COMPONENTS.AlertTriangleIcon
+  : function AlertTriangleIconFallback() { return null; };
+const ShieldCheckIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ShieldCheckIcon)
+  ? window.GATHER_UI_COMPONENTS.ShieldCheckIcon
+  : function ShieldCheckIconFallback() { return null; };
+const CalendarExportIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CalendarExportIcon)
+  ? window.GATHER_UI_COMPONENTS.CalendarExportIcon
+  : function CalendarExportIconFallback() { return null; };
+const GalleryIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.GalleryIcon)
+  ? window.GATHER_UI_COMPONENTS.GalleryIcon
+  : function GalleryIconFallback() { return null; };
+const PollSectionIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PollSectionIcon)
+  ? window.GATHER_UI_COMPONENTS.PollSectionIcon
+  : function PollSectionIconFallback() { return null; };
+const LineHeightIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LineHeightIcon)
+  ? window.GATHER_UI_COMPONENTS.LineHeightIcon
+  : function LineHeightIconFallback() { return null; };
+const MegaphoneIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MegaphoneIcon)
+  ? window.GATHER_UI_COMPONENTS.MegaphoneIcon
+  : function MegaphoneIconFallback() { return null; };
+const SmallXIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SmallXIcon)
+  ? window.GATHER_UI_COMPONENTS.SmallXIcon
+  : function SmallXIconFallback() { return null; };
+const PlaceSectionIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PlaceSectionIcon)
+  ? window.GATHER_UI_COMPONENTS.PlaceSectionIcon
+  : function PlaceSectionIconFallback() { return null; };
+const ThreeLinesIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ThreeLinesIcon)
+  ? window.GATHER_UI_COMPONENTS.ThreeLinesIcon
+  : function ThreeLinesIconFallback() { return null; };
+const PlaceCategoryMarkerIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PlaceCategoryMarkerIcon)
+  ? window.GATHER_UI_COMPONENTS.PlaceCategoryMarkerIcon
+  : function PlaceCategoryMarkerIconFallback() { return null; };
+const CctvIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CctvIcon)
+  ? window.GATHER_UI_COMPONENTS.CctvIcon
+  : function CctvIconFallback() { return null; };
+const DicesIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.DicesIcon)
+  ? window.GATHER_UI_COMPONENTS.DicesIcon
+  : function DicesIconFallback() { return null; };
+
 
 // Matches MenuIcon's exact svg wrapper (16x16, stroke 2, round caps) but needs a <rect> child
 // alongside its <path>s, which MenuIcon's paths-only prop can't express.
-function NotepadTextIcon() {
-  return /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg",
-    width: "16",
-    height: "16",
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    strokeWidth: "2",
-    strokeLinecap: "round",
-    strokeLinejoin: "round",
-    style: { flexShrink: 0 }
-  },
-    /*#__PURE__*/React.createElement("path", { d: "M8 2v4" }),
-    /*#__PURE__*/React.createElement("path", { d: "M12 2v4" }),
-    /*#__PURE__*/React.createElement("path", { d: "M16 2v4" }),
-    /*#__PURE__*/React.createElement("rect", { width: "16", height: "18", x: "4", y: "4", rx: "2" }),
-    /*#__PURE__*/React.createElement("path", { d: "M8 10h6" }),
-    /*#__PURE__*/React.createElement("path", { d: "M8 14h8" }),
-    /*#__PURE__*/React.createElement("path", { d: "M8 18h5" })
-  );
-}
 
-function ChatSectionIcon() {
-  return /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg",
-    width: "20",
-    height: "20",
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    strokeWidth: "2.5",
-    strokeLinecap: "round",
-    strokeLinejoin: "round",
-    style: { marginRight: '6px' }
-  }, /*#__PURE__*/React.createElement("path", {
-    d: "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"
-  }));
-}
+
+
 
 function highlightTextWithYellowMarker(text, keyword) {
   if (!text) return '';
@@ -8365,23 +8484,7 @@ function buildLightboxImageInfo(url, timestamp) {
   };
 }
 
-function LinkIcon({ size = 16 }) {
-  return /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg",
-    width: String(size),
-    height: String(size),
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    strokeWidth: "2",
-    strokeLinecap: "round",
-    strokeLinejoin: "round",
-    className: "icon icon-tabler icons-tabler-outline icon-tabler-link"
-  }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }),
-    /*#__PURE__*/React.createElement("path", { d: "M9 15l6 -6" }),
-    /*#__PURE__*/React.createElement("path", { d: "M11 6l.463 -.536a5 5 0 0 1 7.071 7.072l-.534 .464" }),
-    /*#__PURE__*/React.createElement("path", { d: "M13 18l-.397 .534a5.068 5.068 0 0 1 -7.127 0a4.972 4.972 0 0 1 0 -7.071l.524 -.463" }));
-}
+
 
 // Black-gradient info panel shown at the bottom of the active photo when the Lightbox's
 // tap-to-toggle info mode is on. Fixed 4-line layout: 업로드 date, 파일정보 (format/size/
@@ -8531,30 +8634,11 @@ function ParticipantPickerButton({ participant, onClick }) {
 }
 
 // Speech-bubble "comment" icon (Lucide message), used by the memo comment toggle button.
-function MessageCommentIcon({ size = 24 } = {}) {
-  return /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg", width: String(size), height: String(size), viewBox: "0 0 24 24",
-    fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
-  },
-    /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }),
-    /*#__PURE__*/React.createElement("path", { d: "M8 9h8" }),
-    /*#__PURE__*/React.createElement("path", { d: "M8 13h6" }),
-    /*#__PURE__*/React.createElement("path", { d: "M18 4a3 3 0 0 1 3 3v8a3 3 0 0 1 -3 3h-5l-5 3v-3h-2a3 3 0 0 1 -3 -3v-8a3 3 0 0 1 3 -3h12" })
-  );
-}
+
 
 // Pencil "edit" icon, matching the exact glyph the chat message action row already uses --
 // shared here so the memo comment feature's edit button looks identical rather than a copy.
-function PencilIcon({ size = 12 } = {}) {
-  return /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg", width: String(size), height: String(size), viewBox: "0 0 24 24",
-    fill: "none", stroke: "currentColor", strokeWidth: "2.5", strokeLinecap: "round", strokeLinejoin: "round"
-  },
-    /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }),
-    /*#__PURE__*/React.createElement("path", { d: "M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" }),
-    /*#__PURE__*/React.createElement("path", { d: "M13.5 6.5l4 4" })
-  );
-}
+
 
 // "building-2" icon -- same path data as the raw SVG string PlaceMapView's Leaflet popup builds
 // for its "지도에서 업체정보 보기" button (see businessInfoBtn.innerHTML), so the place list's icon
@@ -8562,18 +8646,7 @@ function PencilIcon({ size = 12 } = {}) {
 
 
 
-function BuildingIcon({ size = 14 } = {}) {
-  return /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg", width: String(size), height: String(size), viewBox: "0 0 24 24",
-    fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
-  },
-    /*#__PURE__*/React.createElement("path", { d: "M10 12h4" }),
-    /*#__PURE__*/React.createElement("path", { d: "M10 8h4" }),
-    /*#__PURE__*/React.createElement("path", { d: "M14 21v-3a2 2 0 0 0-4 0v3" }),
-    /*#__PURE__*/React.createElement("path", { d: "M6 10H4a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-2" }),
-    /*#__PURE__*/React.createElement("path", { d: "M6 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16" })
-  );
-}
+
 
 const ChatParticipantSheet = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ChatParticipantSheet)
   ? window.GATHER_UI_COMPONENTS.ChatParticipantSheet
@@ -8882,13 +8955,7 @@ function formatLogTimestamp(ts) {
 // The single "<" back-button glyph used at the left of every page header in the app (chat room,
 // memo, admin unified search, and any future page) -- a chevron-down rotated 90deg, matching the
 // exact shape/weight this app has always used for "go back", not a full arrow-with-shaft.
-function BackArrowIcon({ size = 24 } = {}) {
-  return /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg", width: String(size), height: String(size), viewBox: "0 0 24 24",
-    fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round",
-    style: { transform: 'rotate(90deg)', display: 'inline-block' }
-  }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), /*#__PURE__*/React.createElement("path", { d: "M6 9l6 6l6 -6" }));
-}
+
 
 // One keyword-search pass over a single calendar's 일정/채팅/태그/정산/메모 data. Shared by
 // GlobalSearchModal (single active calendar) and AdminUnifiedSearchResultsView (looped across
@@ -9032,53 +9099,21 @@ const UserManualOverlay = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPO
 
 
 
-function SunIcon({ size = 16 }) {
-  return /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg", width: String(size), height: String(size), viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", className: "icon icon-tabler icon-tabler-sun"
-  }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), /*#__PURE__*/React.createElement("circle", { cx: "12", cy: "12", r: "4" }), /*#__PURE__*/React.createElement("path", { d: "M3 12h1m8 -9v1m8 8h1m-9 8v1m-6.4 -15.4l.7 .7m12.1 -.7l-.7 .7m0 11.4l.7 .7m-12.1 -.7l-.7 .7" }));
-}
 
-function CloudIcon({ size = 16 }) {
-  return /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg", width: String(size), height: String(size), viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", className: "icon icon-tabler icon-tabler-cloud"
-  }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), /*#__PURE__*/React.createElement("path", { d: "M7 18a4.6 4.4 0 0 1 0 -9h.1a5 4.5 0 0 1 11 2h.9a4 3.5 0 0 1 0 7h-12" }));
-}
 
-function MistIcon({ size = 16 }) {
-  return /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg", width: String(size), height: String(size), viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", className: "icon icon-tabler icon-tabler-mist"
-  }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), /*#__PURE__*/React.createElement("path", { d: "M5 5h14M5 9h14M5 13h14M5 17h14" }));
-}
 
-function CloudRainIcon({ size = 16 }) {
-  return /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg", width: String(size), height: String(size), viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", className: "icon icon-tabler icon-tabler-cloud-rain"
-  }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), /*#__PURE__*/React.createElement("path", { d: "M7 18a4.6 4.4 0 0 1 0 -9h.1a5 4.5 0 0 1 11 2h.9a4 3.5 0 0 1 0 7h-12M8 22l-.5 -1.5M12 22l-.5 -1.5M16 22l-.5 -1.5" }));
-}
 
-function SnowflakeIcon({ size = 16 }) {
-  return /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg", width: String(size), height: String(size), viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", className: "icon icon-tabler icon-tabler-snowflake"
-  }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), /*#__PURE__*/React.createElement("path", { d: "M10 4l2 1l2 -1M12 2v6.5M10 20l2 -1l2 1M12 15.5v6.5M20 10l-1 2l1 2M15.5 12h6.5M4 10l1 2l-1 2M2 12h6.5M4.43 4.43l4.24 4.24M2.5 5.5l1.5 1.5l1.5 -1.5M19.56 19.56l-4.24 -4.24M18.5 17.5l1.5 1.5l1.5 -1.5M19.56 4.43l-4.24 4.24M18.5 6.5l1.5 -1.5l1.5 1.5M4.43 19.56l4.24 -4.24M2.5 18.5l1.5 -1.5l1.5 1.5" }));
-}
 
-function CloudLightningIcon({ size = 16 }) {
-  return /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg", width: String(size), height: String(size), viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", className: "icon icon-tabler icon-tabler-cloud-lightning"
-  }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), /*#__PURE__*/React.createElement("path", { d: "M7 18a4.6 4.4 0 0 1 0 -9h.1a5 4.5 0 0 1 11 2h.9a4 3.5 0 0 1 0 7h-12M13 18l-2 3v-3l-2 3" }));
-}
 
-function SettingsIcon({ size = 18 }) {
-  return /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg", width: String(size), height: String(size), viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", className: "icon icon-tabler icon-tabler-settings"
-  }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), /*#__PURE__*/React.createElement("path", { d: "M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065z" }), /*#__PURE__*/React.createElement("circle", { cx: "12", cy: "12", r: "3" }));
-}
 
-function MapCogIcon({ size = 16 }) {
-  return /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg", width: String(size), height: String(size), viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", className: "icon icon-tabler icons-tabler-outline icon-tabler-map-cog"
-  }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), /*#__PURE__*/React.createElement("path", { d: "M12 18.5l-3 -1.5l-6 3v-13l6 -3l6 3l6 -3v8" }), /*#__PURE__*/React.createElement("path", { d: "M9 4v13" }), /*#__PURE__*/React.createElement("path", { d: "M15 7v6.5" }), /*#__PURE__*/React.createElement("path", { d: "M17.001 19a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" }), /*#__PURE__*/React.createElement("path", { d: "M19.001 15.5v1.5" }), /*#__PURE__*/React.createElement("path", { d: "M19.001 21v1.5" }), /*#__PURE__*/React.createElement("path", { d: "M22.032 17.25l-1.299 .75" }), /*#__PURE__*/React.createElement("path", { d: "M17.27 20l-1.3 .75" }), /*#__PURE__*/React.createElement("path", { d: "M15.97 17.25l1.3 .75" }), /*#__PURE__*/React.createElement("path", { d: "M20.733 20l1.3 .75" }));
-}
+
+
+
+
+
+
+
+
 
 function getWeatherIcon(code, size = 16) {
   const c = Number(code);
@@ -9445,86 +9480,16 @@ const PollModal = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.Po
 
 
 // Icon helper function for gift
-function GiftIcon({ size = 20 } = {}) {
-  return /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg",
-    width: String(size),
-    height: String(size),
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    strokeWidth: "2",
-    strokeLinecap: "round",
-    strokeLinejoin: "round",
-    className: "icon icon-tabler icons-tabler-outline icon-tabler-gift"
-  },
-    /*#__PURE__*/React.createElement("rect", { x: "3", y: "8", width: "18", height: "4", rx: "1" }),
-    /*#__PURE__*/React.createElement("path", { d: "M12 8v13" }),
-    /*#__PURE__*/React.createElement("path", { d: "M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7" }),
-    /*#__PURE__*/React.createElement("path", { d: "M12 8H7.5a2.5 2.5 0 0 1 0-5C11 3 12 8 12 8z" }),
-    /*#__PURE__*/React.createElement("path", { d: "M12 8h4.5a2.5 2.5 0 0 0 0-5C13 3 12 8 12 8z" })
-  );
-}
 
 
 
 
-function MoonStarsIcon() {
-  return /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg",
-    width: "20",
-    height: "20",
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    strokeWidth: "2",
-    strokeLinecap: "round",
-    strokeLinejoin: "round"
-  }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }),
-    /*#__PURE__*/React.createElement("path", { d: "M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454l0 .008" }),
-    /*#__PURE__*/React.createElement("path", { d: "M17 4a2 2 0 0 0 2 2a2 2 0 0 0 -2 2a2 2 0 0 0 -2 -2a2 2 0 0 0 2 -2" }),
-    /*#__PURE__*/React.createElement("path", { d: "M19 11h2m-1 -1v2" }));
-}
 
-function TextResizeIcon() {
-  return /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg",
-    width: "20",
-    height: "20",
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    strokeWidth: "2",
-    strokeLinecap: "round",
-    strokeLinejoin: "round"
-  }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }),
-    /*#__PURE__*/React.createElement("path", { d: "M3 5a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" }),
-    /*#__PURE__*/React.createElement("path", { d: "M17 5a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" }),
-    /*#__PURE__*/React.createElement("path", { d: "M3 19a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" }),
-    /*#__PURE__*/React.createElement("path", { d: "M17 19a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" }),
-    /*#__PURE__*/React.createElement("path", { d: "M5 7v10" }),
-    /*#__PURE__*/React.createElement("path", { d: "M7 5h10" }),
-    /*#__PURE__*/React.createElement("path", { d: "M7 19h10" }),
-    /*#__PURE__*/React.createElement("path", { d: "M19 7v10" }),
-    /*#__PURE__*/React.createElement("path", { d: "M10 10h4" }),
-    /*#__PURE__*/React.createElement("path", { d: "M12 14v-4" }));
-}
 
-function BellIcon() {
-  return /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg",
-    width: "20",
-    height: "20",
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    strokeWidth: "2",
-    strokeLinecap: "round",
-    strokeLinejoin: "round"
-  }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }),
-    /*#__PURE__*/React.createElement("path", { d: "M10 5a2 2 0 1 1 4 0a7 7 0 0 1 4 6v3a4 4 0 0 0 2 3h-16a4 4 0 0 0 2 -3v-3a7 7 0 0 1 4 -6" }),
-    /*#__PURE__*/React.createElement("path", { d: "M9 17v1a3 3 0 0 0 6 0v-1" }));
-}
+
+
+
+
 
 
 // Shared slide-down search row used by chat / memo / places (and gallery). Visual baseline is
@@ -9533,797 +9498,67 @@ function BellIcon() {
 
 
 
-function SearchIcon() {
-  return /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg",
-    width: "24",
-    height: "24",
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
-    className: "icon icon-tabler icons-tabler-outline icon-tabler-search"
-  }, /*#__PURE__*/React.createElement("path", {
-    stroke: "none",
-    d: "M0 0h24v24H0z",
-    fill: "none"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M10 10m-7 0a7 7 0 1 0 14 0a7 7 0 1 0 -14 0"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M21 21l-6 -6"
-  }));
-}
 
-function CalendarCheckIcon() {
-  return /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg",
-    width: "20",
-    height: "20",
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
-    className: "icon lucide lucide-calendar-check"
-  }, /*#__PURE__*/React.createElement("path", {
-    d: "M8 2v3"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M16 2v3"
-  }), /*#__PURE__*/React.createElement("rect", {
-    x: "3",
-    y: "3",
-    width: "18",
-    height: "18",
-    rx: "2"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M3 9h18"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "m9 15 2 2 4-4"
-  }));
-}
 
-function LockIcon() {
-  return /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg",
-    width: "20",
-    height: "20",
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
-    className: "icon icon-tabler icons-tabler-outline icon-tabler-lock"
-  }, /*#__PURE__*/React.createElement("path", {
-    stroke: "none",
-    d: "M0 0h24v24H0z",
-    fill: "none"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M5 11m0 2a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v6a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2z"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M11 16a1 1 0 1 0 2 0a1 1 0 0 0 -2 0"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M8 11v-4a4 4 0 1 1 8 0v4"
-  }));
-}
 
-function LogoutIcon() {
-  return /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg",
-    width: "20",
-    height: "20",
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
-    className: "icon icon-tabler icons-tabler-outline icon-tabler-logout"
-  }, /*#__PURE__*/React.createElement("path", {
-    stroke: "none",
-    d: "M0 0h24v24H0z",
-    fill: "none"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M14 8v-2a2 2 0 0 0 -2 -2h-7a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h7a2 2 0 0 0 2 -2v-2"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M9 12h12l-3 -3"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M18 15l3 -3"
-  }));
-}
 
-function RefreshIcon() {
-  return /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg",
-    width: "20",
-    height: "20",
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
-    className: "icon icon-tabler icons-tabler-outline icon-tabler-refresh"
-  }, /*#__PURE__*/React.createElement("path", {
-    stroke: "none",
-    d: "M0 0h24v24H0z",
-    fill: "none"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4"
-  }));
-}
 
-function AdminFilledMenuIcon() {
-  return /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg",
-    width: "24",
-    height: "24",
-    viewBox: "0 0 24 24",
-    fill: "currentColor",
-    className: "icon icon-tabler icons-tabler-filled icon-tabler-menu-2"
-  }, /*#__PURE__*/React.createElement("path", {
-    stroke: "none",
-    d: "M0 0h24v24H0z",
-    fill: "none"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M21 6a1 1 0 0 1 -1 1h-16a1 1 0 1 1 0 -2h16a1 1 0 0 1 1 1"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M21 12a1 1 0 0 1 -1 1h-16a1 1 0 0 1 0 -2h16a1 1 0 0 1 1 1"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M21 18a1 1 0 0 1 -1 1h-16a1 1 0 0 1 0 -2h16a1 1 0 0 1 1 1"
-  }));
-}
 
-function EmojiPickerIcon() {
-  return /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg",
-    width: "18",
-    height: "18",
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
-    className: "icon icon-tabler icons-tabler-outline icon-tabler-mood-smile"
-  }, /*#__PURE__*/React.createElement("path", {
-    stroke: "none",
-    d: "M0 0h24v24H0z",
-    fill: "none"
-  }), /*#__PURE__*/React.createElement("circle", {
-    cx: "12", cy: "12", r: "9"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M9 10l.01 0"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M15 10l.01 0"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M9.5 15a3.5 3.5 0 0 0 5 0"
-  }));
-}
 
-function ExternalLinkIcon() {
-  return /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg",
-    width: "20",
-    height: "20",
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
-    className: "lucide lucide-external-link-icon lucide-external-link"
-  }, /*#__PURE__*/React.createElement("path", {
-    d: "M15 3h6v6"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M10 14 21 3"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"
-  }));
-}
 
-function ShareIcon({ size = 20 } = {}) {
-  return /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg",
-    width: String(size),
-    height: String(size),
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round"
-  }, /*#__PURE__*/React.createElement("circle", { cx: "18", cy: "5", r: "3" }),
-     /*#__PURE__*/React.createElement("circle", { cx: "6", cy: "12", r: "3" }),
-     /*#__PURE__*/React.createElement("circle", { cx: "18", cy: "19", r: "3" }),
-     /*#__PURE__*/React.createElement("line", { x1: "8.59", y1: "13.51", x2: "15.42", y2: "17.49" }),
-     /*#__PURE__*/React.createElement("line", { x1: "15.41", y1: "6.51", x2: "8.59", y2: "10.49" }));
-}
 
-function WalletIcon({ size = 24 } = {}) {
-  return /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg",
-    width: String(size),
-    height: String(size),
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
-    className: "icon icon-tabler icons-tabler-outline icon-tabler-wallet"
-  }, /*#__PURE__*/React.createElement("path", {
-    stroke: "none",
-    d: "M0 0h24v24H0z",
-    fill: "none"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M17 8v-3a1 1 0 0 0 -1 -1h-10a2 2 0 0 0 0 4h12a1 1 0 0 1 1 1v3m0 4v3a1 1 0 0 1 -1 1h-12a2 2 0 0 1 -2 -2v-12"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M20 12v4h-4a2 2 0 0 1 0 -4h4"
-  }));
-}
 
-function CoinIcon() {
-  return /*#__PURE__*/React.createElement("svg", {
-    className: "day-coin-icon",
-    viewBox: "0 0 24 24",
-    width: "16",
-    height: "17",
-    style: {
-      flexShrink: 0,
-      verticalAlign: 'middle',
-      marginLeft: 0
-    }
-  }, /*#__PURE__*/React.createElement("circle", {
-    cx: "12",
-    cy: "12",
-    r: "11",
-    fill: "#8A99AD"
-  }), /*#__PURE__*/React.createElement("text", {
-    x: "12",
-    y: "16.5",
-    fontSize: "14",
-    fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-    fontWeight: "900",
-    textAnchor: "middle",
-    fill: "#FFFFFF"
-  }, "\u20A9"));
-}
 
-function BanknoteArrowUpIcon({ size = 24 } = {}) {
-  return /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg",
-    width: String(size),
-    height: String(size),
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
-    className: "icon lucide lucide-banknote-arrow-up"
-  }, /*#__PURE__*/React.createElement("path", {
-    d: "M12 18H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M18 12h.01"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M19 22v-6"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "m22 19-3-3-3 3"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M6 12h.01"
-  }), /*#__PURE__*/React.createElement("circle", {
-    cx: "12",
-    cy: "12",
-    r: "2"
-  }));
-}
 
-function BanknoteArrowDownIcon({ size = 24 } = {}) {
-  return /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg",
-    width: String(size),
-    height: String(size),
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
-    className: "icon lucide lucide-banknote-arrow-down"
-  }, /*#__PURE__*/React.createElement("path", {
-    d: "M12 18H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "m16 19 3 3 3-3"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M18 12h.01"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M19 16v6"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M6 12h.01"
-  }), /*#__PURE__*/React.createElement("circle", {
-    cx: "12",
-    cy: "12",
-    r: "2"
-  }));
-}
 
-function PiggyBankIcon({ size = 24 } = {}) {
-  return /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg",
-    width: String(size),
-    height: String(size),
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
-    className: "icon lucide lucide-piggy-bank"
-  }, /*#__PURE__*/React.createElement("path", {
-    d: "M11 17h3v2a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-3a3.16 3.16 0 0 0 2-2h1a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1h-1a5 5 0 0 0-2-4V3a4 4 0 0 0-3.2 1.6l-.3.4H11a6 6 0 0 0-6 6v1a5 5 0 0 0 2 4v3a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1z"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M16 10h.01"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M2 8v1a2 2 0 0 0 2 2h1"
-  }));
-}
 
-function ChartBarIcon() {
-  return /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg",
-    width: "20",
-    height: "20",
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
-    className: "icon icon-tabler icons-tabler-outline icon-tabler-chart-bar"
-  }, /*#__PURE__*/React.createElement("path", {
-    stroke: "none",
-    d: "M0 0h24v24H0z",
-    fill: "none"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M3 13a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v6a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1l0 -6"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M15 9a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v10a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1l0 -10"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M9 5a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v14a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1l0 -14"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M4 20h14"
-  }));
-}
 
-function ChartPieIcon() {
-  return /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg",
-    width: "20",
-    height: "20",
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
-    className: "icon icon-tabler icons-tabler-outline icon-tabler-chart-pie"
-  }, /*#__PURE__*/React.createElement("path", {
-    stroke: "none",
-    d: "M0 0h24v24H0z",
-    fill: "none"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M10 3.2a9 9 0 1 0 10.8 10.8a1 1 0 0 0 -1 -1h-6.8a2 2 0 0 1 -2 -2v-7a.9 .9 0 0 0 -1 -.8"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M15 3.5a9 9 0 0 1 5.5 5.5h-4.5a1 1 0 0 1 -1 -1v-4.5"
-  }));
-}
 
-function CalendarCogIcon() {
-  return /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg",
-    width: "20",
-    height: "20",
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
-    className: "icon icon-tabler icons-tabler-outline icon-tabler-calendar-cog"
-  }, /*#__PURE__*/React.createElement("path", {
-    stroke: "none",
-    d: "M0 0h24v24H0z",
-    fill: "none"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M12 21h-6a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v5"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M16 3v4"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M8 3v4"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M4 11h16"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M17.001 19a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M19.001 15.5v1.5"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M19.001 21v1.5"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M22.032 17.25l-1.299 .75"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M17.27 20l-1.3 .75"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M15.97 17.25l1.3 .75"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M20.733 20l1.3 .75"
-  }));
-}
 
-function CalendarSearchIcon({ size = 20 } = {}) {
-  return /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg",
-    width: String(size),
-    height: String(size),
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
-    className: "icon icon-tabler icons-tabler-outline icon-tabler-calendar-search"
-  }, /*#__PURE__*/React.createElement("path", {
-    stroke: "none",
-    d: "M0 0h24v24H0z",
-    fill: "none"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M11.5 21h-5.5a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4.5"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M16 3v4"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M8 3v4"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M4 11h16"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M15 18a3 3 0 1 0 6 0a3 3 0 1 0 -6 0"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M20.2 20.2l1.8 1.8"
-  }));
-}
 
-function TrophyIcon() {
-  return /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg",
-    width: "20",
-    height: "20",
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
-    className: "lucide lucide-trophy-icon lucide-trophy"
-  }, /*#__PURE__*/React.createElement("path", {
-    d: "M10 14.66V17a1 1 0 0 1-1 1 2 2 0 0 0-2 2v2"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M14 14.66V17a1 1 0 0 0 1 1 2 2 0 0 1 2 2v2"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M17.916 10H19.5A2.5 2.5 0 0 0 22 7.5V5a1 1 0 0 0-1-1h-3"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M4 22h16"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M6 9a6 6 0 0 0 12 0V3a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1z"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M6.084 10H4.5A2.5 2.5 0 0 1 2 7.5V5a1 1 0 0 1 1-1h3"
-  }));
-}
 
-function PodiumIcon() {
-  return /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg",
-    width: "20",
-    height: "20",
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
-    className: "lucide lucide-podium-icon lucide-podium"
-  }, /*#__PURE__*/React.createElement("path", {
-    d: "M12 6V2h-1"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M9 15a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1v-3a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M9 21V11a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v10"
-  }));
-}
 
-function CloudDataConnectionIcon() {
-  return /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg",
-    width: "20",
-    height: "20",
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
-    className: "icon icon-tabler icons-tabler-outline icon-tabler-cloud-data-connection"
-  }, /*#__PURE__*/React.createElement("path", {
-    stroke: "none",
-    d: "M0 0h24v24H0z",
-    fill: "none"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M5 9.897c0 -1.714 1.46 -3.104 3.26 -3.104c.275 -1.22 1.255 -2.215 2.572 -2.611c1.317 -.397 2.77 -.134 3.811 .69c1.042 .822 1.514 2.08 1.239 3.3h.693a2.42 2.42 0 0 1 2.425 2.414a2.42 2.42 0 0 1 -2.425 2.414h-8.315c-1.8 0 -3.26 -1.39 -3.26 -3.103"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M12 13v3"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M10 18a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M14 18h7"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M3 18h7"
-  }));
-}
 
-function LogIcon() {
-  return /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg",
-    width: "18",
-    height: "18",
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    strokeWidth: "2",
-    strokeLinecap: "round",
-    strokeLinejoin: "round",
-    className: "lucide lucide-list-todo"
-  }, /*#__PURE__*/React.createElement("rect", {
-    x: "3",
-    y: "3",
-    width: "18",
-    height: "18",
-    rx: "2"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M9 9h6"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M9 13h6"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M9 17h6"
-  }));
-}
 
-function HourglassIcon() {
-  return /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg",
-    width: "16",
-    height: "16",
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    strokeWidth: "2",
-    strokeLinecap: "round",
-    strokeLinejoin: "round",
-    className: "lucide lucide-rotate-ccw-clock-icon lucide-rotate-ccw-clock"
-  }, /*#__PURE__*/React.createElement("path", {
-    d: "M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M3 3v5h5"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M12 7v5l4 2"
-  }));
-}
 
-function AlertTriangleIcon() {
-  return /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg",
-    width: "20",
-    height: "20",
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
-    className: "icon icon-tabler icons-tabler-outline icon-tabler-alert-triangle"
-  }, /*#__PURE__*/React.createElement("path", {
-    stroke: "none",
-    d: "M0 0h24v24H0z",
-    fill: "none"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M12 9v4"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M10.363 3.591l-8.106 13.534a1.914 1.914 0 0 0 1.636 2.871h16.214a1.914 1.914 0 0 0 1.636 -2.87l-8.106 -13.536a1.914 1.914 0 0 0 -3.274 0z"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M12 16h.01"
-  }));
-}
 
-function ShieldCheckIcon() {
-  return /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg",
-    width: "20",
-    height: "20",
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
-    className: "icon icon-tabler icons-tabler-outline icon-tabler-shield-check"
-  }, /*#__PURE__*/React.createElement("path", {
-    stroke: "none",
-    d: "M0 0h24v24H0z",
-    fill: "none"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M12 3a12 12 0 0 0 8.5 3a12 12 0 0 1 -8.5 15a12 12 0 0 1 -8.5 -15a12 12 0 0 0 8.5 -3"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M9 12l2 2l4 -4"
-  }));
-}
 
-function CalendarExportIcon() {
-  return /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg",
-    width: "16",
-    height: "16",
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
-    className: "icon icon-tabler icons-tabler-outline icon-tabler-calendar-plus"
-  }, /*#__PURE__*/React.createElement("path", {
-    stroke: "none",
-    d: "M0 0h24v24H0z",
-    fill: "none"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M4 7a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12z"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M16 3v4"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M8 3v4"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M4 11h16"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M10 16h4"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M12 14v4"
-  }));
-}
 
-function GalleryIcon() {
-  return /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg",
-    width: "20",
-    height: "20",
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
-    className: "icon icon-tabler icons-tabler-outline icon-tabler-photo"
-  }, /*#__PURE__*/React.createElement("path", {
-    stroke: "none",
-    d: "M0 0h24v24H0z",
-    fill: "none"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M15 8h.01"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M3 6a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v12a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3v-12z"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M3 16l5 -5c.928 -.893 2.072 -.893 3 0l5 5"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M14 14l1 -1c.928 -.893 2.072 -.893 3 0l3 3"
-  }));
-}
 
-function PollSectionIcon() {
-  return /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg",
-    width: "20",
-    height: "20",
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
-    className: "icon icon-tabler icons-tabler-outline icon-tabler-checkbox"
-  }, /*#__PURE__*/React.createElement("path", {
-    stroke: "none",
-    d: "M0 0h24v24H0z",
-    fill: "none"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M9 11l3 3l8 -8"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M20 12v6a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h9"
-  }));
-}
 
-function LineHeightIcon({ size = 22 } = {}) {
-  return /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg",
-    width: String(size),
-    height: String(size),
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
-    className: "icon icon-tabler icons-tabler-outline icon-tabler-line-height"
-  }, /*#__PURE__*/React.createElement("path", {
-    stroke: "none",
-    d: "M0 0h24v24H0z",
-    fill: "none"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M3 8l3 -3l3 3"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M3 16l3 3l3 -3"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M6 5l0 14"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M13 6l7 0"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M13 12l7 0"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M13 18l7 0"
-  }));
-}
 
-function MegaphoneIcon({ size = 20 } = {}) {
-  return /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg",
-    width: String(size),
-    height: String(size),
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
-    className: "lucide lucide-megaphone-icon lucide-megaphone"
-  }, /*#__PURE__*/React.createElement("path", {
-    d: "M11 6a13 13 0 0 0 8.4-2.8A1 1 0 0 1 21 4v12a1 1 0 0 1-1.6.8A13 13 0 0 0 11 14H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M6 14a12 12 0 0 0 2.4 7.2 2 2 0 0 0 3.2-2.4A8 8 0 0 1 10 14"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M8 6v8"
-  }));
-}
 
-function SmallXIcon({ size = 24 } = {}) {
-  return /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg",
-    width: String(size),
-    height: String(size),
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
-    className: "icon icon-tabler icons-tabler-outline icon-tabler-x"
-  }, /*#__PURE__*/React.createElement("path", {
-    stroke: "none",
-    d: "M0 0h24v24H0z",
-    fill: "none"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M18 6l-12 12"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M6 6l12 12"
-  }));
-}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 // Shared "remove attached image" button for thumbnail previews (chat composer, memo composer
 // new/edit) -- keeps the delete affordance visually identical everywhere a photo can be staged,
@@ -10444,28 +9679,7 @@ function loadLeafletMarkerCluster(timeoutMs = 15000) {
   return leafletMarkerClusterLoadPromise;
 }
 
-function PlaceSectionIcon({ size = 20 } = {}) {
-  return /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg",
-    width: String(size),
-    height: String(size),
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
-    className: "icon icon-tabler icons-tabler-outline icon-tabler-map-pin"
-  }, /*#__PURE__*/React.createElement("path", {
-    stroke: "none",
-    d: "M0 0h24v24H0z",
-    fill: "none"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M9 11a3 3 0 1 0 6 0a3 3 0 0 0 -6 0"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M17.657 16.657l-4.243 4.243a2 2 0 0 1 -2.827 0l-4.244 -4.243a8 8 0 1 1 11.314 0z"
-  }));
-}
+
 
 // Default center/zoom for a calendar with no places registered yet -- Seoul City Hall, a
 // reasonable default since this app is Korean-audience-only.
@@ -10488,20 +9702,7 @@ const trimLatLngOutliers = GATHER_APP_UTILS.trimLatLngOutliers || function trimL
   return trimmed.length >= 3 ? trimmed : points;
 };
 
-function ThreeLinesIcon({ size = 18 } = {}) {
-  return /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg",
-    width: String(size),
-    height: String(size),
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round"
-  }, /*#__PURE__*/React.createElement("line", { x1: "4", y1: "7", x2: "20", y2: "7" }),
-    /*#__PURE__*/React.createElement("line", { x1: "4", y1: "12", x2: "20", y2: "12" }),
-    /*#__PURE__*/React.createElement("line", { x1: "4", y1: "17", x2: "20", y2: "17" }));
-}
+
 
 // Small monochrome (white, via stroke="#fff") lucide-style glyph per category id. Each icon is
 // stored as an array of shape descriptors -- { tag: 'path', d } / { tag: 'rect', ... } /
@@ -10596,20 +9797,7 @@ function buildPlaceMarkerHtml(category, visitStatus = 'visited') {
 // React version of the same badge -- a small solid-color circle with the category's white line
 // icon inside, matching the map marker exactly. Used in the place list (PlacesView) so its
 // category badge looks like a miniature of the actual pin instead of a plain emoji.
-function PlaceCategoryMarkerIcon({ category, size = 14, strokeColor = "#fff" } = {}) {
-  const content = getPlaceCategoryMarkerContent(category);
-  return /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg",
-    width: String(size),
-    height: String(size),
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: strokeColor,
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round"
-  }, content.shapes.map((shape, i) => /*#__PURE__*/React.createElement(shape.tag, { key: i, ...(shape.tag === 'rect' ? { x: shape.x, y: shape.y, width: shape.width, height: shape.height, rx: shape.rx, ry: shape.ry } : shape.tag === 'circle' ? { cx: shape.cx, cy: shape.cy, r: shape.r } : { d: shape.d }) })));
-}
+
 
 // Renders an interactive Leaflet/OSM map with one pin per registered place, auto-fit to bounds
 // so every pin stays visible. Popup content is built via DOM nodes (not HTML string
@@ -10712,31 +9900,8 @@ const PlaceRegisterModal = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMP
 
 
 
-function CctvIcon({ size = 14 }) {
-  return /*#__PURE__*/React.createElement('svg', {
-    xmlns: 'http://www.w3.org/2000/svg', width: size, height: size, viewBox: '0 0 24 24',
-    fill: 'none', stroke: 'currentColor', strokeWidth: '2', strokeLinecap: 'round', strokeLinejoin: 'round'
-  },
-    /*#__PURE__*/React.createElement('path', { d: 'M16.75 12h3.632a1 1 0 0 1 .894 1.447l-2.034 4.069a1 1 0 0 1-1.708.134l-2.124-2.97' }),
-    /*#__PURE__*/React.createElement('path', { d: 'M17.106 9.053a1 1 0 0 1 .447 1.341l-3.106 6.211a1 1 0 0 1-1.342.447L3.61 12.3a2.92 2.92 0 0 1-1.3-3.91L3.69 5.6a2.92 2.92 0 0 1 3.92-1.3z' }),
-    /*#__PURE__*/React.createElement('path', { d: 'M2 19h3.76a2 2 0 0 0 1.8-1.1L9 15' }),
-    /*#__PURE__*/React.createElement('path', { d: 'M2 21v-4' }),
-    /*#__PURE__*/React.createElement('path', { d: 'M7 9h.01' })
-  );
-}
-function DicesIcon({ size = 14 }) {
-  return /*#__PURE__*/React.createElement('svg', {
-    xmlns: 'http://www.w3.org/2000/svg', width: size, height: size, viewBox: '0 0 24 24',
-    fill: 'none', stroke: 'currentColor', strokeWidth: '2', strokeLinecap: 'round', strokeLinejoin: 'round'
-  },
-    /*#__PURE__*/React.createElement('rect', { width: '12', height: '12', x: '2', y: '10', rx: '2', ry: '2' }),
-    /*#__PURE__*/React.createElement('path', { d: 'm17.92 14 3.5-3.5a2.24 2.24 0 0 0 0-3l-5-4.92a2.24 2.24 0 0 0-3 0L10 6' }),
-    /*#__PURE__*/React.createElement('path', { d: 'M6 18h.01' }),
-    /*#__PURE__*/React.createElement('path', { d: 'M10 14h.01' }),
-    /*#__PURE__*/React.createElement('path', { d: 'M15 6h.01' }),
-    /*#__PURE__*/React.createElement('path', { d: 'M18 9h.01' })
-  );
-}
+
+
 // Shown only on the main calendar screen -- chat/memo/settlement have a pinned bottom input bar.
 const FOOTER_FAMILY_LINKS = [
   { label: '밖에 눈오나', url: 'https://pyw31337.github.io/cctv/', Icon: CctvIcon },
@@ -10802,6 +9967,62 @@ function bindGatherUiDeps() {
     confetti: typeof confetti === 'function' ? confetti : (typeof window !== 'undefined' ? window.confetti : null),
     CONFETTI_Z_INDEX: typeof CONFETTI_Z_INDEX !== 'undefined' ? CONFETTI_Z_INDEX : 9999,
     AdminDashboard: typeof AdminDashboard === 'function' ? AdminDashboard : null,
+    MenuIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MenuIcon) || (typeof MenuIcon === 'function' ? MenuIcon : null),
+    NotepadTextIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.NotepadTextIcon) || (typeof NotepadTextIcon === 'function' ? NotepadTextIcon : null),
+    ChatSectionIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ChatSectionIcon) || (typeof ChatSectionIcon === 'function' ? ChatSectionIcon : null),
+    LinkIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LinkIcon) || (typeof LinkIcon === 'function' ? LinkIcon : null),
+    MessageCommentIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MessageCommentIcon) || (typeof MessageCommentIcon === 'function' ? MessageCommentIcon : null),
+    PencilIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PencilIcon) || (typeof PencilIcon === 'function' ? PencilIcon : null),
+    BuildingIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.BuildingIcon) || (typeof BuildingIcon === 'function' ? BuildingIcon : null),
+    BackArrowIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.BackArrowIcon) || (typeof BackArrowIcon === 'function' ? BackArrowIcon : null),
+    SunIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SunIcon) || (typeof SunIcon === 'function' ? SunIcon : null),
+    CloudIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CloudIcon) || (typeof CloudIcon === 'function' ? CloudIcon : null),
+    MistIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MistIcon) || (typeof MistIcon === 'function' ? MistIcon : null),
+    CloudRainIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CloudRainIcon) || (typeof CloudRainIcon === 'function' ? CloudRainIcon : null),
+    SnowflakeIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SnowflakeIcon) || (typeof SnowflakeIcon === 'function' ? SnowflakeIcon : null),
+    CloudLightningIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CloudLightningIcon) || (typeof CloudLightningIcon === 'function' ? CloudLightningIcon : null),
+    SettingsIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SettingsIcon) || (typeof SettingsIcon === 'function' ? SettingsIcon : null),
+    MapCogIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MapCogIcon) || (typeof MapCogIcon === 'function' ? MapCogIcon : null),
+    GiftIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.GiftIcon) || (typeof GiftIcon === 'function' ? GiftIcon : null),
+    MoonStarsIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MoonStarsIcon) || (typeof MoonStarsIcon === 'function' ? MoonStarsIcon : null),
+    TextResizeIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.TextResizeIcon) || (typeof TextResizeIcon === 'function' ? TextResizeIcon : null),
+    BellIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.BellIcon) || (typeof BellIcon === 'function' ? BellIcon : null),
+    SearchIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SearchIcon) || (typeof SearchIcon === 'function' ? SearchIcon : null),
+    CalendarCheckIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CalendarCheckIcon) || (typeof CalendarCheckIcon === 'function' ? CalendarCheckIcon : null),
+    LockIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LockIcon) || (typeof LockIcon === 'function' ? LockIcon : null),
+    LogoutIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LogoutIcon) || (typeof LogoutIcon === 'function' ? LogoutIcon : null),
+    RefreshIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.RefreshIcon) || (typeof RefreshIcon === 'function' ? RefreshIcon : null),
+    AdminFilledMenuIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AdminFilledMenuIcon) || (typeof AdminFilledMenuIcon === 'function' ? AdminFilledMenuIcon : null),
+    EmojiPickerIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.EmojiPickerIcon) || (typeof EmojiPickerIcon === 'function' ? EmojiPickerIcon : null),
+    ExternalLinkIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ExternalLinkIcon) || (typeof ExternalLinkIcon === 'function' ? ExternalLinkIcon : null),
+    ShareIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ShareIcon) || (typeof ShareIcon === 'function' ? ShareIcon : null),
+    WalletIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.WalletIcon) || (typeof WalletIcon === 'function' ? WalletIcon : null),
+    CoinIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CoinIcon) || (typeof CoinIcon === 'function' ? CoinIcon : null),
+    BanknoteArrowUpIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.BanknoteArrowUpIcon) || (typeof BanknoteArrowUpIcon === 'function' ? BanknoteArrowUpIcon : null),
+    BanknoteArrowDownIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.BanknoteArrowDownIcon) || (typeof BanknoteArrowDownIcon === 'function' ? BanknoteArrowDownIcon : null),
+    PiggyBankIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PiggyBankIcon) || (typeof PiggyBankIcon === 'function' ? PiggyBankIcon : null),
+    ChartBarIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ChartBarIcon) || (typeof ChartBarIcon === 'function' ? ChartBarIcon : null),
+    ChartPieIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ChartPieIcon) || (typeof ChartPieIcon === 'function' ? ChartPieIcon : null),
+    CalendarCogIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CalendarCogIcon) || (typeof CalendarCogIcon === 'function' ? CalendarCogIcon : null),
+    CalendarSearchIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CalendarSearchIcon) || (typeof CalendarSearchIcon === 'function' ? CalendarSearchIcon : null),
+    TrophyIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.TrophyIcon) || (typeof TrophyIcon === 'function' ? TrophyIcon : null),
+    PodiumIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PodiumIcon) || (typeof PodiumIcon === 'function' ? PodiumIcon : null),
+    CloudDataConnectionIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CloudDataConnectionIcon) || (typeof CloudDataConnectionIcon === 'function' ? CloudDataConnectionIcon : null),
+    LogIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LogIcon) || (typeof LogIcon === 'function' ? LogIcon : null),
+    HourglassIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.HourglassIcon) || (typeof HourglassIcon === 'function' ? HourglassIcon : null),
+    AlertTriangleIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AlertTriangleIcon) || (typeof AlertTriangleIcon === 'function' ? AlertTriangleIcon : null),
+    ShieldCheckIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ShieldCheckIcon) || (typeof ShieldCheckIcon === 'function' ? ShieldCheckIcon : null),
+    CalendarExportIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CalendarExportIcon) || (typeof CalendarExportIcon === 'function' ? CalendarExportIcon : null),
+    GalleryIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.GalleryIcon) || (typeof GalleryIcon === 'function' ? GalleryIcon : null),
+    PollSectionIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PollSectionIcon) || (typeof PollSectionIcon === 'function' ? PollSectionIcon : null),
+    LineHeightIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LineHeightIcon) || (typeof LineHeightIcon === 'function' ? LineHeightIcon : null),
+    MegaphoneIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MegaphoneIcon) || (typeof MegaphoneIcon === 'function' ? MegaphoneIcon : null),
+    SmallXIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SmallXIcon) || (typeof SmallXIcon === 'function' ? SmallXIcon : null),
+    PlaceSectionIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PlaceSectionIcon) || (typeof PlaceSectionIcon === 'function' ? PlaceSectionIcon : null),
+    ThreeLinesIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ThreeLinesIcon) || (typeof ThreeLinesIcon === 'function' ? ThreeLinesIcon : null),
+    PlaceCategoryMarkerIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PlaceCategoryMarkerIcon) || (typeof PlaceCategoryMarkerIcon === 'function' ? PlaceCategoryMarkerIcon : null),
+    CctvIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CctvIcon) || (typeof CctvIcon === 'function' ? CctvIcon : null),
+    DicesIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.DicesIcon) || (typeof DicesIcon === 'function' ? DicesIcon : null),
     ResizableModalContainer: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ResizableModalContainer) || (typeof ResizableModalContainer === 'function' ? ResizableModalContainer : null),
     AutoGrowTextarea: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AutoGrowTextarea) || (typeof AutoGrowTextarea === 'function' ? AutoGrowTextarea : null),
     FormAddEditActionButtons: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.FormAddEditActionButtons) || (typeof FormAddEditActionButtons === 'function' ? FormAddEditActionButtons : null),

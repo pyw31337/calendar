@@ -4,7 +4,12 @@ const SIZE_BUDGETS = [
   {
     path: 'index.html',
     maxBytes: 1_220_000,
-    reason: 'Keep the live app shell from regrowing into a fragile single-file bundle. Raised from 1,150,000 as continued 장소(Places) feature work (categories, name-tag parsing) pushed past 99% of the prior budget.'
+    reason: 'Keep the live app shell from regrowing into a fragile single-file bundle.'
+  },
+  {
+    path: 'assets/app-main.js',
+    maxBytes: 620_000,
+    reason: 'App shell after P4 UI splits. Prevent App monolith from regrowing past ~620KB.'
   }
 ];
 
