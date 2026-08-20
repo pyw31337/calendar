@@ -34,7 +34,7 @@
 
 ### P2 성능
 - P2-1 백그라운드 탭 부담 완화 ✅ 2026-08-20 (15s hidden → disableNetwork)
-- P2-2 이미지 파이프라인/egress
+- P2-2 이미지 파이프라인/egress ✅ 2026-08-20 (gallery count cache 5m, smaller scan, decoding=async)
 - P2-3 어드민 첫 로딩 ✅ 2026-08-20
 - P2-4 메인 맵 지연 마운트 ✅ 2026-08-20 (IntersectionObserver + idle fallback)
 

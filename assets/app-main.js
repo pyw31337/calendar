@@ -2372,13 +2372,21 @@ async function fetchOlderChatMessages(calId, beforeTimestamp, pageSize = CHAT_OL
   }
 }
 
-async function fetchGalleryItemCount(calId, maxPages = 25) {
-  if (!calId || !firebaseDb) return null;
+const galleryItemCountCache = Object.create(null);
+const GALLERY_COUNT_CACHE_MS = 5 * 60 * 1000;
+
+async function fetchGalleryItemCount(calId, maxPages = 8) {
+  if (!calId) return null;
+  const cached = galleryItemCountCache[calId];
+  if (cached && (Date.now() - cached.at) < GALLERY_COUNT_CACHE_MS && typeof cached.n === 'number') {
+    return cached.n;
+  }
+  if (!firebaseDb) return null;
   try {
     let total = 0, lastDoc = null;
     for (let page = 0; page < maxPages; page++) {
       let q = firebaseDb.collection('calendars').doc(`cal_${calId}`).collection('messages')
-        .orderBy('timestamp', 'desc').limit(100);
+        .orderBy('timestamp', 'desc').limit(80);
       if (lastDoc) q = q.startAfter(lastDoc);
       const snap = await q.get();
       if (snap.empty) break;
@@ -2388,12 +2396,11 @@ async function fetchGalleryItemCount(calId, maxPages = 25) {
         total += imgN;
         const direct = typeof getMessageDirectMediaEntry === 'function' ? getMessageDirectMediaEntry(msg) : null;
         if (direct) total += 1;
-        const textUrl = typeof extractFirstUrl === 'function' ? extractFirstUrl(msg.text || '') : '';
-        if (textUrl && !direct && imgN === 0) total += 1;
       });
       lastDoc = snap.docs[snap.docs.length - 1];
-      if (snap.size < 100) break;
+      if (snap.size < 80) break;
     }
+    galleryItemCountCache[calId] = { n: total, at: Date.now() };
     return total;
   } catch (err) {
     console.warn('fetchGalleryItemCount', err);
@@ -19980,6 +19987,7 @@ function ChatGalleryModal({
       src: (photo.thumb && String(photo.thumb)) || (photo.full && String(photo.full)) || '',
       alt: "공유사진",
       loading: "lazy",
+      decoding: "async",
       referrerPolicy: 'no-referrer',
       onClick: () => setActiveLightbox && setActiveLightbox({
         urls: filteredPhotos.map(p => p.full),
@@ -27325,9 +27333,10 @@ function PhotoGallery({ chatMessages, totalGalleryCount, onViewAll, showToast, o
       },
         displayedEntries.map((entry, idx) => /*#__PURE__*/React.createElement("img", {
           key: entry.key,
-          src: entry.thumb,
+          src: (entry.thumb && String(entry.thumb)) || (entry.full && String(entry.full)) || '',
           alt: "채팅에 첨부된 사진",
           loading: "lazy",
+          decoding: "async",
           referrerPolicy: 'no-referrer',
           onClick: () => setLightbox({
             urls: displayedEntries.map(e => e.full),
