@@ -352,6 +352,9 @@ const MAX_CHAT_THUMB_BASE64_LENGTH = readConfigNumber('MAX_CHAT_THUMB_BASE64_LEN
 const CHAT_LIVE_MESSAGE_LIMIT = readConfigNumber('CHAT_LIVE_MESSAGE_LIMIT', 30);
 const ADMIN_MESSAGE_LIVE_LIMIT = readConfigNumber('ADMIN_MESSAGE_LIVE_LIMIT', 50);
 const ADMIN_MEMO_LIVE_LIMIT = readConfigNumber('ADMIN_MEMO_LIVE_LIMIT', 50);
+if (typeof window !== 'undefined') {
+  window.__GATHER_ADMIN_LIMITS = { ADMIN_MESSAGE_LIVE_LIMIT, ADMIN_MEMO_LIVE_LIMIT };
+}
 const GLOBAL_SEARCH_HISTORY_LIMIT = readConfigNumber('GLOBAL_SEARCH_HISTORY_LIMIT', 100);
 const MAX_FIRESTORE_DATA_URL_CHARS = readConfigNumber('MAX_FIRESTORE_DATA_URL_CHARS', 6000);
 
@@ -520,23 +523,74 @@ async function copyTextToClipboard(text) {
 }
 
 const GATHER_APP_NOTIFICATIONS = window.GATHER_APP_NOTIFICATIONS || {};
-const isNotificationSupported = GATHER_APP_NOTIFICATIONS.isNotificationSupported;
-const requestChatNotificationPermission = GATHER_APP_NOTIFICATIONS.requestChatNotificationPermission;
-const ensureChatNotificationPermission = GATHER_APP_NOTIFICATIONS.ensureChatNotificationPermission;
-const getChatNotifyPrefKey = GATHER_APP_NOTIFICATIONS.getChatNotifyPrefKey;
-const isChatNotifyEnabledForCalendar = GATHER_APP_NOTIFICATIONS.isChatNotifyEnabledForCalendar;
-const setChatNotifyEnabledForCalendar = GATHER_APP_NOTIFICATIONS.setChatNotifyEnabledForCalendar;
-const getChatParticipantPrefKey = GATHER_APP_NOTIFICATIONS.getChatParticipantPrefKey;
-const getStoredChatParticipantId = GATHER_APP_NOTIFICATIONS.getStoredChatParticipantId;
-const setStoredChatParticipantId = GATHER_APP_NOTIFICATIONS.setStoredChatParticipantId;
-const describePushSubscribeFailure = GATHER_APP_NOTIFICATIONS.describePushSubscribeFailure;
-const getNotificationDiagnostics = GATHER_APP_NOTIFICATIONS.getNotificationDiagnostics;
-const classifyPushSubscribeError = GATHER_APP_NOTIFICATIONS.classifyPushSubscribeError;
-const getBrowserLabelForNotifications = GATHER_APP_NOTIFICATIONS.getBrowserLabelForNotifications;
-const getNotificationPermissionHelpSteps = GATHER_APP_NOTIFICATIONS.getNotificationPermissionHelpSteps;
-const isIOSDevice = GATHER_APP_NOTIFICATIONS.isIOSDevice;
-const isInstalledStandalonePwa = GATHER_APP_NOTIFICATIONS.isInstalledStandalonePwa;
-const probeNotificationCapability = GATHER_APP_NOTIFICATIONS.probeNotificationCapability;
+function isNotificationSupported(...args) {
+  const f = (window.GATHER_APP_NOTIFICATIONS || {}).isNotificationSupported;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function requestChatNotificationPermission(...args) {
+  const f = (window.GATHER_APP_NOTIFICATIONS || {}).requestChatNotificationPermission;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function ensureChatNotificationPermission(...args) {
+  const f = (window.GATHER_APP_NOTIFICATIONS || {}).ensureChatNotificationPermission;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getChatNotifyPrefKey(...args) {
+  const f = (window.GATHER_APP_NOTIFICATIONS || {}).getChatNotifyPrefKey;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function isChatNotifyEnabledForCalendar(...args) {
+  const f = (window.GATHER_APP_NOTIFICATIONS || {}).isChatNotifyEnabledForCalendar;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function setChatNotifyEnabledForCalendar(...args) {
+  const f = (window.GATHER_APP_NOTIFICATIONS || {}).setChatNotifyEnabledForCalendar;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getChatParticipantPrefKey(...args) {
+  const f = (window.GATHER_APP_NOTIFICATIONS || {}).getChatParticipantPrefKey;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getStoredChatParticipantId(...args) {
+  const f = (window.GATHER_APP_NOTIFICATIONS || {}).getStoredChatParticipantId;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function setStoredChatParticipantId(...args) {
+  const f = (window.GATHER_APP_NOTIFICATIONS || {}).setStoredChatParticipantId;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function describePushSubscribeFailure(...args) {
+  const f = (window.GATHER_APP_NOTIFICATIONS || {}).describePushSubscribeFailure;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getNotificationDiagnostics(...args) {
+  const f = (window.GATHER_APP_NOTIFICATIONS || {}).getNotificationDiagnostics;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function classifyPushSubscribeError(...args) {
+  const f = (window.GATHER_APP_NOTIFICATIONS || {}).classifyPushSubscribeError;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getBrowserLabelForNotifications(...args) {
+  const f = (window.GATHER_APP_NOTIFICATIONS || {}).getBrowserLabelForNotifications;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getNotificationPermissionHelpSteps(...args) {
+  const f = (window.GATHER_APP_NOTIFICATIONS || {}).getNotificationPermissionHelpSteps;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function isIOSDevice(...args) {
+  const f = (window.GATHER_APP_NOTIFICATIONS || {}).isIOSDevice;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function isInstalledStandalonePwa(...args) {
+  const f = (window.GATHER_APP_NOTIFICATIONS || {}).isInstalledStandalonePwa;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function probeNotificationCapability(...args) {
+  const f = (window.GATHER_APP_NOTIFICATIONS || {}).probeNotificationCapability;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
 
 function urlBase64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - base64String.length % 4) % 4);
@@ -10334,6 +10388,8 @@ function bindGatherUiDeps() {
     unsubscribeUserFromPush: typeof unsubscribeUserFromPush === 'function' ? unsubscribeUserFromPush : null,
     validateBackupCalendars: typeof validateBackupCalendars === 'function' ? validateBackupCalendars : null,
     validateCalendarShape: typeof validateCalendarShape === 'function' ? validateCalendarShape : null,
+    ADMIN_MESSAGE_LIVE_LIMIT: typeof ADMIN_MESSAGE_LIVE_LIMIT !== 'undefined' ? ADMIN_MESSAGE_LIVE_LIMIT : 50,
+    ADMIN_MEMO_LIVE_LIMIT: typeof ADMIN_MEMO_LIVE_LIMIT !== 'undefined' ? ADMIN_MEMO_LIVE_LIMIT : 50,
     FOOTER_FAMILY_LINKS: typeof FOOTER_FAMILY_LINKS !== 'undefined' ? FOOTER_FAMILY_LINKS : []
   });
 }

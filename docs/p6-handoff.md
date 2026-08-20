@@ -297,3 +297,7 @@ zsh 에서 줄 시작 `#` 주석은 쓰지 말 것.
 - memo/admin 빈 화면: app-main이 GATHER_UI_COMPONENTS를 로드 시점에 캡처 → Fallback null 고정
 - 렌더 시점 resolve 래퍼로 131개 컴포넌트 수정 (src only)
 - 배포: Actions → Deploy Vite Pages 수동 재실행 필요
+
+## P6-45 진행 (2026-08-20)
+- getStoredChatParticipantId: notifications 를 호출 시 window에서 resolve
+- ADMIN_MESSAGE_LIVE_LIMIT / ADMIN_MEMO_LIVE_LIMIT UI 심 + deps
