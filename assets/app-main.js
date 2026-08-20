@@ -3816,8 +3816,25 @@ function AdminDashboard({ initialCalendars }) {
       }).catch(() => {});
     const loadSummary = () => listAllCalendarsRemote(session.password, { mode: 'summary' })
       .then(result => applyList(result.calendars, result.lastModified, 'summary'));
-    loadSummary().catch(err => {
-      if (isMounted && adminListModeRef.current === 'none') {
+    const loadViaRestFallback = async () => {
+      const knownIds = ['cw', 'kkot', 'jhair'];
+      const preferId = selectedCalIdRef.current || getAdminSelectedCalendarIdFromUrl('kkot');
+      const ids = Array.from(new Set([preferId, ...knownIds].filter(Boolean)));
+      const results = await Promise.all(ids.map(id => fetchSingleCalendarWithRest(id, 8000).catch(() => null)));
+      const cals = results.filter(c => c && c.id).map(normalizeCalendarForSave);
+      if (!isMounted || cals.length === 0) return false;
+      adminListModeRef.current = 'rest-fallback';
+      setServerCalendars(cloneCalendarList(cals));
+      setLoadedAt(new Date());
+      setError('');
+      setIsAdminListLoading(false);
+      return true;
+    };
+    loadSummary().catch(async (err) => {
+      console.warn('listAllCalendars summary failed', err);
+      if (!isMounted) return;
+      const ok = await loadViaRestFallback();
+      if (!ok && adminListModeRef.current === 'none') {
         setError(err.message || '대시보드 데이터를 불러오지 못했습니다.');
         setIsAdminListLoading(false);
       }

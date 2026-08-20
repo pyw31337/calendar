@@ -760,6 +760,7 @@ exports.listAllCalendars = functions.https.onRequest(async (req, res) => {
   if (req.method !== 'POST') { res.status(405).json({ ok: false, message: 'Method not allowed' }); return; }
   const password = req.body && req.body.password;
   if (!password || typeof password !== 'string') { res.status(400).json({ ok: false, message: 'password is required' }); return; }
+  const mode = (req.body && req.body.mode === 'full') ? 'full' : 'summary';
 
   const rateState = await checkAdminAuthRateLimit(req.ip);
   if (rateState.blocked) { res.status(429).json({ ok: false, message: '너무 많은 시도가 있었습니다. 잠시 후 다시 시도해 주세요.' }); return; }
