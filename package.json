@@ -22,7 +22,8 @@
     "restore:rehearsal": "node scripts/restore-rehearsal.mjs",
     "smoke:live": "node scripts/live-smoke-check.mjs",
     "check:required-symbols": "node scripts/check-required-symbols.mjs",
-    "check:isolation": "node scripts/check-calendar-isolation.mjs"
+    "check:isolation": "node scripts/check-calendar-isolation.mjs",
+    "check:share-urls": "node scripts/check-share-urls.mjs"
   },
   "dependencies": {
     "canvas-confetti": "^1.9.2",

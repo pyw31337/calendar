@@ -142,6 +142,16 @@ function createGalleryShareHtml(calendar) {
   });
 }
 
+function createSettlementShareHtml(calendar) {
+  return createShareHtml(calendar, {
+    title: `${calendar.title} 정산`,
+    description: `${calendar.title} 정산 내역을 확인해보세요.`,
+    calendarUrl: `${BASE_URL}/?id=${encodeURIComponent(calendar.id)}&view=settlement`,
+    shareUrl: `${BASE_URL}/share/${encodeURIComponent(calendar.id)}/settlement/`,
+    forwardSearch: false
+  });
+}
+
 async function main() {
   const calendars = await fetchCalendars();
   await rm(OUT_DIR, { recursive: true, force: true });
@@ -156,6 +166,7 @@ async function main() {
       ['places', createPlacesShareHtml],
       ['memo', createMemoShareHtml],
       ['gallery', createGalleryShareHtml],
+      ['settlement', createSettlementShareHtml],
     ];
     for (const [seg, fn] of views) {
       const dir = seg ? path.join(targetDir, seg) : targetDir;
