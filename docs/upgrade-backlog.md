@@ -62,6 +62,8 @@
 - MemoView ✅ 2026-08-20 (assets/ui-memo-view.js)
 - ChatRoomView ✅ 2026-08-20 (assets/ui-chat-room.js)
 - AdminDashboard ✅ 2026-08-20 (assets/ui-admin-dashboard.js)
+- Anniversary/Settlement/Poll modals ✅ 2026-08-20 (assets/ui-event-modals.js)
+- CalendarGrid/Comments/MemoCard/Poll/Search ✅ 2026-08-20 (assets/ui-calendar-core.js)
 
 ### P5 UX 잔여
 - P5-1 공유 URL/OG ✅ 2026-08-20 (ShareModal 뷰 타이틀, settlement OG, check:share-urls)

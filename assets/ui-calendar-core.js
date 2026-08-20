@@ -1,0 +1,2056 @@
+/**
+ * Calendar grid, comments, memo card, polls, search (P4-19)
+ */
+(function () {
+function CalendarGrid({
+  anniversaries = [],
+  calendar,
+  isLoading = false,
+  monthDate,
+  onPrevMonth,
+  onNextMonth,
+  onToday,
+  onJumpToMonth,
+  onSelectDate,
+  compact = false,
+  onMoveAvailability,
+  onParticipantClick
+}) {
+  const React = window.React;
+  const __deps = window.GATHER_UI_DEPS || {};
+  const __comp = window.GATHER_UI_COMPONENTS || {};
+  const CalendarCheckIcon = __comp.CalendarCheckIcon || __deps.CalendarCheckIcon;
+  const CoinIcon = __comp.CoinIcon || __deps.CoinIcon;
+  const getActiveParticipants = __deps.getActiveParticipants;
+
+  const year = monthDate.getFullYear();
+  const month = monthDate.getMonth();
+  const [isPickerOpen, setIsPickerOpen] = React.useState(false);
+  const [pickerYear, setPickerYear] = React.useState(year);
+  const [pickerMonth, setPickerMonth] = React.useState(month);
+
+  // Sync picker values when month navigates externally
+  React.useEffect(() => {
+    setPickerYear(year);
+    setPickerMonth(month);
+  }, [year, month]);
+  const handlePickerApply = () => {
+    onJumpToMonth(pickerYear, pickerMonth);
+    setIsPickerOpen(false);
+  };
+  const MONTH_NAMES = Array.isArray(GATHER_APP_CALENDAR_DATA.MONTH_NAMES) ? GATHER_APP_CALENDAR_DATA.MONTH_NAMES : ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월'];
+  const firstDay = new Date(year, month, 1).getDay();
+  const lastDate = new Date(year, month + 1, 0).getDate();
+  const prevLastDate = new Date(year, month, 0).getDate();
+  const days = [];
+
+  // Fill previous month days
+  for (let i = firstDay - 1; i >= 0; i--) {
+    const d = prevLastDate - i;
+    const prevMonthDate = new Date(year, month - 1, d);
+    const dateStr = `${prevMonthDate.getFullYear()}-${String(prevMonthDate.getMonth() + 1).padStart(2, '0')}-${String(prevMonthDate.getDate()).padStart(2, '0')}`;
+    days.push({
+      dayNum: d,
+      dateStr,
+      isCurrentMonth: false
+    });
+  }
+
+  // Fill current month days
+  for (let i = 1; i <= lastDate; i++) {
+    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+    days.push({
+      dayNum: i,
+      dateStr,
+      isCurrentMonth: true
+    });
+  }
+
+  // Fill next month days to complete the 7-column grid
+  const totalCells = Math.ceil(days.length / 7) * 7;
+  const nextDaysNeeded = totalCells - days.length;
+  for (let i = 1; i <= nextDaysNeeded; i++) {
+    const nextMonthDate = new Date(year, month + 1, i);
+    const dateStr = `${nextMonthDate.getFullYear()}-${String(nextMonthDate.getMonth() + 1).padStart(2, '0')}-${String(nextMonthDate.getDate()).padStart(2, '0')}`;
+    days.push({
+      dayNum: i,
+      dateStr,
+      isCurrentMonth: false
+    });
+  }
+  const availMap = React.useMemo(() => getActiveAvailabilities(calendar).reduce((acc, entry) => {
+    if (!acc[entry.date]) acc[entry.date] = [];
+    acc[entry.date].push(entry);
+    return acc;
+  }, {}), [calendar.availabilities]);
+  const participantsMap = React.useMemo(() => getActiveParticipants(calendar).reduce((acc, p) => {
+    acc[p.id] = p;
+    return acc;
+  }, {}), [calendar.participants]);
+  const totalPartCount = Object.keys(participantsMap).length;
+  const holidayMap = React.useMemo(() => {
+    const map = {};
+    [year - 1, year, year + 1].forEach(y => {
+      computeKoreanHolidaysForYear(y).forEach(e => {
+        (map[e.date] = map[e.date] || []).push(e.name);
+      });
+    });
+    return map;
+  }, [year]);
+  const solarTermMap = React.useMemo(() => {
+    const map = {};
+    [year - 1, year, year + 1].forEach(y => {
+      Object.assign(map, getKoreanSolarTermsForYear(y));
+    });
+    return map;
+  }, [year]);
+  const lunarLabelMap = React.useMemo(() => {
+    const map = {};
+    [year - 1, year, year + 1].forEach(y => {
+      const lunar = KOREAN_LUNAR_HOLIDAY_DATES[y];
+      if (!lunar) return;
+      map[lunar.seollal] = '음력 1.1';
+      map[lunar.chuseok] = '음력 8.15';
+      map[lunar.buddha] = '음력 4.8';
+    });
+    return map;
+  }, [year]);
+  return /*#__PURE__*/React.createElement("div", {
+    className: "calendar-card",
+    style: {
+      position: 'relative'
+    }
+  }, isLoading && /*#__PURE__*/React.createElement("div", {
+    className: "calendar-loading-overlay",
+    role: "status",
+    "aria-live": "polite"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "calendar-loading-pill"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "calendar-spinner",
+    "aria-hidden": "true"
+  }), /*#__PURE__*/React.createElement("span", null, "Firebase에서 캘린더 데이터를 불러오는 중입니다."))), /*#__PURE__*/React.createElement("div", {
+    className: "calendar-nav",
+    style: compact ? { flexWrap: 'nowrap' } : undefined
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "month-display",
+    style: {
+      cursor: 'pointer',
+      userSelect: 'none',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '6px'
+    },
+    onClick: () => setIsPickerOpen(v => !v),
+    title: "\uD074\uB9AD\uD558\uC5EC \uB144\uC6D4 \uC774\uB3D9"
+  }, compact ? `${String(year).slice(2)}.${String(month + 1).padStart(2, '0')}` : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", {
+    className: "month-display-year-full"
+  }, `${year}\uB144 `), /*#__PURE__*/React.createElement("span", {
+    className: "month-display-year-short"
+  }, `${String(year).slice(2)}\uB144 `), `${month + 1}\uC6D4`), /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: '#94A3B8',
+      display: 'inline-flex',
+      alignItems: 'center'
+    }
+  }, /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: "24",
+    height: "24",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    "stroke-width": "2",
+    "stroke-linecap": "round",
+    "stroke-linejoin": "round",
+    className: "icon icon-tabler icons-tabler-outline icon-tabler-chevron-down"
+  }, /*#__PURE__*/React.createElement("path", {
+    stroke: "none",
+    d: "M0 0h24v24H0z",
+    fill: "none"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M6 9l6 6l6 -6"
+  })))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: '6px'
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "btn btn-secondary calendar-month-nav-btn",
+    title: "\uC774\uC804\uB2EC",
+    "aria-label": "\uC774\uC804\uB2EC",
+    style: { padding: '8px' },
+    onClick: onPrevMonth
+  }, /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: "20",
+    height: "20",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    "stroke-width": "2",
+    "stroke-linecap": "round",
+    "stroke-linejoin": "round",
+    style: { transform: 'rotate(90deg)' },
+    className: "icon icon-tabler icons-tabler-outline icon-tabler-chevron-down"
+  }, /*#__PURE__*/React.createElement("path", {
+    stroke: "none",
+    d: "M0 0h24v24H0z",
+    fill: "none"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M6 9l6 6l6 -6"
+  }))), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "btn btn-secondary calendar-month-nav-btn",
+    title: "\uC624\uB298",
+    "aria-label": "\uC624\uB298",
+    style: { padding: '8px' },
+    onClick: onToday
+  }, /*#__PURE__*/React.createElement(CalendarCheckIcon, null)), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "btn btn-secondary calendar-month-nav-btn",
+    title: "\uB2E4\uC74C\uB2EC",
+    "aria-label": "\uB2E4\uC74C\uB2EC",
+    style: { padding: '8px' },
+    onClick: onNextMonth
+  }, /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: "20",
+    height: "20",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    "stroke-width": "2",
+    "stroke-linecap": "round",
+    "stroke-linejoin": "round",
+    style: { transform: 'rotate(-90deg)' },
+    className: "icon icon-tabler icons-tabler-outline icon-tabler-chevron-down"
+  }, /*#__PURE__*/React.createElement("path", {
+    stroke: "none",
+    d: "M0 0h24v24H0z",
+    fill: "none"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M6 9l6 6l6 -6"
+  }))))), (() => {
+    const sheet = isPickerOpen && /*#__PURE__*/React.createElement("div", {
+      className: "bottom-sheet-overlay",
+      onClick: () => setIsPickerOpen(false)
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "bottom-sheet",
+      onClick: e => e.stopPropagation()
+    },
+      /*#__PURE__*/React.createElement("div", { className: "bottom-sheet-header" },
+        /*#__PURE__*/React.createElement("h4", null, "\uC5F0\uC6D4 \uC120\uD0DD"),
+        /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          style: { background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer' },
+          onClick: () => setIsPickerOpen(false)
+        }, "\u2715")
+      ),
+      /*#__PURE__*/React.createElement("div", { className: "bottom-sheet-body" },
+        /*#__PURE__*/React.createElement("div", { style: { marginBottom: '16px' } },
+          /*#__PURE__*/React.createElement("label", {
+            style: { fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '8px' }
+          }, "\uB144\uB3C4"),
+          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '10px' } },
+            /*#__PURE__*/React.createElement("button", {
+              type: "button", className: "btn btn-secondary", style: { padding: '4px 10px', fontSize: '0.85rem' },
+              onClick: () => setPickerYear(y => y - 1)
+            }, "\u25C0"),
+            /*#__PURE__*/React.createElement("span", {
+              style: { fontWeight: 800, fontSize: '1.1rem', minWidth: '60px', textAlign: 'center' }
+            }, pickerYear, "\uB144"),
+            /*#__PURE__*/React.createElement("button", {
+              type: "button", className: "btn btn-secondary", style: { padding: '4px 10px', fontSize: '0.85rem' },
+              onClick: () => setPickerYear(y => y + 1)
+            }, "\u25B6")
+          )
+        ),
+        /*#__PURE__*/React.createElement("div", { style: { marginBottom: '16px' } },
+          /*#__PURE__*/React.createElement("label", {
+            style: { fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '8px' }
+          }, "\uC6D4"),
+          /*#__PURE__*/React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' } },
+            MONTH_NAMES.map((name, idx) => /*#__PURE__*/React.createElement("button", {
+              key: idx, type: "button", onClick: () => setPickerMonth(idx),
+              style: {
+                padding: '6px 4px', borderRadius: '8px',
+                border: pickerMonth === idx ? '2px solid var(--accent-primary)' : '1px solid var(--border-subtle)',
+                background: pickerMonth === idx ? 'rgba(99, 102, 241, 0.15)' : 'var(--bg-card)',
+                color: pickerMonth === idx ? 'var(--accent-primary)' : 'var(--text-main)',
+                fontWeight: pickerMonth === idx ? 800 : 500, fontSize: '0.82rem', cursor: 'pointer'
+              }
+            }, name))
+          )
+        ),
+        /*#__PURE__*/React.createElement("button", {
+          type: "button", className: "btn btn-primary", style: { width: '100%' },
+          onClick: handlePickerApply
+        }, pickerYear, "\uB144 ", pickerMonth + 1, "\uC6D4\uB85C \uC774\uB3D9")
+      )
+    ));
+    return sheet && typeof document !== 'undefined' && ReactDOM.createPortal ? ReactDOM.createPortal(sheet, document.body) : sheet;
+  })(), /*#__PURE__*/React.createElement("div", {
+    className: "weekday-grid"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "weekday-label sun"
+  }, "\uC77C"), /*#__PURE__*/React.createElement("div", {
+    className: "weekday-label"
+  }, "\uC6D4"), /*#__PURE__*/React.createElement("div", {
+    className: "weekday-label"
+  }, "\uD654"), /*#__PURE__*/React.createElement("div", {
+    className: "weekday-label"
+  }, "\uC218"), /*#__PURE__*/React.createElement("div", {
+    className: "weekday-label"
+  }, "\uBAA9"), /*#__PURE__*/React.createElement("div", {
+    className: "weekday-label"
+  }, "\uAE08"), /*#__PURE__*/React.createElement("div", {
+    className: "weekday-label sat"
+  }, "\uD1A0")), /*#__PURE__*/React.createElement("div", {
+    className: "days-grid"
+  }, days.map(({
+    dayNum,
+    dateStr,
+    isCurrentMonth
+  }, idx) => {
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const isToday = isCurrentMonth && dateStr === todayStr;
+    const entries = (availMap[dateStr] || []).filter(e => participantsMap[e.participantId]);
+    const uniqueActiveParts = new Set(entries.map(e => e.participantId));
+    const isAllAvailable = totalPartCount > 0 && uniqueActiveParts.size === totalPartCount;
+    const holidayNames = holidayMap[dateStr];
+    const isHoliday = !!holidayNames && holidayNames.length > 0;
+    const lunarLabel = lunarLabelMap[dateStr];
+    const isConfirmed = isDateConfirmedMeeting(calendar, dateStr);
+    const hasExpenses = (() => {
+      const entry = getConfirmedMeetings(calendar).find(m => m.date === dateStr);
+      return entry && Array.isArray(entry.expenses) && entry.expenses.length > 0;
+    })();
+    const solarTermName = !isHoliday && !isAllAvailable ? solarTermMap[dateStr] : null;
+    const cellAnns = getAnniversariesForDate(dateStr, anniversaries);
+    // Only one badge shows next to the date number: holiday name takes priority (it's
+    // tied to the red date styling), then '확정' if this date has been promoted to a
+    // confirmed meeting, then '전원' if everyone's available that day (replacing a solar
+    // term that would otherwise be shown), then the solar term.
+    const cornerText = isHoliday ? holidayNames.join('·') : isConfirmed ? '확정' : isAllAvailable ? '전원' : solarTermName;
+    const cornerColor = isHoliday ? '#EF4444' : isConfirmed ? '#7C3AED' : isAllAvailable ? '#10B981' : '#94A3B8';
+    const cornerTitle = isHoliday ? (lunarLabel ? `${holidayNames.join(', ')} (${lunarLabel})` : holidayNames.join(', ')) : undefined;
+    const columnDow = idx % 7; // 0=Sun .. 6=Sat, since each week row starts on Sunday
+    const isSunday = columnDow === 0;
+    return /*#__PURE__*/React.createElement("div", {
+      key: idx,
+      className: `day-cell ${isCurrentMonth ? '' : 'other-month'} ${isConfirmed ? 'confirmed-meeting' : isAllAvailable ? 'all-available' : ''}`,
+      style: { "--cell-index": idx },
+      onClick: () => onSelectDate(dateStr),
+      onDragOver: event => {
+        event.preventDefault();
+      },
+      onDrop: event => {
+        event.preventDefault();
+        event.stopPropagation();
+        try {
+          const rawData = event.dataTransfer.getData('text/plain');
+          if (!rawData) return;
+          const data = JSON.parse(rawData);
+          if (data.sourceDate === dateStr) return;
+          if (typeof onMoveAvailability === 'function') {
+            onMoveAvailability(data.entryReferId, data.sourceDate, dateStr, data.participantId, data.participantName);
+          }
+        } catch (err) {
+          console.error('Drop error:', err);
+        }
+      }
+    },
+      /* Day cell header row (Date number & holiday/corner label) */
+      /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: '4px',
+          width: '100%'
+        }
+      },
+        /* Left: Date number & Coin icon */
+        /*#__PURE__*/React.createElement("div", {
+          style: {
+            display: 'flex',
+            alignItems: 'center',
+            gap: '2px',
+            flexShrink: 0
+          }
+        },
+          /*#__PURE__*/React.createElement("span", {
+            className: "day-number",
+            style: isToday ? {
+              backgroundColor: '#3B82F6',
+              color: '#FFFFFF',
+              borderRadius: '50%',
+              fontWeight: '800',
+              boxShadow: '0 2px 4px rgba(59, 130, 246, 0.4)',
+              flexShrink: 0
+            } : isHoliday || isSunday ? {
+              color: '#EF4444',
+              fontWeight: '800',
+              flexShrink: 0
+            } : { flexShrink: 0 }
+          }, dayNum),
+          hasExpenses && /*#__PURE__*/React.createElement(CoinIcon, null)
+        ),
+        /* Right: Holiday / status label */
+        cornerText && /*#__PURE__*/React.createElement("span", {
+          className: `day-corner-label${isHoliday ? ' is-holiday' : ''}${isAllAvailable ? ' is-all-available' : ''}`,
+          title: cornerTitle,
+          style: {
+            fontSize: '0.62rem',
+            fontWeight: isHoliday || isAllAvailable ? 800 : 600,
+            color: cornerColor,
+            lineHeight: 1.2,
+            minWidth: 0,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            textAlign: 'right'
+          }
+        }, cornerText)
+      ),
+
+      /* Middle: Schedule badges container */
+      /*#__PURE__*/React.createElement("div", {
+        className: "badges-container"
+      }, entries.map(e => {
+        const p = participantsMap[e.participantId];
+        if (!p) return null;
+        return /*#__PURE__*/React.createElement("span", {
+          key: p.id,
+          className: "participant-badge",
+          style: {
+            backgroundColor: p.color,
+            color: getContrastTextColor(p.color),
+            cursor: 'pointer'
+          },
+          draggable: true,
+          onDragStart: event => {
+            event.stopPropagation();
+            event.dataTransfer.setData('text/plain', JSON.stringify({
+              entryReferId: e.id,
+              sourceDate: dateStr,
+              participantId: e.participantId,
+              participantName: p.name
+            }));
+          },
+          onClick: event => {
+            event.stopPropagation();
+            if (typeof onParticipantClick === 'function') {
+              onParticipantClick(p.name, dateStr);
+            } else if (typeof onSelectDate === 'function') {
+              onSelectDate(dateStr);
+            }
+          },
+          title: e.note ? `${p.name}: ${e.note}` : p.name
+        }, /*#__PURE__*/React.createElement("span", {
+          className: "badge-name"
+        }, p.name));
+      })),
+
+      /* PC Anniversary Badge (desktop-only, soft banner cards at the bottom of schedules) */
+      cellAnns.length > 0 && /*#__PURE__*/React.createElement("div", {
+        className: "day-anniversary-desktop",
+        style: {
+          flexDirection: 'column',
+          gap: '2px',
+          width: '100%',
+          marginTop: 'auto',
+          paddingTop: '8px',
+          pointerEvents: 'none'
+        }
+      }, cellAnns.map((ann, aIdx) => {
+        const displayColor = getAnniversaryDisplayColor(ann, calendar);
+        return /*#__PURE__*/React.createElement("div", {
+          key: ann.id || aIdx,
+          style: {
+            fontSize: '0.66rem',
+            fontWeight: 'bold',
+            color: displayColor,
+            backgroundColor: `${displayColor}15`,
+            borderLeft: `2px solid ${displayColor}`,
+            padding: '2px 6px',
+            borderRadius: '4px',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+            width: '100%',
+            boxSizing: 'border-box'
+          }
+        }, ann.icon, " ", ann.title);
+      })),
+
+      /* Mobile Anniversary Icon Badge (mobile-only, circular icons containing emoji with participant color) */
+      cellAnns.length > 0 && /*#__PURE__*/React.createElement("div", {
+        className: "day-anniversary-mobile",
+        style: {
+          gap: '3px',
+          justifyContent: 'center',
+          width: '100%',
+          marginTop: 'auto',
+          paddingTop: '6px',
+          pointerEvents: 'none',
+          boxSizing: 'border-box',
+          flexWrap: 'wrap'
+        }
+      }, cellAnns.map((ann, aIdx) => {
+        const displayColor = getAnniversaryDisplayColor(ann, calendar);
+        return /*#__PURE__*/React.createElement("div", {
+          key: ann.id || aIdx,
+          title: ann.title,
+          style: {
+            width: '18px',
+            height: '18px',
+            borderRadius: '50%',
+            backgroundColor: displayColor,
+            color: '#FFFFFF',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '0.64rem',
+            flexShrink: 0
+          }
+        }, ann.icon);
+      }))
+    );
+  })));
+}
+
+function CommentsSection({
+  calendar,
+  recentMessages,
+  chatMessages = [],
+  totalChatCount: totalChatCountProp,
+  chatInput,
+  setChatInput,
+  chatParticipantId,
+  setChatParticipantId,
+  isChatSheetOpen,
+  setIsChatSheetOpen,
+  isChatSubmitting,
+  chatTextareaRef,
+  chatImage: chatImages,
+  setChatImage: setChatImages,
+  activeLightbox,
+  setActiveLightbox,
+  onSend,
+  onDeleteMessage,
+  onEditMessage,
+  onMore,
+  showToast,
+  onPromoteImageUrl,
+  onSaveImageTags,
+  onSearchTag
+}) {
+  const React = window.React;
+  const __deps = window.GATHER_UI_DEPS || {};
+  const __comp = window.GATHER_UI_COMPONENTS || {};
+  const ChatSectionIcon = __comp.ChatSectionIcon || __deps.ChatSectionIcon;
+  const EmojiPickerIcon = __comp.EmojiPickerIcon || __deps.EmojiPickerIcon;
+  const EmojiPickerSheet = __comp.EmojiPickerSheet || __deps.EmojiPickerSheet;
+  const ImageProcessingOverlay = __comp.ImageProcessingOverlay || __deps.ImageProcessingOverlay;
+  const Lightbox = __comp.Lightbox || __deps.Lightbox;
+  const SectionToggleButton = __comp.SectionToggleButton || __deps.SectionToggleButton;
+  const getActiveParticipants = __deps.getActiveParticipants;
+  const autoGrowTextarea = __deps.autoGrowTextarea;
+
+  const participants = getActiveParticipants(calendar);
+  const participantsMap = participants.reduce((acc, p) => {
+    acc[p.id] = p;
+    return acc;
+  }, {});
+  const selectedParticipant = participants.find(p => p.id === chatParticipantId);
+  const fileInputRef = React.useRef(null);
+  const [isCollapsed, setIsCollapsed] = React.useState(true); // default closed
+  const [isEmojiPickerOpen, setIsEmojiPickerOpen] = React.useState(false);
+  const canSendChatNow = () => !isChatSubmitting && (!!chatInput.trim() || chatImages.length > 0);
+  const triggerChatSend = useChatSendGuard(onSend, canSendChatNow);
+  const insertEmojiIntoChatInput = (emoji) => {
+    const textarea = chatTextareaRef.current;
+    const start = textarea ? (textarea.selectionStart ?? chatInput.length) : chatInput.length;
+    const end = textarea ? (textarea.selectionEnd ?? chatInput.length) : chatInput.length;
+    const next = chatInput.slice(0, start) + emoji + chatInput.slice(end);
+    setChatInput(next);
+    if (textarea) {
+      requestAnimationFrame(() => {
+        textarea.focus();
+        const pos = start + emoji.length;
+        textarea.setSelectionRange(pos, pos);
+      });
+    }
+  };
+  const revealedMsgId = useTapRevealedMsgId();
+
+  // Total chat count + read/unread badge, tracked locally per calendar (no server-side
+  // read state). chatMessages holds the most recent up to 100 messages, so its length is
+  // an accurate total as long as a calendar hasn't exceeded that many messages ever sent.
+  const totalChatCount = (typeof totalChatCountProp === 'number' && totalChatCountProp >= chatMessages.length)
+    ? totalChatCountProp
+    : Math.max(chatMessages.length, typeof totalChatCountProp === 'number' ? totalChatCountProp : 0);
+  const latestChatTimestamp = chatMessages.length > 0 ? chatMessages[chatMessages.length - 1].timestamp : 0;
+  const [lastReadTimestamp, setLastReadTimestamp] = React.useState(() => getChatLastReadTimestamp(calendar.id));
+  React.useEffect(() => {
+    setLastReadTimestamp(getChatLastReadTimestamp(calendar.id));
+  }, [calendar.id]);
+  const hasUnreadChat = latestChatTimestamp > lastReadTimestamp;
+  const toggleCommentsSection = () => {
+    setIsCollapsed(prev => {
+      const next = !prev;
+      if (next === false && latestChatTimestamp > 0) {
+        setChatLastReadTimestamp(calendar.id, latestChatTimestamp);
+        setLastReadTimestamp(latestChatTimestamp);
+      }
+      return next;
+    });
+  };
+
+  const [imageProcessing, setImageProcessing] = React.useState(null);
+
+  const handleFileChange = async (e) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    try {
+      await appendChatImageFiles({
+        files,
+        currentCount: chatImages.length,
+        setImageProcessing,
+        setChatImages,
+        showToast
+      });
+    } catch (err) {
+      // Belt-and-suspenders: processImageFilesSequentially already isolates per-file
+      // failures, but this guards against anything unexpected (a browser/environment
+      // quirk we haven't seen) surfacing as silent total failure with no feedback at all.
+      console.error('handleFileChange unexpected error:', err);
+      if (showToast) showToast('사진 첨부 중 오류', 'error', 5000);
+    } finally {
+      setImageProcessing(null);
+      e.target.value = '';
+    }
+  };
+
+  const handlePasteImages = async (e) => {
+    const pastedFiles = getImageFilesFromClipboardEvent(e);
+    if (pastedFiles.length === 0) return;
+    const pastedText = e.clipboardData?.getData('text/plain') || '';
+    if (!pastedText) e.preventDefault();
+    try {
+      await appendChatImageFiles({
+        files: pastedFiles,
+        currentCount: chatImages.length,
+        setImageProcessing,
+        setChatImages,
+        showToast
+      });
+    } catch (err) {
+      console.error('handlePasteImages unexpected error:', err);
+      if (showToast) showToast('붙여넣은 사진 첨부 중 오류', 'error', 5000);
+    } finally {
+      setImageProcessing(null);
+    }
+  };
+
+  const reversed = [...recentMessages].reverse();
+  const messagesToShow = isCollapsed
+    ? (reversed.length > 0 ? [reversed[reversed.length - 1]] : [])
+    : reversed;
+
+  return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("section", {
+    style: { textAlign: 'left' }
+  },
+  /* Header */
+  /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: '10px',
+      cursor: 'pointer'
+    },
+    onClick: toggleCommentsSection
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "summary-title",
+    style: { color: '#2563EB', marginBottom: 0, display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold' }
+  }, /*#__PURE__*/React.createElement(ChatSectionIcon, null), "채팅", totalChatCount > 0 && /*#__PURE__*/React.createElement("span", {
+    title: hasUnreadChat ? '읽지 않은 채팅이 있습니다' : '모두 읽었습니다',
+    className: `main-menu-badge${hasUnreadChat ? ' is-unread' : ''}`
+  }, totalChatCount)),
+  /*#__PURE__*/React.createElement(SectionToggleButton, {
+    collapsed: isCollapsed,
+    onToggle: toggleCommentsSection,
+    label: isCollapsed ? "채팅 펼치기" : "채팅 접기"
+  })),
+  /* List Background Panel -- one continuous gray canvas the individual white message
+     bubbles float on, instead of each message having its own separate gray card */
+  /*#__PURE__*/React.createElement("div", {
+    style: {
+      backgroundColor: 'var(--bg-primary)',
+      borderRadius: '12px',
+      padding: '12px',
+      minHeight: '48px'
+    }
+  }, recentMessages.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    style: { color: 'var(--text-muted)', fontSize: '0.85rem', padding: '8px 0', textAlign: 'center' }
+  }, "등록된 채팅이 없습니다.") : /*#__PURE__*/React.createElement("div", {
+    style: { display: 'flex', flexDirection: 'column', gap: '10px' }
+  }, messagesToShow.map(msg => {
+    const p = participantsMap[msg.participantId];
+    const dateInfo = formatCommentDate(msg.timestamp);
+    const isMsgMe = msg.participantId === chatParticipantId;
+    const badgeColor = p?.color || '#94A3B8';
+    const badgeName = p?.name || '알수없음';
+
+    /* === SHARED ELEMENTS === */
+    const bubbleContent = renderChatMessageBody(msg, setActiveLightbox, { maxWidth: '120px', maxHeight: '90px', isMiniChat: true });
+
+    const editSvg = /*#__PURE__*/React.createElement('svg', { xmlns: 'http://www.w3.org/2000/svg', width: '12', height: '12', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '2.5', strokeLinecap: 'round', strokeLinejoin: 'round' },
+      /*#__PURE__*/React.createElement('path', { stroke: 'none', d: 'M0 0h24v24H0z', fill: 'none' }),
+      /*#__PURE__*/React.createElement('path', { d: 'M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4' }),
+      /*#__PURE__*/React.createElement('path', { d: 'M13.5 6.5l4 4' })
+    );
+    const deleteSvg = /*#__PURE__*/React.createElement('svg', { xmlns: 'http://www.w3.org/2000/svg', width: '14', height: '14', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '2', strokeLinecap: 'round', strokeLinejoin: 'round' },
+      /*#__PURE__*/React.createElement('path', { stroke: 'none', d: 'M0 0h24v24H0z', fill: 'none' }),
+      /*#__PURE__*/React.createElement('line', { x1: '18', y1: '6', x2: '6', y2: '18' }),
+      /*#__PURE__*/React.createElement('line', { x1: '6', y1: '6', x2: '18', y2: '18' })
+    );
+
+    /* === UNIFIED CARD LAYOUT (badge + edit/delete on one header row, full-width bubble
+       below, single-line timestamp bottom-right) === */
+    return /*#__PURE__*/React.createElement('div', {
+      key: msg.id,
+      className: `msg-row-hover ${revealedMsgId === msg.id ? 'msg-actions-revealed' : ''}`,
+      'data-msg-row-id': msg.id,
+      style: {
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '6px'
+      }
+    },
+      /* Header row: name badge left; timestamp always visible top-right, with
+         edit/delete (own messages only) appearing to its right on hover/tap */
+      /*#__PURE__*/React.createElement('div', {
+        style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }
+      },
+        /*#__PURE__*/React.createElement('span', {
+          style: { backgroundColor: badgeColor, color: '#FFFFFF', padding: '3px 10px', borderRadius: 'var(--radius-full)', fontSize: '0.75rem', fontWeight: 'bold', whiteSpace: 'nowrap' }
+        }, badgeName),
+        /*#__PURE__*/React.createElement('div', {
+          style: { display: 'flex', alignItems: 'center', gap: '6px' }
+        },
+          /*#__PURE__*/React.createElement('span', {
+            style: { fontSize: '0.72rem', color: '#94A3B8', whiteSpace: 'nowrap' }
+          }, `${dateInfo.dateStr.replace('(', ' (')} ${dateInfo.timeStr}`),
+          isMsgMe ? /*#__PURE__*/React.createElement('div', {
+            className: 'msg-actions-group-inline',
+            style: { display: 'flex', alignItems: 'center', gap: '4px' }
+          },
+            /* Edit Button */
+            /*#__PURE__*/React.createElement('button', {
+              type: 'button', onClick: () => onEditMessage && onEditMessage(msg), title: '편집',
+              style: { width: '22px', height: '22px', border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-card)', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0, color: '#64748B' }
+            }, editSvg),
+            /* Delete Button */
+            /*#__PURE__*/React.createElement('button', {
+              type: 'button', onClick: () => onDeleteMessage && onDeleteMessage(msg), title: '삭제',
+              style: { width: '22px', height: '22px', border: 'none', background: 'none', padding: 0, cursor: 'pointer', color: '#94A3B8', display: 'flex', alignItems: 'center', justifyContent: 'center' }
+            }, deleteSvg)
+          ) : null
+        )
+      ),
+      /* Full-width bubble with top tail pointing to name badge */
+      /*#__PURE__*/React.createElement('div', { style: { position: 'relative', marginTop: '2px' } },
+        /* Outer tail (border color) */
+        /*#__PURE__*/React.createElement('div', {
+          style: { position: 'absolute', top: '-7px', left: '18px', width: 0, height: 0, borderLeft: '7px solid transparent', borderRight: '7px solid transparent', borderBottom: '7px solid var(--border-subtle)', zIndex: 2 }
+        }),
+        /* Inner tail (white fill) */
+        /*#__PURE__*/React.createElement('div', {
+          style: { position: 'absolute', top: '-5px', left: '19px', width: 0, height: 0, borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderBottom: '6px solid var(--bg-card)', zIndex: 3 }
+        }),
+        /* Bubble container */
+        /*#__PURE__*/React.createElement('div', {
+          style: { backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '10px 12px', fontSize: '0.85rem', lineHeight: '1.4', color: 'var(--text-main)', wordBreak: 'keep-all', overflowWrap: 'break-word', whiteSpace: 'pre-wrap', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', position: 'relative', zIndex: 1 }
+        }, bubbleContent)
+      )
+    );
+  }),
+  /* Full Width "이전 채팅 더보기" Button at bottom of list */
+  recentMessages.length > 0 && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: onMore,
+    style: {
+      width: '100%',
+      backgroundColor: 'color-mix(in srgb, var(--bg-primary) 96%, black)',
+      border: 'none',
+      borderRadius: '8px',
+      padding: '8px 0',
+      fontSize: '0.85rem',
+      fontWeight: 'bold',
+      color: 'var(--text-main)',
+      cursor: 'pointer',
+      textAlign: 'center'
+    }
+  }, "이전 채팅 더보기")
+  )),
+  /* Input row */
+  /*#__PURE__*/React.createElement("div", {
+    style: {
+      backgroundColor: 'var(--bg-card)',
+      border: '1px solid var(--border-subtle)',
+      borderRadius: '12px',
+      padding: '12px',
+      marginTop: '12px',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '10px',
+      boxSizing: 'border-box'
+    }
+  },
+    /* Textarea at top */
+    /*#__PURE__*/React.createElement("textarea", {
+      ref: chatTextareaRef,
+      placeholder: "채팅을 입력하세요...",
+      value: chatInput,
+      maxLength: 5000,
+      onChange: e => { setChatInput(e.target.value); autoGrowTextarea(e.target, 100); },
+      onPaste: handlePasteImages,
+      onKeyDown: e => {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+          e.preventDefault();
+          triggerChatSend();
+        }
+      },
+      style: {
+        width: '100%',
+        height: '44px',
+        minHeight: '44px',
+        maxHeight: '100px',
+        resize: 'none',
+        border: 'none',
+        background: 'none',
+        padding: '2px 4px',
+        fontSize: '0.85rem',
+        lineHeight: '1.4',
+        fontFamily: 'inherit',
+        outline: 'none',
+        boxSizing: 'border-box',
+        overflowY: 'auto'
+      }
+    }),
+
+    /* Attached Images Preview (between Textarea and Action Row) */
+    chatImages.length > 0 ? /*#__PURE__*/React.createElement("div", {
+      style: { display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '4px', alignSelf: 'flex-start' }
+    }, chatImages.map((img, index) => /*#__PURE__*/React.createElement("div", {
+      key: index,
+      style: { position: 'relative', display: 'inline-block' }
+    }, /*#__PURE__*/React.createElement("img", {
+      src: img.thumbnail,
+      alt: `첨부 미리보기 ${index + 1}`,
+      style: {
+        width: '60px',
+        height: '60px',
+        objectFit: 'cover',
+        borderRadius: '8px',
+        display: 'block'
+      }
+    }), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => setChatImages(prev => prev.filter((_, idx) => idx !== index)),
+      style: {
+        position: 'absolute',
+        top: '-6px',
+        right: '-6px',
+        width: '18px',
+        height: '18px',
+        borderRadius: '50%',
+        backgroundColor: '#475569',
+        border: 'none',
+        cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 0,
+        color: '#FFFFFF'
+      }
+    }, /*#__PURE__*/React.createElement("svg", {
+      xmlns: "http://www.w3.org/2000/svg",
+      width: "10",
+      height: "10",
+      viewBox: "0 0 24 24",
+      fill: "none",
+      stroke: "#FFFFFF",
+      strokeWidth: "3",
+      strokeLinecap: "round",
+      strokeLinejoin: "round"
+    }, /*#__PURE__*/React.createElement("line", { x1: "18", y1: "6", x2: "6", y2: "18" }), /*#__PURE__*/React.createElement("line", { x1: "6", y1: "6", x2: "18", y2: "18" })))))) : null,
+
+    /* Hidden File Input */
+    /*#__PURE__*/React.createElement("input", {
+      ref: fileInputRef,
+      type: "file",
+      accept: "image/jpeg, image/png, image/gif, image/webp, image/heic, image/heif, image/*",
+      multiple: true,
+      style: { position: 'absolute', width: '1px', height: '1px', padding: 0, margin: '-1px', overflow: 'hidden', clip: 'rect(0,0,0,0)', border: 0 },
+      onChange: handleFileChange
+    }),
+
+    /* Action Row (Select box, Camera, Send) at bottom */
+    /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        width: '100%',
+        borderTop: '1px solid var(--border-subtle)',
+        paddingTop: '8px',
+        marginTop: '2px'
+      }
+    },
+      /* Left side: Participant select capsule button */
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: () => setIsChatSheetOpen(true),
+        style: {
+          backgroundColor: selectedParticipant?.color || '#94A3B8',
+          color: '#FFFFFF',
+          border: 'none',
+          borderRadius: 'var(--radius-full)',
+          padding: '6px 14px',
+          fontSize: '0.8rem',
+          fontWeight: 'bold',
+          cursor: 'pointer',
+          whiteSpace: 'nowrap',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          height: '32px',
+          flexShrink: 0
+        }
+      }, selectedParticipant?.name || '선택', /*#__PURE__*/React.createElement("span", {
+        style: { fontSize: '0.6rem' }
+      }, "▼")),
+
+      /* Right side: Camera button & Send button */
+      /*#__PURE__*/React.createElement("div", {
+        style: { display: 'flex', alignItems: 'center', gap: '8px' }
+      },
+        /* Emoji Button */
+        /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          onClick: () => setIsEmojiPickerOpen(true),
+          title: "이모티콘",
+          style: {
+            width: '32px',
+            height: '32px',
+            borderRadius: '50%',
+            border: '1px solid var(--border-subtle)',
+            backgroundColor: 'var(--bg-card)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+            padding: 0,
+            color: '#64748B'
+          }
+        }, /*#__PURE__*/React.createElement(EmojiPickerIcon, null)),
+        /* Camera/Image Button */
+        /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          onClick: () => fileInputRef.current && fileInputRef.current.click(),
+          title: "사진 첨부",
+          style: {
+            width: '32px',
+            height: '32px',
+            borderRadius: '50%',
+            border: '1px solid var(--border-subtle)',
+            backgroundColor: 'var(--bg-card)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+            padding: 0,
+            color: '#64748B'
+          }
+        }, /*#__PURE__*/React.createElement("svg", {
+          xmlns: "http://www.w3.org/2000/svg",
+          width: "18",
+          height: "18",
+          viewBox: "0 0 24 24",
+          fill: "none",
+          stroke: "currentColor",
+          strokeWidth: "2",
+          strokeLinecap: "round",
+          strokeLinejoin: "round"
+        },
+          /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }),
+          /*#__PURE__*/React.createElement("path", { d: "M15 8h.01" }),
+          /*#__PURE__*/React.createElement("path", { d: "M12.5 21h-6.5a3 3 0 0 1 -3 -3v-12a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v6.5" }),
+          /*#__PURE__*/React.createElement("path", { d: "M3 16l5 -5c.928 -.893 2.072 -.893 3 0l4 4" }),
+          /*#__PURE__*/React.createElement("path", { d: "M14 14l1 -1c.67 -.644 1.45 -.824 2.182 -.54" }),
+          /*#__PURE__*/React.createElement("path", { d: "M16 19h6" }),
+          /*#__PURE__*/React.createElement("path", { d: "M19 16v6" })
+        )),
+
+        /* Send Button */
+        /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          disabled: isChatSubmitting || (!chatInput.trim() && chatImages.length === 0),
+          onClick: triggerChatSend,
+          style: {
+            height: '32px',
+            padding: '0 16px',
+            fontSize: '0.82rem',
+            fontWeight: 'bold',
+            backgroundColor: '#57606F',
+            color: '#FFFFFF',
+            border: 'none',
+            borderRadius: '16px',
+            cursor: 'pointer',
+            whiteSpace: 'nowrap',
+            opacity: (chatInput.trim() || chatImages.length > 0) && !isChatSubmitting ? 1 : 0.6
+          }
+        }, isChatSubmitting ? '...' : '전송')
+      )
+    )
+  ),
+  activeLightbox ? /*#__PURE__*/React.createElement(Lightbox, {
+    urls: activeLightbox.urls,
+    index: activeLightbox.index,
+    meta: activeLightbox.meta,
+    onClose: () => setActiveLightbox(null),
+    onNavigate: i => setActiveLightbox(prev => prev ? { ...prev, index: i } : prev),
+    showToast,
+    onPromoteImageUrl,
+    onSaveImageTags,
+    onSearchTag
+  }) : null), imageProcessing && /*#__PURE__*/React.createElement(ImageProcessingOverlay, imageProcessing),
+  isEmojiPickerOpen && /*#__PURE__*/React.createElement(EmojiPickerSheet, {
+    onSelect: insertEmojiIntoChatInput,
+    onClose: () => setIsEmojiPickerOpen(false)
+  }));
+}
+
+function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onSelectTag, onCommentsChange, getBorderColor, onRequestConfirm, showToast }) {
+  const React = window.React;
+  const __deps = window.GATHER_UI_DEPS || {};
+  const __comp = window.GATHER_UI_COMPONENTS || {};
+  const ChatParticipantSheet = __comp.ChatParticipantSheet || __deps.ChatParticipantSheet;
+  const LinkPreviewCard = __comp.LinkPreviewCard || __deps.LinkPreviewCard;
+  const MessageCommentIcon = __comp.MessageCommentIcon || __deps.MessageCommentIcon;
+  const ParticipantPickerButton = __comp.ParticipantPickerButton || __deps.ParticipantPickerButton;
+  const PencilIcon = __comp.PencilIcon || __deps.PencilIcon;
+  const ShareIcon = __comp.ShareIcon || __deps.ShareIcon;
+  const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
+  const sanitizeText = __deps.sanitizeText;
+  const extractFirstUrl = __deps.extractFirstUrl;
+
+  const imageUrls = memo.imageUrls || [];
+  const thumbUrls = memo.thumbUrls || [];
+
+  // Comments: stored inline on the memo doc as a size-capped array (see hasValidMemoShape in
+  // firestore.rules -- comments.size() <= 200, no per-comment shape lock). Composer mirrors the
+  // tag-input module's pattern.
+  const comments = memo.comments || [];
+  const [isCommentComposerOpen, setIsCommentComposerOpen] = React.useState(false);
+  const [commentText, setCommentText] = React.useState('');
+  const [commentParticipantId, setCommentParticipantId] = React.useState(() => getStoredChatParticipantId(calendar?.id, calendar));
+  const [isCommentPartOpen, setIsCommentPartOpen] = React.useState(false);
+  const [editingCommentId, setEditingCommentId] = React.useState(null);
+  const commentPart = (calendar?.participants || []).find(p => p.id === commentParticipantId);
+
+  const handleSaveComment = (e) => {
+    e.stopPropagation();
+    const text = commentText.trim();
+    if (!text || !commentParticipantId) return;
+    const now = Date.now();
+    const wasEditing = !!editingCommentId;
+    const nextComments = editingCommentId
+      ? comments.map(c => c.id === editingCommentId ? { ...c, text, participantId: commentParticipantId, updatedAt: now } : c)
+      : [...comments, { id: `cmt_${now}_${Math.random().toString(36).slice(2, 8)}`, participantId: commentParticipantId, text, createdAt: now }];
+    onCommentsChange(nextComments);
+    setCommentText('');
+    setEditingCommentId(null);
+    setIsCommentComposerOpen(false);
+    if (typeof showToast === 'function') {
+      showToast(wasEditing ? '댓글이 수정되었습니다' : '댓글이 등록되었습니다', 'success');
+    }
+  };
+
+  const handleStartEditComment = (e, comment) => {
+    e.stopPropagation();
+    setEditingCommentId(comment.id);
+    setCommentText(comment.text);
+    setCommentParticipantId(comment.participantId);
+    setIsCommentComposerOpen(true);
+  };
+
+  const handleDeleteComment = (e, comment) => {
+    e.stopPropagation();
+    const commentId = typeof comment === 'string' ? comment : comment?.id;
+    if (!commentId) return;
+    const target = typeof comment === 'object' && comment ? comment : comments.find(c => c.id === commentId);
+    const author = (calendar?.participants || []).find(p => p.id === (target?.participantId || ''));
+    const authorName = author?.name || '참여자';
+    const snippet = sanitizeText(String(target?.text || ''), 40);
+    const message = snippet
+      ? `${authorName}님의 '${snippet}' 댓글을 삭제하시겠습니까?`
+      : `${authorName}님의 댓글을 삭제하시겠습니까?`;
+    const doDelete = () => {
+      onCommentsChange(comments.filter(c => c.id !== commentId));
+      if (editingCommentId === commentId) {
+        setEditingCommentId(null);
+        setCommentText('');
+        setIsCommentComposerOpen(false);
+      }
+      if (typeof showToast === 'function') showToast('댓글이 삭제되었습니다', 'success');
+    };
+    if (typeof onRequestConfirm === 'function') {
+      onRequestConfirm('댓글 삭제', message, doDelete);
+    } else if (window.confirm(message)) {
+      doDelete();
+    }
+  };
+
+  // Reusable multi-image proportional CSS Grid to cleanly fit layout inside card
+  const renderMemoCardImages = () => {
+    if (imageUrls.length === 0) return null;
+    if (imageUrls.length === 1) {
+      return /*#__PURE__*/React.createElement("img", {
+        src: thumbUrls[0] || imageUrls[0],
+        style: { width: '100%', maxHeight: '140px', objectFit: 'cover', borderRadius: '6px', marginBottom: '8px' }
+      });
+    }
+
+    const cols = imageUrls.length === 2 ? 2 : 3;
+    const maxW = imageUrls.length === 2 ? '100%' : '100%';
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'grid',
+        gridTemplateColumns: `repeat(${cols}, 1fr)`,
+        gap: '4px',
+        width: '100%',
+        maxWidth: maxW,
+        marginBottom: '8px'
+      }
+    }, thumbUrls.slice(0, 6).map((thumb, idx) => /*#__PURE__*/React.createElement("img", {
+      key: idx,
+      src: thumb || imageUrls[idx],
+      style: {
+        display: 'block',
+        width: '100%',
+        aspectRatio: '1',
+        borderRadius: '4px',
+        objectFit: 'cover'
+      }
+    })));
+  };
+
+  return /*#__PURE__*/React.createElement("div", {
+    onClick: (e) => {
+      const t = e.target;
+      if (t && t.closest && t.closest('input, textarea, select, button, a, [data-stop-card-open]')) return;
+      onOpenEdit(memo);
+    },
+    role: "button",
+    tabIndex: 0,
+    onKeyDown: (e) => {
+      // 댓글 등 입력 중 Space/Enter는 카드 열기로 처리하지 않음
+      const t = e.target;
+      const tag = (t && t.tagName || '').toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select' || (t && t.isContentEditable)) return;
+      if (t && t.closest && t.closest('input, textarea, select, button, a, [data-stop-card-open]')) return;
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        onOpenEdit(memo);
+      }
+    },
+    style: {
+      backgroundColor: memo.color || 'var(--bg-card)',
+      border: '0',
+      borderRadius: '12px',
+      padding: '12px',
+      cursor: 'pointer',
+      boxShadow: '0 2px 5px rgba(0,0,0,0.03)',
+      display: 'flex',
+      flexDirection: 'column',
+      position: 'relative',
+      transition: 'box-shadow 0.2s ease',
+      boxSizing: 'border-box'
+    },
+    className: "memo-card-hover"
+  },
+    /* Share button -- sits immediately left of the pin toggle, same absolute-positioned/
+       unstyled-button pattern, same 16px icon size, stroke weight and color as the pin's
+       neutral ("off") state -- including its 0.2 opacity, which is what actually reads as
+       "weight" at a glance (the stroke-width/color values were already identical; the visual
+       mismatch was the pin's off-state being much fainter than a full-opacity share icon). */
+    /*#__PURE__*/React.createElement("button", {
+      onClick: (e) => {
+        e.stopPropagation();
+        if (onShare) onShare(memo);
+      },
+      title: "메모 공유",
+      style: {
+        position: 'absolute', top: '10px', right: '34px',
+        background: 'none', border: 'none', cursor: 'pointer',
+        color: '#64748B', opacity: 0.2,
+        display: 'flex', alignItems: 'center'
+      },
+      className: "memo-card-share-btn"
+    }, /*#__PURE__*/React.createElement(ShareIcon, { size: 16 })),
+    /* Pin action toggle button (stops click propagation so it doesn't open edit modal!) */
+    /*#__PURE__*/React.createElement("button", {
+      onClick: (e) => {
+        e.stopPropagation();
+        onTogglePin();
+      },
+      style: {
+        position: 'absolute', top: '10px', right: '10px',
+        background: 'none', border: 'none', cursor: 'pointer',
+        color: memo.isPinned ? '#F59E0B' : '#64748B',
+        opacity: memo.isPinned ? 1 : 0.2
+      },
+      className: "memo-card-pin-btn"
+    }, memo.isPinned ?
+      /* ON state filled pin SVG */
+      /*#__PURE__*/React.createElement("svg", {
+        xmlns: "http://www.w3.org/2000/svg", width: "16", height: "16", viewBox: "0 0 24 24", fill: "currentColor", className: "icon icon-tabler icon-tabler-filled icon-tabler-pin"
+      }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), /*#__PURE__*/React.createElement("path", { d: "M15.113 3.21l.094 .083l5.5 5.5a1 1 0 0 1 -1.175 1.59l-3.172 3.171l-1.424 3.797a1 1 0 0 1 -.158 .277l-.07 .08l-1.5 1.5a1 1 0 0 1 -1.32 .082l-.095 -.083l-2.793 -2.792l-3.793 3.792a1 1 0 0 1 -1.497 -1.32l.083 -.094l3.792 -3.793l-2.792 -2.793a1 1 0 0 1 -.083 -1.32l.083 -.094l1.5 -1.5a1 1 0 0 1 .258 -.187l.098 -.042l3.796 -1.425l3.171 -3.17a1 1 0 0 1 1.497 -1.26z" }))
+    :
+      /* OFF state outline pin SVG */
+      /*#__PURE__*/React.createElement("svg", {
+        xmlns: "http://www.w3.org/2000/svg", width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", className: "icon icon-tabler icons-tabler-outline icon-tabler-pin"
+      }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), /*#__PURE__*/React.createElement("path", { d: "M15 4.5l-4 4l-4 1.5l-1.5 1.5l7 7l1.5 -1.5l1.5 -4l4 -4" }), /*#__PURE__*/React.createElement("path", { d: "M9 15l-4.5 4.5" }), /*#__PURE__*/React.createElement("path", { d: "M14.5 4l5.5 5.5" }))
+    ),
+
+    /* Title if exists -- paddingRight now clears both the share and pin icons (44px) */
+    memo.title && /*#__PURE__*/React.createElement("div", {
+      style: { fontSize: '1rem', fontWeight: 'bold', color: 'var(--text-main)', marginBottom: '8px', paddingRight: '44px', wordBreak: 'break-all' }
+    }, memo.title),
+
+    /* Images */
+    renderMemoCardImages(),
+
+    /* Content Body -- when a link preview card is available below, the bare URL inside the
+       text is redundant (same link shown twice), so it's stripped from the body here only.
+       memo.linkPreview is the source of truth for whether the preview actually has content
+       (same field LinkPreviewCard's cachedData reads), so this stays in sync with it. */
+    memo.text && /*#__PURE__*/React.createElement("div", {
+      style: { fontSize: '0.82rem', color: 'var(--text-main)', lineHeight: '1.4', whiteSpace: 'pre-wrap', overflowWrap: 'break-word', wordBreak: 'break-all' }
+    }, parseTextWithLinks(memo.linkPreview ? removeFirstUrl(memo.text) : memo.text)),
+
+    /* Link Preview Card under the card content if applicable */
+    extractFirstUrl(memo.text) && /*#__PURE__*/React.createElement("div", {
+      style: { marginTop: '8px' }
+    }, /*#__PURE__*/React.createElement(LinkPreviewCard, { url: extractFirstUrl(memo.text), cachedData: memo.linkPreview })),
+
+    /* Tags container if exists */
+    /*#__PURE__*/React.createElement("div", {
+      style: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px', marginTop: '10px' }
+    },
+      /* Writer badge (capsule with participant's color and white text) */
+      (() => {
+        const writer = (calendar?.participants || []).find(p => p.id === memo.participantId);
+        if (!writer) return null;
+        return /*#__PURE__*/React.createElement("span", {
+          style: {
+            backgroundColor: writer.color || '#94A3B8',
+            color: '#FFFFFF',
+            borderRadius: 'var(--radius-full)',
+            padding: '3px 8px',
+            fontSize: '0.68rem',
+            fontWeight: 'bold',
+            lineHeight: 1,
+            whiteSpace: 'nowrap'
+          }
+        }, writer.name);
+      })(),
+      
+      /* Tags */
+      memo.tags && memo.tags.length > 0 && memo.tags.map(tag => /*#__PURE__*/React.createElement("span", {
+        key: tag,
+        onClick: (e) => {
+          e.stopPropagation();
+          onSelectTag(tag);
+        },
+        style: {
+          fontSize: '0.68rem', fontWeight: '600',
+          color: '#2563EB', backgroundColor: 'rgba(37, 99, 235, 0.08)',
+          padding: '3px 8px', borderRadius: '4px',
+          cursor: 'pointer', lineHeight: 1,
+          whiteSpace: 'nowrap'
+        }
+      }, tag)),
+
+      /* Comment toggle button -- pushed to the far right of the row */
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: (e) => {
+          e.stopPropagation();
+          setEditingCommentId(null);
+          setCommentText('');
+          setIsCommentComposerOpen(v => !v);
+        },
+        title: "댓글",
+        "aria-label": "댓글",
+        style: {
+          marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', padding: '2px',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: (comments.length > 0 || isCommentComposerOpen) ? 'var(--accent-primary)' : '#94A3B8', flexShrink: 0
+        }
+      }, /*#__PURE__*/React.createElement(MessageCommentIcon, { size: 18 }))
+    ),
+
+    /* Comment list -- gray capsule rows: participant-color dot, text, edit/delete */
+    comments.length > 0 && /*#__PURE__*/React.createElement("div", {
+      style: { display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '8px' }
+    }, comments.map(comment => {
+      const author = (calendar?.participants || []).find(p => p.id === comment.participantId);
+      return /*#__PURE__*/React.createElement("div", {
+        key: comment.id,
+        onClick: e => e.stopPropagation(),
+        style: {
+          display: 'flex', alignItems: 'center', gap: '8px',
+          backgroundColor: 'rgba(148, 163, 184, 0.14)', borderRadius: '8px', padding: '6px 8px'
+        }
+      },
+        /*#__PURE__*/React.createElement("span", {
+          style: { width: '8px', height: '8px', borderRadius: '50%', backgroundColor: author?.color || '#94A3B8', flexShrink: 0 }
+        }),
+        /*#__PURE__*/React.createElement("span", {
+          style: { flex: 1, minWidth: 0, fontSize: '0.78rem', color: 'var(--text-main)', wordBreak: 'break-word' }
+        }, comment.text),
+        /*#__PURE__*/React.createElement("button", {
+          type: "button", onClick: e => handleStartEditComment(e, comment), title: "편집", "aria-label": "댓글 편집",
+          style: { background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', color: '#64748B', flexShrink: 0 }
+        }, /*#__PURE__*/React.createElement(PencilIcon, { size: 12 })),
+        /*#__PURE__*/React.createElement("button", {
+          type: "button", onClick: e => handleDeleteComment(e, comment), title: "삭제", "aria-label": "댓글 삭제",
+          style: { background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', color: '#64748B', flexShrink: 0 }
+        }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 12 }))
+      );
+    })),
+
+    /* Comment composer -- same shape as the tag-input module: participant picker + input + save */
+    isCommentComposerOpen && /*#__PURE__*/React.createElement("div", {
+      onClick: e => e.stopPropagation(),
+      style: { display: 'flex', alignItems: 'center', gap: '6px', marginTop: '8px' }
+    },
+      /*#__PURE__*/React.createElement(ParticipantPickerButton, {
+        participant: commentPart,
+        onClick: () => setIsCommentPartOpen(true)
+      }),
+      /*#__PURE__*/React.createElement("input", {
+        type: "text",
+        value: commentText,
+        onChange: e => setCommentText(e.target.value),
+        onClick: e => e.stopPropagation(),
+        onKeyDown: e => {
+          e.stopPropagation();
+          if (e.key === 'Enter') {
+            if (e.nativeEvent && e.nativeEvent.isComposing) return;
+            e.preventDefault();
+            handleSaveComment(e);
+          }
+        },
+        placeholder: "댓글을 입력하세요...",
+        style: { flex: 1, minWidth: 0, height: '30px', fontSize: '0.8rem', border: '1px solid var(--border-subtle)', borderRadius: '6px', padding: '0 8px', backgroundColor: 'var(--bg-primary)', color: 'var(--text-main)', outline: 'none', boxSizing: 'border-box' }
+      }),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: handleSaveComment,
+        disabled: !commentText.trim() || !commentParticipantId,
+        style: {
+          flexShrink: 0, height: '30px', padding: '0 12px', borderRadius: '6px', border: 'none',
+          backgroundColor: 'var(--accent-primary)', color: '#FFFFFF', fontSize: '0.78rem', fontWeight: 'bold',
+          cursor: 'pointer', opacity: (commentText.trim() && commentParticipantId) ? 1 : 0.5
+        }
+      }, "저장")
+    ),
+
+    isCommentPartOpen && /*#__PURE__*/React.createElement(ChatParticipantSheet, {
+      calendar: calendar,
+      selectedId: commentParticipantId,
+      onSelect: id => { setCommentParticipantId(id); setIsCommentPartOpen(false); },
+      onClose: () => setIsCommentPartOpen(false)
+    })
+  );
+}
+
+function PollList({ calendar, onCreatePoll, onEditPoll, onVotePoll, onCancelVote, onRequestConfirm, expandSignal }) {
+  const React = window.React;
+  const __deps = window.GATHER_UI_DEPS || {};
+  const __comp = window.GATHER_UI_COMPONENTS || {};
+  const PollSectionIcon = __comp.PollSectionIcon || __deps.PollSectionIcon;
+  const SectionCountBadge = __comp.SectionCountBadge || __deps.SectionCountBadge;
+  const SectionToggleButton = __comp.SectionToggleButton || __deps.SectionToggleButton;
+  const SettingsIcon = __comp.SettingsIcon || __deps.SettingsIcon;
+  const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
+  const getActiveParticipants = __deps.getActiveParticipants;
+  const renderTextWithUrlBadge = __deps.renderTextWithUrlBadge;
+
+  // Closed (deadline-passed) polls stay in 진행중 투표 rather than disappearing -- they're shown
+  // with a "confirmed" treatment (dimmed card + winning-option badge) instead of being filtered
+  // out, so the group can still see what was decided without having to dig through poll history.
+  const polls = getCalendarPolls(calendar);
+  const participants = getActiveParticipants(calendar);
+  const participantsMap = participants.reduce((acc, participant) => {
+    acc[participant.id] = participant;
+    return acc;
+  }, {});
+  const [isCollapsed, setIsCollapsed] = React.useState(true); // default closed
+  const [openPollIds, setOpenPollIds] = React.useState({});
+
+  // Header's "투표" main-menu button bumps expandSignal to force this section open (and its
+  // poll cards visible) even if the user had collapsed it -- scrolling here without expanding
+  // would otherwise land on an empty-looking, collapsed header.
+  React.useEffect(() => {
+    if (expandSignal) setIsCollapsed(false);
+  }, [expandSignal]);
+
+  // A poll can be visually open two ways: the whole section is expanded (!isCollapsed), or
+  // it was opened individually while the section stayed collapsed (openPollIds[id]). The
+  // section-level arrow button needs to know if ANYTHING is open to decide its direction --
+  // toggling the raw isCollapsed flag alone would expand a section that's already showing an
+  // individually-opened poll (since isCollapsed was never flipped to false for that), instead
+  // of closing it like the button visually promises.
+  const anyPollOpen = !isCollapsed || Object.values(openPollIds).some(Boolean);
+  const togglePollList = () => {
+    if (anyPollOpen) {
+      setIsCollapsed(true);
+      setOpenPollIds({});
+    } else {
+      setIsCollapsed(false);
+    }
+  };
+
+  return /*#__PURE__*/React.createElement("section", {
+    className: "polls-panel",
+    style: { textAlign: 'left' }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "polls-panel-header",
+    style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' },
+    onClick: togglePollList
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "summary-title",
+    style: { color: '#2563EB', marginBottom: 0, display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold' }
+  }, /*#__PURE__*/React.createElement(PollSectionIcon, null), "\uC9C4\uD589\uC911 \uD22C\uD45C ", /*#__PURE__*/React.createElement(SectionCountBadge, { count: polls.length })),
+  /*#__PURE__*/React.createElement(SectionToggleButton, {
+    collapsed: !anyPollOpen,
+    onToggle: togglePollList,
+    label: anyPollOpen ? "진행중 투표 접기" : "진행중 투표 펼치기"
+  })), polls.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    style: { color: 'var(--text-muted)', fontSize: '0.85rem', padding: '10px 0', textAlign: 'center' }
+  }, "\uC544\uC9C1 \uC0DD\uC131\uB41C \uD22C\uD45C\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.") : /*#__PURE__*/React.createElement("div", {
+    className: "polls-section"
+  }, polls.map(poll => {
+    const isOptionsVisible = !isCollapsed || !!openPollIds[poll.id];
+    const closed = isPollClosed(poll);
+    // Winning option(s) for a closed poll -- ties mark every tied option, and a poll nobody
+    // voted on marks none (no (투표확정) badge shown anywhere in that case). Used to both pin
+    // the winning row(s) to the top of the option list and tag them with a badge in place,
+    // rather than a separate summary line under the title/description.
+    const winningOptionIds = (() => {
+      if (!closed) return new Set();
+      const optionsWithVotes = getActivePollOptions(poll).map(option => ({
+        id: option.id,
+        count: getPollOptionVoterIds(poll, option.id).length
+      }));
+      const maxVotes = optionsWithVotes.reduce((max, o) => Math.max(max, o.count), 0);
+      if (maxVotes <= 0) return new Set();
+      return new Set(optionsWithVotes.filter(o => o.count === maxVotes).map(o => o.id));
+    })();
+    const orderedOptions = (() => {
+      const active = getActivePollOptions(poll);
+      if (!closed || winningOptionIds.size === 0) return active;
+      const winners = active.filter(option => winningOptionIds.has(option.id));
+      const rest = active.filter(option => !winningOptionIds.has(option.id));
+      return [...winners, ...rest];
+    })();
+    // A closed poll's winning row stays visible under the description even while the section/
+    // this poll is collapsed, instead of disappearing along with the rest of the option list --
+    // expanding still shows every option (winner first, per orderedOptions above).
+    const showOptionList = isOptionsVisible || (closed && winningOptionIds.size > 0);
+    const visibleOptions = isOptionsVisible ? orderedOptions : orderedOptions.filter(option => winningOptionIds.has(option.id));
+    // 미참여: active roster members who haven't voted on ANY option of this poll yet (union
+    // across options, not per-option) -- who still needs a nudge to vote at all.
+    const votedParticipantIds = new Set(
+      getActivePollOptions(poll).flatMap(option => getPollOptionVoterIds(poll, option.id))
+    );
+    const nonVoters = participants.filter(p => !votedParticipantIds.has(p.id));
+    const renderNonVoterBadges = className => nonVoters.length > 0 && /*#__PURE__*/React.createElement("div", {
+      key: className, className
+    },
+      /*#__PURE__*/React.createElement("span", {
+        style: { fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', whiteSpace: 'nowrap' }
+      }, "미참여"),
+      nonVoters.map(p => /*#__PURE__*/React.createElement("span", {
+        key: p.id,
+        className: "participant-badge",
+        style: { backgroundColor: p.color, color: getContrastTextColor(p.color), opacity: 0.65, fontSize: '0.7rem' }
+      }, p.name))
+    );
+
+    const togglePollOptions = (event) => {
+      if (isCollapsed) {
+        event.stopPropagation();
+        setOpenPollIds(prev => ({
+          ...prev,
+          [poll.id]: !prev[poll.id]
+        }));
+      }
+    };
+
+    return /*#__PURE__*/React.createElement("section", {
+      key: poll.id,
+      className: "poll-card",
+      style: closed ? { backgroundColor: 'var(--bg-primary)' } : undefined
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "poll-header",
+      style: {
+        alignItems: 'center',
+        marginBottom: showOptionList ? '12px' : '0'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      onClick: togglePollOptions,
+      style: { cursor: isCollapsed ? 'pointer' : 'default', flex: 1 }
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "poll-title",
+      style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }
+    }, poll.title, poll.deadline && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: 'var(--radius-full)', whiteSpace: 'nowrap',
+        backgroundColor: closed ? '#FEE2E2' : '#EFF6FF', color: closed ? '#DC2626' : '#2563EB'
+      }
+    }, closed ? '마감됨' : `마감 ${formatPollDeadline(poll.deadline)}`)), poll.description && /*#__PURE__*/React.createElement("div", {
+      className: "poll-desc"
+    }, renderTextWithUrlBadge(poll.description))), renderNonVoterBadges('poll-nonvoters-desktop'), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      className: "btn btn-secondary",
+      title: "\uD22C\uD45C \uC124\uC815",
+      style: { padding: '8px' },
+      onClick: () => onEditPoll(poll)
+    }, /*#__PURE__*/React.createElement(SettingsIcon, null))), renderNonVoterBadges('poll-nonvoters-mobile'), showOptionList && /*#__PURE__*/React.createElement("div", {
+      className: "poll-option-list"
+    }, visibleOptions.map((option, index) => {
+      const voterIds = getPollOptionVoterIds(poll, option.id).filter(participantId => participantsMap[participantId]);
+      const voteCount = voterIds.length;
+      // Relative to the participant roster, not the sum of votes across options, so an option
+      // everyone voted for reads as a full 100% bar even on a multi-select poll.
+      const percent = participants.length > 0 ? Math.min(100, Math.round(voteCount / participants.length * 100)) : 0;
+      const isWinner = winningOptionIds.has(option.id);
+      return /*#__PURE__*/React.createElement("div", {
+        key: option.id,
+        className: `poll-option-row${isWinner ? ' is-confirmed-winner' : ''}`
+      }, /*#__PURE__*/React.createElement("div", {
+        className: "poll-option-main"
+      }, /*#__PURE__*/React.createElement("div", {
+        style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }
+      }, isWinner && /*#__PURE__*/React.createElement("span", {
+        className: "poll-confirmed-badge"
+      }, "투표확정"), /*#__PURE__*/React.createElement("span", null, option.text)), option.url && /*#__PURE__*/React.createElement("span", {
+        className: "poll-option-link",
+        onClick: event => {
+          event.stopPropagation();
+          window.open(option.url, '_blank', 'noopener,noreferrer');
+        },
+        title: "\uC0C8\uCC3D\uC73C\uB85C \uB9C1\uD06C \uC5F4\uAE30"
+      }, option.url)), /*#__PURE__*/React.createElement("div", {
+        className: "poll-result-row"
+      }, /*#__PURE__*/React.createElement("div", {
+        className: "poll-progress",
+        title: `${percent}%`
+      }, /*#__PURE__*/React.createElement("div", {
+        className: "poll-progress-fill",
+        style: { width: `${percent}%` }
+      })), /*#__PURE__*/React.createElement("span", {
+        className: "poll-vote-count"
+      }, voteCount, "\uD45C")), /*#__PURE__*/React.createElement("div", {
+        className: "poll-vote-actions"
+      }, /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "btn btn-secondary",
+        onClick: () => onVotePoll(poll, option),
+        style: closed ? { display: 'none' } : undefined
+      }, "\uD22C\uD45C\uD558\uAE30"), voterIds.length > 0 && /*#__PURE__*/React.createElement("div", {
+        className: "poll-voter-badges"
+      }, voterIds.map(participantId => {
+        const participant = participantsMap[participantId];
+        const textColor = getContrastTextColor(participant.color);
+        return /*#__PURE__*/React.createElement("span", {
+          key: participantId,
+          className: "poll-voter-badge",
+          style: {
+            backgroundColor: participant.color,
+            color: textColor,
+            // .poll-voter-badge's CSS padding is intentionally right-light (3px 4px 3px 8px) to
+            // make room for the 투표 취소 (X) button below -- once that button stops rendering
+            // (closed poll), the smaller right padding alone made the name text look off-center,
+            // hugging the right edge. Restore symmetric padding here when there's no button.
+            ...(closed ? { padding: '3px 8px' } : null)
+          }
+        }, participant.name, !closed && /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          className: "poll-voter-remove",
+          title: `${participant.name} \uD22C\uD45C \uCDE8\uC18C`,
+          onClick: event => {
+            event.stopPropagation();
+            onRequestConfirm('투표 취소', `${participant.name}님 투표를 취소하시겠습니까?`, () => {
+              onCancelVote(poll, option, participant.id);
+            });
+          }
+        }, /*#__PURE__*/React.createElement(SmallXIcon, null)));
+      }))));
+    })));
+  })));
+}
+
+function GlobalSearchModal({
+  calendar,
+  chatMessages,
+  memos,
+  onClose,
+  onSelectDate,
+  onOpenChatMessage,
+  onOpenImage,
+  onOpenMemo,
+  initialQuery = ''
+}) {
+  const React = window.React;
+  const __deps = window.GATHER_UI_DEPS || {};
+  const __comp = window.GATHER_UI_COMPONENTS || {};
+  const ResizableModalContainer = __comp.ResizableModalContainer || __deps.ResizableModalContainer;
+  const SearchCategoryTabs = __comp.SearchCategoryTabs || __deps.SearchCategoryTabs;
+  const SearchIcon = __comp.SearchIcon || __deps.SearchIcon;
+  const SearchResultLogRow = __comp.SearchResultLogRow || __deps.SearchResultLogRow;
+  const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
+
+  const [query, setQuery] = React.useState(initialQuery);
+  const inputRef = React.useRef(null);
+  React.useEffect(() => { inputRef.current?.focus(); }, []);
+
+  const q = query.trim().toLowerCase();
+
+  // chatMessages/memos are capped for display (chat: last 100 live; memos: paginated), so
+  // search would miss older items. First search of the session fetches a much deeper (but still
+  // bounded) history -- a truly unbounded .get() here would re-download every message/memo a
+  // calendar has ever had on every session's first search, which only gets more expensive as a
+  // calendar accumulates history. 2000 of each is comfortably beyond what any of this app's
+  // calendars have ever had, while still capping the worst case.
+  const [fullHistory, setFullHistory] = React.useState(null);
+  const [isLoadingFullHistory, setIsLoadingFullHistory] = React.useState(false);
+  React.useEffect(() => {
+    if (!q || fullHistory || isLoadingFullHistory || !calendar?.id || !firebaseDb) return;
+    setIsLoadingFullHistory(true);
+    Promise.all([
+      firebaseDb.collection('calendars').doc(`cal_${calendar.id}`).collection('messages').orderBy('timestamp', 'desc').limit(GLOBAL_SEARCH_HISTORY_LIMIT).get(),
+      firebaseDb.collection('calendars').doc(`cal_${calendar.id}`).collection('memos').orderBy('createdAt', 'desc').limit(GLOBAL_SEARCH_HISTORY_LIMIT).get()
+    ]).then(([messagesSnap, memosSnap]) => {
+      setFullHistory({
+        chatMessages: messagesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })),
+        memos: memosSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+      });
+    }).catch(err => {
+      console.warn('Full-history search fetch failed, falling back to already-loaded data:', err);
+    }).finally(() => {
+      setIsLoadingFullHistory(false);
+    });
+  }, [q, fullHistory, isLoadingFullHistory, calendar?.id]);
+
+  const matches = React.useMemo(
+    () => computeCalendarSearchMatches(calendar, fullHistory?.chatMessages || chatMessages, fullHistory?.memos || memos, q, 30),
+    [calendar, fullHistory, chatMessages, memos, q]
+  );
+
+  const tabDefs = [
+    { key: 'schedules', label: '일정', count: matches.schedules.length },
+    { key: 'chat', label: '채팅', count: matches.chat.length },
+    { key: 'tags', label: '태그', count: matches.tags.length },
+    { key: 'expenses', label: '정산', count: matches.expenses.length },
+    { key: 'memos', label: '메모', count: matches.memos.length }
+  ];
+  const hasResults = tabDefs.some(t => t.count > 0);
+
+  const [activeTab, setActiveTab] = React.useState('schedules');
+  // Whenever the query (or its results) changes, jump to the first category that actually has
+  // matches instead of leaving the user staring at an empty tab.
+  React.useEffect(() => {
+    if (!q) return;
+    setActiveTab(prev => {
+      const prevDef = tabDefs.find(t => t.key === prev);
+      if (prevDef && prevDef.count > 0) return prev;
+      const firstNonEmpty = tabDefs.find(t => t.count > 0);
+      return firstNonEmpty ? firstNonEmpty.key : prev;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q, matches.schedules.length, matches.chat.length, matches.tags.length, matches.expenses.length, matches.memos.length]);
+
+  return /*#__PURE__*/React.createElement("div", {
+    className: "modal-overlay",
+    onClick: onClose,
+    style: { zIndex: 11000 }
+  }, /*#__PURE__*/React.createElement(ResizableModalContainer, {
+    className: "modal-container",
+    onClick: e => e.stopPropagation(),
+    style: { maxWidth: '520px' }
+  },
+    /*#__PURE__*/React.createElement("div", { className: "modal-header" },
+      /*#__PURE__*/React.createElement("h3", { style: { fontSize: '1.1rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px' } },
+        /*#__PURE__*/React.createElement(SearchIcon, null), "검색"
+      ),
+      /*#__PURE__*/React.createElement("button", {
+        onClick: onClose,
+        style: { background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer', display: 'flex', alignItems: 'center' }
+      }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }))
+    ),
+    /*#__PURE__*/React.createElement("div", { className: "modal-body" },
+      /*#__PURE__*/React.createElement("input", {
+        ref: inputRef,
+        type: "text",
+        className: "form-input",
+        style: { width: '100%' },
+        placeholder: "일정, 채팅, 태그, 정산, 메모 검색...",
+        value: query,
+        onChange: e => setQuery(e.target.value)
+      }),
+
+      isLoadingFullHistory && /*#__PURE__*/React.createElement("div", {
+        style: { fontSize: '0.76rem', color: 'var(--text-muted)', marginTop: '8px' }
+      }, "전체 기록에서 검색 중..."),
+
+      q && hasResults && /*#__PURE__*/React.createElement("div", {
+        style: { position: 'sticky', top: '-18px', backgroundColor: 'var(--bg-card)', zIndex: 10, marginTop: '10px', marginBottom: '12px' }
+      }, /*#__PURE__*/React.createElement(SearchCategoryTabs, { tabs: tabDefs, activeKey: activeTab, onSelect: setActiveTab })),
+
+      !q && /*#__PURE__*/React.createElement("div", { style: { padding: '30px', color: '#94A3B8', fontSize: '0.85rem', textAlign: 'center' } }, "검색어를 입력해 주세요."),
+      q && !hasResults && /*#__PURE__*/React.createElement("div", { style: { padding: '30px', color: '#94A3B8', fontSize: '0.85rem', textAlign: 'center' } }, "검색 결과가 없습니다."),
+
+      q && hasResults && activeTab === 'schedules' && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
+        matches.schedules.map(item => /*#__PURE__*/React.createElement(SearchResultLogRow, {
+          key: `${item.date}_${item.participantId}`,
+          badgeName: item.participantName,
+          badgeColor: item.participantColor,
+          timeStr: formatDateWithDayName(item.date),
+          onClick: () => { onSelectDate(item.date); onClose(); }
+        }, highlightKeyword(item.note || '', q)))
+      ),
+
+      q && hasResults && activeTab === 'chat' && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
+        matches.chat.map(msg => /*#__PURE__*/React.createElement(SearchResultLogRow, {
+          key: msg.id,
+          badgeName: msg.participantName,
+          badgeColor: msg.participantColor,
+          timeStr: formatLogTimestamp(msg.timestamp),
+          onClick: () => { onOpenChatMessage(msg.id); onClose(); }
+        }, highlightKeyword(msg.text || '', q)))
+      ),
+
+      q && hasResults && activeTab === 'tags' && /*#__PURE__*/React.createElement("div", {
+        style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(72px, 100%), 1fr))', gap: '6px' }
+      },
+        matches.tags.map(entry => /*#__PURE__*/React.createElement("button", {
+          key: `${entry.messageId}_${entry.directMediaUrl ? 'direct' : entry.imageIndex}`,
+          type: "button",
+          title: entry.tags,
+          onClick: () => { onOpenImage && onOpenImage(entry.messageId, entry.imageIndex, entry.directMediaUrl); onClose(); },
+          style: { padding: 0, border: 0, background: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '4px' }
+        },
+          /*#__PURE__*/React.createElement("img", {
+            src: entry.thumb,
+            alt: entry.tags || '태그된 사진',
+            loading: "lazy",
+            style: { width: '100%', aspectRatio: '1 / 1', objectFit: 'cover', borderRadius: 'var(--radius-sm)' }
+          }),
+          /*#__PURE__*/React.createElement("span", {
+            style: { fontSize: '0.68rem', color: '#64748B', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
+          }, highlightKeyword(entry.tags || '', q))
+        ))
+      ),
+
+      q && hasResults && activeTab === 'expenses' && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
+        matches.expenses.map(exp => /*#__PURE__*/React.createElement(SearchResultLogRow, {
+          key: exp.id,
+          badgeName: exp.categoryName,
+          badgeColor: exp.categoryColor,
+          timeStr: formatDateWithDayName(exp.date),
+          onClick: () => { onSelectDate(exp.date); onClose(); }
+        }, highlightKeyword(exp.label || exp.url || '', q), ' · ', /*#__PURE__*/React.createElement("span", {
+          style: { fontWeight: 800, color: exp.amount < 0 ? '#16A34A' : '#DC2626' }
+        }, `${exp.amount < 0 ? '+' : '-'}${Math.abs(Number(exp.amount)).toLocaleString()}원`)))
+      ),
+
+      q && hasResults && activeTab === 'memos' && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
+        matches.memos.map(memo => /*#__PURE__*/React.createElement(SearchResultLogRow, {
+          key: memo.id,
+          badgeName: memo.participantName,
+          badgeColor: memo.participantColor,
+          timeStr: formatLogTimestamp(memo.createdAt),
+          onClick: () => { onOpenMemo && onOpenMemo(memo.id); onClose(); }
+        },
+          memo.title && /*#__PURE__*/React.createElement("div", { style: { fontWeight: 800, marginBottom: '2px' } }, highlightKeyword(memo.title, q)),
+          memo.text && highlightKeyword(memo.text.length > 80 ? memo.text.slice(0, 80) + '...' : memo.text, q)
+        ))
+      )
+    )
+  ));
+}
+
+function EditMessageModal({
+  message,
+  calendar,
+  onSave,
+  onClose,
+  showToast
+}) {
+  const React = window.React;
+  const __deps = window.GATHER_UI_DEPS || {};
+  const __comp = window.GATHER_UI_COMPONENTS || {};
+  const ChatParticipantSheet = __comp.ChatParticipantSheet || __deps.ChatParticipantSheet;
+  const ImageProcessingOverlay = __comp.ImageProcessingOverlay || __deps.ImageProcessingOverlay;
+  const ImageThumbRemoveButton = __comp.ImageThumbRemoveButton || __deps.ImageThumbRemoveButton;
+  const ParticipantPickerButton = __comp.ParticipantPickerButton || __deps.ParticipantPickerButton;
+  const ResizableModalContainer = __comp.ResizableModalContainer || __deps.ResizableModalContainer;
+  const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
+  const autoGrowTextarea = __deps.autoGrowTextarea;
+
+  const [text, setText] = React.useState(message.text || '');
+  const [participantId, setParticipantId] = React.useState(message.participantId || '');
+  const [isPartSheetOpen, setIsPartSheetOpen] = React.useState(false);
+  const part = (calendar.participants || []).find(p => p.id === participantId);
+  const [images, setImages] = React.useState(() => {
+    const urls = Array.isArray(message.imageUrls) && message.imageUrls.length > 0
+      ? message.imageUrls
+      : (message.imageUrl ? [message.imageUrl] : []);
+    const thumbs = Array.isArray(message.thumbUrls) && message.thumbUrls.length > 0
+      ? message.thumbUrls
+      : (message.thumbUrl ? [message.thumbUrl] : []);
+    return urls.map((url, idx) => ({ original: url, thumbnail: thumbs[idx] || url, isExisting: true }));
+  });
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const fileInputRefEdit = React.useRef(null);
+  const [imageProcessingEdit, setImageProcessingEdit] = React.useState(null);
+  const editTextareaRef = React.useRef(null);
+  React.useEffect(() => autoGrowTextarea(editTextareaRef.current, 240), []);
+
+  const handleFileChangeEdit = async (e) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    try {
+      const remainingSlots = 50 - images.length;
+      if (remainingSlots <= 0) {
+        if (showToast) showToast('사진 최대 50장', 'error');
+        return;
+      }
+
+      const filesToProcess = Array.from(files).slice(0, remainingSlots);
+      if (files.length > remainingSlots && showToast) {
+        showToast(`${remainingSlots}장만 추가됨 (최대 50장)`, 'info');
+      }
+
+      setImageProcessingEdit({ current: 0, total: filesToProcess.length });
+      const { succeeded, failed } = await processImageFilesSequentially(
+        filesToProcess,
+        progress => setImageProcessingEdit(progress)
+      );
+
+      if (succeeded.length > 0) {
+        setImages(prev => [...prev, ...succeeded]);
+      }
+      if (failed.length > 0) {
+        console.error('Image compression failed for:', failed.map(f => f.fileName));
+        const message = describeImageProcessingFailures(failed);
+        if (showToast) showToast(message, 'error', 5000);
+        else alert(message);
+      }
+    } catch (err) {
+      console.error('handleFileChangeEdit unexpected error:', err);
+      const message = '사진 첨부 중 오류';
+      if (showToast) showToast(message, 'error', 5000);
+      else alert(message);
+    } finally {
+      setImageProcessingEdit(null);
+      e.target.value = '';
+    }
+  };
+
+  const handleSave = async () => {
+    if ((!text.trim() && images.length === 0) || isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      await onSave(text.trim(), images, participantId);
+      onClose();
+    } catch (err) {
+      console.error('EditMessageModal save error:', err);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    className: "modal-overlay",
+    onClick: () => { if (!isSubmitting) onClose(); },
+    style: { zIndex: 11000 }
+  }, /*#__PURE__*/React.createElement(ResizableModalContainer, {
+    className: "modal-container",
+    onClick: e => e.stopPropagation(),
+    style: { width: '90%', maxWidth: '400px', padding: '16px', borderRadius: '12px' }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: '14px',
+      borderBottom: '1px solid var(--border-subtle)',
+      paddingBottom: '8px'
+    }
+  }, /*#__PURE__*/React.createElement("h3", {
+    style: { fontSize: '1rem', fontWeight: 800, color: 'var(--text-main)', margin: 0 }
+  }, "채팅 수정"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => { if (!isSubmitting) onClose(); },
+    style: { background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer', display: 'flex', alignItems: 'center' }
+  }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }))), /*#__PURE__*/React.createElement("div", {
+    style: { display: 'flex', flexDirection: 'column', gap: '12px' }
+  },
+  images.length > 0 ? /*#__PURE__*/React.createElement("div", {
+    style: { display: 'flex', flexWrap: 'wrap', gap: '8px', alignSelf: 'flex-start' }
+  }, images.map((img, index) => /*#__PURE__*/React.createElement("div", {
+    key: index,
+    style: { position: 'relative', display: 'inline-block' }
+  }, /*#__PURE__*/React.createElement("img", {
+    src: img.thumbnail,
+    alt: `수정 이미지 미리보기 ${index + 1}`,
+    style: {
+      width: '80px',
+      height: '80px',
+      objectFit: 'cover',
+      borderRadius: '8px',
+      display: 'block',
+      border: '1px solid var(--border-subtle)'
+    }
+  }), /*#__PURE__*/React.createElement(ImageThumbRemoveButton, {
+    onClick: () => setImages(prev => prev.filter((_, idx) => idx !== index))
+  })))) : null,
+  /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'flex-end',
+      gap: '8px',
+      backgroundColor: 'var(--bg-primary)',
+      border: '1px solid var(--border-subtle)',
+      borderRadius: '12px',
+      padding: '8px'
+    }
+  }, /*#__PURE__*/React.createElement("textarea", {
+    ref: editTextareaRef,
+    placeholder: "수정할 채팅을 입력하세요...",
+    value: text,
+    onChange: e => {
+      setText(e.target.value);
+      autoGrowTextarea(e.target, 240);
+    },
+    style: {
+      flex: 1,
+      minWidth: 0,
+      height: '80px',
+      minHeight: '80px',
+      maxHeight: '240px',
+      resize: 'none',
+      border: 'none',
+      backgroundColor: 'transparent',
+      fontSize: '0.88rem',
+      lineHeight: '1.4',
+      fontFamily: 'inherit',
+      outline: 'none',
+      boxSizing: 'border-box',
+      overflowY: 'auto'
+    }
+  }), /*#__PURE__*/React.createElement("input", {
+    ref: fileInputRefEdit,
+    type: "file",
+    accept: "image/*",
+    multiple: true,
+    style: { position: 'absolute', width: '1px', height: '1px', padding: 0, margin: '-1px', overflow: 'hidden', clip: 'rect(0,0,0,0)', border: 0 },
+    onChange: handleFileChangeEdit
+  }), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => fileInputRefEdit.current && fileInputRefEdit.current.click(),
+    title: "사진 첨부",
+    style: {
+      width: '32px',
+      height: '32px',
+      borderRadius: '50%',
+      border: '1px solid var(--border-subtle)',
+      backgroundColor: 'var(--bg-card)',
+      cursor: 'pointer',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexShrink: 0,
+      padding: 0,
+      color: 'var(--text-muted)'
+    }
+  }, /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: "16",
+    height: "16",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: "2",
+    strokeLinecap: "round",
+    strokeLinejoin: "round"
+  }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), /*#__PURE__*/React.createElement("path", { d: "M15 8h.01" }), /*#__PURE__*/React.createElement("path", { d: "M12.5 21h-6.5a3 3 0 0 1 -3 -3v-12a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v6.5" }), /*#__PURE__*/React.createElement("path", { d: "M3 16l5 -5c.928 -.893 2.072 -.893 3 0l4 4" }), /*#__PURE__*/React.createElement("path", { d: "M14 14l1 -1c.67 -.644 1.45 -.824 2.182 -.54" }), /*#__PURE__*/React.createElement("path", { d: "M16 19h6" }), /*#__PURE__*/React.createElement("path", { d: "M19 16v6" })))), /*#_PURE_*/React.createElement("div", {
+    style: { display: 'flex', gap: '8px', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }
+  },
+    /* Participant reassignment -- fixes a message posted under the wrong participant */
+    /*#__PURE__*/React.createElement(ParticipantPickerButton, {
+      participant: part,
+      onClick: () => setIsPartSheetOpen(true)
+    }),
+    /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px' } },
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "btn btn-secondary",
+        disabled: isSubmitting,
+        onClick: onClose,
+        style: { height: '34px', fontSize: '0.85rem', padding: '0 14px' }
+      }, "취소"),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "btn btn-poll-create",
+        disabled: isSubmitting || (!text.trim() && images.length === 0),
+        onClick: handleSave,
+        style: { height: '34px', fontSize: '0.85rem', padding: '0 16px', opacity: (text.trim() || images.length > 0) && !isSubmitting ? 1 : 0.6 }
+      }, isSubmitting ? '...' : "수정")
+    )
+  )))), isPartSheetOpen && /*#__PURE__*/React.createElement(ChatParticipantSheet, {
+    calendar: calendar,
+    selectedId: participantId,
+    onSelect: id => { setParticipantId(id); setIsPartSheetOpen(false); },
+    onClose: () => setIsPartSheetOpen(false)
+  }), imageProcessingEdit && /*#__PURE__*/React.createElement(ImageProcessingOverlay, imageProcessingEdit));
+}
+
+  window.GATHER_UI_COMPONENTS = Object.assign({}, window.GATHER_UI_COMPONENTS || {}, {
+    CalendarGrid: CalendarGrid,
+    CommentsSection: CommentsSection,
+    MemoCard: MemoCard,
+    PollList: PollList,
+    GlobalSearchModal: GlobalSearchModal,
+    EditMessageModal: EditMessageModal
+  });
+})();
