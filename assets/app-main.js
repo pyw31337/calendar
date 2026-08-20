@@ -14583,97 +14583,10 @@ function ChatParticipantSheet({ calendar, selectedId, onSelect, onClose }) {
   );
 }
 
-function ConfirmDialog({ title, message, onConfirm, onCancel, showPasswordInput }) {
-  const [password, setPassword] = React.useState('');
-  const [errorMsg, setErrorMsg] = React.useState('');
+const ConfirmDialog = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ConfirmDialog)
+  ? window.GATHER_UI_COMPONENTS.ConfirmDialog
+  : function ConfirmDialogFallback() { return null; };
 
-  React.useEffect(() => {
-    const onKeyDown = (e) => {
-      if (e.key === 'Escape') onCancel();
-      if (e.key === 'Enter') handleConfirmClick();
-    };
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
-  }, [password]);
-
-  const handleConfirmClick = async () => {
-    if (showPasswordInput) {
-      if (!password) {
-        setErrorMsg('비밀번호를 입력하세요.');
-        return;
-      }
-      let ok;
-      try {
-        ok = await verifyAdminPasswordRemote(password);
-      } catch (err) {
-        setErrorMsg(err?.message || '비밀번호 확인 중 오류가 발생했습니다.');
-        return;
-      }
-      if (!ok) {
-        setErrorMsg('비밀번호가 일치하지 않습니다.');
-        return;
-      }
-    }
-    onConfirm();
-  };
-
-  return /*#__PURE__*/React.createElement("div", {
-    className: "modal-overlay",
-    onClick: onCancel,
-    style: { zIndex: 30000 }
-  }, /*#__PURE__*/React.createElement(ResizableModalContainer, {
-    className: "modal-container",
-    onClick: e => e.stopPropagation(),
-    style: { maxWidth: '320px', padding: '20px', borderRadius: '12px' }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: { textAlign: 'center', marginBottom: '20px' }
-  },
-    title ? /*#__PURE__*/React.createElement("h3", {
-      style: { fontSize: '1.05rem', fontWeight: 800, marginBottom: '8px', color: 'var(--text-main)' }
-    }, title) : null,
-    /*#__PURE__*/React.createElement("p", {
-      style: { fontSize: '0.88rem', color: 'var(--text-muted)', lineHeight: '1.5', wordBreak: 'keep-all' }
-    }, message)
-  ), 
-  showPasswordInput && /*#__PURE__*/React.createElement("div", { style: { marginBottom: '14px', textAlign: 'left' } },
-    /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.78rem', fontWeight: 'bold', color: 'var(--text-muted)', marginBottom: '6px' } }, "어드민 비밀번호"),
-    /*#__PURE__*/React.createElement("input", {
-      type: "password",
-      className: "form-input",
-      placeholder: "비밀번호 입력",
-      value: password,
-      onChange: e => { setPassword(e.target.value); setErrorMsg(''); },
-      style: { width: '100%', boxSizing: 'border-box' }
-    }),
-    errorMsg && /*#__PURE__*/React.createElement("div", { style: { color: '#EF4444', fontSize: '0.72rem', marginTop: '4px', fontWeight: 'bold' } }, errorMsg)
-  ),
-  /*#__PURE__*/React.createElement("div", {
-    style: { display: 'flex', gap: '8px', justifyContent: 'center' }
-  },
-    /*#__PURE__*/React.createElement("button", {
-      type: "button",
-      className: "btn btn-secondary",
-      onClick: onCancel,
-      style: { flex: 1, height: '36px', fontSize: '0.85rem' }
-    }, "취소"),
-    /*#__PURE__*/React.createElement("button", {
-      type: "button",
-      className: "btn btn-danger",
-      onClick: handleConfirmClick,
-      style: {
-        flex: 1,
-        height: '36px',
-        fontSize: '0.85rem',
-        backgroundColor: '#EF4444',
-        color: '#FFFFFF',
-        border: 'none',
-        borderRadius: '6px',
-        fontWeight: 'bold',
-        cursor: 'pointer'
-      }
-    }, "확인")
-  )));
-}
 
 function DeleteConfirmModal({
   message,
@@ -27682,6 +27595,15 @@ function ResizableModalContainer({ className, style, children, ...props }) {
     )
   );
 }
+
+function bindGatherUiDeps() {
+  window.GATHER_UI_DEPS = Object.assign({}, window.GATHER_UI_DEPS || {}, {
+    ResizableModalContainer: typeof ResizableModalContainer === 'function' ? ResizableModalContainer : null,
+    verifyAdminPasswordRemote: typeof verifyAdminPasswordRemote === 'function' ? verifyAdminPasswordRemote : null
+  });
+}
+bindGatherUiDeps();
+
 
 try {
   const rootElement = document.getElementById('root');

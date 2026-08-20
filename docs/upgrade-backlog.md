@@ -45,7 +45,8 @@
 - P3-4 kkot/cw/jhair 격리 확인 ✅ 2026-08-20 (check:isolation + calId guards)
 
 ### P4 UI 분리
-- ConfirmDialog, ShareModal, SideMenu, Lightbox
+- ConfirmDialog ✅ 2026-08-20 (assets/ui-confirm-dialog.js)
+- ShareModal, SideMenu, Lightbox
 
 ### P5 UX 잔여
 - 공유 URL/OG, 디자인 규칙 누락, 모바일 체크리스트
