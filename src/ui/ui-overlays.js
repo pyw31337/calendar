@@ -1,8 +1,7 @@
 /**
  * Overlay / emoji picker UI (P4-5)
  */
-(function () {
-function ImageUploadOverlay({ pct, remainingSec, label, current, total }) {
+export function ImageUploadOverlay({ pct, remainingSec, label, current, total }) {
   const React = window.React;
 
   const clamped = Math.max(0, Math.min(100, pct || 0));
@@ -23,7 +22,7 @@ function ImageUploadOverlay({ pct, remainingSec, label, current, total }) {
   ));
 }
 
-function ImageProcessingOverlay({ current, total, fileName, pct, remainingSec }) {
+export function ImageProcessingOverlay({ current, total, fileName, pct, remainingSec }) {
   const React = window.React;
 
   if (!total) return null;
@@ -42,7 +41,7 @@ function ImageProcessingOverlay({ current, total, fileName, pct, remainingSec })
   ));
 }
 
-function EmojiGridButton({ emoji, onSelect }) {
+export function EmojiGridButton({ emoji, onSelect }) {
   const React = window.React;
 
   const [imgFailed, setImgFailed] = React.useState(false);
@@ -64,7 +63,7 @@ function EmojiGridButton({ emoji, onSelect }) {
     }));
 }
 
-function EmojiPickerSheet({ onSelect, onClose }) {
+export function EmojiPickerSheet({ onSelect, onClose }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const EmojiGridButton = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.EmojiGridButton) || __deps.EmojiGridButton;
@@ -104,10 +103,11 @@ function EmojiPickerSheet({ onSelect, onClose }) {
   return ReactDOM.createPortal(sheet, document.body);
 }
 
+  if (typeof window !== 'undefined') {
   window.GATHER_UI_COMPONENTS = Object.assign({}, window.GATHER_UI_COMPONENTS || {}, {
     ImageUploadOverlay: ImageUploadOverlay,
     ImageProcessingOverlay: ImageProcessingOverlay,
     EmojiGridButton: EmojiGridButton,
     EmojiPickerSheet: EmojiPickerSheet
   });
-})();
+}

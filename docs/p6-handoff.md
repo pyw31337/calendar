@@ -100,3 +100,10 @@ zsh 에서 줄 시작 `#` 주석은 쓰지 말 것.
 - npm run build: 모듈 12개, dist JS ~40KB
 - 라이브 경로 유지. Pages 전환 아직 금지.
 - 다음: ui-overlays 또는 ui-widgets
+
+## P6-10 진행 (2026-08-20)
+- src/ui/ui-overlays.js 를 ESM export (assets/ 미변경)
+- ImageUploadOverlay / ImageProcessingOverlay / EmojiGridButton / EmojiPickerSheet
+- src/main.jsx 에서 import
+- 라이브 경로 유지. Pages 전환 아직 금지.
+- 다음: ui-widgets 또는 ui-chat-sheets

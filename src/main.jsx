@@ -8,6 +8,12 @@ import { GATHER_APP_NOTIFICATIONS } from './core/app-notifications.js';
 import { GATHER_FIREBASE_SERVICES } from './core/firebase-services.js';
 import { ConfirmDialog } from './ui/ui-confirm-dialog.js';
 import { ShareModal } from './ui/ui-share-modal.js';
+import {
+  ImageUploadOverlay,
+  ImageProcessingOverlay,
+  EmojiGridButton,
+  EmojiPickerSheet
+} from './ui/ui-overlays.js';
 
 console.log('[P6] Vite entry loaded', {
   constants: !!GATHER_APP_CONSTANTS,
@@ -19,5 +25,7 @@ console.log('[P6] Vite entry loaded', {
   firebaseServices: !!GATHER_FIREBASE_SERVICES,
   ConfirmDialog: typeof ConfirmDialog,
   ShareModal: typeof ShareModal,
+  ImageUploadOverlay: typeof ImageUploadOverlay,
+  EmojiPickerSheet: typeof EmojiPickerSheet,
   publicCalendarIds: GATHER_APP_CONFIG.PUBLIC_CALENDAR_IDS
 });
