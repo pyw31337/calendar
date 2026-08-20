@@ -1010,11 +1010,12 @@ export function LinkPreviewCard({ url, fallbackTitle, cachedData }) {
     target: '_blank',
     rel: 'noopener noreferrer',
     onClick: e => e.stopPropagation(),
+    className: 'link-preview-card',
     style: {
       display: 'flex',
       gap: '8px',
       marginTop: '6px',
-      border: '1px solid #E2E8F0',
+      border: '1px solid var(--border-subtle)',
       borderRadius: '8px',
       overflow: 'hidden',
       textDecoration: 'none',

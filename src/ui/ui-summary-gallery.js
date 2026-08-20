@@ -837,10 +837,10 @@ export function PhotoGallery({ chatMessages, totalGalleryCount, onViewAll, showT
   return /*#__PURE__*/React.createElement("section", { className: "summary-card" },
     /*#__PURE__*/React.createElement("div", {
       className: `summary-title${collapsed ? ' is-collapsed' : ''}`,
-      style: { display: 'flex', alignItems: 'center', gap: '6px', width: '100%' }
+      style: { display: 'flex', alignItems: 'center', gap: '6px', width: '100%', color: '#2563EB' }
     },
       /*#__PURE__*/React.createElement("div", {
-        style: { display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0 }
+        style: { display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0, color: '#2563EB' }
       },
         /*#__PURE__*/React.createElement(GalleryIcon, null),
         /*#__PURE__*/React.createElement("span", null, "갤러리"),

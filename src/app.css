@@ -3438,3 +3438,56 @@ textarea.form-input {
 :root:not([data-theme="light"]) .url-capsule-badge {
   background: #1B2540 !important; color: #A5B4FC !important; border-color: #312E81 !important;
 }
+
+
+/* ===== P6-57 dark mode surfaces ===== */
+.link-preview-card {
+  border-color: var(--border-subtle) !important;
+  background: var(--bg-card) !important;
+}
+.poll-deadline-badge.is-open { background: #EFF6FF; color: #2563EB; }
+.poll-deadline-badge.is-closed { background: #FEE2E2; color: #DC2626; }
+:root[data-theme="dark"] .poll-deadline-badge.is-open,
+:root:not([data-theme="light"]) .poll-deadline-badge.is-open {
+  background: #1E3A5F; color: #93C5FD;
+}
+:root[data-theme="dark"] .poll-deadline-badge.is-closed,
+:root:not([data-theme="light"]) .poll-deadline-badge.is-closed {
+  background: #3F1D1D; color: #FCA5A5;
+}
+:root[data-theme="dark"] .admin-side-menu,
+:root:not([data-theme="light"]) .admin-side-menu {
+  background: #131B2E !important;
+  color: var(--text-main) !important;
+  box-shadow: -12px 0 34px rgba(0, 0, 0, 0.45);
+}
+:root[data-theme="dark"] .admin-side-menu-title,
+:root:not([data-theme="light"]) .admin-side-menu-title { color: var(--text-main) !important; }
+:root[data-theme="dark"] .admin-side-menu-item,
+:root:not([data-theme="light"]) .admin-side-menu-item { color: var(--text-main); }
+:root[data-theme="dark"] .admin-side-menu-item-desc,
+:root:not([data-theme="light"]) .admin-side-menu-item-desc { color: var(--text-muted); }
+:root[data-theme="dark"] .admin-side-menu-item:hover,
+:root[data-theme="dark"] .admin-side-menu-item:focus-visible,
+:root:not([data-theme="light"]) .admin-side-menu-item:hover,
+:root:not([data-theme="light"]) .admin-side-menu-item:focus-visible { background: #1B2540; }
+:root[data-theme="dark"] .admin-side-menu-close-btn,
+:root:not([data-theme="light"]) .admin-side-menu-close-btn { color: var(--text-muted); }
+:root[data-theme="dark"] .admin-side-menu-font-btn,
+:root:not([data-theme="light"]) .admin-side-menu-font-btn {
+  background: #1B2540; color: var(--text-main); border-color: var(--border-subtle);
+}
+:root[data-theme="dark"] .settlement-base-budget-card,
+:root:not([data-theme="light"]) .settlement-base-budget-card {
+  background: #0F2E22 !important; border-color: #14532D !important;
+}
+:root[data-theme="dark"] .settlement-base-budget-card strong,
+:root:not([data-theme="light"]) .settlement-base-budget-card strong { color: #86EFAC !important; }
+:root[data-theme="dark"] .poll-progress,
+:root:not([data-theme="light"]) .poll-progress,
+:root[data-theme="dark"] .admin-progress,
+:root:not([data-theme="light"]) .admin-progress { background: #1B2540 !important; }
+:root[data-theme="dark"] a.link-preview-card,
+:root:not([data-theme="light"]) a.link-preview-card {
+  border-color: var(--border-subtle) !important;
+}

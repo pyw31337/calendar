@@ -1576,7 +1576,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {
     key: item.category.id,
     style: { display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr) auto', gap: '8px', alignItems: 'center', marginTop: '8px' }
   }, categoryBadge(item.category), /*#__PURE__*/React.createElement("div", {
-    style: { height: '8px', borderRadius: '999px', background: '#E2E8F0', overflow: 'hidden' }
+    style: { height: '8px', borderRadius: '999px', background: 'var(--border-subtle)', overflow: 'hidden' }
   }, /*#__PURE__*/React.createElement("div", {
     style: { width: `${allTimeExpense ? Math.max(4, item.total / allTimeExpense * 100) : 0}%`, height: '100%', background: item.category.color, borderRadius: '999px' }
   })), /*#__PURE__*/React.createElement("strong", {
@@ -1584,7 +1584,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {
   }, item.total.toLocaleString(), "원")))), /*#__PURE__*/React.createElement("section", {
     style: { display: 'flex', flexDirection: 'column', gap: '8px' }
   }, baseBudget > 0 && /*#__PURE__*/React.createElement("div", {
-    style: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: '10px', alignItems: 'center', padding: '10px 12px', border: '1px solid #BBF7D0', borderRadius: '12px', background: '#F0FDF4' }
+    className: 'settlement-base-budget-card', style: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: '10px', alignItems: 'center', padding: '10px 12px', border: '1px solid #BBF7D0', borderRadius: '12px', background: '#F0FDF4' }
   }, /*#__PURE__*/React.createElement("div", {
     style: { display: 'flex', flexDirection: 'column', gap: '4px' }
   }, /*#__PURE__*/React.createElement("strong", {

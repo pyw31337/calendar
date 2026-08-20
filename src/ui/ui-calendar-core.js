@@ -2197,9 +2197,9 @@ export function PollList({ calendar, onCreatePoll, onEditPoll, onVotePoll, onCan
       className: "poll-title",
       style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }
     }, poll.title, poll.deadline && /*#__PURE__*/React.createElement("span", {
+      className: closed ? 'poll-deadline-badge is-closed' : 'poll-deadline-badge is-open',
       style: {
-        fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: 'var(--radius-full)', whiteSpace: 'nowrap',
-        backgroundColor: closed ? '#FEE2E2' : '#EFF6FF', color: closed ? '#DC2626' : '#2563EB'
+        fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: 'var(--radius-full)', whiteSpace: 'nowrap'
       }
     }, closed ? '마감됨' : `마감 ${formatPollDeadline(poll.deadline)}`)), poll.description && /*#__PURE__*/React.createElement("div", {
       className: "poll-desc"
