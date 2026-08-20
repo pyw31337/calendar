@@ -1224,73 +1224,95 @@ function autoGrowTextarea(el, maxHeight = 480) {
 }
 
 // 입력필드 규칙: 멀티라인 텍스트는 값(로드/입력/붙여넣기)에 맞춰 세로로 자동 확장
-const ResizableModalContainer = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ResizableModalContainer)
-  ? window.GATHER_UI_COMPONENTS.ResizableModalContainer
-  : function ResizableModalContainerFallback() { return null; };
-const AutoGrowTextarea = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AutoGrowTextarea)
-  ? window.GATHER_UI_COMPONENTS.AutoGrowTextarea
-  : function AutoGrowTextareaFallback() { return null; };
-const FormAddEditActionButtons = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.FormAddEditActionButtons)
-  ? window.GATHER_UI_COMPONENTS.FormAddEditActionButtons
-  : function FormAddEditActionButtonsFallback() { return null; };
-const SegmentedToggle = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SegmentedToggle)
-  ? window.GATHER_UI_COMPONENTS.SegmentedToggle
-  : function SegmentedToggleFallback() { return null; };
-const ItemEditDeleteActions = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ItemEditDeleteActions)
-  ? window.GATHER_UI_COMPONENTS.ItemEditDeleteActions
-  : function ItemEditDeleteActionsFallback() { return null; };
-const GamifiedConfirmButtonContent = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.GamifiedConfirmButtonContent)
-  ? window.GATHER_UI_COMPONENTS.GamifiedConfirmButtonContent
-  : function GamifiedConfirmButtonContentFallback() { return null; };
-const LinkPreviewCard = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LinkPreviewCard)
-  ? window.GATHER_UI_COMPONENTS.LinkPreviewCard
-  : function LinkPreviewCardFallback() { return null; };
-const LinkPreviewProgressOverlay = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LinkPreviewProgressOverlay)
-  ? window.GATHER_UI_COMPONENTS.LinkPreviewProgressOverlay
-  : function LinkPreviewProgressOverlayFallback() { return null; };
-const DeleteConfirmModal = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.DeleteConfirmModal)
-  ? window.GATHER_UI_COMPONENTS.DeleteConfirmModal
-  : function DeleteConfirmModalFallback() { return null; };
-const AdminLoginGate = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AdminLoginGate)
-  ? window.GATHER_UI_COMPONENTS.AdminLoginGate
-  : function AdminLoginGateFallback() { return null; };
-const DonutChart = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.DonutChart)
-  ? window.GATHER_UI_COMPONENTS.DonutChart
-  : function DonutChartFallback() { return null; };
-const ColorSwatchPicker = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ColorSwatchPicker)
-  ? window.GATHER_UI_COMPONENTS.ColorSwatchPicker
-  : function ColorSwatchPickerFallback() { return null; };
-const StickyVideoBox = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.StickyVideoBox)
-  ? window.GATHER_UI_COMPONENTS.StickyVideoBox
-  : function StickyVideoBoxFallback() { return null; };
-const PollVoterSheet = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PollVoterSheet)
-  ? window.GATHER_UI_COMPONENTS.PollVoterSheet
-  : function PollVoterSheetFallback() { return null; };
-const OperationProgressOverlay = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.OperationProgressOverlay)
-  ? window.GATHER_UI_COMPONENTS.OperationProgressOverlay
-  : function OperationProgressOverlayFallback() { return null; };
-const ToggleSwitch = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ToggleSwitch)
-  ? window.GATHER_UI_COMPONENTS.ToggleSwitch
-  : function ToggleSwitchFallback() { return null; };
-const Footer = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.Footer)
-  ? window.GATHER_UI_COMPONENTS.Footer
-  : function FooterFallback() { return null; };
+function ResizableModalContainer(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ResizableModalContainer;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function AutoGrowTextarea(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AutoGrowTextarea;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function FormAddEditActionButtons(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.FormAddEditActionButtons;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function SegmentedToggle(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SegmentedToggle;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function ItemEditDeleteActions(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ItemEditDeleteActions;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function GamifiedConfirmButtonContent(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.GamifiedConfirmButtonContent;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function LinkPreviewCard(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LinkPreviewCard;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function LinkPreviewProgressOverlay(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LinkPreviewProgressOverlay;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function DeleteConfirmModal(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.DeleteConfirmModal;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function AdminLoginGate(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AdminLoginGate;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function DonutChart(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.DonutChart;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function ColorSwatchPicker(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ColorSwatchPicker;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function StickyVideoBox(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.StickyVideoBox;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function PollVoterSheet(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PollVoterSheet;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function OperationProgressOverlay(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.OperationProgressOverlay;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function ToggleSwitch(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ToggleSwitch;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function Footer(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.Footer;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
 
-const SearchResultLogRow = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SearchResultLogRow)
-  ? window.GATHER_UI_COMPONENTS.SearchResultLogRow
-  : function SearchResultLogRowFallback() { return null; };
-const TikTokEmbedWidget = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.TikTokEmbedWidget)
-  ? window.GATHER_UI_COMPONENTS.TikTokEmbedWidget
-  : function TikTokEmbedWidgetFallback() { return null; };
-const UrlCapsuleBadge = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.UrlCapsuleBadge)
-  ? window.GATHER_UI_COMPONENTS.UrlCapsuleBadge
-  : function UrlCapsuleBadgeFallback() { return null; };
-const ParticipantPickerButton = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ParticipantPickerButton)
-  ? window.GATHER_UI_COMPONENTS.ParticipantPickerButton
-  : function ParticipantPickerButtonFallback() { return null; };
-const DateCapsuleBadge = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.DateCapsuleBadge)
-  ? window.GATHER_UI_COMPONENTS.DateCapsuleBadge
-  : function DateCapsuleBadgeFallback() { return null; };
+function SearchResultLogRow(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SearchResultLogRow;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function TikTokEmbedWidget(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.TikTokEmbedWidget;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function UrlCapsuleBadge(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.UrlCapsuleBadge;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function ParticipantPickerButton(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ParticipantPickerButton;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function DateCapsuleBadge(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.DateCapsuleBadge;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
 
 
 
@@ -3539,26 +3561,32 @@ function getCalendarAccentColor(calOrId, indexInList) {
 /* Small dependency-free donut chart: N segments as SVG stroke-dasharray arcs on a ring. */
 
 
-const AdminDashboard = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AdminDashboard)
-  ? window.GATHER_UI_COMPONENTS.AdminDashboard
-  : function AdminDashboardFallback() { return null; };
+function AdminDashboard(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AdminDashboard;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
 
 
-const AdminModal = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AdminModal)
-  ? window.GATHER_UI_COMPONENTS.AdminModal
-  : function AdminModalFallback() { return null; };
-const AdminUnifiedSearchResultsView = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AdminUnifiedSearchResultsView)
-  ? window.GATHER_UI_COMPONENTS.AdminUnifiedSearchResultsView
-  : function AdminUnifiedSearchResultsViewFallback() { return null; };
-const AdminCreateCalendarModal = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AdminCreateCalendarModal)
-  ? window.GATHER_UI_COMPONENTS.AdminCreateCalendarModal
-  : function AdminCreateCalendarModalFallback() { return null; };
-const AdminRestorePhraseModal = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AdminRestorePhraseModal)
-  ? window.GATHER_UI_COMPONENTS.AdminRestorePhraseModal
-  : function AdminRestorePhraseModalFallback() { return null; };
-const AdminUnifiedSearchModal = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AdminUnifiedSearchModal)
-  ? window.GATHER_UI_COMPONENTS.AdminUnifiedSearchModal
-  : function AdminUnifiedSearchModalFallback() { return null; };
+function AdminModal(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AdminModal;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function AdminUnifiedSearchResultsView(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AdminUnifiedSearchResultsView;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function AdminCreateCalendarModal(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AdminCreateCalendarModal;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function AdminRestorePhraseModal(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AdminRestorePhraseModal;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function AdminUnifiedSearchModal(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AdminUnifiedSearchModal;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
 
 
 
@@ -6851,24 +6879,30 @@ function getKoreanSolarTermsForYear(year) {
 }
 
 // Calendar Grid Component
-const CalendarGrid = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CalendarGrid)
-  ? window.GATHER_UI_COMPONENTS.CalendarGrid
-  : function CalendarGridFallback() { return null; };
-const CommentsSection = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CommentsSection)
-  ? window.GATHER_UI_COMPONENTS.CommentsSection
-  : function CommentsSectionFallback() { return null; };
-const MemoCard = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MemoCard)
-  ? window.GATHER_UI_COMPONENTS.MemoCard
-  : function MemoCardFallback() { return null; };
-const PollList = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PollList)
-  ? window.GATHER_UI_COMPONENTS.PollList
-  : function PollListFallback() { return null; };
-const GlobalSearchModal = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.GlobalSearchModal)
-  ? window.GATHER_UI_COMPONENTS.GlobalSearchModal
-  : function GlobalSearchModalFallback() { return null; };
-const EditMessageModal = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.EditMessageModal)
-  ? window.GATHER_UI_COMPONENTS.EditMessageModal
-  : function EditMessageModalFallback() { return null; };
+function CalendarGrid(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CalendarGrid;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function CommentsSection(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CommentsSection;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function MemoCard(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MemoCard;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function PollList(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PollList;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function GlobalSearchModal(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.GlobalSearchModal;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function EditMessageModal(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.EditMessageModal;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
 
 
 // Comments / Chat Icons & Utilities
@@ -7173,18 +7207,22 @@ function getDirectChatMediaInfo(url) {
 // dialogs (100000) so those never get obscured by it.
 
 
-const DirectChatMediaText = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.DirectChatMediaText)
-  ? window.GATHER_UI_COMPONENTS.DirectChatMediaText
-  : function DirectChatMediaTextFallback() { return null; };
-const DeadlineDateTimePicker = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.DeadlineDateTimePicker)
-  ? window.GATHER_UI_COMPONENTS.DeadlineDateTimePicker
-  : function DeadlineDateTimePickerFallback() { return null; };
-const PlacesSection = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PlacesSection)
-  ? window.GATHER_UI_COMPONENTS.PlacesSection
-  : function PlacesSectionFallback() { return null; };
-const ImageUrlModal = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ImageUrlModal)
-  ? window.GATHER_UI_COMPONENTS.ImageUrlModal
-  : function ImageUrlModalFallback() { return null; };
+function DirectChatMediaText(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.DirectChatMediaText;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function DeadlineDateTimePicker(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.DeadlineDateTimePicker;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function PlacesSection(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PlacesSection;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function ImageUrlModal(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ImageUrlModal;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
 
 
 function renderChatMessageBody(msg, setActiveLightbox, singleImageStyle = {}, searchQuery = '', stickyVideoKey = null, onReleaseSticky = null) {
@@ -7737,18 +7775,22 @@ async function appendChatImageFiles({
 
 
 
-const ImageUploadOverlay = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ImageUploadOverlay)
-  ? window.GATHER_UI_COMPONENTS.ImageUploadOverlay
-  : function ImageUploadOverlayFallback() { return null; };
-const ImageProcessingOverlay = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ImageProcessingOverlay)
-  ? window.GATHER_UI_COMPONENTS.ImageProcessingOverlay
-  : function ImageProcessingOverlayFallback() { return null; };
-const EmojiGridButton = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.EmojiGridButton)
-  ? window.GATHER_UI_COMPONENTS.EmojiGridButton
-  : function EmojiGridButtonFallback() { return null; };
-const EmojiPickerSheet = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.EmojiPickerSheet)
-  ? window.GATHER_UI_COMPONENTS.EmojiPickerSheet
-  : function EmojiPickerSheetFallback() { return null; };
+function ImageUploadOverlay(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ImageUploadOverlay;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function ImageProcessingOverlay(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ImageProcessingOverlay;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function EmojiGridButton(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.EmojiGridButton;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function EmojiPickerSheet(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.EmojiPickerSheet;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
 
 
 
@@ -8006,174 +8048,230 @@ function deleteAllChatImagesFromStorage(msg) {
 
 // Small line-icon for the main header's menu bar (Tabler-style outline icons, matching the
 // existing icon set used elsewhere in the header/popovers).
-const MenuIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MenuIcon)
-  ? window.GATHER_UI_COMPONENTS.MenuIcon
-  : function MenuIconFallback() { return null; };
-const NotepadTextIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.NotepadTextIcon)
-  ? window.GATHER_UI_COMPONENTS.NotepadTextIcon
-  : function NotepadTextIconFallback() { return null; };
-const ChatSectionIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ChatSectionIcon)
-  ? window.GATHER_UI_COMPONENTS.ChatSectionIcon
-  : function ChatSectionIconFallback() { return null; };
-const LinkIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LinkIcon)
-  ? window.GATHER_UI_COMPONENTS.LinkIcon
-  : function LinkIconFallback() { return null; };
-const MessageCommentIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MessageCommentIcon)
-  ? window.GATHER_UI_COMPONENTS.MessageCommentIcon
-  : function MessageCommentIconFallback() { return null; };
-const PencilIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PencilIcon)
-  ? window.GATHER_UI_COMPONENTS.PencilIcon
-  : function PencilIconFallback() { return null; };
-const BuildingIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.BuildingIcon)
-  ? window.GATHER_UI_COMPONENTS.BuildingIcon
-  : function BuildingIconFallback() { return null; };
-const BackArrowIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.BackArrowIcon)
-  ? window.GATHER_UI_COMPONENTS.BackArrowIcon
-  : function BackArrowIconFallback() { return null; };
-const SunIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SunIcon)
-  ? window.GATHER_UI_COMPONENTS.SunIcon
-  : function SunIconFallback() { return null; };
-const CloudIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CloudIcon)
-  ? window.GATHER_UI_COMPONENTS.CloudIcon
-  : function CloudIconFallback() { return null; };
-const MistIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MistIcon)
-  ? window.GATHER_UI_COMPONENTS.MistIcon
-  : function MistIconFallback() { return null; };
-const CloudRainIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CloudRainIcon)
-  ? window.GATHER_UI_COMPONENTS.CloudRainIcon
-  : function CloudRainIconFallback() { return null; };
-const SnowflakeIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SnowflakeIcon)
-  ? window.GATHER_UI_COMPONENTS.SnowflakeIcon
-  : function SnowflakeIconFallback() { return null; };
-const CloudLightningIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CloudLightningIcon)
-  ? window.GATHER_UI_COMPONENTS.CloudLightningIcon
-  : function CloudLightningIconFallback() { return null; };
-const SettingsIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SettingsIcon)
-  ? window.GATHER_UI_COMPONENTS.SettingsIcon
-  : function SettingsIconFallback() { return null; };
-const MapCogIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MapCogIcon)
-  ? window.GATHER_UI_COMPONENTS.MapCogIcon
-  : function MapCogIconFallback() { return null; };
-const GiftIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.GiftIcon)
-  ? window.GATHER_UI_COMPONENTS.GiftIcon
-  : function GiftIconFallback() { return null; };
-const MoonStarsIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MoonStarsIcon)
-  ? window.GATHER_UI_COMPONENTS.MoonStarsIcon
-  : function MoonStarsIconFallback() { return null; };
-const TextResizeIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.TextResizeIcon)
-  ? window.GATHER_UI_COMPONENTS.TextResizeIcon
-  : function TextResizeIconFallback() { return null; };
-const BellIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.BellIcon)
-  ? window.GATHER_UI_COMPONENTS.BellIcon
-  : function BellIconFallback() { return null; };
-const SearchIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SearchIcon)
-  ? window.GATHER_UI_COMPONENTS.SearchIcon
-  : function SearchIconFallback() { return null; };
-const CalendarCheckIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CalendarCheckIcon)
-  ? window.GATHER_UI_COMPONENTS.CalendarCheckIcon
-  : function CalendarCheckIconFallback() { return null; };
-const LockIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LockIcon)
-  ? window.GATHER_UI_COMPONENTS.LockIcon
-  : function LockIconFallback() { return null; };
-const LogoutIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LogoutIcon)
-  ? window.GATHER_UI_COMPONENTS.LogoutIcon
-  : function LogoutIconFallback() { return null; };
-const RefreshIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.RefreshIcon)
-  ? window.GATHER_UI_COMPONENTS.RefreshIcon
-  : function RefreshIconFallback() { return null; };
-const AdminFilledMenuIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AdminFilledMenuIcon)
-  ? window.GATHER_UI_COMPONENTS.AdminFilledMenuIcon
-  : function AdminFilledMenuIconFallback() { return null; };
-const EmojiPickerIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.EmojiPickerIcon)
-  ? window.GATHER_UI_COMPONENTS.EmojiPickerIcon
-  : function EmojiPickerIconFallback() { return null; };
-const ExternalLinkIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ExternalLinkIcon)
-  ? window.GATHER_UI_COMPONENTS.ExternalLinkIcon
-  : function ExternalLinkIconFallback() { return null; };
-const ShareIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ShareIcon)
-  ? window.GATHER_UI_COMPONENTS.ShareIcon
-  : function ShareIconFallback() { return null; };
-const WalletIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.WalletIcon)
-  ? window.GATHER_UI_COMPONENTS.WalletIcon
-  : function WalletIconFallback() { return null; };
-const CoinIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CoinIcon)
-  ? window.GATHER_UI_COMPONENTS.CoinIcon
-  : function CoinIconFallback() { return null; };
-const BanknoteArrowUpIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.BanknoteArrowUpIcon)
-  ? window.GATHER_UI_COMPONENTS.BanknoteArrowUpIcon
-  : function BanknoteArrowUpIconFallback() { return null; };
-const BanknoteArrowDownIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.BanknoteArrowDownIcon)
-  ? window.GATHER_UI_COMPONENTS.BanknoteArrowDownIcon
-  : function BanknoteArrowDownIconFallback() { return null; };
-const PiggyBankIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PiggyBankIcon)
-  ? window.GATHER_UI_COMPONENTS.PiggyBankIcon
-  : function PiggyBankIconFallback() { return null; };
-const ChartBarIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ChartBarIcon)
-  ? window.GATHER_UI_COMPONENTS.ChartBarIcon
-  : function ChartBarIconFallback() { return null; };
-const ChartPieIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ChartPieIcon)
-  ? window.GATHER_UI_COMPONENTS.ChartPieIcon
-  : function ChartPieIconFallback() { return null; };
-const CalendarCogIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CalendarCogIcon)
-  ? window.GATHER_UI_COMPONENTS.CalendarCogIcon
-  : function CalendarCogIconFallback() { return null; };
-const CalendarSearchIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CalendarSearchIcon)
-  ? window.GATHER_UI_COMPONENTS.CalendarSearchIcon
-  : function CalendarSearchIconFallback() { return null; };
-const TrophyIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.TrophyIcon)
-  ? window.GATHER_UI_COMPONENTS.TrophyIcon
-  : function TrophyIconFallback() { return null; };
-const PodiumIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PodiumIcon)
-  ? window.GATHER_UI_COMPONENTS.PodiumIcon
-  : function PodiumIconFallback() { return null; };
-const CloudDataConnectionIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CloudDataConnectionIcon)
-  ? window.GATHER_UI_COMPONENTS.CloudDataConnectionIcon
-  : function CloudDataConnectionIconFallback() { return null; };
-const LogIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LogIcon)
-  ? window.GATHER_UI_COMPONENTS.LogIcon
-  : function LogIconFallback() { return null; };
-const HourglassIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.HourglassIcon)
-  ? window.GATHER_UI_COMPONENTS.HourglassIcon
-  : function HourglassIconFallback() { return null; };
-const AlertTriangleIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AlertTriangleIcon)
-  ? window.GATHER_UI_COMPONENTS.AlertTriangleIcon
-  : function AlertTriangleIconFallback() { return null; };
-const ShieldCheckIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ShieldCheckIcon)
-  ? window.GATHER_UI_COMPONENTS.ShieldCheckIcon
-  : function ShieldCheckIconFallback() { return null; };
-const CalendarExportIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CalendarExportIcon)
-  ? window.GATHER_UI_COMPONENTS.CalendarExportIcon
-  : function CalendarExportIconFallback() { return null; };
-const GalleryIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.GalleryIcon)
-  ? window.GATHER_UI_COMPONENTS.GalleryIcon
-  : function GalleryIconFallback() { return null; };
-const PollSectionIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PollSectionIcon)
-  ? window.GATHER_UI_COMPONENTS.PollSectionIcon
-  : function PollSectionIconFallback() { return null; };
-const LineHeightIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LineHeightIcon)
-  ? window.GATHER_UI_COMPONENTS.LineHeightIcon
-  : function LineHeightIconFallback() { return null; };
-const MegaphoneIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MegaphoneIcon)
-  ? window.GATHER_UI_COMPONENTS.MegaphoneIcon
-  : function MegaphoneIconFallback() { return null; };
-const SmallXIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SmallXIcon)
-  ? window.GATHER_UI_COMPONENTS.SmallXIcon
-  : function SmallXIconFallback() { return null; };
-const PlaceSectionIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PlaceSectionIcon)
-  ? window.GATHER_UI_COMPONENTS.PlaceSectionIcon
-  : function PlaceSectionIconFallback() { return null; };
-const ThreeLinesIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ThreeLinesIcon)
-  ? window.GATHER_UI_COMPONENTS.ThreeLinesIcon
-  : function ThreeLinesIconFallback() { return null; };
-const PlaceCategoryMarkerIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PlaceCategoryMarkerIcon)
-  ? window.GATHER_UI_COMPONENTS.PlaceCategoryMarkerIcon
-  : function PlaceCategoryMarkerIconFallback() { return null; };
-const CctvIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CctvIcon)
-  ? window.GATHER_UI_COMPONENTS.CctvIcon
-  : function CctvIconFallback() { return null; };
-const DicesIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.DicesIcon)
-  ? window.GATHER_UI_COMPONENTS.DicesIcon
-  : function DicesIconFallback() { return null; };
+function MenuIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MenuIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function NotepadTextIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.NotepadTextIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function ChatSectionIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ChatSectionIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function LinkIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LinkIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function MessageCommentIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MessageCommentIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function PencilIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PencilIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function BuildingIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.BuildingIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function BackArrowIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.BackArrowIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function SunIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SunIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function CloudIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CloudIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function MistIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MistIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function CloudRainIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CloudRainIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function SnowflakeIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SnowflakeIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function CloudLightningIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CloudLightningIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function SettingsIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SettingsIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function MapCogIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MapCogIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function GiftIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.GiftIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function MoonStarsIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MoonStarsIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function TextResizeIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.TextResizeIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function BellIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.BellIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function SearchIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SearchIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function CalendarCheckIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CalendarCheckIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function LockIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LockIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function LogoutIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LogoutIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function RefreshIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.RefreshIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function AdminFilledMenuIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AdminFilledMenuIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function EmojiPickerIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.EmojiPickerIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function ExternalLinkIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ExternalLinkIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function ShareIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ShareIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function WalletIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.WalletIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function CoinIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CoinIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function BanknoteArrowUpIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.BanknoteArrowUpIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function BanknoteArrowDownIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.BanknoteArrowDownIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function PiggyBankIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PiggyBankIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function ChartBarIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ChartBarIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function ChartPieIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ChartPieIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function CalendarCogIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CalendarCogIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function CalendarSearchIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CalendarSearchIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function TrophyIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.TrophyIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function PodiumIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PodiumIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function CloudDataConnectionIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CloudDataConnectionIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function LogIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LogIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function HourglassIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.HourglassIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function AlertTriangleIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AlertTriangleIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function ShieldCheckIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ShieldCheckIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function CalendarExportIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CalendarExportIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function GalleryIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.GalleryIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function PollSectionIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PollSectionIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function LineHeightIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LineHeightIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function MegaphoneIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MegaphoneIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function SmallXIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SmallXIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function PlaceSectionIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PlaceSectionIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function ThreeLinesIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ThreeLinesIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function PlaceCategoryMarkerIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PlaceCategoryMarkerIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function CctvIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CctvIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function DicesIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.DicesIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
 
 
 // Matches MenuIcon's exact svg wrapper (16x16, stroke 2, round caps) but needs a <rect> child
@@ -8449,12 +8547,14 @@ function buildLightboxImageInfo(url, timestamp) {
 // buttons and dot indicators when there's more than one image, matching the KakaoTalk-style
 // multi-photo gallery UX the chat bubbles are modeled after. `meta` (optional, parallel to
 // `urls`) supplies each image's { timestamp } for the tap-to-toggle info overlay.
-const LightboxInfoPanel = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LightboxInfoPanel)
-  ? window.GATHER_UI_COMPONENTS.LightboxInfoPanel
-  : function LightboxInfoPanelFallback() { return null; };
-const Lightbox = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.Lightbox)
-  ? window.GATHER_UI_COMPONENTS.Lightbox
-  : function LightboxFallback() { return null; };
+function LightboxInfoPanel(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LightboxInfoPanel;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function Lightbox(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.Lightbox;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
 
 
 // Tracks which message row's edit/delete controls should be revealed: desktop hover is
@@ -8496,9 +8596,10 @@ function useChatSendGuard(onSend, canSend) {
 
 
 
-const ChatRoomView = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ChatRoomView)
-  ? window.GATHER_UI_COMPONENTS.ChatRoomView
-  : function ChatRoomViewFallback() { return null; };
+function ChatRoomView(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ChatRoomView;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
 
 
 // A curated, cross-platform-consistent emoji set (Twemoji, the same flat-design set used by
@@ -8576,17 +8677,20 @@ function addRecentEmoji(emoji) {
 
 
 
-const ChatParticipantSheet = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ChatParticipantSheet)
-  ? window.GATHER_UI_COMPONENTS.ChatParticipantSheet
-  : function ChatParticipantSheetFallback() { return null; };
-const NotificationPermissionHelpModal = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.NotificationPermissionHelpModal)
-  ? window.GATHER_UI_COMPONENTS.NotificationPermissionHelpModal
-  : function NotificationPermissionHelpModalFallback() { return null; };
+function ChatParticipantSheet(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ChatParticipantSheet;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function NotificationPermissionHelpModal(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.NotificationPermissionHelpModal;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
 
 
-const ConfirmDialog = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ConfirmDialog)
-  ? window.GATHER_UI_COMPONENTS.ConfirmDialog
-  : function ConfirmDialogFallback() { return null; };
+function ConfirmDialog(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ConfirmDialog;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
 
 
 
@@ -8616,9 +8720,10 @@ function getShortTitleParts(dateStr) {
 
 
 
-const DateModal = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.DateModal)
-  ? window.GATHER_UI_COMPONENTS.DateModal
-  : function DateModalFallback() { return null; };
+function DateModal(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.DateModal;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
 
 
 
@@ -8815,24 +8920,30 @@ const rebuildCalendarToTimestamp = (calendar, T, logs = []) => {
 // A <select>-replacement styled as a form-select trigger button that opens the same bottom-sheet
 // picker pattern used elsewhere in the app (e.g. the admin header's calendar picker) -- unlike a
 // native <select>, the open dropdown list is entirely CSS-styled and follows dark mode.
-const SectionCountBadge = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SectionCountBadge)
-  ? window.GATHER_UI_COMPONENTS.SectionCountBadge
-  : function SectionCountBadgeFallback() { return null; };
-const SectionToggleButton = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SectionToggleButton)
-  ? window.GATHER_UI_COMPONENTS.SectionToggleButton
-  : function SectionToggleButtonFallback() { return null; };
-const SearchCategoryTabs = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SearchCategoryTabs)
-  ? window.GATHER_UI_COMPONENTS.SearchCategoryTabs
-  : function SearchCategoryTabsFallback() { return null; };
-const SimpleBottomSheetPicker = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SimpleBottomSheetPicker)
-  ? window.GATHER_UI_COMPONENTS.SimpleBottomSheetPicker
-  : function SimpleBottomSheetPickerFallback() { return null; };
-const PhotoGallery = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PhotoGallery)
-  ? window.GATHER_UI_COMPONENTS.PhotoGallery
-  : function PhotoGalleryFallback() { return null; };
-const SummaryList = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SummaryList)
-  ? window.GATHER_UI_COMPONENTS.SummaryList
-  : function SummaryListFallback() { return null; };
+function SectionCountBadge(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SectionCountBadge;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function SectionToggleButton(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SectionToggleButton;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function SearchCategoryTabs(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SearchCategoryTabs;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function SimpleBottomSheetPicker(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SimpleBottomSheetPicker;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function PhotoGallery(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PhotoGallery;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function SummaryList(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SummaryList;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
 
 
 
@@ -8992,14 +9103,16 @@ function getAdminSearchResultTargetUrl(type, item) {
 
 
 // Share Modal
-const ShareModal = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ShareModal)
-  ? window.GATHER_UI_COMPONENTS.ShareModal
-  : function ShareModalFallback() { return null; };
+function ShareModal(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ShareModal;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
 
 
-const UserManualOverlay = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.UserManualOverlay)
-  ? window.GATHER_UI_COMPONENTS.UserManualOverlay
-  : function UserManualOverlayFallback() { return null; };
+function UserManualOverlay(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.UserManualOverlay;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
 
 
 
@@ -9032,12 +9145,14 @@ function getWeatherIcon(code, size = 16) {
   return /*#__PURE__*/React.createElement(SunIcon, { size });
 }
 
-const WeatherBadge = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.WeatherBadge)
-  ? window.GATHER_UI_COMPONENTS.WeatherBadge
-  : function WeatherBadgeFallback() { return null; };
-const WeatherLocationModal = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.WeatherLocationModal)
-  ? window.GATHER_UI_COMPONENTS.WeatherLocationModal
-  : function WeatherLocationModalFallback() { return null; };
+function WeatherBadge(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.WeatherBadge;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function WeatherLocationModal(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.WeatherLocationModal;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
 
 
 function translateKoreanToEnglish(query) {
@@ -9097,37 +9212,46 @@ function translateKoreanToEnglish(query) {
 
 
 
-const SharedSideMenuSettings = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SharedSideMenuSettings)
-  ? window.GATHER_UI_COMPONENTS.SharedSideMenuSettings
-  : function SharedSideMenuSettingsFallback() { return null; };
-const MainSideMenu = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MainSideMenu)
-  ? window.GATHER_UI_COMPONENTS.MainSideMenu
-  : function MainSideMenuFallback() { return null; };
+function SharedSideMenuSettings(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SharedSideMenuSettings;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function MainSideMenu(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MainSideMenu;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
 
 
-const UpdateAvailableBanner = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.UpdateAvailableBanner)
-  ? window.GATHER_UI_COMPONENTS.UpdateAvailableBanner
-  : function UpdateAvailableBannerFallback() { return null; };
-const ImageShareViewer = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ImageShareViewer)
-  ? window.GATHER_UI_COMPONENTS.ImageShareViewer
-  : function ImageShareViewerFallback() { return null; };
-const ImageThumbRemoveButton = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ImageThumbRemoveButton)
-  ? window.GATHER_UI_COMPONENTS.ImageThumbRemoveButton
-  : function ImageThumbRemoveButtonFallback() { return null; };
-const InlineSearchBar = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.InlineSearchBar)
-  ? window.GATHER_UI_COMPONENTS.InlineSearchBar
-  : function InlineSearchBarFallback() { return null; };
-const MemoShareModal = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MemoShareModal)
-  ? window.GATHER_UI_COMPONENTS.MemoShareModal
-  : function MemoShareModalFallback() { return null; };
-const ChatSideMenu = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ChatSideMenu)
-  ? window.GATHER_UI_COMPONENTS.ChatSideMenu
-  : function ChatSideMenuFallback() { return null; };
+function UpdateAvailableBanner(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.UpdateAvailableBanner;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function ImageShareViewer(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ImageShareViewer;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function ImageThumbRemoveButton(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ImageThumbRemoveButton;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function InlineSearchBar(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.InlineSearchBar;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function MemoShareModal(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MemoShareModal;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function ChatSideMenu(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ChatSideMenu;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
 
 
-const ChatGalleryModal = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ChatGalleryModal)
-  ? window.GATHER_UI_COMPONENTS.ChatGalleryModal
-  : function ChatGalleryModalFallback() { return null; };
+function ChatGalleryModal(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ChatGalleryModal;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
 
 
 // Scroll-direction-based header visibility (hide on scroll-down, reveal on scroll-up or near
@@ -9152,9 +9276,10 @@ function useScrollHideHeader() {
   return { isHeaderVisible, onScroll };
 }
 
-const MemoView = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MemoView)
-  ? window.GATHER_UI_COMPONENTS.MemoView
-  : function MemoViewFallback() { return null; };
+function MemoView(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MemoView;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
 
 
 
@@ -9373,15 +9498,18 @@ function getSolarFromLunar(year, month, day, isLeap) {
   }
 }
 
-const AnniversaryModal = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AnniversaryModal)
-  ? window.GATHER_UI_COMPONENTS.AnniversaryModal
-  : function AnniversaryModalFallback() { return null; };
-const SettlementSummaryModal = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SettlementSummaryModal)
-  ? window.GATHER_UI_COMPONENTS.SettlementSummaryModal
-  : function SettlementSummaryModalFallback() { return null; };
-const PollModal = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PollModal)
-  ? window.GATHER_UI_COMPONENTS.PollModal
-  : function PollModalFallback() { return null; };
+function AnniversaryModal(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AnniversaryModal;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function SettlementSummaryModal(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SettlementSummaryModal;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function PollModal(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PollModal;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
 
 
 
@@ -9746,12 +9874,14 @@ function panMapToFitMarkerPopup(map, marker, opts) {
   setTimeout(tryPan, 320);
 }
 
-const PlaceMapView = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PlaceMapView)
-  ? window.GATHER_UI_COMPONENTS.PlaceMapView
-  : function PlaceMapViewFallback() { return null; };
-const PlacesView = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PlacesView)
-  ? window.GATHER_UI_COMPONENTS.PlacesView
-  : function PlacesViewFallback() { return null; };
+function PlaceMapView(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PlaceMapView;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function PlacesView(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PlacesView;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
 
 
 // Address/업체명 search (Nominatim, same free geocoder the weather feature already uses as a
@@ -9784,9 +9914,10 @@ async function fetchWithTimeout(url, timeoutMs) {
   }
 }
 
-const PlaceRegisterModal = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PlaceRegisterModal)
-  ? window.GATHER_UI_COMPONENTS.PlaceRegisterModal
-  : function PlaceRegisterModalFallback() { return null; };
+function PlaceRegisterModal(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PlaceRegisterModal;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
 
 
 // Main-screen collapsible map preview -- collapsed shows a short 16:9 map, expanded shows a

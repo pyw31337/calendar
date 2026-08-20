@@ -292,3 +292,8 @@ zsh 에서 줄 시작 `#` 주석은 쓰지 말 것.
 - docs/p6-pages-switch.md 전환/롤백 문서
 - 태그: safe-20260820-p6-vite-ready
 - 라이브 classic 경로 유지 중
+
+## P6-44 진행 (2026-08-20)
+- memo/admin 빈 화면: app-main이 GATHER_UI_COMPONENTS를 로드 시점에 캡처 → Fallback null 고정
+- 렌더 시점 resolve 래퍼로 131개 컴포넌트 수정 (src only)
+- 배포: Actions → Deploy Vite Pages 수동 재실행 필요
