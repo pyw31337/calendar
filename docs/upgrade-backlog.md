@@ -36,7 +36,7 @@
 - P2-1 백그라운드 탭 부담 완화 ✅ 2026-08-20 (15s hidden → disableNetwork)
 - P2-2 이미지 파이프라인/egress
 - P2-3 어드민 첫 로딩 ✅ 2026-08-20
-- P2-4 메인 맵 지연 마운트 검토
+- P2-4 메인 맵 지연 마운트 ✅ 2026-08-20 (IntersectionObserver + idle fallback)
 
 ### P3 Firebase 서비스 계층
 - P3-1 firebase-services.js 스캐폴드

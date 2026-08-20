@@ -26571,9 +26571,44 @@ function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, onDelete,
 // does, since the map itself is the content). "전체보기" sits immediately before the fold arrow,
 // both wrapped in one group pushed to the header's right edge.
 function PlacesSection({ calendar, onViewAll }) {
-  // Expanded by default (4:3 map). Fold arrow collapses to title row only.
   const [collapsed, setCollapsed] = React.useState(false);
+  const [mapShouldMount, setMapShouldMount] = React.useState(false);
+  const mapHostRef = React.useRef(null);
   const places = getCalendarPlaces(calendar);
+
+  React.useEffect(() => {
+    if (collapsed || mapShouldMount) return undefined;
+    const el = mapHostRef.current;
+    if (!el || typeof IntersectionObserver === 'undefined') {
+      const t = setTimeout(() => setMapShouldMount(true), 400);
+      return () => clearTimeout(t);
+    }
+    let done = false;
+    const io = new IntersectionObserver((entries) => {
+      if (done) return;
+      if (entries.some(e => e.isIntersecting || (e.intersectionRatio || 0) > 0)) {
+        done = true;
+        setMapShouldMount(true);
+        io.disconnect();
+      }
+    }, { root: null, rootMargin: '160px 0px', threshold: 0.01 });
+    io.observe(el);
+    let idleId = null, idleTimer = null;
+    if (typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function') {
+      idleId = window.requestIdleCallback(() => {
+        if (!done) { done = true; setMapShouldMount(true); io.disconnect(); }
+      }, { timeout: 2500 });
+    } else {
+      idleTimer = setTimeout(() => {
+        if (!done) { done = true; setMapShouldMount(true); io.disconnect(); }
+      }, 2000);
+    }
+    return () => {
+      io.disconnect();
+      if (idleId != null && typeof window.cancelIdleCallback === 'function') window.cancelIdleCallback(idleId);
+      if (idleTimer) clearTimeout(idleTimer);
+    };
+  }, [collapsed, mapShouldMount]);
 
   return /*#__PURE__*/React.createElement("section", { className: "summary-card" },
     /*#__PURE__*/React.createElement("div", {
@@ -26603,40 +26638,32 @@ function PlacesSection({ calendar, onViewAll }) {
       )
     ),
     !collapsed && /*#__PURE__*/React.createElement("div", {
+      ref: mapHostRef,
       style: {
-        position: 'relative',
-        width: '100%',
-        aspectRatio: '4 / 3',
-        borderRadius: 'var(--radius-sm)',
-        overflow: 'hidden',
-        marginTop: '12px'
+        position: 'relative', width: '100%', aspectRatio: '4 / 3',
+        borderRadius: 'var(--radius-sm)', overflow: 'hidden', marginTop: '12px',
+        backgroundColor: 'color-mix(in srgb, var(--bg-primary) 92%, #94a3b8)'
       }
     },
-      /*#__PURE__*/React.createElement(PlaceMapView, {
-        places,
-        calendar,
-        resizeSignal: collapsed,
-        preferDomesticBounds: true
-      }),
+      mapShouldMount
+        ? /*#__PURE__*/React.createElement(PlaceMapView, {
+            places, calendar, resizeSignal: collapsed, preferDomesticBounds: true
+          })
+        : /*#__PURE__*/React.createElement("div", {
+            style: {
+              position: 'absolute', inset: 0, display: 'flex', alignItems: 'center',
+              justifyContent: 'center', fontSize: '0.8rem', fontWeight: 700,
+              color: 'var(--text-muted)', letterSpacing: '-0.02em'
+            }
+          }, "지도 준비 중…"),
       places.length > 0 && /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        onClick: onViewAll,
+        type: "button", onClick: onViewAll,
         style: {
-          position: 'absolute',
-          left: 0,
-          right: 0,
-          bottom: 0,
-          zIndex: 500,
-          width: '100%',
+          position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 500, width: '100%',
           backgroundColor: 'color-mix(in srgb, var(--bg-primary) 96%, black)',
-          border: 'none',
-          borderRadius: '0 0 8px 8px',
-          padding: '8px 0',
-          fontSize: '0.85rem',
-          fontWeight: 'bold',
-          color: 'var(--text-main)',
-          cursor: 'pointer',
-          textAlign: 'center'
+          border: 'none', borderRadius: '0 0 8px 8px', padding: '8px 0',
+          fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--text-main)',
+          cursor: 'pointer', textAlign: 'center'
         }
       }, "장소 더보기")
     )
