@@ -349,3 +349,8 @@ zsh 에서 줄 시작 `#` 주석은 쓰지 말 것.
 - 참석 명단 모바일 세로 스택 (이름 / 메모 / URL / 우상단 편집삭제)
 - ≤380px 모달·헤더·URL뱃지 가독성
 - 다크모드: form/modal/toast/url-badge/btn-secondary 밝은 잔여색 정리
+
+## P6-56 (2026-08-20)
+- 참석 명단 모바일 세로 스택 (이름 / 메모 / URL / 우상단 편집삭제)
+- ≤380px 모달·헤더·URL뱃지 가독성
+- 다크모드: form/modal/toast/url-badge/btn-secondary 밝은 잔여색 정리
