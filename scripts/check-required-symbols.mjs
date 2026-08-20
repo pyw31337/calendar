@@ -36,7 +36,9 @@ const requiredInMain = [
   'ChatGalleryModal',
   'PhotoGallery',
   'SummaryList',
-  'fetchOlderChatMessages'
+  'fetchOlderChatMessages',
+  'subscribeMessages',
+  'subscribePlaces'
 ];
 
 const requiredInUtils = [
@@ -76,7 +78,11 @@ const requiredInFirebaseServices = [
   'fetchRecentChatMessages',
   'fetchSubcollectionCount',
   'fetchOlderChatMessages',
-  'fetchGalleryItemCount'
+  'fetchGalleryItemCount',
+  'subscribeMessages',
+  'subscribePlaces',
+  'subscribeMemos',
+  'subscribeAnniversaries'
 ];
 for (const name of requiredInFirebaseServices) {
   if (!hasSymbol(firebaseServices, name)) {

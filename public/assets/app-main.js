@@ -2091,6 +2091,52 @@ function bindGatherFirebaseDeps() {
   };
 }
 
+function subscribeMessages(calId, options, onSnapshot, onError) {
+  const svc = window.GATHER_FIREBASE_SERVICES;
+  if (svc && typeof svc.subscribeMessages === 'function' && !svc.isScaffold) {
+    return svc.subscribeMessages(calId, options, onSnapshot, onError);
+  }
+  if (!firebaseDb || !calId) return function () {};
+  let q = firebaseDb.collection('calendars').doc('cal_' + calId).collection('messages');
+  const orderBy = (options && options.orderBy) || 'timestamp';
+  const direction = (options && options.direction) || 'desc';
+  q = q.orderBy(orderBy, direction);
+  if (options && options.limit) q = q.limit(options.limit);
+  return q.onSnapshot(onSnapshot, onError || function () {});
+}
+function subscribePlaces(calId, onSnapshot, onError) {
+  const svc = window.GATHER_FIREBASE_SERVICES;
+  if (svc && typeof svc.subscribePlaces === 'function' && !svc.isScaffold) {
+    return svc.subscribePlaces(calId, onSnapshot, onError);
+  }
+  if (!firebaseDb || !calId) return function () {};
+  return firebaseDb.collection('calendars').doc('cal_' + calId).collection('places')
+    .onSnapshot(onSnapshot, onError || function () {});
+}
+function subscribeMemos(calId, options, onSnapshot, onError) {
+  const svc = window.GATHER_FIREBASE_SERVICES;
+  if (svc && typeof svc.subscribeMemos === 'function' && !svc.isScaffold) {
+    return svc.subscribeMemos(calId, options, onSnapshot, onError);
+  }
+  if (!firebaseDb || !calId) return function () {};
+  let q = firebaseDb.collection('calendars').doc('cal_' + calId).collection('memos');
+  if (options && options.where) q = q.where(options.where[0], options.where[1], options.where[2]);
+  if (options && options.orderBy) q = q.orderBy(options.orderBy, options.direction || 'desc');
+  if (options && options.limit) q = q.limit(options.limit);
+  return q.onSnapshot(onSnapshot, onError || function () {});
+}
+function subscribeAnniversaries(calId, onSnapshot, onError) {
+  const svc = window.GATHER_FIREBASE_SERVICES;
+  if (svc && typeof svc.subscribeAnniversaries === 'function' && !svc.isScaffold) {
+    return svc.subscribeAnniversaries(calId, onSnapshot, onError);
+  }
+  if (!firebaseDb || !calId) return function () {};
+  return firebaseDb.collection('calendars').doc('cal_' + calId).collection('anniversaries')
+    .orderBy('createdAt', 'desc')
+    .onSnapshot(onSnapshot, onError || function () {});
+}
+
+
 const firebaseConfig = {
   apiKey: "AIzaSyD-GatherCalendarAppLiveKey2026",
   authDomain: "metro-live-2918e.firebaseapp.com",
@@ -7025,10 +7071,7 @@ function App() {
     // ascending order for rendering.
     let hasSeenInitialChatSnapshot = false;
     let lastNotifiedMessageId = null;
-    const unsubscribeChat = firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages')
-      .orderBy('timestamp', 'desc')
-      .limit(chatLimit)
-      .onSnapshot(snapshot => {
+    const unsubscribeChat = subscribeMessages(activeCalId, { orderBy: 'timestamp', direction: 'desc', limit: chatLimit }, snapshot => {
         if (!isMounted) return;
         const list = [];
         snapshot.forEach(doc => {
@@ -7066,9 +7109,7 @@ function App() {
     if (!activeCalId || !firebaseDb) return;
     if (activeView !== 'calendar') return;
     let isMounted = true;
-    const unsub = firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('anniversaries')
-      .orderBy('createdAt', 'desc')
-      .onSnapshot(snapshot => {
+    const unsub = subscribeAnniversaries(activeCalId, snapshot => {
         if (!isMounted) return;
         const list = [];
         snapshot.forEach(doc => list.push({ id: doc.id, ...doc.data() }));
@@ -7087,8 +7128,7 @@ function App() {
     if (!activeCalId || !firebaseDb) return;
     if (activeView !== 'calendar' && activeView !== 'places' && activeView !== 'settlement') return;
     let isMounted = true;
-    const unsubPlaces = firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('places')
-      .onSnapshot(snapshot => {
+    const unsubPlaces = subscribePlaces(activeCalId, snapshot => {
         if (!isMounted) return;
         const list = [];
         snapshot.forEach(doc => list.push(doc.data()));
@@ -7154,9 +7194,7 @@ function App() {
       setMemos(Array.from(byId.values()).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)));
     };
 
-    const unsubscribePinned = firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('memos')
-      .where('isPinned', '==', true)
-      .onSnapshot(snapshot => {
+    const unsubscribePinned = subscribeMemos(activeCalId, { where: ['isPinned', '==', true] }, snapshot => {
         if (!isMounted) return;
         pinnedList = [];
         snapshot.forEach(doc => pinnedList.push({ id: doc.id, ...doc.data() }));
@@ -7165,10 +7203,7 @@ function App() {
         console.warn(`Firestore pinned memos subscription error:`, err);
       });
 
-    const unsubscribeRecent = firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('memos')
-      .orderBy('createdAt', 'desc')
-      .limit(memosLimit)
-      .onSnapshot(snapshot => {
+    const unsubscribeRecent = subscribeMemos(activeCalId, { orderBy: 'createdAt', direction: 'desc', limit: memosLimit }, snapshot => {
         if (!isMounted) return;
         recentList = [];
         snapshot.forEach(doc => recentList.push({ id: doc.id, ...doc.data() }));

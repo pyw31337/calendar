@@ -41,7 +41,7 @@
 ### P3 Firebase 서비스 계층
 - P3-1 firebase-services.js 스캐폴드 ✅ 2026-08-20 (window.GATHER_FIREBASE_SERVICES)
 - P3-2 REST 헬퍼 이동 ✅ 2026-08-20 (count/older/recent/gallery → firebase-services)
-- P3-3 구독 래퍼
+- P3-3 구독 래퍼 ✅ 2026-08-20 (messages/places/memos/anniversaries)
 - P3-4 kkot/cw/jhair 격리 확인
 
 ### P4 UI 분리

@@ -221,14 +221,78 @@
     }
   }
 
+
+  function noop() {}
+
+  function subscribeCalSubcollection(calId, subName, options, onSnapshot, onError) {
+    const firebaseDb = getDb();
+    if (!firebaseDb || !calId || !subName) return noop;
+    options = options || {};
+    try {
+      let q = firebaseDb.collection('calendars').doc('cal_' + calId).collection(subName);
+      if (options.where && options.where.length >= 3) {
+        q = q.where(options.where[0], options.where[1], options.where[2]);
+      }
+      if (options.orderBy) {
+        q = q.orderBy(options.orderBy, options.direction || 'desc');
+      }
+      if (options.limit != null && options.limit > 0) {
+        q = q.limit(options.limit);
+      }
+      return q.onSnapshot(onSnapshot, onError || noop);
+    } catch (err) {
+      console.warn('subscribeCalSubcollection', subName, err);
+      if (typeof onError === 'function') onError(err);
+      return noop;
+    }
+  }
+
+  function subscribeMessages(calId, options, onSnapshot, onError) {
+    options = options || {};
+    return subscribeCalSubcollection(
+      calId, 'messages',
+      { orderBy: options.orderBy || 'timestamp', direction: options.direction || 'desc', limit: options.limit },
+      onSnapshot, onError
+    );
+  }
+
+  function subscribePlaces(calId, onSnapshot, onError) {
+    return subscribeCalSubcollection(calId, 'places', {}, onSnapshot, onError);
+  }
+
+  function subscribeMemos(calId, options, onSnapshot, onError) {
+    options = options || {};
+    const spec = {};
+    if (options.where) spec.where = options.where;
+    if (options.orderBy) {
+      spec.orderBy = options.orderBy;
+      spec.direction = options.direction || 'desc';
+    }
+    if (options.limit != null) spec.limit = options.limit;
+    return subscribeCalSubcollection(calId, 'memos', spec, onSnapshot, onError);
+  }
+
+  function subscribeAnniversaries(calId, onSnapshot, onError) {
+    return subscribeCalSubcollection(
+      calId, 'anniversaries',
+      { orderBy: 'createdAt', direction: 'desc' },
+      onSnapshot, onError
+    );
+  }
+
   window.GATHER_FIREBASE_SERVICES = Object.freeze({
-    version: '0.2.0-p3-2',
+    version: '0.3.0-p3-3',
     ready: true,
     isScaffold: false,
     fetchChatMessagesRest: fetchChatMessagesRest,
     fetchRecentChatMessages: fetchRecentChatMessages,
     fetchSubcollectionCount: fetchSubcollectionCount,
     fetchOlderChatMessages: fetchOlderChatMessages,
-    fetchGalleryItemCount: fetchGalleryItemCount
+    fetchGalleryItemCount: fetchGalleryItemCount,
+    subscribeCalSubcollection: subscribeCalSubcollection,
+    subscribeMessages: subscribeMessages,
+    subscribePlaces: subscribePlaces,
+    subscribeMemos: subscribeMemos,
+    subscribeAnniversaries: subscribeAnniversaries
   });
 })();
