@@ -281,3 +281,6 @@ zsh 에서 줄 시작 `#` 주석은 쓰지 말 것.
 
 ## P6-41 진행 (2026-08-20)
 - getContrastTextColor / isPollClosed / formatCommentDate 포함 utils 40개 ESM 심 추가
+
+## P6-42 진행 (2026-08-20)
+- doesPlaceMatchDate 포함 app-main 전용 헬퍼 57개 ESM 심 + bindGatherUiDeps 보강

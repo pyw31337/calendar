@@ -198,6 +198,235 @@ function trimLatLngOutliers(...args) {
   return typeof f === 'function' ? f(...args) : undefined;
 }
 
+function appendChatImageFiles(...args) {
+  const f = __gatherUiDeps().appendChatImageFiles || GATHER_APP_UTILS.appendChatImageFiles;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function autoGrowTextarea(...args) {
+  const f = __gatherUiDeps().autoGrowTextarea || GATHER_APP_UTILS.autoGrowTextarea;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function buildActivityLogsFromAvailabilities(...args) {
+  const f = __gatherUiDeps().buildActivityLogsFromAvailabilities || GATHER_APP_UTILS.buildActivityLogsFromAvailabilities;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function buildAdminDashboardMetrics(...args) {
+  const f = __gatherUiDeps().buildAdminDashboardMetrics || GATHER_APP_UTILS.buildAdminDashboardMetrics;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function buildFieldChangeNote(...args) {
+  const f = __gatherUiDeps().buildFieldChangeNote || GATHER_APP_UTILS.buildFieldChangeNote;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function changeAdminPasswordRemote(...args) {
+  const f = __gatherUiDeps().changeAdminPasswordRemote || GATHER_APP_UTILS.changeAdminPasswordRemote;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function clearAdminSession(...args) {
+  const f = __gatherUiDeps().clearAdminSession || GATHER_APP_UTILS.clearAdminSession;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function cloneCalendarList(...args) {
+  const f = __gatherUiDeps().cloneCalendarList || GATHER_APP_UTILS.cloneCalendarList;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function computeCalendarSearchMatches(...args) {
+  const f = __gatherUiDeps().computeCalendarSearchMatches || GATHER_APP_UTILS.computeCalendarSearchMatches;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function createCalendarBackupPayload(...args) {
+  const f = __gatherUiDeps().createCalendarBackupPayload || GATHER_APP_UTILS.createCalendarBackupPayload;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function createDefaultCalendar(...args) {
+  const f = __gatherUiDeps().createDefaultCalendar || GATHER_APP_UTILS.createDefaultCalendar;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function createMemoActivityLog(...args) {
+  const f = __gatherUiDeps().createMemoActivityLog || GATHER_APP_UTILS.createMemoActivityLog;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function createPollActivityLog(...args) {
+  const f = __gatherUiDeps().createPollActivityLog || GATHER_APP_UTILS.createPollActivityLog;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function deleteActivityLogsAfterTimestamp(...args) {
+  const f = __gatherUiDeps().deleteActivityLogsAfterTimestamp || GATHER_APP_UTILS.deleteActivityLogsAfterTimestamp;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function deleteAllChatImagesFromStorage(...args) {
+  const f = __gatherUiDeps().deleteAllChatImagesFromStorage || GATHER_APP_UTILS.deleteAllChatImagesFromStorage;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function deleteMessageRest(...args) {
+  const f = __gatherUiDeps().deleteMessageRest || GATHER_APP_UTILS.deleteMessageRest;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function describeImageProcessingFailures(...args) {
+  const f = __gatherUiDeps().describeImageProcessingFailures || GATHER_APP_UTILS.describeImageProcessingFailures;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function doesPlaceMatchDate(...args) {
+  const f = __gatherUiDeps().doesPlaceMatchDate || GATHER_APP_UTILS.doesPlaceMatchDate;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function downloadJsonFile(...args) {
+  const f = __gatherUiDeps().downloadJsonFile || GATHER_APP_UTILS.downloadJsonFile;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function exportCalendarConfirmedMeetingsToICS(...args) {
+  const f = __gatherUiDeps().exportCalendarConfirmedMeetingsToICS || GATHER_APP_UTILS.exportCalendarConfirmedMeetingsToICS;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function extractCalendarsFromBackup(...args) {
+  const f = __gatherUiDeps().extractCalendarsFromBackup || GATHER_APP_UTILS.extractCalendarsFromBackup;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function fetchActivityLogsFromFirestore(...args) {
+  const f = __gatherUiDeps().fetchActivityLogsFromFirestore || GATHER_APP_UTILS.fetchActivityLogsFromFirestore;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function fetchChatMessagesRest(...args) {
+  const f = __gatherUiDeps().fetchChatMessagesRest || GATHER_APP_UTILS.fetchChatMessagesRest;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function fetchImageShareDocument(...args) {
+  const f = __gatherUiDeps().fetchImageShareDocument || GATHER_APP_UTILS.fetchImageShareDocument;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function fetchRecentMessagesRest(...args) {
+  const f = __gatherUiDeps().fetchRecentMessagesRest || GATHER_APP_UTILS.fetchRecentMessagesRest;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function fetchSingleCalendarWithRest(...args) {
+  const f = __gatherUiDeps().fetchSingleCalendarWithRest || GATHER_APP_UTILS.fetchSingleCalendarWithRest;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function fetchSubcollectionCount(...args) {
+  const f = __gatherUiDeps().fetchSubcollectionCount || GATHER_APP_UTILS.fetchSubcollectionCount;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function fetchWithTimeout(...args) {
+  const f = __gatherUiDeps().fetchWithTimeout || GATHER_APP_UTILS.fetchWithTimeout;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function formatLogTimestamp(...args) {
+  const f = __gatherUiDeps().formatLogTimestamp || GATHER_APP_UTILS.formatLogTimestamp;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getAdminSearchFilterFromUrl(...args) {
+  const f = __gatherUiDeps().getAdminSearchFilterFromUrl || GATHER_APP_UTILS.getAdminSearchFilterFromUrl;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getAdminSearchQueryFromUrl(...args) {
+  const f = __gatherUiDeps().getAdminSearchQueryFromUrl || GATHER_APP_UTILS.getAdminSearchQueryFromUrl;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getAdminSearchResultTargetUrl(...args) {
+  const f = __gatherUiDeps().getAdminSearchResultTargetUrl || GATHER_APP_UTILS.getAdminSearchResultTargetUrl;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getAdminSelectedCalendarIdFromUrl(...args) {
+  const f = __gatherUiDeps().getAdminSelectedCalendarIdFromUrl || GATHER_APP_UTILS.getAdminSelectedCalendarIdFromUrl;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getAdminSession(...args) {
+  const f = __gatherUiDeps().getAdminSession || GATHER_APP_UTILS.getAdminSession;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getImageFilesFromClipboardEvent(...args) {
+  const f = __gatherUiDeps().getImageFilesFromClipboardEvent || GATHER_APP_UTILS.getImageFilesFromClipboardEvent;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getKnownPlaceParticipantNames(...args) {
+  const f = __gatherUiDeps().getKnownPlaceParticipantNames || GATHER_APP_UTILS.getKnownPlaceParticipantNames;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getPlaceCategoryMarkerContent(...args) {
+  const f = __gatherUiDeps().getPlaceCategoryMarkerContent || GATHER_APP_UTILS.getPlaceCategoryMarkerContent;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getSolarFromLunar(...args) {
+  const f = __gatherUiDeps().getSolarFromLunar || GATHER_APP_UTILS.getSolarFromLunar;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getWeatherIcon(...args) {
+  const f = __gatherUiDeps().getWeatherIcon || GATHER_APP_UTILS.getWeatherIcon;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function isAdminRestoreRoute(...args) {
+  const f = __gatherUiDeps().isAdminRestoreRoute || GATHER_APP_UTILS.isAdminRestoreRoute;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function listAllCalendarsRemote(...args) {
+  const f = __gatherUiDeps().listAllCalendarsRemote || GATHER_APP_UTILS.listAllCalendarsRemote;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function mergeCalendarCollections(...args) {
+  const f = __gatherUiDeps().mergeCalendarCollections || GATHER_APP_UTILS.mergeCalendarCollections;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function mergePollRecord(...args) {
+  const f = __gatherUiDeps().mergePollRecord || GATHER_APP_UTILS.mergePollRecord;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function normalizeCalendarForSave(...args) {
+  const f = __gatherUiDeps().normalizeCalendarForSave || GATHER_APP_UTILS.normalizeCalendarForSave;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function normalizePollOptionInput(...args) {
+  const f = __gatherUiDeps().normalizePollOptionInput || GATHER_APP_UTILS.normalizePollOptionInput;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function processImageFilesSequentially(...args) {
+  const f = __gatherUiDeps().processImageFilesSequentially || GATHER_APP_UTILS.processImageFilesSequentially;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function pushSingleCloudCalendar(...args) {
+  const f = __gatherUiDeps().pushSingleCloudCalendar || GATHER_APP_UTILS.pushSingleCloudCalendar;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function resolveMemoImageBatch(...args) {
+  const f = __gatherUiDeps().resolveMemoImageBatch || GATHER_APP_UTILS.resolveMemoImageBatch;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function sanitizeMemoForFirestore(...args) {
+  const f = __gatherUiDeps().sanitizeMemoForFirestore || GATHER_APP_UTILS.sanitizeMemoForFirestore;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function setAdminSession(...args) {
+  const f = __gatherUiDeps().setAdminSession || GATHER_APP_UTILS.setAdminSession;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function sha256Hex(...args) {
+  const f = __gatherUiDeps().sha256Hex || GATHER_APP_UTILS.sha256Hex;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function subscribeUserToPushWithPermission(...args) {
+  const f = __gatherUiDeps().subscribeUserToPushWithPermission || GATHER_APP_UTILS.subscribeUserToPushWithPermission;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function translateKoreanToEnglish(...args) {
+  const f = __gatherUiDeps().translateKoreanToEnglish || GATHER_APP_UTILS.translateKoreanToEnglish;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function unsubscribeUserFromPush(...args) {
+  const f = __gatherUiDeps().unsubscribeUserFromPush || GATHER_APP_UTILS.unsubscribeUserFromPush;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function validateBackupCalendars(...args) {
+  const f = __gatherUiDeps().validateBackupCalendars || GATHER_APP_UTILS.validateBackupCalendars;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function validateCalendarShape(...args) {
+  const f = __gatherUiDeps().validateCalendarShape || GATHER_APP_UTILS.validateCalendarShape;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function verifyAdminPasswordRemote(...args) {
+  const f = __gatherUiDeps().verifyAdminPasswordRemote || GATHER_APP_UTILS.verifyAdminPasswordRemote;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+
 const KOREAN_LUNAR_HOLIDAY_DATES = GATHER_APP_CALENDAR_DATA.KOREAN_LUNAR_HOLIDAY_DATES || {};
 const KOREAN_TEMPORARY_HOLIDAYS = GATHER_APP_CALENDAR_DATA.KOREAN_TEMPORARY_HOLIDAYS || [];
 const KOREAN_FIXED_HOLIDAYS = GATHER_APP_CALENDAR_DATA.KOREAN_FIXED_HOLIDAYS || [];
