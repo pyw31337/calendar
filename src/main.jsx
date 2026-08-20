@@ -47,7 +47,9 @@ async function boot() {
     ]);
     const root = document.getElementById('root');
     if (root) root.dataset.booted = '1';
+    window.__GATHER_BOOT_READY__ = true;
     await import('./core/app-main.js');
+    if (typeof window.__gatherStartApp === 'function') window.__gatherStartApp();
   } catch (err) {
     console.error('[P6] boot failed', err);
     showBootStatus('로딩 실패. 새로고침 해주세요.');

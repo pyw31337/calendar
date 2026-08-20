@@ -334,3 +334,9 @@ zsh 에서 줄 시작 `#` 주석은 쓰지 말 것.
 ## P6-52 진행 (2026-08-20)
 - isValidCalendarId 등 GATHER_APP_UTILS 별칭을 호출 시 resolve (admin $e is not a function)
 - live-smoke: code-split 엔트리 작은 크기 허용, 청크 합산 검증
+
+## P6-54 긴급 (2026-08-20)
+- jhair/cw "지원하지 않는 캘린더": isAllowedCalendarId undefined 폴백 수정
+- app-main 마운트를 boot 완료 후로 지연
+- PUBLIC_CALENDAR_IDS에 jhair 포함
+- build 후 share/ 를 dist에 복사 (Vite Pages에 share 링크 복구)

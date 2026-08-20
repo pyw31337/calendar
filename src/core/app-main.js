@@ -350,7 +350,7 @@ const ENABLE_FIRESTORE_WRITES = GATHER_APP_CONFIG.ENABLE_FIRESTORE_WRITES !== fa
 // unionConfirmedMeetings, feeding activeCal) stays active either way since it's a safe no-op
 // while the subcollections are empty.
 const ENABLE_PLACES_SUBCOLLECTION_MIGRATION = GATHER_APP_CONFIG.ENABLE_PLACES_SUBCOLLECTION_MIGRATION === true;
-const PUBLIC_CALENDAR_IDS = Array.isArray(GATHER_APP_CONFIG.PUBLIC_CALENDAR_IDS) ? GATHER_APP_CONFIG.PUBLIC_CALENDAR_IDS : ['kkot', 'cw'];
+const PUBLIC_CALENDAR_IDS = Array.isArray(GATHER_APP_CONFIG.PUBLIC_CALENDAR_IDS) ? GATHER_APP_CONFIG.PUBLIC_CALENDAR_IDS : ['kkot', 'cw', 'jhair'];
 const FIREBASE_LOAD_TIMEOUT_MS = readConfigNumber('FIREBASE_LOAD_TIMEOUT_MS', 10000);
 const FIREBASE_LOAD_MAX_ATTEMPTS = readConfigNumber('FIREBASE_LOAD_MAX_ATTEMPTS', 3);
 // Memos load newest-first in pages of this size instead of the whole collection at once, so a
@@ -1003,9 +1003,10 @@ function isInternalTestCalendarId(...args) {
   const f = (window.GATHER_APP_UTILS || {}).isInternalTestCalendarId;
   return typeof f === 'function' ? f(...args) : undefined;
 }
-function isAllowedCalendarId(...args) {
+function isAllowedCalendarId(id) {
   const f = (window.GATHER_APP_UTILS || {}).isAllowedCalendarId;
-  return typeof f === 'function' ? f(...args) : undefined;
+  if (typeof f === 'function') return f(id);
+  return typeof id === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(id);
 }
 function sanitizeText(...args) {
   const f = (window.GATHER_APP_UTILS || {}).sanitizeText;
@@ -10511,6 +10512,7 @@ function bindGatherUiDeps() {
 bindGatherUiDeps();
 
 
+function __gatherStartApp() {
 try {
   const rootElement = document.getElementById('root');
   if (rootElement) {
@@ -10525,4 +10527,11 @@ try {
   }
 } catch (e) {
   console.error('App render error:', e);
+}
+
+}
+
+window.__gatherStartApp = __gatherStartApp;
+if (window.__GATHER_BOOT_READY__) {
+  __gatherStartApp();
 }
