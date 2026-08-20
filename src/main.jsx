@@ -77,6 +77,7 @@ import { PlaceMapView, PlacesView } from './ui/ui-places.js';
 import { MemoView } from './ui/ui-memo-view.js';
 import { ChatRoomView } from './ui/ui-chat-room.js';
 import { DateModal } from './ui/ui-date-modal.js';
+import { AnniversaryModal, SettlementSummaryModal, PollModal } from './ui/ui-event-modals.js';
 
 console.log('[P6] Vite entry loaded', {
   constants: !!GATHER_APP_CONSTANTS,
@@ -87,5 +88,6 @@ console.log('[P6] Vite entry loaded', {
   MemoView: typeof MemoView,
   ChatRoomView: typeof ChatRoomView,
   DateModal: typeof DateModal,
+  AnniversaryModal: typeof AnniversaryModal,
   publicCalendarIds: GATHER_APP_CONFIG.PUBLIC_CALENDAR_IDS
 });

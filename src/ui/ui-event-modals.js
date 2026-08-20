@@ -1,8 +1,7 @@
 /**
  * Anniversary / Settlement / Poll modals (P4-18)
  */
-(function () {
-function AnniversaryModal({
+export function AnniversaryModal({
   calendar,
   anniversaries,
   onClose,
@@ -587,7 +586,7 @@ function AnniversaryModal({
   return ReactDOM.createPortal(portalContent, document.body);
 }
 
-function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {
+export function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -1229,7 +1228,7 @@ function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {
   ));
 }
 
-function PollModal({ calendar, poll, onSave, onClose, showToast, onRequestConfirm }) {
+export function PollModal({ calendar, poll, onSave, onClose, showToast, onRequestConfirm }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -1598,9 +1597,10 @@ function PollModal({ calendar, poll, onSave, onClose, showToast, onRequestConfir
   }, isSubmitting ? "\uC800\uC7A5 \uC911..." : "\uD22C\uD45C \uC800\uC7A5")))));
 }
 
+  if (typeof window !== 'undefined') {
   window.GATHER_UI_COMPONENTS = Object.assign({}, window.GATHER_UI_COMPONENTS || {}, {
     AnniversaryModal: AnniversaryModal,
     SettlementSummaryModal: SettlementSummaryModal,
-    PollModal: PollModal
+    PollModal: PollModal,
   });
-})();
+}
