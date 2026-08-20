@@ -25,6 +25,7 @@ import {
   ChatParticipantSheet,
   NotificationPermissionHelpModal
 } from './ui/ui-chat-sheets.js';
+import { UserManualOverlay } from './ui/ui-user-manual.js';
 
 console.log('[P6] Vite entry loaded', {
   constants: !!GATHER_APP_CONSTANTS,
@@ -34,5 +35,6 @@ console.log('[P6] Vite entry loaded', {
   ShareModal: typeof ShareModal,
   UrlCapsuleBadge: typeof UrlCapsuleBadge,
   ChatParticipantSheet: typeof ChatParticipantSheet,
+  UserManualOverlay: typeof UserManualOverlay,
   publicCalendarIds: GATHER_APP_CONFIG.PUBLIC_CALENDAR_IDS
 });

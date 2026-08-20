@@ -1,8 +1,7 @@
 /**
  * User manual overlay (P4-6)
  */
-(function () {
-function UserManualOverlay({ calendar, onClose }) {
+export function UserManualOverlay({ calendar, onClose }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const SmallXIcon = __deps.SmallXIcon;
@@ -174,7 +173,8 @@ function UserManualOverlay({ calendar, onClose }) {
   }, "팁: 가능한 날짜를 하나만 고르기보다 여러 날짜를 미리 등록해두면, 공통으로 참석 가능한 날짜를 훨씬 빠르게 찾을 수 있습니다."))), document.body);
 }
 
+  if (typeof window !== 'undefined') {
   window.GATHER_UI_COMPONENTS = Object.assign({}, window.GATHER_UI_COMPONENTS || {}, {
-    UserManualOverlay: UserManualOverlay
+    UserManualOverlay: UserManualOverlay,
   });
-})();
+}

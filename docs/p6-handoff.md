@@ -119,3 +119,9 @@ zsh 에서 줄 시작 `#` 주석은 쓰지 말 것.
 - ChatParticipantSheet, NotificationPermissionHelpModal
 - 라이브 경로 유지. Pages 전환 아직 금지.
 - 다음: ui-user-manual 또는 ui-weather
+
+## P6-13 진행 (2026-08-20)
+- src/ui/ui-user-manual.js 를 ESM export (assets/ 미변경)
+- UserManualOverlay
+- 라이브 경로 유지. Pages 전환 아직 금지.
+- 다음: ui-weather
