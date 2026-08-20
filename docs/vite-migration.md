@@ -43,3 +43,8 @@ P4 완료 후 기능 동결. P6 Vite 작업만 진행.
 - src/main.jsx 스텁 생성
 - 라이브(index.html + assets/) 동작 동일 유지
 - 다음: P6-2 (App 분리 + dynamic import) 준비
+
+### P6-1 main 반영 완료 (2026-08-20)
+- p6-1-vite-bridge → main 머지 완료
+- 라이브 동작 동일 유지 확인
+- 다음 단계: P6-2 (기능 동결 상태에서 App 분리 준비)
