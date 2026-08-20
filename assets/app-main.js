@@ -5799,11 +5799,7 @@ function AdminDashboard({ initialCalendars }) {
               type: "text", className: "form-input", placeholder: "이름, 메시지 검색...", value: chatSearchQuery,
               onChange: e => setChatSearchQuery(e.target.value),
               style: { maxWidth: '240px', width: '100%', minWidth: 0 }
-            }),
-            /*#__PURE__*/React.createElement("button", {
-              type: "button", className: "btn btn-secondary", style: { whiteSpace: 'nowrap', height: '36px' },
-              onClick: () => setAdminMessageLimit(prev => prev + ADMIN_MESSAGE_LIVE_LIMIT)
-            }, "이전 로그 더 보기")
+            })
           )
         ),
 
@@ -5844,7 +5840,33 @@ function AdminDashboard({ initialCalendars }) {
                 }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 14 }))
               )
             );
-          })
+          }),
+          (() => {
+            const loadedCount = (messagesMap[selectedCalId] || []).length;
+            const totalCount = (adminMsgTotal[selectedCalId] != null && adminMsgTotal[selectedCalId] > 0)
+              ? adminMsgTotal[selectedCalId]
+              : loadedCount;
+            if (!(totalCount > loadedCount)) return null;
+            const step = ADMIN_MESSAGE_LIVE_LIMIT;
+            return /*#__PURE__*/React.createElement("div", {
+              style: { display: 'flex', justifyContent: 'center', marginTop: '12px', paddingBottom: '4px' }
+            },
+              /*#__PURE__*/React.createElement("button", {
+                type: "button",
+                className: "btn btn-secondary",
+                onClick: () => setAdminMessageLimit(prev => prev + step),
+                style: {
+                  width: '100%',
+                  fontSize: '0.8rem',
+                  padding: '8px 16px',
+                  backgroundColor: '#EFF6FF',
+                  borderColor: '#BFDBFE',
+                  color: '#1D4ED8',
+                  fontWeight: 'bold'
+                }
+              }, `채팅 ${step}개 더 보기 (전체 ${totalCount}개 중 ${loadedCount}개 표시 중)`)
+            );
+          })()
         )
       )
     )),
