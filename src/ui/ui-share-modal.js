@@ -2,10 +2,9 @@
  * ShareModal (P4-2). Site rule: URL + copy + QR.
  * Deps via window.GATHER_UI_DEPS at render time.
  */
-(function () {
-  function getDeps() { return window.GATHER_UI_DEPS || {}; }
+function getDeps() { return window.GATHER_UI_DEPS || {}; }
 
-  function ShareModal(props) {
+  export function ShareModal(props) {
     const React = window.React;
     if (!React) return null;
     const calendar = props.calendar;
@@ -123,7 +122,8 @@
     ))));
   }
 
+  if (typeof window !== 'undefined') {
   window.GATHER_UI_COMPONENTS = Object.assign({}, window.GATHER_UI_COMPONENTS || {}, {
     ShareModal: ShareModal
   });
-})();
+}

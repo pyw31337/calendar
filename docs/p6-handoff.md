@@ -93,3 +93,10 @@ zsh 에서 줄 시작 `#` 주석은 쓰지 말 것.
 - npm run build: 모듈 11개, dist JS ~37KB
 - 라이브 경로 유지. Pages 전환 아직 금지.
 - 다음: ui-share-modal / ui-overlays 등 작은 UI 한 파일씩
+
+## P6-9 진행 (2026-08-20)
+- src/ui/ui-share-modal.js 를 ESM export (assets/ 미변경)
+- ShareModal 을 src/main.jsx 에서 import
+- npm run build: 모듈 12개, dist JS ~40KB
+- 라이브 경로 유지. Pages 전환 아직 금지.
+- 다음: ui-overlays 또는 ui-widgets
