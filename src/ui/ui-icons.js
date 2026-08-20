@@ -926,9 +926,9 @@ export function SearchIcon() {
     viewBox: "0 0 24 24",
     fill: "none",
     stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
+    "strokeWidth": "2",
+    "strokeLinecap": "round",
+    "strokeLinejoin": "round",
     className: "icon icon-tabler icons-tabler-outline icon-tabler-search"
   }, /*#__PURE__*/React.createElement("path", {
     stroke: "none",
@@ -951,9 +951,9 @@ export function CalendarCheckIcon() {
     viewBox: "0 0 24 24",
     fill: "none",
     stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
+    "strokeWidth": "2",
+    "strokeLinecap": "round",
+    "strokeLinejoin": "round",
     className: "icon lucide lucide-calendar-check"
   }, /*#__PURE__*/React.createElement("path", {
     d: "M8 2v3"
@@ -982,9 +982,9 @@ export function LockIcon() {
     viewBox: "0 0 24 24",
     fill: "none",
     stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
+    "strokeWidth": "2",
+    "strokeLinecap": "round",
+    "strokeLinejoin": "round",
     className: "icon icon-tabler icons-tabler-outline icon-tabler-lock"
   }, /*#__PURE__*/React.createElement("path", {
     stroke: "none",
@@ -1009,9 +1009,9 @@ export function LogoutIcon() {
     viewBox: "0 0 24 24",
     fill: "none",
     stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
+    "strokeWidth": "2",
+    "strokeLinecap": "round",
+    "strokeLinejoin": "round",
     className: "icon icon-tabler icons-tabler-outline icon-tabler-logout"
   }, /*#__PURE__*/React.createElement("path", {
     stroke: "none",
@@ -1036,9 +1036,9 @@ export function RefreshIcon() {
     viewBox: "0 0 24 24",
     fill: "none",
     stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
+    "strokeWidth": "2",
+    "strokeLinecap": "round",
+    "strokeLinejoin": "round",
     className: "icon icon-tabler icons-tabler-outline icon-tabler-refresh"
   }, /*#__PURE__*/React.createElement("path", {
     stroke: "none",
@@ -1084,9 +1084,9 @@ export function EmojiPickerIcon() {
     viewBox: "0 0 24 24",
     fill: "none",
     stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
+    "strokeWidth": "2",
+    "strokeLinecap": "round",
+    "strokeLinejoin": "round",
     className: "icon icon-tabler icons-tabler-outline icon-tabler-mood-smile"
   }, /*#__PURE__*/React.createElement("path", {
     stroke: "none",
@@ -1113,9 +1113,9 @@ export function ExternalLinkIcon() {
     viewBox: "0 0 24 24",
     fill: "none",
     stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
+    "strokeWidth": "2",
+    "strokeLinecap": "round",
+    "strokeLinejoin": "round",
     className: "lucide lucide-external-link-icon lucide-external-link"
   }, /*#__PURE__*/React.createElement("path", {
     d: "M15 3h6v6"
@@ -1136,9 +1136,9 @@ export function ShareIcon({ size = 20 } = {}) {
     viewBox: "0 0 24 24",
     fill: "none",
     stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round"
+    "strokeWidth": "2",
+    "strokeLinecap": "round",
+    "strokeLinejoin": "round"
   }, /*#__PURE__*/React.createElement("circle", { cx: "18", cy: "5", r: "3" }),
      /*#__PURE__*/React.createElement("circle", { cx: "6", cy: "12", r: "3" }),
      /*#__PURE__*/React.createElement("circle", { cx: "18", cy: "19", r: "3" }),
@@ -1156,9 +1156,9 @@ export function WalletIcon({ size = 24 } = {}) {
     viewBox: "0 0 24 24",
     fill: "none",
     stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
+    "strokeWidth": "2",
+    "strokeLinecap": "round",
+    "strokeLinejoin": "round",
     className: "icon icon-tabler icons-tabler-outline icon-tabler-wallet"
   }, /*#__PURE__*/React.createElement("path", {
     stroke: "none",
@@ -1210,9 +1210,9 @@ export function BanknoteArrowUpIcon({ size = 24 } = {}) {
     viewBox: "0 0 24 24",
     fill: "none",
     stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
+    "strokeWidth": "2",
+    "strokeLinecap": "round",
+    "strokeLinejoin": "round",
     className: "icon lucide lucide-banknote-arrow-up"
   }, /*#__PURE__*/React.createElement("path", {
     d: "M12 18H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5"
@@ -1241,9 +1241,9 @@ export function BanknoteArrowDownIcon({ size = 24 } = {}) {
     viewBox: "0 0 24 24",
     fill: "none",
     stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
+    "strokeWidth": "2",
+    "strokeLinecap": "round",
+    "strokeLinejoin": "round",
     className: "icon lucide lucide-banknote-arrow-down"
   }, /*#__PURE__*/React.createElement("path", {
     d: "M12 18H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5"
@@ -1272,9 +1272,9 @@ export function PiggyBankIcon({ size = 24 } = {}) {
     viewBox: "0 0 24 24",
     fill: "none",
     stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
+    "strokeWidth": "2",
+    "strokeLinecap": "round",
+    "strokeLinejoin": "round",
     className: "icon lucide lucide-piggy-bank"
   }, /*#__PURE__*/React.createElement("path", {
     d: "M11 17h3v2a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-3a3.16 3.16 0 0 0 2-2h1a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1h-1a5 5 0 0 0-2-4V3a4 4 0 0 0-3.2 1.6l-.3.4H11a6 6 0 0 0-6 6v1a5 5 0 0 0 2 4v3a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1z"
@@ -1295,9 +1295,9 @@ export function ChartBarIcon() {
     viewBox: "0 0 24 24",
     fill: "none",
     stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
+    "strokeWidth": "2",
+    "strokeLinecap": "round",
+    "strokeLinejoin": "round",
     className: "icon icon-tabler icons-tabler-outline icon-tabler-chart-bar"
   }, /*#__PURE__*/React.createElement("path", {
     stroke: "none",
@@ -1324,9 +1324,9 @@ export function ChartPieIcon() {
     viewBox: "0 0 24 24",
     fill: "none",
     stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
+    "strokeWidth": "2",
+    "strokeLinecap": "round",
+    "strokeLinejoin": "round",
     className: "icon icon-tabler icons-tabler-outline icon-tabler-chart-pie"
   }, /*#__PURE__*/React.createElement("path", {
     stroke: "none",
@@ -1349,9 +1349,9 @@ export function CalendarCogIcon() {
     viewBox: "0 0 24 24",
     fill: "none",
     stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
+    "strokeWidth": "2",
+    "strokeLinecap": "round",
+    "strokeLinejoin": "round",
     className: "icon icon-tabler icons-tabler-outline icon-tabler-calendar-cog"
   }, /*#__PURE__*/React.createElement("path", {
     stroke: "none",
@@ -1392,9 +1392,9 @@ export function CalendarSearchIcon({ size = 20 } = {}) {
     viewBox: "0 0 24 24",
     fill: "none",
     stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
+    "strokeWidth": "2",
+    "strokeLinecap": "round",
+    "strokeLinejoin": "round",
     className: "icon icon-tabler icons-tabler-outline icon-tabler-calendar-search"
   }, /*#__PURE__*/React.createElement("path", {
     stroke: "none",
@@ -1425,9 +1425,9 @@ export function TrophyIcon() {
     viewBox: "0 0 24 24",
     fill: "none",
     stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
+    "strokeWidth": "2",
+    "strokeLinecap": "round",
+    "strokeLinejoin": "round",
     className: "lucide lucide-trophy-icon lucide-trophy"
   }, /*#__PURE__*/React.createElement("path", {
     d: "M10 14.66V17a1 1 0 0 1-1 1 2 2 0 0 0-2 2v2"
@@ -1454,9 +1454,9 @@ export function PodiumIcon() {
     viewBox: "0 0 24 24",
     fill: "none",
     stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
+    "strokeWidth": "2",
+    "strokeLinecap": "round",
+    "strokeLinejoin": "round",
     className: "lucide lucide-podium-icon lucide-podium"
   }, /*#__PURE__*/React.createElement("path", {
     d: "M12 6V2h-1"
@@ -1477,9 +1477,9 @@ export function CloudDataConnectionIcon() {
     viewBox: "0 0 24 24",
     fill: "none",
     stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
+    "strokeWidth": "2",
+    "strokeLinecap": "round",
+    "strokeLinejoin": "round",
     className: "icon icon-tabler icons-tabler-outline icon-tabler-cloud-data-connection"
   }, /*#__PURE__*/React.createElement("path", {
     stroke: "none",
@@ -1560,9 +1560,9 @@ export function AlertTriangleIcon() {
     viewBox: "0 0 24 24",
     fill: "none",
     stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
+    "strokeWidth": "2",
+    "strokeLinecap": "round",
+    "strokeLinejoin": "round",
     className: "icon icon-tabler icons-tabler-outline icon-tabler-alert-triangle"
   }, /*#__PURE__*/React.createElement("path", {
     stroke: "none",
@@ -1587,9 +1587,9 @@ export function ShieldCheckIcon() {
     viewBox: "0 0 24 24",
     fill: "none",
     stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
+    "strokeWidth": "2",
+    "strokeLinecap": "round",
+    "strokeLinejoin": "round",
     className: "icon icon-tabler icons-tabler-outline icon-tabler-shield-check"
   }, /*#__PURE__*/React.createElement("path", {
     stroke: "none",
@@ -1612,9 +1612,9 @@ export function CalendarExportIcon() {
     viewBox: "0 0 24 24",
     fill: "none",
     stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
+    "strokeWidth": "2",
+    "strokeLinecap": "round",
+    "strokeLinejoin": "round",
     className: "icon icon-tabler icons-tabler-outline icon-tabler-calendar-plus"
   }, /*#__PURE__*/React.createElement("path", {
     stroke: "none",
@@ -1645,9 +1645,9 @@ export function GalleryIcon() {
     viewBox: "0 0 24 24",
     fill: "none",
     stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
+    "strokeWidth": "2",
+    "strokeLinecap": "round",
+    "strokeLinejoin": "round",
     className: "icon icon-tabler icons-tabler-outline icon-tabler-photo"
   }, /*#__PURE__*/React.createElement("path", {
     stroke: "none",
@@ -1674,9 +1674,9 @@ export function PollSectionIcon() {
     viewBox: "0 0 24 24",
     fill: "none",
     stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
+    "strokeWidth": "2",
+    "strokeLinecap": "round",
+    "strokeLinejoin": "round",
     className: "icon icon-tabler icons-tabler-outline icon-tabler-checkbox"
   }, /*#__PURE__*/React.createElement("path", {
     stroke: "none",
@@ -1699,9 +1699,9 @@ export function LineHeightIcon({ size = 22 } = {}) {
     viewBox: "0 0 24 24",
     fill: "none",
     stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
+    "strokeWidth": "2",
+    "strokeLinecap": "round",
+    "strokeLinejoin": "round",
     className: "icon icon-tabler icons-tabler-outline icon-tabler-line-height"
   }, /*#__PURE__*/React.createElement("path", {
     stroke: "none",
@@ -1732,9 +1732,9 @@ export function MegaphoneIcon({ size = 20 } = {}) {
     viewBox: "0 0 24 24",
     fill: "none",
     stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
+    "strokeWidth": "2",
+    "strokeLinecap": "round",
+    "strokeLinejoin": "round",
     className: "lucide lucide-megaphone-icon lucide-megaphone"
   }, /*#__PURE__*/React.createElement("path", {
     d: "M11 6a13 13 0 0 0 8.4-2.8A1 1 0 0 1 21 4v12a1 1 0 0 1-1.6.8A13 13 0 0 0 11 14H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z"
@@ -1755,9 +1755,9 @@ export function SmallXIcon({ size = 24 } = {}) {
     viewBox: "0 0 24 24",
     fill: "none",
     stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
+    "strokeWidth": "2",
+    "strokeLinecap": "round",
+    "strokeLinejoin": "round",
     className: "icon icon-tabler icons-tabler-outline icon-tabler-x"
   }, /*#__PURE__*/React.createElement("path", {
     stroke: "none",
@@ -1780,9 +1780,9 @@ export function PlaceSectionIcon({ size = 20 } = {}) {
     viewBox: "0 0 24 24",
     fill: "none",
     stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
+    "strokeWidth": "2",
+    "strokeLinecap": "round",
+    "strokeLinejoin": "round",
     className: "icon icon-tabler icons-tabler-outline icon-tabler-map-pin"
   }, /*#__PURE__*/React.createElement("path", {
     stroke: "none",
@@ -1805,8 +1805,8 @@ export function ThreeLinesIcon({ size = 18 } = {}) {
     viewBox: "0 0 24 24",
     fill: "none",
     stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round"
+    "strokeWidth": "2",
+    "strokeLinecap": "round"
   }, /*#__PURE__*/React.createElement("line", { x1: "4", y1: "7", x2: "20", y2: "7" }),
     /*#__PURE__*/React.createElement("line", { x1: "4", y1: "12", x2: "20", y2: "12" }),
     /*#__PURE__*/React.createElement("line", { x1: "4", y1: "17", x2: "20", y2: "17" }));
@@ -1823,9 +1823,9 @@ export function PlaceCategoryMarkerIcon({ category, size = 14, strokeColor = "#f
     viewBox: "0 0 24 24",
     fill: "none",
     stroke: strokeColor,
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round"
+    "strokeWidth": "2",
+    "strokeLinecap": "round",
+    "strokeLinejoin": "round"
   }, content.shapes.map((shape, i) => /*#__PURE__*/React.createElement(shape.tag, { key: i, ...(shape.tag === 'rect' ? { x: shape.x, y: shape.y, width: shape.width, height: shape.height, rx: shape.rx, ry: shape.ry } : shape.tag === 'circle' ? { cx: shape.cx, cy: shape.cy, r: shape.r } : { d: shape.d }) })));
 }
 

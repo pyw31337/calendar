@@ -284,3 +284,11 @@ zsh 에서 줄 시작 `#` 주석은 쓰지 말 것.
 
 ## P6-42 진행 (2026-08-20)
 - doesPlaceMatchDate 포함 app-main 전용 헬퍼 57개 ESM 심 + bindGatherUiDeps 보강
+
+## P6-43 진행 (2026-08-20)
+- src/ui-icons SVG stroke* React 속성 경고 정리
+- vite base: GITHUB_PAGES=1 이면 /calendar/
+- Deploy Vite Pages 워크플로 추가 (workflow_dispatch만, 자동 전환 없음)
+- docs/p6-pages-switch.md 전환/롤백 문서
+- 태그: safe-20260820-p6-vite-ready
+- 라이브 classic 경로 유지 중
