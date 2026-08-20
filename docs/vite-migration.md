@@ -79,3 +79,7 @@ P4 완료 후 기능 동결. P6 Vite 작업만 진행.
 ### P6-2 캐시/deps 복사 (2026-08-20)
 - src/core/cache-and-deps.js 추가
 - p6-2-copy-cache-deps → main 머지
+
+### P6-2 캐시/deps 복사 (2026-08-20)
+- src/core/cache-and-deps.js 추가
+- p6-2-copy-cache-deps → main 머지

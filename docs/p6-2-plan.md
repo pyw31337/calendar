@@ -31,3 +31,5 @@
 - 4단계 계속: src/core/subscriptions.js 에 구독 헬퍼 복사 (원본 유지)
 
 - 4단계 계속: src/core/cache-and-deps.js (loadLocalCache, saveLocalCache, bindGatherFirebaseDeps) 복사
+
+- 4단계 계속: src/core/cache-and-deps.js (loadLocalCache, saveLocalCache, bindGatherFirebaseDeps) 복사
