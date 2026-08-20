@@ -25105,6 +25105,9 @@ function SummaryList({
     confirmed: true,
     past: true
   });
+  const SUMMARY_LIST_PAGE = 10;
+  const [allListLimit, setAllListLimit] = React.useState(SUMMARY_LIST_PAGE);
+  const [confirmedListLimit, setConfirmedListLimit] = React.useState(SUMMARY_LIST_PAGE);
   const toggleSection = sectionKey => {
     setCollapsedSections(prev => ({
       ...prev,
@@ -25316,14 +25319,14 @@ function SummaryList({
       fontSize: '0.85rem',
       padding: '10px 0'
     }
-  }, "\uC544\uC9C1 \uCC38\uC5EC\uC790 \uC804\uC6D0\uC774 \uAC00\uB2A5\uD55C \uB0A0\uC9DC\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4. \uCE98\uB9B0\uB354\uC5D0\uC11C \uB0A0\uC9DC\uB97C \uC120\uD0DD\uD558\uC5EC \uAC00\uB2A5 \uC5EC\uBD80\uB97C \uD45C\uAE30\uD574\uBCF4\uC138\uC694!") : /*#__PURE__*/React.createElement("div", null, sortedAllDates.map(d => {
+  }, "\uC544\uC9C1 \uCC38\uC5EC\uC790 \uC804\uC6D0\uC774 \uAC00\uB2A5\uD55C \uB0A0\uC9DC\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4. \uCE98\uB9B0\uB354\uC5D0\uC11C \uB0A0\uC9DC\uB97C \uC120\uD0DD\uD558\uC5EC \uAC00\uB2A5 \uC5EC\uBD80\uB97C \uD45C\uAE30\uD574\uBCF4\uC138\uC694!") : /*#__PURE__*/React.createElement("div", null, sortedAllDates.slice(0, allListLimit).map(d => {
     const dateEntries = (dateMap[d] || []).filter(e => participantsMap[e.participantId] && !isTombstone(e));
     const formattedDateStr = formatDateWithDayName(d);
     const memoEntries = dateEntries.filter(e => e.note && e.note.trim().length > 0);
     const isPast = d < todayStr;
     return /*#__PURE__*/React.createElement("button", {
       key: d,
-      className: `date-item-btn${isPast ? ' is-past' : ''}`,
+      className: `date-item-btn${isPast ? ' is-past' : ' is-all'}`,
       onClick: () => onSelectDate(d),
       style: {
         flexDirection: 'column',
@@ -25380,7 +25383,22 @@ function SummaryList({
         title: `${p.name}: ${memoText}`
       }, memoText);
     })));
-  })))), anyBeforeConfirmed && isConfirmedVisible && /*#__PURE__*/React.createElement("div", {
+  }), ((() => {
+      const total = sortedAllDates.length;
+      const shown = Math.min(allListLimit, total);
+      if (!(total > shown)) return null;
+      const step = SUMMARY_LIST_PAGE;
+      return /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: () => setAllListLimit(prev => prev + step),
+        style: {
+          width: '100%', marginTop: '4px', marginBottom: '6px', padding: '10px 0',
+          border: 'none', borderRadius: '8px',
+          backgroundColor: 'color-mix(in srgb, var(--bg-primary) 96%, black)',
+          color: '#059669', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer', textAlign: 'center'
+        }
+      }, `더보기 (총 ${total}개 중 ${shown}개)`);
+    })())))), anyBeforeConfirmed && isConfirmedVisible && /*#__PURE__*/React.createElement("div", {
     className: "summary-section-divider"
   }), isConfirmedVisible && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     className: `summary-title is-toggleable${collapsedSections.confirmed ? ' is-collapsed' : ''}`,
@@ -25414,7 +25432,7 @@ function SummaryList({
     collapsed: collapsedSections.confirmed,
     onToggle: () => toggleSection('confirmed'),
     label: collapsedSections.confirmed ? "모임 확정 펼치기" : "모임 확정 접기"
-  })), !collapsedSections.confirmed && /*#__PURE__*/React.createElement("div", null, confirmedDates.map(d => {
+  })), !collapsedSections.confirmed && /*#__PURE__*/React.createElement("div", null, confirmedDates.slice(0, confirmedListLimit).map(d => {
     const dateEntries = (dateMap[d] || []).filter(e => participantsMap[e.participantId] && !isTombstone(e));
     const formattedDateStr = formatDateWithDayName(d);
     const memoEntries = dateEntries.filter(e => e.note && e.note.trim().length > 0);
@@ -25478,7 +25496,22 @@ function SummaryList({
         title: `${p.name}: ${memoText}`
       }, memoText);
     })));
-  }))));
+  }), ((() => {
+      const total = confirmedDates.length;
+      const shown = Math.min(confirmedListLimit, total);
+      if (!(total > shown)) return null;
+      const step = SUMMARY_LIST_PAGE;
+      return /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: () => setConfirmedListLimit(prev => prev + step),
+        style: {
+          width: '100%', marginTop: '4px', marginBottom: '6px', padding: '10px 0',
+          border: 'none', borderRadius: '8px',
+          backgroundColor: 'color-mix(in srgb, var(--bg-primary) 96%, black)',
+          color: '#7C3AED', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer', textAlign: 'center'
+        }
+      }, `더보기 (총 ${total}개 중 ${shown}개)`);
+    })()))));
 }
 
 // Leaflet is a UMD/global-style library (not an ES module), so unlike loadHeicTo's dynamic

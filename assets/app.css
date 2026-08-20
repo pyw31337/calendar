@@ -2295,13 +2295,16 @@ select.form-select {
 .date-item-btn.is-past { opacity: 0.7; background: var(--bg-primary); border-color: transparent; }
 .date-item-btn.is-confirmed { border-color: #E9D5FF; background: #FAF5FF; }
 .date-item-btn.is-available { border-color: #DBEAFE; background: #F8FAFC; }
+.date-item-btn.is-all { border-color: #A7F3D0; background: #ECFDF5; }
 :root[data-theme="dark"] .date-item-btn:hover { background: #1E2A4D; }
 :root[data-theme="dark"] .date-item-btn.is-confirmed { border-color: #5B21B6; background: #241B3D; }
 :root[data-theme="dark"] .date-item-btn.is-available { border-color: #1D4ED8; background: #16233E; }
+:root[data-theme="dark"] .date-item-btn.is-all { border-color: #065F46; background: #0F2E22; }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .date-item-btn:hover { background: #1E2A4D; }
   :root:not([data-theme="light"]) .date-item-btn.is-confirmed { border-color: #5B21B6; background: #241B3D; }
   :root:not([data-theme="light"]) .date-item-btn.is-available { border-color: #1D4ED8; background: #16233E; }
+  :root:not([data-theme="light"]) .date-item-btn.is-all { border-color: #065F46; background: #0F2E22; }
 }
 
 /* Capsule Memo Badge */
