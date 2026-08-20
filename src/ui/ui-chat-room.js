@@ -1,8 +1,7 @@
 /**
  * Chat room view (P4-16)
  */
-(function () {
-function ChatRoomView({
+export function ChatRoomView({
   calendar,
   chatMessages,
   loadingOlderChat,
@@ -1367,7 +1366,8 @@ function ChatRoomView({
   }));
 }
 
+  if (typeof window !== 'undefined') {
   window.GATHER_UI_COMPONENTS = Object.assign({}, window.GATHER_UI_COMPONENTS || {}, {
-    ChatRoomView: ChatRoomView
+    ChatRoomView: ChatRoomView,
   });
-})();
+}

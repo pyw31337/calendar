@@ -75,6 +75,7 @@ import {
 import * as UiIcons from './ui/ui-icons.js';
 import { PlaceMapView, PlacesView } from './ui/ui-places.js';
 import { MemoView } from './ui/ui-memo-view.js';
+import { ChatRoomView } from './ui/ui-chat-room.js';
 
 console.log('[P6] Vite entry loaded', {
   constants: !!GATHER_APP_CONSTANTS,
@@ -83,5 +84,6 @@ console.log('[P6] Vite entry loaded', {
   iconCount: Object.keys(UiIcons).length,
   PlacesView: typeof PlacesView,
   MemoView: typeof MemoView,
+  ChatRoomView: typeof ChatRoomView,
   publicCalendarIds: GATHER_APP_CONFIG.PUBLIC_CALENDAR_IDS
 });
