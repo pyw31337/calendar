@@ -25074,7 +25074,7 @@ function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom = false
         autoPanPaddingBottomRight: isMobileViewport ? [24, 40] : [40, 56],
         keepInView: false
       });
-      if (onSelectPlace) marker.on('click', () => onSelectPlace(place));
+      if (onSelectPlace) marker.on('click', () => onSelectPlace(place, { fromMap: true }));
       marker.addTo(layer);
       bounds.push([place.lat, place.lng]);
     });
@@ -25132,6 +25132,10 @@ function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom = false
     lastFocusTokenRef.current = focusPlace.token;
     const marker = markersByIdRef.current.get(focusPlace.id);
     if (!marker) return;
+    if (focusPlace.fromMap) {
+      try { marker.openPopup(); } catch (e) {}
+      return;
+    }
     const isMobileViewport = window.innerWidth <= 720;
     
     const performFocus = () => {
@@ -25839,14 +25843,15 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
   // Click on list item focuses marker. Since scrollBodyRef scrolls only the place list container
   // now, scrolling is focused on list container or we can ignore scrolling if map is fixed!
   // Wait, let's keep the smooth scroll to top of list container if list scrolls.
-  const handleSelectPlaceOnMap = place => {
+  const handleSelectPlaceOnMap = (place, options = {}) => {
     if (!place || !place.id) return;
     if (focusPlace && focusPlace.id === place.id) {
       setFocusPlace(null);
       return;
     }
     focusTokenRef.current += 1;
-    setFocusPlace({ id: place.id, token: focusTokenRef.current });
+    const fromMap = !!(options && options.fromMap);
+    setFocusPlace({ id: place.id, token: focusTokenRef.current, fromMap });
     requestAnimationFrame(() => {
       try {
         const root = scrollBodyRef.current || document;
