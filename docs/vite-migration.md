@@ -34,3 +34,6 @@
 - [x] firebase-services 계층
 - [x] check:required-symbols / asset-mirrors / isolation
 - [ ] App 본체 분리 (선택, Vite 전 또는 병행)
+
+## 기능 동결 선언 (2026-08-20)
+P4 완료 후 기능 동결. P6 Vite 작업만 진행.
