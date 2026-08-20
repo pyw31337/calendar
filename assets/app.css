@@ -3267,14 +3267,14 @@ textarea.form-input {
 .admin-side-menu .main-side-menu-manual-banner {
   position: relative;
   overflow: hidden;
-  min-height: 64px !important;
+  min-height: 58px !important;
   margin: 2px 8px 8px !important;
-  padding: 14px 12px !important;
+  padding: 12px 12px !important;
   border-radius: 16px !important;
   border: none !important;
   background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 48%, #A855F7 100%) !important;
   color: #fff !important;
-  box-shadow: 0 8px 20px rgba(99, 102, 241, 0.28);
+  box-shadow: none !important;
   transform: none !important;
   gap: 12px !important;
 }
@@ -3283,28 +3283,11 @@ textarea.form-input {
   background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 48%, #9333EA 100%) !important;
   color: #fff !important;
   filter: none;
-  transform: translateY(-1px) !important;
-  box-shadow: 0 10px 24px rgba(99, 102, 241, 0.34);
+  transform: none !important;
+  box-shadow: none !important;
 }
 .admin-side-menu .main-side-menu-manual-banner-glow {
-  position: absolute;
-  right: -18px;
-  top: -22px;
-  width: 88px;
-  height: 88px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.18);
-  pointer-events: none;
-}
-.admin-side-menu .main-side-menu-manual-banner-glow::after {
-  content: "";
-  position: absolute;
-  left: -36px;
-  bottom: -40px;
-  width: 64px;
-  height: 64px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.12);
+  display: none !important;
 }
 .admin-side-menu .main-side-menu-manual-banner-icon-wrap {
   position: relative;
@@ -3331,16 +3314,16 @@ textarea.form-input {
   text-align: left;
 }
 .admin-side-menu .main-side-menu-manual-banner-title {
-  font-size: 0.98rem;
-  font-weight: 800;
-  letter-spacing: -0.02em;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
   color: #fff;
   line-height: 1.2;
 }
 .admin-side-menu .main-side-menu-manual-banner-sub {
   font-size: 0.72rem;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.85);
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.88);
   line-height: 1.2;
 }
 .admin-side-menu .main-side-menu-manual-banner-chevron {
@@ -3350,6 +3333,34 @@ textarea.form-input {
   display: inline-flex;
   flex: 0 0 auto;
 }
-:root[data-theme="dark"] .admin-side-menu .main-side-menu-manual-banner {
-  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.35);
+
+/* Shared side-menu density (all menus) */
+.admin-side-menu .admin-side-menu-list {
+  gap: 0 !important;
+  padding-top: 6px;
+  padding-bottom: 6px;
+  border-bottom: none;
+}
+.admin-side-menu .admin-side-menu-item {
+  min-height: 42px !important;
+  padding-top: 6px !important;
+  padding-bottom: 6px !important;
+}
+.admin-side-menu .admin-side-menu-item-desc {
+  display: none !important;
+}
+.admin-side-menu .admin-side-menu-item-copy {
+  gap: 0 !important;
+}
+.admin-side-menu .admin-side-menu-item-title {
+  font-weight: 650;
+  line-height: 1.25;
+}
+.admin-side-menu .admin-side-menu-setting-row {
+  min-height: 42px !important;
+  padding-top: 6px !important;
+  padding-bottom: 6px !important;
+}
+.admin-side-menu .admin-side-menu-subtitle {
+  display: none !important;
 }

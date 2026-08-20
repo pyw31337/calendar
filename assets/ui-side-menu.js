@@ -167,7 +167,6 @@ function MainSideMenu({
         className: "admin-side-menu-item main-side-menu-manual-banner",
         onClick: () => handle(onOpenManual)
       },
-        /*#__PURE__*/React.createElement("span", { className: "main-side-menu-manual-banner-glow", "aria-hidden": "true" }),
         /*#__PURE__*/React.createElement("span", { className: "main-side-menu-manual-banner-icon-wrap", "aria-hidden": "true" },
           /*#__PURE__*/React.createElement("svg", {
             xmlns: "http://www.w3.org/2000/svg", width: "22", height: "22", viewBox: "0 0 24 24",
