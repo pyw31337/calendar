@@ -1,8 +1,7 @@
 /**
  * Places map + places view (P4-10)
  */
-(function () {
-function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom = false, resizeSignal, preferDomesticBounds = false, focusPlace = null }) {
+export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom = false, resizeSignal, preferDomesticBounds = false, focusPlace = null }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const getCalendarPlaces = __deps.getCalendarPlaces;
@@ -453,7 +452,7 @@ function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom = false
   }, "지도를 불러오는 중..."));
 }
 
-function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, onRequestConfirm, placesInitialQuery, setPlacesInitialQuery, isDarkTheme, onToggleTheme, fontScalePercent, onDecreaseFont, onIncreaseFont, isChatNotifyEnabled, onToggleChatNotifications, onSharePlaces }) {
+export function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, onRequestConfirm, placesInitialQuery, setPlacesInitialQuery, isDarkTheme, onToggleTheme, fontScalePercent, onDecreaseFont, onIncreaseFont, isChatNotifyEnabled, onToggleChatNotifications, onSharePlaces }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -1048,8 +1047,9 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
   );
 }
 
+  if (typeof window !== 'undefined') {
   window.GATHER_UI_COMPONENTS = Object.assign({}, window.GATHER_UI_COMPONENTS || {}, {
     PlaceMapView: PlaceMapView,
-    PlacesView: PlacesView
+    PlacesView: PlacesView,
   });
-})();
+}
