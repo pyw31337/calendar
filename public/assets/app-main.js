@@ -2172,18 +2172,40 @@ setTimeout(() => {
 // like it's reloading from scratch each time the user comes back -- which given how often mobile
 // tabs get backgrounded/foregrounded is the more noticeable cost in practice.
 const VISIBILITY_RECONNECT_THRESHOLD_MS = 60000;
+const BACKGROUND_NETWORK_PAUSE_MS = 15000;
 let lastHiddenAt = 0;
+let backgroundPauseTimer = null;
+let networkPausedForBackground = false;
 if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') {
       lastHiddenAt = Date.now();
+      if (backgroundPauseTimer) clearTimeout(backgroundPauseTimer);
+      backgroundPauseTimer = setTimeout(() => {
+        backgroundPauseTimer = null;
+        if (typeof document === 'undefined' || document.visibilityState !== 'hidden' || !firebaseDb) return;
+        networkPausedForBackground = true;
+        firebaseDb.disableNetwork().catch(e => {
+          console.warn('Firestore background pause notice:', e);
+        });
+      }, BACKGROUND_NETWORK_PAUSE_MS);
       return;
     }
+    if (backgroundPauseTimer) {
+      clearTimeout(backgroundPauseTimer);
+      backgroundPauseTimer = null;
+    }
     if (document.visibilityState !== 'visible' || !firebaseDb) return;
-    if (!lastHiddenAt || (Date.now() - lastHiddenAt) < VISIBILITY_RECONNECT_THRESHOLD_MS) return;
-    firebaseDb.disableNetwork().then(() => firebaseDb.enableNetwork()).catch(e => {
-      console.warn('Firestore reconnect notice:', e);
-    });
+    const hiddenFor = lastHiddenAt ? (Date.now() - lastHiddenAt) : 0;
+    const resume = () => { networkPausedForBackground = false; };
+    if (networkPausedForBackground || hiddenFor >= VISIBILITY_RECONNECT_THRESHOLD_MS) {
+      firebaseDb.disableNetwork()
+        .catch(() => {})
+        .then(() => firebaseDb.enableNetwork())
+        .then(resume)
+        .catch(e => { resume(); console.warn('Firestore reconnect notice:', e); });
+      return;
+    }
   });
 }
 
