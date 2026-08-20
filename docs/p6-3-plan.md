@@ -23,3 +23,11 @@ Vite 빌드 결과물(dist)을 Pages에 배포하는 경로를 만들기.
 - index.html 의 assets 스크립트 태그를 지금은 지우지 말 것
 - assets/app-main.js 에서 함수를 지우지 말 것
 - Pages 배포 소스를 지금 dist로 바꾸지 말 것
+
+## 로컬 Vite 빌드 프로브 (2026-08-20)
+결과: 성공(경고 다수)
+- vite build 가 index.html 을 엔트리로 사용
+- assets/*.js 는 type="module" 이 아니라 번들되지 않음
+- 변환된 모듈 3개, dist/index.html 약 12KB
+- src/main.jsx 는 아직 실제 엔트리가 아님
+- dist 를 Pages 배포 소스로 쓰면 라이브 앱 JS가 빠짐 → 전환 금지
