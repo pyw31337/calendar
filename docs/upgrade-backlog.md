@@ -66,6 +66,7 @@
 - CalendarGrid/Comments/MemoCard/Poll/Search ✅ 2026-08-20 (assets/ui-calendar-core.js)
 - Admin sub-modals ✅ 2026-08-20 (assets/ui-admin-modals.js)
 - Remaining media/deadline/places section ✅ 2026-08-20 (assets/ui-remaining.js)
+- Shared primitives (ResizableModal, form buttons, charts) ✅ 2026-08-20 (assets/ui-shared.js)
 
 ### P5 UX 잔여
 - P5-1 공유 URL/OG ✅ 2026-08-20 (ShareModal 뷰 타이틀, settlement OG, check:share-urls)
@@ -78,7 +79,7 @@
 - 채팅: 입력 초안 있을 때 스크롤해도 composer 유지
 
 ### P6 Vite (별도 일정)
-- P6-0 준비: 현재는 index.html + assets 스크립트. Vite src/ 전환은 기능 동결 후 별도 스프린트
+- P6-0 준비 ✅ 2026-08-20 (docs/vite-migration.md) — Vite src/ 전환은 기능 동결 후 별도 스프린트
 
 ### P7 운영 문서·예산 알림·E2E Action
 - P7-1 운영 런북 ✅ 2026-08-20 (docs/ops-runbook.md)
