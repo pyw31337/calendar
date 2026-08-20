@@ -234,3 +234,10 @@ zsh 에서 줄 시작 `#` 주석은 쓰지 말 것.
 - UI ESM 그래프 완료. Vite 번들 ~521KB (chunk warning 정상)
 - 라이브 경로 유지. Pages 전환 아직 금지.
 - 다음: app-main 브리지 또는 code-splitting / Pages 전환 준비
+
+## P6-32 진행 (2026-08-20)
+- src/core/app-main.js: assets 복사 + window.React/ReactDOM 어댑터
+- src/main.jsx: React 글로벌 주입 후 core/UI/app-main 전부 import
+- npm run build: 모듈 56개, dist JS ~850KB (앱 본체 포함)
+- 라이브 assets/app-main.js·index.html 미변경. Pages 전환 아직 금지.
+- 다음: Vite 로컬 기동 검증, CSS/Firebase 연결, 이후 Pages 전환 검토
