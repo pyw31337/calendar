@@ -1,3 +1,4 @@
+/* ==== P6-2 REGION 1 aliases ==== */
 const GATHER_APP_CONSTANTS = window.GATHER_APP_CONSTANTS || {};
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
 const PRESET_COLORS = Array.isArray(GATHER_APP_CONSTANTS.PRESET_COLORS) ? GATHER_APP_CONSTANTS.PRESET_COLORS : ['#EF4444', '#F97316', '#F59E0B', '#10B981', '#06B6D4', '#3B82F6', '#6366F1', '#8B5CF6', '#EC4899', '#14B8A6'];
@@ -1980,6 +1981,7 @@ function mergeCalendarCollections(sourceList, targetList, options = {}) {
   });
   return Array.from(map.values());
 }
+/* ==== P6-2 REGION 5 seed calendars ==== */
 const INITIAL_CALENDARS = ['kkot', 'cw'].map(id => ({
   id,
   title: '캘린더 불러오는 중...',
@@ -2027,6 +2029,7 @@ function createLoadingCalendarShell(calendarId) {
 
 // Firebase Config for Realtime Multi-User Cloud Sync
 
+/* ==== P6-2 REGION 2 firebase helpers ==== */
 function bindGatherFirebaseDeps() {
   window.GATHER_FIREBASE_DEPS = {
     getDb: function () { return firebaseDb; },
@@ -2044,6 +2047,7 @@ function bindGatherFirebaseDeps() {
   };
 }
 
+/* ==== P6-2 REGION 3 subscriptions ==== */
 function subscribeMessages(calId, options, onSnapshot, onError) {
   const svc = window.GATHER_FIREBASE_SERVICES;
   if (svc && typeof svc.subscribeMessages === 'function' && !svc.isScaffold) {
@@ -3110,6 +3114,7 @@ function updateMetaLastModified(meta, calendarId, lastModified) {
   return next;
 }
 
+/* ==== P6-2 REGION 4 admin routes ==== */
 function isAdminDashboardRoute() {
   const params = new URLSearchParams(window.location.search);
   return params.get('admin') === '1' || params.get('mode') === 'admin';
@@ -3557,6 +3562,7 @@ const AdminUnifiedSearchModal = (window.GATHER_UI_COMPONENTS && window.GATHER_UI
 
 
 
+/* ==== P6-2 REGION 6 App component ==== */
 function App() {
   const [calendars, setCalendarsState] = React.useState(() => loadLocalCache());
   const [toast, setToast] = React.useState(null);
@@ -4189,7 +4195,8 @@ function App() {
     return () => window.visualViewport.removeEventListener('resize', handleResize);
   }, []);
 
-  const changeView = (view) => {
+  /* ==== P6-2 REGION 7 changeView ==== */
+const changeView = (view) => {
     // Leaving chat with a video the user had tapped -> keep it alive as a floating mini player
     // instead of letting it get torn down along with the rest of ChatRoomView. Only fires on the
     // chat -> elsewhere transition, never the reverse: returning to chat is exactly what the
