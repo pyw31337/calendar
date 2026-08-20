@@ -22,9 +22,9 @@
 ## 2. 남은 작업 우선순위
 
 ### P0 안전망
-- P0-1 필수 심볼 검사 (check:required-symbols)
-- P0-2 smoke:live places/memo 포함
-- P0-3 safe 태그
+- P0-1 필수 심볼 검사 (check:required-symbols) ✅ 2026-08-20 (gallery/summary symbols)
+- P0-2 smoke:live places/memo/gallery 포함 ✅ 2026-08-20
+- P0-3 safe 태그 — 배포 후 `git tag safe-20260820-p0 && git push origin safe-20260820-p0`
 
 ### P1 utils 15 마무리
 - P1-1 방문 메모 파싱 → utils ✅ 2026-08-20
@@ -39,7 +39,7 @@
 - P2-4 메인 맵 지연 마운트 ✅ 2026-08-20 (IntersectionObserver + idle fallback)
 
 ### P3 Firebase 서비스 계층
-- P3-1 firebase-services.js 스캐폴드
+- P3-1 firebase-services.js 스캐폴드 ✅ 2026-08-20 (window.GATHER_FIREBASE_SERVICES)
 - P3-2 REST 헬퍼 이동
 - P3-3 구독 래퍼
 - P3-4 kkot/cw/jhair 격리 확인

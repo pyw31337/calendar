@@ -9,7 +9,9 @@ const pages = [
   '?id=cw&view=chat',
   '?id=cw&view=memo',
   '?id=cw&view=places',
+  '?id=cw&view=gallery',
   '?id=kkot&view=places',
+  '?id=kkot&view=gallery',
   '?admin=1',
   '?admin=1&restore=1'
 ];

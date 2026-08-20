@@ -119,3 +119,7 @@
 - PC 폭: 1440px 이상, 1024px, 768px
 - 모바일 폭: 390px, 430px
 - 브라우저: Chrome, Whale, Firefox, Safari 계열은 실제 기기 또는 브라우저별 수동 확인 필요
+
+## 2026-08-20 P3-1
+- `assets/firebase-services.js` scaffold (`window.GATHER_FIREBASE_SERVICES`)
+- Real REST/SDK helpers still in `app-main.js` until P3-2 moves them unit-by-unit

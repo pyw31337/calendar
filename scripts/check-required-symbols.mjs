@@ -27,7 +27,15 @@ const requiredInMain = [
   'trimLatLngOutliers',
   'parseSharePathFromLocation',
   'getCalendarShareUrl',
-  'getViewShareUrl'
+  'getViewShareUrl',
+  'getMessageImageEntries',
+  'fetchGalleryItemCount',
+  'fetchRecentChatMessages',
+  'fetchSubcollectionCount',
+  'ChatGalleryModal',
+  'PhotoGallery',
+  'SummaryList',
+  'fetchOlderChatMessages'
 ];
 
 const requiredInUtils = [
