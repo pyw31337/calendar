@@ -241,3 +241,9 @@ zsh 에서 줄 시작 `#` 주석은 쓰지 말 것.
 - npm run build: 모듈 56개, dist JS ~850KB (앱 본체 포함)
 - 라이브 assets/app-main.js·index.html 미변경. Pages 전환 아직 금지.
 - 다음: Vite 로컬 기동 검증, CSS/Firebase 연결, 이후 Pages 전환 검토
+
+## P6-33 진행 (2026-08-20)
+- src/index.html: 폰트 + Firebase/compat CDN + confetti/lunar/qrcode (프로브 전용)
+- src/main.jsx: import './app.css'
+- 라이브 루트 index.html / assets/ 미변경. Pages 전환 아직 금지.
+- 로컬 확인: npm run dev 후 http://localhost:5173/?id=kkot

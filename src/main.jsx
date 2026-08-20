@@ -1,4 +1,5 @@
 // P6 Vite entry — core + UI + app-main (live still uses index.html + assets/)
+import './app.css';
 import React from 'react';
 import * as ReactDOMAll from 'react-dom';
 import { createRoot } from 'react-dom/client';
