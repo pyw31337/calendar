@@ -1,8 +1,7 @@
 /**
  * Admin dashboard (P4-17)
  */
-(function () {
-function AdminDashboard({ initialCalendars }) {
+export function AdminDashboard({ initialCalendars }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -2468,7 +2467,8 @@ function AdminDashboard({ initialCalendars }) {
   );
 }
 
+  if (typeof window !== 'undefined') {
   window.GATHER_UI_COMPONENTS = Object.assign({}, window.GATHER_UI_COMPONENTS || {}, {
-    AdminDashboard: AdminDashboard
+    AdminDashboard: AdminDashboard,
   });
-})();
+}

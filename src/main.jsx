@@ -93,6 +93,7 @@ import {
   AdminRestorePhraseModal,
   AdminUnifiedSearchModal
 } from './ui/ui-admin-modals.js';
+import { AdminDashboard } from './ui/ui-admin-dashboard.js';
 
 console.log('[P6] Vite entry loaded', {
   constants: !!GATHER_APP_CONSTANTS,
@@ -106,5 +107,6 @@ console.log('[P6] Vite entry loaded', {
   AnniversaryModal: typeof AnniversaryModal,
   CalendarGrid: typeof CalendarGrid,
   AdminModal: typeof AdminModal,
+  AdminDashboard: typeof AdminDashboard,
   publicCalendarIds: GATHER_APP_CONFIG.PUBLIC_CALENDAR_IDS
 });

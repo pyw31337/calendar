@@ -227,3 +227,10 @@ zsh 에서 줄 시작 `#` 주석은 쓰지 말 것.
 - AdminModal 및 admin 검색/생성 모달들
 - 라이브 경로 유지. Pages 전환 아직 금지.
 - 다음: ui-admin-dashboard (마지막 UI 파일)
+
+## P6-31 진행 (2026-08-20)
+- src/ui/ui-admin-dashboard.js 를 ESM export (assets/ 미변경)
+- AdminDashboard — 마지막 UI 파일
+- UI ESM 그래프 완료. Vite 번들 ~521KB (chunk warning 정상)
+- 라이브 경로 유지. Pages 전환 아직 금지.
+- 다음: app-main 브리지 또는 code-splitting / Pages 전환 준비
