@@ -340,3 +340,7 @@ zsh 에서 줄 시작 `#` 주석은 쓰지 말 것.
 - app-main 마운트를 boot 완료 후로 지연
 - PUBLIC_CALENDAR_IDS에 jhair 포함
 - build 후 share/ 를 dist에 복사 (Vite Pages에 share 링크 복구)
+
+## P6-55 긴급 (2026-08-20)
+- ?id=kkot&id=kkot 중복: share 리다이렉트가 search를 재첨부하던 문제 수정
+- App 시작 시 URL id 정규화, changeView 시 id 단일화

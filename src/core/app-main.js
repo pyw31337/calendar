@@ -1079,6 +1079,24 @@ function getRawCalendarIdFromURL() {
   return urlParams.get('id') || urlParams.get('cal') || (share && share.calendarId) || '';
 }
 
+function normalizeCalendarUrlParams() {
+  try {
+    const url = new URL(window.location.href);
+    const id = url.searchParams.get('id') || url.searchParams.get('cal');
+    if (id) {
+      url.searchParams.delete('id');
+      url.searchParams.delete('cal');
+      url.searchParams.set('id', id);
+    }
+    const cleaned = url.pathname + url.search + url.hash;
+    const current = window.location.pathname + window.location.search + window.location.hash;
+    if (cleaned !== current) {
+      window.history.replaceState({}, '', cleaned);
+    }
+  } catch (e) {}
+}
+
+
 const getAppBaseUrl = GATHER_APP_UTILS.getAppBaseUrl
   ? () => GATHER_APP_UTILS.getAppBaseUrl(window.location)
   : function getAppBaseUrl() {
@@ -3749,6 +3767,7 @@ function AdminUnifiedSearchModal(props) {
 
 
 function App() {
+  normalizeCalendarUrlParams();
   const [calendars, setCalendarsState] = React.useState(() => loadLocalCache());
   const [toast, setToast] = React.useState(null);
   const [operationProgress, setOperationProgress] = React.useState(null);
@@ -4396,12 +4415,17 @@ function App() {
       requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: 'auto' }));
     }
     const params = new URLSearchParams(window.location.search);
+    const keepId = params.get('id') || params.get('cal');
+    params.delete('id');
+    params.delete('cal');
+    if (keepId) params.set('id', keepId);
     if (view === 'calendar') {
       params.delete('view');
     } else {
       params.set('view', view);
     }
-    const newUrl = `${window.location.pathname}?${params.toString()}`;
+    const qs = params.toString();
+    const newUrl = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
     window.history.pushState({}, '', newUrl);
   };
   if (isAdminDashboardRoute()) {
