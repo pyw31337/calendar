@@ -731,6 +731,21 @@ exports.adminVerifyPassword = functions.https.onRequest(async (req, res) => {
 // Returns every calendar's document (the admin dashboard's cross-calendar view) after verifying
 // the submitted password server-side -- the only place this data leaves the server now that
 // /calendars no longer allows a client-side `list`.
+
+function slimCalendarForAdminList(cal) {
+  if (!cal || typeof cal !== 'object') return cal;
+  const places = Array.isArray(cal.places) ? cal.places : [];
+  const activityLogs = Array.isArray(cal.activityLogs) ? cal.activityLogs : [];
+  const { places: _p, activityLogs: _a, ...rest } = cal;
+  return {
+    ...rest,
+    places: [],
+    activityLogs: [],
+    _placesCount: places.length,
+    _activityLogsCount: activityLogs.length
+  };
+}
+
 exports.listAllCalendars = functions.https.onRequest(async (req, res) => {
   setAdminCorsHeaders(res);
   if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
@@ -753,7 +768,7 @@ exports.listAllCalendars = functions.https.onRequest(async (req, res) => {
     snap.forEach(doc => {
       const data = doc.data();
       if (data?.calendar?.id) {
-        calendars.push(data.calendar);
+        calendars.push(slimCalendarForAdminList(data.calendar));
         lastModified = Math.max(lastModified, data.lastModified || 0);
       }
     });

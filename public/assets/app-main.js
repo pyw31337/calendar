@@ -3780,35 +3780,61 @@ function AdminDashboard({ initialCalendars }) {
   // refresh action) force an immediate re-fetch.
   const [refreshTick, setRefreshTick] = React.useState(0);
   const refreshServerCalendars = () => setRefreshTick(tick => tick + 1);
+  const [isAdminListLoading, setIsAdminListLoading] = React.useState(true);
+  const adminListLastModifiedRef = React.useRef(0);
   React.useEffect(() => {
     let isMounted = true;
-    const applyResult = (calendars) => {
+    let intervalId = null;
+    const applyResult = (calendars, lastModified) => {
       if (!isMounted) return;
+      const lm = Number(lastModified) || 0;
+      if (lm > 0 && lm === adminListLastModifiedRef.current && (calendars || []).length > 0) {
+        setIsAdminListLoading(false);
+        return;
+      }
+      if (lm > 0) adminListLastModifiedRef.current = lm;
       setServerCalendars(cloneCalendarList(calendars || []).map(normalizeCalendarForSave));
       setLoadedAt(new Date());
       setError('');
+      setIsAdminListLoading(false);
     };
 
     const session = getAdminSession();
     if (!session) {
       setError('관리자 세션이 만료되었습니다. 다시 로그인해 주세요.');
-      return () => {
-        isMounted = false;
-      };
+      setIsAdminListLoading(false);
+      return () => { isMounted = false; };
     }
 
     const load = () => {
       listAllCalendarsRemote(session.password)
-        .then(({ calendars }) => applyResult(calendars))
+        .then((result) => applyResult(result.calendars, result.lastModified))
         .catch(err => {
-          if (isMounted) setError(err.message || '대시보드 데이터를 불러오지 못했습니다.');
+          if (isMounted) {
+            setError(err.message || '대시보드 데이터를 불러오지 못했습니다.');
+            setIsAdminListLoading(false);
+          }
         });
     };
     load();
-    const intervalId = setInterval(load, 120000); // 2min — admin list refresh; manual refresh still available
+    const startPoll = () => {
+      if (intervalId) return;
+      intervalId = setInterval(load, 120000);
+    };
+    const stopPoll = () => {
+      if (intervalId) { clearInterval(intervalId); intervalId = null; }
+    };
+    startPoll();
+    const onVis = () => {
+      if (typeof document === 'undefined') return;
+      if (document.visibilityState === 'hidden') stopPoll();
+      else { load(); startPoll(); }
+    };
+    if (typeof document !== 'undefined') document.addEventListener('visibilitychange', onVis);
     return () => {
       isMounted = false;
-      clearInterval(intervalId);
+      stopPoll();
+      if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', onVis);
     };
   }, [refreshTick]);
 
@@ -5032,6 +5058,9 @@ function AdminDashboard({ initialCalendars }) {
     error && /*#__PURE__*/React.createElement("div", {
       style: { color: '#EF4444', border: '1px solid #EF4444', backgroundColor: '#1A0B0B', marginBottom: '18px', padding: '14px', borderRadius: '8px', fontSize: '0.88rem', fontWeight: 'bold' }
     }, error),
+    isAdminListLoading && !error && /*#__PURE__*/React.createElement("div", {
+      style: { color: '#64748B', border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)', marginBottom: '18px', padding: '14px', borderRadius: '8px', fontSize: '0.88rem', fontWeight: 700 }
+    }, "관리자 캘린더 목록을 불러오는 중…"),
 
     /* ================================================================= */
     /* TAB 1: OPERATIONAL METRICS & CHAT LOGS                            */
