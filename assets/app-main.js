@@ -2320,15 +2320,54 @@ async function fetchSubcollectionCount(calId, subName) {
 }
 
 async function fetchOlderChatMessages(calId, beforeTimestamp, pageSize = CHAT_OLDER_PAGE_SIZE) {
-  if (!calId || !beforeTimestamp || !firebaseDb) return [];
+  if (!calId || !beforeTimestamp) return [];
+  if (firebaseDb) {
+    try {
+      const snap = await firebaseDb.collection('calendars').doc(`cal_${calId}`).collection('messages')
+        .orderBy('timestamp', 'desc').startAfter(beforeTimestamp).limit(pageSize).get();
+      const list = [];
+      snap.forEach(doc => list.push(slimMessageForClient({ id: doc.id, ...doc.data() })));
+      return list.reverse();
+    } catch (err) {
+      console.warn('fetchOlderChatMessages sdk', err);
+    }
+  }
   try {
-    const snap = await firebaseDb.collection('calendars').doc(`cal_${calId}`).collection('messages')
-      .orderBy('timestamp', 'desc').startAfter(beforeTimestamp).limit(pageSize).get();
+    const parent = `projects/${firebaseConfig.projectId}/databases/(default)/documents/calendars/cal_${calId}`;
+    const url = `https://firestore.googleapis.com/v1/${parent}:runQuery`;
+    const body = {
+      structuredQuery: {
+        from: [{ collectionId: 'messages' }],
+        where: {
+          fieldFilter: {
+            field: { fieldPath: 'timestamp' },
+            op: 'LESS_THAN',
+            value: { integerValue: String(Math.floor(Number(beforeTimestamp))) }
+          }
+        },
+        orderBy: [{ field: { fieldPath: 'timestamp' }, direction: 'DESCENDING' }],
+        limit: pageSize
+      }
+    };
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) return [];
+    const rows = await res.json();
     const list = [];
-    snap.forEach(doc => list.push(slimMessageForClient({ id: doc.id, ...doc.data() })));
+    (Array.isArray(rows) ? rows : []).forEach(row => {
+      const doc = row && row.document;
+      if (!doc) return;
+      list.push(slimMessageForClient({
+        id: (doc.name || '').split('/').pop(),
+        ...firestoreDocumentToJs(doc)
+      }));
+    });
     return list.reverse();
   } catch (err) {
-    console.warn('fetchOlderChatMessages', err);
+    console.warn('fetchOlderChatMessages rest', err);
     return [];
   }
 }
@@ -19735,13 +19774,12 @@ function ChatGalleryModal({
     }
   }, [searchQuery, hasMoreOlderChat, loadingOlderChat, hasMoreMemos, (chatMessages || []).length, (memos || []).length]);
 
-  // Gallery page warm-up: pull older pages until we have a decent grid or history is exhausted.
   React.useEffect(() => {
     if (!asPage || (searchQuery || '').trim()) return;
     if (typeof onLoadOlderChat !== 'function' || !hasMoreOlderChat || loadingOlderChat) return;
-    if ((sharedPhotos || []).length >= 48) return;
+    if ((sharedPhotos || []).length >= 60) return;
     onLoadOlderChat();
-  }, [asPage, searchQuery, hasMoreOlderChat, loadingOlderChat, (sharedPhotos || []).length]);
+  }, [asPage, searchQuery, hasMoreOlderChat, loadingOlderChat, (sharedPhotos || []).length, (chatMessages || []).length]);
 
   const displayPhotoTabCount = (typeof totalGalleryCount === 'number' && totalGalleryCount > (sharedPhotos || []).length)
     ? totalGalleryCount
@@ -19922,7 +19960,14 @@ function ChatGalleryModal({
   ) : (
     filteredPhotos.length === 0 ? /*#__PURE__*/React.createElement("div", {
       style: { textAlign: 'center', color: 'var(--text-muted)', padding: '40px 0', fontSize: '0.88rem' }
-    }, searchQuery ? "검색 결과가 없습니다." : "공유된 사진이 없습니다.") : /*#__PURE__*/React.createElement("div", {
+    }, searchQuery
+      ? "검색 결과가 없습니다."
+      : ((hasMoreOlderChat || loadingOlderChat)
+        ? "이전 사진을 불러오는 중…"
+        : ((typeof totalGalleryCount === 'number' && totalGalleryCount > 0)
+          ? "사진 데이터를 아직 불러오지 못했습니다. 아래 더보기를 눌러 주세요."
+          : "공유된 사진이 없습니다.")))
+    : /*#__PURE__*/React.createElement("div", {
       style: {
         display: 'grid',
         gridTemplateColumns: `repeat(${gridCols}, minmax(0, 1fr))`,
@@ -19932,7 +19977,7 @@ function ChatGalleryModal({
       }
     }, filteredPhotos.map((photo, idx) => /*#__PURE__*/React.createElement("img", {
       key: `${photo.messageId}-${photo.directMediaUrl ? 'direct' : photo.imageIndex}`,
-      src: photo.thumb,
+      src: (photo.thumb && String(photo.thumb)) || (photo.full && String(photo.full)) || '',
       alt: "공유사진",
       loading: "lazy",
       referrerPolicy: 'no-referrer',
