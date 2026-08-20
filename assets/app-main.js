@@ -7149,10 +7149,10 @@ function App() {
       if (memoCount != null) setTotalMemoCount(memoCount);
       if (galCount != null) setTotalGalleryCount(galCount);
       try {
-        const flagKey = `gather_b64_mig_v1_${activeCalId}`;
-        if (typeof localStorage !== 'undefined' && localStorage.getItem(flagKey) !== 'done') {
+        if (!window.__gatherB64MigDone) window.__gatherB64MigDone = Object.create(null);
+        if (!window.__gatherB64MigDone[activeCalId]) {
           const result = await migrateBase64ChatImagesForCalendar(activeCalId, { maxMessages: 20 });
-          if (!cancelled && result && (result.failed || 0) === 0) localStorage.setItem(flagKey, 'done');
+          if (!cancelled && result && (result.failed || 0) === 0) window.__gatherB64MigDone[activeCalId] = true;
           if (result && result.migrated > 0) console.info('base64→Storage migrated', activeCalId, result);
         }
       } catch (e) { console.warn('base64 migration skipped', e); }
