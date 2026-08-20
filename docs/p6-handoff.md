@@ -107,3 +107,9 @@ zsh 에서 줄 시작 `#` 주석은 쓰지 말 것.
 - src/main.jsx 에서 import
 - 라이브 경로 유지. Pages 전환 아직 금지.
 - 다음: ui-widgets 또는 ui-chat-sheets
+
+## P6-11 진행 (2026-08-20)
+- src/ui/ui-widgets.js 를 ESM export (assets/ 미변경)
+- SearchResultLogRow, TikTokEmbedWidget, UrlCapsuleBadge, ParticipantPickerButton, DateCapsuleBadge
+- 라이브 경로 유지. Pages 전환 아직 금지.
+- 다음: ui-chat-sheets 또는 ui-user-manual

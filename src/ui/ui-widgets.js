@@ -1,8 +1,7 @@
 /**
  * Leftover small widgets (P4-24)
  */
-(function () {
-function SearchResultLogRow({ badgeName, badgeColor, timeStr, calendarLabel, onClick, children }) {
+export function SearchResultLogRow({ badgeName, badgeColor, timeStr, calendarLabel, onClick, children }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -30,7 +29,7 @@ function SearchResultLogRow({ badgeName, badgeColor, timeStr, calendarLabel, onC
   );
 }
 
-function TikTokEmbedWidget({ url, videoId, onFailed }) {
+export function TikTokEmbedWidget({ url, videoId, onFailed }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -68,7 +67,7 @@ function TikTokEmbedWidget({ url, videoId, onFailed }) {
   }, /*#__PURE__*/React.createElement('section', null)));
 }
 
-function UrlCapsuleBadge({ url, style = null }) {
+export function UrlCapsuleBadge({ url, style = null }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -99,7 +98,7 @@ function UrlCapsuleBadge({ url, style = null }) {
   }, href);
 }
 
-function ParticipantPickerButton({ participant, onClick }) {
+export function ParticipantPickerButton({ participant, onClick }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -127,7 +126,7 @@ function ParticipantPickerButton({ participant, onClick }) {
   }, participant?.name || '작성자 선택', /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.6rem' } }, "▼"));
 }
 
-function DateCapsuleBadge({ date, style = null }) {
+export function DateCapsuleBadge({ date, style = null }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -150,11 +149,12 @@ function DateCapsuleBadge({ date, style = null }) {
   }, label);
 }
 
+  if (typeof window !== 'undefined') {
   window.GATHER_UI_COMPONENTS = Object.assign({}, window.GATHER_UI_COMPONENTS || {}, {
     SearchResultLogRow: SearchResultLogRow,
     TikTokEmbedWidget: TikTokEmbedWidget,
     UrlCapsuleBadge: UrlCapsuleBadge,
     ParticipantPickerButton: ParticipantPickerButton,
-    DateCapsuleBadge: DateCapsuleBadge
+    DateCapsuleBadge: DateCapsuleBadge,
   });
-})();
+}

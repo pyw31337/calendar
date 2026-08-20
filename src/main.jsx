@@ -14,18 +14,21 @@ import {
   EmojiGridButton,
   EmojiPickerSheet
 } from './ui/ui-overlays.js';
+import {
+  SearchResultLogRow,
+  TikTokEmbedWidget,
+  UrlCapsuleBadge,
+  ParticipantPickerButton,
+  DateCapsuleBadge
+} from './ui/ui-widgets.js';
 
 console.log('[P6] Vite entry loaded', {
   constants: !!GATHER_APP_CONSTANTS,
   config: !!GATHER_APP_CONFIG,
-  calendarData: !!GATHER_APP_CALENDAR_DATA,
-  chatData: !!GATHER_APP_CHAT_DATA,
   utils: !!GATHER_APP_UTILS,
-  notifications: !!GATHER_APP_NOTIFICATIONS,
-  firebaseServices: !!GATHER_FIREBASE_SERVICES,
   ConfirmDialog: typeof ConfirmDialog,
   ShareModal: typeof ShareModal,
-  ImageUploadOverlay: typeof ImageUploadOverlay,
   EmojiPickerSheet: typeof EmojiPickerSheet,
+  UrlCapsuleBadge: typeof UrlCapsuleBadge,
   publicCalendarIds: GATHER_APP_CONFIG.PUBLIC_CALENDAR_IDS
 });
