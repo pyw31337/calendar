@@ -21,6 +21,10 @@ import {
   ParticipantPickerButton,
   DateCapsuleBadge
 } from './ui/ui-widgets.js';
+import {
+  ChatParticipantSheet,
+  NotificationPermissionHelpModal
+} from './ui/ui-chat-sheets.js';
 
 console.log('[P6] Vite entry loaded', {
   constants: !!GATHER_APP_CONSTANTS,
@@ -28,7 +32,7 @@ console.log('[P6] Vite entry loaded', {
   utils: !!GATHER_APP_UTILS,
   ConfirmDialog: typeof ConfirmDialog,
   ShareModal: typeof ShareModal,
-  EmojiPickerSheet: typeof EmojiPickerSheet,
   UrlCapsuleBadge: typeof UrlCapsuleBadge,
+  ChatParticipantSheet: typeof ChatParticipantSheet,
   publicCalendarIds: GATHER_APP_CONFIG.PUBLIC_CALENDAR_IDS
 });

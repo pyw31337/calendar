@@ -1,8 +1,7 @@
 /**
  * Chat participant sheet + notification permission help (P4-7)
  */
-(function () {
-function ChatParticipantSheet({ calendar, selectedId, onSelect, onClose }) {
+export function ChatParticipantSheet({ calendar, selectedId, onSelect, onClose }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const SmallXIcon = __deps.SmallXIcon;
@@ -68,7 +67,7 @@ function ChatParticipantSheet({ calendar, selectedId, onSelect, onClose }) {
   );
 }
 
-function NotificationPermissionHelpModal({ onClose, onRetry, showToast }) {
+export function NotificationPermissionHelpModal({ onClose, onRetry, showToast }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const SmallXIcon = __deps.SmallXIcon;
@@ -172,8 +171,9 @@ function NotificationPermissionHelpModal({ onClose, onRetry, showToast }) {
   }, permission === 'ios-not-installed' ? '홈 화면 추가 방법 확인' : permission === 'denied' ? '권한 설정 후 다시 시도' : '권한 다시 요청')))), document.body);
 }
 
+  if (typeof window !== 'undefined') {
   window.GATHER_UI_COMPONENTS = Object.assign({}, window.GATHER_UI_COMPONENTS || {}, {
     ChatParticipantSheet: ChatParticipantSheet,
-    NotificationPermissionHelpModal: NotificationPermissionHelpModal
+    NotificationPermissionHelpModal: NotificationPermissionHelpModal,
   });
-})();
+}

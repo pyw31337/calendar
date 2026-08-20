@@ -113,3 +113,9 @@ zsh 에서 줄 시작 `#` 주석은 쓰지 말 것.
 - SearchResultLogRow, TikTokEmbedWidget, UrlCapsuleBadge, ParticipantPickerButton, DateCapsuleBadge
 - 라이브 경로 유지. Pages 전환 아직 금지.
 - 다음: ui-chat-sheets 또는 ui-user-manual
+
+## P6-12 진행 (2026-08-20)
+- src/ui/ui-chat-sheets.js 를 ESM export (assets/ 미변경)
+- ChatParticipantSheet, NotificationPermissionHelpModal
+- 라이브 경로 유지. Pages 전환 아직 금지.
+- 다음: ui-user-manual 또는 ui-weather
