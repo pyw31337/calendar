@@ -3235,3 +3235,8 @@ textarea.form-input {
   touch-action: pan-x pan-y;
   -webkit-tap-highlight-color: transparent;
 }
+
+
+.place-card-row.is-place-focused {
+  border-color: var(--accent-primary, #4F46E5) !important;
+}

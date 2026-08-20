@@ -25840,13 +25840,23 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
   // now, scrolling is focused on list container or we can ignore scrolling if map is fixed!
   // Wait, let's keep the smooth scroll to top of list container if list scrolls.
   const handleSelectPlaceOnMap = place => {
+    if (!place || !place.id) return;
     if (focusPlace && focusPlace.id === place.id) {
       setFocusPlace(null);
       return;
     }
     focusTokenRef.current += 1;
     setFocusPlace({ id: place.id, token: focusTokenRef.current });
-    // Keep list scroll position -- do not jump to top when focusing a marker.
+    requestAnimationFrame(() => {
+      try {
+        const root = scrollBodyRef.current || document;
+        const safeId = (window.CSS && CSS.escape) ? CSS.escape(String(place.id)) : String(place.id).replace(/"/g, '');
+        const row = root.querySelector('[data-place-id="' + safeId + '"]');
+        if (row && typeof row.scrollIntoView === 'function') {
+          row.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+        }
+      } catch (e) {}
+    });
   };
   const handleCloseModal = () => {
     setIsRegisterOpen(false);
@@ -25980,7 +25990,8 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
         calendar,
         scrollWheelZoom: true,
         resizeSignal: `${mapExpanded}_${mapHeight}`,
-        focusPlace
+        focusPlace,
+        onSelectPlace: handleSelectPlaceOnMap
       }),
       
       /* Centered Grip Handle + Right Resizer Handle Control Bar */
@@ -26110,7 +26121,8 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
             : (memoDate ? [{ date: memoDate, note: memoWithoutDate }] : []);
           return /*#__PURE__*/React.createElement("div", {
             key: place.id,
-            className: "place-card-row",
+            className: "place-card-row" + (focusPlace && focusPlace.id === place.id ? " is-place-focused" : ""),
+            "data-place-id": place.id,
             role: "button",
             tabIndex: 0,
             onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleSelectPlaceOnMap(place); } },
