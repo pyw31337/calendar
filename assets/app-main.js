@@ -2250,10 +2250,6 @@ async function fetchRecentMessagesRest(calId) {
 
 async function fetchChatMessagesRest(calId) {
   try {
-    // Queried newest-first + explicit pageSize (mirroring the live onSnapshot query) so this
-    // always captures the most recent messages rather than relying on the Firestore REST
-    // List Documents endpoint's undocumented default page size, which could otherwise cap
-    // an unordered/ascending fetch at the OLDEST messages once a calendar grows large.
     const url = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/calendars/cal_${calId}/messages?orderBy=timestamp%20desc&pageSize=${CHAT_LIVE_MESSAGE_LIMIT}`;
     const res = await fetch(url);
     if (!res.ok) return [];
@@ -2265,6 +2261,35 @@ async function fetchChatMessagesRest(calId) {
     })).reverse();
   } catch (err) {
     console.warn('fetchChatMessagesRest error:', err);
+    return [];
+  }
+}
+
+async function fetchRecentChatMessages(calId, limit = 60) {
+  if (!calId) return [];
+  const pageSize = Math.max(1, Math.min(100, Number(limit) || 60));
+  try {
+    if (firebaseDb) {
+      const snap = await firebaseDb.collection('calendars').doc(`cal_${calId}`).collection('messages')
+        .orderBy('timestamp', 'desc').limit(pageSize).get();
+      const list = [];
+      snap.forEach(doc => list.push(slimMessageForClient({ id: doc.id, ...doc.data() })));
+      return list.reverse();
+    }
+  } catch (err) {
+    console.warn('fetchRecentChatMessages sdk', err);
+  }
+  try {
+    const url = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/calendars/cal_${calId}/messages?orderBy=timestamp%20desc&pageSize=${pageSize}`;
+    const res = await fetch(url);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return (data.documents || []).map(doc => slimMessageForClient({
+      id: doc.name.split('/').pop(),
+      ...firestoreDocumentToJs(doc)
+    })).reverse();
+  } catch (err) {
+    console.warn('fetchRecentChatMessages rest', err);
     return [];
   }
 }
@@ -6734,6 +6759,7 @@ function App() {
   const [totalChatCount, setTotalChatCount] = React.useState(null);
   const [totalMemoCount, setTotalMemoCount] = React.useState(null);
   const [totalGalleryCount, setTotalGalleryCount] = React.useState(null);
+  const [galleryPreviewMessages, setGalleryPreviewMessages] = React.useState([]);
   const loadingOlderChatRef = React.useRef(false);
   const allChatMessages = React.useMemo(() => {
     const byId = new Map();
@@ -7356,6 +7382,7 @@ function App() {
     setTotalChatCount(null);
     setTotalMemoCount(null);
     setTotalGalleryCount(null);
+    setGalleryPreviewMessages([]);
     if (!activeCalId) return;
     let cancelled = false;
     (async () => {
@@ -7379,6 +7406,16 @@ function App() {
     })();
     return () => { cancelled = true; };
   }, [activeCalId]);
+
+  React.useEffect(() => {
+    if (!activeCalId || activeView !== 'calendar') return;
+    let cancelled = false;
+    (async () => {
+      const list = await fetchRecentChatMessages(activeCalId, 60);
+      if (!cancelled && Array.isArray(list)) setGalleryPreviewMessages(list);
+    })();
+    return () => { cancelled = true; };
+  }, [activeCalId, activeView]);
 
   const loadOlderChatMessages = React.useCallback(async () => {
     if (!activeCalId || loadingOlderChatRef.current || !hasMoreOlderChat) return;
@@ -9328,7 +9365,7 @@ function App() {
       setIsModalOpen(true);
     }
   }), /*#__PURE__*/React.createElement(PhotoGallery, {
-    chatMessages: allChatMessages,
+    chatMessages: (galleryPreviewMessages && galleryPreviewMessages.length > 0) ? galleryPreviewMessages : allChatMessages,
     totalGalleryCount: totalGalleryCount,
     onViewAll: () => changeView('gallery'),
     showToast: showToast,
@@ -27296,7 +27333,9 @@ function PhotoGallery({ chatMessages, totalGalleryCount, onViewAll, showToast, o
   const badgeCount = (typeof totalGalleryCount === 'number' && totalGalleryCount > 0)
     ? totalGalleryCount
     : photoEntries.length;
-  const displayedEntries = photoEntries.slice(0, 12);
+  const displayedEntries = photoEntries
+    .filter(e => (e && ((e.thumb && String(e.thumb)) || (e.full && String(e.full)))))
+    .slice(0, 12);
   const openGalleryPage = () => { if (typeof onViewAll === 'function') onViewAll(); };
 
   if (photoEntries.length === 0 && !(typeof totalGalleryCount === 'number' && totalGalleryCount > 0)) return null;
