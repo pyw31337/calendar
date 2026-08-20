@@ -4222,7 +4222,8 @@ const changeView = (view) => {
   };
   if (isAdminDashboardRoute()) {
     return /*#__PURE__*/React.createElement(AdminLoginGate, null,
-      /*#__PURE__*/React.createElement(AdminDashboard, {
+      /*#__PURE__*//* ==== P6-2 VIEW admin ==== */
+React.createElement(AdminDashboard, {
         initialCalendars: calendars
       })
     );
@@ -6217,7 +6218,8 @@ const changeView = (view) => {
     chatUploadProgress && /*#__PURE__*/React.createElement(ImageUploadOverlay, chatUploadProgress)
   );
   if (activeView === 'chat') {
-    return withStickyVideo(/*#__PURE__*/React.createElement("div", { className: "chat-view-container" }, /*#__PURE__*/React.createElement(ChatRoomView, {
+    return withStickyVideo(/*#__PURE__*/React.createElement("div", { className: "chat-view-container" }, /*#__PURE__*//* ==== P6-2 VIEW chat ==== */
+React.createElement(ChatRoomView, {
       calendar: activeCal,
       chatMessages: allChatMessages,
       loadingOlderChat: loadingOlderChat,
@@ -6265,7 +6267,8 @@ const changeView = (view) => {
   }
 
   if (activeView === 'settlement') {
-    return withStickyVideo(/*#__PURE__*/React.createElement(SettlementSummaryModal, {
+    return withStickyVideo(/*#__PURE__*//* ==== P6-2 VIEW settlement ==== */
+React.createElement(SettlementSummaryModal, {
       calendar: activeCal,
       onBack: () => changeView('calendar'),
       onSelectDate: d => {
@@ -6277,7 +6280,8 @@ const changeView = (view) => {
   }
 
   if (activeView === 'memo') {
-    return withStickyVideo(/*#__PURE__*/React.createElement(MemoView, {
+    return withStickyVideo(/*#__PURE__*//* ==== P6-2 VIEW memo ==== */
+React.createElement(MemoView, {
       calendar: activeCal,
       memos: memos,
       hasMoreMemos: hasMoreMemos,
@@ -6299,7 +6303,8 @@ const changeView = (view) => {
     }));
   }
 
-  if (activeView === 'gallery') {
+  /* ==== P6-2 VIEW gallery ==== */
+if (activeView === 'gallery') {
     return withStickyVideo(/*#__PURE__*/React.createElement(React.Fragment, null,
       /*#__PURE__*/React.createElement(ChatGalleryModal, {
         calendar: activeCal,
@@ -6331,7 +6336,8 @@ const changeView = (view) => {
 
   if (activeView === 'places') {
     return withStickyVideo(/*#__PURE__*/React.createElement(React.Fragment, null,
-      /*#__PURE__*/React.createElement(PlacesView, {
+      /*#__PURE__*//* ==== P6-2 VIEW places ==== */
+React.createElement(PlacesView, {
         calendar: activeCal,
         onBack: () => changeView('calendar'),
         onSavePlace: handleSavePlace,
