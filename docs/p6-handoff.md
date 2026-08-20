@@ -253,3 +253,8 @@ zsh 에서 줄 시작 `#` 주석은 쓰지 말 것.
 - src/index.html 엔트리 /main.jsx
 - 라이브 루트 index.html / assets/ 미변경. Pages 소스 전환 아직 금지.
 - 참고: public/ 복사로 dist/assets 에 구형 파일도 같이 들어감 (전환 시 정리 가능)
+
+## P6-35 진행 (2026-08-20)
+- 빈 화면 수정: ES module import 호이스팅으로 window.React 설정이 app-main보다 늦었음
+- src/react-globals.js 추가, app-main이 이를 먼저 import
+- 라이브 assets/ 미변경

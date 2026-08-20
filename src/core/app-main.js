@@ -1,6 +1,10 @@
 /** P6 ESM adapter for app-main — live assets/app-main.js unchanged */
+import './../react-globals.js';
 const React = window.React;
 const ReactDOM = window.ReactDOM;
+if (!React || !ReactDOM || typeof ReactDOM.createRoot !== 'function') {
+  throw new Error('[P6] React globals missing before app-main');
+}
 
 const GATHER_APP_CONSTANTS = window.GATHER_APP_CONSTANTS || {};
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
