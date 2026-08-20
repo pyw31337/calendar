@@ -1,8 +1,7 @@
 /**
  * Icon components (P4-23)
  */
-(function () {
-function MenuIcon({ paths }) {
+export function MenuIcon({ paths }) {
   const React = window.React;
 
   return /*#__PURE__*/React.createElement("svg", {
@@ -19,7 +18,7 @@ function MenuIcon({ paths }) {
   }, paths.map((d, i) => /*#__PURE__*/React.createElement("path", { key: i, d })));
 }
 
-function NotepadTextIcon() {
+export function NotepadTextIcon() {
   const React = window.React;
 
   return /*#__PURE__*/React.createElement("svg", {
@@ -44,7 +43,7 @@ function NotepadTextIcon() {
   );
 }
 
-function ChatSectionIcon() {
+export function ChatSectionIcon() {
   const React = window.React;
 
   return /*#__PURE__*/React.createElement("svg", {
@@ -63,7 +62,7 @@ function ChatSectionIcon() {
   }));
 }
 
-function LinkIcon({ size = 16 }) {
+export function LinkIcon({ size = 16 }) {
   const React = window.React;
 
   return /*#__PURE__*/React.createElement("svg", {
@@ -83,7 +82,7 @@ function LinkIcon({ size = 16 }) {
     /*#__PURE__*/React.createElement("path", { d: "M13 18l-.397 .534a5.068 5.068 0 0 1 -7.127 0a4.972 4.972 0 0 1 0 -7.071l.524 -.463" }));
 }
 
-function MessageCommentIcon({ size = 24 } = {}) {
+export function MessageCommentIcon({ size = 24 } = {}) {
   const React = window.React;
 
   return /*#__PURE__*/React.createElement("svg", {
@@ -97,7 +96,7 @@ function MessageCommentIcon({ size = 24 } = {}) {
   );
 }
 
-function PencilIcon({ size = 12 } = {}) {
+export function PencilIcon({ size = 12 } = {}) {
   const React = window.React;
 
   return /*#__PURE__*/React.createElement("svg", {
@@ -110,7 +109,7 @@ function PencilIcon({ size = 12 } = {}) {
   );
 }
 
-function BuildingIcon({ size = 14 } = {}) {
+export function BuildingIcon({ size = 14 } = {}) {
   const React = window.React;
 
   return /*#__PURE__*/React.createElement("svg", {
@@ -125,7 +124,7 @@ function BuildingIcon({ size = 14 } = {}) {
   );
 }
 
-function BackArrowIcon({ size = 24 } = {}) {
+export function BackArrowIcon({ size = 24 } = {}) {
   const React = window.React;
 
   return /*#__PURE__*/React.createElement("svg", {
@@ -135,7 +134,7 @@ function BackArrowIcon({ size = 24 } = {}) {
   }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), /*#__PURE__*/React.createElement("path", { d: "M6 9l6 6l6 -6" }));
 }
 
-function SunIcon({ size = 16 }) {
+export function SunIcon({ size = 16 }) {
   const React = window.React;
 
   return /*#__PURE__*/React.createElement("svg", {
@@ -143,7 +142,7 @@ function SunIcon({ size = 16 }) {
   }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), /*#__PURE__*/React.createElement("circle", { cx: "12", cy: "12", r: "4" }), /*#__PURE__*/React.createElement("path", { d: "M3 12h1m8 -9v1m8 8h1m-9 8v1m-6.4 -15.4l.7 .7m12.1 -.7l-.7 .7m0 11.4l.7 .7m-12.1 -.7l-.7 .7" }));
 }
 
-function CloudIcon({ size = 16 }) {
+export function CloudIcon({ size = 16 }) {
   const React = window.React;
 
   return /*#__PURE__*/React.createElement("svg", {
@@ -151,7 +150,7 @@ function CloudIcon({ size = 16 }) {
   }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), /*#__PURE__*/React.createElement("path", { d: "M7 18a4.6 4.4 0 0 1 0 -9h.1a5 4.5 0 0 1 11 2h.9a4 3.5 0 0 1 0 7h-12" }));
 }
 
-function MistIcon({ size = 16 }) {
+export function MistIcon({ size = 16 }) {
   const React = window.React;
 
   return /*#__PURE__*/React.createElement("svg", {
@@ -159,7 +158,7 @@ function MistIcon({ size = 16 }) {
   }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), /*#__PURE__*/React.createElement("path", { d: "M5 5h14M5 9h14M5 13h14M5 17h14" }));
 }
 
-function CloudRainIcon({ size = 16 }) {
+export function CloudRainIcon({ size = 16 }) {
   const React = window.React;
 
   return /*#__PURE__*/React.createElement("svg", {
@@ -167,7 +166,7 @@ function CloudRainIcon({ size = 16 }) {
   }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), /*#__PURE__*/React.createElement("path", { d: "M7 18a4.6 4.4 0 0 1 0 -9h.1a5 4.5 0 0 1 11 2h.9a4 3.5 0 0 1 0 7h-12M8 22l-.5 -1.5M12 22l-.5 -1.5M16 22l-.5 -1.5" }));
 }
 
-function SnowflakeIcon({ size = 16 }) {
+export function SnowflakeIcon({ size = 16 }) {
   const React = window.React;
 
   return /*#__PURE__*/React.createElement("svg", {
@@ -175,7 +174,7 @@ function SnowflakeIcon({ size = 16 }) {
   }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), /*#__PURE__*/React.createElement("path", { d: "M10 4l2 1l2 -1M12 2v6.5M10 20l2 -1l2 1M12 15.5v6.5M20 10l-1 2l1 2M15.5 12h6.5M4 10l1 2l-1 2M2 12h6.5M4.43 4.43l4.24 4.24M2.5 5.5l1.5 1.5l1.5 -1.5M19.56 19.56l-4.24 -4.24M18.5 17.5l1.5 1.5l1.5 -1.5M19.56 4.43l-4.24 4.24M18.5 6.5l1.5 -1.5l1.5 1.5M4.43 19.56l4.24 -4.24M2.5 18.5l1.5 -1.5l1.5 1.5" }));
 }
 
-function CloudLightningIcon({ size = 16 }) {
+export function CloudLightningIcon({ size = 16 }) {
   const React = window.React;
 
   return /*#__PURE__*/React.createElement("svg", {
@@ -183,7 +182,7 @@ function CloudLightningIcon({ size = 16 }) {
   }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), /*#__PURE__*/React.createElement("path", { d: "M7 18a4.6 4.4 0 0 1 0 -9h.1a5 4.5 0 0 1 11 2h.9a4 3.5 0 0 1 0 7h-12M13 18l-2 3v-3l-2 3" }));
 }
 
-function SettingsIcon({ size = 18 }) {
+export function SettingsIcon({ size = 18 }) {
   const React = window.React;
 
   return /*#__PURE__*/React.createElement("svg", {
@@ -191,7 +190,7 @@ function SettingsIcon({ size = 18 }) {
   }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), /*#__PURE__*/React.createElement("path", { d: "M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065z" }), /*#__PURE__*/React.createElement("circle", { cx: "12", cy: "12", r: "3" }));
 }
 
-function MapCogIcon({ size = 16 }) {
+export function MapCogIcon({ size = 16 }) {
   const React = window.React;
 
   return /*#__PURE__*/React.createElement("svg", {
@@ -199,7 +198,7 @@ function MapCogIcon({ size = 16 }) {
   }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), /*#__PURE__*/React.createElement("path", { d: "M12 18.5l-3 -1.5l-6 3v-13l6 -3l6 3l6 -3v8" }), /*#__PURE__*/React.createElement("path", { d: "M9 4v13" }), /*#__PURE__*/React.createElement("path", { d: "M15 7v6.5" }), /*#__PURE__*/React.createElement("path", { d: "M17.001 19a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" }), /*#__PURE__*/React.createElement("path", { d: "M19.001 15.5v1.5" }), /*#__PURE__*/React.createElement("path", { d: "M19.001 21v1.5" }), /*#__PURE__*/React.createElement("path", { d: "M22.032 17.25l-1.299 .75" }), /*#__PURE__*/React.createElement("path", { d: "M17.27 20l-1.3 .75" }), /*#__PURE__*/React.createElement("path", { d: "M15.97 17.25l1.3 .75" }), /*#__PURE__*/React.createElement("path", { d: "M20.733 20l1.3 .75" }));
 }
 
-function GiftIcon({ size = 20 } = {}) {
+export function GiftIcon({ size = 20 } = {}) {
   const React = window.React;
 
   return /*#__PURE__*/React.createElement("svg", {
@@ -222,7 +221,7 @@ function GiftIcon({ size = 20 } = {}) {
   );
 }
 
-function MoonStarsIcon() {
+export function MoonStarsIcon() {
   const React = window.React;
 
   return /*#__PURE__*/React.createElement("svg", {
@@ -241,7 +240,7 @@ function MoonStarsIcon() {
     /*#__PURE__*/React.createElement("path", { d: "M19 11h2m-1 -1v2" }));
 }
 
-function TextResizeIcon() {
+export function TextResizeIcon() {
   const React = window.React;
 
   return /*#__PURE__*/React.createElement("svg", {
@@ -267,7 +266,7 @@ function TextResizeIcon() {
     /*#__PURE__*/React.createElement("path", { d: "M12 14v-4" }));
 }
 
-function BellIcon() {
+export function BellIcon() {
   const React = window.React;
 
   return /*#__PURE__*/React.createElement("svg", {
@@ -285,7 +284,7 @@ function BellIcon() {
     /*#__PURE__*/React.createElement("path", { d: "M9 17v1a3 3 0 0 0 6 0v-1" }));
 }
 
-function SearchIcon() {
+export function SearchIcon() {
   const React = window.React;
 
   return /*#__PURE__*/React.createElement("svg", {
@@ -310,7 +309,7 @@ function SearchIcon() {
   }));
 }
 
-function CalendarCheckIcon() {
+export function CalendarCheckIcon() {
   const React = window.React;
 
   return /*#__PURE__*/React.createElement("svg", {
@@ -341,7 +340,7 @@ function CalendarCheckIcon() {
   }));
 }
 
-function LockIcon() {
+export function LockIcon() {
   const React = window.React;
 
   return /*#__PURE__*/React.createElement("svg", {
@@ -368,7 +367,7 @@ function LockIcon() {
   }));
 }
 
-function LogoutIcon() {
+export function LogoutIcon() {
   const React = window.React;
 
   return /*#__PURE__*/React.createElement("svg", {
@@ -395,7 +394,7 @@ function LogoutIcon() {
   }));
 }
 
-function RefreshIcon() {
+export function RefreshIcon() {
   const React = window.React;
 
   return /*#__PURE__*/React.createElement("svg", {
@@ -420,7 +419,7 @@ function RefreshIcon() {
   }));
 }
 
-function AdminFilledMenuIcon() {
+export function AdminFilledMenuIcon() {
   const React = window.React;
 
   return /*#__PURE__*/React.createElement("svg", {
@@ -443,7 +442,7 @@ function AdminFilledMenuIcon() {
   }));
 }
 
-function EmojiPickerIcon() {
+export function EmojiPickerIcon() {
   const React = window.React;
 
   return /*#__PURE__*/React.createElement("svg", {
@@ -472,7 +471,7 @@ function EmojiPickerIcon() {
   }));
 }
 
-function ExternalLinkIcon() {
+export function ExternalLinkIcon() {
   const React = window.React;
 
   return /*#__PURE__*/React.createElement("svg", {
@@ -495,7 +494,7 @@ function ExternalLinkIcon() {
   }));
 }
 
-function ShareIcon({ size = 20 } = {}) {
+export function ShareIcon({ size = 20 } = {}) {
   const React = window.React;
 
   return /*#__PURE__*/React.createElement("svg", {
@@ -515,7 +514,7 @@ function ShareIcon({ size = 20 } = {}) {
      /*#__PURE__*/React.createElement("line", { x1: "15.41", y1: "6.51", x2: "8.59", y2: "10.49" }));
 }
 
-function WalletIcon({ size = 24 } = {}) {
+export function WalletIcon({ size = 24 } = {}) {
   const React = window.React;
 
   return /*#__PURE__*/React.createElement("svg", {
@@ -540,7 +539,7 @@ function WalletIcon({ size = 24 } = {}) {
   }));
 }
 
-function CoinIcon() {
+export function CoinIcon() {
   const React = window.React;
 
   return /*#__PURE__*/React.createElement("svg", {
@@ -569,7 +568,7 @@ function CoinIcon() {
   }, "\u20A9"));
 }
 
-function BanknoteArrowUpIcon({ size = 24 } = {}) {
+export function BanknoteArrowUpIcon({ size = 24 } = {}) {
   const React = window.React;
 
   return /*#__PURE__*/React.createElement("svg", {
@@ -600,7 +599,7 @@ function BanknoteArrowUpIcon({ size = 24 } = {}) {
   }));
 }
 
-function BanknoteArrowDownIcon({ size = 24 } = {}) {
+export function BanknoteArrowDownIcon({ size = 24 } = {}) {
   const React = window.React;
 
   return /*#__PURE__*/React.createElement("svg", {
@@ -631,7 +630,7 @@ function BanknoteArrowDownIcon({ size = 24 } = {}) {
   }));
 }
 
-function PiggyBankIcon({ size = 24 } = {}) {
+export function PiggyBankIcon({ size = 24 } = {}) {
   const React = window.React;
 
   return /*#__PURE__*/React.createElement("svg", {
@@ -654,7 +653,7 @@ function PiggyBankIcon({ size = 24 } = {}) {
   }));
 }
 
-function ChartBarIcon() {
+export function ChartBarIcon() {
   const React = window.React;
 
   return /*#__PURE__*/React.createElement("svg", {
@@ -683,7 +682,7 @@ function ChartBarIcon() {
   }));
 }
 
-function ChartPieIcon() {
+export function ChartPieIcon() {
   const React = window.React;
 
   return /*#__PURE__*/React.createElement("svg", {
@@ -708,7 +707,7 @@ function ChartPieIcon() {
   }));
 }
 
-function CalendarCogIcon() {
+export function CalendarCogIcon() {
   const React = window.React;
 
   return /*#__PURE__*/React.createElement("svg", {
@@ -751,7 +750,7 @@ function CalendarCogIcon() {
   }));
 }
 
-function CalendarSearchIcon({ size = 20 } = {}) {
+export function CalendarSearchIcon({ size = 20 } = {}) {
   const React = window.React;
 
   return /*#__PURE__*/React.createElement("svg", {
@@ -784,7 +783,7 @@ function CalendarSearchIcon({ size = 20 } = {}) {
   }));
 }
 
-function TrophyIcon() {
+export function TrophyIcon() {
   const React = window.React;
 
   return /*#__PURE__*/React.createElement("svg", {
@@ -813,7 +812,7 @@ function TrophyIcon() {
   }));
 }
 
-function PodiumIcon() {
+export function PodiumIcon() {
   const React = window.React;
 
   return /*#__PURE__*/React.createElement("svg", {
@@ -836,7 +835,7 @@ function PodiumIcon() {
   }));
 }
 
-function CloudDataConnectionIcon() {
+export function CloudDataConnectionIcon() {
   const React = window.React;
 
   return /*#__PURE__*/React.createElement("svg", {
@@ -867,7 +866,7 @@ function CloudDataConnectionIcon() {
   }));
 }
 
-function LogIcon() {
+export function LogIcon() {
   const React = window.React;
 
   return /*#__PURE__*/React.createElement("svg", {
@@ -896,7 +895,7 @@ function LogIcon() {
   }));
 }
 
-function HourglassIcon() {
+export function HourglassIcon() {
   const React = window.React;
 
   return /*#__PURE__*/React.createElement("svg", {
@@ -919,7 +918,7 @@ function HourglassIcon() {
   }));
 }
 
-function AlertTriangleIcon() {
+export function AlertTriangleIcon() {
   const React = window.React;
 
   return /*#__PURE__*/React.createElement("svg", {
@@ -946,7 +945,7 @@ function AlertTriangleIcon() {
   }));
 }
 
-function ShieldCheckIcon() {
+export function ShieldCheckIcon() {
   const React = window.React;
 
   return /*#__PURE__*/React.createElement("svg", {
@@ -971,7 +970,7 @@ function ShieldCheckIcon() {
   }));
 }
 
-function CalendarExportIcon() {
+export function CalendarExportIcon() {
   const React = window.React;
 
   return /*#__PURE__*/React.createElement("svg", {
@@ -1004,7 +1003,7 @@ function CalendarExportIcon() {
   }));
 }
 
-function GalleryIcon() {
+export function GalleryIcon() {
   const React = window.React;
 
   return /*#__PURE__*/React.createElement("svg", {
@@ -1033,7 +1032,7 @@ function GalleryIcon() {
   }));
 }
 
-function PollSectionIcon() {
+export function PollSectionIcon() {
   const React = window.React;
 
   return /*#__PURE__*/React.createElement("svg", {
@@ -1058,7 +1057,7 @@ function PollSectionIcon() {
   }));
 }
 
-function LineHeightIcon({ size = 22 } = {}) {
+export function LineHeightIcon({ size = 22 } = {}) {
   const React = window.React;
 
   return /*#__PURE__*/React.createElement("svg", {
@@ -1091,7 +1090,7 @@ function LineHeightIcon({ size = 22 } = {}) {
   }));
 }
 
-function MegaphoneIcon({ size = 20 } = {}) {
+export function MegaphoneIcon({ size = 20 } = {}) {
   const React = window.React;
 
   return /*#__PURE__*/React.createElement("svg", {
@@ -1114,7 +1113,7 @@ function MegaphoneIcon({ size = 20 } = {}) {
   }));
 }
 
-function SmallXIcon({ size = 24 } = {}) {
+export function SmallXIcon({ size = 24 } = {}) {
   const React = window.React;
 
   return /*#__PURE__*/React.createElement("svg", {
@@ -1139,7 +1138,7 @@ function SmallXIcon({ size = 24 } = {}) {
   }));
 }
 
-function PlaceSectionIcon({ size = 20 } = {}) {
+export function PlaceSectionIcon({ size = 20 } = {}) {
   const React = window.React;
 
   return /*#__PURE__*/React.createElement("svg", {
@@ -1164,7 +1163,7 @@ function PlaceSectionIcon({ size = 20 } = {}) {
   }));
 }
 
-function ThreeLinesIcon({ size = 18 } = {}) {
+export function ThreeLinesIcon({ size = 18 } = {}) {
   const React = window.React;
 
   return /*#__PURE__*/React.createElement("svg", {
@@ -1181,7 +1180,7 @@ function ThreeLinesIcon({ size = 18 } = {}) {
     /*#__PURE__*/React.createElement("line", { x1: "4", y1: "17", x2: "20", y2: "17" }));
 }
 
-function PlaceCategoryMarkerIcon({ category, size = 14, strokeColor = "#fff" } = {}) {
+export function PlaceCategoryMarkerIcon({ category, size = 14, strokeColor = "#fff" } = {}) {
   const React = window.React;
 
   const content = getPlaceCategoryMarkerContent(category);
@@ -1198,7 +1197,7 @@ function PlaceCategoryMarkerIcon({ category, size = 14, strokeColor = "#fff" } =
   }, content.shapes.map((shape, i) => /*#__PURE__*/React.createElement(shape.tag, { key: i, ...(shape.tag === 'rect' ? { x: shape.x, y: shape.y, width: shape.width, height: shape.height, rx: shape.rx, ry: shape.ry } : shape.tag === 'circle' ? { cx: shape.cx, cy: shape.cy, r: shape.r } : { d: shape.d }) })));
 }
 
-function CctvIcon({ size = 14 }) {
+export function CctvIcon({ size = 14 }) {
   const React = window.React;
 
   return /*#__PURE__*/React.createElement('svg', {
@@ -1213,7 +1212,7 @@ function CctvIcon({ size = 14 }) {
   );
 }
 
-function DicesIcon({ size = 14 }) {
+export function DicesIcon({ size = 14 }) {
   const React = window.React;
 
   return /*#__PURE__*/React.createElement('svg', {
@@ -1229,6 +1228,7 @@ function DicesIcon({ size = 14 }) {
   );
 }
 
+  if (typeof window !== 'undefined') {
   window.GATHER_UI_COMPONENTS = Object.assign({}, window.GATHER_UI_COMPONENTS || {}, {
     MenuIcon: MenuIcon,
     NotepadTextIcon: NotepadTextIcon,
@@ -1285,6 +1285,6 @@ function DicesIcon({ size = 14 }) {
     ThreeLinesIcon: ThreeLinesIcon,
     PlaceCategoryMarkerIcon: PlaceCategoryMarkerIcon,
     CctvIcon: CctvIcon,
-    DicesIcon: DicesIcon
+    DicesIcon: DicesIcon,
   });
-})();
+}

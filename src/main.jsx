@@ -72,12 +72,13 @@ import {
   ToggleSwitch,
   Footer
 } from './ui/ui-shared.js';
+import * as UiIcons from './ui/ui-icons.js';
 
 console.log('[P6] Vite entry loaded', {
   constants: !!GATHER_APP_CONSTANTS,
   config: !!GATHER_APP_CONFIG,
   MainSideMenu: typeof MainSideMenu,
   AdminLoginGate: typeof AdminLoginGate,
-  Footer: typeof Footer,
+  iconCount: Object.keys(UiIcons).length,
   publicCalendarIds: GATHER_APP_CONFIG.PUBLIC_CALENDAR_IDS
 });
