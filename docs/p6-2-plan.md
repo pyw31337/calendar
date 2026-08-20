@@ -27,3 +27,5 @@
 
 - 4단계 시작: src/core/admin-routes.js 에 어드민 라우트 함수 복사 (원본 유지)
 - 라이브 assets/app-main.js 는 아직 원본을 사용
+
+- 4단계 계속: src/core/subscriptions.js 에 구독 헬퍼 복사 (원본 유지)
