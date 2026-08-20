@@ -79,6 +79,8 @@
 - 채팅: 입력 초안 있을 때 스크롤해도 composer 유지
 
 - Icons ✅ 2026-08-20 (assets/ui-icons.js)
+- Leftover widgets ✅ 2026-08-20 (assets/ui-widgets.js)
+- **P4 complete except App shell** ✅ 2026-08-20
 - Size budget tracks assets/app-main.js ✅ 2026-08-20
 
 ### P6 Vite (별도 일정)

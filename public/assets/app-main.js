@@ -1268,50 +1268,24 @@ const Footer = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.Foote
   ? window.GATHER_UI_COMPONENTS.Footer
   : function FooterFallback() { return null; };
 
-function UrlCapsuleBadge({ url, style = null }) {
-  const href = sanitizeText(url || '', 500);
-  if (!href) return null;
-  return /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    title: href,
-    onClick: e => { e.stopPropagation(); window.open(href, '_blank', 'noopener,noreferrer'); },
-    style: {
-      display: 'inline-flex',
-      alignItems: 'center',
-      padding: '3px 10px',
-      borderRadius: 'var(--radius-full)',
-      fontSize: '0.72rem',
-      fontWeight: 600,
-      border: 0,
-      backgroundColor: '#E2E8F0',
-      color: '#475569',
-      cursor: 'pointer',
-      wordBreak: 'break-all',
-      maxWidth: '100%',
-      textAlign: 'left',
-      ...(style || {})
-    }
-  }, href);
-}
+const SearchResultLogRow = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SearchResultLogRow)
+  ? window.GATHER_UI_COMPONENTS.SearchResultLogRow
+  : function SearchResultLogRowFallback() { return null; };
+const TikTokEmbedWidget = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.TikTokEmbedWidget)
+  ? window.GATHER_UI_COMPONENTS.TikTokEmbedWidget
+  : function TikTokEmbedWidgetFallback() { return null; };
+const UrlCapsuleBadge = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.UrlCapsuleBadge)
+  ? window.GATHER_UI_COMPONENTS.UrlCapsuleBadge
+  : function UrlCapsuleBadgeFallback() { return null; };
+const ParticipantPickerButton = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ParticipantPickerButton)
+  ? window.GATHER_UI_COMPONENTS.ParticipantPickerButton
+  : function ParticipantPickerButtonFallback() { return null; };
+const DateCapsuleBadge = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.DateCapsuleBadge)
+  ? window.GATHER_UI_COMPONENTS.DateCapsuleBadge
+  : function DateCapsuleBadgeFallback() { return null; };
 
-function DateCapsuleBadge({ date, style = null }) {
-  const label = String(date || '').trim();
-  if (!label) return null;
-  return /*#__PURE__*/React.createElement("span", {
-    style: {
-      display: 'inline-flex',
-      alignItems: 'center',
-      padding: '2px 8px',
-      borderRadius: 'var(--radius-full)',
-      fontSize: '0.72rem',
-      fontWeight: 700,
-      backgroundColor: 'rgba(99, 102, 241, 0.12)',
-      color: '#4338CA',
-      whiteSpace: 'nowrap',
-      ...(style || {})
-    }
-  }, label);
-}
+
+
 
 // 입력필드 표시 규칙: 일반 텍스트 / YY.MM.DD 날짜 / URL 분리
 function tokenizeRichFieldText(text) {
@@ -7182,39 +7156,7 @@ function getDirectChatMediaInfo(url) {
 // Appending a fresh <script> tag per mount makes embed.js rescan the DOM for this blockquote.
 // onFailed fires if no player iframe shows up in time, so the caller can fall back to the
 // link-preview card.
-function TikTokEmbedWidget({ url, videoId, onFailed }) {
-  const containerRef = React.useRef(null);
-  React.useEffect(() => {
-    let cancelled = false;
-    const script = document.createElement('script');
-    script.src = 'https://www.tiktok.com/embed.js';
-    script.async = true;
-    document.body.appendChild(script);
-    const timeoutId = setTimeout(() => {
-      if (cancelled) return;
-      const hasPlayer = containerRef.current && containerRef.current.querySelector('iframe');
-      if (!hasPlayer) onFailed();
-    }, 6000);
-    return () => {
-      cancelled = true;
-      clearTimeout(timeoutId);
-      if (script.parentNode) script.parentNode.removeChild(script);
-    };
-  }, [url]);
 
-  return /*#__PURE__*/React.createElement('div', {
-    ref: containerRef,
-    // overflow:hidden is a safety net -- the real width clamp is the .tiktok-embed !important
-    // rule in app.css, needed because embed.js sets its own inline pixel width on the iframe
-    // it generates once loaded, which otherwise overrides anything set here from React.
-    style: { width: 'min(88vw, 360px)', maxWidth: '500px', minWidth: '200px', margin: '0 auto', overflow: 'hidden' }
-  }, /*#__PURE__*/React.createElement('blockquote', {
-    className: 'tiktok-embed',
-    cite: url,
-    'data-video-id': videoId,
-    style: { maxWidth: '100%', minWidth: '200px', margin: '0 auto' }
-  }, /*#__PURE__*/React.createElement('section', null)));
-}
 
 // Floating video player kept alive via a document.body portal so it survives App()'s
 // activeView-based tab switches without unmounting (see the withStickyVideo wrapper around
@@ -8609,29 +8551,7 @@ function addRecentEmoji(emoji) {
 // Colored capsule button that opens a ChatParticipantSheet -- the "누구 작성" trigger used by
 // the memo composer/editor and the chat edit modal (so a message posted under the wrong
 // participant can be corrected). One definition so the pill's look stays identical everywhere.
-function ParticipantPickerButton({ participant, onClick }) {
-  return /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    onClick,
-    style: {
-      backgroundColor: participant?.color || '#94A3B8',
-      color: '#FFFFFF',
-      border: 'none',
-      borderRadius: 'var(--radius-full)',
-      padding: '6px 14px',
-      fontSize: '0.8rem',
-      fontWeight: 'bold',
-      cursor: 'pointer',
-      whiteSpace: 'nowrap',
-      display: 'flex',
-      alignItems: 'center',
-      gap: '6px',
-      height: '32px',
-      boxSizing: 'border-box',
-      flexShrink: 0
-    }
-  }, participant?.name || '작성자 선택', /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.6rem' } }, "▼"));
-}
+
 
 // Speech-bubble "comment" icon (Lucide message), used by the memo comment toggle button.
 
@@ -9024,29 +8944,7 @@ function computeCalendarSearchMatches(cal, chatMessages, memoList, q, limit = 30
 // Admin-로그-tab-style result row: colorful name/category badge on top, matched content in the
 // middle, timestamp on the bottom. Shared by GlobalSearchModal and AdminUnifiedSearchResultsView
 // for every category except 태그 (which shows a photo thumbnail instead of a badge+text line).
-function SearchResultLogRow({ badgeName, badgeColor, timeStr, calendarLabel, onClick, children }) {
-  const Tag = onClick ? "button" : "div";
-  return /*#__PURE__*/React.createElement(Tag, {
-    type: onClick ? "button" : undefined,
-    onClick,
-    style: {
-      display: 'block', width: '100%', boxSizing: 'border-box', textAlign: 'left',
-      padding: '10px 12px', borderRadius: '10px', backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0',
-      cursor: onClick ? 'pointer' : 'default', font: 'inherit'
-    }
-  },
-    /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px', flexWrap: 'wrap' } },
-      badgeName && /*#__PURE__*/React.createElement("span", {
-        style: { backgroundColor: badgeColor || '#94A3B8', color: getContrastTextColor(badgeColor || '#94A3B8'), padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: '0.7rem', fontWeight: 'bold', whiteSpace: 'nowrap' }
-      }, badgeName),
-      calendarLabel && /*#__PURE__*/React.createElement("span", {
-        style: { fontSize: '0.68rem', color: '#94A3B8', fontWeight: 700 }
-      }, calendarLabel)
-    ),
-    /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.84rem', color: '#0F172A', lineHeight: 1.45, wordBreak: 'break-word' } }, children),
-    timeStr && /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.7rem', color: '#94A3B8', marginTop: '6px' } }, timeStr)
-  );
-}
+
 
 // Global Search Modal -- searches the active calendar's schedule memos, participant names, and
 // chat message text all in one place. Clicking a schedule result opens that date's DateModal;
@@ -9967,6 +9865,11 @@ function bindGatherUiDeps() {
     confetti: typeof confetti === 'function' ? confetti : (typeof window !== 'undefined' ? window.confetti : null),
     CONFETTI_Z_INDEX: typeof CONFETTI_Z_INDEX !== 'undefined' ? CONFETTI_Z_INDEX : 9999,
     AdminDashboard: typeof AdminDashboard === 'function' ? AdminDashboard : null,
+    SearchResultLogRow: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SearchResultLogRow) || (typeof SearchResultLogRow === 'function' ? SearchResultLogRow : null),
+    TikTokEmbedWidget: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.TikTokEmbedWidget) || (typeof TikTokEmbedWidget === 'function' ? TikTokEmbedWidget : null),
+    UrlCapsuleBadge: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.UrlCapsuleBadge) || (typeof UrlCapsuleBadge === 'function' ? UrlCapsuleBadge : null),
+    ParticipantPickerButton: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ParticipantPickerButton) || (typeof ParticipantPickerButton === 'function' ? ParticipantPickerButton : null),
+    DateCapsuleBadge: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.DateCapsuleBadge) || (typeof DateCapsuleBadge === 'function' ? DateCapsuleBadge : null),
     MenuIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MenuIcon) || (typeof MenuIcon === 'function' ? MenuIcon : null),
     NotepadTextIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.NotepadTextIcon) || (typeof NotepadTextIcon === 'function' ? NotepadTextIcon : null),
     ChatSectionIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ChatSectionIcon) || (typeof ChatSectionIcon === 'function' ? ChatSectionIcon : null),
