@@ -1,8 +1,7 @@
 /**
  * Lightbox + LightboxInfoPanel (P4-3).
  */
-(function () {
-function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSearchTag, showToast }) {
+export function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSearchTag, showToast }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const SmallXIcon = __deps.SmallXIcon;
@@ -163,7 +162,7 @@ function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSearchTag
   }));
 }
 
-function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, onPromoteImageUrl, onSaveImageTags, onSearchTag }) {
+export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, onPromoteImageUrl, onSaveImageTags, onSearchTag }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const SmallXIcon = __deps.SmallXIcon;
@@ -560,8 +559,9 @@ function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, onPromote
   return ReactDOM.createPortal(lightboxNode, document.body);
 }
 
+  if (typeof window !== 'undefined') {
   window.GATHER_UI_COMPONENTS = Object.assign({}, window.GATHER_UI_COMPONENTS || {}, {
     LightboxInfoPanel: LightboxInfoPanel,
-    Lightbox: Lightbox
+    Lightbox: Lightbox,
   });
-})();
+}

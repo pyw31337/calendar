@@ -37,11 +37,13 @@ import {
   ChatSideMenu
 } from './ui/ui-misc.js';
 import { PlaceRegisterModal } from './ui/ui-place-register.js';
+import { LightboxInfoPanel, Lightbox } from './ui/ui-lightbox.js';
 
 console.log('[P6] Vite entry loaded', {
   constants: !!GATHER_APP_CONSTANTS,
   config: !!GATHER_APP_CONFIG,
   MainSideMenu: typeof MainSideMenu,
   PlaceRegisterModal: typeof PlaceRegisterModal,
+  Lightbox: typeof Lightbox,
   publicCalendarIds: GATHER_APP_CONFIG.PUBLIC_CALENDAR_IDS
 });
