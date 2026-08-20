@@ -3240,3 +3240,25 @@ textarea.form-input {
 .place-card-row.is-place-focused {
   border-color: var(--accent-primary, #4F46E5) !important;
 }
+
+/* Main side menu: tighter rows, no desc, single dividers */
+.admin-side-menu .admin-side-menu-item {
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+.admin-side-menu .admin-side-menu-item-desc {
+  display: none !important;
+}
+.admin-side-menu .admin-side-menu-item-copy {
+  gap: 0;
+}
+.admin-side-menu .admin-side-menu-list {
+  border-bottom: none;
+}
+.admin-side-menu .main-side-menu-manual-banner:hover {
+  filter: brightness(0.98);
+}
+.admin-side-menu .shared-side-menu-settings .admin-side-menu-setting-row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+}

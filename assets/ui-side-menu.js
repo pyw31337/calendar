@@ -20,7 +20,7 @@ function SharedSideMenuSettings({
 
   return /*#__PURE__*/React.createElement("div", {
     className: "admin-side-menu-list shared-side-menu-settings",
-    style: { borderTop: 'none', borderBottom: 'none', paddingTop: '14px' }
+    style: { borderTop: 'none', borderBottom: 'none', paddingTop: '4px', paddingBottom: '4px' }
   },
     /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-setting-row" },
       /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-label" },
@@ -160,16 +160,24 @@ function MainSideMenu({
 
         )
     ),
-    /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-list" },
+    /* Group 1: manual (banner) + calendar + anniversary */
+    /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-list", style: { borderTop: 'none', borderBottom: 'none', paddingTop: '4px' } },
       /*#__PURE__*/React.createElement("button", {
         type: "button",
-        className: "admin-side-menu-item",
-        onClick: () => handle(onOpenManual)
+        className: "admin-side-menu-item main-side-menu-manual-banner",
+        onClick: () => handle(onOpenManual),
+        style: {
+          background: 'color-mix(in srgb, var(--accent-primary, #6366F1) 10%, var(--bg-primary, #fff))',
+          border: '1px solid color-mix(in srgb, var(--accent-primary, #6366F1) 28%, transparent)',
+          borderRadius: '12px',
+          margin: '0 4px 6px',
+          padding: '12px 12px',
+          fontWeight: 800
+        }
       },
-        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M8 9h8", "M8 13h6", "M12 20l9 -5l-9 -5l-9 5l9 5z", "M12 12l9 -5l-9 -5l-9 5l9 5z"] })),
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon", style: { color: 'var(--accent-primary, #6366F1)' } }, /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M8 9h8", "M8 13h6", "M12 20l9 -5l-9 -5l-9 5l9 5z", "M12 12l9 -5l-9 -5l-9 5l9 5z"] })),
         /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
-          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "사용자 매뉴얼"),
-          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "캘린더 사용 방법 보기")
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title", style: { fontWeight: 800, fontSize: '0.95rem' } }, "사용자 매뉴얼")
         )
       ),
       /*#__PURE__*/React.createElement("button", {
@@ -179,8 +187,7 @@ function MainSideMenu({
       },
         /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement(CalendarCogIcon, null)),
         /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
-          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "캘린더 설정"),
-          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "이름, 설명, 참여자 관리")
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "캘린더 설정")
         )
       ),
       /*#__PURE__*/React.createElement("button", {
@@ -200,35 +207,12 @@ function MainSideMenu({
               color: 'var(--text-muted)',
               marginLeft: '4px'
             }
-          }, anniversaries.length)),
-          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "매년 반복, 음양력, 디데이 관리")
-        )
-      ),
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        className: "admin-side-menu-item",
-        onClick: () => handle(onOpenShare)
-      },
-        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M3 12a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M15 6a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M15 18a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M8.7 10.7l6.6 -3.4", "M8.7 13.3l6.6 3.4"] })),
-        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
-          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "공유하기"),
-          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "캘린더 URL 복사")
-        )
-      ),
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        className: "admin-side-menu-item",
-        onClick: () => handle(onCreateShortcut)
-      },
-        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement(ExternalLinkIcon, null)),
-        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
-          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "바로가기"),
-          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "홈 화면 또는 바탕화면 추가")
+          }, anniversaries.length))
         )
       )
     ),
-    /* Gallery + Places after 기념일/공유 group */
-    /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-list", style: { borderTop: '1px solid #E2E8F0', borderBottom: 'none', paddingTop: '8px' } },
+    /* Group 2: gallery + places */
+    /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-list", style: { borderTop: '1px solid var(--border-subtle, #E2E8F0)', borderBottom: 'none', paddingTop: '6px', marginTop: '2px' } },
       /*#__PURE__*/React.createElement("button", {
         type: "button",
         className: "admin-side-menu-item",
@@ -238,8 +222,7 @@ function MainSideMenu({
           xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2"
         }, /*#__PURE__*/React.createElement("rect", { width: "18", height: "18", x: "3", y: "3", rx: "2", ry: "2" }), /*#__PURE__*/React.createElement("circle", { cx: "9", cy: "9", r: "2" }), /*#__PURE__*/React.createElement("path", { d: "m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" }))),
         /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
-          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "갤러리"),
-          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "채팅·메모 사진 및 링크")
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "갤러리")
         )
       ),
       /*#__PURE__*/React.createElement("button", {
@@ -251,13 +234,12 @@ function MainSideMenu({
           xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2"
         }, /*#__PURE__*/React.createElement("path", { d: "M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" }), /*#__PURE__*/React.createElement("circle", { cx: "12", cy: "10", r: "3" }))),
         /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
-          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "장소"),
-          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "장소 페이지로 이동")
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "장소")
         )
       )
     ),
-    /* Theme / font / chat notify */
-    /*#__PURE__*/React.createElement("div", { style: { borderTop: '1px solid #E2E8F0', borderBottom: 'none', paddingTop: '4px' } },
+    /* Group 3: theme / font / notify */
+    /*#__PURE__*/React.createElement("div", { style: { borderTop: '1px solid var(--border-subtle, #E2E8F0)', marginTop: '2px' } },
       /*#__PURE__*/React.createElement(SharedSideMenuSettings, {
         isDarkTheme: isDarkTheme,
         onToggleTheme: onToggleTheme,
@@ -268,8 +250,31 @@ function MainSideMenu({
         onToggleChatNotifications: onToggleChatNotifications
       })
     ),
-        /* Admin alone at bottom */
-    /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-list", style: { marginTop: 'auto', borderTop: '1px solid #E2E8F0', borderBottom: 'none' } },
+    /* Group 4: share + shortcut */
+    /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-list", style: { borderTop: '1px solid var(--border-subtle, #E2E8F0)', borderBottom: 'none', paddingTop: '6px', marginTop: '2px' } },
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "admin-side-menu-item",
+        onClick: () => handle(onOpenShare)
+      },
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M3 12a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M15 6a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M15 18a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M8.7 10.7l6.6 -3.4", "M8.7 13.3l6.6 3.4"] })),
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "공유하기")
+        )
+      ),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "admin-side-menu-item",
+        onClick: () => handle(onCreateShortcut)
+      },
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement(ExternalLinkIcon, null)),
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "바로가기")
+        )
+      )
+    ),
+    /* Group 5: admin */
+    /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-list", style: { marginTop: 'auto', borderTop: '1px solid var(--border-subtle, #E2E8F0)', borderBottom: 'none', paddingTop: '6px' } },
       /*#__PURE__*/React.createElement("button", {
         type: "button",
         className: "admin-side-menu-item",
@@ -280,8 +285,7 @@ function MainSideMenu({
       },
         /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement(LockIcon, null)),
         /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
-          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "어드민"),
-          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "관리자 페이지 새창 열기")
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "어드민")
         )
       )
     )
