@@ -1,8 +1,7 @@
 /**
  * Summary list, photo gallery, category tabs (P4-11)
  */
-(function () {
-function SectionCountBadge({ count }) {
+export function SectionCountBadge({ count }) {
   const React = window.React;
 
   return /*#__PURE__*/React.createElement("span", {
@@ -10,7 +9,7 @@ function SectionCountBadge({ count }) {
   }, count);
 }
 
-function SectionToggleButton({ collapsed, onToggle, label }) {
+export function SectionToggleButton({ collapsed, onToggle, label }) {
   const React = window.React;
 
   return /*#__PURE__*/React.createElement("button", {
@@ -42,7 +41,7 @@ function SectionToggleButton({ collapsed, onToggle, label }) {
   })));
 }
 
-function SearchCategoryTabs({ tabs, activeKey, onSelect, containerStyle, tabPadding, tabTextStyle, countBadgeClassName, countBadgeStyle }) {
+export function SearchCategoryTabs({ tabs, activeKey, onSelect, containerStyle, tabPadding, tabTextStyle, countBadgeClassName, countBadgeStyle }) {
   const React = window.React;
 
   return /*#__PURE__*/React.createElement("div", {
@@ -75,7 +74,7 @@ function SearchCategoryTabs({ tabs, activeKey, onSelect, containerStyle, tabPadd
       }, tab.count))));
 }
 
-function SimpleBottomSheetPicker({ title, value, options, onSelect, placeholder, disabled, style, className = "form-select" }) {
+export function SimpleBottomSheetPicker({ title, value, options, onSelect, placeholder, disabled, style, className = "form-select" }) {
   const React = window.React;
 
   const [isOpen, setIsOpen] = React.useState(false);
@@ -133,7 +132,7 @@ function SimpleBottomSheetPicker({ title, value, options, onSelect, placeholder,
   );
 }
 
-function PhotoGallery({ chatMessages, totalGalleryCount, onViewAll, showToast, onPromoteImageUrl, onSaveImageTags, onSearchTag }) {
+export function PhotoGallery({ chatMessages, totalGalleryCount, onViewAll, showToast, onPromoteImageUrl, onSaveImageTags, onSearchTag }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -245,7 +244,7 @@ function PhotoGallery({ chatMessages, totalGalleryCount, onViewAll, showToast, o
   );
 }
 
-function SummaryList({
+export function SummaryList({
   calendar,
   onSelectDate
 }) {
@@ -669,12 +668,13 @@ function SummaryList({
     })()))));
 }
 
+  if (typeof window !== 'undefined') {
   window.GATHER_UI_COMPONENTS = Object.assign({}, window.GATHER_UI_COMPONENTS || {}, {
     SectionCountBadge: SectionCountBadge,
     SectionToggleButton: SectionToggleButton,
     SearchCategoryTabs: SearchCategoryTabs,
     SimpleBottomSheetPicker: SimpleBottomSheetPicker,
     PhotoGallery: PhotoGallery,
-    SummaryList: SummaryList
+    SummaryList: SummaryList,
   });
-})();
+}
