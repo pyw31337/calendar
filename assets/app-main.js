@@ -2073,6 +2073,24 @@ function createLoadingCalendarShell(calendarId) {
 }
 
 // Firebase Config for Realtime Multi-User Cloud Sync
+
+function bindGatherFirebaseDeps() {
+  window.GATHER_FIREBASE_DEPS = {
+    getDb: function () { return firebaseDb; },
+    projectId: (typeof firebaseConfig !== 'undefined' && firebaseConfig && firebaseConfig.projectId) || '',
+    slimMessageForClient: typeof slimMessageForClient === 'function' ? slimMessageForClient : function (m) { return m; },
+    firestoreDocumentToJs: typeof firestoreDocumentToJs === 'function' ? firestoreDocumentToJs : function () { return {}; },
+    getMessageImageEntries: function (msg) {
+      return typeof getMessageImageEntries === 'function' ? getMessageImageEntries(msg) : [];
+    },
+    getMessageDirectMediaEntry: function (msg) {
+      return typeof getMessageDirectMediaEntry === 'function' ? getMessageDirectMediaEntry(msg) : null;
+    },
+    CHAT_LIVE_MESSAGE_LIMIT: typeof CHAT_LIVE_MESSAGE_LIMIT !== 'undefined' ? CHAT_LIVE_MESSAGE_LIMIT : 30,
+    CHAT_OLDER_PAGE_SIZE: typeof CHAT_OLDER_PAGE_SIZE !== 'undefined' ? CHAT_OLDER_PAGE_SIZE : 40
+  };
+}
+
 const firebaseConfig = {
   apiKey: "AIzaSyD-GatherCalendarAppLiveKey2026",
   authDomain: "metro-live-2918e.firebaseapp.com",
@@ -2089,6 +2107,7 @@ try {
       firebase.initializeApp(firebaseConfig);
     }
     firebaseDb = firebase.firestore();
+    bindGatherFirebaseDeps();
   }
 } catch (e) {
   console.warn('Firebase init notice:', e);
@@ -2248,189 +2267,52 @@ async function fetchRecentMessagesRest(calId) {
   }
 }
 
-async function fetchChatMessagesRest(calId) {
-  try {
-    const url = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/calendars/cal_${calId}/messages?orderBy=timestamp%20desc&pageSize=${CHAT_LIVE_MESSAGE_LIMIT}`;
-    const res = await fetch(url);
-    if (!res.ok) return [];
-    const data = await res.json();
-    const docs = data.documents || [];
-    return docs.map(doc => slimMessageForClient({
-      id: doc.name.split('/').pop(),
-      ...firestoreDocumentToJs(doc)
-    })).reverse();
-  } catch (err) {
-    console.warn('fetchChatMessagesRest error:', err);
-    return [];
+async function fetchChatMessagesRest() {
+  const svc = window.GATHER_FIREBASE_SERVICES;
+  if (svc && typeof svc.fetchChatMessagesRest === 'function' && !svc.isScaffold) {
+    return svc.fetchChatMessagesRest.apply(null, arguments);
   }
+  console.warn('fetchChatMessagesRest: GATHER_FIREBASE_SERVICES missing');
+  return [];
 }
 
-async function fetchRecentChatMessages(calId, limit = 60) {
-  if (!calId) return [];
-  const pageSize = Math.max(1, Math.min(100, Number(limit) || 60));
-  try {
-    if (firebaseDb) {
-      const snap = await firebaseDb.collection('calendars').doc(`cal_${calId}`).collection('messages')
-        .orderBy('timestamp', 'desc').limit(pageSize).get();
-      const list = [];
-      snap.forEach(doc => list.push(slimMessageForClient({ id: doc.id, ...doc.data() })));
-      return list.reverse();
-    }
-  } catch (err) {
-    console.warn('fetchRecentChatMessages sdk', err);
+async function fetchRecentChatMessages() {
+  const svc = window.GATHER_FIREBASE_SERVICES;
+  if (svc && typeof svc.fetchRecentChatMessages === 'function' && !svc.isScaffold) {
+    return svc.fetchRecentChatMessages.apply(null, arguments);
   }
-  try {
-    const url = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/calendars/cal_${calId}/messages?orderBy=timestamp%20desc&pageSize=${pageSize}`;
-    const res = await fetch(url);
-    if (!res.ok) return [];
-    const data = await res.json();
-    return (data.documents || []).map(doc => slimMessageForClient({
-      id: doc.name.split('/').pop(),
-      ...firestoreDocumentToJs(doc)
-    })).reverse();
-  } catch (err) {
-    console.warn('fetchRecentChatMessages rest', err);
-    return [];
-  }
+  console.warn('fetchRecentChatMessages: GATHER_FIREBASE_SERVICES missing');
+  return [];
 }
 
 const CHAT_OLDER_PAGE_SIZE = readConfigNumber('CHAT_OLDER_PAGE_SIZE', 40);
+bindGatherFirebaseDeps();
 
-async function fetchSubcollectionCount(calId, subName) {
-  if (!calId || !subName) return null;
-  if (firebaseDb) {
-    try {
-      const ref = firebaseDb.collection('calendars').doc(`cal_${calId}`).collection(subName);
-      if (ref && typeof ref.count === 'function') {
-        const snap = await ref.count().get();
-        const n = Number(snap.data().count);
-        if (Number.isFinite(n) && n >= 0) return n;
-      }
-    } catch (err) {
-      console.warn('fetchSubcollectionCount sdk', subName, err);
-    }
+async function fetchSubcollectionCount() {
+  const svc = window.GATHER_FIREBASE_SERVICES;
+  if (svc && typeof svc.fetchSubcollectionCount === 'function' && !svc.isScaffold) {
+    return svc.fetchSubcollectionCount.apply(null, arguments);
   }
-  try {
-    const parentPath = `projects/${firebaseConfig.projectId}/databases/(default)/documents/calendars/cal_${calId}`;
-    const url = `https://firestore.googleapis.com/v1/${parentPath}:runAggregationQuery`;
-    const aggBody = {
-      structuredAggregationQuery: {
-        structuredQuery: { from: [{ collectionId: subName }] },
-        aggregations: [{ alias: 'total', count: {} }]
-      }
-    };
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(aggBody)
-    });
-    if (res.ok) {
-      const data = await res.json();
-      const rows = Array.isArray(data) ? data : [data];
-      for (const row of rows) {
-        const fields = row && row.result && row.result.aggregateFields;
-        const total = fields && fields.total;
-        if (total && total.integerValue != null) {
-          const n = Number(total.integerValue);
-          if (Number.isFinite(n) && n >= 0) return n;
-        }
-      }
-    } else {
-      console.warn('fetchSubcollectionCount rest status', res.status, subName);
-    }
-  } catch (err) {
-    console.warn('fetchSubcollectionCount rest', subName, err);
-  }
+  console.warn('fetchSubcollectionCount: GATHER_FIREBASE_SERVICES missing');
   return null;
 }
 
-async function fetchOlderChatMessages(calId, beforeTimestamp, pageSize = CHAT_OLDER_PAGE_SIZE) {
-  if (!calId || !beforeTimestamp) return [];
-  if (firebaseDb) {
-    try {
-      const snap = await firebaseDb.collection('calendars').doc(`cal_${calId}`).collection('messages')
-        .orderBy('timestamp', 'desc').startAfter(beforeTimestamp).limit(pageSize).get();
-      const list = [];
-      snap.forEach(doc => list.push(slimMessageForClient({ id: doc.id, ...doc.data() })));
-      return list.reverse();
-    } catch (err) {
-      console.warn('fetchOlderChatMessages sdk', err);
-    }
+async function fetchOlderChatMessages() {
+  const svc = window.GATHER_FIREBASE_SERVICES;
+  if (svc && typeof svc.fetchOlderChatMessages === 'function' && !svc.isScaffold) {
+    return svc.fetchOlderChatMessages.apply(null, arguments);
   }
-  try {
-    const parent = `projects/${firebaseConfig.projectId}/databases/(default)/documents/calendars/cal_${calId}`;
-    const url = `https://firestore.googleapis.com/v1/${parent}:runQuery`;
-    const body = {
-      structuredQuery: {
-        from: [{ collectionId: 'messages' }],
-        where: {
-          fieldFilter: {
-            field: { fieldPath: 'timestamp' },
-            op: 'LESS_THAN',
-            value: { integerValue: String(Math.floor(Number(beforeTimestamp))) }
-          }
-        },
-        orderBy: [{ field: { fieldPath: 'timestamp' }, direction: 'DESCENDING' }],
-        limit: pageSize
-      }
-    };
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-    if (!res.ok) return [];
-    const rows = await res.json();
-    const list = [];
-    (Array.isArray(rows) ? rows : []).forEach(row => {
-      const doc = row && row.document;
-      if (!doc) return;
-      list.push(slimMessageForClient({
-        id: (doc.name || '').split('/').pop(),
-        ...firestoreDocumentToJs(doc)
-      }));
-    });
-    return list.reverse();
-  } catch (err) {
-    console.warn('fetchOlderChatMessages rest', err);
-    return [];
-  }
+  console.warn('fetchOlderChatMessages: GATHER_FIREBASE_SERVICES missing');
+  return [];
 }
 
-const galleryItemCountCache = Object.create(null);
-const GALLERY_COUNT_CACHE_MS = 5 * 60 * 1000;
-
-async function fetchGalleryItemCount(calId, maxPages = 8) {
-  if (!calId) return null;
-  const cached = galleryItemCountCache[calId];
-  if (cached && (Date.now() - cached.at) < GALLERY_COUNT_CACHE_MS && typeof cached.n === 'number') {
-    return cached.n;
+async function fetchGalleryItemCount() {
+  const svc = window.GATHER_FIREBASE_SERVICES;
+  if (svc && typeof svc.fetchGalleryItemCount === 'function' && !svc.isScaffold) {
+    return svc.fetchGalleryItemCount.apply(null, arguments);
   }
-  if (!firebaseDb) return null;
-  try {
-    let total = 0, lastDoc = null;
-    for (let page = 0; page < maxPages; page++) {
-      let q = firebaseDb.collection('calendars').doc(`cal_${calId}`).collection('messages')
-        .orderBy('timestamp', 'desc').limit(80);
-      if (lastDoc) q = q.startAfter(lastDoc);
-      const snap = await q.get();
-      if (snap.empty) break;
-      snap.forEach(doc => {
-        const msg = { id: doc.id, ...doc.data() };
-        const imgN = typeof getMessageImageEntries === 'function' ? getMessageImageEntries(msg).length : 0;
-        total += imgN;
-        const direct = typeof getMessageDirectMediaEntry === 'function' ? getMessageDirectMediaEntry(msg) : null;
-        if (direct) total += 1;
-      });
-      lastDoc = snap.docs[snap.docs.length - 1];
-      if (snap.size < 80) break;
-    }
-    galleryItemCountCache[calId] = { n: total, at: Date.now() };
-    return total;
-  } catch (err) {
-    console.warn('fetchGalleryItemCount', err);
-    return null;
-  }
+  console.warn('fetchGalleryItemCount: GATHER_FIREBASE_SERVICES missing');
+  return null;
 }
 
 async function fetchMemosRest(calId, recentLimit = null) {

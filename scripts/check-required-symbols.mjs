@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const main = readFileSync(resolve(root, 'assets/app-main.js'), 'utf8');
 const utils = readFileSync(resolve(root, 'assets/app-utils.js'), 'utf8');
+const firebaseServices = readFileSync(resolve(root, 'assets/firebase-services.js'), 'utf8');
 
 const requiredInMain = [
   'getPlaceSortDateKey',
@@ -70,5 +71,18 @@ for (const name of requiredInUtils) {
     failed = true;
   }
 }
+const requiredInFirebaseServices = [
+  'fetchChatMessagesRest',
+  'fetchRecentChatMessages',
+  'fetchSubcollectionCount',
+  'fetchOlderChatMessages',
+  'fetchGalleryItemCount'
+];
+for (const name of requiredInFirebaseServices) {
+  if (!hasSymbol(firebaseServices, name)) {
+    console.error(`[check-required-symbols] MISSING in firebase-services.js: ${name}`);
+    failed = true;
+  }
+}
 if (failed) process.exit(1);
-console.log(`[check-required-symbols] OK (${requiredInMain.length} main, ${requiredInUtils.length} utils)`);
+console.log(`[check-required-symbols] OK (${requiredInMain.length} main, ${requiredInUtils.length} utils, ${requiredInFirebaseServices.length} firebase-services)`);
