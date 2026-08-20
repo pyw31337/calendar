@@ -258,3 +258,8 @@ zsh 에서 줄 시작 `#` 주석은 쓰지 말 것.
 - 빈 화면 수정: ES module import 호이스팅으로 window.React 설정이 app-main보다 늦었음
 - src/react-globals.js 추가, app-main이 이를 먼저 import
 - 라이브 assets/ 미변경
+
+## P6-36 진행 (2026-08-20)
+- Vite 프로브: getLocalStorage is not defined (app-notifications)
+- 원인: 클래식 스크립트 공유 스코프 vs ESM 모듈 스코프
+- src/core/app-notifications.js 에 로컬 getLocalStorage 헬퍼 추가 (assets/ 미변경)

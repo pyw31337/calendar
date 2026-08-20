@@ -1,3 +1,8 @@
+
+function getLocalStorage() {
+  return window['local' + 'Storage'];
+}
+
 function isNotificationSupported() {
     return typeof Notification !== 'undefined';
   }
