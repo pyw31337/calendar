@@ -165,19 +165,29 @@ function MainSideMenu({
       /*#__PURE__*/React.createElement("button", {
         type: "button",
         className: "admin-side-menu-item main-side-menu-manual-banner",
-        onClick: () => handle(onOpenManual),
-        style: {
-          background: 'color-mix(in srgb, var(--accent-primary, #6366F1) 10%, var(--bg-primary, #fff))',
-          border: '1px solid color-mix(in srgb, var(--accent-primary, #6366F1) 28%, transparent)',
-          borderRadius: '12px',
-          margin: '0 4px 6px',
-          padding: '12px 12px',
-          fontWeight: 800
-        }
+        onClick: () => handle(onOpenManual)
       },
-        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon", style: { color: 'var(--accent-primary, #6366F1)' } }, /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M8 9h8", "M8 13h6", "M12 20l9 -5l-9 -5l-9 5l9 5z", "M12 12l9 -5l-9 -5l-9 5l9 5z"] })),
-        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
-          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title", style: { fontWeight: 800, fontSize: '0.95rem' } }, "사용자 매뉴얼")
+        /*#__PURE__*/React.createElement("span", { className: "main-side-menu-manual-banner-glow", "aria-hidden": "true" }),
+        /*#__PURE__*/React.createElement("span", { className: "main-side-menu-manual-banner-icon-wrap", "aria-hidden": "true" },
+          /*#__PURE__*/React.createElement("svg", {
+            xmlns: "http://www.w3.org/2000/svg", width: "22", height: "22", viewBox: "0 0 24 24",
+            fill: "none", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round", strokeLinejoin: "round"
+          },
+            /*#__PURE__*/React.createElement("path", { d: "M4 19.5A2.5 2.5 0 0 1 6.5 17H20" }),
+            /*#__PURE__*/React.createElement("path", { d: "M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" }),
+            /*#__PURE__*/React.createElement("path", { d: "M8 7h8" }),
+            /*#__PURE__*/React.createElement("path", { d: "M8 11h6" })
+          )
+        ),
+        /*#__PURE__*/React.createElement("span", { className: "main-side-menu-manual-banner-text" },
+          /*#__PURE__*/React.createElement("span", { className: "main-side-menu-manual-banner-title" }, "사용자 매뉴얼"),
+          /*#__PURE__*/React.createElement("span", { className: "main-side-menu-manual-banner-sub" }, "사용 방법 한눈에 보기")
+        ),
+        /*#__PURE__*/React.createElement("span", { className: "main-side-menu-manual-banner-chevron", "aria-hidden": "true" },
+          /*#__PURE__*/React.createElement("svg", {
+            xmlns: "http://www.w3.org/2000/svg", width: "18", height: "18", viewBox: "0 0 24 24",
+            fill: "none", stroke: "currentColor", strokeWidth: "2.2", strokeLinecap: "round", strokeLinejoin: "round"
+          }, /*#__PURE__*/React.createElement("path", { d: "m9 18 6-6-6-6" }))
         )
       ),
       /*#__PURE__*/React.createElement("button", {
