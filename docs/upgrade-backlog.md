@@ -47,7 +47,8 @@
 ### P4 UI 분리
 - ConfirmDialog ✅ 2026-08-20 (assets/ui-confirm-dialog.js)
 - ShareModal ✅ 2026-08-20 (assets/ui-share-modal.js)
-- SideMenu, Lightbox
+- Lightbox ✅ 2026-08-20 (assets/ui-lightbox.js)
+- SideMenu
 
 ### P5 UX 잔여
 - 공유 URL/OG, 디자인 규칙 누락, 모바일 체크리스트

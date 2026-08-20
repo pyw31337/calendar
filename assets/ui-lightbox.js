@@ -1,0 +1,567 @@
+/**
+ * Lightbox + LightboxInfoPanel (P4-3).
+ */
+(function () {
+function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSearchTag, showToast }) {
+  const React = window.React;
+  const __deps = window.GATHER_UI_DEPS || {};
+  const SmallXIcon = __deps.SmallXIcon;
+  const LinkIcon = __deps.LinkIcon;
+  const ConfirmDialog = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ConfirmDialog) || __deps.ConfirmDialog;
+
+  const tagTokens = String(tags || '').split(/[,\s#]+/).map(t => t.trim()).filter(Boolean);
+  const [tagInput, setTagInput] = React.useState('');
+  const [isSavingTags, setIsSavingTags] = React.useState(false);
+  const [confirmDeleteTag, setConfirmDeleteTag] = React.useState(null);
+  const [isDeletingTag, setIsDeletingTag] = React.useState(false);
+  React.useEffect(() => { setTagInput(''); }, [tags]);
+  if (!info.dateLabel && !info.typeLabel && !onSaveTags) return null;
+  const MAX_TAGS = 10;
+  const handleSaveTags = async () => {
+    if (!onSaveTags || isSavingTags) return;
+    // Parse new tokens from input
+    const newTokens = String(tagInput || '').split(/[,\s#]+/).map(t => t.trim()).filter(Boolean);
+    if (newTokens.length === 0) return;
+    // Merge with existing, deduplicate, enforce limit
+    const merged = Array.from(new Set([...tagTokens, ...newTokens]));
+    if (merged.length > MAX_TAGS) {
+      // Check if any of the new tokens would actually be added
+      const wouldAdd = newTokens.filter(t => !tagTokens.includes(t));
+      if (tagTokens.length >= MAX_TAGS || (tagTokens.length + wouldAdd.length) > MAX_TAGS) {
+        if (typeof showToast === 'function') showToast('태그는 최대 10개 저장 가능', 'error');
+        return;
+      }
+    }
+    const finalTags = merged.slice(0, MAX_TAGS);
+    setIsSavingTags(true);
+    try {
+      const saved = await onSaveTags(finalTags.join(' '));
+      if (saved !== false) setTagInput('');
+    } finally {
+      setIsSavingTags(false);
+    }
+  };
+  const handleConfirmDeleteTag = async () => {
+    if (!onSaveTags || !confirmDeleteTag || isDeletingTag) return;
+    setIsDeletingTag(true);
+    try {
+      await onSaveTags(tagTokens.filter(t => t !== confirmDeleteTag).join(' '));
+    } finally {
+      setIsDeletingTag(false);
+      setConfirmDeleteTag(null);
+    }
+  };
+  const labelStyle = { opacity: 0.7, flexShrink: 0, minWidth: '52px' };
+  return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    className: "lightbox-info-panel",
+    style: {
+      position: 'absolute', left: 0, right: 0, bottom: 0, minWidth: '190px',
+      padding: '14px 14px 12px',
+      background: 'linear-gradient(to top, rgba(0,0,0,0.82), rgba(0,0,0,0.45) 60%, transparent)',
+      borderRadius: '0 0 12px 12px',
+      color: '#FFFFFF', fontSize: '0.76rem', lineHeight: 1.7,
+      display: 'flex', flexDirection: 'column', gap: '4px',
+      pointerEvents: 'auto'
+    },
+    onClick: e => e.stopPropagation()
+  },
+    info.dateLabel && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px' } },
+      /*#__PURE__*/React.createElement("span", { style: labelStyle }, "업로드"),
+      /*#__PURE__*/React.createElement("span", { style: { wordBreak: 'break-all' } }, info.dateLabel)
+    ),
+    info.typeLabel && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' } },
+      /*#__PURE__*/React.createElement("span", { style: labelStyle }, "파일정보"),
+      /*#__PURE__*/React.createElement("span", {
+        style: {
+          display: 'inline-flex', alignItems: 'center', padding: '1px 8px', borderRadius: 'var(--radius-full)',
+          border: '1px solid #FFFFFF', color: '#FFFFFF', fontSize: '0.68rem', fontWeight: 800
+        }
+      }, info.typeLabel),
+      /*#__PURE__*/React.createElement("span", null, "/"),
+      /*#__PURE__*/React.createElement("span", null, info.sizeLabel || '-'),
+      /*#__PURE__*/React.createElement("span", null, "/"),
+      /*#__PURE__*/React.createElement("span", null, info.dimensionLabel || '-')
+    ),
+    /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' } },
+      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', minWidth: 0 } },
+        /*#__PURE__*/React.createElement("span", { style: labelStyle }, "해시태그"),
+        tagTokens.map(tag => /*#__PURE__*/React.createElement("span", {
+          key: tag,
+          className: "lightbox-tag-badge",
+          onClick: () => onSearchTag && onSearchTag(tag),
+          style: {
+            display: 'inline-flex', alignItems: 'center', gap: '6px', borderRadius: 'var(--radius-full)',
+            padding: '3px 4px 3px 10px', fontSize: '0.72rem', fontWeight: 900, lineHeight: 1,
+            border: '1px solid #FFFFFF', color: '#FFFFFF', background: 'transparent',
+            cursor: onSearchTag ? 'pointer' : 'default'
+          }
+        }, `#${tag}`, onSaveTags && /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          title: `#${tag} 태그 삭제`,
+          onClick: e => { e.stopPropagation(); setConfirmDeleteTag(tag); },
+          style: {
+            width: '17px', height: '17px', border: 0, borderRadius: '50%',
+            background: '#FFFFFF', color: '#0F172A', display: 'inline-flex',
+            alignItems: 'center', justifyContent: 'center', padding: 0, cursor: 'pointer',
+            flexShrink: 0
+          }
+        }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 12 }))))
+      ),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "lightbox-url-btn",
+        onClick: () => onOpenUrl && onOpenUrl(),
+        style: {
+          flexShrink: 0, height: '30px', padding: '0 10px', borderRadius: 'var(--radius-full)',
+          border: '1px solid rgba(255,255,255,0.32)', background: 'rgba(255,255,255,0.14)',
+          color: '#FFFFFF', display: 'inline-flex', alignItems: 'center', gap: '5px',
+          cursor: 'pointer', fontSize: '0.72rem', fontWeight: 800, backdropFilter: 'blur(6px)'
+        }
+      }, /*#__PURE__*/React.createElement(LinkIcon, { size: 14 }), "URL")
+    ),
+    onSaveTags && /*#__PURE__*/React.createElement("div", {
+      style: { display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }
+    },
+      /*#__PURE__*/React.createElement("span", { style: labelStyle }, "태그입력"),
+      /*#__PURE__*/React.createElement("input", {
+        type: "text",
+        className: "lightbox-tag-input",
+        value: tagInput,
+        onChange: e => setTagInput(e.target.value),
+        onKeyDown: e => {
+          if (e.nativeEvent.isComposing) return;
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            handleSaveTags();
+          }
+        },
+        placeholder: tagTokens.length >= 10 ? "태그 최대 10개 도달" : `태그 입력 (${tagTokens.length}/10)`,
+        maxLength: 100,
+        style: {
+          flex: 1, minWidth: 0, height: '28px', padding: '0 8px', borderRadius: '6px',
+          border: '1px solid rgba(255,255,255,0.32)', background: 'rgba(255,255,255,0.14)',
+          color: '#FFFFFF', fontSize: '0.74rem'
+        }
+      }),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: handleSaveTags,
+        disabled: isSavingTags || tagTokens.length >= 10,
+        style: {
+          flexShrink: 0, height: '28px', padding: '0 10px', borderRadius: '6px',
+          border: '1px solid rgba(255,255,255,0.32)', background: 'rgba(255,255,255,0.22)',
+          color: '#FFFFFF', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer',
+          opacity: (isSavingTags || tagTokens.length >= 10) ? 0.45 : 1
+        }
+      }, isSavingTags ? '...' : '저장')
+    )
+  ), confirmDeleteTag && /*#__PURE__*/React.createElement(ConfirmDialog, {
+    title: "해시태그 삭제",
+    message: `#${confirmDeleteTag} 태그를 삭제하시겠습니까?`,
+    onConfirm: handleConfirmDeleteTag,
+    onCancel: () => setConfirmDeleteTag(null)
+  }));
+}
+
+function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, onPromoteImageUrl, onSaveImageTags, onSearchTag }) {
+  const React = window.React;
+  const __deps = window.GATHER_UI_DEPS || {};
+  const SmallXIcon = __deps.SmallXIcon;
+  const ImageUrlModal = __deps.ImageUrlModal;
+  const LightboxInfoPanel = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LightboxInfoPanel;
+  const buildLightboxImageInfo = __deps.buildLightboxImageInfo;
+
+  const total = urls.length;
+  const [showInfo, setShowInfo] = React.useState(false);
+  const [imageUrlModalOpen, setImageUrlModalOpen] = React.useState(false);
+  const [imageDimensions, setImageDimensions] = React.useState({});
+  const [displayUrls, setDisplayUrls] = React.useState(urls);
+  const lightboxHistoryRef = React.useRef(false);
+  React.useEffect(() => {
+    try {
+      window.history.pushState({ ...(window.history.state || {}), __moyeoraLightbox: true }, '', window.location.href);
+      lightboxHistoryRef.current = true;
+    } catch (e) {
+      lightboxHistoryRef.current = false;
+    }
+    const handlePopState = () => {
+      lightboxHistoryRef.current = false;
+      onClose();
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      lightboxHistoryRef.current = false;
+    };
+  }, []);
+  const closeLightbox = () => {
+    if (lightboxHistoryRef.current && window.history.state && window.history.state.__moyeoraLightbox) {
+      window.history.back();
+      return;
+    }
+    onClose();
+  };
+  React.useEffect(() => { setDisplayUrls(urls); }, [urls]);
+  React.useEffect(() => { setShowInfo(false); }, [index]);
+  const currentUrl = displayUrls[index] || urls[index];
+  const currentInfo = React.useMemo(
+    () => {
+      const base = buildLightboxImageInfo(currentUrl, meta && meta[index] && meta[index].timestamp);
+      const size = imageDimensions[currentUrl];
+      return {
+        ...base,
+        dimensionLabel: size ? `${size.width} × ${size.height}px` : null
+      };
+    },
+    [currentUrl, index, meta, imageDimensions]
+  );
+  // meta is a static snapshot handed in when the Lightbox was opened (built once from
+  // chatMessages at click time), so it never reflects a tag save/delete that happens while the
+  // Lightbox stays open on the same image -- track successful saves here so the info panel
+  // shows the result immediately instead of only after the Lightbox is closed and reopened.
+  const [tagOverrides, setTagOverrides] = React.useState({});
+  const currentMeta = meta && meta[index];
+  const tagOverrideKey = currentMeta ? `${currentMeta.messageId}_${currentMeta.directMediaUrl ? 'direct' : currentMeta.imageIndex}` : null;
+  const currentTags = (tagOverrideKey && tagOverrideKey in tagOverrides) ? tagOverrides[tagOverrideKey] : (currentMeta?.tags || '');
+  // Mirrors handleSaveImageTags' own parse/dedupe/limit rules so the optimistic override shown
+  // here matches what actually got persisted, without needing the save call to round-trip it.
+  const normalizeTagsForDisplay = text => Array.from(new Set(
+    String(text || '').split(/[,\s#]+/).map(t => t.trim()).filter(Boolean)
+  )).slice(0, 20).join(' ');
+  const saveCurrentTags = onSaveImageTags && currentMeta?.messageId != null
+    ? async tagsText => {
+        const ok = await onSaveImageTags(currentMeta.messageId, currentMeta.imageIndex, tagsText, currentMeta);
+        if (ok && tagOverrideKey) setTagOverrides(prev => ({ ...prev, [tagOverrideKey]: normalizeTagsForDisplay(tagsText) }));
+        return ok;
+      }
+    : null;
+  const ensureCurrentShareUrl = async url => {
+    if (typeof url !== 'string' || !url.startsWith('data:')) return url;
+    if (typeof onPromoteImageUrl !== 'function') throw new Error('No image URL promotion handler');
+    const result = await onPromoteImageUrl({ url, meta: meta && meta[index], index });
+    const nextShareUrl = typeof result === 'string' ? result : result?.shareUrl;
+    const nextImageUrl = typeof result === 'string' ? result : result?.imageUrl;
+    if (nextImageUrl && /^https?:\/\//.test(nextImageUrl)) {
+      setDisplayUrls(prev => prev.map((item, i) => i === index ? nextImageUrl : item));
+    }
+    if (nextShareUrl && /^https?:\/\//.test(nextShareUrl)) {
+      if (showToast) showToast('공유 URL 생성완료', 'success', 3000);
+      return nextShareUrl;
+    }
+    throw new Error('Image URL promotion failed');
+  };
+  const recordImageDimensions = (url, e) => {
+    const img = e.currentTarget;
+    const width = img.naturalWidth;
+    const height = img.naturalHeight;
+    if (!url || !width || !height) return;
+    setImageDimensions(prev => prev[url] ? prev : { ...prev, [url]: { width, height } });
+  };
+  const handleImageTap = e => {
+    e.stopPropagation();
+    if (wasDraggedRef.current) { wasDraggedRef.current = false; return; }
+    setShowInfo(prev => !prev);
+  };
+  const imgAreaRef = React.useRef(null);
+  const widthRef = React.useRef(0);
+  const dragStartXRef = React.useRef(null);
+  const isDraggingRef = React.useRef(false);
+  const wasDraggedRef = React.useRef(false);
+  const pendingNavRef = React.useRef(null);
+  const [dragPx, setDragPx] = React.useState(0);
+  const [transitionOn, setTransitionOn] = React.useState(false);
+  const [isDragging, setIsDragging] = React.useState(false);
+
+  const goTo = i => {
+    if (i < 0 || i >= total || i === index) return;
+    onNavigate(i);
+  };
+  // Adjacent (±1) navigation slides the track by exactly one container-width, same visual
+  // motion as a completed drag -- used by the arrow buttons and arrow keys so every way of
+  // moving between photos feels like the same carousel, not just the drag gesture.
+  const animateToAdjacent = newIndex => {
+    if (newIndex < 0 || newIndex >= total || newIndex === index) return;
+    const el = imgAreaRef.current;
+    if (el) widthRef.current = el.getBoundingClientRect().width;
+    pendingNavRef.current = newIndex;
+    setTransitionOn(true);
+    setDragPx(newIndex > index ? -widthRef.current : widthRef.current);
+  };
+  React.useEffect(() => {
+    const onKeyDown = e => {
+      if (e.key === 'Escape') closeLightbox();
+      else if (e.key === 'ArrowLeft') animateToAdjacent(index - 1);
+      else if (e.key === 'ArrowRight') animateToAdjacent(index + 1);
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [index, total]);
+
+  // Carousel drag: the track visually follows the finger/cursor 1:1 while dragging (dragPx is
+  // the live pixel offset added on top of the centered baseline), then on release either
+  // completes the slide to the adjacent photo or springs back -- both animated the same way,
+  // via a CSS transition on transform. The reset back to dragPx:0 after a completed slide
+  // happens in the same handler as the index change (onTransitionEnd), so the swap is
+  // invisible: the outgoing frame and the reset frame show the same photo in the same spot.
+  const SWIPE_THRESHOLD_RATIO = 0.18;
+  const EDGE_RESISTANCE = 0.35;
+  const dampedDelta = raw => {
+    if (raw > 0 && index === 0) return raw * EDGE_RESISTANCE;
+    if (raw < 0 && index === total - 1) return raw * EDGE_RESISTANCE;
+    return raw;
+  };
+  const handleDragStart = clientX => {
+    if (total <= 1) return;
+    const el = imgAreaRef.current;
+    widthRef.current = el ? el.getBoundingClientRect().width : 0;
+    dragStartXRef.current = clientX;
+    isDraggingRef.current = true;
+    wasDraggedRef.current = false;
+    setTransitionOn(false);
+    setIsDragging(true);
+  };
+  const handleDragMove = clientX => {
+    if (!isDraggingRef.current || dragStartXRef.current == null) return;
+    const raw = clientX - dragStartXRef.current;
+    if (Math.abs(raw) > 5) wasDraggedRef.current = true;
+    setDragPx(dampedDelta(raw));
+  };
+  const handleDragEnd = () => {
+    if (!isDraggingRef.current) return;
+    isDraggingRef.current = false;
+    setIsDragging(false);
+    dragStartXRef.current = null;
+    const width = widthRef.current || 1;
+    const threshold = width * SWIPE_THRESHOLD_RATIO;
+    setTransitionOn(true);
+    setDragPx(current => {
+      if (current <= -threshold && index < total - 1) {
+        pendingNavRef.current = index + 1;
+        return -width;
+      }
+      if (current >= threshold && index > 0) {
+        pendingNavRef.current = index - 1;
+        return width;
+      }
+      pendingNavRef.current = null;
+      return 0;
+    });
+  };
+  // Mouse move/up are tracked at the document level (unlike touchmove/touchend, which keep
+  // firing on their original target even once the finger leaves it) so the drag keeps working
+  // if the cursor leaves the image area mid-drag.
+  React.useEffect(() => {
+    const onMouseMove = e => handleDragMove(e.clientX);
+    const onMouseUp = () => handleDragEnd();
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+    return () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+  }, [index, total]);
+  const handleTrackTransitionEnd = e => {
+    if (e.target !== e.currentTarget || e.propertyName !== 'transform') return;
+    if (pendingNavRef.current == null) return;
+    const next = pendingNavRef.current;
+    pendingNavRef.current = null;
+    setTransitionOn(false);
+    setDragPx(0);
+    onNavigate(next);
+  };
+  const handleOverlayClick = () => {
+    if (wasDraggedRef.current) {
+      wasDraggedRef.current = false;
+      return;
+    }
+    closeLightbox();
+  };
+
+  const renderSlide = (url, slot) => /*#__PURE__*/React.createElement("div", {
+    style: { width: '33.3333%', flexShrink: 0, height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }
+  }, url && (slot === 'current' ? /*#__PURE__*/React.createElement("div", {
+    style: { position: 'relative', display: 'inline-flex', maxWidth: '100%', maxHeight: '100%' },
+    onClick: handleImageTap
+  }, /*#__PURE__*/React.createElement("img", {
+    src: url,
+    alt: "원본 이미지",
+    "data-slide": slot,
+    draggable: false,
+    referrerPolicy: 'no-referrer',
+    onLoad: e => recordImageDimensions(url, e),
+    style: {
+      maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: '12px',
+      display: 'block'
+    }
+  }), showInfo && /*#__PURE__*/React.createElement(LightboxInfoPanel, {
+    info: currentInfo,
+    tags: currentTags,
+    onSaveTags: saveCurrentTags,
+    onSearchTag: onSearchTag,
+    onOpenUrl: () => setImageUrlModalOpen(true),
+    showToast: showToast
+  })) : /*#__PURE__*/React.createElement("img", {
+    src: url,
+    alt: "원본 이미지",
+    "data-slide": slot,
+    draggable: false,
+    referrerPolicy: 'no-referrer',
+    onLoad: e => recordImageDimensions(url, e),
+    onClick: e => e.stopPropagation(),
+    style: {
+      maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: '12px'
+    }
+  })));
+
+  const lightboxNode = /*#__PURE__*/React.createElement("div", {
+    className: "lightbox-overlay",
+    onClick: handleOverlayClick,
+    style: {
+      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+      backgroundColor: 'rgba(15, 23, 42, 0.92)', backdropFilter: 'blur(8px)', zIndex: 50000,
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      width: '100%', maxWidth: '100%', overflow: 'hidden',
+      userSelect: 'none'
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: e => { e.stopPropagation(); closeLightbox(); },
+    "aria-label": "닫기",
+    style: {
+      position: 'absolute', top: '16px', right: '16px',
+      background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.25)',
+      borderRadius: '50%', width: '36px', height: '36px', cursor: 'pointer',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#FFFFFF', zIndex: 9001
+    }
+  }, /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg", width: "18", height: "18", viewBox: "0 0 24 24",
+    fill: "none", stroke: "currentColor", strokeWidth: "2.5", strokeLinecap: "round", strokeLinejoin: "round"
+  }, /*#__PURE__*/React.createElement("line", { x1: "18", y1: "6", x2: "6", y2: "18" }), /*#__PURE__*/React.createElement("line", { x1: "6", y1: "6", x2: "18", y2: "18" }))),
+  total > 1 && index > 0 && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: e => { e.stopPropagation(); animateToAdjacent(index - 1); },
+    "aria-label": "이전 이미지",
+    style: {
+      position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)',
+      background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.25)',
+      borderRadius: '50%', width: '40px', height: '40px', cursor: 'pointer',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#FFFFFF', zIndex: 9001
+    }
+  }, /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg", width: "22", height: "22", viewBox: "0 0 24 24",
+    fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
+  }, /*#__PURE__*/React.createElement("path", { d: "M15 6l-6 6l6 6" }))),
+  total > 1 && index < total - 1 && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: e => { e.stopPropagation(); animateToAdjacent(index + 1); },
+    "aria-label": "다음 이미지",
+    style: {
+      position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)',
+      background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.25)',
+      borderRadius: '50%', width: '40px', height: '40px', cursor: 'pointer',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#FFFFFF', zIndex: 9001
+    }
+  }, /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg", width: "22", height: "22", viewBox: "0 0 24 24",
+    fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
+  }, /*#__PURE__*/React.createElement("path", { d: "M9 6l6 6l-6 6" }))),
+  total > 1 ? /*#__PURE__*/React.createElement("div", {
+    ref: imgAreaRef,
+    onMouseDown: e => handleDragStart(e.clientX),
+    onTouchStart: e => handleDragStart(e.touches[0].clientX),
+    onTouchMove: e => handleDragMove(e.touches[0].clientX),
+    onTouchEnd: handleDragEnd,
+    style: {
+      width: '92vw', height: '82vh', overflow: 'hidden',
+      cursor: isDragging ? 'grabbing' : 'grab'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    onTransitionEnd: handleTrackTransitionEnd,
+    style: {
+      display: 'flex', width: '300%', height: '100%',
+      transform: `translateX(calc(-33.3333% + ${dragPx}px))`,
+      transition: transitionOn ? 'transform 280ms ease' : 'none'
+    }
+  }, renderSlide(index > 0 ? displayUrls[index - 1] : null, 'prev'), renderSlide(currentUrl, 'current'), renderSlide(index < total - 1 ? displayUrls[index + 1] : null, 'next')))
+    : /*#__PURE__*/React.createElement("div", {
+    style: { position: 'relative', display: 'inline-flex', maxWidth: '92vw', maxHeight: '82vh' },
+    onClick: handleImageTap
+  }, /*#__PURE__*/React.createElement("img", {
+    src: currentUrl,
+    alt: "원본 이미지",
+    draggable: false,
+    referrerPolicy: 'no-referrer',
+    onLoad: e => recordImageDimensions(currentUrl, e),
+    style: {
+      maxWidth: '92vw', maxHeight: '82vh', borderRadius: '12px', objectFit: 'contain',
+      display: 'block'
+    }
+  }), showInfo && /*#__PURE__*/React.createElement(LightboxInfoPanel, {
+    info: currentInfo,
+    tags: currentTags,
+    onSaveTags: saveCurrentTags,
+    onSearchTag: onSearchTag,
+    onOpenUrl: () => setImageUrlModalOpen(true),
+    showToast: showToast
+  })),
+  total > 1 && (() => {
+    const maxVisibleDots = 10;
+    const startIdx = total <= maxVisibleDots
+      ? 0
+      : Math.max(0, Math.min(index - Math.floor(maxVisibleDots / 2), total - maxVisibleDots));
+    const endIdx = startIdx + Math.min(total, maxVisibleDots);
+    const visibleIndices = Array.from({ length: endIdx - startIdx }, (_, i) => startIdx + i);
+
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: '6px',
+        marginTop: '16px',
+        zIndex: 9001
+      }
+    },
+      /* Text indicator */
+      /*#__PURE__*/React.createElement("span", {
+        style: { color: 'rgba(255, 255, 255, 0.75)', fontSize: '0.8rem', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }
+      }, `${index + 1} / ${total}`),
+      /* Dots container */
+      /*#__PURE__*/React.createElement("div", {
+        onClick: e => e.stopPropagation(),
+        style: { display: 'flex', alignItems: 'center', gap: '7px' }
+      },
+        startIdx > 0 && /*#__PURE__*/React.createElement("span", {
+          style: { width: '4px', height: '4px', borderRadius: '50%', backgroundColor: 'rgba(255, 255, 255, 0.2)' }
+        }),
+        visibleIndices.map(i => /*#__PURE__*/React.createElement("span", {
+          key: i,
+          onClick: () => goTo(i),
+          style: {
+            width: i === index ? '8px' : '6px',
+            height: i === index ? '8px' : '6px',
+            borderRadius: '50%',
+            cursor: 'pointer',
+            backgroundColor: i === index ? '#FFFFFF' : 'rgba(255, 255, 255, 0.35)',
+            transition: 'all 0.15s'
+          }
+        })),
+        endIdx < total && /*#__PURE__*/React.createElement("span", {
+          style: { width: '4px', height: '4px', borderRadius: '50%', backgroundColor: 'rgba(255, 255, 255, 0.2)' }
+        })
+      )
+    );
+  })(), imageUrlModalOpen && /*#__PURE__*/React.createElement(ImageUrlModal, {
+    imageUrl: currentUrl,
+    onClose: () => setImageUrlModalOpen(false),
+    showToast,
+    onEnsureShareUrl: ensureCurrentShareUrl
+  }));
+  return ReactDOM.createPortal(lightboxNode, document.body);
+}
+
+  window.GATHER_UI_COMPONENTS = Object.assign({}, window.GATHER_UI_COMPONENTS || {}, {
+    LightboxInfoPanel: LightboxInfoPanel,
+    Lightbox: Lightbox
+  });
+})();
