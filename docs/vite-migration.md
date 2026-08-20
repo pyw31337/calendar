@@ -62,3 +62,8 @@ P4 완료 후 기능 동결. P6 Vite 작업만 진행.
 - app-main 구역 지도 + src/core/app-main.js 구역 주석만 추가
 - 라이브 assets/ 미변경
 - p6-2-app-split-prep → main 머지
+
+### P6-2 뷰 마커 반영 (2026-08-20)
+- src/core/app-main.js 에 chat/memo/places/gallery/settlement/admin 주석 추가
+- 라이브 assets/ 미변경
+- p6-2-view-markers → main 머지
