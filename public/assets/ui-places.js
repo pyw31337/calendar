@@ -578,11 +578,20 @@ function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, o
     setFocusPlace({ id: place.id, token: focusTokenRef.current, fromMap });
     requestAnimationFrame(() => {
       try {
-        const root = scrollBodyRef.current || document;
+        const container = scrollBodyRef.current;
+        if (!container) return;
         const safeId = (window.CSS && CSS.escape) ? CSS.escape(String(place.id)) : String(place.id).replace(/"/g, '');
-        const row = root.querySelector('[data-place-id="' + safeId + '"]');
-        if (row && typeof row.scrollIntoView === 'function') {
-          row.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+        const row = container.querySelector('[data-place-id="' + safeId + '"]');
+        if (!row) return;
+        // Align focused row to TOP of list scroll area (just under sticky category tabs)
+        const cRect = container.getBoundingClientRect();
+        const rRect = row.getBoundingClientRect();
+        const pad = 8;
+        const nextTop = container.scrollTop + (rRect.top - cRect.top) - pad;
+        if (typeof container.scrollTo === 'function') {
+          container.scrollTo({ top: Math.max(0, nextTop), behavior: 'smooth' });
+        } else {
+          container.scrollTop = Math.max(0, nextTop);
         }
       } catch (e) {}
     });
