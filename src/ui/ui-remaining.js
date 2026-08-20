@@ -1,8 +1,7 @@
 /**
  * Direct media, deadline picker, places section, image URL (P4-21)
  */
-(function () {
-function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox, linkPreview, style = {}, message = null, stickyVideoKey = null, onReleaseSticky = null }) {
+export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox, linkPreview, style = {}, message = null, stickyVideoKey = null, onReleaseSticky = null }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -206,7 +205,7 @@ function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox, linkPr
   );
 }
 
-function DeadlineDateTimePicker({ value, onChange, disabled, dateOnly = false, placeholder }) {
+export function DeadlineDateTimePicker({ value, onChange, disabled, dateOnly = false, placeholder }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -354,7 +353,7 @@ function DeadlineDateTimePicker({ value, onChange, disabled, dateOnly = false, p
   );
 }
 
-function PlacesSection({ calendar, onViewAll }) {
+export function PlacesSection({ calendar, onViewAll }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -463,7 +462,7 @@ function PlacesSection({ calendar, onViewAll }) {
   );
 }
 
-function ImageUrlModal({ imageUrl, onClose, showToast, onEnsureShareUrl }) {
+export function ImageUrlModal({ imageUrl, onClose, showToast, onEnsureShareUrl }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -553,10 +552,11 @@ function ImageUrlModal({ imageUrl, onClose, showToast, onEnsureShareUrl }) {
   }, isGenerating ? "URL 생성 중..." : "URL 복사하기"))));
 }
 
+  if (typeof window !== 'undefined') {
   window.GATHER_UI_COMPONENTS = Object.assign({}, window.GATHER_UI_COMPONENTS || {}, {
     DirectChatMediaText: DirectChatMediaText,
     DeadlineDateTimePicker: DeadlineDateTimePicker,
     PlacesSection: PlacesSection,
-    ImageUrlModal: ImageUrlModal
+    ImageUrlModal: ImageUrlModal,
   });
-})();
+}

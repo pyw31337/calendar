@@ -161,3 +161,9 @@ zsh 에서 줄 시작 `#` 주석은 쓰지 말 것.
 - ChatGalleryModal
 - 라이브 경로 유지. Pages 전환 아직 금지.
 - 다음: ui-remaining
+
+## P6-20 진행 (2026-08-20)
+- src/ui/ui-remaining.js 를 ESM export (assets/ 미변경)
+- DirectChatMediaText, DeadlineDateTimePicker, PlacesSection, ImageUrlModal
+- 라이브 경로 유지. Pages 전환 아직 금지.
+- 다음: ui-summary-gallery 또는 ui-shared
