@@ -3491,3 +3491,59 @@ textarea.form-input {
 :root:not([data-theme="light"]) a.link-preview-card {
   border-color: var(--border-subtle) !important;
 }
+
+
+/* ===== P6-58 side menu dark + dim + font btn ===== */
+:root[data-theme="dark"] .admin-side-menu-overlay,
+:root:not([data-theme="light"]) .admin-side-menu-overlay,
+:root[data-theme="dark"] .modal-overlay,
+:root:not([data-theme="light"]) .modal-overlay,
+:root[data-theme="dark"] .bottom-sheet-overlay,
+:root:not([data-theme="light"]) .bottom-sheet-overlay {
+  background: #0f172acc !important;
+}
+
+:root[data-theme="dark"] .admin-side-menu-item-icon,
+:root:not([data-theme="light"]) .admin-side-menu-item-icon {
+  background: #1B2540 !important;
+  color: #E2E8F0 !important;
+}
+:root[data-theme="dark"] .admin-side-menu-item:hover .admin-side-menu-item-icon,
+:root[data-theme="dark"] .admin-side-menu-item:focus-visible .admin-side-menu-item-icon,
+:root:not([data-theme="light"]) .admin-side-menu-item:hover .admin-side-menu-item-icon,
+:root:not([data-theme="light"]) .admin-side-menu-item:focus-visible .admin-side-menu-item-icon {
+  background: #243152 !important;
+  color: #F8FAFC !important;
+}
+
+:root[data-theme="dark"] .admin-side-menu-setting-row,
+:root:not([data-theme="light"]) .admin-side-menu-setting-row {
+  color: #E2E8F0 !important;
+}
+:root[data-theme="dark"] .admin-side-menu-setting-label,
+:root:not([data-theme="light"]) .admin-side-menu-setting-label {
+  color: #F1F5F9 !important;
+}
+:root[data-theme="dark"] .admin-side-menu-font-value,
+:root:not([data-theme="light"]) .admin-side-menu-font-value {
+  color: #F1F5F9 !important;
+}
+:root[data-theme="dark"] .admin-side-menu-setting-icon,
+:root:not([data-theme="light"]) .admin-side-menu-setting-icon {
+  background: #1B2540 !important;
+  color: #E2E8F0 !important;
+}
+
+.admin-side-menu-font-btn {
+  line-height: 1 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 !important;
+  text-align: center !important;
+}
+.admin-side-menu-font-btn > * {
+  display: block;
+  line-height: 1;
+  transform: translateY(-0.5px);
+}
