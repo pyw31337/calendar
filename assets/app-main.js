@@ -8794,7 +8794,13 @@ function App() {
       memos: memos,
       asPage: true,
       onClose: () => changeView('calendar'),
-      setActiveLightbox: setActiveLightbox
+      setActiveLightbox: setActiveLightbox,
+      hasMoreOlderChat: hasMoreOlderChat,
+      loadingOlderChat: loadingOlderChat,
+      onLoadOlderChat: loadOlderChatMessages,
+      hasMoreMemos: hasMoreMemos,
+      onLoadMoreMemos: () => setMemosLimit(prev => prev + MEMOS_PAGE_SIZE),
+      totalGalleryCount: totalGalleryCount
     }));
   }
 
@@ -13988,7 +13994,11 @@ function ChatRoomView({
   isChatGalleryOpen && /*#__PURE__*/React.createElement(ChatGalleryModal, {
     chatMessages: chatMessages,
     onClose: () => setIsChatGalleryOpen(false),
-    setActiveLightbox: setActiveLightbox
+    setActiveLightbox: setActiveLightbox,
+    hasMoreOlderChat: hasMoreOlderChat,
+    loadingOlderChat: loadingOlderChat,
+    onLoadOlderChat: onLoadOlderChat,
+    totalGalleryCount: 0
   }),
   isSearchOpen && /*#__PURE__*/React.createElement(InlineSearchBar, {
     fixed: true,
@@ -19341,7 +19351,13 @@ function ChatGalleryModal({
   calendar = null,
   asPage = false,
   onClose,
-  setActiveLightbox
+  setActiveLightbox,
+  hasMoreOlderChat = false,
+  loadingOlderChat = false,
+  onLoadOlderChat = null,
+  hasMoreMemos = false,
+  onLoadMoreMemos = null,
+  totalGalleryCount = 0
 }) {
   const [activeTab, setActiveTab] = React.useState('photos'); // 'photos' | 'links'
   const [searchQuery, setSearchQuery] = React.useState('');
@@ -19457,6 +19473,29 @@ function ChatGalleryModal({
       return matchTags || matchText;
     });
   }, [sharedPhotos, searchQuery]);
+
+  // Search must scan the full history: drain older chat pages (and memo pages) while a query is active.
+  React.useEffect(() => {
+    if (!searchQuery.trim()) return;
+    if (typeof onLoadOlderChat === 'function' && hasMoreOlderChat && !loadingOlderChat) {
+      onLoadOlderChat();
+    }
+    if (typeof onLoadMoreMemos === 'function' && hasMoreMemos) {
+      onLoadMoreMemos();
+    }
+  }, [searchQuery, hasMoreOlderChat, loadingOlderChat, hasMoreMemos, (chatMessages || []).length, (memos || []).length]);
+
+  // Gallery page warm-up: pull older pages until we have a decent grid or history is exhausted.
+  React.useEffect(() => {
+    if (!asPage || (searchQuery || '').trim()) return;
+    if (typeof onLoadOlderChat !== 'function' || !hasMoreOlderChat || loadingOlderChat) return;
+    if ((sharedPhotos || []).length >= 48) return;
+    onLoadOlderChat();
+  }, [asPage, searchQuery, hasMoreOlderChat, loadingOlderChat, (sharedPhotos || []).length]);
+
+  const displayPhotoTabCount = (typeof totalGalleryCount === 'number' && totalGalleryCount > (sharedPhotos || []).length)
+    ? totalGalleryCount
+    : (sharedPhotos || []).length;
 
   const galleryShellStyle = asPage ? {
     position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1005,
@@ -19576,7 +19615,9 @@ function ChatGalleryModal({
       } : {})
     }
   }, [['photos', '사진'], ['links', '링크']].map(tab => {
-    const count = tab[0] === 'photos' ? filteredPhotos.length : filteredLinks.length;
+    const count = tab[0] === 'photos'
+      ? ((searchQuery || '').trim() ? filteredPhotos.length : displayPhotoTabCount)
+      : filteredLinks.length;
     return /*#__PURE__*/React.createElement("button", {
       key: tab[0],
       type: "button",
@@ -19660,7 +19701,25 @@ function ChatGalleryModal({
         backgroundColor: 'var(--bg-primary)',
         display: 'block'
       }
-    })))
+    }))),
+    (hasMoreOlderChat || loadingOlderChat) && !(searchQuery || '').trim() && /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => { if (typeof onLoadOlderChat === 'function' && !loadingOlderChat) onLoadOlderChat(); },
+      disabled: !!loadingOlderChat,
+      style: {
+        width: '100%',
+        marginTop: '4px',
+        padding: '12px 0',
+        border: 'none',
+        borderRadius: '8px',
+        backgroundColor: 'color-mix(in srgb, var(--bg-primary) 96%, black)',
+        color: 'var(--text-main)',
+        fontSize: '0.85rem',
+        fontWeight: 700,
+        cursor: loadingOlderChat ? 'wait' : 'pointer',
+        textAlign: 'center'
+      }
+    }, loadingOlderChat ? '이전 사진을 불러오는 중…' : '이전 사진·링크 더 보기')
   ))));
 }
 
