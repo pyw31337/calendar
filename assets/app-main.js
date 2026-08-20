@@ -11404,11 +11404,33 @@ const formatChatDividerDate = GATHER_APP_UTILS.formatChatDividerDate;
 // by multi-image messages. Empty array when the message has no image at all. Shared by the
 // chat bubble renderer below and the calendar-wide PhotoGallery so both read images the same way.
 function getMessageImageEntries(msg) {
-  const urls = Array.isArray(msg.imageUrls) && msg.imageUrls.length > 0 ? msg.imageUrls : (msg.imageUrl ? [msg.imageUrl] : []);
-  const thumbs = Array.isArray(msg.thumbUrls) && msg.thumbUrls.length > 0 ? msg.thumbUrls : (msg.thumbUrl ? [msg.thumbUrl] : []);
+  // Prefer multi-image arrays; fall back to legacy singular fields.
+  // Do NOT require thumbnails — slimMessageForClient may drop oversized base64 thumbs
+  // while keeping https Storage imageUrls. Requiring thumbs looked like data loss.
+  const urls = Array.isArray(msg.imageUrls) && msg.imageUrls.length > 0
+    ? msg.imageUrls.filter(u => typeof u === 'string' && u)
+    : (typeof msg.imageUrl === 'string' && msg.imageUrl ? [msg.imageUrl] : []);
+  const thumbs = Array.isArray(msg.thumbUrls) && msg.thumbUrls.length > 0
+    ? msg.thumbUrls.filter(u => typeof u === 'string' && u)
+    : (typeof msg.thumbUrl === 'string' && msg.thumbUrl ? [msg.thumbUrl] : []);
   const tags = Array.isArray(msg.imageTags) ? msg.imageTags : [];
-  if (thumbs.length === 0) return [];
-  return thumbs.map((thumb, i) => ({ full: urls[i] || thumb, thumb, imageIndex: i, messageId: msg.id, timestamp: msg.timestamp, tags: tags[i] || '' }));
+  const count = Math.max(urls.length, thumbs.length);
+  if (count === 0) return [];
+  const entries = [];
+  for (let i = 0; i < count; i++) {
+    const full = urls[i] || thumbs[i];
+    const thumb = thumbs[i] || urls[i];
+    if (!full && !thumb) continue;
+    entries.push({
+      full: full || thumb,
+      thumb: thumb || full,
+      imageIndex: i,
+      messageId: msg.id,
+      timestamp: msg.timestamp,
+      tags: tags[i] || ''
+    });
+  }
+  return entries;
 }
 
 function getMessageDirectMediaEntry(msg) {
