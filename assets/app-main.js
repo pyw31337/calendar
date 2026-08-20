@@ -7470,7 +7470,8 @@ function App() {
   }, []);
 
   const handleChatScroll = (e) => {
-    // Keep composer while keyboard is open OR chat textarea is focused (typing).
+    // Keep composer while keyboard open, focused, OR draft text/images exist.
+    // Mobile often blurs the textarea as soon as the message list is scrolled.
     const active = document.activeElement;
     const chatInputFocused = !!(
       active &&
@@ -7478,11 +7479,12 @@ function App() {
       active.closest &&
       (active.closest('.chat-composer') || active.closest('.chat-room-container'))
     );
+    const hasComposerDraft = !!(String(chatInput || '').trim() || (chatImages && chatImages.length > 0));
     const scrollTop = e.target.scrollTop;
     if (scrollTop < 120 && hasMoreOlderChat && !loadingOlderChatRef.current) {
       loadOlderChatMessages();
     }
-    if (isKeyboardOpenRef.current || chatInputFocused) {
+    if (isKeyboardOpenRef.current || chatInputFocused || hasComposerDraft) {
       setIsHeaderVisible(true);
       lastScrollTopRef.current = scrollTop;
       return;
@@ -13177,7 +13179,7 @@ function ChatRoomView({
       zIndex: 1020
     }
   }, /*#__PURE__*/React.createElement(BackArrowIcon, { size: 22 })),
-  !(isHeaderVisible || viewportBottom > 80 || isInputFocused) && /*#__PURE__*/React.createElement("button", {
+  !(isHeaderVisible || viewportBottom > 80 || isInputFocused || !!(chatInput && String(chatInput).trim()) || (chatImages && chatImages.length > 0)) && /*#__PURE__*/React.createElement("button", {
     type: "button",
     className: "chat-keyboard-reopen-btn",
     onClick: () => {
@@ -13484,9 +13486,9 @@ function ChatRoomView({
       padding: '12px 16px',
       zIndex: 1012,
       flexShrink: 0,
-      transform: (isHeaderVisible || viewportBottom > 80 || isInputFocused) ? 'translateY(0)' : 'translateY(calc(100% + 12px))',
-      opacity: (isHeaderVisible || viewportBottom > 80 || isInputFocused) ? 1 : 0,
-      pointerEvents: (isHeaderVisible || viewportBottom > 80 || isInputFocused) ? 'auto' : 'none',
+      transform: (isHeaderVisible || viewportBottom > 80 || isInputFocused || !!(chatInput && String(chatInput).trim()) || (chatImages && chatImages.length > 0)) ? 'translateY(0)' : 'translateY(calc(100% + 12px))',
+      opacity: (isHeaderVisible || viewportBottom > 80 || isInputFocused || !!(chatInput && String(chatInput).trim()) || (chatImages && chatImages.length > 0)) ? 1 : 0,
+      pointerEvents: (isHeaderVisible || viewportBottom > 80 || isInputFocused || !!(chatInput && String(chatInput).trim()) || (chatImages && chatImages.length > 0)) ? 'auto' : 'none',
       transition: 'transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.18s ease, bottom 0.12s ease-out'
     }
   },
@@ -13515,6 +13517,10 @@ function ChatRoomView({
           setTimeout(() => {
             const a = document.activeElement;
             if (a && a.closest && a.closest('.chat-composer')) {
+              setIsInputFocused(true);
+              return;
+            }
+            if ((chatInput && String(chatInput).trim()) || (chatImages && chatImages.length > 0)) {
               setIsInputFocused(true);
               return;
             }
