@@ -53,7 +53,7 @@
 ### P5 UX 잔여
 - P5-1 공유 URL/OG ✅ 2026-08-20 (ShareModal 뷰 타이틀, settlement OG, check:share-urls)
 - P5-2 모바일 체크리스트 ✅ 2026-08-20 (docs/mobile-checklist.md)
-- P5-3 디자인 규칙 누락 점검 (잔여)
+- P5-3 디자인 규칙 누락 점검 ✅ 2026-08-20 (docs/design-rules.md + check:design-rules)
 
 ### P6 Vite (별도 일정)
 ### P7 운영 문서·예산 알림·E2E Action
