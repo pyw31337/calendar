@@ -1,0 +1,1563 @@
+/**
+ * Date modal (schedule popup) (P4-14)
+ */
+(function () {
+function DateModal({
+  anniversaries = [],
+  dateStr,
+  calendar,
+  adminMode = false,
+  onSave,
+  onConfirmMeeting,
+  onSaveExpense,
+  onDeleteExpense,
+  onReorderExpenses,
+  onSavePlace,
+  onDeletePlace,
+  onDelete,
+  onDeleteDate,
+  onRequestConfirm,
+  onClose,
+  showToast,
+  onParticipantClick
+}) {
+  const React = window.React;
+  const __deps = window.GATHER_UI_DEPS || {};
+  const __comp = window.GATHER_UI_COMPONENTS || {};
+  const ResizableModalContainer = __deps.ResizableModalContainer;
+  const AutoGrowTextarea = __deps.AutoGrowTextarea;
+  const FormAddEditActionButtons = __deps.FormAddEditActionButtons;
+  const GamifiedConfirmButtonContent = __deps.GamifiedConfirmButtonContent;
+  const ItemEditDeleteActions = __deps.ItemEditDeleteActions;
+  const LineHeightIcon = __deps.LineHeightIcon;
+  const SegmentedToggle = __deps.SegmentedToggle;
+  const SimpleBottomSheetPicker = __comp.SimpleBottomSheetPicker || __deps.SimpleBottomSheetPicker;
+  const UrlCapsuleBadge = __deps.UrlCapsuleBadge;
+  const SmallXIcon = __deps.SmallXIcon;
+  const getActiveParticipants = __deps.getActiveParticipants;
+  const getCalendarPlaces = __deps.getCalendarPlaces;
+  const getPlaceCategories = __deps.getPlaceCategories;
+  const extractLeadingMemoDate = __deps.extractLeadingMemoDate;
+  const parseVisitEntriesFromMemo = __deps.parseVisitEntriesFromMemo;
+  const sortVisitEntriesRecentFirst = __deps.sortVisitEntriesRecentFirst;
+  const normalizePlaceAddress = __deps.normalizePlaceAddress;
+  const normalizePlaceDateForSort = __deps.normalizePlaceDateForSort;
+  const renderTextWithUrlBadge = __deps.renderTextWithUrlBadge;
+  const sanitizeText = __deps.sanitizeText;
+  const autoGrowTextarea = __deps.autoGrowTextarea;
+  const getPlaceCategoryIcon = __deps.getPlaceCategoryIcon;
+  const fetchWithTimeout = __deps.fetchWithTimeout;
+  const firebaseConfig = __deps.firebaseConfig || window.firebaseConfig;
+  const KAKAO_CATEGORY_GROUP_TO_PLACE_CATEGORY = __deps.KAKAO_CATEGORY_GROUP_TO_PLACE_CATEGORY || {};
+
+  const [activeTab, setActiveTab] = React.useState('participant'); // 'participant' | 'meeting' | 'settlement'
+  const [participantId, setParticipantId] = React.useState('');
+  const [note, setNote] = React.useState('');
+  const [isSheetOpen, setIsSheetOpen] = React.useState(false);
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const noteInputRef = React.useRef(null);
+  const activeParticipants = getActiveParticipants(calendar);
+  const dateEntries = getActiveAvailabilities(calendar).filter(e => e.date === dateStr);
+  const dateAnns = getAnniversariesForDate(dateStr, anniversaries);
+  const getExistingNoteForParticipant = id => (dateEntries.find(entry => entry.participantId === id)?.note || '');
+
+  const selectedPart = activeParticipants.find(p => p.id === participantId);
+  const selectedPartName = selectedPart ? selectedPart.name : '';
+  const selectedPartColor = selectedPart ? selectedPart.color : '#94A3B8';
+
+  // Place state
+  const [placeQuery, setPlaceQuery] = React.useState('');
+  const [placeResults, setPlaceResults] = React.useState([]);
+  const [selectedPlace, setSelectedPlace] = React.useState(null);
+  const [placeMemo, setPlaceMemo] = React.useState('');
+  const [placeAlias, setPlaceAlias] = React.useState('');
+  const [placeCategoryId, setPlaceCategoryId] = React.useState(() => getPlaceCategories(calendar)[0]?.id || 'etc');
+  const [placeVisitStatus, setPlaceVisitStatus] = React.useState('visited');
+  const [editingLinkedPlaceId, setEditingLinkedPlaceId] = React.useState(null);
+  const [isPlaceLoading, setIsPlaceLoading] = React.useState(false);
+  const [isPlaceCollapsed, setIsPlaceCollapsed] = React.useState(true);
+  const [placeSearchStage, setPlaceSearchStage] = React.useState(null);
+  const [isSavingPlace, setIsSavingPlace] = React.useState(false);
+
+  // Search progress simulation states
+  const [searchProgress, setSearchProgress] = React.useState(0);
+  const [estRemainingSeconds, setEstRemainingSeconds] = React.useState(5);
+
+  React.useEffect(() => {
+    if (!isPlaceLoading) {
+      setSearchProgress(0);
+      setEstRemainingSeconds(5);
+      return;
+    }
+    setSearchProgress(5);
+    setEstRemainingSeconds(5);
+    const startTime = Date.now();
+    const targetDuration = 5000;
+    const interval = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      const progressValue = Math.min(Math.round(98 * (1 - Math.exp(-elapsed / 2200))), 98);
+      const remaining = Math.max(1, Math.round((targetDuration - elapsed) / 1000));
+      setSearchProgress(progressValue);
+      setEstRemainingSeconds(remaining);
+    }, 100);
+    return () => clearInterval(interval);
+  }, [isPlaceLoading]);
+
+  // Registered places for this date
+  const registeredPlaces = React.useMemo(() => {
+    return getCalendarPlaces(calendar).filter(p => doesPlaceMatchDate(p, dateStr));
+  }, [calendar, dateStr]);
+
+  // Debounced live typing search
+  React.useEffect(() => {
+    const trimmed = placeQuery.trim();
+    if (selectedPlace && selectedPlace.name === trimmed) return undefined;
+    if (trimmed.length < 2) {
+      setPlaceResults([]);
+      return undefined;
+    }
+    const timer = setTimeout(() => { handlePlaceSearch(null, true); }, 380);
+    return () => clearTimeout(timer);
+  }, [placeQuery, selectedPlace]);
+
+  React.useEffect(() => {
+    setParticipantId('');
+    setNote('');
+    setIsSheetOpen(false);
+    setIsSubmitting(false);
+
+    setSelectedPlace(null);
+    setPlaceMemo('');
+    setPlaceAlias('');
+    setPlaceCategoryId(getPlaceCategories(calendar)[0]?.id || 'etc');
+    setPlaceVisitStatus('visited');
+    setEditingLinkedPlaceId(null);
+    setPlaceQuery('');
+    setIsPlaceCollapsed(true);
+    setPlaceResults([]);
+  }, [calendar?.id, dateStr]);
+
+  const handlePlaceSearch = async (e, auto = false) => {
+    if (e) e.preventDefault();
+    const cleanQuery = placeQuery.trim();
+    if (!cleanQuery) {
+      if (!auto) showToast('검색할 주소나 업체명을 입력해 주세요.', 'error');
+      return;
+    }
+    setIsPlaceLoading(true);
+    if (!auto) setPlaceSearchStage('kakao');
+    try {
+      let mapped = [];
+      try {
+        const kakaoUrl = `https://us-central1-${firebaseConfig.projectId}.cloudfunctions.net/kakaoLocalSearchProxy?query=${encodeURIComponent(cleanQuery)}`;
+        const kakaoRes = await fetchWithTimeout(kakaoUrl, 6000);
+        const kakaoJson = kakaoRes.ok ? await kakaoRes.json() : null;
+        if (kakaoJson?.ok && Array.isArray(kakaoJson.documents)) {
+          mapped = kakaoJson.documents.map((doc, idx) => ({
+            id: `kakao_${doc.id || idx}`,
+            name: doc.place_name || cleanQuery,
+            address: doc.road_address_name || doc.address_name || '',
+            lat: parseFloat(doc.y),
+            lng: parseFloat(doc.x),
+            categoryId: KAKAO_CATEGORY_GROUP_TO_PLACE_CATEGORY[doc.category_group_code] || null,
+            categoryLabel: doc.category_name || '',
+            phone: doc.phone || '',
+            url: doc.place_url || ''
+          })).filter(r => Number.isFinite(r.lat) && Number.isFinite(r.lng));
+        }
+      } catch (err) {
+        console.error('Kakao local search failed, falling back to Google Places:', err);
+      }
+      if (mapped.length === 0 && !auto) {
+        setPlaceSearchStage('google');
+        try {
+          const googleUrl = `https://us-central1-${firebaseConfig.projectId}.cloudfunctions.net/googlePlacesSearchProxy?query=${encodeURIComponent(cleanQuery)}`;
+          const googleRes = await fetchWithTimeout(googleUrl, 6000);
+          const googleJson = googleRes.ok ? await googleRes.json() : null;
+          if (googleJson?.ok && Array.isArray(googleJson.places)) {
+            mapped = googleJson.places.map((p, idx) => ({
+              id: `google_${p.id || idx}`,
+              name: p.displayName?.text || cleanQuery,
+              address: p.formattedAddress || '',
+              lat: parseFloat(p.location?.latitude),
+              lng: parseFloat(p.location?.longitude),
+              categoryId: null,
+              categoryLabel: '', phone: '', url: ''
+            })).filter(r => Number.isFinite(r.lat) && Number.isFinite(r.lng));
+          }
+        } catch (err) {
+          console.error('Google Places search failed, falling back to Nominatim:', err);
+        }
+      }
+      if (mapped.length === 0 && !auto) {
+        setPlaceSearchStage('nominatim');
+        const res = await fetchWithTimeout(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(cleanQuery)}&format=json&limit=8&accept-language=ko`, 6000);
+        const data = res.ok ? await res.json() : [];
+        mapped = data.map((doc, idx) => ({
+          id: `osm_${doc.place_id || idx}`,
+          name: doc.display_name?.split(',')[0] || cleanQuery,
+          address: doc.display_name || '',
+          lat: parseFloat(doc.lat),
+          lng: parseFloat(doc.lon),
+          categoryId: null,
+          categoryLabel: '', phone: '', url: ''
+        })).filter(r => Number.isFinite(r.lat) && Number.isFinite(r.lng));
+      }
+      setPlaceResults(mapped);
+      if (mapped.length === 0 && !auto) {
+        showToast('검색 결과가 없습니다.', 'info');
+      }
+    } catch (err) {
+      console.error('Place search error:', err);
+      showToast('장소 검색 중 오류가 발생했습니다.', 'error');
+    } finally {
+      setIsPlaceLoading(false);
+      setPlaceSearchStage(null);
+    }
+  };
+
+  const handleSavePlaceClick = async () => {
+    if (!onSavePlace) return;
+    if (!selectedPlace) {
+      showToast('추가할 장소를 선택해 주세요.', 'error');
+      return;
+    }
+    setIsSavingPlace(true);
+    try {
+      const isConfirmed = isDateConfirmedMeeting(calendar, dateStr);
+      const cleanName = sanitizeText(selectedPlace.name || '', 80);
+      const cleanAddress = normalizePlaceAddressForSave(selectedPlace.address || '', selectedPlace.lat, selectedPlace.lng);
+      const cleanMemo = sanitizeText(placeMemo.trim() || '', 2000);
+      
+      const newPlaceData = {
+        id: editingLinkedPlaceId || undefined,
+        name: cleanName,
+        alias: sanitizeText(placeAlias || '', 80),
+        address: cleanAddress,
+        lat: selectedPlace.lat,
+        lng: selectedPlace.lng,
+        categoryId: placeCategoryId || selectedPlace.categoryId || 'etc',
+        memo: cleanMemo,
+        visitStatus: placeVisitStatus === 'planned' ? 'planned' : 'visited',
+        visitDate: dateStr
+      };
+
+      const ok = await Promise.resolve(onSavePlace(newPlaceData));
+      if (ok === false) {
+        showToast(editingLinkedPlaceId ? '장소 수정에 실패했습니다.' : '장소 추가에 실패했습니다.', 'error');
+        return;
+      }
+      showToast(editingLinkedPlaceId ? '장소가 수정되었습니다.' : '장소가 추가되었습니다.', 'success');
+      setSelectedPlace(null);
+      setPlaceMemo('');
+      setPlaceAlias('');
+      setPlaceCategoryId(getPlaceCategories(calendar)[0]?.id || 'etc');
+      setPlaceVisitStatus('visited');
+      setEditingLinkedPlaceId(null);
+      setPlaceQuery('');
+    } catch (err) {
+      console.error('Save place error:', err);
+      showToast('장소 추가 실패', 'error');
+    } finally {
+      setIsSavingPlace(false);
+    }
+  };
+
+  const handleSelectResult = (res) => {
+    setSelectedPlace(res);
+    setPlaceQuery(res.name);
+    setPlaceResults([]);
+  };
+
+  const handleSubmit = async (e) => {
+    if (e) e.preventDefault();
+    if (!participantId) {
+      showToast('참여자를 선택해 주세요.', 'error');
+      return;
+    }
+    setIsSubmitting(true);
+    const cleanNote = sanitizeText(note, 60);
+    const ok = await onSave(dateStr, participantId, cleanNote);
+    setIsSubmitting(false);
+    if (ok !== false) {
+      const wasEdit = dateEntries.some(en => en.participantId === participantId);
+      showToast(wasEdit ? '참석 정보가 수정되었습니다.' : '참석이 추가되었습니다.', 'success');
+      setParticipantId('');
+      setNote('');
+    }
+  };
+
+  const handleEditClick = (entry) => {
+    setParticipantId(entry.participantId);
+    setNote(entry.note || '');
+    if (noteInputRef.current) {
+      noteInputRef.current.focus();
+    }
+  };
+
+  const handleDeleteClick = (entry) => {
+    if (!onDelete) return;
+    const part = activeParticipants.find(p => p.id === entry.participantId);
+    const nameLabel = part ? part.name : '참여자';
+    onRequestConfirm('참석 삭제', `"${nameLabel}"님의 참석 기록을 삭제하시겠습니까?`, async () => {
+      setIsSubmitting(true);
+      const ok = await onDelete(dateStr, entry.participantId);
+      setIsSubmitting(false);
+      if (ok !== false) showToast('참석 기록이 삭제되었습니다.', 'success');
+      else showToast('삭제에 실패했습니다.', 'error');
+    });
+  };
+
+  const handleClearAllDate = () => {
+    if (!onDeleteDate) return;
+    onRequestConfirm('날짜 초기화', `${getDeleteDateLabel(dateStr)}의 모든 참석/장소/정산 내역을 삭제하고 선택 가능 날짜에서 제외하시겠습니까?`, async () => {
+      setIsSubmitting(true);
+      await onDeleteDate(dateStr);
+      setIsSubmitting(false);
+      showToast('날짜가 초기화되었습니다.', 'success');
+      onClose();
+    });
+  };
+
+  const titleParts = getShortTitleParts(dateStr);
+  const getDeleteDateLabel = dateStr => `${titleParts.year}${titleParts.rest}`;
+  const holidayNames = React.useMemo(() => getHolidayNamesForDate(dateStr), [dateStr]);
+  const holidayLabelText = holidayNames.length > 0 ? holidayNames.join('·') : '';
+  const totalPartCount = activeParticipants.length || 0;
+  const uniqueActiveParts = new Set(dateEntries.map(e => e.participantId));
+  const isAllAvailable = totalPartCount > 0 && uniqueActiveParts.size === totalPartCount;
+  const isConfirmed = isDateConfirmedMeeting(calendar, dateStr);
+  const confirmedMeetingEntry = getConfirmedMeetings(calendar).find(m => m.date === dateStr) || null;
+  const expenses = React.useMemo(
+    () => (Array.isArray(confirmedMeetingEntry?.expenses) ? confirmedMeetingEntry.expenses : [])
+      .filter(e => e && typeof e === 'object' && e.id)
+      .slice()
+      .sort((a, b) => {
+      const aOrder = Number.isFinite(Number(a.order)) ? Number(a.order) : Number.POSITIVE_INFINITY;
+      const bOrder = Number.isFinite(Number(b.order)) ? Number(b.order) : Number.POSITIVE_INFINITY;
+      if (aOrder !== bOrder) return aOrder - bOrder;
+      return (a.createdAt || 0) - (b.createdAt || 0);
+    }),
+    [confirmedMeetingEntry]
+  );
+  const [expenseLabelInput, setExpenseLabelInput] = React.useState('');
+  const [expenseAmountInput, setExpenseAmountInput] = React.useState('');
+  const [expenseCategoryInput, setExpenseCategoryInput] = React.useState(() => getExpenseCategories(calendar)[0]?.id || 'etc');
+  const [expenseIsIncome, setExpenseIsIncome] = React.useState(false);
+  const [editingExpenseId, setEditingExpenseId] = React.useState(null);
+  const [isSavingExpense, setIsSavingExpense] = React.useState(false);
+  const [isSettlementCollapsed, setIsSettlementCollapsed] = React.useState(true);
+  const [draggingExpenseId, setDraggingExpenseId] = React.useState('');
+  const [dragOverExpenseId, setDragOverExpenseId] = React.useState('');
+  const expensePointerSortRef = React.useRef({ sourceId: '', targetId: '', startX: 0, startY: 0, active: false });
+
+  React.useEffect(() => {
+    setExpenseLabelInput('');
+    setExpenseAmountInput('');
+    setExpenseCategoryInput(getExpenseCategories(calendar)[0]?.id || 'etc');
+    setExpenseIsIncome(false);
+    setEditingExpenseId(null);
+    setDraggingExpenseId('');
+    setDragOverExpenseId('');
+    expensePointerSortRef.current = { sourceId: '', targetId: '', startX: 0, startY: 0, active: false };
+  }, [calendar?.id, dateStr]);
+
+  const expenseTotal = expenses.reduce((sum, e) => sum + (Number(e?.amount) || 0), 0);
+  const expenseCategories = getExpenseCategories(calendar) || [];
+  const getExpenseUrl = expense => {
+    try {
+      const labelStr = typeof expense?.label === 'string' ? expense.label : String(expense?.label || '');
+      return sanitizeText(expense?.url || extractFirstUrl(labelStr) || '', 220);
+    } catch (_) {
+      return '';
+    }
+  };
+  const getExpenseLabel = expense => {
+    try {
+      const raw = typeof expense?.label === 'string' ? expense.label : String(expense?.label || '');
+      const url = getExpenseUrl(expense);
+      return url ? raw.replace(url, '').trim() : raw;
+    } catch (_) {
+      return String(expense?.label || '');
+    }
+  };
+  const handleExpenseItemClick = expense => {
+    if (isSavingExpense) return;
+    setEditingExpenseId(expense.id);
+    setExpenseLabelInput(getExpenseLabel(expense));
+    setExpenseIsIncome(Number(expense.amount) < 0);
+    setExpenseAmountInput(Math.abs(Number(expense.amount)).toLocaleString());
+    setExpenseCategoryInput(expense.categoryId || 'etc');
+  };
+  const handleSaveExpenseClick = async () => {
+    if (!onSaveExpense) return;
+    const label = expenseLabelInput.trim();
+    if (!label) {
+      showToast('내역을 입력해 주세요.', 'error');
+      return;
+    }
+    const cleanAmount = Number(expenseAmountInput.replace(/[^0-9]/g, ''));
+    if (!cleanAmount) {
+      showToast('금액을 입력해 주세요.', 'error');
+      return;
+    }
+    setIsSavingExpense(true);
+    const finalAmount = expenseIsIncome ? -cleanAmount : cleanAmount;
+    const ok = await onSaveExpense(dateStr, {
+      id: editingExpenseId || undefined,
+      label,
+      amount: finalAmount,
+      categoryId: expenseCategoryInput
+    });
+    setIsSavingExpense(false);
+    if (ok !== false) {
+      showToast(editingExpenseId ? '정산 내역이 수정되었습니다.' : '정산 내역이 추가되었습니다.', 'success');
+      setEditingExpenseId(null);
+      setExpenseLabelInput('');
+      setExpenseAmountInput('');
+      setExpenseIsIncome(false);
+    }
+  };
+  const handleDeleteExpenseClick = (e, expenseId) => {
+    e.stopPropagation();
+    if (!onDeleteExpense) return;
+    const target = expenses.find(exp => exp.id === expenseId);
+    const rawLabel = String(target?.label || target?.url || '').trim();
+    const shortLabel = rawLabel.length > 24 ? rawLabel.slice(0, 24) + '…' : rawLabel;
+    const kind = Number(target?.amount) < 0 ? '수입' : '지출';
+    const message = shortLabel
+      ? `"${shortLabel}" ${kind} 내역을 삭제하시겠습니까?`
+      : `이 ${kind} 내역을 삭제하시겠습니까?`;
+    // Confirm once only — parent handler must not show another dialog.
+    onRequestConfirm('정산 내역 삭제', message, async () => {
+      setIsSavingExpense(true);
+      const ok = await onDeleteExpense(dateStr, expenseId);
+      setIsSavingExpense(false);
+      if (ok === false) {
+        showToast('삭제에 실패했습니다.', 'error');
+        return;
+      }
+      showToast('정산 내역이 삭제되었습니다.', 'success');
+      if (editingExpenseId === expenseId) {
+        setEditingExpenseId(null);
+        setExpenseLabelInput('');
+        setExpenseAmountInput('');
+      }
+    });
+  };
+    const moveExpense = async (sourceId, targetId) => {
+    if (!onReorderExpenses || !sourceId || !targetId || sourceId === targetId) return false;
+    const sourceIdx = expenses.findIndex(e => e.id === sourceId);
+    const targetIdx = expenses.findIndex(e => e.id === targetId);
+    if (sourceIdx < 0 || targetIdx < 0) return false;
+    const nextExpenses = [...expenses];
+    const [moved] = nextExpenses.splice(sourceIdx, 1);
+    nextExpenses.splice(targetIdx, 0, moved);
+    const orderedIds = nextExpenses.map(exp => exp.id);
+    const result = await Promise.resolve(onReorderExpenses(dateStr, orderedIds));
+    return result !== false;
+  };
+
+  const expensesOrderRef = React.useRef(expenses);
+  expensesOrderRef.current = expenses;
+  const expenseDragHandlersRef = React.useRef({});
+
+  expenseDragHandlersRef.current.update = e => {
+    const ref = expensePointerSortRef.current;
+    if (!ref.active) return;
+    if (e.cancelable) e.preventDefault();
+    const deltaY = e.clientY - ref.startY;
+    const row = document.querySelector(`.expense-sortable-row[data-expense-id="${ref.sourceId}"]`);
+    if (row) {
+      row.style.transform = `translateY(${deltaY}px) scale(1.02)`;
+      row.style.pointerEvents = 'none';
+    }
+    // elementFromPoint 대신 각 행의 세로 영역으로 타겟 판정
+    const rows = Array.from(document.querySelectorAll('.date-modal-settlement-list .expense-sortable-row'));
+    let nextTargetId = '';
+    for (const r of rows) {
+      const id = r.getAttribute('data-expense-id');
+      if (!id || id === ref.sourceId) continue;
+      const rect = r.getBoundingClientRect();
+      if (e.clientY >= rect.top && e.clientY <= rect.bottom) {
+        nextTargetId = id;
+        break;
+      }
+    }
+    if (nextTargetId !== ref.targetId) {
+      if (ref.targetId) {
+        const prev = document.querySelector(`.expense-sortable-row[data-expense-id="${ref.targetId}"]`);
+        if (prev) prev.style.borderColor = 'var(--border-subtle)';
+      }
+      ref.targetId = nextTargetId;
+      if (nextTargetId) {
+        const next = document.querySelector(`.expense-sortable-row[data-expense-id="${nextTargetId}"]`);
+        if (next) next.style.borderColor = 'var(--accent-primary)';
+      }
+      setDragOverExpenseId(nextTargetId || '');
+    }
+  };
+
+  expenseDragHandlersRef.current.finish = async () => {
+    const ref = expensePointerSortRef.current;
+    if (!ref.active) return;
+    const sourceId = ref.sourceId;
+    const targetId = ref.targetId;
+    document.removeEventListener('pointermove', expenseDragHandlersRef.current.onMove);
+    document.removeEventListener('pointerup', expenseDragHandlersRef.current.onUp);
+    document.removeEventListener('pointercancel', expenseDragHandlersRef.current.onCancel);
+    ref.active = false;
+    const row = document.querySelector(`.expense-sortable-row[data-expense-id="${sourceId}"]`);
+    if (row) {
+      row.style.zIndex = '';
+      row.style.boxShadow = '';
+      row.style.transform = '';
+      row.style.transition = '';
+      row.style.pointerEvents = '';
+      row.style.opacity = '';
+    }
+    if (targetId) {
+      const targetRow = document.querySelector(`.expense-sortable-row[data-expense-id="${targetId}"]`);
+      if (targetRow) targetRow.style.borderColor = 'var(--border-subtle)';
+    }
+    setDraggingExpenseId('');
+    setDragOverExpenseId('');
+    expensePointerSortRef.current = { sourceId: '', targetId: '', startX: 0, startY: 0, active: false };
+    if (sourceId && targetId && sourceId !== targetId) {
+      setIsSavingExpense(true);
+      try {
+        const ok = await moveExpense(sourceId, targetId);
+        if (ok === false) showToast('순서 변경에 실패했습니다.', 'error');
+        else showToast('순서가 변경되었습니다.', 'success');
+      } finally {
+        setIsSavingExpense(false);
+      }
+    }
+  };
+
+  expenseDragHandlersRef.current.reset = () => {
+    const ref = expensePointerSortRef.current;
+    document.removeEventListener('pointermove', expenseDragHandlersRef.current.onMove);
+    document.removeEventListener('pointerup', expenseDragHandlersRef.current.onUp);
+    document.removeEventListener('pointercancel', expenseDragHandlersRef.current.onCancel);
+    const sourceId = ref.sourceId;
+    const targetId = ref.targetId;
+    ref.active = false;
+    const row = document.querySelector(`.expense-sortable-row[data-expense-id="${sourceId}"]`);
+    if (row) {
+      row.style.zIndex = '';
+      row.style.boxShadow = '';
+      row.style.transform = '';
+      row.style.transition = '';
+      row.style.pointerEvents = '';
+      row.style.opacity = '';
+    }
+    if (targetId) {
+      const targetRow = document.querySelector(`.expense-sortable-row[data-expense-id="${targetId}"]`);
+      if (targetRow) targetRow.style.borderColor = 'var(--border-subtle)';
+    }
+    setDraggingExpenseId('');
+    setDragOverExpenseId('');
+    expensePointerSortRef.current = { sourceId: '', targetId: '', startX: 0, startY: 0, active: false };
+  };
+
+  expenseDragHandlersRef.current.onMove = e => expenseDragHandlersRef.current.update(e);
+  expenseDragHandlersRef.current.onUp = e => expenseDragHandlersRef.current.finish(e);
+  expenseDragHandlersRef.current.onCancel = () => expenseDragHandlersRef.current.reset();
+
+  const beginExpensePointerSort = (e, expenseId) => {
+    if (isSavingExpense || expenses.length <= 1) return;
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) {}
+    const row = e.currentTarget.closest('.expense-sortable-row');
+    if (!row) return;
+    row.style.zIndex = '1000';
+    row.style.boxShadow = '0 8px 20px rgba(0,0,0,0.12)';
+    row.style.transform = 'scale(1.02)';
+    row.style.transition = 'none';
+    row.style.pointerEvents = 'none';
+    row.style.opacity = '0.92';
+    expensePointerSortRef.current = {
+      sourceId: expenseId, targetId: '', startX: e.clientX, startY: e.clientY, active: true, pointerId: e.pointerId
+    };
+    setDraggingExpenseId(expenseId);
+    setDragOverExpenseId('');
+    document.addEventListener('pointermove', expenseDragHandlersRef.current.onMove, { passive: false });
+    document.addEventListener('pointerup', expenseDragHandlersRef.current.onUp);
+    document.addEventListener('pointercancel', expenseDragHandlersRef.current.onCancel);
+  };
+  const updateExpensePointerSort = e => expenseDragHandlersRef.current.update(e);
+  const finishExpensePointerSort = e => expenseDragHandlersRef.current.finish(e);
+  const resetExpensePointerSort = () => expenseDragHandlersRef.current.reset();
+
+  const [hasInteracted, setHasInteracted] = React.useState(false);
+  const markDirty = React.useCallback(() => setHasInteracted(true), []);
+  const requestClose = () => {
+    if (isSubmitting) return;
+    const dirty = hasInteracted || !!participantId || !!String(note || '').trim() || !!selectedPlace || !!String(placeMemo || '').trim() || !!String(expenseLabelInput || '').trim() || !!String(expenseAmountInput || '').trim() || !!editingExpenseId;
+    if (dirty && typeof onRequestConfirm === 'function') {
+      onRequestConfirm('닫기 확인', '수정 내용이 있는데 닫으시겠습니까?', () => onClose());
+      return;
+    }
+    onClose();
+  };
+
+  const portalContent = /*#__PURE__*/React.createElement("div", {
+    className: "modal-overlay",
+    onClick: e => {
+      if (e.target !== e.currentTarget) return;
+      requestClose();
+    },
+    style: { zIndex: 11000 }
+  }, /*#__PURE__*/React.createElement(ResizableModalContainer, {
+    className: "modal-container",
+    onClick: e => e.stopPropagation()
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "modal-header",
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      padding: '14px 20px',
+      borderBottom: '1px solid var(--border-subtle)'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'baseline',
+      gap: '8px'
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: '1.25rem',
+      fontWeight: 900,
+      color: 'var(--text-main)'
+    }
+  }, titleParts.year, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: isConfirmed ? '#7C3AED' : (isAllAvailable ? '#10B981' : 'var(--text-muted)'),
+      marginLeft: '4px'
+    }
+  }, titleParts.rest)), holidayLabelText && /*#__PURE__*/React.createElement("span", {
+    className: "holiday-tag",
+    style: {
+      fontSize: '0.72rem',
+      fontWeight: 'bold',
+      padding: '3px 8px',
+      borderRadius: '6px',
+      backgroundColor: '#FEF2F2',
+      color: '#EF4444',
+      border: '1px solid #FEE2E2',
+      verticalAlign: 'middle'
+    }
+  }, holidayLabelText)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '12px'
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => {
+      if (!isSubmitting) requestClose();
+    },
+    style: {
+      background: 'none',
+      border: 'none',
+      color: '#64748B',
+      fontSize: '1.25rem',
+      cursor: 'pointer',
+      display: 'flex',
+      alignItems: 'center',
+      padding: '2px 4px',
+      marginLeft: '4px'
+    },
+    title: "닫기"
+  }, "✕"))), /*#__PURE__*/React.createElement("form", {
+    onSubmit: e => {
+      e.preventDefault();
+      if (activeTab === 'participant') handleSubmit(e);
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "modal-body"
+  },
+    /* Tab Bar Menu: 참여자 / 모임 / 정산 */
+    /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr 1fr',
+        gap: '6px',
+        borderBottom: '1px solid var(--border-subtle)',
+        paddingBottom: '12px',
+        marginBottom: '14px'
+      }
+    },
+      /* Tab 1: 참여자 */
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: e => { e.preventDefault(); e.stopPropagation(); setActiveTab('participant'); },
+        style: {
+          border: 'none',
+          borderRadius: '8px',
+          padding: '8px 4px',
+          background: activeTab === 'participant' ? 'var(--accent-primary)' : 'transparent',
+          color: activeTab === 'participant' ? '#FFFFFF' : 'var(--text-muted)',
+          fontWeight: 800,
+          fontSize: '0.82rem',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '4px'
+        }
+      },
+        "참여자",
+        /*#__PURE__*/React.createElement("span", {
+          style: {
+            fontSize: '0.7rem',
+            padding: '1px 5px',
+            borderRadius: '999px',
+            backgroundColor: activeTab === 'participant' ? 'rgba(255,255,255,0.2)' : 'var(--border-subtle)',
+            color: activeTab === 'participant' ? '#FFFFFF' : 'var(--text-muted)',
+            fontWeight: 'bold'
+          }
+        }, dateEntries.length > 0 ? dateEntries.length : '없음')
+      ),
+      /* Tab 2: 장소 */
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: e => { e.preventDefault(); e.stopPropagation(); setActiveTab('meeting'); },
+        style: {
+          border: 'none',
+          borderRadius: '8px',
+          padding: '8px 4px',
+          background: activeTab === 'meeting' ? 'var(--accent-primary)' : 'transparent',
+          color: activeTab === 'meeting' ? '#FFFFFF' : 'var(--text-muted)',
+          fontWeight: 800,
+          fontSize: '0.82rem',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '4px'
+        }
+      },
+        "장소",
+        /*#__PURE__*/React.createElement("span", {
+          style: {
+            fontSize: '0.7rem',
+            padding: '1px 5px',
+            borderRadius: '999px',
+            backgroundColor: activeTab === 'meeting' ? 'rgba(255,255,255,0.2)' : 'var(--border-subtle)',
+            color: activeTab === 'meeting' ? '#FFFFFF' : 'var(--text-muted)',
+            fontWeight: 'bold'
+          }
+        }, registeredPlaces.length > 0 ? registeredPlaces.length : '없음')
+      ),
+      /* Tab 3: 정산 */
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: e => { e.preventDefault(); e.stopPropagation(); setActiveTab('settlement'); },
+        style: {
+          border: 'none',
+          borderRadius: '8px',
+          padding: '8px 4px',
+          background: activeTab === 'settlement' ? 'var(--accent-primary)' : 'transparent',
+          color: activeTab === 'settlement' ? '#FFFFFF' : 'var(--text-muted)',
+          fontWeight: 800,
+          fontSize: '0.82rem',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '4px'
+        }
+      },
+        "정산",
+        /*#__PURE__*/React.createElement("span", {
+          style: {
+            fontSize: '0.7rem',
+            padding: '1px 5px',
+            borderRadius: '999px',
+            backgroundColor: activeTab === 'settlement' ? 'rgba(255,255,255,0.2)' : 'var(--border-subtle)',
+            color: activeTab === 'settlement' ? '#FFFFFF' : 'var(--text-muted)',
+            fontWeight: 'bold'
+          }
+        }, expenses.length > 0 ? expenses.length : '없음')
+      )
+    ),
+
+    /* TAB CONTENTS */
+
+    /* Tab 1 Content: 참여자 */
+    activeTab === 'participant' && /*#__PURE__*/React.createElement(React.Fragment, null,
+      /* Anniversaries banner list inside DateModal body */
+      dateAnns.length > 0 && /*#__PURE__*/React.createElement("div", {
+        style: { display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '14px' }
+      }, dateAnns.map((ann, aIdx) => {
+        const displayColor = getAnniversaryDisplayColor(ann, calendar);
+        return /*#__PURE__*/React.createElement("div", {
+          key: ann.id || aIdx,
+          style: {
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '10px 14px',
+            backgroundColor: `${displayColor}12`,
+            color: displayColor,
+            border: `1px solid ${displayColor}30`,
+            borderLeft: `4px solid ${displayColor}`,
+            borderRadius: '8px',
+            fontSize: '0.82rem',
+            fontWeight: 'bold'
+          }
+        }, ann.icon, " ", ann.title);
+      })),
+
+      !adminMode && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '10px' } },
+        /* Participant Picker Button */
+        /*#__PURE__*/React.createElement("div", null,
+          /*#__PURE__*/React.createElement("label", {
+            style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '6px', color: '#64748B' }
+          }, "참여자 선택"),
+          /*#__PURE__*/React.createElement("button", {
+            type: "button",
+            className: "form-select",
+            style: {
+              width: '100%',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              textAlign: 'left',
+              background: 'var(--bg-card)',
+              cursor: isSubmitting ? 'default' : 'pointer'
+            },
+            disabled: isSubmitting,
+            onClick: () => {
+              if (!isSubmitting) { markDirty(); setIsSheetOpen(true); }
+            }
+          },
+            /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, overflow: 'hidden' } },
+              participantId && /*#__PURE__*/React.createElement("span", {
+                className: "form-select-color-indicator",
+                style: { backgroundColor: selectedPartColor }
+              }),
+              /*#__PURE__*/React.createElement("span", {
+                style: {
+                  fontWeight: 700,
+                  color: participantId ? 'var(--text-main)' : 'var(--text-muted)',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap'
+                }
+              }, participantId ? selectedPartName : '참여할 이름을 골라주세요')
+            ),
+            /*#__PURE__*/React.createElement("svg", {
+              xmlns: "http://www.w3.org/2000/svg",
+              width: "18",
+              height: "18",
+              viewBox: "0 0 24 24",
+              fill: "none",
+              stroke: "currentColor",
+              strokeWidth: "2",
+              strokeLinecap: "round",
+              strokeLinejoin: "round",
+              className: "form-select-chevron",
+              "aria-hidden": "true"
+            }, /*#__PURE__*/React.createElement("path", { d: "M6 9l6 6l6 -6" }))
+          )
+        ),
+        /* Note Input Field */
+        /*#__PURE__*/React.createElement("div", null,
+          /*#__PURE__*/React.createElement("label", {
+            style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '6px', color: '#64748B' }
+          }, "메모 입력 (선택)"),
+          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px' } },
+            /*#__PURE__*/React.createElement("input", {
+              ref: noteInputRef,
+              type: "text",
+              className: "form-input",
+              style: { flex: 1 },
+              placeholder: "간단한 일정 메모를 남길 수 있습니다 (최대 60자)",
+              maxLength: 60,
+              value: note,
+              disabled: isSubmitting,
+              onChange: e => { markDirty(); setNote(e.target.value); }
+            }),
+            /*#__PURE__*/React.createElement(FormAddEditActionButtons, {
+              isEditing: !!participantId && dateEntries.some(en => en.participantId === participantId),
+              isSaving: isSubmitting,
+              disabled: !participantId,
+              onCancel: () => {
+                setParticipantId('');
+                setNote('');
+              },
+              onSubmit: handleSubmit
+            })
+          )
+        )
+      ),
+
+      /* Attendees list */
+      dateEntries.length > 0 && /*#__PURE__*/React.createElement("div", {
+        style: { marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '6px' }
+      },
+        /*#__PURE__*/React.createElement("label", {
+          style: { fontSize: '0.82rem', fontWeight: 700, color: '#64748B', marginBottom: '2px' }
+        }, `참석 명단 (${dateEntries.length}명 가능)`),
+        /* List */
+        /*#__PURE__*/React.createElement("div", {
+          style: {
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+            maxHeight: '260px',
+            overflowY: 'auto',
+            padding: '8px',
+            backgroundColor: 'var(--bg-primary)',
+            border: '1px solid var(--border-subtle)',
+            borderRadius: '12px'
+          }
+        }, dateEntries.map(entry => {
+          const part = activeParticipants.find(p => p.id === entry.participantId);
+          if (!part) return null;
+          return /*#__PURE__*/React.createElement("div", {
+            key: entry.id,
+            style: {
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '8px 12px',
+              backgroundColor: 'var(--bg-card)',
+              border: '1px solid var(--border-subtle)',
+              borderRadius: '8px'
+            }
+          },
+            /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 } },
+              /*#__PURE__*/React.createElement("span", {
+                style: { width: '8px', height: '8px', borderRadius: '50%', backgroundColor: part.color, flexShrink: 0 }
+              }),
+              /*#__PURE__*/React.createElement("span", {
+                style: {
+                  fontWeight: 800,
+                  fontSize: '0.85rem',
+                  color: 'var(--text-main)',
+                  flexShrink: 0,
+                  cursor: 'pointer',
+                  lineHeight: 1.35
+                },
+                title: '눌러서 수정 (참여자·메모 불러오기)',
+                onClick: () => handleEditClick(entry)
+              }, part.name),
+              entry.note && /*#__PURE__*/React.createElement("div", {
+                style: {
+                  fontSize: '0.78rem',
+                  color: 'var(--text-main)',
+                  marginLeft: '4px',
+                  minWidth: 0,
+                  flex: 1,
+                  lineHeight: 1.35,
+                  display: 'flex',
+                  alignItems: 'center'
+                }
+              }, renderTextWithUrlBadge(entry.note))
+            ),
+            !adminMode && /*#__PURE__*/React.createElement(ItemEditDeleteActions, {
+              onEdit: () => handleEditClick(entry),
+              onDelete: () => handleDeleteClick(entry)
+            })
+          );
+        })
+      ),
+      !adminMode && typeof onConfirmMeeting === 'function' && /*#__PURE__*/React.createElement("div", {
+        className: "gamified-confirm-wrap",
+        style: { marginTop: '4px', overflow: 'hidden', borderRadius: '14px' }
+      }, /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: !isConfirmed && isAllAvailable ? 'btn-gamified-confirm' : 'btn-meeting-confirm-plain',
+        disabled: isSubmitting,
+        onClick: async e => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (isSubmitting) return;
+          setIsSubmitting(true);
+          try { await Promise.resolve(onConfirmMeeting(dateStr, '')); }
+          finally { setIsSubmitting(false); }
+        },
+        style: {
+          width: '100%', marginTop: '12px', padding: '12px 16px', borderRadius: '12px',
+          fontWeight: 800, fontSize: '0.92rem', cursor: isSubmitting ? 'wait' : 'pointer',
+          ...((!isConfirmed && isAllAvailable) ? {} : isConfirmed ? {
+            border: '1.5px solid rgb(239, 68, 68)',
+            backgroundColor: 'rgba(239, 68, 68, 0.06)',
+            color: 'rgb(239, 68, 68)'
+          } : {
+            border: '1.5px solid #C4B5FD', backgroundColor: 'rgba(124, 58, 237, 0.08)', color: '#7C3AED'
+          })
+        }
+      }, (!isConfirmed && isAllAvailable)
+        ? /*#__PURE__*/React.createElement(GamifiedConfirmButtonContent, { label: "모임 확정" })
+        : (isConfirmed ? '모임 취소' : '모임 확정')))
+    )),
+
+    /* Tab 2 Content: 장소 */
+    activeTab === 'meeting' && /*#__PURE__*/React.createElement(React.Fragment, null,
+      !adminMode && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '12px' } },
+        /* Search Field */
+        /*#__PURE__*/React.createElement("div", null,
+          /*#__PURE__*/React.createElement("label", {
+            style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '6px', color: '#64748B' }
+          }, "장소 검색"),
+          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px' } },
+            /*#__PURE__*/React.createElement("input", {
+              type: "text",
+              className: "form-input",
+              style: { flex: 1 },
+              placeholder: "지명, 도로명 주소, 또는 업체명 검색",
+              value: placeQuery,
+              onChange: e => setPlaceQuery(e.target.value),
+              onKeyDown: e => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handlePlaceSearch(e, false);
+                }
+              }
+            }),
+            /*#__PURE__*/React.createElement("button", {
+              type: "button",
+              className: "btn btn-poll-create btn-action btn-action-dark",
+              style: { padding: '0 16px', fontWeight: 800, height: '44px' },
+              onClick: e => { e.preventDefault(); e.stopPropagation(); handlePlaceSearch(e, false); }
+            }, "검색")
+          )
+        ),
+
+        /* Search progress overlay */
+        isPlaceLoading && /*#__PURE__*/React.createElement("div", {
+          style: {
+            padding: '12px 14px', borderRadius: '8px', border: '1px solid var(--border-subtle)',
+            backgroundColor: 'var(--bg-primary)', display: 'flex', flexDirection: 'column', gap: '6px'
+          }
+        },
+          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem', fontWeight: 700 } },
+            /*#__PURE__*/React.createElement("span", { style: { color: 'var(--text-muted)' } },
+              placeSearchStage === 'kakao' ? "카카오 로컬 정보 분석 중..." :
+              placeSearchStage === 'google' ? "구글 장소 분석 중..." :
+              placeSearchStage === 'nominatim' ? "지도 매핑 분석 중..." : "주변 정보 수집 중..."
+            ),
+            /*#__PURE__*/React.createElement("span", { style: { color: 'var(--accent-primary)' } }, `${searchProgress}% (${estRemainingSeconds}초 남음)`)
+          ),
+          /*#__PURE__*/React.createElement("div", { style: { width: '100%', height: '6px', backgroundColor: 'var(--border-subtle)', borderRadius: '999px', overflow: 'hidden' } },
+            /*#__PURE__*/React.createElement("div", { style: { width: `${searchProgress}%`, height: '100%', backgroundColor: 'var(--accent-primary)', transition: 'width 0.1s linear' } })
+          )
+        ),
+
+        /* Search Results List */
+        placeResults.length > 0 && /*#__PURE__*/React.createElement("div", {
+          style: {
+            display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '180px', overflowY: 'auto',
+            border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '6px', backgroundColor: 'var(--bg-primary)'
+          }
+        }, placeResults.map(r => /*#__PURE__*/React.createElement("button", {
+          key: r.id,
+          type: "button",
+          onClick: () => handleSelectResult(r),
+          style: { textAlign: 'left', padding: '8px 10px', borderRadius: '6px', border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '2px' },
+          className: "place-result-item"
+        },
+          /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-main)' } }, r.name),
+          /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.72rem', color: 'var(--text-muted)' } }, getDisplayPlaceAddress(r))
+        ))),
+
+        /* Selected place preview card */
+        selectedPlace && /*#__PURE__*/React.createElement("div", {
+          style: {
+            padding: '10px 12px', borderRadius: '8px', backgroundColor: 'rgba(59, 130, 246, 0.08)',
+            border: '1px solid rgba(59, 130, 246, 0.2)', display: 'flex', flexDirection: 'column', gap: '4px'
+          }
+        },
+          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' } },
+            /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.86rem', fontWeight: 800, color: 'var(--text-main)' } }, selectedPlace.name),
+            selectedPlace.categoryLabel && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.7rem', color: 'var(--text-muted)' } }, selectedPlace.categoryLabel)
+          ),
+          selectedPlace.address && /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.76rem', color: 'var(--text-muted)' } }, getDisplayPlaceAddress(selectedPlace)),
+          selectedPlace.phone && /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.76rem', color: 'var(--text-muted)' } }, `☎ ${selectedPlace.phone}`)
+        ),
+
+        selectedPlace && /*#__PURE__*/React.createElement("div", null,
+          /*#__PURE__*/React.createElement("label", {
+            style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#64748B', marginBottom: '6px' }
+          }, "별칭 (선택)"),
+          /*#__PURE__*/React.createElement("input", {
+            type: "text", className: "form-input", placeholder: "목록에 표시할 별칭 (예: 도은네 집)",
+            maxLength: 80, value: placeAlias, onChange: e => setPlaceAlias(e.target.value),
+            style: { width: '100%', boxSizing: 'border-box' }
+          })
+        ),
+        /*#__PURE__*/React.createElement("div", null,
+          /*#__PURE__*/React.createElement("label", {
+            style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#64748B', marginBottom: '6px' }
+          }, "카테고리"),
+          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'stretch', gap: '10px' } },
+            /*#__PURE__*/React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+              /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
+                title: "카테고리 선택",
+                value: placeCategoryId,
+                options: getPlaceCategories(calendar).map(c => ({ value: c.id, label: getPlaceCategoryLabel(c) })),
+                onSelect: setPlaceCategoryId,
+                placeholder: "카테고리 선택"
+              })
+            ),
+            /*#__PURE__*/React.createElement(SegmentedToggle, {
+              ariaLabel: "방문/방문예정 전환",
+              value: placeVisitStatus,
+              onChange: v => setPlaceVisitStatus(v),
+              options: [{ value: 'visited', label: '방문' }, { value: 'planned', label: '예정' }]
+            })
+          )
+        ),
+        /*#__PURE__*/React.createElement("div", null,
+          /*#__PURE__*/React.createElement("label", {
+            style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#64748B', marginBottom: '6px' }
+          }, "장소 메모 입력"),
+          /*#__PURE__*/React.createElement("div", {
+            style: { display: 'flex', gap: '8px', alignItems: 'flex-start' }
+          },
+            /*#__PURE__*/React.createElement(AutoGrowTextarea, {
+              className: "form-input",
+              style: { flex: 1, padding: '8px 12px' },
+              minHeight: 44,
+              maxHeight: 480,
+              placeholder: "메모 입력 (선택, '26.02.12' 또는 URL 입력 가능)",
+              maxLength: 2000,
+              value: placeMemo,
+              disabled: isSavingPlace,
+              onChange: e => setPlaceMemo(e.target.value)
+            }),
+            /*#__PURE__*/React.createElement(FormAddEditActionButtons, {
+              isEditing: !!editingLinkedPlaceId,
+              isSaving: isSavingPlace,
+              disabled: !selectedPlace,
+              alignSelf: 'flex-start',
+              onCancel: () => {
+                setEditingLinkedPlaceId(null);
+                setSelectedPlace(null);
+                setPlaceQuery('');
+                setPlaceAlias('');
+                setPlaceMemo('');
+                setPlaceCategoryId(getPlaceCategories(calendar)[0]?.id || 'etc');
+                setPlaceVisitStatus('visited');
+              },
+              onSubmit: handleSavePlaceClick
+            })
+          )
+        )
+      ),
+
+      /* List of registered places for this date */
+      /*#__PURE__*/React.createElement("div", { style: { marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '6px' } },
+        /*#__PURE__*/React.createElement("label", {
+          style: { fontSize: '0.82rem', fontWeight: 700, color: '#64748B', marginBottom: '2px' }
+        }, `등록된 장소 (${registeredPlaces.length}곳)`),
+        /* List */
+        registeredPlaces.length === 0 ? /*#__PURE__*/React.createElement("div", {
+          style: { textAlign: 'center', color: 'var(--text-muted)', padding: '24px 0', fontSize: '0.82rem', border: '1px dashed var(--border-subtle)', borderRadius: '12px' }
+        }, "등록된 장소가 없습니다.") : /*#__PURE__*/React.createElement("div", {
+          className: "date-modal-places-list",
+          style: { display: 'flex', flexDirection: 'column', gap: '8px', flex: '1 1 auto', minHeight: '80px', overflow: 'visible' }
+        }, registeredPlaces.map(place => {
+          const category = getPlaceCategoryById(calendar, place.categoryId) || { id: 'etc', name: '기타', color: '#64748B' };
+          const catColor = category.color || '#64748B';
+          const catName = category.name || '기타';
+          return /*#__PURE__*/React.createElement("div", {
+            key: place.id,
+            style: {
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '6px',
+              padding: '12px 14px',
+              backgroundColor: 'var(--bg-card)',
+              border: '1px solid var(--border-subtle)',
+              borderRadius: '12px',
+              position: 'relative'
+            }
+          },
+            /* Category Tag */
+            /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px' } },
+              /*#__PURE__*/React.createElement("span", {
+                style: {
+                  fontSize: '0.64rem', fontWeight: 900, padding: '2px 8px', borderRadius: '999px',
+                  backgroundColor: `${catColor}18`, color: catColor
+                }
+              }, catName)
+            ),
+            /* Name & Address — prefer alias when set */
+            /*#__PURE__*/React.createElement("span", { style: { fontWeight: 800, fontSize: '0.88rem', color: 'var(--text-main)' } }, place.alias || place.name),
+            place.alias && place.name && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.72rem', color: 'var(--text-muted)' } }, place.name),
+            place.address && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.74rem', color: 'var(--text-muted)' } }, getDisplayPlaceAddress(place)),
+            /* Memo — one line per visit date entry */
+            place.memo && (() => {
+              let entries = parseVisitEntriesFromMemo(place.memo);
+              if (entries.length === 0) {
+                const leading = typeof extractLeadingMemoDate === 'function' ? extractLeadingMemoDate(place.memo) : '';
+                if (leading) {
+                  const rest = String(place.memo).replace(String(leading), '').replace(/^\s*\/?\s*/, '').trim();
+                  entries = [{ date: leading, note: rest }];
+                }
+              } else if (typeof sortVisitEntriesRecentFirst === 'function') {
+                entries = sortVisitEntriesRecentFirst(entries);
+              }
+              if (entries.length > 0) {
+                return /*#__PURE__*/React.createElement("div", {
+                  style: { display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '0.78rem', color: 'var(--text-main)', lineHeight: 1.45 }
+                }, entries.map((en, idx) => /*#__PURE__*/React.createElement("div", {
+                  key: `${en.date}_${idx}`,
+                  style: { wordBreak: 'break-word' }
+                }, renderTextWithUrlBadge(en.note ? `${en.date} ${en.note}` : en.date))));
+              }
+              return /*#__PURE__*/React.createElement("div", {
+                style: { fontSize: '0.78rem', color: 'var(--text-main)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.45 }
+              }, renderTextWithUrlBadge(place.memo));
+            })(),
+            !adminMode && /*#__PURE__*/React.createElement("div", {
+              style: { position: 'absolute', top: '10px', right: '10px' }
+            }, /*#__PURE__*/React.createElement(ItemEditDeleteActions, {
+              onEdit: () => {
+                setEditingLinkedPlaceId(place.id);
+                setSelectedPlace({ name: place.name, address: place.address || '', lat: place.lat, lng: place.lng, categoryId: place.categoryId || 'etc' });
+                setPlaceQuery(place.name || '');
+                setPlaceAlias(place.alias || '');
+                // 장소리스트와 동일: 날짜 방문기록은 한 줄씩
+                setPlaceMemo(reformatMemoIntoDateLines(place.memo || ''));
+                setPlaceCategoryId(place.categoryId || 'etc');
+                setPlaceVisitStatus(place.visitStatus === 'planned' ? 'planned' : 'visited');
+                setPlaceResults([]);
+              },
+              onDelete: () => {
+                onRequestConfirm('장소 삭제', `"${place.alias || place.name}" 장소를 이 날짜에서 해제하시겠습니까?`, async () => {
+                  setIsSavingPlace(true);
+                  try {
+                    const targetNorm = normalizePlaceDateForSort(dateStr) || dateStr;
+                    let nextVisitDate = place.visitDate || '';
+                    if (nextVisitDate === dateStr || normalizePlaceDateForSort(nextVisitDate) === targetNorm) nextVisitDate = '';
+                    let nextMemo = String(place.memo || '');
+                    const entries = parseVisitEntriesFromMemo(nextMemo);
+                    if (entries.length >= 2) {
+                      nextMemo = entries
+                        .filter(en => normalizePlaceDateForSort(en.date) !== targetNorm)
+                        .map(en => en.note ? `${en.date} ${en.note}` : en.date)
+                        .join(' / ');
+                    } else {
+                      const leading = extractLeadingMemoDate(nextMemo);
+                      if (leading && normalizePlaceDateForSort(leading) === targetNorm) {
+                        nextMemo = nextMemo.replace(/^\s*\d{2,4}[.-]\d{2}[.-]\d{2}\s*/, '').replace(/^\/\s*/, '').trim();
+                      }
+                    }
+                    if (typeof onSavePlace === 'function') {
+                      const ok = await Promise.resolve(onSavePlace({
+                        id: place.id, name: place.name, alias: place.alias || '',
+                        address: place.address || '', lat: place.lat, lng: place.lng,
+                        categoryId: place.categoryId || 'etc', memo: nextMemo,
+                        visitStatus: place.visitStatus === 'planned' ? 'planned' : 'visited',
+                        visitDate: nextVisitDate
+                      }));
+                      if (ok !== false) {
+                        showToast('이 날짜에서 장소가 해제되었습니다.', 'success');
+                        if (editingLinkedPlaceId === place.id) {
+                          setEditingLinkedPlaceId(null); setSelectedPlace(null);
+                          setPlaceQuery(''); setPlaceAlias(''); setPlaceMemo('');
+                        }
+                      } else if (onDeletePlace) {
+                        await Promise.resolve(onDeletePlace(place.id));
+                        showToast('장소가 삭제되었습니다.', 'success');
+                      }
+                    } else if (onDeletePlace) {
+                      await Promise.resolve(onDeletePlace(place.id));
+                      showToast('장소가 삭제되었습니다.', 'success');
+                    }
+                  } finally { setIsSavingPlace(false); }
+                });
+              }
+            }))
+          );
+        }))
+      )
+    ),
+
+    /* Tab 3 Content: 정산 */
+    activeTab === 'settlement' && /*#__PURE__*/React.createElement(React.Fragment, null,
+      /* Profit/Loss Info Badge */
+      /*#__PURE__*/React.createElement("div", {
+        style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderRadius: '12px', border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)', marginBottom: '12px' }
+      },
+        /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)' } }, "총 정산 요약"),
+        (() => {
+          const hasSettlementData = expenses.length > 0;
+          const netAmount = -expenseTotal;
+          const isNegative = netAmount < 0;
+          return /*#__PURE__*/React.createElement("span", {
+            style: {
+              fontSize: '0.78rem',
+              fontWeight: 600,
+              padding: '3px 9px',
+              borderRadius: '999px',
+              whiteSpace: 'nowrap',
+              backgroundColor: !hasSettlementData ? 'var(--bg-card)' : isNegative ? '#FEF2F2' : '#F0FDF4',
+              border: `1px solid ${!hasSettlementData ? 'var(--border-subtle)' : isNegative ? '#FCA5A5' : '#BBF7D0'}`,
+              color: !hasSettlementData ? 'var(--text-muted)' : isNegative ? '#DC2626' : '#16A34A'
+            }
+          }, hasSettlementData ? `${isNegative ? '-' : '+'}${Math.abs(netAmount).toLocaleString()}원` : '없음');
+        })()
+      ),
+
+      /* Input Forms */
+      !adminMode && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '12px' } },
+        /*#__PURE__*/React.createElement("div", null,
+          /*#__PURE__*/React.createElement("label", {
+            style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#64748B', marginBottom: '6px' }
+          }, "구분 / 카테고리"),
+          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
+            /*#__PURE__*/React.createElement(SegmentedToggle, {
+              ariaLabel: "수입/지출 전환",
+              disabled: isSavingExpense,
+              value: expenseIsIncome ? 'income' : 'expense',
+              onChange: v => setExpenseIsIncome(v === 'income'),
+              options: [
+                { value: 'income', label: '+ 수입', activeColor: '#16A34A' },
+                { value: 'expense', label: '- 지출', activeColor: '#DC2626' }
+              ]
+            }),
+            !expenseIsIncome && /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
+              title: "지출 카테고리 선택",
+              placeholder: "지출 카테고리 선택",
+              value: expenseCategoryInput,
+              disabled: isSavingExpense,
+              onSelect: setExpenseCategoryInput,
+              options: expenseCategories.map(category => ({
+                value: category.id,
+                label: getExpenseCategoryLabel(category)
+              })),
+              style: { flex: '1 1 0%', minWidth: 0, height: '42px' }
+            })
+          )
+        ),
+        /*#__PURE__*/React.createElement("div", null,
+          /*#__PURE__*/React.createElement("label", {
+            style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#64748B', marginBottom: '6px' }
+          }, expenseIsIncome ? "수입 명목" : "지출 명목"),
+          /*#__PURE__*/React.createElement("input", {
+            type: "text",
+            className: "form-input",
+            style: { width: '100%' },
+            placeholder: expenseIsIncome ? "수입명목 (예: 회비 입금, URL 첨부 가능)" : "지출명목 (예: 식당 예약금, URL 첨부 가능)",
+            maxLength: 220,
+            value: expenseLabelInput,
+            disabled: isSavingExpense,
+            onChange: e => setExpenseLabelInput(e.target.value)
+          })
+        ),
+        /*#__PURE__*/React.createElement("div", null,
+          /*#__PURE__*/React.createElement("label", {
+            style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#64748B', marginBottom: '6px' }
+          }, expenseIsIncome ? "수입 금액" : "지출 금액"),
+          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px' } },
+          /*#__PURE__*/React.createElement("input", {
+            type: "text",
+            className: "form-input",
+            style: { flex: '1 1 0%', minWidth: 0 },
+            placeholder: expenseIsIncome ? "수입금액 (원)" : "지출금액 (원)",
+            value: expenseAmountInput,
+            disabled: isSavingExpense,
+            onChange: e => {
+              const digits = e.target.value.replace(/[^0-9]/g, '');
+              const formatted = digits ? Number(digits).toLocaleString() : '';
+              setExpenseAmountInput(formatted ? `${expenseIsIncome ? '+' : '-'}${formatted}` : '');
+            }
+          }),
+          /*#__PURE__*/React.createElement(FormAddEditActionButtons, {
+            isEditing: !!editingExpenseId,
+            isSaving: isSavingExpense,
+            onCancel: () => {
+              setEditingExpenseId(null);
+              setExpenseLabelInput('');
+              setExpenseAmountInput('');
+              setExpenseIsIncome(false);
+            },
+            onSubmit: handleSaveExpenseClick
+          })
+          )
+        )
+      ),
+
+      /* Expenses list */
+      expenses.length > 0 && /*#__PURE__*/React.createElement("div", {
+        className: "date-modal-settlement-list",
+        style: {
+          display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '10px',
+          flex: '1 1 auto', minHeight: '80px', overflow: 'visible'
+        }
+      },
+        expenses.map(expense => {
+          const { time: expenseTime, rest: expenseLabel } = extractExpenseTimePrefix(getExpenseLabel(expense));
+          const expenseUrl = getExpenseUrl(expense);
+          const expenseCategory = getDisplayExpenseCategory(calendar, expense) || { id: 'etc', name: '기타', color: '#64748B' };
+          const categoryColor = expenseCategory.color || '#64748B';
+          const categoryName = expenseCategory.name || '기타';
+          return /*#__PURE__*/React.createElement("div", {
+            key: expense.id,
+            "data-expense-id": expense.id,
+            className: `expense-sortable-row poll-sortable-row${draggingExpenseId === expense.id ? ' is-dragging' : ''}${dragOverExpenseId === expense.id ? ' is-drop-target' : ''}`,
+            onClick: () => handleExpenseItemClick(expense),
+            onDragOver: event => {
+              event.preventDefault();
+              event.dataTransfer.dropEffect = 'move';
+              if (draggingExpenseId && draggingExpenseId !== expense.id) setDragOverExpenseId(expense.id);
+            },
+            onDragEnter: event => {
+              event.preventDefault();
+              if (draggingExpenseId && draggingExpenseId !== expense.id) setDragOverExpenseId(expense.id);
+            },
+            onDragLeave: event => {
+              if (!event.currentTarget.contains(event.relatedTarget)) setDragOverExpenseId('');
+            },
+            onDrop: event => {
+              event.preventDefault();
+              event.stopPropagation();
+              const sourceId = event.dataTransfer.getData('text/plain') || draggingExpenseId;
+              moveExpense(sourceId, expense.id);
+              setDraggingExpenseId('');
+              setDragOverExpenseId('');
+            },
+            onDragEnd: resetExpensePointerSort,
+            style: {
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '4px',
+              padding: '12px 48px 12px 12px',
+              position: 'relative',
+              backgroundColor: 'var(--bg-card)',
+              border: '1px solid var(--border-subtle)',
+              borderColor: editingExpenseId === expense.id ? 'var(--accent-primary)' : (dragOverExpenseId === expense.id ? 'var(--accent-primary)' : 'var(--border-subtle)'),
+              borderRadius: '12px',
+              cursor: 'pointer',
+              boxSizing: 'border-box'
+            }
+          },
+            /*#__PURE__*/React.createElement("div", {
+              style: { position: 'absolute', top: '10px', right: '10px', display: 'flex', alignItems: 'center', gap: '4px' }
+            },
+              expenses.length > 1 && /*#__PURE__*/React.createElement("button", {
+                type: "button",
+                className: "poll-drag-handle",
+                disabled: isSavingExpense,
+                title: "드래그하여 순서 변경",
+                style: {
+                  width: '22px', height: '22px', border: '1px solid var(--border-subtle)',
+                  backgroundColor: 'var(--bg-card)', borderRadius: '6px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'grab', padding: 0, color: '#64748B',
+                  touchAction: 'none', userSelect: 'none'
+                },
+                onClick: event => { event.preventDefault(); event.stopPropagation(); },
+                onPointerDown: event => beginExpensePointerSort(event, expense.id)
+              }, /*#__PURE__*/React.createElement(LineHeightIcon, { size: 12 })),
+              /*#__PURE__*/React.createElement(ItemEditDeleteActions, {
+                onEdit: () => handleExpenseItemClick(expense),
+                onDelete: event => handleDeleteExpenseClick(event || { stopPropagation() {} }, expense.id)
+              })
+            ),
+            /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '4px', minWidth: 0 } },
+              /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' } },
+                /*#__PURE__*/React.createElement("span", {
+                  style: {
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    padding: '3px 8px',
+                    borderRadius: '999px',
+                    backgroundColor: `${categoryColor}18`,
+                    color: categoryColor,
+                    fontSize: '0.68rem',
+                    fontWeight: 900
+                  }
+                }, getExpenseCategoryIcon(expenseCategory), getExpenseCategoryIcon(expenseCategory) ? '\u00A0' : '', categoryName),
+                expenseTime && /*#__PURE__*/React.createElement("span", {
+                  style: {
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    padding: '3px 8px',
+                    borderRadius: '999px',
+                    backgroundColor: 'rgba(79, 70, 229, 0.08)',
+                    color: '#4F46E5',
+                    fontSize: '0.68rem',
+                    fontWeight: 'bold'
+                  }
+                }, expenseTime)
+              ),
+              /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap', width: '100%', wordBreak: 'break-all' } },
+                expenseUrl ? /*#__PURE__*/React.createElement(React.Fragment, null,
+                  expenseLabel,
+                  /*#__PURE__*/React.createElement(UrlCapsuleBadge, { url: expenseUrl })
+                ) : expenseLabel
+              ),
+              /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.9rem', fontWeight: 900, color: Number(expense.amount) < 0 ? '#16A34A' : '#DC2626' } },
+                `${Number(expense.amount) < 0 ? '+' : '-'}${Math.abs(Number(expense.amount)).toLocaleString()}원`
+              )
+            )
+          );
+        })
+      )
+    )
+  ))));
+
+  // Bottom-sheet rule: never nest under ResizableModalContainer (CSS transform traps fixed).
+  const participantSheet = isSheetOpen ? /*#__PURE__*/React.createElement("div", {
+    className: "bottom-sheet-overlay",
+    style: { zIndex: 20050 },
+    onClick: () => setIsSheetOpen(false)
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bottom-sheet",
+    style: { maxHeight: '70vh' },
+    onClick: e => e.stopPropagation()
+  },
+    /*#__PURE__*/React.createElement("div", { className: "bottom-sheet-header" },
+      /*#__PURE__*/React.createElement("h4", null, "참여자 선택"),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        style: { background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer' },
+        onClick: () => setIsSheetOpen(false)
+      }, "✕")
+    ),
+    /*#__PURE__*/React.createElement("div", { className: "bottom-sheet-body" },
+      activeParticipants.map(p => /*#__PURE__*/React.createElement("button", {
+        key: p.id,
+        type: "button",
+        className: "bottom-sheet-item",
+        disabled: isSubmitting,
+        onClick: () => {
+          if (isSubmitting) return;
+          markDirty();
+          setParticipantId(p.id);
+          setNote(getExistingNoteForParticipant(p.id));
+          setIsSheetOpen(false);
+        }
+      }, /*#__PURE__*/React.createElement("span", {
+        className: "color-dot",
+        style: { backgroundColor: p.color, width: '12px', height: '12px' }
+      }), /*#__PURE__*/React.createElement("span", { style: { fontWeight: 700 } }, p.name)))
+    )
+  )) : null;
+
+  const portaled = /*#__PURE__*/React.createElement(React.Fragment, null, portalContent, participantSheet);
+  return typeof document !== 'undefined' && ReactDOM.createPortal
+    ? ReactDOM.createPortal(portaled, document.body)
+    : portaled;
+}
+
+  window.GATHER_UI_COMPONENTS = Object.assign({}, window.GATHER_UI_COMPONENTS || {}, {
+    DateModal: DateModal
+  });
+})();

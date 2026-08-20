@@ -1,0 +1,3373 @@
+:root {
+  --font-sans: 'Plus Jakarta Sans', 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
+
+  /* White / Light Theme Colors */
+  --bg-primary: #F8FAFC;
+  --bg-secondary: #FFFFFF;
+  --bg-card: #FFFFFF;
+  --border-subtle: #E2E8F0;
+  --border-hover: #CBD5E1;
+
+  --text-main: #0F172A;
+  --text-muted: #64748B;
+  --text-light: #94A3B8;
+
+  --accent-primary: #4F46E5;
+  --accent-secondary: #7C3AED;
+  --accent-gradient: linear-gradient(135deg, #4F46E5 0%, #7C3AED 50%, #EC4899 100%);
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -1px rgba(0, 0, 0, 0.04);
+  --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.03);
+  color-scheme: light;
+
+  --radius-lg: 16px;
+  --radius-md: 12px;
+  --radius-sm: 8px;
+  --radius-full: 9999px;
+
+  /* Spacing scale (4px base grid). Any bordered container's top/bottom padding should use
+     the same step as its own left/right padding unless there's a specific compositional
+     reason not to (e.g. a sticky footer's extra safe-area inset) -- and sibling regions of
+     the same component (a modal's header/body/footer, a card's title/content) should share
+     one step rather than drifting across nearby-but-different values like 14/16/18/20px. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+}
+
+/* Dark theme: an explicit choice via the header toggle stamps data-theme="dark"/"light" on
+   <html> (see the early inline script in <head>); with no explicit choice, prefers-color-scheme
+   decides. Only the token values change here -- every component built on var(--bg-card) etc.
+   picks the new palette automatically with no per-component edits needed. Scoped to the main
+   user-facing app (header, calendar, modals, forms); the staff-only admin pages style
+   themselves with hardcoded colors rather than these tokens and are not part of this pass. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg-primary: #0B1120;
+    --bg-secondary: #131B2E;
+    --bg-card: #131B2E;
+    --border-subtle: #232F49;
+    --border-hover: #34405C;
+    --text-main: #F1F5F9;
+    --text-muted: #94A3B8;
+    --text-light: #64748B;
+    --accent-primary: #6366F1;
+    --accent-secondary: #9333EA;
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.35), 0 1px 2px rgba(0, 0, 0, 0.25);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.45), 0 8px 10px -6px rgba(0, 0, 0, 0.35);
+    color-scheme: dark;
+  }
+  /* A few widely-reused components hardcode a light background instead of reading
+     var(--bg-card) etc., so the token overrides above don't reach them on their own --
+     .btn-secondary/.btn-danger/.form-input alone cover most of the app including admin
+     screens (they're shared utility classes), and .day-cell covers the calendar grid,
+     the single most central, most-used surface in the app. */
+  :root:not([data-theme="light"]) .day-cell { background: #1B2540; }
+  :root:not([data-theme="light"]) .day-cell:hover { background: #212D4D; }
+  :root:not([data-theme="light"]) .day-cell.today { background: #1E2648; }
+  :root:not([data-theme="light"]) .day-cell.all-available { background: #0F2E22; border-color: #10B981; animation: cell-glow-available 2.5s ease-in-out infinite alternate; }
+  :root:not([data-theme="light"]) .day-cell.confirmed-meeting { background: #241B3D; border-color: #9333EA; animation: cell-glow-confirmed 2.5s ease-in-out infinite alternate; }
+  :root:not([data-theme="light"]) .btn-secondary { background: #1B2540; color: var(--text-main); }
+  :root:not([data-theme="light"]) .btn-secondary:hover { background: #232F49; }
+  :root:not([data-theme="light"]) .btn-danger { background: #2D1518; border-color: #7F1D1D; color: #F87171; }
+  :root:not([data-theme="light"]) .btn-danger:hover { background: #3A1A1E; }
+  :root:not([data-theme="light"]) .form-select,
+  :root:not([data-theme="light"]) .form-input { background: #1B2540; }
+  :root:not([data-theme="light"]) .poll-progress { background: #1B2540; }
+  :root:not([data-theme="light"]) .modal-header.is-confirmed-theme,
+  :root:not([data-theme="light"]) .modal-footer.is-confirmed-theme { background-color: #241B3D; }
+  :root:not([data-theme="light"]) .modal-header.is-all-available-theme,
+  :root:not([data-theme="light"]) .modal-footer.is-all-available-theme { background-color: #0F2E22; }
+  :root:not([data-theme="light"]) .poll-list-row { background-color: #1B2540; border-color: #232F49; }
+}
+:root[data-theme="dark"] .day-cell { background: #1B2540; }
+:root[data-theme="dark"] .day-cell:hover { background: #212D4D; }
+:root[data-theme="dark"] .day-cell.today { background: #1E2648; }
+:root[data-theme="dark"] .day-cell.all-available { background: #0F2E22; border-color: #10B981; animation: cell-glow-available 2.5s ease-in-out infinite alternate; }
+:root[data-theme="dark"] .day-cell.confirmed-meeting { background: #241B3D; border-color: #9333EA; animation: cell-glow-confirmed 2.5s ease-in-out infinite alternate; }
+:root[data-theme="dark"] .btn-secondary { background: #1B2540; color: var(--text-main); }
+:root[data-theme="dark"] .btn-secondary:hover { background: #232F49; }
+:root[data-theme="dark"] .btn-danger { background: #2D1518; border-color: #7F1D1D; color: #F87171; }
+:root[data-theme="dark"] .btn-danger:hover { background: #3A1A1E; }
+:root[data-theme="dark"] .form-select,
+:root[data-theme="dark"] .form-input { background: #1B2540; }
+:root[data-theme="dark"] .poll-progress { background: #1B2540; }
+:root[data-theme="dark"] .modal-header.is-confirmed-theme,
+:root[data-theme="dark"] .modal-footer.is-confirmed-theme { background-color: #241B3D; }
+:root[data-theme="dark"] .modal-header.is-all-available-theme,
+:root[data-theme="dark"] .modal-footer.is-all-available-theme { background-color: #0F2E22; }
+/* Light-mode base (previously inline styles) -- kept as CSS now that dark-mode variants
+   need to target the same classes. */
+.modal-header.is-confirmed-theme, .modal-footer.is-confirmed-theme { background-color: #F3E8FF; }
+.modal-header.is-all-available-theme, .modal-footer.is-all-available-theme { background-color: #D1FAE5; }
+.poll-list-row { background-color: #F8FAFC; border: 1px solid #F1F5F9; }
+:root[data-theme="dark"] .poll-list-row { background-color: #1B2540; border-color: #232F49; }
+/* Status/date-count badges (확정/전원/N명 가능 etc.) set pastel light-mode colors inline;
+   darkening them in place (rather than threading dark variants through every call site)
+   keeps every one of these chips legible without a per-badge color prop. */
+:root[data-theme="dark"] .status-badge { filter: brightness(0.85) saturate(1.15); }
+:root[data-theme="dark"] .date-item-badge { filter: none; }
+:root[data-theme="dark"] .date-item-badge.is-past {
+  background: #1B2540 !important;
+  color: #CBD5E1 !important;
+  border: 1px solid #34405C !important;
+}
+:root[data-theme="dark"] .date-item-badge.is-confirmed {
+  background: #3B1E69 !important;
+  color: #E9D5FF !important;
+  border: 1px solid #8B5CF6 !important;
+}
+:root[data-theme="dark"] .date-item-badge.is-available {
+  background: #1D315C !important;
+  color: #BFDBFE !important;
+  border: 1px solid #3B82F6 !important;
+}
+:root[data-theme="dark"] .date-item-badge.is-all {
+  background: #0F3A2A !important;
+  color: #A7F3D0 !important;
+  border: 1px solid #10B981 !important;
+}
+:root[data-theme="dark"] {
+  --bg-primary: #0B1120;
+  --bg-secondary: #131B2E;
+  --bg-card: #131B2E;
+  --border-subtle: #232F49;
+  --border-hover: #34405C;
+  --text-main: #F1F5F9;
+  --text-muted: #94A3B8;
+  --text-light: #64748B;
+  --accent-primary: #6366F1;
+  --accent-secondary: #9333EA;
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.35), 0 1px 2px rgba(0, 0, 0, 0.25);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.45), 0 8px 10px -6px rgba(0, 0, 0, 0.35);
+  color-scheme: dark;
+}
+/* The staff-only admin dashboard (.admin-scope, AdminDashboard's own root) has no dark-mode
+   feature of its own and stays light regardless of the user-facing dark-mode toggle -- but
+   dark mode is applied at :root, so without this reset the shared utility classes above
+   (.btn-secondary, .form-input, .day-cell, ...) and the token values would otherwise bleed
+   into it too, since AdminDashboard renders inside the same document as the main app. Higher
+   specificity (root attribute + .admin-scope + target class) wins over the plain
+   ":root[data-theme] .foo" rules above regardless of source order. */
+:root[data-theme="dark"] .admin-scope,
+:root:not([data-theme="light"]) .admin-scope {
+  --bg-primary: #F8FAFC;
+  --bg-secondary: #FFFFFF;
+  --bg-card: #FFFFFF;
+  --border-subtle: #E2E8F0;
+  --border-hover: #CBD5E1;
+  --text-main: #0F172A;
+  --text-muted: #64748B;
+  --text-light: #94A3B8;
+  --accent-primary: #4F46E5;
+  --accent-secondary: #7C3AED;
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -1px rgba(0, 0, 0, 0.04);
+  --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.03);
+  color-scheme: light;
+}
+:root[data-theme="dark"] .admin-scope .day-cell,
+:root:not([data-theme="light"]) .admin-scope .day-cell { background: #FFFFFF; }
+:root[data-theme="dark"] .admin-scope .day-cell:hover,
+:root:not([data-theme="light"]) .admin-scope .day-cell:hover { background: #EEF2FF; }
+:root[data-theme="dark"] .admin-scope .day-cell.today,
+:root:not([data-theme="light"]) .admin-scope .day-cell.today { background: #EEF2FF; }
+:root[data-theme="dark"] .admin-scope .day-cell.all-available,
+:root:not([data-theme="light"]) .admin-scope .day-cell.all-available { background: #ECFDF5; border-color: #10B981; }
+:root[data-theme="dark"] .admin-scope .day-cell.confirmed-meeting,
+:root:not([data-theme="light"]) .admin-scope .day-cell.confirmed-meeting { background: #FAF5FF; border-color: #9333EA; }
+:root[data-theme="dark"] .admin-scope .btn-secondary,
+:root:not([data-theme="light"]) .admin-scope .btn-secondary { background: #F8FAFC; color: var(--text-main); }
+:root[data-theme="dark"] .admin-scope .btn-secondary:hover,
+:root:not([data-theme="light"]) .admin-scope .btn-secondary:hover { background: #EEF2FF; }
+:root[data-theme="dark"] .admin-scope .btn-danger,
+:root:not([data-theme="light"]) .admin-scope .btn-danger { background: #FEF2F2; border-color: #FECACA; color: #DC2626; }
+:root[data-theme="dark"] .admin-scope .btn-danger:hover,
+:root:not([data-theme="light"]) .admin-scope .btn-danger:hover { background: #FEE2E2; }
+:root[data-theme="dark"] .admin-scope .form-select,
+:root[data-theme="dark"] .admin-scope .form-input,
+:root:not([data-theme="light"]) .admin-scope .form-select,
+:root:not([data-theme="light"]) .admin-scope .form-input { background: #FFFFFF; }
+:root[data-theme="dark"] .admin-scope .status-badge,
+:root[data-theme="dark"] .admin-scope .date-item-badge,
+:root:not([data-theme="light"]) .admin-scope .status-badge,
+:root:not([data-theme="light"]) .admin-scope .date-item-badge { filter: none; }
+:root[data-theme="dark"] .admin-scope .date-item-btn:hover,
+:root:not([data-theme="light"]) .admin-scope .date-item-btn:hover { background: #EEF2FF; }
+:root[data-theme="dark"] .admin-scope .date-item-btn.is-confirmed,
+:root:not([data-theme="light"]) .admin-scope .date-item-btn.is-confirmed { border-color: #E9D5FF; background: #FAF5FF; }
+:root[data-theme="dark"] .admin-scope .date-item-btn.is-available,
+:root:not([data-theme="light"]) .admin-scope .date-item-btn.is-available { border-color: #DBEAFE; background: #F8FAFC; }
+/* .admin-scope only resets tokens for its own descendants -- body itself is an ANCESTOR of
+   it, so body's background-color: var(--bg-primary) below still reads the dark value from
+   :root unless it's told (via :has()) that an .admin-scope is present somewhere inside it. */
+:root[data-theme="dark"] body:has(.admin-scope),
+:root:not([data-theme="light"]) body:has(.admin-scope) { background-color: #F8FAFC; background-image: none; }
+/* The document/viewport scrollbar's color follows the ROOT element's color-scheme, not
+   body's or .admin-scope's -- :root[data-theme="dark"] sets color-scheme: dark above, which
+   painted a dark scrollbar (and dark native form-control chrome) across the whole page even
+   though .admin-scope's own background was already fixed to light. */
+:root[data-theme="dark"]:has(.admin-scope),
+:root:not([data-theme="light"]):has(.admin-scope) { color-scheme: light; }
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+[hidden] { display: none !important; }
+html {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+body {
+  font-family: var(--font-sans);
+  /* Every digit renders at the same fixed width instead of each glyph's natural (proportional)
+     width, so any two date/time strings of the same shape -- "11.11.11" vs "99.99.99", "1:05" vs
+     "9:45" -- always take up exactly the same amount of horizontal space. Applied once here (an
+     inherited property, so it reaches every date/time string on the site automatically) rather
+     than on individual date-rendering call sites, since a per-component fix would need to be
+     copy-pasted into every place a date or time is ever displayed and would silently stop covering
+     new ones added later. font-feature-settings is the older syntax some engines still need
+     alongside the standard font-variant-numeric property.
+  */
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1, "lnum" 1;
+  background-color: var(--bg-primary);
+  background-image:
+    radial-gradient(at 10% 10%, rgba(79, 70, 229, 0.05) 0px, transparent 40%),
+    radial-gradient(at 90% 80%, rgba(236, 72, 153, 0.04) 0px, transparent 40%),
+    radial-gradient(at 50% 50%, rgba(16, 185, 129, 0.04) 0px, transparent 40%);
+  background-attachment: fixed;
+  color: var(--text-main);
+  min-height: 100vh;
+  line-height: 1.5;
+  padding: 24px 16px 60px;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  overscroll-behavior-x: none;
+}
+body.no-body-padding {
+  padding: 0 !important;
+}
+#root {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: clip;
+}
+@supports not (overflow: clip) {
+  #root { overflow-x: hidden; }
+}
+img,
+video,
+canvas,
+svg {
+  max-width: 100%;
+}
+pre,
+code {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Whenever any layer popup (modal, bottom sheet) is mounted anywhere in the document, lock
+   the page's own scroll so a vertical drag/wheel inside the popup can't also scroll the
+   screen behind it -- applies uniformly to every current and future modal without needing
+   a scroll-lock effect wired into each one individually. */
+body:has(.modal-overlay, .bottom-sheet-overlay) {
+  overflow: hidden;
+}
+
+body:has(.admin-scope),
+body:has(.admin-login-gate) {
+  padding: 0;
+}
+
+@media (max-width: 720px) {
+  body:has(.admin-scope),
+  body:has(.admin-login-gate) {
+    padding: 0;
+  }
+}
+
+/* Motion system ---------------------------------------------------------
+   Inspired by GSAP/Motion/Anime.js principles: transform + opacity first,
+   small interruptible movements, clear press feedback, and strict reduced-
+   motion support. This stays dependency-free so it works consistently in
+   Chrome, Safari, Edge, Firefox, and Whale on both desktop and mobile. */
+:root {
+  --motion-fast: 140ms;
+  --motion-base: 220ms;
+  --motion-slow: 420ms;
+  --motion-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --motion-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --motion-ease-soft: cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes motion-fade-up {
+  from { opacity: 0; transform: translate3d(0, 10px, 0) scale(0.985); }
+  to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+@keyframes motion-soft-pop {
+  0% { opacity: 0; transform: translate3d(0, 8px, 0) scale(0.96); }
+  70% { opacity: 1; transform: translate3d(0, -1px, 0) scale(1.01); }
+  100% { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+@keyframes motion-toast-in {
+  0% { opacity: 0; transform: translate3d(-50%, 14px, 0) scale(0.96); filter: blur(2px); }
+  100% { opacity: 1; transform: translate3d(-50%, 0, 0) scale(1); filter: blur(0); }
+}
+@keyframes motion-modal-pop {
+  0% { opacity: 0; transform: translate3d(0, 12px, 0) scale(0.965); filter: blur(2px); }
+  100% { opacity: 1; transform: translate3d(0, 0, 0) scale(1); filter: blur(0); }
+}
+@keyframes motion-overlay-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes motion-shimmer {
+  from { transform: translateX(-120%); }
+  to { transform: translateX(120%); }
+}
+@keyframes motion-pulse-ring {
+  0% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.32); }
+  70% { box-shadow: 0 0 0 10px rgba(99, 102, 241, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0); }
+}
+.calendar-card,
+.summary-card,
+.poll-card,
+.memo-card-hover,
+.place-card-row {
+  animation: motion-fade-up var(--motion-slow) var(--motion-ease-out) both;
+  will-change: transform, opacity;
+}
+.modal-overlay {
+  animation: motion-overlay-fade var(--motion-base) ease both;
+}
+.modal-container,
+.bottom-sheet,
+.poll-voter-sheet {
+  animation: motion-modal-pop var(--motion-base) var(--motion-ease-spring) both;
+  transform-origin: center bottom;
+  will-change: transform, opacity;
+}
+.toast {
+  animation: motion-toast-in 260ms var(--motion-ease-spring) both;
+  will-change: transform, opacity;
+}
+.btn,
+.day-cell,
+.date-item-btn,
+.poll-card,
+.poll-option-row,
+.recent-log-row,
+.search-result-row,
+.bottom-sheet-item,
+.poll-voter-option,
+.section-toggle-btn,
+.main-menu-item,
+.memo-card-hover,
+.place-card-row {
+  position: relative;
+  isolation: isolate;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    transform var(--motion-base) var(--motion-ease-out),
+    box-shadow var(--motion-base) var(--motion-ease-out),
+    border-color var(--motion-base) ease,
+    background-color var(--motion-base) ease,
+    color var(--motion-base) ease,
+    opacity var(--motion-base) ease;
+}
+.btn,
+.day-cell,
+.date-item-btn,
+.poll-option-row,
+.search-result-row,
+.bottom-sheet-item,
+.poll-voter-option,
+.main-menu-item,
+.memo-card-hover,
+.place-card-row {
+  overflow: hidden;
+}
+.btn:hover,
+.bottom-sheet-item:hover,
+.poll-voter-option:hover,
+.search-result-row:hover,
+.memo-card-hover:hover,
+.place-card-row:hover {
+  transform: translate3d(0, -1px, 0);
+}
+/* A place's visit-history entry (date + note). Desktop keeps them side by side; narrow viewports
+   stack the date onto its own line above the note, since "25.06.27 (금) 영우 유리 서준 / 꽃잎반
+   다낭여행 / 씨푸드플래터..." sharing one line with the date left no room for the note to wrap
+   sensibly. The border-top only applies via the adjacent-sibling selector, so it never shows above
+   the first entry in a place with several visits. */
+.place-visit-entry {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 0.78rem;
+  color: var(--text-main);
+}
+.place-visit-entry-date {
+  flex-shrink: 0;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+.place-visit-entry-note {
+  min-width: 0;
+}
+@media (max-width: 640px) {
+  .place-visit-entry {
+    flex-direction: column;
+    gap: 2px;
+  }
+  .place-visit-entry + .place-visit-entry {
+    margin-top: 6px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border-subtle);
+  }
+}
+.btn.is-pressing,
+.day-cell.is-pressing,
+.date-item-btn.is-pressing,
+.poll-card.is-pressing,
+.poll-option-row.is-pressing,
+.recent-log-row.is-pressing,
+.search-result-row.is-pressing,
+.bottom-sheet-item.is-pressing,
+.poll-voter-option.is-pressing,
+.main-menu-item.is-pressing,
+[role="button"].is-pressing {
+  transform: translate3d(0, 1px, 0) scale(0.985);
+}
+.motion-ripple {
+  position: absolute;
+  left: var(--ripple-x, 50%);
+  top: var(--ripple-y, 50%);
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.42);
+  transform: translate(-50%, -50%) scale(0);
+  pointer-events: none;
+  mix-blend-mode: soft-light;
+  animation: motion-ripple 520ms ease-out forwards;
+  z-index: 0;
+}
+@keyframes motion-ripple {
+  to { opacity: 0; transform: translate(-50%, -50%) scale(16); }
+}
+.day-cell {
+  animation: motion-soft-pop 360ms var(--motion-ease-out) both;
+  animation-delay: calc(var(--cell-index, 0) * 8ms);
+}
+.day-cell.today {
+  animation-name: motion-soft-pop, motion-pulse-ring;
+  animation-duration: 360ms, 1800ms;
+  animation-delay: calc(var(--cell-index, 0) * 8ms), 520ms;
+  animation-iteration-count: 1, 2;
+}
+.participant-badge,
+.memo-capsule-badge,
+.main-menu-badge,
+.section-count-badge,
+.dday-badge,
+.poll-voter-badge {
+  transition: transform var(--motion-fast) var(--motion-ease-spring), filter var(--motion-fast) ease;
+}
+.participant-badge:hover,
+.memo-capsule-badge:hover,
+.poll-voter-badge:hover {
+  transform: translateY(-1px) scale(1.03);
+  filter: saturate(1.08);
+}
+@media (max-width: 720px) {
+  /* Column COUNT is safe to override (a plain number in a custom property has no effect on
+     intrinsic sizing), but track size and grid width must NOT be swapped to `1fr`/percentage
+     values here -- Chromium cannot correctly compute the shrink-to-fit (max-content) size of the
+     ancestor chat bubble through a `minmax(0, 1fr)` track or a `%`-based grid width, since neither
+     has a definite size outside of actual layout. The bubble's flex-item auto-sizing falls back to
+     the images' raw natural pixel dimensions when measuring "how wide do I want to be", which is
+     enormous -- so the bubble balloons out to its max-width (65% of the row) while the grid itself
+     still renders at its correctly-computed (much smaller) size, leaving a large empty gap to the
+     right of the thumbnails. Confirmed via isolated reproduction: literal, non-relative track/width
+     values (matching the desktop default) shrink-wrap correctly with zero gap; `1fr` tracks do not,
+     regardless of any additional width/fit-content styling on the ancestors. See the thumbnail
+     grid's own JS-computed max-width (via calc(), no `%`/`fr`) for why that one stays safe.
+  */
+  .chat-message-image-grid {
+    --chat-image-grid-cols: var(--chat-image-grid-mobile-cols) !important;
+  }
+}
+@media (min-width: 721px) {
+  .chat-message-image-grid.is-wide {
+    width: fit-content;
+    max-width: 100%;
+  }
+}
+/* Drag-to-resize handle on embedded chat videos (YouTube/Vimeo), desktop only -- native
+   `resize` needs a pointer for its corner/edge handle, so it's not a reasonable target for
+   touch. horizontal-only (not `both`) is deliberate: the iframe inside is `width: 100%` with
+   a locked aspect-ratio, so growing/shrinking the wrapper's width alone already scales the
+   video's height in proportion with zero extra JS -- resize: both would let width and height
+   drift independently and leave dead space. Scoped under .chat-room-container so the same
+   DirectChatMediaText markup used in the main-screen chat preview/memos/search results (all
+   much smaller, fixed-size contexts) isn't affected. */
+@media (min-width: 768px) {
+  .chat-room-container .chat-media-resizable {
+    resize: horizontal;
+    overflow: hidden;
+  }
+  /* The iframe's inline maxHeight (min(54vh,430px) landscape / min(72vh,620px) portrait) exists
+     to keep the un-resized embed compact -- but once the user drags wider than that cap allows
+     at the locked aspect-ratio, it clips height and the box stops being 16:9, breaking the
+     "media grows proportionally with the bubble" behavior the resize handle is for. Lifting the
+     cap only inside the resizable chat-room context lets aspect-ratio alone govern height. */
+  .chat-room-container .chat-media-resizable iframe {
+    max-height: none !important;
+  }
+}
+/* TikTok's embed.js widget sets its own inline pixel width (its default is wider than a phone
+   screen) on the iframe it generates inside .tiktok-embed once it loads -- that inline style is
+   applied by TikTok's own script after mount, so it overrides any width we set from React. Only
+   an !important external rule can win over a later inline style, which is what actually keeps
+   the widget from bleeding past the chat bubble on narrow screens. */
+.tiktok-embed,
+.tiktok-embed iframe {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+}
+/* Main-screen footer: stacked+centered on mobile (copyright, then the FAMILY LINK label, then
+   the buttons -- 3 separate lines), a single space-between row on desktop (copyright on the
+   left, "FAMILY LINK" + buttons grouped together at the right edge). Both layouts fall out of
+   the same DOM order (copyright, then the label+links group) via this one flex-direction flip. */
+.app-footer {
+  margin-top: -20px;
+  padding: 20px 20px 26px;
+  border-top: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+}
+.app-footer-copyright {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin: 0;
+}
+.app-footer-family {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.app-footer-family-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+}
+.app-footer-family-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+.app-footer-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-main);
+  padding: 6px 14px;
+  border-radius: 16px;
+  border: 1px solid var(--border-subtle);
+  background-color: var(--bg-secondary);
+  text-decoration: none;
+}
+@media (min-width: 768px) {
+  .app-footer {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    text-align: left;
+  }
+  .app-footer-family {
+    flex-direction: row;
+    align-items: center;
+  }
+}
+.poll-option-row,
+.recent-log-row,
+.search-result-row,
+.bottom-sheet-item,
+.poll-voter-option {
+  animation: motion-fade-up 260ms var(--motion-ease-out) both;
+}
+.poll-progress {
+  position: relative;
+}
+.poll-progress::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.34), transparent);
+  transform: translateX(-120%);
+  animation: motion-shimmer 2.6s ease-in-out infinite;
+}
+.poll-progress-fill {
+  transition: width 420ms var(--motion-ease-out);
+}
+.calendar-loading-pill,
+.btn-primary,
+.btn-poll-create {
+  overflow: hidden;
+}
+.calendar-loading-pill::after,
+.btn-primary::after,
+.btn-poll-create::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(110deg, transparent 20%, rgba(255,255,255,0.2), transparent 80%);
+  transform: translateX(-120%);
+  animation: motion-shimmer 3.4s ease-in-out infinite;
+  pointer-events: none;
+}
+.calendar-loading-pill {
+  position: relative;
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.001ms !important;
+  }
+  .motion-ripple { display: none !important; }
+}
+
+button, input, textarea, select {
+  word-break: keep-all;
+  max-width: 100%;
+}
+
+.app-container {
+  max-width: 1100px;
+  margin: 0 auto;
+  width: 100%;
+  min-width: 0;
+  overflow-x: clip;
+}
+@supports not (overflow: clip) {
+  .app-container { overflow-x: hidden; }
+}
+
+/* Header -- full-bleed fixed bar (edge to edge), hides on scroll-down and reappears on
+   scroll-up, matching the chat room header's behavior. Inner content is centered to the
+   same max-width as .app-container so it lines up with the page content below it. */
+.main-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  max-width: 100%;
+  overflow-x: clip;
+  background: var(--bg-card);
+  box-shadow: var(--shadow-md);
+  z-index: 500;
+  transition: transform 0.3s ease;
+}
+@supports not (overflow: clip) {
+  .main-header { overflow-x: hidden; }
+}
+.main-header-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 18px 10px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+@media (min-width: 768px) {
+  .main-header-inner { padding: 18px 10px 8px; }
+}
+
+/* Calendar name + search/settings buttons share one row (space-between); the description
+   (when present) is its own full-width row underneath, truncated to a single line rather
+   than fighting the title row for space. */
+.main-header-top-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+
+/* Search + settings: no fill/border (icon-only), grouped in one flex wrapper so their own
+   spacing is set once, in one place. */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.header-search-btn,
+.header-settings-btn {
+  background: none;
+  border: none;
+}
+
+/* Menu bar's divider line spans the full VIEWPORT width (not just the inner content's
+   max-width: 1100px box) via the standard "break out of a centered container" trick: an
+   absolutely-positioned pseudo-element centered on the menu bar (which is itself centered
+   on the viewport through its centered ancestors), sized to 100vw. The menu bar's own
+   content stays confined to the max-width box via the negative-margin trick already
+   described below -- only the divider line itself reaches the true edges. */
+.main-menu-bar {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  margin: 0 -16px;
+  padding: 8px 2px 0;
+  gap: 0;
+  /* No overflow-x:auto here: setting it forces overflow-y to compute as 'auto' too (per the
+     CSS Overflow spec, an axis can't stay 'visible' once the other is non-visible), which
+     was silently clipping the 참여자 popover -- it hangs below this bar's own box, so an
+     "auto" bar clips it away entirely instead of just leaving it invisible-until-scrolled.
+     Equal-width flex:1 items with min-width:0 already fit down to a 320px viewport without
+     needing horizontal scroll (verified), so this is a straight bug fix, not a tradeoff. */
+}
+.main-menu-bar::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 100vw;
+  margin-left: -50vw;
+  border-top: 1px solid var(--border-subtle);
+}
+@media (min-width: 768px) {
+  .main-menu-bar { margin: 0 -24px; padding: 8px 24px 0; }
+}
+/* Mobile: icon-less, shortened menu labels (더 넓은 배지/텍스트 공간 확보) -- desktop shows the
+   full icon + label. Both label spans always render; CSS picks which one is visible so no
+   JS branching is needed. */
+.main-menu-icon { display: none; }
+.main-menu-label-full { display: none; }
+.main-menu-label-short { display: inline; }
+@media (min-width: 768px) {
+  .main-menu-icon { display: inline-flex; }
+  .main-menu-label-full { display: inline; }
+  .main-menu-label-short { display: none; }
+}
+.main-menu-item {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  padding: 6px 4px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  border-radius: var(--radius-sm);
+}
+.main-menu-item:hover { background: var(--bg-primary); color: var(--text-main); }
+.main-menu-sep { flex: 0 0 auto; align-self: center; width: 1px; height: 16px; margin: 0 2px; background: var(--border-subtle); }
+.main-menu-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9999px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  background-color: var(--border-subtle);
+  color: var(--text-muted);
+}
+.main-menu-badge.is-unread {
+  background-color: #EF4444;
+  color: #FFFFFF;
+}
+@media (max-width: 480px) {
+  .main-menu-item { font-size: 0.74rem; padding: 6px 2px; }
+  .main-menu-sep { margin: 0 1px; }
+}
+
+
+/* Shrinks (min-width:0 overrides the flex-item default of not shrinking below content
+   width) so a long calendar title truncates instead of pushing header-actions -- which
+   stays flex-shrink:0 -- off the row on narrow screens. */
+.header-left { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1 1 auto; }
+@media (max-width: 640px) {
+  .header-left { margin-left: 10px; }
+}
+
+.calendar-title {
+  font-size: 1.25rem; font-weight: 800; color: var(--text-main); letter-spacing: -0.02em;
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  cursor: pointer;
+}
+@media (min-width: 768px) { .calendar-title { font-size: 1.35rem; } }
+
+.calendar-desc {
+  font-size: 0.825rem; color: var(--text-muted); margin-top: -10px;
+  white-space: normal; word-break: keep-all; overflow-wrap: break-word;
+}
+@media (min-width: 768px) { .calendar-desc { font-size: 0.875rem; } }
+
+/* Buttons */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 10px 16px; border-radius: var(--radius-md); font-size: 0.875rem; font-weight: 700;
+  cursor: pointer; transition: all 0.2s ease; border: 1px solid transparent; font-family: inherit;
+}
+.btn-primary { background: var(--accent-gradient); color: #ffffff; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25); }
+.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(79, 70, 229, 0.35); }
+.btn-poll-create {
+  background: #0F172A;
+  color: #FFFFFF;
+  border-color: #0F172A;
+  padding: 9px 13px;
+  white-space: nowrap;
+}
+.btn-poll-create:hover {
+  background: #020617;
+  border-color: #020617;
+  transform: translateY(-1px);
+}
+
+/* 버튼 규칙: 검색/추가/수정/저장 = Rounded 사각형(캡슐 X), 높이 44px */
+.btn-action,
+.btn-poll-create {
+  border-radius: 12px !important;
+  height: 44px;
+  min-height: 44px;
+  padding: 0 16px;
+  font-weight: 800;
+  white-space: nowrap;
+  box-sizing: border-box;
+}
+.btn-action-dark,
+.btn.btn-action-dark {
+  background: #0F172A !important;
+  border-color: #0F172A !important;
+  color: #FFFFFF !important;
+  box-shadow: none;
+}
+.btn-action-dark:hover,
+.btn.btn-action-dark:hover {
+  background: #020617 !important;
+  border-color: #020617 !important;
+  transform: translateY(-1px);
+}
+
+
+.btn-secondary { background: #F1F5F9; border-color: var(--border-subtle); color: var(--text-main); }
+.btn-secondary:hover { background: #E2E8F0; border-color: var(--border-hover); }
+.calendar-month-nav-btn,
+.calendar-month-nav-btn:focus {
+  background-color: transparent;
+  border: none;
+  box-shadow: none;
+}
+.calendar-month-nav-btn:hover,
+.calendar-month-nav-btn:active {
+  background-color: #E2E8F0;
+  border-color: transparent;
+}
+
+.btn-danger { background: #FEF2F2; border-color: #FCA5A5; color: #DC2626; }
+.btn-danger:hover { background: #FEE2E2; }
+
+
+
+/* Mobile rule: iOS Safari zooms focused inputs under 16px — keep form controls at 16px */
+@media (max-width: 720px) {
+  input.form-input,
+  textarea.form-input,
+  select.form-select,
+  button.form-select,
+  .form-input,
+  .form-select,
+  .inline-search-input,
+  .places-list-search-input,
+  input[type="text"],
+  input[type="search"],
+  input[type="number"],
+  textarea {
+    font-size: 16px !important;
+  }
+}
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+@supports (min-height: 100dvh) {
+  body, #root {
+    min-height: 100dvh;
+  }
+}
+
+/* 셀렉트박스 규칙: 일정 팝업 카테고리와 동일 (Rounded 사각형, Capsule 금지) */
+.form-select, .form-input {
+  width: 100%;
+  padding: 10px 14px;
+  background: var(--bg-card, #FFFFFF);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px !important;
+  color: var(--text-main);
+  font-size: 0.9rem;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  word-break: keep-all;
+  min-height: 44px;
+  box-sizing: border-box;
+}
+button.form-select {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  text-align: left;
+  cursor: pointer;
+  font-weight: 700;
+}
+.form-select-color-indicator {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: inline-block;
+}
+.form-select-chevron {
+  flex-shrink: 0;
+  color: #94A3B8;
+  width: 18px;
+  height: 18px;
+}
+
+.form-select:focus, .form-input:focus { border-color: var(--accent-primary); box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15); }
+
+/* Native <select> elements: replace the browser's default OS-styled dropdown arrow with the
+   same chevron-down icon used everywhere else in the app (e.g. the admin header's calendar
+   picker), so every select box shares one consistent look across browsers/platforms instead
+   of each rendering its own native arrow. */
+select.form-select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  cursor: pointer;
+  padding-right: 40px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%2394A3B8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6l6 -6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 18px;
+}
+
+.color-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+
+.participant-add-row,
+.participant-edit-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.participant-add-input,
+.participant-name-input {
+  min-width: 0;
+}
+
+.participant-action-btn {
+  width: 62px;
+  min-width: 62px;
+  flex: 0 0 62px;
+  height: 44px;
+  min-height: 44px;
+}
+
+.participant-remove-btn {
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  border-radius: 14px;
+  padding: 0 !important;
+  font-size: 1.05rem;
+}
+
+.color-swatch-trigger {
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  padding: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+@media (max-width: 480px) {
+  .color-swatch-trigger {
+    width: 34px;
+    min-width: 34px;
+    height: 34px;
+    flex-basis: 34px;
+  }
+  .participant-add-row { gap: 8px; }
+  .participant-action-btn {
+    width: 58px;
+    min-width: 58px;
+    flex-basis: 58px;
+    padding-left: 0;
+    padding-right: 0;
+  }
+  .participant-edit-row { gap: 8px; }
+  .participant-remove-btn {
+    width: 44px;
+    min-width: 44px;
+    flex-basis: 44px;
+  }
+}
+
+/* Calendar Card */
+.calendar-card {
+  background: var(--bg-card);
+  border-radius: var(--radius-lg); padding: 16px; margin-bottom: 20px; box-shadow: var(--shadow-lg);
+}
+.calendar-loading-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 82px;
+  border-radius: var(--radius-lg);
+  background: rgba(248, 250, 252, 0.78);
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+  pointer-events: none;
+}
+.calendar-loading-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border: 1px solid rgba(59, 130, 246, 0.22);
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.94);
+  color: #1E3A8A;
+  font-size: 0.88rem;
+  font-weight: 800;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.14);
+}
+.calendar-spinner {
+  width: 18px;
+  height: 18px;
+  border: 3px solid rgba(59, 130, 246, 0.18);
+  border-top-color: #2563EB;
+  border-radius: 9999px;
+  animation: calendar-spin 0.8s linear infinite;
+}
+@keyframes calendar-spin {
+  to { transform: rotate(360deg); }
+}
+@media (min-width: 640px) {
+  .calendar-card { padding: 24px; margin-bottom: 28px; }
+}
+
+.calendar-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 8px; }
+@media (min-width: 640px) { .calendar-nav { margin-bottom: 20px; } }
+
+.month-display { font-size: 1.15rem; font-weight: 800; color: var(--text-main); letter-spacing: -0.02em; }
+@media (min-width: 640px) { .month-display { font-size: 1.4rem; } }
+.month-display-year-short { display: none; }
+
+.weekday-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 8px; text-align: center; }
+@media (min-width: 640px) { .weekday-grid { gap: 8px; margin-bottom: 10px; } }
+
+.weekday-label { font-size: 0.75rem; font-weight: 700; color: var(--text-muted); padding: 4px 0; }
+@media (min-width: 640px) { .weekday-label { font-size: 0.8rem; padding: 6px 0; } }
+.weekday-label.sun { color: #EF4444; }
+.weekday-label.sat { color: #2563EB; }
+
+.days-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+@media (min-width: 640px) { .days-grid { gap: 8px; } }
+
+/* Holiday name label (e.g. "광복절") next to the date number gets clipped/unreadable at
+   narrow mobile cell widths -- hide it there (the date number still turns red), but keep it
+   on desktop's roomier cells where it reads fine. */
+@media (max-width: 639px) {
+  .day-corner-label { display: none; }
+  .date-year { display: none; }
+  .month-display-year-full { display: none; }
+  .month-display-year-short { display: inline; }
+  .modal-header h3 { font-size: 0.95rem !important; }
+  .modal-header .holiday-label { font-size: 0.82rem !important; }
+  .modal-header .status-badge { font-size: 0.7rem !important; padding: 2px 4px !important; }
+  .modal-header .btn { padding: 4px 6px !important; font-size: 0.72rem !important; }
+}
+
+.day-cell {
+  min-height: 58px; background: #FAFAFA; border: 1px solid transparent;
+  border-radius: var(--radius-sm); padding: 4px; cursor: pointer; transition: all 0.2s ease;
+  display: flex; flex-direction: column; justify-content: space-between; position: relative;
+  overflow: hidden;
+}
+@media (min-width: 640px) {
+  .day-cell {
+    min-height: 100px;
+    padding: 8px;
+    border-radius: var(--radius-md);
+  }
+}
+@media (max-width: 360px) {
+  .day-cell { min-height: 52px; padding: 2px; }
+}
+
+.day-cell:hover { background: #F8FAFC; border-color: var(--accent-primary); transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.day-coin-icon {
+  width: 14px;
+  height: 15px;
+}
+@media (max-width: 640px) {
+  .day-coin-icon {
+    width: 11px !important;
+    height: 11px !important;
+  }
+}
+.day-anniversary-desktop {
+  display: flex;
+}
+.day-anniversary-mobile {
+  display: none;
+}
+@media (max-width: 640px) {
+  .day-anniversary-desktop {
+    display: none !important;
+  }
+  .day-anniversary-mobile {
+    display: flex !important;
+  }
+}
+.day-cell.other-month {
+  opacity: 1;
+  background: rgba(250, 250, 250, 0.38);
+  border-color: transparent;
+}
+.day-cell.other-month.confirmed-meeting,
+.day-cell.other-month.all-available {
+  background: rgba(248, 250, 252, 0.44);
+  border-color: rgba(148, 163, 184, 0.18);
+}
+.day-cell.other-month:hover {
+  background: rgba(248, 250, 252, 0.62);
+  border-color: rgba(148, 163, 184, 0.26);
+  box-shadow: none;
+}
+.day-cell.other-month .day-number,
+.day-cell.other-month .day-corner-label {
+  color: #CBD5E1 !important;
+  opacity: 0.82;
+}
+.day-cell.other-month .badges-container {
+  opacity: 0.28;
+  filter: saturate(0.55);
+}
+.day-cell.today { border-color: var(--accent-primary); background: #EEF2FF; }
+
+.day-cell.all-available {
+  background: #ECFDF5;
+  border: 1.5px solid #10B981;
+  box-shadow: inset 0 0 4px rgba(16, 185, 129, 0.15);
+  animation: cell-glow-available 2.5s ease-in-out infinite alternate;
+}
+
+.day-cell.confirmed-meeting {
+  background: #FAF5FF;
+  border: 1.5px solid #7C3AED;
+  box-shadow: inset 0 0 5px rgba(124, 58, 237, 0.18);
+  animation: cell-glow-confirmed 2.5s ease-in-out infinite alternate;
+}
+
+@keyframes cell-glow-available {
+  0% { border-color: #10B981; box-shadow: 0 0 1px rgba(16, 185, 129, 0.1), inset 0 0 3px rgba(16, 185, 129, 0.1); }
+  100% { border-color: #34D399; box-shadow: 0 0 8px rgba(52, 211, 153, 0.35), inset 0 0 5px rgba(52, 211, 153, 0.2); }
+}
+
+@keyframes cell-glow-confirmed {
+  0% { border-color: #7C3AED; box-shadow: 0 0 1px rgba(124, 58, 237, 0.12), inset 0 0 3px rgba(124, 58, 237, 0.1); }
+  100% { border-color: #A78BFA; box-shadow: 0 0 9px rgba(167, 139, 250, 0.42), inset 0 0 6px rgba(167, 139, 250, 0.25); }
+}
+:root[data-theme="dark"] .day-cell.other-month {
+  background: rgba(27, 37, 64, 0.34);
+  border-color: rgba(71, 85, 105, 0.2);
+}
+:root[data-theme="dark"] .day-cell.other-month.confirmed-meeting,
+:root[data-theme="dark"] .day-cell.other-month.all-available {
+  background: rgba(27, 37, 64, 0.42);
+  border-color: rgba(100, 116, 139, 0.25);
+}
+:root[data-theme="dark"] .day-cell.other-month:hover {
+  background: rgba(33, 45, 77, 0.52);
+  border-color: rgba(100, 116, 139, 0.32);
+  box-shadow: none;
+}
+:root[data-theme="dark"] .day-cell.other-month .day-number,
+:root[data-theme="dark"] .day-cell.other-month .day-corner-label {
+  color: #64748B !important;
+  opacity: 0.78;
+}
+
+.day-number { font-size: 0.6rem; font-weight: 700; width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; }
+@media (min-width: 640px) {
+  .day-number { font-size: 0.95rem; width: 24px; height: 24px; }
+}
+.sun .day-number { color: #EF4444; }
+.sat .day-number { color: #2563EB; }
+
+.badges-container { display: flex; flex-wrap: wrap; gap: 3px; align-items: center; }
+@media (min-width: 640px) { .badges-container { gap: 4px; } }
+@media (max-width: 640px) {
+  .badges-container { justify-content: center; }
+}
+
+.participant-badge {
+  display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: var(--radius-full);
+  font-size: 0.72rem; font-weight: 700; line-height: 1.2; box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+}
+
+/* Own-message edit/delete controls: hidden by default, revealed on hover (desktop) or
+   tap (mobile, via the .msg-actions-revealed class toggled in JS). Tapping elsewhere
+   clears the revealed state so the buttons hide again. */
+.msg-actions-group { opacity: 0; pointer-events: none; transition: opacity 0.15s ease; }
+.msg-row-hover:hover .msg-actions-group,
+.msg-row-hover.msg-actions-revealed .msg-actions-group { opacity: 1; pointer-events: auto; }
+/* Same reveal behavior, but also collapses its own width to 0 while hidden (instead of
+   just fading) so it doesn't reserve empty space next to the timestamp -- used where the
+   actions sit inline in a header row (CommentsSection) rather than in their own column. */
+.msg-actions-group-inline { max-width: 0; opacity: 0; overflow: hidden; pointer-events: none; transition: max-width 0.15s ease, opacity 0.15s ease; }
+.msg-row-hover:hover .msg-actions-group-inline,
+.msg-row-hover.msg-actions-revealed .msg-actions-group-inline { max-width: 50px; opacity: 1; pointer-events: auto; }
+.registered-at-text {
+  color: #A7B0BF;
+  font-size: 0.6rem;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+.polls-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-bottom: 0;
+}
+.poll-card {
+  background: var(--bg-primary);
+  border-radius: var(--radius-md);
+  padding: 22px;
+}
+.poll-card + .poll-card {
+  border-top: 1px solid var(--border-subtle);
+}
+/* Grouped list look: adjoining edges between stacked poll cards go square, so the whole
+   .polls-section reads as one rounded container instead of a stack of separate boxes. A
+   single poll (:only-child) is left with its full radius. */
+.poll-card:first-child:not(:only-child) {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.poll-card:last-child:not(:only-child) {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+.poll-card:not(:first-child):not(:last-child) {
+  border-radius: 0;
+}
+@media (min-width: 640px) {
+  .poll-card { padding: 22px; }
+}
+.poll-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.poll-title {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--text-main);
+  letter-spacing: -0.02em;
+}
+.poll-desc {
+  color: var(--text-muted);
+  font-size: 0.86rem;
+  margin-top: 4px;
+}
+/* 미참여 (non-voter) badges: shown inline next to the 설정 button on desktop, but that row
+   has no room for them on narrow screens, so they drop to their own full-width row below
+   the title/description there instead. Both blocks always render; CSS picks which is
+   visible, mirroring the main-menu-label-full/short pattern above. */
+.poll-nonvoters-desktop { display: none; }
+.poll-nonvoters-mobile { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+@media (min-width: 768px) {
+  .poll-nonvoters-desktop { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .poll-nonvoters-mobile { display: none; }
+}
+.poll-option-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+@media (min-width: 768px) {
+  /* .poll-nonvoters-mobile above this is hidden at this width (desktop uses
+     .poll-nonvoters-desktop inline in the header instead), so the extra gap has
+     nothing to separate itself from here -- .poll-header's own marginBottom already
+     spaces .poll-option-list from the header on desktop. */
+  .poll-option-list { margin-top: 0; }
+}
+.polls-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 14px;
+  flex-wrap: nowrap;
+}
+.polls-panel-header .summary-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+}
+.poll-option-row {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
+}
+.poll-option-row.is-confirmed-winner {
+  border: 1px solid #8B5CF6;
+  background: #F5F3FF;
+  box-shadow: inset 0 0 0 1px rgba(139, 92, 246, 0.08);
+}
+:root[data-theme="dark"] .poll-option-row.is-confirmed-winner,
+:root:not([data-theme="light"]) .poll-option-row.is-confirmed-winner {
+  border-color: #A78BFA;
+  background: rgba(139, 92, 246, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(167, 139, 250, 0.12);
+}
+.poll-sortable-row {
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
+  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease, background 0.16s ease, opacity 0.16s ease;
+  position: relative;
+}
+.poll-sortable-row.is-dragging {
+  transform: rotate(-0.7deg) scale(1.025);
+  border-color: rgba(37, 99, 235, 0.38);
+  background: #FFFFFF;
+  box-shadow: 0 18px 35px rgba(15, 23, 42, 0.22);
+  z-index: 5;
+  opacity: 0.9;
+}
+.poll-sortable-row.is-drop-target {
+  border-color: #2563EB;
+  background: #EFF6FF;
+  box-shadow: inset 0 0 0 2px rgba(37, 99, 235, 0.16);
+}
+.poll-sortable-row.is-drop-target::before {
+  content: "";
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  top: -5px;
+  height: 3px;
+  border-radius: var(--radius-full);
+  background: #2563EB;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+.poll-option-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+.poll-option-link {
+  color: rgb(100, 116, 139);
+  font-size: 0.6rem;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+.poll-option-link:hover {
+  text-decoration: underline;
+}
+.poll-confirmed-badge {
+  background: #8B5CF6;
+  color: #FFFFFF;
+  font-size: 0.68rem;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  white-space: nowrap;
+}
+:root[data-theme="dark"] .poll-confirmed-badge,
+:root:not([data-theme="light"]) .poll-confirmed-badge {
+  background: #A78BFA;
+  color: #111827;
+}
+.poll-vote-count {
+  font-size: 0.86rem;
+  font-weight: 800;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.poll-result-row {
+  display: grid;
+  grid-template-columns: minmax(90px, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+.poll-vote-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.poll-voter-badges {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.poll-voter-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: var(--radius-full);
+  padding: 3px 4px 3px 8px;
+  font-size: 0.72rem;
+  font-weight: 900;
+  line-height: 1;
+  box-shadow: inset 0 -1px 0 rgba(15, 23, 42, 0.14);
+}
+.poll-voter-remove {
+  width: 17px;
+  height: 17px;
+  border: 0;
+  border-radius: 50%;
+  background: #FFFFFF;
+  color: #0F172A;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.18);
+}
+.poll-voter-remove svg {
+  width: 12px;
+  height: 12px;
+}
+.poll-drag-handle {
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  cursor: grab;
+  touch-action: none;
+  border: 0;
+  background: transparent;
+  padding: 0;
+}
+.poll-drag-handle:active { cursor: grabbing; }
+.poll-drag-handle:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+.poll-progress {
+  width: 100%;
+  min-width: 90px;
+  height: 4px;
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  background: #E2E8F0;
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.08);
+}
+.poll-progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #2563EB, #10B981);
+  transition: width 0.25s ease;
+}
+.poll-voter-sheet {
+  position: fixed;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  width: min(100%, 420px);
+  background: var(--bg-card);
+  border-radius: 18px 18px 0 0;
+  box-shadow: 0 -20px 40px rgba(15, 23, 42, 0.24);
+  z-index: 1200;
+  overflow: hidden;
+  animation: sheetRise 0.18s ease-out;
+}
+@keyframes sheetRise {
+  from { transform: translate(-50%, 18px); opacity: 0.85; }
+  to { transform: translate(-50%, 0); opacity: 1; }
+}
+/* Brief flash on the chat bubble a global-search result navigates to, so it's obvious
+   which message was jumped to once the view scrolls it into place. */
+@keyframes search-result-flash {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(79, 70, 229, 0); }
+  15%, 60% { box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.5); }
+}
+.search-result-flash { animation: search-result-flash 1.6s ease; border-radius: var(--radius-md); }
+.poll-voter-sheet-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-subtle);
+  font-weight: 900;
+  color: var(--text-main);
+}
+.poll-voter-option {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background: var(--bg-primary);
+  color: var(--text-main);
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 900;
+  cursor: pointer;
+}
+.poll-voter-option:hover, .poll-voter-option:focus-visible { background: #EEF2FF; border-color: var(--accent-primary); }
+:root[data-theme="dark"] .poll-voter-option:hover,
+:root[data-theme="dark"] .poll-voter-option:focus-visible,
+:root:not([data-theme="light"]) .poll-voter-option:hover,
+:root:not([data-theme="light"]) .poll-voter-option:focus-visible { background: #212D4D; border-color: var(--accent-primary); }
+@media (max-width: 640px) {
+  .poll-option-row {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+  .poll-vote-count { justify-self: start; }
+}
+@media (max-width: 640px) {
+  .days-grid .participant-badge {
+    padding: 0;
+    width: 8px;
+    height: 8px;
+    min-width: 8px;
+    border-radius: 50%;
+    box-shadow: none;
+  }
+  .days-grid .badge-name {
+    display: none;
+  }
+}
+
+/* Summary Card */
+.summary-card {
+  background: var(--bg-card);
+  border-radius: var(--radius-lg); padding: 16px; margin-bottom: 20px; box-shadow: var(--shadow-md);
+}
+@media (min-width: 640px) {
+  .summary-card { padding: 24px; margin-bottom: 28px; }
+}
+
+.summary-title { font-size: 1.05rem; font-weight: 800; color: var(--text-main); margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+@media (min-width: 640px) {
+  .summary-title { font-size: 1.15rem; margin-bottom: 16px; }
+}
+.section-count-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, currentColor 16%, transparent);
+  color: currentColor;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1;
+}
+.summary-title.is-toggleable {
+  cursor: pointer;
+  user-select: none;
+}
+.section-toggle-btn {
+  margin-left: auto;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  border: 0;
+  background: transparent;
+  color: #94A3B8;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: background-color 0.16s ease, color 0.16s ease;
+}
+.section-toggle-btn:hover {
+  background: #F1F5F9;
+  color: #334155;
+}
+:root[data-theme="dark"] .section-toggle-btn:hover,
+:root:not([data-theme="light"]) .section-toggle-btn:hover {
+  background: var(--border-subtle);
+  color: var(--text-main);
+}
+.section-toggle-btn svg {
+  width: 24px;
+  height: 24px;
+  transition: transform 0.18s ease;
+  transform: rotate(180deg);
+}
+.section-toggle-btn.is-collapsed svg {
+  transform: rotate(0deg);
+}
+.summary-title.is-collapsed {
+  margin-bottom: 0 !important;
+}
+.summary-section-divider {
+  border-top: 1px solid var(--border-subtle);
+  margin: 0;
+}
+
+.admin-section-header {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.admin-section-header .summary-title { margin-bottom: 0; }
+.admin-collapsible-header {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 10px !important;
+  min-width: 0;
+}
+.admin-collapsible-section.admin-section-collapsed .admin-collapsible-header {
+  margin-bottom: 0 !important;
+}
+.admin-collapsible-section.admin-section-collapsed .admin-collapsible-header + * {
+  margin-top: 0 !important;
+}
+.admin-progress {
+  width: 100%;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: #E2E8F0;
+  overflow: hidden;
+  margin-top: 12px;
+}
+.admin-progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: #10B981;
+}
+.admin-quota-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(210px, 100%), 1fr));
+  gap: 12px;
+}
+.admin-quota-card {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  background: #F8FAFC;
+}
+.admin-quota-label {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 850;
+  margin-bottom: 5px;
+}
+.admin-quota-value {
+  color: var(--text-main);
+  font-size: 1.1rem;
+  font-weight: 950;
+  line-height: 1.35;
+}
+.admin-quota-note {
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  font-weight: 700;
+  margin-top: 6px;
+  line-height: 1.45;
+}
+.admin-backup-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
+  gap: 12px;
+}
+.admin-backup-card {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  background: #F8FAFC;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.admin-backup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.admin-top-bar {
+  background-color: #FFFFFF;
+  border-bottom: 1px solid #E2E8F0;
+  margin: -24px 0 0;
+  padding-top: 24px;
+  box-sizing: border-box;
+}
+.admin-header {
+  padding: 20px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+}
+.admin-header-title {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+.admin-header-title > div {
+  white-space: nowrap;
+}
+.admin-auth-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+  order: 3;
+}
+.admin-menu-toggle-btn {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #0F172A;
+  box-shadow: none;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: color 0.16s ease, transform 0.16s ease;
+}
+.admin-menu-toggle-btn:hover {
+  color: #2563EB;
+  transform: translateY(-1px);
+}
+.admin-side-menu-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9990;
+  background: rgba(15, 23, 42, 0.28);
+  display: flex;
+  justify-content: flex-end;
+  animation: adminMenuFadeIn 0.18s ease-out;
+}
+.admin-side-menu {
+  width: min(300px, calc(100vw - 36px));
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;
+  background: #FFFFFF;
+  color: #0F172A;
+  box-shadow: -12px 0 34px rgba(15, 23, 42, 0.12);
+  padding: 22px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  animation: adminMenuSlideIn 0.22s cubic-bezier(.2,.8,.2,1);
+}
+.admin-side-menu-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 2px 22px;
+}
+.admin-side-menu-brand {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.admin-side-menu-logo {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: #111827;
+  color: #FFFFFF;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.05rem;
+  box-shadow: 0 12px 22px rgba(15, 23, 42, 0.18);
+  flex: 0 0 38px;
+}
+.admin-side-menu-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.admin-side-menu-title {
+  font-size: 1rem;
+  font-weight: 900;
+  color: #0F172A;
+  line-height: 1.2;
+}
+.admin-side-menu-subtitle {
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: #94A3B8;
+  line-height: 1.2;
+}
+.admin-side-menu-close-btn {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  color: #64748B;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.16s ease, color 0.16s ease;
+}
+.admin-side-menu-close-btn:hover,
+.admin-side-menu-close-btn:focus-visible {
+  background: #F8FAFC;
+  color: #0F172A;
+  outline: none;
+}
+.admin-side-menu-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 8px 0;
+  border-top: 1px solid #E2E8F0;
+  border-bottom: 1px solid #E2E8F0;
+}
+.admin-side-menu-item {
+  width: 100%;
+  min-height: 42px;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 14px;
+  background: transparent;
+  color: #0F172A;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 850;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: none;
+  transition: background-color 0.16s ease, color 0.16s ease, transform 0.16s ease;
+}
+.admin-side-menu-item:hover,
+.admin-side-menu-item:focus-visible {
+  background: #F8FAFC;
+  color: #0F172A;
+  transform: translateX(2px);
+  outline: none;
+}
+.admin-side-menu-item svg {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+}
+.admin-side-menu-item-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 11px;
+  background: #F8FAFC;
+  color: #0F172A;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 34px;
+  overflow: visible;
+  transition: background-color 0.16s ease, color 0.16s ease;
+}
+@keyframes chat-search-shake {
+  0%   { transform: translateY(0); }
+  12%  { transform: translateY(-11px); }
+  24%  { transform: translateY(9px); }
+  36%  { transform: translateY(-7px); }
+  48%  { transform: translateY(6px); }
+  60%  { transform: translateY(-4px); }
+  72%  { transform: translateY(3px); }
+  84%  { transform: translateY(-2px); }
+  100% { transform: translateY(0); }
+}
+.chat-search-focused-bubble {
+  border: 1.5px solid #7C3AED !important;
+  background-color: rgba(124, 58, 237, 0.06) !important;
+  animation: chat-search-shake 0.72s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+.chat-search-match-bubble {
+  border: 1px solid rgba(124, 58, 237, 0.35) !important;
+  background-color: rgba(124, 58, 237, 0.03) !important;
+}
+.admin-side-menu-item:hover .admin-side-menu-item-icon,
+.admin-side-menu-item:focus-visible .admin-side-menu-item-icon {
+  background: #EEF2FF;
+  color: #0F172A;
+}
+.admin-side-menu-item-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.admin-side-menu-item-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+.admin-side-menu-item-desc {
+  font-size: 0.68rem;
+  font-weight: 400;
+  line-height: 1.2;
+  color: #94A3B8;
+}
+.admin-side-menu-item:hover .admin-side-menu-item-desc,
+.admin-side-menu-item:focus-visible .admin-side-menu-item-desc {
+  color: #64748B;
+}
+.admin-side-menu-setting-row {
+  min-height: 42px;
+  padding: 6px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #0F172A;
+}
+.admin-side-menu-setting-label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.2;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.admin-side-menu-setting-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #334155;
+  background: #F1F5F9;
+  flex-shrink: 0;
+}
+:root[data-theme="dark"] .admin-side-menu-setting-icon,
+:root:not([data-theme="light"]) .admin-side-menu-setting-icon {
+  color: #CBD5E1;
+  background: #1B2540;
+}
+.admin-side-menu-font-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.admin-side-menu-font-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1px solid #E2E8F0;
+  background: #F8FAFC;
+  color: #0F172A;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 800;
+  padding: 0;
+  font-family: inherit;
+}
+.admin-side-menu-font-value {
+  min-width: 42px;
+  text-align: center;
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: #0F172A;
+}
+@keyframes adminMenuFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes adminMenuSlideIn {
+  from { transform: translateX(24px); opacity: 0.88; }
+  to { transform: translateX(0); opacity: 1; }
+}
+.admin-header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex: 1 1 440px;
+  min-width: 0;
+  gap: 8px;
+  flex-wrap: wrap;
+  order: 2;
+}
+.admin-calendar-picker-btn {
+  flex: 1 1 260px;
+  max-width: 360px;
+  min-width: min(260px, 100%);
+}
+.admin-header-action-btn {
+  min-height: 44px;
+  flex: 0 0 auto;
+}
+.admin-tab-bar {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border-top: 1px solid #E2E8F0;
+  padding: 6px 12px 0;
+  gap: 0;
+  min-width: 0;
+}
+.admin-tab-button {
+  justify-content: center;
+  min-width: 0;
+  width: 100%;
+}
+.admin-poll-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  padding: 10px 12px;
+  background-color: #F8FAFC;
+}
+.admin-poll-row-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.admin-poll-row-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.admin-poll-row-meta {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+.admin-poll-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+.admin-metric-card {
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  padding: 16px 12px;
+  background-color: #F8FAFC;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 128px;
+}
+.settlement-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.settlement-metric-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 12px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background-color: var(--bg-card);
+}
+.settlement-metric-card-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: #64748B;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.settlement-metric-card-value {
+  font-size: 1.05rem;
+  font-weight: 950;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (max-width: 480px) {
+  .settlement-metric-card {
+    padding: 10px 6px;
+    gap: 4px;
+  }
+  .settlement-metric-card-label {
+    font-size: 0.6rem;
+    gap: 3px;
+  }
+  .settlement-metric-card-value {
+    font-size: 0.78rem;
+  }
+}
+@media (max-width: 720px) {
+  .admin-header {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px;
+  }
+  .admin-header-title {
+    min-width: 0;
+  }
+  .admin-auth-actions {
+    justify-self: end;
+    order: 0;
+  }
+  .admin-header-actions {
+    justify-content: stretch;
+    grid-column: 1 / -1;
+    grid-row: 2;
+    flex-basis: 100%;
+    order: 0;
+  }
+  .admin-calendar-picker-btn {
+    max-width: none;
+  }
+  .admin-header-action-btn {
+    flex: 1 1 auto;
+  }
+  .admin-poll-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .admin-poll-row-main {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 3px;
+  }
+  .admin-poll-row-title {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+  }
+  .admin-poll-row-meta {
+    white-space: normal;
+  }
+  .admin-poll-row-actions {
+    justify-content: flex-end;
+  }
+}
+
+@media (max-width: 640px) {
+  .settings-poll-row {
+    align-items: center !important;
+  }
+  .settings-poll-row .admin-poll-row-main {
+    gap: 2px !important;
+    flex: 0 1 auto !important;
+  }
+  .settings-poll-row .admin-poll-row-actions {
+    margin-top: 2px;
+  }
+  .recovery-restore-footer {
+    width: 100%;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 6px !important;
+  }
+  .recovery-restore-footer .registered-at-text,
+  .recovery-restore-footer > span {
+    align-self: flex-start;
+    text-align: left !important;
+  }
+  .recovery-restore-btn {
+    width: 100%;
+  }
+}
+
+.date-item-btn {
+  width: 100%; display: flex; flex-direction: column; align-items: flex-start; padding: 12px 14px;
+  background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
+  color: var(--text-main); cursor: pointer; transition: all 0.2s ease; margin-bottom: 10px; text-align: left;
+  gap: 10px;
+}
+@media (min-width: 640px) {
+  .date-item-btn {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    gap: 12px;
+  }
+}
+.date-item-btn:hover { background: #EEF2FF; border-color: var(--accent-primary); transform: translateX(4px); }
+/* isPast/isConfirmed/isAvailable tint variants -- see App's SummaryList date-item-btn
+   usages, which pick one of these instead of inline backgroundColor/borderColor so dark
+   mode can retint them below instead of always showing the light pastel. */
+.date-item-btn.is-past { opacity: 0.7; background: var(--bg-primary); border-color: transparent; }
+.date-item-btn.is-confirmed { border-color: #E9D5FF; background: #FAF5FF; }
+.date-item-btn.is-available { border-color: #DBEAFE; background: #F8FAFC; }
+.date-item-btn.is-all { border-color: #A7F3D0; background: #ECFDF5; }
+:root[data-theme="dark"] .date-item-btn:hover { background: #1E2A4D; }
+:root[data-theme="dark"] .date-item-btn.is-confirmed { border-color: #5B21B6; background: #241B3D; }
+:root[data-theme="dark"] .date-item-btn.is-available { border-color: #1D4ED8; background: #16233E; }
+:root[data-theme="dark"] .date-item-btn.is-all { border-color: #065F46; background: #0F2E22; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .date-item-btn:hover { background: #1E2A4D; }
+  :root:not([data-theme="light"]) .date-item-btn.is-confirmed { border-color: #5B21B6; background: #241B3D; }
+  :root:not([data-theme="light"]) .date-item-btn.is-available { border-color: #1D4ED8; background: #16233E; }
+  :root:not([data-theme="light"]) .date-item-btn.is-all { border-color: #065F46; background: #0F2E22; }
+}
+
+/* Capsule Memo Badge */
+.memo-capsule-badge {
+  display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px;
+  border-radius: var(--radius-full); font-size: 0.75rem; font-weight: 700;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1); line-height: 1.3;
+}
+.confirmed-meeting-label-badge {
+  background-color: var(--bg-card);
+  color: #4F46E5;
+  border: none;
+  box-shadow: none;
+}
+:root[data-theme="dark"] .confirmed-meeting-label-badge {
+  background-color: transparent;
+  color: #C4B5FD;
+  border: none;
+  box-shadow: none;
+}
+@media (min-width: 640px) {
+  .memo-capsule-badge { padding: 4px 12px; font-size: 0.8rem; }
+}
+
+/* D-day capsule on the confirmed-meeting banner */
+.dday-badge {
+  display: inline-flex; align-items: center; flex-shrink: 0; padding: 4px 12px;
+  border-radius: var(--radius-full); font-size: 0.75rem; font-weight: 800; line-height: 1.3;
+  color: #FFFFFF; background: var(--accent-gradient); box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+}
+@media (min-width: 640px) {
+  .dday-badge { padding: 4px 14px; font-size: 0.8rem; }
+}
+
+.date-item-left {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+@media (min-width: 640px) {
+  .date-item-left {
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+    width: auto;
+  }
+}
+
+.date-item-badge {
+  font-size: 0.72rem;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-weight: 700;
+  white-space: nowrap;
+  align-self: flex-start;
+}
+@media (min-width: 640px) {
+  .date-item-badge {
+    font-size: 0.75rem;
+    align-self: center;
+  }
+}
+.search-result-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 8px;
+  padding: 8px 10px;
+  background-color: var(--bg-primary);
+  color: var(--text-main);
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  transition: background-color 0.18s ease;
+}
+.search-result-row:hover {
+  background-color: #EEF2FF;
+}
+:root[data-theme="dark"] .search-result-row {
+  background-color: #1B2540;
+}
+:root[data-theme="dark"] .search-result-row:hover {
+  background-color: #212D4D;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .date-item-badge.is-past {
+    background: #1B2540 !important;
+    color: #CBD5E1 !important;
+    border: 1px solid #34405C !important;
+  }
+  :root:not([data-theme="light"]) .date-item-badge.is-confirmed {
+    background: #3B1E69 !important;
+    color: #E9D5FF !important;
+    border: 1px solid #8B5CF6 !important;
+  }
+  :root:not([data-theme="light"]) .date-item-badge.is-available {
+    background: #1D315C !important;
+    color: #BFDBFE !important;
+    border: 1px solid #3B82F6 !important;
+  }
+  :root:not([data-theme="light"]) .date-item-badge.is-all {
+    background: #0F3A2A !important;
+    color: #A7F3D0 !important;
+    border: 1px solid #10B981 !important;
+  }
+  :root:not([data-theme="light"]) .confirmed-meeting-label-badge {
+    background-color: transparent;
+    color: #C4B5FD;
+    border: none;
+    box-shadow: none;
+  }
+  :root:not([data-theme="light"]) .search-result-row {
+    background-color: #1B2540;
+  }
+  :root:not([data-theme="light"]) .search-result-row:hover {
+    background-color: #212D4D;
+  }
+}
+
+.recent-log-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.recent-log-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-primary);
+}
+.recent-log-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+.recent-log-action {
+  font-size: 0.76rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.recent-log-date {
+  color: var(--text-main);
+  font-size: 0.84rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.recent-log-note {
+  color: rgb(100, 116, 139);
+  font-size: 0.84rem;
+  font-weight: 400;
+  min-width: 0;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+.recent-log-time {
+  margin-left: auto;
+  flex: 0 0 auto;
+  text-align: right;
+}
+.recent-log-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+@media (max-width: 640px) {
+  .recent-log-row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .recent-log-right {
+    margin-left: 0;
+    align-self: stretch;
+    width: 100%;
+    justify-content: space-between;
+  }
+  .recent-log-right .recent-log-time {
+    margin-left: 0;
+    text-align: left;
+  }
+  .recent-log-left {
+    align-items: flex-start;
+    width: 100%;
+  }
+  .recent-log-note {
+    flex-basis: 100%;
+  }
+}
+
+/* Higher than every modal-overlay in the app (including the 9999 override some modals use
+   to stack above other already-open modals) so a bottom-sheet picker opened from inside any
+   modal always renders on top of it instead of being visually swallowed by the modal's own
+   backdrop. Still below the always-on-top progress-overlay/toast tier (99999/100000). */
+.bottom-sheet-overlay {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(15, 23, 42, 0.6); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px);
+  z-index: 20000; display: flex; align-items: flex-end; justify-content: center;
+}
+.bottom-sheet {
+  background: var(--bg-card); width: 100%; max-width: 480px;
+  border-radius: 20px 20px 0 0; box-shadow: 0 -8px 30px rgba(0,0,0,0.15);
+  animation: sheet-slide-up 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex; flex-direction: column; max-height: 70vh;
+  color: var(--text-main);
+}
+.emoji-sheet-overlay {
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0 12px;
+  z-index: 12000;
+}
+.emoji-sheet {
+  width: min(480px, 100%);
+  margin: 0 auto;
+  max-height: min(60vh, 520px);
+  transform: translateZ(0);
+}
+@keyframes sheet-slide-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+.bottom-sheet-header {
+  padding: 16px 20px; border-bottom: 1px solid var(--border-subtle);
+  display: flex; align-items: center; justify-content: space-between;
+  background: var(--bg-primary);
+  border-radius: 20px 20px 0 0;
+}
+.bottom-sheet-header h4 { font-size: 1rem; font-weight: 800; margin: 0; }
+.bottom-sheet-body {
+  padding: 12px 20px 24px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;
+}
+/* 백드롭 규칙: 항목 글자는 참여자 선택과 같이 굵고 진하게 */
+.bottom-sheet-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s ease;
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+.bottom-sheet-item:hover {
+  background: #EEF2FF;
+  border-color: var(--accent-primary);
+  color: var(--text-main);
+}
+.bottom-sheet-item span {
+  color: var(--text-main);
+  font-weight: 700;
+}
+.bottom-sheet-header h4 {
+  font-size: 1rem;
+  font-weight: 800;
+  margin: 0;
+  color: var(--text-main);
+}
+
+.desktop-only { display: block; }
+.mobile-only { display: none; }
+@media (max-width: 640px) {
+  .desktop-only { display: none; }
+  .mobile-only { display: block; }
+}
+
+/* Modal Overlay & Card */
+.modal-overlay {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.6);
+  -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 16px;
+  overflow-x: hidden;
+}
+.modal-container {
+  background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
+  width: 100%; max-width: 480px; box-shadow: var(--shadow-lg); overflow: hidden; overflow-x: hidden; color: var(--text-main);
+  max-height: min(92vh, 860px); max-height: min(92dvh, 860px);
+  display: flex; flex-direction: column;
+}
+.modal-container > form {
+  display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; overflow: hidden;
+}
+.modal-header { padding: var(--space-5); border-bottom: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: space-between; background: var(--bg-primary); flex: 0 0 auto; }
+.modal-body {
+  padding: var(--space-5); display: flex; flex-direction: column; gap: var(--space-4);
+  overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+  flex: 1 1 auto; min-height: 0;
+}
+.modal-footer { padding: var(--space-5); border-top: 1px solid var(--border-subtle); display: flex; justify-content: flex-end; gap: 10px; background: var(--bg-primary); flex: 0 0 auto; }
+@media (max-width: 640px) {
+  .modal-overlay { align-items: center; padding: 12px; }
+  .modal-container { max-height: calc(100vh - 24px); max-height: calc(100dvh - 24px); }
+  .modal-header { padding: 18px; }
+  .modal-body { padding: 18px; gap: 14px; }
+  .modal-footer {
+    padding: 18px 18px max(18px, env(safe-area-inset-bottom));
+    position: sticky; bottom: 0; z-index: 1;
+  }
+}
+
+/* Admin log/list rows (chat log, activity timeline, poll list): left content + right
+   time/action buttons on one line normally, stacked on narrow screens since the two
+   sides' minimum content widths can exceed 320px combined and flex-wrap's auto trigger
+   is too close to the edge to rely on. */
+@media (max-width: 380px) {
+  .admin-log-row { flex-direction: column; align-items: flex-start !important; }
+  .admin-log-row > * { width: 100%; }
+}
+
+/* 복구 탭(모바일): JSON 백업관리 섹션을 타임라인 복구 섹션보다 위로 표시 */
+@media (max-width: 640px) {
+  .recovery-backup-card { order: -1; }
+}
+
+/* Admin dashboard chat-log row: badges + message + timestamp/delete inline as one row on
+   wide screens, split into 3 stacked lines (badges / full message / date+delete) on narrow
+   screens so the message never needs to truncate. */
+.admin-chat-row {
+  display: flex; align-items: center; gap: 8px 12px;
+  border-bottom: 1px solid #E2E8F0; padding: 10px 6px;
+}
+.admin-chat-header { display: flex; align-items: center; gap: 8px; flex-shrink: 0; flex-wrap: wrap; }
+.admin-chat-text {
+  font-size: 0.82rem; color: #0F172A; flex: 1; min-width: 0;
+  text-overflow: ellipsis; overflow: hidden; white-space: nowrap;
+}
+.admin-chat-footer { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+@media (max-width: 640px) {
+  .admin-chat-row { flex-direction: column; align-items: stretch; }
+  .admin-chat-text { white-space: normal; overflow: visible; text-overflow: clip; word-break: break-word; }
+  .admin-chat-footer { justify-content: space-between; }
+  /* 복구탭 타임라인 리스트: '이 시점으로 복구' 버튼을 타임스탬프와 같은 줄에 욱여넣지 않고
+     아랫줄에 전체 너비로 표시 */
+  .recovery-restore-footer { flex-direction: column; align-items: stretch; gap: 6px; }
+  .recovery-restore-btn { width: 100%; }
+}
+
+/* Admin tab bar icons: shown next to the label on desktop, hidden on mobile where the tab
+   bar is already tight on horizontal space and the label text alone is enough. */
+.admin-tab-icon { display: inline-flex; align-items: center; }
+@media (max-width: 640px) {
+  .admin-tab-icon { display: none; }
+}
+
+/* Admin dashboard metrics grid: fixed 2 columns on mobile (as requested), but auto-fit back
+   to compact multi-column on wider screens so desktop admins don't get oversized boxes. */
+.admin-metrics-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+@media (min-width: 768px) {
+  .admin-metrics-grid { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+}
+
+/* Weather settings and badge styles */
+.admin-side-menu-weather-settings-btn:hover {
+  background: #F8FAFC !important;
+  color: #0F172A !important;
+}
+:root[data-theme="dark"] .admin-side-menu-weather-settings-btn:hover {
+  background: rgba(255, 255, 255, 0.06) !important;
+  color: #FFFFFF !important;
+}
+.weather-badge-hover:hover {
+  background-color: rgba(59, 130, 246, 0.15) !important;
+  border-color: rgba(59, 130, 246, 0.28) !important;
+}
+:root[data-theme="dark"] .weather-badge-hover {
+  color: #60A5FA !important;
+  background-color: rgba(96, 165, 250, 0.08) !important;
+  border-color: rgba(96, 165, 250, 0.16) !important;
+}
+:root[data-theme="dark"] .weather-badge-hover:hover {
+  background-color: rgba(96, 165, 250, 0.15) !important;
+  border-color: rgba(96, 165, 250, 0.28) !important;
+}
+
+/* Place map (Leaflet) attribution control -- shrunk rather than removed on narrow phone
+   viewports. OpenStreetMap/CARTO's free tile usage terms require attribution to stay visible,
+   so this keeps it present but as small and unobtrusive as their guidelines allow, instead of
+   fully hiding it, to leave more visual room for pins on small screens. */
+@media (max-width: 720px) {
+  .leaflet-control-attribution {
+    font-size: 8px;
+    line-height: 1.2;
+    padding: 0 4px;
+    max-width: 60vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    background: rgba(255, 255, 255, 0.7);
+  }
+}
+
+/* Places list category filter -- a full-width equal-column tab bar reads fine on desktop, but
+   with 6+ categories (전체/식당/카페/놀이/숙박/쇼핑/기타) a narrow phone can't give each tab enough
+   room to stay legible, so it swaps for a select-box style picker instead. */
+.place-category-select-mobile-only {
+  display: none;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border-subtle);
+  box-sizing: border-box;
+}
+.inline-search-capsule {
+  border: none !important;
+  box-shadow: none !important;
+}
+.places-list-search-input,
+.inline-search-input {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.places-list-search-input:focus,
+.inline-search-input:focus {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+@media (max-width: 720px) {
+  .place-category-tabs-desktop-only {
+    display: none;
+  }
+  .place-category-select-mobile-only {
+    display: block;
+  }
+}
+
+/* Gamified Confirm Meeting Button Style */
+.btn-gamified-confirm {
+  position: relative !important;
+  background: transparent !important; /* Made transparent to let the animated pseudo-element background shine through */
+  color: #FFFFFF !important;
+  font-weight: 800 !important;
+  text-shadow: 0 1.5px 2px rgba(0, 0, 0, 0.5) !important;
+  border: 2px solid #FBCFE8 !important;
+  border-bottom: 4px solid #4C1D95 !important;
+  box-shadow: 0 4px 15px rgba(236, 72, 153, 0.5) !important;
+  animation: gamified-shake 2.5s ease-in-out infinite !important;
+  overflow: hidden !important; /* clip effects so modal scrollbar does not flicker */
+  transform-origin: center center !important;
+  z-index: 1; /* Pushes content above pseudo-element */
+  --btn-scale: 1; /* Custom CSS variable for hover/active scale to prevent keyframe conflict */
+}
+
+/* Flashy, fast animated gradient background layer using pseudo-element */
+.btn-gamified-confirm::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, 
+    #EC4899 0%,   /* Hot Pink */
+    #D946EF 20%,  /* Fuchsia */
+    #8B5CF6 40%,  /* Deep Purple */
+    #3B82F6 60%,  /* Electric Blue */
+    #00FFFF 80%,  /* Vibrant Cyan */
+    #EC4899 100%  /* Loop back to Hot Pink */
+  ) !important;
+  background-size: 300% 100% !important;
+  border-radius: var(--radius-md) !important;
+  animation: gamified-bg-pan 0.8s linear infinite !important;
+  z-index: -1;
+  pointer-events: none;
+}
+
+.btn-gamified-confirm:hover {
+  --btn-scale: 1.03; /* Modifies CSS variable value without overriding the keyframe transform property */
+}
+
+.btn-gamified-confirm:hover::before {
+  filter: brightness(1.2) !important;
+}
+
+.btn-gamified-confirm:active {
+  --btn-scale: 0.98;
+  border-bottom-width: 2px !important;
+}
+
+.btn-gamified-confirm:active::before {
+  filter: brightness(0.9) !important;
+}
+
+/* Seamless infinite horizontal color-flowing animation */
+@keyframes gamified-bg-pan {
+  0% { background-position: 0% 0%; }
+  100% { background-position: -300% 0%; }
+}
+
+/* Interval shake — translate only, no rotation */
+@keyframes gamified-shake {
+  0%, 10% { transform: translate3d(0, 0, 0) scale(var(--btn-scale, 1)); }
+  12% { transform: translate3d(-1.5px, 0, 0) scale(var(--btn-scale, 1)); }
+  14% { transform: translate3d(1.5px, 0, 0) scale(var(--btn-scale, 1)); }
+  16% { transform: translate3d(-1px, 0, 0) scale(var(--btn-scale, 1)); }
+  18% { transform: translate3d(1px, 0, 0) scale(var(--btn-scale, 1)); }
+  20%, 100% { transform: translate3d(0, 0, 0) scale(var(--btn-scale, 1)); }
+}
+
+/* Shiny gloss effect wrapper to constrain the sheen inside the button borders */
+.gamified-shiny-glow-wrapper {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow: hidden !important;
+  border-radius: var(--radius-md) !important;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.gamified-shiny-glow {
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.65) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  transform: skewX(-25deg);
+  animation: gamified-sheen 3s infinite ease-in-out;
+  pointer-events: none;
+}
+
+@keyframes gamified-sheen {
+  0% { left: -100%; }
+  45% { left: 180%; }
+  100% { left: 180%; }
+}
+
+/* Sparks container and elements */
+.gamified-sparks-container {
+  position: absolute;
+  top: -10px;
+  left: -10px;
+  right: -10px;
+  bottom: -10px;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 2;
+}
+
+.gamified-spark {
+  position: absolute;
+  width: 20px;
+  height: 40px;
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(0);
+}
+
+/* Sparks positions aligned parallel and tighter to the border directions */
+.gamified-spark-1 {
+  top: -10px; left: 15%; color: #FFFFFF;
+  filter: drop-shadow(0 0 3px #FFFFFF) drop-shadow(0 0 6px #8B5CF6) !important;
+  animation: spark-pop-1 2s infinite linear;
+  animation-delay: 0s;
+}
+.gamified-spark-2 {
+  top: 2px; right: -5px; color: #00FFFF;
+  filter: drop-shadow(0 0 3px #00FFFF) drop-shadow(0 0 6px #0088FF) !important;
+  animation: spark-pop-2 2s infinite linear;
+  animation-delay: -0.4s;
+}
+.gamified-spark-3 {
+  bottom: -10px; left: 35%; color: #FF007F;
+  filter: drop-shadow(0 0 3px #FF007F) drop-shadow(0 0 6px #D946EF) !important;
+  animation: spark-pop-3 2s infinite linear;
+  animation-delay: -0.8s;
+}
+.gamified-spark-4 {
+  top: 2px; left: -5px; color: #00FFFF;
+  filter: drop-shadow(0 0 3px #00FFFF) drop-shadow(0 0 6px #0088FF) !important;
+  animation: spark-pop-4 2s infinite linear;
+  animation-delay: -1.2s;
+}
+.gamified-spark-5 {
+  top: -10px; right: 25%; color: #FF007F;
+  filter: drop-shadow(0 0 3px #FF007F) drop-shadow(0 0 6px #D946EF) !important;
+  animation: spark-pop-5 2s infinite linear;
+  animation-delay: -1.6s;
+}
+.gamified-spark-6 {
+  bottom: -10px; right: 15%; color: #FFFFFF;
+  filter: drop-shadow(0 0 3px #FFFFFF) drop-shadow(0 0 6px #8B5CF6) !important;
+  animation: spark-pop-6 2s infinite linear;
+  animation-delay: -2s;
+}
+
+/* High-frequency static crackling lightning animations, aligned parallel to top/right/bottom/left borders */
+@keyframes spark-pop-1 {
+  0%, 80%, 100% { opacity: 0; transform: scale(0) rotate(90deg); }
+  81% { opacity: 1; transform: scale(1.3) rotate(95deg); }
+  83% { opacity: 0.2; transform: scale(0.8) rotate(85deg); }
+  85% { opacity: 1; transform: scale(1.4) rotate(100deg); }
+  87% { opacity: 0.3; transform: scale(0.7) rotate(80deg); }
+  89% { opacity: 1; transform: scale(1.2) rotate(90deg); }
+  91% { opacity: 0; transform: scale(0) rotate(90deg); }
+}
+@keyframes spark-pop-2 {
+  0%, 80%, 100% { opacity: 0; transform: scale(0) rotate(0deg); }
+  81% { opacity: 1; transform: scale(1.3) rotate(10deg); }
+  83% { opacity: 0.2; transform: scale(0.8) rotate(-10deg); }
+  85% { opacity: 1; transform: scale(1.4) rotate(15deg); }
+  87% { opacity: 0.3; transform: scale(0.7) rotate(-5deg); }
+  89% { opacity: 1; transform: scale(1.2) rotate(5deg); }
+  91% { opacity: 0; transform: scale(0) rotate(0deg); }
+}
+@keyframes spark-pop-3 {
+  0%, 80%, 100% { opacity: 0; transform: scale(0) rotate(-90deg); }
+  81% { opacity: 1; transform: scale(1.3) rotate(-85deg); }
+  83% { opacity: 0.2; transform: scale(0.8) rotate(-95deg); }
+  85% { opacity: 1; transform: scale(1.4) rotate(-80deg); }
+  87% { opacity: 0.3; transform: scale(0.7) rotate(-100deg); }
+  89% { opacity: 1; transform: scale(1.2) rotate(-90deg); }
+  91% { opacity: 0; transform: scale(0) rotate(-90deg); }
+}
+@keyframes spark-pop-4 {
+  0%, 80%, 100% { opacity: 0; transform: scale(0) rotate(180deg); }
+  81% { opacity: 1; transform: scale(1.3) rotate(190deg); }
+  83% { opacity: 0.2; transform: scale(0.8) rotate(170deg); }
+  85% { opacity: 1; transform: scale(1.4) rotate(195deg); }
+  87% { opacity: 0.3; transform: scale(0.7) rotate(175deg); }
+  89% { opacity: 1; transform: scale(1.2) rotate(185deg); }
+  91% { opacity: 0; transform: scale(0) rotate(180deg); }
+}
+@keyframes spark-pop-5 {
+  0%, 80%, 100% { opacity: 0; transform: scale(0) rotate(90deg); }
+  81% { opacity: 1; transform: scale(1.3) rotate(100deg); }
+  83% { opacity: 0.2; transform: scale(0.8) rotate(80deg); }
+  85% { opacity: 1; transform: scale(1.4) rotate(95deg); }
+  87% { opacity: 0.3; transform: scale(0.7) rotate(85deg); }
+  89% { opacity: 1; transform: scale(1.2) rotate(90deg); }
+  91% { opacity: 0; transform: scale(0) rotate(90deg); }
+}
+@keyframes spark-pop-6 {
+  0%, 80%, 100% { opacity: 0; transform: scale(0) rotate(-90deg); }
+  81% { opacity: 1; transform: scale(1.3) rotate(-95deg); }
+  83% { opacity: 0.2; transform: scale(0.8) rotate(-85deg); }
+  85% { opacity: 1; transform: scale(1.4) rotate(-100deg); }
+  87% { opacity: 0.3; transform: scale(0.7) rotate(-90deg); }
+  89% { opacity: 1; transform: scale(1.2) rotate(-95deg); }
+  91% { opacity: 0; transform: scale(0) rotate(-90deg); }
+}
+
+/* Snappy electric starburst sparklets popping on the button surfaces */
+.gamified-sparklet {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(0);
+}
+
+.gamified-sparklet-1 {
+  top: 15%; left: 25%; color: #FFFFFF;
+  filter: drop-shadow(0 0 2px #FFFFFF) drop-shadow(0 0 4px #00FFFF);
+  animation: sparklet-pop 0.7s infinite linear;
+  animation-delay: 0s;
+}
+.gamified-sparklet-2 {
+  top: 45%; right: 15%; color: #FFFF00;
+  filter: drop-shadow(0 0 2px #FFFF00) drop-shadow(0 0 4px #FF007F);
+  animation: sparklet-pop 0.8s infinite linear;
+  animation-delay: -0.15s;
+}
+.gamified-sparklet-3 {
+  bottom: 12%; left: 45%; color: #00FFFF;
+  filter: drop-shadow(0 0 2px #00FFFF) drop-shadow(0 0 4px #FFFFFF);
+  animation: sparklet-pop 0.75s infinite linear;
+  animation-delay: -0.3s;
+}
+.gamified-sparklet-4 {
+  bottom: 35%; left: 12%; color: #FF007F;
+  filter: drop-shadow(0 0 2px #FF007F) drop-shadow(0 0 4px #D946EF);
+  animation: sparklet-pop 0.85s infinite linear;
+  animation-delay: -0.45s;
+}
+.gamified-sparklet-5 {
+  top: 8%; right: 30%; color: #FFFFFF;
+  filter: drop-shadow(0 0 2px #FFFFFF) drop-shadow(0 0 4px #00FFFF);
+  animation: sparklet-pop 0.68s infinite linear;
+  animation-delay: -0.6s;
+}
+.gamified-sparklet-6 {
+  bottom: 22%; right: 25%; color: #FFFF00;
+  filter: drop-shadow(0 0 2px #FFFF00) drop-shadow(0 0 4px #FF007F);
+  animation: sparklet-pop 0.78s infinite linear;
+  animation-delay: -0.75s;
+}
+
+/* Sparklet strobe crackle/flicker pop animation */
+@keyframes sparklet-pop {
+  0%, 80%, 100% { opacity: 0; transform: scale(0) rotate(0deg); }
+  81% { opacity: 1; transform: scale(1.2) rotate(15deg); }
+  83% { opacity: 0.2; transform: scale(0.6) rotate(-10deg); }
+  85% { opacity: 1; transform: scale(1.4) rotate(45deg); }
+  87% { opacity: 0.3; transform: scale(0.5) rotate(20deg); }
+  89% { opacity: 1; transform: scale(1.1) rotate(0deg); }
+  91% { opacity: 0; transform: scale(0); }
+}
+
+/* Date Details Modal Place Search & Preview card styling */
+
+.place-result-item:hover {
+  background-color: var(--bg-hover) !important;
+}
+.place-preview-card {
+  transition: all 0.2s ease;
+}
+.place-preview-card:hover {
+  border-color: rgba(79, 70, 229, 0.3) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04), inset 0 0 5px rgba(79, 70, 229, 0.05);
+}
+
+/* Sidebar scrollbar hiding and activation during movement */
+.admin-side-menu {
+  overflow-y: auto;
+}
+.admin-side-menu::-webkit-scrollbar {
+  width: 6px;
+  background: transparent;
+}
+.admin-side-menu::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 3px;
+  transition: background-color 0.2s ease;
+}
+.admin-side-menu.scroll-active::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.4);
+}
+
+/* Gallery page: fixed search under header — tabs own the single bottom hairline */
+.gallery-page-container .inline-search-bar.is-fixed {
+  border-bottom: none !important;
+  box-shadow: none !important;
+}
+.gallery-page-container .gallery-page-tabs {
+  border-top: none;
+}
+
+/* bottom-sheet viewport rule */
+.bottom-sheet-overlay {
+  position: fixed !important;
+  top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important;
+  align-items: flex-end !important;
+  justify-content: center !important;
+  transform: none !important;
+}
+.bottom-sheet {
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  border-radius: 20px 20px 0 0 !important;
+}
+
+
+
+
+.btn-meeting-confirm-plain { background: transparent; }
+
+
+
+.date-modal-settlement-list,
+.date-modal-places-list {
+  flex: 1 1 auto;
+  min-height: 80px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.item-edit-delete-actions button:hover { color: var(--text-main); }
+
+.btn-gamified-confirm .gamified-confirm-label { position: relative; z-index: 3; }
+.btn-meeting-confirm-plain { background: transparent; }
+
+/* Uniform electric border — transform-rotate conic (works without @property; Safari/Firefox/Whale) */
+.gamified-border-electric {
+  position: absolute;
+  inset: -3px;
+  border-radius: 15px;
+  pointer-events: none;
+  z-index: 2;
+  overflow: hidden;
+  padding: 2.5px;
+  box-sizing: border-box;
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  filter:
+    drop-shadow(0 0 3px rgba(103, 232, 249, 0.95))
+    drop-shadow(0 0 10px rgba(192, 132, 252, 0.7));
+}
+.gamified-border-electric::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 220%;
+  height: 220%;
+  transform: translate(-50%, -50%);
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    transparent 200deg,
+    #67E8F9 225deg,
+    #FFFFFF 250deg,
+    #C4B5FD 275deg,
+    #F0ABFC 300deg,
+    transparent 330deg,
+    transparent 360deg
+  );
+  animation: gamified-electric-spin 1.35s linear infinite;
+}
+.gamified-border-electric-secondary {
+  padding: 2px;
+  opacity: 0.9;
+  filter:
+    drop-shadow(0 0 2px rgba(255, 255, 255, 0.85))
+    drop-shadow(0 0 8px rgba(236, 72, 153, 0.6));
+}
+.gamified-border-electric-secondary::before {
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    transparent 30deg,
+    #F9A8D4 50deg,
+    #FFFFFF 70deg,
+    #A5F3FC 95deg,
+    transparent 125deg,
+    transparent 360deg
+  );
+  animation-duration: 2s;
+  animation-direction: reverse;
+}
+@keyframes gamified-electric-spin {
+  to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gamified-border-electric::before,
+  .gamified-border-electric-secondary::before,
+  .btn-gamified-confirm,
+  .btn-gamified-confirm::before {
+    animation: none !important;
+  }
+}
+.btn-gamified-confirm .gamified-confirm-label {
+  position: relative;
+  z-index: 3;
+  letter-spacing: 0.02em;
+}
+.btn-gamified-confirm {
+  border: 2px solid rgba(255, 255, 255, 0.35) !important;
+  border-bottom: 3px solid rgba(76, 29, 149, 0.9) !important;
+  box-shadow:
+    0 4px 18px rgba(236, 72, 153, 0.45),
+    0 0 24px rgba(139, 92, 246, 0.28) !important;
+  overflow: visible !important;
+}
+.gamified-confirm-wrap {
+  overflow: visible !important;
+  border-radius: 14px;
+}
+
+.modal-body { overflow-x: hidden !important; }
+.modal-container { overflow-x: hidden !important; }
+
+.expense-sortable-row.is-dragging { opacity: 0.9; z-index: 20; }
+.expense-sortable-row .poll-drag-handle {
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.date-modal-places-list,
+.date-modal-settlement-list {
+  overflow: visible !important;
+}
+.expense-sortable-row {
+  border: 1px solid var(--border-subtle) !important;
+  box-sizing: border-box;
+}
+.expense-sortable-row.is-drop-target {
+  border-color: var(--accent-primary) !important;
+}
+
+textarea.form-input,
+textarea {
+  field-sizing: content;
+  overflow-x: hidden;
+}
+textarea.form-input {
+  min-height: 44px;
+  max-height: 480px;
+}
+
+/* Leaflet: allow one-finger pan on mobile without browser gesture conflicts */
+.leaflet-container {
+  touch-action: pan-x pan-y;
+  -webkit-tap-highlight-color: transparent;
+}
+
+
+.place-card-row.is-place-focused {
+  border-color: var(--accent-primary, #4F46E5) !important;
+}
+
+/* Main side menu: unified row spacing + graphic manual banner */
+.admin-side-menu .admin-side-menu-item {
+  min-height: 42px;
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+.admin-side-menu .admin-side-menu-item-desc {
+  display: none !important;
+}
+.admin-side-menu .admin-side-menu-item-copy {
+  gap: 0;
+}
+.admin-side-menu .admin-side-menu-list {
+  border-bottom: none;
+  gap: 0;
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+.admin-side-menu .shared-side-menu-settings .admin-side-menu-setting-row {
+  min-height: 42px;
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+.admin-side-menu .main-side-menu-manual-banner {
+  position: relative;
+  overflow: hidden;
+  min-height: 58px !important;
+  margin: 2px 8px 8px !important;
+  padding: 12px 12px !important;
+  border-radius: 16px !important;
+  border: none !important;
+  background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 48%, #A855F7 100%) !important;
+  color: #fff !important;
+  box-shadow: none !important;
+  transform: none !important;
+  gap: 12px !important;
+}
+.admin-side-menu .main-side-menu-manual-banner:hover,
+.admin-side-menu .main-side-menu-manual-banner:focus-visible {
+  background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 48%, #9333EA 100%) !important;
+  color: #fff !important;
+  filter: none;
+  transform: none !important;
+  box-shadow: none !important;
+}
+.admin-side-menu .main-side-menu-manual-banner-glow {
+  display: none !important;
+}
+.admin-side-menu .main-side-menu-manual-banner-icon-wrap {
+  position: relative;
+  z-index: 1;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.22);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 40px;
+  backdrop-filter: blur(4px);
+}
+.admin-side-menu .main-side-menu-manual-banner-text {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+.admin-side-menu .main-side-menu-manual-banner-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: #fff;
+  line-height: 1.2;
+}
+.admin-side-menu .main-side-menu-manual-banner-sub {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.88);
+  line-height: 1.2;
+}
+.admin-side-menu .main-side-menu-manual-banner-chevron {
+  position: relative;
+  z-index: 1;
+  color: rgba(255, 255, 255, 0.9);
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
+/* Shared side-menu density (all menus) */
+.admin-side-menu .admin-side-menu-list {
+  gap: 0 !important;
+  padding-top: 6px;
+  padding-bottom: 6px;
+  border-bottom: none;
+}
+.admin-side-menu .admin-side-menu-item {
+  min-height: 42px !important;
+  padding-top: 6px !important;
+  padding-bottom: 6px !important;
+}
+.admin-side-menu .admin-side-menu-item-desc {
+  display: none !important;
+}
+.admin-side-menu .admin-side-menu-item-copy {
+  gap: 0 !important;
+}
+.admin-side-menu .admin-side-menu-item-title {
+  font-weight: 650;
+  line-height: 1.25;
+}
+.admin-side-menu .admin-side-menu-setting-row {
+  min-height: 42px !important;
+  padding-top: 6px !important;
+  padding-bottom: 6px !important;
+}
+.admin-side-menu .admin-side-menu-subtitle {
+  display: none !important;
+}
+
+/* SharedSideMenuSettings: divider above 다크모드 on every side menu */
+.admin-side-menu .shared-side-menu-settings {
+  border-top: 1px solid var(--border-subtle, #E2E8F0) !important;
+  margin-top: 2px;
+  padding-top: 8px !important;
+}

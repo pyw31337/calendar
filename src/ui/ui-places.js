@@ -1,0 +1,1055 @@
+/**
+ * Places map + places view (P4-10)
+ */
+(function () {
+function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom = false, resizeSignal, preferDomesticBounds = false, focusPlace = null }) {
+  const React = window.React;
+  const __deps = window.GATHER_UI_DEPS || {};
+  const getCalendarPlaces = __deps.getCalendarPlaces;
+  const getPlaceCategories = __deps.getPlaceCategories;
+  const loadLeaflet = __deps.loadLeaflet;
+  const loadLeafletMarkerCluster = __deps.loadLeafletMarkerCluster;
+  const buildPlaceMarkerHtml = __deps.buildPlaceMarkerHtml;
+  const panMapToFitMarkerPopup = __deps.panMapToFitMarkerPopup;
+  const PLACE_MAP_DEFAULT_CENTER = __deps.PLACE_MAP_DEFAULT_CENTER;
+  const PLACE_MAP_DEFAULT_ZOOM = __deps.PLACE_MAP_DEFAULT_ZOOM;
+  const getPlaceExternalMapUrl = __deps.getPlaceExternalMapUrl;
+  const extractLeadingMemoDate = __deps.extractLeadingMemoDate;
+  const parseVisitEntriesFromMemo = __deps.parseVisitEntriesFromMemo;
+  const sortVisitEntriesRecentFirst = __deps.sortVisitEntriesRecentFirst;
+
+  const containerRef = React.useRef(null);
+  const mapRef = React.useRef(null);
+  const markersLayerRef = React.useRef(null);
+  // Keyed by place.id so the focusPlace effect below can look up and pan/zoom to a specific
+  // marker (and open its popup) without needing to re-walk `places` or rebuild the marker layer.
+  const markersByIdRef = React.useRef(new Map());
+  // getCalendarPlaces(calendar) builds a brand-new array (and place objects) on every call, so
+  // the `places` prop gets a new reference on every parent re-render even when nothing about the
+  // places actually changed -- e.g. clicking a marker opens the edit modal, which re-renders the
+  // parent, which recomputes `places`, which used to re-trigger the marker-rebuild effect below
+  // and reset the map's pan/zoom back to its fitted view mid-interaction. Comparing an actual
+  // content signature (not the array reference) lets that effect skip doing anything at all when
+  // the underlying data hasn't changed.
+  const dataSignatureRef = React.useRef(null);
+  const [ready, setReady] = React.useState(false);
+  const [loadError, setLoadError] = React.useState(false);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    loadLeaflet().then(async L => {
+      if (cancelled || !containerRef.current || mapRef.current) return;
+      const map = L.map(containerRef.current, {
+          scrollWheelZoom,
+          zoomControl: true,
+          attributionControl: true,
+          touchZoom: true,
+          dragging: true,
+          doubleClickZoom: true,
+          boxZoom: false,
+          keyboard: true,
+          tapTolerance: 15
+        })
+        .setView(PLACE_MAP_DEFAULT_CENTER, PLACE_MAP_DEFAULT_ZOOM);
+      // CartoDB Positron (free, no API key, same OSM data underneath) instead of the standard
+      // OSM tile style -- its muted greyscale/white basemap with minimal labels makes the
+      // colored category pins the only thing that actually pops, unlike the default style's
+      // busy roads/land-use colors competing with them for attention.
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+        maxZoom: 20,
+        subdomains: 'abcd',
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+      }).addTo(map);
+
+      let clusterAvailable = false;
+      try {
+        await loadLeafletMarkerCluster();
+        clusterAvailable = !!L.markerClusterGroup;
+      } catch (err) {
+        console.error('leaflet.markercluster load failed, falling back to ungrouped markers:', err);
+      }
+      if (cancelled) return;
+      markersLayerRef.current = clusterAvailable ? L.markerClusterGroup({
+        chunkedLoading: true,
+        showCoverageOnHover: false,
+        spiderfyOnMaxZoom: true,
+        disableClusteringAtZoom: 15,
+        maxClusterRadius: 50,
+        // Flat solid-color badge instead of the plugin's default ripple-ring style, to match the
+        // rest of the app's flat/minimal look rather than pulling in its default CSS theme too.
+        iconCreateFunction: cluster => {
+          const count = cluster.getChildCount();
+          // Once there's nothing left to merge with (zoomed in far enough that a "cluster" only
+          // has one marker in it, or the plugin momentarily reports a stale/zero count mid-zoom),
+          // show that marker's own category badge instead of a numbered cluster circle -- a
+          // single-marker "cluster" should look exactly like an individual marker, not like a
+          // cluster with nothing in it.
+          if (count <= 1) {
+            const child = cluster.getAllChildMarkers()[0];
+            return L.divIcon({
+              html: buildPlaceMarkerHtml(child?.placeCategory, child?.placeVisitStatus),
+              className: 'place-map-marker',
+              iconSize: [PLACE_MARKER_SIZE, PLACE_MARKER_SIZE],
+              iconAnchor: [PLACE_MARKER_SIZE / 2, PLACE_MARKER_SIZE / 2]
+            });
+          }
+          const size = count < 10 ? 30 : count < 50 ? 36 : 42;
+          return L.divIcon({
+            html: `<div style="width:100%;height:100%;border-radius:8px;background:#3B82F6;border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:12px;">${count}</div>`,
+            className: 'place-cluster-icon',
+            iconSize: [size, size]
+          });
+        }
+      }) : L.layerGroup();
+      markersLayerRef.current.addTo(map);
+      mapRef.current = map;
+      setReady(true);
+    }).catch(err => {
+      console.error('Leaflet load failed:', err);
+      if (!cancelled) setLoadError(true);
+    });
+    return () => {
+      cancelled = true;
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+      }
+    };
+  }, []);
+
+  React.useEffect(() => {
+    if (!ready || !mapRef.current || !window.L) return;
+    const L = window.L;
+    const categories = getPlaceCategories(calendar);
+    const placesKey = (places || []).map(p => `${p.id}|${p.lat}|${p.lng}|${p.updatedAt || 0}|${p.categoryId || ''}|${p.visitStatus || ''}`).join(';');
+    const categoriesKey = (categories || []).map(c => `${c.id}|${c.color || ''}`).join(';');
+    const signature = placesKey + '::' + categoriesKey;
+    if (dataSignatureRef.current === signature) return;
+    dataSignatureRef.current = signature;
+    const layer = markersLayerRef.current;
+    layer.clearLayers();
+    markersByIdRef.current = new Map();
+    const categoryMap = categories.reduce((acc, c) => { acc[c.id] = c; return acc; }, {});
+    const bounds = [];
+    (places || []).forEach(place => {
+      const category = categoryMap[place.categoryId] || categoryMap.etc;
+      // Flat circle instead of the earlier rotated-teardrop shape -- simpler to render (no CSS
+      // transform on top of Leaflet's own positioning transform).
+      const icon = L.divIcon({
+        className: 'place-map-marker',
+        html: buildPlaceMarkerHtml(category, place.visitStatus),
+        iconSize: [PLACE_MARKER_SIZE, PLACE_MARKER_SIZE],
+        iconAnchor: [PLACE_MARKER_SIZE / 2, PLACE_MARKER_SIZE / 2],
+        popupAnchor: [0, -PLACE_MARKER_SIZE / 2]
+      });
+      const marker = L.marker([place.lat, place.lng], { icon });
+      if (place.id) markersByIdRef.current.set(place.id, marker);
+      // Read back by the cluster group's iconCreateFunction above when a cluster collapses down
+      // to just this one marker, so it can render the same category badge instead of a "1".
+      marker.placeCategory = category;
+      marker.placeVisitStatus = place.visitStatus;
+      const isMobileViewport = window.innerWidth <= 720;
+      const popupNode = document.createElement('div');
+      popupNode.style.minWidth = '220px';
+
+      // Header: name+address on the left, a 업체정보(external map) button and a custom close
+      // button on the right -- Leaflet's own default close glyph doesn't share this app's
+      // stroke-based icon styling, so closeButton is disabled below and both buttons are built
+      // here instead, matching each other's size/weight/color exactly.
+      const headerEl = document.createElement('div');
+      headerEl.style.display = 'flex';
+      headerEl.style.alignItems = 'flex-start';
+      headerEl.style.justifyContent = 'space-between';
+      headerEl.style.gap = '8px';
+      const infoEl = document.createElement('div');
+      infoEl.style.minWidth = '0';
+      const nameEl = document.createElement('div');
+      nameEl.style.fontWeight = '800';
+      nameEl.style.fontSize = '0.85rem';
+      nameEl.style.marginBottom = '2px';
+      nameEl.textContent = place.name || '이름 없음';
+      infoEl.appendChild(nameEl);
+      if (place.address) {
+        const addrEl = document.createElement('div');
+        addrEl.style.fontSize = '0.75rem';
+        addrEl.style.color = '#64748B';
+        addrEl.textContent = getDisplayPlaceAddress(place);
+        infoEl.appendChild(addrEl);
+      }
+      headerEl.appendChild(infoEl);
+
+      const actionsEl = document.createElement('div');
+      actionsEl.style.display = 'flex';
+      actionsEl.style.alignItems = 'center';
+      actionsEl.style.gap = '2px';
+      actionsEl.style.flexShrink = '0';
+      const popupActionBtnStyle = { width: '22px', height: '22px', border: 'none', background: 'none', cursor: 'pointer', color: '#94A3B8', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0' };
+
+      const businessInfoBtn = document.createElement('button');
+      businessInfoBtn.type = 'button';
+      businessInfoBtn.title = '지도에서 업체정보 보기';
+      Object.assign(businessInfoBtn.style, popupActionBtnStyle);
+      // Fixed, controlled markup (not user text) -- same reasoning as buildPlaceMarkerHtml's own
+      // innerHTML use above.
+      businessInfoBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 12h4"/><path d="M10 8h4"/><path d="M14 21v-3a2 2 0 0 0-4 0v3"/><path d="M6 10H4a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-2"/><path d="M6 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16"/></svg>';
+      businessInfoBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        window.open(getPlaceExternalMapUrl(place), '_blank', 'noopener,noreferrer');
+      });
+      actionsEl.appendChild(businessInfoBtn);
+
+      const popupCloseBtn = document.createElement('button');
+      popupCloseBtn.type = 'button';
+      popupCloseBtn.title = '닫기';
+      Object.assign(popupCloseBtn.style, popupActionBtnStyle);
+      popupCloseBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6l-12 12"/><path d="M6 6l12 12"/></svg>';
+      popupCloseBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        marker.closePopup();
+      });
+      actionsEl.appendChild(popupCloseBtn);
+
+      headerEl.appendChild(actionsEl);
+      popupNode.appendChild(headerEl);
+
+      const visitEntries = parseVisitEntriesFromMemo(place.memo);
+      const memoDate = extractLeadingMemoDate(place.memo);
+      const memoWithoutDate = memoDate ? place.memo.replace(memoDate, '').trim() : place.memo;
+      const displayVisitEntries = visitEntries.length > 0
+        ? sortVisitEntriesRecentFirst(visitEntries)
+        : (memoDate ? [{ date: memoDate, note: memoWithoutDate }] : []);
+
+      if (displayVisitEntries.length > 0 || place.memo) {
+        const dividerEl = document.createElement('hr');
+        dividerEl.style.border = 'none';
+        dividerEl.style.borderTop = '1px solid #E2E8F0';
+        dividerEl.style.margin = '6px 0';
+        popupNode.appendChild(dividerEl);
+      }
+      if (displayVisitEntries.length > 0) {
+        // Bulk-imported places carry their whole visit history in one memo -- show it as an
+        // actual scrollable list of {date, note} rows here instead of one long run-on line.
+        const historyWrap = document.createElement('div');
+        historyWrap.style.marginTop = '4px';
+        historyWrap.style.maxHeight = '160px';
+        historyWrap.style.overflowY = 'auto';
+        historyWrap.style.display = 'flex';
+        historyWrap.style.flexDirection = 'column';
+        historyWrap.style.gap = '4px';
+        displayVisitEntries.forEach((entry, idx) => {
+          const rowEl = document.createElement('div');
+          rowEl.style.fontSize = '0.72rem';
+          rowEl.style.color = '#334155';
+          rowEl.style.padding = '4px 0';
+
+          if (isMobileViewport) {
+            // Mobile layout: Date one line, note next line, separator line at the bottom
+            const dateEl = document.createElement('div');
+            dateEl.textContent = formatPlaceBadgeDate(entry.date) || entry.date;
+            dateEl.style.fontWeight = '700';
+            dateEl.style.color = '#64748B';
+            dateEl.style.marginBottom = '2px';
+            rowEl.appendChild(dateEl);
+
+            const noteEl = document.createElement('div');
+            noteEl.textContent = entry.note;
+            noteEl.style.color = '#334155';
+            rowEl.appendChild(noteEl);
+
+            if (idx < displayVisitEntries.length - 1) {
+              const divider = document.createElement('div');
+              divider.style.borderTop = '1px solid #E2E8F0';
+              divider.style.margin = '6px 0 2px 0';
+              rowEl.appendChild(divider);
+            }
+          } else {
+            // PC layout: Side-by-side (flex)
+            rowEl.style.display = 'flex';
+            rowEl.style.gap = '8px';
+            rowEl.style.alignItems = 'flex-start';
+
+            const dateEl = document.createElement('span');
+            dateEl.textContent = formatPlaceBadgeDate(entry.date) || entry.date;
+            dateEl.style.flexShrink = '0';
+            dateEl.style.fontWeight = '700';
+            dateEl.style.color = '#64748B';
+            rowEl.appendChild(dateEl);
+
+            const noteEl = document.createElement('span');
+            noteEl.textContent = entry.note;
+            rowEl.appendChild(noteEl);
+          }
+          historyWrap.appendChild(rowEl);
+        });
+        popupNode.appendChild(historyWrap);
+      } else if (memoWithoutDate) {
+        // Built via DOM nodes (not innerHTML) since memo is free-text user input -- the URL
+        // portion still gets the same gray capsule badge look as renderTextWithUrlBadge, just
+        // hand-built here since Leaflet popups render outside React's tree.
+        const memoWrap = document.createElement('div');
+        memoWrap.style.fontSize = '0.75rem';
+        memoWrap.style.color = '#334155';
+        memoWrap.style.marginTop = '4px';
+        memoWrap.style.display = 'flex';
+        memoWrap.style.flexWrap = 'wrap';
+        memoWrap.style.alignItems = 'center';
+        memoWrap.style.gap = '4px';
+        const memoUrl = extractFirstUrl(memoWithoutDate);
+        const memoText = memoUrl ? removeFirstUrl(memoWithoutDate) : memoWithoutDate;
+        if (memoText) {
+          const textEl = document.createElement('span');
+          textEl.textContent = memoText;
+          memoWrap.appendChild(textEl);
+        }
+        if (memoUrl) {
+          const urlEl = document.createElement('a');
+          urlEl.href = memoUrl;
+          urlEl.target = '_blank';
+          urlEl.rel = 'noopener noreferrer';
+          urlEl.textContent = memoUrl;
+          urlEl.style.display = 'inline-block';
+          urlEl.style.padding = '2px 8px';
+          urlEl.style.borderRadius = 'var(--radius-full)';
+          urlEl.style.fontSize = '0.68rem';
+          urlEl.style.fontWeight = '600';
+          urlEl.style.backgroundColor = '#E2E8F0';
+          urlEl.style.color = '#475569';
+          urlEl.style.textDecoration = 'none';
+          urlEl.style.wordBreak = 'break-all';
+          memoWrap.appendChild(urlEl);
+        }
+        popupNode.appendChild(memoWrap);
+      }
+      // closeButton disabled -- popupCloseBtn above replaces it with one that matches this app's
+      // own icon styling. maxWidth wider on desktop (PC 가로폭 확장 요청) and capped at ~80% of
+      // the viewport on mobile instead of a fixed pixel width, matching the isMobileViewport
+      // pattern already used for fitBounds below.
+      marker.bindPopup(popupNode, {
+        closeButton: false,
+        minWidth: 220,
+        maxWidth: isMobileViewport ? Math.round(window.innerWidth * 0.8) : 480,
+        autoPan: true,
+        autoPanPadding: isMobileViewport ? [28, 56] : [48, 80],
+        autoPanPaddingTopLeft: isMobileViewport ? [24, 48] : [40, 72],
+        autoPanPaddingBottomRight: isMobileViewport ? [24, 40] : [40, 56],
+        keepInView: false
+      });
+      if (onSelectPlace) marker.on('click', () => onSelectPlace(place, { fromMap: true }));
+      marker.addTo(layer);
+      bounds.push([place.lat, place.lng]);
+    });
+    // The main-screen preview map opts into this: an imported travel log can mix a handful of
+    // overseas trips into an otherwise domestic cluster, and fitting bounds over every single pin
+    // would zoom out to "half of Asia" just to include one of them. Restricting to domestic
+    // points (and trimming outliers within Korea) keeps the default view centered on wherever
+    // most of the pins actually are, capped at roughly peninsula-wide as the widest it goes.
+    const fitBoundsPoints = preferDomesticBounds
+      ? (() => {
+          const domestic = bounds.filter(([lat, lng]) => isDomesticLatLng(lat, lng));
+          return domestic.length > 0 ? trimLatLngOutliers(domestic) : bounds;
+        })()
+      : bounds;
+    // A narrow phone viewport has much less room than the padding/maxZoom values below assume,
+    // so the same fitBounds fit reads as "too zoomed in" -- pins near the fitted edge end up
+    // hidden under the header/list below the map. Backing off one zoom level and padding out
+    // further on mobile keeps more of the cluster in frame.
+    const isMobileViewport = window.innerWidth <= 720;
+    // Focused place: do not re-center on marker rebuild (lets user drag after select).
+    if (focusPlace && focusPlace.id) {
+      const focused = markersByIdRef.current.get(focusPlace.id);
+      if (focused) {
+        requestAnimationFrame(() => {
+          try { focused.openPopup(); } catch (e) {}
+        });
+      }
+    } else if (fitBoundsPoints.length === 1) {
+      mapRef.current.setView(fitBoundsPoints[0], isMobileViewport ? 14 : 15);
+    } else if (fitBoundsPoints.length > 1) {
+      mapRef.current.fitBounds(fitBoundsPoints, {
+        padding: isMobileViewport ? [50, 70] : [30, 30],
+        maxZoom: isMobileViewport ? 15 : 16
+      });
+    } else if (preferDomesticBounds) {
+      mapRef.current.setView(PLACE_MAP_DEFAULT_CENTER, 10); // 등록된 장소가 없을 때는 서울 중심으로 표시
+    } else {
+      mapRef.current.setView(PLACE_MAP_DEFAULT_CENTER, PLACE_MAP_DEFAULT_ZOOM);
+    }
+  }, [ready, places, calendar, preferDomesticBounds]);
+
+  // Pans/zooms straight to a single place's marker and opens its popup -- driven by PlacesView's
+  // list rows (clicking one focuses that place's pin here) rather than by anything inside this
+  // component itself. `focusPlace` carries a monotonic `token` alongside the place id so clicking
+  // the SAME row twice in a row still re-triggers the pan even though the id didn't change.
+  const lastFocusTokenRef = React.useRef(null);
+  React.useEffect(() => {
+    if (!ready || !mapRef.current) return;
+    if (!focusPlace || !focusPlace.id) {
+      try { mapRef.current.closePopup(); } catch (e) {}
+      lastFocusTokenRef.current = null;
+      return;
+    }
+    if (lastFocusTokenRef.current === focusPlace.token) return;
+    lastFocusTokenRef.current = focusPlace.token;
+    const marker = markersByIdRef.current.get(focusPlace.id);
+    if (!marker) return;
+    if (focusPlace.fromMap) {
+      try { marker.openPopup(); } catch (e) {}
+      return;
+    }
+    const isMobileViewport = window.innerWidth <= 720;
+    
+    const performFocus = () => {
+      if (!mapRef.current) return;
+      const map = mapRef.current;
+      const zoom = 16;
+      const latlng = marker.getLatLng();
+      const size = map.getSize();
+      const targetPoint = map.project(latlng, zoom);
+      const offsetY = Math.min(Math.round(size.y * 0.28), isMobileViewport ? 90 : 140);
+      targetPoint.y += offsetY;
+      map.setView(map.unproject(targetPoint, zoom), zoom, { animate: false });
+      requestAnimationFrame(() => {
+        try { marker.openPopup(); } catch (e) {}
+        panMapToFitMarkerPopup(map, marker, { pad: isMobileViewport ? 20 : 28, animate: true });
+      });
+    };
+
+    const layer = markersLayerRef.current;
+    if (layer && typeof layer.getVisibleParent === 'function') {
+      const parent = layer.getVisibleParent(marker);
+      if (parent && parent !== marker && typeof layer.zoomToShowLayer === 'function') {
+        layer.zoomToShowLayer(marker, performFocus);
+        return;
+      }
+    }
+    performFocus();
+  }, [ready, focusPlace]);
+
+  // Container size changes (the section's collapse/expand aspect-ratio toggle) don't fire a
+  // window resize event, so Leaflet's internal tile grid goes stale until nudged.
+  React.useEffect(() => {
+    if (!ready || !mapRef.current) return;
+    const id = setTimeout(() => mapRef.current && mapRef.current.invalidateSize(), 260);
+    return () => clearTimeout(id);
+  }, [ready, resizeSignal]);
+
+  if (loadError) {
+    return /*#__PURE__*/React.createElement("div", {
+      style: { width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94A3B8', fontSize: '0.8rem', backgroundColor: '#F1F5F9' }
+    }, "지도를 불러오지 못했습니다.");
+  }
+
+  return /*#__PURE__*/React.createElement("div", {
+    ref: containerRef,
+    // Leaflet's internal panes/controls use z-index values up to 1000, and this div (once
+    // Leaflet turns it into .leaflet-container) has no z-index of its own -- without one, it
+    // never opens its own stacking context, so those high z-indexes compare directly against
+    // sibling elements outside the map (like the map-expand grip button below) and win despite
+    // the button's explicit z-index. Giving the container a z-index here contains Leaflet's
+    // internals inside their own stacking context so the button's z-index actually applies.
+    style: { width: '100%', height: '100%', backgroundColor: '#E2E8F0', position: 'relative', zIndex: 1 }
+  }, !ready && /*#__PURE__*/React.createElement("div", {
+    style: { width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94A3B8', fontSize: '0.8rem' }
+  }, "지도를 불러오는 중..."));
+}
+
+function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, onRequestConfirm, placesInitialQuery, setPlacesInitialQuery, isDarkTheme, onToggleTheme, fontScalePercent, onDecreaseFont, onIncreaseFont, isChatNotifyEnabled, onToggleChatNotifications, onSharePlaces }) {
+  const React = window.React;
+  const __deps = window.GATHER_UI_DEPS || {};
+  const __comp = window.GATHER_UI_COMPONENTS || {};
+  const PlaceMapView = __comp.PlaceMapView || __deps.PlaceMapView;
+  const PlaceRegisterModal = __deps.PlaceRegisterModal;
+  const SearchCategoryTabs = __deps.SearchCategoryTabs;
+  const SimpleBottomSheetPicker = __deps.SimpleBottomSheetPicker;
+  const PlaceCategoryMarkerIcon = __deps.PlaceCategoryMarkerIcon;
+  const InlineSearchBar = __comp.InlineSearchBar || __deps.InlineSearchBar;
+  const SharedSideMenuSettings = __comp.SharedSideMenuSettings || __deps.SharedSideMenuSettings;
+  const BackArrowIcon = __deps.BackArrowIcon;
+  const BuildingIcon = __deps.BuildingIcon;
+  const PencilIcon = __deps.PencilIcon;
+  const SearchIcon = __deps.SearchIcon;
+  const SmallXIcon = __deps.SmallXIcon;
+  const ThreeLinesIcon = __deps.ThreeLinesIcon;
+  const getCalendarPlaces = __deps.getCalendarPlaces;
+  const getPlaceCategories = __deps.getPlaceCategories;
+  const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
+  const extractLeadingMemoDate = __deps.extractLeadingMemoDate;
+  const parseVisitEntriesFromMemo = __deps.parseVisitEntriesFromMemo;
+  const sortVisitEntriesRecentFirst = __deps.sortVisitEntriesRecentFirst;
+  const extractKnownParticipantNames = __deps.extractKnownParticipantNames;
+  const getPlaceExternalMapUrl = __deps.getPlaceExternalMapUrl;
+
+  const [isRegisterOpen, setIsRegisterOpen] = React.useState(false);
+  const [editingPlace, setEditingPlace] = React.useState(null);
+  const [categoryFilter, setCategoryFilter] = React.useState('all');
+  const [mapExpanded, setMapExpanded] = React.useState(false);
+  // { id, token } for PlaceMapView's focus effect -- token increments on every select so clicking
+  // the same list row twice in a row still re-triggers the pan/zoom even though id didn't change.
+  const [focusPlace, setFocusPlace] = React.useState(null);
+  const focusTokenRef = React.useRef(0);
+  const scrollBodyRef = React.useRef(null);
+  
+  // Refined: Header search and Map drag height states
+  const [listSearchQuery, setListSearchQuery] = React.useState('');
+  const [isPlacesMenuOpen, setIsPlacesMenuOpen] = React.useState(false);
+  const [isSearchOpen, setIsSearchOpen] = React.useState(false);
+
+  React.useEffect(() => {
+    if (placesInitialQuery) {
+      setListSearchQuery(placesInitialQuery);
+      setIsSearchOpen(true);
+      setCategoryFilter('all');
+      setPlacesInitialQuery('');
+    }
+  }, [placesInitialQuery, setPlacesInitialQuery]);
+  const [mapHeight, setMapHeight] = React.useState(Math.round(window.innerHeight * 0.4));
+  
+  const isDraggingRef = React.useRef(false);
+  const startYRef = React.useRef(0);
+  const startHeightRef = React.useRef(mapHeight);
+  const mapHeightRef = React.useRef(mapHeight);
+  
+  React.useEffect(() => {
+    mapHeightRef.current = mapHeight;
+  }, [mapHeight]);
+
+  const handleDragStart = e => {
+    isDraggingRef.current = true;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    startYRef.current = clientY;
+    startHeightRef.current = mapHeightRef.current;
+    
+    document.addEventListener('mousemove', handleDragMove);
+    document.addEventListener('mouseup', handleDragEnd);
+    document.addEventListener('touchmove', handleDragMove, { passive: false });
+    document.addEventListener('touchend', handleDragEnd);
+  };
+
+  const handleDragMove = e => {
+    if (!isDraggingRef.current) return;
+    if (e.cancelable) e.preventDefault();
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    const deltaY = clientY - startYRef.current;
+    const nextHeight = Math.max(160, Math.min(window.innerHeight - 220, startHeightRef.current + deltaY));
+    setMapHeight(nextHeight);
+  };
+
+  const handleDragEnd = () => {
+    isDraggingRef.current = false;
+    document.removeEventListener('mousemove', handleDragMove);
+    document.removeEventListener('mouseup', handleDragEnd);
+    document.removeEventListener('touchmove', handleDragMove);
+    document.removeEventListener('touchend', handleDragEnd);
+  };
+
+  React.useEffect(() => {
+    return () => {
+      document.removeEventListener('mousemove', handleDragMove);
+      document.removeEventListener('mouseup', handleDragEnd);
+      document.removeEventListener('touchmove', handleDragMove);
+      document.removeEventListener('touchend', handleDragEnd);
+    };
+  }, []);
+
+  const places = getCalendarPlaces(calendar);
+  const categories = getPlaceCategories(calendar);
+  const categoryMap = categories.reduce((acc, c) => { acc[c.id] = c; return acc; }, {});
+
+  const handleOpenRegister = () => {
+    setEditingPlace(null);
+    setIsRegisterOpen(true);
+  };
+  const handleEditPlace = place => {
+    setEditingPlace(place);
+    setIsRegisterOpen(true);
+  };
+  
+  // Click on list item focuses marker. Since scrollBodyRef scrolls only the place list container
+  // now, scrolling is focused on list container or we can ignore scrolling if map is fixed!
+  // Wait, let's keep the smooth scroll to top of list container if list scrolls.
+  const handleSelectPlaceOnMap = (place, options = {}) => {
+    if (!place || !place.id) return;
+    if (focusPlace && focusPlace.id === place.id) {
+      setFocusPlace(null);
+      return;
+    }
+    focusTokenRef.current += 1;
+    const fromMap = !!(options && options.fromMap);
+    setFocusPlace({ id: place.id, token: focusTokenRef.current, fromMap });
+    requestAnimationFrame(() => {
+      try {
+        const container = scrollBodyRef.current;
+        if (!container) return;
+        const safeId = (window.CSS && CSS.escape) ? CSS.escape(String(place.id)) : String(place.id).replace(/"/g, '');
+        const row = container.querySelector('[data-place-id="' + safeId + '"]');
+        if (!row) return;
+        // Align focused row to TOP of list scroll area (just under sticky category tabs)
+        const cRect = container.getBoundingClientRect();
+        const rRect = row.getBoundingClientRect();
+        const pad = 8;
+        const nextTop = container.scrollTop + (rRect.top - cRect.top) - pad;
+        if (typeof container.scrollTo === 'function') {
+          container.scrollTo({ top: Math.max(0, nextTop), behavior: 'smooth' });
+        } else {
+          container.scrollTop = Math.max(0, nextTop);
+        }
+      } catch (e) {}
+    });
+  };
+  const handleCloseModal = () => {
+    setIsRegisterOpen(false);
+    setEditingPlace(null);
+  };
+
+  // Most recent visit date first, oldest last
+  const sortedPlaces = [...places].sort((a, b) => {
+    const dateA = getPlaceSortDateKey(a);
+    const dateB = getPlaceSortDateKey(b);
+    if (dateA && dateB) return dateB.localeCompare(dateA);
+    if (dateA && !dateB) return -1;
+    if (!dateA && dateB) return 1;
+    return (b.updatedAt || 0) - (a.updatedAt || 0);
+  });
+  
+  const searchedPlaces = React.useMemo(() => {
+    if (!listSearchQuery.trim()) return places;
+    const queryLower = listSearchQuery.toLowerCase().trim();
+    return places.filter(p => {
+      const matchName = p.name && p.name.toLowerCase().includes(queryLower);
+      const matchAlias = p.alias && p.alias.toLowerCase().includes(queryLower);
+      const matchAddress = p.address && p.address.toLowerCase().includes(queryLower);
+      const matchMemo = p.memo && p.memo.toLowerCase().includes(queryLower);
+      return matchName || matchAlias || matchAddress || matchMemo;
+    });
+  }, [places, listSearchQuery]);
+
+  const countsByCategory = React.useMemo(() => {
+    return searchedPlaces.reduce((acc, p) => {
+      acc[p.categoryId] = (acc[p.categoryId] || 0) + 1;
+      return acc;
+    }, {});
+  }, [searchedPlaces]);
+  
+  // Filter by category filter AND listSearchQuery query!
+  const filteredPlaces = sortedPlaces.filter(p => {
+    if (categoryFilter !== 'all' && p.categoryId !== categoryFilter) return false;
+    if (listSearchQuery.trim()) {
+      const queryLower = listSearchQuery.toLowerCase().trim();
+      const matchName = p.name && p.name.toLowerCase().includes(queryLower);
+      const matchAddress = p.address && p.address.toLowerCase().includes(queryLower);
+      const matchMemo = p.memo && p.memo.toLowerCase().includes(queryLower);
+      return matchName || matchAddress || matchMemo;
+    }
+    return true;
+  });
+  
+  const knownParticipantNames = getKnownPlaceParticipantNames(calendar);
+
+  return /*#__PURE__*/React.createElement("div", {
+    className: "places-view-container",
+    style: {
+      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+      backgroundColor: 'var(--bg-primary)',
+      display: 'flex', flexDirection: 'column',
+      width: '100%', maxWidth: '100%', overflowX: 'hidden'
+    }
+  },
+    /* Header: inline back button, centered title, right action buttons */
+    /*#__PURE__*/React.createElement("div", {
+      className: "places-view-header",
+      style: {
+        position: 'relative', height: '56px',
+        backgroundColor: 'var(--bg-card)', borderBottom: '1px solid var(--border-subtle)',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '0 16px', zIndex: 1010, flexShrink: 0
+      }
+    },
+      /* Back button inline inside header */
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: onBack,
+        "aria-label": "뒤로가기",
+        style: {
+          width: '36px', height: '36px',
+          borderRadius: '50%', backgroundColor: 'transparent', border: 'none',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          cursor: 'pointer', color: '#64748B'
+        }
+      }, /*#__PURE__*/React.createElement(BackArrowIcon, { size: 22 })),
+      
+      /* Title */
+      /*#__PURE__*/React.createElement("div", {
+        style: {
+          position: 'absolute', left: '50%', transform: 'translateX(-50%)',
+          display: 'flex', alignItems: 'center', fontWeight: 800, fontSize: '0.95rem',
+          color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden',
+          textOverflow: 'ellipsis', maxWidth: 'calc(100vw - 160px)', pointerEvents: 'none'
+        }
+      }, calendar.title, " 장소"),
+      
+      /* Right: 3-line menu (등록/검색) */
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: () => setIsPlacesMenuOpen(true),
+        title: "메뉴",
+        "aria-label": "장소 메뉴",
+        style: {
+          background: 'none', border: 'none', cursor: 'pointer', padding: '6px',
+          color: '#64748B', display: 'flex', alignItems: 'center', justifyContent: 'center'
+        }
+      }, /*#__PURE__*/React.createElement(ThreeLinesIcon, { size: 22 }))
+    ),
+
+    /* Slide-down search input bar (shared InlineSearchBar) */
+    isSearchOpen && /*#__PURE__*/React.createElement(InlineSearchBar, {
+      value: listSearchQuery,
+      placeholder: "등록된 장소명 또는 주소 검색...",
+      onChange: e => {
+        const val = e.target.value;
+        setListSearchQuery(val);
+        if (val.trim()) setCategoryFilter('all');
+      },
+      trailing: listSearchQuery ? /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: () => setListSearchQuery(''),
+        style: { border: 'none', background: 'none', color: 'var(--text-muted)', fontSize: '0.8rem', cursor: 'pointer', fontWeight: 600, flexShrink: 0 }
+      }, "초기화") : null
+    }),
+
+    /* Sticky Map Area */
+    /*#__PURE__*/React.createElement("div", {
+      className: "places-map-sticky-area",
+      style: mapExpanded
+        ? { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1005 }
+        : { position: 'relative', width: '100%', height: `${mapHeight}px`, minHeight: '160px', flexShrink: 0, zIndex: 10 }
+    },
+      /*#__PURE__*/React.createElement(PlaceMapView, {
+        places,
+        calendar,
+        scrollWheelZoom: true,
+        resizeSignal: `${mapExpanded}_${mapHeight}`,
+        focusPlace,
+        onSelectPlace: handleSelectPlaceOnMap
+      }),
+      
+      /* Centered Grip Handle + Right Resizer Handle Control Bar */
+      /*#__PURE__*/React.createElement("div", {
+        style: {
+          position: 'absolute', left: 0, right: 0, bottom: 0, height: '32px',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '0 12px', borderTop: '1px solid var(--border-subtle)',
+          backgroundColor: 'var(--bg-card)', zIndex: 6, boxSizing: 'border-box'
+        }
+      },
+        /* Left Spacer */
+        /*#__PURE__*/React.createElement("div", { style: { width: '32px' } }),
+        
+        /* Centered expand/collapse button */
+        /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          onClick: () => setMapExpanded(prev => !prev),
+          "aria-label": mapExpanded ? '지도 축소' : '지도 확대',
+          title: mapExpanded ? '지도 축소' : '지도 확대',
+          style: {
+            background: 'none', border: 'none', cursor: 'pointer', color: '#64748B',
+            display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }
+        }, /*#__PURE__*/React.createElement(ThreeLinesIcon, { size: 20 })),
+        
+        /* Right drag resizer handle (only shown when map is not fullscreen expanded) */
+        !mapExpanded ? /*#__PURE__*/React.createElement("div", {
+          onMouseDown: handleDragStart,
+          onTouchStart: handleDragStart,
+          title: "드래그하여 지도 크기 조절",
+          style: {
+            width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'ns-resize', color: '#94A3B8', userSelect: 'none', touchAction: 'none'
+          }
+        },
+          /* Lucide-style split diagonal resizing arrows */
+          /*#__PURE__*/React.createElement("svg", {
+            xmlns: "http://www.w3.org/2000/svg",
+            width: "16",
+            height: "16",
+            viewBox: "0 0 24 24",
+            fill: "none",
+            stroke: "currentColor",
+            strokeWidth: "2",
+            strokeLinecap: "round",
+            strokeLinejoin: "round"
+          },
+            /*#__PURE__*/React.createElement("path", { d: "M15 3h6v6" }),
+            /*#__PURE__*/React.createElement("path", { d: "M9 21H3v-6" }),
+            /*#__PURE__*/React.createElement("path", { d: "M21 3l-7 7" }),
+            /*#__PURE__*/React.createElement("path", { d: "M3 21l7-7" })
+          )
+        ) : /*#__PURE__*/React.createElement("div", { style: { width: '32px' } })
+      )
+    ),
+
+    /* Sticky Category Tabs */
+    !mapExpanded && categories.length > 0 && /*#__PURE__*/React.createElement("div", {
+      className: "places-category-sticky-tabs",
+      style: { flexShrink: 0, zIndex: 9, backgroundColor: 'var(--bg-card)', borderBottom: '1px solid var(--border-subtle)' }
+    },
+      /*#__PURE__*/React.createElement("div", { className: "place-category-tabs-desktop-only" },
+        /*#__PURE__*/React.createElement(SearchCategoryTabs, {
+          tabs: [
+            { key: 'all', label: '전체', count: searchedPlaces.length },
+            ...categories.map(category => ({
+              key: category.id,
+              label: `${getPlaceCategoryIcon(category)} ${category.name}`,
+              count: countsByCategory[category.id] || 0
+            }))
+          ],
+          activeKey: categoryFilter,
+          onSelect: setCategoryFilter,
+          containerStyle: { backgroundColor: 'var(--bg-card)' },
+          tabPadding: '12px 4px',
+          tabTextStyle: { fontSize: '0.85rem', fontWeight: 700 },
+          countBadgeClassName: "section-count-badge"
+        })
+      ),
+      /*#__PURE__*/React.createElement("div", { className: "place-category-select-mobile-only" },
+        /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
+          title: "카테고리 선택",
+          value: categoryFilter,
+          options: [
+            {
+              value: 'all',
+              label: /*#__PURE__*/React.createElement(React.Fragment, null, "전체 ", /*#__PURE__*/React.createElement("span", { className: "section-count-badge" }, searchedPlaces.length))
+            },
+            ...categories.map(category => ({
+              value: category.id,
+              label: /*#__PURE__*/React.createElement(React.Fragment, null,
+                `${getPlaceCategoryIcon(category)} ${category.name} `,
+                /*#__PURE__*/React.createElement("span", { className: "section-count-badge" }, countsByCategory[category.id] || 0)
+              )
+            }))
+          ],
+          onSelect: setCategoryFilter
+        })
+      )
+    ),
+
+    /* Scrollable Cards List Container (Scrolling independently) */
+    !mapExpanded && /*#__PURE__*/React.createElement("div", {
+      ref: scrollBodyRef,
+      style: { flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }
+    },
+      /* Place cards list layout */
+      /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: 'flex', flexDirection: 'column', gap: '6px', padding: '10px',
+          border: 'none', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-card)',
+          boxShadow: '0 1px 4px rgba(0,0,0,0.08)'
+        }
+      },
+        filteredPlaces.length === 0 ? /*#__PURE__*/React.createElement("div", {
+          style: { padding: '30px 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }
+        }, places.length === 0 ? "등록된 장소가 없습니다. 우측 상단 아이콘을 눌러 추가해 보세요." : "검색 조건에 맞는 장소가 없습니다.") :
+        filteredPlaces.map(place => {
+          const category = categoryMap[place.categoryId] || categoryMap.etc;
+          const memoDate = extractLeadingMemoDate(place.memo);
+          const visitEntries = parseVisitEntriesFromMemo(place.memo);
+          const memoWithoutDate = memoDate ? place.memo.replace(memoDate, '').trim() : place.memo;
+          const participantNames = extractKnownParticipantNames(place.memo, knownParticipantNames);
+          const displayVisitEntries = visitEntries.length > 0
+            ? sortVisitEntriesRecentFirst(visitEntries)
+            : (memoDate ? [{ date: memoDate, note: memoWithoutDate }] : []);
+          return /*#__PURE__*/React.createElement("div", {
+            key: place.id,
+            className: "place-card-row" + (focusPlace && focusPlace.id === place.id ? " is-place-focused" : ""),
+            "data-place-id": place.id,
+            role: "button",
+            tabIndex: 0,
+            onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleSelectPlaceOnMap(place); } },
+            style: {
+              display: 'flex', flexDirection: 'column', gap: '4px',
+              padding: '10px 12px', position: 'relative',
+              border: focusPlace && focusPlace.id === place.id ? '1.5px solid var(--accent-primary)' : '1px solid var(--border-subtle)',
+              borderRadius: 'var(--radius-md)',
+              cursor: 'pointer',
+              backgroundColor: focusPlace && focusPlace.id === place.id ? 'rgba(79, 70, 229, 0.08)' : 'var(--bg-card)',
+              boxShadow: focusPlace && focusPlace.id === place.id ? '0 0 0 3px rgba(79, 70, 229, 0.12)' : 'none',
+              transition: 'border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease'
+            },
+            onClick: () => handleSelectPlaceOnMap(place)
+          },
+            /* Top-right absolute action buttons */
+            /*#__PURE__*/React.createElement("div", {
+              style: { position: 'absolute', top: '8px', right: '8px', display: 'flex', alignItems: 'center', gap: '4px' }
+            },
+              /*#__PURE__*/React.createElement("button", {
+                type: "button",
+                onClick: event => {
+                  event.stopPropagation();
+                  window.open(getPlaceExternalMapUrl(place), '_blank', 'noopener,noreferrer');
+                },
+                title: "업체보기",
+                style: {
+                  width: '28px', height: '28px',
+                  background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0
+                }
+              }, /*#__PURE__*/React.createElement(BuildingIcon, { size: 14 })),
+              /*#__PURE__*/React.createElement("button", {
+                type: "button",
+                onClick: event => { event.stopPropagation(); handleEditPlace(place); },
+                title: "장소 수정",
+                style: {
+                  width: '28px', height: '28px',
+                  background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0
+                }
+              }, /*#__PURE__*/React.createElement(PencilIcon, { size: 14 }))
+            ),
+            
+            /* Category Label Capsule and Visit Info */
+            /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', paddingRight: '64px' } },
+              /*#__PURE__*/React.createElement("span", {
+                style: {
+                  display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '3px 8px 3px 3px', borderRadius: '999px',
+                  backgroundColor: `${category.color}18`, color: category.color, fontSize: '0.68rem', fontWeight: 900
+                }
+              },
+                /*#__PURE__*/React.createElement("span", {
+                  style: {
+                    width: '16px', height: '16px', borderRadius: '50%', flexShrink: 0,
+                    backgroundColor: place.visitStatus === 'planned' ? '#FFFFFF' : category.color,
+                    border: place.visitStatus === 'planned' ? `1px solid ${category.color}` : 'none',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    boxSizing: 'border-box'
+                  }
+                }, /*#__PURE__*/React.createElement(PlaceCategoryMarkerIcon, {
+                  category,
+                  size: 10,
+                  strokeColor: place.visitStatus === 'planned' ? category.color : '#fff'
+                })),
+                category.name
+              ),
+              /*#__PURE__*/React.createElement("span", {
+                style: {
+                  fontSize: '0.66rem', fontWeight: 700, padding: '2px 7px', borderRadius: 'var(--radius-full)',
+                  backgroundColor: place.visitStatus === 'planned' ? 'rgba(59, 130, 246, 0.12)' : 'rgba(16, 185, 129, 0.12)',
+                  color: place.visitStatus === 'planned' ? '#2563EB' : '#16A34A'
+                }
+              }, place.visitStatus === 'planned' ? '방문예정' : '방문'),
+              visitEntries.length > 0 && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 700 } }, `총 ${visitEntries.length}회 방문`)
+            ),
+            
+            /* Name & Address -- alias is the list display name when set; official name shown underneath */
+            /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 } },
+              /*#__PURE__*/React.createElement("span", { style: { fontWeight: 800, fontSize: '0.88rem', color: 'var(--text-main)' } }, (place.alias || place.name || '이름 없음')),
+              place.alias && place.name && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.72rem', color: 'var(--text-muted)' } }, place.name),
+              place.address && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.74rem', color: 'var(--text-muted)' } }, getDisplayPlaceAddress(place))
+            ),
+            
+            /* Visits history log or plain memo */
+            displayVisitEntries.length > 0
+              ? /*#__PURE__*/React.createElement("div", {
+                  style: {
+                    display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '2px',
+                    backgroundColor: 'var(--bg-primary)', borderRadius: 'var(--radius-md)', padding: '8px 10px'
+                  }
+                }, displayVisitEntries.map((entry, idx) => /*#__PURE__*/React.createElement("div", {
+                  key: idx,
+                  className: "place-visit-entry"
+                },
+                  /*#__PURE__*/React.createElement("span", { className: "place-visit-entry-date" }, formatPlaceBadgeDate(entry.date) || entry.date),
+                  /*#__PURE__*/React.createElement("span", { className: "place-visit-entry-note" }, entry.note)
+                )))
+              : memoWithoutDate && /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.78rem', color: 'var(--text-main)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px' } }, renderTextWithUrlBadge(memoWithoutDate))
+          );
+        })
+      )
+    ),
+
+    isPlacesMenuOpen && /*#__PURE__*/React.createElement("div", {
+      className: "admin-side-menu-overlay",
+      style: { zIndex: 12000 },
+      onClick: () => setIsPlacesMenuOpen(false)
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "admin-side-menu",
+      onClick: e => e.stopPropagation(),
+      role: "dialog",
+      "aria-label": "장소 메뉴"
+    },
+      /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-header" },
+        /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-brand" },
+          /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-copy" },
+            /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-title" }, "장소 메뉴")
+          )
+        ),
+        /*#__PURE__*/React.createElement("button", {
+          type: "button", className: "admin-side-menu-close-btn",
+          title: "메뉴 닫기", "aria-label": "메뉴 닫기",
+          onClick: () => setIsPlacesMenuOpen(false)
+        }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }))
+      ),
+      /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-list" },
+        /*#__PURE__*/React.createElement("button", {
+          type: "button", className: "admin-side-menu-item",
+          onClick: () => { setIsPlacesMenuOpen(false); setIsSearchOpen(true); }
+        },
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement(SearchIcon, null)),
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
+            /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "장소 검색"),
+            /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "등록된 장소명·주소 검색")
+          )
+        ),
+        /*#__PURE__*/React.createElement("button", {
+          type: "button", className: "admin-side-menu-item",
+          onClick: () => { setIsPlacesMenuOpen(false); handleOpenRegister(); }
+        },
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", {
+            xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
+          }, /*#__PURE__*/React.createElement("path", { d: "M5 12h14" }), /*#__PURE__*/React.createElement("path", { d: "M12 5v14" }))),
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
+            /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "장소 등록"),
+            /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "새 장소 추가하기")
+          )
+        ),
+        /*#__PURE__*/React.createElement("button", {
+          type: "button", className: "admin-side-menu-item",
+          onClick: () => {
+            setIsPlacesMenuOpen(false);
+            if (typeof onSharePlaces === 'function') onSharePlaces();
+          }
+        },
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", {
+            xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
+          }, /*#__PURE__*/React.createElement("path", { d: "M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" }), /*#__PURE__*/React.createElement("polyline", { points: "16 6 12 2 8 6" }), /*#__PURE__*/React.createElement("line", { x1: "12", x2: "12", y1: "2", y2: "15" }))),
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
+            /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "공유하기"),
+            /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "장소 페이지 URL 복사")
+          )
+        )
+      ),
+      /*#__PURE__*/React.createElement(SharedSideMenuSettings, {
+        isDarkTheme: isDarkTheme,
+        onToggleTheme: onToggleTheme,
+        fontScalePercent: fontScalePercent,
+        onDecreaseFont: onDecreaseFont,
+        onIncreaseFont: onIncreaseFont,
+        isChatNotifyEnabled: isChatNotifyEnabled,
+        onToggleChatNotifications: onToggleChatNotifications
+      })
+    )),
+    isRegisterOpen && /*#__PURE__*/React.createElement(PlaceRegisterModal, {
+      calendar,
+      editingPlace,
+      onClose: handleCloseModal,
+      onSave: onSavePlace,
+      onDelete: onDeletePlace,
+      showToast,
+      onRequestConfirm
+    })
+  );
+}
+
+  window.GATHER_UI_COMPONENTS = Object.assign({}, window.GATHER_UI_COMPONENTS || {}, {
+    PlaceMapView: PlaceMapView,
+    PlacesView: PlacesView
+  });
+})();
