@@ -20,7 +20,7 @@ function SharedSideMenuSettings({
 
   return /*#__PURE__*/React.createElement("div", {
     className: "admin-side-menu-list shared-side-menu-settings",
-    style: { borderTop: 'none', borderBottom: 'none', paddingTop: '4px', paddingBottom: '4px' }
+    style: { borderTop: '1px solid var(--border-subtle, #E2E8F0)', borderBottom: 'none', paddingTop: '8px', paddingBottom: '4px', marginTop: '2px' }
   },
     /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-setting-row" },
       /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-label" },
@@ -247,18 +247,16 @@ function MainSideMenu({
         )
       )
     ),
-    /* Group 3: theme / font / notify */
-    /*#__PURE__*/React.createElement("div", { style: { borderTop: '1px solid var(--border-subtle, #E2E8F0)', marginTop: '2px' } },
-      /*#__PURE__*/React.createElement(SharedSideMenuSettings, {
-        isDarkTheme: isDarkTheme,
-        onToggleTheme: onToggleTheme,
-        fontScalePercent: fontScalePercent,
-        onDecreaseFont: onDecreaseFont,
-        onIncreaseFont: onIncreaseFont,
-        isChatNotifyEnabled: isChatNotifyEnabled,
-        onToggleChatNotifications: onToggleChatNotifications
-      })
-    ),
+    /* Group 3: theme / font / notify (divider owned by SharedSideMenuSettings) */
+    /*#__PURE__*/React.createElement(SharedSideMenuSettings, {
+      isDarkTheme: isDarkTheme,
+      onToggleTheme: onToggleTheme,
+      fontScalePercent: fontScalePercent,
+      onDecreaseFont: onDecreaseFont,
+      onIncreaseFont: onIncreaseFont,
+      isChatNotifyEnabled: isChatNotifyEnabled,
+      onToggleChatNotifications: onToggleChatNotifications
+    }),
     /* Group 4: share + shortcut */
     /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-list", style: { borderTop: '1px solid var(--border-subtle, #E2E8F0)', borderBottom: 'none', paddingTop: '6px', marginTop: '2px' } },
       /*#__PURE__*/React.createElement("button", {

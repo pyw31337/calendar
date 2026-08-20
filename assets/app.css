@@ -3364,3 +3364,10 @@ textarea.form-input {
 .admin-side-menu .admin-side-menu-subtitle {
   display: none !important;
 }
+
+/* SharedSideMenuSettings: divider above 다크모드 on every side menu */
+.admin-side-menu .shared-side-menu-settings {
+  border-top: 1px solid var(--border-subtle, #E2E8F0) !important;
+  margin-top: 2px;
+  padding-top: 8px !important;
+}
