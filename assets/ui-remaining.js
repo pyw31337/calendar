@@ -1,0 +1,562 @@
+/**
+ * Direct media, deadline picker, places section, image URL (P4-21)
+ */
+(function () {
+function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox, linkPreview, style = {}, message = null, stickyVideoKey = null, onReleaseSticky = null }) {
+  const React = window.React;
+  const __deps = window.GATHER_UI_DEPS || {};
+  const __comp = window.GATHER_UI_COMPONENTS || {};
+  const LinkPreviewCard = __comp.LinkPreviewCard || __deps.LinkPreviewCard;
+  const TikTokEmbedWidget = __comp.TikTokEmbedWidget || __deps.TikTokEmbedWidget;
+  const extractFirstUrl = __deps.extractFirstUrl;
+
+  const firstUrl = extractFirstUrl(text);
+  const mediaInfo = getDirectChatMediaInfo(firstUrl);
+  const [failed, setFailed] = React.useState(false);
+  React.useEffect(() => {
+    setFailed(false);
+  }, [firstUrl]);
+
+  // Tracks which embed the user actually played, so navigating away from chat knows which
+  // video (if any) to keep alive as the floating mini player -- see changeView's sticky-video
+  // promotion. Clicks inside a cross-origin iframe never bubble out to this parent div, so a
+  // plain onClick handler can't see them; a window 'blur' event fires when focus moves INTO the
+  // iframe (e.g. the user hit play), and document.activeElement then correctly identifies which
+  // of possibly many embeds in the chat history received it.
+  const embedIframeRef = React.useRef(null);
+  const isEmbedVideo = mediaInfo && mediaInfo.type === 'embed';
+  React.useEffect(() => {
+    if (!isEmbedVideo) return;
+    const handleWindowBlur = () => {
+      if (document.activeElement === embedIframeRef.current) {
+        lastFocusedChatVideo = {
+          key: message ? message.id : null,
+          embedUrl: mediaInfo.url,
+          provider: mediaInfo.provider,
+          orientation: mediaInfo.orientation,
+          title: mediaInfo.provider === 'youtube' ? 'YouTube 영상' : mediaInfo.provider === 'vimeo' ? 'Vimeo 영상' : '링크 영상'
+        };
+      }
+    };
+    window.addEventListener('blur', handleWindowBlur);
+    return () => window.removeEventListener('blur', handleWindowBlur);
+  }, [isEmbedVideo, mediaInfo && mediaInfo.url, message && message.id]);
+  const isThisSticky = isEmbedVideo && stickyVideoKey && message && message.id === stickyVideoKey;
+
+  if (!mediaInfo || failed) {
+    return /*#__PURE__*/React.createElement(React.Fragment, null,
+      text ? parseTextWithLinks(text, searchQuery) : null,
+      firstUrl && /*#__PURE__*/React.createElement(LinkPreviewCard, {
+        url: firstUrl,
+        fallbackTitle: text ? removeFirstUrl(text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : '',
+        cachedData: linkPreview
+      })
+    );
+  }
+
+  const remainingText = removeFirstUrl(text);
+  const maxWidth = style.maxWidth || '320px';
+  const maxHeight = style.maxHeight || '240px';
+  const marginBottom = remainingText ? '8px' : (style.marginBottom || '0');
+  const isPortraitEmbed = mediaInfo.type === 'embed' && mediaInfo.orientation === 'portrait';
+  const embedTitleMap = {
+    youtube: 'YouTube 영상',
+    vimeo: 'Vimeo 영상'
+  };
+  const commonStyle = {
+    display: 'block',
+    width: '100%',
+    maxWidth: `min(100%, ${maxWidth})`,
+    maxHeight,
+    borderRadius: '10px',
+    backgroundColor: 'var(--bg-primary)',
+    objectFit: 'contain',
+    marginBottom
+  };
+
+  return /*#__PURE__*/React.createElement(React.Fragment, null,
+    mediaInfo.type === 'tiktok-widget'
+      ? /*#__PURE__*/React.createElement(TikTokEmbedWidget, {
+        key: mediaInfo.url,
+        url: mediaInfo.url,
+        videoId: mediaInfo.videoId,
+        onFailed: () => setFailed(true)
+      })
+      : mediaInfo.type === 'image'
+      ? /*#__PURE__*/React.createElement('img', {
+        src: mediaInfo.url,
+        alt: '링크 이미지',
+        loading: 'lazy',
+        referrerPolicy: 'no-referrer',
+        onError: () => setFailed(true),
+        onClick: () => setActiveLightbox && setActiveLightbox({
+          urls: [mediaInfo.url],
+          index: 0,
+          meta: [{
+            timestamp: message?.timestamp || Date.now(),
+            messageId: message?.id || '',
+            imageIndex: 0,
+            thumb: mediaInfo.url,
+            tags: message?.directMediaTags || '',
+            directMediaUrl: mediaInfo.url
+          }]
+        }),
+        style: { ...commonStyle, cursor: setActiveLightbox ? 'pointer' : 'default' }
+      })
+      : mediaInfo.type === 'video'
+      ? /*#__PURE__*/React.createElement('video', {
+        src: mediaInfo.url,
+        muted: true,
+        autoPlay: true,
+        loop: true,
+        playsInline: true,
+        controls: true,
+        preload: 'metadata',
+        referrerPolicy: 'no-referrer',
+        onError: () => setFailed(true),
+        style: commonStyle
+      })
+      : (() => {
+        // Chat-room case uses vw (not %) width: the ancestor chain here (shrink-to-fit flex
+        // item, then a plain block) has no definite width, so % would resolve to 'auto' and
+        // collapse the <iframe> to 300x150. vw resolves against the viewport directly, also
+        // letting bubble/bubble-wrapper shrink-to-fit around it instead of stretching wider and
+        // leaving empty space beside it. isMiniChat (dashboard preview) already sits in a
+        // definite-size container so it stays %-based. Doubles as the desktop drag-resize handle
+        // (.chat-media-resizable in app.css): resize:horizontal grows width, aspect-ratio keeps
+        // height proportional for free.
+        const isMini = !!style.isMiniChat;
+        const embedWidth = isMini ? '100%' : (isPortraitEmbed ? (style.portraitEmbedMaxWidth || '360px') : (style.embedMaxWidth || '760px'));
+        const minW = isMini ? '0' : (isPortraitEmbed ? '150px' : '180px');
+        const maxW = isMini ? '100%' : (isPortraitEmbed ? '500px' : '1400px');
+        // LinkPreviewCard lives INSIDE this width-constrained div, not as a sibling, so it
+        // matches the video's rendered width even after a drag-resize via .chat-media-resizable.
+        const embedBoxStyle = {
+          width: isMini ? `min(100%, ${embedWidth})` : `min(88vw, ${embedWidth})`,
+          // maxWidth also clamps to 100% of the bubble now that bubble-wrapper's min-width:0
+          // lets it actually shrink -- the vw estimate above is only ever a *starting* size;
+          // this is what stops it from overflowing once the real available space is smaller.
+          maxWidth: `min(100%, ${maxW})`,
+          minWidth: minW,
+          margin: '0 auto',
+          marginBottom
+        };
+        // Playing in the mini player already -- show a placeholder instead of a second live
+        // iframe (two iframes racing the same YouTube video is worse than one; the actual
+        // playback lives in the floating StickyVideoBox portal, kept mounted independently).
+        if (isThisSticky) {
+          return /*#__PURE__*/React.createElement('div', {
+            style: {
+              ...embedBoxStyle,
+              aspectRatio: isPortraitEmbed ? '9 / 16' : '16 / 9',
+              maxHeight: isPortraitEmbed ? 'min(72vh, 620px)' : 'min(54vh, 430px)',
+              borderRadius: '10px',
+              backgroundColor: 'var(--bg-secondary, #1E293B)',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              padding: '16px',
+              textAlign: 'center'
+            }
+          }, /*#__PURE__*/React.createElement('div', { style: { fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-secondary, #CBD5E1)' } }, '🎬 미니플레이어에서 재생 중'),
+            /*#__PURE__*/React.createElement('button', {
+              type: 'button',
+              onClick: () => onReleaseSticky && onReleaseSticky(),
+              style: {
+                padding: '6px 12px',
+                fontSize: '0.78rem',
+                fontWeight: '700',
+                color: '#FFFFFF',
+                backgroundColor: '#57606F',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer'
+              }
+            }, '여기서 다시 보기'));
+        }
+        return /*#__PURE__*/React.createElement('div', {
+          className: isMini ? '' : 'chat-media-resizable',
+          style: embedBoxStyle
+        }, /*#__PURE__*/React.createElement('iframe', {
+          ref: embedIframeRef,
+          src: mediaInfo.url,
+          title: embedTitleMap[mediaInfo.provider] || '링크 영상',
+          loading: 'lazy',
+          allow: 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share',
+          allowFullScreen: true,
+          onError: () => setFailed(true),
+          style: {
+            display: 'block',
+            width: '100%',
+            aspectRatio: isPortraitEmbed ? '9 / 16' : '16 / 9',
+            maxHeight: isPortraitEmbed ? 'min(72vh, 620px)' : 'min(54vh, 430px)',
+            border: '0',
+            borderRadius: '10px',
+            backgroundColor: 'var(--bg-primary)'
+          }
+        }), /*#__PURE__*/React.createElement(LinkPreviewCard, {
+          url: firstUrl,
+          fallbackTitle: text ? removeFirstUrl(text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : '',
+          cachedData: linkPreview
+        }));
+      })(),
+    remainingText ? /*#__PURE__*/React.createElement('div', null, parseTextWithLinks(remainingText, searchQuery)) : null
+  );
+}
+
+function DeadlineDateTimePicker({ value, onChange, disabled, dateOnly = false, placeholder }) {
+  const React = window.React;
+  const __deps = window.GATHER_UI_DEPS || {};
+  const __comp = window.GATHER_UI_COMPONENTS || {};
+  const CalendarSearchIcon = __comp.CalendarSearchIcon || __deps.CalendarSearchIcon;
+
+  const [isOpen, setIsOpen] = React.useState(false);
+  const now = new Date();
+  // dateOnly mode stores/reads plain YYYY-MM-DD (no time component) -- append a fixed local
+  // midnight when parsing so Date() doesn't interpret the bare date string as UTC (see
+  // isValidDateString's "always UTC" comment elsewhere in this file for the same pitfall).
+  const parsed = value ? new Date(dateOnly ? `${value}T00:00` : value) : null;
+  const isValid = parsed && !Number.isNaN(parsed.getTime());
+  const [pYear, setPYear] = React.useState(isValid ? parsed.getFullYear() : now.getFullYear());
+  const [pMonth, setPMonth] = React.useState(isValid ? parsed.getMonth() : now.getMonth());
+  const [pDay, setPDay] = React.useState(isValid ? parsed.getDate() : now.getDate());
+  const [pTime, setPTime] = React.useState(isValid && !dateOnly ? value.slice(11, 16) : '23:59');
+
+  const openPicker = () => {
+    const d = value ? new Date(dateOnly ? `${value}T00:00` : value) : null;
+    const v = d && !Number.isNaN(d.getTime());
+    setPYear(v ? d.getFullYear() : now.getFullYear());
+    setPMonth(v ? d.getMonth() : now.getMonth());
+    setPDay(v ? d.getDate() : now.getDate());
+    if (!dateOnly) setPTime(v ? value.slice(11, 16) : '23:59');
+    setIsOpen(true);
+  };
+
+  const daysInMonth = new Date(pYear, pMonth + 1, 0).getDate();
+  const firstWeekday = new Date(pYear, pMonth, 1).getDay();
+
+  const handleApply = () => {
+    const mm = String(pMonth + 1).padStart(2, '0');
+    const dd = String(pDay).padStart(2, '0');
+    onChange(dateOnly ? `${pYear}-${mm}-${dd}` : `${pYear}-${mm}-${dd}T${pTime}`);
+    setIsOpen(false);
+  };
+
+  const displayText = isValid
+    ? dateOnly
+      ? `${parsed.getFullYear()}.${String(parsed.getMonth() + 1).padStart(2, '0')}.${String(parsed.getDate()).padStart(2, '0')}`
+      : `${parsed.getFullYear()}.${String(parsed.getMonth() + 1).padStart(2, '0')}.${String(parsed.getDate()).padStart(2, '0')} ${value.slice(11, 16)}`
+    : (placeholder || (dateOnly ? '날짜 선택' : '날짜/시간 선택'));
+
+  return /*#__PURE__*/React.createElement('div', { style: { position: 'relative' } },
+    /*#__PURE__*/React.createElement('button', {
+      type: 'button',
+      className: 'form-select',
+      disabled,
+      style: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', cursor: disabled ? 'default' : 'pointer', textAlign: 'left' },
+      onClick: openPicker
+    },
+      /*#__PURE__*/React.createElement('span', { style: { minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, displayText),
+      dateOnly && /*#__PURE__*/React.createElement(CalendarSearchIcon, { size: 18 })
+    ),
+    (() => {
+      const sheet = isOpen && /*#__PURE__*/React.createElement('div', {
+        className: 'bottom-sheet-overlay',
+        onClick: () => setIsOpen(false)
+      }, /*#__PURE__*/React.createElement('div', {
+        className: 'bottom-sheet',
+        onClick: e => e.stopPropagation()
+      },
+        /*#__PURE__*/React.createElement('div', { className: 'bottom-sheet-header' },
+          /*#__PURE__*/React.createElement('h4', null, dateOnly ? '날짜 선택' : '날짜/시간 선택'),
+          /*#__PURE__*/React.createElement('button', {
+            type: 'button',
+            style: { background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer' },
+            onClick: () => setIsOpen(false)
+          }, '✕')
+        ),
+        /*#__PURE__*/React.createElement('div', { className: 'bottom-sheet-body' },
+          /*#__PURE__*/React.createElement('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginBottom: '12px' } },
+            /*#__PURE__*/React.createElement('button', { type: 'button', className: 'btn btn-secondary', style: { padding: '4px 10px', fontSize: '0.85rem' }, onClick: () => setPYear(y => y - 1) }, '◀'),
+            /*#__PURE__*/React.createElement('span', { style: { fontWeight: 800, fontSize: '1rem', minWidth: '60px', textAlign: 'center' } }, `${pYear}년`),
+            /*#__PURE__*/React.createElement('button', { type: 'button', className: 'btn btn-secondary', style: { padding: '4px 10px', fontSize: '0.85rem' }, onClick: () => setPYear(y => y + 1) }, '▶')
+          ),
+          /*#__PURE__*/React.createElement('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px', marginBottom: '12px' } },
+            DEADLINE_PICKER_MONTH_NAMES.map((name, idx) => /*#__PURE__*/React.createElement('button', {
+              key: idx, type: 'button',
+              onClick: () => {
+                setPMonth(idx);
+                const dim = new Date(pYear, idx + 1, 0).getDate();
+                if (pDay > dim) setPDay(dim);
+              },
+              style: {
+                padding: '6px 4px', borderRadius: '8px',
+                border: pMonth === idx ? '2px solid var(--accent-primary)' : '1px solid var(--border-subtle)',
+                background: pMonth === idx ? 'rgba(99, 102, 241, 0.15)' : 'var(--bg-card)',
+                color: pMonth === idx ? 'var(--accent-primary)' : 'var(--text-main)',
+                fontWeight: pMonth === idx ? 800 : 500, fontSize: '0.8rem', cursor: 'pointer'
+              }
+            }, name))
+          ),
+          /*#__PURE__*/React.createElement('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', marginBottom: '4px' } },
+            ['일', '월', '화', '수', '목', '금', '토'].map(w => /*#__PURE__*/React.createElement('div', {
+              key: w, style: { textAlign: 'center', fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)' }
+            }, w))
+          ),
+          /*#__PURE__*/React.createElement('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', marginBottom: '14px' } },
+            Array.from({ length: firstWeekday }).map((_, i) => /*#__PURE__*/React.createElement('div', { key: `blank-${i}` })),
+            Array.from({ length: daysInMonth }).map((_, i) => {
+              const day = i + 1;
+              const isSelected = pDay === day;
+              return /*#__PURE__*/React.createElement('button', {
+                key: day, type: 'button', onClick: () => setPDay(day),
+                style: {
+                  padding: '6px 0', borderRadius: '8px',
+                  border: isSelected ? '2px solid var(--accent-primary)' : '1px solid transparent',
+                  background: isSelected ? 'rgba(99, 102, 241, 0.15)' : 'transparent',
+                  color: isSelected ? 'var(--accent-primary)' : 'var(--text-main)',
+                  fontWeight: isSelected ? 800 : 500, fontSize: '0.8rem', cursor: 'pointer'
+                }
+              }, day);
+            })
+          ),
+          !dateOnly && /*#__PURE__*/React.createElement('div', { style: { marginBottom: '14px' } },
+            /*#__PURE__*/React.createElement('label', { style: { fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '6px' } }, '시간'),
+            /*#__PURE__*/React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
+              /*#__PURE__*/React.createElement('input', {
+                type: 'number', className: 'form-input', style: { flex: '1 1 0%', minWidth: 0, textAlign: 'center' },
+                min: 0, max: 23, value: Number(pTime.slice(0, 2)),
+                onChange: e => {
+                  const h = Math.min(23, Math.max(0, Number(e.target.value) || 0));
+                  setPTime(`${String(h).padStart(2, '0')}:${pTime.slice(3, 5)}`);
+                }
+              }),
+              /*#__PURE__*/React.createElement('span', { style: { fontWeight: 800, color: 'var(--text-muted)' } }, ':'),
+              /*#__PURE__*/React.createElement('input', {
+                type: 'number', className: 'form-input', style: { flex: '1 1 0%', minWidth: 0, textAlign: 'center' },
+                min: 0, max: 59, value: Number(pTime.slice(3, 5)),
+                onChange: e => {
+                  const m = Math.min(59, Math.max(0, Number(e.target.value) || 0));
+                  setPTime(`${pTime.slice(0, 2)}:${String(m).padStart(2, '0')}`);
+                }
+              })
+            )
+          ),
+          /*#__PURE__*/React.createElement('button', {
+            type: 'button', className: 'btn btn-primary', style: { width: '100%' }, onClick: handleApply
+          }, '선택 완료')
+        )
+      ));
+      return sheet && typeof document !== 'undefined' && ReactDOM.createPortal ? ReactDOM.createPortal(sheet, document.body) : sheet;
+    })()
+  );
+}
+
+function PlacesSection({ calendar, onViewAll }) {
+  const React = window.React;
+  const __deps = window.GATHER_UI_DEPS || {};
+  const __comp = window.GATHER_UI_COMPONENTS || {};
+  const PlaceMapView = __comp.PlaceMapView || __deps.PlaceMapView;
+  const PlaceSectionIcon = __comp.PlaceSectionIcon || __deps.PlaceSectionIcon;
+  const SectionCountBadge = __comp.SectionCountBadge || __deps.SectionCountBadge;
+  const SectionToggleButton = __comp.SectionToggleButton || __deps.SectionToggleButton;
+  const getCalendarPlaces = __deps.getCalendarPlaces;
+
+  const [collapsed, setCollapsed] = React.useState(false);
+  const [mapShouldMount, setMapShouldMount] = React.useState(false);
+  const mapHostRef = React.useRef(null);
+  const places = getCalendarPlaces(calendar);
+
+  React.useEffect(() => {
+    if (collapsed || mapShouldMount) return undefined;
+    const el = mapHostRef.current;
+    if (!el || typeof IntersectionObserver === 'undefined') {
+      const t = setTimeout(() => setMapShouldMount(true), 400);
+      return () => clearTimeout(t);
+    }
+    let done = false;
+    const io = new IntersectionObserver((entries) => {
+      if (done) return;
+      if (entries.some(e => e.isIntersecting || (e.intersectionRatio || 0) > 0)) {
+        done = true;
+        setMapShouldMount(true);
+        io.disconnect();
+      }
+    }, { root: null, rootMargin: '160px 0px', threshold: 0.01 });
+    io.observe(el);
+    let idleId = null, idleTimer = null;
+    if (typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function') {
+      idleId = window.requestIdleCallback(() => {
+        if (!done) { done = true; setMapShouldMount(true); io.disconnect(); }
+      }, { timeout: 2500 });
+    } else {
+      idleTimer = setTimeout(() => {
+        if (!done) { done = true; setMapShouldMount(true); io.disconnect(); }
+      }, 2000);
+    }
+    return () => {
+      io.disconnect();
+      if (idleId != null && typeof window.cancelIdleCallback === 'function') window.cancelIdleCallback(idleId);
+      if (idleTimer) clearTimeout(idleTimer);
+    };
+  }, [collapsed, mapShouldMount]);
+
+  return /*#__PURE__*/React.createElement("section", { className: "summary-card" },
+    /*#__PURE__*/React.createElement("div", {
+      className: `summary-title${collapsed ? ' is-collapsed' : ''}`,
+      style: { display: 'flex', alignItems: 'center', gap: '6px', width: '100%' }
+    },
+      /*#__PURE__*/React.createElement("div", {
+        style: { display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0 }
+      },
+        /*#__PURE__*/React.createElement(PlaceSectionIcon, null),
+        /*#__PURE__*/React.createElement("span", null, "장소"),
+        places.length > 0 && /*#__PURE__*/React.createElement(SectionCountBadge, { count: places.length })
+      ),
+      /*#__PURE__*/React.createElement("div", {
+        style: { marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '2px', flexShrink: 0 }
+      },
+        /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          onClick: onViewAll,
+          style: { background: 'none', border: 'none', color: '#3B82F6', fontSize: '0.78rem', fontWeight: 800, cursor: 'pointer', padding: '4px 6px' }
+        }, "전체보기"),
+        /*#__PURE__*/React.createElement(SectionToggleButton, {
+          collapsed,
+          onToggle: () => setCollapsed(prev => !prev),
+          label: collapsed ? '지도 펼치기' : '지도 접기'
+        })
+      )
+    ),
+    !collapsed && /*#__PURE__*/React.createElement("div", {
+      ref: mapHostRef,
+      style: {
+        position: 'relative', width: '100%', aspectRatio: '4 / 3',
+        borderRadius: 'var(--radius-sm)', overflow: 'hidden', marginTop: '12px',
+        backgroundColor: 'color-mix(in srgb, var(--bg-primary) 92%, #94a3b8)'
+      }
+    },
+      mapShouldMount
+        ? /*#__PURE__*/React.createElement(PlaceMapView, {
+            places, calendar, resizeSignal: collapsed, preferDomesticBounds: true
+          })
+        : /*#__PURE__*/React.createElement("div", {
+            style: {
+              position: 'absolute', inset: 0, display: 'flex', alignItems: 'center',
+              justifyContent: 'center', fontSize: '0.8rem', fontWeight: 700,
+              color: 'var(--text-muted)', letterSpacing: '-0.02em'
+            }
+          }, "지도 준비 중…"),
+      places.length > 0 && /*#__PURE__*/React.createElement("button", {
+        type: "button", onClick: onViewAll,
+        style: {
+          position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 500, width: '100%',
+          backgroundColor: 'color-mix(in srgb, var(--bg-primary) 96%, black)',
+          border: 'none', borderRadius: '0 0 8px 8px', padding: '8px 0',
+          fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--text-main)',
+          cursor: 'pointer', textAlign: 'center'
+        }
+      }, "장소 더보기")
+    )
+  );
+}
+
+function ImageUrlModal({ imageUrl, onClose, showToast, onEnsureShareUrl }) {
+  const React = window.React;
+  const __deps = window.GATHER_UI_DEPS || {};
+  const __comp = window.GATHER_UI_COMPONENTS || {};
+  const ResizableModalContainer = __comp.ResizableModalContainer || __deps.ResizableModalContainer;
+  const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
+
+  const [resolvedUrl, setResolvedUrl] = React.useState(imageUrl || '');
+  const [isGenerating, setIsGenerating] = React.useState(false);
+  const [errorText, setErrorText] = React.useState('');
+  const isInlineImageUrl = typeof resolvedUrl === 'string' && resolvedUrl.startsWith('data:');
+  const isShareableUrl = /^https?:\/\//.test(resolvedUrl || '');
+  // onEnsureShareUrl is a fresh closure on every Lightbox render (it isn't memoized, since it
+  // closes over meta/index/onPromoteImageUrl), so keeping it out of the effect's dependency
+  // array -- and reading the latest version through a ref instead -- keeps an unrelated parent
+  // re-render (e.g. chat messages updating, image dimensions loading) from cancelling and
+  // restarting an in-flight share-URL generation before it can resolve.
+  const onEnsureShareUrlRef = React.useRef(onEnsureShareUrl);
+  onEnsureShareUrlRef.current = onEnsureShareUrl;
+  React.useEffect(() => {
+    let cancelled = false;
+    setResolvedUrl(imageUrl || '');
+    setErrorText('');
+    if (typeof imageUrl !== 'string' || !imageUrl.startsWith('data:') || typeof onEnsureShareUrlRef.current !== 'function') return;
+    setIsGenerating(true);
+    Promise.resolve(onEnsureShareUrlRef.current(imageUrl)).then(result => {
+      if (cancelled) return;
+      const nextUrl = typeof result === 'string' ? result : result?.shareUrl;
+      if (nextUrl && /^https?:\/\//.test(nextUrl)) {
+        setResolvedUrl(nextUrl);
+      } else {
+        setErrorText('공유 URL 생성 실패');
+      }
+    }).catch(err => {
+      console.error('Image share URL generation failed:', err);
+      if (!cancelled) setErrorText('공유 URL 생성 실패');
+    }).finally(() => {
+      if (!cancelled) setIsGenerating(false);
+    });
+    return () => { cancelled = true; };
+  }, [imageUrl]);
+  return /*#__PURE__*/React.createElement("div", {
+    className: "modal-overlay image-url-modal",
+    onClick: e => { e.stopPropagation(); onClose(); },
+    style: { zIndex: 10050 }
+  }, /*#__PURE__*/React.createElement(ResizableModalContainer, {
+    className: "modal-container",
+    onClick: e => e.stopPropagation()
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "modal-header",
+    style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' }
+  }, /*#__PURE__*/React.createElement("h3", {
+    style: { fontSize: '1.1rem', fontWeight: 800 }
+  }, "이미지 URL"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: onClose,
+    style: {
+      background: 'none',
+      border: 'none',
+      color: '#64748B',
+      cursor: 'pointer',
+      display: 'flex',
+      alignItems: 'center'
+    }
+  }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }))), /*#__PURE__*/React.createElement("div", {
+    className: "modal-body"
+  }, /*#__PURE__*/React.createElement("label", {
+    style: { fontSize: '0.85rem', fontWeight: 700, color: '#64748B' }
+  }, isGenerating ? "공유 가능한 이미지 URL 생성 중" : "선택한 사진의 원본 이미지 URL"), /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    className: "form-input",
+    style: { width: '100%' },
+    value: isGenerating ? '공유 URL을 생성하고 있습니다...' : (isInlineImageUrl ? '공유 가능한 HTTPS URL을 생성할 수 없습니다.' : resolvedUrl || ''),
+    readOnly: true
+  }), errorText && /*#__PURE__*/React.createElement("div", {
+    style: { fontSize: '0.78rem', color: '#EF4444', fontWeight: 700 }
+  }, errorText, " Storage 업로드 권한 또는 네트워크 상태를 확인해 주세요."), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "btn btn-primary",
+    disabled: isGenerating || !isShareableUrl,
+    style: { opacity: isGenerating || !isShareableUrl ? 0.65 : 1, cursor: isGenerating || !isShareableUrl ? 'not-allowed' : 'pointer' },
+    onClick: async () => {
+      const ok = await copyTextToClipboard(resolvedUrl || '');
+      const message = ok ? '이미지 URL이 복사되었습니다.' : '복사에 실패했습니다. URL을 직접 선택해 복사해 주세요.';
+      if (showToast) showToast(message, ok ? 'success' : 'error');
+      else alert(message);
+    }
+  }, isGenerating ? "URL 생성 중..." : "URL 복사하기"))));
+}
+
+  window.GATHER_UI_COMPONENTS = Object.assign({}, window.GATHER_UI_COMPONENTS || {}, {
+    DirectChatMediaText: DirectChatMediaText,
+    DeadlineDateTimePicker: DeadlineDateTimePicker,
+    PlacesSection: PlacesSection,
+    ImageUrlModal: ImageUrlModal
+  });
+})();

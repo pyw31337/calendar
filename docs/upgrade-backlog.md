@@ -64,6 +64,8 @@
 - AdminDashboard ✅ 2026-08-20 (assets/ui-admin-dashboard.js)
 - Anniversary/Settlement/Poll modals ✅ 2026-08-20 (assets/ui-event-modals.js)
 - CalendarGrid/Comments/MemoCard/Poll/Search ✅ 2026-08-20 (assets/ui-calendar-core.js)
+- Admin sub-modals ✅ 2026-08-20 (assets/ui-admin-modals.js)
+- Remaining media/deadline/places section ✅ 2026-08-20 (assets/ui-remaining.js)
 
 ### P5 UX 잔여
 - P5-1 공유 URL/OG ✅ 2026-08-20 (ShareModal 뷰 타이틀, settlement OG, check:share-urls)
