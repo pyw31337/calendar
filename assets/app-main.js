@@ -2250,15 +2250,49 @@ async function fetchChatMessagesRest(calId) {
 const CHAT_OLDER_PAGE_SIZE = readConfigNumber('CHAT_OLDER_PAGE_SIZE', 40);
 
 async function fetchSubcollectionCount(calId, subName) {
-  if (!calId || !firebaseDb || !subName) return null;
+  if (!calId || !subName) return null;
+  if (firebaseDb) {
+    try {
+      const ref = firebaseDb.collection('calendars').doc(`cal_${calId}`).collection(subName);
+      if (ref && typeof ref.count === 'function') {
+        const snap = await ref.count().get();
+        const n = Number(snap.data().count);
+        if (Number.isFinite(n) && n >= 0) return n;
+      }
+    } catch (err) {
+      console.warn('fetchSubcollectionCount sdk', subName, err);
+    }
+  }
   try {
-    const ref = firebaseDb.collection('calendars').doc(`cal_${calId}`).collection(subName);
-    if (ref && typeof ref.count === 'function') {
-      const snap = await ref.count().get();
-      return Number(snap.data().count) || 0;
+    const parentPath = `projects/${firebaseConfig.projectId}/databases/(default)/documents/calendars/cal_${calId}`;
+    const url = `https://firestore.googleapis.com/v1/${parentPath}:runAggregationQuery`;
+    const aggBody = {
+      structuredAggregationQuery: {
+        structuredQuery: { from: [{ collectionId: subName }] },
+        aggregations: [{ alias: 'total', count: {} }]
+      }
+    };
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(aggBody)
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const rows = Array.isArray(data) ? data : [data];
+      for (const row of rows) {
+        const fields = row && row.result && row.result.aggregateFields;
+        const total = fields && fields.total;
+        if (total && total.integerValue != null) {
+          const n = Number(total.integerValue);
+          if (Number.isFinite(n) && n >= 0) return n;
+        }
+      }
+    } else {
+      console.warn('fetchSubcollectionCount rest status', res.status, subName);
     }
   } catch (err) {
-    console.warn('fetchSubcollectionCount', subName, err);
+    console.warn('fetchSubcollectionCount rest', subName, err);
   }
   return null;
 }
@@ -6629,9 +6663,9 @@ function App() {
   const [olderChatMessages, setOlderChatMessages] = React.useState([]);
   const [hasMoreOlderChat, setHasMoreOlderChat] = React.useState(true);
   const [loadingOlderChat, setLoadingOlderChat] = React.useState(false);
-  const [totalChatCount, setTotalChatCount] = React.useState(0);
-  const [totalMemoCount, setTotalMemoCount] = React.useState(0);
-  const [totalGalleryCount, setTotalGalleryCount] = React.useState(0);
+  const [totalChatCount, setTotalChatCount] = React.useState(null);
+  const [totalMemoCount, setTotalMemoCount] = React.useState(null);
+  const [totalGalleryCount, setTotalGalleryCount] = React.useState(null);
   const loadingOlderChatRef = React.useRef(false);
   const allChatMessages = React.useMemo(() => {
     const byId = new Map();
@@ -7251,9 +7285,9 @@ function App() {
     setHasMoreOlderChat(true);
     setLoadingOlderChat(false);
     loadingOlderChatRef.current = false;
-    setTotalChatCount(0);
-    setTotalMemoCount(0);
-    setTotalGalleryCount(0);
+    setTotalChatCount(null);
+    setTotalMemoCount(null);
+    setTotalGalleryCount(null);
     if (!activeCalId) return;
     let cancelled = false;
     (async () => {
@@ -8946,10 +8980,14 @@ function App() {
   }
 
   const mainMenuPollCount = getCalendarPolls(activeCal).filter(poll => !isPollClosed(poll)).length;
-  const mainMenuChatCount = (typeof totalChatCount === 'number' && totalChatCount >= allChatMessages.length) ? totalChatCount : allChatMessages.length;
+  const mainMenuChatCount = (typeof totalChatCount === 'number' && totalChatCount >= 0)
+    ? totalChatCount
+    : Math.max(allChatMessages.length, (chatMessages || []).length);
   const mainMenuChatLatestTimestamp = allChatMessages.length > 0 ? allChatMessages[allChatMessages.length - 1].timestamp : 0;
   const mainMenuChatHasUnread = mainMenuChatLatestTimestamp > getChatLastReadTimestamp(activeCalId);
-  const mainMenuMemoCount = (typeof totalMemoCount === 'number' && totalMemoCount >= (memos || []).length) ? totalMemoCount : (memos || []).length;
+  const mainMenuMemoCount = (typeof totalMemoCount === 'number' && totalMemoCount >= 0)
+    ? totalMemoCount
+    : (memos || []).length;
 
   // Each confirmed meeting gets its own banner bubble on the calendar, and stays up through
   // the day of the meeting itself -- only today-or-future confirmations show.
