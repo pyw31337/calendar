@@ -39,3 +39,8 @@ Vite 빌드 결과물(dist)을 Pages에 배포하는 경로를 만들기.
 - 변환된 모듈 3개, dist/index.html 약 12KB
 - src/main.jsx 는 아직 실제 엔트리가 아님
 - dist 를 Pages 배포 소스로 쓰면 라이브 앱 JS가 빠짐 → 전환 금지
+
+## Vite 전용 엔트리 (2026-08-20)
+- 라이브 index.html 은 그대로 둠
+- Vite 빌드 입력: src/index.html → src/main.jsx
+- dist 는 아직 Pages 배포에 사용하지 않음
