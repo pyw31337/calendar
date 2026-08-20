@@ -55,6 +55,7 @@
 - WeatherBadge + WeatherLocationModal ✅ 2026-08-20 (assets/ui-weather.js)
 - PlacesView + PlaceMapView ✅ 2026-08-20 (assets/ui-places.js)
 - Misc chat/share UI ✅ 2026-08-20 (assets/ui-misc.js)
+- Summary/Gallery/tabs ✅ 2026-08-20 (assets/ui-summary-gallery.js)
 
 ### P5 UX 잔여
 - P5-1 공유 URL/OG ✅ 2026-08-20 (ShareModal 뷰 타이틀, settlement OG, check:share-urls)
