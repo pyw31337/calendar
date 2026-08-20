@@ -1,10 +1,9 @@
 /**
  * ConfirmDialog (P4-1). Deps at render: window.GATHER_UI_DEPS
  */
-(function () {
-  function getDeps() { return window.GATHER_UI_DEPS || {}; }
+function getDeps() { return window.GATHER_UI_DEPS || {}; }
 
-  function ConfirmDialog({ title, message, onConfirm, onCancel, showPasswordInput }) {
+  export function ConfirmDialog({ title, message, onConfirm, onCancel, showPasswordInput }) {
     const React = window.React;
     if (!React) return null;
     const deps = getDeps();
@@ -72,5 +71,6 @@
     )));
   }
 
+  if (typeof window !== 'undefined') {
   window.GATHER_UI_COMPONENTS = Object.assign({}, window.GATHER_UI_COMPONENTS || {}, { ConfirmDialog: ConfirmDialog });
-})();
+}

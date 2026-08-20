@@ -86,3 +86,10 @@ zsh 에서 줄 시작 `#` 주석은 쓰지 말 것.
 - 라이브 경로 유지. Pages 전환 아직 금지.
 - core 데이터/유틸/알림/파이어베이스 연결 완료
 - 다음: UI 모듈 또는 app-main 브리지 (한 파일씩)
+
+## P6-8 진행 (2026-08-20)
+- 첫 UI 잎사귀: src/ui/ui-confirm-dialog.js 를 ESM export (assets/ 미변경)
+- ConfirmDialog 를 src/main.jsx 에서 import
+- npm run build: 모듈 11개, dist JS ~37KB
+- 라이브 경로 유지. Pages 전환 아직 금지.
+- 다음: ui-share-modal / ui-overlays 등 작은 UI 한 파일씩
