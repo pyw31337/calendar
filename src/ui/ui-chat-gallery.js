@@ -1,8 +1,7 @@
 /**
  * Chat / gallery modal (P4-13)
  */
-(function () {
-function ChatGalleryModal({
+export function ChatGalleryModal({
   chatMessages,
   memos = [],
   calendar = null,
@@ -402,7 +401,8 @@ function ChatGalleryModal({
   ))));
 }
 
+  if (typeof window !== 'undefined') {
   window.GATHER_UI_COMPONENTS = Object.assign({}, window.GATHER_UI_COMPONENTS || {}, {
-    ChatGalleryModal: ChatGalleryModal
+    ChatGalleryModal: ChatGalleryModal,
   });
-})();
+}
