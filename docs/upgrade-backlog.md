@@ -24,7 +24,7 @@
 ### P0 안전망
 - P0-1 필수 심볼 검사 (check:required-symbols) ✅ 2026-08-20 (gallery/summary symbols)
 - P0-2 smoke:live places/memo/gallery 포함 ✅ 2026-08-20
-- P0-3 safe 태그 — 배포 후 `git tag safe-20260820-p0 && git push origin safe-20260820-p0`
+- P0-3 safe 태그 ✅ 문서화 2026-08-20 (docs/ops-runbook.md)
 
 ### P1 utils 15 마무리
 - P1-1 방문 메모 파싱 → utils ✅ 2026-08-20
@@ -49,6 +49,7 @@
 - ShareModal ✅ 2026-08-20 (assets/ui-share-modal.js)
 - Lightbox ✅ 2026-08-20 (assets/ui-lightbox.js)
 - SideMenu ✅ 2026-08-20 (assets/ui-side-menu.js)
+- Overlays/Emoji ✅ 2026-08-20 (assets/ui-overlays.js)
 
 ### P5 UX 잔여
 - P5-1 공유 URL/OG ✅ 2026-08-20 (ShareModal 뷰 타이틀, settlement OG, check:share-urls)
@@ -57,6 +58,9 @@
 
 ### P6 Vite (별도 일정)
 ### P7 운영 문서·예산 알림·E2E Action
+- P7-1 운영 런북 ✅ 2026-08-20 (docs/ops-runbook.md)
+- P7-2 Verify CI 강화 ✅ 2026-08-20 (check:all + size-budget)
+- P7-3 Live smoke Action ✅ 2026-08-20 (main push + daily)
 
 ## 3. 권장 순서
 P0 → P1 → P2-3 → P2-2 → P3 → P4 → P5 → (P6 일정 후)
