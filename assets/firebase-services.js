@@ -4,6 +4,9 @@
  */
 (function () {
   function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
+  function isValidCalId(calId) {
+    return typeof calId === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(calId);
+  }
   function getDb() {
     const d = deps();
     return typeof d.getDb === 'function' ? d.getDb() : null;
@@ -54,7 +57,7 @@
   }
 
   async function fetchRecentChatMessages(calId, limit) {
-    if (!calId) return [];
+    if (!isValidCalId(calId)) return [];
     const pageSize = Math.max(1, Math.min(100, Number(limit) || 60));
     const firebaseDb = getDb();
     try {
@@ -83,7 +86,7 @@
   }
 
   async function fetchSubcollectionCount(calId, subName) {
-    if (!calId || !subName) return null;
+    if (!isValidCalId(calId) || !subName) return null;
     const firebaseDb = getDb();
     if (firebaseDb) {
       try {
@@ -133,7 +136,7 @@
   }
 
   async function fetchOlderChatMessages(calId, beforeTimestamp, pageSize) {
-    if (!calId || !beforeTimestamp) return [];
+    if (!isValidCalId(calId) || !beforeTimestamp) return [];
     const size = pageSize != null ? pageSize : olderPageSize();
     const firebaseDb = getDb();
     if (firebaseDb) {
@@ -188,7 +191,7 @@
   const GALLERY_COUNT_CACHE_MS = 5 * 60 * 1000;
 
   async function fetchGalleryItemCount(calId, maxPages) {
-    if (!calId) return null;
+    if (!isValidCalId(calId)) return null;
     if (maxPages == null) maxPages = 8;
     const cached = galleryItemCountCache[calId];
     if (cached && (Date.now() - cached.at) < GALLERY_COUNT_CACHE_MS && typeof cached.n === 'number') {
@@ -226,7 +229,7 @@
 
   function subscribeCalSubcollection(calId, subName, options, onSnapshot, onError) {
     const firebaseDb = getDb();
-    if (!firebaseDb || !calId || !subName) return noop;
+    if (!firebaseDb || !isValidCalId(calId) || !subName) return noop;
     options = options || {};
     try {
       let q = firebaseDb.collection('calendars').doc('cal_' + calId).collection(subName);
@@ -281,7 +284,7 @@
   }
 
   window.GATHER_FIREBASE_SERVICES = Object.freeze({
-    version: '0.3.0-p3-3',
+    version: '0.3.1-p3-4',
     ready: true,
     isScaffold: false,
     fetchChatMessagesRest: fetchChatMessagesRest,

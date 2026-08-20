@@ -21,7 +21,8 @@
     "ops:clean-stress": "node scripts/firebase-clean-stress-docs.mjs",
     "restore:rehearsal": "node scripts/restore-rehearsal.mjs",
     "smoke:live": "node scripts/live-smoke-check.mjs",
-    "check:required-symbols": "node scripts/check-required-symbols.mjs"
+    "check:required-symbols": "node scripts/check-required-symbols.mjs",
+    "check:isolation": "node scripts/check-calendar-isolation.mjs"
   },
   "dependencies": {
     "canvas-confetti": "^1.9.2",
