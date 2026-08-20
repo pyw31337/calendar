@@ -36,11 +36,12 @@ import {
   MemoShareModal,
   ChatSideMenu
 } from './ui/ui-misc.js';
+import { PlaceRegisterModal } from './ui/ui-place-register.js';
 
 console.log('[P6] Vite entry loaded', {
   constants: !!GATHER_APP_CONSTANTS,
   config: !!GATHER_APP_CONFIG,
   MainSideMenu: typeof MainSideMenu,
-  ChatSideMenu: typeof ChatSideMenu,
+  PlaceRegisterModal: typeof PlaceRegisterModal,
   publicCalendarIds: GATHER_APP_CONFIG.PUBLIC_CALENDAR_IDS
 });

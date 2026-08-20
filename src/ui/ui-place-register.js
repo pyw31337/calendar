@@ -1,8 +1,7 @@
 /**
  * Place register/edit modal (P4-12)
  */
-(function () {
-function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, onDelete, showToast, onRequestConfirm }) {
+export function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, onDelete, showToast, onRequestConfirm }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -444,7 +443,8 @@ function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, onDelete,
   ));
 }
 
+  if (typeof window !== 'undefined') {
   window.GATHER_UI_COMPONENTS = Object.assign({}, window.GATHER_UI_COMPONENTS || {}, {
-    PlaceRegisterModal: PlaceRegisterModal
+    PlaceRegisterModal: PlaceRegisterModal,
   });
-})();
+}
