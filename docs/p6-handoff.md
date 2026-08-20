@@ -272,3 +272,6 @@ zsh 에서 줄 시작 `#` 주석은 쓰지 말 것.
 ## P6-38 진행 (2026-08-20)
 - getKoreanSolarTermsForYear / useTapRevealedMsgId / getTrulyConfirmedMeetings 등 추가 심
 - bindGatherUiDeps 키 보강 (src only)
+
+## P6-39 진행 (2026-08-20)
+- KOREAN_LUNAR_HOLIDAY_DATES 등 calendar 상수 ESM 심 추가 (src/ui only)
