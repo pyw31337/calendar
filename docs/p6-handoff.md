@@ -221,3 +221,9 @@ zsh 에서 줄 시작 `#` 주석은 쓰지 말 것.
 - CalendarGrid, CommentsSection, MemoCard, PollList, GlobalSearchModal, EditMessageModal
 - 라이브 경로 유지. Pages 전환 아직 금지.
 - 다음: ui-admin-modals, ui-admin-dashboard
+
+## P6-30 진행 (2026-08-20)
+- src/ui/ui-admin-modals.js 를 ESM export (assets/ 미변경)
+- AdminModal 및 admin 검색/생성 모달들
+- 라이브 경로 유지. Pages 전환 아직 금지.
+- 다음: ui-admin-dashboard (마지막 UI 파일)

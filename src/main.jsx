@@ -86,6 +86,13 @@ import {
   GlobalSearchModal,
   EditMessageModal
 } from './ui/ui-calendar-core.js';
+import {
+  AdminModal,
+  AdminUnifiedSearchResultsView,
+  AdminCreateCalendarModal,
+  AdminRestorePhraseModal,
+  AdminUnifiedSearchModal
+} from './ui/ui-admin-modals.js';
 
 console.log('[P6] Vite entry loaded', {
   constants: !!GATHER_APP_CONSTANTS,
@@ -98,5 +105,6 @@ console.log('[P6] Vite entry loaded', {
   DateModal: typeof DateModal,
   AnniversaryModal: typeof AnniversaryModal,
   CalendarGrid: typeof CalendarGrid,
+  AdminModal: typeof AdminModal,
   publicCalendarIds: GATHER_APP_CONFIG.PUBLIC_CALENDAR_IDS
 });

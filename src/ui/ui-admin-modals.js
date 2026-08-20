@@ -1,8 +1,7 @@
 /**
  * Admin sub-modals (P4-20)
  */
-(function () {
-function AdminModal({
+export function AdminModal({
   anniversaries = [],
   calendar,
   allCalendars,
@@ -900,7 +899,7 @@ function AdminModal({
   ));
 }
 
-function AdminUnifiedSearchResultsView({
+export function AdminUnifiedSearchResultsView({
   query, calendarsList, messagesMap, memosMap,
   calFilter = 'all', dateStart = '', dateEnd = '',
   onCalFilterChange, onDateStartChange, onDateEndChange,
@@ -1133,7 +1132,7 @@ function AdminUnifiedSearchResultsView({
   );
 }
 
-function AdminCreateCalendarModal({ onCreate, onClose }) {
+export function AdminCreateCalendarModal({ onCreate, onClose }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -1197,7 +1196,7 @@ function AdminCreateCalendarModal({ onCreate, onClose }) {
   );
 }
 
-function AdminRestorePhraseModal({ onConfirm, onClose }) {
+export function AdminRestorePhraseModal({ onConfirm, onClose }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -1243,7 +1242,7 @@ function AdminRestorePhraseModal({ onConfirm, onClose }) {
   );
 }
 
-function AdminUnifiedSearchModal({ onClose, onSearch }) {
+export function AdminUnifiedSearchModal({ onClose, onSearch }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -1304,11 +1303,12 @@ function AdminUnifiedSearchModal({ onClose, onSearch }) {
   ));
 }
 
+  if (typeof window !== 'undefined') {
   window.GATHER_UI_COMPONENTS = Object.assign({}, window.GATHER_UI_COMPONENTS || {}, {
     AdminModal: AdminModal,
     AdminUnifiedSearchResultsView: AdminUnifiedSearchResultsView,
     AdminCreateCalendarModal: AdminCreateCalendarModal,
     AdminRestorePhraseModal: AdminRestorePhraseModal,
-    AdminUnifiedSearchModal: AdminUnifiedSearchModal
+    AdminUnifiedSearchModal: AdminUnifiedSearchModal,
   });
-})();
+}
