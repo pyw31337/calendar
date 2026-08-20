@@ -3371,3 +3371,70 @@ textarea.form-input {
   margin-top: 2px;
   padding-top: 8px !important;
 }
+
+
+/* ===== P6-56 mobile + dark polish ===== */
+.date-modal-attendance-row { min-width: 0; }
+.date-modal-attendance-note .url-capsule-badge,
+.date-modal-attendance-note a { max-width: 100%; }
+
+@media (max-width: 380px) {
+  .date-modal-attendance-row {
+    padding: 10px 10px 10px 10px !important;
+    padding-right: 48px !important;
+  }
+  .date-modal-attendance-note {
+    padding-left: 16px !important;
+    font-size: 0.74rem !important;
+  }
+  .modal-container { margin: 0 6px; padding-left: 12px !important; padding-right: 12px !important; }
+  .weekday-label { font-size: 0.7rem; }
+  .day-cell { min-height: 52px; }
+  .url-capsule-badge {
+    max-width: min(100%, 240px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .poll-card, .memo-card-hover, .search-result-row { min-width: 0; }
+  .main-header-title, .header-title {
+    max-width: 46vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+[data-theme="dark"] .btn-secondary,
+:root:not([data-theme="light"]) .btn-secondary {
+  background: #1B2540; color: var(--text-main); border-color: var(--border-subtle);
+}
+[data-theme="dark"] .form-input,
+[data-theme="dark"] input.form-input,
+[data-theme="dark"] textarea.form-input,
+[data-theme="dark"] select.form-input,
+:root:not([data-theme="light"]) .form-input,
+:root:not([data-theme="light"]) input.form-input,
+:root:not([data-theme="light"]) textarea.form-input,
+:root:not([data-theme="light"]) select.form-input {
+  background: #131B2E !important;
+  color: var(--text-main) !important;
+  border-color: var(--border-subtle) !important;
+}
+[data-theme="dark"] .form-input::placeholder,
+:root:not([data-theme="light"]) .form-input::placeholder {
+  color: var(--text-light) !important;
+}
+[data-theme="dark"] .modal-container,
+[data-theme="dark"] .bottom-sheet,
+:root:not([data-theme="light"]) .modal-container,
+:root:not([data-theme="light"]) .bottom-sheet {
+  background: var(--bg-card); color: var(--text-main);
+}
+[data-theme="dark"] .toast,
+:root:not([data-theme="light"]) .toast {
+  background: #1B2540; color: var(--text-main); border-color: var(--border-subtle);
+}
+[data-theme="dark"] .url-capsule-badge,
+:root:not([data-theme="light"]) .url-capsule-badge {
+  background: #1B2540 !important; color: #A5B4FC !important; border-color: #312E81 !important;
+}

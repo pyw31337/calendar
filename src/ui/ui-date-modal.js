@@ -1332,7 +1332,7 @@ export function DateModal({
     style: {
       background: 'none',
       border: 'none',
-      color: '#64748B',
+      color: 'var(--text-muted)',
       fontSize: '1.25rem',
       cursor: 'pointer',
       display: 'flex',
@@ -1486,7 +1486,7 @@ export function DateModal({
         /* Participant Picker Button */
         /*#__PURE__*/React.createElement("div", null,
           /*#__PURE__*/React.createElement("label", {
-            style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '6px', color: '#64748B' }
+            style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '6px', color: 'var(--text-muted)' }
           }, "참여자 선택"),
           /*#__PURE__*/React.createElement("button", {
             type: "button",
@@ -1538,7 +1538,7 @@ export function DateModal({
         /* Note Input Field */
         /*#__PURE__*/React.createElement("div", null,
           /*#__PURE__*/React.createElement("label", {
-            style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '6px', color: '#64748B' }
+            style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '6px', color: 'var(--text-muted)' }
           }, "메모 입력 (선택)"),
           /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px' } },
             /*#__PURE__*/React.createElement("input", {
@@ -1571,7 +1571,7 @@ export function DateModal({
         style: { marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '6px' }
       },
         /*#__PURE__*/React.createElement("label", {
-          style: { fontSize: '0.82rem', fontWeight: 700, color: '#64748B', marginBottom: '2px' }
+          style: { fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '2px' }
         }, `참석 명단 (${dateEntries.length}명 가능)`),
         /* List */
         /*#__PURE__*/React.createElement("div", {
@@ -1591,49 +1591,65 @@ export function DateModal({
           if (!part) return null;
           return /*#__PURE__*/React.createElement("div", {
             key: entry.id,
+            className: "date-modal-attendance-row",
             style: {
               display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '8px 12px',
+              flexDirection: 'column',
+              alignItems: 'stretch',
+              gap: '4px',
+              padding: '10px 12px',
+              paddingRight: adminMode ? '12px' : '52px',
               backgroundColor: 'var(--bg-card)',
               border: '1px solid var(--border-subtle)',
-              borderRadius: '8px'
+              borderRadius: '10px',
+              position: 'relative'
             }
           },
-            /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 } },
+            /*#__PURE__*/React.createElement("div", {
+              className: "date-modal-attendance-row-head",
+              style: { display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }
+            },
               /*#__PURE__*/React.createElement("span", {
                 style: { width: '8px', height: '8px', borderRadius: '50%', backgroundColor: part.color, flexShrink: 0 }
               }),
               /*#__PURE__*/React.createElement("span", {
+                className: "date-modal-attendance-name",
                 style: {
                   fontWeight: 800,
                   fontSize: '0.85rem',
                   color: 'var(--text-main)',
-                  flexShrink: 0,
+                  minWidth: 0,
                   cursor: 'pointer',
-                  lineHeight: 1.35
+                  lineHeight: 1.35,
+                  wordBreak: 'keep-all'
                 },
                 title: '눌러서 수정 (참여자·메모 불러오기)',
                 onClick: () => handleEditClick(entry)
-              }, part.name),
-              entry.note && /*#__PURE__*/React.createElement("div", {
-                style: {
-                  fontSize: '0.78rem',
-                  color: 'var(--text-main)',
-                  marginLeft: '4px',
-                  minWidth: 0,
-                  flex: 1,
-                  lineHeight: 1.35,
-                  display: 'flex',
-                  alignItems: 'center'
-                }
-              }, renderTextWithUrlBadge(entry.note))
+              }, part.name)
             ),
-            !adminMode && /*#__PURE__*/React.createElement(ItemEditDeleteActions, {
+            entry.note && /*#__PURE__*/React.createElement("div", {
+              className: "date-modal-attendance-note",
+              style: {
+                fontSize: '0.78rem',
+                color: 'var(--text-main)',
+                minWidth: 0,
+                lineHeight: 1.4,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'flex-start',
+                gap: '4px',
+                paddingLeft: '16px',
+                wordBreak: 'break-word',
+                overflowWrap: 'anywhere'
+              }
+            }, renderTextWithUrlBadge(entry.note)),
+            !adminMode && /*#__PURE__*/React.createElement("div", {
+              className: "date-modal-attendance-actions",
+              style: { position: 'absolute', top: '8px', right: '8px' }
+            }, /*#__PURE__*/React.createElement(ItemEditDeleteActions, {
               onEdit: () => handleEditClick(entry),
               onDelete: () => handleDeleteClick(entry)
-            })
+            }))
           );
         })
       ),
@@ -1674,7 +1690,7 @@ export function DateModal({
         /* Search Field */
         /*#__PURE__*/React.createElement("div", null,
           /*#__PURE__*/React.createElement("label", {
-            style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '6px', color: '#64748B' }
+            style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '6px', color: 'var(--text-muted)' }
           }, "장소 검색"),
           /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px' } },
             /*#__PURE__*/React.createElement("input", {
@@ -1755,7 +1771,7 @@ export function DateModal({
 
         selectedPlace && /*#__PURE__*/React.createElement("div", null,
           /*#__PURE__*/React.createElement("label", {
-            style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#64748B', marginBottom: '6px' }
+            style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '6px' }
           }, "별칭 (선택)"),
           /*#__PURE__*/React.createElement("input", {
             type: "text", className: "form-input", placeholder: "목록에 표시할 별칭 (예: 도은네 집)",
@@ -1765,7 +1781,7 @@ export function DateModal({
         ),
         /*#__PURE__*/React.createElement("div", null,
           /*#__PURE__*/React.createElement("label", {
-            style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#64748B', marginBottom: '6px' }
+            style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '6px' }
           }, "카테고리"),
           /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'stretch', gap: '10px' } },
             /*#__PURE__*/React.createElement("div", { style: { flex: 1, minWidth: 0 } },
@@ -1787,7 +1803,7 @@ export function DateModal({
         ),
         /*#__PURE__*/React.createElement("div", null,
           /*#__PURE__*/React.createElement("label", {
-            style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#64748B', marginBottom: '6px' }
+            style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '6px' }
           }, "장소 메모 입력"),
           /*#__PURE__*/React.createElement("div", {
             style: { display: 'flex', gap: '8px', alignItems: 'flex-start' }
@@ -1826,7 +1842,7 @@ export function DateModal({
       /* List of registered places for this date */
       /*#__PURE__*/React.createElement("div", { style: { marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '6px' } },
         /*#__PURE__*/React.createElement("label", {
-          style: { fontSize: '0.82rem', fontWeight: 700, color: '#64748B', marginBottom: '2px' }
+          style: { fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '2px' }
         }, `등록된 장소 (${registeredPlaces.length}곳)`),
         /* List */
         registeredPlaces.length === 0 ? /*#__PURE__*/React.createElement("div", {
@@ -1835,7 +1851,7 @@ export function DateModal({
           className: "date-modal-places-list",
           style: { display: 'flex', flexDirection: 'column', gap: '8px', flex: '1 1 auto', minHeight: '80px', overflow: 'visible' }
         }, registeredPlaces.map(place => {
-          const category = getPlaceCategoryById(calendar, place.categoryId) || { id: 'etc', name: '기타', color: '#64748B' };
+          const category = getPlaceCategoryById(calendar, place.categoryId) || { id: 'etc', name: '기타', color: 'var(--text-muted)' };
           const catColor = category.color || '#64748B';
           const catName = category.name || '기타';
           return /*#__PURE__*/React.createElement("div", {
@@ -1983,7 +1999,7 @@ export function DateModal({
       !adminMode && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '12px' } },
         /*#__PURE__*/React.createElement("div", null,
           /*#__PURE__*/React.createElement("label", {
-            style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#64748B', marginBottom: '6px' }
+            style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '6px' }
           }, "구분 / 카테고리"),
           /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
             /*#__PURE__*/React.createElement(SegmentedToggle, {
@@ -2012,7 +2028,7 @@ export function DateModal({
         ),
         /*#__PURE__*/React.createElement("div", null,
           /*#__PURE__*/React.createElement("label", {
-            style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#64748B', marginBottom: '6px' }
+            style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '6px' }
           }, expenseIsIncome ? "수입 명목" : "지출 명목"),
           /*#__PURE__*/React.createElement("input", {
             type: "text",
@@ -2027,7 +2043,7 @@ export function DateModal({
         ),
         /*#__PURE__*/React.createElement("div", null,
           /*#__PURE__*/React.createElement("label", {
-            style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#64748B', marginBottom: '6px' }
+            style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '6px' }
           }, expenseIsIncome ? "수입 금액" : "지출 금액"),
           /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px' } },
           /*#__PURE__*/React.createElement("input", {
@@ -2069,7 +2085,7 @@ export function DateModal({
         expenses.map(expense => {
           const { time: expenseTime, rest: expenseLabel } = extractExpenseTimePrefix(getExpenseLabel(expense));
           const expenseUrl = getExpenseUrl(expense);
-          const expenseCategory = getDisplayExpenseCategory(calendar, expense) || { id: 'etc', name: '기타', color: '#64748B' };
+          const expenseCategory = getDisplayExpenseCategory(calendar, expense) || { id: 'etc', name: '기타', color: 'var(--text-muted)' };
           const categoryColor = expenseCategory.color || '#64748B';
           const categoryName = expenseCategory.name || '기타';
           return /*#__PURE__*/React.createElement("div", {
@@ -2124,7 +2140,7 @@ export function DateModal({
                   width: '22px', height: '22px', border: '1px solid var(--border-subtle)',
                   backgroundColor: 'var(--bg-card)', borderRadius: '6px',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  cursor: 'grab', padding: 0, color: '#64748B',
+                  cursor: 'grab', padding: 0, color: 'var(--text-muted)',
                   touchAction: 'none', userSelect: 'none'
                 },
                 onClick: event => { event.preventDefault(); event.stopPropagation(); },
@@ -2193,7 +2209,7 @@ export function DateModal({
       /*#__PURE__*/React.createElement("h4", null, "참여자 선택"),
       /*#__PURE__*/React.createElement("button", {
         type: "button",
-        style: { background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer' },
+        style: { background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '1.2rem', cursor: 'pointer' },
         onClick: () => setIsSheetOpen(false)
       }, "✕")
     ),

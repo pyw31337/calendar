@@ -942,7 +942,7 @@ export function ItemEditDeleteActions({ onEdit, onDelete, editTitle = '수정', 
         width: '22px', height: '22px', border: '1px solid var(--border-subtle)',
         backgroundColor: 'var(--bg-card)', borderRadius: '6px',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        cursor: 'pointer', padding: 0, color: '#64748B'
+        cursor: 'pointer', padding: 0, color: 'var(--text-muted)'
       }
     }, /*#__PURE__*/React.createElement(PencilIcon, { size: 12 })),
     showDelete && typeof onDelete === 'function' && /*#__PURE__*/React.createElement("button", {
@@ -951,7 +951,7 @@ export function ItemEditDeleteActions({ onEdit, onDelete, editTitle = '수정', 
       title: deleteTitle, "aria-label": deleteTitle,
       style: {
         width: '22px', height: '22px', border: 'none', background: 'none',
-        padding: 0, cursor: 'pointer', color: '#94A3B8',
+        padding: 0, cursor: 'pointer', color: 'var(--text-muted)',
         display: 'flex', alignItems: 'center', justifyContent: 'center'
       }
     }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 14 }))
@@ -1192,7 +1192,7 @@ export function AdminLoginGate({ children }) {
       style: { maxWidth: '320px', padding: '28px', borderRadius: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }
     },
       /*#__PURE__*/React.createElement("div", { style: { fontSize: '1.1rem', fontWeight: 800, color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(LockIcon, null), "관리자 인증"),
-      /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.82rem', color: '#64748B' } }, "비밀번호를 입력해 주세요."),
+      /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.82rem', color: 'var(--text-muted)' } }, "비밀번호를 입력해 주세요."),
       /*#__PURE__*/React.createElement("input", {
         type: "password",
         className: "form-input",
@@ -1288,7 +1288,7 @@ export function ColorSwatchPicker({ value, onChange, disabled, title = "색상 �
       /*#__PURE__*/React.createElement("h4", null, title),
       /*#__PURE__*/React.createElement("button", {
         type: "button",
-        style: { background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer' },
+        style: { background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '1.2rem', cursor: 'pointer' },
         onClick: () => setIsOpen(false)
       }, "✕")
     ),
@@ -1421,7 +1421,7 @@ export function PollVoterSheet({ calendar, pollId, optionId, onSelect, onClose }
   }, /*#__PURE__*/React.createElement("span", null, "\uD22C\uD45C\uC790 \uC120\uD0DD"), /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: onClose,
-    style: { background: 'none', border: 'none', color: '#64748B', cursor: 'pointer', padding: '4px' }
+    style: { background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px' }
   }, /*#__PURE__*/React.createElement(SmallXIcon, null))), /*#__PURE__*/React.createElement("div", {
     style: { display: 'grid', gap: '8px', padding: '14px 20px 24px' }
   }, participants.map(participant => /*#__PURE__*/React.createElement("button", {
