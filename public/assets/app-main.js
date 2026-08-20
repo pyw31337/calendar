@@ -1043,13 +1043,17 @@ function normalizeParticipantName(calendarId, name) {
   return trimmed;
 }
 
-function getActiveParticipants(calendar) {
+const getActiveParticipants = GATHER_APP_UTILS.getActiveParticipants
+  ? GATHER_APP_UTILS.getActiveParticipants
+  : function getActiveParticipants(calendar) {
   return Array.isArray(calendar?.participants) ? calendar.participants.filter(p => !isTombstone(p)) : [];
-}
+};
 
-function getActiveAvailabilities(calendar) {
+const getActiveAvailabilities = GATHER_APP_UTILS.getActiveAvailabilities
+  ? GATHER_APP_UTILS.getActiveAvailabilities
+  : function getActiveAvailabilities(calendar) {
   return Array.isArray(calendar?.availabilities) ? calendar.availabilities.filter(a => !isTombstone(a)) : [];
-}
+};
 
 function getCalendarActivityLogs(calendar) {
   return Array.isArray(calendar?.activityLogs) ? calendar.activityLogs.filter(Boolean) : [];
@@ -1068,13 +1072,17 @@ function unionActivityLogs(calendar, subcollectionLogs) {
   return Array.from(byId.values());
 }
 
-function getCalendarPolls(calendar) {
+const getCalendarPolls = GATHER_APP_UTILS.getCalendarPolls
+  ? GATHER_APP_UTILS.getCalendarPolls
+  : function getCalendarPolls(calendar) {
   return Array.isArray(calendar?.polls) ? calendar.polls.filter(poll => poll && !isTombstone(poll)) : [];
-}
+};
 
-function getActivePollOptions(poll) {
+const getActivePollOptions = GATHER_APP_UTILS.getActivePollOptions
+  ? GATHER_APP_UTILS.getActivePollOptions
+  : function getActivePollOptions(poll) {
   return Array.isArray(poll?.options) ? poll.options.filter(option => option && !isTombstone(option)) : [];
-}
+};
 
 function normalizeDeletedActivityLogIds(ids) {
   if (!Array.isArray(ids)) return [];
@@ -1476,11 +1484,15 @@ function getPollTotalVoteCount(poll) {
   return Object.values(votes).reduce((total, voterIds) => total + voterIds.length, 0);
 }
 
-function isPollClosed(poll) {
+const isPollClosed = GATHER_APP_UTILS.isPollClosed
+  ? GATHER_APP_UTILS.isPollClosed
+  : function isPollClosed(poll) {
   return !!(poll?.deadline && Date.now() >= Number(poll.deadline));
-}
+};
 
-function formatPollDeadline(deadline) {
+const formatPollDeadline = GATHER_APP_UTILS.formatPollDeadline
+  ? GATHER_APP_UTILS.formatPollDeadline
+  : function formatPollDeadline(deadline) {
   if (!deadline) return '';
   const date = new Date(Number(deadline));
   if (Number.isNaN(date.getTime())) return '';
@@ -1490,7 +1502,7 @@ function formatPollDeadline(deadline) {
   const hh = String(date.getHours()).padStart(2, '0');
   const mm = String(date.getMinutes()).padStart(2, '0');
   return `${m}/${d} (${dayNames[date.getDay()]}) ${hh}:${mm}`;
-}
+};
 
 function normalizePoll(calendarId, poll, participantIds = null) {
   if (!poll || typeof poll !== 'object') return null;

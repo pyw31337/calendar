@@ -30,7 +30,7 @@
 - P1-1 방문 메모 파싱 → utils ✅ 2026-08-20
 - P1-2 trimLatLngOutliers → utils ✅ 2026-08-20
 - P1-3 공유 경로 파서 → utils ✅ 2026-08-20
-- P1-4 getActiveParticipants 등 소형 pure
+- P1-4 getActiveParticipants 등 소형 pure ✅ 2026-08-20
 
 ### P2 성능
 - P2-1 백그라운드 탭 부담 완화

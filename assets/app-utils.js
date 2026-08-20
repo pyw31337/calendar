@@ -601,6 +601,42 @@
     return `${getCalendarShareUrl(calendarId, locationLike)}memo/${encodeURIComponent(memoId)}/`;
   }
 
+
+  function getActiveParticipants(calendar) {
+    return Array.isArray(calendar && calendar.participants)
+      ? calendar.participants.filter(function (p) { return !isTombstone(p); })
+      : [];
+  }
+  function getActiveAvailabilities(calendar) {
+    return Array.isArray(calendar && calendar.availabilities)
+      ? calendar.availabilities.filter(function (a) { return !isTombstone(a); })
+      : [];
+  }
+  function getCalendarPolls(calendar) {
+    return Array.isArray(calendar && calendar.polls)
+      ? calendar.polls.filter(function (poll) { return poll && !isTombstone(poll); })
+      : [];
+  }
+  function getActivePollOptions(poll) {
+    return Array.isArray(poll && poll.options)
+      ? poll.options.filter(function (option) { return option && !isTombstone(option); })
+      : [];
+  }
+  function isPollClosed(poll) {
+    return !!(poll && poll.deadline && Date.now() >= Number(poll.deadline));
+  }
+  function formatPollDeadline(deadline) {
+    if (!deadline) return '';
+    var date = new Date(Number(deadline));
+    if (Number.isNaN(date.getTime())) return '';
+    var dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+    var m = date.getMonth() + 1;
+    var d = date.getDate();
+    var hh = String(date.getHours()).padStart(2, '0');
+    var mm = String(date.getMinutes()).padStart(2, '0');
+    return m + '/' + d + ' (' + dayNames[date.getDay()] + ') ' + hh + ':' + mm;
+  }
+
   window.GATHER_APP_UTILS = Object.freeze({
     getContrastTextColor,
     formatDateWithDayName,
@@ -675,6 +711,12 @@
     getAppBaseUrl,
     getCalendarShareUrl,
     getViewShareUrl,
+    getActiveParticipants,
+    getActiveAvailabilities,
+    getCalendarPolls,
+    getActivePollOptions,
+    isPollClosed,
+    formatPollDeadline,
     getMemoItemShareUrl
   });
 })();
