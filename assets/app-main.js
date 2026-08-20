@@ -8956,20 +8956,33 @@ function App() {
   }
 
   if (activeView === 'gallery') {
-    return withStickyVideo(/*#__PURE__*/React.createElement(ChatGalleryModal, {
-      calendar: activeCal,
-      chatMessages: allChatMessages,
-      memos: memos,
-      asPage: true,
-      onClose: () => changeView('calendar'),
-      setActiveLightbox: setActiveLightbox,
-      hasMoreOlderChat: hasMoreOlderChat,
-      loadingOlderChat: loadingOlderChat,
-      onLoadOlderChat: loadOlderChatMessages,
-      hasMoreMemos: hasMoreMemos,
-      onLoadMoreMemos: () => setMemosLimit(prev => prev + MEMOS_PAGE_SIZE),
-      totalGalleryCount: totalGalleryCount
-    }));
+    return withStickyVideo(/*#__PURE__*/React.createElement(React.Fragment, null,
+      /*#__PURE__*/React.createElement(ChatGalleryModal, {
+        calendar: activeCal,
+        chatMessages: allChatMessages,
+        memos: memos,
+        asPage: true,
+        onClose: () => changeView('calendar'),
+        setActiveLightbox: setActiveLightbox,
+        hasMoreOlderChat: hasMoreOlderChat,
+        loadingOlderChat: loadingOlderChat,
+        onLoadOlderChat: loadOlderChatMessages,
+        hasMoreMemos: hasMoreMemos,
+        onLoadMoreMemos: () => setMemosLimit(prev => prev + MEMOS_PAGE_SIZE),
+        totalGalleryCount: totalGalleryCount
+      }),
+      activeLightbox ? /*#__PURE__*/React.createElement(Lightbox, {
+        urls: activeLightbox.urls,
+        index: activeLightbox.index,
+        meta: activeLightbox.meta,
+        onClose: () => setActiveLightbox(null),
+        onNavigate: i => setActiveLightbox(prev => prev ? { ...prev, index: i } : prev),
+        showToast: showToast,
+        onPromoteImageUrl: handlePromoteInlineChatImage,
+        onSaveImageTags: handleSaveImageTags,
+        onSearchTag: handleSearchTag
+      }) : null
+    ));
   }
 
   if (activeView === 'places') {
