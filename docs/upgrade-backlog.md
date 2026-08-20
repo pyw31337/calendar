@@ -53,6 +53,7 @@
 - UserManualOverlay ✅ 2026-08-20 (assets/ui-user-manual.js)
 - ChatParticipantSheet + NotificationHelp ✅ 2026-08-20 (assets/ui-chat-sheets.js)
 - WeatherBadge + WeatherLocationModal ✅ 2026-08-20 (assets/ui-weather.js)
+- PlacesView + PlaceMapView ✅ 2026-08-20 (assets/ui-places.js)
 - Misc chat/share UI ✅ 2026-08-20 (assets/ui-misc.js)
 
 ### P5 UX 잔여
