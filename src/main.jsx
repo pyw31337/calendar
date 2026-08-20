@@ -26,6 +26,7 @@ import {
   NotificationPermissionHelpModal
 } from './ui/ui-chat-sheets.js';
 import { UserManualOverlay } from './ui/ui-user-manual.js';
+import { WeatherBadge, WeatherLocationModal } from './ui/ui-weather.js';
 
 console.log('[P6] Vite entry loaded', {
   constants: !!GATHER_APP_CONSTANTS,
@@ -33,8 +34,7 @@ console.log('[P6] Vite entry loaded', {
   utils: !!GATHER_APP_UTILS,
   ConfirmDialog: typeof ConfirmDialog,
   ShareModal: typeof ShareModal,
-  UrlCapsuleBadge: typeof UrlCapsuleBadge,
-  ChatParticipantSheet: typeof ChatParticipantSheet,
   UserManualOverlay: typeof UserManualOverlay,
+  WeatherBadge: typeof WeatherBadge,
   publicCalendarIds: GATHER_APP_CONFIG.PUBLIC_CALENDAR_IDS
 });

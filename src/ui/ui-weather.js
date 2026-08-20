@@ -1,8 +1,7 @@
 /**
  * Weather badge + location modal (P4-8)
  */
-(function () {
-function WeatherBadge({ weatherLocation }) {
+export function WeatherBadge({ weatherLocation }) {
   const React = window.React;
 
   const [weather, setWeather] = React.useState({ temp: null, code: null, loading: false, error: null });
@@ -98,7 +97,7 @@ function WeatherBadge({ weatherLocation }) {
   );
 }
 
-function WeatherLocationModal({ onClose, onSelectLocation, onDeleteRecentLocation, showToast, recentLocations = [] }) {
+export function WeatherLocationModal({ onClose, onSelectLocation, onDeleteRecentLocation, showToast, recentLocations = [] }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const ResizableModalContainer = __deps.ResizableModalContainer;
@@ -312,8 +311,9 @@ function WeatherLocationModal({ onClose, onSelectLocation, onDeleteRecentLocatio
   ));
 }
 
+  if (typeof window !== 'undefined') {
   window.GATHER_UI_COMPONENTS = Object.assign({}, window.GATHER_UI_COMPONENTS || {}, {
     WeatherBadge: WeatherBadge,
-    WeatherLocationModal: WeatherLocationModal
+    WeatherLocationModal: WeatherLocationModal,
   });
-})();
+}
