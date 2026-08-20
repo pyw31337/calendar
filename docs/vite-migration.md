@@ -83,3 +83,7 @@ P4 완료 후 기능 동결. P6 Vite 작업만 진행.
 ### P6-2 캐시/deps 복사 (2026-08-20)
 - src/core/cache-and-deps.js 추가
 - p6-2-copy-cache-deps → main 머지
+
+### P6-3 준비 시작 (2026-08-20)
+- docs/p6-3-plan.md 작성
+- 배포 경로 변경 없음. 라이브 유지.
