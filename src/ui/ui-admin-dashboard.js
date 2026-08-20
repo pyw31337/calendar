@@ -37,6 +37,24 @@ function getFooterFamilyLinks() {
   return __gatherUiDeps().FOOTER_FAMILY_LINKS || [];
 }
 
+/* __fb() bridge */
+function __fb() {
+  const deps = __gatherUiDeps();
+  if (deps && typeof deps.getDb === 'function') {
+    try { const d = deps.getDb(); if (d) return d; } catch (e) {}
+  }
+  return (typeof window !== 'undefined' && window.__gatherFirebaseDb) || null;
+}
+
+function getStoredChatParticipantId(...args) {
+  const fn = (window.GATHER_APP_NOTIFICATIONS || {}).getStoredChatParticipantId;
+  return typeof fn === 'function' ? fn(...args) : '';
+}
+function setStoredChatParticipantId(...args) {
+  const fn = (window.GATHER_APP_NOTIFICATIONS || {}).setStoredChatParticipantId;
+  return typeof fn === 'function' ? fn(...args) : undefined;
+}
+
 function extractExpenseTimePrefix(...args) {
   const f = __gatherUiDeps().extractExpenseTimePrefix || GATHER_APP_UTILS.extractExpenseTimePrefix;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -1004,7 +1022,7 @@ export function AdminDashboard({ initialCalendars }) {
   }, [selectedCalId]);
 
   React.useEffect(() => {
-    if (!firebaseDb || !calendarsList.length) return;
+    if (!__fb() || !calendarsList.length) return;
     let cancelled = false;
     const ids = calendarsList.map(c => c.id).filter(Boolean);
     (async () => {
@@ -1028,14 +1046,14 @@ export function AdminDashboard({ initialCalendars }) {
       });
     })();
     return () => { cancelled = true; };
-  }, [firebaseDb, calendarsList.map(c => c.id).join('|')]);
+  }, [__fb(), calendarsList.map(c => c.id).join('|')]);
 
   // Chat messages: only selected calendar while 채팅 tab is open
   React.useEffect(() => {
     if (activeTab !== 'logs' || !selectedCalId) return;
 
-    if (firebaseDb) {
-      const unsub = firebaseDb.collection('calendars').doc(`cal_${selectedCalId}`).collection('messages')
+    if (__fb()) {
+      const unsub = __fb().collection('calendars').doc(`cal_${selectedCalId}`).collection('messages')
         .orderBy('timestamp', 'desc').limit(adminMessageLimit)
         .onSnapshot(snapshot => {
           const list = [];
@@ -1062,13 +1080,13 @@ export function AdminDashboard({ initialCalendars }) {
         console.error(`Failed REST message fetch for ${selectedCalId}:`, e);
       }
     })();
-  }, [selectedCalId, firebaseDb, activeTab, adminMessageLimit]);
+  }, [selectedCalId, __fb(), activeTab, adminMessageLimit]);
 
   // 2b. Load memos (same live-listener pattern as messages above, same 2000 cap) -- powers the
   // 통합검색 메모 탭
   React.useEffect(() => {
-    if (activeTab !== 'logs' || !selectedCalId || !firebaseDb) return;
-    const unsub = firebaseDb.collection('calendars').doc(`cal_${selectedCalId}`).collection('memos')
+    if (activeTab !== 'logs' || !selectedCalId || !__fb()) return;
+    const unsub = __fb().collection('calendars').doc(`cal_${selectedCalId}`).collection('memos')
       .orderBy('createdAt', 'desc').limit(adminMemoLimit)
       .onSnapshot(snapshot => {
         const list = [];
@@ -1081,37 +1099,37 @@ export function AdminDashboard({ initialCalendars }) {
         console.error(`Failed to load memos for ${selectedCalId}:`, err);
       });
     return () => unsub();
-  }, [selectedCalId, firebaseDb, activeTab, adminMemoLimit]);
+  }, [selectedCalId, __fb(), activeTab, adminMemoLimit]);
 
   // Link-preview cache stats only on metrics tab (egress rule)
   React.useEffect(() => {
-    if (!firebaseDb) return;
+    if (!__fb()) return;
     if (activeTab !== 'metrics') return;
-    const unsub = firebaseDb.collection('appConfig').doc('linkPreviewStats').onSnapshot(snap => {
+    const unsub = __fb().collection('appConfig').doc('linkPreviewStats').onSnapshot(snap => {
       setLinkPreviewStats(snap.exists ? snap.data() : { cachedCount: 0, updatedAt: null });
     }, () => setLinkPreviewStats(null));
     return () => unsub && unsub();
-  }, [firebaseDb, activeTab]);
+  }, [__fb(), activeTab]);
 
   // Kakao Local search daily usage, loaded once (not tied to any single calendar)
   React.useEffect(() => {
-    if (!firebaseDb) return;
+    if (!__fb()) return;
     if (activeTab !== 'metrics') return;
-    const unsub = firebaseDb.collection('appConfig').doc('kakaoLocalSearchStats').onSnapshot(snap => {
+    const unsub = __fb().collection('appConfig').doc('kakaoLocalSearchStats').onSnapshot(snap => {
       setKakaoSearchStats(snap.exists ? snap.data() : { dailyUsageBucket: null, dailyUsageCount: 0 });
     }, () => setKakaoSearchStats(null));
     return () => unsub && unsub();
-  }, [firebaseDb, activeTab]);
+  }, [__fb(), activeTab]);
 
   // Google Places search monthly usage, loaded once (not tied to any single calendar)
   React.useEffect(() => {
-    if (!firebaseDb) return;
+    if (!__fb()) return;
     if (activeTab !== 'metrics') return;
-    const unsub = firebaseDb.collection('appConfig').doc('googlePlacesSearchStats').onSnapshot(snap => {
+    const unsub = __fb().collection('appConfig').doc('googlePlacesSearchStats').onSnapshot(snap => {
       setGooglePlacesStats(snap.exists ? snap.data() : { monthlyUsageBucket: null, monthlyUsageCount: 0 });
     }, () => setGooglePlacesStats(null));
     return () => unsub && unsub();
-  }, [firebaseDb, activeTab]);
+  }, [__fb(), activeTab]);
 
   // Full, unbounded activity log history for the selected calendar -- only unifiedTimeline
   // (복구 탭's PITR replay) ever reads selectedCalActivityLogs, so this only needs to fetch
@@ -1212,7 +1230,7 @@ export function AdminDashboard({ initialCalendars }) {
   };
 
   const handleImportClick = () => {
-    if (!firebaseDb || !ENABLE_FIRESTORE_WRITES) {
+    if (!__fb() || !ENABLE_FIRESTORE_WRITES) {
       showAdminToast('쓰기 연결 없음', 'error');
       return;
     }
@@ -1484,8 +1502,8 @@ export function AdminDashboard({ initialCalendars }) {
         const messages = messagesMap[calId] || [];
         const messagesToDelete = messages.filter(m => m.timestamp > log.timestamp);
         for (const mToDelete of messagesToDelete) {
-          if (firebaseDb) {
-            await firebaseDb.collection('calendars').doc(`cal_${calId}`).collection('messages').doc(mToDelete.id).delete();
+          if (__fb()) {
+            await __fb().collection('calendars').doc(`cal_${calId}`).collection('messages').doc(mToDelete.id).delete();
           } else {
             await deleteMessageRest(calId, mToDelete.id);
           }
@@ -1515,8 +1533,8 @@ export function AdminDashboard({ initialCalendars }) {
     closeConfirmDialog();
     try {
       let ok = false;
-      if (firebaseDb) {
-        await firebaseDb.collection('calendars').doc(`cal_${calId}`).collection('messages').doc(msg.id).delete();
+      if (__fb()) {
+        await __fb().collection('calendars').doc(`cal_${calId}`).collection('messages').doc(msg.id).delete();
         ok = true;
       } else {
         ok = await deleteMessageRest(calId, msg.id);

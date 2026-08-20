@@ -37,6 +37,24 @@ function getFooterFamilyLinks() {
   return __gatherUiDeps().FOOTER_FAMILY_LINKS || [];
 }
 
+/* __fb() bridge */
+function __fb() {
+  const deps = __gatherUiDeps();
+  if (deps && typeof deps.getDb === 'function') {
+    try { const d = deps.getDb(); if (d) return d; } catch (e) {}
+  }
+  return (typeof window !== 'undefined' && window.__gatherFirebaseDb) || null;
+}
+
+function getStoredChatParticipantId(...args) {
+  const fn = (window.GATHER_APP_NOTIFICATIONS || {}).getStoredChatParticipantId;
+  return typeof fn === 'function' ? fn(...args) : '';
+}
+function setStoredChatParticipantId(...args) {
+  const fn = (window.GATHER_APP_NOTIFICATIONS || {}).setStoredChatParticipantId;
+  return typeof fn === 'function' ? fn(...args) : undefined;
+}
+
 function extractExpenseTimePrefix(...args) {
   const f = __gatherUiDeps().extractExpenseTimePrefix || GATHER_APP_UTILS.extractExpenseTimePrefix;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -870,13 +888,13 @@ export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoad
       };
       if (linkPreview) memoData.linkPreview = linkPreview;
 
-      await firebaseDb.collection('calendars').doc('cal_' + calendarId).collection('memos').doc(memoId).set(sanitizeMemoForFirestore(memoData));
+      await __fb().collection('calendars').doc('cal_' + calendarId).collection('memos').doc(memoId).set(sanitizeMemoForFirestore(memoData));
 
       // 3. Write Activity Log
       const logNote = newTitle.trim() ? `제목: ${newTitle.trim()}` : (newText.trim() ? newText.trim().slice(0, 30) + '...' : '사진 첨부');
       const activityLog = createMemoActivityLog(calendarId, 'memo_create', participantId, stamp, logNote);
       if (activityLog) {
-        await firebaseDb.collection('calendars').doc('cal_' + calendarId).collection('activityLogs').doc(activityLog.id).set(activityLog);
+        await __fb().collection('calendars').doc('cal_' + calendarId).collection('activityLogs').doc(activityLog.id).set(activityLog);
         
         const nextCal = {
           ...calendar,
@@ -964,7 +982,7 @@ export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoad
         linkPreview: linkPreview || null
       };
 
-      await firebaseDb.collection('calendars').doc('cal_' + calendarId).collection('memos').doc(editingMemo.id).set(sanitizeMemoForFirestore(memoData));
+      await __fb().collection('calendars').doc('cal_' + calendarId).collection('memos').doc(editingMemo.id).set(sanitizeMemoForFirestore(memoData));
 
       // Log Memo Update — before→after detail
       const logNote = buildFieldChangeNote(editTitle.trim() || '메모', [
@@ -975,7 +993,7 @@ export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoad
       ]) || (editTitle.trim() || (editText.trim().slice(0, 40) + '...'));
       const activityLog = createMemoActivityLog(calendarId, 'memo_update', participantId, stamp, logNote);
       if (activityLog) {
-        await firebaseDb.collection('calendars').doc('cal_' + calendarId).collection('activityLogs').doc(activityLog.id).set(activityLog);
+        await __fb().collection('calendars').doc('cal_' + calendarId).collection('activityLogs').doc(activityLog.id).set(activityLog);
         
         const nextCal = {
           ...calendar,
@@ -1002,13 +1020,13 @@ export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoad
         const stamp = Date.now();
         const participantId = getStoredChatParticipantId(calendarId, calendar) || 'anonymous';
 
-        await firebaseDb.collection('calendars').doc('cal_' + calendarId).collection('memos').doc(memo.id).delete();
+        await __fb().collection('calendars').doc('cal_' + calendarId).collection('memos').doc(memo.id).delete();
 
         // Log Memo Delete
         const logNote = memo.title ? `제목: ${memo.title}` : (memo.text.slice(0, 30) + '...');
         const activityLog = createMemoActivityLog(calendarId, 'memo_delete', participantId, stamp, logNote);
         if (activityLog) {
-          await firebaseDb.collection('calendars').doc('cal_' + calendarId).collection('activityLogs').doc(activityLog.id).set(activityLog);
+          await __fb().collection('calendars').doc('cal_' + calendarId).collection('activityLogs').doc(activityLog.id).set(activityLog);
           
           const nextCal = {
             ...calendar,
@@ -1061,7 +1079,7 @@ export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoad
 
   const handleTogglePin = async (memo) => {
     try {
-      await firebaseDb.collection('calendars').doc('cal_' + calendar.id).collection('memos').doc(memo.id).update({ isPinned: !memo.isPinned });
+      await __fb().collection('calendars').doc('cal_' + calendar.id).collection('memos').doc(memo.id).update({ isPinned: !memo.isPinned });
     } catch (err) {
       console.error('Failed to toggle memo pin:', err);
       showToast('고정 상태 변경 실패', 'error');
@@ -1070,7 +1088,7 @@ export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoad
 
   const handleMemoCommentsChange = async (memo, nextComments) => {
     try {
-      await firebaseDb.collection('calendars').doc('cal_' + calendar.id).collection('memos').doc(memo.id).update({ comments: nextComments });
+      await __fb().collection('calendars').doc('cal_' + calendar.id).collection('memos').doc(memo.id).update({ comments: nextComments });
     } catch (err) {
       console.error('Failed to update memo comments:', err);
       showToast('댓글 저장 실패', 'error');
@@ -1141,7 +1159,7 @@ export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoad
       try {
         const calendarId = calendar.id;
         const tagsArray = nextTags.map(t => t.startsWith('#') ? t : '#' + t);
-        await firebaseDb.collection('calendars').doc('cal_' + calendarId).collection('memos').doc(editingMemo.id).update({
+        await __fb().collection('calendars').doc('cal_' + calendarId).collection('memos').doc(editingMemo.id).update({
           tags: tagsArray
         });
       } catch (err) {
@@ -1932,7 +1950,7 @@ export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoad
                   try {
                     const calendarId = calendar.id;
                     const tagsArray = nextTags.map(t => t.startsWith('#') ? t : '#' + t);
-                    await firebaseDb.collection('calendars').doc('cal_' + calendarId).collection('memos').doc(editingMemo.id).update({
+                    await __fb().collection('calendars').doc('cal_' + calendarId).collection('memos').doc(editingMemo.id).update({
                       tags: tagsArray
                     });
                   } catch (err) {

@@ -37,6 +37,24 @@ function getFooterFamilyLinks() {
   return __gatherUiDeps().FOOTER_FAMILY_LINKS || [];
 }
 
+/* __fb() bridge */
+function __fb() {
+  const deps = __gatherUiDeps();
+  if (deps && typeof deps.getDb === 'function') {
+    try { const d = deps.getDb(); if (d) return d; } catch (e) {}
+  }
+  return (typeof window !== 'undefined' && window.__gatherFirebaseDb) || null;
+}
+
+function getStoredChatParticipantId(...args) {
+  const fn = (window.GATHER_APP_NOTIFICATIONS || {}).getStoredChatParticipantId;
+  return typeof fn === 'function' ? fn(...args) : '';
+}
+function setStoredChatParticipantId(...args) {
+  const fn = (window.GATHER_APP_NOTIFICATIONS || {}).setStoredChatParticipantId;
+  return typeof fn === 'function' ? fn(...args) : undefined;
+}
+
 function extractExpenseTimePrefix(...args) {
   const f = __gatherUiDeps().extractExpenseTimePrefix || GATHER_APP_UTILS.extractExpenseTimePrefix;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -746,7 +764,7 @@ export function AnniversaryModal({
         annData.isCountDown = ddayMode === 'countdown';
       }
 
-      await firebaseDb.collection('calendars').doc('cal_' + calendarId).collection('anniversaries').doc(anniversaryId).set(annData);
+      await __fb().collection('calendars').doc('cal_' + calendarId).collection('anniversaries').doc(anniversaryId).set(annData);
       showToast(editingId ? '기념일이 수정되었습니다.' : '기념일이 등록되었습니다.', 'success');
       
       // Reset form
@@ -765,7 +783,7 @@ export function AnniversaryModal({
     onRequestConfirm('기념일 삭제', `"${ann.title}" 기념일을 삭제하시겠습니까?`, async () => {
       try {
         const calendarId = calendar.id;
-        await firebaseDb.collection('calendars').doc('cal_' + calendarId).collection('anniversaries').doc(ann.id).delete();
+        await __fb().collection('calendars').doc('cal_' + calendarId).collection('anniversaries').doc(ann.id).delete();
         showToast('기념일이 삭제되었습니다.', 'success');
         if (editingId === ann.id) {
           setEditingId(null);

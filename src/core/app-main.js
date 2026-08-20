@@ -2183,13 +2183,15 @@ const firebaseConfig = {
   appId: "1:154827314076:web:gathercalendar2026"
 };
 let firebaseDb = null;
+function __setFirebaseDb(v){ firebaseDb = v; if (typeof window!=="undefined") window.__gatherFirebaseDb = v; }
+
 let firebaseStorage = null;
 try {
   if (ENABLE_FIRESTORE_SYNC && typeof firebase !== 'undefined') {
     if (!firebase.apps.length) {
       firebase.initializeApp(firebaseConfig);
     }
-    firebaseDb = firebase.firestore();
+    __setFirebaseDb(firebase.firestore());
     bindGatherFirebaseDeps();
   }
 } catch (e) {
@@ -3937,7 +3939,7 @@ function App() {
   }, [activeCalId]);
   const getCurrentChatParticipantId = () => {
     if (chatParticipantIdRef.current) return chatParticipantIdRef.current;
-    return getStoredChatParticipantId(activeCalId, activeCal);
+    return ((window.GATHER_APP_NOTIFICATIONS||{}).getStoredChatParticipantId||(()=>undefined))(activeCalId, activeCal);
   };
   const openNotificationHelp = () => {
     setIsNotificationHelpOpen(true);
@@ -4462,7 +4464,7 @@ function App() {
   // Synchronize chatParticipantId when activeCal changes (loads cached participant or defaults to first active)
   React.useEffect(() => {
     if (activeCal) {
-      setChatParticipantId(getStoredChatParticipantId(activeCalId, activeCal));
+      setChatParticipantId(((window.GATHER_APP_NOTIFICATIONS||{}).getStoredChatParticipantId||(()=>undefined))(activeCalId, activeCal));
     }
   }, [activeCalId, calendars]);
 

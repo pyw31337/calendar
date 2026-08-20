@@ -304,3 +304,7 @@ zsh 에서 줄 시작 `#` 주석은 쓰지 말 것.
 
 ## P6-46 진행 (2026-08-20)
 - live-smoke-check: Vite/classic 이중 모드 지원 (Vite index-*.js 마커)
+
+## P6-47 진행 (2026-08-20)
+- getStoredChatParticipantId: UI 심 + app-main 호출을 window.GATHER_APP_NOTIFICATIONS로
+- firebaseDb: window.__gatherFirebaseDb + UI __fb() 브리지 (admin/memo)
