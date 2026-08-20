@@ -312,3 +312,10 @@ zsh 에서 줄 시작 `#` 주석은 쓰지 말 것.
 ## P6-48 진행 (2026-08-20)
 - memo 정상 확인
 - admin: PEEKALINK_HOUR_BUCKET_MS 등 상수 ESM 심 추가
+
+## P6-49 진행 (2026-08-20)
+- 제목: Vite probe 문구 제거 → 모여라 캘린더
+- Deploy Vite Pages: main push 시 자동 배포 + workflow_dispatch 유지
+- memo/admin 라이브 확인됨 (어드민 초기 로딩 느림은 단일 번들 ~900KB)
+- 태그: safe-20260820-p6-vite-live
+- 다음 후보: 코드 스플리팅으로 초기 로딩 개선, favicon, classic assets 정리

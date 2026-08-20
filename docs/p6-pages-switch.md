@@ -31,3 +31,9 @@
 ## 아직 하지 말 것
 - main push 시 자동 dist 배포 (아직 연결하지 않음)
 - 루트 classic `index.html` / `assets/` 삭제
+
+## 전환 완료 (2026-08-20)
+- Pages Source = GitHub Actions
+- 배포 워크플로: Deploy Vite Pages (push main + 수동)
+- 롤백: Settings → Pages → Deploy from a branch → main / root
+- 태그: safe-20260820-p6-vite-live
