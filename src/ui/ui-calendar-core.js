@@ -1241,6 +1241,15 @@ export function CommentsSection({
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = React.useState(false);
   const canSendChatNow = () => !isChatSubmitting && (!!chatInput.trim() || chatImages.length > 0);
   const triggerChatSend = useChatSendGuard(onSend, canSendChatNow);
+  const handleSendPointerDown = (event) => {
+    if (!canSendChatNow()) return;
+    event.preventDefault();
+    event.stopPropagation();
+    triggerChatSend();
+  };
+  const handleSendClick = () => {
+    triggerChatSend();
+  };
   const insertEmojiIntoChatInput = (emoji) => {
     const textarea = chatTextareaRef.current;
     const start = textarea ? (textarea.selectionStart ?? chatInput.length) : chatInput.length;
@@ -1674,7 +1683,8 @@ export function CommentsSection({
         /*#__PURE__*/React.createElement("button", {
           type: "button",
           disabled: isChatSubmitting || (!chatInput.trim() && chatImages.length === 0),
-          onClick: triggerChatSend,
+          onPointerDown: handleSendPointerDown,
+          onClick: handleSendClick,
           style: {
             height: '32px',
             padding: '0 16px',
