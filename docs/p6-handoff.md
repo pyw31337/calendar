@@ -441,3 +441,9 @@ zsh 에서 줄 시작 `#` 주석은 쓰지 말 것.
 - 캐시 히트 시 초기 로딩 오버레이 생략
 - 오버레이: 1s→280ms, 진행 갱신 빠르게
 - 폴백 get 2.5s→1.2s, 타임아웃 기본 8s
+
+## P6-75 (2026-08-21)
+- 캘린더 설정 빈 화면: AdminModal getActiveParticipants/sanitizeText deps fallback
+- 설정 모달 높이 admin-settings-modal VV 상한 720
+- SW Response clone 오류 수정 (cache-first revalidate)
+- shortcut icon 링크 추가

@@ -713,8 +713,16 @@ export function AdminModal({
   const ResizableModalContainer = __comp.ResizableModalContainer || __deps.ResizableModalContainer;
   const SettingsIcon = __comp.SettingsIcon || __deps.SettingsIcon;
   const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
-  const getActiveParticipants = __deps.getActiveParticipants;
-  const sanitizeText = __deps.sanitizeText;
+  const getActiveParticipants = typeof __deps.getActiveParticipants === 'function'
+    ? __deps.getActiveParticipants
+    : (typeof GATHER_APP_UTILS !== 'undefined' && typeof GATHER_APP_UTILS.getActiveParticipants === 'function'
+      ? GATHER_APP_UTILS.getActiveParticipants
+      : function (cal) { return (cal && Array.isArray(cal.participants) ? cal.participants.filter(function (p) { return p && !p.deletedAt; }) : []); });
+  const sanitizeText = typeof __deps.sanitizeText === 'function'
+    ? __deps.sanitizeText
+    : (typeof GATHER_APP_UTILS !== 'undefined' && typeof GATHER_APP_UTILS.sanitizeText === 'function'
+      ? GATHER_APP_UTILS.sanitizeText
+      : function (s, n) { var v = String(s == null ? '' : s); return typeof n === 'number' ? v.slice(0, n) : v; });
 
   const [activeTab, setActiveTab] = React.useState('settings'); // 'settings', 'calendar', 'recovery', 'logs'
 
@@ -822,7 +830,7 @@ export function AdminModal({
   // Settings tab states
   const [title, setTitle] = React.useState(calendar.title);
   const [description, setDescription] = React.useState(calendar.description || '');
-  const [participants, setParticipants] = React.useState(getActiveParticipants(calendar));
+  const [participants, setParticipants] = React.useState(() => { try { return getActiveParticipants(calendar) || []; } catch (_) { return []; } });
 
   const [newName, setNewName] = React.useState('');
   const newNameInputRef = React.useRef(null);
@@ -1029,14 +1037,26 @@ export function AdminModal({
     [calendar.activityLogs]
   );
 
+  if (!calendar || !calendar.id) {
+    return /*#__PURE__*/React.createElement("div", {
+      className: "modal-overlay",
+      onClick: onClose,
+      style: { zIndex: 10000 }
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "modal-container confirm-dialog-modal",
+      style: { maxWidth: '360px', padding: '20px' }
+    }, /*#__PURE__*/React.createElement("p", { style: { margin: 0 } }, "캘린더 데이터를 불러오는 중입니다."),
+      /*#__PURE__*/React.createElement("button", { type: "button", className: "btn btn-secondary", style: { marginTop: '12px', width: '100%' }, onClick: onClose }, "닫기")));
+  }
+
   return /*#__PURE__*/React.createElement("div", {
     className: "modal-overlay",
     onClick: () => { if (!isSubmitting) onClose(); },
     style: { zIndex: 10000 }
   }, /*#__PURE__*/React.createElement(ResizableModalContainer, {
-    className: "modal-container",
+    className: "modal-container admin-settings-modal",
     onClick: e => e.stopPropagation(),
-    style: { maxWidth: '760px', width: '95vw', display: 'flex', flexDirection: 'column', height: '90vh', maxHeight: '700px', borderRadius: '16px' }
+    style: { maxWidth: '760px', width: '95vw', display: 'flex', flexDirection: 'column', height: 'min(90vh, 720px)', maxHeight: 'min(720px, calc(100svh - 24px), calc(100vh - 24px))', borderRadius: '16px', overflow: 'hidden' }
   },
     /* Header */
     /*#__PURE__*/React.createElement("div", {

@@ -57,15 +57,32 @@ self.addEventListener('fetch', event => {
 
   // Cache-first for the static set, with a background revalidation so an icon/manifest update
   // still reaches users on their next load rather than being stuck forever.
-  event.respondWith(
-    caches.match(req).then(cached => {
-      const network = fetch(req).then(res => {
-        if (res && res.ok) caches.open(STATIC_CACHE).then(cache => cache.put(req, res.clone()));
-        return res;
-      }).catch(() => cached);
-      return cached || network;
-    })
-  );
+  event.respondWith((async () => {
+    const cached = await caches.match(req);
+    if (cached) {
+      fetch(req).then(async (res) => {
+        if (!res || !res.ok) return;
+        try {
+          const copy = res.clone();
+          const cache = await caches.open(STATIC_CACHE);
+          await cache.put(req, copy);
+        } catch (_) {}
+      }).catch(() => {});
+      return cached;
+    }
+    try {
+      const res = await fetch(req);
+      if (res && res.ok) {
+        try {
+          const cache = await caches.open(STATIC_CACHE);
+          await cache.put(req, res.clone());
+        } catch (_) {}
+      }
+      return res;
+    } catch (e) {
+      return cached || Response.error();
+    }
+  })());
 });
 
 // Push/notificationclick handling. Real push messages are sent by the onMessageCreate Cloud
