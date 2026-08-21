@@ -2307,6 +2307,7 @@ function saveLocalCache(list) {
         return next;
       })
       .filter(Boolean);
+    if (slim.length === 0) return;
     ls.setItem(GATHER_LOCAL_CACHE_KEY, JSON.stringify(slim));
   } catch (e) {
     try {
@@ -2324,11 +2325,30 @@ function saveLocalCache(list) {
         revision: c.revision,
         updatedAt: c.updatedAt
       }));
+      if (tiny.length === 0) return;
       ls.setItem(GATHER_LOCAL_CACHE_KEY, JSON.stringify(tiny));
     } catch (e2) {
       console.warn('saveLocalCache notice:', e2);
     }
   }
+}
+
+function isLoadingCalendarShell(calendar) {
+  return Boolean(
+    calendar &&
+    calendar.title === '캘린더 불러오는 중...' &&
+    calendar.description === 'Firebase에서 실시간 캘린더 데이터를 불러오는 중입니다.'
+  );
+}
+
+function isUsableCalendarRecord(calendar) {
+  return Boolean(
+    calendar &&
+    isAllowedCalendarId(calendar.id) &&
+    !isLoadingCalendarShell(calendar) &&
+    typeof calendar.title === 'string' &&
+    calendar.title.trim()
+  );
 }
 
 // Placeholder shown only until the real Firestore document arrives -- deliberately generic
@@ -3930,6 +3950,10 @@ function AdminUnifiedSearchModal(props) {
 function App() {
   normalizeCalendarUrlParams();
   const [calendars, setCalendarsState] = React.useState(() => loadLocalCache());
+  const calendarsRef = React.useRef(calendars);
+  React.useEffect(() => {
+    calendarsRef.current = calendars;
+  }, [calendars]);
   const [toast, setToast] = React.useState(null);
   const [operationProgress, setOperationProgress] = React.useState(null);
   const toastTimeoutRef = React.useRef(null);
@@ -4116,6 +4140,7 @@ function App() {
     const requestedId = getCalendarIdFromURL();
     return requestedId && isAllowedCalendarId(requestedId) ? requestedId : 'kkot';
   });
+  const [cloudReloadToken, setCloudReloadToken] = React.useState(0);
   const [currentMonthDate, setCurrentMonthDate] = React.useState(new Date());
   const [selectedDate, setSelectedDate] = React.useState(null);
   const [isModalOpen, setIsModalOpen] = React.useState(false);
@@ -4694,6 +4719,26 @@ function App() {
     );
   }
 
+  const restoreActiveCalendarFromCache = React.useCallback(() => {
+    if (!isAllowedCalendarId(activeCalId)) return false;
+    const cached = loadLocalCache();
+    const cachedCal = Array.isArray(cached) ? cached.find(c => c && c.id === activeCalId) : null;
+    if (!isUsableCalendarRecord(cachedCal)) return false;
+    let restored = false;
+    setCalendarsState(prevCals => {
+      const current = (prevCals || []).find(c => c && c.id === activeCalId);
+      if (isUsableCalendarRecord(current)) return prevCals;
+      restored = true;
+      const nextCal = cloneCalendar(cachedCal);
+      const nextCals = Array.isArray(prevCals) && prevCals.some(c => c && c.id === activeCalId)
+        ? prevCals.map(c => c && c.id === activeCalId ? nextCal : c)
+        : [nextCal, ...(Array.isArray(prevCals) ? prevCals : [])];
+      calendarsRef.current = nextCals;
+      return nextCals;
+    });
+    return restored || true;
+  }, [activeCalId]);
+
   // Firebase Firestore Real-Time Listener (ISOLATED per activeCalId)
   React.useEffect(() => {
     if (!firebaseDb || !activeCalId) {
@@ -4703,7 +4748,9 @@ function App() {
     let isMounted = true;
     let hasLoadedCloudCalendar = false;
     let unsubscribe = null;
-    const cacheHit = (calendars || []).some(c => c && c.id === activeCalId && c.title && c.title !== '캘린더 불러오는 중...');
+    let retryTimeoutId = null;
+    const restoredFromCache = restoreActiveCalendarFromCache();
+    const cacheHit = restoredFromCache || (calendarsRef.current || []).some(c => c && c.id === activeCalId && isUsableCalendarRecord(c));
     setIsInitialDataLoading(!cacheHit);
 
     const applyLoadedCalendar = (cloudCal, cloudLastMod = Date.now()) => {
@@ -4736,8 +4783,17 @@ function App() {
         }
       }
       if (isMounted && !hasLoadedCloudCalendar) {
-        setIsInitialDataLoading(false);
-        showToast('데이터 로딩 실패', 'error', 7000);
+        const restored = restoreActiveCalendarFromCache();
+        if (restored) {
+          setIsInitialDataLoading(false);
+          showToast('서버 재연결 중', 'info', 4000);
+        } else {
+          setIsInitialDataLoading(true);
+          showToast('데이터 로딩 지연, 재시도 중', 'error', 5000);
+        }
+        retryTimeoutId = setTimeout(() => {
+          if (isMounted) setCloudReloadToken(token => token + 1);
+        }, 3500);
       }
     };
 
@@ -4748,6 +4804,13 @@ function App() {
       }
     }, err => {
       console.warn(`Firestore realtime sync notice for cal_${activeCalId}:`, err);
+      if (isMounted) {
+        restoreActiveCalendarFromCache();
+        setIsInitialDataLoading(false);
+        retryTimeoutId = setTimeout(() => {
+          if (isMounted) setCloudReloadToken(token => token + 1);
+        }, 2500);
+      }
     });
 
     // The onSnapshot listener above already delivers the initial load (from cache first, then
@@ -4769,15 +4832,16 @@ function App() {
     return () => {
       isMounted = false;
       if (fallbackTimeoutId) clearTimeout(fallbackTimeoutId);
+      if (retryTimeoutId) clearTimeout(retryTimeoutId);
       if (unsubscribe) unsubscribe();
     };
-  }, [activeCalId]);
+  }, [activeCalId, cloudReloadToken, restoreActiveCalendarFromCache]);
 
   React.useEffect(() => {
     if (firebaseDb) return;
     showToast('연결 오류', 'error', 5000);
   }, []);
-  const activeCalLoaded = calendars.some(c => c.id === activeCalId);
+  const activeCalLoaded = calendars.some(c => c && c.id === activeCalId && isUsableCalendarRecord(c));
   const rawActiveCal = calendars.find(c => c.id === activeCalId) || createLoadingCalendarShell(activeCalId);
   // Merges the live places/confirmedMeetings subcollections into whatever's still embedded on
   // the calendar document itself (legacy entries not yet migrated -- see unionPlaces/
@@ -4791,6 +4855,36 @@ function App() {
     places: unionPlaces(rawActiveCal, placesSubcollection),
     confirmedMeeting: unionConfirmedMeetings(rawActiveCal, confirmedMeetingsSubcollection)
   }), [rawActiveCal, placesSubcollection, confirmedMeetingsSubcollection]);
+  React.useEffect(() => {
+    if (!firebaseDb || !activeCalId) return undefined;
+    let lastRefreshAt = 0;
+    const refreshFromResume = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      const now = Date.now();
+      if (now - lastRefreshAt < 1200) return;
+      lastRefreshAt = now;
+      const restored = restoreActiveCalendarFromCache();
+      if (!activeCalLoaded && !restored) {
+        setIsInitialDataLoading(true);
+      }
+      setCloudReloadToken(token => token + 1);
+    };
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        setTimeout(refreshFromResume, 400);
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', refreshFromResume);
+    window.addEventListener('online', refreshFromResume);
+    window.addEventListener('pageshow', refreshFromResume);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', refreshFromResume);
+      window.removeEventListener('online', refreshFromResume);
+      window.removeEventListener('pageshow', refreshFromResume);
+    };
+  }, [activeCalId, activeCalLoaded, restoreActiveCalendarFromCache]);
   // The chat message listener below only re-subscribes on [activeCalId], so without this ref it
   // would keep using the activeCal snapshot from whenever that effect last ran -- meaning a
   // participant added (or the calendar renamed) mid-session wouldn't be reflected in incoming
