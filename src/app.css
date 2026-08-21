@@ -2630,18 +2630,19 @@ select.form-select {
     width: calc(100% - 20px);
     max-width: calc(100% - 20px);
     box-sizing: border-box;
-    /* Hard-conservative for mobile browser chrome (address bar + bottom toolbars).
-       ~100px reserved regardless of iPhone/Galaxy safe-area differences.
-       Cap at ~72% of small viewport so chrome show/hide never clips the modal. */
-    max-height: calc(100vh - 100px);
+    /* 670px = comfortable on Fold2 cover / mid phones. Always also cap to
+       visible viewport so short phones (SE etc.) never clip under browser chrome. */
+    max-height: min(670px, calc(100vh - 100px));
     max-height: min(
+      670px,
       72svh,
       calc(100svh - 100px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))
     );
     max-height: min(
+      670px,
       72svh,
       calc(100svh - 100px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)),
-      var(--gather-vv-modal-max, 72svh)
+      var(--gather-vv-modal-max, 670px)
     );
   }
   .modal-header { padding: 18px; }

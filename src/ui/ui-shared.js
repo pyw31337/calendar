@@ -762,7 +762,7 @@ export function ResizableModalContainer({ className, style, children, ...props }
       const vv = window.visualViewport;
       const vvH = vv && typeof vv.height === 'number' ? vv.height : window.innerHeight;
       // Reserve ~100px for mobile browser chrome + margins; also cap at 72% of visible height.
-      const maxPx = Math.max(180, Math.floor(Math.min(vvH * 0.72, vvH - 100)));
+      const maxPx = Math.max(180, Math.floor(Math.min(670, vvH * 0.72, vvH - 100)));
       root.style.setProperty('--gather-vv-modal-max', `${maxPx}px`);
       if (containerRef.current) {
         containerRef.current.style.maxHeight = `${maxPx}px`;

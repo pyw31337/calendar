@@ -429,3 +429,7 @@ zsh 에서 줄 시작 `#` 주석은 쓰지 말 것.
 - 테마: data-theme 항상 light|dark, 애매하면 light. 메인=사이드 동일
 - CSS 다크 오버라이드: [data-theme="dark"]만 사용
 - 사용자매뉴얼 팝업: max-height 68~70svh / viewport-110px, 내부 스크롤
+
+## P6-73 (2026-08-21)
+- 모바일 modal max-height: min(670px, 72svh, viewport-100px)
+- 짧은 기기에서는 670 대신 뷰포트 한도 적용 → 잘림 방지
