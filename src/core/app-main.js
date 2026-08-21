@@ -7178,32 +7178,28 @@ function App() {
       isEditing = true;
       placeData = { ...placeData, id: mergeTargetPlace.id };
     }
-    // Reusing an existing place for a (possibly new) date keeps its curated name/alias/category/
-    // address/primary visitDate untouched (only fills them in if they were empty) and appends
-    // this date as a new memo line (see appendVisitDateToPlaceMemo) instead of overwriting, so
-    // earlier dates/notes on the place aren't lost -- doesPlaceMatchDate already understands that
-    // multi-line format, so the place then shows up under every linked date.
-    const editedFields = mergeTargetPlace ? {
-      name: mergeTargetPlace.name || cleanName,
-      alias: mergeTargetPlace.alias || cleanAlias,
-      address: mergeTargetPlace.address || cleanAddress,
-      lat: mergeTargetPlace.lat,
-      lng: mergeTargetPlace.lng,
-      categoryId: mergeTargetPlace.categoryId || cleanCategoryId,
-      memo: (cleanVisitDate && !doesPlaceMatchDate(mergeTargetPlace, cleanVisitDate))
-        ? appendVisitDateToPlaceMemo(mergeTargetPlace.memo, cleanVisitDate, cleanMemo)
-        : mergeTargetPlace.memo,
-      visitStatus: mergeTargetPlace.visitStatus || cleanVisitStatus,
-      visitDate: mergeTargetPlace.visitDate || cleanVisitDate,
-      sourcePlaceId: mergeTargetPlace.sourcePlaceId || cleanSourcePlaceId,
-      updatedAt: now
-    } : {
-      name: cleanName, alias: cleanAlias, address: cleanAddress, lat: placeData.lat, lng: placeData.lng, categoryId: cleanCategoryId, memo: cleanMemo, visitStatus: cleanVisitStatus, visitDate: cleanVisitDate,
-      // A plain edit of an already-registered place (e.g. via DateModal's pencil icon) doesn't
-      // carry the original search result forward, so an empty incoming value here must NOT wipe
-      // out a sourcePlaceId set by an earlier save -- otherwise this place would lose its dedup
-      // identity and a later search-result pick could create a duplicate after all.
-      sourcePlaceId: cleanSourcePlaceId || (isEditing ? (existingPlaces.find(p => p.id === placeData.id) || {}).sourcePlaceId : '') || '',
+    // Reusing an existing place for a (possibly new) date keeps its curated fields untouched
+    // (mp() only falls back to this save's own value when the existing field is empty) and
+    // appends this date as a new memo line (see appendVisitDateToPlaceMemo) instead of
+    // overwriting, so earlier dates/notes on the place aren't lost -- doesPlaceMatchDate already
+    // understands that multi-line format, so the place then shows up under every linked date. A
+    // plain edit (not a merge) still needs the same sourcePlaceId fallback: its incoming value is
+    // empty (DateModal's pencil-icon edit form doesn't carry the original search result forward),
+    // so an empty value here must not wipe out a sourcePlaceId set by an earlier save.
+    const mp = (key, ownValue) => mergeTargetPlace ? (mergeTargetPlace[key] || ownValue) : ownValue;
+    const editedFields = {
+      name: mp('name', cleanName),
+      alias: mp('alias', cleanAlias),
+      address: mp('address', cleanAddress),
+      lat: mergeTargetPlace ? mergeTargetPlace.lat : placeData.lat,
+      lng: mergeTargetPlace ? mergeTargetPlace.lng : placeData.lng,
+      categoryId: mp('categoryId', cleanCategoryId),
+      memo: mergeTargetPlace
+        ? ((cleanVisitDate && !doesPlaceMatchDate(mergeTargetPlace, cleanVisitDate)) ? appendVisitDateToPlaceMemo(mergeTargetPlace.memo, cleanVisitDate, cleanMemo) : mergeTargetPlace.memo)
+        : cleanMemo,
+      visitStatus: mp('visitStatus', cleanVisitStatus),
+      visitDate: mp('visitDate', cleanVisitDate),
+      sourcePlaceId: mp('sourcePlaceId', cleanSourcePlaceId || (isEditing && !mergeTargetPlace ? (existingPlaces.find(p => p.id === placeData.id) || {}).sourcePlaceId : '') || ''),
       updatedAt: now
     };
     let nextPlaces;
@@ -10254,7 +10250,7 @@ function useModalDirtyGuard(onClose, onRequestConfirm, message, active = true) {
       const tag = target && target.tagName;
       if (tag !== 'TEXTAREA' && tag !== 'INPUT') return;
       const type = (target.type || 'text').toLowerCase();
-      if (['checkbox', 'radio', 'range', 'color', 'file', 'submit', 'button', 'reset', 'image'].includes(type)) return;
+      if (/^(checkbox|radio|range|color|file|submit|button|reset|image)$/.test(type)) return;
       dirtyRef.current = true;
     };
     document.addEventListener('input', handler, true);

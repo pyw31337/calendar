@@ -4,7 +4,10 @@ import { join } from 'node:path';
 const DIST_ASSETS_DIR = join(process.cwd(), 'dist', 'assets');
 
 const BUDGETS = [
-  { pattern: /^app-main-.*\.js$/, maxBytes: 260_000 },
+  // Bumped from 260_000 -- photo/place single-source-of-truth (confirmedMeeting.photos as chat
+  // message references, place dedup by search-result id) and the shared useModalDirtyGuard hook
+  // used across 6 modals added real, non-duplicated logic to this chunk.
+  { pattern: /^app-main-.*\.js$/, maxBytes: 264_000 },
   { pattern: /^ui-views-.*\.js$/, maxBytes: 260_000 },
   { pattern: /^ui-admin-.*\.js$/, maxBytes: 140_000 },
   { pattern: /^vendor-react-dom-.*\.js$/, maxBytes: 150_000 },
