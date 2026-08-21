@@ -941,6 +941,10 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
   const chatOrdinalFetchedRef = React.useRef(new Set());
   const [chatOrdinalCache, setChatOrdinalCache] = React.useState({});
   React.useEffect(() => {
+    // Only fetch once the info panel is actually open -- it's the only place the label shows,
+    // and eagerly firing a count() query for every photo as the user swipes past it (most of
+    // which never get a second look) added real extra Firestore traffic for no visible benefit.
+    if (!showInfo) return;
     if (!currentMeta || currentMeta.source === 'meeting' || currentMeta.source === 'memo') return;
     if (typeof onGetChatMessageOrdinal !== 'function') return;
     const key = currentMeta.messageId;
@@ -952,7 +956,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
       if (!cancelled && typeof n === 'number') setChatOrdinalCache(prev => ({ ...prev, [key]: n }));
     });
     return () => { cancelled = true; };
-  }, [currentMeta, onGetChatMessageOrdinal]);
+  }, [showInfo, currentMeta, onGetChatMessageOrdinal]);
   const sourceInfo = React.useMemo(() => {
     if (!currentMeta) return null;
     if (currentMeta.source === 'meeting') {

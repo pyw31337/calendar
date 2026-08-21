@@ -5290,6 +5290,26 @@ function App() {
   const hasMoreOlderChatRef = React.useRef(hasMoreOlderChat);
   hasMoreOlderChatRef.current = hasMoreOlderChat;
 
+  // A single chat message can be locally cached in up to three independent snapshots at once --
+  // `chatMessages` (the live recent window), `olderChatMessages` (manually paginated-in older
+  // history), and `galleryPreviewMessages` (a one-time fetch for the main-screen gallery widget).
+  // Every per-message mutation (tag save, photo delete/replace, share-URL caching) MUST patch all
+  // three, or whichever snapshot wasn't touched keeps showing stale data (e.g. a tag saved from
+  // the main-screen gallery widget's Lightbox wouldn't show up when the same photo is reopened
+  // from the 갤러리 page, since that page reads from a different one of these three arrays).
+  const patchLocalChatMessage = (messageId, patch) => {
+    const patchMessage = msg => msg.id === messageId ? { ...msg, ...patch } : msg;
+    setChatMessages(prev => prev.map(patchMessage));
+    setOlderChatMessages(prev => prev.map(patchMessage));
+    setGalleryPreviewMessages(prev => prev.map(patchMessage));
+  };
+  const removeLocalChatMessage = messageId => {
+    const dropMessage = prev => prev.filter(m => m.id !== messageId);
+    setChatMessages(dropMessage);
+    setOlderChatMessages(dropMessage);
+    setGalleryPreviewMessages(dropMessage);
+  };
+
   React.useEffect(() => {
     if (activeView === 'chat' && chatMessagesContainerRef.current) {
       const container = chatMessagesContainerRef.current;
@@ -5851,8 +5871,7 @@ function App() {
           const ok = await updateMessageRest(activeCalId, sourceMessage.id, data);
           if (!ok) throw new Error('Message share URL cache update failed');
         }
-        const patchMessage = msg => msg.id === sourceMessage.id ? { ...msg, ...data } : msg;
-        setChatMessages(prev => prev.map(patchMessage));
+        patchLocalChatMessage(sourceMessage.id, data);
         setChatUploadProgress({ pct: 100, remainingSec: 0, label: 'URL 생성완료' });
         return { shareUrl, imageUrl: null };
       }
@@ -6073,8 +6092,7 @@ function App() {
       showToast('태그 저장 실패', 'error');
       return false;
     }
-    const patchMessage = msg => msg.id === messageId ? { ...msg, ...data } : msg;
-    setChatMessages(prev => prev.map(patchMessage));
+    patchLocalChatMessage(messageId, data);
     const sourceEntry = isDirectMedia ? null : getMessageImageEntries(sourceMessage)[imageIndex];
     const imageUrl = String(meta?.imageUrl || meta?.directMediaUrl || sourceEntry?.full || sourceEntry?.thumb || '').trim();
     const thumbUrl = String(meta?.thumb || sourceEntry?.thumb || imageUrl).trim();
@@ -6708,7 +6726,7 @@ function App() {
         } else {
           await deleteMessageRest(activeCalId, messageId);
         }
-        setChatMessages(prev => prev.filter(m => m.id !== messageId));
+        removeLocalChatMessage(messageId);
       } else {
         const data = sanitizeMessageForFirestore({
           imageUrls: nextUrls,
@@ -6723,8 +6741,7 @@ function App() {
           const ok = await updateMessageRest(activeCalId, messageId, data);
           if (!ok) throw new Error('Photo delete REST update failed');
         }
-        const patchMessage = msg => msg.id === messageId ? { ...msg, ...data } : msg;
-        setChatMessages(prev => prev.map(patchMessage));
+        patchLocalChatMessage(messageId, data);
       }
       deleteChatImageFromStorage(target.full);
       if (target.thumb !== target.full) deleteChatImageFromStorage(target.thumb);
@@ -6768,8 +6785,7 @@ function App() {
         const ok = await updateMessageRest(activeCalId, messageId, data);
         if (!ok) throw new Error('Photo replace REST update failed');
       }
-      const patchMessage = msg => msg.id === messageId ? { ...msg, ...data } : msg;
-      setChatMessages(prev => prev.map(patchMessage));
+      patchLocalChatMessage(messageId, data);
       deleteChatImageFromStorage(target.full);
       if (target.thumb !== target.full) deleteChatImageFromStorage(target.thumb);
       showToast('사진 교체완료', 'success');
