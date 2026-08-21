@@ -22,6 +22,8 @@ assert(/thumbs\.map\(\(thumb, idx\)[\s\S]{0,520}objectFit: 'cover'/.test(script)
 const setChatNotifyPrefBody = script.match(/function setChatNotifyEnabledForCalendar\(calId, enabled\) \{([\s\S]*?)\n\}/)?.[1] || '';
 assert(!setChatNotifyPrefBody.includes('gather_chat_notify_pref_global_v1'), 'new chat notification writes must be calendar-scoped, not global');
 assert(/directMediaTags/.test(script), 'direct URL image tags must be persisted on chat messages');
+assert(/function getMessageDirectMediaEntry\(msg\)[\s\S]{0,420}imageIndex: 0[\s\S]{0,420}directMediaUrl: mediaInfo\.url/.test(script), 'direct URL gallery entries must provide a stable imageIndex and directMediaUrl for tag persistence');
+assert(/const normalizeTagsForDisplay = text =>[\s\S]{0,180}\.slice\(0, 10\)\.join\(' '\)/.test(fs.readFileSync('src/ui/ui-lightbox.js', 'utf8')), 'Lightbox optimistic tag display must mirror the 10-tag persistence limit');
 assert(/directMediaTags/.test(firestoreRules), 'Firestore rules must allow direct URL image tag updates');
 assert(/affectedKeys\(\)\.hasOnly\(\[[^\]]*directMediaTags/.test(firestoreRules), 'message update rules must include directMediaTags in the allowed update mask');
 assert(/function hasValidMessageMediaMetadataPatch\(\)/.test(firestoreRules), 'Firestore rules must allow tag/share-cache-only updates without revalidating stale message payloads');

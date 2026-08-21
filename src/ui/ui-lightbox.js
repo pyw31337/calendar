@@ -893,7 +893,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
   // here matches what actually got persisted, without needing the save call to round-trip it.
   const normalizeTagsForDisplay = text => Array.from(new Set(
     String(text || '').split(/[,\s#]+/).map(t => t.trim()).filter(Boolean)
-  )).slice(0, 20).join(' ');
+  )).slice(0, 10).join(' ');
   const saveCurrentTags = onSaveImageTags && currentMeta?.messageId != null
     ? async tagsText => {
         const ok = await onSaveImageTags(currentMeta.messageId, currentMeta.imageIndex, tagsText, currentMeta);
