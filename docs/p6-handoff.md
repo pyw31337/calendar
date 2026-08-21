@@ -424,3 +424,8 @@ zsh 에서 줄 시작 `#` 주석은 쓰지 말 것.
 - :root:not([data-theme="light"]) → [data-theme="dark"] (사이드만 다크 오탐 제거)
 - theme-init / OS prefers-color-scheme change 동기화
 - 대상: 삼성 인터넷, 크롬, 사파리
+
+## P6-72 (2026-08-21)
+- 테마: data-theme 항상 light|dark, 애매하면 light. 메인=사이드 동일
+- CSS 다크 오버라이드: [data-theme="dark"]만 사용
+- 사용자매뉴얼 팝업: max-height 68~70svh / viewport-110px, 내부 스크롤
