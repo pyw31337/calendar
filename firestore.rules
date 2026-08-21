@@ -106,14 +106,21 @@ service cloud.firestore {
           // image-info panel and searched from GlobalSearchModal.
           && (!('imageTags' in data) || (data.imageTags is list && data.imageTags.size() <= 50))
           // directMediaTags stores the same hashtag text for an image rendered from a pasted
-          // URL in the chat text (no imageUrls/thumbUrls entry exists for that synthetic media).
-          && (!('directMediaTags' in data) || (data.directMediaTags is string && data.directMediaTags.size() <= 100));
+          // URL in the chat text. New clients store it as a URL-hash keyed map so each direct
+          // media item can have independent tags; legacy string values are still readable.
+          && (!('directMediaTags' in data) || (
+            (data.directMediaTags is string && data.directMediaTags.size() <= 100)
+            || (data.directMediaTags is map && data.directMediaTags.size() <= 50)
+          ));
       }
       function hasValidMessageMediaMetadataPatch() {
         return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['imageShareUrls', 'imageTags', 'directMediaTags'])
           && (!('imageShareUrls' in request.resource.data) || (request.resource.data.imageShareUrls is list && request.resource.data.imageShareUrls.size() <= 50))
           && (!('imageTags' in request.resource.data) || (request.resource.data.imageTags is list && request.resource.data.imageTags.size() <= 50))
-          && (!('directMediaTags' in request.resource.data) || (request.resource.data.directMediaTags is string && request.resource.data.directMediaTags.size() <= 100));
+          && (!('directMediaTags' in request.resource.data) || (
+            (request.resource.data.directMediaTags is string && request.resource.data.directMediaTags.size() <= 100)
+            || (request.resource.data.directMediaTags is map && request.resource.data.directMediaTags.size() <= 50)
+          ));
       }
 
       match /messages/{messageId} {

@@ -5770,10 +5770,20 @@ function App() {
     const parseTagTokens = text => Array.from(new Set(
       String(text || '').split(/[,\s#]+/).map(t => sanitizeText(t.trim(), 30)).filter(Boolean)
     )).slice(0, 10);
-    const prevTokens = parseTagTokens(isDirectMedia ? sourceMessage.directMediaTags : (Array.isArray(sourceMessage.imageTags) ? sourceMessage.imageTags[imageIndex] : ''));
+    const prevTokens = parseTagTokens(isDirectMedia ? getDirectMediaTagsForUrl(sourceMessage, meta.directMediaUrl) : (Array.isArray(sourceMessage.imageTags) ? sourceMessage.imageTags[imageIndex] : ''));
     const nextTokens = parseTagTokens(tagsText);
     const cleanTags = sanitizeText(nextTokens.join(' '), 100);
-    const data = isDirectMedia ? { directMediaTags: cleanTags } : (() => {
+    const data = isDirectMedia ? (() => {
+      const previous = sourceMessage.directMediaTags;
+      const nextDirectTags = previous && typeof previous === 'object' && !Array.isArray(previous) ? { ...previous } : {};
+      const directKey = getDirectMediaTagKey(meta.directMediaUrl);
+      if (cleanTags) {
+        nextDirectTags[directKey] = cleanTags;
+      } else {
+        delete nextDirectTags[directKey];
+      }
+      return { directMediaTags: nextDirectTags };
+    })() : (() => {
       const nextImageTags = Array.isArray(sourceMessage.imageTags) ? [...sourceMessage.imageTags] : [];
       while (nextImageTags.length < entryCount) nextImageTags.push('');
       nextImageTags[imageIndex] = cleanTags;
@@ -8999,6 +9009,26 @@ function getMessageImageEntries(msg) {
   return entries;
 }
 
+function getDirectMediaTagKey(url) {
+  const source = String(url || '');
+  let hash = 2166136261;
+  for (let i = 0; i < source.length; i++) {
+    hash ^= source.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `u_${(hash >>> 0).toString(36)}`;
+}
+
+function getDirectMediaTagsForUrl(msg, url) {
+  const tags = msg?.directMediaTags;
+  if (!tags) return '';
+  if (typeof tags === 'string') return tags;
+  if (typeof tags === 'object' && !Array.isArray(tags)) {
+    return tags[getDirectMediaTagKey(url)] || '';
+  }
+  return '';
+}
+
 function getMessageDirectMediaEntry(msg) {
   const firstUrl = extractFirstUrl(msg?.text || '');
   const mediaInfo = getDirectChatMediaInfo(firstUrl);
@@ -9009,7 +9039,7 @@ function getMessageDirectMediaEntry(msg) {
     imageIndex: 0,
     messageId: msg.id,
     timestamp: msg.timestamp,
-    tags: msg.directMediaTags || '',
+    tags: getDirectMediaTagsForUrl(msg, mediaInfo.url),
     directMediaUrl: mediaInfo.url
   };
 }
