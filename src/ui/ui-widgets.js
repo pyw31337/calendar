@@ -708,14 +708,32 @@ export function TikTokEmbedWidget({ url, videoId, onFailed }) {
     script.src = 'https://www.tiktok.com/embed.js';
     script.async = true;
     document.body.appendChild(script);
-    const timeoutId = setTimeout(() => {
+    const detectFailure = () => {
       if (cancelled) return;
-      const hasPlayer = containerRef.current && containerRef.current.querySelector('iframe');
-      if (!hasPlayer) onFailed();
-    }, 6000);
+      const node = containerRef.current;
+      if (!node) return;
+      const hasPlayer = node.querySelector('iframe');
+      const text = (node.textContent || '').toLowerCase();
+      // TikTok sometimes injects a plain "overload-protect triggered" message instead of
+      // firing an iframe error. Treat that as a hard embed failure and fall back to the normal
+      // link-preview card so users never see TikTok's internal diagnostic text in a bubble.
+      const hasTikTokInternalError = text.includes('overload-protect') || text.includes('triggered');
+      if (!hasPlayer || hasTikTokInternalError) onFailed();
+    };
+    const observer = new MutationObserver(() => {
+      if (cancelled) return;
+      const node = containerRef.current;
+      const text = (node?.textContent || '').toLowerCase();
+      if (text.includes('overload-protect') || text.includes('triggered')) {
+        onFailed();
+      }
+    });
+    if (containerRef.current) observer.observe(containerRef.current, { childList: true, subtree: true, characterData: true });
+    const timeoutId = setTimeout(detectFailure, 6000);
     return () => {
       cancelled = true;
       clearTimeout(timeoutId);
+      observer.disconnect();
       if (script.parentNode) script.parentNode.removeChild(script);
     };
   }, [url]);

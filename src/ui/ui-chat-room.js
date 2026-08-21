@@ -1003,8 +1003,8 @@ export function ChatRoomView({
   const handlePasteImagesChat = async (e) => {
     const pastedFiles = getImageFilesFromClipboardEvent(e);
     if (pastedFiles.length === 0) return;
-    const pastedText = e.clipboardData?.getData('text/plain') || '';
-    if (!pastedText) e.preventDefault();
+    e.preventDefault();
+    e.stopPropagation();
     try {
       await appendChatImageFiles({
         files: pastedFiles,
