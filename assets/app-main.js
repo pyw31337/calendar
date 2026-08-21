@@ -4080,7 +4080,6 @@ function App() {
   const chatTextareaRef = React.useRef(null);
   const [chatImages, setChatImages] = React.useState([]);
   const [activeLightbox, setActiveLightbox] = React.useState(null); // { urls: string[], index: number } | null
-  const [linkPreviewProgressState, setLinkPreviewProgressState] = React.useState(null);
   const [isGalleryOpen, setIsGalleryOpen] = React.useState(false);
   const [placesInitialQuery, setPlacesInitialQuery] = React.useState('');
   // Clicking a #해시태그 in the lightbox's image-info panel closes the lightbox and opens the
@@ -4831,21 +4830,39 @@ function App() {
     const imageCount = chatImages.length;
     if ((!hasText && imageCount === 0) || !chatParticipantId) return;
     setIsChatSubmitting(true);
-    if (imageCount > 0) setChatUploadProgress({ pct: 0, remainingSec: null });
+    setChatUploadProgress({
+      pct: 3,
+      remainingSec: null,
+      label: imageCount > 0 ? '채팅 준비 중...' : '채팅 전송 준비 중...',
+      current: imageCount > 0 ? 1 : undefined,
+      total: imageCount > 0 ? imageCount : undefined
+    });
 
     try {
       let linkPreview = null;
       if (hasText) {
         const url = extractFirstUrl(chatInput);
         if (url && shouldFetchLinkPreviewForChatUrl(url)) {
-          setLinkPreviewProgressState({ pct: 5, remainingSec: 5 });
+          setChatUploadProgress({
+            pct: 8,
+            remainingSec: 5,
+            label: '링크 미리보기 생성 중...',
+            current: imageCount > 0 ? 1 : undefined,
+            total: imageCount > 0 ? imageCount : undefined
+          });
           const startTime = Date.now();
           const targetDuration = 5000;
           const pInterval = setInterval(() => {
             const elapsed = Date.now() - startTime;
-            const displayPercent = Math.min(Math.round(98 * (1 - Math.exp(-elapsed / 2200))), 98);
+            const displayPercent = Math.min(84, 8 + Math.round(76 * (1 - Math.exp(-elapsed / 2200))));
             const remaining = Math.max(1, Math.round((targetDuration - elapsed) / 1000));
-            setLinkPreviewProgressState({ pct: displayPercent, remainingSec: remaining });
+            setChatUploadProgress({
+              pct: displayPercent,
+              remainingSec: remaining,
+              label: '링크 미리보기 생성 중...',
+              current: imageCount > 0 ? 1 : undefined,
+              total: imageCount > 0 ? imageCount : undefined
+            });
           }, 100);
           try {
             const res = await fetchLinkPreview(url);
@@ -4856,7 +4873,13 @@ function App() {
             console.error('Failed to fetch link preview on chat send:', e);
           } finally {
             clearInterval(pInterval);
-            setLinkPreviewProgressState(null);
+            setChatUploadProgress({
+              pct: imageCount > 0 ? 25 : 86,
+              remainingSec: null,
+              label: imageCount > 0 ? '사진 전송 준비 중...' : '채팅 저장 중...',
+              current: imageCount > 0 ? 1 : undefined,
+              total: imageCount > 0 ? imageCount : undefined
+            });
           }
         }
       }
@@ -4869,16 +4892,15 @@ function App() {
           timestamp: Date.now()
         };
         if (linkPreview) messageData.linkPreview = linkPreview;
-        ok = await runWithOperationProgress({
-          title: '채팅 전송 중...',
-          detail: '메시지를 Firebase에 저장하고 있습니다.'
-        }, async () => {
+        setChatUploadProgress({ pct: 90, remainingSec: 1, label: '채팅 저장 중...' });
+        ok = await (async () => {
           if (firebaseDb) {
             await firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages').add(sanitizeMessageForFirestore(messageData));
             return true;
           }
           return sendChatMessageRest(activeCalId, messageData);
-        });
+        })();
+        if (ok) setChatUploadProgress({ pct: 100, remainingSec: 0, label: '전송 완료' });
       } else {
         // Bundle every attached image into a single multi-thumbnail message when possible.
         // Uploads that land in Storage produce short download URLs, so this is always a single
@@ -4889,6 +4911,13 @@ function App() {
         const chunks = chunkResolvedImagesForMessages(resolvedImages);
         const baseTimestamp = Date.now();
         for (let i = 0; i < chunks.length; i++) {
+          setChatUploadProgress({
+            pct: Math.min(99, 92 + Math.round((i / Math.max(1, chunks.length)) * 7)),
+            remainingSec: chunks.length - i,
+            label: '채팅 저장 중...',
+            current: Math.min(imageCount, i + 1),
+            total: imageCount
+          });
           const chunkImages = chunks[i];
           const messageData = {
             participantId: chatParticipantId,
@@ -4908,6 +4937,7 @@ function App() {
           }
         }
         ok = true;
+        setChatUploadProgress({ pct: 100, remainingSec: 0, label: '전송 완료', current: imageCount, total: imageCount });
       }
 
       if (ok) {
@@ -7001,14 +7031,19 @@ async function fetchLinkPreview(url) {
         }
       }
 
-      const res = await fetch(PEEKALINK_PROXY_URL, {
+      const controller = typeof AbortController === 'function' ? new AbortController() : null;
+      const timeoutId = controller ? setTimeout(() => controller.abort(), 8000) : null;
+      const res = await withTimeout(fetch(PEEKALINK_PROXY_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ link: url })
+        body: JSON.stringify({ link: url }),
+        signal: controller?.signal
+      }), 9000, 'link preview timed out').finally(() => {
+        if (timeoutId) clearTimeout(timeoutId);
       });
-      const json = await res.json();
+      const json = await withTimeout(res.json(), 4000, 'link preview json timed out');
       // Counts against the free-plan quota regardless of json.ok -- the request still reached
       // Peekalink's server and consumed the hourly allowance either way.
       incrementPeekalinkApiCallStat();
@@ -7742,6 +7777,33 @@ const EmojiPickerSheet = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPON
   ? window.GATHER_UI_COMPONENTS.EmojiPickerSheet
   : function EmojiPickerSheetFallback() { return null; };
 
+function getUploadImageBlobMeta(blob, fallbackExt = 'jpg') {
+  const mime = String(blob?.type || '').toLowerCase();
+  const extByMime = {
+    'image/jpeg': 'jpg',
+    'image/jpg': 'jpg',
+    'image/png': 'png',
+    'image/webp': 'webp',
+    'image/gif': 'gif',
+    'image/avif': 'avif',
+    'image/bmp': 'bmp'
+  };
+  const contentTypeByExt = {
+    jpg: 'image/jpeg',
+    jpeg: 'image/jpeg',
+    png: 'image/png',
+    webp: 'image/webp',
+    gif: 'image/gif',
+    avif: 'image/avif',
+    bmp: 'image/bmp'
+  };
+  const ext = extByMime[mime] || fallbackExt || 'jpg';
+  return {
+    ext,
+    contentType: /^image\//.test(mime) ? mime : (contentTypeByExt[ext] || 'image/jpeg')
+  };
+}
+
 
 
 
@@ -7763,19 +7825,21 @@ function uploadChatImageAssets(calendarId, compressed, index, onBytes, timeoutMs
     // request -- Firebase Storage's download endpoint doesn't send a CORS header by default, so
     // a plain fetch() to read Content-Length from a different origin (like this app's GitHub
     // Pages host) is silently blocked by the browser and would never work.
-    const originalRef = firebaseStorage.ref(`${basePath}_original_${compressed.originalBlob.size}b.jpg`);
-    const thumbRef = firebaseStorage.ref(`${basePath}_thumb_${compressed.thumbnailBlob.size}b.jpg`);
+    const originalMeta = getUploadImageBlobMeta(compressed.originalBlob, 'jpg');
+    const thumbMeta = getUploadImageBlobMeta(compressed.thumbnailBlob, originalMeta.ext === 'png' ? 'png' : 'jpg');
+    const originalRef = firebaseStorage.ref(`${basePath}_original_${compressed.originalBlob.size}b.${originalMeta.ext}`);
+    const thumbRef = firebaseStorage.ref(`${basePath}_thumb_${compressed.thumbnailBlob.size}b.${thumbMeta.ext}`);
 
     // On a flaky mobile connection, a stalled upload can go silent with no error/complete event
     // ever firing (the SDK is still waiting on a dead connection) -- without a bound here, the
     // whole send/edit flow would hang forever with no way for the user to recover. Time out and
     // fall back to inline base64 for that image instead.
-    const runUpload = (blob, ref, taskKey) => {
+    const runUpload = (blob, ref, taskKey, contentType) => {
       let settled = false;
       return new Promise((resolveOne) => {
         const settle = value => { if (settled) return; settled = true; resolveOne(value); };
         const timeoutId = setTimeout(() => settle(null), timeoutMs);
-        const task = ref.put(blob, { contentType: 'image/jpeg' });
+        const task = ref.put(blob, { contentType });
         task.on('state_changed', snapshot => {
           if (onBytes) onBytes(taskKey, snapshot.bytesTransferred, snapshot.totalBytes);
         }, () => { clearTimeout(timeoutId); settle(null); }, async () => {
@@ -7790,8 +7854,8 @@ function uploadChatImageAssets(calendarId, compressed, index, onBytes, timeoutMs
     };
 
     Promise.all([
-      runUpload(compressed.originalBlob, originalRef, `${index}-orig`),
-      runUpload(compressed.thumbnailBlob, thumbRef, `${index}-thumb`)
+      runUpload(compressed.originalBlob, originalRef, `${index}-orig`, originalMeta.contentType),
+      runUpload(compressed.thumbnailBlob, thumbRef, `${index}-thumb`, thumbMeta.contentType)
     ]).then(([imageUrl, thumbUrl]) => {
       if (imageUrl && thumbUrl) resolve({ imageUrl, thumbUrl });
       else {
@@ -9184,15 +9248,17 @@ function uploadMemoImageAssets(calendarId, compressed, index, onBytes, timeoutMs
     const rand = Math.random().toString(36).slice(2, 8);
     const basePath = `memoImages/${calendarId}/${stamp}_${rand}_${index}`;
     // Byte size embedded in the filename -- see the matching comment in uploadChatImageAssets.
-    const originalRef = firebaseStorage.ref(`${basePath}_original_${compressed.originalBlob.size}b.jpg`);
-    const thumbRef = firebaseStorage.ref(`${basePath}_thumb_${compressed.thumbnailBlob.size}b.jpg`);
+    const originalMeta = getUploadImageBlobMeta(compressed.originalBlob, 'jpg');
+    const thumbMeta = getUploadImageBlobMeta(compressed.thumbnailBlob, originalMeta.ext === 'png' ? 'png' : 'jpg');
+    const originalRef = firebaseStorage.ref(`${basePath}_original_${compressed.originalBlob.size}b.${originalMeta.ext}`);
+    const thumbRef = firebaseStorage.ref(`${basePath}_thumb_${compressed.thumbnailBlob.size}b.${thumbMeta.ext}`);
 
-    const runUpload = (blob, ref, taskKey) => {
+    const runUpload = (blob, ref, taskKey, contentType) => {
       let settled = false;
       return new Promise((resolveOne) => {
         const settle = value => { if (settled) return; settled = true; resolveOne(value); };
         const timeoutId = setTimeout(() => settle(null), timeoutMs);
-        const task = ref.put(blob, { contentType: 'image/jpeg' });
+        const task = ref.put(blob, { contentType });
         task.on('state_changed', snapshot => {
           if (onBytes) onBytes(taskKey, snapshot.bytesTransferred, snapshot.totalBytes);
         }, () => { clearTimeout(timeoutId); settle(null); }, async () => {
@@ -9207,8 +9273,8 @@ function uploadMemoImageAssets(calendarId, compressed, index, onBytes, timeoutMs
     };
 
     Promise.all([
-      runUpload(compressed.originalBlob, originalRef, `${index}-orig`),
-      runUpload(compressed.thumbnailBlob, thumbRef, `${index}-thumb`)
+      runUpload(compressed.originalBlob, originalRef, `${index}-orig`, originalMeta.contentType),
+      runUpload(compressed.thumbnailBlob, thumbRef, `${index}-thumb`, thumbMeta.contentType)
     ]).then(([imageUrl, thumbUrl]) => {
       if (imageUrl && thumbUrl) resolve({ imageUrl, thumbUrl });
       else {

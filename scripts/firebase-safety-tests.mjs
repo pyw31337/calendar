@@ -251,6 +251,14 @@ runAppScript(productionContext, `
   if (getDirectChatMediaInfo('https://i.aagag.com/o/KpOo5.webp')?.type !== 'image') {
     throw new Error('direct webp chat media detection failed');
   }
+  const webpUploadMeta = getUploadImageBlobMeta(new Blob(['webp'], { type: 'image/webp' }));
+  if (webpUploadMeta.ext !== 'webp' || webpUploadMeta.contentType !== 'image/webp') {
+    throw new Error('webp upload metadata must preserve image/webp');
+  }
+  const pngUploadMeta = getUploadImageBlobMeta(new Blob(['png'], { type: 'image/png' }));
+  if (pngUploadMeta.ext !== 'png' || pngUploadMeta.contentType !== 'image/png') {
+    throw new Error('png upload metadata must preserve image/png');
+  }
   if (getDirectChatMediaInfo('https://example.com/photo.JPEG?size=large')?.type !== 'image') {
     throw new Error('direct jpeg chat media detection failed');
   }
