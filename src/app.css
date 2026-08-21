@@ -2597,14 +2597,23 @@ select.form-select {
   overflow-x: hidden;
   box-sizing: border-box;
 }
-.modal-container {
+.modal-container,
+.modal {
   background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
   width: 100%; max-width: 480px; box-shadow: var(--shadow-lg); overflow: hidden; overflow-x: hidden; color: var(--text-main);
   max-height: min(92vh, 860px); max-height: min(92dvh, 860px);
   display: flex; flex-direction: column;
+  min-height: 0;
 }
-.modal-container > form {
+.modal-container > form,
+.modal > form {
   display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; overflow: hidden;
+}
+.modal-container > .modal-header,
+.modal > .modal-header,
+.modal-container > form > .modal-header,
+.modal > form > .modal-header {
+  flex: 0 0 auto;
 }
 .modal-header { padding: var(--space-5); border-bottom: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: space-between; background: var(--bg-primary); flex: 0 0 auto; }
 .modal-body {
@@ -2612,7 +2621,20 @@ select.form-select {
   overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
   flex: 1 1 auto; min-height: 0;
 }
+.modal-container > .modal-body,
+.modal > .modal-body,
+.modal-container > form > .modal-body,
+.modal > form > .modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+}
 .modal-footer { padding: var(--space-5); border-top: 1px solid var(--border-subtle); display: flex; justify-content: flex-end; gap: 10px; background: var(--bg-primary); flex: 0 0 auto; }
+.modal-container > .modal-footer,
+.modal > .modal-footer,
+.modal-container > form > .modal-footer,
+.modal > form > .modal-footer {
+  flex: 0 0 auto;
+}
 
 .memo-edit-modal-container {
   max-height: min(92vh, 780px);
@@ -2649,24 +2671,17 @@ select.form-select {
     min-height: 100vh;
     min-height: 100svh;
   }
-  .modal-container {
+  .modal-container,
+  .modal {
     margin: 10px;
     width: calc(100% - 20px);
     max-width: calc(100% - 20px);
     box-sizing: border-box;
-    /* 670px = comfortable on Fold2 cover / mid phones. Always also cap to
-       visible viewport so short phones (SE etc.) never clip under browser chrome. */
-    max-height: min(670px, calc(100vh - 100px));
+    max-height: calc(100vh - 20px);
+    max-height: calc(100svh - 20px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
     max-height: min(
-      670px,
-      72svh,
-      calc(100svh - 100px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))
-    );
-    max-height: min(
-      670px,
-      72svh,
-      calc(100svh - 100px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)),
-      var(--gather-vv-modal-max, 670px)
+      calc(100svh - 20px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)),
+      var(--gather-vv-modal-max, 860px)
     );
   }
   .modal-header { padding: 18px; }
@@ -3449,9 +3464,12 @@ textarea.form-input {
     padding-left: 16px !important;
     font-size: 0.74rem !important;
   }
-  .modal-container { margin: 10px; width: calc(100% - 20px); max-width: calc(100% - 20px); box-sizing: border-box; }
+  .modal-container,
+  .modal { margin: 10px; width: calc(100% - 20px); max-width: calc(100% - 20px); box-sizing: border-box; }
   .modal-container:has(.modal-header),
-  .modal-container:has(form) {
+  .modal-container:has(form),
+  .modal:has(.modal-header),
+  .modal:has(form) {
     padding-left: 0 !important;
     padding-right: 0 !important;
   }
@@ -3492,8 +3510,10 @@ textarea.form-input {
   color: var(--text-light) !important;
 }
 [data-theme="dark"] .modal-container,
+[data-theme="dark"] .modal,
 [data-theme="dark"] .bottom-sheet,
 :root[data-theme="dark"] .modal-container,
+:root[data-theme="dark"] .modal,
 :root[data-theme="dark"] .bottom-sheet {
   background: var(--bg-card); color: var(--text-main);
 }
