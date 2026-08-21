@@ -763,12 +763,16 @@ async function ensurePushSubscriptionHealthy(calendarId, activeParticipantId) {
   }
 }
 
-async function sendLocalTestNotification(calendarTitle) {
+async function sendLocalTestNotification(calendarTitle, calendarId) {
   if (!isNotificationSupported() || Notification.permission !== 'granted') {
     return { ok: false, reason: 'permission-not-granted' };
   }
   const title = (calendarTitle || '모여라 캘린더') + ' · 알림 테스트';
   const body = '이 기기로 알림이 정상적으로 도착했습니다.';
+  // Same ?id= URL shape the real Cloud Function push uses (functions/index.js) -- without it,
+  // notificationclick (sw.js) opens the app at the bare origin, which falls back to the
+  // hardcoded default calendar ('kkot') instead of the calendar the test was actually sent from.
+  const targetUrl = isAllowedCalendarId(calendarId) ? `./?id=${calendarId}&view=chat` : './';
   try {
     if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
       const reg = await navigator.serviceWorker.ready;
@@ -779,7 +783,7 @@ async function sendLocalTestNotification(calendarTitle) {
           badge: 'icons/icon-192.png',
           tag: 'gather-test-notification',
           renotify: true,
-          data: './'
+          data: targetUrl
         });
         return { ok: true, via: 'service-worker' };
       }
@@ -4369,7 +4373,7 @@ function App() {
       openNotificationHelp();
       return;
     }
-    const local = await sendLocalTestNotification(activeCal && activeCal.title);
+    const local = await sendLocalTestNotification(activeCal && activeCal.title, activeCalId);
     if (local.ok) showToast('테스트 알림을 보냈습니다. 알림창을 확인해 주세요.', 'success', 5000);
     else {
       showToast('알림 표시 실패. 브라우저 알림 권한을 확인해 주세요.', 'error', 6000);
