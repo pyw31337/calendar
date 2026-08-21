@@ -922,6 +922,7 @@ export function DateModal({
       setEditingLinkedPlaceId(null);
       setPlaceQuery('');
       setHasInteracted(false);
+      const resetPlaceCat = getPlaceCategories(calendar)[0]?.id || 'etc';
       snapshotFormBaseline({
         ...formBaselineRef.current,
         editingLinkedPlaceId: null,
@@ -929,7 +930,7 @@ export function DateModal({
         placeAlias: '',
         placeQuery: '',
         selectedPlaceKey: '',
-        placeCategoryId: '',
+        placeCategoryId: resetPlaceCat,
         placeVisitStatus: 'visited'
       });
     } catch (err) {
@@ -1118,13 +1119,15 @@ export function DateModal({
       setExpenseAmountInput('');
       setExpenseIsIncome(false);
       setHasInteracted(false);
+      const resetExpCat = getExpenseCategories(calendar)[0]?.id || 'etc';
+      setExpenseCategoryInput(resetExpCat);
       snapshotFormBaseline({
         ...formBaselineRef.current,
         editingExpenseId: null,
         expenseLabelInput: '',
         expenseAmountInput: '',
         expenseIsIncome: false,
-        expenseCategoryInput: 'etc'
+        expenseCategoryInput: resetExpCat
       });
     }
   };
@@ -1302,23 +1305,9 @@ export function DateModal({
   const finishExpensePointerSort = e => expenseDragHandlersRef.current.finish(e);
   const resetExpensePointerSort = () => expenseDragHandlersRef.current.reset();
 
-  // Snapshot after load/save. Close-confirm only when current form != baseline.
-  const formBaselineRef = React.useRef({
-    participantId: '',
-    note: '',
-    editingLinkedPlaceId: null,
-    placeMemo: '',
-    placeAlias: '',
-    placeQuery: '',
-    selectedPlaceKey: '',
-    placeCategoryId: '',
-    placeVisitStatus: 'visited',
-    editingExpenseId: null,
-    expenseLabelInput: '',
-    expenseAmountInput: '',
-    expenseIsIncome: false,
-    expenseCategoryInput: 'etc'
-  });
+  // Close-confirm only when form differs from last committed baseline.
+  // Baseline: mount (real defaults), edit-load, successful save.
+  const formBaselineRef = React.useRef(null);
   const placeKeyOf = (sp) => {
     if (!sp) return '';
     return String(sp.id || '') + '|' + String(sp.name || '') + '|' + String(sp.lat || '') + '|' + String(sp.lng || '');
@@ -1332,21 +1321,45 @@ export function DateModal({
       placeAlias: '',
       placeQuery: '',
       selectedPlaceKey: '',
-      placeCategoryId: '',
+      placeCategoryId: getPlaceCategories(calendar)[0]?.id || 'etc',
       placeVisitStatus: 'visited',
       editingExpenseId: null,
       expenseLabelInput: '',
       expenseAmountInput: '',
       expenseIsIncome: false,
-      expenseCategoryInput: 'etc',
+      expenseCategoryInput: getExpenseCategories(calendar)[0]?.id || 'etc',
       ...overrides
     };
+  }, [calendar]);
+  React.useLayoutEffect(() => {
+    snapshotFormBaseline({
+      participantId: '',
+      note: '',
+      editingLinkedPlaceId: null,
+      placeMemo: '',
+      placeAlias: '',
+      placeQuery: '',
+      selectedPlaceKey: '',
+      placeCategoryId: placeCategoryId || getPlaceCategories(calendar)[0]?.id || 'etc',
+      placeVisitStatus: placeVisitStatus || 'visited',
+      editingExpenseId: null,
+      expenseLabelInput: '',
+      expenseAmountInput: '',
+      expenseIsIncome: false,
+      expenseCategoryInput: expenseCategoryInput || getExpenseCategories(calendar)[0]?.id || 'etc'
+    });
+    // mount only
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const [hasInteracted, setHasInteracted] = React.useState(false);
   const markDirty = React.useCallback(() => setHasInteracted(true), []);
   const requestClose = () => {
     if (isSubmitting) return;
-    const b = formBaselineRef.current || {};
+    const b = formBaselineRef.current;
+    if (!b) {
+      onClose();
+      return;
+    }
     const dirty = (
       String(participantId || '') !== String(b.participantId || '') ||
       String(note || '') !== String(b.note || '') ||
@@ -1361,7 +1374,7 @@ export function DateModal({
       String(expenseLabelInput || '') !== String(b.expenseLabelInput || '') ||
       String(expenseAmountInput || '') !== String(b.expenseAmountInput || '') ||
       !!expenseIsIncome !== !!b.expenseIsIncome ||
-      String(expenseCategoryInput || 'etc') !== String(b.expenseCategoryInput || 'etc')
+      String(expenseCategoryInput || '') !== String(b.expenseCategoryInput || '')
     );
     if (dirty && typeof onRequestConfirm === 'function') {
       onRequestConfirm('닫기 확인', '저장하지 않은 내용이 있습니다. 닫으시겠습니까?', () => onClose());
@@ -1602,7 +1615,7 @@ export function DateModal({
             },
             disabled: isSubmitting,
             onClick: () => {
-              if (!isSubmitting) { markDirty(); setIsSheetOpen(true); }
+              if (!isSubmitting) { setIsSheetOpen(true); }
             }
           },
             /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, overflow: 'hidden' } },
