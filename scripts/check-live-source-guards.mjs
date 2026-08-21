@@ -82,6 +82,9 @@ if (!mainEntry.includes('window.__gatherStartApp()')) {
 const appMain = readFileSync(join(ROOT, 'src/core/app-main.js'), 'utf8');
 const adminDashboard = readFileSync(join(ROOT, 'src/ui/ui-admin-dashboard.js'), 'utf8');
 const adminModals = readFileSync(join(ROOT, 'src/ui/ui-admin-modals.js'), 'utf8');
+const rootIndex = readFileSync(join(ROOT, 'index.html'), 'utf8');
+const serviceWorker = readFileSync(join(ROOT, 'sw.js'), 'utf8');
+const copyStatic = readFileSync(join(ROOT, 'scripts/copy-static-to-dist.mjs'), 'utf8');
 
 if (!/function getAdminSelectedCalendarIdFromUrl\(fallback = 'kkot'\)/.test(appMain)) {
   fail('Admin dashboard must read its selected calendar from ?id= so refresh keeps the selected calendar.');
@@ -116,6 +119,24 @@ if (adminModalTabHandlers.length !== 3) {
 for (const requiredTab of ["setActiveTab('settings')", "setActiveTab('recovery')", "setActiveTab('logs')"]) {
   if (!adminModals.includes(requiredTab)) {
     fail(`Calendar settings modal is missing required tab handler: ${requiredTab}`);
+  }
+}
+
+if (!rootIndex.includes("jhair: 'manifest-jhair.json'")) {
+  fail('index.html must select manifest-jhair.json for the jhair calendar.');
+}
+
+if (!serviceWorker.includes("'manifest-jhair.json'")) {
+  fail('sw.js must include manifest-jhair.json in its static asset list.');
+}
+
+if (/cache\.addAll\(STATIC_ASSETS\)/.test(serviceWorker)) {
+  fail('sw.js must not let one failed static asset abort the whole service-worker install.');
+}
+
+for (const manifestFile of ['manifest.json', 'manifest-kkot.json', 'manifest-cw.json', 'manifest-jhair.json']) {
+  if (!copyStatic.includes(manifestFile)) {
+    fail(`copy-static-to-dist must copy ${manifestFile} into dist.`);
   }
 }
 

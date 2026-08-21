@@ -10,23 +10,26 @@
 // static, rarely-changing assets (icons, the per-calendar manifests), which is enough to (a)
 // satisfy PWA installability's usual expectation of a service worker and (b) let those specific
 // assets resolve instantly/offline without touching the freshness of the app itself.
-const STATIC_CACHE = 'moyeora-static-v1';
+const STATIC_CACHE = 'moyeora-static-v2';
 const STATIC_ASSETS = [
   'favicon.ico',
   'manifest.json',
   'manifest-kkot.json',
   'manifest-cw.json',
+  'manifest-jhair.json',
   'icons/icon-192.png',
   'icons/icon-512.png',
   'icons/icon-512-maskable.png',
-  'icons/apple-touch-icon.png',
-  'https://cdn.jsdelivr.net/npm/korean-lunar-calendar/dist/korean-lunar-calendar.min.js'
+  'icons/apple-touch-icon.png'
 ];
 
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(STATIC_CACHE)
-      .then(cache => cache.addAll(STATIC_ASSETS))
+      // Do not let one optional asset failure abort the whole service worker install. A failed
+      // install means PushManager never becomes ready, which looks like a notification failure
+      // even though the app itself loaded fine.
+      .then(cache => Promise.allSettled(STATIC_ASSETS.map(asset => cache.add(asset))))
       .then(() => self.skipWaiting())
   );
 });

@@ -47,7 +47,7 @@
     (function () {
       var params = new URLSearchParams(window.location.search);
       var id = params.get('id') || params.get('cal');
-      var manifestByCalendar = { kkot: 'manifest-kkot.json', cw: 'manifest-cw.json' };
+      var manifestByCalendar = { kkot: 'manifest-kkot.json', cw: 'manifest-cw.json', jhair: 'manifest-jhair.json' };
       if (id && manifestByCalendar[id]) {
         var link = document.querySelector('link[rel="manifest"]');
         if (link) link.setAttribute('href', manifestByCalendar[id]);

@@ -17,7 +17,7 @@ function copyDir(src, dest) {
 }
 
 copyDir(path.join(root, 'share'), path.join(dist, 'share'));
-for (const f of ['og-thumb.jpg', 'sw.js']) {
+for (const f of ['og-thumb.jpg', 'sw.js', 'manifest.json', 'manifest-kkot.json', 'manifest-cw.json', 'manifest-jhair.json']) {
   const s = path.join(root, f);
   if (fs.existsSync(s)) fs.copyFileSync(s, path.join(dist, f));
 }
