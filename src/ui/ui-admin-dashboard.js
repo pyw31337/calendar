@@ -1014,14 +1014,21 @@ export function AdminDashboard({ initialCalendars }) {
   // Auto-select first calendar if selectedCalId is not valid/present in lists (fixes blank tab bug)
   React.useEffect(() => {
     if (calendarsList.length > 0) {
+      const explicitUrlCalId = getAdminSelectedCalendarIdFromUrl('');
       const exists = calendarsList.some(c => c.id === selectedCalId);
       if (!exists) {
+        // A bookmarked/admin-refreshed URL like ?admin=1&id=cw should not be overwritten
+        // by the first partial list that arrives while the dashboard is still hydrating.
+        if (explicitUrlCalId && selectedCalId === explicitUrlCalId && isAdminListLoading) {
+          syncSelectedCalendarUrl(selectedCalId, 'replace');
+          return;
+        }
         selectAdminCalendar(calendarsList[0].id, 'replace');
       } else {
         syncSelectedCalendarUrl(selectedCalId, 'replace');
       }
     }
-  }, [calendarsList, selectedCalId]);
+  }, [calendarsList, selectedCalId, isAdminListLoading]);
 
   // 2. Load Messages (Firestore snapshots or REST) -- capped per calendar (not truly unbounded)
   // so opening the admin dashboard doesn't download/live-sync a calendar's entire message
