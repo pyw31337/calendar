@@ -767,7 +767,7 @@ export function AdminModal({
       ? GATHER_APP_UTILS.sanitizeText
       : function (s, n) { var v = String(s == null ? '' : s); return typeof n === 'number' ? v.slice(0, n) : v; });
 
-  const [activeTab, setActiveTab] = React.useState('settings'); // 'settings', 'calendar', 'recovery', 'logs'
+  const [activeTab, setActiveTab] = React.useState('settings'); // 'settings', 'recovery', 'logs'
 
   // recovery/logs only — avoid loading full activityLogs when opening 일반/설정
   React.useEffect(() => {
@@ -1132,19 +1132,7 @@ export function AdminModal({
           cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
         }
       }, /*#__PURE__*/React.createElement("span", { className: "admin-tab-icon" }, /*#__PURE__*/React.createElement(CalendarCogIcon, null)), "일반"),
-      /* Tab 2: Calendar-based schedule deletion */
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        onClick: () => setActiveTab('calendar'),
-        style: {
-          padding: '12px 8px', fontSize: '0.88rem', fontWeight: 'bold', whiteSpace: 'nowrap',
-          color: activeTab === 'calendar' ? '#2563EB' : '#64748B',
-          border: 'none', background: 'none',
-          borderBottom: activeTab === 'calendar' ? '3px solid #2563EB' : '3px solid transparent',
-          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
-        }
-      }, /*#__PURE__*/React.createElement("span", { className: "admin-tab-icon" }, /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M4 7a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12z", "M16 3v4", "M8 3v4", "M4 11h16"] })), "일정"),
-      /* Tab 3: Log-based recovery */
+      /* Tab 2: Log-based recovery */
       /*#__PURE__*/React.createElement("button", {
         type: "button",
         onClick: () => setActiveTab('recovery'),
@@ -1156,7 +1144,7 @@ export function AdminModal({
           cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
         }
       }, /*#__PURE__*/React.createElement("span", { className: "admin-tab-icon" }, /*#__PURE__*/React.createElement(HourglassIcon, null)), "복구"),
-      /* Tab 4: Logs view list */
+      /* Tab 3: Logs view list */
       /*#__PURE__*/React.createElement("button", {
         type: "button",
         onClick: () => setActiveTab('logs'),

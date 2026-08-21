@@ -81,6 +81,7 @@ if (!mainEntry.includes('window.__gatherStartApp()')) {
 
 const appMain = readFileSync(join(ROOT, 'src/core/app-main.js'), 'utf8');
 const adminDashboard = readFileSync(join(ROOT, 'src/ui/ui-admin-dashboard.js'), 'utf8');
+const adminModals = readFileSync(join(ROOT, 'src/ui/ui-admin-modals.js'), 'utf8');
 
 if (!/function getAdminSelectedCalendarIdFromUrl\(fallback = 'kkot'\)/.test(appMain)) {
   fail('Admin dashboard must read its selected calendar from ?id= so refresh keeps the selected calendar.');
@@ -96,6 +97,16 @@ if (!/params\.set\('admin', '1'\)/.test(adminDashboard) || !/params\.set\('id', 
 
 if (!/React\.useState\(\(\) => getAdminSelectedCalendarIdFromUrl\('kkot'\)\)/.test(adminDashboard)) {
   fail('Admin selected calendar state must initialize from the URL.');
+}
+
+if (/setActiveTab\('calendar'\)|activeTab === 'calendar'/.test(adminModals)) {
+  fail('Calendar settings modal must not expose the removed empty 일정/calendar tab.');
+}
+
+for (const requiredTab of ["setActiveTab('settings')", "setActiveTab('recovery')", "setActiveTab('logs')"]) {
+  if (!adminModals.includes(requiredTab)) {
+    fail(`Calendar settings modal is missing required tab handler: ${requiredTab}`);
+  }
 }
 
 if (!process.exitCode) {
