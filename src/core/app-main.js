@@ -8383,14 +8383,32 @@ function uploadChatImageAssets(calendarId, compressed, index, onBytes, timeoutMs
 
 async function dataUrlToBlob(dataUrl) {
   if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:')) return null;
-  const res = await fetch(dataUrl);
-  return res.ok ? res.blob() : null;
+  const match = dataUrl.match(/^data:([^;,]+)?(;base64)?,(.*)$/);
+  if (!match) return null;
+  const mimeType = match[1] || 'application/octet-stream';
+  const isBase64 = Boolean(match[2]);
+  const payload = match[3] || '';
+  try {
+    if (isBase64) {
+      const binary = atob(payload);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+      return new Blob([bytes], { type: mimeType });
+    }
+    return new Blob([decodeURIComponent(payload)], { type: mimeType });
+  } catch (err) {
+    console.warn('dataUrlToBlob failed:', err);
+    return null;
+  }
 }
 
 async function uploadInlineChatImageToStorage(calendarId, imageUrl, thumbUrl, index = 0, onBytes, timeoutMs = 45000) {
   if (!firebaseStorage) return null;
+  if (onBytes) onBytes(`${index}-prepare`, 1, 10);
   const originalBlob = await dataUrlToBlob(imageUrl);
+  if (onBytes) onBytes(`${index}-prepare`, 5, 10);
   const thumbnailBlob = await dataUrlToBlob(thumbUrl && thumbUrl.startsWith('data:') ? thumbUrl : imageUrl);
+  if (onBytes) onBytes(`${index}-prepare`, 10, 10);
   if (!originalBlob || !thumbnailBlob) return null;
   return uploadChatImageAssets(calendarId, {
     original: imageUrl,
