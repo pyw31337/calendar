@@ -1540,7 +1540,7 @@ export function DateModal({
           /*#__PURE__*/React.createElement("label", {
             style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '6px', color: 'var(--text-muted)' }
           }, "메모 입력 (선택)"),
-          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px' } },
+          /*#__PURE__*/React.createElement("div", { className: "date-modal-field-with-actions", style: { display: 'flex', gap: '8px' } },
             /*#__PURE__*/React.createElement("input", {
               ref: noteInputRef,
               type: "text",
@@ -1552,16 +1552,18 @@ export function DateModal({
               disabled: isSubmitting,
               onChange: e => { markDirty(); setNote(e.target.value); }
             }),
-            /*#__PURE__*/React.createElement(FormAddEditActionButtons, {
-              isEditing: !!participantId && dateEntries.some(en => en.participantId === participantId),
-              isSaving: isSubmitting,
-              disabled: !participantId,
-              onCancel: () => {
-                setParticipantId('');
-                setNote('');
-              },
-              onSubmit: handleSubmit
-            })
+            /*#__PURE__*/React.createElement("div", { className: "date-modal-field-actions" },
+              /*#__PURE__*/React.createElement(FormAddEditActionButtons, {
+                isEditing: !!participantId && dateEntries.some(en => en.participantId === participantId),
+                isSaving: isSubmitting,
+                disabled: !participantId,
+                onCancel: () => {
+                  setParticipantId('');
+                  setNote('');
+                },
+                onSubmit: handleSubmit
+              })
+            )
           )
         )
       ),
@@ -1598,7 +1600,7 @@ export function DateModal({
               alignItems: 'stretch',
               gap: '4px',
               padding: '10px 12px',
-              paddingRight: adminMode ? '12px' : '52px',
+              paddingRight: adminMode ? '12px' : '44px',
               backgroundColor: 'var(--bg-card)',
               border: '1px solid var(--border-subtle)',
               borderRadius: '10px',
@@ -1639,6 +1641,9 @@ export function DateModal({
                 alignItems: 'flex-start',
                 gap: '4px',
                 paddingLeft: '16px',
+                paddingRight: '0',
+                width: '100%',
+                boxSizing: 'border-box',
                 wordBreak: 'break-word',
                 overflowWrap: 'anywhere'
               }
@@ -1692,7 +1697,7 @@ export function DateModal({
           /*#__PURE__*/React.createElement("label", {
             style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '6px', color: 'var(--text-muted)' }
           }, "장소 검색"),
-          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px' } },
+          /*#__PURE__*/React.createElement("div", { className: "date-modal-field-with-actions", style: { display: 'flex', gap: '8px' } },
             /*#__PURE__*/React.createElement("input", {
               type: "text",
               className: "form-input",
@@ -1708,12 +1713,14 @@ export function DateModal({
                 }
               }
             }),
-            /*#__PURE__*/React.createElement("button", {
-              type: "button",
-              className: "btn btn-poll-create btn-action btn-action-dark",
-              style: { padding: '0 16px', fontWeight: 800, height: '44px' },
-              onClick: e => { e.preventDefault(); e.stopPropagation(); handlePlaceSearch(e, false); }
-            }, "검색")
+            /*#__PURE__*/React.createElement("div", { className: "date-modal-field-actions" },
+              /*#__PURE__*/React.createElement("button", {
+                type: "button",
+                className: "btn btn-poll-create btn-action btn-action-dark",
+                style: { padding: '0 16px', fontWeight: 800, height: '44px', flex: 1 },
+                onClick: e => { e.preventDefault(); e.stopPropagation(); handlePlaceSearch(e, false); }
+              }, "검색")
+            )
           )
         ),
 
@@ -1806,6 +1813,7 @@ export function DateModal({
             style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '6px' }
           }, "장소 메모 입력"),
           /*#__PURE__*/React.createElement("div", {
+            className: "date-modal-field-with-actions",
             style: { display: 'flex', gap: '8px', alignItems: 'flex-start' }
           },
             /*#__PURE__*/React.createElement(AutoGrowTextarea, {
@@ -1819,22 +1827,24 @@ export function DateModal({
               disabled: isSavingPlace,
               onChange: e => setPlaceMemo(e.target.value)
             }),
-            /*#__PURE__*/React.createElement(FormAddEditActionButtons, {
-              isEditing: !!editingLinkedPlaceId,
-              isSaving: isSavingPlace,
-              disabled: !selectedPlace,
-              alignSelf: 'flex-start',
-              onCancel: () => {
-                setEditingLinkedPlaceId(null);
-                setSelectedPlace(null);
-                setPlaceQuery('');
-                setPlaceAlias('');
-                setPlaceMemo('');
-                setPlaceCategoryId(getPlaceCategories(calendar)[0]?.id || 'etc');
-                setPlaceVisitStatus('visited');
-              },
-              onSubmit: handleSavePlaceClick
-            })
+            /*#__PURE__*/React.createElement("div", { className: "date-modal-field-actions" },
+              /*#__PURE__*/React.createElement(FormAddEditActionButtons, {
+                isEditing: !!editingLinkedPlaceId,
+                isSaving: isSavingPlace,
+                disabled: !selectedPlace,
+                alignSelf: 'flex-start',
+                onCancel: () => {
+                  setEditingLinkedPlaceId(null);
+                  setSelectedPlace(null);
+                  setPlaceQuery('');
+                  setPlaceAlias('');
+                  setPlaceMemo('');
+                  setPlaceCategoryId(getPlaceCategories(calendar)[0]?.id || 'etc');
+                  setPlaceVisitStatus('visited');
+                },
+                onSubmit: handleSavePlaceClick
+              })
+            )
           )
         )
       ),
@@ -2045,7 +2055,7 @@ export function DateModal({
           /*#__PURE__*/React.createElement("label", {
             style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '6px' }
           }, expenseIsIncome ? "수입 금액" : "지출 금액"),
-          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px' } },
+          /*#__PURE__*/React.createElement("div", { className: "date-modal-field-with-actions", style: { display: 'flex', gap: '8px' } },
           /*#__PURE__*/React.createElement("input", {
             type: "text",
             className: "form-input",
@@ -2059,6 +2069,7 @@ export function DateModal({
               setExpenseAmountInput(formatted ? `${expenseIsIncome ? '+' : '-'}${formatted}` : '');
             }
           }),
+          /*#__PURE__*/React.createElement("div", { className: "date-modal-field-actions" },
           /*#__PURE__*/React.createElement(FormAddEditActionButtons, {
             isEditing: !!editingExpenseId,
             isSaving: isSavingExpense,
@@ -2070,6 +2081,7 @@ export function DateModal({
             },
             onSubmit: handleSaveExpenseClick
           })
+          )
           )
         )
       ),
