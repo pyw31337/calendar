@@ -2639,6 +2639,15 @@ async function fetchOlderChatMessages() {
   return [];
 }
 
+async function fetchMessageOrdinal() {
+  const svc = window.GATHER_FIREBASE_SERVICES;
+  if (svc && typeof svc.fetchMessageOrdinal === 'function' && !svc.isScaffold) {
+    return svc.fetchMessageOrdinal.apply(null, arguments);
+  }
+  console.warn('fetchMessageOrdinal: GATHER_FIREBASE_SERVICES missing');
+  return null;
+}
+
 async function fetchGalleryItemCount() {
   const svc = window.GATHER_FIREBASE_SERVICES;
   if (svc && typeof svc.fetchGalleryItemCount === 'function' && !svc.isScaffold) {
@@ -5271,6 +5280,15 @@ function App() {
       setLoadingOlderChat(false);
     }
   }, [activeCalId, hasMoreOlderChat, allChatMessages, chatMessages]);
+  // "Latest ref" mirrors for handleJumpToChatMessage's retry loop below -- that loop runs
+  // across several ticks via setTimeout, outside any single render's closures, so it reads
+  // these refs (updated fresh every render) instead of the plain consts above, which would
+  // otherwise stay frozen at whatever hasMoreOlderChat/loadOlderChatMessages was when the loop
+  // started.
+  const loadOlderChatMessagesRef = React.useRef(loadOlderChatMessages);
+  loadOlderChatMessagesRef.current = loadOlderChatMessages;
+  const hasMoreOlderChatRef = React.useRef(hasMoreOlderChat);
+  hasMoreOlderChatRef.current = hasMoreOlderChat;
 
   React.useEffect(() => {
     if (activeView === 'chat' && chatMessagesContainerRef.current) {
@@ -6869,18 +6887,38 @@ function App() {
 
   // "이 사진이 있는 채팅으로 이동" -- same pattern already used by the admin/global search
   // modals' onOpenChatMessage, reused here so the Lightbox info panel's source line jumps to
-  // the actual chat bubble consistently with search results.
+  // the actual chat bubble consistently with search results. Chat only keeps a recent window
+  // loaded by default (see loadOlderChatMessages) -- an image message far enough back wouldn't
+  // exist in the DOM yet, so this pages older history in (same as scrolling up manually) until
+  // the target bubble shows up or there's nothing left to load.
   const handleJumpToChatMessage = messageId => {
     if (!messageId) return;
     setActiveLightbox(null);
     changeView('chat');
-    setTimeout(() => {
+    const tryScroll = () => {
       const el = document.querySelector(`[data-msg-row-id="${messageId}"]`);
-      if (!el) return;
+      if (!el) return false;
       el.scrollIntoView({ behavior: 'smooth', block: 'center' });
       el.classList.add('search-result-flash');
       setTimeout(() => el.classList.remove('search-result-flash'), 1700);
+      return true;
+    };
+    setTimeout(async () => {
+      if (tryScroll()) return;
+      for (let i = 0; i < 40 && hasMoreOlderChatRef.current; i++) {
+        await Promise.resolve(loadOlderChatMessagesRef.current());
+        await new Promise(resolve => setTimeout(resolve, 80));
+        if (tryScroll()) return;
+      }
+      showToast('메시지를 찾을 수 없습니다.', 'error');
     }, 350);
+  };
+
+  // Ordinal ("몇 번째 말풍선인지") for the Lightbox source label -- counted directly against
+  // Firestore so it's accurate even before the message's page of chat history has loaded.
+  const handleGetChatMessageOrdinal = timestamp => {
+    if (!activeCalId || !timestamp) return Promise.resolve(null);
+    return fetchMessageOrdinal(activeCalId, timestamp);
   };
 
   // "메모로 이동" -- reuses the sharedMemo mechanism MemoView already renders as a banner card
@@ -7259,8 +7297,6 @@ function App() {
       onDeleteExpense: handleDeleteExpense,
       onReorderExpenses: handleReorderExpenses,
       onAddMeetingPhotos: handleAddMeetingPhotos,
-      onDeleteMeetingPhoto: handleDeleteMeetingPhoto,
-      onReplaceMeetingPhoto: handleReplaceMeetingPhoto,
       setActiveLightbox: setActiveLightbox,
       initialTab: dateModalInitialTab,
       onSavePlace: handleSavePlace,
@@ -7502,6 +7538,7 @@ function App() {
       onJumpToChatMessage: handleJumpToChatMessage,
       onJumpToMemo: handleJumpToMemo,
       onJumpToMeetingDate: handleJumpToMeetingDate,
+      onGetChatMessageOrdinal: handleGetChatMessageOrdinal,
       onRequestConfirm: showConfirmDialog
     })));
   }
@@ -7584,6 +7621,7 @@ function App() {
         onJumpToChatMessage: handleJumpToChatMessage,
         onJumpToMemo: handleJumpToMemo,
         onJumpToMeetingDate: handleJumpToMeetingDate,
+        onGetChatMessageOrdinal: handleGetChatMessageOrdinal,
         onRequestConfirm: showConfirmDialog
       }) : null
     ));
@@ -7627,6 +7665,10 @@ function App() {
   const mainMenuMemoCount = (typeof totalMemoCount === 'number' && totalMemoCount >= 0)
     ? totalMemoCount
     : (memos || []).length;
+  const mainMenuGalleryCount = (typeof totalGalleryCount === 'number' && totalGalleryCount >= 0)
+    ? totalGalleryCount
+    : 0;
+  const mainMenuPlaceCount = getCalendarPlaces(activeCal).length;
 
   // Each confirmed meeting gets its own banner bubble on the calendar, and stays up through
   // the day of the meeting itself -- only today-or-future confirmations show.
@@ -7732,6 +7774,8 @@ function App() {
   }, mainMenuMemoCount))))), isMainSideMenuOpen && /*#__PURE__*/React.createElement(MainSideMenu, {
     calendar: activeCal,
     anniversaries: anniversaries,
+    galleryCount: mainMenuGalleryCount,
+    placeCount: mainMenuPlaceCount,
     onClose: () => setIsMainSideMenuOpen(false),
     onOpenManual: () => {
       setIsGuideOpen(true);
@@ -7903,6 +7947,7 @@ function App() {
     onJumpToChatMessage: handleJumpToChatMessage,
     onJumpToMemo: handleJumpToMemo,
     onJumpToMeetingDate: handleJumpToMeetingDate,
+    onGetChatMessageOrdinal: handleGetChatMessageOrdinal,
     onRequestConfirm: showConfirmDialog
   })), /*#__PURE__*/React.createElement(SummaryList, {
     calendar: activeCal,
@@ -7925,6 +7970,7 @@ function App() {
     onJumpToChatMessage: handleJumpToChatMessage,
     onJumpToMemo: handleJumpToMemo,
     onJumpToMeetingDate: handleJumpToMeetingDate,
+    onGetChatMessageOrdinal: handleGetChatMessageOrdinal,
     onRequestConfirm: showConfirmDialog
   }), /*#__PURE__*/React.createElement(PlacesSection, {
     calendar: activeCal,

@@ -679,8 +679,6 @@ export function DateModal({
   onDeleteExpense,
   onReorderExpenses,
   onAddMeetingPhotos,
-  onDeleteMeetingPhoto,
-  onReplaceMeetingPhoto,
   setActiveLightbox,
   initialTab = null,
   onSavePlace,
@@ -1080,20 +1078,6 @@ export function DateModal({
     } finally {
       setIsSavingMeetingPhotos(false);
     }
-  };
-
-  const handleDeleteMeetingPhoto = photo => {
-    if (!photo?.id || typeof onDeleteMeetingPhoto !== 'function') return;
-    onRequestConfirm('일정 사진 삭제', '이 일정 사진을 삭제하시겠습니까?', async () => {
-      setIsSavingMeetingPhotos(true);
-      try {
-        const ok = await Promise.resolve(onDeleteMeetingPhoto(dateStr, photo.id));
-        if (ok !== false) showToast('사진이 삭제되었습니다.', 'success');
-        else showToast('사진 삭제 실패', 'error');
-      } finally {
-        setIsSavingMeetingPhotos(false);
-      }
-    });
   };
 
   const expenseTotal = expenses.reduce((sum, e) => sum + (Number(e?.amount) || 0), 0);
@@ -1508,15 +1492,14 @@ export function DateModal({
   }, /*#__PURE__*/React.createElement("div", {
     className: "modal-body"
   },
-    /* Tab Bar Menu: 참여자 / 장소 / 정산 / 사진 */
+    /* Tab Bar Menu: 참여자 / 장소 / 정산 / 사진 -- full-bleed + sticky so it stays pinned to
+       modal-header (like a second header row) while the rest of modal-body scrolls under it. */
     /*#__PURE__*/React.createElement("div", {
+      className: "modal-sticky-tab-bar",
       style: {
         display: 'grid',
         gridTemplateColumns: '1fr 1fr 1fr 1fr',
-        gap: '6px',
-        borderBottom: '1px solid var(--border-subtle)',
-        paddingBottom: '12px',
-        marginBottom: '14px'
+        gap: '6px'
       }
     },
       /* Tab 1: 참여자 */
@@ -2509,29 +2492,7 @@ export function DateModal({
               backgroundColor: 'var(--bg-primary)',
               cursor: 'pointer'
             }
-          }),
-          !adminMode && typeof onDeleteMeetingPhoto === 'function' && /*#__PURE__*/React.createElement("button", {
-            type: "button",
-            onClick: e => { e.preventDefault(); e.stopPropagation(); handleDeleteMeetingPhoto(photo); },
-            disabled: isSavingMeetingPhotos,
-            "aria-label": "일정 사진 삭제",
-            style: {
-              position: 'absolute',
-              top: '-7px',
-              right: '-7px',
-              width: '22px',
-              height: '22px',
-              borderRadius: '999px',
-              border: '1px solid rgba(239,68,68,0.45)',
-              backgroundColor: 'var(--bg-card)',
-              color: '#EF4444',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: 0,
-              cursor: 'pointer'
-            }
-          }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 13 }))
+          })
         )))
       )
     )

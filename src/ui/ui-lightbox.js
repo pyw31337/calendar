@@ -722,8 +722,8 @@ export function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSe
     className: "lightbox-info-panel",
     style: {
       position: 'absolute', left: 0, right: 0, bottom: 0, minWidth: '190px',
-      padding: '14px 14px 12px',
-      background: 'linear-gradient(to top, rgba(0,0,0,0.82), rgba(0,0,0,0.45) 60%, transparent)',
+      padding: '34px 14px 12px',
+      background: 'linear-gradient(to top, rgba(0,0,0,0.84) 0%, rgba(0,0,0,0.84) 55%, rgba(0,0,0,0.5) 82%, transparent)',
       borderRadius: '0 0 12px 12px',
       color: '#FFFFFF', fontSize: '0.76rem', lineHeight: 1.7,
       display: 'flex', flexDirection: 'column', gap: '4px',
@@ -842,7 +842,7 @@ export function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSe
   }));
 }
 
-export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, onPromoteImageUrl, onSaveImageTags, onSearchTag, onDeletePhoto, onReplacePhoto, onJumpToChatMessage, onJumpToMemo, onJumpToMeetingDate, onRequestConfirm }) {
+export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, onPromoteImageUrl, onSaveImageTags, onSearchTag, onDeletePhoto, onReplacePhoto, onJumpToChatMessage, onJumpToMemo, onJumpToMeetingDate, onGetChatMessageOrdinal, onRequestConfirm }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const SmallXIcon = __deps.SmallXIcon;
@@ -934,6 +934,25 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
   const canEditPhoto = !!(currentMeta && !currentMeta.directMediaUrl && (
     currentMeta.source === 'meeting' ? isMeetingPhoto : currentMeta.messageId != null
   ));
+  // "채팅방 #117" -- the message's 1-based position in the calendar's full chat history,
+  // fetched on demand (Firestore count() aggregate, independent of how much chat history the
+  // client has paginated in) and cached per messageId so revisiting the same photo doesn't
+  // refetch it.
+  const chatOrdinalFetchedRef = React.useRef(new Set());
+  const [chatOrdinalCache, setChatOrdinalCache] = React.useState({});
+  React.useEffect(() => {
+    if (!currentMeta || currentMeta.source === 'meeting' || currentMeta.source === 'memo') return;
+    if (typeof onGetChatMessageOrdinal !== 'function') return;
+    const key = currentMeta.messageId;
+    const ts = currentMeta.timestamp;
+    if (!key || !ts || chatOrdinalFetchedRef.current.has(key)) return;
+    chatOrdinalFetchedRef.current.add(key);
+    let cancelled = false;
+    Promise.resolve(onGetChatMessageOrdinal(ts)).then(n => {
+      if (!cancelled && typeof n === 'number') setChatOrdinalCache(prev => ({ ...prev, [key]: n }));
+    });
+    return () => { cancelled = true; };
+  }, [currentMeta, onGetChatMessageOrdinal]);
   const sourceInfo = React.useMemo(() => {
     if (!currentMeta) return null;
     if (currentMeta.source === 'meeting') {
@@ -949,18 +968,21 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
       };
     }
     // Default: chat -- distinguishes composer-typed messages from the gallery's own "이미지
-    // 업로드" menu action (see handleUploadGalleryImages' uploadSource:'gallery' marker).
+    // 업로드" menu action (see handleUploadGalleryImages' uploadSource:'gallery' marker). Falls
+    // back to the generic label until the ordinal above resolves.
+    const ordinal = currentMeta.messageId != null ? chatOrdinalCache[currentMeta.messageId] : null;
+    const label = currentMeta.uploadSource === 'gallery'
+      ? (typeof ordinal === 'number' ? `갤러리 업로드 (채팅 #${ordinal})` : '갤러리에서 업로드됨')
+      : (typeof ordinal === 'number' ? `채팅방 #${ordinal}` : '채팅방에서 업로드됨');
     return {
-      label: currentMeta.uploadSource === 'gallery' ? '갤러리에서 업로드됨' : '채팅방에서 업로드됨',
+      label,
       onClick: (onJumpToChatMessage && currentMeta.messageId) ? () => onJumpToChatMessage(currentMeta.messageId) : null
     };
-  }, [currentMeta, onJumpToChatMessage, onJumpToMemo, onJumpToMeetingDate]);
+  }, [currentMeta, onJumpToChatMessage, onJumpToMemo, onJumpToMeetingDate, chatOrdinalCache]);
   const replacePhotoInputRef = React.useRef(null);
   const [isReplacingPhoto, setIsReplacingPhoto] = React.useState(false);
   const [isDeletingPhoto, setIsDeletingPhoto] = React.useState(false);
-  const handleReplacePhotoFile = async event => {
-    const file = event.target.files && event.target.files[0];
-    event.target.value = '';
+  const replacePhotoWithFile = async file => {
     if (!file || !onReplacePhoto || !currentMeta || isReplacingPhoto) return;
     setIsReplacingPhoto(true);
     try {
@@ -972,6 +994,25 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
       setIsReplacingPhoto(false);
     }
   };
+  const handleReplacePhotoFile = async event => {
+    const file = event.target.files && event.target.files[0];
+    event.target.value = '';
+    await replacePhotoWithFile(file);
+  };
+  // Lets 사진 교체 accept a clipboard-pasted image too, not just the file picker -- active
+  // whenever this photo is editable, so Ctrl+V while the Lightbox is open replaces the photo
+  // currently on screen directly (no need to click the pencil button first).
+  React.useEffect(() => {
+    if (!canEditPhoto || !onReplacePhoto) return;
+    const handlePaste = e => {
+      const files = getImageFilesFromClipboardEvent(e);
+      if (!files.length) return;
+      e.preventDefault();
+      replacePhotoWithFile(files[0]);
+    };
+    document.addEventListener('paste', handlePaste);
+    return () => document.removeEventListener('paste', handlePaste);
+  }, [canEditPhoto, onReplacePhoto, currentMeta, currentUrl, index, isReplacingPhoto]);
   const handleDeletePhotoClick = () => {
     if (!onDeletePhoto || !currentMeta || isDeletingPhoto) return;
     const confirmAction = async () => {
@@ -1136,7 +1177,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
   // Shared by both the carousel's "current" slot and the single-image layout below --
   // top-right pencil (교체)/X (삭제) buttons, reusing the same icons already used for editing
   // elsewhere in the app (Places/Memo pencil, tag-delete X).
-  const renderPhotoActions = () => canEditPhoto && /*#__PURE__*/React.createElement("div", {
+  const renderPhotoActions = () => showInfo && canEditPhoto && /*#__PURE__*/React.createElement("div", {
     style: { position: 'absolute', top: '8px', right: '8px', display: 'flex', gap: '6px', zIndex: 10 },
     onClick: e => e.stopPropagation()
   },

@@ -134,6 +134,70 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
     return null;
   }
 
+  // 1-based position of a message within the full chronological chat history, used by the
+  // Lightbox source label ("채팅방 #117") -- independent of how much of the chat is currently
+  // paginated into the client, since it counts directly against Firestore.
+  async function fetchMessageOrdinal(calId, timestamp) {
+    if (!isValidCalId(calId) || !Number.isFinite(Number(timestamp))) return null;
+    const ts = Number(timestamp);
+    const firebaseDb = getDb();
+    if (firebaseDb) {
+      try {
+        const ref = firebaseDb.collection('calendars').doc('cal_' + calId).collection('messages')
+          .where('timestamp', '<=', ts);
+        if (typeof ref.count === 'function') {
+          const snap = await ref.count().get();
+          const n = Number(snap.data().count);
+          if (Number.isFinite(n) && n >= 0) return n;
+        }
+      } catch (err) {
+        console.warn('fetchMessageOrdinal sdk', err);
+      }
+    }
+    try {
+      const parentPath = 'projects/' + projectId() + '/databases/(default)/documents/calendars/cal_' + calId;
+      const url = 'https://firestore.googleapis.com/v1/' + parentPath + ':runAggregationQuery';
+      const aggBody = {
+        structuredAggregationQuery: {
+          structuredQuery: {
+            from: [{ collectionId: 'messages' }],
+            where: {
+              fieldFilter: {
+                field: { fieldPath: 'timestamp' },
+                op: 'LESS_THAN_OR_EQUAL',
+                value: { doubleValue: ts }
+              }
+            }
+          },
+          aggregations: [{ alias: 'total', count: {} }]
+        }
+      };
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(aggBody)
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const rows = Array.isArray(data) ? data : [data];
+        for (let i = 0; i < rows.length; i++) {
+          const row = rows[i];
+          const fields = row && row.result && row.result.aggregateFields;
+          const total = fields && fields.total;
+          if (total && total.integerValue != null) {
+            const n = Number(total.integerValue);
+            if (Number.isFinite(n) && n >= 0) return n;
+          }
+        }
+      } else {
+        console.warn('fetchMessageOrdinal rest status', res.status);
+      }
+    } catch (err) {
+      console.warn('fetchMessageOrdinal rest', err);
+    }
+    return null;
+  }
+
   async function fetchOlderChatMessages(calId, beforeTimestamp, pageSize) {
     if (!isValidCalId(calId) || !beforeTimestamp) return [];
     const size = pageSize != null ? pageSize : olderPageSize();
@@ -290,6 +354,7 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
     fetchRecentChatMessages: fetchRecentChatMessages,
     fetchSubcollectionCount: fetchSubcollectionCount,
     fetchOlderChatMessages: fetchOlderChatMessages,
+    fetchMessageOrdinal: fetchMessageOrdinal,
     fetchGalleryItemCount: fetchGalleryItemCount,
     subscribeCalSubcollection: subscribeCalSubcollection,
     subscribeMessages: subscribeMessages,
