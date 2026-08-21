@@ -754,6 +754,35 @@ export function ResizableModalContainer({ className, style, children, ...props }
     };
   }, []);
 
+  // Fit modal to currently visible viewport (address bar / toolbars on or off).
+  React.useEffect(() => {
+    if (dimensions) return undefined;
+    const root = document.documentElement;
+    const apply = () => {
+      const vv = window.visualViewport;
+      const vvH = vv && typeof vv.height === 'number' ? vv.height : window.innerHeight;
+      const maxPx = Math.max(180, Math.floor(vvH - 24));
+      root.style.setProperty('--gather-vv-modal-max', `${maxPx}px`);
+      if (containerRef.current) {
+        containerRef.current.style.maxHeight = `${maxPx}px`;
+      }
+    };
+    apply();
+    const vv = window.visualViewport;
+    if (vv) {
+      vv.addEventListener('resize', apply);
+      vv.addEventListener('scroll', apply);
+    }
+    window.addEventListener('resize', apply);
+    return () => {
+      if (vv) {
+        vv.removeEventListener('resize', apply);
+        vv.removeEventListener('scroll', apply);
+      }
+      window.removeEventListener('resize', apply);
+    };
+  }, [dimensions]);
+
   const mergedStyle = {
     ...style,
     position: 'relative',

@@ -393,3 +393,7 @@ zsh 에서 줄 시작 `#` 주석은 쓰지 말 것.
 ## P6-65 (2026-08-21)
 - 일정 모달: 추가/수정 저장 후 닫기 확인 오탐 수정
 - dirty는 미저장 초안 필드만 기준, 저장 성공 시 hasInteracted 초기화
+
+## P6-66 (2026-08-21)
+- 모달 높이: dvh 제거, svh(주소창 보인 상태) 기준 보수 적용
+- visualViewport resize/scroll로 --gather-vv-modal-max 실시간 반영

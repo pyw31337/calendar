@@ -2622,18 +2622,22 @@ select.form-select {
     padding-left: 0;
     padding-right: 0;
     box-sizing: border-box;
-    /* cover visible viewport including mobile browser chrome changes */
     min-height: 100vh;
-    min-height: 100dvh;
+    min-height: 100svh;
   }
   .modal-container {
     margin: 10px;
     width: calc(100% - 20px);
     max-width: calc(100% - 20px);
     box-sizing: border-box;
-    /* svh = visible area with browser UI shown; avoids top/bottom crop */
-    max-height: calc(100svh - 20px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
-    max-height: calc(100dvh - 20px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+    /* Conservative: browser chrome VISIBLE (svh). Do NOT use dvh — it grows when
+       the address bar hides and the modal gets clipped when chrome returns. */
+    max-height: calc(100vh - 24px);
+    max-height: calc(100svh - 24px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+    max-height: min(
+      calc(100svh - 24px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)),
+      var(--gather-vv-modal-max, 100svh)
+    );
   }
   .modal-header { padding: 18px; }
   .modal-body { padding: 18px; gap: 14px; }
