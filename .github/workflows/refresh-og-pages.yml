@@ -3,14 +3,17 @@ name: Refresh Calendar OG Pages
 on:
   workflow_dispatch:
   schedule:
-    - cron: '*/15 * * * *'
+    # Daily refresh is enough for Kakao/OpenGraph static share pages and avoids
+    # noisy bot commits/deploys every 15 minutes. Run manually after urgent title
+    # or description changes that must be reflected immediately.
+    - cron: '0 18 * * *'
 
 permissions:
   contents: write
 
 concurrency:
   group: refresh-calendar-og-pages
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   refresh:

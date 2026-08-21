@@ -1,18 +1,34 @@
 # 운영 런북 (P7)
 
-최종 갱신: 2026-08-20 (P4 UI 분리 완료)
+최종 갱신: 2026-08-21 (Vite Pages 운영 기준)
 
 ## 1. 배포
-1. 로컬 검증: npm run predeploy   # check:all(size-budget·tab-wiring 포함) + safety
-2. main push → GitHub Pages + Verify Calendar
-3. 배포 후: npm run smoke:live
+1. 로컬 검증: `npm run check:all`, `npm run safety:test`, `npm run build`
+2. main push → `Deploy Vite Pages` + `Verify Calendar`
+3. 배포 후: `npm run smoke:live`
+4. Firebase Functions 변경이 포함된 경우 GitHub Pages 배포와 별도로 functions 배포 여부를 확인
 
 ## 2. 안전 태그
-git tag safe-20260820-p4-complete && git push origin safe-20260820-p4-complete
+현재 주요 태그:
+- `safe-20260820-p4-complete`: P4 UI 분리 완료
+- `safe-20260820-p6-vite-live`: Vite Pages 전환 완료
 
-## 3. 모듈 지도 (P4 이후)
+새로운 대형 구조 변경 전에는 `safe-YYYYMMDD-short-topic` 형식으로 태그를 만든다.
 
-### UI (assets/ui-*.js)
+## 3. 모듈 지도
+
+### 라이브 소스
+- `src/main.jsx`: Vite 부트스트랩
+- `src/core/app-main.js`: App 본체, 상태, 라우팅, Firestore 구독
+- `src/core/firebase-services.js`: Firebase 읽기/구독 헬퍼
+- `src/ui/*.js`: 화면 및 모달 컴포넌트
+- `src/app.css`: 전역 스타일
+
+### Classic 호환 파일
+- 루트 `index.html` + `assets/*`는 롤백/참조용으로 남아 있다.
+- 현재 GitHub Pages 운영 기준은 Vite `dist/` 배포다.
+
+### UI (`src/ui/*.js`)
 - ui-admin-dashboard.js
 - ui-admin-modals.js
 - ui-calendar-core.js
@@ -49,7 +65,7 @@ git tag safe-20260820-p4-complete && git push origin safe-20260820-p4-complete
 - firebase-services.js
 
 ### 잔여 모놀리스
-- app-main.js — App 본체(상태·라우팅·Firestore 구독)만 큼. 추가 UI 컴포넌트 분리 완료.
+- `src/core/app-main.js` — App 본체가 아직 크다. 다음 구조 개선은 route/view별 App shell 분리를 우선한다.
 
 ## 4. 배포 전 스모크 (수동)
 1. 메인: 캘린더, 사이드메뉴, 일정 팝업
@@ -63,7 +79,12 @@ console.cloud.google.com → 결제 → 예산 및 알림 (월 5~10달러 권장
 
 ## 6. CI
 - Verify Calendar: safety + check:all + size-budget
+- Deploy Vite Pages: main push + manual
 - Live smoke: main push + daily
+- Refresh Calendar OG Pages: manual + daily 18:00 UTC
 
-## 7. 다음 큰 단계 (P6 Vite)
-- 기능 동결 스프린트에서만 진행 (docs/vite-migration.md)
+## 7. 다음 큰 단계
+1. `src/core/app-main.js`를 route/view 단위로 더 분리
+2. `src/main.jsx`에서 모든 UI를 한 번에 import하지 않고 화면별 lazy import로 전환
+3. Playwright 기반 E2E/시각 회귀 테스트 추가
+4. 알림 진단/푸시 구독 상태를 관리자 화면에 표시
