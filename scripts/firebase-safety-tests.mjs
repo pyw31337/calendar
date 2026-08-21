@@ -24,6 +24,8 @@ assert(!setChatNotifyPrefBody.includes('gather_chat_notify_pref_global_v1'), 'ne
 assert(/directMediaTags/.test(script), 'direct URL image tags must be persisted on chat messages');
 assert(/directMediaTags/.test(firestoreRules), 'Firestore rules must allow direct URL image tag updates');
 assert(/affectedKeys\(\)\.hasOnly\(\[[^\]]*directMediaTags/.test(firestoreRules), 'message update rules must include directMediaTags in the allowed update mask');
+assert(/function hasValidMessageMediaMetadataPatch\(\)/.test(firestoreRules), 'Firestore rules must allow tag/share-cache-only updates without revalidating stale message payloads');
+assert(/hasValidMessageMediaMetadataPatch\(\)[\s\S]{0,260}\|\|[\s\S]{0,260}hasValidMessageText\(request\.resource\.data\)/.test(firestoreRules), 'message update rules must branch media metadata patches before full message validation');
 
 function createContext(url) {
   const parsed = new URL(url);

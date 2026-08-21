@@ -109,6 +109,12 @@ service cloud.firestore {
           // URL in the chat text (no imageUrls/thumbUrls entry exists for that synthetic media).
           && (!('directMediaTags' in data) || (data.directMediaTags is string && data.directMediaTags.size() <= 100));
       }
+      function hasValidMessageMediaMetadataPatch() {
+        return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['imageShareUrls', 'imageTags', 'directMediaTags'])
+          && (!('imageShareUrls' in request.resource.data) || (request.resource.data.imageShareUrls is list && request.resource.data.imageShareUrls.size() <= 50))
+          && (!('imageTags' in request.resource.data) || (request.resource.data.imageTags is list && request.resource.data.imageTags.size() <= 50))
+          && (!('directMediaTags' in request.resource.data) || (request.resource.data.directMediaTags is string && request.resource.data.directMediaTags.size() <= 100));
+      }
 
       match /messages/{messageId} {
         allow get, list: if isCalendarDoc(calendarDocId);
@@ -122,11 +128,16 @@ service cloud.firestore {
           && hasValidLinkPreview(request.resource.data);
         allow update: if isCalendarDoc(calendarDocId)
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['text', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageShareUrls', 'imageTags', 'directMediaTags', 'participantId', 'linkPreview'])
-          && hasValidMessageText(request.resource.data)
-          && hasValidMessageImages(request.resource.data)
-          && hasValidLinkPreview(request.resource.data)
-          && (!('participantId' in request.resource.data) ||
-              (request.resource.data.participantId is string && request.resource.data.participantId.size() <= 160));
+          && (
+            hasValidMessageMediaMetadataPatch()
+            || (
+              hasValidMessageText(request.resource.data)
+              && hasValidMessageImages(request.resource.data)
+              && hasValidLinkPreview(request.resource.data)
+              && (!('participantId' in request.resource.data) ||
+                  (request.resource.data.participantId is string && request.resource.data.participantId.size() <= 160))
+            )
+          );
         allow delete: if isCalendarDoc(calendarDocId);
       }
 
