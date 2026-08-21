@@ -704,6 +704,7 @@ export function ChatGalleryModal({
   const MenuIcon = __deps.MenuIcon || __comp.MenuIcon;
   const getMessageImageEntries = __deps.getMessageImageEntries;
   const getMessageDirectMediaEntry = __deps.getMessageDirectMediaEntry;
+  const resolveMeetingPhotoDisplay = __deps.resolveMeetingPhotoDisplay;
   const extractFirstUrl = __deps.extractFirstUrl;
   const removeFirstUrl = __deps.removeFirstUrl;
   const formatChatHeaderTitle = __deps.formatChatHeaderTitle;
@@ -803,8 +804,13 @@ export function ChatGalleryModal({
     getConfirmedMeetings(calendar).forEach(meeting => {
       const photos = Array.isArray(meeting?.photos) ? meeting.photos : [];
       photos.forEach((photo, index) => {
-        const full = String(photo?.imageUrl || photo?.full || '');
-        const thumb = String(photo?.thumbUrl || photo?.thumb || full);
+        // Auto-linked entries (sourceMessageId set) are references to a real chat photo, not
+        // independent copies -- resolve the live imageUrl/thumbUrl/tags from that source
+        // message so this tile always matches the chat original exactly, including any tag
+        // edit made from anywhere else.
+        const resolved = resolveMeetingPhotoDisplay ? resolveMeetingPhotoDisplay(photo, chatMessages) : null;
+        const full = String(resolved?.imageUrl || photo?.imageUrl || photo?.full || '');
+        const thumb = String(resolved?.thumbUrl || photo?.thumbUrl || photo?.thumb || full);
         if (!full && !thumb) return;
         list.push({
           full: full || thumb,
@@ -812,8 +818,10 @@ export function ChatGalleryModal({
           imageIndex: index,
           messageId: null,
           photoId: photo?.id || '',
+          sourceMessageId: photo?.sourceMessageId || '',
+          sourceImageIndex: Number.isInteger(photo?.sourceImageIndex) ? photo.sourceImageIndex : null,
           timestamp: Number(photo?.createdAt || photo?.updatedAt || meeting?.confirmedAt || 0),
-          tags: String(photo?.tags || ''),
+          tags: String(resolved?.tags ?? photo?.tags ?? ''),
           text: `${meeting.date || ''} 일정 사진`,
           participantId: '',
           source: 'meeting',
@@ -1229,7 +1237,7 @@ export function ChatGalleryModal({
       onClick: () => setActiveLightbox && setActiveLightbox({
         urls: filteredPhotos.map(p => p.full),
         index: idx,
-        meta: filteredPhotos.map(p => ({ timestamp: p.timestamp, messageId: p.messageId, imageIndex: p.imageIndex, thumb: p.thumb, tags: p.tags, directMediaUrl: p.directMediaUrl, source: p.source, meetingDate: p.meetingDate, photoId: p.photoId }))
+        meta: filteredPhotos.map(p => ({ timestamp: p.timestamp, messageId: p.messageId, imageIndex: p.imageIndex, thumb: p.thumb, tags: p.tags, directMediaUrl: p.directMediaUrl, source: p.source, uploadSource: p.uploadSource, meetingDate: p.meetingDate, photoId: p.photoId, sourceMessageId: p.sourceMessageId, sourceImageIndex: p.sourceImageIndex }))
       }),
       style: {
         width: '100%',

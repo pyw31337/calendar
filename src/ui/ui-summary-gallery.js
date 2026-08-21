@@ -805,6 +805,7 @@ export function PhotoGallery({ chatMessages, calendar = null, totalGalleryCount,
   const __comp = window.GATHER_UI_COMPONENTS || {};
   const GalleryIcon = __deps.GalleryIcon;
   const Lightbox = __comp.Lightbox || __deps.Lightbox;
+  const resolveMeetingPhotoDisplay = __deps.resolveMeetingPhotoDisplay;
   const SectionCountBadge = __comp.SectionCountBadge;
   const SectionToggleButton = __comp.SectionToggleButton;
 
@@ -827,8 +828,12 @@ export function PhotoGallery({ chatMessages, calendar = null, totalGalleryCount,
     getConfirmedMeetings(calendar).forEach(meeting => {
       const photos = Array.isArray(meeting?.photos) ? meeting.photos : [];
       photos.forEach((photo, index) => {
-        const full = String(photo?.imageUrl || photo?.full || '');
-        const thumb = String(photo?.thumbUrl || photo?.thumb || full);
+        // Auto-linked entries (sourceMessageId set) are references to a real chat photo --
+        // resolve the live imageUrl/thumbUrl/tags from that source message so this tile always
+        // matches the chat original exactly.
+        const resolved = resolveMeetingPhotoDisplay ? resolveMeetingPhotoDisplay(photo, chatMessages) : null;
+        const full = String(resolved?.imageUrl || photo?.imageUrl || photo?.full || '');
+        const thumb = String(resolved?.thumbUrl || photo?.thumbUrl || photo?.thumb || full);
         if (!full && !thumb) return;
         meetingEntries.push({
           full: full || thumb,
@@ -836,8 +841,10 @@ export function PhotoGallery({ chatMessages, calendar = null, totalGalleryCount,
           imageIndex: index,
           messageId: null,
           photoId: photo?.id || '',
+          sourceMessageId: photo?.sourceMessageId || '',
+          sourceImageIndex: Number.isInteger(photo?.sourceImageIndex) ? photo.sourceImageIndex : null,
           timestamp: Number(photo?.createdAt || photo?.updatedAt || meeting?.confirmedAt || 0),
-          tags: String(photo?.tags || ''),
+          tags: String(resolved?.tags ?? photo?.tags ?? ''),
           directMediaUrl: '',
           source: 'meeting',
           meetingDate: meeting.date || '',
@@ -907,7 +914,7 @@ export function PhotoGallery({ chatMessages, calendar = null, totalGalleryCount,
           referrerPolicy: 'no-referrer',
           onClick: () => setLightbox({
             urls: displayedEntries.map(e => e.full),
-            meta: displayedEntries.map(e => ({ timestamp: e.timestamp, messageId: e.messageId, imageIndex: e.imageIndex, thumb: e.thumb, tags: e.tags, directMediaUrl: e.directMediaUrl, source: e.source, meetingDate: e.meetingDate, photoId: e.photoId })),
+            meta: displayedEntries.map(e => ({ timestamp: e.timestamp, messageId: e.messageId, imageIndex: e.imageIndex, thumb: e.thumb, tags: e.tags, directMediaUrl: e.directMediaUrl, source: e.source, uploadSource: e.uploadSource, meetingDate: e.meetingDate, photoId: e.photoId, sourceMessageId: e.sourceMessageId, sourceImageIndex: e.sourceImageIndex })),
             index: idx
           }),
           style: { width: '100%', aspectRatio: '1 / 1', objectFit: 'cover', borderRadius: 'var(--radius-sm)', cursor: 'pointer' }
