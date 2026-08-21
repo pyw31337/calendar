@@ -5949,7 +5949,36 @@ function App() {
     return linkedCount;
   };
 
+  // 'meeting' gallery photos are archival copies stored on confirmedMeeting.photos (see
+  // linkTaggedImageToMeetingDates above), not chat messages -- they have their own independent
+  // tags field, identified by meetingDate+photoId rather than messageId/imageIndex.
+  const handleSaveMeetingPhotoTags = async (meetingDate, photoId, tagsText) => {
+    if (!activeCal || !meetingDate || !photoId) return false;
+    const existingMeetings = getConfirmedMeetings(activeCal);
+    const meeting = existingMeetings.find(m => m.date === meetingDate);
+    const photos = Array.isArray(meeting?.photos) ? meeting.photos : [];
+    const photoIndex = photos.findIndex(p => p?.id === photoId);
+    if (!meeting || photoIndex === -1) {
+      showToast('태그 저장 대상 사진을 찾지 못했습니다.', 'error', 4000);
+      return false;
+    }
+    const parseTagTokens = text => Array.from(new Set(
+      String(text || '').split(/[,\s#]+/).map(t => sanitizeText(t.trim(), 30)).filter(Boolean)
+    )).slice(0, 10);
+    const cleanTags = sanitizeText(parseTagTokens(tagsText).join(' '), 100);
+    const nextPhotos = photos.map((p, i) => i === photoIndex ? { ...p, tags: cleanTags } : p);
+    const updatedCal = {
+      ...activeCal,
+      confirmedMeeting: existingMeetings.map(m => m.date === meetingDate ? { ...meeting, photos: nextPhotos } : m),
+      updatedAt: Date.now(),
+      revision: (activeCal.revision || 0) + 1
+    };
+    const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
+    return updateCalendars(nextCalendars, '태그 저장완료', 'success', updatedCal.id, 'settings');
+  };
+
   const handleSaveImageTags = async (messageId, imageIndex, tagsText, meta = {}) => {
+    if (meta?.source === 'meeting') return handleSaveMeetingPhotoTags(meta.meetingDate, meta.photoId, tagsText);
     if (!messageId || !Number.isInteger(imageIndex)) return false;
     let sourceMessage = (chatMessages || []).find(msg => msg.id === messageId);
     if (!sourceMessage) {
