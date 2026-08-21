@@ -8,6 +8,7 @@
 
 ## What Is Stable
 - `npm run check:all`, `npm run safety:test`, `npm run build`, and `npm run smoke:live` are the required release gate.
+- `check:live-source` blocks JSONBlob, legacy browser persistence keys, stale seed copy, and hardcoded production calendar paths in the Vite `src/` tree.
 - Firestore rules bind calendar document IDs to calendar IDs and deny broad listing.
 - Live smoke covers the main calendars, chat, memo, places, gallery, admin, and restore URLs.
 - GitHub Pages deployment is handled by `Deploy Vite Pages`.

@@ -82,6 +82,7 @@ console.cloud.google.com → 결제 → 예산 및 알림 (월 5~10달러 권장
 - Deploy Vite Pages: main push + manual
 - Live smoke: main push + daily
 - Refresh Calendar OG Pages: manual + daily 18:00 UTC
+- Live source guard: `src/`에 JSONBlob, 구형 seed 문구, 하드코딩 캘린더 경로가 다시 들어오면 실패
 
 ## 7. 다음 큰 단계
 1. `src/core/app-main.js`를 route/view 단위로 더 분리
