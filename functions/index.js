@@ -99,7 +99,7 @@ exports.onMessageCreate = functions.runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).
         .catch(err => {
           console.error(`Failed to send push to sub ${doc.id}:`, err);
           // If endpoint is expired or unregistered (HTTP 410 or 404), clean it up from database
-          if (err.statusCode === 410 || err.statusCode === 404) {
+          if (err.statusCode === 410 || err.statusCode === 404 || err.statusCode === 400 || err.statusCode === 403) {
             console.log(`Removing expired subscription: ${doc.id}`);
             return doc.ref.delete();
           }
@@ -208,7 +208,7 @@ exports.sendAnniversaryReminders = functions.runWith({ secrets: ['VAPID_PRIVATE_
           })
           .catch(err => {
             console.error(`Failed to send anniversary push to sub ${subDoc.id}:`, err);
-            if (err.statusCode === 410 || err.statusCode === 404) {
+            if (err.statusCode === 410 || err.statusCode === 404 || err.statusCode === 400 || err.statusCode === 403) {
               console.log(`Removing expired subscription: ${subDoc.id}`);
               return subDoc.ref.delete();
             }

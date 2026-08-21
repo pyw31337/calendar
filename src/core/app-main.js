@@ -653,7 +653,7 @@ function getSubscriptionHashId(endpoint) {
   return 'sub_' + Math.abs(hash) + '_' + endpoint.slice(-20).replace(/[^a-zA-Z0-9]/g, '');
 }
 
-async function subscribeUserToPush(calendarId, activeParticipantId) {
+async function subscribeUserToPush(calendarId, activeParticipantId, options = {}) {
   if (!calendarId) return { ok: false, reason: 'missing-calendar' };
   if (!activeParticipantId) return { ok: false, reason: 'missing-participant' };
   if (typeof window !== 'undefined' && window.isSecureContext === false) {
@@ -666,6 +666,11 @@ async function subscribeUserToPush(calendarId, activeParticipantId) {
     return { ok: false, reason: 'service-worker-unsupported' };
   }
   try {
+    if (typeof isIOSDevice === 'function' && isIOSDevice() && typeof isInstalledStandalonePwa === 'function' && !isInstalledStandalonePwa()) {
+      return { ok: false, reason: 'ios-not-installed' };
+    }
+  } catch (_) {}
+  try {
     const registration = await Promise.race([
       navigator.serviceWorker.ready,
       new Promise((_, reject) => setTimeout(() => reject(new Error('service worker ready timeout')), 10000))
@@ -674,8 +679,12 @@ async function subscribeUserToPush(calendarId, activeParticipantId) {
       console.warn('Push manager not supported on this browser');
       return { ok: false, reason: 'push-manager-unsupported' };
     }
-    let subscription = await registration.pushManager.getSubscription();
     const publicVapidKey = 'BNk35C4KAQy9JdQJ8uzLuzDAc7zUBCznmPFJc194fcWqEtD3EZTnj03ZCwE_P2SxwVILZnDzHsj2UZxIQ0Q-huU';
+    let subscription = await registration.pushManager.getSubscription();
+    if (options.forceResubscribe && subscription) {
+      try { await subscription.unsubscribe(); } catch (_) {}
+      subscription = null;
+    }
     if (!subscription) {
       subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
@@ -702,12 +711,71 @@ async function subscribeUserToPush(calendarId, activeParticipantId) {
         userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
         updatedAt: Date.now()
       }, { merge: true });
+      try {
+        getLocalStorage().setItem('gather_push_health_' + calendarId, JSON.stringify({
+          subId: subId,
+          participantId: participantId,
+          endpointTail: String(subscription.endpoint || '').slice(-32),
+          updatedAt: Date.now()
+        }));
+      } catch (_) {}
       return { ok: true, subId };
     }
     return { ok: false, reason: 'firestore-unavailable' };
   } catch (err) {
     console.error('Failed to subscribe user to Web Push:', err);
     return { ok: false, reason: classifyPushSubscribeError(err), detail: err?.message || '' };
+  }
+}
+
+async function ensurePushSubscriptionHealthy(calendarId, activeParticipantId) {
+  if (!calendarId || !activeParticipantId) return { ok: false, reason: 'missing-participant' };
+  if (!isNotificationSupported() || Notification.permission !== 'granted') {
+    return { ok: false, reason: 'permission-not-granted' };
+  }
+  if (typeof isChatNotifyEnabledForCalendar === 'function' && !isChatNotifyEnabledForCalendar(calendarId)) {
+    return { ok: false, reason: 'pref-disabled' };
+  }
+  try {
+    const registration = await navigator.serviceWorker.ready;
+    const subscription = registration.pushManager ? await registration.pushManager.getSubscription() : null;
+    if (!subscription) {
+      return subscribeUserToPush(calendarId, activeParticipantId, { forceResubscribe: false });
+    }
+    const result = await subscribeUserToPush(calendarId, activeParticipantId, {});
+    if (result.ok) return result;
+    return subscribeUserToPush(calendarId, activeParticipantId, { forceResubscribe: true });
+  } catch (err) {
+    return { ok: false, reason: classifyPushSubscribeError(err), detail: err?.message || '' };
+  }
+}
+
+async function sendLocalTestNotification(calendarTitle) {
+  if (!isNotificationSupported() || Notification.permission !== 'granted') {
+    return { ok: false, reason: 'permission-not-granted' };
+  }
+  const title = (calendarTitle || '모여라 캘린더') + ' · 알림 테스트';
+  const body = '이 기기로 알림이 정상적으로 도착했습니다.';
+  try {
+    if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+      const reg = await navigator.serviceWorker.ready;
+      if (reg && reg.showNotification) {
+        await reg.showNotification(title, {
+          body: body,
+          icon: 'icons/icon-192.png',
+          badge: 'icons/icon-192.png',
+          tag: 'gather-test-notification',
+          renotify: true,
+          data: './'
+        });
+        return { ok: true, via: 'service-worker' };
+      }
+    }
+    const n = new Notification(title, { body: body, tag: 'gather-test-notification' });
+    setTimeout(() => { try { n.close(); } catch (_) {} }, 8000);
+    return { ok: true, via: 'notification-api' };
+  } catch (err) {
+    return { ok: false, reason: 'show-failed', detail: err && err.message };
   }
 }
 
@@ -4171,12 +4239,74 @@ function App() {
     setMainChatNotifyEnabled(isChatNotifyEnabledForCalendar(activeCalId));
     setMainNotifPermission(isNotificationSupported() ? Notification.permission : 'unsupported');
   }, [activeCalId]);
+
+  React.useEffect(() => {
+    if (!activeCalId || !firebaseDb) return undefined;
+    if (!isChatNotifyEnabledForCalendar(activeCalId)) return undefined;
+    let cancelled = false;
+    const run = async () => {
+      if (cancelled) return;
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      let pid = null;
+      try {
+        pid = ((window.GATHER_APP_NOTIFICATIONS || {}).getStoredChatParticipantId || (() => null))(activeCalId, null);
+      } catch (_) {}
+      if (!pid) return;
+      try { await ensurePushSubscriptionHealthy(activeCalId, pid); } catch (e) { console.warn('push health:', e); }
+    };
+    run();
+    const onVis = () => { if (document.visibilityState === 'visible') run(); };
+    document.addEventListener('visibilitychange', onVis);
+    window.addEventListener('focus', run);
+    const intervalId = setInterval(run, 6 * 60 * 60 * 1000);
+    return () => {
+      cancelled = true;
+      document.removeEventListener('visibilitychange', onVis);
+      window.removeEventListener('focus', run);
+      clearInterval(intervalId);
+    };
+  }, [activeCalId, mainChatNotifyEnabled]);
   const getCurrentChatParticipantId = () => {
     if (chatParticipantIdRef.current) return chatParticipantIdRef.current;
     return ((window.GATHER_APP_NOTIFICATIONS||{}).getStoredChatParticipantId||(()=>undefined))(activeCalId, activeCal);
   };
   const openNotificationHelp = () => {
     setIsNotificationHelpOpen(true);
+  };
+  const handleTestPushNotification = async () => {
+    if (!isNotificationSupported()) {
+      showToast('이 브라우저는 알림을 지원하지 않습니다.', 'error');
+      openNotificationHelp();
+      return;
+    }
+    if (Notification.permission !== 'granted') {
+      showToast('먼저 채팅알림을 켜 권한을 허용해 주세요.', 'error');
+      openNotificationHelp();
+      return;
+    }
+    const pid = getCurrentChatParticipantId();
+    if (!pid) {
+      showToast('채팅에서 내 이름을 선택한 뒤 다시 시도해 주세요.', 'error', 5000);
+      return;
+    }
+    showToast('구독 확인 중...', 'info', 2000);
+    const health = await ensurePushSubscriptionHealthy(activeCalId, pid);
+    if (!health.ok) {
+      if (health.reason === 'ios-not-installed') {
+        showToast('iOS는 홈 화면 추가 앱에서만 알림이 갑니다.', 'error', 6000);
+        openNotificationHelp();
+        return;
+      }
+      showToast('푸시 구독 실패: ' + describePushSubscribeFailure(health.reason), 'error', 6000);
+      openNotificationHelp();
+      return;
+    }
+    const local = await sendLocalTestNotification(activeCal && activeCal.title);
+    if (local.ok) showToast('테스트 알림을 보냈습니다. 알림창을 확인해 주세요.', 'success', 5000);
+    else {
+      showToast('알림 표시 실패. 브라우저 알림 권한을 확인해 주세요.', 'error', 6000);
+      openNotificationHelp();
+    }
   };
   const handleMainToggleNotifications = async () => {
     if (!isNotificationSupported()) {
@@ -6843,6 +6973,7 @@ function App() {
     onIncreaseFont: () => setFontScalePercent(prev => Math.min(130, prev + 10)),
     isChatNotifyEnabled: mainNotifPermission === 'granted' && mainChatNotifyEnabled,
     onToggleChatNotifications: handleMainToggleNotifications,
+    onTestChatNotification: handleTestPushNotification,
     onUpdateWeatherLocation: handleUpdateWeatherLocation,
     onDeleteRecentLocation: handleDeleteRecentWeatherLocation,
     showToast: showToast
@@ -10656,6 +10787,8 @@ function bindGatherUiDeps() {
     setAdminSession: typeof setAdminSession === 'function' ? setAdminSession : null,
     sha256Hex: typeof sha256Hex === 'function' ? sha256Hex : null,
     subscribeUserToPushWithPermission: typeof subscribeUserToPushWithPermission === 'function' ? subscribeUserToPushWithPermission : null,
+    ensurePushSubscriptionHealthy: typeof ensurePushSubscriptionHealthy === 'function' ? ensurePushSubscriptionHealthy : null,
+    sendLocalTestNotification: typeof sendLocalTestNotification === 'function' ? sendLocalTestNotification : null,
     translateKoreanToEnglish: typeof translateKoreanToEnglish === 'function' ? translateKoreanToEnglish : null,
     unsubscribeUserFromPush: typeof unsubscribeUserFromPush === 'function' ? unsubscribeUserFromPush : null,
     validateBackupCalendars: typeof validateBackupCalendars === 'function' ? validateBackupCalendars : null,

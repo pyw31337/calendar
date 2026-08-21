@@ -95,19 +95,26 @@ self.addEventListener('fetch', event => {
 // Web Notifications API path in index.html's notifyNewChatMessage() is a separate, tab-must-
 // be-open fallback that doesn't depend on this at all.
 self.addEventListener('push', event => {
-  if (!event.data) return;
-  let payload;
+  let payload = { title: '모여라 캘린더', body: '새 알림이 도착했습니다.', url: './', tag: 'gather-push' };
   try {
-    payload = event.data.json();
-  } catch (e) {
-    payload = { title: '모여라 캘린더', body: event.data.text() };
-  }
+    if (event.data) {
+      try { payload = Object.assign(payload, event.data.json()); }
+      catch (e) { payload.body = event.data.text() || payload.body; }
+    }
+  } catch (_) {}
+  const title = payload.title || '모여라 캘린더';
+  const options = {
+    body: payload.body || '',
+    icon: 'icons/icon-192.png',
+    badge: 'icons/icon-192.png',
+    tag: payload.tag || 'gather-push',
+    renotify: true,
+    data: payload.url || './',
+    vibrate: [80, 40, 80]
+  };
   event.waitUntil(
-    self.registration.showNotification(payload.title || '모여라 캘린더', {
-      body: payload.body || '',
-      icon: 'icons/icon-192.png',
-      tag: payload.tag || 'moyeora-push',
-      data: payload.url || './'
+    self.registration.showNotification(title, options).catch(function () {
+      return self.registration.showNotification(title, { body: options.body, tag: 'gather-push-fallback', data: options.data });
     })
   );
 });

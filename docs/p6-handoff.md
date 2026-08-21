@@ -459,3 +459,11 @@ zsh 에서 줄 시작 `#` 주석은 쓰지 말 것.
 - 다크모드 잔여 #FFFFFF → var(--bg-card) / dark override
 - 캘린더설정 '일정' 탭 제거 (메인 캘린더와 중복)
 - 사용자 매뉴얼: 문구 단축, 1열, 모바일 패딩/높이
+
+## P6-78 (2026-08-21) 알림 강화 (네이티브 제외)
+- ensurePushSubscriptionHealthy: 포커스/가시성/6h 주기 재등록
+- forceResubscribe + health localStorage
+- 사이드메뉴 「알림 테스트」
+- iOS/삼성/크롬 안내 문구 강화
+- SW push showNotification 보강
+- Functions 만료 구독 삭제 상태코드 확대 (배포 필요)
