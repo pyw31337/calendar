@@ -79,6 +79,25 @@ if (!mainEntry.includes('window.__gatherStartApp()')) {
   fail('src/main.jsx must call window.__gatherStartApp() after dependencies load.');
 }
 
+const appMain = readFileSync(join(ROOT, 'src/core/app-main.js'), 'utf8');
+const adminDashboard = readFileSync(join(ROOT, 'src/ui/ui-admin-dashboard.js'), 'utf8');
+
+if (!/function getAdminSelectedCalendarIdFromUrl\(fallback = 'kkot'\)/.test(appMain)) {
+  fail('Admin dashboard must read its selected calendar from ?id= so refresh keeps the selected calendar.');
+}
+
+if (!/(function|const)\s+syncSelectedCalendarUrl\b[\s\S]{0,80}calId[\s\S]{0,80}mode = 'replace'/.test(adminDashboard)) {
+  fail('Admin dashboard must sync selected calendar changes back to the URL.');
+}
+
+if (!/params\.set\('admin', '1'\)/.test(adminDashboard) || !/params\.set\('id', calId\)/.test(adminDashboard)) {
+  fail('Admin calendar URL sync must preserve admin=1 and write id=<calendarId>.');
+}
+
+if (!/React\.useState\(\(\) => getAdminSelectedCalendarIdFromUrl\('kkot'\)\)/.test(adminDashboard)) {
+  fail('Admin selected calendar state must initialize from the URL.');
+}
+
 if (!process.exitCode) {
   console.log('[check-live-source-guards] OK: live source guards passed');
 }
