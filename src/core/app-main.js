@@ -5519,6 +5519,87 @@ function App() {
     }
   };
 
+  const prepareGalleryImageUploads = async (files, title = '사진 업로드 준비 중...') => {
+    const imageFiles = Array.from(files || []).filter(file => /^image\//i.test(file?.type || '') || isHeicFile(file));
+    if (imageFiles.length === 0) {
+      showToast('업로드할 이미지가 없습니다.', 'error');
+      return [];
+    }
+    const limitedFiles = imageFiles.slice(0, 50);
+    if (imageFiles.length > limitedFiles.length) showToast('최대 50장까지 업로드됩니다.', 'info');
+    setChatUploadProgress({ pct: 2, remainingSec: null, label: title, current: 0, total: limitedFiles.length });
+    const { succeeded, failed } = await processImageFilesSequentially(limitedFiles, progress => {
+      const total = Math.max(1, progress.total || limitedFiles.length);
+      const current = Math.min(total, progress.current || 0);
+      setChatUploadProgress({
+        pct: Math.min(25, 4 + Math.round((current / total) * 20)),
+        remainingSec: null,
+        label: '사진 압축 중...',
+        current,
+        total
+      });
+    });
+    if (failed.length > 0) {
+      console.error('Gallery image processing failed for:', failed.map(f => f.fileName));
+      showToast(describeImageProcessingFailures(failed), 'error', 5000);
+    }
+    return succeeded;
+  };
+
+  const handleUploadGalleryImages = async files => {
+    if (!guardLoadedCalendar()) return false;
+    const compressed = await prepareGalleryImageUploads(files, '갤러리 사진 업로드 준비 중...');
+    if (!compressed.length) {
+      setChatUploadProgress(null);
+      return false;
+    }
+    try {
+      const resolvedImages = await resolveChatImageBatch(activeCal.id, compressed, progress => {
+        setChatUploadProgress({
+          ...progress,
+          label: '갤러리 사진 업로드 중...'
+        });
+      });
+      const chunks = chunkResolvedImagesForMessages(resolvedImages);
+      const now = Date.now();
+      const fallbackParticipantId = chatParticipantId || getActiveParticipants(activeCal)[0]?.id || '';
+      for (let i = 0; i < chunks.length; i += 1) {
+        const chunkImages = chunks[i];
+        setChatUploadProgress({
+          pct: Math.min(99, 90 + Math.round((i / Math.max(1, chunks.length)) * 9)),
+          remainingSec: Math.max(1, chunks.length - i),
+          label: '갤러리 기록 저장 중...',
+          current: Math.min(resolvedImages.length, i + 1),
+          total: resolvedImages.length
+        });
+        const messageData = {
+          participantId: fallbackParticipantId,
+          text: i === 0 ? '갤러리 사진' : '',
+          imageUrl: chunkImages[0].imageUrl,
+          thumbUrl: chunkImages[0].thumbUrl,
+          imageUrls: chunkImages.map(r => r.imageUrl),
+          thumbUrls: chunkImages.map(r => r.thumbUrl),
+          timestamp: now + i
+        };
+        if (firebaseDb) {
+          await firebaseDb.collection('calendars').doc(`cal_${activeCal.id}`).collection('messages').add(sanitizeMessageForFirestore(messageData));
+        } else {
+          const sent = await sendChatMessageRest(activeCal.id, messageData);
+          if (!sent) throw new Error(`Gallery upload REST save failed ${i + 1}/${chunks.length}`);
+        }
+      }
+      setChatUploadProgress({ pct: 100, remainingSec: 0, label: '갤러리 업로드 완료' });
+      showToast('갤러리에 사진이 추가되었습니다.', 'success');
+      return true;
+    } catch (err) {
+      console.error('handleUploadGalleryImages failed:', err);
+      showToast('갤러리 업로드 실패', 'error', 4000);
+      return false;
+    } finally {
+      setTimeout(() => setChatUploadProgress(null), 250);
+    }
+  };
+
   const handleDeleteMessage = (msg) => {
     setDeletingMessage({ ...msg, calId: activeCalId });
   };
@@ -6275,6 +6356,81 @@ function App() {
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
     return updateCalendars(nextCalendars, '지출 순서 저장완료', 'success', updatedCal.id, 'settings', []);
   };
+
+  const handleAddMeetingPhotos = async (dateStr, files) => {
+    if (!activeCal || !isValidDateString(dateStr)) return false;
+    const compressed = await prepareGalleryImageUploads(files, '일정 사진 업로드 준비 중...');
+    if (!compressed.length) {
+      setChatUploadProgress(null);
+      return false;
+    }
+    try {
+      const resolvedImages = await resolveChatImageBatch(activeCal.id, compressed, progress => {
+        setChatUploadProgress({ ...progress, label: '일정 사진 업로드 중...' });
+      });
+      const now = Date.now();
+      const nextPhotos = resolvedImages.map((image, index) => ({
+        id: `photo_${activeCal.id}_${dateStr}_${now}_${index}_${Math.random().toString(36).slice(2, 7)}`,
+        imageUrl: image.imageUrl,
+        thumbUrl: image.thumbUrl || image.imageUrl,
+        createdAt: now + index
+      }));
+      const existingMeetings = getConfirmedMeetings(activeCal);
+      const meetingIndex = existingMeetings.findIndex(m => m.date === dateStr);
+      let meetings = existingMeetings;
+      if (meetingIndex < 0) {
+        meetings = [...existingMeetings, { date: dateStr, note: '', confirmedAt: null, confirmed: false, expenses: [], photos: [] }];
+      }
+      const targetIndex = meetingIndex >= 0 ? meetingIndex : meetings.length - 1;
+      const nextConfirmedMeetings = meetings.map((m, i) => i === targetIndex
+        ? { ...m, photos: [...(Array.isArray(m.photos) ? m.photos : []), ...nextPhotos], amount: m.amount || null }
+        : m);
+      const photoLog = createActivityLog(activeCal.id, 'photo_create', dateStr, '', now, `${nextPhotos.length}장 일정 사진 추가`);
+      const updatedCal = {
+        ...activeCal,
+        confirmedMeeting: nextConfirmedMeetings,
+        updatedAt: now,
+        revision: (activeCal.revision || 0) + 1,
+        activityLogs: photoLog ? [...getCalendarActivityLogs(activeCal), photoLog] : getCalendarActivityLogs(activeCal)
+      };
+      const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
+      setChatUploadProgress({ pct: 100, remainingSec: 0, label: '일정 사진 저장 완료' });
+      return updateCalendars(nextCalendars, '일정 사진 저장완료', 'success', updatedCal.id, 'settings', photoLog ? [photoLog] : []);
+    } catch (err) {
+      console.error('handleAddMeetingPhotos failed:', err);
+      showToast('일정 사진 저장 실패', 'error', 4000);
+      return false;
+    } finally {
+      setTimeout(() => setChatUploadProgress(null), 250);
+    }
+  };
+
+  const handleDeleteMeetingPhoto = (dateStr, photoId) => {
+    if (!activeCal || !isValidDateString(dateStr) || !photoId) return false;
+    const existingMeetings = getConfirmedMeetings(activeCal);
+    const meetingIndex = existingMeetings.findIndex(m => m.date === dateStr);
+    if (meetingIndex < 0) return false;
+    const meeting = existingMeetings[meetingIndex];
+    const existingPhotos = Array.isArray(meeting.photos) ? meeting.photos : [];
+    const deletedPhoto = existingPhotos.find(photo => photo.id === photoId);
+    if (!deletedPhoto) return false;
+    deleteChatImageFromStorage(deletedPhoto.imageUrl);
+    deleteChatImageFromStorage(deletedPhoto.thumbUrl);
+    const now = Date.now();
+    const nextConfirmedMeetings = existingMeetings.map((m, i) => i === meetingIndex
+      ? { ...m, photos: existingPhotos.filter(photo => photo.id !== photoId) }
+      : m);
+    const photoLog = createActivityLog(activeCal.id, 'photo_delete', dateStr, '', now, '일정 사진 삭제');
+    const updatedCal = {
+      ...activeCal,
+      confirmedMeeting: nextConfirmedMeetings,
+      updatedAt: now,
+      revision: (activeCal.revision || 0) + 1,
+      activityLogs: photoLog ? [...getCalendarActivityLogs(activeCal), photoLog] : getCalendarActivityLogs(activeCal)
+    };
+    const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
+    return updateCalendars(nextCalendars, '사진 삭제완료', 'delete', updatedCal.id, 'settings', photoLog ? [photoLog] : []);
+  };
   const handleSavePlace = (placeData) => {
     if (!activeCal || !Number.isFinite(placeData?.lat) || !Number.isFinite(placeData?.lng)) return false;
     const cleanName = sanitizeText(placeData?.name || '', 80);
@@ -6624,6 +6780,8 @@ function App() {
       onSaveExpense: handleSaveExpense,
       onDeleteExpense: handleDeleteExpense,
       onReorderExpenses: handleReorderExpenses,
+      onAddMeetingPhotos: handleAddMeetingPhotos,
+      onDeleteMeetingPhoto: handleDeleteMeetingPhoto,
       onSavePlace: handleSavePlace,
       onDeletePlace: handleDeletePlace,
       showToast: showToast,
@@ -6904,6 +7062,11 @@ function App() {
         memos: memos,
         asPage: true,
         onClose: () => changeView('calendar'),
+        onUploadImages: handleUploadGalleryImages,
+        onOpenShare: () => {
+          if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 공유 정보를 확인해 주세요.')) setIsShareOpen(true);
+        },
+        onOpenShortcut: () => tryCreateShortcut(msg => showToast(msg, 'info', 5000)),
         setActiveLightbox: setActiveLightbox,
         hasMoreOlderChat: hasMoreOlderChat,
         loadingOlderChat: loadingOlderChat,
@@ -7105,8 +7268,14 @@ function App() {
     onDeleteRecentLocation: handleDeleteRecentWeatherLocation,
     showToast: showToast
   }), isGalleryOpen && /*#__PURE__*/React.createElement(ChatGalleryModal, {
+    calendar: activeCal,
     chatMessages: chatMessages,
     onClose: () => setIsGalleryOpen(false),
+    onUploadImages: handleUploadGalleryImages,
+    onOpenShare: () => {
+      if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 공유 정보를 확인해 주세요.')) setIsShareOpen(true);
+    },
+    onOpenShortcut: () => tryCreateShortcut(msg => showToast(msg, 'info', 5000)),
     setActiveLightbox: setActiveLightbox
   }), isGuideOpen && /*#__PURE__*/React.createElement(UserManualOverlay, {
     calendar: activeCal,
@@ -7238,6 +7407,7 @@ function App() {
     }
   }), /*#__PURE__*/React.createElement(PhotoGallery, {
     chatMessages: (galleryPreviewMessages && galleryPreviewMessages.length > 0) ? galleryPreviewMessages : allChatMessages,
+    calendar: activeCal,
     totalGalleryCount: totalGalleryCount,
     onViewAll: () => changeView('gallery'),
     showToast: showToast,
@@ -9550,7 +9720,7 @@ const rebuildCalendarToTimestamp = (calendar, T, logs = []) => {
     participants: rebuiltParticipants,
     availabilities: Array.from(rebuiltAvailabilities.values()),
     polls: rebuiltPolls,
-    confirmedMeeting: Array.from(rebuiltMeetingsMap.values()).filter(m => m.confirmed !== false || m.expenses.length > 0),
+    confirmedMeeting: Array.from(rebuiltMeetingsMap.values()).filter(m => m.confirmed !== false || m.expenses.length > 0 || (Array.isArray(m.photos) && m.photos.length > 0)),
     activityLogs: rebuiltLogs,
     updatedAt: now,
     revision: (calendar.revision || 0) + 1

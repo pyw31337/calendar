@@ -799,7 +799,7 @@ export function SimpleBottomSheetPicker({ title, value, options, onSelect, place
   );
 }
 
-export function PhotoGallery({ chatMessages, totalGalleryCount, onViewAll, showToast, onPromoteImageUrl, onSaveImageTags, onSearchTag }) {
+export function PhotoGallery({ chatMessages, calendar = null, totalGalleryCount, onViewAll, showToast, onPromoteImageUrl, onSaveImageTags, onSearchTag }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -813,7 +813,7 @@ export function PhotoGallery({ chatMessages, totalGalleryCount, onViewAll, showT
 
   const photoEntries = React.useMemo(() => {
     const sorted = [...(chatMessages || [])].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-    return sorted.flatMap(msg => {
+    const chatEntries = sorted.flatMap(msg => {
       const directEntry = getMessageDirectMediaEntry(msg);
       const entries = directEntry ? [...getMessageImageEntries(msg), directEntry] : getMessageImageEntries(msg);
       return entries.map((entry, i) => ({
@@ -822,7 +822,27 @@ export function PhotoGallery({ chatMessages, totalGalleryCount, onViewAll, showT
         timestamp: msg.timestamp
       }));
     });
-  }, [chatMessages]);
+    const meetingEntries = [];
+    getConfirmedMeetings(calendar).forEach(meeting => {
+      const photos = Array.isArray(meeting?.photos) ? meeting.photos : [];
+      photos.forEach((photo, index) => {
+        const full = String(photo?.imageUrl || photo?.full || '');
+        const thumb = String(photo?.thumbUrl || photo?.thumb || full);
+        if (!full && !thumb) return;
+        meetingEntries.push({
+          full: full || thumb,
+          thumb: thumb || full,
+          imageIndex: index,
+          messageId: null,
+          timestamp: Number(photo?.createdAt || photo?.updatedAt || meeting?.confirmedAt || 0),
+          tags: '',
+          directMediaUrl: '',
+          key: `meeting_${meeting.date || 'date'}_${photo?.id || index}`
+        });
+      });
+    });
+    return [...chatEntries, ...meetingEntries].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+  }, [chatMessages, calendar]);
 
   const badgeCount = (typeof totalGalleryCount === 'number' && totalGalleryCount > 0)
     ? totalGalleryCount

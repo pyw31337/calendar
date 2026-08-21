@@ -1,8 +1,674 @@
 /**
  * Date modal (schedule popup) (P4-14)
  */
-(function () {
-function DateModal({
+
+/* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
+const GATHER_APP_CALENDAR_DATA = window.GATHER_APP_CALENDAR_DATA || {};
+const GATHER_APP_CHAT_DATA = window.GATHER_APP_CHAT_DATA || {};
+const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
+const GATHER_APP_CONSTANTS = window.GATHER_APP_CONSTANTS || {};
+const GATHER_APP_CONFIG = window.GATHER_APP_CONFIG || {};
+function __gatherUiDeps() { return window.GATHER_UI_DEPS || {}; }
+function getActiveAvailabilities(calendar) {
+  const f = __gatherUiDeps().getActiveAvailabilities || GATHER_APP_UTILS.getActiveAvailabilities;
+  return typeof f === 'function' ? f(calendar) : [];
+}
+function getActiveParticipants(calendar) {
+  const f = __gatherUiDeps().getActiveParticipants || GATHER_APP_UTILS.getActiveParticipants;
+  return typeof f === 'function' ? f(calendar) : [];
+}
+function getCalendarPolls(calendar) {
+  const f = __gatherUiDeps().getCalendarPolls || GATHER_APP_UTILS.getCalendarPolls;
+  return typeof f === 'function' ? f(calendar) : [];
+}
+function getCalendarPlaces(calendar) {
+  const f = __gatherUiDeps().getCalendarPlaces || GATHER_APP_UTILS.getCalendarPlaces;
+  return typeof f === 'function' ? f(calendar) : [];
+}
+function useChatSendGuard(onSend, canSend) {
+  const f = __gatherUiDeps().useChatSendGuard;
+  return typeof f === 'function' ? f(onSend, canSend) : onSend;
+}
+function computeKoreanHolidaysForYear(year) {
+  const f = __gatherUiDeps().computeKoreanHolidaysForYear;
+  return typeof f === 'function' ? f(year) : [];
+}
+function getFooterFamilyLinks() {
+  return __gatherUiDeps().FOOTER_FAMILY_LINKS || [];
+}
+
+/* __fb() bridge */
+function __fb() {
+  const deps = __gatherUiDeps();
+  if (deps && typeof deps.getDb === 'function') {
+    try { const d = deps.getDb(); if (d) return d; } catch (e) {}
+  }
+  return (typeof window !== 'undefined' && window.__gatherFirebaseDb) || null;
+}
+
+function getStoredChatParticipantId(...args) {
+  const fn = (window.GATHER_APP_NOTIFICATIONS || {}).getStoredChatParticipantId;
+  return typeof fn === 'function' ? fn(...args) : '';
+}
+function setStoredChatParticipantId(...args) {
+  const fn = (window.GATHER_APP_NOTIFICATIONS || {}).setStoredChatParticipantId;
+  return typeof fn === 'function' ? fn(...args) : undefined;
+}
+
+function extractExpenseTimePrefix(...args) {
+  const f = __gatherUiDeps().extractExpenseTimePrefix || GATHER_APP_UTILS.extractExpenseTimePrefix;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function extractFirstUrl(...args) {
+  const f = __gatherUiDeps().extractFirstUrl || GATHER_APP_UTILS.extractFirstUrl;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function extractLeadingMemoDate(...args) {
+  const f = __gatherUiDeps().extractLeadingMemoDate || GATHER_APP_UTILS.extractLeadingMemoDate;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function formatChatDividerDate(...args) {
+  const f = __gatherUiDeps().formatChatDividerDate || GATHER_APP_UTILS.formatChatDividerDate;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function formatChatTime(...args) {
+  const f = __gatherUiDeps().formatChatTime || GATHER_APP_UTILS.formatChatTime;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function formatCommentDate(...args) {
+  const f = __gatherUiDeps().formatCommentDate || GATHER_APP_UTILS.formatCommentDate;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function formatDateWithDayName(...args) {
+  const f = __gatherUiDeps().formatDateWithDayName || GATHER_APP_UTILS.formatDateWithDayName;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function formatPlaceBadgeDate(...args) {
+  const f = __gatherUiDeps().formatPlaceBadgeDate || GATHER_APP_UTILS.formatPlaceBadgeDate;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function formatPollDeadline(...args) {
+  const f = __gatherUiDeps().formatPollDeadline || GATHER_APP_UTILS.formatPollDeadline;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function formatRegisteredAt(...args) {
+  const f = __gatherUiDeps().formatRegisteredAt || GATHER_APP_UTILS.formatRegisteredAt;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function formatShortDateWithDayName(...args) {
+  const f = __gatherUiDeps().formatShortDateWithDayName || GATHER_APP_UTILS.formatShortDateWithDayName;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getActivePollOptions(...args) {
+  const f = __gatherUiDeps().getActivePollOptions || GATHER_APP_UTILS.getActivePollOptions;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getActivityLogStamp(...args) {
+  const f = __gatherUiDeps().getActivityLogStamp || GATHER_APP_UTILS.getActivityLogStamp;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getContrastTextColor(...args) {
+  const f = __gatherUiDeps().getContrastTextColor || GATHER_APP_UTILS.getContrastTextColor;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getDisplayExpenseCategory(...args) {
+  const f = __gatherUiDeps().getDisplayExpenseCategory || GATHER_APP_UTILS.getDisplayExpenseCategory;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getDisplayPlaceAddress(...args) {
+  const f = __gatherUiDeps().getDisplayPlaceAddress || GATHER_APP_UTILS.getDisplayPlaceAddress;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getExpenseCategories(...args) {
+  const f = __gatherUiDeps().getExpenseCategories || GATHER_APP_UTILS.getExpenseCategories;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getExpenseCategory(...args) {
+  const f = __gatherUiDeps().getExpenseCategory || GATHER_APP_UTILS.getExpenseCategory;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getExpenseCategoryIcon(...args) {
+  const f = __gatherUiDeps().getExpenseCategoryIcon || GATHER_APP_UTILS.getExpenseCategoryIcon;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getExpenseCategoryLabel(...args) {
+  const f = __gatherUiDeps().getExpenseCategoryLabel || GATHER_APP_UTILS.getExpenseCategoryLabel;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getPlaceCategoryById(...args) {
+  const f = __gatherUiDeps().getPlaceCategoryById || GATHER_APP_UTILS.getPlaceCategoryById;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getPlaceCategoryIcon(...args) {
+  const f = __gatherUiDeps().getPlaceCategoryIcon || GATHER_APP_UTILS.getPlaceCategoryIcon;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getPlaceCategoryLabel(...args) {
+  const f = __gatherUiDeps().getPlaceCategoryLabel || GATHER_APP_UTILS.getPlaceCategoryLabel;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function isDomesticLatLng(...args) {
+  const f = __gatherUiDeps().isDomesticLatLng || GATHER_APP_UTILS.isDomesticLatLng;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function isExpenseIncomeEntry(...args) {
+  const f = __gatherUiDeps().isExpenseIncomeEntry || GATHER_APP_UTILS.isExpenseIncomeEntry;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function isInternalTestCalendarId(...args) {
+  const f = __gatherUiDeps().isInternalTestCalendarId || GATHER_APP_UTILS.isInternalTestCalendarId;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function isPollClosed(...args) {
+  const f = __gatherUiDeps().isPollClosed || GATHER_APP_UTILS.isPollClosed;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function isTombstone(...args) {
+  const f = __gatherUiDeps().isTombstone || GATHER_APP_UTILS.isTombstone;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function isValidCalendarId(...args) {
+  const f = __gatherUiDeps().isValidCalendarId || GATHER_APP_UTILS.isValidCalendarId;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function isValidDateString(...args) {
+  const f = __gatherUiDeps().isValidDateString || GATHER_APP_UTILS.isValidDateString;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function normalizeColorValue(...args) {
+  const f = __gatherUiDeps().normalizeColorValue || GATHER_APP_UTILS.normalizeColorValue;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function normalizeExpenseCategories(...args) {
+  const f = __gatherUiDeps().normalizeExpenseCategories || GATHER_APP_UTILS.normalizeExpenseCategories;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function normalizePlaceAddressForSave(...args) {
+  const f = __gatherUiDeps().normalizePlaceAddressForSave || GATHER_APP_UTILS.normalizePlaceAddressForSave;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function normalizePlaceCategories(...args) {
+  const f = __gatherUiDeps().normalizePlaceCategories || GATHER_APP_UTILS.normalizePlaceCategories;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function normalizePlaceDateForSort(...args) {
+  const f = __gatherUiDeps().normalizePlaceDateForSort || GATHER_APP_UTILS.normalizePlaceDateForSort;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function parseVisitEntriesFromMemo(...args) {
+  const f = __gatherUiDeps().parseVisitEntriesFromMemo || GATHER_APP_UTILS.parseVisitEntriesFromMemo;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function reformatMemoIntoDateLines(...args) {
+  const f = __gatherUiDeps().reformatMemoIntoDateLines || GATHER_APP_UTILS.reformatMemoIntoDateLines;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function removeFirstUrl(...args) {
+  const f = __gatherUiDeps().removeFirstUrl || GATHER_APP_UTILS.removeFirstUrl;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function sortVisitEntriesRecentFirst(...args) {
+  const f = __gatherUiDeps().sortVisitEntriesRecentFirst || GATHER_APP_UTILS.sortVisitEntriesRecentFirst;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function trimLatLngOutliers(...args) {
+  const f = __gatherUiDeps().trimLatLngOutliers || GATHER_APP_UTILS.trimLatLngOutliers;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+
+function appendChatImageFiles(...args) {
+  const f = __gatherUiDeps().appendChatImageFiles || GATHER_APP_UTILS.appendChatImageFiles;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function autoGrowTextarea(...args) {
+  const f = __gatherUiDeps().autoGrowTextarea || GATHER_APP_UTILS.autoGrowTextarea;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function buildActivityLogsFromAvailabilities(...args) {
+  const f = __gatherUiDeps().buildActivityLogsFromAvailabilities || GATHER_APP_UTILS.buildActivityLogsFromAvailabilities;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function buildAdminDashboardMetrics(...args) {
+  const f = __gatherUiDeps().buildAdminDashboardMetrics || GATHER_APP_UTILS.buildAdminDashboardMetrics;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function buildFieldChangeNote(...args) {
+  const f = __gatherUiDeps().buildFieldChangeNote || GATHER_APP_UTILS.buildFieldChangeNote;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function changeAdminPasswordRemote(...args) {
+  const f = __gatherUiDeps().changeAdminPasswordRemote || GATHER_APP_UTILS.changeAdminPasswordRemote;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function clearAdminSession(...args) {
+  const f = __gatherUiDeps().clearAdminSession || GATHER_APP_UTILS.clearAdminSession;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function cloneCalendarList(...args) {
+  const f = __gatherUiDeps().cloneCalendarList || GATHER_APP_UTILS.cloneCalendarList;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function computeCalendarSearchMatches(...args) {
+  const f = __gatherUiDeps().computeCalendarSearchMatches || GATHER_APP_UTILS.computeCalendarSearchMatches;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function createCalendarBackupPayload(...args) {
+  const f = __gatherUiDeps().createCalendarBackupPayload || GATHER_APP_UTILS.createCalendarBackupPayload;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function createDefaultCalendar(...args) {
+  const f = __gatherUiDeps().createDefaultCalendar || GATHER_APP_UTILS.createDefaultCalendar;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function createMemoActivityLog(...args) {
+  const f = __gatherUiDeps().createMemoActivityLog || GATHER_APP_UTILS.createMemoActivityLog;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function createPollActivityLog(...args) {
+  const f = __gatherUiDeps().createPollActivityLog || GATHER_APP_UTILS.createPollActivityLog;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function deleteActivityLogsAfterTimestamp(...args) {
+  const f = __gatherUiDeps().deleteActivityLogsAfterTimestamp || GATHER_APP_UTILS.deleteActivityLogsAfterTimestamp;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function deleteAllChatImagesFromStorage(...args) {
+  const f = __gatherUiDeps().deleteAllChatImagesFromStorage || GATHER_APP_UTILS.deleteAllChatImagesFromStorage;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function deleteMessageRest(...args) {
+  const f = __gatherUiDeps().deleteMessageRest || GATHER_APP_UTILS.deleteMessageRest;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function describeImageProcessingFailures(...args) {
+  const f = __gatherUiDeps().describeImageProcessingFailures || GATHER_APP_UTILS.describeImageProcessingFailures;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function doesPlaceMatchDate(...args) {
+  const f = __gatherUiDeps().doesPlaceMatchDate || GATHER_APP_UTILS.doesPlaceMatchDate;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function downloadJsonFile(...args) {
+  const f = __gatherUiDeps().downloadJsonFile || GATHER_APP_UTILS.downloadJsonFile;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function exportCalendarConfirmedMeetingsToICS(...args) {
+  const f = __gatherUiDeps().exportCalendarConfirmedMeetingsToICS || GATHER_APP_UTILS.exportCalendarConfirmedMeetingsToICS;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function extractCalendarsFromBackup(...args) {
+  const f = __gatherUiDeps().extractCalendarsFromBackup || GATHER_APP_UTILS.extractCalendarsFromBackup;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function fetchActivityLogsFromFirestore(...args) {
+  const f = __gatherUiDeps().fetchActivityLogsFromFirestore || GATHER_APP_UTILS.fetchActivityLogsFromFirestore;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function fetchChatMessagesRest(...args) {
+  const f = __gatherUiDeps().fetchChatMessagesRest || GATHER_APP_UTILS.fetchChatMessagesRest;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function fetchImageShareDocument(...args) {
+  const f = __gatherUiDeps().fetchImageShareDocument || GATHER_APP_UTILS.fetchImageShareDocument;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function fetchRecentMessagesRest(...args) {
+  const f = __gatherUiDeps().fetchRecentMessagesRest || GATHER_APP_UTILS.fetchRecentMessagesRest;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function fetchSingleCalendarWithRest(...args) {
+  const f = __gatherUiDeps().fetchSingleCalendarWithRest || GATHER_APP_UTILS.fetchSingleCalendarWithRest;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function fetchSubcollectionCount(...args) {
+  const f = __gatherUiDeps().fetchSubcollectionCount || GATHER_APP_UTILS.fetchSubcollectionCount;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function fetchWithTimeout(...args) {
+  const f = __gatherUiDeps().fetchWithTimeout || GATHER_APP_UTILS.fetchWithTimeout;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function formatLogTimestamp(...args) {
+  const f = __gatherUiDeps().formatLogTimestamp || GATHER_APP_UTILS.formatLogTimestamp;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getAdminSearchFilterFromUrl(...args) {
+  const f = __gatherUiDeps().getAdminSearchFilterFromUrl || GATHER_APP_UTILS.getAdminSearchFilterFromUrl;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getAdminSearchQueryFromUrl(...args) {
+  const f = __gatherUiDeps().getAdminSearchQueryFromUrl || GATHER_APP_UTILS.getAdminSearchQueryFromUrl;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getAdminSearchResultTargetUrl(...args) {
+  const f = __gatherUiDeps().getAdminSearchResultTargetUrl || GATHER_APP_UTILS.getAdminSearchResultTargetUrl;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getAdminSelectedCalendarIdFromUrl(...args) {
+  const f = __gatherUiDeps().getAdminSelectedCalendarIdFromUrl || GATHER_APP_UTILS.getAdminSelectedCalendarIdFromUrl;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getAdminSession(...args) {
+  const f = __gatherUiDeps().getAdminSession || GATHER_APP_UTILS.getAdminSession;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getImageFilesFromClipboardEvent(...args) {
+  const f = __gatherUiDeps().getImageFilesFromClipboardEvent || GATHER_APP_UTILS.getImageFilesFromClipboardEvent;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getKnownPlaceParticipantNames(...args) {
+  const f = __gatherUiDeps().getKnownPlaceParticipantNames || GATHER_APP_UTILS.getKnownPlaceParticipantNames;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getPlaceCategoryMarkerContent(...args) {
+  const f = __gatherUiDeps().getPlaceCategoryMarkerContent || GATHER_APP_UTILS.getPlaceCategoryMarkerContent;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getSolarFromLunar(...args) {
+  const f = __gatherUiDeps().getSolarFromLunar || GATHER_APP_UTILS.getSolarFromLunar;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getWeatherIcon(...args) {
+  const f = __gatherUiDeps().getWeatherIcon || GATHER_APP_UTILS.getWeatherIcon;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function isAdminRestoreRoute(...args) {
+  const f = __gatherUiDeps().isAdminRestoreRoute || GATHER_APP_UTILS.isAdminRestoreRoute;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function listAllCalendarsRemote(...args) {
+  const f = __gatherUiDeps().listAllCalendarsRemote || GATHER_APP_UTILS.listAllCalendarsRemote;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function mergeCalendarCollections(...args) {
+  const f = __gatherUiDeps().mergeCalendarCollections || GATHER_APP_UTILS.mergeCalendarCollections;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function mergePollRecord(...args) {
+  const f = __gatherUiDeps().mergePollRecord || GATHER_APP_UTILS.mergePollRecord;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function normalizeCalendarForSave(...args) {
+  const f = __gatherUiDeps().normalizeCalendarForSave || GATHER_APP_UTILS.normalizeCalendarForSave;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function normalizePollOptionInput(...args) {
+  const f = __gatherUiDeps().normalizePollOptionInput || GATHER_APP_UTILS.normalizePollOptionInput;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function processImageFilesSequentially(...args) {
+  const f = __gatherUiDeps().processImageFilesSequentially || GATHER_APP_UTILS.processImageFilesSequentially;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function pushSingleCloudCalendar(...args) {
+  const f = __gatherUiDeps().pushSingleCloudCalendar || GATHER_APP_UTILS.pushSingleCloudCalendar;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function resolveMemoImageBatch(...args) {
+  const f = __gatherUiDeps().resolveMemoImageBatch || GATHER_APP_UTILS.resolveMemoImageBatch;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function sanitizeMemoForFirestore(...args) {
+  const f = __gatherUiDeps().sanitizeMemoForFirestore || GATHER_APP_UTILS.sanitizeMemoForFirestore;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function setAdminSession(...args) {
+  const f = __gatherUiDeps().setAdminSession || GATHER_APP_UTILS.setAdminSession;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function sha256Hex(...args) {
+  const f = __gatherUiDeps().sha256Hex || GATHER_APP_UTILS.sha256Hex;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function subscribeUserToPushWithPermission(...args) {
+  const f = __gatherUiDeps().subscribeUserToPushWithPermission || GATHER_APP_UTILS.subscribeUserToPushWithPermission;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function translateKoreanToEnglish(...args) {
+  const f = __gatherUiDeps().translateKoreanToEnglish || GATHER_APP_UTILS.translateKoreanToEnglish;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function unsubscribeUserFromPush(...args) {
+  const f = __gatherUiDeps().unsubscribeUserFromPush || GATHER_APP_UTILS.unsubscribeUserFromPush;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function validateBackupCalendars(...args) {
+  const f = __gatherUiDeps().validateBackupCalendars || GATHER_APP_UTILS.validateBackupCalendars;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function validateCalendarShape(...args) {
+  const f = __gatherUiDeps().validateCalendarShape || GATHER_APP_UTILS.validateCalendarShape;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function verifyAdminPasswordRemote(...args) {
+  const f = __gatherUiDeps().verifyAdminPasswordRemote || GATHER_APP_UTILS.verifyAdminPasswordRemote;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+
+const ADMIN_MESSAGE_LIVE_LIMIT = (__gatherUiDeps().ADMIN_MESSAGE_LIVE_LIMIT
+  || (window.__GATHER_ADMIN_LIMITS && window.__GATHER_ADMIN_LIMITS.ADMIN_MESSAGE_LIVE_LIMIT)
+  || 50);
+const ADMIN_MEMO_LIVE_LIMIT = (__gatherUiDeps().ADMIN_MEMO_LIVE_LIMIT
+  || (window.__GATHER_ADMIN_LIMITS && window.__GATHER_ADMIN_LIMITS.ADMIN_MEMO_LIVE_LIMIT)
+  || 50);
+
+const PEEKALINK_HOUR_BUCKET_MS = Number.isFinite(GATHER_APP_CHAT_DATA.PEEKALINK_HOUR_BUCKET_MS) ? GATHER_APP_CHAT_DATA.PEEKALINK_HOUR_BUCKET_MS : 3600000;
+const PEEKALINK_FREE_HOURLY_LIMIT = Number.isFinite(GATHER_APP_CHAT_DATA.PEEKALINK_FREE_HOURLY_LIMIT) ? GATHER_APP_CHAT_DATA.PEEKALINK_FREE_HOURLY_LIMIT : 50;
+const ENABLE_FIRESTORE_WRITES = (window.GATHER_APP_CONFIG || {}).ENABLE_FIRESTORE_WRITES !== false;
+const GLOBAL_SEARCH_HISTORY_LIMIT = 100;
+const EXPENSE_ACTIVITY_ACTIONS = GATHER_APP_CONSTANTS.EXPENSE_ACTIVITY_ACTIONS || [];
+const IMAGE_TAG_ACTIVITY_ACTIONS = GATHER_APP_CONSTANTS.IMAGE_TAG_ACTIVITY_ACTIONS || [];
+const MEETING_ACTIVITY_ACTIONS = GATHER_APP_CONSTANTS.MEETING_ACTIVITY_ACTIONS || [];
+const PLACE_ACTIVITY_ACTIONS = GATHER_APP_CONSTANTS.PLACE_ACTIVITY_ACTIONS || [];
+const POLL_ACTIVITY_ACTIONS = GATHER_APP_CONSTANTS.POLL_ACTIVITY_ACTIONS || [];
+const KAKAO_CATEGORY_GROUP_TO_PLACE_CATEGORY = GATHER_APP_CONSTANTS.KAKAO_CATEGORY_GROUP_TO_PLACE_CATEGORY || {};
+const KOREAN_LUNAR_HOLIDAY_DATES = GATHER_APP_CALENDAR_DATA.KOREAN_LUNAR_HOLIDAY_DATES || {};
+const KOREAN_TEMPORARY_HOLIDAYS = GATHER_APP_CALENDAR_DATA.KOREAN_TEMPORARY_HOLIDAYS || [];
+const KOREAN_FIXED_HOLIDAYS = GATHER_APP_CALENDAR_DATA.KOREAN_FIXED_HOLIDAYS || [];
+const KOREAN_SOLAR_TERMS = GATHER_APP_CALENDAR_DATA.KOREAN_SOLAR_TERMS || [];
+const MONTH_NAMES = GATHER_APP_CALENDAR_DATA.MONTH_NAMES || ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+const PRESET_COLORS = GATHER_APP_CONSTANTS.PRESET_COLORS || [];
+const DEFAULT_EXPENSE_CATEGORIES = GATHER_APP_CONSTANTS.DEFAULT_EXPENSE_CATEGORIES || [];
+const DEFAULT_PLACE_CATEGORIES = GATHER_APP_CONSTANTS.DEFAULT_PLACE_CATEGORIES || GATHER_APP_UTILS.DEFAULT_PLACE_CATEGORIES || [];
+const EMOJI_CATEGORIES = GATHER_APP_CONSTANTS.EMOJI_CATEGORIES || [];
+const INCOME_EXPENSE_CATEGORY = GATHER_APP_UTILS.INCOME_EXPENSE_CATEGORY || { id: 'income', name: '수입', color: '#16A34A' };
+const PLACE_MAP_DEFAULT_CENTER = __gatherUiDeps().PLACE_MAP_DEFAULT_CENTER || [37.5665, 126.978];
+const PLACE_MAP_DEFAULT_ZOOM = __gatherUiDeps().PLACE_MAP_DEFAULT_ZOOM || 11;
+const PLACE_MARKER_SIZE = __gatherUiDeps().PLACE_MARKER_SIZE || 28;
+const CONFETTI_Z_INDEX = 9999;
+const DEADLINE_PICKER_MONTH_NAMES = GATHER_APP_CALENDAR_DATA.MONTH_NAMES || ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+
+function getKoreanSolarTermsForYear(...args) {
+  const f = __gatherUiDeps().getKoreanSolarTermsForYear || GATHER_APP_UTILS.getKoreanSolarTermsForYear;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function useTapRevealedMsgId(...args) {
+  const f = __gatherUiDeps().useTapRevealedMsgId || GATHER_APP_UTILS.useTapRevealedMsgId;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getTrulyConfirmedMeetings(...args) {
+  const f = __gatherUiDeps().getTrulyConfirmedMeetings || GATHER_APP_UTILS.getTrulyConfirmedMeetings;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getConfirmedMeetings(...args) {
+  const f = __gatherUiDeps().getConfirmedMeetings || GATHER_APP_UTILS.getConfirmedMeetings;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getHolidayNamesForDate(...args) {
+  const f = __gatherUiDeps().getHolidayNamesForDate || GATHER_APP_UTILS.getHolidayNamesForDate;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getAnniversariesForDate(...args) {
+  const f = __gatherUiDeps().getAnniversariesForDate || GATHER_APP_UTILS.getAnniversariesForDate;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getPinnedNotices(...args) {
+  const f = __gatherUiDeps().getPinnedNotices || GATHER_APP_UTILS.getPinnedNotices;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getMessageImageEntries(...args) {
+  const f = __gatherUiDeps().getMessageImageEntries || GATHER_APP_UTILS.getMessageImageEntries;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getMessageDirectMediaEntry(...args) {
+  const f = __gatherUiDeps().getMessageDirectMediaEntry || GATHER_APP_UTILS.getMessageDirectMediaEntry;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function renderTextWithUrlBadge(...args) {
+  const f = __gatherUiDeps().renderTextWithUrlBadge || GATHER_APP_UTILS.renderTextWithUrlBadge;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function renderChatMessageBody(...args) {
+  const f = __gatherUiDeps().renderChatMessageBody || GATHER_APP_UTILS.renderChatMessageBody;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function parseTextWithLinks(...args) {
+  const f = __gatherUiDeps().parseTextWithLinks || GATHER_APP_UTILS.parseTextWithLinks;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function highlightKeyword(...args) {
+  const f = __gatherUiDeps().highlightKeyword || GATHER_APP_UTILS.highlightKeyword;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function highlightTextWithYellowMarker(...args) {
+  const f = __gatherUiDeps().highlightTextWithYellowMarker || GATHER_APP_UTILS.highlightTextWithYellowMarker;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function copyTextToClipboard(...args) {
+  const f = __gatherUiDeps().copyTextToClipboard || GATHER_APP_UTILS.copyTextToClipboard;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getCalendarShareUrl(...args) {
+  const f = __gatherUiDeps().getCalendarShareUrl || GATHER_APP_UTILS.getCalendarShareUrl;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getViewShareUrl(...args) {
+  const f = __gatherUiDeps().getViewShareUrl || GATHER_APP_UTILS.getViewShareUrl;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getMemoItemShareUrl(...args) {
+  const f = __gatherUiDeps().getMemoItemShareUrl || GATHER_APP_UTILS.getMemoItemShareUrl;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function buildLightboxImageInfo(...args) {
+  const f = __gatherUiDeps().buildLightboxImageInfo || GATHER_APP_UTILS.buildLightboxImageInfo;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function normalizeTagsForDisplay(...args) {
+  const f = __gatherUiDeps().normalizeTagsForDisplay || GATHER_APP_UTILS.normalizeTagsForDisplay;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getRecentEmojis(...args) {
+  const f = __gatherUiDeps().getRecentEmojis || GATHER_APP_UTILS.getRecentEmojis;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function addRecentEmoji(...args) {
+  const f = __gatherUiDeps().addRecentEmoji || GATHER_APP_UTILS.addRecentEmoji;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function fetchLinkPreview(...args) {
+  const f = __gatherUiDeps().fetchLinkPreview || GATHER_APP_UTILS.fetchLinkPreview;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function useLinkPreview(...args) {
+  const f = __gatherUiDeps().useLinkPreview || GATHER_APP_UTILS.useLinkPreview;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function useScrollHideHeader(...args) {
+  const f = __gatherUiDeps().useScrollHideHeader || GATHER_APP_UTILS.useScrollHideHeader;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function loadLeaflet(...args) {
+  const f = __gatherUiDeps().loadLeaflet || GATHER_APP_UTILS.loadLeaflet;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function loadLeafletMarkerCluster(...args) {
+  const f = __gatherUiDeps().loadLeafletMarkerCluster || GATHER_APP_UTILS.loadLeafletMarkerCluster;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function buildPlaceMarkerHtml(...args) {
+  const f = __gatherUiDeps().buildPlaceMarkerHtml || GATHER_APP_UTILS.buildPlaceMarkerHtml;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function panMapToFitMarkerPopup(...args) {
+  const f = __gatherUiDeps().panMapToFitMarkerPopup || GATHER_APP_UTILS.panMapToFitMarkerPopup;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getPlaceCategories(...args) {
+  const f = __gatherUiDeps().getPlaceCategories || GATHER_APP_UTILS.getPlaceCategories;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getPlaceSortDateKey(...args) {
+  const f = __gatherUiDeps().getPlaceSortDateKey || GATHER_APP_UTILS.getPlaceSortDateKey;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getPlaceExternalMapUrl(...args) {
+  const f = __gatherUiDeps().getPlaceExternalMapUrl || GATHER_APP_UTILS.getPlaceExternalMapUrl;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function extractKnownParticipantNames(...args) {
+  const f = __gatherUiDeps().extractKnownParticipantNames || GATHER_APP_UTILS.extractKnownParticipantNames;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getChatLastReadTimestamp(...args) {
+  const f = __gatherUiDeps().getChatLastReadTimestamp || GATHER_APP_UTILS.getChatLastReadTimestamp;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function setChatLastReadTimestamp(...args) {
+  const f = __gatherUiDeps().setChatLastReadTimestamp || GATHER_APP_UTILS.setChatLastReadTimestamp;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function isDateConfirmedMeeting(...args) {
+  const f = __gatherUiDeps().isDateConfirmedMeeting || GATHER_APP_UTILS.isDateConfirmedMeeting;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function calculateDday(...args) {
+  const f = __gatherUiDeps().calculateDday || GATHER_APP_UTILS.calculateDday;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function formatChatHeaderTitle(...args) {
+  const f = __gatherUiDeps().formatChatHeaderTitle || GATHER_APP_UTILS.formatChatHeaderTitle;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getShortTitleParts(...args) {
+  const f = __gatherUiDeps().getShortTitleParts || GATHER_APP_UTILS.getShortTitleParts;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function isEmojiOnlyChatText(...args) {
+  const f = __gatherUiDeps().isEmojiOnlyChatText || GATHER_APP_UTILS.isEmojiOnlyChatText;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function twemojiImageUrl(...args) {
+  const f = __gatherUiDeps().twemojiImageUrl || GATHER_APP_UTILS.twemojiImageUrl;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getDirectChatMediaInfo(...args) {
+  const f = __gatherUiDeps().getDirectChatMediaInfo || GATHER_APP_UTILS.getDirectChatMediaInfo;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getPollOptionVoterIds(...args) {
+  const f = __gatherUiDeps().getPollOptionVoterIds || GATHER_APP_UTILS.getPollOptionVoterIds;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getPollTotalVoteCount(...args) {
+  const f = __gatherUiDeps().getPollTotalVoteCount || GATHER_APP_UTILS.getPollTotalVoteCount;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getCalendarActivityLogs(...args) {
+  const f = __gatherUiDeps().getCalendarActivityLogs || GATHER_APP_UTILS.getCalendarActivityLogs;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getCalendarAccentColor(...args) {
+  const f = __gatherUiDeps().getCalendarAccentColor || GATHER_APP_UTILS.getCalendarAccentColor;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getAnniversaryDisplayColor(...args) {
+  const f = __gatherUiDeps().getAnniversaryDisplayColor || GATHER_APP_UTILS.getAnniversaryDisplayColor;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+
+
+export function DateModal({
   anniversaries = [],
   dateStr,
   calendar,
@@ -12,6 +678,8 @@ function DateModal({
   onSaveExpense,
   onDeleteExpense,
   onReorderExpenses,
+  onAddMeetingPhotos,
+  onDeleteMeetingPhoto,
   onSavePlace,
   onDeletePlace,
   onDelete,
@@ -255,6 +923,18 @@ function DateModal({
       setPlaceVisitStatus('visited');
       setEditingLinkedPlaceId(null);
       setPlaceQuery('');
+      setHasInteracted(false);
+      const resetPlaceCat = getPlaceCategories(calendar)[0]?.id || 'etc';
+      snapshotFormBaseline({
+        ...formBaselineRef.current,
+        editingLinkedPlaceId: null,
+        placeMemo: '',
+        placeAlias: '',
+        placeQuery: '',
+        selectedPlaceKey: '',
+        placeCategoryId: resetPlaceCat,
+        placeVisitStatus: 'visited'
+      });
     } catch (err) {
       console.error('Save place error:', err);
       showToast('장소 추가 실패', 'error');
@@ -276,7 +956,7 @@ function DateModal({
       return;
     }
     setIsSubmitting(true);
-    const cleanNote = sanitizeText(note, 60);
+    const cleanNote = sanitizeText(note, 500);
     const ok = await onSave(dateStr, participantId, cleanNote);
     setIsSubmitting(false);
     if (ok !== false) {
@@ -284,12 +964,22 @@ function DateModal({
       showToast(wasEdit ? '참석 정보가 수정되었습니다.' : '참석이 추가되었습니다.', 'success');
       setParticipantId('');
       setNote('');
+      setHasInteracted(false);
+      snapshotFormBaseline({ ...formBaselineRef.current, participantId: '', note: '' });
     }
   };
 
   const handleEditClick = (entry) => {
-    setParticipantId(entry.participantId);
-    setNote(entry.note || '');
+    const pid = entry.participantId;
+    const n = entry.note || '';
+    setParticipantId(pid);
+    setNote(n);
+    setHasInteracted(false);
+    snapshotFormBaseline({
+      ...formBaselineRef.current,
+      participantId: pid,
+      note: n
+    });
     if (noteInputRef.current) {
       noteInputRef.current.focus();
     }
@@ -328,6 +1018,15 @@ function DateModal({
   const isAllAvailable = totalPartCount > 0 && uniqueActiveParts.size === totalPartCount;
   const isConfirmed = isDateConfirmedMeeting(calendar, dateStr);
   const confirmedMeetingEntry = getConfirmedMeetings(calendar).find(m => m.date === dateStr) || null;
+  const meetingPhotos = React.useMemo(
+    () => (Array.isArray(confirmedMeetingEntry?.photos) ? confirmedMeetingEntry.photos : [])
+      .filter(photo => photo && (photo.imageUrl || photo.thumbUrl))
+      .slice()
+      .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)),
+    [confirmedMeetingEntry]
+  );
+  const meetingPhotoInputRef = React.useRef(null);
+  const [isSavingMeetingPhotos, setIsSavingMeetingPhotos] = React.useState(false);
   const expenses = React.useMemo(
     () => (Array.isArray(confirmedMeetingEntry?.expenses) ? confirmedMeetingEntry.expenses : [])
       .filter(e => e && typeof e === 'object' && e.id)
@@ -360,7 +1059,39 @@ function DateModal({
     setDraggingExpenseId('');
     setDragOverExpenseId('');
     expensePointerSortRef.current = { sourceId: '', targetId: '', startX: 0, startY: 0, active: false };
+    setIsSavingMeetingPhotos(false);
   }, [calendar?.id, dateStr]);
+
+  const handleMeetingPhotoFiles = async event => {
+    const files = Array.from(event.target.files || []);
+    event.target.value = '';
+    if (!files.length || typeof onAddMeetingPhotos !== 'function') return;
+    setIsSavingMeetingPhotos(true);
+    try {
+      const ok = await Promise.resolve(onAddMeetingPhotos(dateStr, files));
+      if (ok !== false) showToast('일정 사진이 추가되었습니다.', 'success');
+      else showToast('사진 추가 실패', 'error');
+    } catch (err) {
+      console.error('Meeting photo upload failed:', err);
+      showToast('사진 추가 실패', 'error');
+    } finally {
+      setIsSavingMeetingPhotos(false);
+    }
+  };
+
+  const handleDeleteMeetingPhoto = photo => {
+    if (!photo?.id || typeof onDeleteMeetingPhoto !== 'function') return;
+    onRequestConfirm('일정 사진 삭제', '이 일정 사진을 삭제하시겠습니까?', async () => {
+      setIsSavingMeetingPhotos(true);
+      try {
+        const ok = await Promise.resolve(onDeleteMeetingPhoto(dateStr, photo.id));
+        if (ok !== false) showToast('사진이 삭제되었습니다.', 'success');
+        else showToast('사진 삭제 실패', 'error');
+      } finally {
+        setIsSavingMeetingPhotos(false);
+      }
+    });
+  };
 
   const expenseTotal = expenses.reduce((sum, e) => sum + (Number(e?.amount) || 0), 0);
   const expenseCategories = getExpenseCategories(calendar) || [];
@@ -383,11 +1114,25 @@ function DateModal({
   };
   const handleExpenseItemClick = expense => {
     if (isSavingExpense) return;
-    setEditingExpenseId(expense.id);
-    setExpenseLabelInput(getExpenseLabel(expense));
-    setExpenseIsIncome(Number(expense.amount) < 0);
-    setExpenseAmountInput(Math.abs(Number(expense.amount)).toLocaleString());
-    setExpenseCategoryInput(expense.categoryId || 'etc');
+    const eid = expense.id;
+    const label = getExpenseLabel(expense);
+    const isIncome = Number(expense.amount) < 0;
+    const amountStr = Math.abs(Number(expense.amount)).toLocaleString();
+    const cat = expense.categoryId || 'etc';
+    setEditingExpenseId(eid);
+    setExpenseLabelInput(label);
+    setExpenseIsIncome(isIncome);
+    setExpenseAmountInput(amountStr);
+    setExpenseCategoryInput(cat);
+    setHasInteracted(false);
+    snapshotFormBaseline({
+      ...formBaselineRef.current,
+      editingExpenseId: eid,
+      expenseLabelInput: label,
+      expenseAmountInput: amountStr,
+      expenseIsIncome: isIncome,
+      expenseCategoryInput: cat
+    });
   };
   const handleSaveExpenseClick = async () => {
     if (!onSaveExpense) return;
@@ -416,6 +1161,17 @@ function DateModal({
       setExpenseLabelInput('');
       setExpenseAmountInput('');
       setExpenseIsIncome(false);
+      setHasInteracted(false);
+      const resetExpCat = getExpenseCategories(calendar)[0]?.id || 'etc';
+      setExpenseCategoryInput(resetExpCat);
+      snapshotFormBaseline({
+        ...formBaselineRef.current,
+        editingExpenseId: null,
+        expenseLabelInput: '',
+        expenseAmountInput: '',
+        expenseIsIncome: false,
+        expenseCategoryInput: resetExpCat
+      });
     }
   };
   const handleDeleteExpenseClick = (e, expenseId) => {
@@ -592,13 +1348,79 @@ function DateModal({
   const finishExpensePointerSort = e => expenseDragHandlersRef.current.finish(e);
   const resetExpensePointerSort = () => expenseDragHandlersRef.current.reset();
 
+  // Close-confirm only when form differs from last committed baseline.
+  // Baseline: mount (real defaults), edit-load, successful save.
+  const formBaselineRef = React.useRef(null);
+  const placeKeyOf = (sp) => {
+    if (!sp) return '';
+    return String(sp.id || '') + '|' + String(sp.name || '') + '|' + String(sp.lat || '') + '|' + String(sp.lng || '');
+  };
+  const snapshotFormBaseline = React.useCallback((overrides = {}) => {
+    formBaselineRef.current = {
+      participantId: '',
+      note: '',
+      editingLinkedPlaceId: null,
+      placeMemo: '',
+      placeAlias: '',
+      placeQuery: '',
+      selectedPlaceKey: '',
+      placeCategoryId: getPlaceCategories(calendar)[0]?.id || 'etc',
+      placeVisitStatus: 'visited',
+      editingExpenseId: null,
+      expenseLabelInput: '',
+      expenseAmountInput: '',
+      expenseIsIncome: false,
+      expenseCategoryInput: getExpenseCategories(calendar)[0]?.id || 'etc',
+      ...overrides
+    };
+  }, [calendar]);
+  React.useLayoutEffect(() => {
+    snapshotFormBaseline({
+      participantId: '',
+      note: '',
+      editingLinkedPlaceId: null,
+      placeMemo: '',
+      placeAlias: '',
+      placeQuery: '',
+      selectedPlaceKey: '',
+      placeCategoryId: placeCategoryId || getPlaceCategories(calendar)[0]?.id || 'etc',
+      placeVisitStatus: placeVisitStatus || 'visited',
+      editingExpenseId: null,
+      expenseLabelInput: '',
+      expenseAmountInput: '',
+      expenseIsIncome: false,
+      expenseCategoryInput: expenseCategoryInput || getExpenseCategories(calendar)[0]?.id || 'etc'
+    });
+    // mount only
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [hasInteracted, setHasInteracted] = React.useState(false);
   const markDirty = React.useCallback(() => setHasInteracted(true), []);
   const requestClose = () => {
     if (isSubmitting) return;
-    const dirty = hasInteracted || !!participantId || !!String(note || '').trim() || !!selectedPlace || !!String(placeMemo || '').trim() || !!String(expenseLabelInput || '').trim() || !!String(expenseAmountInput || '').trim() || !!editingExpenseId;
+    const b = formBaselineRef.current;
+    if (!b) {
+      onClose();
+      return;
+    }
+    const dirty = (
+      String(participantId || '') !== String(b.participantId || '') ||
+      String(note || '') !== String(b.note || '') ||
+      String(editingLinkedPlaceId || '') !== String(b.editingLinkedPlaceId || '') ||
+      String(placeMemo || '') !== String(b.placeMemo || '') ||
+      String(placeAlias || '') !== String(b.placeAlias || '') ||
+      String(placeQuery || '') !== String(b.placeQuery || '') ||
+      placeKeyOf(selectedPlace) !== String(b.selectedPlaceKey || '') ||
+      String(placeCategoryId || '') !== String(b.placeCategoryId || '') ||
+      String(placeVisitStatus || 'visited') !== String(b.placeVisitStatus || 'visited') ||
+      String(editingExpenseId || '') !== String(b.editingExpenseId || '') ||
+      String(expenseLabelInput || '') !== String(b.expenseLabelInput || '') ||
+      String(expenseAmountInput || '') !== String(b.expenseAmountInput || '') ||
+      !!expenseIsIncome !== !!b.expenseIsIncome ||
+      String(expenseCategoryInput || '') !== String(b.expenseCategoryInput || '')
+    );
     if (dirty && typeof onRequestConfirm === 'function') {
-      onRequestConfirm('닫기 확인', '수정 내용이 있는데 닫으시겠습니까?', () => onClose());
+      onRequestConfirm('닫기 확인', '저장하지 않은 내용이 있습니다. 닫으시겠습니까?', () => onClose());
       return;
     }
     onClose();
@@ -666,7 +1488,7 @@ function DateModal({
     style: {
       background: 'none',
       border: 'none',
-      color: '#64748B',
+      color: 'var(--text-muted)',
       fontSize: '1.25rem',
       cursor: 'pointer',
       display: 'flex',
@@ -820,7 +1642,7 @@ function DateModal({
         /* Participant Picker Button */
         /*#__PURE__*/React.createElement("div", null,
           /*#__PURE__*/React.createElement("label", {
-            style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '6px', color: '#64748B' }
+            style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '6px', color: 'var(--text-muted)' }
           }, "참여자 선택"),
           /*#__PURE__*/React.createElement("button", {
             type: "button",
@@ -836,7 +1658,7 @@ function DateModal({
             },
             disabled: isSubmitting,
             onClick: () => {
-              if (!isSubmitting) { markDirty(); setIsSheetOpen(true); }
+              if (!isSubmitting) { setIsSheetOpen(true); }
             }
           },
             /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, overflow: 'hidden' } },
@@ -872,30 +1694,34 @@ function DateModal({
         /* Note Input Field */
         /*#__PURE__*/React.createElement("div", null,
           /*#__PURE__*/React.createElement("label", {
-            style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '6px', color: '#64748B' }
+            style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '6px', color: 'var(--text-muted)' }
           }, "메모 입력 (선택)"),
-          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px' } },
+          /*#__PURE__*/React.createElement("div", { className: "date-modal-field-with-actions", style: { display: 'flex', gap: '8px' } },
             /*#__PURE__*/React.createElement("input", {
               ref: noteInputRef,
               type: "text",
               className: "form-input",
               style: { flex: 1 },
-              placeholder: "간단한 일정 메모를 남길 수 있습니다 (최대 60자)",
-              maxLength: 60,
+              placeholder: "일정 메모를 남길 수 있습니다 (최대 500자)",
+              maxLength: 500,
               value: note,
               disabled: isSubmitting,
               onChange: e => { markDirty(); setNote(e.target.value); }
             }),
-            /*#__PURE__*/React.createElement(FormAddEditActionButtons, {
-              isEditing: !!participantId && dateEntries.some(en => en.participantId === participantId),
-              isSaving: isSubmitting,
-              disabled: !participantId,
-              onCancel: () => {
-                setParticipantId('');
-                setNote('');
-              },
-              onSubmit: handleSubmit
-            })
+            /*#__PURE__*/React.createElement("div", { className: "date-modal-field-actions" },
+              /*#__PURE__*/React.createElement(FormAddEditActionButtons, {
+                isEditing: !!participantId && dateEntries.some(en => en.participantId === participantId),
+                isSaving: isSubmitting,
+                disabled: !participantId,
+                onCancel: () => {
+                  setParticipantId('');
+                  setNote('');
+                  setHasInteracted(false);
+                  snapshotFormBaseline({ ...formBaselineRef.current, participantId: '', note: '' });
+                },
+                onSubmit: handleSubmit
+              })
+            )
           )
         )
       ),
@@ -905,7 +1731,7 @@ function DateModal({
         style: { marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '6px' }
       },
         /*#__PURE__*/React.createElement("label", {
-          style: { fontSize: '0.82rem', fontWeight: 700, color: '#64748B', marginBottom: '2px' }
+          style: { fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '2px' }
         }, `참석 명단 (${dateEntries.length}명 가능)`),
         /* List */
         /*#__PURE__*/React.createElement("div", {
@@ -925,49 +1751,68 @@ function DateModal({
           if (!part) return null;
           return /*#__PURE__*/React.createElement("div", {
             key: entry.id,
+            className: "date-modal-attendance-row",
             style: {
               display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '8px 12px',
+              flexDirection: 'column',
+              alignItems: 'stretch',
+              gap: '4px',
+              padding: '10px 12px',
+              paddingRight: adminMode ? '12px' : '44px',
               backgroundColor: 'var(--bg-card)',
               border: '1px solid var(--border-subtle)',
-              borderRadius: '8px'
+              borderRadius: '10px',
+              position: 'relative'
             }
           },
-            /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 } },
+            /*#__PURE__*/React.createElement("div", {
+              className: "date-modal-attendance-row-head",
+              style: { display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }
+            },
               /*#__PURE__*/React.createElement("span", {
                 style: { width: '8px', height: '8px', borderRadius: '50%', backgroundColor: part.color, flexShrink: 0 }
               }),
               /*#__PURE__*/React.createElement("span", {
+                className: "date-modal-attendance-name",
                 style: {
                   fontWeight: 800,
                   fontSize: '0.85rem',
                   color: 'var(--text-main)',
-                  flexShrink: 0,
+                  minWidth: 0,
                   cursor: 'pointer',
-                  lineHeight: 1.35
+                  lineHeight: 1.35,
+                  wordBreak: 'keep-all'
                 },
                 title: '눌러서 수정 (참여자·메모 불러오기)',
                 onClick: () => handleEditClick(entry)
-              }, part.name),
-              entry.note && /*#__PURE__*/React.createElement("div", {
-                style: {
-                  fontSize: '0.78rem',
-                  color: 'var(--text-main)',
-                  marginLeft: '4px',
-                  minWidth: 0,
-                  flex: 1,
-                  lineHeight: 1.35,
-                  display: 'flex',
-                  alignItems: 'center'
-                }
-              }, renderTextWithUrlBadge(entry.note))
+              }, part.name)
             ),
-            !adminMode && /*#__PURE__*/React.createElement(ItemEditDeleteActions, {
+            entry.note && /*#__PURE__*/React.createElement("div", {
+              className: "date-modal-attendance-note",
+              style: {
+                fontSize: '0.78rem',
+                color: 'var(--text-main)',
+                minWidth: 0,
+                lineHeight: 1.4,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'flex-start',
+                gap: '4px',
+                paddingLeft: '16px',
+                paddingRight: '0',
+                width: '100%',
+                boxSizing: 'border-box',
+                wordBreak: 'break-word',
+                overflowWrap: 'anywhere'
+              }
+            }, renderTextWithUrlBadge(entry.note)),
+            !adminMode && /*#__PURE__*/React.createElement("div", {
+              className: "date-modal-attendance-actions",
+              style: { position: 'absolute', top: '8px', right: '8px' }
+            }, /*#__PURE__*/React.createElement(ItemEditDeleteActions, {
               onEdit: () => handleEditClick(entry),
               onDelete: () => handleDeleteClick(entry)
-            })
+            }))
           );
         })
       ),
@@ -1008,9 +1853,9 @@ function DateModal({
         /* Search Field */
         /*#__PURE__*/React.createElement("div", null,
           /*#__PURE__*/React.createElement("label", {
-            style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '6px', color: '#64748B' }
+            style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '6px', color: 'var(--text-muted)' }
           }, "장소 검색"),
-          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px' } },
+          /*#__PURE__*/React.createElement("div", { className: "date-modal-field-with-actions", style: { display: 'flex', gap: '8px' } },
             /*#__PURE__*/React.createElement("input", {
               type: "text",
               className: "form-input",
@@ -1026,12 +1871,14 @@ function DateModal({
                 }
               }
             }),
-            /*#__PURE__*/React.createElement("button", {
-              type: "button",
-              className: "btn btn-poll-create btn-action btn-action-dark",
-              style: { padding: '0 16px', fontWeight: 800, height: '44px' },
-              onClick: e => { e.preventDefault(); e.stopPropagation(); handlePlaceSearch(e, false); }
-            }, "검색")
+            /*#__PURE__*/React.createElement("div", { className: "date-modal-field-actions" },
+              /*#__PURE__*/React.createElement("button", {
+                type: "button",
+                className: "btn btn-poll-create btn-action btn-action-dark",
+                style: { padding: '0 16px', fontWeight: 800, height: '44px', flex: 1 },
+                onClick: e => { e.preventDefault(); e.stopPropagation(); handlePlaceSearch(e, false); }
+              }, "검색")
+            )
           )
         ),
 
@@ -1089,7 +1936,7 @@ function DateModal({
 
         selectedPlace && /*#__PURE__*/React.createElement("div", null,
           /*#__PURE__*/React.createElement("label", {
-            style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#64748B', marginBottom: '6px' }
+            style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '6px' }
           }, "별칭 (선택)"),
           /*#__PURE__*/React.createElement("input", {
             type: "text", className: "form-input", placeholder: "목록에 표시할 별칭 (예: 도은네 집)",
@@ -1099,7 +1946,7 @@ function DateModal({
         ),
         /*#__PURE__*/React.createElement("div", null,
           /*#__PURE__*/React.createElement("label", {
-            style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#64748B', marginBottom: '6px' }
+            style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '6px' }
           }, "카테고리"),
           /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'stretch', gap: '10px' } },
             /*#__PURE__*/React.createElement("div", { style: { flex: 1, minWidth: 0 } },
@@ -1121,9 +1968,10 @@ function DateModal({
         ),
         /*#__PURE__*/React.createElement("div", null,
           /*#__PURE__*/React.createElement("label", {
-            style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#64748B', marginBottom: '6px' }
+            style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '6px' }
           }, "장소 메모 입력"),
           /*#__PURE__*/React.createElement("div", {
+            className: "date-modal-field-with-actions",
             style: { display: 'flex', gap: '8px', alignItems: 'flex-start' }
           },
             /*#__PURE__*/React.createElement(AutoGrowTextarea, {
@@ -1137,22 +1985,24 @@ function DateModal({
               disabled: isSavingPlace,
               onChange: e => setPlaceMemo(e.target.value)
             }),
-            /*#__PURE__*/React.createElement(FormAddEditActionButtons, {
-              isEditing: !!editingLinkedPlaceId,
-              isSaving: isSavingPlace,
-              disabled: !selectedPlace,
-              alignSelf: 'flex-start',
-              onCancel: () => {
-                setEditingLinkedPlaceId(null);
-                setSelectedPlace(null);
-                setPlaceQuery('');
-                setPlaceAlias('');
-                setPlaceMemo('');
-                setPlaceCategoryId(getPlaceCategories(calendar)[0]?.id || 'etc');
-                setPlaceVisitStatus('visited');
-              },
-              onSubmit: handleSavePlaceClick
-            })
+            /*#__PURE__*/React.createElement("div", { className: "date-modal-field-actions" },
+              /*#__PURE__*/React.createElement(FormAddEditActionButtons, {
+                isEditing: !!editingLinkedPlaceId,
+                isSaving: isSavingPlace,
+                disabled: !selectedPlace,
+                alignSelf: 'flex-start',
+                onCancel: () => {
+                  setEditingLinkedPlaceId(null);
+                  setSelectedPlace(null);
+                  setPlaceQuery('');
+                  setPlaceAlias('');
+                  setPlaceMemo('');
+                  setPlaceCategoryId(getPlaceCategories(calendar)[0]?.id || 'etc');
+                  setPlaceVisitStatus('visited');
+                },
+                onSubmit: handleSavePlaceClick
+              })
+            )
           )
         )
       ),
@@ -1160,7 +2010,7 @@ function DateModal({
       /* List of registered places for this date */
       /*#__PURE__*/React.createElement("div", { style: { marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '6px' } },
         /*#__PURE__*/React.createElement("label", {
-          style: { fontSize: '0.82rem', fontWeight: 700, color: '#64748B', marginBottom: '2px' }
+          style: { fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '2px' }
         }, `등록된 장소 (${registeredPlaces.length}곳)`),
         /* List */
         registeredPlaces.length === 0 ? /*#__PURE__*/React.createElement("div", {
@@ -1169,7 +2019,7 @@ function DateModal({
           className: "date-modal-places-list",
           style: { display: 'flex', flexDirection: 'column', gap: '8px', flex: '1 1 auto', minHeight: '80px', overflow: 'visible' }
         }, registeredPlaces.map(place => {
-          const category = getPlaceCategoryById(calendar, place.categoryId) || { id: 'etc', name: '기타', color: '#64748B' };
+          const category = getPlaceCategoryById(calendar, place.categoryId) || { id: 'etc', name: '기타', color: 'var(--text-muted)' };
           const catColor = category.color || '#64748B';
           const catName = category.name || '기타';
           return /*#__PURE__*/React.createElement("div", {
@@ -1226,15 +2076,29 @@ function DateModal({
               style: { position: 'absolute', top: '10px', right: '10px' }
             }, /*#__PURE__*/React.createElement(ItemEditDeleteActions, {
               onEdit: () => {
+                const sp = { name: place.name, address: place.address || '', lat: place.lat, lng: place.lng, categoryId: place.categoryId || 'etc' };
+                const memoLines = reformatMemoIntoDateLines(place.memo || '');
+                const catId = place.categoryId || 'etc';
+                const visit = place.visitStatus === 'planned' ? 'planned' : 'visited';
                 setEditingLinkedPlaceId(place.id);
-                setSelectedPlace({ name: place.name, address: place.address || '', lat: place.lat, lng: place.lng, categoryId: place.categoryId || 'etc' });
+                setSelectedPlace(sp);
                 setPlaceQuery(place.name || '');
                 setPlaceAlias(place.alias || '');
-                // 장소리스트와 동일: 날짜 방문기록은 한 줄씩
-                setPlaceMemo(reformatMemoIntoDateLines(place.memo || ''));
-                setPlaceCategoryId(place.categoryId || 'etc');
-                setPlaceVisitStatus(place.visitStatus === 'planned' ? 'planned' : 'visited');
+                setPlaceMemo(memoLines);
+                setPlaceCategoryId(catId);
+                setPlaceVisitStatus(visit);
                 setPlaceResults([]);
+                setHasInteracted(false);
+                snapshotFormBaseline({
+                  ...formBaselineRef.current,
+                  editingLinkedPlaceId: place.id,
+                  placeMemo: memoLines,
+                  placeAlias: place.alias || '',
+                  placeQuery: place.name || '',
+                  selectedPlaceKey: String(sp.id || '') + '|' + String(sp.name || '') + '|' + String(sp.lat || '') + '|' + String(sp.lng || ''),
+                  placeCategoryId: catId,
+                  placeVisitStatus: visit
+                });
               },
               onDelete: () => {
                 onRequestConfirm('장소 삭제', `"${place.alias || place.name}" 장소를 이 날짜에서 해제하시겠습니까?`, async () => {
@@ -1284,6 +2148,96 @@ function DateModal({
             }))
           );
         }))
+      ),
+
+      /* Meeting photo attachments */
+      /*#__PURE__*/React.createElement("div", {
+        style: { marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }
+      },
+        /*#__PURE__*/React.createElement("input", {
+          ref: meetingPhotoInputRef,
+          type: "file",
+          accept: "image/*",
+          multiple: true,
+          onChange: handleMeetingPhotoFiles,
+          style: { display: 'none' }
+        }),
+        /*#__PURE__*/React.createElement("div", {
+          style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }
+        },
+          /*#__PURE__*/React.createElement("label", {
+            style: { fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-muted)' }
+          }, `일정 사진 (${meetingPhotos.length}장)`),
+          !adminMode && /*#__PURE__*/React.createElement("button", {
+            type: "button",
+            className: "btn btn-action btn-action-dark",
+            disabled: isSavingMeetingPhotos,
+            onClick: () => meetingPhotoInputRef.current && meetingPhotoInputRef.current.click(),
+            style: {
+              height: '36px',
+              padding: '0 12px',
+              borderRadius: '10px',
+              fontSize: '0.78rem',
+              fontWeight: 900,
+              cursor: isSavingMeetingPhotos ? 'wait' : 'pointer'
+            }
+          }, isSavingMeetingPhotos ? "업로드 중..." : "사진 추가")
+        ),
+        meetingPhotos.length === 0 ? /*#__PURE__*/React.createElement("div", {
+          style: { textAlign: 'center', color: 'var(--text-muted)', padding: '22px 0', fontSize: '0.82rem', border: '1px dashed var(--border-subtle)', borderRadius: '12px' }
+        }, "이 일정에 첨부된 사진이 없습니다.") : /*#__PURE__*/React.createElement("div", {
+          style: {
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(72px, 1fr))',
+            gap: '8px'
+          }
+        }, meetingPhotos.map((photo, index) => /*#__PURE__*/React.createElement("div", {
+          key: photo.id || `${photo.imageUrl}_${index}`,
+          style: { position: 'relative', minWidth: 0 }
+        },
+          /*#__PURE__*/React.createElement("img", {
+            src: photo.thumbUrl || photo.imageUrl,
+            alt: "일정 사진",
+            loading: "lazy",
+            decoding: "async",
+            referrerPolicy: "no-referrer",
+            onClick: () => {
+              const url = photo.imageUrl || photo.thumbUrl;
+              if (url) window.open(url, '_blank', 'noopener,noreferrer');
+            },
+            style: {
+              width: '100%',
+              aspectRatio: '1 / 1',
+              objectFit: 'cover',
+              display: 'block',
+              borderRadius: '10px',
+              backgroundColor: 'var(--bg-primary)',
+              cursor: 'pointer'
+            }
+          }),
+          !adminMode && typeof onDeleteMeetingPhoto === 'function' && /*#__PURE__*/React.createElement("button", {
+            type: "button",
+            onClick: e => { e.preventDefault(); e.stopPropagation(); handleDeleteMeetingPhoto(photo); },
+            disabled: isSavingMeetingPhotos,
+            "aria-label": "일정 사진 삭제",
+            style: {
+              position: 'absolute',
+              top: '-7px',
+              right: '-7px',
+              width: '22px',
+              height: '22px',
+              borderRadius: '999px',
+              border: '1px solid rgba(239,68,68,0.45)',
+              backgroundColor: 'var(--bg-card)',
+              color: '#EF4444',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: 0,
+              cursor: 'pointer'
+            }
+          }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 13 }))
+        )))
       )
     ),
 
@@ -1317,7 +2271,7 @@ function DateModal({
       !adminMode && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '12px' } },
         /*#__PURE__*/React.createElement("div", null,
           /*#__PURE__*/React.createElement("label", {
-            style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#64748B', marginBottom: '6px' }
+            style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '6px' }
           }, "구분 / 카테고리"),
           /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
             /*#__PURE__*/React.createElement(SegmentedToggle, {
@@ -1346,7 +2300,7 @@ function DateModal({
         ),
         /*#__PURE__*/React.createElement("div", null,
           /*#__PURE__*/React.createElement("label", {
-            style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#64748B', marginBottom: '6px' }
+            style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '6px' }
           }, expenseIsIncome ? "수입 명목" : "지출 명목"),
           /*#__PURE__*/React.createElement("input", {
             type: "text",
@@ -1361,9 +2315,9 @@ function DateModal({
         ),
         /*#__PURE__*/React.createElement("div", null,
           /*#__PURE__*/React.createElement("label", {
-            style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#64748B', marginBottom: '6px' }
+            style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '6px' }
           }, expenseIsIncome ? "수입 금액" : "지출 금액"),
-          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px' } },
+          /*#__PURE__*/React.createElement("div", { className: "date-modal-field-with-actions", style: { display: 'flex', gap: '8px' } },
           /*#__PURE__*/React.createElement("input", {
             type: "text",
             className: "form-input",
@@ -1377,6 +2331,7 @@ function DateModal({
               setExpenseAmountInput(formatted ? `${expenseIsIncome ? '+' : '-'}${formatted}` : '');
             }
           }),
+          /*#__PURE__*/React.createElement("div", { className: "date-modal-field-actions" },
           /*#__PURE__*/React.createElement(FormAddEditActionButtons, {
             isEditing: !!editingExpenseId,
             isSaving: isSavingExpense,
@@ -1388,6 +2343,7 @@ function DateModal({
             },
             onSubmit: handleSaveExpenseClick
           })
+          )
           )
         )
       ),
@@ -1403,7 +2359,7 @@ function DateModal({
         expenses.map(expense => {
           const { time: expenseTime, rest: expenseLabel } = extractExpenseTimePrefix(getExpenseLabel(expense));
           const expenseUrl = getExpenseUrl(expense);
-          const expenseCategory = getDisplayExpenseCategory(calendar, expense) || { id: 'etc', name: '기타', color: '#64748B' };
+          const expenseCategory = getDisplayExpenseCategory(calendar, expense) || { id: 'etc', name: '기타', color: 'var(--text-muted)' };
           const categoryColor = expenseCategory.color || '#64748B';
           const categoryName = expenseCategory.name || '기타';
           return /*#__PURE__*/React.createElement("div", {
@@ -1447,7 +2403,8 @@ function DateModal({
             }
           },
             /*#__PURE__*/React.createElement("div", {
-              style: { position: 'absolute', top: '10px', right: '10px', display: 'flex', alignItems: 'center', gap: '4px' }
+              className: "expense-row-actions",
+              style: { position: 'absolute', top: '10px', right: '10px', display: 'flex', alignItems: 'center', gap: '6px' }
             },
               expenses.length > 1 && /*#__PURE__*/React.createElement("button", {
                 type: "button",
@@ -1458,16 +2415,32 @@ function DateModal({
                   width: '22px', height: '22px', border: '1px solid var(--border-subtle)',
                   backgroundColor: 'var(--bg-card)', borderRadius: '6px',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  cursor: 'grab', padding: 0, color: '#64748B',
+                  cursor: 'grab', padding: 0, color: 'var(--text-muted)',
                   touchAction: 'none', userSelect: 'none'
                 },
                 onClick: event => { event.preventDefault(); event.stopPropagation(); },
                 onPointerDown: event => beginExpensePointerSort(event, expense.id)
               }, /*#__PURE__*/React.createElement(LineHeightIcon, { size: 12 })),
-              /*#__PURE__*/React.createElement(ItemEditDeleteActions, {
-                onEdit: () => handleExpenseItemClick(expense),
-                onDelete: event => handleDeleteExpenseClick(event || { stopPropagation() {} }, expense.id)
-              })
+              /*#__PURE__*/React.createElement("button", {
+                type: "button",
+                className: "expense-row-delete-btn",
+                title: "삭제",
+                "aria-label": "삭제",
+                style: {
+                  width: '22px',
+                  height: '22px',
+                  border: 'none',
+                  background: 'none',
+                  borderRadius: '6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  padding: 0,
+                  color: 'var(--text-muted)'
+                },
+                onClick: event => handleDeleteExpenseClick(event, expense.id)
+              }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 14 }))
             ),
             /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '4px', minWidth: 0 } },
               /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' } },
@@ -1527,7 +2500,7 @@ function DateModal({
       /*#__PURE__*/React.createElement("h4", null, "참여자 선택"),
       /*#__PURE__*/React.createElement("button", {
         type: "button",
-        style: { background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer' },
+        style: { background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '1.2rem', cursor: 'pointer' },
         onClick: () => setIsSheetOpen(false)
       }, "✕")
     ),
@@ -1557,7 +2530,8 @@ function DateModal({
     : portaled;
 }
 
+  if (typeof window !== 'undefined') {
   window.GATHER_UI_COMPONENTS = Object.assign({}, window.GATHER_UI_COMPONENTS || {}, {
-    DateModal: DateModal
+    DateModal: DateModal,
   });
-})();
+}

@@ -239,7 +239,8 @@ service cloud.firestore {
       function hasValidConfirmedMeetingShape(data) {
         return (!('date' in data) || (data.date is string && data.date.size() <= 20))
           && (!('note' in data) || (data.note is string && data.note.size() <= 1000))
-          && (!('expenses' in data) || (data.expenses is list && data.expenses.size() <= 200));
+          && (!('expenses' in data) || (data.expenses is list && data.expenses.size() <= 200))
+          && (!('photos' in data) || (data.photos is list && data.photos.size() <= 300));
       }
       match /confirmedMeetings/{meetingId} {
         allow read: if isCalendarDoc(calendarDocId);

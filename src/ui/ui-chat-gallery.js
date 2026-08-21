@@ -674,6 +674,9 @@ export function ChatGalleryModal({
   calendar = null,
   asPage = false,
   onClose,
+  onUploadImages = null,
+  onOpenShare = null,
+  onOpenShortcut = null,
   setActiveLightbox,
   hasMoreOlderChat = false,
   loadingOlderChat = false,
@@ -690,6 +693,7 @@ export function ChatGalleryModal({
   const BackArrowIcon = __deps.BackArrowIcon;
   const InlineSearchBar = __comp.InlineSearchBar || __deps.InlineSearchBar;
   const LinkPreviewCard = __deps.LinkPreviewCard || __comp.LinkPreviewCard;
+  const MenuIcon = __deps.MenuIcon || __comp.MenuIcon;
   const getMessageImageEntries = __deps.getMessageImageEntries;
   const getMessageDirectMediaEntry = __deps.getMessageDirectMediaEntry;
   const extractFirstUrl = __deps.extractFirstUrl;
@@ -700,6 +704,8 @@ export function ChatGalleryModal({
   const [activeTab, setActiveTab] = React.useState('photos'); // 'photos' | 'links'
   const [searchQuery, setSearchQuery] = React.useState('');
   const [isSearchOpen, setIsSearchOpen] = React.useState(false);
+  const [isMenuOpen, setIsMenuOpen] = React.useState(false);
+  const uploadInputRef = React.useRef(null);
   // 창이 넓어지면 썸네일을 키우지 않고 단 수(2~12)를 늘린다. 셀 목표 너비 ~108px.
   const [gridCols, setGridCols] = React.useState(() => {
     const w = typeof window !== 'undefined' ? window.innerWidth : 400;
@@ -782,8 +788,28 @@ export function ChatGalleryModal({
         list.push({ ...entry, text: asMsg.text || '', participantId: asMsg.participantId || '', source: 'memo' });
       });
     });
+    getConfirmedMeetings(calendar).forEach(meeting => {
+      const photos = Array.isArray(meeting?.photos) ? meeting.photos : [];
+      photos.forEach((photo, index) => {
+        const full = String(photo?.imageUrl || photo?.full || '');
+        const thumb = String(photo?.thumbUrl || photo?.thumb || full);
+        if (!full && !thumb) return;
+        list.push({
+          full: full || thumb,
+          thumb: thumb || full,
+          imageIndex: index,
+          messageId: null,
+          timestamp: Number(photo?.createdAt || photo?.updatedAt || meeting?.confirmedAt || 0),
+          tags: '',
+          text: `${meeting.date || ''} 일정 사진`,
+          participantId: '',
+          source: 'meeting',
+          meetingDate: meeting.date || ''
+        });
+      });
+    });
     return list.sort((a, b) => b.timestamp - a.timestamp);
-  }, [chatMessages, memos]);
+  }, [chatMessages, memos, calendar]);
 
   const filteredLinks = React.useMemo(() => {
     if (!searchQuery.trim()) return sharedLinks;
@@ -833,6 +859,24 @@ export function ChatGalleryModal({
   const displayPhotoTabCount = (typeof totalGalleryCount === 'number' && totalGalleryCount > (sharedPhotos || []).length)
     ? totalGalleryCount
     : (sharedPhotos || []).length;
+
+  const handleUploadClick = () => {
+    if (uploadInputRef.current) uploadInputRef.current.click();
+  };
+  const handleUploadChange = async event => {
+    const files = Array.from(event.target.files || []);
+    event.target.value = '';
+    if (!files.length || typeof onUploadImages !== 'function') return;
+    setIsMenuOpen(false);
+    await Promise.resolve(onUploadImages(files));
+    setActiveTab('photos');
+  };
+  const renderMenuIcon = () => MenuIcon
+    ? /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M4 6h16", "M4 12h16", "M4 18h16"] })
+    : /*#__PURE__*/React.createElement("svg", {
+        xmlns: "http://www.w3.org/2000/svg", width: "22", height: "22", viewBox: "0 0 24 24",
+        fill: "none", stroke: "currentColor", strokeWidth: "2.5", strokeLinecap: "round", strokeLinejoin: "round"
+      }, /*#__PURE__*/React.createElement("path", { d: "M4 6h16" }), /*#__PURE__*/React.createElement("path", { d: "M4 12h16" }), /*#__PURE__*/React.createElement("path", { d: "M4 18h16" }));
 
   const galleryShellStyle = asPage ? {
     position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1005,
@@ -902,7 +946,16 @@ export function ChatGalleryModal({
           }, /*#__PURE__*/React.createElement("svg", {
             xmlns: "http://www.w3.org/2000/svg", width: "22", height: "22", viewBox: "0 0 24 24",
             fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
-          }, /*#__PURE__*/React.createElement("circle", { cx: "11", cy: "11", r: "8" }), /*#__PURE__*/React.createElement("path", { d: "m21 21-4.3-4.3" })))
+          }, /*#__PURE__*/React.createElement("circle", { cx: "11", cy: "11", r: "8" }), /*#__PURE__*/React.createElement("path", { d: "m21 21-4.3-4.3" }))),
+          /*#__PURE__*/React.createElement("button", {
+            type: "button",
+            onClick: () => setIsMenuOpen(true),
+            title: "갤러리 메뉴", "aria-label": "갤러리 메뉴",
+            style: {
+              background: 'none', border: 'none', cursor: 'pointer', padding: '6px',
+              color: '#64748B', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+            }
+          }, renderMenuIcon())
         )
       : /*#__PURE__*/React.createElement(React.Fragment, null,
           /*#__PURE__*/React.createElement("h3", {
@@ -923,6 +976,70 @@ export function ChatGalleryModal({
           )
         )
   ),
+  /*#__PURE__*/React.createElement("input", {
+    ref: uploadInputRef,
+    type: "file",
+    accept: "image/*",
+    multiple: true,
+    onChange: handleUploadChange,
+    style: { display: 'none' }
+  }),
+  asPage && isMenuOpen && /*#__PURE__*/React.createElement("div", {
+    className: "admin-side-menu-overlay gallery-side-menu-overlay",
+    onClick: () => setIsMenuOpen(false),
+    style: { zIndex: 12000 }
+  }, /*#__PURE__*/React.createElement("nav", {
+    className: "admin-side-menu-panel gallery-side-menu-panel",
+    onClick: e => e.stopPropagation()
+  },
+    /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-header" },
+      /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-copy" },
+        /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-title" }, "갤러리 메뉴"),
+        /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-subtitle" }, "사진 업로드와 공유 관리")
+      ),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "admin-side-menu-close-btn",
+        onClick: () => setIsMenuOpen(false),
+        "aria-label": "메뉴 닫기"
+      }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }))
+    ),
+    /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-list" },
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "admin-side-menu-item",
+        onClick: handleUploadClick
+      },
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, "🖼️"),
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "이미지 업로드"),
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "갤러리에 사진을 바로 추가")
+        )
+      ),
+      typeof onOpenShare === 'function' && /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "admin-side-menu-item",
+        onClick: () => { setIsMenuOpen(false); onOpenShare(); }
+      },
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, "🔗"),
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "공유하기"),
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "현재 갤러리 캘린더 공유")
+        )
+      ),
+      typeof onOpenShortcut === 'function' && /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "admin-side-menu-item",
+        onClick: () => { setIsMenuOpen(false); onOpenShortcut(); }
+      },
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, "⭐"),
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "바로가기"),
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "홈 화면에 빠르게 접근")
+        )
+      )
+    )
+  )),
   isSearchOpen && /*#__PURE__*/React.createElement(InlineSearchBar, {
     value: searchQuery,
     placeholder: "사진·링크 통합 검색 (태그, 텍스트, URL)",
@@ -1025,7 +1142,7 @@ export function ChatGalleryModal({
         alignContent: 'start'
       }
     }, filteredPhotos.map((photo, idx) => /*#__PURE__*/React.createElement("img", {
-      key: `${photo.messageId}-${photo.directMediaUrl ? 'direct' : photo.imageIndex}`,
+      key: `${photo.messageId || photo.source || 'photo'}-${photo.meetingDate || ''}-${photo.directMediaUrl ? 'direct' : photo.imageIndex}-${photo.timestamp || idx}`,
       src: (photo.thumb && String(photo.thumb)) || (photo.full && String(photo.full)) || '',
       alt: "공유사진",
       loading: "lazy",

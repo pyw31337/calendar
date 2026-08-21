@@ -678,6 +678,8 @@ export function DateModal({
   onSaveExpense,
   onDeleteExpense,
   onReorderExpenses,
+  onAddMeetingPhotos,
+  onDeleteMeetingPhoto,
   onSavePlace,
   onDeletePlace,
   onDelete,
@@ -1016,6 +1018,15 @@ export function DateModal({
   const isAllAvailable = totalPartCount > 0 && uniqueActiveParts.size === totalPartCount;
   const isConfirmed = isDateConfirmedMeeting(calendar, dateStr);
   const confirmedMeetingEntry = getConfirmedMeetings(calendar).find(m => m.date === dateStr) || null;
+  const meetingPhotos = React.useMemo(
+    () => (Array.isArray(confirmedMeetingEntry?.photos) ? confirmedMeetingEntry.photos : [])
+      .filter(photo => photo && (photo.imageUrl || photo.thumbUrl))
+      .slice()
+      .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)),
+    [confirmedMeetingEntry]
+  );
+  const meetingPhotoInputRef = React.useRef(null);
+  const [isSavingMeetingPhotos, setIsSavingMeetingPhotos] = React.useState(false);
   const expenses = React.useMemo(
     () => (Array.isArray(confirmedMeetingEntry?.expenses) ? confirmedMeetingEntry.expenses : [])
       .filter(e => e && typeof e === 'object' && e.id)
@@ -1048,7 +1059,39 @@ export function DateModal({
     setDraggingExpenseId('');
     setDragOverExpenseId('');
     expensePointerSortRef.current = { sourceId: '', targetId: '', startX: 0, startY: 0, active: false };
+    setIsSavingMeetingPhotos(false);
   }, [calendar?.id, dateStr]);
+
+  const handleMeetingPhotoFiles = async event => {
+    const files = Array.from(event.target.files || []);
+    event.target.value = '';
+    if (!files.length || typeof onAddMeetingPhotos !== 'function') return;
+    setIsSavingMeetingPhotos(true);
+    try {
+      const ok = await Promise.resolve(onAddMeetingPhotos(dateStr, files));
+      if (ok !== false) showToast('일정 사진이 추가되었습니다.', 'success');
+      else showToast('사진 추가 실패', 'error');
+    } catch (err) {
+      console.error('Meeting photo upload failed:', err);
+      showToast('사진 추가 실패', 'error');
+    } finally {
+      setIsSavingMeetingPhotos(false);
+    }
+  };
+
+  const handleDeleteMeetingPhoto = photo => {
+    if (!photo?.id || typeof onDeleteMeetingPhoto !== 'function') return;
+    onRequestConfirm('일정 사진 삭제', '이 일정 사진을 삭제하시겠습니까?', async () => {
+      setIsSavingMeetingPhotos(true);
+      try {
+        const ok = await Promise.resolve(onDeleteMeetingPhoto(dateStr, photo.id));
+        if (ok !== false) showToast('사진이 삭제되었습니다.', 'success');
+        else showToast('사진 삭제 실패', 'error');
+      } finally {
+        setIsSavingMeetingPhotos(false);
+      }
+    });
+  };
 
   const expenseTotal = expenses.reduce((sum, e) => sum + (Number(e?.amount) || 0), 0);
   const expenseCategories = getExpenseCategories(calendar) || [];
@@ -2105,6 +2148,96 @@ export function DateModal({
             }))
           );
         }))
+      ),
+
+      /* Meeting photo attachments */
+      /*#__PURE__*/React.createElement("div", {
+        style: { marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }
+      },
+        /*#__PURE__*/React.createElement("input", {
+          ref: meetingPhotoInputRef,
+          type: "file",
+          accept: "image/*",
+          multiple: true,
+          onChange: handleMeetingPhotoFiles,
+          style: { display: 'none' }
+        }),
+        /*#__PURE__*/React.createElement("div", {
+          style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }
+        },
+          /*#__PURE__*/React.createElement("label", {
+            style: { fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-muted)' }
+          }, `일정 사진 (${meetingPhotos.length}장)`),
+          !adminMode && /*#__PURE__*/React.createElement("button", {
+            type: "button",
+            className: "btn btn-action btn-action-dark",
+            disabled: isSavingMeetingPhotos,
+            onClick: () => meetingPhotoInputRef.current && meetingPhotoInputRef.current.click(),
+            style: {
+              height: '36px',
+              padding: '0 12px',
+              borderRadius: '10px',
+              fontSize: '0.78rem',
+              fontWeight: 900,
+              cursor: isSavingMeetingPhotos ? 'wait' : 'pointer'
+            }
+          }, isSavingMeetingPhotos ? "업로드 중..." : "사진 추가")
+        ),
+        meetingPhotos.length === 0 ? /*#__PURE__*/React.createElement("div", {
+          style: { textAlign: 'center', color: 'var(--text-muted)', padding: '22px 0', fontSize: '0.82rem', border: '1px dashed var(--border-subtle)', borderRadius: '12px' }
+        }, "이 일정에 첨부된 사진이 없습니다.") : /*#__PURE__*/React.createElement("div", {
+          style: {
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(72px, 1fr))',
+            gap: '8px'
+          }
+        }, meetingPhotos.map((photo, index) => /*#__PURE__*/React.createElement("div", {
+          key: photo.id || `${photo.imageUrl}_${index}`,
+          style: { position: 'relative', minWidth: 0 }
+        },
+          /*#__PURE__*/React.createElement("img", {
+            src: photo.thumbUrl || photo.imageUrl,
+            alt: "일정 사진",
+            loading: "lazy",
+            decoding: "async",
+            referrerPolicy: "no-referrer",
+            onClick: () => {
+              const url = photo.imageUrl || photo.thumbUrl;
+              if (url) window.open(url, '_blank', 'noopener,noreferrer');
+            },
+            style: {
+              width: '100%',
+              aspectRatio: '1 / 1',
+              objectFit: 'cover',
+              display: 'block',
+              borderRadius: '10px',
+              backgroundColor: 'var(--bg-primary)',
+              cursor: 'pointer'
+            }
+          }),
+          !adminMode && typeof onDeleteMeetingPhoto === 'function' && /*#__PURE__*/React.createElement("button", {
+            type: "button",
+            onClick: e => { e.preventDefault(); e.stopPropagation(); handleDeleteMeetingPhoto(photo); },
+            disabled: isSavingMeetingPhotos,
+            "aria-label": "일정 사진 삭제",
+            style: {
+              position: 'absolute',
+              top: '-7px',
+              right: '-7px',
+              width: '22px',
+              height: '22px',
+              borderRadius: '999px',
+              border: '1px solid rgba(239,68,68,0.45)',
+              backgroundColor: 'var(--bg-card)',
+              color: '#EF4444',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: 0,
+              cursor: 'pointer'
+            }
+          }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 13 }))
+        )))
       )
     ),
 
