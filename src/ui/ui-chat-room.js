@@ -711,7 +711,13 @@ export function ChatRoomView({
   onOpenGallery,
   onChangeView,
   stickyVideoKey,
-  onReleaseSticky
+  onReleaseSticky,
+  onDeletePhoto,
+  onReplacePhoto,
+  onJumpToChatMessage,
+  onJumpToMemo,
+  onJumpToMeetingDate,
+  onRequestConfirm
 }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -1941,7 +1947,13 @@ export function ChatRoomView({
     showToast,
     onPromoteImageUrl,
     onSaveImageTags,
-    onSearchTag
+    onSearchTag,
+    onDeletePhoto,
+    onReplacePhoto,
+    onJumpToChatMessage,
+    onJumpToMemo,
+    onJumpToMeetingDate,
+    onRequestConfirm
   }) : null), imageProcessingChat && /*#__PURE__*/React.createElement(ImageProcessingOverlay, imageProcessingChat),
   isEmojiPickerOpen && /*#__PURE__*/React.createElement(EmojiPickerSheet, {
     onSelect: insertEmojiIntoChatInput,

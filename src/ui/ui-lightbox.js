@@ -668,7 +668,7 @@ function getAnniversaryDisplayColor(...args) {
 }
 
 
-export function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSearchTag, showToast }) {
+export function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSearchTag, showToast, sourceInfo = null }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const SmallXIcon = __deps.SmallXIcon;
@@ -681,7 +681,7 @@ export function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSe
   const [confirmDeleteTag, setConfirmDeleteTag] = React.useState(null);
   const [isDeletingTag, setIsDeletingTag] = React.useState(false);
   React.useEffect(() => { setTagInput(''); }, [tags]);
-  if (!info.dateLabel && !info.typeLabel && !onSaveTags) return null;
+  if (!info.dateLabel && !info.typeLabel && !onSaveTags && !sourceInfo) return null;
   const MAX_TAGS = 10;
   const handleSaveTags = async () => {
     if (!onSaveTags || isSavingTags) return;
@@ -734,6 +734,19 @@ export function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSe
     info.dateLabel && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px' } },
       /*#__PURE__*/React.createElement("span", { style: labelStyle }, "업로드"),
       /*#__PURE__*/React.createElement("span", { style: { wordBreak: 'break-all' } }, info.dateLabel)
+    ),
+    sourceInfo && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px', alignItems: 'center' } },
+      /*#__PURE__*/React.createElement("span", { style: labelStyle }, "출처"),
+      sourceInfo.onClick
+        ? /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          onClick: e => { e.stopPropagation(); sourceInfo.onClick(); },
+          style: {
+            border: 'none', background: 'none', padding: 0, color: '#93C5FD', fontSize: 'inherit',
+            fontWeight: 800, textDecoration: 'underline', cursor: 'pointer'
+          }
+        }, sourceInfo.label)
+        : /*#__PURE__*/React.createElement("span", null, sourceInfo.label)
     ),
     info.typeLabel && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' } },
       /*#__PURE__*/React.createElement("span", { style: labelStyle }, "파일정보"),
@@ -829,10 +842,11 @@ export function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSe
   }));
 }
 
-export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, onPromoteImageUrl, onSaveImageTags, onSearchTag }) {
+export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, onPromoteImageUrl, onSaveImageTags, onSearchTag, onDeletePhoto, onReplacePhoto, onJumpToChatMessage, onJumpToMemo, onJumpToMeetingDate, onRequestConfirm }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const SmallXIcon = __deps.SmallXIcon;
+  const PencilIcon = __deps.PencilIcon;
   const ImageUrlModal = __deps.ImageUrlModal;
   const LightboxInfoPanel = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LightboxInfoPanel;
   const buildLightboxImageInfo = __deps.buildLightboxImageInfo;
@@ -914,6 +928,69 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
         return ok;
       }
     : null;
+  // Unlike tag editing, memo photos DO have a clean single-item delete/replace target (their
+  // own imageUrls[imageIndex]), even though memo TAGS are a whole-memo field with no such
+  // target -- so this is intentionally broader than canEditTags above.
+  const canEditPhoto = !!(currentMeta && !currentMeta.directMediaUrl && (
+    currentMeta.source === 'meeting' ? isMeetingPhoto : currentMeta.messageId != null
+  ));
+  const sourceInfo = React.useMemo(() => {
+    if (!currentMeta) return null;
+    if (currentMeta.source === 'meeting') {
+      return {
+        label: '일정 사진으로 업로드됨',
+        onClick: (onJumpToMeetingDate && currentMeta.meetingDate) ? () => onJumpToMeetingDate(currentMeta.meetingDate, 'photos') : null
+      };
+    }
+    if (currentMeta.source === 'memo') {
+      return {
+        label: '메모에서 업로드됨',
+        onClick: (onJumpToMemo && currentMeta.messageId) ? () => onJumpToMemo(currentMeta.messageId) : null
+      };
+    }
+    // Default: chat -- distinguishes composer-typed messages from the gallery's own "이미지
+    // 업로드" menu action (see handleUploadGalleryImages' uploadSource:'gallery' marker).
+    return {
+      label: currentMeta.uploadSource === 'gallery' ? '갤러리에서 업로드됨' : '채팅방에서 업로드됨',
+      onClick: (onJumpToChatMessage && currentMeta.messageId) ? () => onJumpToChatMessage(currentMeta.messageId) : null
+    };
+  }, [currentMeta, onJumpToChatMessage, onJumpToMemo, onJumpToMeetingDate]);
+  const replacePhotoInputRef = React.useRef(null);
+  const [isReplacingPhoto, setIsReplacingPhoto] = React.useState(false);
+  const [isDeletingPhoto, setIsDeletingPhoto] = React.useState(false);
+  const handleReplacePhotoFile = async event => {
+    const file = event.target.files && event.target.files[0];
+    event.target.value = '';
+    if (!file || !onReplacePhoto || !currentMeta || isReplacingPhoto) return;
+    setIsReplacingPhoto(true);
+    try {
+      const nextUrl = await onReplacePhoto({ ...currentMeta, imageUrl: currentUrl }, file);
+      if (nextUrl && typeof nextUrl === 'string') {
+        setDisplayUrls(prev => prev.map((item, i) => i === index ? nextUrl : item));
+      }
+    } finally {
+      setIsReplacingPhoto(false);
+    }
+  };
+  const handleDeletePhotoClick = () => {
+    if (!onDeletePhoto || !currentMeta || isDeletingPhoto) return;
+    const confirmAction = async () => {
+      setIsDeletingPhoto(true);
+      try {
+        const ok = await onDeletePhoto({ ...currentMeta, imageUrl: currentUrl });
+        // No good way to remove just this one entry from the static urls/meta snapshot the
+        // parent handed in -- close and let the next open reflect live data instead.
+        if (ok) closeLightbox();
+      } finally {
+        setIsDeletingPhoto(false);
+      }
+    };
+    if (typeof onRequestConfirm === 'function') {
+      onRequestConfirm('사진 삭제', '이 사진을 삭제하시겠습니까?', confirmAction);
+    } else if (window.confirm('이 사진을 삭제하시겠습니까?')) {
+      confirmAction();
+    }
+  };
   const ensureCurrentShareUrl = async url => {
     if (typeof url !== 'string' || !url.startsWith('data:')) return url;
     if (typeof onPromoteImageUrl !== 'function') throw new Error('No image URL promotion handler');
@@ -1056,6 +1133,41 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
     closeLightbox();
   };
 
+  // Shared by both the carousel's "current" slot and the single-image layout below --
+  // top-right pencil (교체)/X (삭제) buttons, reusing the same icons already used for editing
+  // elsewhere in the app (Places/Memo pencil, tag-delete X).
+  const renderPhotoActions = () => canEditPhoto && /*#__PURE__*/React.createElement("div", {
+    style: { position: 'absolute', top: '8px', right: '8px', display: 'flex', gap: '6px', zIndex: 10 },
+    onClick: e => e.stopPropagation()
+  },
+    onReplacePhoto && /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => replacePhotoInputRef.current && replacePhotoInputRef.current.click(),
+      disabled: isReplacingPhoto || isDeletingPhoto,
+      "aria-label": "사진 편집",
+      title: "사진 교체",
+      style: {
+        width: '30px', height: '30px', borderRadius: '50%', border: 'none',
+        background: 'rgba(15,23,42,0.62)', color: '#FFFFFF', display: 'flex',
+        alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '0.72rem',
+        opacity: (isReplacingPhoto || isDeletingPhoto) ? 0.5 : 1
+      }
+    }, isReplacingPhoto ? '...' : /*#__PURE__*/React.createElement(PencilIcon, { size: 15 })),
+    onDeletePhoto && /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: handleDeletePhotoClick,
+      disabled: isReplacingPhoto || isDeletingPhoto,
+      "aria-label": "사진 삭제",
+      title: "사진 삭제",
+      style: {
+        width: '30px', height: '30px', borderRadius: '50%', border: 'none',
+        background: 'rgba(15,23,42,0.62)', color: '#FFFFFF', display: 'flex',
+        alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '0.72rem',
+        opacity: (isReplacingPhoto || isDeletingPhoto) ? 0.5 : 1
+      }
+    }, isDeletingPhoto ? '...' : /*#__PURE__*/React.createElement(SmallXIcon, { size: 15 }))
+  );
+
   const renderSlide = (url, slot) => /*#__PURE__*/React.createElement("div", {
     style: { width: '33.3333%', flexShrink: 0, height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }
   }, url && (slot === 'current' ? /*#__PURE__*/React.createElement("div", {
@@ -1072,13 +1184,14 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
       maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: '12px',
       display: 'block'
     }
-  }), showInfo && /*#__PURE__*/React.createElement(LightboxInfoPanel, {
+  }), renderPhotoActions(), showInfo && /*#__PURE__*/React.createElement(LightboxInfoPanel, {
     info: currentInfo,
     tags: currentTags,
     onSaveTags: saveCurrentTags,
     onSearchTag: onSearchTag,
     onOpenUrl: () => setImageUrlModalOpen(true),
-    showToast: showToast
+    showToast: showToast,
+    sourceInfo: sourceInfo
   })) : /*#__PURE__*/React.createElement("img", {
     src: url,
     alt: "원본 이미지",
@@ -1102,7 +1215,14 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
       width: '100%', maxWidth: '100%', overflow: 'hidden',
       userSelect: 'none'
     }
-  }, /*#__PURE__*/React.createElement("button", {
+  }, /*#__PURE__*/React.createElement("input", {
+    ref: replacePhotoInputRef,
+    type: "file",
+    accept: "image/*",
+    onClick: e => e.stopPropagation(),
+    onChange: handleReplacePhotoFile,
+    style: { display: 'none' }
+  }), /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: e => { e.stopPropagation(); closeLightbox(); },
     "aria-label": "닫기",
@@ -1175,13 +1295,14 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
       maxWidth: '92vw', maxHeight: '82vh', borderRadius: '12px', objectFit: 'contain',
       display: 'block'
     }
-  }), showInfo && /*#__PURE__*/React.createElement(LightboxInfoPanel, {
+  }), renderPhotoActions(), showInfo && /*#__PURE__*/React.createElement(LightboxInfoPanel, {
     info: currentInfo,
     tags: currentTags,
     onSaveTags: saveCurrentTags,
     onSearchTag: onSearchTag,
     onOpenUrl: () => setImageUrlModalOpen(true),
-    showToast: showToast
+    showToast: showToast,
+    sourceInfo: sourceInfo
   })),
   total > 1 && (() => {
     const maxVisibleDots = 10;
