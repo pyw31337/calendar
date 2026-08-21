@@ -697,10 +697,14 @@ function getDeps() { return window.GATHER_UI_DEPS || {}; }
       return false;
     };
     const getViewShareUrl = deps.getViewShareUrl || function (id, view) {
-      return window.location.origin + window.location.pathname + '?id=' + encodeURIComponent(id) + '&view=' + encodeURIComponent(view);
+      const base = getCalendarShareUrl(id);
+      if (!view || view === 'calendar') return base;
+      return `${base}${encodeURIComponent(view)}/`;
     };
     const getCalendarShareUrl = deps.getCalendarShareUrl || function (id) {
-      return window.location.origin + window.location.pathname + '?id=' + encodeURIComponent(id);
+      const basePath = String(window.location.pathname || '/').replace(/\/share(?:\/.*)?$/, '/').replace(/\/(?:index\.html)?$/, '/');
+      const normalizedBasePath = basePath.endsWith('/') ? basePath : `${basePath}/`;
+      return `${window.location.origin}${normalizedBasePath}share/${encodeURIComponent(id)}/`;
     };
 
     const shareUrl = React.useMemo(function () {

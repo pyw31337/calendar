@@ -6,7 +6,7 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const files = ['assets/app-utils.js', 'assets/ui-share-modal.js', 'assets/app-main.js'];
+const files = ['src/core/app-utils.js', 'src/ui/ui-share-modal.js', 'src/core/app-main.js'];
 let failed = false;
 
 for (const rel of files) {
@@ -19,7 +19,7 @@ for (const rel of files) {
     }
   }
 }
-const utils = readFileSync(resolve(root, 'assets/app-utils.js'), 'utf8');
+const utils = readFileSync(resolve(root, 'src/core/app-utils.js'), 'utf8');
 for (const name of ['getCalendarShareUrl', 'getViewShareUrl', 'getMemoItemShareUrl', 'parseSharePathFromLocation']) {
   if (!utils.includes('function ' + name)) {
     console.error('[check-share-urls] missing', name);
