@@ -1733,6 +1733,7 @@ export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoad
     },
       /* Modal Container */
       /*#__PURE__*/React.createElement(ResizableModalContainer, {
+        className: "modal-container memo-edit-modal-container",
         style: {
           width: '100%', maxWidth: '520px',
           backgroundColor: editColor,
@@ -1746,6 +1747,7 @@ export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoad
       },
         /* Header: Title & Pin */
         /*#__PURE__*/React.createElement("div", {
+          className: "memo-edit-modal-header",
           style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }
         },
           /* Title input - Styled precisely as user requested */
@@ -1795,6 +1797,9 @@ export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoad
           )
         ),
 
+        /*#__PURE__*/React.createElement("div", {
+          className: "memo-edit-modal-body"
+        },
         /* Textarea wrapped relatively with bottom-right emoji & file picker icons - Styled precisely as user requested */
         /*#__PURE__*/React.createElement("div", {
           style: { position: 'relative', width: '100%' }
@@ -1927,10 +1932,11 @@ export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoad
               opacity: editTags.length >= 10 ? 0.45 : 1
             }
           }, "저장")
-        ),
+        )),
 
         /* Footer Controls: Participant button and Tag Badges row (Swatches dot menu removed completely) */
         /*#__PURE__*/React.createElement("div", {
+          className: "memo-edit-modal-footer",
           style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '8px', gap: '8px', flexWrap: 'wrap' }
         },
           /* Participant select box & tag badges list to its right */

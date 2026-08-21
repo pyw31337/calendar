@@ -763,8 +763,11 @@ export function ResizableModalContainer({ className, style, children, ...props }
       const vvH = vv && typeof vv.height === 'number' ? vv.height : window.innerHeight;
       // Reserve ~100px for mobile browser chrome + margins; also cap at 72% of visible height.
       const isAdminSettings = containerRef.current && containerRef.current.classList.contains('admin-settings-modal');
+      const isMemoEdit = containerRef.current && containerRef.current.classList.contains('memo-edit-modal-container');
       const maxPx = Math.max(180, Math.floor(isAdminSettings
         ? Math.min(720, vvH - 24)
+        : isMemoEdit
+          ? Math.min(780, vvH - 32)
         : Math.min(670, vvH * 0.72, vvH - 100)));
       root.style.setProperty('--gather-vv-modal-max', `${maxPx}px`);
       if (containerRef.current) {

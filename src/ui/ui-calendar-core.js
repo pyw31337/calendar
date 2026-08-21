@@ -1943,15 +1943,17 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
       },
       "data-stop-card-open": "true",
       style: {
-        alignSelf: 'flex-start',
-        marginTop: '6px',
-        padding: '4px 0',
+        width: '100%',
+        marginTop: '8px',
+        padding: '8px 12px',
         border: 'none',
-        background: 'transparent',
-        color: 'var(--accent-primary)',
-        fontSize: '0.76rem',
+        borderRadius: '8px',
+        background: 'var(--bg-primary)',
+        color: 'var(--text-main)',
+        fontSize: '0.78rem',
         fontWeight: 800,
-        cursor: 'pointer'
+        cursor: 'pointer',
+        textAlign: 'center'
       }
     }, isMemoTextExpanded ? "접기" : "더 보기"),
 
