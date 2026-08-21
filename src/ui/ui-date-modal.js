@@ -672,6 +672,7 @@ export function DateModal({
   anniversaries = [],
   dateStr,
   calendar,
+  chatMessages = [],
   adminMode = false,
   onSave,
   onConfirmMeeting,
@@ -703,6 +704,7 @@ export function DateModal({
   const SimpleBottomSheetPicker = __comp.SimpleBottomSheetPicker || __deps.SimpleBottomSheetPicker;
   const UrlCapsuleBadge = __deps.UrlCapsuleBadge;
   const SmallXIcon = __deps.SmallXIcon;
+  const resolveMeetingPhotoDisplay = __deps.resolveMeetingPhotoDisplay;
   const getActiveParticipants = __deps.getActiveParticipants;
   const getCalendarPlaces = __deps.getCalendarPlaces;
   const getPlaceCategories = __deps.getPlaceCategories;
@@ -1022,9 +1024,15 @@ export function DateModal({
   const meetingPhotos = React.useMemo(
     () => (Array.isArray(confirmedMeetingEntry?.photos) ? confirmedMeetingEntry.photos : [])
       .filter(photo => photo && (photo.imageUrl || photo.thumbUrl))
-      .slice()
+      // Auto-linked entries (sourceMessageId set) are references to a real chat photo --
+      // resolve the live imageUrl/thumbUrl/tags from that source message so this tile always
+      // matches the chat original exactly, including any tag edit made from anywhere else.
+      .map(photo => {
+        const resolved = resolveMeetingPhotoDisplay ? resolveMeetingPhotoDisplay(photo, chatMessages) : null;
+        return resolved ? { ...photo, imageUrl: resolved.imageUrl, thumbUrl: resolved.thumbUrl, tags: resolved.tags } : photo;
+      })
       .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)),
-    [confirmedMeetingEntry]
+    [confirmedMeetingEntry, chatMessages]
   );
   const meetingPhotoInputRef = React.useRef(null);
   const [isSavingMeetingPhotos, setIsSavingMeetingPhotos] = React.useState(false);
@@ -2479,7 +2487,9 @@ export function DateModal({
                   tags: String(p.tags || ''),
                   source: 'meeting',
                   meetingDate: dateStr,
-                  photoId: p.id || ''
+                  photoId: p.id || '',
+                  sourceMessageId: p.sourceMessageId || '',
+                  sourceImageIndex: Number.isInteger(p.sourceImageIndex) ? p.sourceImageIndex : null
                 }))
               });
             },

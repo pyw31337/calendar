@@ -5680,6 +5680,7 @@ function App() {
       }
       if (ok) {
         deleteAllChatImagesFromStorage(deletingMessage);
+        unlinkMeetingPhotoReferences(id, null).catch(err => console.warn('unlinkMeetingPhotoReferences skipped:', err));
         if (!firebaseDb) {
           fetchChatMessagesRest(calId).then(list => setChatMessages(list));
         }
@@ -5937,16 +5938,33 @@ function App() {
     return Array.from(dates);
   };
 
+  // The photo's own tag text is the single source of truth for which dates it's linked to --
+  // this both adds new links for date tokens found in the CURRENT tags and drops any earlier
+  // auto-link (matched by sourceMessageId+sourceImageIndex, never by URL -- a replaced photo
+  // keeps the same identity even though its URL changes) whose date is no longer present, so a
+  // photo tagged "260912 260815" shows up under both dates and staying consistent everywhere as
+  // tags are edited. Manually uploaded 일정 사진 (added via DateModal's own upload button, no
+  // sourceMessageId) are a separate, standalone thing and are never touched here.
   const linkTaggedImageToMeetingDates = async (dateStrs, photo, sourceMessage, cleanTags) => {
-    if (!activeCal || !Array.isArray(dateStrs) || dateStrs.length === 0 || !photo?.imageUrl) return 0;
-    const validDates = Array.from(new Set(dateStrs.filter(isValidDateString)));
-    if (validDates.length === 0) return 0;
+    if (!activeCal || !sourceMessage?.id || !photo?.imageUrl) return 0;
+    const validDates = Array.from(new Set((Array.isArray(dateStrs) ? dateStrs : []).filter(isValidDateString)));
+    const sourceMessageId = sourceMessage.id;
+    const sourceImageIndex = Number.isInteger(photo.imageIndex) ? photo.imageIndex : 0;
     const existingMeetings = getConfirmedMeetings(activeCal);
     const byDate = new Map(existingMeetings.map(meeting => [meeting.date, {
       ...meeting,
       photos: Array.isArray(meeting.photos) ? [...meeting.photos] : []
     }]));
     const now = Date.now();
+    let changed = false;
+    byDate.forEach((meeting, dateStr) => {
+      if (validDates.includes(dateStr)) return;
+      const nextPhotos = meeting.photos.filter(p => !(p?.sourceMessageId === sourceMessageId && p?.sourceImageIndex === sourceImageIndex));
+      if (nextPhotos.length !== meeting.photos.length) {
+        byDate.set(dateStr, { ...meeting, photos: nextPhotos });
+        changed = true;
+      }
+    });
     let linkedCount = 0;
     validDates.forEach((dateStr, index) => {
       const meeting = byDate.get(dateStr) || {
@@ -5958,7 +5976,7 @@ function App() {
         photos: []
       };
       const photos = Array.isArray(meeting.photos) ? meeting.photos : [];
-      const alreadyLinked = photos.some(item => String(item?.imageUrl || item?.full || '') === photo.imageUrl);
+      const alreadyLinked = photos.some(p => p?.sourceMessageId === sourceMessageId && p?.sourceImageIndex === sourceImageIndex);
       if (alreadyLinked) {
         byDate.set(dateStr, meeting);
         return;
@@ -5969,14 +5987,15 @@ function App() {
         thumbUrl: photo.thumbUrl || photo.imageUrl,
         createdAt: now + index,
         source: 'lightbox-tag',
-        sourceMessageId: sourceMessage?.id || '',
-        sourceImageIndex: Number.isInteger(photo.imageIndex) ? photo.imageIndex : 0,
+        sourceMessageId,
+        sourceImageIndex,
         tags: cleanTags || ''
       });
       byDate.set(dateStr, { ...meeting, photos, amount: meeting.amount || null });
       linkedCount += 1;
+      changed = true;
     });
-    if (linkedCount === 0) return 0;
+    if (!changed) return 0;
     const photoLogs = validDates.map((dateStr, index) => (
       createActivityLog(activeCal.id, 'photo_create', dateStr, '', now + index, '사진 날짜 태그 연결')
     )).filter(Boolean);
@@ -5988,7 +6007,14 @@ function App() {
       activityLogs: photoLogs.length > 0 ? [...getCalendarActivityLogs(activeCal), ...photoLogs] : getCalendarActivityLogs(activeCal)
     };
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-    await updateCalendars(nextCalendars, `${linkedCount}건 일정 사진 연결완료`, 'success', updatedCal.id, 'settings', photoLogs);
+    await updateCalendars(
+      nextCalendars,
+      linkedCount > 0 ? `${linkedCount}건 일정 사진 연결완료` : '일정 사진 연결 정리완료',
+      'success',
+      updatedCal.id,
+      'settings',
+      photoLogs
+    );
     return linkedCount;
   };
 
@@ -6021,7 +6047,17 @@ function App() {
   };
 
   const handleSaveImageTags = async (messageId, imageIndex, tagsText, meta = {}) => {
-    if (meta?.source === 'meeting') return handleSaveMeetingPhotoTags(meta.meetingDate, meta.photoId, tagsText);
+    if (meta?.source === 'meeting') {
+      // An auto-linked 일정 사진 (created via a date hashtag, see linkTaggedImageToMeetingDates)
+      // is just a reference to a real chat photo -- edit its tags there, not on the reference
+      // itself, so the change is visible everywhere that photo appears, not just this one date.
+      // Only a manually-uploaded 일정 사진 (no sourceMessageId, no chat photo behind it) still
+      // writes to its own standalone tags field via handleSaveMeetingPhotoTags.
+      if (meta.sourceMessageId && Number.isInteger(meta.sourceImageIndex)) {
+        return handleSaveImageTags(meta.sourceMessageId, meta.sourceImageIndex, tagsText, {});
+      }
+      return handleSaveMeetingPhotoTags(meta.meetingDate, meta.photoId, tagsText);
+    }
     if (!messageId || !Number.isInteger(imageIndex)) return false;
     let sourceMessage = (chatMessages || []).find(msg => msg.id === messageId);
     if (!sourceMessage) {
@@ -6098,14 +6134,14 @@ function App() {
     const thumbUrl = String(meta?.thumb || sourceEntry?.thumb || imageUrl).trim();
     let linkedCount = 0;
     if (imageUrl) {
+      // Always call this (even with an empty dateStrs array) so removing every date tag
+      // un-links the photo from any meeting date it was previously auto-linked to.
       const dateStrs = parseFlexibleDateTokens(tagsText);
-      if (dateStrs.length > 0) {
-        try {
-          linkedCount = await linkTaggedImageToMeetingDates(dateStrs, { imageUrl, thumbUrl, imageIndex }, sourceMessage, cleanTags);
-        } catch (dateLinkErr) {
-          console.warn('Image tag date link skipped:', dateLinkErr);
-          showToast('태그는 저장됐지만 일정 사진 연결은 실패했습니다.', 'error', 5000);
-        }
+      try {
+        linkedCount = await linkTaggedImageToMeetingDates(dateStrs, { imageUrl, thumbUrl, imageIndex }, sourceMessage, cleanTags);
+      } catch (dateLinkErr) {
+        console.warn('Image tag date link skipped:', dateLinkErr);
+        showToast('태그는 저장됐지만 일정 사진 연결은 실패했습니다.', 'error', 5000);
       }
     }
     if (!linkedCount) showToast('태그 저장완료', 'success');
@@ -6704,6 +6740,45 @@ function App() {
     }
   };
 
+  // Keeps confirmedMeeting.photos[] REFERENCES (see linkTaggedImageToMeetingDates) pointing at
+  // the right photo after the chat message they trace back to loses an image -- the entry at
+  // the deleted index is dropped (that photo is gone everywhere now, not just here), and every
+  // later index shifts down by one to track the now-renumbered imageUrls array. Pass
+  // deletedImageIndex=null when the whole message was removed, dropping every reference to it
+  // regardless of index.
+  const unlinkMeetingPhotoReferences = async (messageId, deletedImageIndex) => {
+    if (!activeCal || !messageId) return;
+    const existingMeetings = getConfirmedMeetings(activeCal);
+    let changed = false;
+    const nextConfirmedMeetings = existingMeetings.map(meeting => {
+      const photos = Array.isArray(meeting.photos) ? meeting.photos : [];
+      let meetingChanged = false;
+      const nextPhotos = photos.reduce((acc, p) => {
+        if (p?.sourceMessageId !== messageId) { acc.push(p); return acc; }
+        if (deletedImageIndex === null || p.sourceImageIndex === deletedImageIndex) { meetingChanged = true; return acc; }
+        if (p.sourceImageIndex > deletedImageIndex) {
+          meetingChanged = true;
+          acc.push({ ...p, sourceImageIndex: p.sourceImageIndex - 1 });
+          return acc;
+        }
+        acc.push(p);
+        return acc;
+      }, []);
+      if (!meetingChanged) return meeting;
+      changed = true;
+      return { ...meeting, photos: nextPhotos };
+    });
+    if (!changed) return;
+    const updatedCal = {
+      ...activeCal,
+      confirmedMeeting: nextConfirmedMeetings,
+      updatedAt: Date.now(),
+      revision: (activeCal.revision || 0) + 1
+    };
+    const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
+    await updateCalendars(nextCalendars, '일정 사진 연결 정리완료', 'success', updatedCal.id, 'settings');
+  };
+
   const handleDeleteChatMessagePhoto = async (messageId, imageIndex) => {
     if (!messageId || !Number.isInteger(imageIndex)) return false;
     const sourceMessage = await findChatMessageById(messageId);
@@ -6727,6 +6802,7 @@ function App() {
           await deleteMessageRest(activeCalId, messageId);
         }
         removeLocalChatMessage(messageId);
+        unlinkMeetingPhotoReferences(messageId, null).catch(err => console.warn('unlinkMeetingPhotoReferences skipped:', err));
       } else {
         const data = sanitizeMessageForFirestore({
           imageUrls: nextUrls,
@@ -6742,6 +6818,7 @@ function App() {
           if (!ok) throw new Error('Photo delete REST update failed');
         }
         patchLocalChatMessage(messageId, data);
+        unlinkMeetingPhotoReferences(messageId, imageIndex).catch(err => console.warn('unlinkMeetingPhotoReferences skipped:', err));
       }
       deleteChatImageFromStorage(target.full);
       if (target.thumb !== target.full) deleteChatImageFromStorage(target.thumb);
@@ -6890,13 +6967,27 @@ function App() {
   // the edit/delete buttons for it).
   const handleDeletePhoto = meta => {
     if (!meta || meta.directMediaUrl) return false;
-    if (meta.source === 'meeting') return handleDeleteMeetingPhoto(meta.meetingDate, meta.photoId);
+    if (meta.source === 'meeting') {
+      // An auto-linked 일정 사진 is the same photo as its chat original -- deleting it here
+      // deletes the real photo (and every other date it's linked to, via
+      // unlinkMeetingPhotoReferences), not just this one date's reference to it. Only a
+      // manually-uploaded 일정 사진 (no sourceMessageId) is deleted as its own standalone thing.
+      if (meta.sourceMessageId && Number.isInteger(meta.sourceImageIndex)) {
+        return handleDeleteChatMessagePhoto(meta.sourceMessageId, meta.sourceImageIndex);
+      }
+      return handleDeleteMeetingPhoto(meta.meetingDate, meta.photoId);
+    }
     if (meta.source === 'memo') return handleDeleteMemoPhoto(meta.messageId, meta.imageIndex);
     return handleDeleteChatMessagePhoto(meta.messageId, meta.imageIndex);
   };
   const handleReplacePhoto = (meta, file) => {
     if (!meta || meta.directMediaUrl) return false;
-    if (meta.source === 'meeting') return handleReplaceMeetingPhoto(meta.meetingDate, meta.photoId, file);
+    if (meta.source === 'meeting') {
+      if (meta.sourceMessageId && Number.isInteger(meta.sourceImageIndex)) {
+        return handleReplaceChatMessagePhoto(meta.sourceMessageId, meta.sourceImageIndex, file);
+      }
+      return handleReplaceMeetingPhoto(meta.meetingDate, meta.photoId, file);
+    }
     if (meta.source === 'memo') return handleReplaceMemoPhoto(meta.messageId, meta.imageIndex, file);
     return handleReplaceChatMessagePhoto(meta.messageId, meta.imageIndex, file);
   };
@@ -7305,6 +7396,7 @@ function App() {
       anniversaries: anniversaries,
       dateStr: selectedDate,
       calendar: activeCal,
+      chatMessages: allChatMessages,
       onSave: handleSaveAvailability,
       onDelete: handleDeleteAvailability,
       onDeleteDate: handleDeleteAllForDate,
@@ -9757,6 +9849,30 @@ function getMessageImageEntries(msg) {
   return entries;
 }
 
+// A confirmedMeeting.photos[] entry auto-linked via a date hashtag (see
+// linkTaggedImageToMeetingDates) is a REFERENCE to a real chat message photo
+// (sourceMessageId + sourceImageIndex), not an independent copy -- its imageUrl/thumbUrl/tags
+// are resolved live from the source message here whenever it's still loaded locally, so the
+// exact same photo with the exact same tags shows up identically in the chat room, every
+// gallery, and every meeting date it's linked to, and an edit from any one of those places is
+// immediately visible everywhere else. Falls back to the entry's own stored fields when the
+// source message isn't loaded locally (yet) or no longer exists, and passes manually-uploaded
+// 일정 사진 (no sourceMessageId -- a standalone upload with no chat photo behind it) straight
+// through unchanged.
+function resolveMeetingPhotoDisplay(photo, chatMessages) {
+  const fallback = {
+    imageUrl: photo?.imageUrl || photo?.full || '',
+    thumbUrl: photo?.thumbUrl || photo?.thumb || photo?.imageUrl || photo?.full || '',
+    tags: String(photo?.tags || '')
+  };
+  if (!photo?.sourceMessageId || !Number.isInteger(photo?.sourceImageIndex)) return fallback;
+  const sourceMessage = (Array.isArray(chatMessages) ? chatMessages : []).find(m => m && m.id === photo.sourceMessageId);
+  if (!sourceMessage) return fallback;
+  const entry = getMessageImageEntries(sourceMessage)[photo.sourceImageIndex];
+  if (!entry) return fallback;
+  return { imageUrl: entry.full, thumbUrl: entry.thumb, tags: entry.tags || '' };
+}
+
 function getDirectMediaTagKey(url) {
   const source = String(url || '');
   let hash = 2166136261;
@@ -11396,6 +11512,7 @@ function bindGatherUiDeps() {
     ChatGalleryModal: typeof ChatGalleryModal === 'function' ? ChatGalleryModal : null,
     LinkPreviewCard: typeof LinkPreviewCard === 'function' ? LinkPreviewCard : null,
     getMessageImageEntries: typeof getMessageImageEntries === 'function' ? getMessageImageEntries : null,
+    resolveMeetingPhotoDisplay: typeof resolveMeetingPhotoDisplay === 'function' ? resolveMeetingPhotoDisplay : null,
     DateModal: typeof DateModal === 'function' ? DateModal : null,
     MemoView: typeof MemoView === 'function' ? MemoView : null,
     ChatRoomView: typeof ChatRoomView === 'function' ? ChatRoomView : null,
