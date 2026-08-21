@@ -2660,6 +2660,7 @@ select.form-select {
   padding-right: 2px;
 }
 .memo-edit-textarea {
+  font-size: 0.82rem;
   max-height: min(48vh, 480px) !important;
   overflow-y: auto !important;
   overflow-x: hidden !important;
