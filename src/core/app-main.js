@@ -7240,7 +7240,14 @@ function App() {
         onLoadOlderChat: loadOlderChatMessages,
         hasMoreMemos: hasMoreMemos,
         onLoadMoreMemos: () => setMemosLimit(prev => prev + MEMOS_PAGE_SIZE),
-        totalGalleryCount: totalGalleryCount
+        totalGalleryCount: totalGalleryCount,
+        isDarkTheme: isDarkTheme,
+        onToggleTheme: toggleTheme,
+        fontScalePercent: fontScalePercent,
+        onDecreaseFont: () => setFontScalePercent(prev => Math.max(80, prev - 10)),
+        onIncreaseFont: () => setFontScalePercent(prev => Math.min(130, prev + 10)),
+        isChatNotifyEnabled: mainNotifPermission === 'granted' && mainChatNotifyEnabled,
+        onToggleChatNotifications: handleMainToggleNotifications
       }),
       activeLightbox ? /*#__PURE__*/React.createElement(Lightbox, {
         urls: activeLightbox.urls,

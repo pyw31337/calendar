@@ -683,7 +683,14 @@ export function ChatGalleryModal({
   onLoadOlderChat = null,
   hasMoreMemos = false,
   onLoadMoreMemos = null,
-  totalGalleryCount = 0
+  totalGalleryCount = 0,
+  isDarkTheme,
+  onToggleTheme,
+  fontScalePercent,
+  onDecreaseFont,
+  onIncreaseFont,
+  isChatNotifyEnabled,
+  onToggleChatNotifications
 }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -691,6 +698,7 @@ export function ChatGalleryModal({
   const ResizableModalContainer = __deps.ResizableModalContainer;
   const SmallXIcon = __deps.SmallXIcon;
   const BackArrowIcon = __deps.BackArrowIcon;
+  const SharedSideMenuSettings = __comp.SharedSideMenuSettings || __deps.SharedSideMenuSettings;
   const InlineSearchBar = __comp.InlineSearchBar || __deps.InlineSearchBar;
   const LinkPreviewCard = __deps.LinkPreviewCard || __comp.LinkPreviewCard;
   const MenuIcon = __deps.MenuIcon || __comp.MenuIcon;
@@ -978,19 +986,6 @@ export function ChatGalleryModal({
           }, formatChatHeaderTitle(calendar?.title) ? formatChatHeaderTitle(calendar?.title) + " 갤러리" : "갤러리"),
           /*#__PURE__*/React.createElement("button", {
             type: "button",
-            onClick: () => setIsSearchOpen(prev => { if (prev) setSearchQuery(''); return !prev; }),
-            title: "검색", "aria-label": "갤러리 검색",
-            style: {
-              background: 'none', border: 'none', cursor: 'pointer', padding: '6px',
-              color: isSearchOpen ? 'var(--text-main)' : '#64748B',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
-            }
-          }, /*#__PURE__*/React.createElement("svg", {
-            xmlns: "http://www.w3.org/2000/svg", width: "22", height: "22", viewBox: "0 0 24 24",
-            fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
-          }, /*#__PURE__*/React.createElement("circle", { cx: "11", cy: "11", r: "8" }), /*#__PURE__*/React.createElement("path", { d: "m21 21-4.3-4.3" }))),
-          /*#__PURE__*/React.createElement("button", {
-            type: "button",
             onClick: () => setIsMenuOpen(true),
             title: "갤러리 메뉴", "aria-label": "갤러리 메뉴",
             style: {
@@ -1027,11 +1022,12 @@ export function ChatGalleryModal({
     style: { display: 'none' }
   }),
   asPage && isMenuOpen && /*#__PURE__*/React.createElement("div", {
-    className: "admin-side-menu-overlay gallery-side-menu-overlay",
+    className: "admin-side-menu-overlay",
     onClick: () => setIsMenuOpen(false),
     style: { zIndex: 12000 }
   }, /*#__PURE__*/React.createElement("nav", {
-    className: "admin-side-menu gallery-side-menu-panel",
+    className: "admin-side-menu",
+    "aria-label": "갤러리 메뉴",
     onClick: e => e.stopPropagation()
   },
     /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-header" },
@@ -1048,6 +1044,20 @@ export function ChatGalleryModal({
       }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }))
     ),
     /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-list" },
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "admin-side-menu-item",
+        onClick: () => { setIsMenuOpen(false); setIsSearchOpen(true); }
+      },
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", {
+          xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24",
+          fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
+        }, /*#__PURE__*/React.createElement("circle", { cx: "11", cy: "11", r: "8" }), /*#__PURE__*/React.createElement("path", { d: "m21 21-4.3-4.3" }))),
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "갤러리 검색"),
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "사진·링크 통합 검색")
+        )
+      ),
       /*#__PURE__*/React.createElement("button", {
         type: "button",
         className: "admin-side-menu-item",
@@ -1081,7 +1091,16 @@ export function ChatGalleryModal({
           /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "홈 화면에 빠르게 접근")
         )
       )
-    )
+    ),
+    /*#__PURE__*/React.createElement(SharedSideMenuSettings, {
+      isDarkTheme: isDarkTheme,
+      onToggleTheme: onToggleTheme,
+      fontScalePercent: fontScalePercent,
+      onDecreaseFont: onDecreaseFont,
+      onIncreaseFont: onIncreaseFont,
+      isChatNotifyEnabled: isChatNotifyEnabled,
+      onToggleChatNotifications: onToggleChatNotifications
+    })
   )),
   isSearchOpen && /*#__PURE__*/React.createElement(InlineSearchBar, {
     value: searchQuery,
