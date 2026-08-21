@@ -1456,10 +1456,13 @@ function removeFirstUrl(...args) {
 // from pushing the rest of the form off-screen -- past that point it scrolls internally as before.
 function autoGrowTextarea(el, maxHeight = 480) {
   if (!el) return;
-  el.style.overflow = 'hidden';
+  el.style.overflowX = 'hidden';
+  el.style.overflowY = 'hidden';
   el.style.height = 'auto';
-  const next = Math.min(maxHeight, Math.max(el.scrollHeight, el.offsetHeight || 0));
+  const scrollHeight = el.scrollHeight;
+  const next = Math.min(maxHeight, Math.max(scrollHeight, el.offsetHeight || 0));
   el.style.height = `${next}px`;
+  el.style.overflowY = scrollHeight > maxHeight ? 'auto' : 'hidden';
 }
 
 // 입력필드 규칙: 멀티라인 텍스트는 값(로드/입력/붙여넣기)에 맞춰 세로로 자동 확장

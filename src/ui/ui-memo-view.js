@@ -1807,6 +1807,7 @@ export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoad
           /* Body Textarea */
           /*#__PURE__*/React.createElement("textarea", {
             ref: editMemoTextareaRef,
+            className: "memo-edit-textarea",
             placeholder: "메모 입력...",
             value: editText,
             onChange: e => { setEditText(e.target.value); autoGrowTextarea(e.target, 480); },
