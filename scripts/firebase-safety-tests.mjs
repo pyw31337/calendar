@@ -10,6 +10,7 @@ function assert(condition, message) {
 const script = fs.readFileSync('assets/app-main.js', 'utf8');
 const utilsScript = fs.readFileSync('assets/app-utils.js', 'utf8');
 const notificationScript = fs.readFileSync('assets/app-notifications.js', 'utf8');
+const firestoreRules = fs.existsSync('firestore.rules') ? fs.readFileSync('firestore.rules', 'utf8') : '';
 assert(script, 'assets/app-main.js not found');
 assert(!/JSONBlob|jsonblob|localStorage|gather_calendars|FORCE_LOCAL_STORAGE/.test(script), 'app script must not use legacy browser or JSONBlob storage');
 assert(!/8월 여름휴가|여름 휴가|하계휴가|친목 모임|꽃잎반 모임 \(cw\)/.test(script), 'app script must not include obsolete seed calendar copy');
@@ -20,6 +21,9 @@ assert(/if \(thumbs\.length === 1\)[\s\S]{0,260}src: displayUrls\[0\] \|\| thumb
 assert(/thumbs\.map\(\(thumb, idx\)[\s\S]{0,520}objectFit: 'cover'/.test(script), 'multi-image chat grid should keep cropped square thumbnails');
 const setChatNotifyPrefBody = script.match(/function setChatNotifyEnabledForCalendar\(calId, enabled\) \{([\s\S]*?)\n\}/)?.[1] || '';
 assert(!setChatNotifyPrefBody.includes('gather_chat_notify_pref_global_v1'), 'new chat notification writes must be calendar-scoped, not global');
+assert(/directMediaTags/.test(script), 'direct URL image tags must be persisted on chat messages');
+assert(/directMediaTags/.test(firestoreRules), 'Firestore rules must allow direct URL image tag updates');
+assert(/affectedKeys\(\)\.hasOnly\(\[[^\]]*directMediaTags/.test(firestoreRules), 'message update rules must include directMediaTags in the allowed update mask');
 
 function createContext(url) {
   const parsed = new URL(url);
