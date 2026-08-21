@@ -8,7 +8,7 @@
     // instead of failing closed with a silent-data-loss 403 (see assets/app-main.js's
     // stripEmbeddedPlacesField/stripEmbeddedConfirmedMeetingField call sites).
     ENABLE_PLACES_SUBCOLLECTION_MIGRATION: true,
-    PUBLIC_CALENDAR_IDS: Object.freeze(['kkot', 'cw']),
+    PUBLIC_CALENDAR_IDS: Object.freeze(['kkot', 'cw', 'jhair']),
     FIREBASE_LOAD_TIMEOUT_MS: 10000,
     FIREBASE_LOAD_MAX_ATTEMPTS: 3,
     MEMOS_PAGE_SIZE: 30,

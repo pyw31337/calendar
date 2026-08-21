@@ -313,7 +313,7 @@ const ENABLE_FIRESTORE_WRITES = GATHER_APP_CONFIG.ENABLE_FIRESTORE_WRITES !== fa
 // unionConfirmedMeetings, feeding activeCal) stays active either way since it's a safe no-op
 // while the subcollections are empty.
 const ENABLE_PLACES_SUBCOLLECTION_MIGRATION = GATHER_APP_CONFIG.ENABLE_PLACES_SUBCOLLECTION_MIGRATION === true;
-const PUBLIC_CALENDAR_IDS = Array.isArray(GATHER_APP_CONFIG.PUBLIC_CALENDAR_IDS) ? GATHER_APP_CONFIG.PUBLIC_CALENDAR_IDS : ['kkot', 'cw'];
+const PUBLIC_CALENDAR_IDS = Array.isArray(GATHER_APP_CONFIG.PUBLIC_CALENDAR_IDS) ? GATHER_APP_CONFIG.PUBLIC_CALENDAR_IDS : ['kkot', 'cw', 'jhair'];
 const FIREBASE_LOAD_TIMEOUT_MS = readConfigNumber('FIREBASE_LOAD_TIMEOUT_MS', 10000);
 const FIREBASE_LOAD_MAX_ATTEMPTS = readConfigNumber('FIREBASE_LOAD_MAX_ATTEMPTS', 3);
 // Memos load newest-first in pages of this size instead of the whole collection at once, so a
@@ -1980,7 +1980,7 @@ function mergeCalendarCollections(sourceList, targetList, options = {}) {
   });
   return Array.from(map.values());
 }
-const INITIAL_CALENDARS = ['kkot', 'cw'].map(id => ({
+const INITIAL_CALENDARS = ['kkot', 'cw', 'jhair'].map(id => ({
   id,
   title: '캘린더 불러오는 중...',
   description: 'Firebase에서 실시간 캘린더 데이터를 불러오는 중입니다.',
