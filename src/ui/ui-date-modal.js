@@ -2270,7 +2270,8 @@ export function DateModal({
             }
           },
             /*#__PURE__*/React.createElement("div", {
-              style: { position: 'absolute', top: '10px', right: '10px', display: 'flex', alignItems: 'center', gap: '4px' }
+              className: "expense-row-actions",
+              style: { position: 'absolute', top: '10px', right: '10px', display: 'flex', alignItems: 'center', gap: '6px' }
             },
               expenses.length > 1 && /*#__PURE__*/React.createElement("button", {
                 type: "button",
@@ -2287,10 +2288,26 @@ export function DateModal({
                 onClick: event => { event.preventDefault(); event.stopPropagation(); },
                 onPointerDown: event => beginExpensePointerSort(event, expense.id)
               }, /*#__PURE__*/React.createElement(LineHeightIcon, { size: 12 })),
-              /*#__PURE__*/React.createElement(ItemEditDeleteActions, {
-                onEdit: () => handleExpenseItemClick(expense),
-                onDelete: event => handleDeleteExpenseClick(event || { stopPropagation() {} }, expense.id)
-              })
+              /*#__PURE__*/React.createElement("button", {
+                type: "button",
+                className: "expense-row-delete-btn",
+                title: "삭제",
+                "aria-label": "삭제",
+                style: {
+                  width: '22px',
+                  height: '22px',
+                  border: 'none',
+                  background: 'none',
+                  borderRadius: '6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  padding: 0,
+                  color: 'var(--text-muted)'
+                },
+                onClick: event => handleDeleteExpenseClick(event, expense.id)
+              }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 14 }))
             ),
             /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '4px', minWidth: 0 } },
               /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' } },
