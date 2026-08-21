@@ -432,6 +432,49 @@ function unsubscribeUserFromPush(...args) {
   const f = __gatherUiDeps().unsubscribeUserFromPush || GATHER_APP_UTILS.unsubscribeUserFromPush;
   return typeof f === 'function' ? f(...args) : undefined;
 }
+
+function isNotificationSupported(...args) {
+  const n = window.GATHER_APP_NOTIFICATIONS || {};
+  const f = __gatherUiDeps().isNotificationSupported || n.isNotificationSupported || GATHER_APP_UTILS.isNotificationSupported;
+  if (typeof f === 'function') return f(...args);
+  try { return typeof Notification !== 'undefined' && 'Notification' in window; } catch (_) { return false; }
+}
+function isChatNotifyEnabledForCalendar(...args) {
+  const n = window.GATHER_APP_NOTIFICATIONS || {};
+  const f = __gatherUiDeps().isChatNotifyEnabledForCalendar || n.isChatNotifyEnabledForCalendar;
+  return typeof f === 'function' ? f(...args) : false;
+}
+function setChatNotifyEnabledForCalendar(...args) {
+  const n = window.GATHER_APP_NOTIFICATIONS || {};
+  const f = __gatherUiDeps().setChatNotifyEnabledForCalendar || n.setChatNotifyEnabledForCalendar;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function probeNotificationCapability(...args) {
+  const n = window.GATHER_APP_NOTIFICATIONS || {};
+  const f = __gatherUiDeps().probeNotificationCapability || n.probeNotificationCapability;
+  if (typeof f === 'function') return f(...args);
+  return Promise.resolve({ ok: isNotificationSupported(), reason: 'unsupported' });
+}
+function ensureChatNotificationPermission(...args) {
+  const n = window.GATHER_APP_NOTIFICATIONS || {};
+  const f = __gatherUiDeps().ensureChatNotificationPermission || n.ensureChatNotificationPermission;
+  if (typeof f === 'function') return f(...args);
+  try {
+    if (!isNotificationSupported()) return Promise.resolve('unsupported');
+    if (Notification.permission === 'granted') return Promise.resolve('granted');
+    if (Notification.permission === 'denied') return Promise.resolve('denied');
+    return Notification.requestPermission();
+  } catch (_) {
+    return Promise.resolve('unsupported');
+  }
+}
+function describePushSubscribeFailure(...args) {
+  const n = window.GATHER_APP_NOTIFICATIONS || {};
+  const f = __gatherUiDeps().describePushSubscribeFailure || n.describePushSubscribeFailure;
+  if (typeof f === 'function') return f(...args);
+  return String(args[0] || 'unknown');
+}
+
 function validateBackupCalendars(...args) {
   const f = __gatherUiDeps().validateBackupCalendars || GATHER_APP_UTILS.validateBackupCalendars;
   return typeof f === 'function' ? f(...args) : undefined;

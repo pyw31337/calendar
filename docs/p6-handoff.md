@@ -447,3 +447,8 @@ zsh 에서 줄 시작 `#` 주석은 쓰지 말 것.
 - 설정 모달 높이 admin-settings-modal VV 상한 720
 - SW Response clone 오류 수정 (cache-first revalidate)
 - shortcut icon 링크 추가
+
+## P6-76 (2026-08-21)
+- AdminModal: isNotificationSupported 등 알림 헬퍼 ESM 심 추가 (설정 빈 화면 수정)
+- getActiveParticipants/sanitizeText deps fallback
+- SW Response clone 재수정
