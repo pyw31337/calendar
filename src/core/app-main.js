@@ -7297,8 +7297,6 @@ function App() {
       onDeleteExpense: handleDeleteExpense,
       onReorderExpenses: handleReorderExpenses,
       onAddMeetingPhotos: handleAddMeetingPhotos,
-      onDeleteMeetingPhoto: handleDeleteMeetingPhoto,
-      onReplaceMeetingPhoto: handleReplaceMeetingPhoto,
       setActiveLightbox: setActiveLightbox,
       initialTab: dateModalInitialTab,
       onSavePlace: handleSavePlace,
