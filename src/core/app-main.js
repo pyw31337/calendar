@@ -2719,6 +2719,20 @@ async function deleteMessageRest(calId, messageId) {
   }
 }
 
+async function fetchMessageRest(calId, messageId) {
+  try {
+    if (!calId || !messageId) return null;
+    const url = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/calendars/cal_${calId}/messages/${messageId}`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const doc = await res.json();
+    return { ...firestoreDocumentToJs(doc), id: messageId };
+  } catch (err) {
+    console.warn('fetchMessageRest error:', err);
+    return null;
+  }
+}
+
 async function updateMessageRest(calId, messageId, data) {
   try {
     const fields = {};
@@ -2727,7 +2741,12 @@ async function updateMessageRest(calId, messageId, data) {
     if (data.thumbUrl !== undefined) fields.thumbUrl = jsToFirestoreValue(data.thumbUrl);
     if (data.imageUrls !== undefined) fields.imageUrls = jsToFirestoreValue(data.imageUrls);
     if (data.thumbUrls !== undefined) fields.thumbUrls = jsToFirestoreValue(data.thumbUrls);
+    if (data.imageShareUrls !== undefined) fields.imageShareUrls = jsToFirestoreValue(data.imageShareUrls);
+    if (data.imageTags !== undefined) fields.imageTags = jsToFirestoreValue(data.imageTags);
+    if (data.directMediaTags !== undefined) fields.directMediaTags = jsToFirestoreValue(data.directMediaTags);
+    if (data.linkPreview !== undefined) fields.linkPreview = jsToFirestoreValue(data.linkPreview);
     if (data.participantId !== undefined) fields.participantId = jsToFirestoreValue(data.participantId);
+    if (Object.keys(fields).length === 0) return false;
     const updateMask = Object.keys(fields).map(k => `updateMask.fieldPaths=${k}`).join('&');
     const url = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/calendars/cal_${calId}/messages/${messageId}?${updateMask}`;
     const res = await fetch(url, {
@@ -5932,8 +5951,23 @@ function App() {
 
   const handleSaveImageTags = async (messageId, imageIndex, tagsText, meta = {}) => {
     if (!messageId || !Number.isInteger(imageIndex)) return false;
-    const sourceMessage = (chatMessages || []).find(msg => msg.id === messageId);
-    if (!sourceMessage) return false;
+    let sourceMessage = (chatMessages || []).find(msg => msg.id === messageId);
+    if (!sourceMessage) {
+      try {
+        if (firebaseDb) {
+          const snap = await withTimeout(firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages').doc(messageId).get(), 9000, 'image tag source message read');
+          sourceMessage = snap?.exists ? { id: messageId, ...snap.data() } : null;
+        } else {
+          sourceMessage = await fetchMessageRest(activeCalId, messageId);
+        }
+      } catch (readErr) {
+        console.warn('Image tag source message read failed:', readErr);
+      }
+    }
+    if (!sourceMessage) {
+      showToast('태그 저장 대상 이미지를 찾지 못했습니다.', 'error', 4000);
+      return false;
+    }
     const isDirectMedia = !!meta?.directMediaUrl;
     const entryCount = getMessageImageEntries(sourceMessage).length;
     if (!isDirectMedia && (imageIndex < 0 || imageIndex >= entryCount)) return false;
