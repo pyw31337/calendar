@@ -433,3 +433,11 @@ zsh 에서 줄 시작 `#` 주석은 쓰지 말 것.
 ## P6-73 (2026-08-21)
 - 모바일 modal max-height: min(670px, 72svh, viewport-100px)
 - 짧은 기기에서는 670 대신 뷰포트 한도 적용 → 잘림 방지
+
+## P6-74 (2026-08-21) 로딩 속도
+- localStorage 캘린더 캐시 복구 (즉시 표시, 클라우드는 백그라운드 갱신)
+- lastModified 메타 로컬 저장
+- Firestore enablePersistence(synchronizeTabs)
+- 캐시 히트 시 초기 로딩 오버레이 생략
+- 오버레이: 1s→280ms, 진행 갱신 빠르게
+- 폴백 get 2.5s→1.2s, 타임아웃 기본 8s

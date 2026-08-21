@@ -351,7 +351,7 @@ const ENABLE_FIRESTORE_WRITES = GATHER_APP_CONFIG.ENABLE_FIRESTORE_WRITES !== fa
 // while the subcollections are empty.
 const ENABLE_PLACES_SUBCOLLECTION_MIGRATION = GATHER_APP_CONFIG.ENABLE_PLACES_SUBCOLLECTION_MIGRATION === true;
 const PUBLIC_CALENDAR_IDS = Array.isArray(GATHER_APP_CONFIG.PUBLIC_CALENDAR_IDS) ? GATHER_APP_CONFIG.PUBLIC_CALENDAR_IDS : ['kkot', 'cw', 'jhair'];
-const FIREBASE_LOAD_TIMEOUT_MS = readConfigNumber('FIREBASE_LOAD_TIMEOUT_MS', 10000);
+const FIREBASE_LOAD_TIMEOUT_MS = readConfigNumber('FIREBASE_LOAD_TIMEOUT_MS', 8000);
 const FIREBASE_LOAD_MAX_ATTEMPTS = readConfigNumber('FIREBASE_LOAD_MAX_ATTEMPTS', 3);
 // Memos load newest-first in pages of this size instead of the whole collection at once, so a
 // calendar with thousands of memos doesn't download/subscribe to all of them on every open.
@@ -2194,12 +2194,71 @@ const INITIAL_CALENDARS = ['kkot', 'cw'].map(id => ({
   updatedAt: 0
 }));
 
-function loadLocalCache() {
-  // Firestore is the only source of truth. Start empty so seed/demo data can never flash on screen.
-  return [];
+const GATHER_LOCAL_CACHE_KEY = 'gather_calendars_cache_v2';
+const GATHER_LOCAL_META_KEY = 'gather_calendars_meta_v2';
+
+function __gatherSafeLocalStorage() {
+  try { return window.localStorage; } catch (_) { return null; }
 }
 
-function saveLocalCache() {}
+function loadLocalCache() {
+  // Instant paint from last successful cloud snapshot. Firestore remains source of truth
+  // and replaces this via onSnapshot (revision/lastModified gated).
+  try {
+    const ls = __gatherSafeLocalStorage();
+    if (!ls) return [];
+    const raw = ls.getItem(GATHER_LOCAL_CACHE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter(c => c && typeof c.id === 'string' && isAllowedCalendarId(c.id))
+      .map(c => cloneCalendar(c))
+      .filter(Boolean);
+  } catch (e) {
+    console.warn('loadLocalCache notice:', e);
+    return [];
+  }
+}
+
+function saveLocalCache(list) {
+  try {
+    const ls = __gatherSafeLocalStorage();
+    if (!ls || !Array.isArray(list)) return;
+    const slim = list
+      .filter(c => c && isAllowedCalendarId(c.id))
+      .map(c => {
+        const next = cloneCalendar(c);
+        if (!next) return null;
+        if (Array.isArray(next.activityLogs) && next.activityLogs.length > 80) {
+          next.activityLogs = next.activityLogs.slice(-80);
+        }
+        return next;
+      })
+      .filter(Boolean);
+    ls.setItem(GATHER_LOCAL_CACHE_KEY, JSON.stringify(slim));
+  } catch (e) {
+    try {
+      const ls = __gatherSafeLocalStorage();
+      if (!ls || !Array.isArray(list)) return;
+      const tiny = list.filter(c => c && isAllowedCalendarId(c.id)).slice(0, 3).map(c => ({
+        id: c.id,
+        title: c.title,
+        description: c.description,
+        participants: c.participants,
+        availabilities: c.availabilities,
+        polls: c.polls,
+        places: c.places,
+        confirmedMeeting: c.confirmedMeeting,
+        revision: c.revision,
+        updatedAt: c.updatedAt
+      }));
+      ls.setItem(GATHER_LOCAL_CACHE_KEY, JSON.stringify(tiny));
+    } catch (e2) {
+      console.warn('saveLocalCache notice:', e2);
+    }
+  }
+}
 
 // Placeholder shown only until the real Firestore document arrives -- deliberately generic
 // (not a real-looking calendar name) so a refresh never flashes stale/outdated text before the
@@ -2309,6 +2368,13 @@ try {
       firebase.initializeApp(firebaseConfig);
     }
     __setFirebaseDb(firebase.firestore());
+    try {
+      firebase.firestore().enablePersistence({ synchronizeTabs: true }).catch(function (err) {
+        console.warn('Firestore persistence notice:', err && err.code || err);
+      });
+    } catch (persistErr) {
+      console.warn('Firestore persistence init notice:', persistErr);
+    }
     bindGatherFirebaseDeps();
   }
 } catch (e) {
@@ -3289,9 +3355,33 @@ async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 18,
   return pushSingleCalendarWithRest(normalizedCal, lastModified, saveMode, retryCount, newActivityLogs);
 }
 function loadLocalMeta() {
-  return { lastModified: 0, byCalendar: {} };
+  try {
+    const ls = __gatherSafeLocalStorage();
+    if (!ls) return { lastModified: 0, byCalendar: {} };
+    const raw = ls.getItem(GATHER_LOCAL_META_KEY);
+    if (!raw) return { lastModified: 0, byCalendar: {} };
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return { lastModified: 0, byCalendar: {} };
+    return {
+      lastModified: typeof parsed.lastModified === 'number' ? parsed.lastModified : 0,
+      byCalendar: parsed.byCalendar && typeof parsed.byCalendar === 'object' ? parsed.byCalendar : {}
+    };
+  } catch (_) {
+    return { lastModified: 0, byCalendar: {} };
+  }
 }
-function saveLocalMeta() {}
+function saveLocalMeta(meta) {
+  try {
+    const ls = __gatherSafeLocalStorage();
+    if (!ls || !meta) return;
+    ls.setItem(GATHER_LOCAL_META_KEY, JSON.stringify({
+      lastModified: typeof meta.lastModified === 'number' ? meta.lastModified : 0,
+      byCalendar: meta.byCalendar && typeof meta.byCalendar === 'object' ? meta.byCalendar : {}
+    }));
+  } catch (e) {
+    console.warn('saveLocalMeta notice:', e);
+  }
+}
 
 function getMetaLastModified(meta, calendarId) {
   if (!meta) return 0;
@@ -4178,7 +4268,16 @@ function App() {
   const [voteTarget, setVoteTarget] = React.useState(null);
   const [isGuideOpen, setIsGuideOpen] = React.useState(false);
   const [isAnniversariesOpen, setIsAnniversariesOpen] = React.useState(false);
-  const [isInitialDataLoading, setIsInitialDataLoading] = React.useState(() => Boolean(firebaseDb));
+  const [isInitialDataLoading, setIsInitialDataLoading] = React.useState(() => {
+    if (!firebaseDb) return false;
+    try {
+      const cached = loadLocalCache();
+      const hit = Array.isArray(cached) && cached.some(c => c && c.id === activeCalId && c.title && c.title !== '캘린더 불러오는 중...');
+      return !hit;
+    } catch (_) {
+      return true;
+    }
+  });
   const initialLoadOverlayTimerRef = React.useRef(null);
   const initialLoadOverlayIntervalRef = React.useRef(null);
   React.useEffect(() => {
@@ -4190,19 +4289,19 @@ function App() {
       setOperationProgress(prev => prev?.id === 'initial-load' ? null : prev);
       return;
     }
-    let pct = 18;
+    let pct = 22;
     initialLoadOverlayTimerRef.current = setTimeout(() => {
       setOperationProgress({
         id: 'initial-load',
-        title: '캘린더 데이터 로딩 중...',
-        detail: 'Firebase에서 최신 캘린더와 채팅 데이터를 불러오고 있습니다.',
+        title: '캘린더 불러오는 중...',
+        detail: '최신 데이터를 동기화하고 있습니다.',
         pct
       });
       initialLoadOverlayIntervalRef.current = setInterval(() => {
-        pct = Math.min(92, pct + (pct < 60 ? 7 : 3));
+        pct = Math.min(90, pct + (pct < 50 ? 12 : 5));
         setOperationProgress(prev => prev?.id === 'initial-load' ? { ...prev, pct } : prev);
-      }, 700);
-    }, 1000);
+      }, 400);
+    }, 280);
     return () => {
       if (initialLoadOverlayTimerRef.current) clearTimeout(initialLoadOverlayTimerRef.current);
       if (initialLoadOverlayIntervalRef.current) clearInterval(initialLoadOverlayIntervalRef.current);
@@ -4471,7 +4570,8 @@ function App() {
     let isMounted = true;
     let hasLoadedCloudCalendar = false;
     let unsubscribe = null;
-    setIsInitialDataLoading(true);
+    const cacheHit = (calendars || []).some(c => c && c.id === activeCalId && c.title && c.title !== '캘린더 불러오는 중...');
+    setIsInitialDataLoading(!cacheHit);
 
     const applyLoadedCalendar = (cloudCal, cloudLastMod = Date.now()) => {
       if (!isMounted || !cloudCal || cloudCal.id !== activeCalId) return false;
@@ -4525,7 +4625,7 @@ function App() {
     // calls on every normal calendar open.
     const fallbackTimeoutId = setTimeout(() => {
       if (isMounted && !hasLoadedCloudCalendar) runInitialLoad();
-    }, 2500);
+    }, 1200);
 
     return () => {
       isMounted = false;
