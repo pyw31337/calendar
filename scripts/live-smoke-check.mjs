@@ -21,6 +21,12 @@ const pages = [
   '?admin=1&restore=1'
 ];
 
+const sharePages = [
+  ['kkot', '🌸 꽃잎반 캘린더'],
+  ['cw', '🍺 모아엘가 캘린더'],
+  ['jhair', '💈 제이헤어 캘린더']
+];
+
 const CLASSIC_REQUIRED_SCRIPT_MARKERS = [
   'assets/app-main.js',
   'assets/app-utils.js',
@@ -80,6 +86,26 @@ for (const page of pages) {
     } else {
       if (!html.includes('assets/app-utils.js')) throw new Error(`Missing app-utils: ${url}`);
       if (!html.includes('assets/app-notifications.js')) throw new Error(`Missing app-notifications: ${url}`);
+    }
+  });
+}
+
+for (const [calendarId, expectedTitle] of sharePages) {
+  await checkUrl(withCacheBust(`share/${calendarId}/`), (html, url) => {
+    if (!html.includes(`<title>${expectedTitle}</title>`)) {
+      throw new Error(`Share page title mismatch: ${url}`);
+    }
+    if (!html.includes(`property="og:title" content="${expectedTitle}"`)) {
+      throw new Error(`Share page og:title mismatch: ${url}`);
+    }
+    if (!html.includes(`href="https://pyw31337.github.io/calendar/?id=${calendarId}"`)) {
+      throw new Error(`Share page canonical mismatch: ${url}`);
+    }
+    if (!html.includes(`property="og:url" content="https://pyw31337.github.io/calendar/share/${calendarId}/"`)) {
+      throw new Error(`Share page og:url mismatch: ${url}`);
+    }
+    if (!html.includes(`github.io/calendar/?id=${calendarId}`)) {
+      throw new Error(`Share page redirect target mismatch: ${url}`);
     }
   });
 }
