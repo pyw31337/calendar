@@ -799,7 +799,7 @@ export function SimpleBottomSheetPicker({ title, value, options, onSelect, place
   );
 }
 
-export function PhotoGallery({ chatMessages, calendar = null, totalGalleryCount, onViewAll, showToast, onPromoteImageUrl, onSaveImageTags, onSearchTag }) {
+export function PhotoGallery({ chatMessages, calendar = null, totalGalleryCount, onViewAll, showToast, onPromoteImageUrl, onSaveImageTags, onSearchTag, onDeletePhoto, onReplacePhoto, onJumpToChatMessage, onJumpToMemo, onJumpToMeetingDate, onRequestConfirm }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -940,7 +940,13 @@ export function PhotoGallery({ chatMessages, calendar = null, totalGalleryCount,
       showToast,
       onPromoteImageUrl,
       onSaveImageTags,
-      onSearchTag
+      onSearchTag,
+      onDeletePhoto,
+      onReplacePhoto,
+      onJumpToChatMessage,
+      onJumpToMemo,
+      onJumpToMeetingDate,
+      onRequestConfirm
     })
   );
 }

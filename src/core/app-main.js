@@ -4137,6 +4137,9 @@ function App() {
   const [currentMonthDate, setCurrentMonthDate] = React.useState(new Date());
   const [selectedDate, setSelectedDate] = React.useState(null);
   const [isModalOpen, setIsModalOpen] = React.useState(false);
+  // Lets a Lightbox "이동" action (from handleJumpToMeetingDate) open DateModal straight on
+  // its 사진 tab instead of the default 참여자 tab; null everywhere else.
+  const [dateModalInitialTab, setDateModalInitialTab] = React.useState(null);
   const [isAdminOpen, setIsAdminOpen] = React.useState(false);
   const [isGlobalSearchOpen, setIsGlobalSearchOpen] = React.useState(false);
   const [globalSearchInitialQuery, setGlobalSearchInitialQuery] = React.useState('');
@@ -5165,7 +5168,7 @@ function App() {
         const entries = getMessageImageEntries(msg);
         setActiveLightbox({
           urls: entries.map(e => e.full),
-          meta: entries.map(e => ({ timestamp: msg.timestamp, messageId: msg.id, imageIndex: e.imageIndex, thumb: e.thumb, tags: e.tags })),
+          meta: entries.map(e => ({ timestamp: msg.timestamp, messageId: msg.id, imageIndex: e.imageIndex, thumb: e.thumb, tags: e.tags, source: e.source, uploadSource: e.uploadSource })),
           index: Number(imgParam) || 0
         });
       }
@@ -5598,7 +5601,10 @@ function App() {
           thumbUrl: chunkImages[0].thumbUrl,
           imageUrls: chunkImages.map(r => r.imageUrl),
           thumbUrls: chunkImages.map(r => r.thumbUrl),
-          timestamp: now + i
+          timestamp: now + i,
+          // Marks this message as gallery-uploaded (vs typed into the chat composer) so the
+          // Lightbox info panel can show "갤러리에서 업로드됨" instead of "채팅방에서 업로드됨".
+          uploadSource: 'gallery'
         };
         if (firebaseDb) {
           await firebaseDb.collection('calendars').doc(`cal_${activeCal.id}`).collection('messages').add(sanitizeMessageForFirestore(messageData));
@@ -6598,6 +6604,311 @@ function App() {
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
     return updateCalendars(nextCalendars, '사진 삭제완료', 'delete', updatedCal.id, 'settings', photoLog ? [photoLog] : []);
   };
+
+  const handleReplaceMeetingPhoto = async (dateStr, photoId, file) => {
+    if (!activeCal || !isValidDateString(dateStr) || !photoId || !file) return false;
+    const existingMeetings = getConfirmedMeetings(activeCal);
+    const meetingIndex = existingMeetings.findIndex(m => m.date === dateStr);
+    if (meetingIndex < 0) return false;
+    const meeting = existingMeetings[meetingIndex];
+    const existingPhotos = Array.isArray(meeting.photos) ? meeting.photos : [];
+    const targetPhoto = existingPhotos.find(photo => photo.id === photoId);
+    if (!targetPhoto) return false;
+    const compressed = await prepareGalleryImageUploads([file], '사진 교체 준비 중...');
+    if (!compressed.length) { setChatUploadProgress(null); return false; }
+    try {
+      const [resolved] = await resolveChatImageBatch(activeCal.id, compressed, progress => {
+        setChatUploadProgress({ ...progress, label: '사진 교체 중...' });
+      });
+      if (!resolved) throw new Error('Replacement upload returned no result');
+      const prevImageUrl = targetPhoto.imageUrl;
+      const prevThumbUrl = targetPhoto.thumbUrl;
+      const now = Date.now();
+      const nextConfirmedMeetings = existingMeetings.map((m, i) => i === meetingIndex
+        ? { ...m, photos: existingPhotos.map(photo => photo.id === photoId ? { ...photo, imageUrl: resolved.imageUrl, thumbUrl: resolved.thumbUrl || resolved.imageUrl } : photo) }
+        : m);
+      const updatedCal = {
+        ...activeCal,
+        confirmedMeeting: nextConfirmedMeetings,
+        updatedAt: now,
+        revision: (activeCal.revision || 0) + 1
+      };
+      const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
+      const ok = await updateCalendars(nextCalendars, '사진 교체완료', 'success', updatedCal.id, 'settings');
+      if (ok) {
+        deleteChatImageFromStorage(prevImageUrl);
+        deleteChatImageFromStorage(prevThumbUrl);
+      }
+      return ok ? resolved.imageUrl : false;
+    } catch (err) {
+      console.error('handleReplaceMeetingPhoto failed:', err);
+      showToast('사진 교체 실패', 'error', 4000);
+      return false;
+    } finally {
+      setTimeout(() => setChatUploadProgress(null), 250);
+    }
+  };
+
+  // Shared by handleDeleteChatMessagePhoto/handleReplaceChatMessagePhoto -- mirrors
+  // handleSaveImageTags' own message lookup (local state first, then a direct Firestore/REST
+  // read, since the Lightbox can be opened on a message that hasn't been paginated into
+  // chatMessages yet).
+  const findChatMessageById = async messageId => {
+    const local = (chatMessages || []).find(msg => msg.id === messageId);
+    if (local) return local;
+    try {
+      if (firebaseDb) {
+        const snap = await withTimeout(firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages').doc(messageId).get(), 9000, 'photo edit source message read');
+        return snap?.exists ? { id: messageId, ...snap.data() } : null;
+      }
+      return await fetchMessageRest(activeCalId, messageId);
+    } catch (readErr) {
+      console.warn('findChatMessageById failed:', readErr);
+      return null;
+    }
+  };
+
+  const handleDeleteChatMessagePhoto = async (messageId, imageIndex) => {
+    if (!messageId || !Number.isInteger(imageIndex)) return false;
+    const sourceMessage = await findChatMessageById(messageId);
+    if (!sourceMessage) {
+      showToast('삭제 대상 이미지를 찾지 못했습니다.', 'error', 4000);
+      return false;
+    }
+    const entries = getMessageImageEntries(sourceMessage);
+    const target = entries[imageIndex];
+    if (!target) return false;
+    const nextUrls = entries.filter((_, i) => i !== imageIndex).map(e => e.full);
+    const nextThumbs = entries.filter((_, i) => i !== imageIndex).map(e => e.thumb);
+    const nextTags = entries.filter((_, i) => i !== imageIndex).map(e => e.tags || '');
+    const remainingText = String(sourceMessage.text || '').trim();
+    try {
+      if (nextUrls.length === 0 && !remainingText) {
+        // No images and no text left -- nothing to keep, remove the whole message.
+        if (firebaseDb) {
+          await firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages').doc(messageId).delete();
+        } else {
+          await deleteMessageRest(activeCalId, messageId);
+        }
+        setChatMessages(prev => prev.filter(m => m.id !== messageId));
+      } else {
+        const data = sanitizeMessageForFirestore({
+          imageUrls: nextUrls,
+          thumbUrls: nextThumbs,
+          imageUrl: nextUrls[0] || null,
+          thumbUrl: nextThumbs[0] || null,
+          imageTags: nextTags
+        });
+        if (firebaseDb) {
+          await withTimeout(firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages').doc(messageId).update(data), 9000, 'photo delete write');
+        } else {
+          const ok = await updateMessageRest(activeCalId, messageId, data);
+          if (!ok) throw new Error('Photo delete REST update failed');
+        }
+        const patchMessage = msg => msg.id === messageId ? { ...msg, ...data } : msg;
+        setChatMessages(prev => prev.map(patchMessage));
+      }
+      deleteChatImageFromStorage(target.full);
+      if (target.thumb !== target.full) deleteChatImageFromStorage(target.thumb);
+      showToast('사진 삭제완료', 'success');
+      return true;
+    } catch (err) {
+      console.error('handleDeleteChatMessagePhoto failed:', err);
+      showToast('사진 삭제 실패', 'error', 4000);
+      return false;
+    }
+  };
+
+  const handleReplaceChatMessagePhoto = async (messageId, imageIndex, file) => {
+    if (!messageId || !Number.isInteger(imageIndex) || !file) return false;
+    const sourceMessage = await findChatMessageById(messageId);
+    if (!sourceMessage) {
+      showToast('교체 대상 이미지를 찾지 못했습니다.', 'error', 4000);
+      return false;
+    }
+    const entries = getMessageImageEntries(sourceMessage);
+    const target = entries[imageIndex];
+    if (!target) return false;
+    const compressed = await prepareGalleryImageUploads([file], '사진 교체 준비 중...');
+    if (!compressed.length) { setChatUploadProgress(null); return false; }
+    try {
+      const [resolved] = await resolveChatImageBatch(activeCalId, compressed, progress => {
+        setChatUploadProgress({ ...progress, label: '사진 교체 중...' });
+      });
+      if (!resolved) throw new Error('Replacement upload returned no result');
+      const nextUrls = entries.map((e, i) => i === imageIndex ? resolved.imageUrl : e.full);
+      const nextThumbs = entries.map((e, i) => i === imageIndex ? (resolved.thumbUrl || resolved.imageUrl) : e.thumb);
+      const data = sanitizeMessageForFirestore({
+        imageUrls: nextUrls,
+        thumbUrls: nextThumbs,
+        imageUrl: nextUrls[0] || null,
+        thumbUrl: nextThumbs[0] || null
+      });
+      if (firebaseDb) {
+        await withTimeout(firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages').doc(messageId).update(data), 9000, 'photo replace write');
+      } else {
+        const ok = await updateMessageRest(activeCalId, messageId, data);
+        if (!ok) throw new Error('Photo replace REST update failed');
+      }
+      const patchMessage = msg => msg.id === messageId ? { ...msg, ...data } : msg;
+      setChatMessages(prev => prev.map(patchMessage));
+      deleteChatImageFromStorage(target.full);
+      if (target.thumb !== target.full) deleteChatImageFromStorage(target.thumb);
+      showToast('사진 교체완료', 'success');
+      return resolved.imageUrl;
+    } catch (err) {
+      console.error('handleReplaceChatMessagePhoto failed:', err);
+      showToast('사진 교체 실패', 'error', 4000);
+      return false;
+    } finally {
+      setTimeout(() => setChatUploadProgress(null), 250);
+    }
+  };
+
+  // Memo photos live in the memos collection, structurally identical to chat message images
+  // (imageUrls/thumbUrls arrays), so this mirrors handleDeleteChatMessagePhoto/
+  // handleReplaceChatMessagePhoto one-for-one against that collection instead.
+  const findMemoById = async memoId => {
+    const local = (memos || []).find(m => m.id === memoId);
+    if (local) return local;
+    try {
+      if (firebaseDb) {
+        const snap = await firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('memos').doc(memoId).get();
+        return snap?.exists ? { id: memoId, ...snap.data() } : null;
+      }
+      const res = await fetch(`https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/calendars/cal_${activeCalId}/memos/${memoId}`);
+      return res.ok ? { id: memoId, ...firestoreDocumentToJs(await res.json()) } : null;
+    } catch (readErr) {
+      console.warn('findMemoById failed:', readErr);
+      return null;
+    }
+  };
+
+  const handleDeleteMemoPhoto = async (memoId, imageIndex) => {
+    if (!memoId || !Number.isInteger(imageIndex)) return false;
+    const memo = await findMemoById(memoId);
+    if (!memo) {
+      showToast('삭제 대상 이미지를 찾지 못했습니다.', 'error', 4000);
+      return false;
+    }
+    const urls = Array.isArray(memo.imageUrls) ? memo.imageUrls : (memo.imageUrl ? [memo.imageUrl] : []);
+    const thumbs = Array.isArray(memo.thumbUrls) ? memo.thumbUrls : (memo.thumbUrl ? [memo.thumbUrl] : []);
+    if (!urls[imageIndex]) return false;
+    const removedUrl = urls[imageIndex];
+    const removedThumb = thumbs[imageIndex] || removedUrl;
+    const nextUrls = urls.filter((_, i) => i !== imageIndex);
+    const nextThumbs = thumbs.filter((_, i) => i !== imageIndex);
+    try {
+      const data = sanitizeMemoForFirestore({ imageUrls: nextUrls, thumbUrls: nextThumbs, imageUrl: nextUrls[0] || null, thumbUrl: nextThumbs[0] || null });
+      await firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('memos').doc(memoId).update(data);
+      setMemos(prev => prev.map(m => m.id === memoId ? { ...m, ...data } : m));
+      deleteChatImageFromStorage(removedUrl);
+      if (removedThumb !== removedUrl) deleteChatImageFromStorage(removedThumb);
+      showToast('사진 삭제완료', 'success');
+      return true;
+    } catch (err) {
+      console.error('handleDeleteMemoPhoto failed:', err);
+      showToast('사진 삭제 실패', 'error', 4000);
+      return false;
+    }
+  };
+
+  const handleReplaceMemoPhoto = async (memoId, imageIndex, file) => {
+    if (!memoId || !Number.isInteger(imageIndex) || !file) return false;
+    const memo = await findMemoById(memoId);
+    if (!memo) {
+      showToast('교체 대상 이미지를 찾지 못했습니다.', 'error', 4000);
+      return false;
+    }
+    const urls = Array.isArray(memo.imageUrls) ? memo.imageUrls : (memo.imageUrl ? [memo.imageUrl] : []);
+    const thumbs = Array.isArray(memo.thumbUrls) ? memo.thumbUrls : (memo.thumbUrl ? [memo.thumbUrl] : []);
+    if (!urls[imageIndex]) return false;
+    const compressed = await prepareGalleryImageUploads([file], '사진 교체 준비 중...');
+    if (!compressed.length) { setChatUploadProgress(null); return false; }
+    try {
+      const [resolved] = await resolveChatImageBatch(activeCalId, compressed, progress => {
+        setChatUploadProgress({ ...progress, label: '사진 교체 중...' });
+      });
+      if (!resolved) throw new Error('Replacement upload returned no result');
+      const removedUrl = urls[imageIndex];
+      const removedThumb = thumbs[imageIndex] || removedUrl;
+      const nextUrls = urls.map((u, i) => i === imageIndex ? resolved.imageUrl : u);
+      const nextThumbs = thumbs.map((t, i) => i === imageIndex ? (resolved.thumbUrl || resolved.imageUrl) : t);
+      const data = sanitizeMemoForFirestore({ imageUrls: nextUrls, thumbUrls: nextThumbs, imageUrl: nextUrls[0] || null, thumbUrl: nextThumbs[0] || null });
+      await firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('memos').doc(memoId).update(data);
+      setMemos(prev => prev.map(m => m.id === memoId ? { ...m, ...data } : m));
+      deleteChatImageFromStorage(removedUrl);
+      if (removedThumb !== removedUrl) deleteChatImageFromStorage(removedThumb);
+      showToast('사진 교체완료', 'success');
+      return resolved.imageUrl;
+    } catch (err) {
+      console.error('handleReplaceMemoPhoto failed:', err);
+      showToast('사진 교체 실패', 'error', 4000);
+      return false;
+    } finally {
+      setTimeout(() => setChatUploadProgress(null), 250);
+    }
+  };
+
+  // Single dispatch point handed to every Lightbox instance -- routes to the right storage
+  // location based on meta.source. directMediaUrl (an image pasted as a bare URL in chat/memo
+  // text) has no clean single-item target to mutate, so it's left unsupported (Lightbox hides
+  // the edit/delete buttons for it).
+  const handleDeletePhoto = meta => {
+    if (!meta || meta.directMediaUrl) return false;
+    if (meta.source === 'meeting') return handleDeleteMeetingPhoto(meta.meetingDate, meta.photoId);
+    if (meta.source === 'memo') return handleDeleteMemoPhoto(meta.messageId, meta.imageIndex);
+    return handleDeleteChatMessagePhoto(meta.messageId, meta.imageIndex);
+  };
+  const handleReplacePhoto = (meta, file) => {
+    if (!meta || meta.directMediaUrl) return false;
+    if (meta.source === 'meeting') return handleReplaceMeetingPhoto(meta.meetingDate, meta.photoId, file);
+    if (meta.source === 'memo') return handleReplaceMemoPhoto(meta.messageId, meta.imageIndex, file);
+    return handleReplaceChatMessagePhoto(meta.messageId, meta.imageIndex, file);
+  };
+
+  // "이 사진이 있는 채팅으로 이동" -- same pattern already used by the admin/global search
+  // modals' onOpenChatMessage, reused here so the Lightbox info panel's source line jumps to
+  // the actual chat bubble consistently with search results.
+  const handleJumpToChatMessage = messageId => {
+    if (!messageId) return;
+    setActiveLightbox(null);
+    changeView('chat');
+    setTimeout(() => {
+      const el = document.querySelector(`[data-msg-row-id="${messageId}"]`);
+      if (!el) return;
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.classList.add('search-result-flash');
+      setTimeout(() => el.classList.remove('search-result-flash'), 1700);
+    }, 350);
+  };
+
+  // "메모로 이동" -- reuses the sharedMemo mechanism MemoView already renders as a banner card
+  // above the list (see the ?memo= deep-link effect above), so no MemoView changes are needed.
+  const handleJumpToMemo = async memoId => {
+    if (!memoId) return;
+    setActiveLightbox(null);
+    const local = (memos || []).find(m => m.id === memoId);
+    if (local) {
+      setSharedMemo(local);
+      changeView('memo');
+      return;
+    }
+    const fetched = await findMemoById(memoId);
+    if (fetched) setSharedMemo(fetched);
+    changeView('memo');
+  };
+
+  // "일정으로 이동" -- opens that date's DateModal, optionally straight on its 사진 tab.
+  const handleJumpToMeetingDate = (dateStr, initialTab = null) => {
+    if (!dateStr) return;
+    setActiveLightbox(null);
+    setDateModalInitialTab(initialTab);
+    setSelectedDate(dateStr);
+    setIsModalOpen(true);
+    changeView('calendar');
+  };
+
   const handleSavePlace = (placeData) => {
     if (!activeCal || !Number.isFinite(placeData?.lat) || !Number.isFinite(placeData?.lng)) return false;
     const cleanName = sanitizeText(placeData?.name || '', 80);
@@ -6949,11 +7260,14 @@ function App() {
       onReorderExpenses: handleReorderExpenses,
       onAddMeetingPhotos: handleAddMeetingPhotos,
       onDeleteMeetingPhoto: handleDeleteMeetingPhoto,
+      onReplaceMeetingPhoto: handleReplaceMeetingPhoto,
+      setActiveLightbox: setActiveLightbox,
+      initialTab: dateModalInitialTab,
       onSavePlace: handleSavePlace,
       onDeletePlace: handleDeletePlace,
       showToast: showToast,
       onRequestConfirm: showConfirmDialog,
-      onClose: () => setIsModalOpen(false),
+      onClose: () => { setIsModalOpen(false); setDateModalInitialTab(null); },
       onParticipantClick: handleParticipantClick
     }),
     confirmDialog && /*#__PURE__*/React.createElement(ConfirmDialog, {
@@ -7022,7 +7336,7 @@ function App() {
           const entries = directMediaUrl && directEntry ? [directEntry] : getMessageImageEntries(msg);
           setActiveLightbox({
             urls: entries.map(e => e.full),
-            meta: entries.map(e => ({ timestamp: msg.timestamp, messageId: msg.id, imageIndex: e.imageIndex, thumb: e.thumb, tags: e.tags, directMediaUrl: e.directMediaUrl })),
+            meta: entries.map(e => ({ timestamp: msg.timestamp, messageId: msg.id, imageIndex: e.imageIndex, thumb: e.thumb, tags: e.tags, directMediaUrl: e.directMediaUrl, source: e.source, uploadSource: e.uploadSource })),
             index: directMediaUrl ? 0 : imageIndex
           });
         }, 350);
@@ -7058,7 +7372,7 @@ function App() {
           const entries = directMediaUrl && directEntry ? [directEntry] : getMessageImageEntries(msg);
           setActiveLightbox({
             urls: entries.map(e => e.full),
-            meta: entries.map(e => ({ timestamp: msg.timestamp, messageId: msg.id, imageIndex: e.imageIndex, thumb: e.thumb, tags: e.tags, directMediaUrl: e.directMediaUrl })),
+            meta: entries.map(e => ({ timestamp: msg.timestamp, messageId: msg.id, imageIndex: e.imageIndex, thumb: e.thumb, tags: e.tags, directMediaUrl: e.directMediaUrl, source: e.source, uploadSource: e.uploadSource })),
             index: directMediaUrl ? 0 : imageIndex
           });
         }, 350);
@@ -7182,7 +7496,13 @@ function App() {
       isChatNotifyEnabled: mainNotifPermission === 'granted' && mainChatNotifyEnabled,
       onToggleChatNotifications: handleMainToggleNotifications,
       stickyVideoKey: stickyVideo ? stickyVideo.key : null,
-      onReleaseSticky: () => setStickyVideo(null)
+      onReleaseSticky: () => setStickyVideo(null),
+      onDeletePhoto: handleDeletePhoto,
+      onReplacePhoto: handleReplacePhoto,
+      onJumpToChatMessage: handleJumpToChatMessage,
+      onJumpToMemo: handleJumpToMemo,
+      onJumpToMeetingDate: handleJumpToMeetingDate,
+      onRequestConfirm: showConfirmDialog
     })));
   }
 
@@ -7258,7 +7578,13 @@ function App() {
         showToast: showToast,
         onPromoteImageUrl: handlePromoteInlineChatImage,
         onSaveImageTags: handleSaveImageTags,
-        onSearchTag: handleSearchTag
+        onSearchTag: handleSearchTag,
+        onDeletePhoto: handleDeletePhoto,
+        onReplacePhoto: handleReplacePhoto,
+        onJumpToChatMessage: handleJumpToChatMessage,
+        onJumpToMemo: handleJumpToMemo,
+        onJumpToMeetingDate: handleJumpToMeetingDate,
+        onRequestConfirm: showConfirmDialog
       }) : null
     ));
   }
@@ -7571,7 +7897,13 @@ function App() {
     showToast: showToast,
     onPromoteImageUrl: handlePromoteInlineChatImage,
     onSaveImageTags: handleSaveImageTags,
-    onSearchTag: handleSearchTag
+    onSearchTag: handleSearchTag,
+    onDeletePhoto: handleDeletePhoto,
+    onReplacePhoto: handleReplacePhoto,
+    onJumpToChatMessage: handleJumpToChatMessage,
+    onJumpToMemo: handleJumpToMemo,
+    onJumpToMeetingDate: handleJumpToMeetingDate,
+    onRequestConfirm: showConfirmDialog
   })), /*#__PURE__*/React.createElement(SummaryList, {
     calendar: activeCal,
     onSelectDate: d => {
@@ -7587,7 +7919,13 @@ function App() {
     showToast: showToast,
     onPromoteImageUrl: handlePromoteInlineChatImage,
     onSaveImageTags: handleSaveImageTags,
-    onSearchTag: handleSearchTag
+    onSearchTag: handleSearchTag,
+    onDeletePhoto: handleDeletePhoto,
+    onReplacePhoto: handleReplacePhoto,
+    onJumpToChatMessage: handleJumpToChatMessage,
+    onJumpToMemo: handleJumpToMemo,
+    onJumpToMeetingDate: handleJumpToMeetingDate,
+    onRequestConfirm: showConfirmDialog
   }), /*#__PURE__*/React.createElement(PlacesSection, {
     calendar: activeCal,
     onViewAll: () => changeView('places')
@@ -9347,7 +9685,11 @@ function getMessageImageEntries(msg) {
       imageIndex: i,
       messageId: msg.id,
       timestamp: msg.timestamp,
-      tags: tags[i] || ''
+      tags: tags[i] || '',
+      // Callers building non-chat entries (e.g. memo pseudo-messages) override `source`
+      // explicitly -- see ui-chat-gallery.js/ui-summary-gallery.js's sharedPhotos/photoEntries.
+      source: 'chat',
+      uploadSource: msg.uploadSource || null
     });
   }
   return entries;
@@ -9384,7 +9726,9 @@ function getMessageDirectMediaEntry(msg) {
     messageId: msg.id,
     timestamp: msg.timestamp,
     tags: getDirectMediaTagsForUrl(msg, mediaInfo.url),
-    directMediaUrl: mediaInfo.url
+    directMediaUrl: mediaInfo.url,
+    source: 'chat',
+    uploadSource: msg.uploadSource || null
   };
 }
 
@@ -9396,7 +9740,7 @@ function renderChatMessageImages(msg, setActiveLightbox, singleImageStyle = {}) 
   if (entries.length === 0) return null;
   const thumbs = entries.map(e => e.thumb);
   const displayUrls = entries.map(e => e.full);
-  const meta = entries.map(e => ({ timestamp: msg.timestamp, messageId: msg.id, imageIndex: e.imageIndex, thumb: e.thumb, tags: e.tags }));
+  const meta = entries.map(e => ({ timestamp: msg.timestamp, messageId: msg.id, imageIndex: e.imageIndex, thumb: e.thumb, tags: e.tags, source: e.source, uploadSource: e.uploadSource }));
   if (thumbs.length === 1) {
     return /*#__PURE__*/React.createElement('img', {
       src: displayUrls[0] || thumbs[0],

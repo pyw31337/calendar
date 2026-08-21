@@ -1216,7 +1216,13 @@ export function CommentsSection({
   showToast,
   onPromoteImageUrl,
   onSaveImageTags,
-  onSearchTag
+  onSearchTag,
+  onDeletePhoto,
+  onReplacePhoto,
+  onJumpToChatMessage,
+  onJumpToMemo,
+  onJumpToMeetingDate,
+  onRequestConfirm
 }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -1711,7 +1717,13 @@ export function CommentsSection({
     showToast,
     onPromoteImageUrl,
     onSaveImageTags,
-    onSearchTag
+    onSearchTag,
+    onDeletePhoto,
+    onReplacePhoto,
+    onJumpToChatMessage,
+    onJumpToMemo,
+    onJumpToMeetingDate,
+    onRequestConfirm
   }) : null), imageProcessing && /*#__PURE__*/React.createElement(ImageProcessingOverlay, imageProcessing),
   isEmojiPickerOpen && /*#__PURE__*/React.createElement(EmojiPickerSheet, {
     onSelect: insertEmojiIntoChatInput,
