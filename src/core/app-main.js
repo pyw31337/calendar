@@ -4842,7 +4842,16 @@ function App() {
     showToast('연결 오류', 'error', 5000);
   }, []);
   const activeCalLoaded = calendars.some(c => c && c.id === activeCalId && isUsableCalendarRecord(c));
-  const rawActiveCal = calendars.find(c => c.id === activeCalId) || createLoadingCalendarShell(activeCalId);
+  const activeCalendarFromState = calendars.find(c => c.id === activeCalId);
+  const lastUsableActiveCalendarRef = React.useRef(null);
+  if (isUsableCalendarRecord(activeCalendarFromState)) {
+    lastUsableActiveCalendarRef.current = cloneCalendar(activeCalendarFromState);
+  }
+  const rawActiveCal = isUsableCalendarRecord(activeCalendarFromState)
+    ? activeCalendarFromState
+    : (lastUsableActiveCalendarRef.current?.id === activeCalId
+      ? lastUsableActiveCalendarRef.current
+      : createLoadingCalendarShell(activeCalId));
   // Merges the live places/confirmedMeetings subcollections into whatever's still embedded on
   // the calendar document itself (legacy entries not yet migrated -- see unionPlaces/
   // unionConfirmedMeetings and the self-healing migration in pushSingleCloudCalendar/
