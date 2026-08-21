@@ -31,6 +31,8 @@ jobs:
         run: npm run check:size-budget
       - name: Build
         run: npm run build
+      - name: Check Vite build output budget
+        run: npm run check:dist-budget
 
   live-smoke:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
