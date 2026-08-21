@@ -71,7 +71,7 @@
 1. 메인: 캘린더, 사이드메뉴, 일정 팝업
 2. 채팅: 메시지, 갤러리, composer, 사이드메뉴 구분선
 3. 메모 / 장소 / 갤러리
-4. 공유 URL (/share/... )
+4. 공유 URL (`/share/kkot/`, `/share/cw/`, `/share/jhair/`)
 5. 어드민 로그인·탭
 
 ## 5. Google Cloud 예산 알림
@@ -83,6 +83,8 @@ console.cloud.google.com → 결제 → 예산 및 알림 (월 5~10달러 권장
 - Live smoke: main push + daily
 - Refresh Calendar OG Pages: manual + daily 18:00 UTC
 - Live source guard: `src/`에 JSONBlob, 구형 seed 문구, 하드코딩 캘린더 경로가 다시 들어오면 실패
+- Share URL guard: 공유 모달과 공식 공유 페이지가 `/share/{id}/`를 유지하는지 운영 소스와 라이브 URL 기준으로 검사
+- Tab wiring guard: 운영 소스의 탭/모드 버튼과 렌더링 분기가 서로 어긋나지 않는지 검사
 - Vite dist budget: `npm run build` 후 `npm run check:dist-budget`로 실제 배포 청크 크기 검증
 
 ## 7. 다음 큰 단계
