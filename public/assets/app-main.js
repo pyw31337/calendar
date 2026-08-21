@@ -5284,6 +5284,95 @@ function App() {
   // 라이트박스의 이미지정보 패널에서 입력하고, GlobalSearchModal의 태그 검색에서 사용된다.
   // 이전 태그 목록과 비교해 새로 추가/삭제된 토큰마다 활동 로그를 남겨 어드민 페이지에서
   // 언제 어떤 해시태그가 추가/삭제됐는지 확인할 수 있게 한다.
+  const parseFlexibleDateTokens = text => {
+    const source = String(text || '').replace(/[()[\]{}'"“”‘’]/g, ' ');
+    const dates = new Set();
+    const pushDate = (yearRaw, monthRaw, dayRaw) => {
+      let year = Number(yearRaw);
+      const month = Number(monthRaw);
+      const day = Number(dayRaw);
+      if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return;
+      if (year < 100) year += 2000;
+      if (year < 2000 || year > 2099 || month < 1 || month > 12 || day < 1 || day > 31) return;
+      const check = new Date(year, month - 1, day);
+      if (check.getFullYear() !== year || check.getMonth() !== month - 1 || check.getDate() !== day) return;
+      const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      if (isValidDateString(dateStr)) dates.add(dateStr);
+    };
+    source.replace(/(?:^|[^\d])(\d{2,4})\s*[.\-/]\s*(\d{1,2})\s*[.\-/]\s*(\d{1,2})(?=$|[^\d])/g, (match, y, m, d) => {
+      pushDate(y, m, d);
+      return match;
+    });
+    source.replace(/(?:^|[^\d])(\d{2,4})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일?/g, (match, y, m, d) => {
+      pushDate(y, m, d);
+      return match;
+    });
+    source.replace(/(?:^|[^\d])(\d{4})(\d{2})(\d{2})(?=$|[^\d])/g, (match, y, m, d) => {
+      pushDate(y, m, d);
+      return match;
+    });
+    source.replace(/(?:^|[^\d])(\d{2})(\d{2})(\d{2})(?=$|[^\d])/g, (match, y, m, d) => {
+      pushDate(y, m, d);
+      return match;
+    });
+    return Array.from(dates);
+  };
+
+  const linkTaggedImageToMeetingDates = async (dateStrs, photo, sourceMessage, cleanTags) => {
+    if (!activeCal || !Array.isArray(dateStrs) || dateStrs.length === 0 || !photo?.imageUrl) return 0;
+    const validDates = Array.from(new Set(dateStrs.filter(isValidDateString)));
+    if (validDates.length === 0) return 0;
+    const existingMeetings = getConfirmedMeetings(activeCal);
+    const byDate = new Map(existingMeetings.map(meeting => [meeting.date, {
+      ...meeting,
+      photos: Array.isArray(meeting.photos) ? [...meeting.photos] : []
+    }]));
+    const now = Date.now();
+    let linkedCount = 0;
+    validDates.forEach((dateStr, index) => {
+      const meeting = byDate.get(dateStr) || {
+        date: dateStr,
+        note: '',
+        confirmedAt: null,
+        confirmed: false,
+        expenses: [],
+        photos: []
+      };
+      const photos = Array.isArray(meeting.photos) ? meeting.photos : [];
+      const alreadyLinked = photos.some(item => String(item?.imageUrl || item?.full || '') === photo.imageUrl);
+      if (alreadyLinked) {
+        byDate.set(dateStr, meeting);
+        return;
+      }
+      photos.push({
+        id: `photo_${activeCal.id}_${dateStr}_${now}_${index}_${Math.random().toString(36).slice(2, 7)}`,
+        imageUrl: photo.imageUrl,
+        thumbUrl: photo.thumbUrl || photo.imageUrl,
+        createdAt: now + index,
+        source: 'lightbox-tag',
+        sourceMessageId: sourceMessage?.id || '',
+        sourceImageIndex: Number.isInteger(photo.imageIndex) ? photo.imageIndex : 0,
+        tags: cleanTags || ''
+      });
+      byDate.set(dateStr, { ...meeting, photos, amount: meeting.amount || null });
+      linkedCount += 1;
+    });
+    if (linkedCount === 0) return 0;
+    const photoLogs = validDates.map((dateStr, index) => (
+      createActivityLog(activeCal.id, 'photo_create', dateStr, '', now + index, '사진 날짜 태그 연결')
+    )).filter(Boolean);
+    const updatedCal = {
+      ...activeCal,
+      confirmedMeeting: Array.from(byDate.values()).sort((a, b) => String(a.date || '').localeCompare(String(b.date || ''))),
+      updatedAt: now,
+      revision: (activeCal.revision || 0) + 1,
+      activityLogs: photoLogs.length > 0 ? [...getCalendarActivityLogs(activeCal), ...photoLogs] : getCalendarActivityLogs(activeCal)
+    };
+    const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
+    await updateCalendars(nextCalendars, `${linkedCount}건 일정 사진 연결완료`, 'success', updatedCal.id, 'settings', photoLogs);
+    return linkedCount;
+  };
+
   const handleSaveImageTags = async (messageId, imageIndex, tagsText, meta = {}) => {
     if (!messageId || !Number.isInteger(imageIndex)) return false;
     const sourceMessage = (chatMessages || []).find(msg => msg.id === messageId);
@@ -5335,7 +5424,22 @@ function App() {
     }
     const patchMessage = msg => msg.id === messageId ? { ...msg, ...data } : msg;
     setChatMessages(prev => prev.map(patchMessage));
-    showToast('태그 저장완료', 'success');
+    const sourceEntry = isDirectMedia ? null : getMessageImageEntries(sourceMessage)[imageIndex];
+    const imageUrl = String(meta?.imageUrl || meta?.directMediaUrl || sourceEntry?.full || sourceEntry?.thumb || '').trim();
+    const thumbUrl = String(meta?.thumb || sourceEntry?.thumb || imageUrl).trim();
+    let linkedCount = 0;
+    if (imageUrl) {
+      const dateStrs = parseFlexibleDateTokens(tagsText);
+      if (dateStrs.length > 0) {
+        try {
+          linkedCount = await linkTaggedImageToMeetingDates(dateStrs, { imageUrl, thumbUrl, imageIndex }, sourceMessage, cleanTags);
+        } catch (dateLinkErr) {
+          console.warn('Image tag date link skipped:', dateLinkErr);
+          showToast('태그는 저장됐지만 일정 사진 연결은 실패했습니다.', 'error', 5000);
+        }
+      }
+    }
+    if (!linkedCount) showToast('태그 저장완료', 'success');
     return true;
   };
 

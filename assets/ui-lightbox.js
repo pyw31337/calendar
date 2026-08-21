@@ -230,7 +230,10 @@ function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, onPromote
   )).slice(0, 20).join(' ');
   const saveCurrentTags = onSaveImageTags && currentMeta?.messageId != null
     ? async tagsText => {
-        const ok = await onSaveImageTags(currentMeta.messageId, currentMeta.imageIndex, tagsText, currentMeta);
+        const ok = await onSaveImageTags(currentMeta.messageId, currentMeta.imageIndex, tagsText, {
+          ...currentMeta,
+          imageUrl: currentUrl
+        });
         if (ok && tagOverrideKey) setTagOverrides(prev => ({ ...prev, [tagOverrideKey]: normalizeTagsForDisplay(tagsText) }));
         return ok;
       }
