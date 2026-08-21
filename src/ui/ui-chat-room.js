@@ -711,7 +711,8 @@ export function ChatRoomView({
   onOpenGallery,
   onChangeView,
   stickyVideoKey,
-  onReleaseSticky,
+  onActivateVideo,
+  onVideoDockRectChange,
   onDeletePhoto,
   onReplacePhoto,
   onJumpToChatMessage,
@@ -1259,7 +1260,7 @@ export function ChatRoomView({
         // identically across Chrome/Whale/Safari/Firefox, unlike relying purely on width math.
         overflow: 'hidden'
       }
-    }, renderChatMessageBody(msg, setActiveLightbox, chatMediaStyle, searchQuery, stickyVideoKey, onReleaseSticky)), /*#__PURE__*/React.createElement("div", {
+    }, renderChatMessageBody(msg, setActiveLightbox, chatMediaStyle, searchQuery, stickyVideoKey, onActivateVideo, onVideoDockRectChange)), /*#__PURE__*/React.createElement("div", {
       style: {
         position: 'absolute',
         right: '-7px',
@@ -1317,7 +1318,7 @@ export function ChatRoomView({
         // identically across Chrome/Whale/Safari/Firefox, unlike relying purely on width math.
         overflow: 'hidden'
       }
-    }, renderChatMessageBody(msg, setActiveLightbox, chatMediaStyle, searchQuery, stickyVideoKey, onReleaseSticky)), /*#__PURE__*/React.createElement("div", {
+    }, renderChatMessageBody(msg, setActiveLightbox, chatMediaStyle, searchQuery, stickyVideoKey, onActivateVideo, onVideoDockRectChange)), /*#__PURE__*/React.createElement("div", {
       style: {
         position: 'absolute',
         left: '-7px',
