@@ -1381,7 +1381,6 @@ select.form-select {
   background: #F5F3FF;
   box-shadow: inset 0 0 0 1px rgba(139, 92, 246, 0.08);
 }
-:root[data-theme="dark"] .poll-option-row.is-confirmed-winner,
 :root[data-theme="dark"] .poll-option-row.is-confirmed-winner {
   border-color: #A78BFA;
   background: rgba(139, 92, 246, 0.16);
