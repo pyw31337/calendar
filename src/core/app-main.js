@@ -5780,7 +5780,14 @@ function App() {
         ...added.map((t, i) => createActivityLog(activeCalId, 'tag_add', '', '', now + i, `#${t}`)),
         ...removed.map((t, i) => createActivityLog(activeCalId, 'tag_remove', '', '', now + added.length + i, `#${t}`))
       ].filter(Boolean);
-      if (tagLogs.length > 0) await writeActivityLogsToFirestore(activeCalId, tagLogs);
+      if (tagLogs.length > 0) {
+        try {
+          await writeActivityLogsToFirestore(activeCalId, tagLogs);
+        } catch (logErr) {
+          // Tag persistence is the primary user action; activity logs are best-effort metadata.
+          console.warn('Image tag activity log write skipped:', logErr);
+        }
+      }
     } catch (err) {
       console.error('Image tag save failed:', err);
       showToast('태그 저장 실패', 'error');
