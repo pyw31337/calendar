@@ -2630,13 +2630,18 @@ select.form-select {
     width: calc(100% - 20px);
     max-width: calc(100% - 20px);
     box-sizing: border-box;
-    /* Conservative: browser chrome VISIBLE (svh). Do NOT use dvh — it grows when
-       the address bar hides and the modal gets clipped when chrome returns. */
-    max-height: calc(100vh - 24px);
-    max-height: calc(100svh - 24px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+    /* Hard-conservative for mobile browser chrome (address bar + bottom toolbars).
+       ~100px reserved regardless of iPhone/Galaxy safe-area differences.
+       Cap at ~72% of small viewport so chrome show/hide never clips the modal. */
+    max-height: calc(100vh - 100px);
     max-height: min(
-      calc(100svh - 24px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)),
-      var(--gather-vv-modal-max, 100svh)
+      72svh,
+      calc(100svh - 100px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))
+    );
+    max-height: min(
+      72svh,
+      calc(100svh - 100px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)),
+      var(--gather-vv-modal-max, 72svh)
     );
   }
   .modal-header { padding: 18px; }
