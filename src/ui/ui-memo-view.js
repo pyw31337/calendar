@@ -1821,7 +1821,7 @@ export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoad
               borderImage: 'none',
               outline: 'none',
               resize: 'none',
-              fontSize: '0.88rem',
+              fontSize: '0.82rem',
               color: 'var(--text-main)',
               width: '100%',
               paddingBottom: '28px',
