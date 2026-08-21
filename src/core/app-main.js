@@ -3982,11 +3982,18 @@ function App() {
     }
   };
   const applyThemeChoice = (choice) => {
-    if (choice === 'dark' || choice === 'light') {
-      document.documentElement.setAttribute('data-theme', choice);
-    } else {
-      document.documentElement.removeAttribute('data-theme');
+    // Always stamp explicit light|dark. Unset data-theme made
+    // :root:not([data-theme="light"]) darken side menu only while page stayed light
+    // (Samsung Internet / system theme).
+    let resolved = choice;
+    if (choice !== 'dark' && choice !== 'light') {
+      try {
+        resolved = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      } catch (_) {
+        resolved = 'light';
+      }
     }
+    document.documentElement.setAttribute('data-theme', resolved);
   };
   const [themeChoice, setThemeChoice] = React.useState(() => {
     if (isAdminDashboardRoute()) return 'light';
@@ -4013,6 +4020,25 @@ function App() {
     setThemeChoice(next);
     isFirstCalIdRenderRef.current = false;
   }, [activeCalId]);
+
+  React.useEffect(() => {
+    if (isAdminDashboardRoute()) return undefined;
+    if (themeChoice === 'dark' || themeChoice === 'light') return undefined;
+    let mql;
+    try {
+      mql = window.matchMedia('(prefers-color-scheme: dark)');
+    } catch (_) {
+      return undefined;
+    }
+    const onChange = () => applyThemeChoice('system');
+    if (mql.addEventListener) mql.addEventListener('change', onChange);
+    else if (mql.addListener) mql.addListener(onChange);
+    applyThemeChoice('system');
+    return () => {
+      if (mql.removeEventListener) mql.removeEventListener('change', onChange);
+      else if (mql.removeListener) mql.removeListener(onChange);
+    };
+  }, [themeChoice, activeCalId]);
 
   // Text-size preference, relative to the browser's own default (100%).
   const readFontScaleForCalendar = (calId) => {

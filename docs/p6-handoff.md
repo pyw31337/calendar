@@ -418,3 +418,9 @@ zsh 에서 줄 시작 `#` 주석은 쓰지 말 것.
 - 닫기 확인 오탐: 초기 place/expense 카테고리 기본값이 baseline '' 과 달라 dirty 되던 문제 수정
 - mount 시 실제 state로 baseline 스냅샷
 - 참여자 시트만 연 것은 dirty 아님
+
+## P6-71 (2026-08-21)
+- 테마: data-theme 항상 light|dark (system도 해석 후 고정)
+- :root:not([data-theme="light"]) → [data-theme="dark"] (사이드만 다크 오탐 제거)
+- theme-init / OS prefers-color-scheme change 동기화
+- 대상: 삼성 인터넷, 크롬, 사파리

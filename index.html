@@ -69,13 +69,8 @@
     });
   </script>
   <script id="theme-init">
-    // Applies the user's saved theme choice for THIS calendar (if any) before first paint, so
-    // the page never flashes the wrong theme -- with no saved choice, the CSS's own
-    // prefers-color-scheme:dark rule (see :root in the <style> block) decides instead. Dark
-    // mode is a per-calendar preference (see the 일반 tab in settings), so the storage key is
-    // scoped by the ?id=/?cal= URL param the same way pwa-manifest-switch above resolves it --
-    // isAllowedCalendarId() itself isn't defined yet this early, so this only needs the id to
-    // pick the right localStorage key, not to fully validate it.
+    // Always stamp data-theme=light|dark before paint. Never leave unset
+    // (side-menu-only dark bug on Samsung Internet / system theme).
     (function () {
       try {
         var params = new URLSearchParams(window.location.search);
@@ -84,12 +79,15 @@
           return;
         }
         var id = params.get('id') || params.get('cal') || '';
-        if (!id) return;
-        var saved = window['local' + 'Storage'].getItem('gather_theme_preference_' + id + '_v1');
-        if (saved === 'dark' || saved === 'light') {
-          document.documentElement.setAttribute('data-theme', saved);
+        var saved = id ? (window['local' + 'Storage'].getItem('gather_theme_preference_' + id + '_v1') || '') : '';
+        var resolved = saved;
+        if (resolved !== 'dark' && resolved !== 'light') {
+          resolved = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
         }
-      } catch (e) {}
+        document.documentElement.setAttribute('data-theme', resolved);
+      } catch (e) {
+        try { document.documentElement.setAttribute('data-theme', 'light'); } catch (_) {}
+      }
     })();
   </script>
 

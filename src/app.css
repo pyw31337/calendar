@@ -48,7 +48,7 @@
    user-facing app (header, calendar, modals, forms); the staff-only admin pages style
    themselves with hardcoded colors rather than these tokens and are not part of this pass. */
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
+  :root[data-theme="dark"] {
     --bg-primary: #0B1120;
     --bg-secondary: #131B2E;
     --bg-card: #131B2E;
@@ -69,23 +69,23 @@
      .btn-secondary/.btn-danger/.form-input alone cover most of the app including admin
      screens (they're shared utility classes), and .day-cell covers the calendar grid,
      the single most central, most-used surface in the app. */
-  :root:not([data-theme="light"]) .day-cell { background: #1B2540; }
-  :root:not([data-theme="light"]) .day-cell:hover { background: #212D4D; }
-  :root:not([data-theme="light"]) .day-cell.today { background: #1E2648; }
-  :root:not([data-theme="light"]) .day-cell.all-available { background: #0F2E22; border-color: #10B981; animation: cell-glow-available 2.5s ease-in-out infinite alternate; }
-  :root:not([data-theme="light"]) .day-cell.confirmed-meeting { background: #241B3D; border-color: #9333EA; animation: cell-glow-confirmed 2.5s ease-in-out infinite alternate; }
-  :root:not([data-theme="light"]) .btn-secondary { background: #1B2540; color: var(--text-main); }
-  :root:not([data-theme="light"]) .btn-secondary:hover { background: #232F49; }
-  :root:not([data-theme="light"]) .btn-danger { background: #2D1518; border-color: #7F1D1D; color: #F87171; }
-  :root:not([data-theme="light"]) .btn-danger:hover { background: #3A1A1E; }
-  :root:not([data-theme="light"]) .form-select,
-  :root:not([data-theme="light"]) .form-input { background: #1B2540; }
-  :root:not([data-theme="light"]) .poll-progress { background: #1B2540; }
-  :root:not([data-theme="light"]) .modal-header.is-confirmed-theme,
-  :root:not([data-theme="light"]) .modal-footer.is-confirmed-theme { background-color: #241B3D; }
-  :root:not([data-theme="light"]) .modal-header.is-all-available-theme,
-  :root:not([data-theme="light"]) .modal-footer.is-all-available-theme { background-color: #0F2E22; }
-  :root:not([data-theme="light"]) .poll-list-row { background-color: #1B2540; border-color: #232F49; }
+  :root[data-theme="dark"] .day-cell { background: #1B2540; }
+  :root[data-theme="dark"] .day-cell:hover { background: #212D4D; }
+  :root[data-theme="dark"] .day-cell.today { background: #1E2648; }
+  :root[data-theme="dark"] .day-cell.all-available { background: #0F2E22; border-color: #10B981; animation: cell-glow-available 2.5s ease-in-out infinite alternate; }
+  :root[data-theme="dark"] .day-cell.confirmed-meeting { background: #241B3D; border-color: #9333EA; animation: cell-glow-confirmed 2.5s ease-in-out infinite alternate; }
+  :root[data-theme="dark"] .btn-secondary { background: #1B2540; color: var(--text-main); }
+  :root[data-theme="dark"] .btn-secondary:hover { background: #232F49; }
+  :root[data-theme="dark"] .btn-danger { background: #2D1518; border-color: #7F1D1D; color: #F87171; }
+  :root[data-theme="dark"] .btn-danger:hover { background: #3A1A1E; }
+  :root[data-theme="dark"] .form-select,
+  :root[data-theme="dark"] .form-input { background: #1B2540; }
+  :root[data-theme="dark"] .poll-progress { background: #1B2540; }
+  :root[data-theme="dark"] .modal-header.is-confirmed-theme,
+  :root[data-theme="dark"] .modal-footer.is-confirmed-theme { background-color: #241B3D; }
+  :root[data-theme="dark"] .modal-header.is-all-available-theme,
+  :root[data-theme="dark"] .modal-footer.is-all-available-theme { background-color: #0F2E22; }
+  :root[data-theme="dark"] .poll-list-row { background-color: #1B2540; border-color: #232F49; }
 }
 :root[data-theme="dark"] .day-cell { background: #1B2540; }
 :root[data-theme="dark"] .day-cell:hover { background: #212D4D; }
@@ -158,7 +158,7 @@
    specificity (root attribute + .admin-scope + target class) wins over the plain
    ":root[data-theme] .foo" rules above regardless of source order. */
 :root[data-theme="dark"] .admin-scope,
-:root:not([data-theme="light"]) .admin-scope {
+:root[data-theme="dark"] .admin-scope {
   --bg-primary: #F8FAFC;
   --bg-secondary: #FFFFFF;
   --bg-card: #FFFFFF;
@@ -175,48 +175,48 @@
   color-scheme: light;
 }
 :root[data-theme="dark"] .admin-scope .day-cell,
-:root:not([data-theme="light"]) .admin-scope .day-cell { background: #FFFFFF; }
+:root[data-theme="dark"] .admin-scope .day-cell { background: #FFFFFF; }
 :root[data-theme="dark"] .admin-scope .day-cell:hover,
-:root:not([data-theme="light"]) .admin-scope .day-cell:hover { background: #EEF2FF; }
+:root[data-theme="dark"] .admin-scope .day-cell:hover { background: #EEF2FF; }
 :root[data-theme="dark"] .admin-scope .day-cell.today,
-:root:not([data-theme="light"]) .admin-scope .day-cell.today { background: #EEF2FF; }
+:root[data-theme="dark"] .admin-scope .day-cell.today { background: #EEF2FF; }
 :root[data-theme="dark"] .admin-scope .day-cell.all-available,
-:root:not([data-theme="light"]) .admin-scope .day-cell.all-available { background: #ECFDF5; border-color: #10B981; }
+:root[data-theme="dark"] .admin-scope .day-cell.all-available { background: #ECFDF5; border-color: #10B981; }
 :root[data-theme="dark"] .admin-scope .day-cell.confirmed-meeting,
-:root:not([data-theme="light"]) .admin-scope .day-cell.confirmed-meeting { background: #FAF5FF; border-color: #9333EA; }
+:root[data-theme="dark"] .admin-scope .day-cell.confirmed-meeting { background: #FAF5FF; border-color: #9333EA; }
 :root[data-theme="dark"] .admin-scope .btn-secondary,
-:root:not([data-theme="light"]) .admin-scope .btn-secondary { background: #F8FAFC; color: var(--text-main); }
+:root[data-theme="dark"] .admin-scope .btn-secondary { background: #F8FAFC; color: var(--text-main); }
 :root[data-theme="dark"] .admin-scope .btn-secondary:hover,
-:root:not([data-theme="light"]) .admin-scope .btn-secondary:hover { background: #EEF2FF; }
+:root[data-theme="dark"] .admin-scope .btn-secondary:hover { background: #EEF2FF; }
 :root[data-theme="dark"] .admin-scope .btn-danger,
-:root:not([data-theme="light"]) .admin-scope .btn-danger { background: #FEF2F2; border-color: #FECACA; color: #DC2626; }
+:root[data-theme="dark"] .admin-scope .btn-danger { background: #FEF2F2; border-color: #FECACA; color: #DC2626; }
 :root[data-theme="dark"] .admin-scope .btn-danger:hover,
-:root:not([data-theme="light"]) .admin-scope .btn-danger:hover { background: #FEE2E2; }
+:root[data-theme="dark"] .admin-scope .btn-danger:hover { background: #FEE2E2; }
 :root[data-theme="dark"] .admin-scope .form-select,
 :root[data-theme="dark"] .admin-scope .form-input,
-:root:not([data-theme="light"]) .admin-scope .form-select,
-:root:not([data-theme="light"]) .admin-scope .form-input { background: #FFFFFF; }
+:root[data-theme="dark"] .admin-scope .form-select,
+:root[data-theme="dark"] .admin-scope .form-input { background: #FFFFFF; }
 :root[data-theme="dark"] .admin-scope .status-badge,
 :root[data-theme="dark"] .admin-scope .date-item-badge,
-:root:not([data-theme="light"]) .admin-scope .status-badge,
-:root:not([data-theme="light"]) .admin-scope .date-item-badge { filter: none; }
+:root[data-theme="dark"] .admin-scope .status-badge,
+:root[data-theme="dark"] .admin-scope .date-item-badge { filter: none; }
 :root[data-theme="dark"] .admin-scope .date-item-btn:hover,
-:root:not([data-theme="light"]) .admin-scope .date-item-btn:hover { background: #EEF2FF; }
+:root[data-theme="dark"] .admin-scope .date-item-btn:hover { background: #EEF2FF; }
 :root[data-theme="dark"] .admin-scope .date-item-btn.is-confirmed,
-:root:not([data-theme="light"]) .admin-scope .date-item-btn.is-confirmed { border-color: #E9D5FF; background: #FAF5FF; }
+:root[data-theme="dark"] .admin-scope .date-item-btn.is-confirmed { border-color: #E9D5FF; background: #FAF5FF; }
 :root[data-theme="dark"] .admin-scope .date-item-btn.is-available,
-:root:not([data-theme="light"]) .admin-scope .date-item-btn.is-available { border-color: #DBEAFE; background: #F8FAFC; }
+:root[data-theme="dark"] .admin-scope .date-item-btn.is-available { border-color: #DBEAFE; background: #F8FAFC; }
 /* .admin-scope only resets tokens for its own descendants -- body itself is an ANCESTOR of
    it, so body's background-color: var(--bg-primary) below still reads the dark value from
    :root unless it's told (via :has()) that an .admin-scope is present somewhere inside it. */
 :root[data-theme="dark"] body:has(.admin-scope),
-:root:not([data-theme="light"]) body:has(.admin-scope) { background-color: #F8FAFC; background-image: none; }
+:root[data-theme="dark"] body:has(.admin-scope) { background-color: #F8FAFC; background-image: none; }
 /* The document/viewport scrollbar's color follows the ROOT element's color-scheme, not
    body's or .admin-scope's -- :root[data-theme="dark"] sets color-scheme: dark above, which
    painted a dark scrollbar (and dark native form-control chrome) across the whole page even
    though .admin-scope's own background was already fixed to light. */
 :root[data-theme="dark"]:has(.admin-scope),
-:root:not([data-theme="light"]):has(.admin-scope) { color-scheme: light; }
+:root[data-theme="dark"]:has(.admin-scope) { color-scheme: light; }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 [hidden] { display: none !important; }
@@ -1382,7 +1382,7 @@ select.form-select {
   box-shadow: inset 0 0 0 1px rgba(139, 92, 246, 0.08);
 }
 :root[data-theme="dark"] .poll-option-row.is-confirmed-winner,
-:root:not([data-theme="light"]) .poll-option-row.is-confirmed-winner {
+:root[data-theme="dark"] .poll-option-row.is-confirmed-winner {
   border-color: #A78BFA;
   background: rgba(139, 92, 246, 0.16);
   box-shadow: inset 0 0 0 1px rgba(167, 139, 250, 0.12);
@@ -1450,7 +1450,7 @@ select.form-select {
   white-space: nowrap;
 }
 :root[data-theme="dark"] .poll-confirmed-badge,
-:root:not([data-theme="light"]) .poll-confirmed-badge {
+:root[data-theme="dark"] .poll-confirmed-badge {
   background: #A78BFA;
   color: #111827;
 }
@@ -1592,8 +1592,8 @@ select.form-select {
 .poll-voter-option:hover, .poll-voter-option:focus-visible { background: #EEF2FF; border-color: var(--accent-primary); }
 :root[data-theme="dark"] .poll-voter-option:hover,
 :root[data-theme="dark"] .poll-voter-option:focus-visible,
-:root:not([data-theme="light"]) .poll-voter-option:hover,
-:root:not([data-theme="light"]) .poll-voter-option:focus-visible { background: #212D4D; border-color: var(--accent-primary); }
+:root[data-theme="dark"] .poll-voter-option:hover,
+:root[data-theme="dark"] .poll-voter-option:focus-visible { background: #212D4D; border-color: var(--accent-primary); }
 @media (max-width: 640px) {
   .poll-option-row {
     grid-template-columns: 1fr;
@@ -1667,7 +1667,7 @@ select.form-select {
   color: #334155;
 }
 :root[data-theme="dark"] .section-toggle-btn:hover,
-:root:not([data-theme="light"]) .section-toggle-btn:hover {
+:root[data-theme="dark"] .section-toggle-btn:hover {
   background: var(--border-subtle);
   color: var(--text-main);
 }
@@ -2032,7 +2032,7 @@ select.form-select {
   flex-shrink: 0;
 }
 :root[data-theme="dark"] .admin-side-menu-setting-icon,
-:root:not([data-theme="light"]) .admin-side-menu-setting-icon {
+:root[data-theme="dark"] .admin-side-menu-setting-icon {
   color: #CBD5E1;
   background: #1B2540;
 }
@@ -2301,10 +2301,10 @@ select.form-select {
 :root[data-theme="dark"] .date-item-btn.is-available { border-color: #1D4ED8; background: #16233E; }
 :root[data-theme="dark"] .date-item-btn.is-all { border-color: #065F46; background: #0F2E22; }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .date-item-btn:hover { background: #1E2A4D; }
-  :root:not([data-theme="light"]) .date-item-btn.is-confirmed { border-color: #5B21B6; background: #241B3D; }
-  :root:not([data-theme="light"]) .date-item-btn.is-available { border-color: #1D4ED8; background: #16233E; }
-  :root:not([data-theme="light"]) .date-item-btn.is-all { border-color: #065F46; background: #0F2E22; }
+  :root[data-theme="dark"] .date-item-btn:hover { background: #1E2A4D; }
+  :root[data-theme="dark"] .date-item-btn.is-confirmed { border-color: #5B21B6; background: #241B3D; }
+  :root[data-theme="dark"] .date-item-btn.is-available { border-color: #1D4ED8; background: #16233E; }
+  :root[data-theme="dark"] .date-item-btn.is-all { border-color: #065F46; background: #0F2E22; }
 }
 
 /* Capsule Memo Badge */
@@ -2392,36 +2392,36 @@ select.form-select {
   background-color: #212D4D;
 }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .date-item-badge.is-past {
+  :root[data-theme="dark"] .date-item-badge.is-past {
     background: #1B2540 !important;
     color: #CBD5E1 !important;
     border: 1px solid #34405C !important;
   }
-  :root:not([data-theme="light"]) .date-item-badge.is-confirmed {
+  :root[data-theme="dark"] .date-item-badge.is-confirmed {
     background: #3B1E69 !important;
     color: #E9D5FF !important;
     border: 1px solid #8B5CF6 !important;
   }
-  :root:not([data-theme="light"]) .date-item-badge.is-available {
+  :root[data-theme="dark"] .date-item-badge.is-available {
     background: #1D315C !important;
     color: #BFDBFE !important;
     border: 1px solid #3B82F6 !important;
   }
-  :root:not([data-theme="light"]) .date-item-badge.is-all {
+  :root[data-theme="dark"] .date-item-badge.is-all {
     background: #0F3A2A !important;
     color: #A7F3D0 !important;
     border: 1px solid #10B981 !important;
   }
-  :root:not([data-theme="light"]) .confirmed-meeting-label-badge {
+  :root[data-theme="dark"] .confirmed-meeting-label-badge {
     background-color: transparent;
     color: #C4B5FD;
     border: none;
     box-shadow: none;
   }
-  :root:not([data-theme="light"]) .search-result-row {
+  :root[data-theme="dark"] .search-result-row {
     background-color: #1B2540;
   }
-  :root:not([data-theme="light"]) .search-result-row:hover {
+  :root[data-theme="dark"] .search-result-row:hover {
     background-color: #212D4D;
   }
 }
@@ -3440,37 +3440,37 @@ textarea.form-input {
 }
 
 [data-theme="dark"] .btn-secondary,
-:root:not([data-theme="light"]) .btn-secondary {
+:root[data-theme="dark"] .btn-secondary {
   background: #1B2540; color: var(--text-main); border-color: var(--border-subtle);
 }
 [data-theme="dark"] .form-input,
 [data-theme="dark"] input.form-input,
 [data-theme="dark"] textarea.form-input,
 [data-theme="dark"] select.form-input,
-:root:not([data-theme="light"]) .form-input,
-:root:not([data-theme="light"]) input.form-input,
-:root:not([data-theme="light"]) textarea.form-input,
-:root:not([data-theme="light"]) select.form-input {
+:root[data-theme="dark"] .form-input,
+:root[data-theme="dark"] input.form-input,
+:root[data-theme="dark"] textarea.form-input,
+:root[data-theme="dark"] select.form-input {
   background: #131B2E !important;
   color: var(--text-main) !important;
   border-color: var(--border-subtle) !important;
 }
 [data-theme="dark"] .form-input::placeholder,
-:root:not([data-theme="light"]) .form-input::placeholder {
+:root[data-theme="dark"] .form-input::placeholder {
   color: var(--text-light) !important;
 }
 [data-theme="dark"] .modal-container,
 [data-theme="dark"] .bottom-sheet,
-:root:not([data-theme="light"]) .modal-container,
-:root:not([data-theme="light"]) .bottom-sheet {
+:root[data-theme="dark"] .modal-container,
+:root[data-theme="dark"] .bottom-sheet {
   background: var(--bg-card); color: var(--text-main);
 }
 [data-theme="dark"] .toast,
-:root:not([data-theme="light"]) .toast {
+:root[data-theme="dark"] .toast {
   background: #1B2540; color: var(--text-main); border-color: var(--border-subtle);
 }
 [data-theme="dark"] .url-capsule-badge,
-:root:not([data-theme="light"]) .url-capsule-badge {
+:root[data-theme="dark"] .url-capsule-badge {
   background: #1B2540 !important; color: #A5B4FC !important; border-color: #312E81 !important;
 }
 
@@ -3483,88 +3483,88 @@ textarea.form-input {
 .poll-deadline-badge.is-open { background: #EFF6FF; color: #2563EB; }
 .poll-deadline-badge.is-closed { background: #FEE2E2; color: #DC2626; }
 :root[data-theme="dark"] .poll-deadline-badge.is-open,
-:root:not([data-theme="light"]) .poll-deadline-badge.is-open {
+:root[data-theme="dark"] .poll-deadline-badge.is-open {
   background: #1E3A5F; color: #93C5FD;
 }
 :root[data-theme="dark"] .poll-deadline-badge.is-closed,
-:root:not([data-theme="light"]) .poll-deadline-badge.is-closed {
+:root[data-theme="dark"] .poll-deadline-badge.is-closed {
   background: #3F1D1D; color: #FCA5A5;
 }
 :root[data-theme="dark"] .admin-side-menu,
-:root:not([data-theme="light"]) .admin-side-menu {
+:root[data-theme="dark"] .admin-side-menu {
   background: #131B2E !important;
   color: var(--text-main) !important;
   box-shadow: -12px 0 34px rgba(0, 0, 0, 0.45);
 }
 :root[data-theme="dark"] .admin-side-menu-title,
-:root:not([data-theme="light"]) .admin-side-menu-title { color: var(--text-main) !important; }
+:root[data-theme="dark"] .admin-side-menu-title { color: var(--text-main) !important; }
 :root[data-theme="dark"] .admin-side-menu-item,
-:root:not([data-theme="light"]) .admin-side-menu-item { color: var(--text-main); }
+:root[data-theme="dark"] .admin-side-menu-item { color: var(--text-main); }
 :root[data-theme="dark"] .admin-side-menu-item-desc,
-:root:not([data-theme="light"]) .admin-side-menu-item-desc { color: var(--text-muted); }
+:root[data-theme="dark"] .admin-side-menu-item-desc { color: var(--text-muted); }
 :root[data-theme="dark"] .admin-side-menu-item:hover,
 :root[data-theme="dark"] .admin-side-menu-item:focus-visible,
-:root:not([data-theme="light"]) .admin-side-menu-item:hover,
-:root:not([data-theme="light"]) .admin-side-menu-item:focus-visible { background: #1B2540; }
+:root[data-theme="dark"] .admin-side-menu-item:hover,
+:root[data-theme="dark"] .admin-side-menu-item:focus-visible { background: #1B2540; }
 :root[data-theme="dark"] .admin-side-menu-close-btn,
-:root:not([data-theme="light"]) .admin-side-menu-close-btn { color: var(--text-muted); }
+:root[data-theme="dark"] .admin-side-menu-close-btn { color: var(--text-muted); }
 :root[data-theme="dark"] .admin-side-menu-font-btn,
-:root:not([data-theme="light"]) .admin-side-menu-font-btn {
+:root[data-theme="dark"] .admin-side-menu-font-btn {
   background: #1B2540; color: var(--text-main); border-color: var(--border-subtle);
 }
 :root[data-theme="dark"] .settlement-base-budget-card,
-:root:not([data-theme="light"]) .settlement-base-budget-card {
+:root[data-theme="dark"] .settlement-base-budget-card {
   background: #0F2E22 !important; border-color: #14532D !important;
 }
 :root[data-theme="dark"] .settlement-base-budget-card strong,
-:root:not([data-theme="light"]) .settlement-base-budget-card strong { color: #86EFAC !important; }
+:root[data-theme="dark"] .settlement-base-budget-card strong { color: #86EFAC !important; }
 :root[data-theme="dark"] .poll-progress,
-:root:not([data-theme="light"]) .poll-progress,
+:root[data-theme="dark"] .poll-progress,
 :root[data-theme="dark"] .admin-progress,
-:root:not([data-theme="light"]) .admin-progress { background: #1B2540 !important; }
+:root[data-theme="dark"] .admin-progress { background: #1B2540 !important; }
 :root[data-theme="dark"] a.link-preview-card,
-:root:not([data-theme="light"]) a.link-preview-card {
+:root[data-theme="dark"] a.link-preview-card {
   border-color: var(--border-subtle) !important;
 }
 
 
 /* ===== P6-58 side menu dark + dim + font btn ===== */
 :root[data-theme="dark"] .admin-side-menu-overlay,
-:root:not([data-theme="light"]) .admin-side-menu-overlay,
+:root[data-theme="dark"] .admin-side-menu-overlay,
 :root[data-theme="dark"] .modal-overlay,
-:root:not([data-theme="light"]) .modal-overlay,
+:root[data-theme="dark"] .modal-overlay,
 :root[data-theme="dark"] .bottom-sheet-overlay,
-:root:not([data-theme="light"]) .bottom-sheet-overlay {
+:root[data-theme="dark"] .bottom-sheet-overlay {
   background: #0f172acc !important;
 }
 
 :root[data-theme="dark"] .admin-side-menu-item-icon,
-:root:not([data-theme="light"]) .admin-side-menu-item-icon {
+:root[data-theme="dark"] .admin-side-menu-item-icon {
   background: #1B2540 !important;
   color: #E2E8F0 !important;
 }
 :root[data-theme="dark"] .admin-side-menu-item:hover .admin-side-menu-item-icon,
 :root[data-theme="dark"] .admin-side-menu-item:focus-visible .admin-side-menu-item-icon,
-:root:not([data-theme="light"]) .admin-side-menu-item:hover .admin-side-menu-item-icon,
-:root:not([data-theme="light"]) .admin-side-menu-item:focus-visible .admin-side-menu-item-icon {
+:root[data-theme="dark"] .admin-side-menu-item:hover .admin-side-menu-item-icon,
+:root[data-theme="dark"] .admin-side-menu-item:focus-visible .admin-side-menu-item-icon {
   background: #243152 !important;
   color: #F8FAFC !important;
 }
 
 :root[data-theme="dark"] .admin-side-menu-setting-row,
-:root:not([data-theme="light"]) .admin-side-menu-setting-row {
+:root[data-theme="dark"] .admin-side-menu-setting-row {
   color: #E2E8F0 !important;
 }
 :root[data-theme="dark"] .admin-side-menu-setting-label,
-:root:not([data-theme="light"]) .admin-side-menu-setting-label {
+:root[data-theme="dark"] .admin-side-menu-setting-label {
   color: #F1F5F9 !important;
 }
 :root[data-theme="dark"] .admin-side-menu-font-value,
-:root:not([data-theme="light"]) .admin-side-menu-font-value {
+:root[data-theme="dark"] .admin-side-menu-font-value {
   color: #F1F5F9 !important;
 }
 :root[data-theme="dark"] .admin-side-menu-setting-icon,
-:root:not([data-theme="light"]) .admin-side-menu-setting-icon {
+:root[data-theme="dark"] .admin-side-menu-setting-icon {
   background: #1B2540 !important;
   color: #E2E8F0 !important;
 }
@@ -3586,24 +3586,24 @@ textarea.form-input {
 
 /* ===== P6-59 dark dividers ===== */
 :root[data-theme="dark"] .admin-side-menu-list,
-:root:not([data-theme="light"]) .admin-side-menu-list,
+:root[data-theme="dark"] .admin-side-menu-list,
 :root[data-theme="dark"] .admin-side-menu .shared-side-menu-settings,
-:root:not([data-theme="light"]) .admin-side-menu .shared-side-menu-settings {
+:root[data-theme="dark"] .admin-side-menu .shared-side-menu-settings {
   border-top-color: var(--border-subtle) !important;
   border-bottom-color: var(--border-subtle) !important;
 }
 :root[data-theme="dark"] .admin-side-menu,
-:root:not([data-theme="light"]) .admin-side-menu {
+:root[data-theme="dark"] .admin-side-menu {
   --border-subtle: #232F49;
 }
 :root[data-theme="dark"] .summary-section-divider,
-:root:not([data-theme="light"]) .summary-section-divider,
+:root[data-theme="dark"] .summary-section-divider,
 :root[data-theme="dark"] .admin-tab-bar,
-:root:not([data-theme="light"]) .admin-tab-bar {
+:root[data-theme="dark"] .admin-tab-bar {
   border-color: var(--border-subtle) !important;
 }
 :root[data-theme="dark"] .admin-poll-row,
-:root:not([data-theme="light"]) .admin-poll-row {
+:root[data-theme="dark"] .admin-poll-row {
   border-color: var(--border-subtle) !important;
   background-color: var(--bg-primary) !important;
 }
