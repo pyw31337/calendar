@@ -1098,12 +1098,17 @@ export function ChatRoomView({
     const isMe = msg.participantId === chatParticipantId;
     const timeStr = formatChatTime(msg.timestamp);
     const msgHasImages = !!(msg.imageUrl || (Array.isArray(msg.imageUrls) && msg.imageUrls.length > 0));
+    const msgImageCount = Array.isArray(msg.imageUrls) && msg.imageUrls.length > 0 ? msg.imageUrls.length : (msg.imageUrl ? 1 : 0);
     const msgDirectMediaInfo = getDirectChatMediaInfo(extractFirstUrl(msg.text || ''));
     const isEmbedMessage = msgDirectMediaInfo?.type === 'embed';
     // Wide enough that the embed's own .chat-media-resizable wrapper (see DirectChatMediaText)
     // has real headroom to drag-resize into on desktop, instead of immediately overflowing
     // this bubble's box the moment the user grows it past the old 820px ceiling.
     const chatBubbleMaxWidth = isEmbedMessage ? 'calc(100% - 60px)' : '65%';
+    const multiImageBubbleMaxWidth = msgImageCount >= 2
+      ? `min(65%, calc(${msgImageCount >= 12 ? 6 : msgImageCount >= 5 ? 5 : msgImageCount === 2 ? 2 : 3} * 76px + (${msgImageCount >= 12 ? 6 : msgImageCount >= 5 ? 5 : msgImageCount === 2 ? 2 : 3} - 1) * 4px + 24px))`
+      : chatBubbleMaxWidth;
+    const bubbleWrapperMaxWidth = (!isEmbedMessage && msgImageCount >= 2) ? multiImageBubbleMaxWidth : chatBubbleMaxWidth;
     const chatMediaStyle = isEmbedMessage
       ? { maxWidth: '760px', embedMaxWidth: '760px', portraitEmbedMaxWidth: '360px', maxHeight: '72vh', marginBottom: msg.text ? '10px' : '0' }
       : { maxWidth: '420px', maxHeight: '62vh', marginBottom: msg.text ? '10px' : '0' };
@@ -1223,7 +1228,7 @@ export function ChatRoomView({
       // shrink the bubble below its content's natural size (the classic flexbox overflow trap) --
       // without it, an oversized child (e.g. an embed sized by an imprecise vw estimate) can force
       // this box wider than message-row actually has room for.
-      style: { position: 'relative', maxWidth: chatBubbleMaxWidth, minWidth: 0, zIndex: 1, alignSelf: 'flex-end' }
+      style: { position: 'relative', maxWidth: bubbleWrapperMaxWidth, minWidth: 0, zIndex: 1, alignSelf: 'flex-end' }
     }, /*#__PURE__*/React.createElement("div", {
       key: isSearchFocused ? `bubble-focused-${rowId}` : undefined,
       className: isSearchFocused ? 'chat-search-focused-bubble' : (isSearchMatch ? 'chat-search-match-bubble' : ''),
@@ -1281,7 +1286,7 @@ export function ChatRoomView({
       }
     }))] : [/*#__PURE__*/React.createElement("div", {
       key: "bubble-wrapper",
-      style: { position: 'relative', maxWidth: chatBubbleMaxWidth, minWidth: 0, zIndex: 1 }
+      style: { position: 'relative', maxWidth: bubbleWrapperMaxWidth, minWidth: 0, zIndex: 1 }
     }, /*#__PURE__*/React.createElement("div", {
       key: isSearchFocused ? `bubble-focused-${rowId}` : undefined,
       className: isSearchFocused ? 'chat-search-focused-bubble' : (isSearchMatch ? 'chat-search-match-bubble' : ''),
