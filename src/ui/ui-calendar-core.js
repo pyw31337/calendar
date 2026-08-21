@@ -1725,6 +1725,10 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
 
   const imageUrls = memo.imageUrls || [];
   const thumbUrls = memo.thumbUrls || [];
+  const displayMemoText = memo.text ? (memo.linkPreview ? removeFirstUrl(memo.text) : memo.text) : '';
+  const memoTextLineCount = displayMemoText ? displayMemoText.split(/\r?\n/).length : 0;
+  const hasLongMemoText = displayMemoText.length > 280 || memoTextLineCount > 8;
+  const [isMemoTextExpanded, setIsMemoTextExpanded] = React.useState(false);
 
   // Comments: stored inline on the memo doc as a size-capped array (see hasValidMemoShape in
   // firestore.rules -- comments.size() <= 200, no per-comment shape lock). Composer mirrors the
@@ -1914,9 +1918,42 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
        text is redundant (same link shown twice), so it's stripped from the body here only.
        memo.linkPreview is the source of truth for whether the preview actually has content
        (same field LinkPreviewCard's cachedData reads), so this stays in sync with it. */
-    memo.text && /*#__PURE__*/React.createElement("div", {
-      style: { fontSize: '0.82rem', color: 'var(--text-main)', lineHeight: '1.4', whiteSpace: 'pre-wrap', overflowWrap: 'break-word', wordBreak: 'break-all' }
-    }, parseTextWithLinks(memo.linkPreview ? removeFirstUrl(memo.text) : memo.text)),
+    displayMemoText && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: '0.82rem',
+        color: 'var(--text-main)',
+        lineHeight: '1.4',
+        whiteSpace: 'pre-wrap',
+        overflowWrap: 'break-word',
+        wordBreak: 'break-all',
+        ...(hasLongMemoText && !isMemoTextExpanded ? {
+          display: '-webkit-box',
+          WebkitLineClamp: 8,
+          WebkitBoxOrient: 'vertical',
+          overflow: 'hidden'
+        } : {})
+      }
+    }, parseTextWithLinks(displayMemoText)),
+
+    hasLongMemoText && /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: (e) => {
+        e.stopPropagation();
+        setIsMemoTextExpanded(v => !v);
+      },
+      "data-stop-card-open": "true",
+      style: {
+        alignSelf: 'flex-start',
+        marginTop: '6px',
+        padding: '4px 0',
+        border: 'none',
+        background: 'transparent',
+        color: 'var(--accent-primary)',
+        fontSize: '0.76rem',
+        fontWeight: 800,
+        cursor: 'pointer'
+      }
+    }, isMemoTextExpanded ? "접기" : "더 보기"),
 
     /* Link Preview Card under the card content if applicable */
     extractFirstUrl(memo.text) && /*#__PURE__*/React.createElement("div", {
