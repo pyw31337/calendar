@@ -717,6 +717,7 @@ export function ChatRoomView({
   onJumpToChatMessage,
   onJumpToMemo,
   onJumpToMeetingDate,
+  onGetChatMessageOrdinal,
   onRequestConfirm
 }) {
   const React = window.React;
@@ -1953,6 +1954,7 @@ export function ChatRoomView({
     onJumpToChatMessage,
     onJumpToMemo,
     onJumpToMeetingDate,
+    onGetChatMessageOrdinal,
     onRequestConfirm
   }) : null), imageProcessingChat && /*#__PURE__*/React.createElement(ImageProcessingOverlay, imageProcessingChat),
   isEmojiPickerOpen && /*#__PURE__*/React.createElement(EmojiPickerSheet, {

@@ -893,14 +893,30 @@ export function ChatGalleryModal({
   const handleUploadClick = () => {
     if (uploadInputRef.current) uploadInputRef.current.click();
   };
-  const handleUploadChange = async event => {
-    const files = Array.from(event.target.files || []);
-    event.target.value = '';
+  const uploadFiles = async files => {
     if (!files.length || typeof onUploadImages !== 'function') return;
     setIsMenuOpen(false);
     await Promise.resolve(onUploadImages(files));
     setActiveTab('photos');
   };
+  const handleUploadChange = async event => {
+    const files = Array.from(event.target.files || []);
+    event.target.value = '';
+    await uploadFiles(files);
+  };
+  // Lets '이미지 업로드' accept a clipboard-pasted image too, not just the file picker -- active
+  // for as long as the 갤러리 페이지 is open, so Ctrl+V uploads directly without opening the menu.
+  React.useEffect(() => {
+    if (typeof onUploadImages !== 'function') return;
+    const handlePaste = e => {
+      const files = getImageFilesFromClipboardEvent(e);
+      if (!files.length) return;
+      e.preventDefault();
+      uploadFiles(files);
+    };
+    document.addEventListener('paste', handlePaste);
+    return () => document.removeEventListener('paste', handlePaste);
+  }, [onUploadImages]);
   const renderMenuIcon = () => MenuIcon
     ? /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M4 6h16", "M4 12h16", "M4 18h16"] })
     : /*#__PURE__*/React.createElement("svg", {

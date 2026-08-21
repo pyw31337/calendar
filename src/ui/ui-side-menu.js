@@ -730,6 +730,8 @@ export function SharedSideMenuSettings({
 export function MainSideMenu({
   calendar,
   anniversaries = [],
+  galleryCount = 0,
+  placeCount = 0,
   onClose,
   onOpenManual,
   onOpenSettings,
@@ -905,7 +907,13 @@ export function MainSideMenu({
           xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2"
         }, /*#__PURE__*/React.createElement("rect", { width: "18", height: "18", x: "3", y: "3", rx: "2", ry: "2" }), /*#__PURE__*/React.createElement("circle", { cx: "9", cy: "9", r: "2" }), /*#__PURE__*/React.createElement("path", { d: "m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" }))),
         /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
-          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "갤러리")
+          /*#__PURE__*/React.createElement("span", {
+            className: "admin-side-menu-item-title",
+            style: { display: 'flex', alignItems: 'center', gap: '6px' }
+          }, "갤러리", galleryCount > 0 && /*#__PURE__*/React.createElement("span", {
+            className: "main-menu-badge",
+            style: { backgroundColor: 'var(--border-subtle)', color: 'var(--text-muted)', marginLeft: '4px' }
+          }, galleryCount))
         )
       ),
       /*#__PURE__*/React.createElement("button", {
@@ -917,7 +925,13 @@ export function MainSideMenu({
           xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2"
         }, /*#__PURE__*/React.createElement("path", { d: "M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" }), /*#__PURE__*/React.createElement("circle", { cx: "12", cy: "10", r: "3" }))),
         /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
-          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "장소")
+          /*#__PURE__*/React.createElement("span", {
+            className: "admin-side-menu-item-title",
+            style: { display: 'flex', alignItems: 'center', gap: '6px' }
+          }, "장소", placeCount > 0 && /*#__PURE__*/React.createElement("span", {
+            className: "main-menu-badge",
+            style: { backgroundColor: 'var(--border-subtle)', color: 'var(--text-muted)', marginLeft: '4px' }
+          }, placeCount))
         )
       )
     ),
