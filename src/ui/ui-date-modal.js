@@ -942,7 +942,7 @@ export function DateModal({
       return;
     }
     setIsSubmitting(true);
-    const cleanNote = sanitizeText(note, 60);
+    const cleanNote = sanitizeText(note, 500);
     const ok = await onSave(dateStr, participantId, cleanNote);
     setIsSubmitting(false);
     if (ok !== false) {
@@ -1546,8 +1546,8 @@ export function DateModal({
               type: "text",
               className: "form-input",
               style: { flex: 1 },
-              placeholder: "간단한 일정 메모를 남길 수 있습니다 (최대 60자)",
-              maxLength: 60,
+              placeholder: "일정 메모를 남길 수 있습니다 (최대 500자)",
+              maxLength: 500,
               value: note,
               disabled: isSubmitting,
               onChange: e => { markDirty(); setNote(e.target.value); }

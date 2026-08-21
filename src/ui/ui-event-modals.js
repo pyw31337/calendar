@@ -1230,8 +1230,8 @@ export function AnniversaryModal({
         /*#__PURE__*/React.createElement("input", {
           type: "text",
           className: "form-input",
-          placeholder: "반복 일정 메모 (선택)",
-          maxLength: 120,
+          placeholder: "반복 일정 메모 (선택, 최대 500자)",
+          maxLength: 500,
           value: bulkNote,
           onChange: e => setBulkNote(e.target.value),
           disabled: isBulkSubmitting,

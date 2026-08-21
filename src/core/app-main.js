@@ -1850,7 +1850,7 @@ function validateCalendarShape(calendar) {
   for (const availability of availabilities) {
     if (!availability?.date || !isValidDateString(availability.date)) return '일정 날짜가 올바르지 않습니다.';
     if (!participantIds.has(availability.participantId)) return '일정의 참여자 연결이 올바르지 않습니다.';
-    if (sanitizeText(availability.note, 120).length > 120) return '메모가 너무 깁니다.';
+    if (sanitizeText(availability.note, 500).length > 500) return '메모가 너무 깁니다.';
   }
   for (const log of activityLogs) {
     if (!normalizeActivityLog(calendar.id, log, participantIds)) return '활동 로그 형식이 올바르지 않습니다.';
@@ -1902,7 +1902,7 @@ function normalizeCalendarForSave(calendar) {
       ...availability,
       date: availability.date,
       participantId,
-      note: sanitizeText(availability.note, 120)
+      note: sanitizeText(availability.note, 500)
     };
     const key = `${normalizedAvailability.date}_${normalizedAvailability.participantId}`;
     availabilityMap.set(key, mergeAvailabilityRecord(availabilityMap.get(key), normalizedAvailability));
@@ -1959,7 +1959,7 @@ function mergeAvailabilityRecord(existing, incoming) {
   const existingClone = cloneAvailability(existing);
   const incomingClone = cloneAvailability(incoming);
   if (incomingClone) {
-    incomingClone.note = sanitizeText(incomingClone.note, 120);
+    incomingClone.note = sanitizeText(incomingClone.note, 500);
   }
   if (!existingClone) return incomingClone;
   if (!incomingClone) return existingClone;
@@ -5499,7 +5499,7 @@ function App() {
       return false;
     }
     const now = Date.now();
-    const cleanNote = sanitizeText(note, 120);
+    const cleanNote = sanitizeText(note, 500);
     const existing = activeCal.availabilities || [];
     const index = existing.findIndex(e => e.date === dateStr && e.participantId === participantId);
     const existingActive = index >= 0 && !isTombstone(existing[index]);
@@ -5618,7 +5618,7 @@ function App() {
     const validDates = (dateStrList || []).filter(isValidDateString);
     if (validDates.length === 0) return false;
     const now = Date.now();
-    const cleanNote = sanitizeText(note, 120);
+    const cleanNote = sanitizeText(note, 500);
     let nextAvail = [...(activeCal.availabilities || [])];
     const activityLogs = [];
     validDates.forEach((dateStr, i) => {
@@ -5721,13 +5721,13 @@ function App() {
       // handleSaveExpense below) -- promote it to a real confirmed meeting instead of adding
       // a duplicate entry for the same date.
       nextConfirmedMeetings = existingMeetings.map((m, i) => i === meetingIndex
-        ? { ...m, confirmed: true, note: sanitizeText(note, 120), confirmedAt: now }
+        ? { ...m, confirmed: true, note: sanitizeText(note, 500), confirmedAt: now }
         : m);
     } else {
-      nextConfirmedMeetings = [...existingMeetings, { date: dateStr, note: sanitizeText(note, 120), confirmedAt: now, confirmed: true }];
+      nextConfirmedMeetings = [...existingMeetings, { date: dateStr, note: sanitizeText(note, 500), confirmedAt: now, confirmed: true }];
     }
     const action = isAlreadyConfirmed ? 'meeting_cancel' : 'meeting_confirm';
-    const logNote = sanitizeText(note || '', 120) || (isAlreadyConfirmed ? '모임 확정 취소됨' : '모임 확정됨');
+    const logNote = sanitizeText(note || '', 500) || (isAlreadyConfirmed ? '모임 확정 취소됨' : '모임 확정됨');
     const meetingLog = createActivityLog(activeCal.id, action, dateStr, '', now, logNote);
     const updatedCal = {
       ...activeCal,
