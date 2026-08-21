@@ -921,6 +921,7 @@ export function DateModal({
       setPlaceVisitStatus('visited');
       setEditingLinkedPlaceId(null);
       setPlaceQuery('');
+      setHasInteracted(false);
     } catch (err) {
       console.error('Save place error:', err);
       showToast('장소 추가 실패', 'error');
@@ -950,6 +951,7 @@ export function DateModal({
       showToast(wasEdit ? '참석 정보가 수정되었습니다.' : '참석이 추가되었습니다.', 'success');
       setParticipantId('');
       setNote('');
+      setHasInteracted(false);
     }
   };
 
@@ -1082,6 +1084,7 @@ export function DateModal({
       setExpenseLabelInput('');
       setExpenseAmountInput('');
       setExpenseIsIncome(false);
+      setHasInteracted(false);
     }
   };
   const handleDeleteExpenseClick = (e, expenseId) => {
@@ -1262,9 +1265,21 @@ export function DateModal({
   const markDirty = React.useCallback(() => setHasInteracted(true), []);
   const requestClose = () => {
     if (isSubmitting) return;
-    const dirty = hasInteracted || !!participantId || !!String(note || '').trim() || !!selectedPlace || !!String(placeMemo || '').trim() || !!String(expenseLabelInput || '').trim() || !!String(expenseAmountInput || '').trim() || !!editingExpenseId;
+    // Only warn when there is an unsaved draft in the form.
+    // Successful 추가/수정 clears fields + hasInteracted; past saves are not dirty.
+    const dirty = (
+      !!participantId ||
+      !!String(note || '').trim() ||
+      !!selectedPlace ||
+      !!editingLinkedPlaceId ||
+      !!String(placeMemo || '').trim() ||
+      !!String(placeAlias || '').trim() ||
+      !!String(expenseLabelInput || '').trim() ||
+      !!String(expenseAmountInput || '').trim() ||
+      !!editingExpenseId
+    );
     if (dirty && typeof onRequestConfirm === 'function') {
-      onRequestConfirm('닫기 확인', '수정 내용이 있는데 닫으시겠습니까?', () => onClose());
+      onRequestConfirm('닫기 확인', '저장하지 않은 내용이 있습니다. 닫으시겠습니까?', () => onClose());
       return;
     }
     onClose();
