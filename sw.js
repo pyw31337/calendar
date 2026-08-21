@@ -12,6 +12,7 @@
 // assets resolve instantly/offline without touching the freshness of the app itself.
 const STATIC_CACHE = 'moyeora-static-v1';
 const STATIC_ASSETS = [
+  'favicon.ico',
   'manifest.json',
   'manifest-kkot.json',
   'manifest-cw.json',

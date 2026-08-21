@@ -1397,7 +1397,7 @@ select.form-select {
 .poll-sortable-row.is-dragging {
   transform: rotate(-0.7deg) scale(1.025);
   border-color: rgba(37, 99, 235, 0.38);
-  background: #FFFFFF;
+  background: var(--bg-card);
   box-shadow: 0 18px 35px rgba(15, 23, 42, 0.22);
   z-index: 5;
   opacity: 0.9;
@@ -1769,7 +1769,7 @@ select.form-select {
   gap: 8px;
 }
 .admin-top-bar {
-  background-color: #FFFFFF;
+  background-color: var(--bg-card);
   border-bottom: 1px solid var(--border-subtle);
   margin: -24px 0 0;
   padding-top: 24px;
@@ -1830,8 +1830,8 @@ select.form-select {
   height: 100%;
   max-height: 100%;
   min-height: 0;
-  background: #FFFFFF;
-  color: #0F172A;
+  background: var(--bg-card);
+  color: var(--text-main);
   box-shadow: -12px 0 34px rgba(15, 23, 42, 0.12);
   padding: 22px 16px 16px;
   display: flex;
@@ -3678,4 +3678,31 @@ textarea.form-input {
     padding-left: 18px;
     padding-right: 18px;
   }
+}
+
+
+/* ===== P6-77 dark residual surfaces ===== */
+:root[data-theme="dark"] .admin-top-bar,
+:root[data-theme="dark"] .admin-side-menu,
+:root[data-theme="dark"] .poll-sortable-row.is-dragging {
+  background: #131B2E !important;
+  color: var(--text-main) !important;
+}
+:root[data-theme="dark"] .admin-menu-toggle-btn { color: var(--text-main); }
+
+
+/* ===== P6-77 user manual mobile ===== */
+.manual-mobile-friendly { padding: 14px 14px 18px !important; }
+.manual-mobile-friendly h2 { font-size: 1.25rem !important; line-height: 1.25 !important; word-break: keep-all; }
+.manual-mobile-friendly p { word-break: keep-all; line-height: 1.45 !important; }
+@media (max-width: 640px) {
+  .manual-mobile-friendly {
+    max-height: min(78svh, calc(100svh - 80px)) !important;
+  }
+  .manual-mobile-friendly article {
+    padding: 12px !important;
+    border-radius: 14px !important;
+  }
+  .manual-mobile-friendly article h3 { font-size: 0.95rem !important; }
+  .manual-mobile-friendly article p { font-size: 0.82rem !important; margin-top: 4px !important; }
 }

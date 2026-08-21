@@ -4623,13 +4623,19 @@ function App() {
     // start and only fall back to the explicit fetch/retry loop if it hasn't come through yet --
     // this keeps the retry safety net for a genuinely stuck listener without doubling up network
     // calls on every normal calendar open.
-    const fallbackTimeoutId = setTimeout(() => {
-      if (isMounted && !hasLoadedCloudCalendar) runInitialLoad();
-    }, 1200);
+    // Cache miss: fetch in parallel with onSnapshot (no artificial delay).
+    let fallbackTimeoutId = null;
+    if (!cacheHit) {
+      runInitialLoad();
+    } else {
+      fallbackTimeoutId = setTimeout(() => {
+        if (isMounted && !hasLoadedCloudCalendar) runInitialLoad();
+      }, 1500);
+    }
 
     return () => {
       isMounted = false;
-      clearTimeout(fallbackTimeoutId);
+      if (fallbackTimeoutId) clearTimeout(fallbackTimeoutId);
       if (unsubscribe) unsubscribe();
     };
   }, [activeCalId]);

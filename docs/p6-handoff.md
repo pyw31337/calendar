@@ -452,3 +452,10 @@ zsh 에서 줄 시작 `#` 주석은 쓰지 말 것.
 - AdminModal: isNotificationSupported 등 알림 헬퍼 ESM 심 추가 (설정 빈 화면 수정)
 - getActiveParticipants/sanitizeText deps fallback
 - SW Response clone 재수정
+
+## P6-77 (2026-08-21)
+- favicon.ico + link (앱 경로 404 완화)
+- 첫 방문: 캐시 미스 시 get 즉시 병행
+- 다크모드 잔여 #FFFFFF → var(--bg-card) / dark override
+- 캘린더설정 '일정' 탭 제거 (메인 캘린더와 중복)
+- 사용자 매뉴얼: 문구 단축, 1열, 모바일 패딩/높이

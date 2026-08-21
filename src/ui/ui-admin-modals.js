@@ -1118,7 +1118,7 @@ export function AdminModal({
 
     /* Tab Menu Bar */
     /*#__PURE__*/React.createElement("div", {
-      style: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', borderBottom: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)', flexShrink: 0, minWidth: 0 }
+      style: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', borderBottom: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)', flexShrink: 0, minWidth: 0 }
     },
       /* Tab 1: General settings */
       /*#__PURE__*/React.createElement("button", {
@@ -1173,7 +1173,7 @@ export function AdminModal({
     /* Modal Scrollable Body */
     /*#__PURE__*/React.createElement("div", {
       className: "modal-body",
-      style: { flex: (activeTab === 'calendar' || activeTab === 'logs') ? '0 0 auto' : 1, overflowY: 'auto', padding: (activeTab === 'calendar' || activeTab === 'logs') ? '0px' : '20px', display: 'flex', flexDirection: 'column', gap: '20px' }
+      style: { flex: activeTab === 'logs' ? '0 0 auto' : 1, overflowY: 'auto', padding: activeTab === 'logs' ? '0px' : '20px', display: 'flex', flexDirection: 'column', gap: '20px' }
     },
       /* ========================================== */
       /* TAB 2: CALENDAR & POLLS SETTINGS           */
@@ -1316,7 +1316,7 @@ export function AdminModal({
                     type: "button",
                     onClick: () => { setEditingPoll(poll); setIsPollModalOpen(true); },
                     style: {
-                      backgroundColor: '#FFFFFF', border: '1px solid #CBD5E1', borderRadius: '6px',
+                      backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: '6px',
                       padding: '4px 10px', fontSize: '0.75rem', cursor: 'pointer', color: '#334155'
                     }
                   }, "수정"),
@@ -1581,39 +1581,6 @@ export function AdminModal({
     /* ========================================== */
     /* TAB 5: CALENDAR-BASED SCHEDULE DELETION      */
     /* ========================================== */
-    activeTab === 'calendar' && /*#__PURE__*/React.createElement("div", {
-      style: { flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', padding: '0 20px 20px' }
-    },
-      /*#__PURE__*/React.createElement(CalendarGrid, {
-        anniversaries: anniversaries,
-        calendar: calendar,
-        isLoading: false,
-        monthDate: adminCalMonthDate,
-        onPrevMonth: () => setAdminCalMonthDate(new Date(adminCalMonthDate.getFullYear(), adminCalMonthDate.getMonth() - 1, 1)),
-        onNextMonth: () => setAdminCalMonthDate(new Date(adminCalMonthDate.getFullYear(), adminCalMonthDate.getMonth() + 1, 1)),
-        onToday: () => setAdminCalMonthDate(new Date()),
-        onJumpToMonth: (y, m) => setAdminCalMonthDate(new Date(y, m, 1)),
-        onSelectDate: d => setAdminSelectedDate(d),
-        compact: true,
-        onMoveAvailability: () => {}
-      }),
-
-
-
-      adminSelectedDate && /*#__PURE__*/React.createElement(DateModal, {
-        anniversaries: anniversaries,
-        dateStr: adminSelectedDate,
-        calendar: calendar,
-        adminMode: true,
-        onSave: () => false,
-        onConfirmMeeting: () => false,
-        onDelete: onDeleteAvailability,
-        onDeleteDate: onDeleteAllForDate,
-        onRequestConfirm: onRequestConfirm,
-        onClose: () => setAdminSelectedDate(null)
-      })
-    ),
-
     /* Inner PollModal to Edit/Create Polls */
     isPollModalOpen && /*#__PURE__*/React.createElement(PollModal, {
       calendar: calendar,
@@ -1737,14 +1704,14 @@ export function AdminUnifiedSearchResultsView({
     // rule (and the dark-mode-lock rules that also key off .admin-scope) never matched here no
     // matter how many times the padding fix was reapplied. This class is the actual fix.
     className: "admin-scope",
-    style: { backgroundColor: '#FFFFFF', minHeight: '100vh', width: '100%', maxWidth: '100%', overflowX: 'hidden' }
+    style: { backgroundColor: 'var(--bg-primary)', minHeight: '100vh', width: '100%', maxWidth: '100%', overflowX: 'hidden' }
   },
     /* Chat-room-header-style header: left back arrow, centered title, symmetric right spacer */
     /*#__PURE__*/React.createElement("div", {
       style: {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         height: '56px', padding: '0 16px', borderBottom: '1px solid #E2E8F0',
-        position: 'sticky', top: 0, backgroundColor: '#FFFFFF', zIndex: 5
+        position: 'sticky', top: 0, backgroundColor: 'var(--bg-card)', zIndex: 5
       }
     },
       /*#__PURE__*/React.createElement("button", {
