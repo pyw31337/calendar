@@ -25,10 +25,6 @@ jobs:
         run: npm run safety:test
       - name: Static design and isolation guards
         run: npm run check:all
-      - name: Check tab wiring
-        run: npm run check:tab-wiring
-      - name: Check size budget
-        run: npm run check:size-budget
       - name: Build
         run: npm run build
       - name: Check Vite build output budget
