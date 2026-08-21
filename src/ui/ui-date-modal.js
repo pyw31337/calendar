@@ -910,7 +910,12 @@ export function DateModal({
         categoryId: placeCategoryId || selectedPlace.categoryId || 'etc',
         memo: cleanMemo,
         visitStatus: placeVisitStatus === 'planned' ? 'planned' : 'visited',
-        visitDate: dateStr
+        visitDate: dateStr,
+        // The picked search result's own id (kakao_/google_/osm_ prefixed) -- lets handleSavePlace
+        // recognize "the same business already registered elsewhere" and link this date onto that
+        // existing place instead of creating a duplicate. Empty when editing an already-linked
+        // place (selectedPlace is rebuilt from the place record then, not a fresh search result).
+        sourcePlaceId: selectedPlace.id || ''
       };
 
       const ok = await Promise.resolve(onSavePlace(newPlaceData));

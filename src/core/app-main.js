@@ -230,6 +230,19 @@ const sortVisitEntriesRecentFirst = GATHER_APP_UTILS.sortVisitEntriesRecentFirst
     return dateB.localeCompare(dateA);
   });
 };
+// Links one more meeting date onto an existing place record without disturbing whatever's
+// already there -- reuses the same multi-date memo format parseVisitEntriesFromMemo already
+// understands (one "YYYY-MM-DD 메모" line per visit), so a place picked from search results for a
+// second/third date shows up on all of them via doesPlaceMatchDate instead of creating a
+// duplicate place document. No-ops if this exact date is already present as a line.
+function appendVisitDateToPlaceMemo(existingMemo, dateStr, note) {
+  const cleanNote = String(note || '').trim();
+  const newLine = cleanNote ? `${dateStr} ${cleanNote}` : dateStr;
+  const trimmedExisting = String(existingMemo || '').trim();
+  if (!trimmedExisting) return newLine;
+  if (trimmedExisting.split('\n').some(line => line.trim().startsWith(dateStr))) return trimmedExisting;
+  return `${trimmedExisting}\n${newLine}`;
+}
 
 const KNOWN_PLACE_PARTICIPANT_NAME_TAGS = [
   '영우', '유리', '서준', '광석', '수진', '아윤', '현석', '효진',
@@ -2618,6 +2631,15 @@ async function fetchRecentChatMessages() {
   return [];
 }
 
+async function fetchRecentGalleryMessages() {
+  const svc = window.GATHER_FIREBASE_SERVICES;
+  if (svc && typeof svc.fetchRecentGalleryMessages === 'function' && !svc.isScaffold) {
+    return svc.fetchRecentGalleryMessages.apply(null, arguments);
+  }
+  console.warn('fetchRecentGalleryMessages: GATHER_FIREBASE_SERVICES missing');
+  return [];
+}
+
 const CHAT_OLDER_PAGE_SIZE = readConfigNumber('CHAT_OLDER_PAGE_SIZE', 40);
 bindGatherFirebaseDeps();
 
@@ -2704,13 +2726,21 @@ async function sendChatMessageRest(calId, message) {
     if (message.thumbUrl) fields.thumbUrl = jsToFirestoreValue(message.thumbUrl);
     if (Array.isArray(message.imageUrls) && message.imageUrls.length > 0) fields.imageUrls = jsToFirestoreValue(message.imageUrls);
     if (Array.isArray(message.thumbUrls) && message.thumbUrls.length > 0) fields.thumbUrls = jsToFirestoreValue(message.thumbUrls);
+    if (Array.isArray(message.imageTags) && message.imageTags.length > 0) fields.imageTags = jsToFirestoreValue(message.imageTags);
+    if (message.uploadSource) fields.uploadSource = jsToFirestoreValue(message.uploadSource);
     const payload = { fields };
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
-    return res.ok;
+    if (!res.ok) return false;
+    // The create-document REST response's `name` is the full resource path
+    // (.../messages/{id}) -- callers that need to reference the new message right away (e.g.
+    // linking a freshly-uploaded photo into confirmedMeeting.photos) read `.id` off this object.
+    const data = await res.json().catch(() => null);
+    const id = typeof data?.name === 'string' ? data.name.split('/').pop() : null;
+    return { success: true, id };
   } catch (err) {
     console.warn('sendChatMessageRest error:', err);
     return false;
@@ -4067,6 +4097,11 @@ function App() {
 
   const isSavingRef = React.useRef(false);
   const serverRevisionRef = React.useRef(loadLocalMeta());
+  // Tracks which calendar id the "서버 재연결 중" toast has already been shown for, so a stuck
+  // connection that keeps retrying every 3.5s (see runInitialLoad below) only surfaces it once
+  // instead of repeating it forever -- the cache-restored screen already told the user the data
+  // might be stale, repeating that same toast on every retry tick added noise without new information.
+  const reconnectToastShownForRef = React.useRef(null);
 
   const applyServerCalendars = (serverCalendars, lastModified = Date.now()) => {
     const normalized = cloneCalendarList(serverCalendars).map(normalizeCalendarForSave);
@@ -4780,6 +4815,7 @@ function App() {
         const result = await fetchSingleCloudCalendar(activeCalId, 1, FIREBASE_LOAD_TIMEOUT_MS);
         if (result?.calendar && applyLoadedCalendar(result.calendar, result.lastModified || Date.now())) {
           if (attempt > 1) showToast('다시 불러옴', 'success', 3000);
+          reconnectToastShownForRef.current = null;
           return;
         }
         if (attempt < FIREBASE_LOAD_MAX_ATTEMPTS && isMounted && !hasLoadedCloudCalendar) {
@@ -4790,7 +4826,10 @@ function App() {
         const restored = restoreActiveCalendarFromCache();
         if (restored) {
           setIsInitialDataLoading(false);
-          showToast('서버 재연결 중', 'info', 4000);
+          if (reconnectToastShownForRef.current !== activeCalId) {
+            reconnectToastShownForRef.current = activeCalId;
+            showToast('서버 재연결 중', 'info', 4000);
+          }
         } else {
           setIsInitialDataLoading(true);
           showToast('데이터 로딩 지연, 재시도 중', 'error', 5000);
@@ -5213,7 +5252,13 @@ function App() {
     setTotalMemoCount(null);
     setTotalGalleryCount(null);
     setGalleryPreviewMessages([]);
-    if (!activeCalId) return;
+    // These counts/migration scan are non-essential background work -- deferred until the
+    // initial calendar document has actually finished loading (isInitialDataLoading false) so
+    // they queue up behind the one fetch that matters on a cold start instead of racing it. A
+    // burst of count()/paginated get() calls firing on the very same tick as the critical
+    // calendar-doc fetch was starving that fetch of its 8s timeout budget, which is what made
+    // the "서버 재연결 중" toast show up so often on first load / deep-link entry.
+    if (!activeCalId || isInitialDataLoading) return;
     let cancelled = false;
     (async () => {
       const [msgCount, memoCount, galCount] = await Promise.all([
@@ -5235,17 +5280,23 @@ function App() {
       } catch (e) { console.warn('base64 migration skipped', e); }
     })();
     return () => { cancelled = true; };
-  }, [activeCalId]);
+  }, [activeCalId, isInitialDataLoading]);
 
   React.useEffect(() => {
-    if (!activeCalId || activeView !== 'calendar') return;
+    // Same reasoning as above -- wait for the initial calendar document load to finish before
+    // spending a paginated Firestore scan on gallery-preview thumbnails.
+    if (!activeCalId || activeView !== 'calendar' || isInitialDataLoading) return;
     let cancelled = false;
     (async () => {
-      const list = await fetchRecentChatMessages(activeCalId, 60);
+      // Keeps paging through history until at least 12 photos have been found (matching the
+      // widget's own 12-thumbnail cap below), instead of grabbing the newest 60 messages
+      // regardless of content -- a text-heavy recent stretch of chat used to starve the main
+      // screen's gallery widget of thumbnails even when far more photos existed further back.
+      const list = await fetchRecentGalleryMessages(activeCalId, 12);
       if (!cancelled && Array.isArray(list)) setGalleryPreviewMessages(list);
     })();
     return () => { cancelled = true; };
-  }, [activeCalId, activeView]);
+  }, [activeCalId, activeView, isInitialDataLoading]);
 
   const loadOlderChatMessages = React.useCallback(async () => {
     if (!activeCalId || loadingOlderChatRef.current || !hasMoreOlderChat) return;
@@ -6602,6 +6653,12 @@ function App() {
     return updateCalendars(nextCalendars, '지출 순서 저장완료', 'success', updatedCal.id, 'settings', []);
   };
 
+  // Uploaded through the exact same chat-message pipeline as every other photo in the app (see
+  // handleUploadGalleryImages) -- this is a real chat message (uploadSource: 'meeting'), not an
+  // independent copy, so it shows up in the chat room/gallery/main gallery too. confirmedMeeting
+  // .photos below only stores a REFERENCE to it (sourceMessageId + sourceImageIndex, tags set to
+  // the meeting date), matching linkTaggedImageToMeetingDates' identity model -- one photo, one
+  // Storage file, shared everywhere it's tagged.
   const handleAddMeetingPhotos = async (dateStr, files) => {
     if (!activeCal || !isValidDateString(dateStr)) return false;
     const compressed = await prepareGalleryImageUploads(files, '일정 사진 업로드 준비 중...');
@@ -6613,13 +6670,52 @@ function App() {
       const resolvedImages = await resolveChatImageBatch(activeCal.id, compressed, progress => {
         setChatUploadProgress({ ...progress, label: '일정 사진 업로드 중...' });
       });
+      const chunks = chunkResolvedImagesForMessages(resolvedImages);
       const now = Date.now();
-      const nextPhotos = resolvedImages.map((image, index) => ({
-        id: `photo_${activeCal.id}_${dateStr}_${now}_${index}_${Math.random().toString(36).slice(2, 7)}`,
-        imageUrl: image.imageUrl,
-        thumbUrl: image.thumbUrl || image.imageUrl,
-        createdAt: now + index
-      }));
+      const fallbackParticipantId = chatParticipantId || getActiveParticipants(activeCal)[0]?.id || '';
+      const newRefs = [];
+      for (let i = 0; i < chunks.length; i += 1) {
+        const chunkImages = chunks[i];
+        setChatUploadProgress({
+          pct: Math.min(99, 90 + Math.round((i / Math.max(1, chunks.length)) * 9)),
+          remainingSec: Math.max(1, chunks.length - i),
+          label: '일정 사진 저장 중...',
+          current: Math.min(resolvedImages.length, i + 1),
+          total: resolvedImages.length
+        });
+        const messageData = {
+          participantId: fallbackParticipantId,
+          text: i === 0 ? '일정 사진' : '',
+          imageUrl: chunkImages[0].imageUrl,
+          thumbUrl: chunkImages[0].thumbUrl,
+          imageUrls: chunkImages.map(r => r.imageUrl),
+          thumbUrls: chunkImages.map(r => r.thumbUrl),
+          imageTags: chunkImages.map(() => dateStr),
+          timestamp: now + i,
+          uploadSource: 'meeting'
+        };
+        let newMessageId = null;
+        if (firebaseDb) {
+          const ref = await firebaseDb.collection('calendars').doc(`cal_${activeCal.id}`).collection('messages').add(sanitizeMessageForFirestore(messageData));
+          newMessageId = ref.id;
+        } else {
+          const sent = await sendChatMessageRest(activeCal.id, messageData);
+          if (!sent) throw new Error(`Meeting photo save failed ${i + 1}/${chunks.length}`);
+          newMessageId = sent.id || null;
+        }
+        chunkImages.forEach((img, idx) => {
+          newRefs.push({
+            id: `photo_${activeCal.id}_${dateStr}_${now}_${i}_${idx}_${Math.random().toString(36).slice(2, 7)}`,
+            imageUrl: img.imageUrl,
+            thumbUrl: img.thumbUrl || img.imageUrl,
+            createdAt: now + i,
+            source: 'lightbox-tag',
+            sourceMessageId: newMessageId || '',
+            sourceImageIndex: idx,
+            tags: dateStr
+          });
+        });
+      }
       const existingMeetings = getConfirmedMeetings(activeCal);
       const meetingIndex = existingMeetings.findIndex(m => m.date === dateStr);
       let meetings = existingMeetings;
@@ -6628,9 +6724,9 @@ function App() {
       }
       const targetIndex = meetingIndex >= 0 ? meetingIndex : meetings.length - 1;
       const nextConfirmedMeetings = meetings.map((m, i) => i === targetIndex
-        ? { ...m, photos: [...(Array.isArray(m.photos) ? m.photos : []), ...nextPhotos], amount: m.amount || null }
+        ? { ...m, photos: [...(Array.isArray(m.photos) ? m.photos : []), ...newRefs], amount: m.amount || null }
         : m);
-      const photoLog = createActivityLog(activeCal.id, 'photo_create', dateStr, '', now, `${nextPhotos.length}장 일정 사진 추가`);
+      const photoLog = createActivityLog(activeCal.id, 'photo_create', dateStr, '', now, `${newRefs.length}장 일정 사진 추가`);
       const updatedCal = {
         ...activeCal,
         confirmedMeeting: nextConfirmedMeetings,
@@ -7060,7 +7156,7 @@ function App() {
     if (!cleanName) return false;
     const now = Date.now();
     const existingPlaces = getCalendarPlaces(activeCal);
-    const isEditing = !!placeData.id;
+    let isEditing = !!placeData.id;
     const categoryIds = new Set(getPlaceCategories(activeCal).map(c => c.id));
     const cleanCategoryId = categoryIds.has(placeData.categoryId) ? placeData.categoryId : 'etc';
     const cleanAddress = normalizePlaceAddressForSave(placeData.address || '', placeData.lat, placeData.lng);
@@ -7068,7 +7164,48 @@ function App() {
     const cleanMemo = sanitizeText(placeData.memo || '', 2000);
     const cleanVisitStatus = placeData.visitStatus === 'planned' ? 'planned' : 'visited';
     const cleanVisitDate = cleanVisitStatus === 'visited' && isValidDateString(placeData.visitDate) ? placeData.visitDate : '';
-    const editedFields = { name: cleanName, alias: cleanAlias, address: cleanAddress, lat: placeData.lat, lng: placeData.lng, categoryId: cleanCategoryId, memo: cleanMemo, visitStatus: cleanVisitStatus, visitDate: cleanVisitDate, updatedAt: now };
+    const cleanSourcePlaceId = sanitizeText(placeData.sourcePlaceId || '', 120);
+    // Same business, different save -- a place picked from a live search result (Kakao/Google
+    // Places/Nominatim, see sourcePlaceId) that already exists somewhere in this calendar (any
+    // date, or registered directly on the 장소 페이지) reuses that record instead of creating a
+    // duplicate. Deliberately narrower than merging by address/name (see the no-merge rule below,
+    // still in force for freehand entries like 도은네/은우네 in the same building) -- this only
+    // fires when the exact same external search result was picked again.
+    const mergeTargetPlace = (!isEditing && cleanSourcePlaceId)
+      ? existingPlaces.find(p => p.sourcePlaceId && p.sourcePlaceId === cleanSourcePlaceId) || null
+      : null;
+    if (mergeTargetPlace) {
+      isEditing = true;
+      placeData = { ...placeData, id: mergeTargetPlace.id };
+    }
+    // Reusing an existing place for a (possibly new) date keeps its curated name/alias/category/
+    // address/primary visitDate untouched (only fills them in if they were empty) and appends
+    // this date as a new memo line (see appendVisitDateToPlaceMemo) instead of overwriting, so
+    // earlier dates/notes on the place aren't lost -- doesPlaceMatchDate already understands that
+    // multi-line format, so the place then shows up under every linked date.
+    const editedFields = mergeTargetPlace ? {
+      name: mergeTargetPlace.name || cleanName,
+      alias: mergeTargetPlace.alias || cleanAlias,
+      address: mergeTargetPlace.address || cleanAddress,
+      lat: mergeTargetPlace.lat,
+      lng: mergeTargetPlace.lng,
+      categoryId: mergeTargetPlace.categoryId || cleanCategoryId,
+      memo: (cleanVisitDate && !doesPlaceMatchDate(mergeTargetPlace, cleanVisitDate))
+        ? appendVisitDateToPlaceMemo(mergeTargetPlace.memo, cleanVisitDate, cleanMemo)
+        : mergeTargetPlace.memo,
+      visitStatus: mergeTargetPlace.visitStatus || cleanVisitStatus,
+      visitDate: mergeTargetPlace.visitDate || cleanVisitDate,
+      sourcePlaceId: mergeTargetPlace.sourcePlaceId || cleanSourcePlaceId,
+      updatedAt: now
+    } : {
+      name: cleanName, alias: cleanAlias, address: cleanAddress, lat: placeData.lat, lng: placeData.lng, categoryId: cleanCategoryId, memo: cleanMemo, visitStatus: cleanVisitStatus, visitDate: cleanVisitDate,
+      // A plain edit of an already-registered place (e.g. via DateModal's pencil icon) doesn't
+      // carry the original search result forward, so an empty incoming value here must NOT wipe
+      // out a sourcePlaceId set by an earlier save -- otherwise this place would lose its dedup
+      // identity and a later search-result pick could create a duplicate after all.
+      sourcePlaceId: cleanSourcePlaceId || (isEditing ? (existingPlaces.find(p => p.id === placeData.id) || {}).sourcePlaceId : '') || '',
+      updatedAt: now
+    };
     let nextPlaces;
     if (isEditing) {
       const found = existingPlaces.some(p => p.id === placeData.id);
@@ -7432,6 +7569,7 @@ function App() {
       calendar: activeCal,
       onSave: handleSaveEditMessage,
       onClose: () => setEditingMessage(null),
+      onRequestConfirm: showConfirmDialog,
       showToast: showToast
     }),
     isAdminOpen && /*#__PURE__*/React.createElement(AdminModal, {
@@ -10091,6 +10229,51 @@ function useTapRevealedMsgId() {
   return revealedId;
 }
 
+// Tracks whether the user has actually typed/edited a text field (not merely clicked a
+// toggle/radio/checkbox/dropdown, tapped a search result, or tapped around) since a modal opened,
+// and exposes a single backdrop-click/close-button handler built on top of that: closes
+// immediately when nothing was typed, or routes through onRequestConfirm ("저장하지 않은 내용이
+// 있습니다...") when it was -- so a stray tap on the dim background never silently discards text
+// someone was mid-way through writing, while a pure click-only interaction (picking a search
+// result, toggling 방문/예정, choosing a category) never triggers an unnecessary confirmation.
+// Listens at the document level (not scoped to the modal's own DOM) since every modal in this app
+// is effectively singular/blocking while open -- see DateModal's own bespoke field-diff version
+// of this same idea (formBaselineRef/requestClose) for the original reference implementation this
+// generalizes for every other form modal. `active` defaults to true, which is correct for the
+// common case (a modal component that mounts fresh each time it opens and unmounts on close) --
+// pass `active` explicitly only for a modal that's really an always-mounted conditional block
+// inside a persistent page (e.g. MemoView's inline memo editor), so the listener doesn't pick up
+// typing elsewhere on that page and the dirty flag resets on each open rather than only once ever.
+function useModalDirtyGuard(onClose, onRequestConfirm, message, active = true) {
+  const dirtyRef = React.useRef(false);
+  React.useEffect(() => {
+    if (!active) return undefined;
+    dirtyRef.current = false;
+    const handler = e => {
+      const target = e.target;
+      const tag = target && target.tagName;
+      if (tag !== 'TEXTAREA' && tag !== 'INPUT') return;
+      const type = (target.type || 'text').toLowerCase();
+      if (['checkbox', 'radio', 'range', 'color', 'file', 'submit', 'button', 'reset', 'image'].includes(type)) return;
+      dirtyRef.current = true;
+    };
+    document.addEventListener('input', handler, true);
+    return () => document.removeEventListener('input', handler, true);
+  }, [active]);
+  const requestClose = React.useCallback(() => {
+    if (dirtyRef.current && typeof onRequestConfirm === 'function') {
+      onRequestConfirm('닫기 확인', message || '저장하지 않은 내용이 있습니다. 닫으시겠습니까?', () => onClose());
+      return;
+    }
+    onClose();
+  }, [onClose, onRequestConfirm, message]);
+  const overlayOnClick = React.useCallback(e => {
+    if (e.target !== e.currentTarget) return;
+    requestClose();
+  }, [requestClose]);
+  return { requestClose, overlayOnClick, markSaved: () => { dirtyRef.current = false; } };
+}
+
 // De-dupes rapid double-taps / pointerdown+click event duplication firing onSend() twice for the
 // same message -- extracted from ChatRoomView (see its own history of this exact bug) so
 // CommentsSection's independent Send button/Ctrl+Enter shortcut get the same protection instead
@@ -11522,6 +11705,7 @@ function bindGatherUiDeps() {
     setChatLastReadTimestamp: typeof setChatLastReadTimestamp === 'function' ? setChatLastReadTimestamp : null,
     useTapRevealedMsgId: typeof useTapRevealedMsgId === 'function' ? useTapRevealedMsgId : null,
     useChatSendGuard: typeof useChatSendGuard === 'function' ? useChatSendGuard : null,
+    useModalDirtyGuard: typeof useModalDirtyGuard === 'function' ? useModalDirtyGuard : null,
     appendChatImageFiles: typeof appendChatImageFiles === 'function' ? appendChatImageFiles : null,
     confetti: typeof confetti === 'function' ? confetti : (typeof window !== 'undefined' ? window.confetti : null),
     CONFETTI_Z_INDEX: typeof CONFETTI_Z_INDEX !== 'undefined' ? CONFETTI_Z_INDEX : 9999,

@@ -29,6 +29,14 @@ function useChatSendGuard(onSend, canSend) {
   const f = __gatherUiDeps().useChatSendGuard;
   return typeof f === 'function' ? f(onSend, canSend) : onSend;
 }
+function useModalDirtyGuard(onClose, onRequestConfirm, message) {
+  const f = __gatherUiDeps().useModalDirtyGuard;
+  return typeof f === 'function' ? f(onClose, onRequestConfirm, message) : {
+    requestClose: onClose,
+    overlayOnClick: e => { if (e.target === e.currentTarget) onClose(); },
+    markSaved: () => {}
+  };
+}
 function computeKoreanHolidaysForYear(year) {
   const f = __gatherUiDeps().computeKoreanHolidaysForYear;
   return typeof f === 'function' ? f(year) : [];
@@ -722,6 +730,12 @@ export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoad
 
   // Editing Memo State
   const [editingMemo, setEditingMemo] = React.useState(null);
+  // MemoView itself never unmounts while the editor is open (unlike every other modal in this
+  // app, which is its own component that mounts fresh on open) -- passing active:!!editingMemo
+  // scopes the dirty-tracking listener to just the time the editor is actually shown, so typing
+  // in the page's own "새 메모" composer or search box elsewhere doesn't get picked up, and the
+  // dirty flag resets correctly each time a different memo is opened for editing.
+  const memoEditorDirtyGuard = useModalDirtyGuard(() => setEditingMemo(null), onRequestConfirm, undefined, !!editingMemo);
   const [editTitle, setEditTitle] = React.useState('');
   const [editText, setEditText] = React.useState('');
   const editMemoTextareaRef = React.useRef(null);
@@ -1724,6 +1738,7 @@ export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoad
 
     /* Memo Editor Modal Overlay */
     editingMemo && /*#__PURE__*/React.createElement("div", {
+      onClick: memoEditorDirtyGuard.overlayOnClick,
       style: {
         position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
         backgroundColor: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)',
@@ -2008,7 +2023,7 @@ export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoad
             /*#__PURE__*/React.createElement("button", {
               type: "button",
               className: "btn btn-secondary",
-              onClick: () => setEditingMemo(null),
+              onClick: memoEditorDirtyGuard.requestClose,
               style: {
                 whiteSpace: 'nowrap',
                 cursor: 'pointer',
