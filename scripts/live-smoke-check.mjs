@@ -15,6 +15,9 @@ const pages = [
   '?id=kkot&view=memo',
   '?id=jhair&view=chat',
   '?admin=1',
+  '?admin=1&id=cw',
+  '?admin=1&id=jhair',
+  '?admin=1&search=%EB%B0%95&cal=all',
   '?admin=1&restore=1'
 ];
 
