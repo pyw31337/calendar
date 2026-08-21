@@ -29,6 +29,14 @@ function useChatSendGuard(onSend, canSend) {
   const f = __gatherUiDeps().useChatSendGuard;
   return typeof f === 'function' ? f(onSend, canSend) : onSend;
 }
+function useModalDirtyGuard(onClose, onRequestConfirm, message) {
+  const f = __gatherUiDeps().useModalDirtyGuard;
+  return typeof f === 'function' ? f(onClose, onRequestConfirm, message) : {
+    requestClose: onClose,
+    overlayOnClick: e => { if (e.target === e.currentTarget) onClose(); },
+    markSaved: () => {}
+  };
+}
 function computeKoreanHolidaysForYear(year) {
   const f = __gatherUiDeps().computeKoreanHolidaysForYear;
   return typeof f === 'function' ? f(year) : [];
@@ -2542,6 +2550,7 @@ export function EditMessageModal({
   calendar,
   onSave,
   onClose,
+  onRequestConfirm,
   showToast
 }) {
   const React = window.React;
@@ -2554,6 +2563,7 @@ export function EditMessageModal({
   const ResizableModalContainer = __comp.ResizableModalContainer || __deps.ResizableModalContainer;
   const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
   const autoGrowTextarea = __deps.autoGrowTextarea;
+  const { requestClose, overlayOnClick } = useModalDirtyGuard(onClose, onRequestConfirm);
 
   const [text, setText] = React.useState(message.text || '');
   const [participantId, setParticipantId] = React.useState(message.participantId || '');
@@ -2630,7 +2640,7 @@ export function EditMessageModal({
 
   return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     className: "modal-overlay",
-    onClick: () => { if (!isSubmitting) onClose(); },
+    onClick: e => { if (!isSubmitting) overlayOnClick(e); },
     style: { zIndex: 11000 }
   }, /*#__PURE__*/React.createElement(ResizableModalContainer, {
     className: "modal-container",
@@ -2649,7 +2659,7 @@ export function EditMessageModal({
     style: { fontSize: '1rem', fontWeight: 800, color: 'var(--text-main)', margin: 0 }
   }, "채팅 수정"), /*#__PURE__*/React.createElement("button", {
     type: "button",
-    onClick: () => { if (!isSubmitting) onClose(); },
+    onClick: () => { if (!isSubmitting) requestClose(); },
     style: { background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer', display: 'flex', alignItems: 'center' }
   }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }))), /*#__PURE__*/React.createElement("div", {
     style: { display: 'flex', flexDirection: 'column', gap: '12px' }

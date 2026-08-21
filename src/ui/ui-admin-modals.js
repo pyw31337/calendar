@@ -29,6 +29,14 @@ function useChatSendGuard(onSend, canSend) {
   const f = __gatherUiDeps().useChatSendGuard;
   return typeof f === 'function' ? f(onSend, canSend) : onSend;
 }
+function useModalDirtyGuard(onClose, onRequestConfirm, message) {
+  const f = __gatherUiDeps().useModalDirtyGuard;
+  return typeof f === 'function' ? f(onClose, onRequestConfirm, message) : {
+    requestClose: onClose,
+    overlayOnClick: e => { if (e.target === e.currentTarget) onClose(); },
+    markSaved: () => {}
+  };
+}
 function computeKoreanHolidaysForYear(year) {
   const f = __gatherUiDeps().computeKoreanHolidaysForYear;
   return typeof f === 'function' ? f(year) : [];
@@ -766,6 +774,7 @@ export function AdminModal({
     : (typeof GATHER_APP_UTILS !== 'undefined' && typeof GATHER_APP_UTILS.sanitizeText === 'function'
       ? GATHER_APP_UTILS.sanitizeText
       : function (s, n) { var v = String(s == null ? '' : s); return typeof n === 'number' ? v.slice(0, n) : v; });
+  const { requestClose, overlayOnClick, markSaved } = useModalDirtyGuard(onClose, onRequestConfirm);
 
   const [activeTab, setActiveTab] = React.useState('settings'); // 'settings', 'recovery', 'logs'
 
@@ -1094,7 +1103,7 @@ export function AdminModal({
 
   return /*#__PURE__*/React.createElement("div", {
     className: "modal-overlay",
-    onClick: () => { if (!isSubmitting) onClose(); },
+    onClick: e => { if (!isSubmitting) overlayOnClick(e); },
     style: { zIndex: 10000 }
   }, /*#__PURE__*/React.createElement(ResizableModalContainer, {
     className: "modal-container admin-settings-modal",
@@ -1111,7 +1120,7 @@ export function AdminModal({
       ),
       /*#__PURE__*/React.createElement("button", {
         type: "button",
-        onClick: () => { if (!isSubmitting) onClose(); },
+        onClick: () => { if (!isSubmitting) requestClose(); },
         style: { background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer', display: 'flex', alignItems: 'center' }
       }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }))
     ),

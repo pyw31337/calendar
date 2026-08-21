@@ -29,6 +29,14 @@ function useChatSendGuard(onSend, canSend) {
   const f = __gatherUiDeps().useChatSendGuard;
   return typeof f === 'function' ? f(onSend, canSend) : onSend;
 }
+function useModalDirtyGuard(onClose, onRequestConfirm, message) {
+  const f = __gatherUiDeps().useModalDirtyGuard;
+  return typeof f === 'function' ? f(onClose, onRequestConfirm, message) : {
+    requestClose: onClose,
+    overlayOnClick: e => { if (e.target === e.currentTarget) onClose(); },
+    markSaved: () => {}
+  };
+}
 function computeKoreanHolidaysForYear(year) {
   const f = __gatherUiDeps().computeKoreanHolidaysForYear;
   return typeof f === 'function' ? f(year) : [];
@@ -686,6 +694,7 @@ export function AnniversaryModal({
   const SimpleBottomSheetPicker = __comp.SimpleBottomSheetPicker || __deps.SimpleBottomSheetPicker;
   const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
   const getActiveParticipants = __deps.getActiveParticipants;
+  const { requestClose, overlayOnClick, markSaved } = useModalDirtyGuard(onClose, onRequestConfirm);
 
   const [activeTab, setActiveTab] = React.useState('list'); // 'list', 'add', 'bulk'
   const [editingId, setEditingId] = React.useState(null); // null when registering a new anniversary
@@ -777,7 +786,8 @@ export function AnniversaryModal({
 
       await __fb().collection('calendars').doc('cal_' + calendarId).collection('anniversaries').doc(anniversaryId).set(annData);
       showToast(editingId ? '기념일이 수정되었습니다.' : '기념일이 등록되었습니다.', 'success');
-      
+      markSaved();
+
       // Reset form
       setNewTitle('');
       setIsLunar(false);
@@ -891,7 +901,7 @@ export function AnniversaryModal({
 
   const portalContent = /*#__PURE__*/React.createElement("div", {
     className: "modal-overlay",
-    onClick: onClose,
+    onClick: overlayOnClick,
     style: { zIndex: 11000 }
   }, /*#__PURE__*/React.createElement(ResizableModalContainer, {
     className: "modal-container",
@@ -908,11 +918,11 @@ export function AnniversaryModal({
       }, /*#__PURE__*/React.createElement("svg", {
         xmlns: "http://www.w3.org/2000/svg", width: "18", height: "18", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2"
       }, /*#__PURE__*/React.createElement("circle", { cx: "12", cy: "12", r: "10" }), /*#__PURE__*/React.createElement("polyline", { points: "12 6 12 12 16 14" })), "기념일 & 반복 일정 설정"),
-      
+
       /* Close button */
       /*#__PURE__*/React.createElement("button", {
         type: "button",
-        onClick: onClose,
+        onClick: requestClose,
         style: { width: '30px', height: '30px', borderRadius: '50%', border: 'none', background: 'var(--border-subtle)', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }
       }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 16 }))
     ),
@@ -1905,6 +1915,7 @@ export function PollModal({ calendar, poll, onSave, onClose, showToast, onReques
   const SectionToggleButton = __comp.SectionToggleButton || __deps.SectionToggleButton;
   const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
   const sanitizeText = __deps.sanitizeText;
+  const { requestClose, overlayOnClick, markSaved } = useModalDirtyGuard(onClose, onRequestConfirm);
 
   const now = Date.now();
   const isEditing = Boolean(poll?.id);
@@ -2081,8 +2092,8 @@ export function PollModal({ calendar, poll, onSave, onClose, showToast, onReques
   };
   return /*#__PURE__*/React.createElement("div", {
     className: "modal-overlay",
-    onClick: () => {
-      if (!isSubmitting) onClose();
+    onClick: e => {
+      if (!isSubmitting) overlayOnClick(e);
     },
     style: { zIndex: 11000 }
   }, /*#__PURE__*/React.createElement(ResizableModalContainer, {
@@ -2100,7 +2111,7 @@ export function PollModal({ calendar, poll, onSave, onClose, showToast, onReques
     style: { fontSize: '0.6rem', whiteSpace: 'nowrap' }
   }, "\uC0DD\uC131\uC77C\uC790 ", createdAtText), /*#__PURE__*/React.createElement("button", {
     onClick: () => {
-      if (!isSubmitting) onClose();
+      if (!isSubmitting) requestClose();
     },
     style: { background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer', display: 'flex', alignItems: 'center' }
   }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 })))), /*#__PURE__*/React.createElement("form", {

@@ -29,6 +29,14 @@ function useChatSendGuard(onSend, canSend) {
   const f = __gatherUiDeps().useChatSendGuard;
   return typeof f === 'function' ? f(onSend, canSend) : onSend;
 }
+function useModalDirtyGuard(onClose, onRequestConfirm, message) {
+  const f = __gatherUiDeps().useModalDirtyGuard;
+  return typeof f === 'function' ? f(onClose, onRequestConfirm, message) : {
+    requestClose: onClose,
+    overlayOnClick: e => { if (e.target === e.currentTarget) onClose(); },
+    markSaved: () => {}
+  };
+}
 function computeKoreanHolidaysForYear(year) {
   const f = __gatherUiDeps().computeKoreanHolidaysForYear;
   return typeof f === 'function' ? f(year) : [];
@@ -688,6 +696,7 @@ export function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, on
   const fetchWithTimeout = __deps.fetchWithTimeout;
   const firebaseConfig = __deps.firebaseConfig || window.firebaseConfig;
   const KAKAO_CATEGORY_GROUP_TO_PLACE_CATEGORY = __deps.KAKAO_CATEGORY_GROUP_TO_PLACE_CATEGORY || {};
+  const { requestClose, overlayOnClick } = useModalDirtyGuard(onClose, onRequestConfirm);
 
   const categories = getPlaceCategories(calendar);
   const [query, setQuery] = React.useState(editingPlace ? (editingPlace.name || '') : '');
@@ -860,7 +869,12 @@ export function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, on
       categoryId,
       memo: memo.trim(),
       visitStatus,
-      visitDate: visitStatus === 'visited' ? visitDate : ''
+      visitDate: visitStatus === 'visited' ? visitDate : '',
+      // Lets handleSavePlace recognize this exact business (by its Kakao/Google/Nominatim search
+      // result id) if it's already registered from a DateModal date (or a previous 장소 페이지
+      // save), and link onto that record instead of creating a duplicate. Empty while editing an
+      // existing place (selected is rebuilt from the place record then, not a fresh search pick).
+      sourcePlaceId: selected.id || ''
     });
     setSaving(false);
     if (ok !== false) onClose();
@@ -928,7 +942,7 @@ export function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, on
 
   return /*#__PURE__*/React.createElement("div", {
     className: "modal-overlay",
-    onClick: onClose,
+    onClick: overlayOnClick,
     style: { zIndex: 12000 }
   }, /*#__PURE__*/React.createElement(ResizableModalContainer, {
     className: "modal-container",
@@ -944,7 +958,7 @@ export function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, on
       }, /*#__PURE__*/React.createElement(PlaceSectionIcon, { size: 16 }), editingPlace ? '장소 수정' : '장소 등록'),
       /*#__PURE__*/React.createElement("button", {
         type: "button",
-        onClick: onClose,
+        onClick: requestClose,
         style: { width: '28px', height: '28px', borderRadius: '50%', border: 'none', background: 'var(--border-subtle)', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }
       }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 14 }))
     ),

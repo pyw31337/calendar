@@ -972,11 +972,14 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
       };
     }
     // Default: chat -- distinguishes composer-typed messages from the gallery's own "이미지
-    // 업로드" menu action (see handleUploadGalleryImages' uploadSource:'gallery' marker). Falls
-    // back to the generic label until the ordinal above resolves.
+    // 업로드" menu action and DateModal's own "일정 사진 추가" button (see
+    // handleUploadGalleryImages/handleAddMeetingPhotos' uploadSource marker). Falls back to the
+    // generic label until the ordinal above resolves.
     const ordinal = currentMeta.messageId != null ? chatOrdinalCache[currentMeta.messageId] : null;
     const label = currentMeta.uploadSource === 'gallery'
       ? (typeof ordinal === 'number' ? `갤러리 업로드 (채팅 #${ordinal})` : '갤러리에서 업로드됨')
+      : currentMeta.uploadSource === 'meeting'
+      ? (typeof ordinal === 'number' ? `일정 사진 업로드 (채팅 #${ordinal})` : '일정 사진으로 업로드됨')
       : (typeof ordinal === 'number' ? `채팅방 #${ordinal}` : '채팅방에서 업로드됨');
     return {
       label,
