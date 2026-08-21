@@ -668,7 +668,7 @@ function getAnniversaryDisplayColor(...args) {
 }
 
 
-export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox, linkPreview, style = {}, message = null, stickyVideoKey = null, onReleaseSticky = null }) {
+export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox, linkPreview, style = {}, message = null, stickyVideoKey = null, onActivateVideo = null, onVideoDockRectChange = null }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -683,31 +683,58 @@ export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox,
     setFailed(false);
   }, [firstUrl]);
 
-  // Tracks which embed the user actually played, so navigating away from chat knows which
-  // video (if any) to keep alive as the floating mini player -- see changeView's sticky-video
-  // promotion. Clicks inside a cross-origin iframe never bubble out to this parent div, so a
-  // plain onClick handler can't see them; a window 'blur' event fires when focus moves INTO the
-  // iframe (e.g. the user hit play), and document.activeElement then correctly identifies which
-  // of possibly many embeds in the chat history received it.
+  // Detects which embed the user actually pressed play on, so it can be promoted to the single
+  // persistent player (see PersistentVideoPlayer/StickyVideoBox) that survives view/tab switches
+  // without ever unmounting -- that's what makes playback genuinely uninterrupted rather than
+  // just restarted in a new iframe elsewhere. Clicks inside a cross-origin iframe never bubble
+  // out to this parent div, so a plain onClick handler can't see them; a window 'blur' event
+  // fires when focus moves INTO the iframe (e.g. the user hit play), and document.activeElement
+  // then correctly identifies which of possibly many embeds in the chat history received it.
   const embedIframeRef = React.useRef(null);
   const isEmbedVideo = mediaInfo && mediaInfo.type === 'embed';
   React.useEffect(() => {
-    if (!isEmbedVideo) return;
+    if (!isEmbedVideo || !onActivateVideo) return undefined;
     const handleWindowBlur = () => {
       if (document.activeElement === embedIframeRef.current) {
-        lastFocusedChatVideo = {
+        onActivateVideo({
           key: message ? message.id : null,
           embedUrl: mediaInfo.url,
           provider: mediaInfo.provider,
           orientation: mediaInfo.orientation,
           title: mediaInfo.provider === 'youtube' ? 'YouTube 영상' : mediaInfo.provider === 'vimeo' ? 'Vimeo 영상' : '링크 영상'
-        };
+        });
       }
     };
     window.addEventListener('blur', handleWindowBlur);
     return () => window.removeEventListener('blur', handleWindowBlur);
-  }, [isEmbedVideo, mediaInfo && mediaInfo.url, message && message.id]);
+  }, [isEmbedVideo, onActivateVideo, mediaInfo && mediaInfo.url, message && message.id]);
   const isThisSticky = isEmbedVideo && stickyVideoKey && message && message.id === stickyVideoKey;
+  // While this message owns the active/persistent video, it doesn't render its own iframe at all
+  // (see the isThisSticky branch below) -- instead it continuously reports its own on-screen
+  // rect so the persistent player (mounted once at the app root) can overlay itself exactly on
+  // top of this spot, making it look perfectly inline even though the iframe DOM node actually
+  // lives elsewhere and never gets torn down. useLayoutEffect (not useEffect) so the "no longer
+  // docked" report on unmount lands in the SAME commit as this message leaving the DOM (e.g.
+  // switching away from the chat tab), instead of one paint later where the player would
+  // otherwise flash at the old, now-meaningless coordinates for a frame.
+  const dockPlaceholderRef = React.useRef(null);
+  React.useLayoutEffect(() => {
+    if (!isThisSticky || !onVideoDockRectChange) return undefined;
+    let rafId = null;
+    const measure = () => {
+      const el = dockPlaceholderRef.current;
+      if (el) {
+        const r = el.getBoundingClientRect();
+        onVideoDockRectChange({ top: r.top, left: r.left, width: r.width, height: r.height });
+      }
+      rafId = requestAnimationFrame(measure);
+    };
+    rafId = requestAnimationFrame(measure);
+    return () => {
+      if (rafId) cancelAnimationFrame(rafId);
+      onVideoDockRectChange(null);
+    };
+  }, [isThisSticky, onVideoDockRectChange]);
 
   if (!mediaInfo || failed) {
     return /*#__PURE__*/React.createElement(React.Fragment, null,
@@ -807,40 +834,22 @@ export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox,
           margin: '0 auto',
           marginBottom
         };
-        // Playing in the mini player already -- show a placeholder instead of a second live
-        // iframe (two iframes racing the same YouTube video is worse than one; the actual
-        // playback lives in the floating StickyVideoBox portal, kept mounted independently).
+        // This message owns the active/persistent video -- reserve its exact on-screen spot (see
+        // the useLayoutEffect above, which keeps reporting this element's rect every frame) and
+        // render nothing else here. The real, still-playing iframe lives in the app-root portal
+        // player and gets positioned to overlay precisely on top of this box, so it reads as a
+        // normal inline video even though the DOM node backing it never actually unmounted.
         if (isThisSticky) {
           return /*#__PURE__*/React.createElement('div', {
+            ref: dockPlaceholderRef,
             style: {
               ...embedBoxStyle,
               aspectRatio: isPortraitEmbed ? '9 / 16' : '16 / 9',
               maxHeight: isPortraitEmbed ? 'min(72vh, 620px)' : 'min(54vh, 430px)',
               borderRadius: '10px',
-              backgroundColor: 'var(--bg-secondary, #1E293B)',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-              padding: '16px',
-              textAlign: 'center'
+              backgroundColor: '#000'
             }
-          }, /*#__PURE__*/React.createElement('div', { style: { fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-secondary, #CBD5E1)' } }, '🎬 미니플레이어에서 재생 중'),
-            /*#__PURE__*/React.createElement('button', {
-              type: 'button',
-              onClick: () => onReleaseSticky && onReleaseSticky(),
-              style: {
-                padding: '6px 12px',
-                fontSize: '0.78rem',
-                fontWeight: '700',
-                color: '#FFFFFF',
-                backgroundColor: '#57606F',
-                border: 'none',
-                borderRadius: '8px',
-                cursor: 'pointer'
-              }
-            }, '여기서 다시 보기'));
+          });
         }
         return /*#__PURE__*/React.createElement('div', {
           className: isMini ? '' : 'chat-media-resizable',

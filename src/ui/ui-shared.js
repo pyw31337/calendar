@@ -1363,35 +1363,65 @@ export function ColorSwatchPicker({ value, onChange, disabled, title = "색상 �
   );
 }
 
-export function StickyVideoBox({ stickyVideo, onClose, onGoToChat }) {
+// The single persistent chat-video player: one <iframe> DOM node, kept alive (same React `key`)
+// for as long as `stickyVideo` is set, regardless of which app view is showing. When `dockRect`
+// is given (the owning chat message is currently mounted -- see DirectChatMediaText's
+// isThisSticky placeholder), it's absolutely positioned to overlay exactly on top of that spot,
+// reading as a normal inline video. When dockRect is null (navigated away from chat, or that
+// message isn't mounted), it falls back to floating in the corner as a small mini player. Either
+// way the iframe itself never unmounts, so playback is genuinely uninterrupted -- only its
+// on-screen position/size changes.
+export function StickyVideoBox({ stickyVideo, dockRect, onClose, onGoToChat }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
 
   if (!stickyVideo || typeof document === 'undefined' || !ReactDOM.createPortal) return null;
   const isPortrait = stickyVideo.orientation === 'portrait';
-  const width = isPortrait ? 172 : 260;
-  const height = isPortrait ? Math.round(width * 16 / 9) : Math.round(width * 9 / 16);
+  const floatWidth = isPortrait ? 172 : 260;
+  const floatHeight = isPortrait ? Math.round(floatWidth * 16 / 9) : Math.round(floatWidth * 9 / 16);
+  const isDocked = !!dockRect;
+  // autoplay -- only for THIS portal iframe, never the plain inline one a chat message shows
+  // before it's been promoted (see DirectChatMediaText) -- so a newly-promoted video keeps
+  // playing straight through instead of landing on a paused first frame the user has to tap
+  // again. Browsers only honor this when the promotion itself traces back to a user gesture
+  // (which it always does here: the blur-detection trigger only fires right after the user
+  // pressed play in the original inline iframe), so it degrades gracefully to muted/paused
+  // otherwise rather than failing.
+  const autoplaySrc = stickyVideo.embedUrl + (stickyVideo.embedUrl.includes('?') ? '&' : '?') + 'autoplay=1';
+  const containerStyle = isDocked ? {
+    position: 'fixed',
+    top: `${dockRect.top}px`,
+    left: `${dockRect.left}px`,
+    width: `${dockRect.width}px`,
+    height: `${dockRect.height}px`,
+    zIndex: 500,
+    borderRadius: '10px',
+    overflow: 'hidden',
+    backgroundColor: '#000'
+  } : {
+    position: 'fixed',
+    right: '14px',
+    bottom: 'calc(14px + env(safe-area-inset-bottom, 0px))',
+    width: `${floatWidth}px`,
+    zIndex: 40000,
+    borderRadius: '12px',
+    overflow: 'hidden',
+    boxShadow: '0 12px 32px rgba(0,0,0,0.4)',
+    backgroundColor: '#000'
+  };
   return ReactDOM.createPortal(/*#__PURE__*/React.createElement('div', {
-    style: {
-      position: 'fixed',
-      right: '14px',
-      bottom: 'calc(14px + env(safe-area-inset-bottom, 0px))',
-      width: `${width}px`,
-      zIndex: 40000,
-      borderRadius: '12px',
-      overflow: 'hidden',
-      boxShadow: '0 12px 32px rgba(0,0,0,0.4)',
-      backgroundColor: '#000'
-    }
+    style: containerStyle
   }, /*#__PURE__*/React.createElement('iframe', {
     key: stickyVideo.key,
-    src: stickyVideo.embedUrl,
+    src: autoplaySrc,
     title: stickyVideo.title || '미니플레이어',
     allow: 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share',
     allowFullScreen: true,
-    style: { display: 'block', width: '100%', height: `${height}px`, border: '0' }
-  }), /*#__PURE__*/React.createElement('div', {
+    style: isDocked
+      ? { display: 'block', width: '100%', height: '100%', border: '0' }
+      : { display: 'block', width: '100%', height: `${floatHeight}px`, border: '0' }
+  }), !isDocked && /*#__PURE__*/React.createElement('div', {
     style: {
       display: 'flex',
       alignItems: 'center',

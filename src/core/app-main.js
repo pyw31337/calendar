@@ -4651,11 +4651,28 @@ function App() {
     return params.get('view') || 'calendar';
   };
   const [activeView, setActiveView] = React.useState(getActiveViewFromURL);
-  // The chat embed the user tapped just before navigating away from chat, kept alive as a
-  // floating mini player instead of being unmounted along with the rest of ChatRoomView --
-  // { key, embedUrl, provider, orientation, title } | null. See changeView below for the
-  // promotion trigger and StickyVideoBox for the persistent portal that actually renders it.
+  // The chat embed the user tapped play on -- { key, embedUrl, provider, orientation, title } |
+  // null. Once set, it's rendered through a SINGLE always-mounted portal iframe (StickyVideoBox)
+  // that never unmounts across view/tab switches, so playback genuinely never stops -- only its
+  // on-screen position changes (see videoDockRect below). Previously this was only promoted when
+  // leaving chat (via changeView), which meant the mini player got a brand-new iframe with no
+  // autoplay and no relation to the one that had been playing -- i.e. playback actually did stop,
+  // just less obviously. Now activation happens the moment the user presses play in chat, and the
+  // same iframe DOM node (same React `key`) is reused for the rest of its life.
   const [stickyVideo, setStickyVideo] = React.useState(null);
+  // Live screen position of the chat message that owns the currently-active video, in fixed
+  // viewport coordinates ({top,left,width,height}), continuously reported by that message's own
+  // placeholder (see DirectChatMediaText's isThisSticky branch) while it's mounted. StickyVideoBox
+  // overlays the persistent iframe exactly on top of this rect so it looks perfectly inline while
+  // still in chat; null (no placeholder currently mounted -- i.e. navigated away from chat, or the
+  // message isn't loaded) means "float as the small corner mini player" instead.
+  const [videoDockRect, setVideoDockRect] = React.useState(null);
+  const handleActivateChatVideo = React.useCallback(videoInfo => {
+    setStickyVideo(videoInfo);
+  }, []);
+  const handleVideoDockRectChange = React.useCallback(rect => {
+    setVideoDockRect(rect);
+  }, []);
 
   React.useEffect(() => {
     const handleUrlChange = () => {
@@ -4726,14 +4743,10 @@ function App() {
   }, []);
 
   const changeView = (view) => {
-    // Leaving chat with a video the user had tapped -> keep it alive as a floating mini player
-    // instead of letting it get torn down along with the rest of ChatRoomView. Only fires on the
-    // chat -> elsewhere transition, never the reverse: returning to chat is exactly what the
-    // mini player's own "채팅으로 이동" button already does (see StickyVideoBox), and that path
-    // intentionally releases sticky mode so the video goes back to playing inline in its message.
-    if (activeView === 'chat' && view !== 'chat' && lastFocusedChatVideo) {
-      setStickyVideo(lastFocusedChatVideo);
-    }
+    // No sticky-video promotion needed here anymore -- stickyVideo (once set by actually pressing
+    // play in chat, see handleActivateChatVideo) stays active across every view by itself.
+    // StickyVideoBox docks it inline over the chat message while activeView === 'chat' and floats
+    // it in the corner everywhere else, purely via videoDockRect going null/non-null.
     setActiveView(view);
     if (view !== 'chat') {
       setIsMainHeaderVisible(true);
@@ -7518,16 +7531,20 @@ function App() {
     );
   };
   // App() early-returns a completely different tree per activeView (see the 5 branches below),
-  // so the sticky mini player can't just live inline in one of them -- it has to be included as
-  // a stable sibling in every branch's return, wrapped in the SAME portal element shape each
+  // so the persistent video player can't just live inline in one of them -- it has to be included
+  // as a stable sibling in every branch's return, wrapped in the SAME portal element shape each
   // time, or React would unmount/remount (and restart) it on every tab switch. See StickyVideoBox
-  // for the actual floating player and changeView above for how a video gets promoted into it.
+  // for the actual portal player and handleActivateChatVideo/handleVideoDockRectChange above for
+  // how a video becomes active and how its on-screen position is tracked.
   const withStickyVideo = (content) => /*#__PURE__*/React.createElement(React.Fragment, null,
     content,
     /*#__PURE__*/React.createElement(StickyVideoBox, {
       stickyVideo: stickyVideo,
+      dockRect: activeView === 'chat' ? videoDockRect : null,
       onClose: () => setStickyVideo(null),
-      onGoToChat: () => { changeView('chat'); setStickyVideo(null); }
+      // Preserves playback -- the message's own placeholder re-mounts and re-reports its rect,
+      // so the SAME iframe just docks back inline instead of being torn down and restarted.
+      onGoToChat: () => changeView('chat')
     }),
     isModalOpen && /*#__PURE__*/React.createElement(DateModal, {
       anniversaries: anniversaries,
@@ -7778,7 +7795,8 @@ function App() {
       isChatNotifyEnabled: mainNotifPermission === 'granted' && mainChatNotifyEnabled,
       onToggleChatNotifications: handleMainToggleNotifications,
       stickyVideoKey: stickyVideo ? stickyVideo.key : null,
-      onReleaseSticky: () => setStickyVideo(null),
+      onActivateVideo: handleActivateChatVideo,
+      onVideoDockRectChange: handleVideoDockRectChange,
       onDeletePhoto: handleDeletePhoto,
       onReplacePhoto: handleReplacePhoto,
       onJumpToChatMessage: handleJumpToChatMessage,
@@ -8485,13 +8503,6 @@ const PEEKALINK_PROXY_URL = `https://us-central1-${firebaseConfig.projectId}.clo
 const GATHER_APP_CHAT_DATA = window.GATHER_APP_CHAT_DATA || {};
 const linkPreviewCache = new Map();
 const linkPreviewInflight = new Map();
-// Single mutable slot (not React state -- nothing needs to re-render when this changes) recording
-// the last embedded chat video the user actually tapped/interacted with. Read once, at the moment
-// the user navigates away from the chat tab (see changeView's sticky-video promotion), to decide
-// which video -- if any -- should keep playing as the floating mini player. A module-level
-// singleton is safe here the same way linkPreviewCache above is: this app only ever mounts one
-// <App/> instance.
-let lastFocusedChatVideo = null;
 // Peekalink's free plan is a 50-request-per-hour rate limit, not a fixed lifetime quota --
 // it resets every clock hour rather than depleting over time. See PEEKALINK_HOUR_BUCKET_MS below.
 const PEEKALINK_FREE_HOURLY_LIMIT = Number.isFinite(GATHER_APP_CHAT_DATA.PEEKALINK_FREE_HOURLY_LIMIT) ? GATHER_APP_CHAT_DATA.PEEKALINK_FREE_HOURLY_LIMIT : 50;
@@ -8773,7 +8784,7 @@ function ImageUrlModal(props) {
 }
 
 
-function renderChatMessageBody(msg, setActiveLightbox, singleImageStyle = {}, searchQuery = '', stickyVideoKey = null, onReleaseSticky = null) {
+function renderChatMessageBody(msg, setActiveLightbox, singleImageStyle = {}, searchQuery = '', stickyVideoKey = null, onActivateVideo = null, onVideoDockRectChange = null) {
   const msgImages = renderChatMessageImages(msg, setActiveLightbox, singleImageStyle);
   return /*#__PURE__*/React.createElement(React.Fragment, null,
     msgImages ? /*#__PURE__*/React.createElement('div', { style: { marginBottom: msg.text ? '8px' : '0' } }, msgImages) : null,
@@ -8785,7 +8796,8 @@ function renderChatMessageBody(msg, setActiveLightbox, singleImageStyle = {}, se
       style: singleImageStyle,
       message: msg,
       stickyVideoKey,
-      onReleaseSticky
+      onActivateVideo,
+      onVideoDockRectChange
     }) : null
   );
 }
