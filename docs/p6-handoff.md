@@ -385,3 +385,7 @@ zsh 에서 줄 시작 `#` 주석은 쓰지 말 것.
 - 참석/일정 메모 한도 60·120 → 500자 (UI maxLength + sanitize/validate)
 - 반복 일정 메모 120 → 500
 - 장소 메모는 기존 2000 유지
+
+## P6-64 (2026-08-21)
+- 모바일 modal-container margin: 10px
+- safe-area-inset + svh/dvh로 사파리/웨일/크롬 등 브라우저 크롬에 팝업 잘림 완화

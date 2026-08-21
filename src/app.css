@@ -2592,8 +2592,10 @@ select.form-select {
 /* Modal Overlay & Card */
 .modal-overlay {
   position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.6);
-  -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 16px 0;
+  -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 1000;
+  padding: max(16px, env(safe-area-inset-top, 0px)) 0 max(16px, env(safe-area-inset-bottom, 0px));
   overflow-x: hidden;
+  box-sizing: border-box;
 }
 .modal-container {
   background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
@@ -2612,12 +2614,31 @@ select.form-select {
 }
 .modal-footer { padding: var(--space-5); border-top: 1px solid var(--border-subtle); display: flex; justify-content: flex-end; gap: 10px; background: var(--bg-primary); flex: 0 0 auto; }
 @media (max-width: 640px) {
-  .modal-overlay { align-items: center; padding: 12px 0; }
-  .modal-container { max-height: calc(100vh - 24px); max-height: calc(100dvh - 24px); width: 100%; }
+  .modal-overlay {
+    align-items: center;
+    justify-content: center;
+    padding-top: max(10px, env(safe-area-inset-top, 0px));
+    padding-bottom: max(10px, env(safe-area-inset-bottom, 0px));
+    padding-left: 0;
+    padding-right: 0;
+    box-sizing: border-box;
+    /* cover visible viewport including mobile browser chrome changes */
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+  .modal-container {
+    margin: 10px;
+    width: calc(100% - 20px);
+    max-width: calc(100% - 20px);
+    box-sizing: border-box;
+    /* svh = visible area with browser UI shown; avoids top/bottom crop */
+    max-height: calc(100svh - 20px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+    max-height: calc(100dvh - 20px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  }
   .modal-header { padding: 18px; }
   .modal-body { padding: 18px; gap: 14px; }
   .modal-footer {
-    padding: 18px 18px max(18px, env(safe-area-inset-bottom));
+    padding: 18px 18px max(18px, env(safe-area-inset-bottom, 0px));
     position: sticky; bottom: 0; z-index: 1;
   }
 }
@@ -3387,7 +3408,7 @@ textarea.form-input {
     padding-left: 16px !important;
     font-size: 0.74rem !important;
   }
-  .modal-container { margin: 0; padding-left: 0 !important; padding-right: 0 !important; }
+  .modal-container { margin: 10px; padding-left: 0 !important; padding-right: 0 !important; width: calc(100% - 20px); max-width: calc(100% - 20px); box-sizing: border-box; }
   .weekday-label { font-size: 0.7rem; }
   .day-cell { min-height: 52px; }
   .url-capsule-badge {
