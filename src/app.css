@@ -3417,7 +3417,12 @@ textarea.form-input {
     padding-left: 16px !important;
     font-size: 0.74rem !important;
   }
-  .modal-container { margin: 10px; padding-left: 0 !important; padding-right: 0 !important; width: calc(100% - 20px); max-width: calc(100% - 20px); box-sizing: border-box; }
+  .modal-container { margin: 10px; width: calc(100% - 20px); max-width: calc(100% - 20px); box-sizing: border-box; }
+  .modal-container:has(.modal-header),
+  .modal-container:has(form) {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
   .weekday-label { font-size: 0.7rem; }
   .day-cell { min-height: 52px; }
   .url-capsule-badge {
@@ -3642,5 +3647,34 @@ textarea.form-input {
   .date-modal-attendance-note {
     padding-left: 16px !important;
     width: 100% !important;
+  }
+}
+
+
+/* ===== P6-69 confirm dialog content padding ===== */
+.modal-container.confirm-dialog-modal {
+  padding: 20px !important;
+  max-width: min(320px, calc(100% - 20px)) !important;
+  width: auto !important;
+  box-sizing: border-box;
+}
+.confirm-dialog-actions {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  box-sizing: border-box;
+}
+.confirm-dialog-actions .btn {
+  flex: 1 1 0;
+  min-width: 0;
+}
+@media (max-width: 640px) {
+  .modal-body {
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+  .modal-footer {
+    padding-left: 18px;
+    padding-right: 18px;
   }
 }

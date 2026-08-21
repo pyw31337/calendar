@@ -705,10 +705,10 @@ function getDeps() { return window.GATHER_UI_DEPS || {}; }
     return React.createElement('div', {
       className: 'modal-overlay', onClick: onCancel, style: { zIndex: 30000 }
     }, React.createElement(ResizableModalContainer, {
-      className: 'modal-container',
+      className: 'modal-container confirm-dialog-modal',
       onClick: function (e) { e.stopPropagation(); },
-      style: { maxWidth: '320px', padding: '20px', borderRadius: '12px' }
-    }, React.createElement('div', { style: { textAlign: 'center', marginBottom: '20px' } },
+      style: { maxWidth: '320px', borderRadius: '12px' }
+    }, React.createElement('div', { className: 'confirm-dialog-body', style: { textAlign: 'center', marginBottom: '16px' } },
       title ? React.createElement('h3', {
         style: { fontSize: '1.05rem', fontWeight: 800, marginBottom: '8px', color: 'var(--text-main)' }
       }, title) : null,
@@ -726,7 +726,7 @@ function getDeps() { return window.GATHER_UI_DEPS || {}; }
       }),
       errorMsg && React.createElement('div', { style: { color: '#EF4444', fontSize: '0.72rem', marginTop: '4px', fontWeight: 'bold' } }, errorMsg)
     ),
-    React.createElement('div', { style: { display: 'flex', gap: '8px', justifyContent: 'center' } },
+    React.createElement('div', { className: 'confirm-dialog-actions', style: { display: 'flex', gap: '10px', justifyContent: 'center' } },
       React.createElement('button', {
         type: 'button', className: 'btn btn-secondary', onClick: onCancel,
         style: { flex: 1, height: '36px', fontSize: '0.85rem' }
