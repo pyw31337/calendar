@@ -922,6 +922,16 @@ export function DateModal({
       setEditingLinkedPlaceId(null);
       setPlaceQuery('');
       setHasInteracted(false);
+      snapshotFormBaseline({
+        ...formBaselineRef.current,
+        editingLinkedPlaceId: null,
+        placeMemo: '',
+        placeAlias: '',
+        placeQuery: '',
+        selectedPlaceKey: '',
+        placeCategoryId: '',
+        placeVisitStatus: 'visited'
+      });
     } catch (err) {
       console.error('Save place error:', err);
       showToast('장소 추가 실패', 'error');
@@ -952,12 +962,21 @@ export function DateModal({
       setParticipantId('');
       setNote('');
       setHasInteracted(false);
+      snapshotFormBaseline({ ...formBaselineRef.current, participantId: '', note: '' });
     }
   };
 
   const handleEditClick = (entry) => {
-    setParticipantId(entry.participantId);
-    setNote(entry.note || '');
+    const pid = entry.participantId;
+    const n = entry.note || '';
+    setParticipantId(pid);
+    setNote(n);
+    setHasInteracted(false);
+    snapshotFormBaseline({
+      ...formBaselineRef.current,
+      participantId: pid,
+      note: n
+    });
     if (noteInputRef.current) {
       noteInputRef.current.focus();
     }
@@ -1051,11 +1070,25 @@ export function DateModal({
   };
   const handleExpenseItemClick = expense => {
     if (isSavingExpense) return;
-    setEditingExpenseId(expense.id);
-    setExpenseLabelInput(getExpenseLabel(expense));
-    setExpenseIsIncome(Number(expense.amount) < 0);
-    setExpenseAmountInput(Math.abs(Number(expense.amount)).toLocaleString());
-    setExpenseCategoryInput(expense.categoryId || 'etc');
+    const eid = expense.id;
+    const label = getExpenseLabel(expense);
+    const isIncome = Number(expense.amount) < 0;
+    const amountStr = Math.abs(Number(expense.amount)).toLocaleString();
+    const cat = expense.categoryId || 'etc';
+    setEditingExpenseId(eid);
+    setExpenseLabelInput(label);
+    setExpenseIsIncome(isIncome);
+    setExpenseAmountInput(amountStr);
+    setExpenseCategoryInput(cat);
+    setHasInteracted(false);
+    snapshotFormBaseline({
+      ...formBaselineRef.current,
+      editingExpenseId: eid,
+      expenseLabelInput: label,
+      expenseAmountInput: amountStr,
+      expenseIsIncome: isIncome,
+      expenseCategoryInput: cat
+    });
   };
   const handleSaveExpenseClick = async () => {
     if (!onSaveExpense) return;
@@ -1085,6 +1118,14 @@ export function DateModal({
       setExpenseAmountInput('');
       setExpenseIsIncome(false);
       setHasInteracted(false);
+      snapshotFormBaseline({
+        ...formBaselineRef.current,
+        editingExpenseId: null,
+        expenseLabelInput: '',
+        expenseAmountInput: '',
+        expenseIsIncome: false,
+        expenseCategoryInput: 'etc'
+      });
     }
   };
   const handleDeleteExpenseClick = (e, expenseId) => {
@@ -1261,22 +1302,66 @@ export function DateModal({
   const finishExpensePointerSort = e => expenseDragHandlersRef.current.finish(e);
   const resetExpensePointerSort = () => expenseDragHandlersRef.current.reset();
 
+  // Snapshot after load/save. Close-confirm only when current form != baseline.
+  const formBaselineRef = React.useRef({
+    participantId: '',
+    note: '',
+    editingLinkedPlaceId: null,
+    placeMemo: '',
+    placeAlias: '',
+    placeQuery: '',
+    selectedPlaceKey: '',
+    placeCategoryId: '',
+    placeVisitStatus: 'visited',
+    editingExpenseId: null,
+    expenseLabelInput: '',
+    expenseAmountInput: '',
+    expenseIsIncome: false,
+    expenseCategoryInput: 'etc'
+  });
+  const placeKeyOf = (sp) => {
+    if (!sp) return '';
+    return String(sp.id || '') + '|' + String(sp.name || '') + '|' + String(sp.lat || '') + '|' + String(sp.lng || '');
+  };
+  const snapshotFormBaseline = React.useCallback((overrides = {}) => {
+    formBaselineRef.current = {
+      participantId: '',
+      note: '',
+      editingLinkedPlaceId: null,
+      placeMemo: '',
+      placeAlias: '',
+      placeQuery: '',
+      selectedPlaceKey: '',
+      placeCategoryId: '',
+      placeVisitStatus: 'visited',
+      editingExpenseId: null,
+      expenseLabelInput: '',
+      expenseAmountInput: '',
+      expenseIsIncome: false,
+      expenseCategoryInput: 'etc',
+      ...overrides
+    };
+  }, []);
   const [hasInteracted, setHasInteracted] = React.useState(false);
   const markDirty = React.useCallback(() => setHasInteracted(true), []);
   const requestClose = () => {
     if (isSubmitting) return;
-    // Only warn when there is an unsaved draft in the form.
-    // Successful 추가/수정 clears fields + hasInteracted; past saves are not dirty.
+    const b = formBaselineRef.current || {};
     const dirty = (
-      !!participantId ||
-      !!String(note || '').trim() ||
-      !!selectedPlace ||
-      !!editingLinkedPlaceId ||
-      !!String(placeMemo || '').trim() ||
-      !!String(placeAlias || '').trim() ||
-      !!String(expenseLabelInput || '').trim() ||
-      !!String(expenseAmountInput || '').trim() ||
-      !!editingExpenseId
+      String(participantId || '') !== String(b.participantId || '') ||
+      String(note || '') !== String(b.note || '') ||
+      String(editingLinkedPlaceId || '') !== String(b.editingLinkedPlaceId || '') ||
+      String(placeMemo || '') !== String(b.placeMemo || '') ||
+      String(placeAlias || '') !== String(b.placeAlias || '') ||
+      String(placeQuery || '') !== String(b.placeQuery || '') ||
+      placeKeyOf(selectedPlace) !== String(b.selectedPlaceKey || '') ||
+      String(placeCategoryId || '') !== String(b.placeCategoryId || '') ||
+      String(placeVisitStatus || 'visited') !== String(b.placeVisitStatus || 'visited') ||
+      String(editingExpenseId || '') !== String(b.editingExpenseId || '') ||
+      String(expenseLabelInput || '') !== String(b.expenseLabelInput || '') ||
+      String(expenseAmountInput || '') !== String(b.expenseAmountInput || '') ||
+      !!expenseIsIncome !== !!b.expenseIsIncome ||
+      String(expenseCategoryInput || 'etc') !== String(b.expenseCategoryInput || 'etc')
     );
     if (dirty && typeof onRequestConfirm === 'function') {
       onRequestConfirm('닫기 확인', '저장하지 않은 내용이 있습니다. 닫으시겠습니까?', () => onClose());
@@ -1575,6 +1660,8 @@ export function DateModal({
                 onCancel: () => {
                   setParticipantId('');
                   setNote('');
+                  setHasInteracted(false);
+                  snapshotFormBaseline({ ...formBaselineRef.current, participantId: '', note: '' });
                 },
                 onSubmit: handleSubmit
               })
@@ -1933,15 +2020,29 @@ export function DateModal({
               style: { position: 'absolute', top: '10px', right: '10px' }
             }, /*#__PURE__*/React.createElement(ItemEditDeleteActions, {
               onEdit: () => {
+                const sp = { name: place.name, address: place.address || '', lat: place.lat, lng: place.lng, categoryId: place.categoryId || 'etc' };
+                const memoLines = reformatMemoIntoDateLines(place.memo || '');
+                const catId = place.categoryId || 'etc';
+                const visit = place.visitStatus === 'planned' ? 'planned' : 'visited';
                 setEditingLinkedPlaceId(place.id);
-                setSelectedPlace({ name: place.name, address: place.address || '', lat: place.lat, lng: place.lng, categoryId: place.categoryId || 'etc' });
+                setSelectedPlace(sp);
                 setPlaceQuery(place.name || '');
                 setPlaceAlias(place.alias || '');
-                // 장소리스트와 동일: 날짜 방문기록은 한 줄씩
-                setPlaceMemo(reformatMemoIntoDateLines(place.memo || ''));
-                setPlaceCategoryId(place.categoryId || 'etc');
-                setPlaceVisitStatus(place.visitStatus === 'planned' ? 'planned' : 'visited');
+                setPlaceMemo(memoLines);
+                setPlaceCategoryId(catId);
+                setPlaceVisitStatus(visit);
                 setPlaceResults([]);
+                setHasInteracted(false);
+                snapshotFormBaseline({
+                  ...formBaselineRef.current,
+                  editingLinkedPlaceId: place.id,
+                  placeMemo: memoLines,
+                  placeAlias: place.alias || '',
+                  placeQuery: place.name || '',
+                  selectedPlaceKey: String(sp.id || '') + '|' + String(sp.name || '') + '|' + String(sp.lat || '') + '|' + String(sp.lng || ''),
+                  placeCategoryId: catId,
+                  placeVisitStatus: visit
+                });
               },
               onDelete: () => {
                 onRequestConfirm('장소 삭제', `"${place.alias || place.name}" 장소를 이 날짜에서 해제하시겠습니까?`, async () => {

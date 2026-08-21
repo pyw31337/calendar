@@ -397,3 +397,7 @@ zsh 에서 줄 시작 `#` 주석은 쓰지 말 것.
 ## P6-66 (2026-08-21)
 - 모달 높이: dvh 제거, svh(주소창 보인 상태) 기준 보수 적용
 - visualViewport resize/scroll로 --gather-vv-modal-max 실시간 반영
+
+## P6-67 (2026-08-21)
+- 닫기 확인: 기존 참석/장소/정산 로드만 한 경우 dirty 아님
+- form baseline 스냅샷과 현재값 비교로 실제 미저장 변경만 감지
