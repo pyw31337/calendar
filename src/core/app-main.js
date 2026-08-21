@@ -2536,52 +2536,26 @@ setTimeout(() => {
 }, 1000);
 
 // Mobile browsers aggressively suspend a backgrounded tab's network activity, and Firestore's
-// realtime "listen" stream can come back stale/dead when the tab is foregrounded again -- the
-// onSnapshot listener is still technically subscribed, but its underlying connection stopped
-// delivering updates, so messages sent elsewhere while this tab was backgrounded never appear
-// until a full page reload re-creates everything from scratch. Cycling disableNetwork() then
-// enableNetwork() on visibility-return forces the SDK to drop and re-establish its streams,
-// which reliably clears this up without requiring a reload.
-//
-// Only worth doing after a real background stretch, though: a brief glance away (checking a
-// notification, switching apps for a couple seconds) is well within what Firestore's own
-// connection handles fine on its own, and forcing every single listener (calendar doc, chat,
-// memos, anniversaries, ...) to fully reconnect on EVERY foreground event makes the app look
-// like it's reloading from scratch each time the user comes back -- which given how often mobile
-// tabs get backgrounded/foregrounded is the more noticeable cost in practice.
+// realtime "listen" stream can come back stale/dead when the tab is foregrounded again. We only
+// force a reconnect after the tab returns to the foreground. Do NOT disable Firestore while the
+// tab is hidden: in Safari/Whale/Samsung-style mobile lifecycles, the browser can freeze before
+// the matching enableNetwork() runs, which briefly makes the app look like every calendar record
+// vanished. Keeping the last usable snapshot visible is more important than background thrift.
 const VISIBILITY_RECONNECT_THRESHOLD_MS = 60000;
-const BACKGROUND_NETWORK_PAUSE_MS = 15000;
 let lastHiddenAt = 0;
-let backgroundPauseTimer = null;
-let networkPausedForBackground = false;
 if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') {
       lastHiddenAt = Date.now();
-      if (backgroundPauseTimer) clearTimeout(backgroundPauseTimer);
-      backgroundPauseTimer = setTimeout(() => {
-        backgroundPauseTimer = null;
-        if (typeof document === 'undefined' || document.visibilityState !== 'hidden' || !firebaseDb) return;
-        networkPausedForBackground = true;
-        firebaseDb.disableNetwork().catch(e => {
-          console.warn('Firestore background pause notice:', e);
-        });
-      }, BACKGROUND_NETWORK_PAUSE_MS);
       return;
-    }
-    if (backgroundPauseTimer) {
-      clearTimeout(backgroundPauseTimer);
-      backgroundPauseTimer = null;
     }
     if (document.visibilityState !== 'visible' || !firebaseDb) return;
     const hiddenFor = lastHiddenAt ? (Date.now() - lastHiddenAt) : 0;
-    const resume = () => { networkPausedForBackground = false; };
-    if (networkPausedForBackground || hiddenFor >= VISIBILITY_RECONNECT_THRESHOLD_MS) {
+    if (hiddenFor >= VISIBILITY_RECONNECT_THRESHOLD_MS) {
       firebaseDb.disableNetwork()
         .catch(() => {})
         .then(() => firebaseDb.enableNetwork())
-        .then(resume)
-        .catch(e => { resume(); console.warn('Firestore reconnect notice:', e); });
+        .catch(e => { console.warn('Firestore reconnect notice:', e); });
       return;
     }
   });

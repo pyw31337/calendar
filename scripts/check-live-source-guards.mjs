@@ -134,6 +134,10 @@ if (/cache\.addAll\(STATIC_ASSETS\)/.test(serviceWorker)) {
   fail('sw.js must not let one failed static asset abort the whole service-worker install.');
 }
 
+if (/BACKGROUND_NETWORK_PAUSE_MS|networkPausedForBackground|Firestore background pause notice/.test(appMain)) {
+  fail('app-main must not disable Firestore while a browser tab is hidden; it can make resumed tabs look empty.');
+}
+
 for (const manifestFile of ['manifest.json', 'manifest-kkot.json', 'manifest-cw.json', 'manifest-jhair.json']) {
   if (!copyStatic.includes(manifestFile)) {
     fail(`copy-static-to-dist must copy ${manifestFile} into dist.`);
