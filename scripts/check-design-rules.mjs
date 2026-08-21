@@ -6,10 +6,10 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const css = readFileSync(resolve(root, 'assets/app.css'), 'utf8');
-const shareModal = readFileSync(resolve(root, 'assets/ui-share-modal.js'), 'utf8');
-const main = readFileSync(resolve(root, 'assets/app-main.js'), 'utf8');
-const utils = readFileSync(resolve(root, 'assets/app-utils.js'), 'utf8');
+const css = readFileSync(resolve(root, 'src/app.css'), 'utf8');
+const shareModal = readFileSync(resolve(root, 'src/ui/ui-share-modal.js'), 'utf8');
+const main = readFileSync(resolve(root, 'src/core/app-main.js'), 'utf8');
+const utils = readFileSync(resolve(root, 'src/core/app-utils.js'), 'utf8');
 
 let failed = false;
 function fail(msg) {

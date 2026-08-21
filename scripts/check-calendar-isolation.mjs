@@ -6,9 +6,9 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const main = readFileSync(resolve(root, 'assets/app-main.js'), 'utf8');
-const services = readFileSync(resolve(root, 'assets/firebase-services.js'), 'utf8');
-const utils = readFileSync(resolve(root, 'assets/app-utils.js'), 'utf8');
+const main = readFileSync(resolve(root, 'src/core/app-main.js'), 'utf8');
+const services = readFileSync(resolve(root, 'src/core/firebase-services.js'), 'utf8');
+const utils = readFileSync(resolve(root, 'src/core/app-utils.js'), 'utf8');
 const rules = readFileSync(resolve(root, 'firestore.rules'), 'utf8');
 
 let failed = false;
