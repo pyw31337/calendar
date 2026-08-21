@@ -2127,7 +2127,7 @@ export function AdminDashboard({ initialCalendars }) {
         /*#__PURE__*/React.createElement("button", {
           type: "button", className: "admin-tab-button", onClick: () => setActiveTab('recovery'),
           style: styles.tabButton(activeTab === 'recovery')
-        }, /*#__PURE__*/React.createElement("span", { className: "admin-tab-icon" }, /*#__PURE__*/React.createElement(HourglassIcon, null)), "로그")
+        }, /*#__PURE__*/React.createElement("span", { className: "admin-tab-icon" }, /*#__PURE__*/React.createElement(HourglassIcon, null)), "복구")
       )
     ),
 
