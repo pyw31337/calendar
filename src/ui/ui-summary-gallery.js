@@ -818,6 +818,7 @@ export function PhotoGallery({ chatMessages, calendar = null, totalGalleryCount,
       const entries = directEntry ? [...getMessageImageEntries(msg), directEntry] : getMessageImageEntries(msg);
       return entries.map((entry, i) => ({
         ...entry,
+        source: 'chat',
         key: `${msg.id}_${entry.directMediaUrl ? 'direct' : i}`,
         timestamp: msg.timestamp
       }));
@@ -834,14 +835,27 @@ export function PhotoGallery({ chatMessages, calendar = null, totalGalleryCount,
           thumb: thumb || full,
           imageIndex: index,
           messageId: null,
+          photoId: photo?.id || '',
           timestamp: Number(photo?.createdAt || photo?.updatedAt || meeting?.confirmedAt || 0),
-          tags: '',
+          tags: String(photo?.tags || ''),
           directMediaUrl: '',
+          source: 'meeting',
+          meetingDate: meeting.date || '',
           key: `meeting_${meeting.date || 'date'}_${photo?.id || index}`
         });
       });
     });
-    return [...chatEntries, ...meetingEntries].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+    // Tagging a photo with a date auto-links a copy of it onto that date's meeting record (see
+    // linkTaggedImageToMeetingDates in app-main.js), so the same photo can appear in both lists
+    // above -- collapse by URL, preferring the chat copy (its tag editor writes back to a real
+    // message) so this strip never shows the same photo twice.
+    const byUrl = new Map();
+    [...chatEntries, ...meetingEntries].forEach(entry => {
+      const key = entry.full || entry.thumb;
+      if (!key) return;
+      if (!byUrl.has(key) || entry.source === 'chat') byUrl.set(key, entry);
+    });
+    return Array.from(byUrl.values()).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
   }, [chatMessages, calendar]);
 
   const badgeCount = (typeof totalGalleryCount === 'number' && totalGalleryCount > 0)
@@ -893,7 +907,7 @@ export function PhotoGallery({ chatMessages, calendar = null, totalGalleryCount,
           referrerPolicy: 'no-referrer',
           onClick: () => setLightbox({
             urls: displayedEntries.map(e => e.full),
-            meta: displayedEntries.map(e => ({ timestamp: e.timestamp, messageId: e.messageId, imageIndex: e.imageIndex, thumb: e.thumb, tags: e.tags, directMediaUrl: e.directMediaUrl })),
+            meta: displayedEntries.map(e => ({ timestamp: e.timestamp, messageId: e.messageId, imageIndex: e.imageIndex, thumb: e.thumb, tags: e.tags, directMediaUrl: e.directMediaUrl, source: e.source, meetingDate: e.meetingDate, photoId: e.photoId })),
             index: idx
           }),
           style: { width: '100%', aspectRatio: '1 / 1', objectFit: 'cover', borderRadius: 'var(--radius-sm)', cursor: 'pointer' }

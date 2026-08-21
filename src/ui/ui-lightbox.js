@@ -887,14 +887,24 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
   // shows the result immediately instead of only after the Lightbox is closed and reopened.
   const [tagOverrides, setTagOverrides] = React.useState({});
   const currentMeta = meta && meta[index];
-  const tagOverrideKey = currentMeta ? `${currentMeta.messageId}_${currentMeta.directMediaUrl ? 'direct' : currentMeta.imageIndex}` : null;
+  // 'meeting' entries never carry a messageId (they're archival copies stored on the
+  // confirmedMeeting record, not a chat message -- see linkTaggedImageToMeetingDates in
+  // app-main.js), so they need meetingDate+photoId to identify which photo instead. 'memo'
+  // entries DO carry a truthy messageId (the memo's own id), but that id only resolves against
+  // the messages collection, not memos -- tags there are a whole-memo field with no single-photo
+  // target, so editing is intentionally left disabled rather than silently failing to save.
+  const isMeetingPhoto = currentMeta?.source === 'meeting' && !!currentMeta?.meetingDate && !!currentMeta?.photoId;
+  const canEditTags = currentMeta && (currentMeta.source === 'chat' ? currentMeta.messageId != null : isMeetingPhoto);
+  const tagOverrideKey = currentMeta
+    ? (isMeetingPhoto ? `meeting_${currentMeta.meetingDate}_${currentMeta.photoId}` : `${currentMeta.messageId}_${currentMeta.directMediaUrl ? 'direct' : currentMeta.imageIndex}`)
+    : null;
   const currentTags = (tagOverrideKey && tagOverrideKey in tagOverrides) ? tagOverrides[tagOverrideKey] : (currentMeta?.tags || '');
   // Mirrors handleSaveImageTags' own parse/dedupe/limit rules so the optimistic override shown
   // here matches what actually got persisted, without needing the save call to round-trip it.
   const normalizeTagsForDisplay = text => Array.from(new Set(
     String(text || '').split(/[,\s#]+/).map(t => t.trim()).filter(Boolean)
   )).slice(0, 10).join(' ');
-  const saveCurrentTags = onSaveImageTags && currentMeta?.messageId != null
+  const saveCurrentTags = onSaveImageTags && canEditTags
     ? async tagsText => {
         const ok = await onSaveImageTags(currentMeta.messageId, currentMeta.imageIndex, tagsText, {
           ...currentMeta,

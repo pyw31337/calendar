@@ -777,6 +777,10 @@ export function ChatGalleryModal({
       });
     });
     (memos || []).forEach(memo => {
+      // memo.tags is a whole-memo tag list (not per-image), so it's only readable here for
+      // display -- there's no single-photo target to write back to, which is why the tag
+      // editor below is gated off (source !== 'chat'/'meeting') for memo-sourced entries.
+      const memoTagsDisplay = Array.isArray(memo.tags) ? memo.tags.map(t => String(t || '').replace(/^#/, '')).filter(Boolean).join(' ') : '';
       const asMsg = {
         id: memo.id, text: memo.text || memo.content || memo.body || '',
         imageUrl: memo.imageUrl, imageUrls: memo.imageUrls, thumbUrl: memo.thumbUrl, thumbUrls: memo.thumbUrls,
@@ -785,7 +789,7 @@ export function ChatGalleryModal({
       const directEntry = getMessageDirectMediaEntry(asMsg);
       const entries = directEntry ? [...getMessageImageEntries(asMsg), directEntry] : getMessageImageEntries(asMsg);
       entries.forEach(entry => {
-        list.push({ ...entry, text: asMsg.text || '', participantId: asMsg.participantId || '', source: 'memo' });
+        list.push({ ...entry, tags: memoTagsDisplay, text: asMsg.text || '', participantId: asMsg.participantId || '', source: 'memo' });
       });
     });
     getConfirmedMeetings(calendar).forEach(meeting => {
@@ -799,6 +803,7 @@ export function ChatGalleryModal({
           thumb: thumb || full,
           imageIndex: index,
           messageId: null,
+          photoId: photo?.id || '',
           timestamp: Number(photo?.createdAt || photo?.updatedAt || meeting?.confirmedAt || 0),
           tags: String(photo?.tags || ''),
           text: `${meeting.date || ''} 일정 사진`,
@@ -808,7 +813,24 @@ export function ChatGalleryModal({
         });
       });
     });
-    return list.sort((a, b) => b.timestamp - a.timestamp);
+    // Tagging a photo with a date auto-links a copy of it onto that date's 일정(meeting) record
+    // (see linkTaggedImageToMeetingDates in app-main.js), so the same photo can legitimately
+    // appear twice in the raw lists above: once as the original chat/memo message, once as the
+    // meeting's archival copy. Collapse those down to one tile per photo URL so the gallery
+    // doesn't show duplicates -- keep the chat/memo copy when both exist (its tag editor writes
+    // back to a real message), falling back to the meeting copy only when it's the sole survivor
+    // (e.g. the original message hasn't been paginated into view yet).
+    const byUrl = new Map();
+    const sourceRank = { chat: 0, memo: 1, meeting: 2 };
+    list.forEach(entry => {
+      const key = entry.full || entry.thumb;
+      if (!key) return;
+      const existing = byUrl.get(key);
+      if (!existing || (sourceRank[entry.source] ?? 9) < (sourceRank[existing.source] ?? 9)) {
+        byUrl.set(key, entry);
+      }
+    });
+    return Array.from(byUrl.values()).sort((a, b) => b.timestamp - a.timestamp);
   }, [chatMessages, memos, calendar]);
 
   const filteredLinks = React.useMemo(() => {
@@ -1172,7 +1194,7 @@ export function ChatGalleryModal({
       onClick: () => setActiveLightbox && setActiveLightbox({
         urls: filteredPhotos.map(p => p.full),
         index: idx,
-        meta: filteredPhotos.map(p => ({ timestamp: p.timestamp, messageId: p.messageId, imageIndex: p.imageIndex, thumb: p.thumb, tags: p.tags, directMediaUrl: p.directMediaUrl }))
+        meta: filteredPhotos.map(p => ({ timestamp: p.timestamp, messageId: p.messageId, imageIndex: p.imageIndex, thumb: p.thumb, tags: p.tags, directMediaUrl: p.directMediaUrl, source: p.source, meetingDate: p.meetingDate, photoId: p.photoId }))
       }),
       style: {
         width: '100%',
