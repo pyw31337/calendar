@@ -45,9 +45,25 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const req = event.request;
   if (req.method !== 'GET') return;
-  // Never intercept navigations or the app script itself -- always fresh from the network,
-  // matching index.html's own no-cache header (see the note above).
-  if (req.mode === 'navigate' || req.url.endsWith('/index.html')) return;
+  // Navigations (typing the URL, back/forward, a script reload -- and critically, the browser
+  // silently reloading a tab it discarded while backgrounded, which mobile Safari/Chrome do
+  // routinely) must always hit the network fresh. GitHub Pages ignores this app's own caching
+  // intent -- there is no way to configure it to send index.html with the no-cache header the
+  // top-of-file note above assumed; it actually serves `Cache-Control: max-age=600` on every
+  // response including index.html, which a browser is fully entitled to serve straight out of
+  // its own HTTP cache for the next 10 minutes with zero network round-trip. That becomes a hard
+  // failure ("로딩 실패. 새로고침 해주세요." in main.jsx) the moment even one deploy lands in
+  // that window: every deploy here replaces the entire site (GitHub Pages keeps no old-version
+  // fallback), so the still-cached HTML's <script> tags point at content-hashed chunk files
+  // (app-main-<hash>.js etc.) that no longer exist, and the dynamic imports in boot() 404. Forcing
+  // `cache: 'no-store'` here bypasses only the browser's own HTTP cache for this one fetch (the
+  // CDN in front of Pages is a separate layer, already invalidated as part of every deploy), so a
+  // resumed/reloaded tab always gets the index.html that matches whatever is actually live right
+  // now instead of whatever happened to be cached from up to 10 minutes ago.
+  if (req.mode === 'navigate' || req.url.endsWith('/index.html')) {
+    event.respondWith(fetch(req, { cache: 'no-store' }).catch(() => Response.error()));
+    return;
+  }
 
   const url = new URL(req.url);
   const isStaticAsset = url.origin === self.location.origin && STATIC_ASSETS.some(asset => url.pathname.endsWith('/' + asset) || url.pathname.endsWith(asset));
