@@ -1442,8 +1442,14 @@ export function DateModal({
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
-      padding: '14px 20px',
-      borderBottom: '1px solid var(--border-subtle)'
+      // No paddingBottom/borderBottom here on purpose: this modal always has a
+      // .modal-sticky-tab-bar right below it, and inline styles unconditionally beat the
+      // app.css `:has(.modal-sticky-tab-bar)` rule that fuses the two into one visual block --
+      // an earlier fix only touched that CSS rule and had no visible effect for exactly this
+      // reason. Leaving those two properties unset lets the stylesheet own them.
+      paddingTop: '14px',
+      paddingLeft: '20px',
+      paddingRight: '20px'
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
