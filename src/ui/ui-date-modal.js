@@ -671,6 +671,52 @@ function getAnniversaryDisplayColor(...args) {
   return typeof f === 'function' ? f(...args) : undefined;
 }
 
+// Tracks whether the OS clipboard currently holds an image, so a '붙여넣기' button can be
+// disabled when there's nothing to paste. Browsers vary wildly here (Firefox has no image
+// support for navigator.clipboard.read(), Safari/Chrome gate it behind the clipboard-read
+// permission) -- this fails OPEN (button stays enabled) whenever the check itself is
+// unsupported or inconclusive, and specifically avoids calling clipboard.read() while
+// permission is still 'prompt' so merely rendering the button never pops a permission dialog.
+function useClipboardHasImage(active) {
+  const React = window.React;
+  const [hasImage, setHasImage] = React.useState(true);
+  React.useEffect(() => {
+    if (!active || typeof navigator === 'undefined' || !navigator.clipboard || typeof navigator.clipboard.read !== 'function') {
+      return undefined;
+    }
+    let cancelled = false;
+    const check = async () => {
+      try {
+        if (navigator.permissions && typeof navigator.permissions.query === 'function') {
+          let state = 'granted';
+          try {
+            state = (await navigator.permissions.query({ name: 'clipboard-read' })).state;
+          } catch (e) {
+            // Permission name not recognized (Firefox) -- fall through to a direct read attempt.
+          }
+          if (state === 'denied') { if (!cancelled) setHasImage(false); return; }
+          if (state === 'prompt') return;
+        }
+        const items = await navigator.clipboard.read();
+        const found = items.some(item => item.types.some(t => t.startsWith('image/')));
+        if (!cancelled) setHasImage(found);
+      } catch (e) {
+        // Read blocked/unsupported right now -- leave the button as-is rather than disabling
+        // it over an inconclusive check.
+      }
+    };
+    check();
+    window.addEventListener('focus', check);
+    document.addEventListener('visibilitychange', check);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('focus', check);
+      document.removeEventListener('visibilitychange', check);
+    };
+  }, [active]);
+  return hasImage;
+}
+
 
 export function DateModal({
   anniversaries = [],
@@ -1087,6 +1133,12 @@ export function DateModal({
   }, [confirmedMeetingEntry, chatMessages, dateStr]);
   const meetingPhotoInputRef = React.useRef(null);
   const [isSavingMeetingPhotos, setIsSavingMeetingPhotos] = React.useState(false);
+  const hasClipboardImage = useClipboardHasImage(activeTab === 'photo');
+  const [pastePreview, setPastePreview] = React.useState(null); // { files, previewUrls } | null
+  React.useEffect(() => () => {
+    // Safety net if the component unmounts (e.g. modal closed) while the preview is still open.
+    if (pastePreview) pastePreview.previewUrls.forEach(url => { try { URL.revokeObjectURL(url); } catch (e) {} });
+  }, [pastePreview]);
   const expenses = React.useMemo(
     () => (Array.isArray(confirmedMeetingEntry?.expenses) ? confirmedMeetingEntry.expenses : [])
       .filter(e => e && typeof e === 'object' && e.id)
@@ -1148,10 +1200,27 @@ export function DateModal({
     try {
       const files = await readClipboardImageFiles();
       if (files && files.length > 0) {
-        setIsSavingMeetingPhotos(true);
-        // See handleMeetingPhotoFiles above for why no toast is shown for the resolved result.
-        await Promise.resolve(onAddMeetingPhotos(dateStr, files));
+        // Show what will be uploaded and let the user confirm instead of uploading immediately --
+        // handleConfirmPasteMeetingPhotos does the actual upload once confirmed.
+        setPastePreview({ files, previewUrls: files.map(f => URL.createObjectURL(f)) });
       }
+    } catch (err) {
+      console.error('Paste meeting photo failed:', err);
+      showToast('사진 추가 실패', 'error');
+    }
+  };
+
+  // previewUrls are revoked by the cleanup effect above once pastePreview changes (including
+  // back to null here) -- no need to revoke them again in these two handlers.
+  const handleCancelPastePreview = () => setPastePreview(null);
+  const handleConfirmPastePreview = async () => {
+    if (!pastePreview || typeof onAddMeetingPhotos !== 'function') return;
+    const files = pastePreview.files;
+    setPastePreview(null);
+    setIsSavingMeetingPhotos(true);
+    try {
+      // See handleMeetingPhotoFiles above for why no toast is shown for the resolved result.
+      await Promise.resolve(onAddMeetingPhotos(dateStr, files));
     } catch (err) {
       console.error('Paste meeting photo failed:', err);
       showToast('사진 추가 실패', 'error');
@@ -2566,8 +2635,9 @@ export function DateModal({
           /*#__PURE__*/React.createElement("button", {
             type: "button",
             className: "btn btn-action btn-action-outline",
-            disabled: isSavingMeetingPhotos,
+            disabled: isSavingMeetingPhotos || !hasClipboardImage,
             onClick: handlePasteMeetingPhotos,
+            title: hasClipboardImage ? undefined : '클립보드에 붙여넣을 이미지가 없습니다.',
             style: {
               height: '36px',
               padding: '0 12px',
@@ -2710,7 +2780,45 @@ export function DateModal({
     )
   )) : null;
 
-  const portaled = /*#__PURE__*/React.createElement(React.Fragment, null, portalContent, participantSheet);
+  // Paste preview/confirm modal -- shown after clicking '붙여넣기' (photo tab) and before the
+  // clipboard image(s) actually upload, so the user can see what's about to be attached.
+  const pastePreviewModal = pastePreview ? /*#__PURE__*/React.createElement("div", {
+    className: "modal-overlay",
+    style: { zIndex: 30000 },
+    onClick: handleCancelPastePreview
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "modal-container confirm-dialog-modal",
+    onClick: e => e.stopPropagation(),
+    style: { maxWidth: '360px', borderRadius: '12px' }
+  },
+    /*#__PURE__*/React.createElement("h3", {
+      style: { fontSize: '1.05rem', fontWeight: 800, marginBottom: '12px', color: 'var(--text-main)', textAlign: 'center' }
+    }, `클립보드 이미지 ${pastePreview.previewUrls.length}장을 붙여넣을까요?`),
+    /*#__PURE__*/React.createElement("div", {
+      style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(76px, 1fr))', gap: '8px', marginBottom: '16px', maxHeight: '50vh', overflowY: 'auto' }
+    }, pastePreview.previewUrls.map((url, i) => /*#__PURE__*/React.createElement("img", {
+      key: i,
+      src: url,
+      alt: "붙여넣을 이미지 미리보기",
+      style: { width: '100%', aspectRatio: '1 / 1', objectFit: 'cover', borderRadius: '10px', backgroundColor: 'var(--bg-primary)' }
+    }))),
+    /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '10px', justifyContent: 'center' } },
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "btn btn-secondary",
+        onClick: handleCancelPastePreview,
+        style: { flex: 1, height: '36px', fontSize: '0.85rem' }
+      }, "취소"),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "btn btn-action-dark",
+        onClick: handleConfirmPastePreview,
+        style: { flex: 1, height: '36px', fontSize: '0.85rem' }
+      }, "업로드")
+    )
+  )) : null;
+
+  const portaled = /*#__PURE__*/React.createElement(React.Fragment, null, portalContent, participantSheet, pastePreviewModal);
   return typeof document !== 'undefined' && ReactDOM.createPortal
     ? ReactDOM.createPortal(portaled, document.body)
     : portaled;

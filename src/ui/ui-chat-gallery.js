@@ -671,6 +671,51 @@ function getAnniversaryDisplayColor(...args) {
   return typeof f === 'function' ? f(...args) : undefined;
 }
 
+// Tracks whether the OS clipboard currently holds an image, so a '붙여넣기' button can be
+// disabled when there's nothing to paste. Browsers vary wildly here (Firefox has no image
+// support for navigator.clipboard.read(), Safari/Chrome gate it behind the clipboard-read
+// permission) -- this fails OPEN (button stays enabled) whenever the check itself is
+// unsupported or inconclusive, and specifically avoids calling clipboard.read() while
+// permission is still 'prompt' so merely rendering the button never pops a permission dialog.
+function useClipboardHasImage(active) {
+  const React = window.React;
+  const [hasImage, setHasImage] = React.useState(true);
+  React.useEffect(() => {
+    if (!active || typeof navigator === 'undefined' || !navigator.clipboard || typeof navigator.clipboard.read !== 'function') {
+      return undefined;
+    }
+    let cancelled = false;
+    const check = async () => {
+      try {
+        if (navigator.permissions && typeof navigator.permissions.query === 'function') {
+          let state = 'granted';
+          try {
+            state = (await navigator.permissions.query({ name: 'clipboard-read' })).state;
+          } catch (e) {
+            // Permission name not recognized (Firefox) -- fall through to a direct read attempt.
+          }
+          if (state === 'denied') { if (!cancelled) setHasImage(false); return; }
+          if (state === 'prompt') return;
+        }
+        const items = await navigator.clipboard.read();
+        const found = items.some(item => item.types.some(t => t.startsWith('image/')));
+        if (!cancelled) setHasImage(found);
+      } catch (e) {
+        // Read blocked/unsupported right now -- leave the button as-is rather than disabling
+        // it over an inconclusive check.
+      }
+    };
+    check();
+    window.addEventListener('focus', check);
+    document.addEventListener('visibilitychange', check);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('focus', check);
+      document.removeEventListener('visibilitychange', check);
+    };
+  }, [active]);
+  return hasImage;
+}
 
 export function ChatGalleryModal({
   chatMessages,
@@ -719,6 +764,12 @@ export function ChatGalleryModal({
   const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
   const uploadInputRef = React.useRef(null);
+  const hasClipboardImage = useClipboardHasImage(true);
+  const [pastePreview, setPastePreview] = React.useState(null); // { files, previewUrls } | null
+  React.useEffect(() => () => {
+    // Safety net if the component unmounts (e.g. gallery closed) while the preview is still open.
+    if (pastePreview) pastePreview.previewUrls.forEach(url => { try { URL.revokeObjectURL(url); } catch (e) {} });
+  }, [pastePreview]);
   // 창이 넓어지면 썸네일을 키우지 않고 단 수(2~12)를 늘린다. 셀 목표 너비 ~108px.
   const [gridCols, setGridCols] = React.useState(() => {
     const w = typeof window !== 'undefined' ? window.innerWidth : 400;
@@ -909,8 +960,20 @@ export function ChatGalleryModal({
     if (e) e.stopPropagation();
     const files = await readClipboardImageFiles();
     if (files && files.length > 0) {
-      await uploadFiles(files);
+      // Show what will be uploaded and let the user confirm instead of uploading immediately --
+      // handleConfirmPastePreview does the actual upload once confirmed.
+      setIsMenuOpen(false);
+      setPastePreview({ files, previewUrls: files.map(f => URL.createObjectURL(f)) });
     }
+  };
+  // previewUrls are revoked by the cleanup effect above once pastePreview changes (including
+  // back to null here) -- no need to revoke them again in these two handlers.
+  const handleCancelPastePreview = () => setPastePreview(null);
+  const handleConfirmPastePreview = async () => {
+    if (!pastePreview) return;
+    const files = pastePreview.files;
+    setPastePreview(null);
+    await uploadFiles(files);
   };
   const uploadFiles = async files => {
     if (!files.length || typeof onUploadImages !== 'function') return;
@@ -963,6 +1026,44 @@ export function ChatGalleryModal({
      /*#__PURE__*/React.createElement("path", { d: "M10 14 21 3" }),
      /*#__PURE__*/React.createElement("path", { d: "M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" }));
 
+  // Paste preview/confirm modal -- shown after clicking '붙여넣기' and before the clipboard
+  // image(s) actually upload, so the user can see what's about to be attached.
+  const pastePreviewModal = pastePreview ? /*#__PURE__*/React.createElement("div", {
+    className: "modal-overlay",
+    style: { zIndex: 30000 },
+    onClick: handleCancelPastePreview
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "modal-container confirm-dialog-modal",
+    onClick: e => e.stopPropagation(),
+    style: { maxWidth: '360px', borderRadius: '12px' }
+  },
+    /*#__PURE__*/React.createElement("h3", {
+      style: { fontSize: '1.05rem', fontWeight: 800, marginBottom: '12px', color: 'var(--text-main)', textAlign: 'center' }
+    }, `클립보드 이미지 ${pastePreview.previewUrls.length}장을 붙여넣을까요?`),
+    /*#__PURE__*/React.createElement("div", {
+      style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(76px, 1fr))', gap: '8px', marginBottom: '16px', maxHeight: '50vh', overflowY: 'auto' }
+    }, pastePreview.previewUrls.map((url, i) => /*#__PURE__*/React.createElement("img", {
+      key: i,
+      src: url,
+      alt: "붙여넣을 이미지 미리보기",
+      style: { width: '100%', aspectRatio: '1 / 1', objectFit: 'cover', borderRadius: '10px', backgroundColor: 'var(--bg-primary)' }
+    }))),
+    /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '10px', justifyContent: 'center' } },
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "btn btn-secondary",
+        onClick: handleCancelPastePreview,
+        style: { flex: 1, height: '36px', fontSize: '0.85rem' }
+      }, "취소"),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "btn btn-action-dark",
+        onClick: handleConfirmPastePreview,
+        style: { flex: 1, height: '36px', fontSize: '0.85rem' }
+      }, "업로드")
+    )
+  )) : null;
+
   const galleryShellStyle = asPage ? {
     position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1005,
     backgroundColor: 'var(--bg-primary)', display: 'flex', flexDirection: 'column',
@@ -989,7 +1090,7 @@ export function ChatGalleryModal({
     position: 'relative', overflow: 'hidden'
   };
 
-  return /*#__PURE__*/React.createElement("div", {
+  const galleryTree = /*#__PURE__*/React.createElement("div", {
     className: asPage ? "gallery-page-container" : "modal-overlay",
     onClick: asPage ? undefined : onClose,
     style: galleryShellStyle
@@ -1111,13 +1212,15 @@ export function ChatGalleryModal({
         /*#__PURE__*/React.createElement("button", {
           type: "button",
           className: "btn btn-action btn-action-outline",
+          disabled: !hasClipboardImage,
           onClick: handlePasteGalleryUpload,
+          title: hasClipboardImage ? undefined : '클립보드에 붙여넣을 이미지가 없습니다.',
           style: {
             padding: '4px 10px',
             fontSize: '0.76rem',
             fontWeight: 900,
             borderRadius: '8px',
-            cursor: 'pointer',
+            cursor: hasClipboardImage ? 'pointer' : 'default',
             flexShrink: 0,
             whiteSpace: 'nowrap'
           }
@@ -1299,6 +1402,7 @@ export function ChatGalleryModal({
       }
     }, loadingOlderChat ? '이전 사진을 불러오는 중…' : '이전 사진·링크 더 보기')
   ))));
+  return pastePreviewModal ? /*#__PURE__*/React.createElement(React.Fragment, null, galleryTree, pastePreviewModal) : galleryTree;
 }
 
   if (typeof window !== 'undefined') {
