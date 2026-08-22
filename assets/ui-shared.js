@@ -1400,24 +1400,10 @@ export function StickyVideoBox({ stickyVideo, dockAnchorNode, onClose, onGoToCha
   // this particular video stays active; a newly-activated video starts back at the default.
   const [floatWidth, setFloatWidth] = React.useState(null);
   const dragStateRef = React.useRef(null);
-  const hasFloatedRef = React.useRef(false);
-  const activeVideoKeyRef = React.useRef(null);
 
-  const currentKey = stickyVideo ? stickyVideo.key : null;
-  if (activeVideoKeyRef.current !== currentKey) {
-    activeVideoKeyRef.current = currentKey;
-    hasFloatedRef.current = false;
-  }
-
-  // React's own portal reconciliation keys a HostPortal fiber to its `containerInfo` by strict
-  // reference: passing createPortal(children, dockAnchorNode || document.body) straight through
-  // means every dock<->float transition hands React a *different* container object, which it
-  // treats as a non-matching fiber and fully unmounts+remounts the subtree -- destroying the
-  // cross-origin iframe and forcing YouTube to start a brand new (ad-serving) playback session
-  // from 0:00. To avoid that, the portal always targets this ONE never-changing host div instead;
-  // moving *that* node between dockAnchorNode and document.body is done manually below with plain
-  // DOM appendChild calls, which browsers treat as a single reparent that preserves the iframe's
-  // live browsing context (no unmount, no reload, playback continues uninterrupted).
+  // Host container div in document.body for persistent PIP player.
+  // Always kept inside document.body so browsers never reload or reset the iframe browsing context
+  // during view transitions or sequential video switches.
   const hostRef = React.useRef(null);
   if (!hostRef.current && typeof document !== 'undefined') {
     hostRef.current = document.createElement('div');
@@ -1426,20 +1412,8 @@ export function StickyVideoBox({ stickyVideo, dockAnchorNode, onClose, onGoToCha
   React.useLayoutEffect(() => {
     const host = hostRef.current;
     if (!host || typeof document === 'undefined') return undefined;
-
-    // Once dockAnchorNode becomes null (e.g. user leaves chat room), the video transitions
-    // to floating PIP in document.body. We mark hasFloatedRef = true.
-    if (stickyVideo && !dockAnchorNode) {
-      hasFloatedRef.current = true;
-    }
-
-    // If the video has already transitioned to floating PIP mode (hasFloatedRef is true),
-    // target stays document.body so returning to chat room does NOT reparent the iframe DOM node.
-    // This prevents YouTube iframe reloads and keeps playback 100% continuous and unbroken!
-    const target = (stickyVideo && dockAnchorNode && !hasFloatedRef.current) ? dockAnchorNode : document.body;
-
-    if (host.parentNode !== target) target.appendChild(host);
-  }, [dockAnchorNode, !!stickyVideo]);
+    if (host.parentNode !== document.body) document.body.appendChild(host);
+  }, [!!stickyVideo]);
   React.useEffect(() => () => {
     const host = hostRef.current;
     if (host && host.parentNode) host.parentNode.removeChild(host);
@@ -1450,13 +1424,7 @@ export function StickyVideoBox({ stickyVideo, dockAnchorNode, onClose, onGoToCha
   const effectiveFloatWidth = floatWidth || defaultFloatWidth;
   const effectiveFloatHeight = isPortrait ? Math.round(effectiveFloatWidth * 16 / 9) : Math.round(effectiveFloatWidth * 9 / 16);
 
-  // Drag-to-resize the floating mini player -- pointer events cover mouse and touch alike. The
-  // box is anchored to the bottom-right corner of the screen, so the handle sits at its
-  // top-left: dragging up/left grows it, down/right shrinks it. Height follows from width to
-  // keep the video's own aspect ratio (16:9 landscape / 9:16 portrait), matching how the inline
-  // chat embed's own drag-resize (.chat-media-resizable) already behaves elsewhere in this app.
-  // The cap is bounded by BOTH viewport dimensions (not just a flat pixel number) so it can grow
-  // close to filling the screen on a large display without ever pushing the box off-screen.
+  // Drag-to-resize the floating mini player -- pointer events cover mouse and touch alike.
   const handleResizePointerDown = e => {
     e.preventDefault();
     e.stopPropagation();
@@ -1483,42 +1451,31 @@ export function StickyVideoBox({ stickyVideo, dockAnchorNode, onClose, onGoToCha
   };
 
   if (!stickyVideo || typeof document === 'undefined' || !ReactDOM.createPortal || !hostRef.current) return null;
-  const isDocked = !!(dockAnchorNode && !hasFloatedRef.current);
-  // autoplay -- only for THIS portal iframe, never the plain inline one a chat message shows
-  // before it's been promoted (see DirectChatMediaText) -- so a newly-promoted video keeps
-  // playing straight through instead of landing on a paused first frame the user has to tap
-  // again. Browsers only honor this when the promotion itself traces back to a user gesture
-  // (which it always does here: the blur-detection trigger only fires right after the user
-  // pressed play in the original inline iframe), so it degrades gracefully to muted/paused
-  // otherwise rather than failing.
   const autoplaySrc = stickyVideo.embedUrl + (stickyVideo.embedUrl.includes('?') ? '&' : '?') + 'autoplay=1';
+
   return ReactDOM.createPortal(/*#__PURE__*/React.createElement('div', {
-    style: isDocked
-      ? { width: '100%', height: '100%' }
-      : {
-          position: 'fixed',
-          right: '14px',
-          bottom: 'calc(14px + env(safe-area-inset-bottom, 0px))',
-          left: 'auto',
-          top: 'auto',
-          width: `${effectiveFloatWidth}px`,
-          height: `${effectiveFloatHeight + STICKY_VIDEO_CONTROLS_HEIGHT}px`,
-          zIndex: 40000,
-          borderRadius: '12px',
-          overflow: 'hidden',
-          background: '#000',
-          boxShadow: '0 12px 32px rgba(0,0,0,0.4)'
-        }
+    style: {
+      position: 'fixed',
+      right: '14px',
+      bottom: 'calc(14px + env(safe-area-inset-bottom, 0px))',
+      left: 'auto',
+      top: 'auto',
+      width: `${effectiveFloatWidth}px`,
+      height: `${effectiveFloatHeight + STICKY_VIDEO_CONTROLS_HEIGHT}px`,
+      zIndex: 40000,
+      borderRadius: '12px',
+      overflow: 'hidden',
+      background: '#000',
+      boxShadow: '0 12px 32px rgba(0,0,0,0.4)'
+    }
   }, /*#__PURE__*/React.createElement('iframe', {
     key: stickyVideo.key,
     src: autoplaySrc,
     title: stickyVideo.title || '미니플레이어',
     allow: 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share',
     allowFullScreen: true,
-    style: isDocked
-      ? { display: 'block', width: '100%', height: '100%', border: '0' }
-      : { display: 'block', width: '100%', height: `${effectiveFloatHeight}px`, border: '0' }
-  }), !isDocked && /*#__PURE__*/React.createElement('div', {
+    style: { display: 'block', width: '100%', height: `${effectiveFloatHeight}px`, border: '0' }
+  }), /*#__PURE__*/React.createElement('div', {
     onPointerDown: handleResizePointerDown,
     'aria-label': '미니플레이어 크기 조절',
     style: {
@@ -1537,7 +1494,7 @@ export function StickyVideoBox({ stickyVideo, dockAnchorNode, onClose, onGoToCha
     }
   }, /*#__PURE__*/React.createElement('svg', {
     width: '10', height: '10', viewBox: '0 0 10 10', fill: 'none', stroke: 'currentColor', strokeWidth: '1.4', strokeLinecap: 'round'
-  }, /*#__PURE__*/React.createElement('path', { d: 'M1 9 L9 1 M4.5 9 L9 4.5 M8 9 L9 8' }))), !isDocked && /*#__PURE__*/React.createElement('div', {
+  }, /*#__PURE__*/React.createElement('path', { d: 'M1 9 L9 1 M4.5 9 L9 4.5 M8 9 L9 8' }))), /*#__PURE__*/React.createElement('div', {
     style: {
       display: 'flex',
       alignItems: 'center',

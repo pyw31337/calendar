@@ -10146,33 +10146,28 @@ function renderChatMessageImages(msg, setActiveLightbox, singleImageStyle = {}) 
     });
   }
 
-  // Multi-image layout: PC gets denser rows so mixed image+text bubbles do not leave a huge
-  // empty right side. Mobile keeps the compact 2/3-column layout for touch readability.
+  // Multi-image layout: PC gets denser rows (4/5/6 cols) while Mobile uses compact 2/3 cols with minmax(0, 1fr)
+  // so thumbnails never overflow the chat speech bubble or the right edge of mobile screens.
   const mobileCols = thumbs.length === 2 ? 2 : 3;
-  const desktopCols = thumbs.length >= 12 ? 6 : thumbs.length >= 5 ? 5 : mobileCols;
-  const cols = `var(--chat-image-grid-cols, ${mobileCols})`;
-  const shouldFillBubble = thumbs.length >= 5;
-  // Must match the grid's own actual rendered width (cols * 76px track + gaps) exactly -- a
-  // 2-image message previously hardcoded '180px' here instead of the true 156px, leaving a real
-  // 24px gap to the right of the thumbnails even independent of the mobile shrink-to-fit bug
-  // above (see the CSS media query comment for that one).
-  const maxW = `min(100%, calc(var(--chat-image-grid-cols, ${mobileCols}) * 76px + (var(--chat-image-grid-cols, ${mobileCols}) - 1) * 4px))`;
+  const isMobile = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(max-width: 640px)').matches;
+  const activeCols = isMobile ? mobileCols : (thumbs.length >= 12 ? 6 : thumbs.length >= 5 ? 5 : mobileCols);
+  const maxW = isMobile ? 'min(100%, 280px)' : `min(100%, calc(${activeCols} * 76px + (${activeCols} - 1) * 4px))`;
 
   return /*#__PURE__*/React.createElement('div', {
-    className: `chat-message-image-grid${shouldFillBubble ? ' is-wide' : ''}`,
+    className: `chat-message-image-grid${thumbs.length >= 5 ? ' is-wide' : ''}`,
     style: {
-      '--chat-image-grid-cols': desktopCols,
-      '--chat-image-grid-mobile-cols': mobileCols,
-      '--chat-image-grid-max-width': maxW,
-      '--chat-image-thumb-track': '76px'
-    },
+      width: '100%',
+      maxWidth: maxW,
+      boxSizing: 'border-box'
+    }
   }, /*#__PURE__*/React.createElement('div', {
     style: {
       display: 'grid',
-      gridTemplateColumns: `repeat(${cols}, var(--chat-image-thumb-track, 76px))`,
+      gridTemplateColumns: `repeat(${activeCols}, minmax(0, 1fr))`,
       gap: '4px',
-      width: 'var(--chat-image-grid-max-width)',
+      width: '100%',
       maxWidth: '100%',
+      boxSizing: 'border-box',
       marginBottom: singleImageStyle.marginBottom || '0'
     }
   }, thumbs.map((thumb, idx) => /*#__PURE__*/React.createElement('img', {
