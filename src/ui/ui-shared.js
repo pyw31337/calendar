@@ -1370,19 +1370,24 @@ const STICKY_VIDEO_CONTROLS_HEIGHT = 38;
 
 // The single persistent chat-video player: one <iframe> DOM node, kept alive (same React `key`)
 // for as long as `stickyVideo` is set, regardless of which app view is showing -- so playback is
-// genuinely uninterrupted once a video is promoted. Always renders as a small resizable floating
-// player fixed to the bottom-right corner, in every view including chat itself; it never tries to
-// dock/overlay itself back on top of the original chat message's position. An earlier version did
-// try to dock there (measuring the owning message's placeholder rect every animation frame and
-// writing it into this box's position), so the video would look inline while still in chat -- but
-// even after moving that position sync off React state and onto a plain ref (to avoid a 60-times-
-// a-second re-render storm across the whole app), the docked iframe still frequently failed to
-// actually paint a frame despite audio working, an unresolved quirk with continuously
-// repositioning a cross-origin iframe via transform. Always floating sidesteps that class of bug
-// entirely, and matches what a viewer actually wants anyway: the video stays reachable as a small
-// PIP no matter which screen they're on, chat included, instead of disappearing back into the
-// message list every time they return to chat.
-export function StickyVideoBox({ stickyVideo, onClose, onGoToChat }) {
+// genuinely uninterrupted once a video is promoted. Portals into `dockAnchorNode` (the owning
+// chat message's own placeholder box, registered via DirectChatMediaText's ref callback) when
+// that's available -- i.e. whenever the message is actually mounted in the chat room -- so the
+// video looks perfectly inline right there in the message flow; otherwise (any other view, or
+// scrolled out of the loaded chat window) it falls back to a small resizable floating PIP fixed
+// to the bottom-right corner.
+//
+// This is NOT the same "docking" an earlier version tried and abandoned: that version always
+// portaled into document.body and used position:fixed + a transform continuously recalculated
+// from the anchor's getBoundingClientRect() on every animation frame, to make the fixed box
+// visually track the anchor's position -- fragile, and the cross-origin iframe frequently failed
+// to actually paint under that constant re-transform. Here there is no position tracking at all:
+// the portal's CONTAINER itself simply switches between the anchor node and document.body
+// whenever `dockAnchorNode` changes (a rare, discrete mount/unmount event, not a per-frame one).
+// The iframe becomes a genuine, normal-flow DOM child of the anchor box when docked -- sized by
+// plain CSS, laid out by the browser like any other element, nothing computed or reapplied every
+// frame -- which is both simpler and far more likely to actually render.
+export function StickyVideoBox({ stickyVideo, dockAnchorNode, onClose, onGoToChat }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -1403,6 +1408,8 @@ export function StickyVideoBox({ stickyVideo, onClose, onGoToChat }) {
   // top-left: dragging up/left grows it, down/right shrinks it. Height follows from width to
   // keep the video's own aspect ratio (16:9 landscape / 9:16 portrait), matching how the inline
   // chat embed's own drag-resize (.chat-media-resizable) already behaves elsewhere in this app.
+  // The cap is bounded by BOTH viewport dimensions (not just a flat pixel number) so it can grow
+  // close to filling the screen on a large display without ever pushing the box off-screen.
   const handleResizePointerDown = e => {
     e.preventDefault();
     e.stopPropagation();
@@ -1412,7 +1419,10 @@ export function StickyVideoBox({ stickyVideo, onClose, onGoToChat }) {
     const handleMove = moveEvent => {
       if (!dragStateRef.current) return;
       const dx = dragStateRef.current.startX - moveEvent.clientX;
-      const maxWidth = Math.min(420, window.innerWidth - 28);
+      const maxWidthByViewportWidth = window.innerWidth - 28;
+      const availableHeight = window.innerHeight - 28 - STICKY_VIDEO_CONTROLS_HEIGHT;
+      const maxWidthByViewportHeight = isPortrait ? availableHeight * 9 / 16 : availableHeight * 16 / 9;
+      const maxWidth = Math.max(120, Math.min(maxWidthByViewportWidth, maxWidthByViewportHeight));
       const next = Math.max(120, Math.min(maxWidth, dragStateRef.current.startWidth + dx));
       setFloatWidth(next);
     };
@@ -1426,6 +1436,8 @@ export function StickyVideoBox({ stickyVideo, onClose, onGoToChat }) {
   };
 
   if (!stickyVideo || typeof document === 'undefined' || !ReactDOM.createPortal) return null;
+  const isDocked = !!dockAnchorNode;
+  const portalContainer = dockAnchorNode || document.body;
   // autoplay -- only for THIS portal iframe, never the plain inline one a chat message shows
   // before it's been promoted (see DirectChatMediaText) -- so a newly-promoted video keeps
   // playing straight through instead of landing on a paused first frame the user has to tap
@@ -1435,28 +1447,32 @@ export function StickyVideoBox({ stickyVideo, onClose, onGoToChat }) {
   // otherwise rather than failing.
   const autoplaySrc = stickyVideo.embedUrl + (stickyVideo.embedUrl.includes('?') ? '&' : '?') + 'autoplay=1';
   return ReactDOM.createPortal(/*#__PURE__*/React.createElement('div', {
-    style: {
-      position: 'fixed',
-      right: '14px',
-      bottom: 'calc(14px + env(safe-area-inset-bottom, 0px))',
-      left: 'auto',
-      top: 'auto',
-      width: `${effectiveFloatWidth}px`,
-      height: `${effectiveFloatHeight + STICKY_VIDEO_CONTROLS_HEIGHT}px`,
-      zIndex: 40000,
-      borderRadius: '12px',
-      overflow: 'hidden',
-      background: '#000',
-      boxShadow: '0 12px 32px rgba(0,0,0,0.4)'
-    }
+    style: isDocked
+      ? { width: '100%', height: '100%' }
+      : {
+          position: 'fixed',
+          right: '14px',
+          bottom: 'calc(14px + env(safe-area-inset-bottom, 0px))',
+          left: 'auto',
+          top: 'auto',
+          width: `${effectiveFloatWidth}px`,
+          height: `${effectiveFloatHeight + STICKY_VIDEO_CONTROLS_HEIGHT}px`,
+          zIndex: 40000,
+          borderRadius: '12px',
+          overflow: 'hidden',
+          background: '#000',
+          boxShadow: '0 12px 32px rgba(0,0,0,0.4)'
+        }
   }, /*#__PURE__*/React.createElement('iframe', {
     key: stickyVideo.key,
     src: autoplaySrc,
     title: stickyVideo.title || '미니플레이어',
     allow: 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share',
     allowFullScreen: true,
-    style: { display: 'block', width: '100%', height: `${effectiveFloatHeight}px`, border: '0' }
-  }), /*#__PURE__*/React.createElement('div', {
+    style: isDocked
+      ? { display: 'block', width: '100%', height: '100%', border: '0' }
+      : { display: 'block', width: '100%', height: `${effectiveFloatHeight}px`, border: '0' }
+  }), !isDocked && /*#__PURE__*/React.createElement('div', {
     onPointerDown: handleResizePointerDown,
     'aria-label': '미니플레이어 크기 조절',
     style: {
@@ -1475,7 +1491,7 @@ export function StickyVideoBox({ stickyVideo, onClose, onGoToChat }) {
     }
   }, /*#__PURE__*/React.createElement('svg', {
     width: '10', height: '10', viewBox: '0 0 10 10', fill: 'none', stroke: 'currentColor', strokeWidth: '1.4', strokeLinecap: 'round'
-  }, /*#__PURE__*/React.createElement('path', { d: 'M1 9 L9 1 M4.5 9 L9 4.5 M8 9 L9 8' }))), /*#__PURE__*/React.createElement('div', {
+  }, /*#__PURE__*/React.createElement('path', { d: 'M1 9 L9 1 M4.5 9 L9 4.5 M8 9 L9 8' }))), !isDocked && /*#__PURE__*/React.createElement('div', {
     style: {
       display: 'flex',
       alignItems: 'center',
@@ -1516,7 +1532,7 @@ export function StickyVideoBox({ stickyVideo, onClose, onGoToChat }) {
       borderRadius: '8px',
       cursor: 'pointer'
     }
-  }, '✕'))), document.body);
+  }, '✕'))), portalContainer);
 }
 
 export function PollVoterSheet({ calendar, pollId, optionId, onSelect, onClose }) {
