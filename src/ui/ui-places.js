@@ -1138,7 +1138,7 @@ export function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showT
   const ThreeLinesIcon = __deps.ThreeLinesIcon;
   const getCalendarPlaces = __deps.getCalendarPlaces;
   const getPlaceCategories = __deps.getPlaceCategories;
-  const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
+const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
   const extractLeadingMemoDate = __deps.extractLeadingMemoDate;
   const parseVisitEntriesFromMemo = __deps.parseVisitEntriesFromMemo;
   const sortVisitEntriesRecentFirst = __deps.sortVisitEntriesRecentFirst;
@@ -1148,6 +1148,7 @@ export function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showT
   const [isRegisterOpen, setIsRegisterOpen] = React.useState(false);
   const [editingPlace, setEditingPlace] = React.useState(null);
   const [categoryFilter, setCategoryFilter] = React.useState('all');
+  const [visitFilter, setVisitFilter] = React.useState('all'); // 'all', 'visited', 'planned'
   const [mapExpanded, setMapExpanded] = React.useState(false);
   // { id, token } for PlaceMapView's focus effect -- token increments on every select so clicking
   // the same list row twice in a row still re-triggers the pan/zoom even though id didn't change.
@@ -1296,9 +1297,12 @@ export function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showT
     }, {});
   }, [searchedPlaces]);
   
-  // Filter by category filter AND listSearchQuery query!
+  // Filter by category filter, visit status filter, AND listSearchQuery query!
   const filteredPlaces = sortedPlaces.filter(p => {
     if (categoryFilter !== 'all' && p.categoryId !== categoryFilter) return false;
+    const isPlanned = p.visitStatus === 'planned';
+    if (visitFilter === 'visited' && isPlanned) return false;
+    if (visitFilter === 'planned' && !isPlanned) return false;
     if (listSearchQuery.trim()) {
       const queryLower = listSearchQuery.toLowerCase().trim();
       const matchName = p.name && p.name.toLowerCase().includes(queryLower);
@@ -1349,21 +1353,61 @@ export function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showT
           position: 'absolute', left: '50%', transform: 'translateX(-50%)',
           display: 'flex', alignItems: 'center', fontWeight: 800, fontSize: '0.95rem',
           color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden',
-          textOverflow: 'ellipsis', maxWidth: 'calc(100vw - 160px)', pointerEvents: 'none'
+          textOverflow: 'ellipsis', maxWidth: 'calc(100vw - 220px)', pointerEvents: 'none'
         }
       }, calendar.title, " 장소"),
       
-      /* Right: 3-line menu (등록/검색) */
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        onClick: () => setIsPlacesMenuOpen(true),
-        title: "메뉴",
-        "aria-label": "장소 메뉴",
-        style: {
-          background: 'none', border: 'none', cursor: 'pointer', padding: '6px',
-          color: '#64748B', display: 'flex', alignItems: 'center', justifyContent: 'center'
-        }
-      }, /*#__PURE__*/React.createElement(ThreeLinesIcon, { size: 22 }))
+      /* Right Controls: Desktop Visit Filter Toggle + 3-line menu */
+      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
+        /* Desktop Visit Filter Toggle: 전체 | 방문 | 예정 */
+        /*#__PURE__*/React.createElement("div", {
+          className: "visit-filter-toggle-desktop",
+          style: {
+            display: 'flex', alignItems: 'center', gap: '2px',
+            backgroundColor: 'var(--bg-primary)', padding: '3px', borderRadius: '10px',
+            border: '1px solid var(--border-subtle)'
+          }
+        },
+          /*#__PURE__*/React.createElement("button", {
+            type: "button",
+            onClick: () => setVisitFilter('all'),
+            style: {
+              padding: '4px 10px', fontSize: '0.75rem', fontWeight: 800, borderRadius: '8px', border: 'none', cursor: 'pointer',
+              backgroundColor: visitFilter === 'all' ? '#4F46E5' : 'transparent',
+              color: visitFilter === 'all' ? '#FFFFFF' : 'var(--text-muted)'
+            }
+          }, "전체"),
+          /*#__PURE__*/React.createElement("button", {
+            type: "button",
+            onClick: () => setVisitFilter('visited'),
+            style: {
+              padding: '4px 10px', fontSize: '0.75rem', fontWeight: 800, borderRadius: '8px', border: 'none', cursor: 'pointer',
+              backgroundColor: visitFilter === 'visited' ? '#4F46E5' : 'transparent',
+              color: visitFilter === 'visited' ? '#FFFFFF' : 'var(--text-muted)'
+            }
+          }, "방문"),
+          /*#__PURE__*/React.createElement("button", {
+            type: "button",
+            onClick: () => setVisitFilter('planned'),
+            style: {
+              padding: '4px 10px', fontSize: '0.75rem', fontWeight: 800, borderRadius: '8px', border: 'none', cursor: 'pointer',
+              backgroundColor: visitFilter === 'planned' ? '#4F46E5' : 'transparent',
+              color: visitFilter === 'planned' ? '#FFFFFF' : 'var(--text-muted)'
+            }
+          }, "예정")
+        ),
+        /* 3-line menu */
+        /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          onClick: () => setIsPlacesMenuOpen(true),
+          title: "메뉴",
+          "aria-label": "장소 메뉴",
+          style: {
+            background: 'none', border: 'none', cursor: 'pointer', padding: '6px',
+            color: '#64748B', display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }
+        }, /*#__PURE__*/React.createElement(ThreeLinesIcon, { size: 22 }))
+      )
     ),
 
     /* Slide-down search input bar (shared InlineSearchBar) */
@@ -1420,13 +1464,13 @@ export function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showT
             background: 'none', border: 'none', cursor: 'pointer', color: '#64748B',
             display: 'flex', alignItems: 'center', justifyContent: 'center'
           }
-        }, /*#__PURE__*/React.createElement(ThreeLinesIcon, { size: 20 })),
+        }, mapExpanded ? "지도 축소" : "지도 확대"),
         
         /* Right drag resizer handle (only shown when map is not fullscreen expanded) */
         !mapExpanded ? /*#__PURE__*/React.createElement("div", {
           onMouseDown: handleDragStart,
           onTouchStart: handleDragStart,
-          title: "드래그하여 지도 크기 조절",
+          title: "드래그하여 지도 높이 조절",
           style: {
             width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center',
             cursor: 'ns-resize', color: '#94A3B8', userSelect: 'none', touchAction: 'none'
@@ -1458,6 +1502,7 @@ export function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showT
       className: "places-category-sticky-tabs",
       style: { flexShrink: 0, zIndex: 9, backgroundColor: 'var(--bg-card)', borderBottom: '1px solid var(--border-subtle)' }
     },
+      /* Desktop Category Bar */
       /*#__PURE__*/React.createElement("div", { className: "place-category-tabs-desktop-only" },
         /*#__PURE__*/React.createElement(SearchCategoryTabs, {
           tabs: [
@@ -1476,7 +1521,11 @@ export function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showT
           countBadgeClassName: "section-count-badge"
         })
       ),
-      /*#__PURE__*/React.createElement("div", { className: "place-category-select-mobile-only" },
+      /* Mobile Category Select Box + Visit/Planned Switching Tab */
+      /*#__PURE__*/React.createElement("div", {
+        className: "place-category-select-mobile-only",
+        style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', padding: '6px 12px' }
+      },
         /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
           title: "카테고리 선택",
           value: categoryFilter,
@@ -1494,7 +1543,50 @@ export function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showT
             }))
           ],
           onSelect: setCategoryFilter
-        })
+        }),
+        /* Mobile Switching Tab: 방문 | 예정 */
+        /*#__PURE__*/React.createElement("div", {
+          className: "visit-filter-toggle-mobile",
+          style: {
+            display: 'inline-flex',
+            alignItems: 'center',
+            padding: '3px',
+            borderRadius: '12px',
+            border: '1px solid var(--border-subtle)',
+            backgroundColor: 'var(--bg-card)',
+            flexShrink: 0
+          }
+        },
+          /*#__PURE__*/React.createElement("button", {
+            type: "button",
+            onClick: () => setVisitFilter(prev => prev === 'visited' ? 'all' : 'visited'),
+            style: {
+              padding: '5px 12px',
+              fontSize: '0.8rem',
+              fontWeight: 900,
+              borderRadius: '9px',
+              border: 'none',
+              cursor: 'pointer',
+              backgroundColor: visitFilter === 'visited' ? '#4F46E5' : 'transparent',
+              color: visitFilter === 'visited' ? '#FFFFFF' : 'var(--text-muted)'
+            }
+          }, "방문"),
+          /*#__PURE__*/React.createElement("div", { style: { width: '1px', height: '14px', backgroundColor: 'var(--border-subtle)', margin: '0 2px' } }),
+          /*#__PURE__*/React.createElement("button", {
+            type: "button",
+            onClick: () => setVisitFilter(prev => prev === 'planned' ? 'all' : 'planned'),
+            style: {
+              padding: '5px 12px',
+              fontSize: '0.8rem',
+              fontWeight: 900,
+              borderRadius: '9px',
+              border: 'none',
+              cursor: 'pointer',
+              backgroundColor: visitFilter === 'planned' ? '#4F46E5' : 'transparent',
+              color: visitFilter === 'planned' ? '#FFFFFF' : 'var(--text-muted)'
+            }
+          }, "예정")
+        )
       )
     ),
 

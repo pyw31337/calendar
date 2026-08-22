@@ -2414,12 +2414,17 @@ export function GlobalSearchModal({
     [calendar, fullHistory, chatMessages, memos, q]
   );
 
+  const SimpleBottomSheetPicker = __deps.SimpleBottomSheetPicker;
+
+  const isMobile = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(max-width: 640px)').matches;
+
   const tabDefs = [
-    { key: 'schedules', label: '일정', count: matches.schedules.length },
-    { key: 'chat', label: '채팅', count: matches.chat.length },
-    { key: 'tags', label: '태그', count: matches.tags.length },
-    { key: 'expenses', label: '정산', count: matches.expenses.length },
-    { key: 'memos', label: '메모', count: matches.memos.length }
+    { key: 'schedules', label: '일정', count: (matches.schedules || []).length },
+    { key: 'chat', label: '채팅', count: (matches.chat || []).length },
+    { key: 'photos', label: '사진', count: (matches.photos || []).length },
+    { key: 'places', label: '장소', count: (matches.places || []).length },
+    { key: 'expenses', label: '정산', count: (matches.expenses || []).length },
+    { key: 'memos', label: '메모', count: (matches.memos || []).length }
   ];
   const hasResults = tabDefs.some(t => t.count > 0);
 
@@ -2435,7 +2440,7 @@ export function GlobalSearchModal({
       return firstNonEmpty ? firstNonEmpty.key : prev;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, matches.schedules.length, matches.chat.length, matches.tags.length, matches.expenses.length, matches.memos.length]);
+  }, [q, matches.schedules.length, matches.chat.length, (matches.photos || []).length, (matches.places || []).length, matches.expenses.length, matches.memos.length]);
 
   return /*#__PURE__*/React.createElement("div", {
     className: "modal-overlay",
@@ -2461,7 +2466,7 @@ export function GlobalSearchModal({
         type: "text",
         className: "form-input",
         style: { width: '100%' },
-        placeholder: "일정, 채팅, 태그, 정산, 메모 검색...",
+        placeholder: "일정, 채팅, 사진, 장소, 정산, 메모 검색...",
         value: query,
         onChange: e => setQuery(e.target.value)
       }),
@@ -2471,8 +2476,16 @@ export function GlobalSearchModal({
       }, "전체 기록에서 검색 중..."),
 
       q && hasResults && /*#__PURE__*/React.createElement("div", {
-        style: { position: 'sticky', top: '-18px', backgroundColor: 'var(--bg-card)', zIndex: 10, marginTop: '10px', marginBottom: '12px' }
-      }, /*#__PURE__*/React.createElement(SearchCategoryTabs, { tabs: tabDefs, activeKey: activeTab, onSelect: setActiveTab })),
+        style: { position: 'sticky', top: '-18px', backgroundColor: 'var(--bg-card)', zIndex: 10, marginTop: '10px', marginBottom: '12px', width: '100%' }
+      }, isMobile && SimpleBottomSheetPicker ? /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
+        title: "검색 카테고리 선택",
+        value: activeTab,
+        options: tabDefs.map(t => ({
+          value: t.key,
+          label: /*#__PURE__*/React.createElement(React.Fragment, null, `${t.label} `, /*#__PURE__*/React.createElement("span", { className: "section-count-badge" }, t.count))
+        })),
+        onSelect: setActiveTab
+      }) : /*#__PURE__*/React.createElement(SearchCategoryTabs, { tabs: tabDefs, activeKey: activeTab, onSelect: setActiveTab, containerStyle: { width: '100%' } })),
 
       !q && /*#__PURE__*/React.createElement("div", { style: { padding: '30px', color: '#94A3B8', fontSize: '0.85rem', textAlign: 'center' } }, "검색어를 입력해 주세요."),
       q && !hasResults && /*#__PURE__*/React.createElement("div", { style: { padding: '30px', color: '#94A3B8', fontSize: '0.85rem', textAlign: 'center' } }, "검색 결과가 없습니다."),
@@ -2495,6 +2508,26 @@ export function GlobalSearchModal({
           timeStr: formatLogTimestamp(msg.timestamp),
           onClick: () => { onOpenChatMessage(msg.id); onClose(); }
         }, highlightKeyword(msg.text || '', q)))
+      ),
+
+      q && hasResults && activeTab === 'photos' && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
+        (matches.photos || []).map((photo, idx) => /*#__PURE__*/React.createElement(SearchResultLogRow, {
+          key: photo.id || `${photo.imageUrl}_${idx}`,
+          badgeName: "일정 사진",
+          badgeColor: "#8B5CF6",
+          timeStr: photo.date ? formatDateWithDayName(photo.date) : '',
+          onClick: () => { if (photo.date) onSelectDate(photo.date); onClose(); }
+        }, photo.tags || '일정 사진'))
+      ),
+
+      q && hasResults && activeTab === 'places' && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
+        (matches.places || []).map(place => /*#__PURE__*/React.createElement(SearchResultLogRow, {
+          key: place.id,
+          badgeName: place.alias || place.name,
+          badgeColor: "#06B6D4",
+          timeStr: place.address || '',
+          onClick: () => { onClose(); }
+        }, highlightKeyword(place.memo || place.name || '', q)))
       ),
 
       q && hasResults && activeTab === 'tags' && /*#__PURE__*/React.createElement("div", {

@@ -9285,7 +9285,7 @@ function formatLogTimestamp(ts) {
 // GlobalSearchModal (single active calendar) and AdminUnifiedSearchResultsView (looped across
 // every calendar) so the two search surfaces can never drift out of sync on matching rules.
 function computeCalendarSearchMatches(cal, chatMessages, memoList, q, limit = 30) {
-  if (!cal || !q) return { schedules: [], chat: [], tags: [], expenses: [], memos: [] };
+  if (!cal || !q) return { schedules: [], chat: [], photos: [], places: [], expenses: [], memos: [] };
   const participantsMap = getActiveParticipants(cal).reduce((acc, p) => { acc[p.id] = p; return acc; }, {});
   const expenseCategoriesMap = getExpenseCategories(cal).reduce((acc, c) => { acc[c.id] = c; return acc; }, {});
 
@@ -9300,6 +9300,20 @@ function computeCalendarSearchMatches(cal, chatMessages, memoList, q, limit = 30
     .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
     .slice(0, limit)
     .map(msg => ({ ...msg, participantName: participantsMap[msg.participantId]?.name || '알수없음', participantColor: participantsMap[msg.participantId]?.color || '#94A3B8' }));
+
+  const photos = [];
+  (cal.confirmedMeeting || []).forEach(meeting => {
+    (meeting.photos || []).forEach(photo => {
+      if ((photo.tags || '').toLowerCase().includes(q) || (meeting.date || '').toLowerCase().includes(q)) {
+        photos.push({ ...photo, date: meeting.date });
+      }
+    });
+  });
+
+  const getCalendarPlaces = typeof window !== 'undefined' && window.GATHER_APP_UTILS && window.GATHER_APP_UTILS.getCalendarPlaces ? window.GATHER_APP_UTILS.getCalendarPlaces : (() => []);
+  const places = (getCalendarPlaces(cal) || [])
+    .filter(place => (place.name || '').toLowerCase().includes(q) || (place.alias || '').toLowerCase().includes(q) || (place.address || '').toLowerCase().includes(q) || (place.memo || '').toLowerCase().includes(q))
+    .slice(0, limit);
 
   const tags = [];
   (chatMessages || []).forEach(msg => {
@@ -9316,11 +9330,6 @@ function computeCalendarSearchMatches(cal, chatMessages, memoList, q, limit = 30
   const expenses = [];
   (cal.confirmedMeeting || []).forEach(meeting => {
     (meeting.expenses || []).forEach(exp => {
-      // Income entries are stored with categoryId 'etc' as a placeholder (they don't have a
-      // real spending category), so resolving categoryName straight off expenseCategoriesMap
-      // would badge/match them as "기타" like a real misc *expense* -- same fix SettlementPage's
-      // getDisplayCategory already applies for the on-screen badge, mirrored here so search
-      // agrees with what's actually shown.
       const isIncome = isExpenseIncomeEntry(exp);
       const category = expenseCategoriesMap[exp.categoryId];
       const categoryName = isIncome ? '수입' : (category?.name || '기타');
@@ -9338,7 +9347,7 @@ function computeCalendarSearchMatches(cal, chatMessages, memoList, q, limit = 30
     .slice(0, limit)
     .map(memo => ({ ...memo, participantName: participantsMap[memo.participantId]?.name || '알수없음', participantColor: participantsMap[memo.participantId]?.color || '#94A3B8' }));
 
-  return { schedules, chat, tags: tags.slice(0, limit), expenses: expenses.slice(0, limit), memos };
+  return { schedules, chat, photos: photos.slice(0, limit), places, tags: tags.slice(0, limit), expenses: expenses.slice(0, limit), memos };
 }
 
 // Underlined tab bar with count badges, used by both search surfaces to switch between the
