@@ -668,7 +668,7 @@ function getAnniversaryDisplayColor(...args) {
 }
 
 
-export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox, linkPreview, style = {}, message = null, stickyVideoKey = null, onActivateVideo = null, onDockAnchorChange = null }) {
+export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox, linkPreview, style = {}, message = null, stickyVideoKey = null, onActivateVideo = null }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -709,17 +709,10 @@ export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox,
     return () => window.removeEventListener('blur', handleWindowBlur);
   }, [isEmbedVideo, onActivateVideo, mediaInfo && mediaInfo.url, message && message.id]);
   // While this message owns the active/persistent video, it doesn't render its own iframe at all
-  // -- instead it registers its own DOM node as the dock anchor (see the isThisSticky branch
-  // below) via a stable ref callback, so the persistent player (StickyVideoBox, mounted once at
-  // the app root) can portal its single never-unmounted iframe DOM node directly into this box
-  // and look perfectly inline, while still being the exact same iframe that keeps playing when
-  // the message unmounts (e.g. navigating away from chat) and the player falls back to floating.
-  // useCallback keeps this ref's identity stable across re-renders so React only invokes it on
-  // real mount/unmount, not on every render of this component.
+  // -- the persistent player (StickyVideoBox, mounted once at the app root) already has the same
+  // iframe playing in its own floating PIP, so this just shows a placeholder instead of a second,
+  // competing iframe for the same video (see the isThisSticky branch below).
   const isThisSticky = isEmbedVideo && stickyVideoKey && message && message.id === stickyVideoKey;
-  const dockPlaceholderRef = React.useCallback(node => {
-    if (onDockAnchorChange) onDockAnchorChange(node);
-  }, [onDockAnchorChange]);
 
   if (!mediaInfo || failed) {
     return /*#__PURE__*/React.createElement(React.Fragment, null,
@@ -820,12 +813,9 @@ export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox,
           marginBottom
         };
         // This message owns the active/persistent video -- it doesn't render its own iframe here
-        // at all. Instead this box registers itself (via dockPlaceholderRef) as the dock anchor
-        // that StickyVideoBox portals its single never-unmounted iframe into, so the video shows
-        // up exactly here, as a normal in-flow child, indistinguishable from a plain embed.
+        // at all, since the exact same iframe is already playing in StickyVideoBox's floating PIP.
         if (isThisSticky) {
           return /*#__PURE__*/React.createElement('div', {
-            ref: dockPlaceholderRef,
             style: {
               ...embedBoxStyle,
               aspectRatio: isPortraitEmbed ? '9 / 16' : '16 / 9',

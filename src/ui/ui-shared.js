@@ -1370,27 +1370,20 @@ const STICKY_VIDEO_CONTROLS_HEIGHT = 38;
 
 // The single persistent chat-video player: one <iframe> DOM node, kept alive (same React `key`)
 // for as long as `stickyVideo` is set, regardless of which app view is showing -- so playback is
-// genuinely uninterrupted once a video is promoted. Portals into `dockAnchorNode` (the owning
-// chat message's own placeholder box, registered via DirectChatMediaText's ref callback) when
-// that's available -- i.e. whenever the message is actually mounted in the chat room -- so the
-// video looks perfectly inline right there in the message flow; otherwise (any other view, or
-// scrolled out of the loaded chat window) it falls back to a small resizable floating PIP fixed
-// to the bottom-right corner.
+// genuinely uninterrupted once a video is promoted. Always renders as a small resizable floating
+// PIP fixed to the bottom-right corner, in every view including chat (the owning chat message
+// shows a "playing in PIP" placeholder instead -- see DirectChatMediaText's isThisSticky branch --
+// rather than a second, competing inline iframe).
 //
-// This is NOT the same "docking" an earlier version tried and abandoned: that version always
-// portaled into document.body and used position:fixed + a transform continuously recalculated
-// from the anchor's getBoundingClientRect() on every animation frame, to make the fixed box
-// visually track the anchor's position -- fragile, and the cross-origin iframe frequently failed
-// to actually paint under that constant re-transform. Here there is no position tracking at all:
-// the iframe becomes a genuine, normal-flow DOM child of the anchor box when docked -- sized by
-// plain CSS, laid out by the browser like any other element, nothing computed or reapplied every
-// frame. The portal itself always targets one stable, never-recreated host div (see hostRef
-// below); *that* node is what actually moves between the anchor and document.body, via plain DOM
-// appendChild rather than by ever changing what `ReactDOM.createPortal` is called with -- doing
-// it the other way (passing a differently-referenced container straight into createPortal) makes
-// React's own reconciliation treat every dock<->float switch as a non-matching portal fiber and
-// fully unmount+remount the iframe, which is both simpler and far more likely to actually render.
-export function StickyVideoBox({ stickyVideo, dockAnchorNode, onClose, onGoToChat }) {
+// An earlier version tried portaling into the owning chat message's own placeholder box while it
+// was mounted, so the video would look inline there instead of floating -- and before that, an
+// even earlier version always portaled into document.body but used position:fixed + a transform
+// continuously recalculated from the anchor's getBoundingClientRect() on every animation frame to
+// make the fixed box visually track the anchor's position. Both were abandoned: the cross-origin
+// iframe frequently failed to actually paint under the constant reparenting/re-transform. The
+// portal here always targets one stable, never-recreated host div (see hostRef below) appended
+// directly to document.body, so the iframe DOM node itself is never moved or recreated.
+export function StickyVideoBox({ stickyVideo, onClose, onGoToChat }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
