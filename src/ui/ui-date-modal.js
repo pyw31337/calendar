@@ -1647,7 +1647,7 @@ export function DateModal({
     activeTab === 'participant' && /*#__PURE__*/React.createElement(React.Fragment, null,
       /* Anniversaries banner list inside DateModal body */
       dateAnns.length > 0 && /*#__PURE__*/React.createElement("div", {
-        style: { display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '14px' }
+        style: { display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '10px' }
       }, dateAnns.map((ann, aIdx) => {
         const displayColor = getAnniversaryDisplayColor(ann, calendar);
         return /*#__PURE__*/React.createElement("div", {
@@ -1758,7 +1758,7 @@ export function DateModal({
 
       /* Attendees list */
       dateEntries.length > 0 && /*#__PURE__*/React.createElement("div", {
-        style: { marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '6px' }
+        style: { marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '6px' }
       },
         /*#__PURE__*/React.createElement("label", {
           style: { fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '2px' }
@@ -1862,7 +1862,7 @@ export function DateModal({
           finally { setIsSubmitting(false); }
         },
         style: {
-          width: '100%', marginTop: '12px', padding: '12px 16px', borderRadius: '12px',
+          width: '100%', marginTop: '10px', padding: '12px 16px', borderRadius: '12px',
           fontWeight: 800, fontSize: '0.92rem', cursor: isSubmitting ? 'wait' : 'pointer',
           ...((!isConfirmed && isAllAvailable) ? {} : isConfirmed ? {
             border: '1.5px solid rgb(239, 68, 68)',
@@ -1879,7 +1879,7 @@ export function DateModal({
 
     /* Tab 2 Content: 장소 */
     activeTab === 'meeting' && /*#__PURE__*/React.createElement(React.Fragment, null,
-      !adminMode && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '12px' } },
+      !adminMode && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '10px' } },
         /* Search Field */
         /*#__PURE__*/React.createElement("div", null,
           /*#__PURE__*/React.createElement("label", {
@@ -2038,7 +2038,7 @@ export function DateModal({
       ),
 
       /* List of registered places for this date */
-      /*#__PURE__*/React.createElement("div", { style: { marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '6px' } },
+      /*#__PURE__*/React.createElement("div", { style: { marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '6px' } },
         /*#__PURE__*/React.createElement("label", {
           style: { fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '2px' }
         }, `등록된 장소 (${registeredPlaces.length}곳)`),
@@ -2185,7 +2185,7 @@ export function DateModal({
     activeTab === 'settlement' && /*#__PURE__*/React.createElement(React.Fragment, null,
       /* Profit/Loss Info Badge */
       /*#__PURE__*/React.createElement("div", {
-        style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderRadius: '12px', border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)', marginBottom: '12px' }
+        style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderRadius: '12px', border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)', marginBottom: '10px' }
       },
         /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)' } }, "총 정산 요약"),
         (() => {
@@ -2208,7 +2208,7 @@ export function DateModal({
       ),
 
       /* Input Forms */
-      !adminMode && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '12px' } },
+      !adminMode && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '10px' } },
         /*#__PURE__*/React.createElement("div", null,
           /*#__PURE__*/React.createElement("label", {
             style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '6px' }
@@ -2428,7 +2428,7 @@ export function DateModal({
     /* Tab 4 Content: 사진 */
     activeTab === 'photos' && /*#__PURE__*/React.createElement(React.Fragment, null,
       /*#__PURE__*/React.createElement("div", {
-        style: { display: 'flex', flexDirection: 'column', gap: '8px' }
+        style: { display: 'flex', flexDirection: 'column', gap: '10px' }
       },
         /*#__PURE__*/React.createElement("input", {
           ref: meetingPhotoInputRef,
