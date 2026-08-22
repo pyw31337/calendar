@@ -668,7 +668,7 @@ function getAnniversaryDisplayColor(...args) {
 }
 
 
-export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox, linkPreview, style = {}, message = null, stickyVideoKey = null, onActivateVideo = null }) {
+export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox, linkPreview, style = {}, message = null, stickyVideoKey = null, onActivateVideo = null, onDockAnchorChange = null }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -709,10 +709,17 @@ export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox,
     return () => window.removeEventListener('blur', handleWindowBlur);
   }, [isEmbedVideo, onActivateVideo, mediaInfo && mediaInfo.url, message && message.id]);
   // While this message owns the active/persistent video, it doesn't render its own iframe at all
-  // -- the persistent player (StickyVideoBox) is mounted once at the app root and always floats
-  // as a fixed-corner PIP instead, so this message just shows a static placeholder in its place
-  // (see the isThisSticky branch below).
+  // -- instead it registers its own DOM node as the dock anchor (see the isThisSticky branch
+  // below) via a stable ref callback, so the persistent player (StickyVideoBox, mounted once at
+  // the app root) can portal its single never-unmounted iframe DOM node directly into this box
+  // and look perfectly inline, while still being the exact same iframe that keeps playing when
+  // the message unmounts (e.g. navigating away from chat) and the player falls back to floating.
+  // useCallback keeps this ref's identity stable across re-renders so React only invokes it on
+  // real mount/unmount, not on every render of this component.
   const isThisSticky = isEmbedVideo && stickyVideoKey && message && message.id === stickyVideoKey;
+  const dockPlaceholderRef = React.useCallback(node => {
+    if (onDockAnchorChange) onDockAnchorChange(node);
+  }, [onDockAnchorChange]);
 
   if (!mediaInfo || failed) {
     return /*#__PURE__*/React.createElement(React.Fragment, null,
@@ -812,36 +819,22 @@ export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox,
           margin: '0 auto',
           marginBottom
         };
-        // This message owns the active/persistent video -- it no longer plays here (the real,
-        // still-playing iframe lives in the app-root portal player, always floating as a
-        // fixed-corner PIP -- see StickyVideoBox), so this just reserves the spot with a static
-        // placeholder instead of an iframe.
+        // This message owns the active/persistent video -- it doesn't render its own iframe here
+        // at all. Instead this box registers itself (via dockPlaceholderRef) as the dock anchor
+        // that StickyVideoBox portals its single never-unmounted iframe into, so the video shows
+        // up exactly here, as a normal in-flow child, indistinguishable from a plain embed.
         if (isThisSticky) {
           return /*#__PURE__*/React.createElement('div', {
+            ref: dockPlaceholderRef,
             style: {
               ...embedBoxStyle,
               aspectRatio: isPortraitEmbed ? '9 / 16' : '16 / 9',
               maxHeight: isPortraitEmbed ? 'min(72vh, 620px)' : 'min(54vh, 430px)',
               borderRadius: '10px',
               backgroundColor: '#000',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-              color: 'rgba(255,255,255,0.75)'
+              overflow: 'hidden'
             }
-          },
-            /*#__PURE__*/React.createElement('svg', {
-              width: '26', height: '26', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '1.8', strokeLinecap: 'round', strokeLinejoin: 'round'
-            },
-              /*#__PURE__*/React.createElement('rect', { x: '2', y: '4', width: '20', height: '14', rx: '2' }),
-              /*#__PURE__*/React.createElement('rect', { x: '12', y: '11.5', width: '8', height: '5.5', rx: '1', fill: 'currentColor', stroke: 'none' })
-            ),
-            /*#__PURE__*/React.createElement('span', {
-              style: { fontSize: '0.78rem', fontWeight: 700 }
-            }, '우측 하단에서 재생 중')
-          );
+          });
         }
         return /*#__PURE__*/React.createElement('div', {
           className: isMini ? '' : 'chat-media-resizable',

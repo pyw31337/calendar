@@ -1330,9 +1330,14 @@ export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoad
          as before below it. The memo may be older than the paginated `memos` window, hence the
          separate direct-by-id fetch (see sharedMemo in App()) rather than searching the list. */
       sharedMemo && /*#__PURE__*/React.createElement("div", {
+        // Same purple-border + up/down-shake "you were just brought here" treatment used
+        // everywhere else in the app (see chat-search-focused-bubble/chat-search-shake) --
+        // keyed by memo id so navigating between two different shared-memo links replays it.
+        key: sharedMemo.id,
+        className: "chat-search-focused-bubble",
         style: {
           width: '100%', maxWidth: '520px', margin: '0 auto', boxSizing: 'border-box',
-          border: '2px solid #4F46E5', borderRadius: '16px', padding: '10px',
+          borderRadius: '16px', padding: '10px',
           boxShadow: '0 6px 18px rgba(79, 70, 229, 0.14)',
           display: 'flex', flexDirection: 'column', gap: '8px'
         }

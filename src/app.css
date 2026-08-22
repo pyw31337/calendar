@@ -3335,10 +3335,6 @@ textarea.form-input {
 }
 
 
-.place-card-row.is-place-focused {
-  border-color: var(--accent-primary, #4F46E5) !important;
-}
-
 /* Main side menu: unified row spacing + graphic manual banner */
 .admin-side-menu .admin-side-menu-item {
   min-height: 42px;

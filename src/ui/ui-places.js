@@ -1523,9 +1523,12 @@ export function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showT
           const displayVisitEntries = visitEntries.length > 0
             ? sortVisitEntriesRecentFirst(visitEntries)
             : (memoDate ? [{ date: memoDate, note: memoWithoutDate }] : []);
+          const isPlaceFocused = !!(focusPlace && focusPlace.id === place.id);
           return /*#__PURE__*/React.createElement("div", {
             key: place.id,
-            className: "place-card-row" + (focusPlace && focusPlace.id === place.id ? " is-place-focused" : ""),
+            // Same purple-border + up/down-shake "you were just brought here" treatment used
+            // everywhere else in the app (see chat-search-focused-bubble/chat-search-shake).
+            className: "place-card-row" + (isPlaceFocused ? " chat-search-focused-bubble" : ""),
             "data-place-id": place.id,
             role: "button",
             tabIndex: 0,
@@ -1533,12 +1536,11 @@ export function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showT
             style: {
               display: 'flex', flexDirection: 'column', gap: '4px',
               padding: '10px 12px', position: 'relative',
-              border: focusPlace && focusPlace.id === place.id ? '1.5px solid var(--accent-primary)' : '1px solid var(--border-subtle)',
+              border: '1px solid var(--border-subtle)',
               borderRadius: 'var(--radius-md)',
               cursor: 'pointer',
-              backgroundColor: focusPlace && focusPlace.id === place.id ? 'rgba(79, 70, 229, 0.08)' : 'var(--bg-card)',
-              boxShadow: focusPlace && focusPlace.id === place.id ? '0 0 0 3px rgba(79, 70, 229, 0.12)' : 'none',
-              transition: 'border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease'
+              backgroundColor: 'var(--bg-card)',
+              transition: 'border-color 0.15s ease, background-color 0.15s ease'
             },
             onClick: () => handleSelectPlaceOnMap(place)
           },
