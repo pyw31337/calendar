@@ -1533,6 +1533,7 @@ export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoad
               /* Image element */
               /*#__PURE__*/React.createElement("img", {
                 src: img.thumbnail,
+                decoding: 'async',
                 style: { width: '100%', height: '100%', objectFit: 'cover', borderRadius: '6px', border: '1px solid var(--border-subtle)' }
               }),
               /* Remove button (shared with chat's attachment thumbnail) */
@@ -1908,6 +1909,7 @@ export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoad
           /* Image element */
           /*#__PURE__*/React.createElement("img", {
             src: img.thumbnail,
+            decoding: 'async',
             style: { width: '100%', height: '100%', objectFit: 'cover', borderRadius: '6px', border: '1px solid var(--border-subtle)' }
           }),
           /* Remove button (shared with chat's attachment thumbnail) */

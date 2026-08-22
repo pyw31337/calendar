@@ -1887,7 +1887,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {
     onClick: e => e.stopPropagation(),
     style: { width: '90%', maxWidth: '360px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center' }
   },
-    /*#__PURE__*/React.createElement("img", { src: shareImageUrl, alt: "정산 결과 공유 이미지", style: { width: '100%', borderRadius: '10px', border: '1px solid var(--border-subtle)' } }),
+    /*#__PURE__*/React.createElement("img", { src: shareImageUrl, alt: "정산 결과 공유 이미지", decoding: "async", style: { width: '100%', borderRadius: '10px', border: '1px solid var(--border-subtle)' } }),
     /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.76rem', color: 'var(--text-muted)', textAlign: 'center' } }, "이미지를 길게 눌러 저장하거나, 아래 버튼으로 다운로드하세요"),
     /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px', width: '100%' } },
       /*#__PURE__*/React.createElement("button", {

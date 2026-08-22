@@ -1799,7 +1799,7 @@ export function AdminUnifiedSearchResultsView({
         onClick: () => window.open(getAdminSearchResultTargetUrl('tags', entry), '_blank', 'noopener'),
         style: { padding: 0, border: 0, background: 'none', cursor: 'pointer', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '4px', font: 'inherit' }
       },
-        /*#__PURE__*/React.createElement("img", { src: entry.thumb, referrerPolicy: 'no-referrer', style: { width: '100%', aspectRatio: '1 / 1', objectFit: 'cover', borderRadius: '6px' } }),
+        /*#__PURE__*/React.createElement("img", { src: entry.thumb, loading: 'lazy', decoding: 'async', referrerPolicy: 'no-referrer', style: { width: '100%', aspectRatio: '1 / 1', objectFit: 'cover', borderRadius: '6px' } }),
         /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.68rem', color: '#94A3B8', fontWeight: 700 } }, entry.calendarLabel),
         /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.7rem', color: '#0F172A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, highlightKeyword(entry.tags || '', q))
       ))),

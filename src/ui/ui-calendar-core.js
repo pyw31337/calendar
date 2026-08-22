@@ -1548,6 +1548,7 @@ export function CommentsSection({
     }, /*#__PURE__*/React.createElement("img", {
       src: img.thumbnail,
       alt: `첨부 미리보기 ${index + 1}`,
+      decoding: 'async',
       style: {
         width: '60px',
         height: '60px',
@@ -1834,6 +1835,8 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
     if (imageUrls.length === 1) {
       return /*#__PURE__*/React.createElement("img", {
         src: thumbUrls[0] || imageUrls[0],
+        loading: 'lazy',
+        decoding: 'async',
         style: { width: '100%', maxHeight: '140px', objectFit: 'cover', borderRadius: '6px', marginBottom: '8px' }
       });
     }
@@ -1852,6 +1855,8 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
     }, thumbUrls.slice(0, 6).map((thumb, idx) => /*#__PURE__*/React.createElement("img", {
       key: idx,
       src: thumb || imageUrls[idx],
+      loading: 'lazy',
+      decoding: 'async',
       style: {
         display: 'block',
         width: '100%',
@@ -2544,6 +2549,7 @@ export function GlobalSearchModal({
             src: entry.thumb,
             alt: entry.tags || '태그된 사진',
             loading: "lazy",
+            decoding: "async",
             style: { width: '100%', aspectRatio: '1 / 1', objectFit: 'cover', borderRadius: 'var(--radius-sm)' }
           }),
           /*#__PURE__*/React.createElement("span", {
@@ -2707,6 +2713,7 @@ export function EditMessageModal({
   }, /*#__PURE__*/React.createElement("img", {
     src: img.thumbnail,
     alt: `수정 이미지 미리보기 ${index + 1}`,
+    decoding: 'async',
     style: {
       width: '80px',
       height: '80px',

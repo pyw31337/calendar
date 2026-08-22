@@ -1802,6 +1802,7 @@ export function ChatRoomView({
       }, /*#__PURE__*/React.createElement("img", {
         src: img.thumbnail,
         alt: `첨부 미리보기 ${index + 1}`,
+        decoding: 'async',
         style: {
           width: '60px',
           height: '60px',
