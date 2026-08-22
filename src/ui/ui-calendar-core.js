@@ -703,6 +703,129 @@ export function CalendarGrid({
   const [pickerYear, setPickerYear] = React.useState(year);
   const [pickerMonth, setPickerMonth] = React.useState(month);
 
+  // Touch equivalent of the desktop-only HTML5 draggable/onDragStart/onDrop badge-move below --
+  // native Drag-and-Drop never fires from touch input on any mobile browser, so without this a
+  // participant badge simply couldn't be moved between dates on a phone at all. Implemented as a
+  // long-press-then-drag gesture (not a plain touchmove-drag) specifically so a normal vertical
+  // scroll that happens to start on a badge still scrolls the page instead of accidentally
+  // grabbing it -- touchDragRef tracks the pending/active gesture, isTouchDragging mirrors
+  // whether it's actually dragging (vs. just pressed) for the body touch-action lock below, and
+  // touchDropTargetDate is which day-cell is currently under the finger (for the highlight).
+  const TOUCH_LONG_PRESS_MS = 350;
+  const TOUCH_MOVE_CANCEL_PX = 10;
+  const touchDragRef = React.useRef(null);
+  const justTouchDraggedRef = React.useRef(false);
+  const [isTouchDragging, setIsTouchDragging] = React.useState(false);
+  const [touchDragBadge, setTouchDragBadge] = React.useState(null); // { name, color, x, y } | null
+  const [touchDropTargetDate, setTouchDropTargetDate] = React.useState(null);
+
+  // touch-action:'auto' stays in effect (native scroll works normally) until the long-press
+  // actually fires -- see handleBadgeTouchStart below, which is also the only place drag state
+  // gets created, so the browser never fights a scroll gesture that never intended to be a drag.
+  React.useEffect(() => {
+    if (!isTouchDragging) return undefined;
+    const originalTouchAction = document.body.style.touchAction;
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.touchAction = 'none';
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.touchAction = originalTouchAction;
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [isTouchDragging]);
+
+  const findDayCellDateAt = (x, y) => {
+    const el = typeof document.elementFromPoint === 'function' ? document.elementFromPoint(x, y) : null;
+    const cell = el && typeof el.closest === 'function' ? el.closest('.day-cell') : null;
+    return cell ? cell.dataset.dateStr || null : null;
+  };
+
+  const endTouchDrag = (targetDate) => {
+    const state = touchDragRef.current;
+    touchDragRef.current = null;
+    setIsTouchDragging(false);
+    setTouchDragBadge(null);
+    setTouchDropTargetDate(null);
+    if (!state || !state.dragging) return;
+    justTouchDraggedRef.current = true;
+    // Cleared on the next tick rather than immediately -- the browser's compatibility click (if
+    // any survives touchend's preventDefault below) fires essentially synchronously after, and
+    // the badge's onClick checks this flag to avoid also opening the participant view right
+    // after a drag-to-move.
+    setTimeout(() => { justTouchDraggedRef.current = false; }, 300);
+    if (targetDate && targetDate !== state.sourceDate && typeof onMoveAvailability === 'function') {
+      onMoveAvailability(state.entryReferId, state.sourceDate, targetDate, state.participantId, state.participantName);
+    }
+  };
+
+  const handleBadgeTouchStart = (event, entry, participant, dateStr) => {
+    if (event.touches.length !== 1) return;
+    const touch = event.touches[0];
+    if (touchDragRef.current) clearTimeout(touchDragRef.current.timer);
+    const dragInfo = {
+      entryReferId: entry.id,
+      sourceDate: dateStr,
+      participantId: entry.participantId,
+      participantName: participant.name,
+      color: participant.color,
+      touchId: touch.identifier,
+      startX: touch.clientX,
+      startY: touch.clientY,
+      dragging: false,
+      timer: null
+    };
+    dragInfo.timer = setTimeout(() => {
+      if (touchDragRef.current !== dragInfo) return;
+      dragInfo.dragging = true;
+      setIsTouchDragging(true);
+      setTouchDragBadge({ name: dragInfo.participantName, color: dragInfo.color, x: dragInfo.startX, y: dragInfo.startY });
+      setTouchDropTargetDate(dateStr);
+      if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+        try { navigator.vibrate(15); } catch (e) {}
+      }
+    }, TOUCH_LONG_PRESS_MS);
+    touchDragRef.current = dragInfo;
+  };
+
+  const handleBadgeTouchMove = event => {
+    const state = touchDragRef.current;
+    if (!state) return;
+    const touch = Array.from(event.touches).find(t => t.identifier === state.touchId);
+    if (!touch) return;
+    if (!state.dragging) {
+      const dx = Math.abs(touch.clientX - state.startX);
+      const dy = Math.abs(touch.clientY - state.startY);
+      if (dx > TOUCH_MOVE_CANCEL_PX || dy > TOUCH_MOVE_CANCEL_PX) {
+        // Moved before the long-press committed -- this is a normal scroll/swipe, not a drag.
+        clearTimeout(state.timer);
+        touchDragRef.current = null;
+      }
+      return;
+    }
+    setTouchDragBadge(prev => (prev ? { ...prev, x: touch.clientX, y: touch.clientY } : prev));
+    setTouchDropTargetDate(findDayCellDateAt(touch.clientX, touch.clientY));
+  };
+
+  const handleBadgeTouchEnd = event => {
+    const state = touchDragRef.current;
+    if (!state) return;
+    clearTimeout(state.timer);
+    if (state.dragging) {
+      const touch = Array.from(event.changedTouches).find(t => t.identifier === state.touchId) || event.changedTouches[0];
+      const targetDate = touch ? findDayCellDateAt(touch.clientX, touch.clientY) : null;
+      event.preventDefault();
+      endTouchDrag(targetDate);
+    } else {
+      touchDragRef.current = null;
+    }
+  };
+
+  const handleBadgeTouchCancel = () => {
+    const state = touchDragRef.current;
+    if (state) clearTimeout(state.timer);
+    endTouchDrag(null);
+  };
+
   // Sync picker values when month navigates externally
   React.useEffect(() => {
     setPickerYear(year);
@@ -789,7 +912,7 @@ export function CalendarGrid({
     });
     return map;
   }, [year]);
-  return /*#__PURE__*/React.createElement("div", {
+  const gridTree = /*#__PURE__*/React.createElement("div", {
     className: "calendar-card",
     style: {
       position: 'relative'
@@ -1013,10 +1136,14 @@ export function CalendarGrid({
     const cornerTitle = isHoliday ? (lunarLabel ? `${holidayNames.join(', ')} (${lunarLabel})` : holidayNames.join(', ')) : undefined;
     const columnDow = idx % 7; // 0=Sun .. 6=Sat, since each week row starts on Sunday
     const isSunday = columnDow === 0;
+    const isTouchDropTarget = isTouchDragging && touchDropTargetDate === dateStr;
     return /*#__PURE__*/React.createElement("div", {
       key: idx,
       className: `day-cell ${isCurrentMonth ? '' : 'other-month'} ${isConfirmed ? 'confirmed-meeting' : isAllAvailable ? 'all-available' : ''}`,
-      style: { "--cell-index": idx },
+      "data-date-str": dateStr,
+      style: isTouchDropTarget
+        ? { "--cell-index": idx, outline: '2px solid var(--accent-primary)', outlineOffset: '-2px' }
+        : { "--cell-index": idx },
       onClick: () => onSelectDate(dateStr),
       onDragOver: event => {
         event.preventDefault();
@@ -1115,8 +1242,13 @@ export function CalendarGrid({
               participantName: p.name
             }));
           },
+          onTouchStart: event => { event.stopPropagation(); handleBadgeTouchStart(event, e, p, dateStr); },
+          onTouchMove: event => { event.stopPropagation(); handleBadgeTouchMove(event); },
+          onTouchEnd: event => { event.stopPropagation(); handleBadgeTouchEnd(event); },
+          onTouchCancel: event => { event.stopPropagation(); handleBadgeTouchCancel(); },
           onClick: event => {
             event.stopPropagation();
+            if (justTouchDraggedRef.current) return;
             if (typeof onParticipantClick === 'function') {
               onParticipantClick(p.name, dateStr);
             } else if (typeof onSelectDate === 'function') {
@@ -1198,6 +1330,36 @@ export function CalendarGrid({
       }))
     );
   })));
+
+  // Floating badge that follows the finger while a touch drag is active (see
+  // handleBadgeTouchStart above) -- portaled straight to <body> so it renders above everything
+  // regardless of where CalendarGrid itself sits in the DOM, and isn't affected by any ancestor
+  // establishing its own containing block (transform/filter/etc. would otherwise break a plain
+  // position:fixed descendant).
+  const touchDragIndicator = touchDragBadge && typeof document !== 'undefined' && ReactDOM.createPortal
+    ? ReactDOM.createPortal(/*#__PURE__*/React.createElement("div", {
+      style: {
+        position: 'fixed',
+        left: `${touchDragBadge.x}px`,
+        top: `${touchDragBadge.y}px`,
+        transform: 'translate(-50%, -130%)',
+        backgroundColor: touchDragBadge.color,
+        color: getContrastTextColor(touchDragBadge.color),
+        padding: '6px 12px',
+        borderRadius: '999px',
+        fontSize: '0.8rem',
+        fontWeight: 800,
+        boxShadow: '0 8px 20px rgba(0,0,0,0.28)',
+        pointerEvents: 'none',
+        zIndex: 100001,
+        whiteSpace: 'nowrap'
+      }
+    }, touchDragBadge.name), document.body)
+    : null;
+
+  return touchDragIndicator
+    ? /*#__PURE__*/React.createElement(React.Fragment, null, gridTree, touchDragIndicator)
+    : gridTree;
 }
 
 export function CommentsSection({
