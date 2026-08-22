@@ -4803,6 +4803,94 @@ function App() {
     };
   }, [isMainSideMenuOpen]);
 
+  // JS fallback for three app.css rules that rely on :has() -- background-scroll lock while any
+  // modal/bottom sheet is mounted, the admin screen's forced light-mode override, and its
+  // padding reset. :has() is supported by every evergreen browser (Safari 15.4+/Chrome 105+/
+  // Firefox 121+) but some outdated embedded webviews still lack it (e.g. an old Android OEM
+  // WebView inside KakaoTalk/Naver's in-app browser, both realistic sources of traffic for a
+  // Korean link-shared app) -- there, the CSS rules silently do nothing and background scroll
+  // stays unlocked / the admin screen stays in dark colors it isn't designed for. A
+  // MutationObserver (rather than threading each overlay's own open/close state into this one
+  // effect) mirrors the exact same rules for every current and future modal without extra
+  // wiring, and only ever touches the DOM when :has() isn't supported at all -- on every modern
+  // engine this effect is a no-op and the native CSS rules do all the work, unchanged.
+  React.useEffect(() => {
+    if (typeof MutationObserver === 'undefined') return undefined;
+    if (typeof CSS !== 'undefined' && typeof CSS.supports === 'function' && CSS.supports('selector(:has(*))')) return undefined;
+
+    let overlayLocked = false;
+    let savedOverflow = '';
+    let adminScopeActive = false;
+    let savedBackgroundColor = '';
+    let savedBackgroundImage = '';
+    let savedColorScheme = '';
+    let bodyPaddingReset = false;
+    let savedPadding = '';
+
+    const sync = () => {
+      // Mirrors: body:has(.modal-overlay, .bottom-sheet-overlay) { overflow: hidden; }
+      const hasOverlay = !!document.body.querySelector('.modal-overlay, .bottom-sheet-overlay');
+      if (hasOverlay !== overlayLocked) {
+        overlayLocked = hasOverlay;
+        if (overlayLocked) {
+          savedOverflow = document.body.style.overflow;
+          document.body.style.overflow = 'hidden';
+        } else {
+          document.body.style.overflow = savedOverflow;
+        }
+      }
+
+      const hasAdminScope = !!document.body.querySelector('.admin-scope');
+      const hasLoginGate = !!document.body.querySelector('.admin-login-gate');
+
+      // Mirrors: body:has(.admin-scope), body:has(.admin-login-gate) { padding: 0; }
+      const shouldResetPadding = hasAdminScope || hasLoginGate;
+      if (shouldResetPadding !== bodyPaddingReset) {
+        bodyPaddingReset = shouldResetPadding;
+        if (bodyPaddingReset) {
+          savedPadding = document.body.style.padding;
+          document.body.style.padding = '0';
+        } else {
+          document.body.style.padding = savedPadding;
+        }
+      }
+
+      // Mirrors: :root[data-theme="dark"] body:has(.admin-scope) { background-color/-image }
+      // and :root[data-theme="dark"]:has(.admin-scope) { color-scheme: light }
+      const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+      const shouldForceLight = isDark && hasAdminScope;
+      if (shouldForceLight !== adminScopeActive) {
+        adminScopeActive = shouldForceLight;
+        if (adminScopeActive) {
+          savedBackgroundColor = document.body.style.backgroundColor;
+          savedBackgroundImage = document.body.style.backgroundImage;
+          savedColorScheme = document.documentElement.style.colorScheme;
+          document.body.style.backgroundColor = '#F8FAFC';
+          document.body.style.backgroundImage = 'none';
+          document.documentElement.style.colorScheme = 'light';
+        } else {
+          document.body.style.backgroundColor = savedBackgroundColor;
+          document.body.style.backgroundImage = savedBackgroundImage;
+          document.documentElement.style.colorScheme = savedColorScheme;
+        }
+      }
+    };
+
+    sync();
+    const bodyObserver = new MutationObserver(sync);
+    // attributes+attributeFilter:['class'] on top of childList/subtree catches the rarer case of
+    // a persistently-mounted element's className toggling (e.g. via a class-list update rather
+    // than mount/unmount) in addition to the more common case of the overlay/admin element itself
+    // being mounted or removed.
+    bodyObserver.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+    const themeObserver = new MutationObserver(sync);
+    themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    return () => {
+      bodyObserver.disconnect();
+      themeObserver.disconnect();
+    };
+  }, []);
+
   // Global visual viewport resize handler to scroll active inputs into view (e.g. CommentsSection)
   React.useEffect(() => {
     if (!window.visualViewport) return;
