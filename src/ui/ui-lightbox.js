@@ -983,7 +983,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
       const dateParts = currentMeta.meetingDate ? getShortTitleParts(currentMeta.meetingDate) : null;
       return {
         label: dateParts ? `일정 ${dateParts.year}${dateParts.rest}` : '일정 사진으로 업로드됨',
-        onClick: (onJumpToMeetingDate && currentMeta.meetingDate) ? () => onJumpToMeetingDate(currentMeta.meetingDate, 'photos') : null
+        onClick: (onJumpToMeetingDate && currentMeta.meetingDate) ? () => onJumpToMeetingDate(currentMeta.meetingDate, 'photo') : null
       };
     }
     if (currentMeta.source === 'memo') {
