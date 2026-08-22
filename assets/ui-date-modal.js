@@ -2082,29 +2082,40 @@ export function DateModal({
             /*#__PURE__*/React.createElement("span", { style: { fontWeight: 800, fontSize: '0.88rem', color: 'var(--text-main)' } }, place.alias || place.name),
             place.alias && place.name && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.72rem', color: 'var(--text-muted)' } }, place.name),
             place.address && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.74rem', color: 'var(--text-muted)' } }, getDisplayPlaceAddress(place)),
-            /* Memo — one line per visit date entry */
+            /* Memo — in DateModal's '장소' tab, filter to display ONLY the memo entry corresponding to THIS dateStr */
             place.memo && (() => {
+              const targetNorm = typeof normalizePlaceDateForSort === 'function' ? (normalizePlaceDateForSort(dateStr) || dateStr) : dateStr;
               let entries = parseVisitEntriesFromMemo(place.memo);
-              if (entries.length === 0) {
+              if (entries.length > 0) {
+                const dateEntries = entries.filter(en => {
+                  const enNorm = typeof normalizePlaceDateForSort === 'function' ? normalizePlaceDateForSort(en.date) : en.date;
+                  return enNorm === targetNorm;
+                });
+                if (dateEntries.length > 0) {
+                  return /*#__PURE__*/React.createElement("div", {
+                    style: { display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '0.78rem', color: 'var(--text-main)', lineHeight: 1.45 }
+                  }, dateEntries.map((en, idx) => /*#__PURE__*/React.createElement("div", {
+                    key: `${en.date}_${idx}`,
+                    style: { wordBreak: 'break-word' }
+                  }, renderTextWithUrlBadge(en.note ? `${en.date} ${en.note}` : en.date))));
+                }
+              } else {
                 const leading = typeof extractLeadingMemoDate === 'function' ? extractLeadingMemoDate(place.memo) : '';
                 if (leading) {
-                  const rest = String(place.memo).replace(String(leading), '').replace(/^\s*\/?\s*/, '').trim();
-                  entries = [{ date: leading, note: rest }];
+                  const leadingNorm = typeof normalizePlaceDateForSort === 'function' ? normalizePlaceDateForSort(leading) : leading;
+                  if (leadingNorm === targetNorm) {
+                    const rest = String(place.memo).replace(String(leading), '').replace(/^\s*\/?\s*/, '').trim();
+                    return /*#__PURE__*/React.createElement("div", {
+                      style: { fontSize: '0.78rem', color: 'var(--text-main)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.45 }
+                    }, renderTextWithUrlBadge(rest ? `${leading} ${rest}` : leading));
+                  }
+                } else {
+                  return /*#__PURE__*/React.createElement("div", {
+                    style: { fontSize: '0.78rem', color: 'var(--text-main)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.45 }
+                  }, renderTextWithUrlBadge(place.memo));
                 }
-              } else if (typeof sortVisitEntriesRecentFirst === 'function') {
-                entries = sortVisitEntriesRecentFirst(entries);
               }
-              if (entries.length > 0) {
-                return /*#__PURE__*/React.createElement("div", {
-                  style: { display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '0.78rem', color: 'var(--text-main)', lineHeight: 1.45 }
-                }, entries.map((en, idx) => /*#__PURE__*/React.createElement("div", {
-                  key: `${en.date}_${idx}`,
-                  style: { wordBreak: 'break-word' }
-                }, renderTextWithUrlBadge(en.note ? `${en.date} ${en.note}` : en.date))));
-              }
-              return /*#__PURE__*/React.createElement("div", {
-                style: { fontSize: '0.78rem', color: 'var(--text-main)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.45 }
-              }, renderTextWithUrlBadge(place.memo));
+              return null;
             })(),
             !adminMode && /*#__PURE__*/React.createElement("div", {
               style: { position: 'absolute', top: '10px', right: '10px' }
@@ -2182,96 +2193,6 @@ export function DateModal({
             }))
           );
         }))
-      ),
-
-      /* Meeting photo attachments */
-      /*#__PURE__*/React.createElement("div", {
-        style: { marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }
-      },
-        /*#__PURE__*/React.createElement("input", {
-          ref: meetingPhotoInputRef,
-          type: "file",
-          accept: "image/*",
-          multiple: true,
-          onChange: handleMeetingPhotoFiles,
-          style: { display: 'none' }
-        }),
-        /*#__PURE__*/React.createElement("div", {
-          style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }
-        },
-          /*#__PURE__*/React.createElement("label", {
-            style: { fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-muted)' }
-          }, `일정 사진 (${meetingPhotos.length}장)`),
-          !adminMode && /*#__PURE__*/React.createElement("button", {
-            type: "button",
-            className: "btn btn-action btn-action-dark",
-            disabled: isSavingMeetingPhotos,
-            onClick: () => meetingPhotoInputRef.current && meetingPhotoInputRef.current.click(),
-            style: {
-              height: '36px',
-              padding: '0 12px',
-              borderRadius: '10px',
-              fontSize: '0.78rem',
-              fontWeight: 900,
-              cursor: isSavingMeetingPhotos ? 'wait' : 'pointer'
-            }
-          }, isSavingMeetingPhotos ? "업로드 중..." : "사진 추가")
-        ),
-        meetingPhotos.length === 0 ? /*#__PURE__*/React.createElement("div", {
-          style: { textAlign: 'center', color: 'var(--text-muted)', padding: '22px 0', fontSize: '0.82rem', border: '1px dashed var(--border-subtle)', borderRadius: '12px' }
-        }, "이 일정에 첨부된 사진이 없습니다.") : /*#__PURE__*/React.createElement("div", {
-          style: {
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(72px, 1fr))',
-            gap: '8px'
-          }
-        }, meetingPhotos.map((photo, index) => /*#__PURE__*/React.createElement("div", {
-          key: photo.id || `${photo.imageUrl}_${index}`,
-          style: { position: 'relative', minWidth: 0 }
-        },
-          /*#__PURE__*/React.createElement("img", {
-            src: photo.thumbUrl || photo.imageUrl,
-            alt: "일정 사진",
-            loading: "lazy",
-            decoding: "async",
-            referrerPolicy: "no-referrer",
-            onClick: () => {
-              const url = photo.imageUrl || photo.thumbUrl;
-              if (url) window.open(url, '_blank', 'noopener,noreferrer');
-            },
-            style: {
-              width: '100%',
-              aspectRatio: '1 / 1',
-              objectFit: 'cover',
-              display: 'block',
-              borderRadius: '10px',
-              backgroundColor: 'var(--bg-primary)',
-              cursor: 'pointer'
-            }
-          }),
-          !adminMode && typeof onDeleteMeetingPhoto === 'function' && /*#__PURE__*/React.createElement("button", {
-            type: "button",
-            onClick: e => { e.preventDefault(); e.stopPropagation(); handleDeleteMeetingPhoto(photo); },
-            disabled: isSavingMeetingPhotos,
-            "aria-label": "일정 사진 삭제",
-            style: {
-              position: 'absolute',
-              top: '-7px',
-              right: '-7px',
-              width: '22px',
-              height: '22px',
-              borderRadius: '999px',
-              border: '1px solid rgba(239,68,68,0.45)',
-              backgroundColor: 'var(--bg-card)',
-              color: '#EF4444',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: 0,
-              cursor: 'pointer'
-            }
-          }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 13 }))
-        )))
       )
     ),
 
