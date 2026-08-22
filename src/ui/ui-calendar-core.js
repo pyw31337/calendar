@@ -1231,6 +1231,7 @@ export function CommentsSection({
   onJumpToMemo,
   onJumpToMeetingDate,
   onGetChatMessageOrdinal,
+  onGetGalleryPhotoOrdinal,
   onRequestConfirm
 }) {
   const React = window.React;
@@ -1733,6 +1734,7 @@ export function CommentsSection({
     onJumpToMemo,
     onJumpToMeetingDate,
     onGetChatMessageOrdinal,
+    onGetGalleryPhotoOrdinal,
     onRequestConfirm
   }) : null), imageProcessing && /*#__PURE__*/React.createElement(ImageProcessingOverlay, imageProcessing),
   isEmojiPickerOpen && /*#__PURE__*/React.createElement(EmojiPickerSheet, {

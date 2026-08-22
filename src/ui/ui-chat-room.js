@@ -712,14 +712,15 @@ export function ChatRoomView({
   onChangeView,
   stickyVideoKey,
   onActivateVideo,
-  dockAnchorRef,
   onDeletePhoto,
   onReplacePhoto,
   onJumpToChatMessage,
   onJumpToMemo,
   onJumpToMeetingDate,
   onGetChatMessageOrdinal,
-  onRequestConfirm
+  onGetGalleryPhotoOrdinal,
+  onRequestConfirm,
+  externalFocusMessageId = null
 }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -1123,7 +1124,11 @@ export function ChatRoomView({
     const isEmojiOnlyMessage = isEmojiOnlyChatText(msg.text) && !msgHasImages;
     const rowId = msg.id || `msg-${idx}`;
     const isSearchMatch = searchQuery && msg.text && msg.text.toLowerCase().includes(searchQuery.toLowerCase());
-    const isSearchFocused = isSearchMatch && rowId === focusedMsgId;
+    // Focused either by in-chat text search (isSearchMatch + arrow-key navigation) or by an
+    // external jump-to-message request (Lightbox source link, admin/global search, ?msg= deep
+    // link -- see focusChatMessage in app-main.js) -- both render identically, the same purple
+    // border + up/down shake as the in-chat search feature has always used.
+    const isSearchFocused = (isSearchMatch && rowId === focusedMsgId) || (!!externalFocusMessageId && rowId === externalFocusMessageId);
     renderedMessages.push(/*#__PURE__*/React.createElement("div", {
       key: rowId,
       className: `msg-row-hover ${revealedMsgId === rowId ? 'msg-actions-revealed' : ''}`,
@@ -1260,7 +1265,7 @@ export function ChatRoomView({
         // identically across Chrome/Whale/Safari/Firefox, unlike relying purely on width math.
         overflow: 'hidden'
       }
-    }, renderChatMessageBody(msg, setActiveLightbox, chatMediaStyle, searchQuery, stickyVideoKey, onActivateVideo, dockAnchorRef)), /*#__PURE__*/React.createElement("div", {
+    }, renderChatMessageBody(msg, setActiveLightbox, chatMediaStyle, searchQuery, stickyVideoKey, onActivateVideo)), /*#__PURE__*/React.createElement("div", {
       style: {
         position: 'absolute',
         right: '-7px',
@@ -1318,7 +1323,7 @@ export function ChatRoomView({
         // identically across Chrome/Whale/Safari/Firefox, unlike relying purely on width math.
         overflow: 'hidden'
       }
-    }, renderChatMessageBody(msg, setActiveLightbox, chatMediaStyle, searchQuery, stickyVideoKey, onActivateVideo, dockAnchorRef)), /*#__PURE__*/React.createElement("div", {
+    }, renderChatMessageBody(msg, setActiveLightbox, chatMediaStyle, searchQuery, stickyVideoKey, onActivateVideo)), /*#__PURE__*/React.createElement("div", {
       style: {
         position: 'absolute',
         left: '-7px',
@@ -1956,6 +1961,7 @@ export function ChatRoomView({
     onJumpToMemo,
     onJumpToMeetingDate,
     onGetChatMessageOrdinal,
+    onGetGalleryPhotoOrdinal,
     onRequestConfirm
   }) : null), imageProcessingChat && /*#__PURE__*/React.createElement(ImageProcessingOverlay, imageProcessingChat),
   isEmojiPickerOpen && /*#__PURE__*/React.createElement(EmojiPickerSheet, {

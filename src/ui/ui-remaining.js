@@ -668,7 +668,7 @@ function getAnniversaryDisplayColor(...args) {
 }
 
 
-export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox, linkPreview, style = {}, message = null, stickyVideoKey = null, onActivateVideo = null, dockAnchorRef = null }) {
+export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox, linkPreview, style = {}, message = null, stickyVideoKey = null, onActivateVideo = null }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -708,23 +708,11 @@ export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox,
     window.addEventListener('blur', handleWindowBlur);
     return () => window.removeEventListener('blur', handleWindowBlur);
   }, [isEmbedVideo, onActivateVideo, mediaInfo && mediaInfo.url, message && message.id]);
-  const isThisSticky = isEmbedVideo && stickyVideoKey && message && message.id === stickyVideoKey;
   // While this message owns the active/persistent video, it doesn't render its own iframe at all
-  // (see the isThisSticky branch below) -- instead it registers its own DOM node into
-  // dockAnchorRef (a plain ref object shared with StickyVideoBox, lifted up in app-main.js) so
-  // the persistent player -- mounted once at the app root, entirely separate from this component
-  // tree -- can measure and overlay itself exactly on top of this spot on every frame, making it
-  // look perfectly inline even though the iframe DOM node actually lives elsewhere and never gets
-  // torn down. This is a plain ref assignment, NOT React state -- StickyVideoBox does its own
-  // requestAnimationFrame polling of this ref and writes position directly via DOM style, so a
-  // moving/scrolling video never forces a re-render of this (or any other) component tree. An
-  // earlier version funneled the measured rect through React state on every animation frame,
-  // which re-rendered the entire top-level App 60 times/sec while a video was docked -- easily
-  // enough sustained layout/reconciliation churn to keep the embedded YouTube iframe from ever
-  // painting (it showed solid black until you switched away from chat, where the loop stopped).
-  const dockPlaceholderRef = node => {
-    if (dockAnchorRef) dockAnchorRef.current = node;
-  };
+  // -- the persistent player (StickyVideoBox) is mounted once at the app root and always floats
+  // as a fixed-corner PIP instead, so this message just shows a static placeholder in its place
+  // (see the isThisSticky branch below).
+  const isThisSticky = isEmbedVideo && stickyVideoKey && message && message.id === stickyVideoKey;
 
   if (!mediaInfo || failed) {
     return /*#__PURE__*/React.createElement(React.Fragment, null,
@@ -824,22 +812,36 @@ export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox,
           margin: '0 auto',
           marginBottom
         };
-        // This message owns the active/persistent video -- reserve its exact on-screen spot and
-        // register this DOM node into dockAnchorRef (see dockPlaceholderRef above) instead of
-        // rendering an iframe here. The real, still-playing iframe lives in the app-root portal
-        // player and continuously measures/overlays itself precisely on top of this box, so it
-        // reads as a normal inline video even though the DOM node backing it never unmounted.
+        // This message owns the active/persistent video -- it no longer plays here (the real,
+        // still-playing iframe lives in the app-root portal player, always floating as a
+        // fixed-corner PIP -- see StickyVideoBox), so this just reserves the spot with a static
+        // placeholder instead of an iframe.
         if (isThisSticky) {
           return /*#__PURE__*/React.createElement('div', {
-            ref: dockPlaceholderRef,
             style: {
               ...embedBoxStyle,
               aspectRatio: isPortraitEmbed ? '9 / 16' : '16 / 9',
               maxHeight: isPortraitEmbed ? 'min(72vh, 620px)' : 'min(54vh, 430px)',
               borderRadius: '10px',
-              backgroundColor: '#000'
+              backgroundColor: '#000',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              color: 'rgba(255,255,255,0.75)'
             }
-          });
+          },
+            /*#__PURE__*/React.createElement('svg', {
+              width: '26', height: '26', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '1.8', strokeLinecap: 'round', strokeLinejoin: 'round'
+            },
+              /*#__PURE__*/React.createElement('rect', { x: '2', y: '4', width: '20', height: '14', rx: '2' }),
+              /*#__PURE__*/React.createElement('rect', { x: '12', y: '11.5', width: '8', height: '5.5', rx: '1', fill: 'currentColor', stroke: 'none' })
+            ),
+            /*#__PURE__*/React.createElement('span', {
+              style: { fontSize: '0.78rem', fontWeight: 700 }
+            }, '우측 하단에서 재생 중')
+          );
         }
         return /*#__PURE__*/React.createElement('div', {
           className: isMini ? '' : 'chat-media-resizable',

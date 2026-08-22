@@ -842,7 +842,7 @@ export function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSe
   }));
 }
 
-export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, onPromoteImageUrl, onSaveImageTags, onSearchTag, onDeletePhoto, onReplacePhoto, onJumpToChatMessage, onJumpToMemo, onJumpToMeetingDate, onGetChatMessageOrdinal, onRequestConfirm }) {
+export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, onPromoteImageUrl, onSaveImageTags, onSearchTag, onDeletePhoto, onReplacePhoto, onJumpToChatMessage, onJumpToMemo, onJumpToMeetingDate, onGetChatMessageOrdinal, onGetGalleryPhotoOrdinal, onRequestConfirm }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const SmallXIcon = __deps.SmallXIcon;
@@ -934,10 +934,9 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
   const canEditPhoto = !!(currentMeta && !currentMeta.directMediaUrl && (
     currentMeta.source === 'meeting' ? isMeetingPhoto : currentMeta.messageId != null
   ));
-  // "채팅방 #117" -- the message's 1-based position in the calendar's full chat history,
-  // fetched on demand (Firestore count() aggregate, independent of how much chat history the
-  // client has paginated in) and cached per messageId so revisiting the same photo doesn't
-  // refetch it.
+  // "채팅 #117" -- the message's 1-based position in the calendar's full chat history, fetched
+  // on demand (Firestore count() aggregate, independent of how much chat history the client has
+  // paginated in) and cached per messageId so revisiting the same photo doesn't refetch it.
   const chatOrdinalFetchedRef = React.useRef(new Set());
   const [chatOrdinalCache, setChatOrdinalCache] = React.useState({});
   React.useEffect(() => {
@@ -946,6 +945,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
     // which never get a second look) added real extra Firestore traffic for no visible benefit.
     if (!showInfo) return;
     if (!currentMeta || currentMeta.source === 'meeting' || currentMeta.source === 'memo') return;
+    if (currentMeta.uploadSource === 'gallery') return; // uses the photo-ordinal fetch below instead
     if (typeof onGetChatMessageOrdinal !== 'function') return;
     const key = currentMeta.messageId;
     const ts = currentMeta.timestamp;
@@ -957,11 +957,32 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
     });
     return () => { cancelled = true; };
   }, [showInfo, currentMeta, onGetChatMessageOrdinal]);
+  // "갤러리 #20" -- the photo's 1-based position among every photo ever uploaded through the
+  // gallery's own "이미지 업로드" action, counted (and cached) the same on-demand way as the
+  // chat ordinal above, but by photo rather than by message (see fetchGalleryPhotoOrdinal).
+  const galleryOrdinalFetchedRef = React.useRef(new Set());
+  const [galleryOrdinalCache, setGalleryOrdinalCache] = React.useState({});
+  React.useEffect(() => {
+    if (!showInfo) return;
+    if (!currentMeta || currentMeta.uploadSource !== 'gallery') return;
+    if (typeof onGetGalleryPhotoOrdinal !== 'function') return;
+    const messageId = currentMeta.messageId;
+    if (!messageId) return;
+    const key = `${messageId}_${currentMeta.imageIndex || 0}`;
+    if (galleryOrdinalFetchedRef.current.has(key)) return;
+    galleryOrdinalFetchedRef.current.add(key);
+    let cancelled = false;
+    Promise.resolve(onGetGalleryPhotoOrdinal(messageId, currentMeta.imageIndex)).then(n => {
+      if (!cancelled && typeof n === 'number') setGalleryOrdinalCache(prev => ({ ...prev, [key]: n }));
+    });
+    return () => { cancelled = true; };
+  }, [showInfo, currentMeta, onGetGalleryPhotoOrdinal]);
   const sourceInfo = React.useMemo(() => {
     if (!currentMeta) return null;
     if (currentMeta.source === 'meeting') {
+      const dateParts = currentMeta.meetingDate ? getShortTitleParts(currentMeta.meetingDate) : null;
       return {
-        label: '일정 사진으로 업로드됨',
+        label: dateParts ? `일정 ${dateParts.year}${dateParts.rest}` : '일정 사진으로 업로드됨',
         onClick: (onJumpToMeetingDate && currentMeta.meetingDate) ? () => onJumpToMeetingDate(currentMeta.meetingDate, 'photos') : null
       };
     }
@@ -974,18 +995,24 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
     // Default: chat -- distinguishes composer-typed messages from the gallery's own "이미지
     // 업로드" menu action and DateModal's own "일정 사진 추가" button (see
     // handleUploadGalleryImages/handleAddMeetingPhotos' uploadSource marker). Falls back to the
-    // generic label until the ordinal above resolves.
+    // generic label until the relevant ordinal above resolves.
+    if (currentMeta.uploadSource === 'gallery') {
+      const galleryKey = currentMeta.messageId != null ? `${currentMeta.messageId}_${currentMeta.imageIndex || 0}` : null;
+      const galleryOrdinal = galleryKey != null ? galleryOrdinalCache[galleryKey] : null;
+      return {
+        label: typeof galleryOrdinal === 'number' ? `갤러리 #${galleryOrdinal}` : '갤러리에서 업로드됨',
+        onClick: (onJumpToChatMessage && currentMeta.messageId) ? () => onJumpToChatMessage(currentMeta.messageId) : null
+      };
+    }
     const ordinal = currentMeta.messageId != null ? chatOrdinalCache[currentMeta.messageId] : null;
-    const label = currentMeta.uploadSource === 'gallery'
-      ? (typeof ordinal === 'number' ? `갤러리 업로드 (채팅 #${ordinal})` : '갤러리에서 업로드됨')
-      : currentMeta.uploadSource === 'meeting'
+    const label = currentMeta.uploadSource === 'meeting'
       ? (typeof ordinal === 'number' ? `일정 사진 업로드 (채팅 #${ordinal})` : '일정 사진으로 업로드됨')
-      : (typeof ordinal === 'number' ? `채팅방 #${ordinal}` : '채팅방에서 업로드됨');
+      : (typeof ordinal === 'number' ? `채팅 #${ordinal}` : '채팅');
     return {
       label,
       onClick: (onJumpToChatMessage && currentMeta.messageId) ? () => onJumpToChatMessage(currentMeta.messageId) : null
     };
-  }, [currentMeta, onJumpToChatMessage, onJumpToMemo, onJumpToMeetingDate, chatOrdinalCache]);
+  }, [currentMeta, onJumpToChatMessage, onJumpToMemo, onJumpToMeetingDate, chatOrdinalCache, galleryOrdinalCache]);
   const replacePhotoInputRef = React.useRef(null);
   const [isReplacingPhoto, setIsReplacingPhoto] = React.useState(false);
   const [isDeletingPhoto, setIsDeletingPhoto] = React.useState(false);
