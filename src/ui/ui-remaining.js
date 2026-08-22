@@ -668,7 +668,7 @@ function getAnniversaryDisplayColor(...args) {
 }
 
 
-export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox, linkPreview, style = {}, message = null, stickyVideoKey = null, onActivateVideo = null, onVideoDockRectChange = null }) {
+export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox, linkPreview, style = {}, message = null, stickyVideoKey = null, onActivateVideo = null, dockAnchorRef = null }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -710,31 +710,21 @@ export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox,
   }, [isEmbedVideo, onActivateVideo, mediaInfo && mediaInfo.url, message && message.id]);
   const isThisSticky = isEmbedVideo && stickyVideoKey && message && message.id === stickyVideoKey;
   // While this message owns the active/persistent video, it doesn't render its own iframe at all
-  // (see the isThisSticky branch below) -- instead it continuously reports its own on-screen
-  // rect so the persistent player (mounted once at the app root) can overlay itself exactly on
-  // top of this spot, making it look perfectly inline even though the iframe DOM node actually
-  // lives elsewhere and never gets torn down. useLayoutEffect (not useEffect) so the "no longer
-  // docked" report on unmount lands in the SAME commit as this message leaving the DOM (e.g.
-  // switching away from the chat tab), instead of one paint later where the player would
-  // otherwise flash at the old, now-meaningless coordinates for a frame.
-  const dockPlaceholderRef = React.useRef(null);
-  React.useLayoutEffect(() => {
-    if (!isThisSticky || !onVideoDockRectChange) return undefined;
-    let rafId = null;
-    const measure = () => {
-      const el = dockPlaceholderRef.current;
-      if (el) {
-        const r = el.getBoundingClientRect();
-        onVideoDockRectChange({ top: r.top, left: r.left, width: r.width, height: r.height });
-      }
-      rafId = requestAnimationFrame(measure);
-    };
-    rafId = requestAnimationFrame(measure);
-    return () => {
-      if (rafId) cancelAnimationFrame(rafId);
-      onVideoDockRectChange(null);
-    };
-  }, [isThisSticky, onVideoDockRectChange]);
+  // (see the isThisSticky branch below) -- instead it registers its own DOM node into
+  // dockAnchorRef (a plain ref object shared with StickyVideoBox, lifted up in app-main.js) so
+  // the persistent player -- mounted once at the app root, entirely separate from this component
+  // tree -- can measure and overlay itself exactly on top of this spot on every frame, making it
+  // look perfectly inline even though the iframe DOM node actually lives elsewhere and never gets
+  // torn down. This is a plain ref assignment, NOT React state -- StickyVideoBox does its own
+  // requestAnimationFrame polling of this ref and writes position directly via DOM style, so a
+  // moving/scrolling video never forces a re-render of this (or any other) component tree. An
+  // earlier version funneled the measured rect through React state on every animation frame,
+  // which re-rendered the entire top-level App 60 times/sec while a video was docked -- easily
+  // enough sustained layout/reconciliation churn to keep the embedded YouTube iframe from ever
+  // painting (it showed solid black until you switched away from chat, where the loop stopped).
+  const dockPlaceholderRef = node => {
+    if (dockAnchorRef) dockAnchorRef.current = node;
+  };
 
   if (!mediaInfo || failed) {
     return /*#__PURE__*/React.createElement(React.Fragment, null,
@@ -834,11 +824,11 @@ export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox,
           margin: '0 auto',
           marginBottom
         };
-        // This message owns the active/persistent video -- reserve its exact on-screen spot (see
-        // the useLayoutEffect above, which keeps reporting this element's rect every frame) and
-        // render nothing else here. The real, still-playing iframe lives in the app-root portal
-        // player and gets positioned to overlay precisely on top of this box, so it reads as a
-        // normal inline video even though the DOM node backing it never actually unmounted.
+        // This message owns the active/persistent video -- reserve its exact on-screen spot and
+        // register this DOM node into dockAnchorRef (see dockPlaceholderRef above) instead of
+        // rendering an iframe here. The real, still-playing iframe lives in the app-root portal
+        // player and continuously measures/overlays itself precisely on top of this box, so it
+        // reads as a normal inline video even though the DOM node backing it never unmounted.
         if (isThisSticky) {
           return /*#__PURE__*/React.createElement('div', {
             ref: dockPlaceholderRef,
