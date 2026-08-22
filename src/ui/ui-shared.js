@@ -1400,6 +1400,14 @@ export function StickyVideoBox({ stickyVideo, dockAnchorNode, onClose, onGoToCha
   // this particular video stays active; a newly-activated video starts back at the default.
   const [floatWidth, setFloatWidth] = React.useState(null);
   const dragStateRef = React.useRef(null);
+  const hasFloatedRef = React.useRef(false);
+  const activeVideoKeyRef = React.useRef(null);
+
+  const currentKey = stickyVideo ? stickyVideo.key : null;
+  if (activeVideoKeyRef.current !== currentKey) {
+    activeVideoKeyRef.current = currentKey;
+    hasFloatedRef.current = false;
+  }
 
   // React's own portal reconciliation keys a HostPortal fiber to its `containerInfo` by strict
   // reference: passing createPortal(children, dockAnchorNode || document.body) straight through
@@ -1418,7 +1426,18 @@ export function StickyVideoBox({ stickyVideo, dockAnchorNode, onClose, onGoToCha
   React.useLayoutEffect(() => {
     const host = hostRef.current;
     if (!host || typeof document === 'undefined') return undefined;
-    const target = (stickyVideo && dockAnchorNode) ? dockAnchorNode : document.body;
+
+    // Once dockAnchorNode becomes null (e.g. user leaves chat room), the video transitions
+    // to floating PIP in document.body. We mark hasFloatedRef = true.
+    if (stickyVideo && !dockAnchorNode) {
+      hasFloatedRef.current = true;
+    }
+
+    // If the video has already transitioned to floating PIP mode (hasFloatedRef is true),
+    // target stays document.body so returning to chat room does NOT reparent the iframe DOM node.
+    // This prevents YouTube iframe reloads and keeps playback 100% continuous and unbroken!
+    const target = (stickyVideo && dockAnchorNode && !hasFloatedRef.current) ? dockAnchorNode : document.body;
+
     if (host.parentNode !== target) target.appendChild(host);
   }, [dockAnchorNode, !!stickyVideo]);
   React.useEffect(() => () => {
@@ -1464,7 +1483,7 @@ export function StickyVideoBox({ stickyVideo, dockAnchorNode, onClose, onGoToCha
   };
 
   if (!stickyVideo || typeof document === 'undefined' || !ReactDOM.createPortal || !hostRef.current) return null;
-  const isDocked = !!dockAnchorNode;
+  const isDocked = !!(dockAnchorNode && !hasFloatedRef.current);
   // autoplay -- only for THIS portal iframe, never the plain inline one a chat message shows
   // before it's been promoted (see DirectChatMediaText) -- so a newly-promoted video keeps
   // playing straight through instead of landing on a paused first frame the user has to tap

@@ -832,9 +832,15 @@ export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox,
               maxHeight: isPortraitEmbed ? 'min(72vh, 620px)' : 'min(54vh, 430px)',
               borderRadius: '10px',
               backgroundColor: '#000',
-              overflow: 'hidden'
+              overflow: 'hidden',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'rgba(255, 255, 255, 0.75)',
+              fontSize: '0.8rem',
+              fontWeight: 800
             }
-          });
+          }, /*#__PURE__*/React.createElement('span', null, '▶ 미니플레이어(PIP) 재생 중'));
         }
         return /*#__PURE__*/React.createElement('div', {
           className: isMini ? '' : 'chat-media-resizable',
