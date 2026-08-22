@@ -1382,11 +1382,14 @@ const STICKY_VIDEO_CONTROLS_HEIGHT = 38;
 // from the anchor's getBoundingClientRect() on every animation frame, to make the fixed box
 // visually track the anchor's position -- fragile, and the cross-origin iframe frequently failed
 // to actually paint under that constant re-transform. Here there is no position tracking at all:
-// the portal's CONTAINER itself simply switches between the anchor node and document.body
-// whenever `dockAnchorNode` changes (a rare, discrete mount/unmount event, not a per-frame one).
-// The iframe becomes a genuine, normal-flow DOM child of the anchor box when docked -- sized by
+// the iframe becomes a genuine, normal-flow DOM child of the anchor box when docked -- sized by
 // plain CSS, laid out by the browser like any other element, nothing computed or reapplied every
-// frame -- which is both simpler and far more likely to actually render.
+// frame. The portal itself always targets one stable, never-recreated host div (see hostRef
+// below); *that* node is what actually moves between the anchor and document.body, via plain DOM
+// appendChild rather than by ever changing what `ReactDOM.createPortal` is called with -- doing
+// it the other way (passing a differently-referenced container straight into createPortal) makes
+// React's own reconciliation treat every dock<->float switch as a non-matching portal fiber and
+// fully unmount+remount the iframe, which is both simpler and far more likely to actually render.
 export function StickyVideoBox({ stickyVideo, dockAnchorNode, onClose, onGoToChat }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -1397,6 +1400,31 @@ export function StickyVideoBox({ stickyVideo, dockAnchorNode, onClose, onGoToCha
   // this particular video stays active; a newly-activated video starts back at the default.
   const [floatWidth, setFloatWidth] = React.useState(null);
   const dragStateRef = React.useRef(null);
+
+  // React's own portal reconciliation keys a HostPortal fiber to its `containerInfo` by strict
+  // reference: passing createPortal(children, dockAnchorNode || document.body) straight through
+  // means every dock<->float transition hands React a *different* container object, which it
+  // treats as a non-matching fiber and fully unmounts+remounts the subtree -- destroying the
+  // cross-origin iframe and forcing YouTube to start a brand new (ad-serving) playback session
+  // from 0:00. To avoid that, the portal always targets this ONE never-changing host div instead;
+  // moving *that* node between dockAnchorNode and document.body is done manually below with plain
+  // DOM appendChild calls, which browsers treat as a single reparent that preserves the iframe's
+  // live browsing context (no unmount, no reload, playback continues uninterrupted).
+  const hostRef = React.useRef(null);
+  if (!hostRef.current && typeof document !== 'undefined') {
+    hostRef.current = document.createElement('div');
+    hostRef.current.style.display = 'contents';
+  }
+  React.useLayoutEffect(() => {
+    const host = hostRef.current;
+    if (!host || typeof document === 'undefined') return undefined;
+    const target = (stickyVideo && dockAnchorNode) ? dockAnchorNode : document.body;
+    if (host.parentNode !== target) target.appendChild(host);
+  }, [dockAnchorNode, !!stickyVideo]);
+  React.useEffect(() => () => {
+    const host = hostRef.current;
+    if (host && host.parentNode) host.parentNode.removeChild(host);
+  }, []);
 
   const isPortrait = !!(stickyVideo && stickyVideo.orientation === 'portrait');
   const defaultFloatWidth = isPortrait ? 172 : 260;
@@ -1435,9 +1463,8 @@ export function StickyVideoBox({ stickyVideo, dockAnchorNode, onClose, onGoToCha
     window.addEventListener('pointerup', handleUp);
   };
 
-  if (!stickyVideo || typeof document === 'undefined' || !ReactDOM.createPortal) return null;
+  if (!stickyVideo || typeof document === 'undefined' || !ReactDOM.createPortal || !hostRef.current) return null;
   const isDocked = !!dockAnchorNode;
-  const portalContainer = dockAnchorNode || document.body;
   // autoplay -- only for THIS portal iframe, never the plain inline one a chat message shows
   // before it's been promoted (see DirectChatMediaText) -- so a newly-promoted video keeps
   // playing straight through instead of landing on a paused first frame the user has to tap
@@ -1532,7 +1559,7 @@ export function StickyVideoBox({ stickyVideo, dockAnchorNode, onClose, onGoToCha
       borderRadius: '8px',
       cursor: 'pointer'
     }
-  }, '✕'))), portalContainer);
+  }, '✕'))), hostRef.current);
 }
 
 export function PollVoterSheet({ calendar, pollId, optionId, onSelect, onClose }) {
