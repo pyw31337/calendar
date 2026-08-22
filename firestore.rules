@@ -284,7 +284,13 @@ service cloud.firestore {
           && request.resource.data.date.size() <= 20
           && request.resource.data.action is string
           && request.resource.data.note is string
-          && request.resource.data.note.size() <= 200
+          // 320, not 200 -- normalizeActivityLog (the actual function that builds every activity
+          // log entry before it's written) caps note at 320 chars via sanitizeText, so a 200 cap
+          // here would silently reject (and, since writeActivityLogsToFirestore is fire-and-forget,
+          // silently drop) any entry whose note landed in the 201-320 range -- the exact same class
+          // of bug as the messages/{messageId} hasOnly() mismatch fixed above, just smaller blast
+          // radius (an audit-trail entry going missing, not a whole photo upload failing).
+          && request.resource.data.note.size() <= 320
           && request.resource.data.timestamp is number;
         allow update: if false;
         allow delete: if isCalendarDoc(calendarDocId);
