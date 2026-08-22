@@ -829,6 +829,23 @@ export function DateModal({
     return getCalendarPlaces(calendar).filter(p => doesPlaceMatchDate(p, dateStr));
   }, [calendar, dateStr]);
 
+  // Places already registered on THIS calendar (any date, e.g. a place first visited weeks ago)
+  // matching the current search text -- '장소 검색' below only queries Kakao/Google/Nominatim's
+  // public business directories, which never contain a private/informal place someone only ever
+  // hand-registered here (e.g. "서준네"). Surfacing these lets the user reuse that record (see
+  // handleSelectExistingPlace) instead of typing it as a brand-new place with no visit history.
+  const existingPlaceSuggestions = React.useMemo(() => {
+    const trimmed = placeQuery.trim();
+    if (selectedPlace && selectedPlace.name === trimmed) return [];
+    if (trimmed.length < 2) return [];
+    const q = trimmed.toLowerCase();
+    const todayIds = new Set(registeredPlaces.map(p => p.id));
+    return getCalendarPlaces(calendar)
+      .filter(p => !todayIds.has(p.id))
+      .filter(p => (p.name || '').toLowerCase().includes(q) || (p.alias || '').toLowerCase().includes(q))
+      .slice(0, 8);
+  }, [placeQuery, selectedPlace, calendar, registeredPlaces]);
+
   // Debounced live typing search
   React.useEffect(() => {
     const trimmed = placeQuery.trim();
@@ -960,7 +977,13 @@ export function DateModal({
         categoryId: placeCategoryId || selectedPlace.categoryId || 'etc',
         memo: cleanMemo,
         visitStatus: placeVisitStatus === 'planned' ? 'planned' : 'visited',
-        visitDate: dateStr
+        visitDate: dateStr,
+        // Not set while editing a place already linked to this date (editingLinkedPlaceId) --
+        // only relevant when adding a NEW date entry, so handleSavePlace (app-main.js) can
+        // recognize "the same Kakao/Google/Nominatim result, or the same already-registered
+        // calendar place (see handleSelectExistingPlace), was picked again" and merge into that
+        // record's multi-date memo instead of creating a duplicate place.
+        sourcePlaceId: editingLinkedPlaceId ? '' : (selectedPlace.id || '')
       };
 
       const ok = await Promise.resolve(onSavePlace(newPlaceData));
@@ -999,6 +1022,27 @@ export function DateModal({
   const handleSelectResult = (res) => {
     setSelectedPlace(res);
     setPlaceQuery(res.name);
+    setPlaceResults([]);
+  };
+
+  // Reuses an already-registered calendar place picked from existingPlaceSuggestions above.
+  // Deliberately does NOT set editingLinkedPlaceId (that's reserved for the pencil-icon edit of
+  // a place already linked to THIS date) -- instead handleSavePlaceClick below carries this
+  // place's own id through as sourcePlaceId, which handleSavePlace (app-main.js) recognizes and
+  // merges into, appending this date onto the place's existing multi-date memo instead of
+  // creating a duplicate place document.
+  const handleSelectExistingPlace = (place) => {
+    setSelectedPlace({
+      id: place.id,
+      name: place.name,
+      address: place.address,
+      lat: place.lat,
+      lng: place.lng,
+      categoryId: place.categoryId
+    });
+    setPlaceAlias(place.alias || '');
+    setPlaceCategoryId(place.categoryId || getPlaceCategories(calendar)[0]?.id || 'etc');
+    setPlaceQuery(place.name);
     setPlaceResults([]);
   };
 
@@ -2105,6 +2149,30 @@ export function DateModal({
           /*#__PURE__*/React.createElement("div", { style: { width: '100%', height: '6px', backgroundColor: 'var(--border-subtle)', borderRadius: '999px', overflow: 'hidden' } },
             /*#__PURE__*/React.createElement("div", { style: { width: `${searchProgress}%`, height: '100%', backgroundColor: 'var(--accent-primary)', transition: 'width 0.1s linear' } })
           )
+        ),
+
+        /* Existing calendar places matching the search text -- shown above the external
+           Kakao/Google/Nominatim results so an already-registered private place (e.g. "서준네")
+           is picked instead of accidentally creating a duplicate. */
+        existingPlaceSuggestions.length > 0 && /*#__PURE__*/React.createElement("div", {
+          style: {
+            display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '180px', overflowY: 'auto',
+            border: '1px solid rgba(79, 70, 229, 0.35)', borderRadius: '8px', padding: '6px', backgroundColor: 'rgba(79, 70, 229, 0.06)'
+          }
+        },
+          /*#__PURE__*/React.createElement("div", {
+            style: { fontSize: '0.72rem', fontWeight: 800, color: 'var(--accent-primary)', padding: '2px 6px' }
+          }, "이미 등록된 장소"),
+          existingPlaceSuggestions.map(p => /*#__PURE__*/React.createElement("button", {
+            key: p.id,
+            type: "button",
+            onClick: () => handleSelectExistingPlace(p),
+            style: { textAlign: 'left', padding: '8px 10px', borderRadius: '6px', border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '2px' },
+            className: "place-result-item"
+          },
+            /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-main)' } }, p.alias || p.name),
+            /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.72rem', color: 'var(--text-muted)' } }, getDisplayPlaceAddress(p) || p.name)
+          ))
         ),
 
         /* Search Results List */

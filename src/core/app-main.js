@@ -7289,14 +7289,24 @@ function App() {
     // date, or registered directly on the 장소 페이지) reuses that record instead of creating a
     // duplicate. Deliberately narrower than merging by address/name (see the no-merge rule below,
     // still in force for freehand entries like 도은네/은우네 in the same building) -- this only
-    // fires when the exact same external search result was picked again.
+    // fires when the exact same external search result was picked again, OR (second fallback)
+    // when DateModal's own "이미 등록된 장소" suggestions (handleSelectExistingPlace,
+    // ui-date-modal.js) pass the place's own id through as sourcePlaceId, since a private/
+    // informal place (e.g. "서준네") often isn't findable in Kakao/Google's business directories
+    // at all and so never gets a real external sourcePlaceId of its own.
     const mergeTargetPlace = (!isEditing && cleanSourcePlaceId)
-      ? existingPlaces.find(p => p.sourcePlaceId && p.sourcePlaceId === cleanSourcePlaceId) || null
+      ? (existingPlaces.find(p => p.sourcePlaceId && p.sourcePlaceId === cleanSourcePlaceId)
+        || existingPlaces.find(p => p.id === cleanSourcePlaceId))
+        || null
       : null;
     if (mergeTargetPlace) {
       isEditing = true;
       placeData = { ...placeData, id: mergeTargetPlace.id };
     }
+    // A sourcePlaceId that just points at the merge target's own id (the "이미 등록된 장소"
+    // fallback match above) isn't a real external search-result reference -- don't let it get
+    // written back into the place's own sourcePlaceId field as if it were one.
+    const sourcePlaceIdForSave = (mergeTargetPlace && cleanSourcePlaceId === mergeTargetPlace.id) ? '' : cleanSourcePlaceId;
     // Reusing an existing place for a (possibly new) date keeps its curated fields untouched
     // (mp() only falls back to this save's own value when the existing field is empty) and
     // appends this date as a new memo line (see appendVisitDateToPlaceMemo) instead of
@@ -7318,7 +7328,7 @@ function App() {
         : cleanMemo,
       visitStatus: mp('visitStatus', cleanVisitStatus),
       visitDate: mp('visitDate', cleanVisitDate),
-      sourcePlaceId: mp('sourcePlaceId', cleanSourcePlaceId || (isEditing && !mergeTargetPlace ? (existingPlaces.find(p => p.id === placeData.id) || {}).sourcePlaceId : '') || ''),
+      sourcePlaceId: mp('sourcePlaceId', sourcePlaceIdForSave || (isEditing && !mergeTargetPlace ? (existingPlaces.find(p => p.id === placeData.id) || {}).sourcePlaceId : '') || ''),
       updatedAt: now
     };
     let nextPlaces;
