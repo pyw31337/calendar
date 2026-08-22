@@ -1145,7 +1145,29 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
   const extractKnownParticipantNames = __deps.extractKnownParticipantNames;
   const getPlaceExternalMapUrl = __deps.getPlaceExternalMapUrl;
 
-  const isMobile = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(max-width: 640px)').matches;
+  // A plain `const isMobile = window.matchMedia(...).matches` read once per render only reflects
+  // reality by accident, whenever some unrelated state change happens to force a re-render after
+  // the viewport settles -- on a fresh mobile page load with no such re-render yet, it can stay
+  // stuck reporting whatever it evaluated to on the very first pass. Tracked as real state with a
+  // matchMedia listener instead, so it updates the moment the viewport actually crosses the
+  // breakpoint (load, rotation, resize) regardless of what else is re-rendering this component.
+  // 720px, not 640px, to match this file's own isMobileViewport breakpoint (used for the map's
+  // fitBounds zoom) and the place-category-tabs-desktop-only/place-category-select-mobile-only
+  // CSS media queries below -- the previous 640px here disagreed with both, so a viewport between
+  // 640-720px got neither the desktop nor the mobile category bar rendered by React at all.
+  const [isMobile, setIsMobile] = React.useState(() => typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(max-width: 720px)').matches);
+  React.useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return undefined;
+    const mq = window.matchMedia('(max-width: 720px)');
+    const handleChange = () => setIsMobile(mq.matches);
+    handleChange();
+    if (mq.addEventListener) mq.addEventListener('change', handleChange);
+    else if (mq.addListener) mq.addListener(handleChange);
+    return () => {
+      if (mq.removeEventListener) mq.removeEventListener('change', handleChange);
+      else if (mq.removeListener) mq.removeListener(handleChange);
+    };
+  }, []);
 
   const [isRegisterOpen, setIsRegisterOpen] = React.useState(false);
   const [editingPlace, setEditingPlace] = React.useState(null);
@@ -1280,17 +1302,24 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
     return (b.updatedAt || 0) - (a.updatedAt || 0);
   });
   
+  // Feeds the "전체 N" badge and countsByCategory below -- both need to move together with
+  // visitFilter (전체/방문/예정), not just listSearchQuery, or clicking 방문/예정 changes which
+  // place cards actually show (see filteredPlaces below) while every badge next to it keeps
+  // showing the unfiltered total, which is what this used to do.
   const searchedPlaces = React.useMemo(() => {
-    if (!listSearchQuery.trim()) return places;
-    const queryLower = listSearchQuery.toLowerCase().trim();
     return places.filter(p => {
+      const isPlanned = p.visitStatus === 'planned';
+      if (visitFilter === 'visited' && isPlanned) return false;
+      if (visitFilter === 'planned' && !isPlanned) return false;
+      if (!listSearchQuery.trim()) return true;
+      const queryLower = listSearchQuery.toLowerCase().trim();
       const matchName = p.name && p.name.toLowerCase().includes(queryLower);
       const matchAlias = p.alias && p.alias.toLowerCase().includes(queryLower);
       const matchAddress = p.address && p.address.toLowerCase().includes(queryLower);
       const matchMemo = p.memo && p.memo.toLowerCase().includes(queryLower);
       return matchName || matchAlias || matchAddress || matchMemo;
     });
-  }, [places, listSearchQuery]);
+  }, [places, listSearchQuery, visitFilter]);
 
   const countsByCategory = React.useMemo(() => {
     return searchedPlaces.reduce((acc, p) => {
@@ -1463,13 +1492,13 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
           "aria-label": mapExpanded ? '지도 축소' : '지도 확대',
           title: mapExpanded ? '지도 축소' : '지도 확대',
           style: {
-            background: 'none', border: 'none', cursor: 'pointer', color: '#64748B',
+            background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8',
             display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px'
           }
         }, mapExpanded ? /*#__PURE__*/React.createElement("svg", {
           xmlns: "http://www.w3.org/2000/svg",
-          width: "22",
-          height: "22",
+          width: "16",
+          height: "16",
           viewBox: "0 0 24 24",
           fill: "none",
           stroke: "currentColor",
@@ -1487,8 +1516,8 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
           /*#__PURE__*/React.createElement("path", { d: "M6 9h-1a2 2 0 0 0 -2 2v2a2 2 0 0 0 2 2h1" })
         ) : /*#__PURE__*/React.createElement("svg", {
           xmlns: "http://www.w3.org/2000/svg",
-          width: "22",
-          height: "22",
+          width: "16",
+          height: "16",
           viewBox: "0 0 24 24",
           fill: "none",
           stroke: "currentColor",
