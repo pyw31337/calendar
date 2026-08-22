@@ -6848,7 +6848,17 @@ function App() {
       return updateCalendars(nextCalendars, '일정 사진 저장완료', 'success', updatedCal.id, 'settings', photoLog ? [photoLog] : []);
     } catch (err) {
       console.error('handleAddMeetingPhotos failed:', err);
-      showToast('일정 사진 저장 실패', 'error', 4000);
+      // Same reasoning as describeUpdateCalendarsFailure above (see its comment): a bare
+      // "일정 사진 저장 실패" with the real reason only in the console is exactly what made this
+      // keep getting reported without ever getting fixed. Everything that can throw inside the
+      // try block above (resolveChatImageBatch's Storage upload, the per-chunk Firestore message
+      // writes) surfaces a Firebase/network error message that's usually readable on its own
+      // (e.g. "Missing or insufficient permissions.", a timeout, a quota message) even though it
+      // isn't hand-written Korean like updateCalendars' own errors -- so this appends it whenever
+      // it looks like a plain message rather than a raw JSON/object dump.
+      const rawMessage = err && typeof err.message === 'string' ? err.message.trim() : '';
+      const detail = rawMessage && rawMessage.length <= 300 && !/[{}[\]]/.test(rawMessage) ? `: ${rawMessage}` : '';
+      showToast(`일정 사진 저장 실패${detail}`, 'error', 6000);
       return false;
     } finally {
       setTimeout(() => setChatUploadProgress(null), 250);
