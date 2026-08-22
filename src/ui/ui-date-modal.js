@@ -1128,9 +1128,13 @@ export function DateModal({
     if (!files.length || typeof onAddMeetingPhotos !== 'function') return;
     setIsSavingMeetingPhotos(true);
     try {
-      const ok = await Promise.resolve(onAddMeetingPhotos(dateStr, files));
-      if (ok !== false) showToast('일정 사진이 추가되었습니다.', 'success');
-      else showToast('사진 추가 실패', 'error');
+      // onAddMeetingPhotos (handleAddMeetingPhotos in app-main.js) always shows its own toast on
+      // both success and failure -- including a specific reason when there is one (e.g. the
+      // calendar data size guard), not just a generic message -- so showing another toast here on
+      // top of it would only ever overwrite that toast (showToast is single-slot) before the user
+      // has a chance to read it. Only the case that function can't cover -- it throwing instead of
+      // resolving, an actual bug rather than an expected failure -- gets a toast from here.
+      await Promise.resolve(onAddMeetingPhotos(dateStr, files));
     } catch (err) {
       console.error('Meeting photo upload failed:', err);
       showToast('사진 추가 실패', 'error');
@@ -1145,9 +1149,8 @@ export function DateModal({
       const files = await readClipboardImageFiles();
       if (files && files.length > 0) {
         setIsSavingMeetingPhotos(true);
-        const ok = await Promise.resolve(onAddMeetingPhotos(dateStr, files));
-        if (ok !== false) showToast('일정 사진이 추가되었습니다.', 'success');
-        else showToast('사진 추가 실패', 'error');
+        // See handleMeetingPhotoFiles above for why no toast is shown for the resolved result.
+        await Promise.resolve(onAddMeetingPhotos(dateStr, files));
       }
     } catch (err) {
       console.error('Paste meeting photo failed:', err);
@@ -1165,9 +1168,8 @@ export function DateModal({
       e.preventDefault();
       setIsSavingMeetingPhotos(true);
       try {
-        const ok = await Promise.resolve(onAddMeetingPhotos(dateStr, files));
-        if (ok !== false) showToast('일정 사진이 추가되었습니다.', 'success');
-        else showToast('사진 추가 실패', 'error');
+        // See handleMeetingPhotoFiles above for why no toast is shown for the resolved result.
+        await Promise.resolve(onAddMeetingPhotos(dateStr, files));
       } catch (err) {
         console.error('Clipboard paste meeting photo failed:', err);
         showToast('사진 추가 실패', 'error');

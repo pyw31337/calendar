@@ -2660,6 +2660,14 @@ async function fetchRecentGalleryMessages() {
 }
 
 const CHAT_OLDER_PAGE_SIZE = readConfigNumber('CHAT_OLDER_PAGE_SIZE', 40);
+// olderChatMessages otherwise grows without any upper bound for the rest of the browser tab's
+// life -- every "load more" while scrolling up prepends another page and nothing ever trims it,
+// so a long session with a lot of upward scrolling keeps adding more message rows (images
+// included) to the DOM for every remaining re-render of the chat room, not just the one that
+// loaded them. This stops the *fetching* once a generous amount of history is already loaded in
+// this tab -- a plain page refresh resets olderChatMessages back to empty (see the `[]` reset
+// keyed on activeCalId) if someone genuinely needs to keep scrolling back further than this.
+const MAX_OLDER_CHAT_MESSAGES = readConfigNumber('MAX_OLDER_CHAT_MESSAGES', 1000);
 bindGatherFirebaseDeps();
 
 async function fetchSubcollectionCount() {
@@ -3280,6 +3288,26 @@ function isRetryableFirestoreConflict(errorText) {
   return /ABORTED|FAILED_PRECONDITION|409|stored version|base version/i.test(String(errorText || ''));
 }
 
+// updateCalendars' catch block used to always show a generic "저장 실패" toast, no matter what
+// actually went wrong -- including for deterministic, specific failures like the calendar doc
+// size guard (estimateCalendarDocWireBytes > CALENDAR_DOC_SAFE_BYTE_LIMIT) or a
+// validateCalendarShape rejection, both of which throw their own clear Korean message but had it
+// swallowed. That made a save that will keep failing on every retry (the underlying data problem
+// doesn't go away on its own) look identical to a one-off network hiccup, with the real reason
+// visible only in the browser console -- which is exactly the kind of bug that gets reported
+// repeatedly without ever getting fixed, since nobody debugging it from the outside can see why.
+// Only surface err.message directly when it looks like one of our own crafted user-facing
+// strings (Korean text, short, no braces/brackets that would mean it's raw JSON or a stack
+// trace) -- anything else (a bare Firestore REST error body, an English internal assertion)
+// falls back to the generic message rather than dumping something confusing/technical at the user.
+function describeUpdateCalendarsFailure(err) {
+  const message = err && err.message;
+  if (typeof message === 'string' && message.length > 0 && message.length <= 200 && !/[{}[\]]/.test(message) && /[가-힣]/.test(message)) {
+    return message;
+  }
+  return '저장 실패';
+}
+
 function getFirestoreRetryDelay(attempt) {
   const baseDelay = Math.min(3000, 180 * Math.pow(1.55, attempt));
   const jitter = Math.floor(Math.random() * 180);
@@ -3395,12 +3423,17 @@ async function pushSingleCalendarWithRest(normalizedCal, lastModified, saveMode,
     } catch (error) {
       if (error?.nonRetryable || attempt === retryCount) {
         console.warn(`Firestore REST fallback failed for cal_${normalizedCal.id}:`, error);
-        return false;
+        // Rethrow (rather than just returning false) so the real reason -- a specific,
+        // user-facing message for a nonRetryable failure like the size guard below, or the raw
+        // Firestore error text otherwise -- reaches updateCalendars' catch block and can be
+        // shown to the user instead of a generic "저장 실패" that gives no clue why a save keeps
+        // failing every single time.
+        throw error;
       }
       await new Promise(resolve => setTimeout(resolve, getFirestoreRetryDelay(attempt)));
     }
   }
-  return false;
+  throw new Error('캘린더 저장에 반복적으로 실패했습니다.');
 }
 
 // Pushes isolated calendar data to the durable master store and Firestore when available.
@@ -4202,7 +4235,7 @@ function App() {
     } catch (err) {
       console.error('updateCalendars failed:', err);
       if (previousCalendars) setCalendarsState(previousCalendars);
-      showToast('저장 실패', 'error');
+      showToast(describeUpdateCalendarsFailure(err), 'error', 6000);
       return false;
     } finally {
       isSavingRef.current = false;
@@ -5368,6 +5401,10 @@ function App() {
 
   const loadOlderChatMessages = React.useCallback(async () => {
     if (!activeCalId || loadingOlderChatRef.current || !hasMoreOlderChat) return;
+    if (olderChatMessages.length >= MAX_OLDER_CHAT_MESSAGES) {
+      setHasMoreOlderChat(false);
+      return;
+    }
     const oldest = allChatMessages[0];
     const beforeTs = oldest && oldest.timestamp;
     if (!beforeTs) return;
@@ -5398,7 +5435,7 @@ function App() {
       loadingOlderChatRef.current = false;
       setLoadingOlderChat(false);
     }
-  }, [activeCalId, hasMoreOlderChat, allChatMessages, chatMessages]);
+  }, [activeCalId, hasMoreOlderChat, allChatMessages, chatMessages, olderChatMessages]);
   // "Latest ref" mirrors for handleJumpToChatMessage's retry loop below -- that loop runs
   // across several ticks via setTimeout, outside any single render's closures, so it reads
   // these refs (updated fresh every render) instead of the plain consts above, which would
@@ -6728,10 +6765,14 @@ function App() {
   // the meeting date), matching linkTaggedImageToMeetingDates' identity model -- one photo, one
   // Storage file, shared everywhere it's tagged.
   const handleAddMeetingPhotos = async (dateStr, files) => {
-    if (!activeCal || !isValidDateString(dateStr)) return false;
+    if (!activeCal || !isValidDateString(dateStr)) {
+      showToast('일정 정보를 확인할 수 없습니다.', 'error');
+      return false;
+    }
     const compressed = await prepareGalleryImageUploads(files, '일정 사진 업로드 준비 중...');
     if (!compressed.length) {
       setChatUploadProgress(null);
+      showToast('사진을 처리할 수 없습니다.', 'error');
       return false;
     }
     try {
