@@ -4691,18 +4691,6 @@ function App() {
   // obviously. Now activation happens the moment the user presses play in chat, and the same
   // iframe DOM node (same React `key`) is reused for the rest of its life.
   const [stickyVideo, setStickyVideo] = React.useState(null);
-  // The chat message's own placeholder DOM node that StickyVideoBox should portal its iframe
-  // into, while that message is mounted in the chat room (see DirectChatMediaText's isThisSticky
-  // branch + dockPlaceholderRef); null otherwise, which makes StickyVideoBox fall back to a
-  // floating corner PIP. This is plain React STATE, not a ref -- but it only changes on the rare
-  // mount/unmount of that one placeholder, not continuously, so it's cheap. An earlier version
-  // instead always floated as a fixed-position PIP and tried to visually overlay it on top of
-  // the chat bubble's rect (recomputed every animation frame via direct DOM style writes) to
-  // fake looking inline -- that was fragile, and the cross-origin iframe frequently failed to
-  // actually paint under the constant re-transform. Portaling into the REAL anchor node instead
-  // (switching the portal's container, not faking its position) sidesteps that whole class of
-  // bug: when docked the iframe is a genuine, normally-laid-out DOM child, nothing computed.
-  const [dockAnchorNode, setDockAnchorNode] = React.useState(null);
   const handleActivateChatVideo = React.useCallback(videoInfo => {
     setStickyVideo(videoInfo);
   }, []);
@@ -4800,10 +4788,8 @@ function App() {
 
   const changeView = (view) => {
     // No sticky-video promotion needed here anymore -- stickyVideo (once set by actually pressing
-    // play in chat, see handleActivateChatVideo) stays active across every view by itself.
-    // StickyVideoBox docks it inline into the owning chat message's placeholder while that
-    // message is mounted (only ever true when activeView === 'chat') and floats in the corner
-    // otherwise, purely via dockAnchorNode going non-null/null as that placeholder mounts/unmounts.
+    // play in chat, see handleActivateChatVideo) stays active across every view by itself, always
+    // floating as PIP (see StickyVideoBox).
     setActiveView(view);
     if (view !== 'chat') {
       setIsMainHeaderVisible(true);
@@ -7587,22 +7573,18 @@ function App() {
   // so the persistent video player can't just live inline in one of them -- it has to be included
   // as a stable sibling in every branch's return, wrapped in the SAME portal element shape each
   // time, or React would unmount/remount (and restart) it on every tab switch. See StickyVideoBox
-  // for the actual portal player and handleActivateChatVideo/dockAnchorNode above for how a video
-  // becomes active and where it renders (docked inline while its owning message is mounted in
-  // chat, floating PIP otherwise).
+  // for the actual portal player and handleActivateChatVideo above for how a video becomes active.
   const withStickyVideo = (content) => /*#__PURE__*/React.createElement(React.Fragment, null,
     content,
     /*#__PURE__*/React.createElement(StickyVideoBox, {
       stickyVideo: stickyVideo,
-      dockAnchorNode: dockAnchorNode,
       onClose: () => setStickyVideo(null),
       onGoToChat: () => {
         const messageId = stickyVideo ? stickyVideo.key : null;
         changeView('chat');
         // Highlights the bubble the same way in-chat search does (see focusChatMessage) once it's
-        // actually mounted -- the video itself is already docked back inline by then (its
-        // placeholder registers as soon as ChatRoomView remounts), this is purely to help the
-        // viewer's eye land on the right message in a long chat history.
+        // actually mounted, purely to help the viewer's eye land on the right message in a long
+        // chat history -- the video itself keeps playing in its floating PIP throughout.
         if (messageId) setTimeout(() => { focusChatMessage(messageId); }, 350);
       }
     }),
@@ -7844,7 +7826,6 @@ function App() {
       onToggleChatNotifications: handleMainToggleNotifications,
       stickyVideoKey: stickyVideo ? stickyVideo.key : null,
       onActivateVideo: handleActivateChatVideo,
-      onDockAnchorChange: setDockAnchorNode,
       onDeletePhoto: handleDeletePhoto,
       onReplacePhoto: handleReplacePhoto,
       onJumpToChatMessage: handleJumpToChatMessage,
@@ -8841,7 +8822,7 @@ function ImageUrlModal(props) {
 }
 
 
-function renderChatMessageBody(msg, setActiveLightbox, singleImageStyle = {}, searchQuery = '', stickyVideoKey = null, onActivateVideo = null, onDockAnchorChange = null) {
+function renderChatMessageBody(msg, setActiveLightbox, singleImageStyle = {}, searchQuery = '', stickyVideoKey = null, onActivateVideo = null) {
   const msgImages = renderChatMessageImages(msg, setActiveLightbox, singleImageStyle);
   return /*#__PURE__*/React.createElement(React.Fragment, null,
     msgImages ? /*#__PURE__*/React.createElement('div', { style: { marginBottom: msg.text ? '8px' : '0' } }, msgImages) : null,
@@ -8853,8 +8834,7 @@ function renderChatMessageBody(msg, setActiveLightbox, singleImageStyle = {}, se
       style: singleImageStyle,
       message: msg,
       stickyVideoKey,
-      onActivateVideo,
-      onDockAnchorChange
+      onActivateVideo
     }) : null
   );
 }

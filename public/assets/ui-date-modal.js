@@ -678,6 +678,7 @@ export function DateModal({
   calendar,
   chatMessages = [],
   setActiveLightbox,
+  initialTab = null,
   adminMode = false,
   onSave,
   onConfirmMeeting,
@@ -724,7 +725,7 @@ export function DateModal({
   const firebaseConfig = __deps.firebaseConfig || window.firebaseConfig;
   const KAKAO_CATEGORY_GROUP_TO_PLACE_CATEGORY = __deps.KAKAO_CATEGORY_GROUP_TO_PLACE_CATEGORY || {};
 
-  const [activeTab, setActiveTab] = React.useState('participant'); // 'participant' | 'meeting' | 'settlement'
+  const [activeTab, setActiveTab] = React.useState(initialTab || 'participant'); // 'participant' | 'meeting' | 'settlement' | 'photo'
   const [participantId, setParticipantId] = React.useState('');
   const [note, setNote] = React.useState('');
   const [isSheetOpen, setIsSheetOpen] = React.useState(false);
@@ -1022,6 +1023,8 @@ export function DateModal({
   const totalPartCount = activeParticipants.length || 0;
   const uniqueActiveParts = new Set(dateEntries.map(e => e.participantId));
   const isAllAvailable = totalPartCount > 0 && uniqueActiveParts.size === totalPartCount;
+  const isConfirmed = isDateConfirmedMeeting(calendar, dateStr);
+  const confirmedMeetingEntry = getConfirmedMeetings(calendar).find(m => m.date === dateStr) || null;
   const getMessageImageEntries = __deps.getMessageImageEntries;
   const parseFlexibleDateTokens = __deps.parseFlexibleDateTokens;
   const dateStrToHashtag = __deps.dateStrToHashtag;
