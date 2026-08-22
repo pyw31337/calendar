@@ -672,7 +672,6 @@ export function DateModal({
   anniversaries = [],
   dateStr,
   calendar,
-  chatMessages = [],
   adminMode = false,
   onSave,
   onConfirmMeeting,
@@ -680,8 +679,7 @@ export function DateModal({
   onDeleteExpense,
   onReorderExpenses,
   onAddMeetingPhotos,
-  setActiveLightbox,
-  initialTab = null,
+  onDeleteMeetingPhoto,
   onSavePlace,
   onDeletePlace,
   onDelete,
@@ -704,7 +702,6 @@ export function DateModal({
   const SimpleBottomSheetPicker = __comp.SimpleBottomSheetPicker || __deps.SimpleBottomSheetPicker;
   const UrlCapsuleBadge = __deps.UrlCapsuleBadge;
   const SmallXIcon = __deps.SmallXIcon;
-  const resolveMeetingPhotoDisplay = __deps.resolveMeetingPhotoDisplay;
   const getActiveParticipants = __deps.getActiveParticipants;
   const getCalendarPlaces = __deps.getCalendarPlaces;
   const getPlaceCategories = __deps.getPlaceCategories;
@@ -721,7 +718,7 @@ export function DateModal({
   const firebaseConfig = __deps.firebaseConfig || window.firebaseConfig;
   const KAKAO_CATEGORY_GROUP_TO_PLACE_CATEGORY = __deps.KAKAO_CATEGORY_GROUP_TO_PLACE_CATEGORY || {};
 
-  const [activeTab, setActiveTab] = React.useState(initialTab || 'participant'); // 'participant' | 'meeting' | 'settlement' | 'photos'
+  const [activeTab, setActiveTab] = React.useState('participant'); // 'participant' | 'meeting' | 'settlement'
   const [participantId, setParticipantId] = React.useState('');
   const [note, setNote] = React.useState('');
   const [isSheetOpen, setIsSheetOpen] = React.useState(false);
@@ -910,12 +907,7 @@ export function DateModal({
         categoryId: placeCategoryId || selectedPlace.categoryId || 'etc',
         memo: cleanMemo,
         visitStatus: placeVisitStatus === 'planned' ? 'planned' : 'visited',
-        visitDate: dateStr,
-        // The picked search result's own id (kakao_/google_/osm_ prefixed) -- lets handleSavePlace
-        // recognize "the same business already registered elsewhere" and link this date onto that
-        // existing place instead of creating a duplicate. Empty when editing an already-linked
-        // place (selectedPlace is rebuilt from the place record then, not a fresh search result).
-        sourcePlaceId: selectedPlace.id || ''
+        visitDate: dateStr
       };
 
       const ok = await Promise.resolve(onSavePlace(newPlaceData));
@@ -1029,15 +1021,9 @@ export function DateModal({
   const meetingPhotos = React.useMemo(
     () => (Array.isArray(confirmedMeetingEntry?.photos) ? confirmedMeetingEntry.photos : [])
       .filter(photo => photo && (photo.imageUrl || photo.thumbUrl))
-      // Auto-linked entries (sourceMessageId set) are references to a real chat photo --
-      // resolve the live imageUrl/thumbUrl/tags from that source message so this tile always
-      // matches the chat original exactly, including any tag edit made from anywhere else.
-      .map(photo => {
-        const resolved = resolveMeetingPhotoDisplay ? resolveMeetingPhotoDisplay(photo, chatMessages) : null;
-        return resolved ? { ...photo, imageUrl: resolved.imageUrl, thumbUrl: resolved.thumbUrl, tags: resolved.tags } : photo;
-      })
+      .slice()
       .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)),
-    [confirmedMeetingEntry, chatMessages]
+    [confirmedMeetingEntry]
   );
   const meetingPhotoInputRef = React.useRef(null);
   const [isSavingMeetingPhotos, setIsSavingMeetingPhotos] = React.useState(false);
@@ -1091,6 +1077,20 @@ export function DateModal({
     } finally {
       setIsSavingMeetingPhotos(false);
     }
+  };
+
+  const handleDeleteMeetingPhoto = photo => {
+    if (!photo?.id || typeof onDeleteMeetingPhoto !== 'function') return;
+    onRequestConfirm('일정 사진 삭제', '이 일정 사진을 삭제하시겠습니까?', async () => {
+      setIsSavingMeetingPhotos(true);
+      try {
+        const ok = await Promise.resolve(onDeleteMeetingPhoto(dateStr, photo.id));
+        if (ok !== false) showToast('사진이 삭제되었습니다.', 'success');
+        else showToast('사진 삭제 실패', 'error');
+      } finally {
+        setIsSavingMeetingPhotos(false);
+      }
+    });
   };
 
   const expenseTotal = expenses.reduce((sum, e) => sum + (Number(e?.amount) || 0), 0);
@@ -1440,16 +1440,18 @@ export function DateModal({
     className: "modal-header",
     style: {
       display: 'flex',
+      flexDirection: 'column',
+      gap: '10px',
+      padding: '14px 16px 12px 16px',
+      borderBottom: '1px solid var(--border-subtle)',
+      backgroundColor: 'var(--bg-card)'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
-      // No paddingBottom/borderBottom here on purpose: this modal always has a
-      // .modal-sticky-tab-bar right below it, and inline styles unconditionally beat the
-      // app.css `:has(.modal-sticky-tab-bar)` rule that fuses the two into one visual block --
-      // an earlier fix only touched that CSS rule and had no visible effect for exactly this
-      // reason. Leaving those two properties unset lets the stylesheet own them.
-      paddingTop: '14px',
-      paddingLeft: '20px',
-      paddingRight: '20px'
+      width: '100%'
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -1499,11 +1501,142 @@ export function DateModal({
       cursor: 'pointer',
       display: 'flex',
       alignItems: 'center',
-      padding: '2px 4px',
-      marginLeft: '4px'
+      padding: '2px 4px'
     },
     title: "닫기"
-  }, "✕"))), /*#__PURE__*/React.createElement("form", {
+  }, "✕"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(4, 1fr)',
+      gap: '6px',
+      width: '100%'
+    }
+  },
+    /* Tab 1: 참여자 */
+    /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: e => { e.preventDefault(); e.stopPropagation(); setActiveTab('participant'); },
+      style: {
+        border: 'none',
+        borderRadius: '8px',
+        padding: '7px 4px',
+        background: activeTab === 'participant' ? 'var(--accent-primary)' : 'transparent',
+        color: activeTab === 'participant' ? '#FFFFFF' : 'var(--text-muted)',
+        fontWeight: 800,
+        fontSize: '0.8rem',
+        cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '4px'
+      }
+    },
+      "참여자",
+      /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: '0.68rem',
+          padding: '1px 5px',
+          borderRadius: '999px',
+          backgroundColor: activeTab === 'participant' ? 'rgba(255,255,255,0.2)' : 'var(--border-subtle)',
+          color: activeTab === 'participant' ? '#FFFFFF' : 'var(--text-muted)',
+          fontWeight: 'bold'
+        }
+      }, dateEntries.length > 0 ? dateEntries.length : '없음')
+    ),
+    /* Tab 2: 장소 */
+    /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: e => { e.preventDefault(); e.stopPropagation(); setActiveTab('meeting'); },
+      style: {
+        border: 'none',
+        borderRadius: '8px',
+        padding: '7px 4px',
+        background: activeTab === 'meeting' ? 'var(--accent-primary)' : 'transparent',
+        color: activeTab === 'meeting' ? '#FFFFFF' : 'var(--text-muted)',
+        fontWeight: 800,
+        fontSize: '0.8rem',
+        cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '4px'
+      }
+    },
+      "장소",
+      /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: '0.68rem',
+          padding: '1px 5px',
+          borderRadius: '999px',
+          backgroundColor: activeTab === 'meeting' ? 'rgba(255,255,255,0.2)' : 'var(--border-subtle)',
+          color: activeTab === 'meeting' ? '#FFFFFF' : 'var(--text-muted)',
+          fontWeight: 'bold'
+        }
+      }, registeredPlaces.length > 0 ? registeredPlaces.length : '없음')
+    ),
+    /* Tab 3: 정산 */
+    /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: e => { e.preventDefault(); e.stopPropagation(); setActiveTab('settlement'); },
+      style: {
+        border: 'none',
+        borderRadius: '8px',
+        padding: '7px 4px',
+        background: activeTab === 'settlement' ? 'var(--accent-primary)' : 'transparent',
+        color: activeTab === 'settlement' ? '#FFFFFF' : 'var(--text-muted)',
+        fontWeight: 800,
+        fontSize: '0.8rem',
+        cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '4px'
+      }
+    },
+      "정산",
+      /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: '0.68rem',
+          padding: '1px 5px',
+          borderRadius: '999px',
+          backgroundColor: activeTab === 'settlement' ? 'rgba(255,255,255,0.2)' : 'var(--border-subtle)',
+          color: activeTab === 'settlement' ? '#FFFFFF' : 'var(--text-muted)',
+          fontWeight: 'bold'
+        }
+      }, expenses.length > 0 ? expenses.length : '없음')
+    ),
+    /* Tab 4: 사진 */
+    /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: e => { e.preventDefault(); e.stopPropagation(); setActiveTab('photo'); },
+      style: {
+        border: 'none',
+        borderRadius: '8px',
+        padding: '7px 4px',
+        background: activeTab === 'photo' ? 'var(--accent-primary)' : 'transparent',
+        color: activeTab === 'photo' ? '#FFFFFF' : 'var(--text-muted)',
+        fontWeight: 800,
+        fontSize: '0.8rem',
+        cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '4px'
+      }
+    },
+      "사진",
+      /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: '0.68rem',
+          padding: '1px 5px',
+          borderRadius: '999px',
+          backgroundColor: activeTab === 'photo' ? 'rgba(255,255,255,0.2)' : 'var(--border-subtle)',
+          color: activeTab === 'photo' ? '#FFFFFF' : 'var(--text-muted)',
+          fontWeight: 'bold'
+        }
+      }, meetingPhotos.length > 0 ? meetingPhotos.length : '없음')
+    )
+  )), /*#__PURE__*/React.createElement("form", {
     onSubmit: e => {
       e.preventDefault();
       if (activeTab === 'participant') handleSubmit(e);
@@ -1511,141 +1644,6 @@ export function DateModal({
   }, /*#__PURE__*/React.createElement("div", {
     className: "modal-body"
   },
-    /* Tab Bar Menu: 참여자 / 장소 / 정산 / 사진 -- full-bleed + sticky so it stays pinned to
-       modal-header (like a second header row) while the rest of modal-body scrolls under it. */
-    /*#__PURE__*/React.createElement("div", {
-      className: "modal-sticky-tab-bar",
-      style: {
-        display: 'grid',
-        gridTemplateColumns: '1fr 1fr 1fr 1fr',
-        gap: '6px'
-      }
-    },
-      /* Tab 1: 참여자 */
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        onClick: e => { e.preventDefault(); e.stopPropagation(); setActiveTab('participant'); },
-        style: {
-          border: 'none',
-          borderRadius: '8px',
-          padding: '8px 4px',
-          background: activeTab === 'participant' ? 'var(--accent-primary)' : 'transparent',
-          color: activeTab === 'participant' ? '#FFFFFF' : 'var(--text-muted)',
-          fontWeight: 800,
-          fontSize: '0.82rem',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '4px'
-        }
-      },
-        "참여자",
-        /*#__PURE__*/React.createElement("span", {
-          style: {
-            fontSize: '0.7rem',
-            padding: '1px 5px',
-            borderRadius: '999px',
-            backgroundColor: activeTab === 'participant' ? 'rgba(255,255,255,0.2)' : 'var(--border-subtle)',
-            color: activeTab === 'participant' ? '#FFFFFF' : 'var(--text-muted)',
-            fontWeight: 'bold'
-          }
-        }, dateEntries.length > 0 ? dateEntries.length : '없음')
-      ),
-      /* Tab 2: 장소 */
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        onClick: e => { e.preventDefault(); e.stopPropagation(); setActiveTab('meeting'); },
-        style: {
-          border: 'none',
-          borderRadius: '8px',
-          padding: '8px 4px',
-          background: activeTab === 'meeting' ? 'var(--accent-primary)' : 'transparent',
-          color: activeTab === 'meeting' ? '#FFFFFF' : 'var(--text-muted)',
-          fontWeight: 800,
-          fontSize: '0.82rem',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '4px'
-        }
-      },
-        "장소",
-        /*#__PURE__*/React.createElement("span", {
-          style: {
-            fontSize: '0.7rem',
-            padding: '1px 5px',
-            borderRadius: '999px',
-            backgroundColor: activeTab === 'meeting' ? 'rgba(255,255,255,0.2)' : 'var(--border-subtle)',
-            color: activeTab === 'meeting' ? '#FFFFFF' : 'var(--text-muted)',
-            fontWeight: 'bold'
-          }
-        }, registeredPlaces.length > 0 ? registeredPlaces.length : '없음')
-      ),
-      /* Tab 3: 정산 */
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        onClick: e => { e.preventDefault(); e.stopPropagation(); setActiveTab('settlement'); },
-        style: {
-          border: 'none',
-          borderRadius: '8px',
-          padding: '8px 4px',
-          background: activeTab === 'settlement' ? 'var(--accent-primary)' : 'transparent',
-          color: activeTab === 'settlement' ? '#FFFFFF' : 'var(--text-muted)',
-          fontWeight: 800,
-          fontSize: '0.82rem',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '4px'
-        }
-      },
-        "정산",
-        /*#__PURE__*/React.createElement("span", {
-          style: {
-            fontSize: '0.7rem',
-            padding: '1px 5px',
-            borderRadius: '999px',
-            backgroundColor: activeTab === 'settlement' ? 'rgba(255,255,255,0.2)' : 'var(--border-subtle)',
-            color: activeTab === 'settlement' ? '#FFFFFF' : 'var(--text-muted)',
-            fontWeight: 'bold'
-          }
-        }, expenses.length > 0 ? expenses.length : '없음')
-      ),
-      /* Tab 4: 사진 */
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        onClick: e => { e.preventDefault(); e.stopPropagation(); setActiveTab('photos'); },
-        style: {
-          border: 'none',
-          borderRadius: '8px',
-          padding: '8px 4px',
-          background: activeTab === 'photos' ? 'var(--accent-primary)' : 'transparent',
-          color: activeTab === 'photos' ? '#FFFFFF' : 'var(--text-muted)',
-          fontWeight: 800,
-          fontSize: '0.82rem',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '4px'
-        }
-      },
-        "사진",
-        /*#__PURE__*/React.createElement("span", {
-          style: {
-            fontSize: '0.7rem',
-            padding: '1px 5px',
-            borderRadius: '999px',
-            backgroundColor: activeTab === 'photos' ? 'rgba(255,255,255,0.2)' : 'var(--border-subtle)',
-            color: activeTab === 'photos' ? '#FFFFFF' : 'var(--text-muted)',
-            fontWeight: 'bold'
-          }
-        }, meetingPhotos.length > 0 ? meetingPhotos.length : '없음')
-      )
-    ),
 
     /* TAB CONTENTS */
 
@@ -1653,7 +1651,7 @@ export function DateModal({
     activeTab === 'participant' && /*#__PURE__*/React.createElement(React.Fragment, null,
       /* Anniversaries banner list inside DateModal body */
       dateAnns.length > 0 && /*#__PURE__*/React.createElement("div", {
-        style: { display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '10px' }
+        style: { display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '14px' }
       }, dateAnns.map((ann, aIdx) => {
         const displayColor = getAnniversaryDisplayColor(ann, calendar);
         return /*#__PURE__*/React.createElement("div", {
@@ -1764,7 +1762,7 @@ export function DateModal({
 
       /* Attendees list */
       dateEntries.length > 0 && /*#__PURE__*/React.createElement("div", {
-        style: { marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '6px' }
+        style: { marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '6px' }
       },
         /*#__PURE__*/React.createElement("label", {
           style: { fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '2px' }
@@ -1868,7 +1866,7 @@ export function DateModal({
           finally { setIsSubmitting(false); }
         },
         style: {
-          width: '100%', marginTop: '10px', padding: '12px 16px', borderRadius: '12px',
+          width: '100%', marginTop: '12px', padding: '12px 16px', borderRadius: '12px',
           fontWeight: 800, fontSize: '0.92rem', cursor: isSubmitting ? 'wait' : 'pointer',
           ...((!isConfirmed && isAllAvailable) ? {} : isConfirmed ? {
             border: '1.5px solid rgb(239, 68, 68)',
@@ -1885,7 +1883,7 @@ export function DateModal({
 
     /* Tab 2 Content: 장소 */
     activeTab === 'meeting' && /*#__PURE__*/React.createElement(React.Fragment, null,
-      !adminMode && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '10px' } },
+      !adminMode && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '12px' } },
         /* Search Field */
         /*#__PURE__*/React.createElement("div", null,
           /*#__PURE__*/React.createElement("label", {
@@ -2044,7 +2042,7 @@ export function DateModal({
       ),
 
       /* List of registered places for this date */
-      /*#__PURE__*/React.createElement("div", { style: { marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '6px' } },
+      /*#__PURE__*/React.createElement("div", { style: { marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '6px' } },
         /*#__PURE__*/React.createElement("label", {
           style: { fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '2px' }
         }, `등록된 장소 (${registeredPlaces.length}곳)`),
@@ -2184,6 +2182,96 @@ export function DateModal({
             }))
           );
         }))
+      ),
+
+      /* Meeting photo attachments */
+      /*#__PURE__*/React.createElement("div", {
+        style: { marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }
+      },
+        /*#__PURE__*/React.createElement("input", {
+          ref: meetingPhotoInputRef,
+          type: "file",
+          accept: "image/*",
+          multiple: true,
+          onChange: handleMeetingPhotoFiles,
+          style: { display: 'none' }
+        }),
+        /*#__PURE__*/React.createElement("div", {
+          style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }
+        },
+          /*#__PURE__*/React.createElement("label", {
+            style: { fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-muted)' }
+          }, `일정 사진 (${meetingPhotos.length}장)`),
+          !adminMode && /*#__PURE__*/React.createElement("button", {
+            type: "button",
+            className: "btn btn-action btn-action-dark",
+            disabled: isSavingMeetingPhotos,
+            onClick: () => meetingPhotoInputRef.current && meetingPhotoInputRef.current.click(),
+            style: {
+              height: '36px',
+              padding: '0 12px',
+              borderRadius: '10px',
+              fontSize: '0.78rem',
+              fontWeight: 900,
+              cursor: isSavingMeetingPhotos ? 'wait' : 'pointer'
+            }
+          }, isSavingMeetingPhotos ? "업로드 중..." : "사진 추가")
+        ),
+        meetingPhotos.length === 0 ? /*#__PURE__*/React.createElement("div", {
+          style: { textAlign: 'center', color: 'var(--text-muted)', padding: '22px 0', fontSize: '0.82rem', border: '1px dashed var(--border-subtle)', borderRadius: '12px' }
+        }, "이 일정에 첨부된 사진이 없습니다.") : /*#__PURE__*/React.createElement("div", {
+          style: {
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(72px, 1fr))',
+            gap: '8px'
+          }
+        }, meetingPhotos.map((photo, index) => /*#__PURE__*/React.createElement("div", {
+          key: photo.id || `${photo.imageUrl}_${index}`,
+          style: { position: 'relative', minWidth: 0 }
+        },
+          /*#__PURE__*/React.createElement("img", {
+            src: photo.thumbUrl || photo.imageUrl,
+            alt: "일정 사진",
+            loading: "lazy",
+            decoding: "async",
+            referrerPolicy: "no-referrer",
+            onClick: () => {
+              const url = photo.imageUrl || photo.thumbUrl;
+              if (url) window.open(url, '_blank', 'noopener,noreferrer');
+            },
+            style: {
+              width: '100%',
+              aspectRatio: '1 / 1',
+              objectFit: 'cover',
+              display: 'block',
+              borderRadius: '10px',
+              backgroundColor: 'var(--bg-primary)',
+              cursor: 'pointer'
+            }
+          }),
+          !adminMode && typeof onDeleteMeetingPhoto === 'function' && /*#__PURE__*/React.createElement("button", {
+            type: "button",
+            onClick: e => { e.preventDefault(); e.stopPropagation(); handleDeleteMeetingPhoto(photo); },
+            disabled: isSavingMeetingPhotos,
+            "aria-label": "일정 사진 삭제",
+            style: {
+              position: 'absolute',
+              top: '-7px',
+              right: '-7px',
+              width: '22px',
+              height: '22px',
+              borderRadius: '999px',
+              border: '1px solid rgba(239,68,68,0.45)',
+              backgroundColor: 'var(--bg-card)',
+              color: '#EF4444',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: 0,
+              cursor: 'pointer'
+            }
+          }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 13 }))
+        )))
       )
     ),
 
@@ -2191,7 +2279,7 @@ export function DateModal({
     activeTab === 'settlement' && /*#__PURE__*/React.createElement(React.Fragment, null,
       /* Profit/Loss Info Badge */
       /*#__PURE__*/React.createElement("div", {
-        style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderRadius: '12px', border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)', marginBottom: '10px' }
+        style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderRadius: '12px', border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)', marginBottom: '12px' }
       },
         /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)' } }, "총 정산 요약"),
         (() => {
@@ -2214,7 +2302,7 @@ export function DateModal({
       ),
 
       /* Input Forms */
-      !adminMode && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '10px' } },
+      !adminMode && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '12px' } },
         /*#__PURE__*/React.createElement("div", null,
           /*#__PURE__*/React.createElement("label", {
             style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '6px' }
@@ -2428,93 +2516,6 @@ export function DateModal({
             )
           );
         })
-      )
-    ),
-
-    /* Tab 4 Content: 사진 */
-    activeTab === 'photos' && /*#__PURE__*/React.createElement(React.Fragment, null,
-      /*#__PURE__*/React.createElement("div", {
-        style: { display: 'flex', flexDirection: 'column', gap: '10px' }
-      },
-        /*#__PURE__*/React.createElement("input", {
-          ref: meetingPhotoInputRef,
-          type: "file",
-          accept: "image/*",
-          multiple: true,
-          onChange: handleMeetingPhotoFiles,
-          style: { display: 'none' }
-        }),
-        /*#__PURE__*/React.createElement("div", {
-          style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }
-        },
-          /*#__PURE__*/React.createElement("label", {
-            style: { fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-muted)' }
-          }, `일정 사진 (${meetingPhotos.length}장)`),
-          !adminMode && /*#__PURE__*/React.createElement("button", {
-            type: "button",
-            className: "btn btn-action btn-action-dark",
-            disabled: isSavingMeetingPhotos,
-            onClick: () => meetingPhotoInputRef.current && meetingPhotoInputRef.current.click(),
-            style: {
-              height: '36px',
-              padding: '0 12px',
-              borderRadius: '10px',
-              fontSize: '0.78rem',
-              fontWeight: 900,
-              cursor: isSavingMeetingPhotos ? 'wait' : 'pointer'
-            }
-          }, isSavingMeetingPhotos ? "업로드 중..." : "사진 추가")
-        ),
-        meetingPhotos.length === 0 ? /*#__PURE__*/React.createElement("div", {
-          style: { textAlign: 'center', color: 'var(--text-muted)', padding: '22px 0', fontSize: '0.82rem', border: '1px dashed var(--border-subtle)', borderRadius: '12px' }
-        }, "이 일정에 첨부된 사진이 없습니다.") : /*#__PURE__*/React.createElement("div", {
-          style: {
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(72px, 1fr))',
-            gap: '8px'
-          }
-        }, meetingPhotos.map((photo, index) => /*#__PURE__*/React.createElement("div", {
-          key: photo.id || `${photo.imageUrl}_${index}`,
-          style: { position: 'relative', minWidth: 0 }
-        },
-          /*#__PURE__*/React.createElement("img", {
-            src: photo.thumbUrl || photo.imageUrl,
-            alt: "일정 사진",
-            loading: "lazy",
-            decoding: "async",
-            referrerPolicy: "no-referrer",
-            onClick: () => {
-              if (typeof setActiveLightbox !== 'function') {
-                const url = photo.imageUrl || photo.thumbUrl;
-                if (url) window.open(url, '_blank', 'noopener,noreferrer');
-                return;
-              }
-              setActiveLightbox({
-                urls: meetingPhotos.map(p => p.imageUrl || p.thumbUrl),
-                index: index,
-                meta: meetingPhotos.map(p => ({
-                  timestamp: Number(p.createdAt || p.updatedAt || 0),
-                  thumb: p.thumbUrl || p.imageUrl,
-                  tags: String(p.tags || ''),
-                  source: 'meeting',
-                  meetingDate: dateStr,
-                  photoId: p.id || '',
-                  sourceMessageId: p.sourceMessageId || '',
-                  sourceImageIndex: Number.isInteger(p.sourceImageIndex) ? p.sourceImageIndex : null
-                }))
-              });
-            },
-            style: {
-              width: '100%',
-              aspectRatio: '1 / 1',
-              objectFit: 'cover',
-              display: 'block',
-              borderRadius: '10px',
-              backgroundColor: 'var(--bg-primary)',
-              cursor: 'pointer'
-            }
-          })
-        )))
       )
     )
   ))));

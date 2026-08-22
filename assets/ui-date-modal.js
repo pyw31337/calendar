@@ -1440,10 +1440,18 @@ export function DateModal({
     className: "modal-header",
     style: {
       display: 'flex',
+      flexDirection: 'column',
+      gap: '10px',
+      padding: '14px 16px 12px 16px',
+      borderBottom: '1px solid var(--border-subtle)',
+      backgroundColor: 'var(--bg-card)'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
-      padding: '14px 20px',
-      borderBottom: '1px solid var(--border-subtle)'
+      width: '100%'
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -1493,11 +1501,142 @@ export function DateModal({
       cursor: 'pointer',
       display: 'flex',
       alignItems: 'center',
-      padding: '2px 4px',
-      marginLeft: '4px'
+      padding: '2px 4px'
     },
     title: "닫기"
-  }, "✕"))), /*#__PURE__*/React.createElement("form", {
+  }, "✕"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(4, 1fr)',
+      gap: '6px',
+      width: '100%'
+    }
+  },
+    /* Tab 1: 참여자 */
+    /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: e => { e.preventDefault(); e.stopPropagation(); setActiveTab('participant'); },
+      style: {
+        border: 'none',
+        borderRadius: '8px',
+        padding: '7px 4px',
+        background: activeTab === 'participant' ? 'var(--accent-primary)' : 'transparent',
+        color: activeTab === 'participant' ? '#FFFFFF' : 'var(--text-muted)',
+        fontWeight: 800,
+        fontSize: '0.8rem',
+        cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '4px'
+      }
+    },
+      "참여자",
+      /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: '0.68rem',
+          padding: '1px 5px',
+          borderRadius: '999px',
+          backgroundColor: activeTab === 'participant' ? 'rgba(255,255,255,0.2)' : 'var(--border-subtle)',
+          color: activeTab === 'participant' ? '#FFFFFF' : 'var(--text-muted)',
+          fontWeight: 'bold'
+        }
+      }, dateEntries.length > 0 ? dateEntries.length : '없음')
+    ),
+    /* Tab 2: 장소 */
+    /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: e => { e.preventDefault(); e.stopPropagation(); setActiveTab('meeting'); },
+      style: {
+        border: 'none',
+        borderRadius: '8px',
+        padding: '7px 4px',
+        background: activeTab === 'meeting' ? 'var(--accent-primary)' : 'transparent',
+        color: activeTab === 'meeting' ? '#FFFFFF' : 'var(--text-muted)',
+        fontWeight: 800,
+        fontSize: '0.8rem',
+        cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '4px'
+      }
+    },
+      "장소",
+      /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: '0.68rem',
+          padding: '1px 5px',
+          borderRadius: '999px',
+          backgroundColor: activeTab === 'meeting' ? 'rgba(255,255,255,0.2)' : 'var(--border-subtle)',
+          color: activeTab === 'meeting' ? '#FFFFFF' : 'var(--text-muted)',
+          fontWeight: 'bold'
+        }
+      }, registeredPlaces.length > 0 ? registeredPlaces.length : '없음')
+    ),
+    /* Tab 3: 정산 */
+    /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: e => { e.preventDefault(); e.stopPropagation(); setActiveTab('settlement'); },
+      style: {
+        border: 'none',
+        borderRadius: '8px',
+        padding: '7px 4px',
+        background: activeTab === 'settlement' ? 'var(--accent-primary)' : 'transparent',
+        color: activeTab === 'settlement' ? '#FFFFFF' : 'var(--text-muted)',
+        fontWeight: 800,
+        fontSize: '0.8rem',
+        cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '4px'
+      }
+    },
+      "정산",
+      /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: '0.68rem',
+          padding: '1px 5px',
+          borderRadius: '999px',
+          backgroundColor: activeTab === 'settlement' ? 'rgba(255,255,255,0.2)' : 'var(--border-subtle)',
+          color: activeTab === 'settlement' ? '#FFFFFF' : 'var(--text-muted)',
+          fontWeight: 'bold'
+        }
+      }, expenses.length > 0 ? expenses.length : '없음')
+    ),
+    /* Tab 4: 사진 */
+    /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: e => { e.preventDefault(); e.stopPropagation(); setActiveTab('photo'); },
+      style: {
+        border: 'none',
+        borderRadius: '8px',
+        padding: '7px 4px',
+        background: activeTab === 'photo' ? 'var(--accent-primary)' : 'transparent',
+        color: activeTab === 'photo' ? '#FFFFFF' : 'var(--text-muted)',
+        fontWeight: 800,
+        fontSize: '0.8rem',
+        cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '4px'
+      }
+    },
+      "사진",
+      /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: '0.68rem',
+          padding: '1px 5px',
+          borderRadius: '999px',
+          backgroundColor: activeTab === 'photo' ? 'rgba(255,255,255,0.2)' : 'var(--border-subtle)',
+          color: activeTab === 'photo' ? '#FFFFFF' : 'var(--text-muted)',
+          fontWeight: 'bold'
+        }
+      }, meetingPhotos.length > 0 ? meetingPhotos.length : '없음')
+    )
+  )), /*#__PURE__*/React.createElement("form", {
     onSubmit: e => {
       e.preventDefault();
       if (activeTab === 'participant') handleSubmit(e);
@@ -1505,111 +1644,6 @@ export function DateModal({
   }, /*#__PURE__*/React.createElement("div", {
     className: "modal-body"
   },
-    /* Tab Bar Menu: 참여자 / 모임 / 정산 */
-    /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: 'grid',
-        gridTemplateColumns: '1fr 1fr 1fr',
-        gap: '6px',
-        borderBottom: '1px solid var(--border-subtle)',
-        paddingBottom: '12px',
-        marginBottom: '14px'
-      }
-    },
-      /* Tab 1: 참여자 */
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        onClick: e => { e.preventDefault(); e.stopPropagation(); setActiveTab('participant'); },
-        style: {
-          border: 'none',
-          borderRadius: '8px',
-          padding: '8px 4px',
-          background: activeTab === 'participant' ? 'var(--accent-primary)' : 'transparent',
-          color: activeTab === 'participant' ? '#FFFFFF' : 'var(--text-muted)',
-          fontWeight: 800,
-          fontSize: '0.82rem',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '4px'
-        }
-      },
-        "참여자",
-        /*#__PURE__*/React.createElement("span", {
-          style: {
-            fontSize: '0.7rem',
-            padding: '1px 5px',
-            borderRadius: '999px',
-            backgroundColor: activeTab === 'participant' ? 'rgba(255,255,255,0.2)' : 'var(--border-subtle)',
-            color: activeTab === 'participant' ? '#FFFFFF' : 'var(--text-muted)',
-            fontWeight: 'bold'
-          }
-        }, dateEntries.length > 0 ? dateEntries.length : '없음')
-      ),
-      /* Tab 2: 장소 */
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        onClick: e => { e.preventDefault(); e.stopPropagation(); setActiveTab('meeting'); },
-        style: {
-          border: 'none',
-          borderRadius: '8px',
-          padding: '8px 4px',
-          background: activeTab === 'meeting' ? 'var(--accent-primary)' : 'transparent',
-          color: activeTab === 'meeting' ? '#FFFFFF' : 'var(--text-muted)',
-          fontWeight: 800,
-          fontSize: '0.82rem',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '4px'
-        }
-      },
-        "장소",
-        /*#__PURE__*/React.createElement("span", {
-          style: {
-            fontSize: '0.7rem',
-            padding: '1px 5px',
-            borderRadius: '999px',
-            backgroundColor: activeTab === 'meeting' ? 'rgba(255,255,255,0.2)' : 'var(--border-subtle)',
-            color: activeTab === 'meeting' ? '#FFFFFF' : 'var(--text-muted)',
-            fontWeight: 'bold'
-          }
-        }, registeredPlaces.length > 0 ? registeredPlaces.length : '없음')
-      ),
-      /* Tab 3: 정산 */
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        onClick: e => { e.preventDefault(); e.stopPropagation(); setActiveTab('settlement'); },
-        style: {
-          border: 'none',
-          borderRadius: '8px',
-          padding: '8px 4px',
-          background: activeTab === 'settlement' ? 'var(--accent-primary)' : 'transparent',
-          color: activeTab === 'settlement' ? '#FFFFFF' : 'var(--text-muted)',
-          fontWeight: 800,
-          fontSize: '0.82rem',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '4px'
-        }
-      },
-        "정산",
-        /*#__PURE__*/React.createElement("span", {
-          style: {
-            fontSize: '0.7rem',
-            padding: '1px 5px',
-            borderRadius: '999px',
-            backgroundColor: activeTab === 'settlement' ? 'rgba(255,255,255,0.2)' : 'var(--border-subtle)',
-            color: activeTab === 'settlement' ? '#FFFFFF' : 'var(--text-muted)',
-            fontWeight: 'bold'
-          }
-        }, expenses.length > 0 ? expenses.length : '없음')
-      )
-    ),
 
     /* TAB CONTENTS */
 
