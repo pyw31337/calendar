@@ -8754,7 +8754,11 @@ function getDirectChatMediaInfo(url) {
       const path = parsed.pathname || '';
       if (host === 'youtu.be') {
         const id = path.split('/').filter(Boolean)[0];
-        if (id) return { type: 'embed', provider: 'youtube', url: `https://www.youtube-nocookie.com/embed/${encodeURIComponent(id)}`, orientation: 'landscape' };
+        // Plain youtube.com (not youtube-nocookie.com) so the iframe can read the viewer's own
+        // YouTube session cookies -- nocookie mode deliberately can't identify a signed-in user at
+        // all, which means it can never honor a YouTube Premium account's ad-free playback and
+        // always serves the logged-out/ad-supported experience regardless of the viewer's account.
+        if (id) return { type: 'embed', provider: 'youtube', url: `https://www.youtube.com/embed/${encodeURIComponent(id)}`, orientation: 'landscape' };
       }
       if (host === 'youtube.com' || host === 'm.youtube.com' || host === 'music.youtube.com') {
         const watchId = parsed.searchParams.get('v');
@@ -8762,7 +8766,7 @@ function getDirectChatMediaInfo(url) {
         const embedId = path.match(/\/embed\/([^/?#]+)/i)?.[1];
         const liveId = path.match(/\/live\/([^/?#]+)/i)?.[1];
         const id = watchId || shortsId || embedId || liveId;
-        if (id) return { type: 'embed', provider: 'youtube', url: `https://www.youtube-nocookie.com/embed/${encodeURIComponent(id)}`, orientation: shortsId ? 'portrait' : 'landscape' };
+        if (id) return { type: 'embed', provider: 'youtube', url: `https://www.youtube.com/embed/${encodeURIComponent(id)}`, orientation: shortsId ? 'portrait' : 'landscape' };
       }
       if (host === 'vimeo.com' || host === 'player.vimeo.com') {
         const id = path.match(/(?:\/video)?\/(\d+)(?:$|[/?#])/i)?.[1] || path.match(/\/(\d+)(?:$|[/?#])/i)?.[1];
