@@ -1747,7 +1747,7 @@ export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoad
       onClick: memoEditorDirtyGuard.overlayOnClick,
       style: {
         position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-        backgroundColor: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)',
+        backgroundColor: 'rgba(0,0,0,0.4)', WebkitBackdropFilter: 'blur(4px)', backdropFilter: 'blur(4px)',
         zIndex: 10000,
         display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px'
       }

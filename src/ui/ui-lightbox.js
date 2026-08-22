@@ -794,7 +794,7 @@ export function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSe
           flexShrink: 0, height: '30px', padding: '0 10px', borderRadius: 'var(--radius-full)',
           border: '1px solid rgba(255,255,255,0.32)', background: 'rgba(255,255,255,0.14)',
           color: '#FFFFFF', display: 'inline-flex', alignItems: 'center', gap: '5px',
-          cursor: 'pointer', fontSize: '0.72rem', fontWeight: 800, backdropFilter: 'blur(6px)'
+          cursor: 'pointer', fontSize: '0.72rem', fontWeight: 800, WebkitBackdropFilter: 'blur(6px)', backdropFilter: 'blur(6px)'
         }
       }, /*#__PURE__*/React.createElement(LinkIcon, { size: 14 }), "URL")
     ),
@@ -1293,7 +1293,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
     onClick: handleOverlayClick,
     style: {
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-      backgroundColor: 'rgba(15, 23, 42, 0.92)', backdropFilter: 'blur(8px)', zIndex: 50000,
+      backgroundColor: 'rgba(15, 23, 42, 0.92)', WebkitBackdropFilter: 'blur(8px)', backdropFilter: 'blur(8px)', zIndex: 50000,
       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
       width: '100%', maxWidth: '100%', overflow: 'hidden',
       userSelect: 'none'

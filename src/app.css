@@ -1628,6 +1628,10 @@ select.form-select {
   height: 20px;
   padding: 0 6px;
   border-radius: var(--radius-full);
+  /* Plain fallback first (ignored by browsers that support color-mix, kept as-is by those that
+     don't -- an unsupported color-mix() value makes the whole declaration invalid, so it never
+     overwrites this one) so the badge still has a visible pill background everywhere. */
+  background: rgba(100, 116, 139, 0.16);
   background: color-mix(in srgb, currentColor 16%, transparent);
   color: currentColor;
   font-size: 0.72rem;
@@ -2538,7 +2542,8 @@ select.form-select {
 }
 .bottom-sheet-header h4 { font-size: 1rem; font-weight: 800; margin: 0; }
 .bottom-sheet-body {
-  padding: 12px 20px 24px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;
+  padding: 12px 20px calc(24px + env(safe-area-inset-bottom, 0px));
+  overflow-y: auto; display: flex; flex-direction: column; gap: 8px;
 }
 /* 백드롭 규칙: 항목 글자는 참여자 선택과 같이 굵고 진하게 */
 .bottom-sheet-item {
@@ -3128,6 +3133,12 @@ select.form-select {
 /* Sidebar scrollbar hiding and activation during movement */
 .admin-side-menu {
   overflow-y: auto;
+  /* Firefox has no per-state (hover/active) scrollbar styling like the ::-webkit-scrollbar
+     rules below -- scrollbar-color only takes one static thumb/track pair -- so this can't
+     replicate the auto-hide-until-scrolling behavior exactly, but at least gives Firefox a
+     thin scrollbar instead of the full-width OS default. */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(100, 116, 139, 0.4) transparent;
 }
 .admin-side-menu::-webkit-scrollbar {
   width: 6px;
@@ -3377,6 +3388,7 @@ textarea.form-input {
   align-items: center;
   justify-content: center;
   flex: 0 0 40px;
+  -webkit-backdrop-filter: blur(4px);
   backdrop-filter: blur(4px);
 }
 .admin-side-menu .main-side-menu-manual-banner-text {
