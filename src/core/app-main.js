@@ -8672,6 +8672,23 @@ async function incrementPeekalinkApiCallStat() {
   }
 }
 
+// Mirrors functions/index.js's looksLikeBlockedPreviewTitle -- some sites (Coupang among
+// them) answer a scraper with a 200 OK "Access Denied"/bot-check interstitial instead of a real
+// error status, which used to get cached and shown to users as if it were the link's actual
+// preview. Used here to skip (and let the fetch below silently refresh) any doc that was cached
+// by the proxy BEFORE that server-side fix existed, so already-broken cache entries self-heal
+// instead of staying wrong forever.
+function looksLikeBlockedPreviewTitle(title) {
+  const t = String(title || '').trim().toLowerCase();
+  if (!t) return false;
+  const blockedPatterns = [
+    'access denied', 'forbidden', '403 forbidden', 'attention required',
+    'just a moment', 'are you a human', 'bot detection', 'unusual traffic',
+    'captcha', 'request blocked', 'error 1020'
+  ];
+  return blockedPatterns.some(p => t === p || t.includes(p));
+}
+
 async function fetchLinkPreview(url) {
   if (linkPreviewCache.has(url)) return linkPreviewCache.get(url);
   if (linkPreviewInflight.has(url)) return linkPreviewInflight.get(url);
@@ -8683,7 +8700,7 @@ async function fetchLinkPreview(url) {
       if (firebaseDb) {
         try {
           const sharedDoc = await firebaseDb.collection('linkPreviews').doc(urlHash).get();
-          if (sharedDoc.exists) {
+          if (sharedDoc.exists && !looksLikeBlockedPreviewTitle(sharedDoc.data()?.title)) {
             const d = sharedDoc.data();
             const result = { status: 'success', data: normalizeLinkPreviewData(url, d, d.fetchedAt) };
             linkPreviewCache.set(url, result);

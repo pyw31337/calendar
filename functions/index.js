@@ -315,6 +315,26 @@ async function checkProxyRateLimit(bucketKey, ip, windowMs, maxRequests) {
   }
 }
 
+// Some sites (Coupang among them) answer a scraper's request with a 200 OK "차단/Access
+// Denied" interstitial page instead of a real error status -- both Peekalink's own crawler and
+// our fetchFallbackPreview() direct-fetch step below see this as a "successful" fetch with a
+// real <title>, so without this check a bot-block page's title would be shown to the user as if
+// it were the actual link's preview (exactly the "Access Denied" card reported for Coupang
+// share links). KakaoTalk's own preview works for the same links because Coupang specifically
+// allowlists Kakao's crawler IP/UA -- we have no equivalent allowlist relationship, so the best
+// we can do is recognize the block page and fall through to a generic domain-only preview
+// instead of showing the wrong content.
+function looksLikeBlockedPreviewTitle(title) {
+  const t = String(title || '').trim().toLowerCase();
+  if (!t) return false;
+  const blockedPatterns = [
+    'access denied', 'forbidden', '403 forbidden', 'attention required',
+    'just a moment', 'are you a human', 'bot detection', 'unusual traffic',
+    'captcha', 'request blocked', 'error 1020'
+  ];
+  return blockedPatterns.some(p => t === p || t.includes(p));
+}
+
 async function fetchFallbackPreview(link) {
   try {
     const url = new URL(link);
@@ -357,11 +377,12 @@ async function fetchFallbackPreview(link) {
           return m1 ? m1[1] : null;
         };
         
-        const title = getMetaContent('og:title') || html.match(/<title>([^<]*)<\/title>/i)?.[1] || '';
+        const rawTitle = getMetaContent('og:title') || html.match(/<title>([^<]*)<\/title>/i)?.[1] || '';
+        const title = looksLikeBlockedPreviewTitle(rawTitle) ? '' : rawTitle;
         const description = getMetaContent('og:description') || getMetaContent('description') || '';
         const image = getMetaContent('og:image') || '';
         const siteName = getMetaContent('og:site_name') || domain;
-        
+
         if (title || image || description) {
           return {
             ok: true,
@@ -431,7 +452,7 @@ exports.peekalinkProxy = functions.runWith({ secrets: ['PEEKALINK_API_KEY'] }).h
     });
     if (peekalinkRes.ok) {
       const json = await peekalinkRes.json();
-      if (json && json.ok && json.title) {
+      if (json && json.ok && json.title && !looksLikeBlockedPreviewTitle(json.title)) {
         res.status(200).json(json);
         return;
       }
