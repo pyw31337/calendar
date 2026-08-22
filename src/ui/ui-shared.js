@@ -1363,24 +1363,97 @@ export function ColorSwatchPicker({ value, onChange, disabled, title = "색상 �
   );
 }
 
+// Height (px) of the "채팅으로 이동 / ✕" controls bar shown below the video when floating --
+// shared between the resize-drag math and the container height calc below so they can't drift
+// apart.
+const STICKY_VIDEO_CONTROLS_HEIGHT = 38;
+
 // The single persistent chat-video player: one <iframe> DOM node, kept alive (same React `key`)
-// for as long as `stickyVideo` is set, regardless of which app view is showing. When `dockRect`
-// is given (the owning chat message is currently mounted -- see DirectChatMediaText's
-// isThisSticky placeholder), it's absolutely positioned to overlay exactly on top of that spot,
-// reading as a normal inline video. When dockRect is null (navigated away from chat, or that
-// message isn't mounted), it falls back to floating in the corner as a small mini player. Either
-// way the iframe itself never unmounts, so playback is genuinely uninterrupted -- only its
-// on-screen position/size changes.
-export function StickyVideoBox({ stickyVideo, dockRect, onClose, onGoToChat }) {
+// for as long as `stickyVideo` is set, regardless of which app view is showing. When
+// `dockAnchorRef.current` holds a live DOM node (the owning chat message's placeholder -- see
+// DirectChatMediaText's isThisSticky branch), this positions itself exactly on top of that
+// node's rect every frame, reading as a normal inline video; otherwise it floats in the corner
+// as a small resizable mini player. Either way the iframe itself never unmounts, so playback is
+// genuinely uninterrupted -- only its on-screen position/size changes.
+//
+// Position/size tracking is done via a requestAnimationFrame loop that writes directly to the
+// container's DOM style (through containerElRef), deliberately bypassing React state/render for
+// this high-frequency read -- an earlier version routed the measured rect through React state on
+// every frame, which re-rendered the entire top-level App 60 times/sec for as long as a video
+// was docked. That was enough sustained reconciliation churn to keep the embedded YouTube iframe
+// from ever actually painting (it showed solid black the whole time it was docked in chat, while
+// the floating mini player -- whose loop only runs once on mount/unmount, not every frame --
+// worked fine). isDocked itself IS still React state, but it only flips (and re-renders) on the
+// rare frame where docked/floating actually changes, not continuously.
+export function StickyVideoBox({ stickyVideo, dockAnchorRef, onClose, onGoToChat }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
 
+  const containerElRef = React.useRef(null);
+  const [isDocked, setIsDocked] = React.useState(false);
+  // User's drag-resized floating width (px), null until they've actually dragged the resize
+  // handle -- falls back to the orientation-based default below. Persists only for as long as
+  // this particular video stays active; a newly-activated video starts back at the default.
+  const [floatWidth, setFloatWidth] = React.useState(null);
+  const dragStateRef = React.useRef(null);
+
+  const isPortrait = !!(stickyVideo && stickyVideo.orientation === 'portrait');
+  const defaultFloatWidth = isPortrait ? 172 : 260;
+  const effectiveFloatWidth = floatWidth || defaultFloatWidth;
+  const effectiveFloatHeight = isPortrait ? Math.round(effectiveFloatWidth * 16 / 9) : Math.round(effectiveFloatWidth * 9 / 16);
+
+  React.useEffect(() => {
+    if (!stickyVideo) return undefined;
+    let rafId = null;
+    let lastDocked = null;
+    const tick = () => {
+      const el = containerElRef.current;
+      const anchor = dockAnchorRef && dockAnchorRef.current;
+      if (el) {
+        if (anchor) {
+          const r = anchor.getBoundingClientRect();
+          el.style.cssText = `position:fixed; top:0; left:0; width:${r.width}px; height:${r.height}px; transform:translate(${r.left}px, ${r.top}px); z-index:500; border-radius:10px; overflow:hidden; background:#000;`;
+          if (lastDocked !== true) { lastDocked = true; setIsDocked(true); }
+        } else {
+          el.style.cssText = `position:fixed; right:14px; bottom:calc(14px + env(safe-area-inset-bottom, 0px)); left:auto; top:auto; width:${effectiveFloatWidth}px; height:${effectiveFloatHeight + STICKY_VIDEO_CONTROLS_HEIGHT}px; transform:none; z-index:40000; border-radius:12px; overflow:hidden; background:#000; box-shadow:0 12px 32px rgba(0,0,0,0.4);`;
+          if (lastDocked !== false) { lastDocked = false; setIsDocked(false); }
+        }
+      }
+      rafId = requestAnimationFrame(tick);
+    };
+    rafId = requestAnimationFrame(tick);
+    return () => { if (rafId) cancelAnimationFrame(rafId); };
+  }, [stickyVideo, dockAnchorRef, effectiveFloatWidth, effectiveFloatHeight]);
+
+  // Drag-to-resize the floating mini player -- pointer events cover mouse and touch alike. The
+  // box is anchored to the bottom-right corner of the screen, so the handle sits at its
+  // top-left: dragging up/left grows it, down/right shrinks it. Height follows from width to
+  // keep the video's own aspect ratio (16:9 landscape / 9:16 portrait), matching how the inline
+  // chat embed's own drag-resize (.chat-media-resizable) already behaves elsewhere in this app.
+  const handleResizePointerDown = e => {
+    e.preventDefault();
+    e.stopPropagation();
+    const startX = e.clientX;
+    const startWidth = effectiveFloatWidth;
+    dragStateRef.current = { startX, startWidth };
+    const handleMove = moveEvent => {
+      if (!dragStateRef.current) return;
+      const dx = dragStateRef.current.startX - moveEvent.clientX;
+      const maxWidth = Math.min(420, window.innerWidth - 28);
+      const next = Math.max(120, Math.min(maxWidth, dragStateRef.current.startWidth + dx));
+      setFloatWidth(next);
+    };
+    const handleUp = () => {
+      dragStateRef.current = null;
+      window.removeEventListener('pointermove', handleMove);
+      window.removeEventListener('pointerup', handleUp);
+    };
+    window.addEventListener('pointermove', handleMove);
+    window.addEventListener('pointerup', handleUp);
+  };
+
   if (!stickyVideo || typeof document === 'undefined' || !ReactDOM.createPortal) return null;
-  const isPortrait = stickyVideo.orientation === 'portrait';
-  const floatWidth = isPortrait ? 172 : 260;
-  const floatHeight = isPortrait ? Math.round(floatWidth * 16 / 9) : Math.round(floatWidth * 9 / 16);
-  const isDocked = !!dockRect;
   // autoplay -- only for THIS portal iframe, never the plain inline one a chat message shows
   // before it's been promoted (see DirectChatMediaText) -- so a newly-promoted video keeps
   // playing straight through instead of landing on a paused first frame the user has to tap
@@ -1389,29 +1462,8 @@ export function StickyVideoBox({ stickyVideo, dockRect, onClose, onGoToChat }) {
   // pressed play in the original inline iframe), so it degrades gracefully to muted/paused
   // otherwise rather than failing.
   const autoplaySrc = stickyVideo.embedUrl + (stickyVideo.embedUrl.includes('?') ? '&' : '?') + 'autoplay=1';
-  const containerStyle = isDocked ? {
-    position: 'fixed',
-    top: `${dockRect.top}px`,
-    left: `${dockRect.left}px`,
-    width: `${dockRect.width}px`,
-    height: `${dockRect.height}px`,
-    zIndex: 500,
-    borderRadius: '10px',
-    overflow: 'hidden',
-    backgroundColor: '#000'
-  } : {
-    position: 'fixed',
-    right: '14px',
-    bottom: 'calc(14px + env(safe-area-inset-bottom, 0px))',
-    width: `${floatWidth}px`,
-    zIndex: 40000,
-    borderRadius: '12px',
-    overflow: 'hidden',
-    boxShadow: '0 12px 32px rgba(0,0,0,0.4)',
-    backgroundColor: '#000'
-  };
   return ReactDOM.createPortal(/*#__PURE__*/React.createElement('div', {
-    style: containerStyle
+    ref: containerElRef
   }, /*#__PURE__*/React.createElement('iframe', {
     key: stickyVideo.key,
     src: autoplaySrc,
@@ -1420,13 +1472,34 @@ export function StickyVideoBox({ stickyVideo, dockRect, onClose, onGoToChat }) {
     allowFullScreen: true,
     style: isDocked
       ? { display: 'block', width: '100%', height: '100%', border: '0' }
-      : { display: 'block', width: '100%', height: `${floatHeight}px`, border: '0' }
+      : { display: 'block', width: '100%', height: `${effectiveFloatHeight}px`, border: '0' }
   }), !isDocked && /*#__PURE__*/React.createElement('div', {
+    onPointerDown: handleResizePointerDown,
+    'aria-label': '미니플레이어 크기 조절',
+    style: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      width: '22px',
+      height: '22px',
+      cursor: 'nwse-resize',
+      touchAction: 'none',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      color: 'rgba(255,255,255,0.85)',
+      background: 'linear-gradient(135deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.55) 45%, transparent 46%)'
+    }
+  }, /*#__PURE__*/React.createElement('svg', {
+    width: '10', height: '10', viewBox: '0 0 10 10', fill: 'none', stroke: 'currentColor', strokeWidth: '1.4', strokeLinecap: 'round'
+  }, /*#__PURE__*/React.createElement('path', { d: 'M1 9 L9 1 M4.5 9 L9 4.5 M8 9 L9 8' }))), !isDocked && /*#__PURE__*/React.createElement('div', {
     style: {
       display: 'flex',
       alignItems: 'center',
       gap: '6px',
       padding: '6px',
+      height: `${STICKY_VIDEO_CONTROLS_HEIGHT}px`,
+      boxSizing: 'border-box',
       backgroundColor: 'rgba(15,23,42,0.94)'
     }
   }, /*#__PURE__*/React.createElement('button', {

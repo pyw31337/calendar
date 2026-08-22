@@ -4654,24 +4654,27 @@ function App() {
   // The chat embed the user tapped play on -- { key, embedUrl, provider, orientation, title } |
   // null. Once set, it's rendered through a SINGLE always-mounted portal iframe (StickyVideoBox)
   // that never unmounts across view/tab switches, so playback genuinely never stops -- only its
-  // on-screen position changes (see videoDockRect below). Previously this was only promoted when
-  // leaving chat (via changeView), which meant the mini player got a brand-new iframe with no
-  // autoplay and no relation to the one that had been playing -- i.e. playback actually did stop,
-  // just less obviously. Now activation happens the moment the user presses play in chat, and the
-  // same iframe DOM node (same React `key`) is reused for the rest of its life.
+  // on-screen position changes (see videoDockAnchorRef below). Previously this was only promoted
+  // when leaving chat (via changeView), which meant the mini player got a brand-new iframe with
+  // no autoplay and no relation to the one that had been playing -- i.e. playback actually did
+  // stop, just less obviously. Now activation happens the moment the user presses play in chat,
+  // and the same iframe DOM node (same React `key`) is reused for the rest of its life.
   const [stickyVideo, setStickyVideo] = React.useState(null);
-  // Live screen position of the chat message that owns the currently-active video, in fixed
-  // viewport coordinates ({top,left,width,height}), continuously reported by that message's own
-  // placeholder (see DirectChatMediaText's isThisSticky branch) while it's mounted. StickyVideoBox
-  // overlays the persistent iframe exactly on top of this rect so it looks perfectly inline while
-  // still in chat; null (no placeholder currently mounted -- i.e. navigated away from chat, or the
-  // message isn't loaded) means "float as the small corner mini player" instead.
-  const [videoDockRect, setVideoDockRect] = React.useState(null);
+  // The DOM node of the chat message that owns the currently-active video, while it's mounted --
+  // registered directly by that message's own placeholder (see DirectChatMediaText's isThisSticky
+  // branch) via a plain ref assignment, deliberately NOT React state. StickyVideoBox polls this
+  // ref itself (its own requestAnimationFrame loop) and positions the persistent iframe exactly
+  // on top of it via direct DOM style writes, so it looks perfectly inline while still in chat;
+  // null (no placeholder currently registered -- i.e. navigated away from chat) means "float as
+  // the small corner mini player" instead. Routing this through React state instead (setState on
+  // every animation frame) was tried first and re-rendered the entire top-level App 60 times/sec
+  // for as long as a video was docked -- more than enough sustained reconciliation churn to keep
+  // the embedded YouTube iframe from ever actually painting (solid black until leaving chat,
+  // where the loop stopped and the floating mini player -- unaffected by the render storm --
+  // showed up fine). A ref sidesteps React's render cycle entirely for this high-frequency read.
+  const videoDockAnchorRef = React.useRef(null);
   const handleActivateChatVideo = React.useCallback(videoInfo => {
     setStickyVideo(videoInfo);
-  }, []);
-  const handleVideoDockRectChange = React.useCallback(rect => {
-    setVideoDockRect(rect);
   }, []);
 
   React.useEffect(() => {
@@ -7534,13 +7537,13 @@ function App() {
   // so the persistent video player can't just live inline in one of them -- it has to be included
   // as a stable sibling in every branch's return, wrapped in the SAME portal element shape each
   // time, or React would unmount/remount (and restart) it on every tab switch. See StickyVideoBox
-  // for the actual portal player and handleActivateChatVideo/handleVideoDockRectChange above for
-  // how a video becomes active and how its on-screen position is tracked.
+  // for the actual portal player and handleActivateChatVideo/videoDockAnchorRef above for how a
+  // video becomes active and how its on-screen position is tracked.
   const withStickyVideo = (content) => /*#__PURE__*/React.createElement(React.Fragment, null,
     content,
     /*#__PURE__*/React.createElement(StickyVideoBox, {
       stickyVideo: stickyVideo,
-      dockRect: activeView === 'chat' ? videoDockRect : null,
+      dockAnchorRef: activeView === 'chat' ? videoDockAnchorRef : null,
       onClose: () => setStickyVideo(null),
       // Preserves playback -- the message's own placeholder re-mounts and re-reports its rect,
       // so the SAME iframe just docks back inline instead of being torn down and restarted.
@@ -7796,7 +7799,7 @@ function App() {
       onToggleChatNotifications: handleMainToggleNotifications,
       stickyVideoKey: stickyVideo ? stickyVideo.key : null,
       onActivateVideo: handleActivateChatVideo,
-      onVideoDockRectChange: handleVideoDockRectChange,
+      dockAnchorRef: videoDockAnchorRef,
       onDeletePhoto: handleDeletePhoto,
       onReplacePhoto: handleReplacePhoto,
       onJumpToChatMessage: handleJumpToChatMessage,
@@ -8784,7 +8787,7 @@ function ImageUrlModal(props) {
 }
 
 
-function renderChatMessageBody(msg, setActiveLightbox, singleImageStyle = {}, searchQuery = '', stickyVideoKey = null, onActivateVideo = null, onVideoDockRectChange = null) {
+function renderChatMessageBody(msg, setActiveLightbox, singleImageStyle = {}, searchQuery = '', stickyVideoKey = null, onActivateVideo = null, dockAnchorRef = null) {
   const msgImages = renderChatMessageImages(msg, setActiveLightbox, singleImageStyle);
   return /*#__PURE__*/React.createElement(React.Fragment, null,
     msgImages ? /*#__PURE__*/React.createElement('div', { style: { marginBottom: msg.text ? '8px' : '0' } }, msgImages) : null,
@@ -8797,7 +8800,7 @@ function renderChatMessageBody(msg, setActiveLightbox, singleImageStyle = {}, se
       message: msg,
       stickyVideoKey,
       onActivateVideo,
-      onVideoDockRectChange
+      dockAnchorRef
     }) : null
   );
 }
