@@ -758,6 +758,7 @@ export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox,
         src: mediaInfo.url,
         alt: '링크 이미지',
         loading: 'lazy',
+        decoding: 'async',
         referrerPolicy: 'no-referrer',
         onError: () => setFailed(true),
         onClick: () => setActiveLightbox && setActiveLightbox({

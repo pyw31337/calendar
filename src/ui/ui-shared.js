@@ -1062,6 +1062,8 @@ export function LinkPreviewCard({ url, fallbackTitle, cachedData }) {
     image && /*#__PURE__*/React.createElement('img', {
       src: image,
       alt: '',
+      loading: 'lazy',
+      decoding: 'async',
       referrerPolicy: 'no-referrer',
       style: { width: '72px', height: '72px', objectFit: 'cover', flexShrink: 0, backgroundColor: 'var(--bg-primary)' }
     }),

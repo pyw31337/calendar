@@ -785,6 +785,7 @@ export function ImageShareViewer({ shareId }) {
     /*#__PURE__*/React.createElement("img", {
       src: state.share.imageUrl,
       alt: "공유 이미지",
+      decoding: "async",
       style: {
         maxWidth: '100%',
         maxHeight: 'calc(100dvh - 96px)',

@@ -10157,6 +10157,8 @@ function renderChatMessageImages(msg, setActiveLightbox, singleImageStyle = {}) 
     return /*#__PURE__*/React.createElement('img', {
       src: displayUrls[0] || thumbs[0],
       alt: '첨부이미지',
+      loading: 'lazy',
+      decoding: 'async',
       referrerPolicy: 'no-referrer',
       onClick: () => setActiveLightbox && setActiveLightbox({ urls: displayUrls, index: 0, meta }),
       style: { 
@@ -10201,6 +10203,8 @@ function renderChatMessageImages(msg, setActiveLightbox, singleImageStyle = {}) 
     key: idx,
     src: thumb,
     alt: `첨부이미지 ${idx + 1}`,
+    loading: 'lazy',
+    decoding: 'async',
     referrerPolicy: 'no-referrer',
     onClick: () => setActiveLightbox && setActiveLightbox({ urls: displayUrls, index: idx, meta }),
     style: {

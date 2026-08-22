@@ -725,7 +725,7 @@ export function EmojiGridButton({ emoji, onSelect }) {
   }, imgFailed
     ? emoji
     : /*#__PURE__*/React.createElement('img', {
-      src: twemojiImageUrl(emoji), alt: emoji, width: 24, height: 24, loading: 'lazy', draggable: false,
+      src: twemojiImageUrl(emoji), alt: emoji, width: 24, height: 24, loading: 'lazy', decoding: 'async', draggable: false,
       onError: () => setImgFailed(true)
     }));
 }

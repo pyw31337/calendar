@@ -1253,6 +1253,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
     alt: "원본 이미지",
     "data-slide": slot,
     draggable: false,
+    decoding: 'async',
     referrerPolicy: 'no-referrer',
     onLoad: e => recordImageDimensions(url, e),
     style: {
@@ -1272,6 +1273,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
     alt: "원본 이미지",
     "data-slide": slot,
     draggable: false,
+    decoding: 'async',
     referrerPolicy: 'no-referrer',
     onLoad: e => recordImageDimensions(url, e),
     onClick: e => e.stopPropagation(),
@@ -1364,6 +1366,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
     src: currentUrl,
     alt: "원본 이미지",
     draggable: false,
+    decoding: 'async',
     referrerPolicy: 'no-referrer',
     onLoad: e => recordImageDimensions(currentUrl, e),
     style: {
