@@ -1556,13 +1556,6 @@ select.form-select {
   from { transform: translate(-50%, 18px); opacity: 0.85; }
   to { transform: translate(-50%, 0); opacity: 1; }
 }
-/* Brief flash on the chat bubble a global-search result navigates to, so it's obvious
-   which message was jumped to once the view scrolls it into place. */
-@keyframes search-result-flash {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(79, 70, 229, 0); }
-  15%, 60% { box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.5); }
-}
-.search-result-flash { animation: search-result-flash 1.6s ease; border-radius: var(--radius-md); }
 .poll-voter-sheet-header {
   display: flex;
   align-items: center;
@@ -2637,7 +2630,10 @@ select.form-select {
   top: 0;
   z-index: 5;
   margin: calc(var(--space-5) * -1) calc(var(--space-5) * -1) 0;
-  padding: 12px var(--space-5);
+  /* Less top padding than bottom -- pulls the tab row right up against .modal-header's own
+     bottom border so the title row and the tab row read as one fixed block, instead of the
+     tab row floating with its own separate breathing room underneath the header. */
+  padding: 6px var(--space-5) 12px;
   background: var(--bg-primary);
   border-bottom: 1px solid var(--border-subtle);
 }
@@ -2707,7 +2703,7 @@ select.form-select {
   }
   .modal-header { padding: 18px; }
   .modal-body { padding: 18px; gap: 14px; }
-  .modal-sticky-tab-bar { margin: -18px -18px 0; padding: 10px 18px; }
+  .modal-sticky-tab-bar { margin: -18px -18px 0; padding: 6px 18px 10px; }
   .modal-footer {
     padding: 18px 18px max(18px, env(safe-area-inset-bottom, 0px));
     position: sticky; bottom: 0; z-index: 1;

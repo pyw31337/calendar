@@ -179,8 +179,17 @@ function getCalendarPlaces(calendar) {
 // { ...calendar, places: subcollectionPlaces } would silently drop pre-migration entries.
 function unionPlaces(calendar, subcollectionPlaces) {
   const byId = new Map();
-  getCalendarPlaces(calendar).forEach(p => { if (p?.id) byId.set(p.id, p); });
+  // Subcollection entries go in FIRST so the calendar's own (local, possibly just-written)
+  // entries overwrite them on a shared id -- not the other way around. The live subcollection
+  // listener only re-fires after its own write round-trips, so right after an optimistic local
+  // update (see updateCalendars' setCalendarsState) the listener's snapshot is still the OLD
+  // data; processing it last would let that stale snapshot silently overwrite the fresh local
+  // write for that id every render until the listener catches up -- exactly the bug where a
+  // newly added place/photo would flash in and then vanish. If the write actually failed,
+  // updateCalendars rolls the local state back to the pre-write calendar, so local data is
+  // always the one that should win here.
   (Array.isArray(subcollectionPlaces) ? subcollectionPlaces : []).forEach(p => { if (p?.id) byId.set(p.id, p); });
+  getCalendarPlaces(calendar).forEach(p => { if (p?.id) byId.set(p.id, p); });
   return Array.from(byId.values());
 }
 
@@ -992,8 +1001,14 @@ function getConfirmedMeetings(calendar) {
 // rather than a generated id.
 function unionConfirmedMeetings(calendar, subcollectionMeetings) {
   const byDate = new Map();
-  getConfirmedMeetings(calendar).forEach(m => { if (m?.date) byDate.set(m.date, m); });
+  // Subcollection entries go in FIRST so the calendar's own (local, possibly just-written)
+  // entries overwrite them on a shared date -- see unionPlaces' identical comment just above for
+  // the full reasoning. Processing subcollection data last previously let the live listener's
+  // still-stale snapshot silently overwrite a freshly-uploaded 일정 사진 for that date on every
+  // render until the listener caught up, which is exactly why an uploaded meeting photo could
+  // flash a "저장완료" toast and then not actually show up.
   (Array.isArray(subcollectionMeetings) ? subcollectionMeetings : []).forEach(m => { if (m?.date) byDate.set(m.date, m); });
+  getConfirmedMeetings(calendar).forEach(m => { if (m?.date) byDate.set(m.date, m); });
   return Array.from(byDate.values());
 }
 
@@ -2674,6 +2689,15 @@ async function fetchMessageOrdinal() {
   return null;
 }
 
+async function fetchGalleryPhotoOrdinal() {
+  const svc = window.GATHER_FIREBASE_SERVICES;
+  if (svc && typeof svc.fetchGalleryPhotoOrdinal === 'function' && !svc.isScaffold) {
+    return svc.fetchGalleryPhotoOrdinal.apply(null, arguments);
+  }
+  console.warn('fetchGalleryPhotoOrdinal: GATHER_FIREBASE_SERVICES missing');
+  return null;
+}
+
 async function fetchGalleryItemCount() {
   const svc = window.GATHER_FIREBASE_SERVICES;
   if (svc && typeof svc.fetchGalleryItemCount === 'function' && !svc.isScaffold) {
@@ -3726,6 +3750,13 @@ function formatICSDateOnly(dateStr) {
   return dateStr.replace(/-/g, '');
 }
 
+// 'YYYY-MM-DD' -> '260802' -- the app's own hashtag convention for meeting dates (see the
+// \d{6} case in linkTaggedImageToMeetingDates' date-token parser), so a photo auto-tagged with
+// its meeting date links up exactly the same way a manually typed "#260802" tag would.
+function dateStrToHashtag(dateStr) {
+  return isValidDateString(dateStr) ? dateStr.replace(/-/g, '').slice(2) : '';
+}
+
 function addDaysToDateStr(dateStr, days) {
   const [y, m, d] = dateStr.split('-').map(Number);
   const date = new Date(y, m - 1, d);
@@ -4654,28 +4685,51 @@ function App() {
   // The chat embed the user tapped play on -- { key, embedUrl, provider, orientation, title } |
   // null. Once set, it's rendered through a SINGLE always-mounted portal iframe (StickyVideoBox)
   // that never unmounts across view/tab switches, so playback genuinely never stops -- only its
-  // on-screen position changes (see videoDockAnchorRef below). Previously this was only promoted
-  // when leaving chat (via changeView), which meant the mini player got a brand-new iframe with
-  // no autoplay and no relation to the one that had been playing -- i.e. playback actually did
-  // stop, just less obviously. Now activation happens the moment the user presses play in chat,
-  // and the same iframe DOM node (same React `key`) is reused for the rest of its life.
+  // on-screen position changes. Previously this was only promoted when leaving chat (via
+  // changeView), which meant the mini player got a brand-new iframe with no autoplay and no
+  // relation to the one that had been playing -- i.e. playback actually did stop, just less
+  // obviously. Now activation happens the moment the user presses play in chat, and the same
+  // iframe DOM node (same React `key`) is reused for the rest of its life.
+  //
+  // Once active, StickyVideoBox is ALWAYS a small fixed-corner floating player (PIP), in every
+  // view including chat itself -- it never tries to overlay/dock itself back on top of the
+  // original chat bubble's position. An earlier version did try to dock: it measured the chat
+  // message placeholder's rect every animation frame and wrote it into the portal iframe's
+  // position via direct DOM style writes, so the floating player would snap into the bubble's
+  // spot and look inline while still in chat. That was real trouble -- even after moving the
+  // position sync off React state and onto a plain ref (avoiding the render-storm this used to
+  // cause), the docked iframe still frequently failed to actually paint a frame despite audio
+  // playing, an unresolved rendering quirk with continuously repositioning a cross-origin
+  // iframe via transform. Not docking at all sidesteps the whole problem: the chat bubble that
+  // owns the active video just shows a static placeholder (see DirectChatMediaText's
+  // isThisSticky branch) instead of trying to look like the video is still sitting there.
   const [stickyVideo, setStickyVideo] = React.useState(null);
-  // The DOM node of the chat message that owns the currently-active video, while it's mounted --
-  // registered directly by that message's own placeholder (see DirectChatMediaText's isThisSticky
-  // branch) via a plain ref assignment, deliberately NOT React state. StickyVideoBox polls this
-  // ref itself (its own requestAnimationFrame loop) and positions the persistent iframe exactly
-  // on top of it via direct DOM style writes, so it looks perfectly inline while still in chat;
-  // null (no placeholder currently registered -- i.e. navigated away from chat) means "float as
-  // the small corner mini player" instead. Routing this through React state instead (setState on
-  // every animation frame) was tried first and re-rendered the entire top-level App 60 times/sec
-  // for as long as a video was docked -- more than enough sustained reconciliation churn to keep
-  // the embedded YouTube iframe from ever actually painting (solid black until leaving chat,
-  // where the loop stopped and the floating mini player -- unaffected by the render storm --
-  // showed up fine). A ref sidesteps React's render cycle entirely for this high-frequency read.
-  const videoDockAnchorRef = React.useRef(null);
   const handleActivateChatVideo = React.useCallback(videoInfo => {
     setStickyVideo(videoInfo);
   }, []);
+
+  // Shared "jump to this chat message and highlight it" treatment -- the Lightbox source-jump
+  // link, the admin/global search modals' message-open actions, and the ?msg= deep link all
+  // funnel through this so every entry point highlights the target bubble exactly like in-chat
+  // search's own focused-match style (chat-search-focused-bubble/chat-search-shake, see
+  // ChatRoomView's isSearchFocused), instead of each call site rolling its own imperative
+  // classList flash shaped like a plain rectangle rather than the actual speech-bubble outline.
+  const externalFocusTimeoutRef = React.useRef(null);
+  const [externalFocusMsgId, setExternalFocusMsgId] = React.useState(null);
+  const focusChatMessage = messageId => {
+    const el = document.querySelector(`[data-msg-row-id="${messageId}"]`);
+    if (!el) return false;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (externalFocusTimeoutRef.current) clearTimeout(externalFocusTimeoutRef.current);
+    // Clear first so re-targeting the same message a second time still re-triggers the shake
+    // animation (ChatRoomView keys the focused bubble off this value flipping to a new state).
+    setExternalFocusMsgId(null);
+    requestAnimationFrame(() => {
+      setExternalFocusMsgId(messageId);
+      externalFocusTimeoutRef.current = setTimeout(() => setExternalFocusMsgId(null), 1700);
+    });
+    return true;
+  };
 
   React.useEffect(() => {
     const handleUrlChange = () => {
@@ -5223,12 +5277,8 @@ function App() {
     const msgParam = params.get('msg');
     if (!msgParam) return;
     if (activeView !== 'chat') { changeView('chat'); return; }
-    const el = document.querySelector(`[data-msg-row-id="${msgParam}"]`);
-    if (!el) return;
+    if (!focusChatMessage(msgParam)) return;
     chatDeepLinkHandledRef.current = true;
-    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    el.classList.add('search-result-flash');
-    setTimeout(() => el.classList.remove('search-result-flash'), 1700);
     const imgParam = params.get('img');
     if (imgParam !== null) {
       const msg = chatMessages.find(m => m.id === msgParam);
@@ -6710,7 +6760,7 @@ function App() {
           thumbUrl: chunkImages[0].thumbUrl,
           imageUrls: chunkImages.map(r => r.imageUrl),
           thumbUrls: chunkImages.map(r => r.thumbUrl),
-          imageTags: chunkImages.map(() => dateStr),
+          imageTags: chunkImages.map(() => dateStrToHashtag(dateStr)),
           timestamp: now + i,
           uploadSource: 'meeting'
         };
@@ -6732,7 +6782,7 @@ function App() {
             source: 'lightbox-tag',
             sourceMessageId: newMessageId || '',
             sourceImageIndex: idx,
-            tags: dateStr
+            tags: dateStrToHashtag(dateStr)
           });
         });
       }
@@ -7118,20 +7168,12 @@ function App() {
     if (!messageId) return;
     setActiveLightbox(null);
     changeView('chat');
-    const tryScroll = () => {
-      const el = document.querySelector(`[data-msg-row-id="${messageId}"]`);
-      if (!el) return false;
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      el.classList.add('search-result-flash');
-      setTimeout(() => el.classList.remove('search-result-flash'), 1700);
-      return true;
-    };
     setTimeout(async () => {
-      if (tryScroll()) return;
+      if (focusChatMessage(messageId)) return;
       for (let i = 0; i < 40 && hasMoreOlderChatRef.current; i++) {
         await Promise.resolve(loadOlderChatMessagesRef.current());
         await new Promise(resolve => setTimeout(resolve, 80));
-        if (tryScroll()) return;
+        if (focusChatMessage(messageId)) return;
       }
       showToast('메시지를 찾을 수 없습니다.', 'error');
     }, 350);
@@ -7142,6 +7184,14 @@ function App() {
   const handleGetChatMessageOrdinal = timestamp => {
     if (!activeCalId || !timestamp) return Promise.resolve(null);
     return fetchMessageOrdinal(activeCalId, timestamp);
+  };
+
+  // Ordinal ("몇 번째 사진인지") for a gallery-uploaded photo's Lightbox source label
+  // ("갤러리 #20") -- unlike the chat ordinal above this counts PHOTOS, not messages, since a
+  // single gallery upload can chunk into several multi-photo messages.
+  const handleGetGalleryPhotoOrdinal = (messageId, imageIndex) => {
+    if (!activeCalId || !messageId) return Promise.resolve(null);
+    return fetchGalleryPhotoOrdinal(activeCalId, messageId, imageIndex);
   };
 
   // "메모로 이동" -- reuses the sharedMemo mechanism MemoView already renders as a banner card
@@ -7537,16 +7587,13 @@ function App() {
   // so the persistent video player can't just live inline in one of them -- it has to be included
   // as a stable sibling in every branch's return, wrapped in the SAME portal element shape each
   // time, or React would unmount/remount (and restart) it on every tab switch. See StickyVideoBox
-  // for the actual portal player and handleActivateChatVideo/videoDockAnchorRef above for how a
-  // video becomes active and how its on-screen position is tracked.
+  // for the actual portal player and handleActivateChatVideo above for how a video becomes
+  // active; once active it always floats as a fixed-corner PIP, in every view.
   const withStickyVideo = (content) => /*#__PURE__*/React.createElement(React.Fragment, null,
     content,
     /*#__PURE__*/React.createElement(StickyVideoBox, {
       stickyVideo: stickyVideo,
-      dockAnchorRef: activeView === 'chat' ? videoDockAnchorRef : null,
       onClose: () => setStickyVideo(null),
-      // Preserves playback -- the message's own placeholder re-mounts and re-reports its rect,
-      // so the SAME iframe just docks back inline instead of being torn down and restarted.
       onGoToChat: () => changeView('chat')
     }),
     isModalOpen && /*#__PURE__*/React.createElement(DateModal, {
@@ -7621,13 +7668,7 @@ function App() {
       },
       onOpenChatMessage: messageId => {
         changeView('chat');
-        setTimeout(() => {
-          const el = document.querySelector(`[data-msg-row-id="${messageId}"]`);
-          if (!el) return;
-          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          el.classList.add('search-result-flash');
-          setTimeout(() => el.classList.remove('search-result-flash'), 1700);
-        }, 350);
+        setTimeout(() => { focusChatMessage(messageId); }, 350);
       },
       onOpenImage: (messageId, imageIndex, directMediaUrl = '') => {
         changeView('chat');
@@ -7657,13 +7698,7 @@ function App() {
       },
       onOpenChatMessage: messageId => {
         changeView('chat');
-        setTimeout(() => {
-          const el = document.querySelector(`[data-msg-row-id="${messageId}"]`);
-          if (!el) return;
-          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          el.classList.add('search-result-flash');
-          setTimeout(() => el.classList.remove('search-result-flash'), 1700);
-        }, 350);
+        setTimeout(() => { focusChatMessage(messageId); }, 350);
       },
       onOpenImage: (messageId, imageIndex, directMediaUrl = '') => {
         changeView('chat');
@@ -7799,14 +7834,15 @@ function App() {
       onToggleChatNotifications: handleMainToggleNotifications,
       stickyVideoKey: stickyVideo ? stickyVideo.key : null,
       onActivateVideo: handleActivateChatVideo,
-      dockAnchorRef: videoDockAnchorRef,
       onDeletePhoto: handleDeletePhoto,
       onReplacePhoto: handleReplacePhoto,
       onJumpToChatMessage: handleJumpToChatMessage,
       onJumpToMemo: handleJumpToMemo,
       onJumpToMeetingDate: handleJumpToMeetingDate,
       onGetChatMessageOrdinal: handleGetChatMessageOrdinal,
-      onRequestConfirm: showConfirmDialog
+      onGetGalleryPhotoOrdinal: handleGetGalleryPhotoOrdinal,
+      onRequestConfirm: showConfirmDialog,
+      externalFocusMessageId: externalFocusMsgId
     })));
   }
 
@@ -7889,6 +7925,7 @@ function App() {
         onJumpToMemo: handleJumpToMemo,
         onJumpToMeetingDate: handleJumpToMeetingDate,
         onGetChatMessageOrdinal: handleGetChatMessageOrdinal,
+        onGetGalleryPhotoOrdinal: handleGetGalleryPhotoOrdinal,
         onRequestConfirm: showConfirmDialog
       }) : null
     ));
@@ -8215,6 +8252,7 @@ function App() {
     onJumpToMemo: handleJumpToMemo,
     onJumpToMeetingDate: handleJumpToMeetingDate,
     onGetChatMessageOrdinal: handleGetChatMessageOrdinal,
+    onGetGalleryPhotoOrdinal: handleGetGalleryPhotoOrdinal,
     onRequestConfirm: showConfirmDialog
   })), /*#__PURE__*/React.createElement(SummaryList, {
     calendar: activeCal,
@@ -8238,6 +8276,7 @@ function App() {
     onJumpToMemo: handleJumpToMemo,
     onJumpToMeetingDate: handleJumpToMeetingDate,
     onGetChatMessageOrdinal: handleGetChatMessageOrdinal,
+    onGetGalleryPhotoOrdinal: handleGetGalleryPhotoOrdinal,
     onRequestConfirm: showConfirmDialog
   }), /*#__PURE__*/React.createElement(PlacesSection, {
     calendar: activeCal,
@@ -8787,7 +8826,7 @@ function ImageUrlModal(props) {
 }
 
 
-function renderChatMessageBody(msg, setActiveLightbox, singleImageStyle = {}, searchQuery = '', stickyVideoKey = null, onActivateVideo = null, dockAnchorRef = null) {
+function renderChatMessageBody(msg, setActiveLightbox, singleImageStyle = {}, searchQuery = '', stickyVideoKey = null, onActivateVideo = null) {
   const msgImages = renderChatMessageImages(msg, setActiveLightbox, singleImageStyle);
   return /*#__PURE__*/React.createElement(React.Fragment, null,
     msgImages ? /*#__PURE__*/React.createElement('div', { style: { marginBottom: msg.text ? '8px' : '0' } }, msgImages) : null,
@@ -8799,8 +8838,7 @@ function renderChatMessageBody(msg, setActiveLightbox, singleImageStyle = {}, se
       style: singleImageStyle,
       message: msg,
       stickyVideoKey,
-      onActivateVideo,
-      dockAnchorRef
+      onActivateVideo
     }) : null
   );
 }

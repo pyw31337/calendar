@@ -235,6 +235,73 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
     return null;
   }
 
+  // 1-based position of a specific PHOTO among every photo ever uploaded through the gallery's
+  // own "이미지 업로드" action (uploadSource: 'gallery') -- used by the Lightbox source label
+  // ("갤러리 #20"). A single gallery upload can chunk into several messages with several photos
+  // each, so this sums photo counts across messages (ordered by timestamp) rather than counting
+  // messages the way fetchMessageOrdinal does for plain chat photos. Fetches the uploadSource==
+  // 'gallery' subset with a single-field equality filter -- deliberately not combined with a
+  // timestamp range filter in the same Firestore query, which would need a composite index this
+  // app doesn't define -- and does the ordering/summing client-side instead.
+  async function fetchGalleryPhotoOrdinal(calId, messageId, imageIndex) {
+    if (!isValidCalId(calId) || !messageId) return null;
+    const idx = Number.isInteger(imageIndex) ? imageIndex : 0;
+    const firebaseDb = getDb();
+    let docs = null;
+    if (firebaseDb) {
+      try {
+        const snap = await firebaseDb.collection('calendars').doc('cal_' + calId).collection('messages')
+          .where('uploadSource', '==', 'gallery').get();
+        docs = [];
+        snap.forEach(function (doc) { docs.push({ id: doc.id, ...doc.data() }); });
+      } catch (err) {
+        console.warn('fetchGalleryPhotoOrdinal sdk', err);
+      }
+    }
+    if (!docs) {
+      try {
+        const parentPath = 'projects/' + projectId() + '/databases/(default)/documents/calendars/cal_' + calId;
+        const url = 'https://firestore.googleapis.com/v1/' + parentPath + ':runQuery';
+        const body = {
+          structuredQuery: {
+            from: [{ collectionId: 'messages' }],
+            where: {
+              fieldFilter: {
+                field: { fieldPath: 'uploadSource' },
+                op: 'EQUAL',
+                value: { stringValue: 'gallery' }
+              }
+            }
+          }
+        };
+        const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        if (res.ok) {
+          const data = await res.json();
+          const rows = Array.isArray(data) ? data : [data];
+          docs = rows.filter(function (row) { return row && row.document; }).map(function (row) {
+            return { id: row.document.name.split('/').pop(), ...docToJs(row.document) };
+          });
+        } else {
+          console.warn('fetchGalleryPhotoOrdinal rest status', res.status);
+        }
+      } catch (err) {
+        console.warn('fetchGalleryPhotoOrdinal rest', err);
+      }
+    }
+    if (!docs) return null;
+    docs.sort(function (a, b) { return (Number(a.timestamp) || 0) - (Number(b.timestamp) || 0); });
+    let count = 0;
+    for (let i = 0; i < docs.length; i++) {
+      const doc = docs[i];
+      const photoCount = Array.isArray(doc.imageUrls) && doc.imageUrls.length > 0
+        ? doc.imageUrls.length
+        : (doc.imageUrl ? 1 : 0);
+      if (doc.id === messageId) return count + Math.min(idx, Math.max(0, photoCount - 1)) + 1;
+      count += photoCount;
+    }
+    return null;
+  }
+
   async function fetchOlderChatMessages(calId, beforeTimestamp, pageSize) {
     if (!isValidCalId(calId) || !beforeTimestamp) return [];
     const size = pageSize != null ? pageSize : olderPageSize();
@@ -393,6 +460,7 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
     fetchSubcollectionCount: fetchSubcollectionCount,
     fetchOlderChatMessages: fetchOlderChatMessages,
     fetchMessageOrdinal: fetchMessageOrdinal,
+    fetchGalleryPhotoOrdinal: fetchGalleryPhotoOrdinal,
     fetchGalleryItemCount: fetchGalleryItemCount,
     subscribeCalSubcollection: subscribeCalSubcollection,
     subscribeMessages: subscribeMessages,
