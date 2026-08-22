@@ -1,6 +1,8 @@
 import './react-globals.js';
 import './app.css';
 
+const BOOT_RETRY_KEY = 'gather_boot_auto_retry';
+
 function showBootStatus(msg) {
   const root = document.getElementById('root');
   if (!root || root.dataset.booted === '1') return;
@@ -50,8 +52,27 @@ async function boot() {
     window.__GATHER_BOOT_READY__ = true;
     await import('./core/app-main.js');
     if (typeof window.__gatherStartApp === 'function') window.__gatherStartApp();
+    try { sessionStorage.removeItem(BOOT_RETRY_KEY); } catch (_) {}
   } catch (err) {
     console.error('[P6] boot failed', err);
+    // The most common real cause here is a stale cached index.html (from before this tab was
+    // backgrounded) still pointing at content-hashed chunk files a newer deploy has since
+    // replaced -- every deploy fully replaces the site, so those old chunk URLs 404 and the
+    // dynamic imports above reject. sw.js's own fix (forcing navigations to bypass the HTTP
+    // cache) should prevent that at the source, but this is the fallback for whatever still slips
+    // through (a mid-navigation deploy race, a browser that ignores the no-store hint, etc.): one
+    // automatic hard reload, which fetches this same page fresh and gets the chunk hashes that
+    // are actually live right now. Guarded by a per-tab flag so a genuinely offline device or a
+    // real bug doesn't reload-loop forever -- it gets exactly one free retry, then the manual
+    // message.
+    let alreadyRetried = false;
+    try { alreadyRetried = sessionStorage.getItem(BOOT_RETRY_KEY) === '1'; } catch (_) {}
+    if (!alreadyRetried) {
+      try { sessionStorage.setItem(BOOT_RETRY_KEY, '1'); } catch (_) {}
+      showBootStatus('불러오는 중… (자동 재시도)');
+      window.location.reload();
+      return;
+    }
     showBootStatus('로딩 실패. 새로고침 해주세요.');
   }
 }
