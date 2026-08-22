@@ -1613,12 +1613,15 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
           ],
           onSelect: setCategoryFilter
         }),
-        /* Mobile Switching Tab: 방문 | 예정 */
+        /* Mobile Switching Tab: 방문 | 예정 -- height matches the 카테고리 select box next to it
+           (.form-select's 44px, see app.css) so the two controls line up edge-to-edge. */
         /*#__PURE__*/React.createElement("div", {
           className: "visit-filter-toggle-mobile",
           style: {
             display: 'inline-flex',
             alignItems: 'center',
+            height: '44px',
+            boxSizing: 'border-box',
             padding: '3px',
             borderRadius: '12px',
             border: '1px solid var(--border-subtle)',
@@ -1630,7 +1633,9 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
             type: "button",
             onClick: () => setVisitFilter(prev => prev === 'visited' ? 'all' : 'visited'),
             style: {
-              padding: '5px 12px',
+              height: '100%',
+              boxSizing: 'border-box',
+              padding: '0 12px',
               fontSize: '0.8rem',
               fontWeight: 900,
               borderRadius: '9px',
@@ -1645,7 +1650,9 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
             type: "button",
             onClick: () => setVisitFilter(prev => prev === 'planned' ? 'all' : 'planned'),
             style: {
-              padding: '5px 12px',
+              height: '100%',
+              boxSizing: 'border-box',
+              padding: '0 12px',
               fontSize: '0.8rem',
               fontWeight: 900,
               borderRadius: '9px',

@@ -671,6 +671,52 @@ function getAnniversaryDisplayColor(...args) {
   return typeof f === 'function' ? f(...args) : undefined;
 }
 
+// Tracks whether the OS clipboard currently holds an image, so a '붙여넣기' button can be
+// disabled when there's nothing to paste. Browsers vary wildly here (Firefox has no image
+// support for navigator.clipboard.read(), Safari/Chrome gate it behind the clipboard-read
+// permission) -- this fails OPEN (button stays enabled) whenever the check itself is
+// unsupported or inconclusive, and specifically avoids calling clipboard.read() while
+// permission is still 'prompt' so merely rendering the button never pops a permission dialog.
+function useClipboardHasImage(active) {
+  const React = window.React;
+  const [hasImage, setHasImage] = React.useState(true);
+  React.useEffect(() => {
+    if (!active || typeof navigator === 'undefined' || !navigator.clipboard || typeof navigator.clipboard.read !== 'function') {
+      return undefined;
+    }
+    let cancelled = false;
+    const check = async () => {
+      try {
+        if (navigator.permissions && typeof navigator.permissions.query === 'function') {
+          let state = 'granted';
+          try {
+            state = (await navigator.permissions.query({ name: 'clipboard-read' })).state;
+          } catch (e) {
+            // Permission name not recognized (Firefox) -- fall through to a direct read attempt.
+          }
+          if (state === 'denied') { if (!cancelled) setHasImage(false); return; }
+          if (state === 'prompt') return;
+        }
+        const items = await navigator.clipboard.read();
+        const found = items.some(item => item.types.some(t => t.startsWith('image/')));
+        if (!cancelled) setHasImage(found);
+      } catch (e) {
+        // Read blocked/unsupported right now -- leave the button as-is rather than disabling
+        // it over an inconclusive check.
+      }
+    };
+    check();
+    window.addEventListener('focus', check);
+    document.addEventListener('visibilitychange', check);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('focus', check);
+      document.removeEventListener('visibilitychange', check);
+    };
+  }, [active]);
+  return hasImage;
+}
+
 
 export function DateModal({
   anniversaries = [],
@@ -782,6 +828,23 @@ export function DateModal({
   const registeredPlaces = React.useMemo(() => {
     return getCalendarPlaces(calendar).filter(p => doesPlaceMatchDate(p, dateStr));
   }, [calendar, dateStr]);
+
+  // Places already registered on THIS calendar (any date, e.g. a place first visited weeks ago)
+  // matching the current search text -- '장소 검색' below only queries Kakao/Google/Nominatim's
+  // public business directories, which never contain a private/informal place someone only ever
+  // hand-registered here (e.g. "서준네"). Surfacing these lets the user reuse that record (see
+  // handleSelectExistingPlace) instead of typing it as a brand-new place with no visit history.
+  const existingPlaceSuggestions = React.useMemo(() => {
+    const trimmed = placeQuery.trim();
+    if (selectedPlace && selectedPlace.name === trimmed) return [];
+    if (trimmed.length < 2) return [];
+    const q = trimmed.toLowerCase();
+    const todayIds = new Set(registeredPlaces.map(p => p.id));
+    return getCalendarPlaces(calendar)
+      .filter(p => !todayIds.has(p.id))
+      .filter(p => (p.name || '').toLowerCase().includes(q) || (p.alias || '').toLowerCase().includes(q))
+      .slice(0, 8);
+  }, [placeQuery, selectedPlace, calendar, registeredPlaces]);
 
   // Debounced live typing search
   React.useEffect(() => {
@@ -914,7 +977,13 @@ export function DateModal({
         categoryId: placeCategoryId || selectedPlace.categoryId || 'etc',
         memo: cleanMemo,
         visitStatus: placeVisitStatus === 'planned' ? 'planned' : 'visited',
-        visitDate: dateStr
+        visitDate: dateStr,
+        // Not set while editing a place already linked to this date (editingLinkedPlaceId) --
+        // only relevant when adding a NEW date entry, so handleSavePlace (app-main.js) can
+        // recognize "the same Kakao/Google/Nominatim result, or the same already-registered
+        // calendar place (see handleSelectExistingPlace), was picked again" and merge into that
+        // record's multi-date memo instead of creating a duplicate place.
+        sourcePlaceId: editingLinkedPlaceId ? '' : (selectedPlace.id || '')
       };
 
       const ok = await Promise.resolve(onSavePlace(newPlaceData));
@@ -953,6 +1022,27 @@ export function DateModal({
   const handleSelectResult = (res) => {
     setSelectedPlace(res);
     setPlaceQuery(res.name);
+    setPlaceResults([]);
+  };
+
+  // Reuses an already-registered calendar place picked from existingPlaceSuggestions above.
+  // Deliberately does NOT set editingLinkedPlaceId (that's reserved for the pencil-icon edit of
+  // a place already linked to THIS date) -- instead handleSavePlaceClick below carries this
+  // place's own id through as sourcePlaceId, which handleSavePlace (app-main.js) recognizes and
+  // merges into, appending this date onto the place's existing multi-date memo instead of
+  // creating a duplicate place document.
+  const handleSelectExistingPlace = (place) => {
+    setSelectedPlace({
+      id: place.id,
+      name: place.name,
+      address: place.address,
+      lat: place.lat,
+      lng: place.lng,
+      categoryId: place.categoryId
+    });
+    setPlaceAlias(place.alias || '');
+    setPlaceCategoryId(place.categoryId || getPlaceCategories(calendar)[0]?.id || 'etc');
+    setPlaceQuery(place.name);
     setPlaceResults([]);
   };
 
@@ -1087,6 +1177,12 @@ export function DateModal({
   }, [confirmedMeetingEntry, chatMessages, dateStr]);
   const meetingPhotoInputRef = React.useRef(null);
   const [isSavingMeetingPhotos, setIsSavingMeetingPhotos] = React.useState(false);
+  const hasClipboardImage = useClipboardHasImage(activeTab === 'photo');
+  const [pastePreview, setPastePreview] = React.useState(null); // { files, previewUrls } | null
+  React.useEffect(() => () => {
+    // Safety net if the component unmounts (e.g. modal closed) while the preview is still open.
+    if (pastePreview) pastePreview.previewUrls.forEach(url => { try { URL.revokeObjectURL(url); } catch (e) {} });
+  }, [pastePreview]);
   const expenses = React.useMemo(
     () => (Array.isArray(confirmedMeetingEntry?.expenses) ? confirmedMeetingEntry.expenses : [])
       .filter(e => e && typeof e === 'object' && e.id)
@@ -1148,10 +1244,27 @@ export function DateModal({
     try {
       const files = await readClipboardImageFiles();
       if (files && files.length > 0) {
-        setIsSavingMeetingPhotos(true);
-        // See handleMeetingPhotoFiles above for why no toast is shown for the resolved result.
-        await Promise.resolve(onAddMeetingPhotos(dateStr, files));
+        // Show what will be uploaded and let the user confirm instead of uploading immediately --
+        // handleConfirmPasteMeetingPhotos does the actual upload once confirmed.
+        setPastePreview({ files, previewUrls: files.map(f => URL.createObjectURL(f)) });
       }
+    } catch (err) {
+      console.error('Paste meeting photo failed:', err);
+      showToast('사진 추가 실패', 'error');
+    }
+  };
+
+  // previewUrls are revoked by the cleanup effect above once pastePreview changes (including
+  // back to null here) -- no need to revoke them again in these two handlers.
+  const handleCancelPastePreview = () => setPastePreview(null);
+  const handleConfirmPastePreview = async () => {
+    if (!pastePreview || typeof onAddMeetingPhotos !== 'function') return;
+    const files = pastePreview.files;
+    setPastePreview(null);
+    setIsSavingMeetingPhotos(true);
+    try {
+      // See handleMeetingPhotoFiles above for why no toast is shown for the resolved result.
+      await Promise.resolve(onAddMeetingPhotos(dateStr, files));
     } catch (err) {
       console.error('Paste meeting photo failed:', err);
       showToast('사진 추가 실패', 'error');
@@ -2038,6 +2151,30 @@ export function DateModal({
           )
         ),
 
+        /* Existing calendar places matching the search text -- shown above the external
+           Kakao/Google/Nominatim results so an already-registered private place (e.g. "서준네")
+           is picked instead of accidentally creating a duplicate. */
+        existingPlaceSuggestions.length > 0 && /*#__PURE__*/React.createElement("div", {
+          style: {
+            display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '180px', overflowY: 'auto',
+            border: '1px solid rgba(79, 70, 229, 0.35)', borderRadius: '8px', padding: '6px', backgroundColor: 'rgba(79, 70, 229, 0.06)'
+          }
+        },
+          /*#__PURE__*/React.createElement("div", {
+            style: { fontSize: '0.72rem', fontWeight: 800, color: 'var(--accent-primary)', padding: '2px 6px' }
+          }, "이미 등록된 장소"),
+          existingPlaceSuggestions.map(p => /*#__PURE__*/React.createElement("button", {
+            key: p.id,
+            type: "button",
+            onClick: () => handleSelectExistingPlace(p),
+            style: { textAlign: 'left', padding: '8px 10px', borderRadius: '6px', border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '2px' },
+            className: "place-result-item"
+          },
+            /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-main)' } }, p.alias || p.name),
+            /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.72rem', color: 'var(--text-muted)' } }, getDisplayPlaceAddress(p) || p.name)
+          ))
+        ),
+
         /* Search Results List */
         placeResults.length > 0 && /*#__PURE__*/React.createElement("div", {
           style: {
@@ -2566,8 +2703,9 @@ export function DateModal({
           /*#__PURE__*/React.createElement("button", {
             type: "button",
             className: "btn btn-action btn-action-outline",
-            disabled: isSavingMeetingPhotos,
+            disabled: isSavingMeetingPhotos || !hasClipboardImage,
             onClick: handlePasteMeetingPhotos,
+            title: hasClipboardImage ? undefined : '클립보드에 붙여넣을 이미지가 없습니다.',
             style: {
               height: '36px',
               padding: '0 12px',
@@ -2614,16 +2752,22 @@ export function DateModal({
           referrerPolicy: "no-referrer",
           onClick: () => {
             if (typeof setActiveLightbox === 'function') {
+              // Lightbox expects { urls, index, meta } (array-shaped, for prev/next
+              // navigation) -- NOT a single flat photo object. Passing a flat object left
+              // `urls` undefined, which crashed Lightbox on `urls.length` and rendered a
+              // blank white screen. 'chat-tag' entries (tag-matched chat photos with no
+              // confirmedMeeting.photos entry of their own) route edit/delete/jump through
+              // messageId/imageIndex like any other chat photo; real meeting-tab uploads
+              // route through source:'meeting' + sourceMessageId/sourceImageIndex/
+              // meetingDate/photoId (see handleDeletePhoto/handleSaveImageTags in app-main.js).
               setActiveLightbox({
-                imageUrl: photo.imageUrl || photo.thumbUrl,
-                thumbUrl: photo.thumbUrl || photo.imageUrl,
-                createdAt: photo.createdAt,
-                tags: photo.tags,
-                source: photo.source || 'meeting',
-                sourceMessageId: photo.sourceMessageId,
-                sourceImageIndex: photo.sourceImageIndex,
-                meetingDate: dateStr,
-                photoId: photo.id
+                urls: meetingPhotos.map(p => p.imageUrl || p.thumbUrl),
+                index,
+                meta: meetingPhotos.map(p => (
+                  p.source === 'chat-tag'
+                    ? { timestamp: p.createdAt, tags: p.tags, messageId: p.sourceMessageId, imageIndex: p.sourceImageIndex }
+                    : { timestamp: p.createdAt, tags: p.tags, source: 'meeting', sourceMessageId: p.sourceMessageId, sourceImageIndex: p.sourceImageIndex, meetingDate: dateStr, photoId: p.id }
+                ))
               });
             } else {
               const url = photo.imageUrl || photo.thumbUrl;
@@ -2704,7 +2848,45 @@ export function DateModal({
     )
   )) : null;
 
-  const portaled = /*#__PURE__*/React.createElement(React.Fragment, null, portalContent, participantSheet);
+  // Paste preview/confirm modal -- shown after clicking '붙여넣기' (photo tab) and before the
+  // clipboard image(s) actually upload, so the user can see what's about to be attached.
+  const pastePreviewModal = pastePreview ? /*#__PURE__*/React.createElement("div", {
+    className: "modal-overlay",
+    style: { zIndex: 30000 },
+    onClick: handleCancelPastePreview
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "modal-container confirm-dialog-modal",
+    onClick: e => e.stopPropagation(),
+    style: { maxWidth: '360px', borderRadius: '12px' }
+  },
+    /*#__PURE__*/React.createElement("h3", {
+      style: { fontSize: '1.05rem', fontWeight: 800, marginBottom: '12px', color: 'var(--text-main)', textAlign: 'center' }
+    }, `클립보드 이미지 ${pastePreview.previewUrls.length}장을 붙여넣을까요?`),
+    /*#__PURE__*/React.createElement("div", {
+      style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(76px, 1fr))', gap: '8px', marginBottom: '16px', maxHeight: '50vh', overflowY: 'auto' }
+    }, pastePreview.previewUrls.map((url, i) => /*#__PURE__*/React.createElement("img", {
+      key: i,
+      src: url,
+      alt: "붙여넣을 이미지 미리보기",
+      style: { width: '100%', aspectRatio: '1 / 1', objectFit: 'cover', borderRadius: '10px', backgroundColor: 'var(--bg-primary)' }
+    }))),
+    /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '10px', justifyContent: 'center' } },
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "btn btn-secondary",
+        onClick: handleCancelPastePreview,
+        style: { flex: 1, height: '36px', fontSize: '0.85rem' }
+      }, "취소"),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "btn btn-action-dark",
+        onClick: handleConfirmPastePreview,
+        style: { flex: 1, height: '36px', fontSize: '0.85rem' }
+      }, "업로드")
+    )
+  )) : null;
+
+  const portaled = /*#__PURE__*/React.createElement(React.Fragment, null, portalContent, participantSheet, pastePreviewModal);
   return typeof document !== 'undefined' && ReactDOM.createPortal
     ? ReactDOM.createPortal(portaled, document.body)
     : portaled;

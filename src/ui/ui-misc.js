@@ -739,6 +739,13 @@ export function UpdateAvailableBanner() {
   );
 }
 
+// A plain JS style object can't use CSS's @supports fallback cascade the way app.css does (two
+// inline style keys of the same name just collapse to the last one -- the '100vh' this used to
+// sit next to was always dead code, never an actual fallback) -- pick the right unit once here
+// instead, so an engine without dvh support (very old browsers only at this point) still gets a
+// valid minHeight rather than none at all.
+const SUPPORTS_DVH = typeof CSS !== 'undefined' && typeof CSS.supports === 'function' && CSS.supports('height', '1dvh');
+
 export function ImageShareViewer({ shareId }) {
   const React = window.React;
 
@@ -761,8 +768,7 @@ export function ImageShareViewer({ shareId }) {
 
   return /*#__PURE__*/React.createElement("div", {
     style: {
-      minHeight: '100vh',
-      minHeight: '100dvh',
+      minHeight: SUPPORTS_DVH ? '100dvh' : '100vh',
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',

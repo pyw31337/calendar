@@ -1230,7 +1230,7 @@ export function AdminModal({
                 }),
                 /*#__PURE__*/React.createElement("button", {
                   type: "button", className: "btn btn-secondary", disabled: isSubmitting,
-                  style: { whiteSpace: 'nowrap', height: '34px' },
+                  style: { whiteSpace: 'nowrap', height: '44px' },
                   onClick: handleAddParticipant
                 }, "추가")
               ),
@@ -1765,7 +1765,7 @@ export function AdminUnifiedSearchResultsView({
         type: "button",
         onClick: () => { onCalFilterChange('all'); onDateStartChange(''); onDateEndChange(''); },
         className: "btn btn-secondary",
-        style: { padding: '6px 12px', fontSize: '0.78rem', flexShrink: 0 }
+        style: { height: '44px', boxSizing: 'border-box', padding: '0 12px', fontSize: '0.78rem', flexShrink: 0 }
       }, "초기화")
     ),
 

@@ -786,6 +786,7 @@ export function UserManualOverlay({ calendar, onClose }) {
       inset: 0,
       zIndex: 10040,
       background: 'rgba(15, 23, 42, 0.72)',
+      WebkitBackdropFilter: 'blur(9px)',
       backdropFilter: 'blur(9px)',
       display: 'flex',
       alignItems: 'center',
