@@ -2614,16 +2614,22 @@ export function DateModal({
           referrerPolicy: "no-referrer",
           onClick: () => {
             if (typeof setActiveLightbox === 'function') {
+              // Lightbox expects { urls, index, meta } (array-shaped, for prev/next
+              // navigation) -- NOT a single flat photo object. Passing a flat object left
+              // `urls` undefined, which crashed Lightbox on `urls.length` and rendered a
+              // blank white screen. 'chat-tag' entries (tag-matched chat photos with no
+              // confirmedMeeting.photos entry of their own) route edit/delete/jump through
+              // messageId/imageIndex like any other chat photo; real meeting-tab uploads
+              // route through source:'meeting' + sourceMessageId/sourceImageIndex/
+              // meetingDate/photoId (see handleDeletePhoto/handleSaveImageTags in app-main.js).
               setActiveLightbox({
-                imageUrl: photo.imageUrl || photo.thumbUrl,
-                thumbUrl: photo.thumbUrl || photo.imageUrl,
-                createdAt: photo.createdAt,
-                tags: photo.tags,
-                source: photo.source || 'meeting',
-                sourceMessageId: photo.sourceMessageId,
-                sourceImageIndex: photo.sourceImageIndex,
-                meetingDate: dateStr,
-                photoId: photo.id
+                urls: meetingPhotos.map(p => p.imageUrl || p.thumbUrl),
+                index,
+                meta: meetingPhotos.map(p => (
+                  p.source === 'chat-tag'
+                    ? { timestamp: p.createdAt, tags: p.tags, messageId: p.sourceMessageId, imageIndex: p.sourceImageIndex }
+                    : { timestamp: p.createdAt, tags: p.tags, source: 'meeting', sourceMessageId: p.sourceMessageId, sourceImageIndex: p.sourceImageIndex, meetingDate: dateStr, photoId: p.id }
+                ))
               });
             } else {
               const url = photo.imageUrl || photo.thumbUrl;
