@@ -676,6 +676,8 @@ export function DateModal({
   anniversaries = [],
   dateStr,
   calendar,
+  chatMessages = [],
+  setActiveLightbox,
   adminMode = false,
   onSave,
   onConfirmMeeting,
@@ -1020,15 +1022,66 @@ export function DateModal({
   const totalPartCount = activeParticipants.length || 0;
   const uniqueActiveParts = new Set(dateEntries.map(e => e.participantId));
   const isAllAvailable = totalPartCount > 0 && uniqueActiveParts.size === totalPartCount;
-  const isConfirmed = isDateConfirmedMeeting(calendar, dateStr);
-  const confirmedMeetingEntry = getConfirmedMeetings(calendar).find(m => m.date === dateStr) || null;
-  const meetingPhotos = React.useMemo(
-    () => (Array.isArray(confirmedMeetingEntry?.photos) ? confirmedMeetingEntry.photos : [])
-      .filter(photo => photo && (photo.imageUrl || photo.thumbUrl))
-      .slice()
-      .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)),
-    [confirmedMeetingEntry]
-  );
+  const getMessageImageEntries = __deps.getMessageImageEntries;
+  const parseFlexibleDateTokens = __deps.parseFlexibleDateTokens;
+  const dateStrToHashtag = __deps.dateStrToHashtag;
+
+  const meetingPhotos = React.useMemo(() => {
+    const directPhotos = (Array.isArray(confirmedMeetingEntry?.photos) ? confirmedMeetingEntry.photos : [])
+      .filter(photo => photo && (photo.imageUrl || photo.thumbUrl));
+
+    const directUrls = new Set(directPhotos.map(p => p.imageUrl || p.thumbUrl).filter(Boolean));
+    const targetTag = typeof dateStrToHashtag === 'function' ? dateStrToHashtag(dateStr) : (dateStr ? dateStr.replace(/-/g, '').slice(2) : '');
+
+    const chatPhotos = [];
+    (chatMessages || []).forEach(msg => {
+      const getEntries = typeof getMessageImageEntries === 'function' ? getMessageImageEntries : null;
+      const entries = getEntries ? getEntries(msg) : [];
+      if (entries.length > 0) {
+        entries.forEach((entry, idx) => {
+          const tags = (Array.isArray(msg.imageTags) ? msg.imageTags[idx] : '') || entry.tags || '';
+          const parsedDates = typeof parseFlexibleDateTokens === 'function' ? parseFlexibleDateTokens(tags) : [];
+          const matchesTag = (targetTag && tags.includes(targetTag)) || parsedDates.includes(dateStr);
+          if (matchesTag) {
+            const url = entry.full || entry.thumb || entry.imageUrl;
+            if (url && !directUrls.has(url)) {
+              directUrls.add(url);
+              chatPhotos.push({
+                id: `chat_photo_${msg.id}_${idx}`,
+                imageUrl: url,
+                thumbUrl: entry.thumb || url,
+                createdAt: msg.timestamp || 0,
+                source: 'chat-tag',
+                sourceMessageId: msg.id,
+                sourceImageIndex: idx,
+                tags: tags
+              });
+            }
+          }
+        });
+      } else {
+        const imageUrl = msg.imageUrl || msg.thumbUrl;
+        const tags = (Array.isArray(msg.imageTags) ? msg.imageTags[0] : '') || msg.tags || '';
+        const parsedDates = typeof parseFlexibleDateTokens === 'function' ? parseFlexibleDateTokens(tags) : [];
+        const matchesTag = (targetTag && tags.includes(targetTag)) || parsedDates.includes(dateStr);
+        if (imageUrl && matchesTag && !directUrls.has(imageUrl)) {
+          directUrls.add(imageUrl);
+          chatPhotos.push({
+            id: `chat_photo_${msg.id}_0`,
+            imageUrl: imageUrl,
+            thumbUrl: msg.thumbUrl || imageUrl,
+            createdAt: msg.timestamp || 0,
+            source: 'chat-tag',
+            sourceMessageId: msg.id,
+            sourceImageIndex: 0,
+            tags: tags
+          });
+        }
+      }
+    });
+
+    return [...directPhotos, ...chatPhotos].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  }, [confirmedMeetingEntry, chatMessages, dateStr]);
   const meetingPhotoInputRef = React.useRef(null);
   const [isSavingMeetingPhotos, setIsSavingMeetingPhotos] = React.useState(false);
   const expenses = React.useMemo(
@@ -2555,8 +2608,22 @@ export function DateModal({
           decoding: "async",
           referrerPolicy: "no-referrer",
           onClick: () => {
-            const url = photo.imageUrl || photo.thumbUrl;
-            if (url) window.open(url, '_blank', 'noopener,noreferrer');
+            if (typeof setActiveLightbox === 'function') {
+              setActiveLightbox({
+                imageUrl: photo.imageUrl || photo.thumbUrl,
+                thumbUrl: photo.thumbUrl || photo.imageUrl,
+                createdAt: photo.createdAt,
+                tags: photo.tags,
+                source: photo.source || 'meeting',
+                sourceMessageId: photo.sourceMessageId,
+                sourceImageIndex: photo.sourceImageIndex,
+                meetingDate: dateStr,
+                photoId: photo.id
+              });
+            } else {
+              const url = photo.imageUrl || photo.thumbUrl;
+              if (url) window.open(url, '_blank', 'noopener,noreferrer');
+            }
           },
           style: {
             width: '100%',

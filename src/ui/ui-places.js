@@ -1145,6 +1145,8 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
   const extractKnownParticipantNames = __deps.extractKnownParticipantNames;
   const getPlaceExternalMapUrl = __deps.getPlaceExternalMapUrl;
 
+  const isMobile = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(max-width: 640px)').matches;
+
   const [isRegisterOpen, setIsRegisterOpen] = React.useState(false);
   const [editingPlace, setEditingPlace] = React.useState(null);
   const [categoryFilter, setCategoryFilter] = React.useState('all');
