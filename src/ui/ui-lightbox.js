@@ -946,6 +946,9 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
     if (!showInfo) return;
     if (!currentMeta || currentMeta.source === 'meeting' || currentMeta.source === 'memo') return;
     if (currentMeta.uploadSource === 'gallery') return; // uses the photo-ordinal fetch below instead
+    // 'meeting'-uploadSource photos are hidden from the chat feed (see ChatRoomView's render
+    // filter), so a chat ordinal for them is never shown/clickable -- no point fetching it.
+    if (currentMeta.uploadSource === 'meeting') return;
     if (typeof onGetChatMessageOrdinal !== 'function') return;
     const key = currentMeta.messageId;
     const ts = currentMeta.timestamp;
@@ -996,20 +999,23 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
     // 업로드" menu action and DateModal's own "일정 사진 추가" button (see
     // handleUploadGalleryImages/handleAddMeetingPhotos' uploadSource marker). Falls back to the
     // generic label until the relevant ordinal above resolves.
+    // 'gallery'/'meeting' uploadSource photos are never rendered in the chat feed (see
+    // ChatRoomView's render filter + onMessageCreate's push-skip) -- there is no chat bubble to
+    // jump to, so their source chip stays a plain (non-clickable) label.
     if (currentMeta.uploadSource === 'gallery') {
       const galleryKey = currentMeta.messageId != null ? `${currentMeta.messageId}_${currentMeta.imageIndex || 0}` : null;
       const galleryOrdinal = galleryKey != null ? galleryOrdinalCache[galleryKey] : null;
       return {
         label: typeof galleryOrdinal === 'number' ? `갤러리 #${galleryOrdinal}` : '갤러리에서 업로드됨',
-        onClick: (onJumpToChatMessage && currentMeta.messageId) ? () => onJumpToChatMessage(currentMeta.messageId) : null
+        onClick: null
       };
     }
+    if (currentMeta.uploadSource === 'meeting') {
+      return { label: '일정 사진으로 업로드됨', onClick: null };
+    }
     const ordinal = currentMeta.messageId != null ? chatOrdinalCache[currentMeta.messageId] : null;
-    const label = currentMeta.uploadSource === 'meeting'
-      ? (typeof ordinal === 'number' ? `일정 사진 업로드 (채팅 #${ordinal})` : '일정 사진으로 업로드됨')
-      : (typeof ordinal === 'number' ? `채팅 #${ordinal}` : '채팅');
     return {
-      label,
+      label: typeof ordinal === 'number' ? `채팅 #${ordinal}` : '채팅',
       onClick: (onJumpToChatMessage && currentMeta.messageId) ? () => onJumpToChatMessage(currentMeta.messageId) : null
     };
   }, [currentMeta, onJumpToChatMessage, onJumpToMemo, onJumpToMeetingDate, chatOrdinalCache, galleryOrdinalCache]);

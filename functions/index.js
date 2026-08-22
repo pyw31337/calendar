@@ -28,9 +28,17 @@ exports.onMessageCreate = functions.runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).
     ensureVapidConfigured();
     const calendarDocId = context.params.calendarDocId;
     const message = snapshot.data();
-    
+
+    // 일정 레이어팝업 사진탭('meeting')/갤러리 페이지('gallery')에서 올린 사진은 태그
+    // 편집·삭제 등을 위해 실제 채팅 메시지 문서로 저장되지만, 채팅 활동이 아니므로
+    // 채팅방에도 노출되지 않고(ChatRoomView 렌더 필터 참고) 푸시 알림도 보내지 않아야 함.
+    if (message.uploadSource === 'meeting' || message.uploadSource === 'gallery') {
+      console.log('Skipping push for non-chat photo upload:', message.uploadSource);
+      return;
+    }
+
     const db = admin.firestore();
-    
+
     // 1. Get calendar details to retrieve title and participants
     const calendarSnap = await db.collection('calendars').doc(calendarDocId).get();
     if (!calendarSnap.exists) {

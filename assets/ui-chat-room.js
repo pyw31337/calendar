@@ -364,6 +364,10 @@ function ChatRoomView({
   let readMarkerInserted = false;
   const renderedMessages = [];
   chatMessages.forEach((msg, idx) => {
+    // 일정탭('meeting')/갤러리페이지('gallery')에서 올린 사진은 참조용 실제 채팅 메시지
+    // 문서로 저장되긴 하지만(태그 편집·삭제·갤러리 정렬 번호 매기기가 이 문서를 가리킴),
+    // 채팅 피드에는 노출되지 않아야 함 -- 갤러리/일정 레이어팝업 사진탭에서만 보여야 함.
+    if (msg.uploadSource === 'meeting' || msg.uploadSource === 'gallery') return;
     if (!readMarkerInserted && priorReadTimestamp > 0 && msg.timestamp > priorReadTimestamp) {
       readMarkerInserted = true;
       renderedMessages.push(/*#__PURE__*/React.createElement("div", {
