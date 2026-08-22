@@ -8265,13 +8265,54 @@ async function migrateBase64ChatImagesForCalendar(calId, { maxMessages = 40 } = 
 }
 
 
+async function readClipboardImageFiles() {
+  if (typeof navigator === 'undefined' || !navigator.clipboard) {
+    if (typeof showToast === 'function') showToast('클립보드 접근을 지원하지 않는 브라우저입니다.', 'error');
+    return [];
+  }
+  try {
+    const files = [];
+    if (typeof navigator.clipboard.read === 'function') {
+      const items = await navigator.clipboard.read();
+      for (const item of items) {
+        for (const type of item.types) {
+          if (type.startsWith('image/')) {
+            const blob = await item.getType(type);
+            const ext = type.split('/')[1] || 'png';
+            const file = new File([blob], `paste_${Date.now()}.${ext}`, { type });
+            files.push(file);
+          }
+        }
+      }
+    }
+    if (files.length === 0) {
+      if (typeof showToast === 'function') showToast('클립보드에 이미지가 없습니다.', 'info');
+    }
+    return files;
+  } catch (err) {
+    console.warn('readClipboardImageFiles failed:', err);
+    if (typeof showToast === 'function') showToast('클립보드 이미지를 읽을 수 없거나 접근 권한이 없습니다.', 'error');
+    return [];
+  }
+}
+
 // Resolves the {imageUrl, thumbUrl} pair a message/memo should store: uploaded Storage
 // download URLs when possible, the original compressed base64 data URLs otherwise. uploadFn
 // is uploadChatImageAssets or uploadMemoImageAssets, keeping each feature's Storage path.
 async function resolveImageUrls(calendarId, compressed, index, onBytes, uploadFn) {
-  const uploaded = await uploadFn(calendarId, compressed, index, onBytes);
-  if (uploaded) return uploaded;
-  throw new Error('이미지 업로드에 실패했습니다. 네트워크 상태를 확인한 뒤 다시 시도해 주세요.');
+  try {
+    const uploaded = await uploadFn(calendarId, compressed, index, onBytes);
+    if (uploaded && uploaded.imageUrl && uploaded.thumbUrl) return uploaded;
+  } catch (e) {
+    console.warn('Image Storage upload attempt failed, falling back to base64 data URL:', e);
+  }
+  if (compressed && (compressed.original || compressed.thumbnail)) {
+    return {
+      imageUrl: compressed.original || compressed.thumbnail,
+      thumbUrl: compressed.thumbnail || compressed.original
+    };
+  }
+  throw new Error('이미지 처리 중 오류가 발생했습니다.');
 }
 
 // Resolves a whole batch of images (upload + fallback per image, same as resolveImageUrls)
@@ -8283,15 +8324,12 @@ async function resolveImageBatch(calendarId, compressedList, onProgress, uploadF
     .map((c, idx) => ({ c, idx }))
     .filter(({ c }) => !c.isExisting);
 
-  const isStorageWorking = await checkFirebaseStorageHealth();
+  const isStorageWorking = await checkFirebaseStorageHealth().catch(() => false);
   if (uploadIndexes.length === 0) {
     if (onProgress) onProgress({ pct: 100, remainingSec: 0, current: compressedList.length, total: compressedList.length });
     return Promise.all(compressedList.map((c) =>
       Promise.resolve({ imageUrl: c.original, thumbUrl: c.thumbnail })
     ));
-  }
-  if (!firebaseStorage || !isStorageWorking) {
-    throw new Error('이미지 저장소를 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.');
   }
 
   // Progress split: compression = 0~45%, upload = 45~99%
@@ -8299,9 +8337,6 @@ async function resolveImageBatch(calendarId, compressedList, onProgress, uploadF
   const startedAt = Date.now();
   const total = compressedList.length;
   let compressionDone = 0;
-  // 1-indexed position of the image currently being uploaded, for the "(n/total)" label --
-  // images upload strictly one at a time (see the sequential loop below), so this is always
-  // unambiguous.
   let currentIndex = 0;
 
   const reportCompressionProgress = () => {
@@ -8309,7 +8344,7 @@ async function resolveImageBatch(calendarId, compressedList, onProgress, uploadF
     const pct = Math.min(44, Math.round((compressionDone / total) * 45));
     const elapsedSec = (Date.now() - startedAt) / 1000;
     const remainingSec = compressionDone > 0
-      ? Math.max(0, Math.round((elapsedSec / compressionDone) * (total - compressionDone) * 2)) // *2 for upload phase too
+      ? Math.max(0, Math.round((elapsedSec / compressionDone) * (total - compressionDone) * 2))
       : null;
     onProgress({ pct, remainingSec, current: currentIndex, total });
   };

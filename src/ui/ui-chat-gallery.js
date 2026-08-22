@@ -400,6 +400,10 @@ function processImageFilesSequentially(...args) {
   const f = __gatherUiDeps().processImageFilesSequentially || GATHER_APP_UTILS.processImageFilesSequentially;
   return typeof f === 'function' ? f(...args) : undefined;
 }
+function readClipboardImageFiles(...args) {
+  const f = __gatherUiDeps().readClipboardImageFiles || GATHER_APP_UTILS.readClipboardImageFiles;
+  return typeof f === 'function' ? f(...args) : Promise.resolve([]);
+}
 function pushSingleCloudCalendar(...args) {
   const f = __gatherUiDeps().pushSingleCloudCalendar || GATHER_APP_UTILS.pushSingleCloudCalendar;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -901,6 +905,13 @@ export function ChatGalleryModal({
   const handleUploadClick = () => {
     if (uploadInputRef.current) uploadInputRef.current.click();
   };
+  const handlePasteGalleryUpload = async e => {
+    if (e) e.stopPropagation();
+    const files = await readClipboardImageFiles();
+    if (files && files.length > 0) {
+      await uploadFiles(files);
+    }
+  };
   const uploadFiles = async files => {
     if (!files.length || typeof onUploadImages !== 'function') return;
     setIsMenuOpen(false);
@@ -1082,16 +1093,35 @@ export function ChatGalleryModal({
           /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "사진·링크 통합 검색")
         )
       ),
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        className: "admin-side-menu-item",
-        onClick: handleUploadClick
+      /*#__PURE__*/React.createElement("div", {
+        style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', paddingRight: '8px' }
       },
-        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, renderGalleryUploadIcon()),
-        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
-          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "이미지 업로드"),
-          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "갤러리에 사진을 바로 추가")
-        )
+        /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          className: "admin-side-menu-item",
+          onClick: handleUploadClick,
+          style: { flex: 1 }
+        },
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, renderGalleryUploadIcon()),
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
+            /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "이미지 업로드"),
+            /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "갤러리에 사진을 바로 추가")
+          )
+        ),
+        /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          className: "btn btn-action btn-action-outline",
+          onClick: handlePasteGalleryUpload,
+          style: {
+            padding: '4px 10px',
+            fontSize: '0.76rem',
+            fontWeight: 900,
+            borderRadius: '8px',
+            cursor: 'pointer',
+            flexShrink: 0,
+            whiteSpace: 'nowrap'
+          }
+        }, "붙여넣기")
       ),
       typeof onOpenShare === 'function' && /*#__PURE__*/React.createElement("button", {
         type: "button",

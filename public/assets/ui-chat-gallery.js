@@ -400,6 +400,10 @@ function processImageFilesSequentially(...args) {
   const f = __gatherUiDeps().processImageFilesSequentially || GATHER_APP_UTILS.processImageFilesSequentially;
   return typeof f === 'function' ? f(...args) : undefined;
 }
+function readClipboardImageFiles(...args) {
+  const f = __gatherUiDeps().readClipboardImageFiles || GATHER_APP_UTILS.readClipboardImageFiles;
+  return typeof f === 'function' ? f(...args) : Promise.resolve([]);
+}
 function pushSingleCloudCalendar(...args) {
   const f = __gatherUiDeps().pushSingleCloudCalendar || GATHER_APP_UTILS.pushSingleCloudCalendar;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -683,7 +687,14 @@ export function ChatGalleryModal({
   onLoadOlderChat = null,
   hasMoreMemos = false,
   onLoadMoreMemos = null,
-  totalGalleryCount = 0
+  totalGalleryCount = 0,
+  isDarkTheme,
+  onToggleTheme,
+  fontScalePercent,
+  onDecreaseFont,
+  onIncreaseFont,
+  isChatNotifyEnabled,
+  onToggleChatNotifications
 }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -691,11 +702,13 @@ export function ChatGalleryModal({
   const ResizableModalContainer = __deps.ResizableModalContainer;
   const SmallXIcon = __deps.SmallXIcon;
   const BackArrowIcon = __deps.BackArrowIcon;
+  const SharedSideMenuSettings = __comp.SharedSideMenuSettings || __deps.SharedSideMenuSettings;
   const InlineSearchBar = __comp.InlineSearchBar || __deps.InlineSearchBar;
   const LinkPreviewCard = __deps.LinkPreviewCard || __comp.LinkPreviewCard;
   const MenuIcon = __deps.MenuIcon || __comp.MenuIcon;
   const getMessageImageEntries = __deps.getMessageImageEntries;
   const getMessageDirectMediaEntry = __deps.getMessageDirectMediaEntry;
+  const resolveMeetingPhotoDisplay = __deps.resolveMeetingPhotoDisplay;
   const extractFirstUrl = __deps.extractFirstUrl;
   const removeFirstUrl = __deps.removeFirstUrl;
   const formatChatHeaderTitle = __deps.formatChatHeaderTitle;
@@ -777,6 +790,10 @@ export function ChatGalleryModal({
       });
     });
     (memos || []).forEach(memo => {
+      // memo.tags is a whole-memo tag list (not per-image), so it's only readable here for
+      // display -- there's no single-photo target to write back to, which is why the tag
+      // editor below is gated off (source !== 'chat'/'meeting') for memo-sourced entries.
+      const memoTagsDisplay = Array.isArray(memo.tags) ? memo.tags.map(t => String(t || '').replace(/^#/, '')).filter(Boolean).join(' ') : '';
       const asMsg = {
         id: memo.id, text: memo.text || memo.content || memo.body || '',
         imageUrl: memo.imageUrl, imageUrls: memo.imageUrls, thumbUrl: memo.thumbUrl, thumbUrls: memo.thumbUrls,
@@ -785,22 +802,30 @@ export function ChatGalleryModal({
       const directEntry = getMessageDirectMediaEntry(asMsg);
       const entries = directEntry ? [...getMessageImageEntries(asMsg), directEntry] : getMessageImageEntries(asMsg);
       entries.forEach(entry => {
-        list.push({ ...entry, text: asMsg.text || '', participantId: asMsg.participantId || '', source: 'memo' });
+        list.push({ ...entry, tags: memoTagsDisplay, text: asMsg.text || '', participantId: asMsg.participantId || '', source: 'memo' });
       });
     });
     getConfirmedMeetings(calendar).forEach(meeting => {
       const photos = Array.isArray(meeting?.photos) ? meeting.photos : [];
       photos.forEach((photo, index) => {
-        const full = String(photo?.imageUrl || photo?.full || '');
-        const thumb = String(photo?.thumbUrl || photo?.thumb || full);
+        // Auto-linked entries (sourceMessageId set) are references to a real chat photo, not
+        // independent copies -- resolve the live imageUrl/thumbUrl/tags from that source
+        // message so this tile always matches the chat original exactly, including any tag
+        // edit made from anywhere else.
+        const resolved = resolveMeetingPhotoDisplay ? resolveMeetingPhotoDisplay(photo, chatMessages) : null;
+        const full = String(resolved?.imageUrl || photo?.imageUrl || photo?.full || '');
+        const thumb = String(resolved?.thumbUrl || photo?.thumbUrl || photo?.thumb || full);
         if (!full && !thumb) return;
         list.push({
           full: full || thumb,
           thumb: thumb || full,
           imageIndex: index,
           messageId: null,
+          photoId: photo?.id || '',
+          sourceMessageId: photo?.sourceMessageId || '',
+          sourceImageIndex: Number.isInteger(photo?.sourceImageIndex) ? photo.sourceImageIndex : null,
           timestamp: Number(photo?.createdAt || photo?.updatedAt || meeting?.confirmedAt || 0),
-          tags: String(photo?.tags || ''),
+          tags: String(resolved?.tags ?? photo?.tags ?? ''),
           text: `${meeting.date || ''} 일정 사진`,
           participantId: '',
           source: 'meeting',
@@ -808,7 +833,24 @@ export function ChatGalleryModal({
         });
       });
     });
-    return list.sort((a, b) => b.timestamp - a.timestamp);
+    // Tagging a photo with a date auto-links a copy of it onto that date's 일정(meeting) record
+    // (see linkTaggedImageToMeetingDates in app-main.js), so the same photo can legitimately
+    // appear twice in the raw lists above: once as the original chat/memo message, once as the
+    // meeting's archival copy. Collapse those down to one tile per photo URL so the gallery
+    // doesn't show duplicates -- keep the chat/memo copy when both exist (its tag editor writes
+    // back to a real message), falling back to the meeting copy only when it's the sole survivor
+    // (e.g. the original message hasn't been paginated into view yet).
+    const byUrl = new Map();
+    const sourceRank = { chat: 0, memo: 1, meeting: 2 };
+    list.forEach(entry => {
+      const key = entry.full || entry.thumb;
+      if (!key) return;
+      const existing = byUrl.get(key);
+      if (!existing || (sourceRank[entry.source] ?? 9) < (sourceRank[existing.source] ?? 9)) {
+        byUrl.set(key, entry);
+      }
+    });
+    return Array.from(byUrl.values()).sort((a, b) => b.timestamp - a.timestamp);
   }, [chatMessages, memos, calendar]);
 
   const filteredLinks = React.useMemo(() => {
@@ -863,14 +905,37 @@ export function ChatGalleryModal({
   const handleUploadClick = () => {
     if (uploadInputRef.current) uploadInputRef.current.click();
   };
-  const handleUploadChange = async event => {
-    const files = Array.from(event.target.files || []);
-    event.target.value = '';
+  const handlePasteGalleryUpload = async e => {
+    if (e) e.stopPropagation();
+    const files = await readClipboardImageFiles();
+    if (files && files.length > 0) {
+      await uploadFiles(files);
+    }
+  };
+  const uploadFiles = async files => {
     if (!files.length || typeof onUploadImages !== 'function') return;
     setIsMenuOpen(false);
     await Promise.resolve(onUploadImages(files));
     setActiveTab('photos');
   };
+  const handleUploadChange = async event => {
+    const files = Array.from(event.target.files || []);
+    event.target.value = '';
+    await uploadFiles(files);
+  };
+  // Lets '이미지 업로드' accept a clipboard-pasted image too, not just the file picker -- active
+  // for as long as the 갤러리 페이지 is open, so Ctrl+V uploads directly without opening the menu.
+  React.useEffect(() => {
+    if (typeof onUploadImages !== 'function') return;
+    const handlePaste = e => {
+      const files = getImageFilesFromClipboardEvent(e);
+      if (!files.length) return;
+      e.preventDefault();
+      uploadFiles(files);
+    };
+    document.addEventListener('paste', handlePaste);
+    return () => document.removeEventListener('paste', handlePaste);
+  }, [onUploadImages]);
   const renderMenuIcon = () => MenuIcon
     ? /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M4 6h16", "M4 12h16", "M4 18h16"] })
     : /*#__PURE__*/React.createElement("svg", {
@@ -956,19 +1021,6 @@ export function ChatGalleryModal({
           }, formatChatHeaderTitle(calendar?.title) ? formatChatHeaderTitle(calendar?.title) + " 갤러리" : "갤러리"),
           /*#__PURE__*/React.createElement("button", {
             type: "button",
-            onClick: () => setIsSearchOpen(prev => { if (prev) setSearchQuery(''); return !prev; }),
-            title: "검색", "aria-label": "갤러리 검색",
-            style: {
-              background: 'none', border: 'none', cursor: 'pointer', padding: '6px',
-              color: isSearchOpen ? 'var(--text-main)' : '#64748B',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
-            }
-          }, /*#__PURE__*/React.createElement("svg", {
-            xmlns: "http://www.w3.org/2000/svg", width: "22", height: "22", viewBox: "0 0 24 24",
-            fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
-          }, /*#__PURE__*/React.createElement("circle", { cx: "11", cy: "11", r: "8" }), /*#__PURE__*/React.createElement("path", { d: "m21 21-4.3-4.3" }))),
-          /*#__PURE__*/React.createElement("button", {
-            type: "button",
             onClick: () => setIsMenuOpen(true),
             title: "갤러리 메뉴", "aria-label": "갤러리 메뉴",
             style: {
@@ -1005,11 +1057,12 @@ export function ChatGalleryModal({
     style: { display: 'none' }
   }),
   asPage && isMenuOpen && /*#__PURE__*/React.createElement("div", {
-    className: "admin-side-menu-overlay gallery-side-menu-overlay",
+    className: "admin-side-menu-overlay",
     onClick: () => setIsMenuOpen(false),
     style: { zIndex: 12000 }
   }, /*#__PURE__*/React.createElement("nav", {
-    className: "admin-side-menu gallery-side-menu-panel",
+    className: "admin-side-menu",
+    "aria-label": "갤러리 메뉴",
     onClick: e => e.stopPropagation()
   },
     /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-header" },
@@ -1029,13 +1082,46 @@ export function ChatGalleryModal({
       /*#__PURE__*/React.createElement("button", {
         type: "button",
         className: "admin-side-menu-item",
-        onClick: handleUploadClick
+        onClick: () => { setIsMenuOpen(false); setIsSearchOpen(true); }
       },
-        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, renderGalleryUploadIcon()),
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", {
+          xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24",
+          fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
+        }, /*#__PURE__*/React.createElement("circle", { cx: "11", cy: "11", r: "8" }), /*#__PURE__*/React.createElement("path", { d: "m21 21-4.3-4.3" }))),
         /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
-          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "이미지 업로드"),
-          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "갤러리에 사진을 바로 추가")
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "갤러리 검색"),
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "사진·링크 통합 검색")
         )
+      ),
+      /*#__PURE__*/React.createElement("div", {
+        style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', paddingRight: '8px' }
+      },
+        /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          className: "admin-side-menu-item",
+          onClick: handleUploadClick,
+          style: { flex: 1 }
+        },
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, renderGalleryUploadIcon()),
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
+            /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "이미지 업로드"),
+            /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "갤러리에 사진을 바로 추가")
+          )
+        ),
+        /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          className: "btn btn-action btn-action-outline",
+          onClick: handlePasteGalleryUpload,
+          style: {
+            padding: '4px 10px',
+            fontSize: '0.76rem',
+            fontWeight: 900,
+            borderRadius: '8px',
+            cursor: 'pointer',
+            flexShrink: 0,
+            whiteSpace: 'nowrap'
+          }
+        }, "붙여넣기")
       ),
       typeof onOpenShare === 'function' && /*#__PURE__*/React.createElement("button", {
         type: "button",
@@ -1059,7 +1145,16 @@ export function ChatGalleryModal({
           /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "홈 화면에 빠르게 접근")
         )
       )
-    )
+    ),
+    /*#__PURE__*/React.createElement(SharedSideMenuSettings, {
+      isDarkTheme: isDarkTheme,
+      onToggleTheme: onToggleTheme,
+      fontScalePercent: fontScalePercent,
+      onDecreaseFont: onDecreaseFont,
+      onIncreaseFont: onIncreaseFont,
+      isChatNotifyEnabled: isChatNotifyEnabled,
+      onToggleChatNotifications: onToggleChatNotifications
+    })
   )),
   isSearchOpen && /*#__PURE__*/React.createElement(InlineSearchBar, {
     value: searchQuery,
@@ -1172,7 +1267,7 @@ export function ChatGalleryModal({
       onClick: () => setActiveLightbox && setActiveLightbox({
         urls: filteredPhotos.map(p => p.full),
         index: idx,
-        meta: filteredPhotos.map(p => ({ timestamp: p.timestamp, messageId: p.messageId, imageIndex: p.imageIndex, thumb: p.thumb, tags: p.tags, directMediaUrl: p.directMediaUrl }))
+        meta: filteredPhotos.map(p => ({ timestamp: p.timestamp, messageId: p.messageId, imageIndex: p.imageIndex, thumb: p.thumb, tags: p.tags, directMediaUrl: p.directMediaUrl, source: p.source, uploadSource: p.uploadSource, meetingDate: p.meetingDate, photoId: p.photoId, sourceMessageId: p.sourceMessageId, sourceImageIndex: p.sourceImageIndex }))
       }),
       style: {
         width: '100%',

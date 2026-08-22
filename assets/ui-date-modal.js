@@ -400,6 +400,10 @@ function processImageFilesSequentially(...args) {
   const f = __gatherUiDeps().processImageFilesSequentially || GATHER_APP_UTILS.processImageFilesSequentially;
   return typeof f === 'function' ? f(...args) : undefined;
 }
+function readClipboardImageFiles(...args) {
+  const f = __gatherUiDeps().readClipboardImageFiles || GATHER_APP_UTILS.readClipboardImageFiles;
+  return typeof f === 'function' ? f(...args) : Promise.resolve([]);
+}
 function pushSingleCloudCalendar(...args) {
   const f = __gatherUiDeps().pushSingleCloudCalendar || GATHER_APP_UTILS.pushSingleCloudCalendar;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -1078,6 +1082,46 @@ export function DateModal({
       setIsSavingMeetingPhotos(false);
     }
   };
+
+  const handlePasteMeetingPhotos = async () => {
+    if (typeof onAddMeetingPhotos !== 'function' || isSavingMeetingPhotos) return;
+    try {
+      const files = await readClipboardImageFiles();
+      if (files && files.length > 0) {
+        setIsSavingMeetingPhotos(true);
+        const ok = await Promise.resolve(onAddMeetingPhotos(dateStr, files));
+        if (ok !== false) showToast('일정 사진이 추가되었습니다.', 'success');
+        else showToast('사진 추가 실패', 'error');
+      }
+    } catch (err) {
+      console.error('Paste meeting photo failed:', err);
+      showToast('사진 추가 실패', 'error');
+    } finally {
+      setIsSavingMeetingPhotos(false);
+    }
+  };
+
+  React.useEffect(() => {
+    if (activeTab !== 'photo' || typeof onAddMeetingPhotos !== 'function') return;
+    const handlePaste = async (e) => {
+      const files = getImageFilesFromClipboardEvent(e);
+      if (!files || !files.length) return;
+      e.preventDefault();
+      setIsSavingMeetingPhotos(true);
+      try {
+        const ok = await Promise.resolve(onAddMeetingPhotos(dateStr, files));
+        if (ok !== false) showToast('일정 사진이 추가되었습니다.', 'success');
+        else showToast('사진 추가 실패', 'error');
+      } catch (err) {
+        console.error('Clipboard paste meeting photo failed:', err);
+        showToast('사진 추가 실패', 'error');
+      } finally {
+        setIsSavingMeetingPhotos(false);
+      }
+    };
+    document.addEventListener('paste', handlePaste);
+    return () => document.removeEventListener('paste', handlePaste);
+  }, [activeTab, dateStr, onAddMeetingPhotos]);
 
   const handleDeleteMeetingPhoto = photo => {
     if (!photo?.id || typeof onDeleteMeetingPhoto !== 'function') return;
@@ -2458,20 +2502,38 @@ export function DateModal({
         /*#__PURE__*/React.createElement("label", {
           style: { fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-muted)' }
         }, `등록된 사진 (${meetingPhotos.length}장)`),
-        !adminMode && /*#__PURE__*/React.createElement("button", {
-          type: "button",
-          className: "btn btn-action btn-action-dark",
-          disabled: isSavingMeetingPhotos,
-          onClick: () => meetingPhotoInputRef.current && meetingPhotoInputRef.current.click(),
-          style: {
-            height: '36px',
-            padding: '0 12px',
-            borderRadius: '10px',
-            fontSize: '0.78rem',
-            fontWeight: 900,
-            cursor: isSavingMeetingPhotos ? 'wait' : 'pointer'
-          }
-        }, isSavingMeetingPhotos ? "업로드 중..." : "사진 추가")
+        !adminMode && /*#__PURE__*/React.createElement("div", {
+          style: { display: 'flex', alignItems: 'center', gap: '6px' }
+        },
+          /*#__PURE__*/React.createElement("button", {
+            type: "button",
+            className: "btn btn-action btn-action-outline",
+            disabled: isSavingMeetingPhotos,
+            onClick: handlePasteMeetingPhotos,
+            style: {
+              height: '36px',
+              padding: '0 12px',
+              borderRadius: '10px',
+              fontSize: '0.78rem',
+              fontWeight: 900,
+              cursor: isSavingMeetingPhotos ? 'wait' : 'pointer'
+            }
+          }, "붙여넣기"),
+          /*#__PURE__*/React.createElement("button", {
+            type: "button",
+            className: "btn btn-action btn-action-dark",
+            disabled: isSavingMeetingPhotos,
+            onClick: () => meetingPhotoInputRef.current && meetingPhotoInputRef.current.click(),
+            style: {
+              height: '36px',
+              padding: '0 12px',
+              borderRadius: '10px',
+              fontSize: '0.78rem',
+              fontWeight: 900,
+              cursor: isSavingMeetingPhotos ? 'wait' : 'pointer'
+            }
+          }, isSavingMeetingPhotos ? "업로드 중..." : "추가")
+        )
       ),
       /* Empty State or Photo Grid */
       meetingPhotos.length === 0 ? /*#__PURE__*/React.createElement("div", {
