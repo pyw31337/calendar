@@ -1359,8 +1359,8 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
       
       /* Right Controls: Desktop Visit Filter Toggle + 3-line menu */
       /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
-        /* Desktop Visit Filter Toggle: 전체 | 방문 | 예정 */
-        /*#__PURE__*/React.createElement("div", {
+        /* Desktop Visit Filter Toggle: 전체 | 방문 | 예정 (Only on PC) */
+        !isMobile && /*#__PURE__*/React.createElement("div", {
           className: "visit-filter-toggle-desktop",
           style: {
             display: 'flex', alignItems: 'center', gap: '2px',
@@ -1462,9 +1462,47 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
           title: mapExpanded ? '지도 축소' : '지도 확대',
           style: {
             background: 'none', border: 'none', cursor: 'pointer', color: '#64748B',
-            display: 'flex', alignItems: 'center', justifyContent: 'center'
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px'
           }
-        }, mapExpanded ? "지도 축소" : "지도 확대"),
+        }, mapExpanded ? /*#__PURE__*/React.createElement("svg", {
+          xmlns: "http://www.w3.org/2000/svg",
+          width: "22",
+          height: "22",
+          viewBox: "0 0 24 24",
+          fill: "none",
+          stroke: "currentColor",
+          strokeWidth: "2",
+          strokeLinecap: "round",
+          strokeLinejoin: "round",
+          className: "icon icon-tabler icons-tabler-outline icon-tabler-viewport-short"
+        },
+          /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }),
+          /*#__PURE__*/React.createElement("path", { d: "M12 3v7l3 -3" }),
+          /*#__PURE__*/React.createElement("path", { d: "M9 7l3 3" }),
+          /*#__PURE__*/React.createElement("path", { d: "M12 21v-7l3 3" }),
+          /*#__PURE__*/React.createElement("path", { d: "M9 17l3 -3" }),
+          /*#__PURE__*/React.createElement("path", { d: "M18 9h1a2 2 0 0 1 2 2v2a2 2 0 0 1 -2 2h-1" }),
+          /*#__PURE__*/React.createElement("path", { d: "M6 9h-1a2 2 0 0 0 -2 2v2a2 2 0 0 0 2 2h1" })
+        ) : /*#__PURE__*/React.createElement("svg", {
+          xmlns: "http://www.w3.org/2000/svg",
+          width: "22",
+          height: "22",
+          viewBox: "0 0 24 24",
+          fill: "none",
+          stroke: "currentColor",
+          strokeWidth: "2",
+          strokeLinecap: "round",
+          strokeLinejoin: "round",
+          className: "icon icon-tabler icons-tabler-outline icon-tabler-viewport-tall"
+        },
+          /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }),
+          /*#__PURE__*/React.createElement("path", { d: "M12 10v-7l3 3" }),
+          /*#__PURE__*/React.createElement("path", { d: "M9 6l3 -3" }),
+          /*#__PURE__*/React.createElement("path", { d: "M12 14v7l3 -3" }),
+          /*#__PURE__*/React.createElement("path", { d: "M9 18l3 3" }),
+          /*#__PURE__*/React.createElement("path", { d: "M18 3h1a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-1" }),
+          /*#__PURE__*/React.createElement("path", { d: "M6 3h-1a2 2 0 0 0 -2 2v14a2 2 0 0 0 2 2h1" })
+        )),
         
         /* Right drag resizer handle (only shown when map is not fullscreen expanded) */
         !mapExpanded ? /*#__PURE__*/React.createElement("div", {
@@ -1502,8 +1540,8 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
       className: "places-category-sticky-tabs",
       style: { flexShrink: 0, zIndex: 9, backgroundColor: 'var(--bg-card)', borderBottom: '1px solid var(--border-subtle)' }
     },
-      /* Desktop Category Bar */
-      /*#__PURE__*/React.createElement("div", { className: "place-category-tabs-desktop-only" },
+      /* Desktop Category Bar (Only on PC) */
+      !isMobile && /*#__PURE__*/React.createElement("div", { className: "place-category-tabs-desktop-only" },
         /*#__PURE__*/React.createElement(SearchCategoryTabs, {
           tabs: [
             { key: 'all', label: '전체', count: searchedPlaces.length },
@@ -1521,8 +1559,8 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
           countBadgeClassName: "section-count-badge"
         })
       ),
-      /* Mobile Category Select Box + Visit/Planned Switching Tab */
-      /*#__PURE__*/React.createElement("div", {
+      /* Mobile Category Select Box + Visit/Planned Switching Tab (Only on Mobile) */
+      isMobile && /*#__PURE__*/React.createElement("div", {
         className: "place-category-select-mobile-only",
         style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', padding: '6px 12px' }
       },
