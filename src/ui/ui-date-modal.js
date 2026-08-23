@@ -1044,6 +1044,11 @@ export function DateModal({
     setPlaceCategoryId(place.categoryId || getPlaceCategories(calendar)[0]?.id || 'etc');
     setPlaceQuery(place.name);
     setPlaceResults([]);
+    // Prefill with the place's existing memo instead of leaving the field blank -- typing into
+    // what looks empty risked burying/duplicating earlier notes on this place once saved.
+    // handleSavePlace (app-main.js) recognizes when what comes back still starts with this same
+    // text (a continuation) and uses it as-is instead of appending a new dated line on top of it.
+    setPlaceMemo(place.memo || '');
   };
 
   const handleSubmit = async (e) => {
