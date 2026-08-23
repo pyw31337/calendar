@@ -7429,8 +7429,21 @@ function App() {
       lat: mergeTargetPlace ? mergeTargetPlace.lat : placeData.lat,
       lng: mergeTargetPlace ? mergeTargetPlace.lng : placeData.lng,
       categoryId: mp('categoryId', cleanCategoryId),
+      // DateModal prefills placeMemo with the existing place's memo when reusing an
+      // already-registered place (handleSelectExistingPlace, ui-date-modal.js) so the user sees
+      // it and can continue writing from there instead of typing into what looks like an empty
+      // field. If what comes back still starts with that same prefill, it's an edit/continuation
+      // of the existing text (not a short note for just this date) -- use it as the place's new
+      // memo outright, since appending the usual one-line-per-visit entry on top would duplicate
+      // the whole prior history inside that new line. Anything else (field left blank, or the
+      // prefill was cleared and a fresh short note typed instead) keeps the original
+      // append-one-dated-line-per-visit behavior.
       memo: mergeTargetPlace
-        ? ((cleanVisitDate && !doesPlaceMatchDate(mergeTargetPlace, cleanVisitDate)) ? appendVisitDateToPlaceMemo(mergeTargetPlace.memo, cleanVisitDate, cleanMemo) : mergeTargetPlace.memo)
+        ? (() => {
+            const existingMemoTrimmed = String(mergeTargetPlace.memo || '').trim();
+            if (existingMemoTrimmed && cleanMemo.startsWith(existingMemoTrimmed)) return cleanMemo;
+            return (cleanVisitDate && !doesPlaceMatchDate(mergeTargetPlace, cleanVisitDate)) ? appendVisitDateToPlaceMemo(mergeTargetPlace.memo, cleanVisitDate, cleanMemo) : mergeTargetPlace.memo;
+          })()
         : cleanMemo,
       visitStatus: mp('visitStatus', cleanVisitStatus),
       visitDate: mp('visitDate', cleanVisitDate),
