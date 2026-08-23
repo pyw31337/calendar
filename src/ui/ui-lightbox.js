@@ -681,7 +681,7 @@ export function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSe
   const [confirmDeleteTag, setConfirmDeleteTag] = React.useState(null);
   const [isDeletingTag, setIsDeletingTag] = React.useState(false);
   React.useEffect(() => { setTagInput(''); }, [tags]);
-  if (!info.dateLabel && !info.typeLabel && !onSaveTags && !sourceInfo) return null;
+  if (!info.dateLabel && !info.typeLabel && !onSaveTags && !sourceInfo && !showZoomControls) return null;
   const MAX_TAGS = 10;
   const handleSaveTags = async () => {
     if (!onSaveTags || isSavingTags) return;
@@ -748,20 +748,63 @@ export function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSe
         }, sourceInfo.label)
         : /*#__PURE__*/React.createElement("span", null, sourceInfo.label)
     ),
-    info.typeLabel && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' } },
-      /*#__PURE__*/React.createElement("span", { style: labelStyle }, "파일정보"),
-      /*#__PURE__*/React.createElement("span", {
-        style: {
-          display: 'inline-flex', alignItems: 'center', padding: '1px 8px', borderRadius: 'var(--radius-full)',
-          border: '1px solid #FFFFFF', color: '#FFFFFF', fontSize: '0.68rem', fontWeight: 800
-        }
-      }, info.typeLabel),
-      /*#__PURE__*/React.createElement("span", null, "/"),
-      /*#__PURE__*/React.createElement("span", null, info.sizeLabel || '-'),
-      /*#__PURE__*/React.createElement("span", null, "/"),
-      /*#__PURE__*/React.createElement("span", null, info.dimensionLabel || '-')
+    (info.typeLabel || showZoomControls) && /*#__PURE__*/React.createElement("div", {
+      style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }
+    },
+      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', minWidth: 0 } },
+        info.typeLabel && /*#__PURE__*/React.createElement(React.Fragment, null,
+          /*#__PURE__*/React.createElement("span", { style: labelStyle }, "파일정보"),
+          /*#__PURE__*/React.createElement("span", {
+            style: {
+              display: 'inline-flex', alignItems: 'center', padding: '1px 8px', borderRadius: 'var(--radius-full)',
+              border: '1px solid #FFFFFF', color: '#FFFFFF', fontSize: '0.68rem', fontWeight: 800
+            }
+          }, info.typeLabel),
+          /*#__PURE__*/React.createElement("span", null, "/"),
+          /*#__PURE__*/React.createElement("span", null, info.sizeLabel || '-'),
+          /*#__PURE__*/React.createElement("span", null, "/"),
+          /*#__PURE__*/React.createElement("span", null, info.dimensionLabel || '-')
+        )
+      ),
+      // PC-only zoom controls -- on the same line as 파일정보 (right-aligned) rather than its own
+      // row, so it doesn't leave an awkward gap between 파일정보 and 해시태그 below.
+      showZoomControls && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 } },
+        /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          onClick: onZoomOut,
+          disabled: zoomLevel <= zoomMin,
+          "aria-label": "축소",
+          title: "축소",
+          style: {
+            width: '26px', height: '26px', borderRadius: '50%', border: 'none',
+            background: 'rgba(15,23,42,0.62)', color: '#FFFFFF', display: 'flex',
+            alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '0.72rem',
+            opacity: zoomLevel <= zoomMin ? 0.5 : 1
+          }
+        }, /*#__PURE__*/React.createElement(ZoomOutIcon, { size: 13 })),
+        /*#__PURE__*/React.createElement("span", {
+          style: {
+            minWidth: '34px', textAlign: 'center', color: '#FFFFFF', fontSize: '0.7rem',
+            fontWeight: 700, padding: '3px 2px', borderRadius: '10px',
+            background: 'rgba(15,23,42,0.62)'
+          }
+        }, `${zoomLevel}%`),
+        /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          onClick: onZoomIn,
+          disabled: zoomLevel >= zoomMax,
+          "aria-label": "확대",
+          title: "확대",
+          style: {
+            width: '26px', height: '26px', borderRadius: '50%', border: 'none',
+            background: 'rgba(15,23,42,0.62)', color: '#FFFFFF', display: 'flex',
+            alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '0.72rem',
+            opacity: zoomLevel >= zoomMax ? 0.5 : 1
+          }
+        }, /*#__PURE__*/React.createElement(ZoomInIcon, { size: 13 }))
+      )
     ),
-    /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '10px' } },
+    /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' } },
       /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', minWidth: 0 } },
         /*#__PURE__*/React.createElement("span", { style: labelStyle }, "해시태그"),
         tagTokens.map(tag => /*#__PURE__*/React.createElement("span", {
@@ -786,57 +829,17 @@ export function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSe
           }
         }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 12 }))))
       ),
-      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px', flexShrink: 0 } },
-        // PC-only zoom controls, moved here (directly above the URL button) from the top-right
-        // photo-actions row -- see Lightbox's renderPhotoActions comment for why that row is now
-        // limited to the edit/delete buttons only.
-        showZoomControls && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px' } },
-          /*#__PURE__*/React.createElement("button", {
-            type: "button",
-            onClick: onZoomOut,
-            disabled: zoomLevel <= zoomMin,
-            "aria-label": "축소",
-            title: "축소",
-            style: {
-              width: '30px', height: '30px', borderRadius: '50%', border: 'none',
-              background: 'rgba(15,23,42,0.62)', color: '#FFFFFF', display: 'flex',
-              alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '0.72rem',
-              opacity: zoomLevel <= zoomMin ? 0.5 : 1
-            }
-          }, /*#__PURE__*/React.createElement(ZoomOutIcon, { size: 15 })),
-          /*#__PURE__*/React.createElement("span", {
-            style: {
-              minWidth: '38px', textAlign: 'center', color: '#FFFFFF', fontSize: '0.72rem',
-              fontWeight: 700, padding: '4px 2px', borderRadius: '10px',
-              background: 'rgba(15,23,42,0.62)'
-            }
-          }, `${zoomLevel}%`),
-          /*#__PURE__*/React.createElement("button", {
-            type: "button",
-            onClick: onZoomIn,
-            disabled: zoomLevel >= zoomMax,
-            "aria-label": "확대",
-            title: "확대",
-            style: {
-              width: '30px', height: '30px', borderRadius: '50%', border: 'none',
-              background: 'rgba(15,23,42,0.62)', color: '#FFFFFF', display: 'flex',
-              alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '0.72rem',
-              opacity: zoomLevel >= zoomMax ? 0.5 : 1
-            }
-          }, /*#__PURE__*/React.createElement(ZoomInIcon, { size: 15 }))
-        ),
-        /*#__PURE__*/React.createElement("button", {
-          type: "button",
-          className: "lightbox-url-btn",
-          onClick: () => onOpenUrl && onOpenUrl(),
-          style: {
-            flexShrink: 0, height: '30px', padding: '0 10px', borderRadius: 'var(--radius-full)',
-            border: '1px solid rgba(255,255,255,0.32)', background: 'rgba(255,255,255,0.14)',
-            color: '#FFFFFF', display: 'inline-flex', alignItems: 'center', gap: '5px',
-            cursor: 'pointer', fontSize: '0.72rem', fontWeight: 800, WebkitBackdropFilter: 'blur(6px)', backdropFilter: 'blur(6px)'
-          }
-        }, /*#__PURE__*/React.createElement(LinkIcon, { size: 14 }), "URL")
-      )
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "lightbox-url-btn",
+        onClick: () => onOpenUrl && onOpenUrl(),
+        style: {
+          flexShrink: 0, height: '30px', padding: '0 10px', borderRadius: 'var(--radius-full)',
+          border: '1px solid rgba(255,255,255,0.32)', background: 'rgba(255,255,255,0.14)',
+          color: '#FFFFFF', display: 'inline-flex', alignItems: 'center', gap: '5px',
+          cursor: 'pointer', fontSize: '0.72rem', fontWeight: 800, WebkitBackdropFilter: 'blur(6px)', backdropFilter: 'blur(6px)'
+        }
+      }, /*#__PURE__*/React.createElement(LinkIcon, { size: 14 }), "URL")
     ),
     onSaveTags && /*#__PURE__*/React.createElement("div", {
       style: { display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }
