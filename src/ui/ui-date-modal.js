@@ -1387,24 +1387,19 @@ export function DateModal({
 
   React.useEffect(() => {
     if (activeTab !== 'photo' || typeof onAddMeetingPhotos !== 'function') return;
-    const handlePaste = async (e) => {
+    // Same preview/confirm gate as the 붙여넣기 button (handlePasteMeetingPhotos) -- this used to
+    // upload straight from the paste event with no confirmation step, so a stray Ctrl+V (or an
+    // image left on the clipboard from something unrelated) could add a photo the user never
+    // meant to attach.
+    const handlePaste = (e) => {
       const files = getImageFilesFromClipboardEvent(e);
       if (!files || !files.length) return;
       e.preventDefault();
-      setIsSavingMeetingPhotos(true);
-      try {
-        // See handleMeetingPhotoFiles above for why no toast is shown for the resolved result.
-        await Promise.resolve(onAddMeetingPhotos(dateStr, files));
-      } catch (err) {
-        console.error('Clipboard paste meeting photo failed:', err);
-        showToast('사진 추가 실패', 'error');
-      } finally {
-        setIsSavingMeetingPhotos(false);
-      }
+      setPastePreview({ files, previewUrls: files.map(f => URL.createObjectURL(f)) });
     };
     document.addEventListener('paste', handlePaste);
     return () => document.removeEventListener('paste', handlePaste);
-  }, [activeTab, dateStr, onAddMeetingPhotos]);
+  }, [activeTab, onAddMeetingPhotos]);
 
   const handleDeleteMeetingPhoto = photo => {
     if (!photo?.id || typeof onDeleteMeetingPhoto !== 'function') return;
