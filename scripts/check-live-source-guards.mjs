@@ -80,13 +80,19 @@ if (!mainEntry.includes('window.__gatherStartApp()')) {
 }
 
 const appMain = readFileSync(join(ROOT, 'src/core/app-main.js'), 'utf8');
+// app-main.js was split into these two in a later refactor (each has its own manualChunks entry
+// in vite.config.js), so which file a given piece of core logic lives in has shifted and can
+// shift again -- appMainAndData covers the whole split for "must contain" checks below.
+const appMainAndData = appMain
+  + '\n' + readFileSync(join(ROOT, 'src/core/app-domain-helpers.js'), 'utf8')
+  + '\n' + readFileSync(join(ROOT, 'src/core/app-firebase-data.js'), 'utf8');
 const adminDashboard = readFileSync(join(ROOT, 'src/ui/ui-admin-dashboard.js'), 'utf8');
 const adminModals = readFileSync(join(ROOT, 'src/ui/ui-admin-modals.js'), 'utf8');
 const rootIndex = readFileSync(join(ROOT, 'index.html'), 'utf8');
 const serviceWorker = readFileSync(join(ROOT, 'sw.js'), 'utf8');
 const copyStatic = readFileSync(join(ROOT, 'scripts/copy-static-to-dist.mjs'), 'utf8');
 
-if (!/function getAdminSelectedCalendarIdFromUrl\(fallback = 'kkot'\)/.test(appMain)) {
+if (!/function getAdminSelectedCalendarIdFromUrl\(fallback = 'kkot'\)/.test(appMainAndData)) {
   fail('Admin dashboard must read its selected calendar from ?id= so refresh keeps the selected calendar.');
 }
 
