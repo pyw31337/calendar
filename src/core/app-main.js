@@ -9029,6 +9029,11 @@ function ImageUrlModal(props) {
 
 function renderChatMessageBody(msg, setActiveLightbox, singleImageStyle = {}, searchQuery = '', stickyVideoKey = null, onActivateVideo = null) {
   const msgImages = renderChatMessageImages(msg, setActiveLightbox, singleImageStyle);
+  // A fit-content chat bubble sizes itself to whichever of its children is widest. When there's
+  // a multi-image grid above, cap the caption text below it to that same grid width -- otherwise
+  // a long caption stretches the bubble past the grid, leaving a gap to the grid's right.
+  const imageEntryCount = getMessageImageEntries(msg).length;
+  const textMaxWidth = imageEntryCount >= 2 ? computeChatImageGridMaxWidth(imageEntryCount) : null;
   return /*#__PURE__*/React.createElement(React.Fragment, null,
     msgImages ? /*#__PURE__*/React.createElement('div', { style: { marginBottom: msg.text ? '8px' : '0' } }, msgImages) : null,
     msg.text ? /*#__PURE__*/React.createElement(DirectChatMediaText, {
@@ -9039,7 +9044,8 @@ function renderChatMessageBody(msg, setActiveLightbox, singleImageStyle = {}, se
       style: singleImageStyle,
       message: msg,
       stickyVideoKey,
-      onActivateVideo
+      onActivateVideo,
+      textMaxWidth
     }) : null
   );
 }
@@ -10340,6 +10346,16 @@ function getMessageDirectMediaEntry(msg) {
 // Renders a chat message's attached image(s): a single thumbnail for legacy/one-image
 // messages, or a wrapping grid of thumbnails for messages sent with multiple images
 // (msg.imageUrls/msg.thumbUrls). Returns null when the message has no image at all.
+// Shared by renderChatMessageImages below and renderChatMessageBody's caption-text cap so a
+// multi-image grid and the caption text under it always agree on a max width -- without this,
+// a fit-content chat bubble sizes itself to whichever of the two is wider, and an uncapped long
+// caption stretches the bubble past the grid, leaving a visible gap to the grid's right.
+function computeChatImageGridMaxWidth(count) {
+  const mobileCols = count === 2 ? 2 : 3;
+  const isMobile = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(max-width: 640px)').matches;
+  const activeCols = isMobile ? mobileCols : (count >= 12 ? 6 : count >= 5 ? 5 : mobileCols);
+  return isMobile ? 'min(100%, 280px)' : `min(100%, calc(${activeCols} * 76px + (${activeCols} - 1) * 4px))`;
+}
 function renderChatMessageImages(msg, setActiveLightbox, singleImageStyle = {}) {
   const entries = getMessageImageEntries(msg);
   if (entries.length === 0) return null;
@@ -10373,7 +10389,7 @@ function renderChatMessageImages(msg, setActiveLightbox, singleImageStyle = {}) 
   const mobileCols = thumbs.length === 2 ? 2 : 3;
   const isMobile = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(max-width: 640px)').matches;
   const activeCols = isMobile ? mobileCols : (thumbs.length >= 12 ? 6 : thumbs.length >= 5 ? 5 : mobileCols);
-  const maxW = isMobile ? 'min(100%, 280px)' : `min(100%, calc(${activeCols} * 76px + (${activeCols} - 1) * 4px))`;
+  const maxW = computeChatImageGridMaxWidth(thumbs.length);
 
   return /*#__PURE__*/React.createElement('div', {
     className: `chat-message-image-grid${thumbs.length >= 5 ? ' is-wide' : ''}`,

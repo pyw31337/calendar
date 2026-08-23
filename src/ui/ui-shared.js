@@ -1049,6 +1049,16 @@ export function LinkPreviewCard({ url, fallbackTitle, cachedData }) {
     className: 'link-preview-card',
     style: {
       display: 'flex',
+      // A fit-content chat bubble resolves its width to whichever child is widest -- once a
+      // longer caption line (rendered above this card) settles that width, a plain flex block
+      // with no width of its own stretches to fill it, leaving a blank gap next to this card's
+      // actual (much narrower) thumbnail+title content. width:fit-content makes the card hug its
+      // own content instead, regardless of what a sibling line established for the bubble; the
+      // maxWidth cap keeps that same fit-content from growing unbounded to fit a long title in
+      // one line now that the bubble's width no longer implicitly bounds it -- title/description
+      // below still truncate with ellipsis inside this width.
+      width: 'fit-content',
+      maxWidth: 'min(100%, 280px)',
       gap: '8px',
       marginTop: '6px',
       border: '1px solid var(--border-subtle)',
