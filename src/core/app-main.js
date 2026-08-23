@@ -8698,6 +8698,19 @@ const PEEKALINK_PROXY_URL = `https://us-central1-${firebaseConfig.projectId}.clo
 const GATHER_APP_CHAT_DATA = window.GATHER_APP_CHAT_DATA || {};
 const linkPreviewCache = new Map();
 const linkPreviewInflight = new Map();
+const LINK_PREVIEW_CACHE_MAX_ENTRIES = 300;
+// Unlike linkPreviewInflight (self-cleans via .delete() once each fetch settles),
+// linkPreviewCache has no natural cap -- every distinct link ever previewed across the whole
+// session stays in memory. Low severity for a normal session, but a calendar left open for
+// weeks with lots of shared links could accumulate indefinitely, so evict the oldest entry
+// (Map preserves insertion order) once this grows past a generous ceiling.
+function cacheLinkPreview(url, result) {
+  linkPreviewCache.set(url, result);
+  if (linkPreviewCache.size > LINK_PREVIEW_CACHE_MAX_ENTRIES) {
+    const oldestKey = linkPreviewCache.keys().next().value;
+    if (oldestKey !== undefined) linkPreviewCache.delete(oldestKey);
+  }
+}
 // Peekalink's free plan is a 50-request-per-hour rate limit, not a fixed lifetime quota --
 // it resets every clock hour rather than depleting over time. See PEEKALINK_HOUR_BUCKET_MS below.
 const PEEKALINK_FREE_HOURLY_LIMIT = Number.isFinite(GATHER_APP_CHAT_DATA.PEEKALINK_FREE_HOURLY_LIMIT) ? GATHER_APP_CHAT_DATA.PEEKALINK_FREE_HOURLY_LIMIT : 50;
@@ -8801,7 +8814,7 @@ async function fetchLinkPreview(url) {
           if (sharedDoc.exists && !looksLikeBlockedPreviewTitle(sharedDoc.data()?.title)) {
             const d = sharedDoc.data();
             const result = { status: 'success', data: normalizeLinkPreviewData(url, d, d.fetchedAt) };
-            linkPreviewCache.set(url, result);
+            cacheLinkPreview(url, result);
             return result;
           }
         } catch (e) {
@@ -8837,7 +8850,7 @@ async function fetchLinkPreview(url) {
       const result = { status: hasContent ? 'success' : 'empty', data };
       // Only cache successful results; let empty/failed results be retried on next render
       if (hasContent) {
-        linkPreviewCache.set(url, result);
+        cacheLinkPreview(url, result);
         if (firebaseDb) {
           firebaseDb.collection('linkPreviews').doc(urlHash).set(data).then(() => incrementLinkPreviewStat()).catch(() => {});
         }

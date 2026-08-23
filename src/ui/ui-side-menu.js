@@ -779,6 +779,9 @@ export function MainSideMenu({
       setIsScrollingActive(false);
     }, 1200);
   };
+  React.useEffect(() => () => {
+    if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+  }, []);
   return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     className: "admin-side-menu-overlay",
     onClick: onClose
