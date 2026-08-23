@@ -672,7 +672,7 @@ function getAnniversaryDisplayColor(...args) {
 }
 
 
-export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox, linkPreview, style = {}, message = null, stickyVideoKey = null, onActivateVideo = null }) {
+export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox, linkPreview, style = {}, message = null, stickyVideoKey = null, onActivateVideo = null, textMaxWidth = null }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -758,13 +758,28 @@ export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox,
         onClick: () => setActiveLightbox && setActiveLightbox({ urls, index: idx, meta }),
         style: { display: 'block', width: '100%', aspectRatio: '1', borderRadius: '6px', cursor: setActiveLightbox ? 'pointer' : 'default', objectFit: 'cover' }
       })))),
-      remainingText ? parseTextWithLinks(remainingText, searchQuery) : null
+      // Capped to the same maxW as the grid above -- a fit-content chat bubble sizes itself to
+      // whichever child is widest, so an uncapped caption longer than the grid would stretch the
+      // bubble past it, leaving a gap to the grid's right (see computeChatImageGridMaxWidth in
+      // app-main.js, whose real-upload counterpart needs the identical fix for the same reason).
+      remainingText ? /*#__PURE__*/React.createElement('div', {
+        style: { maxWidth: maxW, width: '100%', boxSizing: 'border-box' }
+      }, parseTextWithLinks(remainingText, searchQuery)) : null
     );
   }
 
   if (!mediaInfo || failed) {
+    const textNode = text ? parseTextWithLinks(text, searchQuery) : null;
+    // textMaxWidth is set when this caption sits below a real multi-image upload grid (see
+    // renderChatMessageBody in app-main.js) -- capping it to the grid's width keeps this
+    // fit-content bubble from stretching past the grid when the caption is the longer child.
+    const cappedTextNode = (textNode && textMaxWidth)
+      ? /*#__PURE__*/React.createElement('div', {
+        style: { maxWidth: textMaxWidth, width: '100%', boxSizing: 'border-box' }
+      }, textNode)
+      : textNode;
     return /*#__PURE__*/React.createElement(React.Fragment, null,
-      text ? parseTextWithLinks(text, searchQuery) : null,
+      cappedTextNode,
       firstUrl && /*#__PURE__*/React.createElement(LinkPreviewCard, {
         url: firstUrl,
         fallbackTitle: text ? removeFirstUrl(text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : '',
