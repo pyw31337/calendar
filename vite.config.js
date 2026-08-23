@@ -39,11 +39,13 @@ export default defineConfig({
             id.includes('/ui/ui-memo-view') ||
             id.includes('/ui/ui-event-modals')
           ) return 'ui-views-modals';
-          // app-domain-helpers is only ever imported by app-main.js, but it's given its own
-          // chunk explicitly (Rollup's default heuristic would otherwise inline a single-importer
-          // module straight back into its importer's chunk) so splitting it out of app-main.js
-          // actually shrinks the app-main chunk instead of just reorganizing its source internally.
+          // app-domain-helpers/app-firebase-data are only ever imported by app-main.js, but each
+          // is given its own chunk explicitly (Rollup's default heuristic would otherwise inline
+          // a single-importer module straight back into its importer's chunk) so splitting them
+          // out of app-main.js actually shrinks the app-main chunk instead of just reorganizing
+          // its source internally.
           if (id.includes('/core/app-domain-helpers')) return 'app-domain-helpers';
+          if (id.includes('/core/app-firebase-data')) return 'app-firebase-data';
           if (id.includes('/core/app-main')) return 'app-main';
         }
       }
