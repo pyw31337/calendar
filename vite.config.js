@@ -23,14 +23,22 @@ export default defineConfig({
             return 'vendor';
           }
           if (id.includes('/ui/ui-admin-')) return 'ui-admin';
+          // Split what used to be one 'ui-views' chunk in two once it crept up near the
+          // per-chunk size budget (check:dist-budget) -- these 6 files are all awaited together
+          // in the same boot-time Promise.all (src/main.jsx), never lazy-loaded independently,
+          // so splitting them doesn't change what downloads or when; it only keeps each output
+          // file comfortably under its own budget instead of one chunk absorbing all 6 files'
+          // combined growth.
           if (
-            id.includes('/ui/ui-memo-view') ||
+            id.includes('/ui/ui-calendar-core') ||
             id.includes('/ui/ui-chat-room') ||
-            id.includes('/ui/ui-places') ||
+            id.includes('/ui/ui-places')
+          ) return 'ui-views-calendar';
+          if (
             id.includes('/ui/ui-date-modal') ||
-            id.includes('/ui/ui-event-modals') ||
-            id.includes('/ui/ui-calendar-core')
-          ) return 'ui-views';
+            id.includes('/ui/ui-memo-view') ||
+            id.includes('/ui/ui-event-modals')
+          ) return 'ui-views-modals';
           if (id.includes('/core/app-main')) return 'app-main';
         }
       }
