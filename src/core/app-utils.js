@@ -328,49 +328,6 @@ const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
     return match ? { time: match[1], rest: match[2].trim() } : { time: '', rest: text };
   }
 
-  function detectBrowserForShortcutInstructions(navigatorLike = typeof navigator !== 'undefined' ? navigator : {}) {
-    const ua = navigatorLike.userAgent || '';
-    const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigatorLike.platform === 'MacIntel' && navigatorLike.maxTouchPoints > 1);
-    const isEdge = /Edg|EdgiOS|EdgA/.test(ua);
-    const isChrome = /Chrome|CriOS|Chromium/.test(ua) && !isEdge;
-    const isSafari = /Safari/.test(ua) && !/Chrome|CriOS|EdgiOS|FxiOS/.test(ua);
-    const isFirefox = /Firefox|FxiOS/.test(ua);
-    const isWhale = /Whale|NAVER/.test(ua);
-    if (isIOS && isSafari) return 'ios-safari';
-    if (isIOS) return 'ios-other';
-    if (isSafari) return 'macos-safari';
-    if (isFirefox) return 'firefox';
-    if (isWhale) return 'whale';
-    if (isEdge) return 'edge';
-    if (isChrome) return 'chrome';
-    return 'other';
-  }
-
-  function getShortcutInstructions(kind) {
-    switch (kind) {
-      case 'ios-safari':
-        return '하단 공유 버튼( ⬆️ )을 누른 뒤 "홈 화면에 추가"를 선택해 주세요.';
-      case 'macos-safari':
-        return '공유 버튼을 누른 뒤 "Dock에 추가" 또는 "홈 화면에 추가"를 선택해 주세요.';
-      case 'ios-other':
-        return 'iPhone/iPad에서는 브라우저 메뉴 또는 공유 버튼에서 "홈 화면에 추가"를 선택해 주세요. 자동 생성은 iOS 정책상 제한됩니다.';
-      case 'firefox':
-        return '브라우저 메뉴(≡)를 열어 "홈 화면에 추가" 또는 "설치"를 선택해 주세요.';
-      case 'whale':
-        return '웨일 하단 메뉴(≡)에서 "홈 화면 추가" 또는 "앱 설치"를 선택해 주세요.';
-      case 'chrome':
-        return 'Chrome 메뉴(⋮)에서 "앱 설치" 또는 "홈 화면에 추가"를 선택해 주세요.';
-      case 'edge':
-        return 'Edge 메뉴(⋯)에서 "앱" 또는 "이 사이트를 앱으로 설치"를 선택해 주세요.';
-      default:
-        return '브라우저 메뉴에서 "홈 화면에 추가" 또는 "앱 설치"를 찾아 선택해 주세요.';
-    }
-  }
-
-  function canUseNativeInstallPrompt(kind) {
-    return kind === 'chrome' || kind === 'edge' || kind === 'other';
-  }
-
 
   const INCOME_EXPENSE_CATEGORY = { id: 'income', name: '수입', color: '#16A34A' };
 
@@ -635,8 +592,16 @@ const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
     const memoDate = toMemoDateFormat(dateStr);
     const entries = parsePlaceMemoEntries(existingMemo);
     const idx = entries.findIndex(entry => normalizePlaceDateForSort(entry.date) === targetNorm);
-    if (idx >= 0) entries[idx] = { date: entries[idx].date || memoDate, note: cleanNote };
-    else entries.push({ date: memoDate, note: cleanNote });
+    if (idx >= 0) {
+      entries[idx] = { date: entries[idx].date || memoDate, note: cleanNote };
+    } else if (entries.length === 1 && !entries[0].date) {
+      // A legacy single freeform note (no date yet) is what getPlaceMemoEntryForDate falls back
+      // to showing/prefilling for any date -- editing and saving it should replace that note in
+      // place, not leave it behind as an orphaned dateless entry alongside a new dated one.
+      entries[0] = { date: memoDate, note: cleanNote };
+    } else {
+      entries.push({ date: memoDate, note: cleanNote });
+    }
     return serializePlaceMemoEntries(entries);
   }
 
@@ -650,7 +615,12 @@ const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
     const targetNorm = normalizePlaceDateForSort(dateStr);
     const entries = parsePlaceMemoEntries(memo);
     const entry = entries.find(e => normalizePlaceDateForSort(e.date) === targetNorm);
-    return entry ? entry.note : '';
+    if (entry) return entry.note;
+    // A place whose memo was never touched by the per-date system yet (a single freeform note
+    // with no date at all) still needs to show up regardless of which date it's viewed from --
+    // matches how a plain place.memo string always displayed before this per-date restructure.
+    if (entries.length === 1 && !entries[0].date) return entries[0].note;
+    return '';
   }
 
 
@@ -775,9 +745,6 @@ const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
     getExpenseCategoryIcon,
     getExpenseCategoryLabel,
     extractExpenseTimePrefix,
-    detectBrowserForShortcutInstructions,
-    getShortcutInstructions,
-    canUseNativeInstallPrompt,
     INCOME_EXPENSE_CATEGORY,
     isExpenseIncomeEntry,
     getDisplayExpenseCategory,
