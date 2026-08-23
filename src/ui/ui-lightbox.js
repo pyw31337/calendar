@@ -668,7 +668,7 @@ function getAnniversaryDisplayColor(...args) {
 }
 
 
-export function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSearchTag, showToast, sourceInfo = null }) {
+export function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSearchTag, showToast, sourceInfo = null, showZoomControls = false, zoomLevel = 100, zoomMin = 100, zoomMax = 300, onZoomIn, onZoomOut }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const SmallXIcon = __deps.SmallXIcon;
@@ -761,7 +761,7 @@ export function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSe
       /*#__PURE__*/React.createElement("span", null, "/"),
       /*#__PURE__*/React.createElement("span", null, info.dimensionLabel || '-')
     ),
-    /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' } },
+    /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '10px' } },
       /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', minWidth: 0 } },
         /*#__PURE__*/React.createElement("span", { style: labelStyle }, "해시태그"),
         tagTokens.map(tag => /*#__PURE__*/React.createElement("span", {
@@ -786,17 +786,57 @@ export function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSe
           }
         }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 12 }))))
       ),
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        className: "lightbox-url-btn",
-        onClick: () => onOpenUrl && onOpenUrl(),
-        style: {
-          flexShrink: 0, height: '30px', padding: '0 10px', borderRadius: 'var(--radius-full)',
-          border: '1px solid rgba(255,255,255,0.32)', background: 'rgba(255,255,255,0.14)',
-          color: '#FFFFFF', display: 'inline-flex', alignItems: 'center', gap: '5px',
-          cursor: 'pointer', fontSize: '0.72rem', fontWeight: 800, WebkitBackdropFilter: 'blur(6px)', backdropFilter: 'blur(6px)'
-        }
-      }, /*#__PURE__*/React.createElement(LinkIcon, { size: 14 }), "URL")
+      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px', flexShrink: 0 } },
+        // PC-only zoom controls, moved here (directly above the URL button) from the top-right
+        // photo-actions row -- see Lightbox's renderPhotoActions comment for why that row is now
+        // limited to the edit/delete buttons only.
+        showZoomControls && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px' } },
+          /*#__PURE__*/React.createElement("button", {
+            type: "button",
+            onClick: onZoomOut,
+            disabled: zoomLevel <= zoomMin,
+            "aria-label": "축소",
+            title: "축소",
+            style: {
+              width: '30px', height: '30px', borderRadius: '50%', border: 'none',
+              background: 'rgba(15,23,42,0.62)', color: '#FFFFFF', display: 'flex',
+              alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '0.72rem',
+              opacity: zoomLevel <= zoomMin ? 0.5 : 1
+            }
+          }, /*#__PURE__*/React.createElement(ZoomOutIcon, { size: 15 })),
+          /*#__PURE__*/React.createElement("span", {
+            style: {
+              minWidth: '38px', textAlign: 'center', color: '#FFFFFF', fontSize: '0.72rem',
+              fontWeight: 700, padding: '4px 2px', borderRadius: '10px',
+              background: 'rgba(15,23,42,0.62)'
+            }
+          }, `${zoomLevel}%`),
+          /*#__PURE__*/React.createElement("button", {
+            type: "button",
+            onClick: onZoomIn,
+            disabled: zoomLevel >= zoomMax,
+            "aria-label": "확대",
+            title: "확대",
+            style: {
+              width: '30px', height: '30px', borderRadius: '50%', border: 'none',
+              background: 'rgba(15,23,42,0.62)', color: '#FFFFFF', display: 'flex',
+              alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '0.72rem',
+              opacity: zoomLevel >= zoomMax ? 0.5 : 1
+            }
+          }, /*#__PURE__*/React.createElement(ZoomInIcon, { size: 15 }))
+        ),
+        /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          className: "lightbox-url-btn",
+          onClick: () => onOpenUrl && onOpenUrl(),
+          style: {
+            flexShrink: 0, height: '30px', padding: '0 10px', borderRadius: 'var(--radius-full)',
+            border: '1px solid rgba(255,255,255,0.32)', background: 'rgba(255,255,255,0.14)',
+            color: '#FFFFFF', display: 'inline-flex', alignItems: 'center', gap: '5px',
+            cursor: 'pointer', fontSize: '0.72rem', fontWeight: 800, WebkitBackdropFilter: 'blur(6px)', backdropFilter: 'blur(6px)'
+          }
+        }, /*#__PURE__*/React.createElement(LinkIcon, { size: 14 }), "URL")
+      )
     ),
     onSaveTags && /*#__PURE__*/React.createElement("div", {
       style: { display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }
@@ -902,19 +942,75 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
   const ZOOM_MAX = 300;
   const ZOOM_STEP = 25;
   const [zoomLevel, setZoomLevel] = React.useState(ZOOM_MIN);
+  // Drag-to-pan once zoomed past fit-view -- panOffset is a screen-pixel translate applied
+  // before the scale (see zoomImageStyle below), so it stays 1:1 with cursor movement regardless
+  // of zoom level. Reset to {0,0} on every zoom-button click rather than trying to re-clamp the
+  // existing offset against the new scale -- simpler and avoids the image appearing to jump to
+  // an now-invalid position when zooming out.
+  const [panOffset, setPanOffset] = React.useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = React.useState(false);
+  const zoomedImgRef = React.useRef(null);
+  const panStartRef = React.useRef(null);
+  const isPanningRef = React.useRef(false);
   // Reset to fit-view whenever the visible photo changes, so zoom never carries over onto a
   // different image (which would show it pre-cropped/enlarged with no visual cue why).
-  React.useEffect(() => { setZoomLevel(ZOOM_MIN); }, [index]);
+  React.useEffect(() => { setZoomLevel(ZOOM_MIN); setPanOffset({ x: 0, y: 0 }); }, [index]);
   const handleZoomIn = e => {
     e.stopPropagation();
+    setPanOffset({ x: 0, y: 0 });
     setZoomLevel(prev => Math.min(ZOOM_MAX, prev + ZOOM_STEP));
   };
   const handleZoomOut = e => {
     e.stopPropagation();
+    setPanOffset({ x: 0, y: 0 });
     setZoomLevel(prev => Math.max(ZOOM_MIN, prev - ZOOM_STEP));
   };
+  // Clamped so the image can't be dragged entirely off-screen -- bounds come from the actual
+  // rendered (post-scale) image box vs. the lightbox's own viewport cap (92vw / 82vh, matching
+  // the maxWidth/maxHeight used everywhere below), not a fixed guess, so it works the same at
+  // any zoom level or original photo aspect ratio.
+  const handlePanStart = (clientX, clientY) => {
+    if (!isDesktop || zoomLevel <= ZOOM_MIN) return;
+    panStartRef.current = { x: clientX, y: clientY, startX: panOffset.x, startY: panOffset.y };
+    isPanningRef.current = true;
+    wasDraggedRef.current = false;
+    setIsPanning(true);
+  };
+  const handlePanMove = (clientX, clientY) => {
+    if (!isPanningRef.current || !panStartRef.current) return;
+    if (Math.abs(clientX - panStartRef.current.x) > 5 || Math.abs(clientY - panStartRef.current.y) > 5) {
+      // Reuses the same ref handleImageTap already checks to distinguish a drag from a tap, so
+      // releasing the mouse after panning doesn't also toggle the info panel off.
+      wasDraggedRef.current = true;
+    }
+    const el = zoomedImgRef.current;
+    const rect = el ? el.getBoundingClientRect() : null;
+    const maxOffsetX = rect ? Math.max(0, (rect.width - window.innerWidth * 0.92) / 2) : 0;
+    const maxOffsetY = rect ? Math.max(0, (rect.height - window.innerHeight * 0.82) / 2) : 0;
+    const rawX = panStartRef.current.startX + (clientX - panStartRef.current.x);
+    const rawY = panStartRef.current.startY + (clientY - panStartRef.current.y);
+    setPanOffset({
+      x: Math.min(maxOffsetX, Math.max(-maxOffsetX, rawX)),
+      y: Math.min(maxOffsetY, Math.max(-maxOffsetY, rawY))
+    });
+  };
+  const handlePanEnd = () => {
+    if (!isPanningRef.current) return;
+    isPanningRef.current = false;
+    panStartRef.current = null;
+    setIsPanning(false);
+  };
+  const handleZoomedImageMouseDown = e => {
+    if (!isDesktop || zoomLevel <= ZOOM_MIN) return;
+    e.stopPropagation();
+    handlePanStart(e.clientX, e.clientY);
+  };
   const zoomImageStyle = isDesktop && zoomLevel !== ZOOM_MIN
-    ? { transform: `scale(${zoomLevel / 100})`, transition: 'transform 150ms ease' }
+    ? {
+        transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoomLevel / 100})`,
+        transition: isPanning ? 'none' : 'transform 150ms ease',
+        cursor: isPanning ? 'grabbing' : 'grab'
+      }
     : undefined;
   const lightboxHistoryRef = React.useRef(false);
   React.useEffect(() => {
@@ -1269,10 +1365,19 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
   };
   // Mouse move/up are tracked at the document level (unlike touchmove/touchend, which keep
   // firing on their original target even once the finger leaves it) so the drag keeps working
-  // if the cursor leaves the image area mid-drag.
+  // if the cursor leaves the image area mid-drag. Pan-dragging (zoomed image) and slide-nav
+  // dragging (carousel) are mutually exclusive -- handleZoomedImageMouseDown stops the mousedown
+  // from ever reaching the carousel container while zoomed, so isPanningRef alone is enough to
+  // route move/up to the right handler here.
   React.useEffect(() => {
-    const onMouseMove = e => handleDragMove(e.clientX);
-    const onMouseUp = () => handleDragEnd();
+    const onMouseMove = e => {
+      if (isPanningRef.current) { handlePanMove(e.clientX, e.clientY); return; }
+      handleDragMove(e.clientX);
+    };
+    const onMouseUp = () => {
+      if (isPanningRef.current) { handlePanEnd(); return; }
+      handleDragEnd();
+    };
     document.addEventListener('mousemove', onMouseMove);
     document.addEventListener('mouseup', onMouseUp);
     return () => {
@@ -1299,51 +1404,13 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
 
   // Shared by both the carousel's "current" slot and the single-image layout below --
   // top-right pencil (교체)/X (삭제) buttons, reusing the same icons already used for editing
-  // elsewhere in the app (Places/Memo pencil, tag-delete X), plus PC-only zoom controls at the
-  // left end of the same row. The row itself must now show whenever EITHER zoom (desktop) or
-  // edit (canEditPhoto) applies -- zoom is a viewing feature independent of whether this
-  // particular photo is editable (e.g. a directMediaUrl link-embedded image), so gating the
-  // whole row on canEditPhoto alone would have hidden zoom on exactly the photos most likely to
-  // need it (no replace/delete affordance to fall back on).
-  const renderPhotoActions = () => showInfo && (canEditPhoto || isDesktop) && /*#__PURE__*/React.createElement("div", {
+  // elsewhere in the app (Places/Memo pencil, tag-delete X). Zoom controls used to live at the
+  // left end of this same row, but were moved into LightboxInfoPanel (directly above the URL
+  // button) per user request, so this row is gated on canEditPhoto alone again.
+  const renderPhotoActions = () => showInfo && canEditPhoto && /*#__PURE__*/React.createElement("div", {
     style: { position: 'absolute', top: '8px', right: '8px', display: 'flex', alignItems: 'center', gap: '6px', zIndex: 10 },
     onClick: e => e.stopPropagation()
   },
-    isDesktop && /*#__PURE__*/React.createElement(React.Fragment, null,
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        onClick: handleZoomOut,
-        disabled: zoomLevel <= ZOOM_MIN,
-        "aria-label": "축소",
-        title: "축소",
-        style: {
-          width: '30px', height: '30px', borderRadius: '50%', border: 'none',
-          background: 'rgba(15,23,42,0.62)', color: '#FFFFFF', display: 'flex',
-          alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '0.72rem',
-          opacity: zoomLevel <= ZOOM_MIN ? 0.5 : 1
-        }
-      }, /*#__PURE__*/React.createElement(ZoomOutIcon, { size: 15 })),
-      /*#__PURE__*/React.createElement("span", {
-        style: {
-          minWidth: '38px', textAlign: 'center', color: '#FFFFFF', fontSize: '0.72rem',
-          fontWeight: 700, padding: '4px 2px', borderRadius: '10px',
-          background: 'rgba(15,23,42,0.62)'
-        }
-      }, `${zoomLevel}%`),
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        onClick: handleZoomIn,
-        disabled: zoomLevel >= ZOOM_MAX,
-        "aria-label": "확대",
-        title: "확대",
-        style: {
-          width: '30px', height: '30px', borderRadius: '50%', border: 'none',
-          background: 'rgba(15,23,42,0.62)', color: '#FFFFFF', display: 'flex',
-          alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '0.72rem',
-          opacity: zoomLevel >= ZOOM_MAX ? 0.5 : 1
-        }
-      }, /*#__PURE__*/React.createElement(ZoomInIcon, { size: 15 }))
-    ),
     canEditPhoto && onReplacePhoto && /*#__PURE__*/React.createElement("button", {
       type: "button",
       onClick: () => replacePhotoInputRef.current && replacePhotoInputRef.current.click(),
@@ -1378,6 +1445,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
     style: { position: 'relative', display: 'inline-flex', maxWidth: '100%', maxHeight: '100%' },
     onClick: handleImageTap
   }, /*#__PURE__*/React.createElement("img", {
+    ref: zoomedImgRef,
     src: url,
     alt: "원본 이미지",
     "data-slide": slot,
@@ -1385,6 +1453,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
     decoding: 'async',
     referrerPolicy: 'no-referrer',
     onLoad: e => recordImageDimensions(url, e),
+    onMouseDown: handleZoomedImageMouseDown,
     style: {
       maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: '12px',
       display: 'block', ...zoomImageStyle
@@ -1396,7 +1465,13 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
     onSearchTag: onSearchTag,
     onOpenUrl: () => setImageUrlModalOpen(true),
     showToast: showToast,
-    sourceInfo: sourceInfo
+    sourceInfo: sourceInfo,
+    showZoomControls: isDesktop,
+    zoomLevel: zoomLevel,
+    zoomMin: ZOOM_MIN,
+    zoomMax: ZOOM_MAX,
+    onZoomIn: handleZoomIn,
+    onZoomOut: handleZoomOut
   })) : /*#__PURE__*/React.createElement("img", {
     src: url,
     alt: "원본 이미지",
@@ -1492,12 +1567,14 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
     style: { position: 'relative', display: 'inline-flex', maxWidth: '92vw', maxHeight: '82vh' },
     onClick: handleImageTap
   }, /*#__PURE__*/React.createElement("img", {
+    ref: zoomedImgRef,
     src: currentUrl,
     alt: "원본 이미지",
     draggable: false,
     decoding: 'async',
     referrerPolicy: 'no-referrer',
     onLoad: e => recordImageDimensions(currentUrl, e),
+    onMouseDown: handleZoomedImageMouseDown,
     style: {
       maxWidth: '92vw', maxHeight: '82vh', borderRadius: '12px', objectFit: 'contain',
       display: 'block', ...zoomImageStyle
@@ -1509,7 +1586,13 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
     onSearchTag: onSearchTag,
     onOpenUrl: () => setImageUrlModalOpen(true),
     showToast: showToast,
-    sourceInfo: sourceInfo
+    sourceInfo: sourceInfo,
+    showZoomControls: isDesktop,
+    zoomLevel: zoomLevel,
+    zoomMin: ZOOM_MIN,
+    zoomMax: ZOOM_MAX,
+    onZoomIn: handleZoomIn,
+    onZoomOut: handleZoomOut
   })),
   total > 1 && (() => {
     const maxVisibleDots = 10;
