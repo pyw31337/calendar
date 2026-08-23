@@ -8463,7 +8463,13 @@ async function readClipboardImageFiles(showToast) {
   try {
     const files = [];
     if (typeof navigator.clipboard.read === 'function') {
-      const items = await navigator.clipboard.read();
+      // Some mobile browsers (notably Android Chrome when Permissions-Policy silently withholds
+      // clipboard-read for this context) neither resolve nor reject this promise -- they just
+      // hang forever with no error and no data. Without a bound, that reads to the user as the
+      // 붙여넣기 button doing literally nothing when pressed (no toast, no preview, no error).
+      // Bounding it guarantees the catch block's error toast fires within a few seconds either
+      // way, so a press always produces some visible reaction.
+      const items = await withTimeout(navigator.clipboard.read(), 5000, 'clipboard read timed out');
       for (const item of items) {
         for (const type of item.types) {
           if (type.startsWith('image/')) {

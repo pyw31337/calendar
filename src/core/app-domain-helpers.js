@@ -1206,17 +1206,40 @@ function buildDynamicManifest(calendar) {
   };
 }
 
+// Same mapping as the pwa-manifest-switch bootstrap script in src/index.html's <head> -- kept
+// in sync manually since the two run in entirely different load phases (that one runs before
+// this bundle even starts fetching).
+const STATIC_MANIFEST_FILE_BY_CALENDAR = { kkot: 'manifest-kkot.json', cw: 'manifest-cw.json', jhair: 'manifest-jhair.json' };
+
 let activeManifestBlobUrl = null;
-// Swaps <link rel="manifest"> to a blob: URL generated from this calendar's real title. Safe
-// to call repeatedly (e.g. once per calendar switch) -- the previous blob URL is revoked each
-// time so this doesn't leak memory over a long-lived tab.
+// Swaps <link rel="manifest"> to this calendar's manifest. For kkot/cw/jhair, always points at
+// the real static manifest-<id>.json file instead of generating one -- home-screen installs
+// on mobile Chrome were colliding across different calendars (installing a second one reported
+// "already installed", and opening either installed icon opened whichever was installed most
+// recently) when every calendar's manifest was blob: URL-generated here. Each manifest's `id`
+// field WAS already a distinct absolute URL, which per spec should be enough on its own for
+// Chrome to treat them as separate apps regardless of start_url/scope/manifest path -- but a
+// blob: URL is a fresh, session-local object each call (recreated on every calendar-load effect
+// run), and in practice that was not producing distinct installable identities. A real,
+// stably-addressable manifest file removes that variable entirely. Calendars outside this map
+// (any created since calendar creation stopped being restricted to kkot/cw) still fall back to
+// the blob-generated manifest below so they at least get their own title instead of the generic
+// "모여라 캘린더" placeholder -- accepting that install-identity risk only for that admin-only,
+// rarely-installed-to-home-screen case.
 function applyDynamicManifest(calendar) {
   try {
+    const link = document.querySelector('link[rel="manifest"]');
+    if (!link) return;
+    const staticFile = STATIC_MANIFEST_FILE_BY_CALENDAR[calendar.id];
+    if (staticFile) {
+      if (activeManifestBlobUrl) { URL.revokeObjectURL(activeManifestBlobUrl); activeManifestBlobUrl = null; }
+      link.setAttribute('href', staticFile);
+      return;
+    }
     const manifest = buildDynamicManifest(calendar);
     const blob = new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' });
     const nextUrl = URL.createObjectURL(blob);
-    const link = document.querySelector('link[rel="manifest"]');
-    if (link) link.setAttribute('href', nextUrl);
+    link.setAttribute('href', nextUrl);
     if (activeManifestBlobUrl) URL.revokeObjectURL(activeManifestBlobUrl);
     activeManifestBlobUrl = nextUrl;
   } catch (e) {
