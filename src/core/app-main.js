@@ -10354,7 +10354,18 @@ function computeChatImageGridMaxWidth(count) {
   const mobileCols = count === 2 ? 2 : 3;
   const isMobile = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(max-width: 640px)').matches;
   const activeCols = isMobile ? mobileCols : (count >= 12 ? 6 : count >= 5 ? 5 : mobileCols);
-  return isMobile ? 'min(100%, 280px)' : `min(100%, calc(${activeCols} * 76px + (${activeCols} - 1) * 4px))`;
+  // Deliberately a plain length, NOT wrapped in min(100%, ...) -- every caller already pairs this
+  // with width:'100%' on the same element, which already shrinks it to the actual available space
+  // during normal layout (percentages resolve fine against a definite parent there). Wrapping the
+  // max-width itself in min(100%, ...) is redundant for that, and actively wrong: verified via an
+  // isolated repro that when an ANCESTOR (the fit-content chat bubble) is computing its own
+  // preferred width, a descendant's max-width containing a percentage inside min()/max() resolves
+  // as indefinite for that intrinsic-size calculation and gets ignored -- so the bubble sizes
+  // itself to something close to its full available width instead of hugging this grid's actual
+  // (much narrower) rendered size, leaving a large gap next to it. A bare length isn't ambiguous
+  // that way, and still gets safely clamped by the paired width:'100%' when the bubble ends up
+  // genuinely narrower than this value.
+  return isMobile ? '280px' : `calc(${activeCols} * 76px + (${activeCols} - 1) * 4px)`;
 }
 function renderChatMessageImages(msg, setActiveLightbox, singleImageStyle = {}) {
   const entries = getMessageImageEntries(msg);
