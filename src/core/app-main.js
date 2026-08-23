@@ -12309,6 +12309,7 @@ function bindGatherUiDeps() {
     isEmojiOnlyChatText: typeof isEmojiOnlyChatText === 'function' ? isEmojiOnlyChatText : null,
     twemojiImageUrl: typeof twemojiImageUrl === 'function' ? twemojiImageUrl : null,
     getDirectChatMediaInfo: typeof getDirectChatMediaInfo === 'function' ? getDirectChatMediaInfo : null,
+    getDirectMediaTagsForUrl: typeof getDirectMediaTagsForUrl === 'function' ? getDirectMediaTagsForUrl : null,
     getPollOptionVoterIds: typeof getPollOptionVoterIds === 'function' ? getPollOptionVoterIds : null,
     getPollTotalVoteCount: typeof getPollTotalVoteCount === 'function' ? getPollTotalVoteCount : null,
     getCalendarActivityLogs: typeof getCalendarActivityLogs === 'function' ? getCalendarActivityLogs : null,

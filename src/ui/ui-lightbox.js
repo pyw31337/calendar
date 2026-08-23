@@ -920,8 +920,15 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
     currentMeta.source === 'memo' ? false :
     currentMeta.messageId != null
   );
+  // Was `${messageId}_${directMediaUrl ? 'direct' : imageIndex}` -- the literal string 'direct'
+  // collapsed every directMediaUrl slide of the SAME message onto one shared key, so saving a tag
+  // on one external image in a multi-image-link message made the just-saved override show on
+  // every other image in that message too (until the Lightbox was closed and reopened and this
+  // stale local override was no longer consulted). Keying on the URL itself keeps each slide's
+  // optimistic override distinct, matching how the actual save (getDirectMediaTagKey) already
+  // keys directMediaTags per-URL in Firestore.
   const tagOverrideKey = currentMeta
-    ? (isMeetingPhoto ? `meeting_${currentMeta.meetingDate}_${currentMeta.photoId}` : `${currentMeta.messageId}_${currentMeta.directMediaUrl ? 'direct' : currentMeta.imageIndex}`)
+    ? (isMeetingPhoto ? `meeting_${currentMeta.meetingDate}_${currentMeta.photoId}` : `${currentMeta.messageId}_${currentMeta.directMediaUrl || currentMeta.imageIndex}`)
     : null;
   const currentTags = (tagOverrideKey && tagOverrideKey in tagOverrides) ? tagOverrides[tagOverrideKey] : (currentMeta?.tags || '');
   // Mirrors handleSaveImageTags' own parse/dedupe/limit rules so the optimistic override shown

@@ -646,6 +646,10 @@ function getDirectChatMediaInfo(...args) {
   const f = __gatherUiDeps().getDirectChatMediaInfo || GATHER_APP_UTILS.getDirectChatMediaInfo;
   return typeof f === 'function' ? f(...args) : undefined;
 }
+function getDirectMediaTagsForUrl(...args) {
+  const f = __gatherUiDeps().getDirectMediaTagsForUrl || GATHER_APP_UTILS.getDirectMediaTagsForUrl;
+  return typeof f === 'function' ? f(...args) : '';
+}
 function extractDirectImageUrls(...args) {
   const f = __gatherUiDeps().extractDirectImageUrls || GATHER_APP_UTILS.extractDirectImageUrls;
   return typeof f === 'function' ? f(...args) : [];
@@ -730,7 +734,11 @@ export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox,
       messageId: message?.id || '',
       imageIndex: idx,
       thumb: info.url,
-      directMediaUrl: info.url
+      directMediaUrl: info.url,
+      // Without this, reopening the Lightbox on a multi-image-link message always showed blank
+      // tags regardless of what was actually saved -- getMessageDirectMediaEntry (the single-
+      // embedded-image case) already does this the same way.
+      tags: message ? getDirectMediaTagsForUrl(message, info.url) : ''
     }));
     let remainingText = text;
     directImageUrls.forEach(info => { remainingText = remainingText.split(info.raw).join(''); });
