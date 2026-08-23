@@ -597,6 +597,62 @@ const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
     });
   }
 
+  // Structured per-date memo stack: unlike parseVisitEntriesFromMemo (which only parses when 2+
+  // dates are present, since it exists purely to reformat run-on memo strings for display), this
+  // always returns one entry per date so a place's very first memo entry is addressable too.
+  function parsePlaceMemoEntries(memo) {
+    const text = String(memo || '').trim();
+    if (!text) return [];
+    const dateMatches = [...text.matchAll(new RegExp(MEMO_DATE_RE, 'g'))]
+      .filter(match => normalizeMemoDateMatch(match));
+    if (dateMatches.length === 0) return [{ date: '', note: text }];
+    return dateMatches.map((match, idx) => {
+      const segmentEnd = idx + 1 < dateMatches.length ? dateMatches[idx + 1].index : text.length;
+      const note = text.slice(match.index + match[0].length, segmentEnd)
+        .trim()
+        .replace(/^\/\s*/, '')
+        .replace(/\s*\/\s*$/, '');
+      return { date: normalizeMemoDateMatch(match), note };
+    });
+  }
+
+  function serializePlaceMemoEntries(entries) {
+    return (entries || [])
+      .filter(entry => entry && (entry.date || entry.note))
+      .map(entry => (entry.date ? (entry.note ? `${entry.date} ${entry.note}` : entry.date) : entry.note))
+      .join('\n');
+  }
+
+  function toMemoDateFormat(dateStr) {
+    const match = String(dateStr || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    return match ? `${match[1].slice(2)}.${match[2]}.${match[3]}` : (extractLeadingMemoDate(dateStr) || String(dateStr || ''));
+  }
+
+  function upsertPlaceMemoEntry(existingMemo, dateStr, note) {
+    const cleanNote = String(note || '').trim();
+    if (!cleanNote) return String(existingMemo || '');
+    const targetNorm = normalizePlaceDateForSort(dateStr);
+    const memoDate = toMemoDateFormat(dateStr);
+    const entries = parsePlaceMemoEntries(existingMemo);
+    const idx = entries.findIndex(entry => normalizePlaceDateForSort(entry.date) === targetNorm);
+    if (idx >= 0) entries[idx] = { date: entries[idx].date || memoDate, note: cleanNote };
+    else entries.push({ date: memoDate, note: cleanNote });
+    return serializePlaceMemoEntries(entries);
+  }
+
+  function removePlaceMemoEntry(existingMemo, dateStr) {
+    const targetNorm = normalizePlaceDateForSort(dateStr);
+    const entries = parsePlaceMemoEntries(existingMemo).filter(entry => normalizePlaceDateForSort(entry.date) !== targetNorm);
+    return serializePlaceMemoEntries(entries);
+  }
+
+  function getPlaceMemoEntryForDate(memo, dateStr) {
+    const targetNorm = normalizePlaceDateForSort(dateStr);
+    const entries = parsePlaceMemoEntries(memo);
+    const entry = entries.find(e => normalizePlaceDateForSort(e.date) === targetNorm);
+    return entry ? entry.note : '';
+  }
+
 
   function trimLatLngOutliers(points) {
     if (!Array.isArray(points) || points.length <= 5) return points || [];
@@ -754,6 +810,12 @@ const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
     parseVisitEntriesFromMemo,
     reformatMemoIntoDateLines,
     sortVisitEntriesRecentFirst,
+    parsePlaceMemoEntries,
+    serializePlaceMemoEntries,
+    toMemoDateFormat,
+    upsertPlaceMemoEntry,
+    removePlaceMemoEntry,
+    getPlaceMemoEntryForDate,
     trimLatLngOutliers,
     parseSharePathFromLocation,
     getAppBaseUrl,

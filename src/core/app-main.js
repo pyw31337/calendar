@@ -239,19 +239,56 @@ const sortVisitEntriesRecentFirst = GATHER_APP_UTILS.sortVisitEntriesRecentFirst
     return dateB.localeCompare(dateA);
   });
 };
-// Links one more meeting date onto an existing place record without disturbing whatever's
-// already there -- reuses the same multi-date memo format parseVisitEntriesFromMemo already
-// understands (one "YYYY-MM-DD 메모" line per visit), so a place picked from search results for a
-// second/third date shows up on all of them via doesPlaceMatchDate instead of creating a
-// duplicate place document. No-ops if this exact date is already present as a line.
-function appendVisitDateToPlaceMemo(existingMemo, dateStr, note) {
+// Place memo as a stack of per-date entries -- one entry per visit, addressable/editable/deletable
+// individually (unlike parseVisitEntriesFromMemo above, which only kicks in once 2+ dates already
+// exist, since it exists purely to reformat run-on strings for display). A place's very first memo
+// entry is a single-date parse result here, not an empty array.
+const parsePlaceMemoEntries = GATHER_APP_UTILS.parsePlaceMemoEntries || function parsePlaceMemoEntries(memo) {
+  const text = String(memo || "").trim();
+  if (!text) return [];
+  const dateMatches = [...text.matchAll(new RegExp(MEMO_DATE_RE, "g"))].filter(m => normalizeMemoDateMatch(m));
+  if (dateMatches.length === 0) return [{ date: '', note: text }];
+  return dateMatches.map((match, idx) => {
+    const segmentEnd = idx + 1 < dateMatches.length ? dateMatches[idx + 1].index : text.length;
+    const note = text.slice(match.index + match[0].length, segmentEnd).trim().replace(/^\/\s*/, "").replace(/\s*\/\s*$/, "");
+    return { date: normalizeMemoDateMatch(match), note };
+  });
+};
+const serializePlaceMemoEntries = GATHER_APP_UTILS.serializePlaceMemoEntries || function serializePlaceMemoEntries(entries) {
+  return (entries || [])
+    .filter(entry => entry && (entry.date || entry.note))
+    .map(entry => (entry.date ? (entry.note ? `${entry.date} ${entry.note}` : entry.date) : entry.note))
+    .join('\n');
+};
+const toMemoDateFormat = GATHER_APP_UTILS.toMemoDateFormat || function toMemoDateFormat(dateStr) {
+  const match = String(dateStr || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return match ? `${match[1].slice(2)}.${match[2]}.${match[3]}` : (extractLeadingMemoDate(dateStr) || String(dateStr || ''));
+};
+// Replaces this date's entry if one already exists (edit), otherwise appends a new one (add) --
+// this is the single write path for place memos now, used both for a brand-new visit note and for
+// editing/continuing an existing one, so the memo string never accumulates duplicate date lines.
+const upsertPlaceMemoEntry = GATHER_APP_UTILS.upsertPlaceMemoEntry || function upsertPlaceMemoEntry(existingMemo, dateStr, note) {
   const cleanNote = String(note || '').trim();
-  const newLine = cleanNote ? `${dateStr} ${cleanNote}` : dateStr;
-  const trimmedExisting = String(existingMemo || '').trim();
-  if (!trimmedExisting) return newLine;
-  if (trimmedExisting.split('\n').some(line => line.trim().startsWith(dateStr))) return trimmedExisting;
-  return `${trimmedExisting}\n${newLine}`;
-}
+  if (!cleanNote) return String(existingMemo || '');
+  const targetNorm = normalizePlaceDateForSort(dateStr);
+  const memoDate = toMemoDateFormat(dateStr);
+  const entries = parsePlaceMemoEntries(existingMemo);
+  const idx = entries.findIndex(entry => normalizePlaceDateForSort(entry.date) === targetNorm);
+  if (idx >= 0) entries[idx] = { date: entries[idx].date || memoDate, note: cleanNote };
+  else entries.push({ date: memoDate, note: cleanNote });
+  return serializePlaceMemoEntries(entries);
+};
+const removePlaceMemoEntry = GATHER_APP_UTILS.removePlaceMemoEntry || function removePlaceMemoEntry(existingMemo, dateStr) {
+  const targetNorm = normalizePlaceDateForSort(dateStr);
+  const entries = parsePlaceMemoEntries(existingMemo).filter(entry => normalizePlaceDateForSort(entry.date) !== targetNorm);
+  return serializePlaceMemoEntries(entries);
+};
+const getPlaceMemoEntryForDate = GATHER_APP_UTILS.getPlaceMemoEntryForDate || function getPlaceMemoEntryForDate(memo, dateStr) {
+  const targetNorm = normalizePlaceDateForSort(dateStr);
+  const entries = parsePlaceMemoEntries(memo);
+  const entry = entries.find(e => normalizePlaceDateForSort(e.date) === targetNorm);
+  return entry ? entry.note : '';
+};
 
 const KNOWN_PLACE_PARTICIPANT_NAME_TAGS = [
   '영우', '유리', '서준', '광석', '수진', '아윤', '현석', '효진',
@@ -769,39 +806,6 @@ async function ensurePushSubscriptionHealthy(calendarId, activeParticipantId) {
     return subscribeUserToPush(calendarId, activeParticipantId, { forceResubscribe: true });
   } catch (err) {
     return { ok: false, reason: classifyPushSubscribeError(err), detail: err?.message || '' };
-  }
-}
-
-async function sendLocalTestNotification(calendarTitle, calendarId) {
-  if (!isNotificationSupported() || Notification.permission !== 'granted') {
-    return { ok: false, reason: 'permission-not-granted' };
-  }
-  const title = (calendarTitle || '모여라 캘린더') + ' · 알림 테스트';
-  const body = '이 기기로 알림이 정상적으로 도착했습니다.';
-  // Same ?id= URL shape the real Cloud Function push uses (functions/index.js) -- without it,
-  // notificationclick (sw.js) opens the app at the bare origin, which falls back to the
-  // hardcoded default calendar ('kkot') instead of the calendar the test was actually sent from.
-  const targetUrl = isAllowedCalendarId(calendarId) ? `./?id=${calendarId}&view=chat` : './';
-  try {
-    if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
-      const reg = await navigator.serviceWorker.ready;
-      if (reg && reg.showNotification) {
-        await reg.showNotification(title, {
-          body: body,
-          icon: 'icons/icon-192.png',
-          badge: 'icons/icon-192.png',
-          tag: 'gather-test-notification',
-          renotify: true,
-          data: targetUrl
-        });
-        return { ok: true, via: 'service-worker' };
-      }
-    }
-    const n = new Notification(title, { body: body, tag: 'gather-test-notification' });
-    setTimeout(() => { try { n.close(); } catch (_) {} }, 8000);
-    return { ok: true, via: 'notification-api' };
-  } catch (err) {
-    return { ok: false, reason: 'show-failed', detail: err && err.message };
   }
 }
 
@@ -4417,41 +4421,6 @@ function App() {
   const openNotificationHelp = () => {
     setIsNotificationHelpOpen(true);
   };
-  const handleTestPushNotification = async () => {
-    if (!isNotificationSupported()) {
-      showToast('이 브라우저는 알림을 지원하지 않습니다.', 'error');
-      openNotificationHelp();
-      return;
-    }
-    if (Notification.permission !== 'granted') {
-      showToast('먼저 채팅알림을 켜 권한을 허용해 주세요.', 'error');
-      openNotificationHelp();
-      return;
-    }
-    const pid = getCurrentChatParticipantId();
-    if (!pid) {
-      showToast('채팅에서 내 이름을 선택한 뒤 다시 시도해 주세요.', 'error', 5000);
-      return;
-    }
-    showToast('구독 확인 중...', 'info', 2000);
-    const health = await ensurePushSubscriptionHealthy(activeCalId, pid);
-    if (!health.ok) {
-      if (health.reason === 'ios-not-installed') {
-        showToast('iOS는 홈 화면 추가 앱에서만 알림이 갑니다.', 'error', 6000);
-        openNotificationHelp();
-        return;
-      }
-      showToast('푸시 구독 실패: ' + describePushSubscribeFailure(health.reason), 'error', 6000);
-      openNotificationHelp();
-      return;
-    }
-    const local = await sendLocalTestNotification(activeCal && activeCal.title, activeCalId);
-    if (local.ok) showToast('테스트 알림을 보냈습니다. 알림창을 확인해 주세요.', 'success', 5000);
-    else {
-      showToast('알림 표시 실패. 브라우저 알림 권한을 확인해 주세요.', 'error', 6000);
-      openNotificationHelp();
-    }
-  };
   const handleMainToggleNotifications = async () => {
     if (!isNotificationSupported()) {
       showToast('알림 미지원 브라우저', 'error');
@@ -7414,14 +7383,27 @@ function App() {
     // written back into the place's own sourcePlaceId field as if it were one.
     const sourcePlaceIdForSave = (mergeTargetPlace && cleanSourcePlaceId === mergeTargetPlace.id) ? '' : cleanSourcePlaceId;
     // Reusing an existing place for a (possibly new) date keeps its curated fields untouched
-    // (mp() only falls back to this save's own value when the existing field is empty) and
-    // appends this date as a new memo line (see appendVisitDateToPlaceMemo) instead of
-    // overwriting, so earlier dates/notes on the place aren't lost -- doesPlaceMatchDate already
-    // understands that multi-line format, so the place then shows up under every linked date. A
-    // plain edit (not a merge) still needs the same sourcePlaceId fallback: its incoming value is
-    // empty (DateModal's pencil-icon edit form doesn't carry the original search result forward),
-    // so an empty value here must not wipe out a sourcePlaceId set by an earlier save.
+    // (mp() only falls back to this save's own value when the existing field is empty). A plain
+    // edit (not a merge) still needs the same sourcePlaceId fallback: its incoming value is empty
+    // (DateModal's pencil-icon edit form doesn't carry the original search result forward), so an
+    // empty value here must not wipe out a sourcePlaceId set by an earlier save.
     const mp = (key, ownValue) => mergeTargetPlace ? (mergeTargetPlace[key] || ownValue) : ownValue;
+    // Place memo is a stack of per-date entries ("YY.MM.DD 메모", one line per visit), addressable
+    // individually via parsePlaceMemoEntries/upsertPlaceMemoEntry/removePlaceMemoEntry -- the same
+    // functions drive DateModal's single-date view and PlacesView's full-history view, so the memo
+    // reads identically everywhere it's shown. DateModal's place form always represents just ONE
+    // date's note (this date, whether it's a brand new place, an existing place reused for another
+    // date via merge, or an already-linked place being re-edited) and marks that with
+    // memoOp:'upsert' so it's merged into the target place's existing stack instead of overwriting
+    // it. Everything else (PlacesView's per-entry edit/delete, DateModal's unlink-from-date) already
+    // computes and sends the exact final memo string itself, so that's stored as-is.
+    const memoBasePlace = mergeTargetPlace || (isEditing ? existingPlaces.find(p => p.id === placeData.id) : null);
+    const nextMemo = placeData.memoOp === 'upsert'
+      // No visit date to key an entry on (e.g. visitStatus switched to 'planned') -- nothing to
+      // upsert, so leave whatever stack already exists on the base place untouched rather than
+      // collapsing it down to just this save's raw note.
+      ? (cleanVisitDate ? upsertPlaceMemoEntry(memoBasePlace ? memoBasePlace.memo : '', cleanVisitDate, cleanMemo) : (memoBasePlace ? memoBasePlace.memo : cleanMemo))
+      : (mergeTargetPlace ? mergeTargetPlace.memo : cleanMemo);
     const editedFields = {
       name: mp('name', cleanName),
       alias: mp('alias', cleanAlias),
@@ -7429,22 +7411,7 @@ function App() {
       lat: mergeTargetPlace ? mergeTargetPlace.lat : placeData.lat,
       lng: mergeTargetPlace ? mergeTargetPlace.lng : placeData.lng,
       categoryId: mp('categoryId', cleanCategoryId),
-      // DateModal prefills placeMemo with the existing place's memo when reusing an
-      // already-registered place (handleSelectExistingPlace, ui-date-modal.js) so the user sees
-      // it and can continue writing from there instead of typing into what looks like an empty
-      // field. If what comes back still starts with that same prefill, it's an edit/continuation
-      // of the existing text (not a short note for just this date) -- use it as the place's new
-      // memo outright, since appending the usual one-line-per-visit entry on top would duplicate
-      // the whole prior history inside that new line. Anything else (field left blank, or the
-      // prefill was cleared and a fresh short note typed instead) keeps the original
-      // append-one-dated-line-per-visit behavior.
-      memo: mergeTargetPlace
-        ? (() => {
-            const existingMemoTrimmed = String(mergeTargetPlace.memo || '').trim();
-            if (existingMemoTrimmed && cleanMemo.startsWith(existingMemoTrimmed)) return cleanMemo;
-            return (cleanVisitDate && !doesPlaceMatchDate(mergeTargetPlace, cleanVisitDate)) ? appendVisitDateToPlaceMemo(mergeTargetPlace.memo, cleanVisitDate, cleanMemo) : mergeTargetPlace.memo;
-          })()
-        : cleanMemo,
+      memo: nextMemo,
       visitStatus: mp('visitStatus', cleanVisitStatus),
       visitDate: mp('visitDate', cleanVisitDate),
       sourcePlaceId: mp('sourcePlaceId', sourcePlaceIdForSave || (isEditing && !mergeTargetPlace ? (existingPlaces.find(p => p.id === placeData.id) || {}).sourcePlaceId : '') || ''),
@@ -7470,7 +7437,7 @@ function App() {
       placeLogNote = buildFieldChangeNote(displayLabel, [
         { key: '별칭', before: prevPlace.alias || '', after: cleanAlias },
         { key: '이름', before: prevPlace.name || '', after: cleanName },
-        { key: '메모', before: prevPlace.memo || '', after: cleanMemo },
+        { key: '메모', before: prevPlace.memo || '', after: nextMemo },
         { key: '카테고리', before: catName(prevPlace.categoryId), after: catName(cleanCategoryId) },
         { key: '주소', before: prevPlace.address || '', after: cleanAddress },
         { key: '방문', before: prevPlace.visitStatus === 'planned' ? '예정' : '방문', after: cleanVisitStatus === 'planned' ? '예정' : '방문' },
@@ -7479,7 +7446,7 @@ function App() {
     } else if (!isEditing) {
       const bits = [displayLabel];
       if (cleanAlias && cleanAlias !== cleanName) bits.push(`별칭 ${cleanAlias}`);
-      if (cleanMemo) bits.push(`메모 ${sanitizeText(cleanMemo, 40)}`);
+      if (nextMemo) bits.push(`메모 ${sanitizeText(nextMemo, 40)}`);
       if (cleanCategoryId && cleanCategoryId !== 'etc') bits.push(`카테고리 ${catName(cleanCategoryId)}`);
       if (cleanVisitDate) bits.push(`일자 ${cleanVisitDate}`);
       placeLogNote = sanitizeText(bits.join(' · '), 300);
@@ -8295,7 +8262,6 @@ function App() {
     onIncreaseFont: () => setFontScalePercent(prev => Math.min(130, prev + 10)),
     isChatNotifyEnabled: mainNotifPermission === 'granted' && mainChatNotifyEnabled,
     onToggleChatNotifications: handleMainToggleNotifications,
-    onTestChatNotification: handleTestPushNotification,
     onUpdateWeatherLocation: handleUpdateWeatherLocation,
     onDeleteRecentLocation: handleDeleteRecentWeatherLocation,
     showToast: showToast
@@ -12299,6 +12265,11 @@ function bindGatherUiDeps() {
     extractLeadingMemoDate: typeof extractLeadingMemoDate === 'function' ? extractLeadingMemoDate : null,
     parseVisitEntriesFromMemo: typeof parseVisitEntriesFromMemo === 'function' ? parseVisitEntriesFromMemo : null,
     sortVisitEntriesRecentFirst: typeof sortVisitEntriesRecentFirst === 'function' ? sortVisitEntriesRecentFirst : null,
+    parsePlaceMemoEntries: typeof parsePlaceMemoEntries === 'function' ? parsePlaceMemoEntries : null,
+    toMemoDateFormat: typeof toMemoDateFormat === 'function' ? toMemoDateFormat : null,
+    upsertPlaceMemoEntry: typeof upsertPlaceMemoEntry === 'function' ? upsertPlaceMemoEntry : null,
+    removePlaceMemoEntry: typeof removePlaceMemoEntry === 'function' ? removePlaceMemoEntry : null,
+    getPlaceMemoEntryForDate: typeof getPlaceMemoEntryForDate === 'function' ? getPlaceMemoEntryForDate : null,
     extractKnownParticipantNames: typeof extractKnownParticipantNames === 'function' ? extractKnownParticipantNames : null,
     getPlaceExternalMapUrl: typeof getPlaceExternalMapUrl === 'function' ? getPlaceExternalMapUrl : null,
     loadLeaflet: typeof loadLeaflet === 'function' ? loadLeaflet : null,
@@ -12392,7 +12363,6 @@ function bindGatherUiDeps() {
     sha256Hex: typeof sha256Hex === 'function' ? sha256Hex : null,
     subscribeUserToPushWithPermission: typeof subscribeUserToPushWithPermission === 'function' ? subscribeUserToPushWithPermission : null,
     ensurePushSubscriptionHealthy: typeof ensurePushSubscriptionHealthy === 'function' ? ensurePushSubscriptionHealthy : null,
-    sendLocalTestNotification: typeof sendLocalTestNotification === 'function' ? sendLocalTestNotification : null,
     translateKoreanToEnglish: typeof translateKoreanToEnglish === 'function' ? translateKoreanToEnglish : null,
     unsubscribeUserFromPush: typeof unsubscribeUserFromPush === 'function' ? unsubscribeUserFromPush : null,
     validateBackupCalendars: typeof validateBackupCalendars === 'function' ? validateBackupCalendars : null,
