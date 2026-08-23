@@ -824,7 +824,12 @@ export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox,
   const commonStyle = {
     display: 'block',
     width: '100%',
-    maxWidth: `min(100%, ${maxWidth})`,
+    // Plain length, not min(100%, ...) -- same fit-content-ancestor bug as
+    // computeChatImageGridMaxWidth in app-main.js: a direct-linked image/video pasted in chat
+    // sits inside the same fit-content bubble, so wrapping this in min() with a percentage makes
+    // the bubble ignore the cap and balloon out while the element itself still renders capped,
+    // leaving a gap to its right. width:'100%' above already shrinks it safely when narrower.
+    maxWidth,
     maxHeight,
     borderRadius: '10px',
     backgroundColor: 'var(--bg-primary)',
