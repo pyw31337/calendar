@@ -248,11 +248,13 @@ const parsePlaceMemoEntries = GATHER_APP_UTILS.parsePlaceMemoEntries || function
   if (!text) return [];
   const dateMatches = [...text.matchAll(new RegExp(MEMO_DATE_RE, "g"))].filter(m => normalizeMemoDateMatch(m));
   if (dateMatches.length === 0) return [{ date: '', note: text }];
-  return dateMatches.map((match, idx) => {
+  const entries = dateMatches.map((match, idx) => {
     const segmentEnd = idx + 1 < dateMatches.length ? dateMatches[idx + 1].index : text.length;
     const note = text.slice(match.index + match[0].length, segmentEnd).trim().replace(/^\/\s*/, "").replace(/\s*\/\s*$/, "");
     return { date: normalizeMemoDateMatch(match), note };
   });
+  const cleaned = entries.filter(e => !(e.date && !e.note));
+  return cleaned.length > 0 ? cleaned : entries;
 };
 const serializePlaceMemoEntries = GATHER_APP_UTILS.serializePlaceMemoEntries || function serializePlaceMemoEntries(entries) {
   return (entries || [])

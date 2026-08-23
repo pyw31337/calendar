@@ -563,7 +563,7 @@ const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
     const dateMatches = [...text.matchAll(new RegExp(MEMO_DATE_RE, 'g'))]
       .filter(match => normalizeMemoDateMatch(match));
     if (dateMatches.length === 0) return [{ date: '', note: text }];
-    return dateMatches.map((match, idx) => {
+    const entries = dateMatches.map((match, idx) => {
       const segmentEnd = idx + 1 < dateMatches.length ? dateMatches[idx + 1].index : text.length;
       const note = text.slice(match.index + match[0].length, segmentEnd)
         .trim()
@@ -571,6 +571,14 @@ const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
         .replace(/\s*\/\s*$/, '');
       return { date: normalizeMemoDateMatch(match), note };
     });
+    // A dated entry with an empty note is parsing noise, not a real visit -- typically a
+    // duplicated/typo'd date token sitting right before the real "date note" pair in legacy
+    // run-on memo text (e.g. "... 26.08.22 26.08.22 실제메모..."). Left in, it would silently win
+    // every date lookup below (Array.find/findIndex return the first match), hiding the real note
+    // for that date. New saves never produce one (upsertPlaceMemoEntry requires a non-empty note),
+    // so this only ever strips pre-existing noise.
+    const cleaned = entries.filter(e => !(e.date && !e.note));
+    return cleaned.length > 0 ? cleaned : entries;
   }
 
   function serializePlaceMemoEntries(entries) {
