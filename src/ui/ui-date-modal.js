@@ -1192,15 +1192,22 @@ export function DateModal({
   // same "이전 채팅 더보기" mechanism Gallery already uses, until either there's nothing older
   // left or the oldest loaded message is already older than this date -- at that point every
   // message that could possibly carry this date's hashtag has been loaded.
+  //
+  // Runs as soon as the modal opens, not gated on activeTab === 'photo': the 사진 tab's own count
+  // badge reads meetingPhotos.length too, so if this only fired once the user actually clicked
+  // into that tab, the badge would show a too-low count (whatever fit in the narrow initial
+  // window) right up until the click, then visibly jump once the wider scan finished -- exactly
+  // the "숫자뱃지가 1로 나왔다가 누르면 12로 바뀐다" bug report. olderChatMessages is cached at
+  // the app level (app-main.js), so this only pays real Firestore-read cost once per date range
+  // per session, not on every single date click.
   React.useEffect(() => {
-    if (activeTab !== 'photo') return;
     if (typeof onLoadOlderChat !== 'function' || !hasMoreOlderChat || loadingOlderChat) return;
     const oldestLoadedTs = chatMessages && chatMessages.length > 0 ? Number(chatMessages[0].timestamp || 0) : 0;
     const targetDayStartTs = new Date(`${dateStr}T00:00:00`).getTime();
     if (!oldestLoadedTs || !Number.isFinite(targetDayStartTs) || oldestLoadedTs > targetDayStartTs) {
       onLoadOlderChat();
     }
-  }, [activeTab, dateStr, hasMoreOlderChat, loadingOlderChat, onLoadOlderChat, chatMessages]);
+  }, [dateStr, hasMoreOlderChat, loadingOlderChat, onLoadOlderChat, chatMessages]);
 
   const meetingPhotos = React.useMemo(() => {
     // An auto-linked 일정 사진 (sourceMessageId set) is only a reference/archival copy of a real
