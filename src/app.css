@@ -423,6 +423,7 @@ body:has(.admin-login-gate) {
 .place-visit-entry-date {
   flex-shrink: 0;
   font-weight: 700;
+  font-size: 0.78rem;
   color: var(--text-muted);
 }
 .place-visit-entry-note {
