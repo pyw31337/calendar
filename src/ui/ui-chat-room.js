@@ -823,6 +823,7 @@ export function ChatRoomView({
   const prevLastMsgIdRef = React.useRef(undefined);
   React.useEffect(() => {
     return; // Disabled chat confetti per user request
+    // eslint-disable-next-line no-unreachable -- kept in place to make re-enabling easy later
     const last = chatMessages[chatMessages.length - 1];
     const prevId = prevLastMsgIdRef.current;
     prevLastMsgIdRef.current = last ? last.id : null;

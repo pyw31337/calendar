@@ -1341,7 +1341,7 @@ export function DateModal({
   const handlePasteMeetingPhotos = async () => {
     if (typeof onAddMeetingPhotos !== 'function' || isSavingMeetingPhotos) return;
     try {
-      const files = await readClipboardImageFiles();
+      const files = await readClipboardImageFiles(showToast);
       if (files && files.length > 0) {
         // Show what will be uploaded and let the user confirm instead of uploading immediately --
         // handleConfirmPasteMeetingPhotos does the actual upload once confirmed.
@@ -1722,7 +1722,6 @@ export function DateModal({
       expenseCategoryInput: expenseCategoryInput || getExpenseCategories(calendar)[0]?.id || 'etc'
     });
     // mount only
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const [hasInteracted, setHasInteracted] = React.useState(false);
   const markDirty = React.useCallback(() => setHasInteracted(true), []);

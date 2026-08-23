@@ -217,6 +217,7 @@ for (const target of testCalendars) {
   assert(activeAvailabilities.length === 16, `${target.id} expected 16 active availabilities, got ${activeAvailabilities.length}`);
   assert(activeAvailabilities.every((item) => expectedDates.has(item.date)), `${target.id} deleted dates are still active`);
   assert(activeAvailabilities.every((item) => item.participantId.startsWith(`${target.id}_p`)), `${target.id} contains foreign participant IDs`);
+  // eslint-disable-next-line no-control-regex -- verifying control chars were stripped
   assert(activeAvailabilities.every((item) => !/[\u0000-\u001F\u007F]/.test(item.note || '') && (item.note || '').length <= 120), `${target.id} contains unsanitized notes`);
   target.summary = {
     id: target.id,

@@ -566,6 +566,10 @@ function normalizeTagsForDisplay(...args) {
   const f = __gatherUiDeps().normalizeTagsForDisplay || GATHER_APP_UTILS.normalizeTagsForDisplay;
   return typeof f === 'function' ? f(...args) : undefined;
 }
+function sanitizeText(...args) {
+  const f = __gatherUiDeps().sanitizeText || GATHER_APP_UTILS.sanitizeText;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
 function getRecentEmojis(...args) {
   const f = __gatherUiDeps().getRecentEmojis || GATHER_APP_UTILS.getRecentEmojis;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -837,7 +841,6 @@ export function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, on
     }
     const timer = setTimeout(() => { handleSearch(null, true); }, 380);
     return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query]);
 
   const handleSelectResult = result => {

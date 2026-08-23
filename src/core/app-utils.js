@@ -190,6 +190,7 @@ const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
 
   function sanitizeTextValue(value, maxLength = 120) {
     return String(value ?? '')
+      // eslint-disable-next-line no-control-regex -- intentionally stripping ASCII control chars
       .replace(/[\u0000-\u001F\u007F]/g, ' ')
       .replace(/\s+/g, ' ')
       .trim()
@@ -404,7 +405,7 @@ const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
     if (!category) return PLACE_CATEGORY_ICONS.etc;
     const name = String(category.name || '');
     let hasEmoji = false;
-    try { hasEmoji = /\p{Extended_Pictographic}/u.test(name); } catch (e) { hasEmoji = false; }
+    try { hasEmoji = /\p{Extended_Pictographic}/u.test(name); } catch (e) {}
     if (hasEmoji) return '';
     const id = String(category.id || '').toLowerCase();
     if (PLACE_CATEGORY_ICONS[id]) return PLACE_CATEGORY_ICONS[id];
@@ -509,7 +510,7 @@ const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
   }
 
 
-  const MEMO_DATE_RE = /(\d{4}|\d{2})[.\-](\d{2})[.\-](\d{2})/;
+  const MEMO_DATE_RE = /(\d{4}|\d{2})[.-](\d{2})[.-](\d{2})/;
 
   function normalizeMemoDateMatch(match) {
     if (!match) return null;
