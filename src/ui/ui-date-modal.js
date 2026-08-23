@@ -701,7 +701,13 @@ function useClipboardHasImage(active) {
           if (state === 'denied') { if (!cancelled) setHasImage(false); return; }
           if (state === 'prompt') return;
         }
-        const items = await navigator.clipboard.read();
+        // Bounded the same way the actual paste handler is (readClipboardImageFiles in
+        // app-main.js) -- some mobile browsers can hang clipboard.read() indefinitely instead of
+        // resolving/rejecting, which would otherwise strand this background check forever.
+        const items = await Promise.race([
+          navigator.clipboard.read(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('clipboard read timed out')), 5000))
+        ]);
         const found = items.some(item => item.types.some(t => t.startsWith('image/')));
         if (!cancelled) setHasImage(found);
       } catch (e) {
