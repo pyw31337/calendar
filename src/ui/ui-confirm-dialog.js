@@ -703,7 +703,10 @@ function getDeps() { return window.GATHER_UI_DEPS || {}; }
     };
 
     return React.createElement('div', {
-      className: 'modal-overlay', onClick: onCancel, style: { zIndex: 30000 }
+      // Must outrank every other overlay in the app, including the Lightbox (zIndex 50000) --
+      // ConfirmDialog can be triggered from inside it (e.g. photo delete), and at 30000 it used
+      // to render behind the Lightbox overlay, making the confirm prompt invisible.
+      className: 'modal-overlay', onClick: onCancel, style: { zIndex: 200000 }
     }, React.createElement(ResizableModalContainer, {
       className: 'modal-container confirm-dialog-modal',
       onClick: function (e) { e.stopPropagation(); },

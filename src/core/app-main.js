@@ -8557,6 +8557,7 @@ function bindGatherUiDeps() {
     normalizePollOptionInput: typeof normalizePollOptionInput === 'function' ? normalizePollOptionInput : null,
     processImageFilesSequentially: typeof processImageFilesSequentially === 'function' ? processImageFilesSequentially : null,
     pushSingleCloudCalendar: typeof pushSingleCloudCalendar === 'function' ? pushSingleCloudCalendar : null,
+    readClipboardImageFiles: typeof readClipboardImageFiles === 'function' ? readClipboardImageFiles : null,
     resolveMemoImageBatch: typeof resolveMemoImageBatch === 'function' ? resolveMemoImageBatch : null,
     sanitizeMemoForFirestore: typeof sanitizeMemoForFirestore === 'function' ? sanitizeMemoForFirestore : null,
     setAdminSession: typeof setAdminSession === 'function' ? setAdminSession : null,

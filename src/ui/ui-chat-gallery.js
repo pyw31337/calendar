@@ -1062,14 +1062,18 @@ export function ChatGalleryModal({
     await uploadFiles(files);
   };
   // Lets '이미지 업로드' accept a clipboard-pasted image too, not just the file picker -- active
-  // for as long as the 갤러리 페이지 is open, so Ctrl+V uploads directly without opening the menu.
+  // for as long as the 갤러리 페이지 is open. Routes through the same preview/confirm modal as
+  // the 붙여넣기 button (handlePasteGalleryUpload) rather than uploading straight from the paste
+  // event -- otherwise a stray Ctrl+V uploads whatever happens to be on the clipboard with no
+  // chance to back out.
   React.useEffect(() => {
     if (typeof onUploadImages !== 'function') return;
     const handlePaste = e => {
       const files = getImageFilesFromClipboardEvent(e);
       if (!files.length) return;
       e.preventDefault();
-      uploadFiles(files);
+      setIsMenuOpen(false);
+      setPastePreview({ files, previewUrls: files.map(f => URL.createObjectURL(f)) });
     };
     document.addEventListener('paste', handlePaste);
     return () => document.removeEventListener('paste', handlePaste);
