@@ -1474,6 +1474,10 @@ function extractFirstUrl(...args) {
   const f = (window.GATHER_APP_UTILS || {}).extractFirstUrl;
   return typeof f === 'function' ? f(...args) : undefined;
 }
+function extractAllUrlInfos(...args) {
+  const f = (window.GATHER_APP_UTILS || {}).extractAllUrlInfos;
+  return typeof f === 'function' ? f(...args) : [];
+}
 function removeFirstUrl(...args) {
   const f = (window.GATHER_APP_UTILS || {}).removeFirstUrl;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -8983,6 +8987,16 @@ function getDirectChatMediaInfo(url) {
   return null;
 }
 
+// Detects when chat message TEXT contains several pasted image links (typed/pasted as plain
+// URLs, e.g. one per line) rather than a single embedded link, so DirectChatMediaText can show
+// them as a thumbnail grid like an actual multi-image upload instead of only picking out the
+// first URL. Deliberately requires 2+ recognized image URLs -- a single one keeps using the
+// existing one-image embed path (which also covers video/embed types this doesn't need to
+// duplicate).
+function extractDirectImageUrls(text) {
+  return extractAllUrlInfos(text).filter(info => getDirectChatMediaInfo(info.url)?.type === 'image');
+}
+
 // Appending a fresh <script> tag per mount makes embed.js rescan the DOM for this blockquote.
 // onFailed fires if no player iframe shows up in time, so the caller can fall back to the
 // link-preview card.
@@ -12195,6 +12209,8 @@ function bindGatherUiDeps() {
     sanitizeText: typeof sanitizeText === 'function' ? sanitizeText : null,
     getMessageDirectMediaEntry: typeof getMessageDirectMediaEntry === 'function' ? getMessageDirectMediaEntry : null,
     extractFirstUrl: typeof extractFirstUrl === 'function' ? extractFirstUrl : null,
+    extractAllUrlInfos: typeof extractAllUrlInfos === 'function' ? extractAllUrlInfos : null,
+    extractDirectImageUrls: typeof extractDirectImageUrls === 'function' ? extractDirectImageUrls : null,
     removeFirstUrl: typeof removeFirstUrl === 'function' ? removeFirstUrl : null,
     formatChatHeaderTitle: typeof formatChatHeaderTitle === 'function' ? formatChatHeaderTitle : null,
     useScrollHideHeader: typeof useScrollHideHeader === 'function' ? useScrollHideHeader : null,

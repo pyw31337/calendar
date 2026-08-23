@@ -135,6 +135,29 @@ const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
     return extractFirstUrlInfo(value).url;
   }
 
+  // Like extractFirstUrlInfo, but returns every distinct URL in the text instead of just the
+  // first -- used to detect a message that's a plain list of pasted image links (one per line or
+  // otherwise) rather than a single embedded link. Deliberately simpler than
+  // extractFirstUrlInfo's regex (no markdown-link or bare-domain-without-scheme matching): a
+  // multi-URL message is expected to have each link spelled out with an explicit http(s):// or
+  // www. prefix, and loosening this further would risk false-matching ordinary sentence text
+  // that merely contains a dot.
+  function extractAllUrlInfos(value = '') {
+    const source = String(value || '');
+    const matches = source.match(/(?:https?:\/\/|www\.)[^\s)\]]+/gi) || [];
+    const seen = new Set();
+    const results = [];
+    matches.forEach(m => {
+      const raw = stripUrlEdgePunctuation(m);
+      if (!raw || !/[a-z0-9]/i.test(raw)) return;
+      const url = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+      if (seen.has(url)) return;
+      seen.add(url);
+      results.push({ raw, url });
+    });
+    return results;
+  }
+
   function removeFirstUrl(value = '') {
     const source = String(value || '');
     const { raw } = extractFirstUrlInfo(source);
@@ -653,6 +676,7 @@ const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
     stripUrlEdgePunctuation,
     extractFirstUrlInfo,
     extractFirstUrl,
+    extractAllUrlInfos,
     removeFirstUrl,
     sanitizeText: sanitizeTextValue,
     normalizeColorValue,
