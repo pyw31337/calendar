@@ -4996,14 +4996,24 @@ function App() {
     };
 
     const runInitialLoad = async () => {
+      // cacheHit means we already have a usable calendar record on screen (from cache or state)
+      // when this effect started -- runInitialLoad still runs in that case as a background
+      // refresh (see the fallbackTimeoutId branch below), most often right after the module-level
+      // visibilitychange handler force-cycles disableNetwork/enableNetwork on returning from a
+      // long background stint (see VISIBILITY_RECONNECT_THRESHOLD_MS), which can leave the
+      // onSnapshot listener briefly slow to redeliver. That's a routine reconnect the user already
+      // has working data for, not a "no data at all" emergency -- showing "N차 재시도 중" /
+      // "데이터 로딩 지연" toasts for it just alarms the user over something that resolves itself,
+      // sometimes repeatedly on every background/foreground cycle. Only escalate to the user when
+      // there was NO usable data to fall back on to begin with.
       for (let attempt = 1; attempt <= FIREBASE_LOAD_MAX_ATTEMPTS && isMounted && !hasLoadedCloudCalendar; attempt += 1) {
         const result = await fetchSingleCloudCalendar(activeCalId, 1, FIREBASE_LOAD_TIMEOUT_MS);
         if (result?.calendar && applyLoadedCalendar(result.calendar, result.lastModified || Date.now())) {
-          if (attempt > 1) showToast('다시 불러옴', 'success', 3000);
+          if (attempt > 1 && !cacheHit) showToast('다시 불러옴', 'success', 3000);
           reconnectToastShownForRef.current = null;
           return;
         }
-        if (attempt < FIREBASE_LOAD_MAX_ATTEMPTS && isMounted && !hasLoadedCloudCalendar) {
+        if (attempt < FIREBASE_LOAD_MAX_ATTEMPTS && isMounted && !hasLoadedCloudCalendar && !cacheHit) {
           showToast(`${attempt + 1}차 재시도 중`, 'info', 3000);
         }
       }
@@ -5011,13 +5021,13 @@ function App() {
         const restored = restoreActiveCalendarFromCache();
         if (restored) {
           setIsInitialDataLoading(false);
-          if (reconnectToastShownForRef.current !== activeCalId) {
+          if (!cacheHit && reconnectToastShownForRef.current !== activeCalId) {
             reconnectToastShownForRef.current = activeCalId;
             showToast('서버 재연결 중', 'info', 4000);
           }
         } else {
           setIsInitialDataLoading(true);
-          showToast('데이터 로딩 지연, 재시도 중', 'error', 5000);
+          if (!cacheHit) showToast('데이터 로딩 지연, 재시도 중', 'error', 5000);
         }
         retryTimeoutId = setTimeout(() => {
           if (isMounted) setCloudReloadToken(token => token + 1);
