@@ -9061,15 +9061,23 @@ function renderChatMessageImages(msg, setActiveLightbox, singleImageStyle = {}) 
       decoding: 'async',
       referrerPolicy: 'no-referrer',
       onClick: () => setActiveLightbox && setActiveLightbox({ urls: displayUrls, index: 0, meta }),
-      style: { 
-        display: 'block', 
-        borderRadius: '8px', 
-        cursor: 'pointer', 
+      style: {
+        display: 'block',
+        borderRadius: '8px',
+        cursor: 'pointer',
         objectFit: 'contain',
-        width: '100%', 
-        height: 'auto', 
-        ...singleImageStyle, 
-        maxWidth: 'min(100%, ' + (singleImageStyle.maxWidth || '420px') + ')',
+        width: '100%',
+        height: 'auto',
+        ...singleImageStyle,
+        // Plain length, NOT min(100%, ...) -- same fit-content-ancestor bug as
+        // computeChatImageGridMaxWidth above (see its comment): wrapping this in min() with a
+        // percentage makes the chat bubble's own fit-content width calculation treat it as
+        // indefinite and ignore the cap, so the bubble balloons out while the actual <img> still
+        // renders capped at maxWidth during normal layout -- leaving a gap on its right. This was
+        // the single-image case that PR #230 (grid/link-preview/URL text) didn't cover, which is
+        // why the same-looking gap kept resurfacing on plain photo messages. width:'100%' above
+        // already shrinks it safely on a narrow bubble.
+        maxWidth: singleImageStyle.maxWidth || '420px',
         maxHeight: singleImageStyle.maxHeight || '60vh'
       }
     });
