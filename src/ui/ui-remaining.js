@@ -770,12 +770,21 @@ export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox,
 
   if (!mediaInfo || failed) {
     const textNode = text ? parseTextWithLinks(text, searchQuery) : null;
-    // textMaxWidth is set when this caption sits below a real multi-image upload grid (see
-    // renderChatMessageBody in app-main.js) -- capping it to the grid's width keeps this
-    // fit-content bubble from stretching past the grid when the caption is the longer child.
-    const cappedTextNode = (textNode && textMaxWidth)
+    // textMaxWidth (grid caption case, see above) takes priority when both apply. Otherwise, if
+    // this text contains a URL, cap it to the same width LinkPreviewCard below uses (whether or
+    // not that card actually ends up rendering -- it may still be loading, or fail to fetch a
+    // preview at all). Pasted links are often padded with long tracking query strings that, left
+    // unbounded, are literally the ONE piece of content wide enough to force this fit-content
+    // bubble out to its absolute max width -- verified by measuring rendered widths in an
+    // isolated repro: an unbounded 140-char tracking URL alone stretched the bubble ~400px wider
+    // than the card sitting next to it, while wrapping the same URL at the card's own width
+    // closed that gap to a few px. overflow-wrap:break-word is already inherited from the bubble,
+    // so it wraps here instead of overflowing; the link stays fully visible and clickable either
+    // way, unlike hiding it outright (which would leave nothing clickable if the card fails).
+    const effectiveMaxWidth = textMaxWidth || (firstUrl ? 'min(100%, 280px)' : null);
+    const cappedTextNode = (textNode && effectiveMaxWidth)
       ? /*#__PURE__*/React.createElement('div', {
-        style: { maxWidth: textMaxWidth, width: '100%', boxSizing: 'border-box' }
+        style: { maxWidth: effectiveMaxWidth, width: '100%', boxSizing: 'border-box' }
       }, textNode)
       : textNode;
     return /*#__PURE__*/React.createElement(React.Fragment, null,

@@ -1078,7 +1078,14 @@ export function LinkPreviewCard({ url, fallbackTitle, cachedData }) {
       style: { width: '72px', height: '72px', objectFit: 'cover', flexShrink: 0, backgroundColor: 'var(--bg-primary)' }
     }),
     /*#__PURE__*/React.createElement('div', {
-      style: { padding: '6px 8px', minWidth: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '2px' }
+      // Explicit maxWidth (not just minWidth:0 + flex-shrink) so this column's OWN contribution
+      // to the card's fit-content sizing is already bounded to the card's 280px budget minus the
+      // thumbnail -- without it, an unclamped single-line title/description can still make the
+      // card's computed preferred width overshoot 280px pre-clamp, so the outer maxWidth clamp
+      // then shrinks the card back down independently, leaving a several-dozen-px gap between the
+      // (already-sized) bubble and the (separately re-clamped) card. Verified by measuring both
+      // ways in an isolated repro.
+      style: { padding: '6px 8px', minWidth: 0, maxWidth: image ? '198px' : '270px', overflow: 'hidden', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '2px' }
     },
       displayTitle && /*#__PURE__*/React.createElement('div', {
       style: { fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
