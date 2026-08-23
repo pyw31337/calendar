@@ -1474,6 +1474,202 @@ function autoGrowTextarea(el, maxHeight = 480) {
   el.style.overflowY = scrollHeight > maxHeight ? 'auto' : 'hidden';
 }
 
+// Chat-image/direct-media detection + small generic utils, moved here (rather than kept as
+// two hand-synced copies in app-main.js and app-firebase-data.js) after a code review flagged
+// the duplication as a silent-drift risk: app-firebase-data.js's copy is what actually drives
+// fetchGalleryItemCount's user-visible "총 N장" count and fetchRecentGalleryMessages'
+// pagination-stop heuristic, while app-main.js's copy drives the chat UI itself -- a future
+// edit to only one (e.g. a new image extension in getDirectChatMediaInfo) would have made the
+// gallery count and the chat rendering quietly disagree, with nothing catching it.
+function getDirectChatMediaInfo(url) {
+  const normalizedUrl = sanitizeText(url || '', 2000);
+  if (!normalizedUrl || !/^https?:\/\//i.test(normalizedUrl)) return null;
+  const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.avif', '.bmp', '.svg', '.jfif', '.pjpeg', '.pjp', '.ico'];
+  const videoExtensions = ['.mp4', '.webm', '.ogv', '.ogg', '.m4v', '.mov', '.3gp', '.3g2'];
+  const getExtensionType = candidate => {
+    try {
+      const parsed = new URL(candidate);
+      const path = decodeURIComponent(parsed.pathname || '').toLowerCase();
+      if (imageExtensions.some(ext => path.endsWith(ext))) return 'image';
+      if (videoExtensions.some(ext => path.endsWith(ext))) return 'video';
+    } catch (e) {
+      const clean = String(candidate || '').split(/[?#]/)[0].toLowerCase();
+      if (imageExtensions.some(ext => clean.endsWith(ext))) return 'image';
+      if (videoExtensions.some(ext => clean.endsWith(ext))) return 'video';
+    }
+    return '';
+  };
+  const getEmbedInfo = source => {
+    try {
+      const parsed = new URL(source);
+      const host = parsed.hostname.replace(/^www\./i, '').toLowerCase();
+      const path = parsed.pathname || '';
+      if (host === 'youtu.be') {
+        const id = path.split('/').filter(Boolean)[0];
+        // Plain youtube.com (not youtube-nocookie.com) so the iframe can read the viewer's own
+        // YouTube session cookies -- nocookie mode deliberately can't identify a signed-in user at
+        // all, which means it can never honor a YouTube Premium account's ad-free playback and
+        // always serves the logged-out/ad-supported experience regardless of the viewer's account.
+        if (id) return { type: 'embed', provider: 'youtube', url: `https://www.youtube.com/embed/${encodeURIComponent(id)}`, orientation: 'landscape' };
+      }
+      if (host === 'youtube.com' || host === 'm.youtube.com' || host === 'music.youtube.com') {
+        const watchId = parsed.searchParams.get('v');
+        const shortsId = path.match(/\/shorts\/([^/?#]+)/i)?.[1];
+        const embedId = path.match(/\/embed\/([^/?#]+)/i)?.[1];
+        const liveId = path.match(/\/live\/([^/?#]+)/i)?.[1];
+        const id = watchId || shortsId || embedId || liveId;
+        if (id) return { type: 'embed', provider: 'youtube', url: `https://www.youtube.com/embed/${encodeURIComponent(id)}`, orientation: shortsId ? 'portrait' : 'landscape' };
+      }
+      if (host === 'vimeo.com' || host === 'player.vimeo.com') {
+        const id = path.match(/(?:\/video)?\/(\d+)(?:$|[/?#])/i)?.[1] || path.match(/\/(\d+)(?:$|[/?#])/i)?.[1];
+        if (id) return { type: 'embed', provider: 'vimeo', url: `https://player.vimeo.com/video/${encodeURIComponent(id)}`, orientation: 'landscape' };
+      }
+      // TikTok's official embed.js widget (see TikTokEmbedWidget below). Falls back to the
+      // link-preview card if it doesn't produce a player within a few seconds.
+      if (host === 'tiktok.com' || host === 'm.tiktok.com') {
+        const videoId = path.match(/\/video\/(\d+)/)?.[1];
+        if (videoId) return { type: 'tiktok-widget', provider: 'tiktok', url: source, videoId };
+      }
+    } catch (e) {
+      // Keep non-URL and unsupported providers on the regular link-preview path.
+    }
+    return null;
+  };
+
+  const embedInfo = getEmbedInfo(normalizedUrl);
+  if (embedInfo) return embedInfo;
+
+  const candidates = [normalizedUrl];
+  try {
+    const parsed = new URL(normalizedUrl);
+    ['src', 'url', 'u', 'image', 'img', 'media'].forEach(key => {
+      const value = parsed.searchParams.get(key);
+      if (!value) return;
+      candidates.push(value);
+      try {
+        candidates.push(decodeURIComponent(value));
+      } catch (e) {
+        // URLSearchParams usually decodes already; this only covers double-encoded sources.
+      }
+    });
+  } catch (e) {
+    // Invalid URL is rejected by the normalizedUrl guard above; keep this defensive.
+  }
+
+  for (const candidate of candidates) {
+    const type = getExtensionType(candidate);
+    if (type) return { type, url: normalizedUrl };
+  }
+  return null;
+}
+
+function withTimeout(promise, ms, timeoutMessage) {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const timeoutId = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      reject(Object.assign(new Error(timeoutMessage || 'TIMEOUT'), { code: 'TIMEOUT' }));
+    }, ms);
+    promise.then(
+      value => { if (settled) return; settled = true; clearTimeout(timeoutId); resolve(value); },
+      err => { if (settled) return; settled = true; clearTimeout(timeoutId); reject(err); }
+    );
+  });
+}
+
+function getMessageImageEntries(msg) {
+  // Prefer multi-image arrays; fall back to legacy singular fields.
+  // Do NOT require thumbnails — slimMessageForClient may drop oversized base64 thumbs
+  // while keeping https Storage imageUrls. Requiring thumbs looked like data loss.
+  const urls = Array.isArray(msg.imageUrls) && msg.imageUrls.length > 0
+    ? msg.imageUrls.filter(u => typeof u === 'string' && u)
+    : (typeof msg.imageUrl === 'string' && msg.imageUrl ? [msg.imageUrl] : []);
+  const thumbs = Array.isArray(msg.thumbUrls) && msg.thumbUrls.length > 0
+    ? msg.thumbUrls.filter(u => typeof u === 'string' && u)
+    : (typeof msg.thumbUrl === 'string' && msg.thumbUrl ? [msg.thumbUrl] : []);
+  const tags = Array.isArray(msg.imageTags) ? msg.imageTags : [];
+  const count = Math.max(urls.length, thumbs.length);
+  if (count === 0) return [];
+  const entries = [];
+  for (let i = 0; i < count; i++) {
+    const full = urls[i] || thumbs[i];
+    const thumb = thumbs[i] || urls[i];
+    if (!full && !thumb) continue;
+    entries.push({
+      full: full || thumb,
+      thumb: thumb || full,
+      imageIndex: i,
+      messageId: msg.id,
+      timestamp: msg.timestamp,
+      tags: tags[i] || '',
+      // Callers building non-chat entries (e.g. memo pseudo-messages) override `source`
+      // explicitly -- see ui-chat-gallery.js/ui-summary-gallery.js's sharedPhotos/photoEntries.
+      source: 'chat',
+      uploadSource: msg.uploadSource || null
+    });
+  }
+  return entries;
+}
+
+function getDirectMediaTagKey(url) {
+  const source = String(url || '');
+  let hash = 2166136261;
+  for (let i = 0; i < source.length; i++) {
+    hash ^= source.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `u_${(hash >>> 0).toString(36)}`;
+}
+
+function getDirectMediaTagsForUrl(msg, url) {
+  const tags = msg?.directMediaTags;
+  if (!tags) return '';
+  if (typeof tags === 'string') return tags;
+  if (typeof tags === 'object' && !Array.isArray(tags)) {
+    return tags[getDirectMediaTagKey(url)] || '';
+  }
+  return '';
+}
+
+function getMessageDirectMediaEntry(msg) {
+  const firstUrl = extractFirstUrl(msg?.text || '');
+  const mediaInfo = getDirectChatMediaInfo(firstUrl);
+  if (!mediaInfo || mediaInfo.type !== 'image') return null;
+  return {
+    full: mediaInfo.url,
+    thumb: mediaInfo.url,
+    imageIndex: 0,
+    messageId: msg.id,
+    timestamp: msg.timestamp,
+    tags: getDirectMediaTagsForUrl(msg, mediaInfo.url),
+    directMediaUrl: mediaInfo.url,
+    source: 'chat',
+    uploadSource: msg.uploadSource || null
+  };
+}
+
+function formatBytes(...args) {
+  const f = (window.GATHER_APP_UTILS || {}).formatBytes;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+
+function getDataUrlInfo(url) {
+  if (typeof url !== 'string' || !url.startsWith('data:')) return null;
+  const match = url.match(/^data:([^;,]*)(;base64)?,/);
+  if (!match) return null;
+  const mime = match[1] || 'application/octet-stream';
+  const dataPart = url.slice(match[0].length);
+  let sizeBytes;
+  if (match[2]) {
+    const padding = dataPart.endsWith('==') ? 2 : dataPart.endsWith('=') ? 1 : 0;
+    sizeBytes = Math.floor(dataPart.length * 3 / 4) - padding;
+  } else {
+    sizeBytes = decodeURIComponent(dataPart).length;
+  }
+  return { mime, sizeBytes };
+}
+
 export {
   PRESET_COLORS,
   DEFAULT_EXPENSE_CATEGORIES,
@@ -1654,5 +1850,13 @@ export {
   extractAllUrlInfos,
   extractAllUrlInfosLoose,
   removeFirstUrl,
-  autoGrowTextarea
+  autoGrowTextarea,
+  getDirectChatMediaInfo,
+  withTimeout,
+  getMessageImageEntries,
+  getDirectMediaTagKey,
+  getDirectMediaTagsForUrl,
+  getMessageDirectMediaEntry,
+  formatBytes,
+  getDataUrlInfo
 };
