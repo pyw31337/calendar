@@ -842,6 +842,33 @@ export function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSe
   }));
 }
 
+// PC-only zoom controls for the photo action row -- scoped to this file since they're not part
+// of the shared icon set used elsewhere. Zoom-out is the same lucide zoom-in glyph minus its
+// vertical stroke (matching lucide's own zoom-in/zoom-out pair).
+function ZoomInIcon({ size = 15 } = {}) {
+  const React = window.React;
+  return /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg", width: String(size), height: String(size), viewBox: "0 0 24 24",
+    fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
+  },
+    /*#__PURE__*/React.createElement("circle", { cx: "11", cy: "11", r: "8" }),
+    /*#__PURE__*/React.createElement("line", { x1: "21", x2: "16.65", y1: "21", y2: "16.65" }),
+    /*#__PURE__*/React.createElement("line", { x1: "11", x2: "11", y1: "8", y2: "14" }),
+    /*#__PURE__*/React.createElement("line", { x1: "8", x2: "14", y1: "11", y2: "11" })
+  );
+}
+function ZoomOutIcon({ size = 15 } = {}) {
+  const React = window.React;
+  return /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg", width: String(size), height: String(size), viewBox: "0 0 24 24",
+    fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
+  },
+    /*#__PURE__*/React.createElement("circle", { cx: "11", cy: "11", r: "8" }),
+    /*#__PURE__*/React.createElement("line", { x1: "21", x2: "16.65", y1: "21", y2: "16.65" }),
+    /*#__PURE__*/React.createElement("line", { x1: "8", x2: "14", y1: "11", y2: "11" })
+  );
+}
+
 export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, onPromoteImageUrl, onSaveImageTags, onSearchTag, onDeletePhoto, onReplacePhoto, onJumpToChatMessage, onJumpToMemo, onJumpToMeetingDate, onGetChatMessageOrdinal, onGetGalleryPhotoOrdinal, onRequestConfirm }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -856,6 +883,39 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
   const [imageUrlModalOpen, setImageUrlModalOpen] = React.useState(false);
   const [imageDimensions, setImageDimensions] = React.useState({});
   const [displayUrls, setDisplayUrls] = React.useState(urls);
+  // Zoom is PC-only -- mobile already has native pinch-to-zoom on the image, and a live
+  // matchMedia listener (not a one-time read) so the buttons correctly appear/disappear if a
+  // desktop window is resized narrow or a tablet is rotated while the lightbox is open.
+  const [isDesktop, setIsDesktop] = React.useState(() => typeof window !== 'undefined' && window.matchMedia && !window.matchMedia('(max-width: 640px)').matches);
+  React.useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return undefined;
+    const mq = window.matchMedia('(max-width: 640px)');
+    const onChange = () => setIsDesktop(!mq.matches);
+    if (mq.addEventListener) mq.addEventListener('change', onChange);
+    else if (mq.addListener) mq.addListener(onChange);
+    return () => {
+      if (mq.removeEventListener) mq.removeEventListener('change', onChange);
+      else if (mq.removeListener) mq.removeListener(onChange);
+    };
+  }, []);
+  const ZOOM_MIN = 100;
+  const ZOOM_MAX = 300;
+  const ZOOM_STEP = 25;
+  const [zoomLevel, setZoomLevel] = React.useState(ZOOM_MIN);
+  // Reset to fit-view whenever the visible photo changes, so zoom never carries over onto a
+  // different image (which would show it pre-cropped/enlarged with no visual cue why).
+  React.useEffect(() => { setZoomLevel(ZOOM_MIN); }, [index]);
+  const handleZoomIn = e => {
+    e.stopPropagation();
+    setZoomLevel(prev => Math.min(ZOOM_MAX, prev + ZOOM_STEP));
+  };
+  const handleZoomOut = e => {
+    e.stopPropagation();
+    setZoomLevel(prev => Math.max(ZOOM_MIN, prev - ZOOM_STEP));
+  };
+  const zoomImageStyle = isDesktop && zoomLevel !== ZOOM_MIN
+    ? { transform: `scale(${zoomLevel / 100})`, transition: 'transform 150ms ease' }
+    : undefined;
   const lightboxHistoryRef = React.useRef(false);
   React.useEffect(() => {
     try {
@@ -1239,12 +1299,52 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
 
   // Shared by both the carousel's "current" slot and the single-image layout below --
   // top-right pencil (교체)/X (삭제) buttons, reusing the same icons already used for editing
-  // elsewhere in the app (Places/Memo pencil, tag-delete X).
-  const renderPhotoActions = () => showInfo && canEditPhoto && /*#__PURE__*/React.createElement("div", {
-    style: { position: 'absolute', top: '8px', right: '8px', display: 'flex', gap: '6px', zIndex: 10 },
+  // elsewhere in the app (Places/Memo pencil, tag-delete X), plus PC-only zoom controls at the
+  // left end of the same row. The row itself must now show whenever EITHER zoom (desktop) or
+  // edit (canEditPhoto) applies -- zoom is a viewing feature independent of whether this
+  // particular photo is editable (e.g. a directMediaUrl link-embedded image), so gating the
+  // whole row on canEditPhoto alone would have hidden zoom on exactly the photos most likely to
+  // need it (no replace/delete affordance to fall back on).
+  const renderPhotoActions = () => showInfo && (canEditPhoto || isDesktop) && /*#__PURE__*/React.createElement("div", {
+    style: { position: 'absolute', top: '8px', right: '8px', display: 'flex', alignItems: 'center', gap: '6px', zIndex: 10 },
     onClick: e => e.stopPropagation()
   },
-    onReplacePhoto && /*#__PURE__*/React.createElement("button", {
+    isDesktop && /*#__PURE__*/React.createElement(React.Fragment, null,
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: handleZoomOut,
+        disabled: zoomLevel <= ZOOM_MIN,
+        "aria-label": "축소",
+        title: "축소",
+        style: {
+          width: '30px', height: '30px', borderRadius: '50%', border: 'none',
+          background: 'rgba(15,23,42,0.62)', color: '#FFFFFF', display: 'flex',
+          alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '0.72rem',
+          opacity: zoomLevel <= ZOOM_MIN ? 0.5 : 1
+        }
+      }, /*#__PURE__*/React.createElement(ZoomOutIcon, { size: 15 })),
+      /*#__PURE__*/React.createElement("span", {
+        style: {
+          minWidth: '38px', textAlign: 'center', color: '#FFFFFF', fontSize: '0.72rem',
+          fontWeight: 700, padding: '4px 2px', borderRadius: '10px',
+          background: 'rgba(15,23,42,0.62)'
+        }
+      }, `${zoomLevel}%`),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: handleZoomIn,
+        disabled: zoomLevel >= ZOOM_MAX,
+        "aria-label": "확대",
+        title: "확대",
+        style: {
+          width: '30px', height: '30px', borderRadius: '50%', border: 'none',
+          background: 'rgba(15,23,42,0.62)', color: '#FFFFFF', display: 'flex',
+          alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '0.72rem',
+          opacity: zoomLevel >= ZOOM_MAX ? 0.5 : 1
+        }
+      }, /*#__PURE__*/React.createElement(ZoomInIcon, { size: 15 }))
+    ),
+    canEditPhoto && onReplacePhoto && /*#__PURE__*/React.createElement("button", {
       type: "button",
       onClick: () => replacePhotoInputRef.current && replacePhotoInputRef.current.click(),
       disabled: isReplacingPhoto || isDeletingPhoto,
@@ -1257,7 +1357,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
         opacity: (isReplacingPhoto || isDeletingPhoto) ? 0.5 : 1
       }
     }, isReplacingPhoto ? '...' : /*#__PURE__*/React.createElement(PencilIcon, { size: 15 })),
-    onDeletePhoto && /*#__PURE__*/React.createElement("button", {
+    canEditPhoto && onDeletePhoto && /*#__PURE__*/React.createElement("button", {
       type: "button",
       onClick: handleDeletePhotoClick,
       disabled: isReplacingPhoto || isDeletingPhoto,
@@ -1287,7 +1387,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
     onLoad: e => recordImageDimensions(url, e),
     style: {
       maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: '12px',
-      display: 'block'
+      display: 'block', ...zoomImageStyle
     }
   }), renderPhotoActions(), showInfo && /*#__PURE__*/React.createElement(LightboxInfoPanel, {
     info: currentInfo,
@@ -1400,7 +1500,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
     onLoad: e => recordImageDimensions(currentUrl, e),
     style: {
       maxWidth: '92vw', maxHeight: '82vh', borderRadius: '12px', objectFit: 'contain',
-      display: 'block'
+      display: 'block', ...zoomImageStyle
     }
   }), renderPhotoActions(), showInfo && /*#__PURE__*/React.createElement(LightboxInfoPanel, {
     info: currentInfo,
