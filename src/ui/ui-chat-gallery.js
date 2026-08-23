@@ -63,6 +63,10 @@ function extractFirstUrl(...args) {
   const f = __gatherUiDeps().extractFirstUrl || GATHER_APP_UTILS.extractFirstUrl;
   return typeof f === 'function' ? f(...args) : undefined;
 }
+function extractAllUrlInfos(...args) {
+  const f = __gatherUiDeps().extractAllUrlInfos || GATHER_APP_UTILS.extractAllUrlInfos;
+  return typeof f === 'function' ? f(...args) : [];
+}
 function extractLeadingMemoDate(...args) {
   const f = __gatherUiDeps().extractLeadingMemoDate || GATHER_APP_UTILS.extractLeadingMemoDate;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -754,7 +758,6 @@ export function ChatGalleryModal({
   const getMessageImageEntries = __deps.getMessageImageEntries;
   const getMessageDirectMediaEntry = __deps.getMessageDirectMediaEntry;
   const resolveMeetingPhotoDisplay = __deps.resolveMeetingPhotoDisplay;
-  const extractFirstUrl = __deps.extractFirstUrl;
   const removeFirstUrl = __deps.removeFirstUrl;
   const formatChatHeaderTitle = __deps.formatChatHeaderTitle;
   const useScrollHideHeader = __deps.useScrollHideHeader;
@@ -809,24 +812,32 @@ export function ChatGalleryModal({
   }, [asPage, activeTab]);
 
   const sharedLinks = React.useMemo(() => {
+    // Was extractFirstUrl -- a message or memo with several distinct links (not just a multi-image
+    // link grid, any mix of URLs typed/pasted together) only ever contributed its first one here,
+    // silently dropping the rest from this tab even though every one of them still renders its own
+    // preview in the chat/memo itself. extractAllUrlInfos surfaces all of them; only the first
+    // per message reuses the cached linkPreview (that cache is keyed to the message's first URL),
+    // the rest fetch their own preview live the same way a fresh link normally would.
     const list = [];
     const seen = new Set();
     (chatMessages || []).forEach(msg => {
       if (!msg.text) return;
-      const url = extractFirstUrl(msg.text);
-      if (url && !seen.has(url)) {
-        seen.add(url);
-        list.push({ url, timestamp: msg.timestamp, messageId: msg.id, text: msg.text, linkPreview: msg.linkPreview, source: 'chat' });
-      }
+      extractAllUrlInfos(msg.text).forEach((info, idx) => {
+        if (info.url && !seen.has(info.url)) {
+          seen.add(info.url);
+          list.push({ url: info.url, timestamp: msg.timestamp, messageId: msg.id, text: msg.text, linkPreview: idx === 0 ? msg.linkPreview : null, source: 'chat' });
+        }
+      });
     });
     (memos || []).forEach(memo => {
       const body = memo?.text || memo?.content || memo?.body || '';
       if (!body) return;
-      const url = extractFirstUrl(body);
-      if (url && !seen.has(url)) {
-        seen.add(url);
-        list.push({ url, timestamp: memo.updatedAt || memo.createdAt || 0, messageId: memo.id, text: body, linkPreview: memo.linkPreview || null, source: 'memo' });
-      }
+      extractAllUrlInfos(body).forEach((info, idx) => {
+        if (info.url && !seen.has(info.url)) {
+          seen.add(info.url);
+          list.push({ url: info.url, timestamp: memo.updatedAt || memo.createdAt || 0, messageId: memo.id, text: body, linkPreview: idx === 0 ? (memo.linkPreview || null) : null, source: 'memo' });
+        }
+      });
     });
     return list.sort((a, b) => b.timestamp - a.timestamp);
   }, [chatMessages, memos]);
