@@ -646,6 +646,10 @@ function getDirectChatMediaInfo(...args) {
   const f = __gatherUiDeps().getDirectChatMediaInfo || GATHER_APP_UTILS.getDirectChatMediaInfo;
   return typeof f === 'function' ? f(...args) : undefined;
 }
+function extractDirectImageUrls(...args) {
+  const f = __gatherUiDeps().extractDirectImageUrls || GATHER_APP_UTILS.extractDirectImageUrls;
+  return typeof f === 'function' ? f(...args) : [];
+}
 function getPollOptionVoterIds(...args) {
   const f = __gatherUiDeps().getPollOptionVoterIds || GATHER_APP_UTILS.getPollOptionVoterIds;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -682,6 +686,11 @@ export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox,
   React.useEffect(() => {
     setFailed(false);
   }, [firstUrl]);
+  // Several pasted image links (not an actual upload) shown as a thumbnail grid, same as a real
+  // multi-image message -- see extractDirectImageUrls. Computed unconditionally every render like
+  // the hooks around it so this component's hook order never changes; the multi-image early
+  // return below happens after all hooks have run.
+  const directImageUrls = React.useMemo(() => extractDirectImageUrls(text), [text]);
 
   // Detects which embed the user actually pressed play on, so it can be promoted to the single
   // persistent player (see PersistentVideoPlayer/StickyVideoBox) that survives view/tab switches
@@ -713,6 +722,45 @@ export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox,
   // iframe playing in its own floating PIP, so this just shows a placeholder instead of a second,
   // competing iframe for the same video (see the isThisSticky branch below).
   const isThisSticky = isEmbedVideo && stickyVideoKey && message && message.id === stickyVideoKey;
+
+  if (directImageUrls.length >= 2) {
+    const urls = directImageUrls.map(info => info.url);
+    const meta = directImageUrls.map((info, idx) => ({
+      timestamp: message?.timestamp || Date.now(),
+      messageId: message?.id || '',
+      imageIndex: idx,
+      thumb: info.url,
+      directMediaUrl: info.url
+    }));
+    let remainingText = text;
+    directImageUrls.forEach(info => { remainingText = remainingText.split(info.raw).join(''); });
+    remainingText = remainingText.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+    // Same multi-image grid layout as renderChatMessageImages' multi-image branch (app-main.js) --
+    // deliberately duplicated rather than shared since that one reads from getMessageImageEntries
+    // (actual uploads) while this reads from plain URLs pulled out of the text.
+    const mobileCols = urls.length === 2 ? 2 : 3;
+    const isMobile = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(max-width: 640px)').matches;
+    const activeCols = isMobile ? mobileCols : (urls.length >= 12 ? 6 : urls.length >= 5 ? 5 : mobileCols);
+    const maxW = isMobile ? 'min(100%, 280px)' : `min(100%, calc(${activeCols} * 76px + (${activeCols} - 1) * 4px))`;
+    return /*#__PURE__*/React.createElement(React.Fragment, null,
+      /*#__PURE__*/React.createElement('div', {
+        className: `chat-message-image-grid${urls.length >= 5 ? ' is-wide' : ''}`,
+        style: { width: '100%', maxWidth: maxW, boxSizing: 'border-box', marginBottom: remainingText ? '8px' : (style.marginBottom || '0') }
+      }, /*#__PURE__*/React.createElement('div', {
+        style: { display: 'grid', gridTemplateColumns: `repeat(${activeCols}, minmax(0, 1fr))`, gap: '4px', width: '100%', maxWidth: '100%', boxSizing: 'border-box' }
+      }, urls.map((url, idx) => /*#__PURE__*/React.createElement('img', {
+        key: idx,
+        src: url,
+        alt: `링크 이미지 ${idx + 1}`,
+        loading: 'lazy',
+        decoding: 'async',
+        referrerPolicy: 'no-referrer',
+        onClick: () => setActiveLightbox && setActiveLightbox({ urls, index: idx, meta }),
+        style: { display: 'block', width: '100%', aspectRatio: '1', borderRadius: '6px', cursor: setActiveLightbox ? 'pointer' : 'default', objectFit: 'cover' }
+      })))),
+      remainingText ? parseTextWithLinks(remainingText, searchQuery) : null
+    );
+  }
 
   if (!mediaInfo || failed) {
     return /*#__PURE__*/React.createElement(React.Fragment, null,

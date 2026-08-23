@@ -1433,6 +1433,22 @@ export function DateModal({
   expensesOrderRef.current = expenses;
   const expenseDragHandlersRef = React.useRef({});
 
+  // Safety net for the document-level pointermove/up/cancel listeners the settlement drag-reorder
+  // below attaches directly (not via useEffect, since they need to live exactly as long as one
+  // drag gesture) -- normally finish()/reset() (fired by pointerup/pointercancel) remove them, but
+  // if DateModal closes mid-drag (an interrupted gesture that never delivers either event, or a
+  // parent force-closing the modal), those listeners would otherwise never be removed and would
+  // keep referencing this now-unmounted instance's closures for the rest of the page's life.
+  React.useEffect(() => () => {
+    const ref = expensePointerSortRef.current;
+    const handlers = expenseDragHandlersRef.current;
+    if (ref && ref.active && handlers) {
+      document.removeEventListener('pointermove', handlers.onMove);
+      document.removeEventListener('pointerup', handlers.onUp);
+      document.removeEventListener('pointercancel', handlers.onCancel);
+    }
+  }, []);
+
   expenseDragHandlersRef.current.update = e => {
     const ref = expensePointerSortRef.current;
     if (!ref.active) return;
