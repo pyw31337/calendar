@@ -2701,7 +2701,7 @@ export function DateModal({
       /*#__PURE__*/React.createElement("input", {
         ref: meetingPhotoInputRef,
         type: "file",
-        accept: "image/*",
+        accept: "image/jpeg, image/png, image/gif, image/webp, image/heic, image/heif, image/*",
         multiple: true,
         onChange: handleMeetingPhotoFiles,
         style: { display: 'none' }

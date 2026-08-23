@@ -1822,7 +1822,7 @@ export function ChatRoomView({
       /*#__PURE__*/React.createElement("input", {
         ref: fileInputRefChat,
         type: "file",
-        accept: "image/*",
+        accept: "image/jpeg, image/png, image/gif, image/webp, image/heic, image/heif, image/*",
         multiple: true,
         style: { position: 'absolute', width: '1px', height: '1px', padding: 0, margin: '-1px', overflow: 'hidden', clip: 'rect(0,0,0,0)', border: 0 },
         onChange: handleFileChangeChat

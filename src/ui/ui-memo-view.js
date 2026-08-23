@@ -1507,7 +1507,7 @@ export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoad
                   /*#__PURE__*/React.createElement("input", {
                     type: "file",
                     multiple: true,
-                    accept: "image/*",
+                    accept: "image/jpeg, image/png, image/gif, image/webp, image/heic, image/heif, image/*",
                     onChange: handleComposerFileSelect,
                     style: { display: 'none' }
                   }),
@@ -1878,7 +1878,7 @@ export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoad
               /*#__PURE__*/React.createElement("input", {
                 type: "file",
                 multiple: true,
-                accept: "image/*",
+                accept: "image/jpeg, image/png, image/gif, image/webp, image/heic, image/heif, image/*",
                 onChange: handleEditFileSelect,
                 style: { display: 'none' }
               }),

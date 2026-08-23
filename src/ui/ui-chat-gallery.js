@@ -1152,7 +1152,7 @@ export function ChatGalleryModal({
   /*#__PURE__*/React.createElement("input", {
     ref: uploadInputRef,
     type: "file",
-    accept: "image/*",
+    accept: "image/jpeg, image/png, image/gif, image/webp, image/heic, image/heif, image/*",
     multiple: true,
     onChange: handleUploadChange,
     style: { display: 'none' }
