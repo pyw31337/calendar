@@ -67,6 +67,10 @@ function extractAllUrlInfos(...args) {
   const f = __gatherUiDeps().extractAllUrlInfos || GATHER_APP_UTILS.extractAllUrlInfos;
   return typeof f === 'function' ? f(...args) : [];
 }
+function extractAllUrlInfosLoose(...args) {
+  const f = __gatherUiDeps().extractAllUrlInfosLoose || GATHER_APP_UTILS.extractAllUrlInfosLoose;
+  return typeof f === 'function' ? f(...args) : [];
+}
 function extractLeadingMemoDate(...args) {
   const f = __gatherUiDeps().extractLeadingMemoDate || GATHER_APP_UTILS.extractLeadingMemoDate;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -654,6 +658,30 @@ function getDirectChatMediaInfo(...args) {
   const f = __gatherUiDeps().getDirectChatMediaInfo || GATHER_APP_UTILS.getDirectChatMediaInfo;
   return typeof f === 'function' ? f(...args) : undefined;
 }
+function getDirectMediaTagsForUrl(...args) {
+  const f = __gatherUiDeps().getDirectMediaTagsForUrl || GATHER_APP_UTILS.getDirectMediaTagsForUrl;
+  return typeof f === 'function' ? f(...args) : '';
+}
+// Generalizes getMessageDirectMediaEntry (which only ever returned the FIRST externally-linked
+// image in a message) to every recognized image link in the text -- a message pasted with several
+// external image links (see DirectChatMediaText's multi-image grid in ui-remaining.js) needs every
+// one of them to show up here too, not just the first, the same way a real multi-image upload
+// already does via getMessageImageEntries.
+function getAllDirectMediaImageEntries(msgLike) {
+  if (!msgLike?.text) return [];
+  return extractAllUrlInfosLoose(msgLike.text)
+    .filter(info => getDirectChatMediaInfo(info.url)?.type === 'image')
+    .map((info, idx) => ({
+      full: info.url,
+      thumb: info.url,
+      imageIndex: idx,
+      messageId: msgLike.id,
+      timestamp: msgLike.timestamp,
+      tags: getDirectMediaTagsForUrl(msgLike, info.url),
+      directMediaUrl: info.url,
+      uploadSource: msgLike.uploadSource || null
+    }));
+}
 function getPollOptionVoterIds(...args) {
   const f = __gatherUiDeps().getPollOptionVoterIds || GATHER_APP_UTILS.getPollOptionVoterIds;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -756,7 +784,6 @@ export function ChatGalleryModal({
   const LinkPreviewCard = __deps.LinkPreviewCard || __comp.LinkPreviewCard;
   const MenuIcon = __deps.MenuIcon || __comp.MenuIcon;
   const getMessageImageEntries = __deps.getMessageImageEntries;
-  const getMessageDirectMediaEntry = __deps.getMessageDirectMediaEntry;
   const resolveMeetingPhotoDisplay = __deps.resolveMeetingPhotoDisplay;
   const removeFirstUrl = __deps.removeFirstUrl;
   const formatChatHeaderTitle = __deps.formatChatHeaderTitle;
@@ -815,28 +842,36 @@ export function ChatGalleryModal({
     // Was extractFirstUrl -- a message or memo with several distinct links (not just a multi-image
     // link grid, any mix of URLs typed/pasted together) only ever contributed its first one here,
     // silently dropping the rest from this tab even though every one of them still renders its own
-    // preview in the chat/memo itself. extractAllUrlInfos surfaces all of them; only the first
-    // per message reuses the cached linkPreview (that cache is keyed to the message's first URL),
-    // the rest fetch their own preview live the same way a fresh link normally would.
+    // preview in the chat/memo itself. extractAllUrlInfosLoose surfaces all of them, INCLUDING a
+    // bare domain with no http(s):// or www. prefix (e.g. a share-sheet link pasted as just
+    // "naver.me/xxxx") -- that already rendered its own preview fine in chat/memo (via
+    // extractFirstUrlInfo's looser single-link match) but was invisible to this tab entirely
+    // under the stricter extractAllUrlInfos. Only the first URL per message reuses the cached
+    // linkPreview (that cache is keyed to the message's first URL); the rest fetch their own
+    // preview live the same way a fresh link normally would. Recognized image links are excluded
+    // here -- those belong to the 사진 tab only (see sharedPhotos below), not duplicated as a
+    // generic link card here too.
     const list = [];
     const seen = new Set();
     (chatMessages || []).forEach(msg => {
       if (!msg.text) return;
-      extractAllUrlInfos(msg.text).forEach((info, idx) => {
-        if (info.url && !seen.has(info.url)) {
-          seen.add(info.url);
-          list.push({ url: info.url, timestamp: msg.timestamp, messageId: msg.id, text: msg.text, linkPreview: idx === 0 ? msg.linkPreview : null, source: 'chat' });
-        }
+      let firstUrlSeen = false;
+      extractAllUrlInfosLoose(msg.text).forEach(info => {
+        if (!info.url || seen.has(info.url) || getDirectChatMediaInfo(info.url)?.type === 'image') return;
+        seen.add(info.url);
+        list.push({ url: info.url, timestamp: msg.timestamp, messageId: msg.id, text: msg.text, linkPreview: !firstUrlSeen ? msg.linkPreview : null, source: 'chat' });
+        firstUrlSeen = true;
       });
     });
     (memos || []).forEach(memo => {
       const body = memo?.text || memo?.content || memo?.body || '';
       if (!body) return;
-      extractAllUrlInfos(body).forEach((info, idx) => {
-        if (info.url && !seen.has(info.url)) {
-          seen.add(info.url);
-          list.push({ url: info.url, timestamp: memo.updatedAt || memo.createdAt || 0, messageId: memo.id, text: body, linkPreview: idx === 0 ? (memo.linkPreview || null) : null, source: 'memo' });
-        }
+      let firstUrlSeen = false;
+      extractAllUrlInfosLoose(body).forEach(info => {
+        if (!info.url || seen.has(info.url) || getDirectChatMediaInfo(info.url)?.type === 'image') return;
+        seen.add(info.url);
+        list.push({ url: info.url, timestamp: memo.updatedAt || memo.createdAt || 0, messageId: memo.id, text: body, linkPreview: !firstUrlSeen ? (memo.linkPreview || null) : null, source: 'memo' });
+        firstUrlSeen = true;
       });
     });
     return list.sort((a, b) => b.timestamp - a.timestamp);
@@ -845,8 +880,7 @@ export function ChatGalleryModal({
   const sharedPhotos = React.useMemo(() => {
     const list = [];
     (chatMessages || []).forEach(msg => {
-      const directEntry = getMessageDirectMediaEntry(msg);
-      const entries = directEntry ? [...getMessageImageEntries(msg), directEntry] : getMessageImageEntries(msg);
+      const entries = [...getMessageImageEntries(msg), ...getAllDirectMediaImageEntries(msg)];
       entries.forEach(entry => {
         list.push({ ...entry, text: msg.text || '', participantId: msg.participantId || '', source: 'chat' });
       });
@@ -861,8 +895,7 @@ export function ChatGalleryModal({
         imageUrl: memo.imageUrl, imageUrls: memo.imageUrls, thumbUrl: memo.thumbUrl, thumbUrls: memo.thumbUrls,
         timestamp: memo.updatedAt || memo.createdAt || 0, participantId: memo.participantId || ''
       };
-      const directEntry = getMessageDirectMediaEntry(asMsg);
-      const entries = directEntry ? [...getMessageImageEntries(asMsg), directEntry] : getMessageImageEntries(asMsg);
+      const entries = [...getMessageImageEntries(asMsg), ...getAllDirectMediaImageEntries(asMsg)];
       entries.forEach(entry => {
         list.push({ ...entry, tags: memoTagsDisplay, text: asMsg.text || '', participantId: asMsg.participantId || '', source: 'memo' });
       });
@@ -953,12 +986,28 @@ export function ChatGalleryModal({
     }
   }, [searchQuery, hasMoreOlderChat, loadingOlderChat, hasMoreMemos, (chatMessages || []).length, (memos || []).length]);
 
+  // Keeps auto-loading older chat history while the 사진 tab is active and still short of a
+  // decent first page -- unaffected by the tab-aware effect below (which only targets link count
+  // once the 링크 tab is open).
   React.useEffect(() => {
-    if (!asPage || (searchQuery || '').trim()) return;
+    if (!asPage || (searchQuery || '').trim() || activeTab !== 'photos') return;
     if (typeof onLoadOlderChat !== 'function' || !hasMoreOlderChat || loadingOlderChat) return;
     if ((sharedPhotos || []).length >= 60) return;
     onLoadOlderChat();
-  }, [asPage, searchQuery, hasMoreOlderChat, loadingOlderChat, (sharedPhotos || []).length, (chatMessages || []).length]);
+  }, [asPage, searchQuery, activeTab, hasMoreOlderChat, loadingOlderChat, (sharedPhotos || []).length, (chatMessages || []).length]);
+
+  // Was missing entirely: the 사진 tab's auto-load above only ever watches photo count, so once
+  // it had loaded "enough" photos it stopped pulling in older chat/memo history for good --
+  // switching to the 링크 tab afterward saw whatever links happened to already be in that
+  // photo-sized window and nothing more, with no way to pull in additional history (그 tab had no
+  // "더보기" button of its own either -- see below). Links can come from BOTH chat and memos, so
+  // this drains both independently once the 링크 tab is actually open.
+  React.useEffect(() => {
+    if (!asPage || (searchQuery || '').trim() || activeTab !== 'links') return;
+    if ((sharedLinks || []).length >= 50) return;
+    if (typeof onLoadOlderChat === 'function' && hasMoreOlderChat && !loadingOlderChat) onLoadOlderChat();
+    if (typeof onLoadMoreMemos === 'function' && hasMoreMemos) onLoadMoreMemos();
+  }, [asPage, searchQuery, activeTab, hasMoreOlderChat, loadingOlderChat, hasMoreMemos, (sharedLinks || []).length, (chatMessages || []).length, (memos || []).length]);
 
   const displayPhotoTabCount = (typeof totalGalleryCount === 'number' && totalGalleryCount > (sharedPhotos || []).length)
     ? totalGalleryCount
@@ -1346,13 +1395,34 @@ export function ChatGalleryModal({
       display: 'flex', flexDirection: 'column', gap: '12px', boxSizing: 'border-box',
       minWidth: 0
     }
-  }, activeTab === 'links' ? (
+  }, activeTab === 'links' ? /*#__PURE__*/React.createElement(React.Fragment, null,
     filteredLinks.length === 0 ? /*#__PURE__*/React.createElement("div", {
       style: { textAlign: 'center', color: 'var(--text-muted)', padding: '40px 0', fontSize: '0.88rem' }
     }, searchQuery ? "검색 결과가 없습니다." : "공유된 링크가 없습니다.") : filteredLinks.map(item => /*#__PURE__*/React.createElement("div", {
       key: item.messageId,
       style: { width: '100%' }
-    }, /*#__PURE__*/React.createElement(LinkPreviewCard, { url: item.url, fallbackTitle: item.text ? removeFirstUrl(item.text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : '', cachedData: item.linkPreview, stretch: true })))
+    }, /*#__PURE__*/React.createElement(LinkPreviewCard, { url: item.url, fallbackTitle: item.text ? removeFirstUrl(item.text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : '', cachedData: item.linkPreview, stretch: true }))),
+    (hasMoreOlderChat || hasMoreMemos) && !(searchQuery || '').trim() && /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => {
+        if (typeof onLoadOlderChat === 'function' && hasMoreOlderChat && !loadingOlderChat) onLoadOlderChat();
+        if (typeof onLoadMoreMemos === 'function' && hasMoreMemos) onLoadMoreMemos();
+      },
+      disabled: !!loadingOlderChat,
+      style: {
+        width: '100%',
+        marginTop: '4px',
+        padding: '12px 0',
+        border: 'none',
+        borderRadius: '8px',
+        backgroundColor: 'color-mix(in srgb, var(--bg-primary) 96%, black)',
+        color: 'var(--text-main)',
+        fontSize: '0.85rem',
+        fontWeight: 700,
+        cursor: loadingOlderChat ? 'wait' : 'pointer',
+        textAlign: 'center'
+      }
+    }, loadingOlderChat ? '이전 링크를 불러오는 중…' : '이전 링크 더 보기')
   ) : /*#__PURE__*/React.createElement(React.Fragment, null,
     filteredPhotos.length === 0 ? /*#__PURE__*/React.createElement("div", {
       style: { textAlign: 'center', color: 'var(--text-muted)', padding: '40px 0', fontSize: '0.88rem' }

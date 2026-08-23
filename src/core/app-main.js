@@ -1478,6 +1478,10 @@ function extractAllUrlInfos(...args) {
   const f = (window.GATHER_APP_UTILS || {}).extractAllUrlInfos;
   return typeof f === 'function' ? f(...args) : [];
 }
+function extractAllUrlInfosLoose(...args) {
+  const f = (window.GATHER_APP_UTILS || {}).extractAllUrlInfosLoose;
+  return typeof f === 'function' ? f(...args) : [];
+}
 function removeFirstUrl(...args) {
   const f = (window.GATHER_APP_UTILS || {}).removeFirstUrl;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -12247,6 +12251,7 @@ function bindGatherUiDeps() {
     getMessageDirectMediaEntry: typeof getMessageDirectMediaEntry === 'function' ? getMessageDirectMediaEntry : null,
     extractFirstUrl: typeof extractFirstUrl === 'function' ? extractFirstUrl : null,
     extractAllUrlInfos: typeof extractAllUrlInfos === 'function' ? extractAllUrlInfos : null,
+    extractAllUrlInfosLoose: typeof extractAllUrlInfosLoose === 'function' ? extractAllUrlInfosLoose : null,
     extractDirectImageUrls: typeof extractDirectImageUrls === 'function' ? extractDirectImageUrls : null,
     removeFirstUrl: typeof removeFirstUrl === 'function' ? removeFirstUrl : null,
     formatChatHeaderTitle: typeof formatChatHeaderTitle === 'function' ? formatChatHeaderTitle : null,
