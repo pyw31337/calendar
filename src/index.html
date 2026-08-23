@@ -4,6 +4,37 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>모여라 캘린더</title>
+    <!-- PWA manifest + icons. Previously present only in the legacy root index.html (not the
+         Vite entry actually served by dist/), so the deployed site never linked a manifest at
+         all -- beforeinstallprompt/"홈 화면에 추가" had no valid installability signal to fire
+         on regardless of browser. See copy-static-to-dist.mjs for how manifest*.json/icons/
+         reach dist/. No beforeinstallprompt capture script here on purpose: this app has no
+         custom install-prompt UI (see PR #236), so Chromium's own default install affordance
+         (address-bar icon / mini-infobar) is left to handle itself undisturbed. -->
+    <link rel="manifest" href="manifest.json" />
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
+    <link rel="icon" href="favicon.ico" />
+    <meta name="theme-color" content="#4F46E5" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="모여라 캘린더" />
+    <script>
+      // Points the manifest at a per-calendar variant (start_url baked in) so installing while
+      // viewing ?id=kkot or ?id=cw launches back into that same calendar -- manifest.json's own
+      // start_url has no query string, so without this every installed shortcut would silently
+      // open the default calendar regardless of which one was on screen at install time.
+      (function () {
+        var params = new URLSearchParams(window.location.search);
+        var id = params.get('id') || params.get('cal');
+        var manifestByCalendar = { kkot: 'manifest-kkot.json', cw: 'manifest-cw.json', jhair: 'manifest-jhair.json' };
+        if (id && manifestByCalendar[id]) {
+          var link = document.querySelector('link[rel="manifest"]');
+          if (link) link.setAttribute('href', manifestByCalendar[id]);
+        }
+      })();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet" />
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
