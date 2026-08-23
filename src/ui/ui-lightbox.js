@@ -908,7 +908,18 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
   // the messages collection, not memos -- tags there are a whole-memo field with no single-photo
   // target, so editing is intentionally left disabled rather than silently failing to save.
   const isMeetingPhoto = currentMeta?.source === 'meeting' && !!currentMeta?.meetingDate && !!currentMeta?.photoId;
-  const canEditTags = currentMeta && (currentMeta.source === 'chat' ? currentMeta.messageId != null : isMeetingPhoto);
+  // Was keyed on source === 'chat' specifically, which left tag editing silently disabled for
+  // any directMediaUrl entry (a link pasted as plain text in a message, single or multi-image --
+  // see DirectChatMediaText) since those never set `source` at all. Reworked to mirror
+  // canEditPhoto's structure below: 'meeting' is the one case needing isMeetingPhoto, 'memo' stays
+  // explicitly disabled (a memo's tags are a whole-memo field, no single-photo target to write
+  // to -- see the comment above), and everything else (chat, chat-tag, or an untagged
+  // directMediaUrl entry) just needs a real messageId to write handleSaveImageTags' update to.
+  const canEditTags = currentMeta && (
+    currentMeta.source === 'meeting' ? isMeetingPhoto :
+    currentMeta.source === 'memo' ? false :
+    currentMeta.messageId != null
+  );
   const tagOverrideKey = currentMeta
     ? (isMeetingPhoto ? `meeting_${currentMeta.meetingDate}_${currentMeta.photoId}` : `${currentMeta.messageId}_${currentMeta.directMediaUrl ? 'direct' : currentMeta.imageIndex}`)
     : null;
@@ -1301,7 +1312,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
   }, /*#__PURE__*/React.createElement("input", {
     ref: replacePhotoInputRef,
     type: "file",
-    accept: "image/*",
+    accept: "image/jpeg, image/png, image/gif, image/webp, image/heic, image/heif, image/*",
     onClick: e => e.stopPropagation(),
     onChange: handleReplacePhotoFile,
     style: { display: 'none' }
