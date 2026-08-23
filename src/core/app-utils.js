@@ -158,6 +158,30 @@ const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
     return results;
   }
 
+  // Like extractAllUrlInfos, but ALSO matches a bare domain with no http(s):// or www. prefix --
+  // the same relaxed pattern extractFirstUrlInfo already uses for the single-link chat/memo
+  // preview. Used by the gallery's 링크 tab, which aggregates links across many messages/memos
+  // rather than deciding whether one specific message IS a multi-image-link message -- there the
+  // false-positive risk that keeps extractAllUrlInfos strict doesn't apply the same way, while
+  // being strict there meant a share-sheet link pasted without its scheme (common when copying a
+  // shortened URL like naver.me/xxxx) rendered its own preview fine in chat/memo but never made
+  // it into the gallery's aggregated list at all.
+  function extractAllUrlInfosLoose(value = '') {
+    const source = String(value || '');
+    const matches = source.match(/(?:https?:\/\/|www\.)[^\s)\]]+|(?:[a-z0-9-]+\.)+[a-z]{2,}(?:\/[^\s)\]]*)?/gi) || [];
+    const seen = new Set();
+    const results = [];
+    matches.forEach(m => {
+      const raw = stripUrlEdgePunctuation(m);
+      if (!raw || !/[a-z0-9]/i.test(raw)) return;
+      const url = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+      if (seen.has(url)) return;
+      seen.add(url);
+      results.push({ raw, url });
+    });
+    return results;
+  }
+
   function removeFirstUrl(value = '') {
     const source = String(value || '');
     const { raw } = extractFirstUrlInfo(source);
@@ -677,6 +701,7 @@ const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
     extractFirstUrlInfo,
     extractFirstUrl,
     extractAllUrlInfos,
+    extractAllUrlInfosLoose,
     removeFirstUrl,
     sanitizeText: sanitizeTextValue,
     normalizeColorValue,
