@@ -1031,7 +1031,7 @@ export function GamifiedConfirmButtonContent({ label }) {
   );
 }
 
-export function LinkPreviewCard({ url, fallbackTitle, cachedData }) {
+export function LinkPreviewCard({ url, fallbackTitle, cachedData, stretch = false }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -1062,8 +1062,12 @@ export function LinkPreviewCard({ url, fallbackTitle, cachedData }) {
       // the same pattern that, on a plain (non-fit-content) block elsewhere in this bug, was found
       // to corrupt an ancestor's intrinsic-size calculation (percentage-in-min() resolves as
       // indefinite there) -- removing it here too since there's no upside to keeping it.
-      width: 'fit-content',
-      maxWidth: '280px',
+      // `stretch` opts out of all of the above: a vertical list of these cards (e.g. the gallery
+      // page's 링크 tab) wants every row the SAME width regardless of how long each one's own
+      // title/description happens to be, not each row shrinking to its own content -- the exact
+      // opposite of what a chat bubble wants.
+      width: stretch ? '100%' : 'fit-content',
+      maxWidth: stretch ? '100%' : '280px',
       gap: '8px',
       marginTop: '6px',
       border: '1px solid var(--border-subtle)',
@@ -1090,7 +1094,7 @@ export function LinkPreviewCard({ url, fallbackTitle, cachedData }) {
       // then shrinks the card back down independently, leaving a several-dozen-px gap between the
       // (already-sized) bubble and the (separately re-clamped) card. Verified by measuring both
       // ways in an isolated repro.
-      style: { padding: '6px 8px', minWidth: 0, maxWidth: image ? '198px' : '270px', overflow: 'hidden', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '2px' }
+      style: { padding: '6px 8px', minWidth: 0, maxWidth: stretch ? 'none' : (image ? '198px' : '270px'), flex: stretch ? '1 1 0' : '0 1 auto', overflow: 'hidden', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '2px' }
     },
       displayTitle && /*#__PURE__*/React.createElement('div', {
       style: { fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
