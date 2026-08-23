@@ -741,7 +741,11 @@ export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox,
     const mobileCols = urls.length === 2 ? 2 : 3;
     const isMobile = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(max-width: 640px)').matches;
     const activeCols = isMobile ? mobileCols : (urls.length >= 12 ? 6 : urls.length >= 5 ? 5 : mobileCols);
-    const maxW = isMobile ? 'min(100%, 280px)' : `min(100%, calc(${activeCols} * 76px + (${activeCols} - 1) * 4px))`;
+    // Plain length, not wrapped in min(100%, ...) -- see computeChatImageGridMaxWidth in
+    // app-main.js for why: paired with width:'100%' below, that's already enough to shrink this
+    // safely on a narrow viewport, and min()+percentage here actively breaks the ancestor
+    // bubble's own fit-content sizing (verified via isolated repro).
+    const maxW = isMobile ? '280px' : `calc(${activeCols} * 76px + (${activeCols} - 1) * 4px)`;
     return /*#__PURE__*/React.createElement(React.Fragment, null,
       /*#__PURE__*/React.createElement('div', {
         className: `chat-message-image-grid${urls.length >= 5 ? ' is-wide' : ''}`,
@@ -781,7 +785,10 @@ export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox,
     // closed that gap to a few px. overflow-wrap:break-word is already inherited from the bubble,
     // so it wraps here instead of overflowing; the link stays fully visible and clickable either
     // way, unlike hiding it outright (which would leave nothing clickable if the card fails).
-    const effectiveMaxWidth = textMaxWidth || (firstUrl ? 'min(100%, 280px)' : null);
+    // Plain length (not min(100%, ...)) for the same reason as computeChatImageGridMaxWidth in
+    // app-main.js -- paired with width:'100%' below, that alone is enough to shrink safely on a
+    // narrow viewport, and min()+percentage here breaks the ancestor bubble's fit-content sizing.
+    const effectiveMaxWidth = textMaxWidth || (firstUrl ? '280px' : null);
     const cappedTextNode = (textNode && effectiveMaxWidth)
       ? /*#__PURE__*/React.createElement('div', {
         style: { maxWidth: effectiveMaxWidth, width: '100%', boxSizing: 'border-box' }

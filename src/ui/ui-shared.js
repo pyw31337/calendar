@@ -1057,8 +1057,13 @@ export function LinkPreviewCard({ url, fallbackTitle, cachedData }) {
       // maxWidth cap keeps that same fit-content from growing unbounded to fit a long title in
       // one line now that the bubble's width no longer implicitly bounds it -- title/description
       // below still truncate with ellipsis inside this width.
+      // Plain length, not min(100%, 280px) -- fit-content already includes "shrink to available
+      // space if narrower" in its own definition, so the min(100%, ...) was redundant. It's also
+      // the same pattern that, on a plain (non-fit-content) block elsewhere in this bug, was found
+      // to corrupt an ancestor's intrinsic-size calculation (percentage-in-min() resolves as
+      // indefinite there) -- removing it here too since there's no upside to keeping it.
       width: 'fit-content',
-      maxWidth: 'min(100%, 280px)',
+      maxWidth: '280px',
       gap: '8px',
       marginTop: '6px',
       border: '1px solid var(--border-subtle)',
