@@ -675,8 +675,7 @@ export function SharedSideMenuSettings({
   onDecreaseFont,
   onIncreaseFont,
   isChatNotifyEnabled,
-  onToggleChatNotifications,
-  onTestChatNotification
+  onToggleChatNotifications
 }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -717,13 +716,7 @@ export function SharedSideMenuSettings({
         "채팅알림"
       ),
       /*#__PURE__*/React.createElement(ToggleSwitch, { checked: !!isChatNotifyEnabled, onChange: onToggleChatNotifications, label: "채팅알림" })
-    ),
-    typeof onTestChatNotification === 'function' && /*#__PURE__*/React.createElement("button", {
-      type: "button",
-      className: "btn btn-secondary",
-      onClick: onTestChatNotification,
-      style: { width: '100%', marginTop: '8px', fontSize: '0.85rem', fontWeight: 700 }
-    }, "알림 테스트")
+    )
   );
 }
 
@@ -746,7 +739,6 @@ export function MainSideMenu({
   onIncreaseFont,
   isChatNotifyEnabled,
   onToggleChatNotifications,
-  onTestChatNotification,
   onUpdateWeatherLocation,
   onDeleteRecentLocation,
   showToast,
@@ -946,8 +938,7 @@ export function MainSideMenu({
       onDecreaseFont: onDecreaseFont,
       onIncreaseFont: onIncreaseFont,
       isChatNotifyEnabled: isChatNotifyEnabled,
-      onToggleChatNotifications: onToggleChatNotifications,
-      onTestChatNotification: onTestChatNotification
+      onToggleChatNotifications: onToggleChatNotifications
     }),
     /* Group 4: share + shortcut */
     /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-list", style: { borderTop: '1px solid var(--border-subtle, #E2E8F0)', borderBottom: 'none', paddingTop: '6px', marginTop: '2px' } },

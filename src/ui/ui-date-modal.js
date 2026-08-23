@@ -63,10 +63,6 @@ function extractFirstUrl(...args) {
   const f = __gatherUiDeps().extractFirstUrl || GATHER_APP_UTILS.extractFirstUrl;
   return typeof f === 'function' ? f(...args) : undefined;
 }
-function extractLeadingMemoDate(...args) {
-  const f = __gatherUiDeps().extractLeadingMemoDate || GATHER_APP_UTILS.extractLeadingMemoDate;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
 function formatChatDividerDate(...args) {
   const f = __gatherUiDeps().formatChatDividerDate || GATHER_APP_UTILS.formatChatDividerDate;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -139,6 +135,10 @@ function getPlaceCategoryById(...args) {
   const f = __gatherUiDeps().getPlaceCategoryById || GATHER_APP_UTILS.getPlaceCategoryById;
   return typeof f === 'function' ? f(...args) : undefined;
 }
+function getPlaceMemoEntryForDate(...args) {
+  const f = __gatherUiDeps().getPlaceMemoEntryForDate || GATHER_APP_UTILS.getPlaceMemoEntryForDate;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
 function getPlaceCategoryIcon(...args) {
   const f = __gatherUiDeps().getPlaceCategoryIcon || GATHER_APP_UTILS.getPlaceCategoryIcon;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -195,20 +195,20 @@ function normalizePlaceDateForSort(...args) {
   const f = __gatherUiDeps().normalizePlaceDateForSort || GATHER_APP_UTILS.normalizePlaceDateForSort;
   return typeof f === 'function' ? f(...args) : undefined;
 }
-function parseVisitEntriesFromMemo(...args) {
-  const f = __gatherUiDeps().parseVisitEntriesFromMemo || GATHER_APP_UTILS.parseVisitEntriesFromMemo;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function reformatMemoIntoDateLines(...args) {
-  const f = __gatherUiDeps().reformatMemoIntoDateLines || GATHER_APP_UTILS.reformatMemoIntoDateLines;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
 function removeFirstUrl(...args) {
   const f = __gatherUiDeps().removeFirstUrl || GATHER_APP_UTILS.removeFirstUrl;
   return typeof f === 'function' ? f(...args) : undefined;
 }
+function removePlaceMemoEntry(...args) {
+  const f = __gatherUiDeps().removePlaceMemoEntry || GATHER_APP_UTILS.removePlaceMemoEntry;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
 function sortVisitEntriesRecentFirst(...args) {
   const f = __gatherUiDeps().sortVisitEntriesRecentFirst || GATHER_APP_UTILS.sortVisitEntriesRecentFirst;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function toMemoDateFormat(...args) {
+  const f = __gatherUiDeps().toMemoDateFormat || GATHER_APP_UTILS.toMemoDateFormat;
   return typeof f === 'function' ? f(...args) : undefined;
 }
 function trimLatLngOutliers(...args) {
@@ -518,6 +518,10 @@ function getMessageDirectMediaEntry(...args) {
   const f = __gatherUiDeps().getMessageDirectMediaEntry || GATHER_APP_UTILS.getMessageDirectMediaEntry;
   return typeof f === 'function' ? f(...args) : undefined;
 }
+function resolveMeetingPhotoDisplay(...args) {
+  const f = __gatherUiDeps().resolveMeetingPhotoDisplay || GATHER_APP_UTILS.resolveMeetingPhotoDisplay;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
 function renderTextWithUrlBadge(...args) {
   const f = __gatherUiDeps().renderTextWithUrlBadge || GATHER_APP_UTILS.renderTextWithUrlBadge;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -758,8 +762,6 @@ export function DateModal({
   const getActiveParticipants = __deps.getActiveParticipants;
   const getCalendarPlaces = __deps.getCalendarPlaces;
   const getPlaceCategories = __deps.getPlaceCategories;
-  const extractLeadingMemoDate = __deps.extractLeadingMemoDate;
-  const parseVisitEntriesFromMemo = __deps.parseVisitEntriesFromMemo;
   const sortVisitEntriesRecentFirst = __deps.sortVisitEntriesRecentFirst;
   const normalizePlaceAddress = __deps.normalizePlaceAddress;
   const normalizePlaceDateForSort = __deps.normalizePlaceDateForSort;
@@ -791,6 +793,18 @@ export function DateModal({
   const [placeResults, setPlaceResults] = React.useState([]);
   const [selectedPlace, setSelectedPlace] = React.useState(null);
   const [placeMemo, setPlaceMemo] = React.useState('');
+  // Once 장소 메모 wraps past a single line, the 추가/취소/수정 buttons no longer fit comfortably
+  // beside it -- even on PC, not just the <480px mobile breakpoint that already stacks every other
+  // field's actions below it (see .date-modal-field-with-actions in app.css). Measured off the
+  // textarea's own scrollHeight (its content height regardless of screen width) rather than a
+  // viewport media query, since this is about the memo text itself overflowing, not the device.
+  const placeMemoTextareaRef = React.useRef(null);
+  const [isPlaceMemoWrapped, setIsPlaceMemoWrapped] = React.useState(false);
+  React.useLayoutEffect(() => {
+    const el = placeMemoTextareaRef.current;
+    if (!el) return;
+    setIsPlaceMemoWrapped(el.scrollHeight > 48);
+  }, [placeMemo]);
   const [placeAlias, setPlaceAlias] = React.useState('');
   const [placeCategoryId, setPlaceCategoryId] = React.useState(() => getPlaceCategories(calendar)[0]?.id || 'etc');
   const [placeVisitStatus, setPlaceVisitStatus] = React.useState('visited');
@@ -976,6 +990,11 @@ export function DateModal({
         lng: selectedPlace.lng,
         categoryId: placeCategoryId || selectedPlace.categoryId || 'etc',
         memo: cleanMemo,
+        // This field always represents just THIS date's note (brand new place, an existing place
+        // reused for another date, or an already-linked place being re-edited) -- memoOp:'upsert'
+        // tells handleSavePlace (app-main.js) to merge it into the target place's per-date memo
+        // stack instead of overwriting the whole memo with just this one note.
+        memoOp: 'upsert',
         visitStatus: placeVisitStatus === 'planned' ? 'planned' : 'visited',
         visitDate: dateStr,
         // Not set while editing a place already linked to this date (editingLinkedPlaceId) --
@@ -1044,11 +1063,11 @@ export function DateModal({
     setPlaceCategoryId(place.categoryId || getPlaceCategories(calendar)[0]?.id || 'etc');
     setPlaceQuery(place.name);
     setPlaceResults([]);
-    // Prefill with the place's existing memo instead of leaving the field blank -- typing into
-    // what looks empty risked burying/duplicating earlier notes on this place once saved.
-    // handleSavePlace (app-main.js) recognizes when what comes back still starts with this same
-    // text (a continuation) and uses it as-is instead of appending a new dated line on top of it.
-    setPlaceMemo(place.memo || '');
+    // Leave blank rather than prefilling the place's existing memo -- this field now always holds
+    // just THIS date's note, which handleSavePlaceClick below upserts into the place's per-date
+    // memo stack (see app-main.js's handleSavePlace, memoOp:'upsert') without disturbing its other
+    // dates' entries.
+    setPlaceMemo('');
   };
 
   const handleSubmit = async (e) => {
@@ -1125,8 +1144,24 @@ export function DateModal({
   const dateStrToHashtag = __deps.dateStrToHashtag;
 
   const meetingPhotos = React.useMemo(() => {
+    // An auto-linked 일정 사진 (sourceMessageId set) is only a reference/archival copy of a real
+    // chat photo -- its own imageUrl/thumbUrl/tags fields are a snapshot from whenever it was
+    // linked, and a later tag edit (e.g. from the Gallery page's Lightbox) writes to the SOURCE
+    // MESSAGE, not back onto this snapshot (see handleSaveImageTags in app-main.js). Gallery
+    // already resolves the live values via resolveMeetingPhotoDisplay before displaying; this tab
+    // didn't, so the exact same photo could show different tags depending on which page you
+    // opened it from. Resolving here keeps this tab's thumbnails and Lightbox in sync with it.
     const directPhotos = (Array.isArray(confirmedMeetingEntry?.photos) ? confirmedMeetingEntry.photos : [])
-      .filter(photo => photo && (photo.imageUrl || photo.thumbUrl));
+      .filter(photo => photo && (photo.imageUrl || photo.thumbUrl))
+      .map(photo => {
+        const resolved = resolveMeetingPhotoDisplay(photo, chatMessages) || {};
+        return {
+          ...photo,
+          imageUrl: resolved.imageUrl || photo.imageUrl,
+          thumbUrl: resolved.thumbUrl || photo.thumbUrl,
+          tags: resolved.tags != null ? resolved.tags : photo.tags
+        };
+      });
 
     const directUrls = new Set(directPhotos.map(p => p.imageUrl || p.thumbUrl).filter(Boolean));
     const targetTag = typeof dateStrToHashtag === 'function' ? dateStrToHashtag(dateStr) : (dateStr ? dateStr.replace(/-/g, '').slice(2) : '');
@@ -2266,25 +2301,30 @@ export function DateModal({
           }, "장소 메모 입력"),
           /*#__PURE__*/React.createElement("div", {
             className: "date-modal-field-with-actions",
-            style: { display: 'flex', gap: '8px', alignItems: 'flex-start' }
+            style: { display: 'flex', gap: '8px', alignItems: 'flex-start', flexDirection: isPlaceMemoWrapped ? 'column' : 'row' }
           },
             /*#__PURE__*/React.createElement(AutoGrowTextarea, {
               className: "form-input",
-              style: { flex: 1, padding: '8px 12px' },
+              style: { flex: 1, width: isPlaceMemoWrapped ? '100%' : undefined, padding: '8px 12px' },
               minHeight: 44,
               maxHeight: 480,
+              textareaRef: placeMemoTextareaRef,
               placeholder: "메모 입력 (선택, '26.02.12' 또는 URL 입력 가능)",
               maxLength: 2000,
               value: placeMemo,
               disabled: isSavingPlace,
               onChange: e => setPlaceMemo(e.target.value)
             }),
-            /*#__PURE__*/React.createElement("div", { className: "date-modal-field-actions" },
+            /*#__PURE__*/React.createElement("div", {
+              className: "date-modal-field-actions",
+              style: isPlaceMemoWrapped ? { width: '100%' } : undefined
+            },
               /*#__PURE__*/React.createElement(FormAddEditActionButtons, {
                 isEditing: !!editingLinkedPlaceId,
                 isSaving: isSavingPlace,
                 disabled: !selectedPlace,
                 alignSelf: 'flex-start',
+                flexGrow: isPlaceMemoWrapped,
                 onCancel: () => {
                   setEditingLinkedPlaceId(null);
                   setSelectedPlace(null);
@@ -2342,54 +2382,32 @@ export function DateModal({
             /*#__PURE__*/React.createElement("span", { style: { fontWeight: 800, fontSize: '0.88rem', color: 'var(--text-main)' } }, place.alias || place.name),
             place.alias && place.name && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.72rem', color: 'var(--text-muted)' } }, place.name),
             place.address && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.74rem', color: 'var(--text-muted)' } }, getDisplayPlaceAddress(place)),
-            /* Memo — in DateModal's '장소' tab, filter to display ONLY the memo entry corresponding to THIS dateStr */
+            /* Memo — in DateModal's '장소' tab, show ONLY the memo entry for THIS dateStr; the
+               full per-place history (every date's entry) is shown on the 장소 페이지 instead. */
             place.memo && (() => {
-              const targetNorm = typeof normalizePlaceDateForSort === 'function' ? (normalizePlaceDateForSort(dateStr) || dateStr) : dateStr;
-              let entries = parseVisitEntriesFromMemo(place.memo);
-              if (entries.length > 0) {
-                const dateEntries = entries.filter(en => {
-                  const enNorm = typeof normalizePlaceDateForSort === 'function' ? normalizePlaceDateForSort(en.date) : en.date;
-                  return enNorm === targetNorm;
-                });
-                if (dateEntries.length > 0) {
-                  return /*#__PURE__*/React.createElement("div", {
-                    style: { display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '0.78rem', color: 'var(--text-main)', lineHeight: 1.45 }
-                  }, dateEntries.map((en, idx) => /*#__PURE__*/React.createElement("div", {
-                    key: `${en.date}_${idx}`,
-                    style: { wordBreak: 'break-word' }
-                  }, renderTextWithUrlBadge(en.note ? `${en.date} ${en.note}` : en.date))));
-                }
-              } else {
-                const leading = typeof extractLeadingMemoDate === 'function' ? extractLeadingMemoDate(place.memo) : '';
-                if (leading) {
-                  const leadingNorm = typeof normalizePlaceDateForSort === 'function' ? normalizePlaceDateForSort(leading) : leading;
-                  if (leadingNorm === targetNorm) {
-                    const rest = String(place.memo).replace(String(leading), '').replace(/^\s*\/?\s*/, '').trim();
-                    return /*#__PURE__*/React.createElement("div", {
-                      style: { fontSize: '0.78rem', color: 'var(--text-main)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.45 }
-                    }, renderTextWithUrlBadge(rest ? `${leading} ${rest}` : leading));
-                  }
-                } else {
-                  return /*#__PURE__*/React.createElement("div", {
-                    style: { fontSize: '0.78rem', color: 'var(--text-main)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.45 }
-                  }, renderTextWithUrlBadge(place.memo));
-                }
-              }
-              return null;
+              const dateNote = getPlaceMemoEntryForDate(place.memo, dateStr);
+              if (!dateNote) return null;
+              const memoDate = typeof toMemoDateFormat === 'function' ? toMemoDateFormat(dateStr) : dateStr;
+              return /*#__PURE__*/React.createElement("div", {
+                style: { fontSize: '0.78rem', color: 'var(--text-main)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.45 }
+              }, renderTextWithUrlBadge(`${memoDate} ${dateNote}`));
             })(),
             !adminMode && /*#__PURE__*/React.createElement("div", {
               style: { position: 'absolute', top: '10px', right: '10px' }
             }, /*#__PURE__*/React.createElement(ItemEditDeleteActions, {
               onEdit: () => {
                 const sp = { name: place.name, address: place.address || '', lat: place.lat, lng: place.lng, categoryId: place.categoryId || 'etc' };
-                const memoLines = reformatMemoIntoDateLines(place.memo || '');
+                // Prefill with ONLY this date's note, not the place's whole memo history -- this
+                // field always represents a single date's entry, upserted back into the stack on
+                // save (see handleSavePlaceClick's memoOp:'upsert').
+                const dateNote = getPlaceMemoEntryForDate(place.memo || '', dateStr);
                 const catId = place.categoryId || 'etc';
                 const visit = place.visitStatus === 'planned' ? 'planned' : 'visited';
                 setEditingLinkedPlaceId(place.id);
                 setSelectedPlace(sp);
                 setPlaceQuery(place.name || '');
                 setPlaceAlias(place.alias || '');
-                setPlaceMemo(memoLines);
+                setPlaceMemo(dateNote);
                 setPlaceCategoryId(catId);
                 setPlaceVisitStatus(visit);
                 setPlaceResults([]);
@@ -2397,7 +2415,7 @@ export function DateModal({
                 snapshotFormBaseline({
                   ...formBaselineRef.current,
                   editingLinkedPlaceId: place.id,
-                  placeMemo: memoLines,
+                  placeMemo: dateNote,
                   placeAlias: place.alias || '',
                   placeQuery: place.name || '',
                   selectedPlaceKey: String(sp.id || '') + '|' + String(sp.name || '') + '|' + String(sp.lat || '') + '|' + String(sp.lng || ''),
@@ -2412,19 +2430,7 @@ export function DateModal({
                     const targetNorm = normalizePlaceDateForSort(dateStr) || dateStr;
                     let nextVisitDate = place.visitDate || '';
                     if (nextVisitDate === dateStr || normalizePlaceDateForSort(nextVisitDate) === targetNorm) nextVisitDate = '';
-                    let nextMemo = String(place.memo || '');
-                    const entries = parseVisitEntriesFromMemo(nextMemo);
-                    if (entries.length >= 2) {
-                      nextMemo = entries
-                        .filter(en => normalizePlaceDateForSort(en.date) !== targetNorm)
-                        .map(en => en.note ? `${en.date} ${en.note}` : en.date)
-                        .join(' / ');
-                    } else {
-                      const leading = extractLeadingMemoDate(nextMemo);
-                      if (leading && normalizePlaceDateForSort(leading) === targetNorm) {
-                        nextMemo = nextMemo.replace(/^\s*\d{2,4}[.-]\d{2}[.-]\d{2}\s*/, '').replace(/^\/\s*/, '').trim();
-                      }
-                    }
+                    const nextMemo = removePlaceMemoEntry(place.memo || '', dateStr);
                     if (typeof onSavePlace === 'function') {
                       const ok = await Promise.resolve(onSavePlace({
                         id: place.id, name: place.name, alias: place.alias || '',
