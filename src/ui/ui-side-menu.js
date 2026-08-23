@@ -730,7 +730,6 @@ export function MainSideMenu({
   onOpenSettings,
   onOpenAnniversaries,
   onOpenShare,
-  onCreateShortcut,
   onOpenAdmin,
   isDarkTheme,
   onToggleTheme,
@@ -754,7 +753,6 @@ export function MainSideMenu({
   const MapCogIcon = __deps.MapCogIcon;
   const GiftIcon = __deps.GiftIcon;
   const LockIcon = __deps.LockIcon;
-  const ExternalLinkIcon = __deps.ExternalLinkIcon;
   const WeatherBadge = __deps.WeatherBadge;
   const WeatherLocationModal = __deps.WeatherLocationModal;
 
@@ -950,16 +948,6 @@ export function MainSideMenu({
         /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M3 12a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M15 6a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M15 18a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M8.7 10.7l6.6 -3.4", "M8.7 13.3l6.6 3.4"] })),
         /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
           /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "공유하기")
-        )
-      ),
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        className: "admin-side-menu-item",
-        onClick: () => handle(onCreateShortcut)
-      },
-        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement(ExternalLinkIcon, null)),
-        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
-          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "바로가기")
         )
       )
     ),

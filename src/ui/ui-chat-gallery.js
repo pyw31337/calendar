@@ -757,7 +757,6 @@ export function ChatGalleryModal({
   onClose,
   onUploadImages = null,
   onOpenShare = null,
-  onOpenShortcut = null,
   setActiveLightbox,
   hasMoreOlderChat = false,
   loadingOlderChat = false,
@@ -935,14 +934,23 @@ export function ChatGalleryModal({
     // doesn't show duplicates -- keep the chat/memo copy when both exist (its tag editor writes
     // back to a real message), falling back to the meeting copy only when it's the sole survivor
     // (e.g. the original message hasn't been paginated into view yet).
+    // The winning (chat/memo) copy is best for tag editing (see above), but its own entry never
+    // carries meetingDate -- that only lives on the meeting-side archival copy being discarded
+    // here. Carry it over onto the winner so the Lightbox can still show "일정 YY.MM.DD" with a
+    // jump-to-date link for a photo that's genuinely both a real chat message AND linked to a
+    // meeting date, instead of falling back to the generic non-clickable "일정 사진으로 업로드됨".
     const byUrl = new Map();
     const sourceRank = { chat: 0, memo: 1, meeting: 2 };
     list.forEach(entry => {
       const key = entry.full || entry.thumb;
       if (!key) return;
       const existing = byUrl.get(key);
-      if (!existing || (sourceRank[entry.source] ?? 9) < (sourceRank[existing.source] ?? 9)) {
+      if (!existing) {
         byUrl.set(key, entry);
+      } else if ((sourceRank[entry.source] ?? 9) < (sourceRank[existing.source] ?? 9)) {
+        byUrl.set(key, { ...entry, meetingDate: entry.meetingDate || existing.meetingDate || '' });
+      } else if (!existing.meetingDate && entry.meetingDate) {
+        byUrl.set(key, { ...existing, meetingDate: entry.meetingDate });
       }
     });
     return Array.from(byUrl.values()).sort((a, b) => b.timestamp - a.timestamp);
@@ -1079,12 +1087,6 @@ export function ChatGalleryModal({
         xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24",
         fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
       }, /*#__PURE__*/React.createElement("circle", { cx: "6", cy: "12", r: "3" }), /*#__PURE__*/React.createElement("circle", { cx: "18", cy: "6", r: "3" }), /*#__PURE__*/React.createElement("circle", { cx: "18", cy: "18", r: "3" }), /*#__PURE__*/React.createElement("path", { d: "M8.7 10.7l6.6-3.4" }), /*#__PURE__*/React.createElement("path", { d: "M8.7 13.3l6.6 3.4" }));
-  const renderShortcutIcon = () => /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24",
-    fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
-  }, /*#__PURE__*/React.createElement("path", { d: "M15 3h6v6" }),
-     /*#__PURE__*/React.createElement("path", { d: "M10 14 21 3" }),
-     /*#__PURE__*/React.createElement("path", { d: "M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" }));
 
   // Paste preview/confirm modal -- shown after clicking '붙여넣기' and before the clipboard
   // image(s) actually upload, so the user can see what's about to be attached.
@@ -1295,17 +1297,6 @@ export function ChatGalleryModal({
         /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
           /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "공유하기"),
           /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "현재 갤러리 캘린더 공유")
-        )
-      ),
-      typeof onOpenShortcut === 'function' && /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        className: "admin-side-menu-item",
-        onClick: () => { setIsMenuOpen(false); onOpenShortcut(); }
-      },
-        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, renderShortcutIcon()),
-        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
-          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "바로가기"),
-          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "홈 화면에 빠르게 접근")
         )
       )
     ),

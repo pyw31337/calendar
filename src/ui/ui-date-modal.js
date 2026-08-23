@@ -737,6 +737,7 @@ export function DateModal({
   onReorderExpenses,
   onAddMeetingPhotos,
   onDeleteMeetingPhoto,
+  onFindChatMessageById,
   onSavePlace,
   onDeletePlace,
   onDelete,
@@ -1143,6 +1144,42 @@ export function DateModal({
   const parseFlexibleDateTokens = __deps.parseFlexibleDateTokens;
   const dateStrToHashtag = __deps.dateStrToHashtag;
 
+  // A 일정 사진's sourceMessageId can point at a chat message older than whatever's currently
+  // paginated into `chatMessages` (that array only holds the live-loaded window here -- unlike
+  // the Gallery page, this modal has no "load more" of its own to widen it), which made
+  // resolveMeetingPhotoDisplay below silently fall back to the archival snapshot's stale tags
+  // whenever that happened. Fetch any missing source messages directly by id (same lookup
+  // Gallery's own tag-save path already uses) and fold them in below.
+  const [fetchedSourceMessages, setFetchedSourceMessages] = React.useState({});
+  const fetchedSourceIdsRef = React.useRef(new Set());
+  React.useEffect(() => {
+    if (typeof onFindChatMessageById !== 'function') return;
+    const loadedIds = new Set((chatMessages || []).map(m => m && m.id).filter(Boolean));
+    const missingIds = Array.from(new Set(
+      (Array.isArray(confirmedMeetingEntry?.photos) ? confirmedMeetingEntry.photos : [])
+        .map(p => p && p.sourceMessageId)
+        .filter(id => id && !loadedIds.has(id) && !fetchedSourceIdsRef.current.has(id))
+    ));
+    if (missingIds.length === 0) return;
+    missingIds.forEach(id => fetchedSourceIdsRef.current.add(id));
+    let cancelled = false;
+    Promise.all(missingIds.map(id => Promise.resolve(onFindChatMessageById(id)).then(msg => [id, msg]))).then(pairs => {
+      if (cancelled) return;
+      const found = pairs.filter(([, msg]) => msg);
+      if (found.length === 0) return;
+      setFetchedSourceMessages(prev => {
+        const next = { ...prev };
+        found.forEach(([id, msg]) => { next[id] = msg; });
+        return next;
+      });
+    });
+    return () => { cancelled = true; };
+  }, [confirmedMeetingEntry, chatMessages, onFindChatMessageById]);
+  const chatMessagesWithFetchedSources = React.useMemo(() => {
+    const extra = Object.values(fetchedSourceMessages);
+    return extra.length === 0 ? chatMessages : [...(chatMessages || []), ...extra];
+  }, [chatMessages, fetchedSourceMessages]);
+
   const meetingPhotos = React.useMemo(() => {
     // An auto-linked 일정 사진 (sourceMessageId set) is only a reference/archival copy of a real
     // chat photo -- its own imageUrl/thumbUrl/tags fields are a snapshot from whenever it was
@@ -1154,7 +1191,7 @@ export function DateModal({
     const directPhotos = (Array.isArray(confirmedMeetingEntry?.photos) ? confirmedMeetingEntry.photos : [])
       .filter(photo => photo && (photo.imageUrl || photo.thumbUrl))
       .map(photo => {
-        const resolved = resolveMeetingPhotoDisplay(photo, chatMessages) || {};
+        const resolved = resolveMeetingPhotoDisplay(photo, chatMessagesWithFetchedSources) || {};
         return {
           ...photo,
           imageUrl: resolved.imageUrl || photo.imageUrl,
@@ -1214,7 +1251,7 @@ export function DateModal({
     });
 
     return [...directPhotos, ...chatPhotos].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-  }, [confirmedMeetingEntry, chatMessages, dateStr]);
+  }, [confirmedMeetingEntry, chatMessages, chatMessagesWithFetchedSources, dateStr]);
   const meetingPhotoInputRef = React.useRef(null);
   const [isSavingMeetingPhotos, setIsSavingMeetingPhotos] = React.useState(false);
   const hasClipboardImage = useClipboardHasImage(activeTab === 'photo');

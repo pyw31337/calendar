@@ -962,7 +962,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
     // and eagerly firing a count() query for every photo as the user swipes past it (most of
     // which never get a second look) added real extra Firestore traffic for no visible benefit.
     if (!showInfo) return;
-    if (!currentMeta || currentMeta.source === 'meeting' || currentMeta.source === 'memo') return;
+    if (!currentMeta || currentMeta.source === 'meeting' || currentMeta.source === 'memo' || currentMeta.meetingDate) return;
     if (currentMeta.uploadSource === 'gallery') return; // uses the photo-ordinal fetch below instead
     // 'meeting'-uploadSource photos are hidden from the chat feed (see ChatRoomView's render
     // filter), so a chat ordinal for them is never shown/clickable -- no point fetching it.
@@ -1000,7 +1000,12 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
   }, [showInfo, currentMeta, onGetGalleryPhotoOrdinal]);
   const sourceInfo = React.useMemo(() => {
     if (!currentMeta) return null;
-    if (currentMeta.source === 'meeting') {
+    // A photo tagged with a date hashtag is auto-linked onto that date's meeting record (see
+    // linkTaggedImageToMeetingDates, app-main.js) while still being a real chat/gallery message --
+    // Gallery's dedup keeps the chat/gallery copy (source stays whatever it was) but carries the
+    // meetingDate over, so this checks meetingDate directly rather than requiring source==='meeting'
+    // (which only the DateModal 사진 tab's own archival-reference entries actually have).
+    if (currentMeta.source === 'meeting' || currentMeta.meetingDate) {
       const dateParts = currentMeta.meetingDate ? getShortTitleParts(currentMeta.meetingDate) : null;
       return {
         label: dateParts ? `일정 ${dateParts.year}${dateParts.rest}` : '일정 사진으로 업로드됨',

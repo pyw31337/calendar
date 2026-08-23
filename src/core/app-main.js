@@ -275,6 +275,7 @@ const upsertPlaceMemoEntry = GATHER_APP_UTILS.upsertPlaceMemoEntry || function u
   const entries = parsePlaceMemoEntries(existingMemo);
   const idx = entries.findIndex(entry => normalizePlaceDateForSort(entry.date) === targetNorm);
   if (idx >= 0) entries[idx] = { date: entries[idx].date || memoDate, note: cleanNote };
+  else if (entries.length === 1 && !entries[0].date) entries[0] = { date: memoDate, note: cleanNote };
   else entries.push({ date: memoDate, note: cleanNote });
   return serializePlaceMemoEntries(entries);
 };
@@ -287,7 +288,9 @@ const getPlaceMemoEntryForDate = GATHER_APP_UTILS.getPlaceMemoEntryForDate || fu
   const targetNorm = normalizePlaceDateForSort(dateStr);
   const entries = parsePlaceMemoEntries(memo);
   const entry = entries.find(e => normalizePlaceDateForSort(e.date) === targetNorm);
-  return entry ? entry.note : '';
+  if (entry) return entry.note;
+  if (entries.length === 1 && !entries[0].date) return entries[0].note;
+  return '';
 };
 
 const KNOWN_PLACE_PARTICIPANT_NAME_TAGS = [
@@ -891,16 +894,6 @@ function notifyMeetingReminder(calendar, meeting, whenLabel) {
   return body;
 }
 
-// Home screen / desktop shortcut creation. Only Chromium-based browsers (Chrome, Edge, and
-// Chromium-based mobile browsers) expose a JS-triggerable native install prompt via
-// beforeinstallprompt -- Safari and Firefox have no such API by design and require the user
-// to go through their own browser UI manually, so those get step-by-step instructions instead.
-// The event itself is captured as early as possible by the pwa-install-capture bootstrap
-// script in <head> (see its comment for why a listener down here would be too late) and
-// stashed on window.__deferredInstallPrompt -- read fresh at click time below rather than
-// cached into a local, since a late-firing event (e.g. after the manifest updates once real
-// calendar data loads) still needs to be picked up.
-
 // Registers sw.js, which only caches static assets (icons/manifests) -- never index.html
 // itself, since this app deliberately serves its HTML as no-cache (see sw.js for why). Safe to
 // register unconditionally: browsers without service worker support simply skip this.
@@ -908,61 +901,6 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw.js').catch(e => console.warn('Service worker registration failed:', e));
   });
-}
-
-function detectBrowserForShortcutInstructions(...args) {
-  const f = (window.GATHER_APP_UTILS || {}).detectBrowserForShortcutInstructions;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function getShortcutInstructions(...args) {
-  const f = (window.GATHER_APP_UTILS || {}).getShortcutInstructions;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function canUseNativeInstallPrompt(...args) {
-  const f = (window.GATHER_APP_UTILS || {}).canUseNativeInstallPrompt;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function waitForDeferredInstallPrompt(timeoutMs = 1800) {
-  if (window.__deferredInstallPrompt) return Promise.resolve(window.__deferredInstallPrompt);
-  return new Promise(resolve => {
-    let settled = false;
-    const done = promptEvent => {
-      if (settled) return;
-      settled = true;
-      window.removeEventListener('beforeinstallprompt', onPrompt);
-      clearTimeout(timer);
-      resolve(promptEvent || window.__deferredInstallPrompt || null);
-    };
-    const onPrompt = e => {
-      e.preventDefault();
-      window.__deferredInstallPrompt = e;
-      done(e);
-    };
-    const timer = setTimeout(() => done(null), timeoutMs);
-    window.addEventListener('beforeinstallprompt', onPrompt, { once: true });
-  });
-}
-
-async function tryCreateShortcut(notify) {
-  const shortcutKind = detectBrowserForShortcutInstructions();
-  const deferredInstallPrompt = canUseNativeInstallPrompt(shortcutKind)
-    ? await waitForDeferredInstallPrompt()
-    : null;
-  if (deferredInstallPrompt) {
-    try {
-      deferredInstallPrompt.prompt();
-      const choice = await deferredInstallPrompt.userChoice;
-      window.__deferredInstallPrompt = null;
-      if (choice?.outcome === 'accepted') {
-        if (notify) notify('바로가기가 생성되었습니다!');
-        return;
-      }
-    } catch (e) {
-      console.warn('Native install prompt failed:', e);
-    }
-  }
-  const instructions = getShortcutInstructions(shortcutKind);
-  if (notify) notify(instructions);
 }
 
 function getContrastTextColor(...args) {
@@ -7760,6 +7698,7 @@ function App() {
       onDeleteExpense: handleDeleteExpense,
       onReorderExpenses: handleReorderExpenses,
       onAddMeetingPhotos: handleAddMeetingPhotos,
+      onFindChatMessageById: findChatMessageById,
       setActiveLightbox: setActiveLightbox,
       initialTab: dateModalInitialTab,
       onSavePlace: handleSavePlace,
@@ -8044,7 +7983,6 @@ function App() {
         onOpenShare: () => {
           if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 공유 정보를 확인해 주세요.')) setIsShareOpen(true);
         },
-        onOpenShortcut: () => tryCreateShortcut(msg => showToast(msg, 'info', 5000)),
         setActiveLightbox: setActiveLightbox,
         hasMoreOlderChat: hasMoreOlderChat,
         loadingOlderChat: loadingOlderChat,
@@ -8248,10 +8186,6 @@ function App() {
       setIsMainSideMenuOpen(false);
       if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 공유 정보를 확인해 주세요.')) setIsShareOpen(true);
     },
-    onCreateShortcut: () => {
-      setIsMainSideMenuOpen(false);
-      tryCreateShortcut(msg => showToast(msg, 'info', 5000));
-    },
     onOpenAdmin: () => window.open(`${window.location.pathname}?admin=1`, '_blank', 'noopener,noreferrer'),
     onOpenGallery: () => changeView('gallery'),
     onChangeView: changeView,
@@ -8273,7 +8207,6 @@ function App() {
     onOpenShare: () => {
       if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 공유 정보를 확인해 주세요.')) setIsShareOpen(true);
     },
-    onOpenShortcut: () => tryCreateShortcut(msg => showToast(msg, 'info', 5000)),
     setActiveLightbox: setActiveLightbox
   }), isGuideOpen && /*#__PURE__*/React.createElement(UserManualOverlay, {
     calendar: activeCal,
