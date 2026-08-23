@@ -738,6 +738,9 @@ export function DateModal({
   onAddMeetingPhotos,
   onDeleteMeetingPhoto,
   onFindChatMessageById,
+  onLoadOlderChat,
+  hasMoreOlderChat = false,
+  loadingOlderChat = false,
   onSavePlace,
   onDeletePlace,
   onDelete,
@@ -1179,6 +1182,25 @@ export function DateModal({
     const extra = Object.values(fetchedSourceMessages);
     return extra.length === 0 ? chatMessages : [...(chatMessages || []), ...extra];
   }, [chatMessages, fetchedSourceMessages]);
+
+  // meetingPhotos below also finds photos purely by scanning chatMessages for this date's
+  // hashtag (no sourceMessageId to fetch by, unlike the archival-copy case above) -- but outside
+  // the 채팅/갤러리 view, the live chat listener only keeps the most recent ~10 messages loaded
+  // (see app-main.js's chatLimit), so a tagged photo sitting further back than that was silently
+  // invisible here even though the exact same tag scan on the Gallery page (which keeps a much
+  // wider window, and pages further back on its own) found it. Page back through chat history,
+  // same "이전 채팅 더보기" mechanism Gallery already uses, until either there's nothing older
+  // left or the oldest loaded message is already older than this date -- at that point every
+  // message that could possibly carry this date's hashtag has been loaded.
+  React.useEffect(() => {
+    if (activeTab !== 'photo') return;
+    if (typeof onLoadOlderChat !== 'function' || !hasMoreOlderChat || loadingOlderChat) return;
+    const oldestLoadedTs = chatMessages && chatMessages.length > 0 ? Number(chatMessages[0].timestamp || 0) : 0;
+    const targetDayStartTs = new Date(`${dateStr}T00:00:00`).getTime();
+    if (!oldestLoadedTs || !Number.isFinite(targetDayStartTs) || oldestLoadedTs > targetDayStartTs) {
+      onLoadOlderChat();
+    }
+  }, [activeTab, dateStr, hasMoreOlderChat, loadingOlderChat, onLoadOlderChat, chatMessages]);
 
   const meetingPhotos = React.useMemo(() => {
     // An auto-linked 일정 사진 (sourceMessageId set) is only a reference/archival copy of a real
