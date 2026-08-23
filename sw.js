@@ -67,13 +67,16 @@ self.addEventListener('fetch', event => {
 
   const url = new URL(req.url);
   const isStaticAsset = url.origin === self.location.origin && STATIC_ASSETS.some(asset => url.pathname.endsWith('/' + asset) || url.pathname.endsWith(asset));
-  // The app's own CSS/split-JS files (assets/app*.js, assets/app.css) are cache-busted with a
-  // ?v=<date>-splitN query string on every deploy -- a fresh deploy always requests a brand new
-  // URL, so caching them here can never serve stale content the way caching index.html would
-  // (see the note at the top of this file for why index.html itself stays excluded). Matched by
-  // pathname so it covers each split file without hardcoding all six names.
-  const isVersionedAppAsset = url.origin === self.location.origin && /\/assets\/app[\w-]*\.(?:js|css)$/.test(url.pathname);
-  if (!isStaticAsset && !isVersionedAppAsset) return;
+  // Every file Vite emits into dist/assets/ is content-hashed (app-main-<hash>.js,
+  // index-<hash>.js, vendor-react-dom-<hash>.js, ui-*-<hash>.js, index-<hash>.css, ...) -- a
+  // fresh deploy that changes a file's content always produces a brand-new URL, so caching all
+  // of them here can never serve stale content the way caching index.html would (see the note at
+  // the top of this file for why index.html itself stays excluded). Matched by directory rather
+  // than a filename prefix: an earlier version of this only matched names starting with "app",
+  // which silently excluded the entry chunk and every UI/vendor chunk -- everything except the
+  // 7 files under that prefix went uncached, so a reloaded offline PWA never actually booted.
+  const isViteAsset = url.origin === self.location.origin && /\/assets\/[^/]+\.(?:js|css)$/.test(url.pathname);
+  if (!isStaticAsset && !isViteAsset) return;
 
   // Cache-first for the static set, with a background revalidation so an icon/manifest update
   // still reaches users on their next load rather than being stuck forever.
