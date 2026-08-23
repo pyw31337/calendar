@@ -495,6 +495,10 @@ function verifyAdminPasswordRemote(...args) {
   const f = __gatherUiDeps().verifyAdminPasswordRemote || GATHER_APP_UTILS.verifyAdminPasswordRemote;
   return typeof f === 'function' ? f(...args) : undefined;
 }
+function rebuildCalendarToTimestamp(...args) {
+  const f = __gatherUiDeps().rebuildCalendarToTimestamp || GATHER_APP_UTILS.rebuildCalendarToTimestamp;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
 
 const ADMIN_MESSAGE_LIVE_LIMIT = (__gatherUiDeps().ADMIN_MESSAGE_LIVE_LIMIT
   || (window.__GATHER_ADMIN_LIMITS && window.__GATHER_ADMIN_LIMITS.ADMIN_MESSAGE_LIVE_LIMIT)
@@ -1692,7 +1696,6 @@ export function AdminUnifiedSearchResultsView({
     if (current && current.count > 0) return;
     const firstNonEmpty = tabDefs.find(t => t.count > 0);
     if (firstNonEmpty) setActiveTab(firstNonEmpty.key);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q, allMatches]);
 
   return /*#__PURE__*/React.createElement("div", {

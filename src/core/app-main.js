@@ -121,7 +121,7 @@ const getPlaceCategoryIcon = GATHER_APP_UTILS.getPlaceCategoryIcon || function g
   if (!category) return PLACE_CATEGORY_ICONS.etc;
   const name = String(category.name || '');
   let hasEmoji = false;
-  try { hasEmoji = /\p{Extended_Pictographic}/u.test(name); } catch (e) { hasEmoji = false; }
+  try { hasEmoji = /\p{Extended_Pictographic}/u.test(name); } catch (e) {}
   if (hasEmoji) return '';
   const id = String(category.id || '').toLowerCase();
   if (PLACE_CATEGORY_ICONS[id]) return PLACE_CATEGORY_ICONS[id];
@@ -204,7 +204,7 @@ function unionPlaces(calendar, subcollectionPlaces) {
 // always normalized back to the canonical 'YY.MM.DD' shape below so every other place-date
 // helper (normalizePlaceDateForSort, formatPlaceBadgeDate, the sort comparator in PlacesView)
 // keeps working against the one shape they already expect, without having to touch them.
-const MEMO_DATE_RE = GATHER_APP_UTILS.MEMO_DATE_RE || /(\d{4}|\d{2})[.\-](\d{2})[.\-](\d{2})/;
+const MEMO_DATE_RE = GATHER_APP_UTILS.MEMO_DATE_RE || /(\d{4}|\d{2})[.-](\d{2})[.-](\d{2})/;
 const normalizeMemoDateMatch = GATHER_APP_UTILS.normalizeMemoDateMatch || function normalizeMemoDateMatch(match) {
   if (!match) return null;
   let [, y, m, d] = match;
@@ -688,7 +688,7 @@ function probeNotificationCapability(...args) {
 function urlBase64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - base64String.length % 4) % 4);
   const base64 = (base64String + padding)
-    .replace(/\-/g, '+')
+    .replace(/-/g, '+')
     .replace(/_/g, '/');
   const rawData = window.atob(base64);
   const outputArray = new Uint8Array(rawData.length);
@@ -1553,7 +1553,7 @@ function tokenizeRichFieldText(text) {
   let match;
   while ((match = urlRe.exec(source)) !== null) {
     if (match.index > last) chunks.push({ type: 'raw', value: source.slice(last, match.index) });
-    let href = match[0].replace(/[.,);\]\}]+$/g, '');
+    let href = match[0].replace(/[.,);\]}]+$/g, '');
     chunks.push({ type: 'url', value: href });
     last = match.index + match[0].length;
   }
@@ -2967,7 +2967,7 @@ async function fetchImageShareDocument(shareId) {
   if (!shareId || !/^img_[A-Za-z0-9_-]{3,180}$/.test(shareId)) return null;
   const resolveMessageShare = async share => {
     if (!share || share.imageUrl || share.source !== 'message' || !share.calendarId || !share.messageId) return share;
-    let msg = null;
+    let msg;
     if (firebaseDb) {
       const snap = await firebaseDb.collection('calendars').doc(`cal_${share.calendarId}`).collection('messages').doc(share.messageId).get();
       msg = snap.exists ? snap.data() : null;
@@ -4686,7 +4686,6 @@ function App() {
       setSelectedDate(dateParam);
       setIsModalOpen(true);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // The header is now position:fixed (full-bleed), so page content needs top padding equal to
@@ -8001,7 +8000,8 @@ function App() {
         onDecreaseFont: () => setFontScalePercent(prev => Math.max(80, prev - 10)),
         onIncreaseFont: () => setFontScalePercent(prev => Math.min(130, prev + 10)),
         isChatNotifyEnabled: mainNotifPermission === 'granted' && mainChatNotifyEnabled,
-        onToggleChatNotifications: handleMainToggleNotifications
+        onToggleChatNotifications: handleMainToggleNotifications,
+        showToast: showToast
       }),
       activeLightbox ? /*#__PURE__*/React.createElement(Lightbox, {
         urls: activeLightbox.urls,
@@ -8212,7 +8212,8 @@ function App() {
     onOpenShare: () => {
       if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 공유 정보를 확인해 주세요.')) setIsShareOpen(true);
     },
-    setActiveLightbox: setActiveLightbox
+    setActiveLightbox: setActiveLightbox,
+    showToast: showToast
   }), isGuideOpen && /*#__PURE__*/React.createElement(UserManualOverlay, {
     calendar: activeCal,
     onClose: () => setIsGuideOpen(false)
@@ -9709,7 +9710,7 @@ async function migrateBase64ChatImagesForCalendar(calId, { maxMessages = 40 } = 
 }
 
 
-async function readClipboardImageFiles() {
+async function readClipboardImageFiles(showToast) {
   if (typeof navigator === 'undefined' || !navigator.clipboard) {
     if (typeof showToast === 'function') showToast('클립보드 접근을 지원하지 않는 브라우저입니다.', 'error');
     return [];
@@ -10159,7 +10160,10 @@ function isEmojiOnlyChatText(text) {
   try {
     return /^[\p{Emoji_Presentation}\p{Extended_Pictographic}\uFE0F\u200D\s]+$/u.test(compact);
   } catch (e) {
-    return /^[\u203C-\u3299\uD83C-\uDBFF\uDC00-\uDFFF\uFE0F\u200D\s]+$/.test(compact);
+    // FE0F/200D are matched as individual quantified class members here, not as part of a
+    // combined grapheme, so the character class below is intentional.
+    // eslint-disable-next-line no-misleading-character-class
+    return /^[\u203C-\u3299\uD83C-\uDBFF\uDC00-\uDFFF\uFE0F\u200D\s]+$/u.test(compact);
   }
 }
 
@@ -11922,39 +11926,20 @@ const FOOTER_FAMILY_LINKS = [
 
 function bindGatherUiDeps() {
   window.GATHER_UI_DEPS = Object.assign({}, window.GATHER_UI_DEPS || {}, {
-    ResizableModalContainer: typeof ResizableModalContainer === 'function' ? ResizableModalContainer : null,
     verifyAdminPasswordRemote: typeof verifyAdminPasswordRemote === 'function' ? verifyAdminPasswordRemote : null,
-    SmallXIcon: typeof SmallXIcon === 'function' ? SmallXIcon : null,
-    LinkIcon: typeof LinkIcon === 'function' ? LinkIcon : null,
+    rebuildCalendarToTimestamp: typeof rebuildCalendarToTimestamp === 'function' ? rebuildCalendarToTimestamp : null,
     copyTextToClipboard: typeof copyTextToClipboard === 'function' ? copyTextToClipboard : null,
     getCalendarShareUrl: typeof getCalendarShareUrl === 'function' ? getCalendarShareUrl : null,
     getViewShareUrl: typeof getViewShareUrl === 'function' ? getViewShareUrl : null,
-    ImageUrlModal: typeof ImageUrlModal === 'function' ? ImageUrlModal : null,
     buildLightboxImageInfo: typeof buildLightboxImageInfo === 'function' ? buildLightboxImageInfo : null,
-    normalizeTagsForDisplay: typeof normalizeTagsForDisplay === 'function' ? normalizeTagsForDisplay : null,
-    MoonStarsIcon: typeof MoonStarsIcon === 'function' ? MoonStarsIcon : null,
-    TextResizeIcon: typeof TextResizeIcon === 'function' ? TextResizeIcon : null,
-    BellIcon: typeof BellIcon === 'function' ? BellIcon : null,
-    ToggleSwitch: typeof ToggleSwitch === 'function' ? ToggleSwitch : null,
-    MenuIcon: typeof MenuIcon === 'function' ? MenuIcon : null,
-    CalendarCogIcon: typeof CalendarCogIcon === 'function' ? CalendarCogIcon : null,
-    MapCogIcon: typeof MapCogIcon === 'function' ? MapCogIcon : null,
-    GiftIcon: typeof GiftIcon === 'function' ? GiftIcon : null,
-    LockIcon: typeof LockIcon === 'function' ? LockIcon : null,
-    ExternalLinkIcon: typeof ExternalLinkIcon === 'function' ? ExternalLinkIcon : null,
-    SettingsIcon: typeof SettingsIcon === 'function' ? SettingsIcon : null,
-    MegaphoneIcon: typeof MegaphoneIcon === 'function' ? MegaphoneIcon : null,
     getMemoItemShareUrl: typeof getMemoItemShareUrl === 'function' ? getMemoItemShareUrl : null,
     WeatherBadge: typeof WeatherBadge === 'function' ? WeatherBadge : null,
     WeatherLocationModal: typeof WeatherLocationModal === 'function' ? WeatherLocationModal : null,
     ChatGalleryModal: typeof ChatGalleryModal === 'function' ? ChatGalleryModal : null,
-    LinkPreviewCard: typeof LinkPreviewCard === 'function' ? LinkPreviewCard : null,
     getMessageImageEntries: typeof getMessageImageEntries === 'function' ? getMessageImageEntries : null,
     resolveMeetingPhotoDisplay: typeof resolveMeetingPhotoDisplay === 'function' ? resolveMeetingPhotoDisplay : null,
-    DateModal: typeof DateModal === 'function' ? DateModal : null,
     MemoView: typeof MemoView === 'function' ? MemoView : null,
     ChatRoomView: typeof ChatRoomView === 'function' ? ChatRoomView : null,
-    PencilIcon: typeof PencilIcon === 'function' ? PencilIcon : null,
     getPinnedNotices: typeof getPinnedNotices === 'function' ? getPinnedNotices : null,
     getChatLastReadTimestamp: typeof getChatLastReadTimestamp === 'function' ? getChatLastReadTimestamp : null,
     setChatLastReadTimestamp: typeof setChatLastReadTimestamp === 'function' ? setChatLastReadTimestamp : null,
@@ -11965,160 +11950,59 @@ function bindGatherUiDeps() {
     confetti: typeof confetti === 'function' ? confetti : (typeof window !== 'undefined' ? window.confetti : null),
     CONFETTI_Z_INDEX: typeof CONFETTI_Z_INDEX !== 'undefined' ? CONFETTI_Z_INDEX : 9999,
     AdminDashboard: typeof AdminDashboard === 'function' ? AdminDashboard : null,
-    SearchResultLogRow: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SearchResultLogRow) || (typeof SearchResultLogRow === 'function' ? SearchResultLogRow : null),
-    TikTokEmbedWidget: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.TikTokEmbedWidget) || (typeof TikTokEmbedWidget === 'function' ? TikTokEmbedWidget : null),
-    UrlCapsuleBadge: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.UrlCapsuleBadge) || (typeof UrlCapsuleBadge === 'function' ? UrlCapsuleBadge : null),
-    ParticipantPickerButton: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ParticipantPickerButton) || (typeof ParticipantPickerButton === 'function' ? ParticipantPickerButton : null),
     DateCapsuleBadge: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.DateCapsuleBadge) || (typeof DateCapsuleBadge === 'function' ? DateCapsuleBadge : null),
-    MenuIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MenuIcon) || (typeof MenuIcon === 'function' ? MenuIcon : null),
     NotepadTextIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.NotepadTextIcon) || (typeof NotepadTextIcon === 'function' ? NotepadTextIcon : null),
-    ChatSectionIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ChatSectionIcon) || (typeof ChatSectionIcon === 'function' ? ChatSectionIcon : null),
     LinkIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LinkIcon) || (typeof LinkIcon === 'function' ? LinkIcon : null),
-    MessageCommentIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MessageCommentIcon) || (typeof MessageCommentIcon === 'function' ? MessageCommentIcon : null),
-    PencilIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PencilIcon) || (typeof PencilIcon === 'function' ? PencilIcon : null),
-    BuildingIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.BuildingIcon) || (typeof BuildingIcon === 'function' ? BuildingIcon : null),
-    BackArrowIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.BackArrowIcon) || (typeof BackArrowIcon === 'function' ? BackArrowIcon : null),
     SunIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SunIcon) || (typeof SunIcon === 'function' ? SunIcon : null),
     CloudIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CloudIcon) || (typeof CloudIcon === 'function' ? CloudIcon : null),
     MistIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MistIcon) || (typeof MistIcon === 'function' ? MistIcon : null),
     CloudRainIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CloudRainIcon) || (typeof CloudRainIcon === 'function' ? CloudRainIcon : null),
     SnowflakeIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SnowflakeIcon) || (typeof SnowflakeIcon === 'function' ? SnowflakeIcon : null),
     CloudLightningIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CloudLightningIcon) || (typeof CloudLightningIcon === 'function' ? CloudLightningIcon : null),
-    SettingsIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SettingsIcon) || (typeof SettingsIcon === 'function' ? SettingsIcon : null),
     MapCogIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MapCogIcon) || (typeof MapCogIcon === 'function' ? MapCogIcon : null),
     GiftIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.GiftIcon) || (typeof GiftIcon === 'function' ? GiftIcon : null),
     MoonStarsIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MoonStarsIcon) || (typeof MoonStarsIcon === 'function' ? MoonStarsIcon : null),
     TextResizeIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.TextResizeIcon) || (typeof TextResizeIcon === 'function' ? TextResizeIcon : null),
     BellIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.BellIcon) || (typeof BellIcon === 'function' ? BellIcon : null),
-    SearchIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SearchIcon) || (typeof SearchIcon === 'function' ? SearchIcon : null),
-    CalendarCheckIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CalendarCheckIcon) || (typeof CalendarCheckIcon === 'function' ? CalendarCheckIcon : null),
-    LockIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LockIcon) || (typeof LockIcon === 'function' ? LockIcon : null),
-    LogoutIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LogoutIcon) || (typeof LogoutIcon === 'function' ? LogoutIcon : null),
-    RefreshIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.RefreshIcon) || (typeof RefreshIcon === 'function' ? RefreshIcon : null),
-    AdminFilledMenuIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AdminFilledMenuIcon) || (typeof AdminFilledMenuIcon === 'function' ? AdminFilledMenuIcon : null),
-    EmojiPickerIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.EmojiPickerIcon) || (typeof EmojiPickerIcon === 'function' ? EmojiPickerIcon : null),
-    ExternalLinkIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ExternalLinkIcon) || (typeof ExternalLinkIcon === 'function' ? ExternalLinkIcon : null),
-    ShareIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ShareIcon) || (typeof ShareIcon === 'function' ? ShareIcon : null),
     WalletIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.WalletIcon) || (typeof WalletIcon === 'function' ? WalletIcon : null),
-    CoinIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CoinIcon) || (typeof CoinIcon === 'function' ? CoinIcon : null),
-    BanknoteArrowUpIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.BanknoteArrowUpIcon) || (typeof BanknoteArrowUpIcon === 'function' ? BanknoteArrowUpIcon : null),
-    BanknoteArrowDownIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.BanknoteArrowDownIcon) || (typeof BanknoteArrowDownIcon === 'function' ? BanknoteArrowDownIcon : null),
-    PiggyBankIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PiggyBankIcon) || (typeof PiggyBankIcon === 'function' ? PiggyBankIcon : null),
-    ChartBarIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ChartBarIcon) || (typeof ChartBarIcon === 'function' ? ChartBarIcon : null),
-    ChartPieIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ChartPieIcon) || (typeof ChartPieIcon === 'function' ? ChartPieIcon : null),
-    CalendarCogIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CalendarCogIcon) || (typeof CalendarCogIcon === 'function' ? CalendarCogIcon : null),
-    CalendarSearchIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CalendarSearchIcon) || (typeof CalendarSearchIcon === 'function' ? CalendarSearchIcon : null),
-    TrophyIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.TrophyIcon) || (typeof TrophyIcon === 'function' ? TrophyIcon : null),
-    PodiumIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PodiumIcon) || (typeof PodiumIcon === 'function' ? PodiumIcon : null),
-    CloudDataConnectionIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CloudDataConnectionIcon) || (typeof CloudDataConnectionIcon === 'function' ? CloudDataConnectionIcon : null),
-    LogIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LogIcon) || (typeof LogIcon === 'function' ? LogIcon : null),
-    HourglassIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.HourglassIcon) || (typeof HourglassIcon === 'function' ? HourglassIcon : null),
-    AlertTriangleIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AlertTriangleIcon) || (typeof AlertTriangleIcon === 'function' ? AlertTriangleIcon : null),
-    ShieldCheckIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ShieldCheckIcon) || (typeof ShieldCheckIcon === 'function' ? ShieldCheckIcon : null),
-    CalendarExportIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CalendarExportIcon) || (typeof CalendarExportIcon === 'function' ? CalendarExportIcon : null),
-    GalleryIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.GalleryIcon) || (typeof GalleryIcon === 'function' ? GalleryIcon : null),
-    PollSectionIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PollSectionIcon) || (typeof PollSectionIcon === 'function' ? PollSectionIcon : null),
-    LineHeightIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LineHeightIcon) || (typeof LineHeightIcon === 'function' ? LineHeightIcon : null),
     MegaphoneIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MegaphoneIcon) || (typeof MegaphoneIcon === 'function' ? MegaphoneIcon : null),
-    SmallXIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SmallXIcon) || (typeof SmallXIcon === 'function' ? SmallXIcon : null),
-    PlaceSectionIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PlaceSectionIcon) || (typeof PlaceSectionIcon === 'function' ? PlaceSectionIcon : null),
-    ThreeLinesIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ThreeLinesIcon) || (typeof ThreeLinesIcon === 'function' ? ThreeLinesIcon : null),
-    PlaceCategoryMarkerIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PlaceCategoryMarkerIcon) || (typeof PlaceCategoryMarkerIcon === 'function' ? PlaceCategoryMarkerIcon : null),
     CctvIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CctvIcon) || (typeof CctvIcon === 'function' ? CctvIcon : null),
     DicesIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.DicesIcon) || (typeof DicesIcon === 'function' ? DicesIcon : null),
-    ResizableModalContainer: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ResizableModalContainer) || (typeof ResizableModalContainer === 'function' ? ResizableModalContainer : null),
-    AutoGrowTextarea: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AutoGrowTextarea) || (typeof AutoGrowTextarea === 'function' ? AutoGrowTextarea : null),
-    FormAddEditActionButtons: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.FormAddEditActionButtons) || (typeof FormAddEditActionButtons === 'function' ? FormAddEditActionButtons : null),
-    SegmentedToggle: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SegmentedToggle) || (typeof SegmentedToggle === 'function' ? SegmentedToggle : null),
-    ItemEditDeleteActions: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ItemEditDeleteActions) || (typeof ItemEditDeleteActions === 'function' ? ItemEditDeleteActions : null),
-    GamifiedConfirmButtonContent: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.GamifiedConfirmButtonContent) || (typeof GamifiedConfirmButtonContent === 'function' ? GamifiedConfirmButtonContent : null),
-    LinkPreviewCard: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LinkPreviewCard) || (typeof LinkPreviewCard === 'function' ? LinkPreviewCard : null),
-    LinkPreviewProgressOverlay: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LinkPreviewProgressOverlay) || (typeof LinkPreviewProgressOverlay === 'function' ? LinkPreviewProgressOverlay : null),
     DeleteConfirmModal: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.DeleteConfirmModal) || (typeof DeleteConfirmModal === 'function' ? DeleteConfirmModal : null),
     AdminLoginGate: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AdminLoginGate) || (typeof AdminLoginGate === 'function' ? AdminLoginGate : null),
-    DonutChart: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.DonutChart) || (typeof DonutChart === 'function' ? DonutChart : null),
-    ColorSwatchPicker: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ColorSwatchPicker) || (typeof ColorSwatchPicker === 'function' ? ColorSwatchPicker : null),
     StickyVideoBox: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.StickyVideoBox) || (typeof StickyVideoBox === 'function' ? StickyVideoBox : null),
     PollVoterSheet: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PollVoterSheet) || (typeof PollVoterSheet === 'function' ? PollVoterSheet : null),
     OperationProgressOverlay: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.OperationProgressOverlay) || (typeof OperationProgressOverlay === 'function' ? OperationProgressOverlay : null),
     ToggleSwitch: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ToggleSwitch) || (typeof ToggleSwitch === 'function' ? ToggleSwitch : null),
     Footer: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.Footer) || (typeof Footer === 'function' ? Footer : null),
-    AdminCreateCalendarModal: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AdminCreateCalendarModal) || (typeof AdminCreateCalendarModal === 'function' ? AdminCreateCalendarModal : null),
     AdminModal: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AdminModal) || (typeof AdminModal === 'function' ? AdminModal : null),
-    AdminRestorePhraseModal: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AdminRestorePhraseModal) || (typeof AdminRestorePhraseModal === 'function' ? AdminRestorePhraseModal : null),
-    AdminUnifiedSearchModal: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AdminUnifiedSearchModal) || (typeof AdminUnifiedSearchModal === 'function' ? AdminUnifiedSearchModal : null),
-    AdminUnifiedSearchResultsView: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AdminUnifiedSearchResultsView) || (typeof AdminUnifiedSearchResultsView === 'function' ? AdminUnifiedSearchResultsView : null),
-    AlertTriangleIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AlertTriangleIcon) || (typeof AlertTriangleIcon === 'function' ? AlertTriangleIcon : null),
-    BackArrowIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.BackArrowIcon) || (typeof BackArrowIcon === 'function' ? BackArrowIcon : null),
-    CalendarCogIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CalendarCogIcon) || (typeof CalendarCogIcon === 'function' ? CalendarCogIcon : null),
     CalendarExportIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CalendarExportIcon) || (typeof CalendarExportIcon === 'function' ? CalendarExportIcon : null),
-    CalendarGrid: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CalendarGrid) || (typeof CalendarGrid === 'function' ? CalendarGrid : null),
     CalendarSearchIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CalendarSearchIcon) || (typeof CalendarSearchIcon === 'function' ? CalendarSearchIcon : null),
-    ColorSwatchPicker: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ColorSwatchPicker) || (typeof ColorSwatchPicker === 'function' ? ColorSwatchPicker : null),
     DateModal: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.DateModal) || (typeof DateModal === 'function' ? DateModal : null),
-    DeadlineDateTimePicker: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.DeadlineDateTimePicker) || (typeof DeadlineDateTimePicker === 'function' ? DeadlineDateTimePicker : null),
     DirectChatMediaText: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.DirectChatMediaText) || (typeof DirectChatMediaText === 'function' ? DirectChatMediaText : null),
-    HourglassIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.HourglassIcon) || (typeof HourglassIcon === 'function' ? HourglassIcon : null),
     ImageUrlModal: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ImageUrlModal) || (typeof ImageUrlModal === 'function' ? ImageUrlModal : null),
-    LinkPreviewCard: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LinkPreviewCard) || (typeof LinkPreviewCard === 'function' ? LinkPreviewCard : null),
     LogIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LogIcon) || (typeof LogIcon === 'function' ? LogIcon : null),
     MenuIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MenuIcon) || (typeof MenuIcon === 'function' ? MenuIcon : null),
-    PlaceMapView: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PlaceMapView) || (typeof PlaceMapView === 'function' ? PlaceMapView : null),
-    PlaceSectionIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PlaceSectionIcon) || (typeof PlaceSectionIcon === 'function' ? PlaceSectionIcon : null),
     PlacesSection: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PlacesSection) || (typeof PlacesSection === 'function' ? PlacesSection : null),
-    PollModal: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PollModal) || (typeof PollModal === 'function' ? PollModal : null),
-    PollSectionIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PollSectionIcon) || (typeof PollSectionIcon === 'function' ? PollSectionIcon : null),
-    ResizableModalContainer: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ResizableModalContainer) || (typeof ResizableModalContainer === 'function' ? ResizableModalContainer : null),
-    SearchCategoryTabs: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SearchCategoryTabs) || (typeof SearchCategoryTabs === 'function' ? SearchCategoryTabs : null),
-    SearchIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SearchIcon) || (typeof SearchIcon === 'function' ? SearchIcon : null),
-    SearchResultLogRow: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SearchResultLogRow) || (typeof SearchResultLogRow === 'function' ? SearchResultLogRow : null),
-    SectionCountBadge: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SectionCountBadge) || (typeof SectionCountBadge === 'function' ? SectionCountBadge : null),
-    SectionToggleButton: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SectionToggleButton) || (typeof SectionToggleButton === 'function' ? SectionToggleButton : null),
-    SettingsIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SettingsIcon) || (typeof SettingsIcon === 'function' ? SettingsIcon : null),
-    SimpleBottomSheetPicker: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SimpleBottomSheetPicker) || (typeof SimpleBottomSheetPicker === 'function' ? SimpleBottomSheetPicker : null),
-    SmallXIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SmallXIcon) || (typeof SmallXIcon === 'function' ? SmallXIcon : null),
     TikTokEmbedWidget: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.TikTokEmbedWidget) || (typeof TikTokEmbedWidget === 'function' ? TikTokEmbedWidget : null),
     AnniversaryModal: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AnniversaryModal) || (typeof AnniversaryModal === 'function' ? AnniversaryModal : null),
-    BackArrowIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.BackArrowIcon) || (typeof BackArrowIcon === 'function' ? BackArrowIcon : null),
     BanknoteArrowDownIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.BanknoteArrowDownIcon) || (typeof BanknoteArrowDownIcon === 'function' ? BanknoteArrowDownIcon : null),
     BanknoteArrowUpIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.BanknoteArrowUpIcon) || (typeof BanknoteArrowUpIcon === 'function' ? BanknoteArrowUpIcon : null),
     CalendarCheckIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CalendarCheckIcon) || (typeof CalendarCheckIcon === 'function' ? CalendarCheckIcon : null),
     CalendarGrid: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CalendarGrid) || (typeof CalendarGrid === 'function' ? CalendarGrid : null),
-    ChartBarIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ChartBarIcon) || (typeof ChartBarIcon === 'function' ? ChartBarIcon : null),
-    ChatParticipantSheet: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ChatParticipantSheet) || (typeof ChatParticipantSheet === 'function' ? ChatParticipantSheet : null),
-    ChatSectionIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ChatSectionIcon) || (typeof ChatSectionIcon === 'function' ? ChatSectionIcon : null),
     CoinIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CoinIcon) || (typeof CoinIcon === 'function' ? CoinIcon : null),
     CommentsSection: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CommentsSection) || (typeof CommentsSection === 'function' ? CommentsSection : null),
     DeadlineDateTimePicker: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.DeadlineDateTimePicker) || (typeof DeadlineDateTimePicker === 'function' ? DeadlineDateTimePicker : null),
     EditMessageModal: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.EditMessageModal) || (typeof EditMessageModal === 'function' ? EditMessageModal : null),
-    EmojiPickerIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.EmojiPickerIcon) || (typeof EmojiPickerIcon === 'function' ? EmojiPickerIcon : null),
-    EmojiPickerSheet: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.EmojiPickerSheet) || (typeof EmojiPickerSheet === 'function' ? EmojiPickerSheet : null),
     GlobalSearchModal: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.GlobalSearchModal) || (typeof GlobalSearchModal === 'function' ? GlobalSearchModal : null),
-    ImageProcessingOverlay: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ImageProcessingOverlay) || (typeof ImageProcessingOverlay === 'function' ? ImageProcessingOverlay : null),
-    ImageThumbRemoveButton: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ImageThumbRemoveButton) || (typeof ImageThumbRemoveButton === 'function' ? ImageThumbRemoveButton : null),
-    Lightbox: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.Lightbox) || (typeof Lightbox === 'function' ? Lightbox : null),
-    LineHeightIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LineHeightIcon) || (typeof LineHeightIcon === 'function' ? LineHeightIcon : null),
     LinkPreviewCard: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LinkPreviewCard) || (typeof LinkPreviewCard === 'function' ? LinkPreviewCard : null),
-    MemoCard: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MemoCard) || (typeof MemoCard === 'function' ? MemoCard : null),
     MessageCommentIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MessageCommentIcon) || (typeof MessageCommentIcon === 'function' ? MessageCommentIcon : null),
-    ParticipantPickerButton: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ParticipantPickerButton) || (typeof ParticipantPickerButton === 'function' ? ParticipantPickerButton : null),
-    PencilIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PencilIcon) || (typeof PencilIcon === 'function' ? PencilIcon : null),
     PiggyBankIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PiggyBankIcon) || (typeof PiggyBankIcon === 'function' ? PiggyBankIcon : null),
     PollList: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PollList) || (typeof PollList === 'function' ? PollList : null),
-    PollModal: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PollModal) || (typeof PollModal === 'function' ? PollModal : null),
-    PollSectionIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PollSectionIcon) || (typeof PollSectionIcon === 'function' ? PollSectionIcon : null),
     ResizableModalContainer: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ResizableModalContainer) || (typeof ResizableModalContainer === 'function' ? ResizableModalContainer : null),
-    SearchCategoryTabs: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SearchCategoryTabs) || (typeof SearchCategoryTabs === 'function' ? SearchCategoryTabs : null),
-    SearchIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SearchIcon) || (typeof SearchIcon === 'function' ? SearchIcon : null),
     SearchResultLogRow: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SearchResultLogRow) || (typeof SearchResultLogRow === 'function' ? SearchResultLogRow : null),
-    SectionCountBadge: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SectionCountBadge) || (typeof SectionCountBadge === 'function' ? SectionCountBadge : null),
-    SectionToggleButton: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SectionToggleButton) || (typeof SectionToggleButton === 'function' ? SectionToggleButton : null),
-    SegmentedToggle: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SegmentedToggle) || (typeof SegmentedToggle === 'function' ? SegmentedToggle : null),
-    SettingsIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SettingsIcon) || (typeof SettingsIcon === 'function' ? SettingsIcon : null),
     SettlementSummaryModal: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SettlementSummaryModal) || (typeof SettlementSummaryModal === 'function' ? SettlementSummaryModal : null),
     ShareIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ShareIcon) || (typeof ShareIcon === 'function' ? ShareIcon : null),
-    SimpleBottomSheetPicker: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SimpleBottomSheetPicker) || (typeof SimpleBottomSheetPicker === 'function' ? SimpleBottomSheetPicker : null),
-    SmallXIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SmallXIcon) || (typeof SmallXIcon === 'function' ? SmallXIcon : null),
     fetchSubcollectionCount: typeof fetchSubcollectionCount === 'function' ? fetchSubcollectionCount : null,
     AdminCreateCalendarModal: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AdminCreateCalendarModal) || (typeof AdminCreateCalendarModal === 'function' ? AdminCreateCalendarModal : null),
     AdminFilledMenuIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AdminFilledMenuIcon) || (typeof AdminFilledMenuIcon === 'function' ? AdminFilledMenuIcon : null),
@@ -12142,8 +12026,6 @@ function bindGatherUiDeps() {
     PollModal: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PollModal) || (typeof PollModal === 'function' ? PollModal : null),
     PollSectionIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PollSectionIcon) || (typeof PollSectionIcon === 'function' ? PollSectionIcon : null),
     RefreshIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.RefreshIcon) || (typeof RefreshIcon === 'function' ? RefreshIcon : null),
-    SearchIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SearchIcon) || (typeof SearchIcon === 'function' ? SearchIcon : null),
-    SectionCountBadge: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SectionCountBadge) || (typeof SectionCountBadge === 'function' ? SectionCountBadge : null),
     SettingsIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SettingsIcon) || (typeof SettingsIcon === 'function' ? SettingsIcon : null),
     ShieldCheckIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ShieldCheckIcon) || (typeof ShieldCheckIcon === 'function' ? ShieldCheckIcon : null),
     SmallXIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SmallXIcon) || (typeof SmallXIcon === 'function' ? SmallXIcon : null),
@@ -12180,16 +12062,12 @@ function bindGatherUiDeps() {
     FormAddEditActionButtons: typeof FormAddEditActionButtons === 'function' ? FormAddEditActionButtons : null,
     PlaceSectionIcon: typeof PlaceSectionIcon === 'function' ? PlaceSectionIcon : null,
     SegmentedToggle: typeof SegmentedToggle === 'function' ? SegmentedToggle : null,
-    normalizePlaceAddress: typeof normalizePlaceAddress === 'function' ? normalizePlaceAddress : null,
     normalizePlaceDateForSort: typeof normalizePlaceDateForSort === 'function' ? normalizePlaceDateForSort : null,
-    extractLeadingMemoDate: typeof extractLeadingMemoDate === 'function' ? extractLeadingMemoDate : null,
     autoGrowTextarea: typeof autoGrowTextarea === 'function' ? autoGrowTextarea : null,
     getPlaceCategoryIcon: typeof getPlaceCategoryIcon === 'function' ? getPlaceCategoryIcon : null,
     fetchWithTimeout: typeof fetchWithTimeout === 'function' ? fetchWithTimeout : null,
     firebaseConfig: typeof firebaseConfig !== 'undefined' ? firebaseConfig : null,
     KAKAO_CATEGORY_GROUP_TO_PLACE_CATEGORY: typeof KAKAO_CATEGORY_GROUP_TO_PLACE_CATEGORY !== 'undefined' ? KAKAO_CATEGORY_GROUP_TO_PLACE_CATEGORY : null,
-    SearchCategoryTabs: typeof SearchCategoryTabs === 'function' ? SearchCategoryTabs : null,
-    SimpleBottomSheetPicker: typeof SimpleBottomSheetPicker === 'function' ? SimpleBottomSheetPicker : null,
     PlaceCategoryMarkerIcon: typeof PlaceCategoryMarkerIcon === 'function' ? PlaceCategoryMarkerIcon : null,
     InlineSearchBar: typeof InlineSearchBar === 'function' ? InlineSearchBar : null,
     BackArrowIcon: typeof BackArrowIcon === 'function' ? BackArrowIcon : null,

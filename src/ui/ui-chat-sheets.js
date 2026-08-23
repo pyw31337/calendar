@@ -54,6 +54,38 @@ function setStoredChatParticipantId(...args) {
   const fn = (window.GATHER_APP_NOTIFICATIONS || {}).setStoredChatParticipantId;
   return typeof fn === 'function' ? fn(...args) : undefined;
 }
+function isNotificationSupported(...args) {
+  const f = (window.GATHER_APP_NOTIFICATIONS || {}).isNotificationSupported;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function requestChatNotificationPermission(...args) {
+  const f = (window.GATHER_APP_NOTIFICATIONS || {}).requestChatNotificationPermission;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getNotificationDiagnostics(...args) {
+  const f = (window.GATHER_APP_NOTIFICATIONS || {}).getNotificationDiagnostics;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getBrowserLabelForNotifications(...args) {
+  const f = (window.GATHER_APP_NOTIFICATIONS || {}).getBrowserLabelForNotifications;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getNotificationPermissionHelpSteps(...args) {
+  const f = (window.GATHER_APP_NOTIFICATIONS || {}).getNotificationPermissionHelpSteps;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function isIOSDevice(...args) {
+  const f = (window.GATHER_APP_NOTIFICATIONS || {}).isIOSDevice;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function isInstalledStandalonePwa(...args) {
+  const f = (window.GATHER_APP_NOTIFICATIONS || {}).isInstalledStandalonePwa;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function probeNotificationCapability(...args) {
+  const f = (window.GATHER_APP_NOTIFICATIONS || {}).probeNotificationCapability;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
 
 function extractExpenseTimePrefix(...args) {
   const f = __gatherUiDeps().extractExpenseTimePrefix || GATHER_APP_UTILS.extractExpenseTimePrefix;

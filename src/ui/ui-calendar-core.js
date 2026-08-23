@@ -2610,7 +2610,6 @@ export function GlobalSearchModal({
       const firstNonEmpty = tabDefs.find(t => t.count > 0);
       return firstNonEmpty ? firstNonEmpty.key : prev;
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q, matches.schedules.length, matches.chat.length, (matches.photos || []).length, (matches.places || []).length, matches.expenses.length, matches.memos.length]);
 
   return /*#__PURE__*/React.createElement("div", {

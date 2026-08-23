@@ -770,7 +770,8 @@ export function ChatGalleryModal({
   onDecreaseFont,
   onIncreaseFont,
   isChatNotifyEnabled,
-  onToggleChatNotifications
+  onToggleChatNotifications,
+  showToast
 }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -1026,7 +1027,7 @@ export function ChatGalleryModal({
   };
   const handlePasteGalleryUpload = async e => {
     if (e) e.stopPropagation();
-    const files = await readClipboardImageFiles();
+    const files = await readClipboardImageFiles(showToast);
     if (files && files.length > 0) {
       // Show what will be uploaded and let the user confirm instead of uploading immediately --
       // handleConfirmPastePreview does the actual upload once confirmed.
