@@ -2090,12 +2090,12 @@ export function PollModal({ calendar, poll, onSave, onClose, showToast, onReques
     }
     onClose();
   };
-  return /*#__PURE__*/React.createElement("div", {
+  const modalEl = /*#__PURE__*/React.createElement("div", {
     className: "modal-overlay",
     onClick: e => {
       if (!isSubmitting) overlayOnClick(e);
     },
-    style: { zIndex: 11000 }
+    style: { zIndex: 12000 }
   }, /*#__PURE__*/React.createElement(ResizableModalContainer, {
     className: "modal-container",
     onClick: e => e.stopPropagation()
@@ -2158,12 +2158,8 @@ export function PollModal({ calendar, poll, onSave, onClose, showToast, onReques
     style: { display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px', color: '#64748B' }
   }, "\uD22C\uD45C \uC124\uC815"), /*#__PURE__*/React.createElement("div", {
     className: "participant-add-row",
-    style: { display: 'flex', gap: '8px', marginBottom: '12px' }
+    style: { display: 'flex', gap: '6px', marginBottom: '8px' }
   }, /*#__PURE__*/React.createElement("input", {
-    type: "text",
-    className: "form-input participant-add-input",
-    style: { flex: 1, minWidth: 0 },
-    placeholder: isClosed ? "\uB9C8\uAC10\uB41C \uD22C\uD45C\uC5D0\uB294 \uD6C4\uBCF4\uB97C \uCD94\uAC00\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4" : "\uC608: \uCC9C\uC655\uC5ED\uBAA8\uC544\uC5D8\uAC00 https://naver.me/54LbfTLU",
     value: newOption,
     disabled: isSubmitting || isClosed,
     maxLength: 220,

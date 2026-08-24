@@ -1011,18 +1011,24 @@ export function DeadlineDateTimePicker({ value, onChange, disabled, dateOnly = f
     setIsOpen(false);
   };
 
+  const dayNamesKo = ['일', '월', '화', '수', '목', '금', '토'];
+  const dayNameStr = isValid ? dayNamesKo[parsed.getDay()] : '';
   const displayText = isValid
     ? dateOnly
-      ? `${parsed.getFullYear()}.${String(parsed.getMonth() + 1).padStart(2, '0')}.${String(parsed.getDate()).padStart(2, '0')}`
-      : `${parsed.getFullYear()}.${String(parsed.getMonth() + 1).padStart(2, '0')}.${String(parsed.getDate()).padStart(2, '0')} ${value.slice(11, 16)}`
+      ? `${parsed.getFullYear()}.${String(parsed.getMonth() + 1).padStart(2, '0')}.${String(parsed.getDate()).padStart(2, '0')} (${dayNameStr})`
+      : `${parsed.getFullYear()}.${String(parsed.getMonth() + 1).padStart(2, '0')}.${String(parsed.getDate()).padStart(2, '0')} (${dayNameStr}) ${value.slice(11, 16)}`
     : (placeholder || (dateOnly ? '날짜 선택' : '날짜/시간 선택'));
 
   return /*#__PURE__*/React.createElement('div', { style: { position: 'relative' } },
     /*#__PURE__*/React.createElement('button', {
       type: 'button',
-      className: 'form-select',
+      className: 'form-input',
       disabled,
-      style: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', cursor: disabled ? 'default' : 'pointer', textAlign: 'left' },
+      style: {
+        width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px',
+        cursor: disabled ? 'default' : 'pointer', textAlign: 'left',
+        fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-main)', height: '42px', boxSizing: 'border-box'
+      },
       onClick: openPicker
     },
       /*#__PURE__*/React.createElement('span', { style: { minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, displayText),
@@ -1031,7 +1037,8 @@ export function DeadlineDateTimePicker({ value, onChange, disabled, dateOnly = f
     (() => {
       const sheet = isOpen && /*#__PURE__*/React.createElement('div', {
         className: 'bottom-sheet-overlay',
-        onClick: () => setIsOpen(false)
+        onClick: () => setIsOpen(false),
+        style: { zIndex: 12000 }
       }, /*#__PURE__*/React.createElement('div', {
         className: 'bottom-sheet',
         onClick: e => e.stopPropagation()
@@ -1112,7 +1119,10 @@ export function DeadlineDateTimePicker({ value, onChange, disabled, dateOnly = f
             )
           ),
           /*#__PURE__*/React.createElement('button', {
-            type: 'button', className: 'btn btn-primary', style: { width: '100%' }, onClick: handleApply
+            type: 'button',
+            className: 'btn btn-primary',
+            style: { width: '100%', height: '44px', minHeight: '44px', fontSize: '0.95rem', fontWeight: 800, borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+            onClick: handleApply
           }, '선택 완료')
         )
       ));

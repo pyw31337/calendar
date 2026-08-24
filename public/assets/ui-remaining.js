@@ -63,6 +63,10 @@ function extractFirstUrl(...args) {
   const f = __gatherUiDeps().extractFirstUrl || GATHER_APP_UTILS.extractFirstUrl;
   return typeof f === 'function' ? f(...args) : undefined;
 }
+function extractAllUrlInfos(...args) {
+  const f = __gatherUiDeps().extractAllUrlInfos || GATHER_APP_UTILS.extractAllUrlInfos;
+  return typeof f === 'function' ? f(...args) : [];
+}
 function extractLeadingMemoDate(...args) {
   const f = __gatherUiDeps().extractLeadingMemoDate || GATHER_APP_UTILS.extractLeadingMemoDate;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -470,7 +474,7 @@ const MONTH_NAMES = GATHER_APP_CALENDAR_DATA.MONTH_NAMES || ['1월','2월','3월
 const PRESET_COLORS = GATHER_APP_CONSTANTS.PRESET_COLORS || [];
 const DEFAULT_EXPENSE_CATEGORIES = GATHER_APP_CONSTANTS.DEFAULT_EXPENSE_CATEGORIES || [];
 const DEFAULT_PLACE_CATEGORIES = GATHER_APP_CONSTANTS.DEFAULT_PLACE_CATEGORIES || GATHER_APP_UTILS.DEFAULT_PLACE_CATEGORIES || [];
-const EMOJI_CATEGORIES = GATHER_APP_CONSTANTS.EMOJI_CATEGORIES || [];
+const EMOJI_CATEGORIES = GATHER_APP_CHAT_DATA.EMOJI_CATEGORIES || [];
 const INCOME_EXPENSE_CATEGORY = GATHER_APP_UTILS.INCOME_EXPENSE_CATEGORY || { id: 'income', name: '수입', color: '#16A34A' };
 const PLACE_MAP_DEFAULT_CENTER = __gatherUiDeps().PLACE_MAP_DEFAULT_CENTER || [37.5665, 126.978];
 const PLACE_MAP_DEFAULT_ZOOM = __gatherUiDeps().PLACE_MAP_DEFAULT_ZOOM || 11;
@@ -646,6 +650,14 @@ function getDirectChatMediaInfo(...args) {
   const f = __gatherUiDeps().getDirectChatMediaInfo || GATHER_APP_UTILS.getDirectChatMediaInfo;
   return typeof f === 'function' ? f(...args) : undefined;
 }
+function getDirectMediaTagsForUrl(...args) {
+  const f = __gatherUiDeps().getDirectMediaTagsForUrl || GATHER_APP_UTILS.getDirectMediaTagsForUrl;
+  return typeof f === 'function' ? f(...args) : '';
+}
+function extractDirectImageUrls(...args) {
+  const f = __gatherUiDeps().extractDirectImageUrls || GATHER_APP_UTILS.extractDirectImageUrls;
+  return typeof f === 'function' ? f(...args) : [];
+}
 function getPollOptionVoterIds(...args) {
   const f = __gatherUiDeps().getPollOptionVoterIds || GATHER_APP_UTILS.getPollOptionVoterIds;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -668,7 +680,7 @@ function getAnniversaryDisplayColor(...args) {
 }
 
 
-export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox, linkPreview, style = {}, message = null, stickyVideoKey = null, onActivateVideo = null, onDockAnchorChange = null }) {
+export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox, linkPreview, style = {}, message = null, stickyVideoKey = null, onActivateVideo = null, textMaxWidth = null }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -678,10 +690,28 @@ export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox,
 
   const firstUrl = extractFirstUrl(text);
   const mediaInfo = getDirectChatMediaInfo(firstUrl);
+  // A bubble with several plain webpage links (not a multi-image-link message, which is handled
+  // separately below) used to only ever preview firstUrl -- every other link in the same message
+  // was left as plain clickable text with no card. firstUrl always leads the list (and keeps its
+  // message-level cachedData below) so a single-link message renders byte-identical to before;
+  // any further distinct URLs extractAllUrlInfos finds are appended, each getting its own live-
+  // fetched (globally cached by URL, see fetchLinkPreview) preview card.
+  const allPreviewUrls = React.useMemo(() => {
+    const list = firstUrl ? [firstUrl] : [];
+    extractAllUrlInfos(text).forEach(info => {
+      if (!list.includes(info.url)) list.push(info.url);
+    });
+    return list;
+  }, [text, firstUrl]);
   const [failed, setFailed] = React.useState(false);
   React.useEffect(() => {
     setFailed(false);
   }, [firstUrl]);
+  // Several pasted image links (not an actual upload) shown as a thumbnail grid, same as a real
+  // multi-image message -- see extractDirectImageUrls. Computed unconditionally every render like
+  // the hooks around it so this component's hook order never changes; the multi-image early
+  // return below happens after all hooks have run.
+  const directImageUrls = React.useMemo(() => extractDirectImageUrls(text), [text]);
 
   // Detects which embed the user actually pressed play on, so it can be promoted to the single
   // persistent player (see PersistentVideoPlayer/StickyVideoBox) that survives view/tab switches
@@ -709,26 +739,94 @@ export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox,
     return () => window.removeEventListener('blur', handleWindowBlur);
   }, [isEmbedVideo, onActivateVideo, mediaInfo && mediaInfo.url, message && message.id]);
   // While this message owns the active/persistent video, it doesn't render its own iframe at all
-  // -- instead it registers its own DOM node as the dock anchor (see the isThisSticky branch
-  // below) via a stable ref callback, so the persistent player (StickyVideoBox, mounted once at
-  // the app root) can portal its single never-unmounted iframe DOM node directly into this box
-  // and look perfectly inline, while still being the exact same iframe that keeps playing when
-  // the message unmounts (e.g. navigating away from chat) and the player falls back to floating.
-  // useCallback keeps this ref's identity stable across re-renders so React only invokes it on
-  // real mount/unmount, not on every render of this component.
+  // -- the persistent player (StickyVideoBox, mounted once at the app root) already has the same
+  // iframe playing in its own floating PIP, so this just shows a placeholder instead of a second,
+  // competing iframe for the same video (see the isThisSticky branch below).
   const isThisSticky = isEmbedVideo && stickyVideoKey && message && message.id === stickyVideoKey;
-  const dockPlaceholderRef = React.useCallback(node => {
-    if (onDockAnchorChange) onDockAnchorChange(node);
-  }, [onDockAnchorChange]);
+
+  if (directImageUrls.length >= 2) {
+    const urls = directImageUrls.map(info => info.url);
+    const meta = directImageUrls.map((info, idx) => ({
+      timestamp: message?.timestamp || Date.now(),
+      messageId: message?.id || '',
+      imageIndex: idx,
+      thumb: info.url,
+      directMediaUrl: info.url,
+      // Without this, reopening the Lightbox on a multi-image-link message always showed blank
+      // tags regardless of what was actually saved -- getMessageDirectMediaEntry (the single-
+      // embedded-image case) already does this the same way.
+      tags: message ? getDirectMediaTagsForUrl(message, info.url) : ''
+    }));
+    let remainingText = text;
+    directImageUrls.forEach(info => { remainingText = remainingText.split(info.raw).join(''); });
+    remainingText = remainingText.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+    // Same multi-image grid layout as renderChatMessageImages' multi-image branch (app-main.js) --
+    // deliberately duplicated rather than shared since that one reads from getMessageImageEntries
+    // (actual uploads) while this reads from plain URLs pulled out of the text.
+    const mobileCols = urls.length === 2 ? 2 : 3;
+    const isMobile = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(max-width: 640px)').matches;
+    const activeCols = isMobile ? mobileCols : (urls.length >= 12 ? 6 : urls.length >= 5 ? 5 : mobileCols);
+    // Plain length, not wrapped in min(100%, ...) -- see computeChatImageGridMaxWidth in
+    // app-main.js for why: paired with width:'100%' below, that's already enough to shrink this
+    // safely on a narrow viewport, and min()+percentage here actively breaks the ancestor
+    // bubble's own fit-content sizing (verified via isolated repro).
+    const maxW = isMobile ? '280px' : `calc(${activeCols} * 76px + (${activeCols} - 1) * 4px)`;
+    return /*#__PURE__*/React.createElement(React.Fragment, null,
+      /*#__PURE__*/React.createElement('div', {
+        className: `chat-message-image-grid${urls.length >= 5 ? ' is-wide' : ''}`,
+        style: { width: '100%', maxWidth: maxW, boxSizing: 'border-box', marginBottom: remainingText ? '8px' : (style.marginBottom || '0') }
+      }, /*#__PURE__*/React.createElement('div', {
+        style: { display: 'grid', gridTemplateColumns: `repeat(${activeCols}, minmax(0, 1fr))`, gap: '4px', width: '100%', maxWidth: '100%', boxSizing: 'border-box' }
+      }, urls.map((url, idx) => /*#__PURE__*/React.createElement('img', {
+        key: idx,
+        src: url,
+        alt: `링크 이미지 ${idx + 1}`,
+        loading: 'lazy',
+        decoding: 'async',
+        referrerPolicy: 'no-referrer',
+        onClick: () => setActiveLightbox && setActiveLightbox({ urls, index: idx, meta }),
+        style: { display: 'block', width: '100%', aspectRatio: '1', borderRadius: '6px', cursor: setActiveLightbox ? 'pointer' : 'default', objectFit: 'cover' }
+      })))),
+      // Capped to the same maxW as the grid above -- a fit-content chat bubble sizes itself to
+      // whichever child is widest, so an uncapped caption longer than the grid would stretch the
+      // bubble past it, leaving a gap to the grid's right (see computeChatImageGridMaxWidth in
+      // app-main.js, whose real-upload counterpart needs the identical fix for the same reason).
+      remainingText ? /*#__PURE__*/React.createElement('div', {
+        style: { maxWidth: maxW, width: '100%', boxSizing: 'border-box' }
+      }, parseTextWithLinks(remainingText, searchQuery)) : null
+    );
+  }
 
   if (!mediaInfo || failed) {
+    const textNode = text ? parseTextWithLinks(text, searchQuery) : null;
+    // textMaxWidth (grid caption case, see above) takes priority when both apply. Otherwise, if
+    // this text contains a URL, cap it to the same width LinkPreviewCard below uses (whether or
+    // not that card actually ends up rendering -- it may still be loading, or fail to fetch a
+    // preview at all). Pasted links are often padded with long tracking query strings that, left
+    // unbounded, are literally the ONE piece of content wide enough to force this fit-content
+    // bubble out to its absolute max width -- verified by measuring rendered widths in an
+    // isolated repro: an unbounded 140-char tracking URL alone stretched the bubble ~400px wider
+    // than the card sitting next to it, while wrapping the same URL at the card's own width
+    // closed that gap to a few px. overflow-wrap:break-word is already inherited from the bubble,
+    // so it wraps here instead of overflowing; the link stays fully visible and clickable either
+    // way, unlike hiding it outright (which would leave nothing clickable if the card fails).
+    // Plain length (not min(100%, ...)) for the same reason as computeChatImageGridMaxWidth in
+    // app-main.js -- paired with width:'100%' below, that alone is enough to shrink safely on a
+    // narrow viewport, and min()+percentage here breaks the ancestor bubble's fit-content sizing.
+    const effectiveMaxWidth = textMaxWidth || (firstUrl ? '280px' : null);
+    const cappedTextNode = (textNode && effectiveMaxWidth)
+      ? /*#__PURE__*/React.createElement('div', {
+        style: { maxWidth: effectiveMaxWidth, width: '100%', boxSizing: 'border-box' }
+      }, textNode)
+      : textNode;
     return /*#__PURE__*/React.createElement(React.Fragment, null,
-      text ? parseTextWithLinks(text, searchQuery) : null,
-      firstUrl && /*#__PURE__*/React.createElement(LinkPreviewCard, {
-        url: firstUrl,
-        fallbackTitle: text ? removeFirstUrl(text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : '',
-        cachedData: linkPreview
-      })
+      cappedTextNode,
+      allPreviewUrls.map((url, idx) => /*#__PURE__*/React.createElement(LinkPreviewCard, {
+        key: url,
+        url,
+        fallbackTitle: (idx === 0 && text) ? removeFirstUrl(text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : '',
+        cachedData: idx === 0 ? linkPreview : undefined
+      }))
     );
   }
 
@@ -744,7 +842,12 @@ export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox,
   const commonStyle = {
     display: 'block',
     width: '100%',
-    maxWidth: `min(100%, ${maxWidth})`,
+    // Plain length, not min(100%, ...) -- same fit-content-ancestor bug as
+    // computeChatImageGridMaxWidth in app-main.js: a direct-linked image/video pasted in chat
+    // sits inside the same fit-content bubble, so wrapping this in min() with a percentage makes
+    // the bubble ignore the cap and balloon out while the element itself still renders capped,
+    // leaving a gap to its right. width:'100%' above already shrinks it safely when narrower.
+    maxWidth,
     maxHeight,
     borderRadius: '10px',
     backgroundColor: 'var(--bg-primary)',
@@ -765,6 +868,7 @@ export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox,
         src: mediaInfo.url,
         alt: '링크 이미지',
         loading: 'lazy',
+        decoding: 'async',
         referrerPolicy: 'no-referrer',
         onError: () => setFailed(true),
         onClick: () => setActiveLightbox && setActiveLightbox({
@@ -820,12 +924,9 @@ export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox,
           marginBottom
         };
         // This message owns the active/persistent video -- it doesn't render its own iframe here
-        // at all. Instead this box registers itself (via dockPlaceholderRef) as the dock anchor
-        // that StickyVideoBox portals its single never-unmounted iframe into, so the video shows
-        // up exactly here, as a normal in-flow child, indistinguishable from a plain embed.
+        // at all, since the exact same iframe is already playing in StickyVideoBox's floating PIP.
         if (isThisSticky) {
           return /*#__PURE__*/React.createElement('div', {
-            ref: dockPlaceholderRef,
             style: {
               ...embedBoxStyle,
               aspectRatio: isPortraitEmbed ? '9 / 16' : '16 / 9',
@@ -910,18 +1011,24 @@ export function DeadlineDateTimePicker({ value, onChange, disabled, dateOnly = f
     setIsOpen(false);
   };
 
+  const dayNamesKo = ['일', '월', '화', '수', '목', '금', '토'];
+  const dayNameStr = isValid ? dayNamesKo[parsed.getDay()] : '';
   const displayText = isValid
     ? dateOnly
-      ? `${parsed.getFullYear()}.${String(parsed.getMonth() + 1).padStart(2, '0')}.${String(parsed.getDate()).padStart(2, '0')}`
-      : `${parsed.getFullYear()}.${String(parsed.getMonth() + 1).padStart(2, '0')}.${String(parsed.getDate()).padStart(2, '0')} ${value.slice(11, 16)}`
+      ? `${parsed.getFullYear()}.${String(parsed.getMonth() + 1).padStart(2, '0')}.${String(parsed.getDate()).padStart(2, '0')} (${dayNameStr})`
+      : `${parsed.getFullYear()}.${String(parsed.getMonth() + 1).padStart(2, '0')}.${String(parsed.getDate()).padStart(2, '0')} (${dayNameStr}) ${value.slice(11, 16)}`
     : (placeholder || (dateOnly ? '날짜 선택' : '날짜/시간 선택'));
 
   return /*#__PURE__*/React.createElement('div', { style: { position: 'relative' } },
     /*#__PURE__*/React.createElement('button', {
       type: 'button',
-      className: 'form-select',
+      className: 'form-input',
       disabled,
-      style: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', cursor: disabled ? 'default' : 'pointer', textAlign: 'left' },
+      style: {
+        width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px',
+        cursor: disabled ? 'default' : 'pointer', textAlign: 'left',
+        fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-main)', height: '42px', boxSizing: 'border-box'
+      },
       onClick: openPicker
     },
       /*#__PURE__*/React.createElement('span', { style: { minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, displayText),
@@ -930,7 +1037,8 @@ export function DeadlineDateTimePicker({ value, onChange, disabled, dateOnly = f
     (() => {
       const sheet = isOpen && /*#__PURE__*/React.createElement('div', {
         className: 'bottom-sheet-overlay',
-        onClick: () => setIsOpen(false)
+        onClick: () => setIsOpen(false),
+        style: { zIndex: 12000 }
       }, /*#__PURE__*/React.createElement('div', {
         className: 'bottom-sheet',
         onClick: e => e.stopPropagation()
@@ -1011,7 +1119,10 @@ export function DeadlineDateTimePicker({ value, onChange, disabled, dateOnly = f
             )
           ),
           /*#__PURE__*/React.createElement('button', {
-            type: 'button', className: 'btn btn-primary', style: { width: '100%' }, onClick: handleApply
+            type: 'button',
+            className: 'btn btn-primary',
+            style: { width: '100%', height: '44px', minHeight: '44px', fontSize: '0.95rem', fontWeight: 800, borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+            onClick: handleApply
           }, '선택 완료')
         )
       ));
