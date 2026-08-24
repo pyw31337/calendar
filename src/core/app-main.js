@@ -1788,9 +1788,24 @@ function App() {
 
   // Places + confirmed meetings: calendar / places / settlement only
   React.useEffect(() => {
-    if (!activeCalId || !firebaseDb) return;
-    if (activeView !== 'calendar' && activeView !== 'places' && activeView !== 'settlement') return;
+    if (!activeCalId) return;
     let isMounted = true;
+
+    // Instant REST fetch on boot guarantees zero-lag server truth across all devices and browsers
+    fetchConfirmedMeetingsFromFirestore(activeCalId).then(list => {
+      if (isMounted && Array.isArray(list) && list.length > 0) {
+        setConfirmedMeetingsSubcollection(list);
+      }
+    }).catch(() => {});
+
+    fetchPlacesFromFirestore(activeCalId).then(list => {
+      if (isMounted && Array.isArray(list) && list.length > 0) {
+        setPlacesSubcollection(list);
+      }
+    }).catch(() => {});
+
+    if (!firebaseDb) return undefined;
+
     const unsubPlaces = subscribePlaces(activeCalId, snapshot => {
         if (!isMounted) return;
         const list = [];
@@ -1819,7 +1834,7 @@ function App() {
       unsubPlaces();
       unsubMeetings();
     };
-  }, [activeCalId, activeView, firebaseDb]);
+  }, [activeCalId, firebaseDb]);
 
   // Memos: paginated newest-first load (rather than subscribing to the entire collection at
   // once, which would download/re-sync thousands of memos on every open as a calendar grows).
