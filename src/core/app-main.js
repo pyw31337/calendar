@@ -3218,6 +3218,7 @@ function App() {
       activityLogs: meetingLog ? [...getCalendarActivityLogs(activeCal), meetingLog] : getCalendarActivityLogs(activeCal)
     };
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
+    writeConfirmedMeetingsToFirestore(activeCal.id, nextConfirmedMeetings).catch(e => console.warn('Subcollection confirmedMeetings write failed:', e));
     return updateCalendars(nextCalendars, isAlreadyConfirmed ? '모임 확정 취소' : '모임 확정', 'success', updatedCal.id, 'settings', meetingLog ? [meetingLog] : []);
   };
   // Saved via saveMode 'settings' like confirmedMeeting itself -- mergeCalendarSettingsDelta

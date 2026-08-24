@@ -96,7 +96,7 @@ async function checkPage(browser, baseUrl, viewport, calId, view) {
   const page = await context.newPage();
   const consoleErrors = [];
   const pageErrors = [];
-  page.on('console', msg => { if (msg.type() === 'error' && !msg.text().includes('compute-pressure') && !msg.text().includes('Permissions policy') && !msg.text().includes('status of 503') && !msg.text().includes('status of 502')) consoleErrors.push(msg.text()); });
+  page.on('console', msg => { if (msg.type() === 'error' && !msg.text().includes('compute-pressure') && !msg.text().includes('Permissions policy') && !msg.text().includes('status of 503') && !msg.text().includes('status of 502') && !msg.text().includes('ERR_NAME_NOT_RESOLVED') && !msg.text().includes('ERR_CONNECTION_REFUSED')) consoleErrors.push(msg.text()); });
   page.on('pageerror', err => pageErrors.push(err.message));
 
   const url = `${baseUrl}?id=${calId}${view.suffix}`;

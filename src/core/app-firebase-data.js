@@ -553,6 +553,18 @@ function mergeCalendarAvailabilityDelta(serverCalendar, incomingCalendar, change
   };
 }
 
+function mergeConfirmedMeetings(serverList = [], incomingList = []) {
+  const byDate = new Map();
+  (Array.isArray(serverList) ? serverList : []).forEach(m => { if (m?.date) byDate.set(m.date, m); });
+  (Array.isArray(incomingList) ? incomingList : []).forEach(m => {
+    if (m?.date) {
+      const existing = byDate.get(m.date);
+      byDate.set(m.date, existing ? { ...existing, ...m } : m);
+    }
+  });
+  return Array.from(byDate.values());
+}
+
 function mergeCalendarSettingsDelta(serverCalendar, incomingCalendar) {
   const server = cloneCalendar(serverCalendar) || {};
   const incoming = cloneCalendar(incomingCalendar) || {};
@@ -591,10 +603,7 @@ function mergeCalendarSettingsDelta(serverCalendar, incomingCalendar) {
     activityLogs: mergeActivityLogs(server.activityLogs || [], incoming.activityLogs || [], calendarId, new Set(Array.from(participantMap.values()).map(participant => participant.id))),
     polls: mergePolls(server.polls || [], incoming.polls || [], calendarId, new Set(Array.from(participantMap.values()).map(participant => participant.id))),
     deletedActivityLogIds: mergeDeletedActivityLogIds(server.deletedActivityLogIds || [], incoming.deletedActivityLogIds || []),
-    // Explicit rather than relying on the "...incoming" spread above: confirmed-meeting expense
-    // edits (category/label/amount) go through this exact saveMode, so an incoming payload that's
-    // missing the field for any reason must not silently fall back to dropping the meeting data.
-    confirmedMeeting: incoming.confirmedMeeting !== undefined ? incoming.confirmedMeeting : (server.confirmedMeeting || []),
+    confirmedMeeting: mergeConfirmedMeetings(server.confirmedMeeting || [], incoming.confirmedMeeting || []),
     expenseCategories: incoming.expenseCategories !== undefined ? incoming.expenseCategories : server.expenseCategories,
     places: incoming.places !== undefined ? incoming.places : server.places,
     placeCategories: incoming.placeCategories !== undefined ? incoming.placeCategories : server.placeCategories,
