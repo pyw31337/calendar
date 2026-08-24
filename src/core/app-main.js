@@ -5741,13 +5741,21 @@ async function compressImageToDataUrls(file, { maxThumbBase64Length = MAX_CHAT_T
   // High-quality blob for Firebase Storage (when storage is working): images already within the
   // 1920px cap upload completely untouched (100% pixel-perfect, zero compression noise) as long
   // as they're a reasonable file size; anything larger gets its longest side scaled down to 1920.
+  // The untouched-file threshold used to be 4MB, which let a same-dimension JPEG anywhere up to
+  // that size skip recompression entirely -- a fairly common case (a nice camera's own JPEG
+  // output, a downloaded photo) that made single-photo uploads feel slow independent of how many
+  // photos or how fast the connection was, since 2-4MB is a lot to push over typical mobile
+  // upload bandwidth (often far lower than download). Recompressing at quality 0.7 here still
+  // looks effectively identical for chat/gallery viewing while cutting that payload by roughly
+  // 70-85% in the common case, so lowering the bar to 2MB trades a compression pass most devices
+  // do in well under a second for a meaningfully shorter upload.
   const getHighQualityBlob = () => {
     if (isStorageDisabled) return Promise.resolve(null);
 
     const maxDimHigh = 1920;
     const isOversized = img.width > maxDimHigh || img.height > maxDimHigh;
 
-    if (!isOversized && file.size <= 4 * 1024 * 1024) {
+    if (!isOversized && file.size <= 2 * 1024 * 1024) {
       return Promise.resolve(file);
     }
 
