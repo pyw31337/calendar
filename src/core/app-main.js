@@ -692,11 +692,6 @@ function App() {
         showToast('캘린더 ID 오류', 'error');
         return false;
       }
-      const requestedId = getCalendarIdFromURL();
-      if (requestedId && requestedId !== targetCalId) {
-        showToast('캘린더 불일치', 'error');
-        return false;
-      }
       const now = Date.now();
       const normalizedCalendars = cloneCalendarList(nextCalendars).map(normalizeCalendarForSave);
 
