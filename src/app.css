@@ -2150,26 +2150,34 @@ select.form-select {
 .settlement-metric-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
+  gap: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+  background-color: var(--bg-card);
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 .settlement-metric-card {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   min-width: 0;
-  padding: 12px 10px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 12px;
-  background-color: var(--bg-card);
+  padding: 14px 12px;
+  border-right: 1px solid var(--border-subtle);
+  background-color: transparent;
+  box-sizing: border-box;
+}
+.settlement-metric-card:last-child {
+  border-right: none;
 }
 .settlement-metric-card-label {
   display: flex;
   align-items: center;
   gap: 6px;
   min-width: 0;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   font-weight: 800;
-  color: #64748B;
+  color: var(--text-main);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2180,14 +2188,14 @@ select.form-select {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  letter-spacing: -0.01em;
 }
 @media (max-width: 480px) {
   .settlement-metric-card {
-    padding: 10px 6px;
-    gap: 4px;
+    padding: 12px 6px;
+    gap: 6px;
   }
   .settlement-metric-card-label {
-    font-size: 0.6rem;
     gap: 3px;
   }
   .settlement-metric-card-value {
