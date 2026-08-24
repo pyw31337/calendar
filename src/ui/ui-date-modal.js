@@ -2856,11 +2856,18 @@ export function DateModal({
               setActiveLightbox({
                 urls: meetingPhotos.map(p => p.imageUrl || p.thumbUrl),
                 index,
-                meta: meetingPhotos.map(p => (
-                  p.source === 'chat-tag'
-                    ? { timestamp: p.createdAt, tags: p.tags, messageId: p.sourceMessageId, imageIndex: p.sourceImageIndex }
-                    : { timestamp: p.createdAt, tags: p.tags, source: 'meeting', sourceMessageId: p.sourceMessageId, sourceImageIndex: p.sourceImageIndex, meetingDate: dateStr, photoId: p.id }
-                ))
+                meta: meetingPhotos.map(p => ({
+                  timestamp: p.createdAt,
+                  tags: p.tags,
+                  source: p.source || 'meeting',
+                  uploadSource: p.uploadSource || (p.source === 'chat-tag' ? 'chat' : 'meeting'),
+                  messageId: p.sourceMessageId || p.messageId,
+                  imageIndex: p.sourceImageIndex ?? p.imageIndex,
+                  sourceMessageId: p.sourceMessageId,
+                  sourceImageIndex: p.sourceImageIndex,
+                  meetingDate: dateStr,
+                  photoId: p.id
+                }))
               });
             } else {
               const url = photo.imageUrl || photo.thumbUrl;

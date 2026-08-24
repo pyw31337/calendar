@@ -478,7 +478,7 @@ const MONTH_NAMES = GATHER_APP_CALENDAR_DATA.MONTH_NAMES || ['1월','2월','3월
 const PRESET_COLORS = GATHER_APP_CONSTANTS.PRESET_COLORS || [];
 const DEFAULT_EXPENSE_CATEGORIES = GATHER_APP_CONSTANTS.DEFAULT_EXPENSE_CATEGORIES || [];
 const DEFAULT_PLACE_CATEGORIES = GATHER_APP_CONSTANTS.DEFAULT_PLACE_CATEGORIES || GATHER_APP_UTILS.DEFAULT_PLACE_CATEGORIES || [];
-const EMOJI_CATEGORIES = GATHER_APP_CONSTANTS.EMOJI_CATEGORIES || [];
+const EMOJI_CATEGORIES = GATHER_APP_CHAT_DATA.EMOJI_CATEGORIES || [];
 const INCOME_EXPENSE_CATEGORY = GATHER_APP_UTILS.INCOME_EXPENSE_CATEGORY || { id: 'income', name: '수입', color: '#16A34A' };
 const PLACE_MAP_DEFAULT_CENTER = __gatherUiDeps().PLACE_MAP_DEFAULT_CENTER || [37.5665, 126.978];
 const PLACE_MAP_DEFAULT_ZOOM = __gatherUiDeps().PLACE_MAP_DEFAULT_ZOOM || 11;
@@ -703,6 +703,129 @@ export function CalendarGrid({
   const [pickerYear, setPickerYear] = React.useState(year);
   const [pickerMonth, setPickerMonth] = React.useState(month);
 
+  // Touch equivalent of the desktop-only HTML5 draggable/onDragStart/onDrop badge-move below --
+  // native Drag-and-Drop never fires from touch input on any mobile browser, so without this a
+  // participant badge simply couldn't be moved between dates on a phone at all. Implemented as a
+  // long-press-then-drag gesture (not a plain touchmove-drag) specifically so a normal vertical
+  // scroll that happens to start on a badge still scrolls the page instead of accidentally
+  // grabbing it -- touchDragRef tracks the pending/active gesture, isTouchDragging mirrors
+  // whether it's actually dragging (vs. just pressed) for the body touch-action lock below, and
+  // touchDropTargetDate is which day-cell is currently under the finger (for the highlight).
+  const TOUCH_LONG_PRESS_MS = 350;
+  const TOUCH_MOVE_CANCEL_PX = 10;
+  const touchDragRef = React.useRef(null);
+  const justTouchDraggedRef = React.useRef(false);
+  const [isTouchDragging, setIsTouchDragging] = React.useState(false);
+  const [touchDragBadge, setTouchDragBadge] = React.useState(null); // { name, color, x, y } | null
+  const [touchDropTargetDate, setTouchDropTargetDate] = React.useState(null);
+
+  // touch-action:'auto' stays in effect (native scroll works normally) until the long-press
+  // actually fires -- see handleBadgeTouchStart below, which is also the only place drag state
+  // gets created, so the browser never fights a scroll gesture that never intended to be a drag.
+  React.useEffect(() => {
+    if (!isTouchDragging) return undefined;
+    const originalTouchAction = document.body.style.touchAction;
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.touchAction = 'none';
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.touchAction = originalTouchAction;
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [isTouchDragging]);
+
+  const findDayCellDateAt = (x, y) => {
+    const el = typeof document.elementFromPoint === 'function' ? document.elementFromPoint(x, y) : null;
+    const cell = el && typeof el.closest === 'function' ? el.closest('.day-cell') : null;
+    return cell ? cell.dataset.dateStr || null : null;
+  };
+
+  const endTouchDrag = (targetDate) => {
+    const state = touchDragRef.current;
+    touchDragRef.current = null;
+    setIsTouchDragging(false);
+    setTouchDragBadge(null);
+    setTouchDropTargetDate(null);
+    if (!state || !state.dragging) return;
+    justTouchDraggedRef.current = true;
+    // Cleared on the next tick rather than immediately -- the browser's compatibility click (if
+    // any survives touchend's preventDefault below) fires essentially synchronously after, and
+    // the badge's onClick checks this flag to avoid also opening the participant view right
+    // after a drag-to-move.
+    setTimeout(() => { justTouchDraggedRef.current = false; }, 300);
+    if (targetDate && targetDate !== state.sourceDate && typeof onMoveAvailability === 'function') {
+      onMoveAvailability(state.entryReferId, state.sourceDate, targetDate, state.participantId, state.participantName);
+    }
+  };
+
+  const handleBadgeTouchStart = (event, entry, participant, dateStr) => {
+    if (event.touches.length !== 1) return;
+    const touch = event.touches[0];
+    if (touchDragRef.current) clearTimeout(touchDragRef.current.timer);
+    const dragInfo = {
+      entryReferId: entry.id,
+      sourceDate: dateStr,
+      participantId: entry.participantId,
+      participantName: participant.name,
+      color: participant.color,
+      touchId: touch.identifier,
+      startX: touch.clientX,
+      startY: touch.clientY,
+      dragging: false,
+      timer: null
+    };
+    dragInfo.timer = setTimeout(() => {
+      if (touchDragRef.current !== dragInfo) return;
+      dragInfo.dragging = true;
+      setIsTouchDragging(true);
+      setTouchDragBadge({ name: dragInfo.participantName, color: dragInfo.color, x: dragInfo.startX, y: dragInfo.startY });
+      setTouchDropTargetDate(dateStr);
+      if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+        try { navigator.vibrate(15); } catch (e) {}
+      }
+    }, TOUCH_LONG_PRESS_MS);
+    touchDragRef.current = dragInfo;
+  };
+
+  const handleBadgeTouchMove = event => {
+    const state = touchDragRef.current;
+    if (!state) return;
+    const touch = Array.from(event.touches).find(t => t.identifier === state.touchId);
+    if (!touch) return;
+    if (!state.dragging) {
+      const dx = Math.abs(touch.clientX - state.startX);
+      const dy = Math.abs(touch.clientY - state.startY);
+      if (dx > TOUCH_MOVE_CANCEL_PX || dy > TOUCH_MOVE_CANCEL_PX) {
+        // Moved before the long-press committed -- this is a normal scroll/swipe, not a drag.
+        clearTimeout(state.timer);
+        touchDragRef.current = null;
+      }
+      return;
+    }
+    setTouchDragBadge(prev => (prev ? { ...prev, x: touch.clientX, y: touch.clientY } : prev));
+    setTouchDropTargetDate(findDayCellDateAt(touch.clientX, touch.clientY));
+  };
+
+  const handleBadgeTouchEnd = event => {
+    const state = touchDragRef.current;
+    if (!state) return;
+    clearTimeout(state.timer);
+    if (state.dragging) {
+      const touch = Array.from(event.changedTouches).find(t => t.identifier === state.touchId) || event.changedTouches[0];
+      const targetDate = touch ? findDayCellDateAt(touch.clientX, touch.clientY) : null;
+      event.preventDefault();
+      endTouchDrag(targetDate);
+    } else {
+      touchDragRef.current = null;
+    }
+  };
+
+  const handleBadgeTouchCancel = () => {
+    const state = touchDragRef.current;
+    if (state) clearTimeout(state.timer);
+    endTouchDrag(null);
+  };
+
   // Sync picker values when month navigates externally
   React.useEffect(() => {
     setPickerYear(year);
@@ -789,7 +912,7 @@ export function CalendarGrid({
     });
     return map;
   }, [year]);
-  return /*#__PURE__*/React.createElement("div", {
+  const gridTree = /*#__PURE__*/React.createElement("div", {
     className: "calendar-card",
     style: {
       position: 'relative'
@@ -1013,10 +1136,14 @@ export function CalendarGrid({
     const cornerTitle = isHoliday ? (lunarLabel ? `${holidayNames.join(', ')} (${lunarLabel})` : holidayNames.join(', ')) : undefined;
     const columnDow = idx % 7; // 0=Sun .. 6=Sat, since each week row starts on Sunday
     const isSunday = columnDow === 0;
+    const isTouchDropTarget = isTouchDragging && touchDropTargetDate === dateStr;
     return /*#__PURE__*/React.createElement("div", {
       key: idx,
       className: `day-cell ${isCurrentMonth ? '' : 'other-month'} ${isConfirmed ? 'confirmed-meeting' : isAllAvailable ? 'all-available' : ''}`,
-      style: { "--cell-index": idx },
+      "data-date-str": dateStr,
+      style: isTouchDropTarget
+        ? { "--cell-index": idx, outline: '2px solid var(--accent-primary)', outlineOffset: '-2px' }
+        : { "--cell-index": idx },
       onClick: () => onSelectDate(dateStr),
       onDragOver: event => {
         event.preventDefault();
@@ -1115,8 +1242,13 @@ export function CalendarGrid({
               participantName: p.name
             }));
           },
+          onTouchStart: event => { event.stopPropagation(); handleBadgeTouchStart(event, e, p, dateStr); },
+          onTouchMove: event => { event.stopPropagation(); handleBadgeTouchMove(event); },
+          onTouchEnd: event => { event.stopPropagation(); handleBadgeTouchEnd(event); },
+          onTouchCancel: event => { event.stopPropagation(); handleBadgeTouchCancel(); },
           onClick: event => {
             event.stopPropagation();
+            if (justTouchDraggedRef.current) return;
             if (typeof onParticipantClick === 'function') {
               onParticipantClick(p.name, dateStr);
             } else if (typeof onSelectDate === 'function') {
@@ -1198,6 +1330,36 @@ export function CalendarGrid({
       }))
     );
   })));
+
+  // Floating badge that follows the finger while a touch drag is active (see
+  // handleBadgeTouchStart above) -- portaled straight to <body> so it renders above everything
+  // regardless of where CalendarGrid itself sits in the DOM, and isn't affected by any ancestor
+  // establishing its own containing block (transform/filter/etc. would otherwise break a plain
+  // position:fixed descendant).
+  const touchDragIndicator = touchDragBadge && typeof document !== 'undefined' && ReactDOM.createPortal
+    ? ReactDOM.createPortal(/*#__PURE__*/React.createElement("div", {
+      style: {
+        position: 'fixed',
+        left: `${touchDragBadge.x}px`,
+        top: `${touchDragBadge.y}px`,
+        transform: 'translate(-50%, -130%)',
+        backgroundColor: touchDragBadge.color,
+        color: getContrastTextColor(touchDragBadge.color),
+        padding: '6px 12px',
+        borderRadius: '999px',
+        fontSize: '0.8rem',
+        fontWeight: 800,
+        boxShadow: '0 8px 20px rgba(0,0,0,0.28)',
+        pointerEvents: 'none',
+        zIndex: 100001,
+        whiteSpace: 'nowrap'
+      }
+    }, touchDragBadge.name), document.body)
+    : null;
+
+  return touchDragIndicator
+    ? /*#__PURE__*/React.createElement(React.Fragment, null, gridTree, touchDragIndicator)
+    : gridTree;
 }
 
 export function CommentsSection({
@@ -1351,7 +1513,11 @@ export function CommentsSection({
     }
   };
 
-  const reversed = [...recentMessages].reverse();
+  // 일정탭('meeting')/갤러리페이지('gallery')에서 올린 사진은 참조용 실제 채팅 메시지
+  // 문서로 저장되지만 채팅 피드에는 노출되지 않아야 함 -- ChatRoomView(ui-chat-room.js)의
+  // 같은 필터를 이 메인화면 채팅 미리보기 위젯에도 동일하게 적용.
+  const visibleRecentMessages = recentMessages.filter(msg => msg.uploadSource !== 'meeting' && msg.uploadSource !== 'gallery');
+  const reversed = [...visibleRecentMessages].reverse();
   const messagesToShow = isCollapsed
     ? (reversed.length > 0 ? [reversed[reversed.length - 1]] : [])
     : reversed;
@@ -1390,7 +1556,7 @@ export function CommentsSection({
       padding: '12px',
       minHeight: '48px'
     }
-  }, recentMessages.length === 0 ? /*#__PURE__*/React.createElement("div", {
+  }, visibleRecentMessages.length === 0 ? /*#__PURE__*/React.createElement("div", {
     style: { color: 'var(--text-muted)', fontSize: '0.85rem', padding: '8px 0', textAlign: 'center' }
   }, "등록된 채팅이 없습니다.") : /*#__PURE__*/React.createElement("div", {
     style: { display: 'flex', flexDirection: 'column', gap: '10px' }
@@ -1548,6 +1714,7 @@ export function CommentsSection({
     }, /*#__PURE__*/React.createElement("img", {
       src: img.thumbnail,
       alt: `첨부 미리보기 ${index + 1}`,
+      decoding: 'async',
       style: {
         width: '60px',
         height: '60px',
@@ -1834,6 +2001,8 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
     if (imageUrls.length === 1) {
       return /*#__PURE__*/React.createElement("img", {
         src: thumbUrls[0] || imageUrls[0],
+        loading: 'lazy',
+        decoding: 'async',
         style: { width: '100%', maxHeight: '140px', objectFit: 'cover', borderRadius: '6px', marginBottom: '8px' }
       });
     }
@@ -1852,6 +2021,8 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
     }, thumbUrls.slice(0, 6).map((thumb, idx) => /*#__PURE__*/React.createElement("img", {
       key: idx,
       src: thumb || imageUrls[idx],
+      loading: 'lazy',
+      decoding: 'async',
       style: {
         display: 'block',
         width: '100%',
@@ -1863,6 +2034,8 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
   };
 
   return /*#__PURE__*/React.createElement("div", {
+    id: `memo-${memo.id}`,
+    "data-memo-id": memo.id,
     onClick: (e) => {
       const t = e.target;
       if (t && t.closest && t.closest('input, textarea, select, button, a, [data-stop-card-open]')) return;
@@ -2439,7 +2612,6 @@ export function GlobalSearchModal({
       const firstNonEmpty = tabDefs.find(t => t.count > 0);
       return firstNonEmpty ? firstNonEmpty.key : prev;
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q, matches.schedules.length, matches.chat.length, (matches.photos || []).length, (matches.places || []).length, matches.expenses.length, matches.memos.length]);
 
   return /*#__PURE__*/React.createElement("div", {
@@ -2544,6 +2716,7 @@ export function GlobalSearchModal({
             src: entry.thumb,
             alt: entry.tags || '태그된 사진',
             loading: "lazy",
+            decoding: "async",
             style: { width: '100%', aspectRatio: '1 / 1', objectFit: 'cover', borderRadius: 'var(--radius-sm)' }
           }),
           /*#__PURE__*/React.createElement("span", {
@@ -2592,6 +2765,8 @@ export function EditMessageModal({
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
   const ChatParticipantSheet = __comp.ChatParticipantSheet || __deps.ChatParticipantSheet;
+  const EmojiPickerIcon = __comp.EmojiPickerIcon || __deps.EmojiPickerIcon;
+  const EmojiPickerSheet = __comp.EmojiPickerSheet || __deps.EmojiPickerSheet;
   const ImageProcessingOverlay = __comp.ImageProcessingOverlay || __deps.ImageProcessingOverlay;
   const ImageThumbRemoveButton = __comp.ImageThumbRemoveButton || __deps.ImageThumbRemoveButton;
   const ParticipantPickerButton = __comp.ParticipantPickerButton || __deps.ParticipantPickerButton;
@@ -2603,6 +2778,7 @@ export function EditMessageModal({
   const [text, setText] = React.useState(message.text || '');
   const [participantId, setParticipantId] = React.useState(message.participantId || '');
   const [isPartSheetOpen, setIsPartSheetOpen] = React.useState(false);
+  const [isEmojiPickerOpen, setIsEmojiPickerOpen] = React.useState(false);
   const part = (calendar.participants || []).find(p => p.id === participantId);
   const [images, setImages] = React.useState(() => {
     const urls = Array.isArray(message.imageUrls) && message.imageUrls.length > 0
@@ -2617,7 +2793,7 @@ export function EditMessageModal({
   const fileInputRefEdit = React.useRef(null);
   const [imageProcessingEdit, setImageProcessingEdit] = React.useState(null);
   const editTextareaRef = React.useRef(null);
-  React.useEffect(() => autoGrowTextarea(editTextareaRef.current, 240), []);
+  React.useEffect(() => autoGrowTextarea(editTextareaRef.current, 5000), []);
 
   const handleFileChangeEdit = async (e) => {
     const files = e.target.files;
@@ -2673,6 +2849,45 @@ export function EditMessageModal({
     }
   };
 
+  const insertEmojiIntoEditInput = (emoji) => {
+    const textarea = editTextareaRef.current;
+    const start = textarea ? (textarea.selectionStart ?? text.length) : text.length;
+    const end = textarea ? (textarea.selectionEnd ?? text.length) : text.length;
+    const next = text.slice(0, start) + emoji + text.slice(end);
+    setText(next);
+    if (textarea) {
+      requestAnimationFrame(() => {
+        textarea.focus();
+        const pos = start + emoji.length;
+        textarea.setSelectionRange(pos, pos);
+      });
+    }
+  };
+
+  // Mirrors the main composer's handlePasteImagesChat -- the edit textarea had no paste handler
+  // at all before this, so Ctrl+V (or a right-click "이미지 복사" paste) here silently did
+  // nothing while the same gesture in the composer attached the image with a progress overlay.
+  const handlePasteImagesEdit = async (e) => {
+    const pastedFiles = getImageFilesFromClipboardEvent(e);
+    if (pastedFiles.length === 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      await appendChatImageFiles({
+        files: pastedFiles,
+        currentCount: images.length,
+        setImageProcessing: setImageProcessingEdit,
+        setChatImages: setImages,
+        showToast
+      });
+    } catch (err) {
+      console.error('handlePasteImagesEdit unexpected error:', err);
+      if (showToast) showToast('붙여넣은 사진 첨부 중 오류', 'error', 5000);
+    } finally {
+      setImageProcessingEdit(null);
+    }
+  };
+
   return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     className: "modal-overlay",
     onClick: e => { if (!isSubmitting) overlayOnClick(e); },
@@ -2680,24 +2895,25 @@ export function EditMessageModal({
   }, /*#__PURE__*/React.createElement(ResizableModalContainer, {
     className: "modal-container",
     onClick: e => e.stopPropagation(),
-    style: { width: '90%', maxWidth: '400px', padding: '16px', borderRadius: '12px' }
+    style: { width: '90%', maxWidth: '400px', borderRadius: '12px' }
   }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: '14px',
-      borderBottom: '1px solid var(--border-subtle)',
-      paddingBottom: '8px'
-    }
+    className: "modal-header",
+    style: { padding: '16px', marginBottom: 0 }
   }, /*#__PURE__*/React.createElement("h3", {
     style: { fontSize: '1rem', fontWeight: 800, color: 'var(--text-main)', margin: 0 }
   }, "채팅 수정"), /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: () => { if (!isSubmitting) requestClose(); },
     style: { background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer', display: 'flex', alignItems: 'center' }
-  }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }))), /*#__PURE__*/React.createElement("div", {
-    style: { display: 'flex', flexDirection: 'column', gap: '12px' }
+  }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }))),
+  // .modal-body handles the actual grow-then-scroll behavior (flex:1 1 auto, min-height:0,
+  // overflow-y:auto, capped by .modal-container's own visualViewport-aware max-height set in
+  // ResizableModalContainer) -- so this modal naturally grows taller with the message's content,
+  // up to the visible screen height, and only then scrolls internally. The header/footer stay
+  // pinned outside this scrolling region so the 취소/수정 buttons are never clipped off-screen.
+  /*#__PURE__*/React.createElement("div", {
+    className: "modal-body",
+    style: { padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }
   },
   images.length > 0 ? /*#__PURE__*/React.createElement("div", {
     style: { display: 'flex', flexWrap: 'wrap', gap: '8px', alignSelf: 'flex-start' }
@@ -2707,6 +2923,7 @@ export function EditMessageModal({
   }, /*#__PURE__*/React.createElement("img", {
     src: img.thumbnail,
     alt: `수정 이미지 미리보기 ${index + 1}`,
+    decoding: 'async',
     style: {
       width: '80px',
       height: '80px',
@@ -2720,9 +2937,7 @@ export function EditMessageModal({
   })))) : null,
   /*#__PURE__*/React.createElement("div", {
     style: {
-      display: 'flex',
-      alignItems: 'flex-end',
-      gap: '8px',
+      position: 'relative',
       backgroundColor: 'var(--bg-primary)',
       border: '1px solid var(--border-subtle)',
       borderRadius: '12px',
@@ -2734,14 +2949,16 @@ export function EditMessageModal({
     value: text,
     onChange: e => {
       setText(e.target.value);
-      autoGrowTextarea(e.target, 240);
+      // No practical cap here -- the textarea itself should keep growing with the message
+      // (matching how long the bubble's content actually is); .modal-body's own scroll (see
+      // above) is what takes over once the whole modal no longer fits the screen.
+      autoGrowTextarea(e.target, 5000);
     },
+    onPaste: handlePasteImagesEdit,
     style: {
-      flex: 1,
-      minWidth: 0,
-      height: '80px',
+      display: 'block',
+      width: '100%',
       minHeight: '80px',
-      maxHeight: '240px',
       resize: 'none',
       border: 'none',
       backgroundColor: 'transparent',
@@ -2750,45 +2967,73 @@ export function EditMessageModal({
       fontFamily: 'inherit',
       outline: 'none',
       boxSizing: 'border-box',
-      overflowY: 'auto'
+      // Reserved so typed/pasted text never runs underneath the emoji/사진첨부 buttons floating
+      // over the bottom-right corner (see below) -- those buttons used to sit in their own flex
+      // column next to the textarea, permanently eating ~80px of its width even on short replies.
+      paddingRight: '76px',
+      paddingBottom: '4px'
     }
   }), /*#__PURE__*/React.createElement("input", {
     ref: fileInputRefEdit,
     type: "file",
-    accept: "image/*",
+    accept: "image/jpeg, image/png, image/gif, image/webp, image/heic, image/heif, image/*",
     multiple: true,
     style: { position: 'absolute', width: '1px', height: '1px', padding: 0, margin: '-1px', overflow: 'hidden', clip: 'rect(0,0,0,0)', border: 0 },
     onChange: handleFileChangeEdit
-  }), /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    onClick: () => fileInputRefEdit.current && fileInputRefEdit.current.click(),
-    title: "사진 첨부",
-    style: {
-      width: '32px',
-      height: '32px',
-      borderRadius: '50%',
-      border: '1px solid var(--border-subtle)',
-      backgroundColor: 'var(--bg-card)',
-      cursor: 'pointer',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      flexShrink: 0,
-      padding: 0,
-      color: 'var(--text-muted)'
-    }
-  }, /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg",
-    width: "16",
-    height: "16",
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    strokeWidth: "2",
-    strokeLinecap: "round",
-    strokeLinejoin: "round"
-  }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), /*#__PURE__*/React.createElement("path", { d: "M15 8h.01" }), /*#__PURE__*/React.createElement("path", { d: "M12.5 21h-6.5a3 3 0 0 1 -3 -3v-12a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v6.5" }), /*#__PURE__*/React.createElement("path", { d: "M3 16l5 -5c.928 -.893 2.072 -.893 3 0l4 4" }), /*#__PURE__*/React.createElement("path", { d: "M14 14l1 -1c.67 -.644 1.45 -.824 2.182 -.54" }), /*#__PURE__*/React.createElement("path", { d: "M16 19h6" }), /*#__PURE__*/React.createElement("path", { d: "M19 16v6" })))), /*#_PURE_*/React.createElement("div", {
-    style: { display: 'flex', gap: '8px', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: { position: 'absolute', right: '8px', bottom: '8px', display: 'flex', gap: '6px' }
+  },
+    /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => setIsEmojiPickerOpen(true),
+      title: "이모티콘 추가",
+      style: {
+        width: '32px',
+        height: '32px',
+        borderRadius: '50%',
+        border: '1px solid var(--border-subtle)',
+        backgroundColor: 'var(--bg-card)',
+        cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
+        padding: 0,
+        color: '#64748B'
+      }
+    }, /*#__PURE__*/React.createElement(EmojiPickerIcon, null)),
+    /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => fileInputRefEdit.current && fileInputRefEdit.current.click(),
+      title: "사진 첨부",
+      style: {
+        width: '32px',
+        height: '32px',
+        borderRadius: '50%',
+        border: '1px solid var(--border-subtle)',
+        backgroundColor: 'var(--bg-card)',
+        cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
+        padding: 0,
+        color: 'var(--text-muted)'
+      }
+    }, /*#__PURE__*/React.createElement("svg", {
+      xmlns: "http://www.w3.org/2000/svg",
+      width: "16",
+      height: "16",
+      viewBox: "0 0 24 24",
+      fill: "none",
+      stroke: "currentColor",
+      strokeWidth: "2",
+      strokeLinecap: "round",
+      strokeLinejoin: "round"
+    }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), /*#__PURE__*/React.createElement("path", { d: "M15 8h.01" }), /*#__PURE__*/React.createElement("path", { d: "M12.5 21h-6.5a3 3 0 0 1 -3 -3v-12a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v6.5" }), /*#__PURE__*/React.createElement("path", { d: "M3 16l5 -5c.928 -.893 2.072 -.893 3 0l4 4" }), /*#__PURE__*/React.createElement("path", { d: "M14 14l1 -1c.67 -.644 1.45 -.824 2.182 -.54" }), /*#__PURE__*/React.createElement("path", { d: "M16 19h6" }), /*#__PURE__*/React.createElement("path", { d: "M19 16v6" }))))
+  )), /*#__PURE__*/React.createElement("div", {
+    className: "modal-footer",
+    style: { padding: '16px', justifyContent: 'space-between', alignItems: 'center' }
   },
     /* Participant reassignment -- fixes a message posted under the wrong participant */
     /*#__PURE__*/React.createElement(ParticipantPickerButton, {
@@ -2801,21 +3046,24 @@ export function EditMessageModal({
         className: "btn btn-secondary",
         disabled: isSubmitting,
         onClick: onClose,
-        style: { height: '34px', fontSize: '0.85rem', padding: '0 14px' }
+        style: { height: '44px', minHeight: '44px', fontSize: '0.85rem', padding: '0 16px' }
       }, "취소"),
       /*#__PURE__*/React.createElement("button", {
         type: "button",
         className: "btn btn-poll-create",
         disabled: isSubmitting || (!text.trim() && images.length === 0),
         onClick: handleSave,
-        style: { height: '34px', fontSize: '0.85rem', padding: '0 16px', opacity: (text.trim() || images.length > 0) && !isSubmitting ? 1 : 0.6 }
+        style: { height: '44px', minHeight: '44px', fontSize: '0.85rem', padding: '0 16px', opacity: (text.trim() || images.length > 0) && !isSubmitting ? 1 : 0.6 }
       }, isSubmitting ? '...' : "수정")
     )
-  )))), isPartSheetOpen && /*#__PURE__*/React.createElement(ChatParticipantSheet, {
+  ))), isPartSheetOpen && /*#__PURE__*/React.createElement(ChatParticipantSheet, {
     calendar: calendar,
     selectedId: participantId,
     onSelect: id => { setParticipantId(id); setIsPartSheetOpen(false); },
     onClose: () => setIsPartSheetOpen(false)
+  }), isEmojiPickerOpen && /*#__PURE__*/React.createElement(EmojiPickerSheet, {
+    onSelect: insertEmojiIntoEditInput,
+    onClose: () => setIsEmojiPickerOpen(false)
   }), imageProcessingEdit && /*#__PURE__*/React.createElement(ImageProcessingOverlay, imageProcessingEdit));
 }
 

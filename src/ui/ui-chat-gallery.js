@@ -1445,6 +1445,8 @@ export function ChatGalleryModal({
       }
     }, filteredPhotos.map((photo, idx) => /*#__PURE__*/React.createElement("img", {
       key: `${photo.messageId || photo.source || 'photo'}-${photo.meetingDate || ''}-${photo.directMediaUrl ? 'direct' : photo.imageIndex}-${photo.timestamp || idx}`,
+      "data-photo-url": photo.full || photo.thumb,
+      "data-message-id": photo.messageId || photo.sourceMessageId,
       src: (photo.thumb && String(photo.thumb)) || (photo.full && String(photo.full)) || '',
       alt: "공유사진",
       loading: "lazy",

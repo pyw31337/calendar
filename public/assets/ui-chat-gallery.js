@@ -63,6 +63,14 @@ function extractFirstUrl(...args) {
   const f = __gatherUiDeps().extractFirstUrl || GATHER_APP_UTILS.extractFirstUrl;
   return typeof f === 'function' ? f(...args) : undefined;
 }
+function extractAllUrlInfos(...args) {
+  const f = __gatherUiDeps().extractAllUrlInfos || GATHER_APP_UTILS.extractAllUrlInfos;
+  return typeof f === 'function' ? f(...args) : [];
+}
+function extractAllUrlInfosLoose(...args) {
+  const f = __gatherUiDeps().extractAllUrlInfosLoose || GATHER_APP_UTILS.extractAllUrlInfosLoose;
+  return typeof f === 'function' ? f(...args) : [];
+}
 function extractLeadingMemoDate(...args) {
   const f = __gatherUiDeps().extractLeadingMemoDate || GATHER_APP_UTILS.extractLeadingMemoDate;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -474,7 +482,7 @@ const MONTH_NAMES = GATHER_APP_CALENDAR_DATA.MONTH_NAMES || ['1월','2월','3월
 const PRESET_COLORS = GATHER_APP_CONSTANTS.PRESET_COLORS || [];
 const DEFAULT_EXPENSE_CATEGORIES = GATHER_APP_CONSTANTS.DEFAULT_EXPENSE_CATEGORIES || [];
 const DEFAULT_PLACE_CATEGORIES = GATHER_APP_CONSTANTS.DEFAULT_PLACE_CATEGORIES || GATHER_APP_UTILS.DEFAULT_PLACE_CATEGORIES || [];
-const EMOJI_CATEGORIES = GATHER_APP_CONSTANTS.EMOJI_CATEGORIES || [];
+const EMOJI_CATEGORIES = GATHER_APP_CHAT_DATA.EMOJI_CATEGORIES || [];
 const INCOME_EXPENSE_CATEGORY = GATHER_APP_UTILS.INCOME_EXPENSE_CATEGORY || { id: 'income', name: '수입', color: '#16A34A' };
 const PLACE_MAP_DEFAULT_CENTER = __gatherUiDeps().PLACE_MAP_DEFAULT_CENTER || [37.5665, 126.978];
 const PLACE_MAP_DEFAULT_ZOOM = __gatherUiDeps().PLACE_MAP_DEFAULT_ZOOM || 11;
@@ -650,6 +658,30 @@ function getDirectChatMediaInfo(...args) {
   const f = __gatherUiDeps().getDirectChatMediaInfo || GATHER_APP_UTILS.getDirectChatMediaInfo;
   return typeof f === 'function' ? f(...args) : undefined;
 }
+function getDirectMediaTagsForUrl(...args) {
+  const f = __gatherUiDeps().getDirectMediaTagsForUrl || GATHER_APP_UTILS.getDirectMediaTagsForUrl;
+  return typeof f === 'function' ? f(...args) : '';
+}
+// Generalizes getMessageDirectMediaEntry (which only ever returned the FIRST externally-linked
+// image in a message) to every recognized image link in the text -- a message pasted with several
+// external image links (see DirectChatMediaText's multi-image grid in ui-remaining.js) needs every
+// one of them to show up here too, not just the first, the same way a real multi-image upload
+// already does via getMessageImageEntries.
+function getAllDirectMediaImageEntries(msgLike) {
+  if (!msgLike?.text) return [];
+  return extractAllUrlInfosLoose(msgLike.text)
+    .filter(info => getDirectChatMediaInfo(info.url)?.type === 'image')
+    .map((info, idx) => ({
+      full: info.url,
+      thumb: info.url,
+      imageIndex: idx,
+      messageId: msgLike.id,
+      timestamp: msgLike.timestamp,
+      tags: getDirectMediaTagsForUrl(msgLike, info.url),
+      directMediaUrl: info.url,
+      uploadSource: msgLike.uploadSource || null
+    }));
+}
 function getPollOptionVoterIds(...args) {
   const f = __gatherUiDeps().getPollOptionVoterIds || GATHER_APP_UTILS.getPollOptionVoterIds;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -671,6 +703,57 @@ function getAnniversaryDisplayColor(...args) {
   return typeof f === 'function' ? f(...args) : undefined;
 }
 
+// Tracks whether the OS clipboard currently holds an image, so a '붙여넣기' button can be
+// disabled when there's nothing to paste. Browsers vary wildly here (Firefox has no image
+// support for navigator.clipboard.read(), Safari/Chrome gate it behind the clipboard-read
+// permission) -- this fails OPEN (button stays enabled) whenever the check itself is
+// unsupported or inconclusive, and specifically avoids calling clipboard.read() while
+// permission is still 'prompt' so merely rendering the button never pops a permission dialog.
+function useClipboardHasImage(active) {
+  const React = window.React;
+  const [hasImage, setHasImage] = React.useState(true);
+  React.useEffect(() => {
+    if (!active || typeof navigator === 'undefined' || !navigator.clipboard || typeof navigator.clipboard.read !== 'function') {
+      return undefined;
+    }
+    let cancelled = false;
+    const check = async () => {
+      try {
+        if (navigator.permissions && typeof navigator.permissions.query === 'function') {
+          let state = 'granted';
+          try {
+            state = (await navigator.permissions.query({ name: 'clipboard-read' })).state;
+          } catch (e) {
+            // Permission name not recognized (Firefox) -- fall through to a direct read attempt.
+          }
+          if (state === 'denied') { if (!cancelled) setHasImage(false); return; }
+          if (state === 'prompt') return;
+        }
+        // Bounded the same way the actual paste handler is (readClipboardImageFiles in
+        // app-main.js) -- some mobile browsers can hang clipboard.read() indefinitely instead of
+        // resolving/rejecting, which would otherwise strand this background check forever.
+        const items = await Promise.race([
+          navigator.clipboard.read(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('clipboard read timed out')), 5000))
+        ]);
+        const found = items.some(item => item.types.some(t => t.startsWith('image/')));
+        if (!cancelled) setHasImage(found);
+      } catch (e) {
+        // Read blocked/unsupported right now -- leave the button as-is rather than disabling
+        // it over an inconclusive check.
+      }
+    };
+    check();
+    window.addEventListener('focus', check);
+    document.addEventListener('visibilitychange', check);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('focus', check);
+      document.removeEventListener('visibilitychange', check);
+    };
+  }, [active]);
+  return hasImage;
+}
 
 export function ChatGalleryModal({
   chatMessages,
@@ -680,7 +763,6 @@ export function ChatGalleryModal({
   onClose,
   onUploadImages = null,
   onOpenShare = null,
-  onOpenShortcut = null,
   setActiveLightbox,
   hasMoreOlderChat = false,
   loadingOlderChat = false,
@@ -694,7 +776,8 @@ export function ChatGalleryModal({
   onDecreaseFont,
   onIncreaseFont,
   isChatNotifyEnabled,
-  onToggleChatNotifications
+  onToggleChatNotifications,
+  showToast
 }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -707,9 +790,7 @@ export function ChatGalleryModal({
   const LinkPreviewCard = __deps.LinkPreviewCard || __comp.LinkPreviewCard;
   const MenuIcon = __deps.MenuIcon || __comp.MenuIcon;
   const getMessageImageEntries = __deps.getMessageImageEntries;
-  const getMessageDirectMediaEntry = __deps.getMessageDirectMediaEntry;
   const resolveMeetingPhotoDisplay = __deps.resolveMeetingPhotoDisplay;
-  const extractFirstUrl = __deps.extractFirstUrl;
   const removeFirstUrl = __deps.removeFirstUrl;
   const formatChatHeaderTitle = __deps.formatChatHeaderTitle;
   const useScrollHideHeader = __deps.useScrollHideHeader;
@@ -719,6 +800,12 @@ export function ChatGalleryModal({
   const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
   const uploadInputRef = React.useRef(null);
+  const hasClipboardImage = useClipboardHasImage(true);
+  const [pastePreview, setPastePreview] = React.useState(null); // { files, previewUrls } | null
+  React.useEffect(() => () => {
+    // Safety net if the component unmounts (e.g. gallery closed) while the preview is still open.
+    if (pastePreview) pastePreview.previewUrls.forEach(url => { try { URL.revokeObjectURL(url); } catch (e) {} });
+  }, [pastePreview]);
   // 창이 넓어지면 썸네일을 키우지 않고 단 수(2~12)를 늘린다. 셀 목표 너비 ~108px.
   const [gridCols, setGridCols] = React.useState(() => {
     const w = typeof window !== 'undefined' ? window.innerWidth : 400;
@@ -758,24 +845,40 @@ export function ChatGalleryModal({
   }, [asPage, activeTab]);
 
   const sharedLinks = React.useMemo(() => {
+    // Was extractFirstUrl -- a message or memo with several distinct links (not just a multi-image
+    // link grid, any mix of URLs typed/pasted together) only ever contributed its first one here,
+    // silently dropping the rest from this tab even though every one of them still renders its own
+    // preview in the chat/memo itself. extractAllUrlInfosLoose surfaces all of them, INCLUDING a
+    // bare domain with no http(s):// or www. prefix (e.g. a share-sheet link pasted as just
+    // "naver.me/xxxx") -- that already rendered its own preview fine in chat/memo (via
+    // extractFirstUrlInfo's looser single-link match) but was invisible to this tab entirely
+    // under the stricter extractAllUrlInfos. Only the first URL per message reuses the cached
+    // linkPreview (that cache is keyed to the message's first URL); the rest fetch their own
+    // preview live the same way a fresh link normally would. Recognized image links are excluded
+    // here -- those belong to the 사진 tab only (see sharedPhotos below), not duplicated as a
+    // generic link card here too.
     const list = [];
     const seen = new Set();
     (chatMessages || []).forEach(msg => {
       if (!msg.text) return;
-      const url = extractFirstUrl(msg.text);
-      if (url && !seen.has(url)) {
-        seen.add(url);
-        list.push({ url, timestamp: msg.timestamp, messageId: msg.id, text: msg.text, linkPreview: msg.linkPreview, source: 'chat' });
-      }
+      let firstUrlSeen = false;
+      extractAllUrlInfosLoose(msg.text).forEach(info => {
+        if (!info.url || seen.has(info.url) || getDirectChatMediaInfo(info.url)?.type === 'image') return;
+        seen.add(info.url);
+        list.push({ url: info.url, timestamp: msg.timestamp, messageId: msg.id, text: msg.text, linkPreview: !firstUrlSeen ? msg.linkPreview : null, source: 'chat' });
+        firstUrlSeen = true;
+      });
     });
     (memos || []).forEach(memo => {
       const body = memo?.text || memo?.content || memo?.body || '';
       if (!body) return;
-      const url = extractFirstUrl(body);
-      if (url && !seen.has(url)) {
-        seen.add(url);
-        list.push({ url, timestamp: memo.updatedAt || memo.createdAt || 0, messageId: memo.id, text: body, linkPreview: memo.linkPreview || null, source: 'memo' });
-      }
+      let firstUrlSeen = false;
+      extractAllUrlInfosLoose(body).forEach(info => {
+        if (!info.url || seen.has(info.url) || getDirectChatMediaInfo(info.url)?.type === 'image') return;
+        seen.add(info.url);
+        list.push({ url: info.url, timestamp: memo.updatedAt || memo.createdAt || 0, messageId: memo.id, text: body, linkPreview: !firstUrlSeen ? (memo.linkPreview || null) : null, source: 'memo' });
+        firstUrlSeen = true;
+      });
     });
     return list.sort((a, b) => b.timestamp - a.timestamp);
   }, [chatMessages, memos]);
@@ -783,8 +886,7 @@ export function ChatGalleryModal({
   const sharedPhotos = React.useMemo(() => {
     const list = [];
     (chatMessages || []).forEach(msg => {
-      const directEntry = getMessageDirectMediaEntry(msg);
-      const entries = directEntry ? [...getMessageImageEntries(msg), directEntry] : getMessageImageEntries(msg);
+      const entries = [...getMessageImageEntries(msg), ...getAllDirectMediaImageEntries(msg)];
       entries.forEach(entry => {
         list.push({ ...entry, text: msg.text || '', participantId: msg.participantId || '', source: 'chat' });
       });
@@ -799,8 +901,7 @@ export function ChatGalleryModal({
         imageUrl: memo.imageUrl, imageUrls: memo.imageUrls, thumbUrl: memo.thumbUrl, thumbUrls: memo.thumbUrls,
         timestamp: memo.updatedAt || memo.createdAt || 0, participantId: memo.participantId || ''
       };
-      const directEntry = getMessageDirectMediaEntry(asMsg);
-      const entries = directEntry ? [...getMessageImageEntries(asMsg), directEntry] : getMessageImageEntries(asMsg);
+      const entries = [...getMessageImageEntries(asMsg), ...getAllDirectMediaImageEntries(asMsg)];
       entries.forEach(entry => {
         list.push({ ...entry, tags: memoTagsDisplay, text: asMsg.text || '', participantId: asMsg.participantId || '', source: 'memo' });
       });
@@ -840,14 +941,23 @@ export function ChatGalleryModal({
     // doesn't show duplicates -- keep the chat/memo copy when both exist (its tag editor writes
     // back to a real message), falling back to the meeting copy only when it's the sole survivor
     // (e.g. the original message hasn't been paginated into view yet).
+    // The winning (chat/memo) copy is best for tag editing (see above), but its own entry never
+    // carries meetingDate -- that only lives on the meeting-side archival copy being discarded
+    // here. Carry it over onto the winner so the Lightbox can still show "일정 YY.MM.DD" with a
+    // jump-to-date link for a photo that's genuinely both a real chat message AND linked to a
+    // meeting date, instead of falling back to the generic non-clickable "일정 사진으로 업로드됨".
     const byUrl = new Map();
     const sourceRank = { chat: 0, memo: 1, meeting: 2 };
     list.forEach(entry => {
       const key = entry.full || entry.thumb;
       if (!key) return;
       const existing = byUrl.get(key);
-      if (!existing || (sourceRank[entry.source] ?? 9) < (sourceRank[existing.source] ?? 9)) {
+      if (!existing) {
         byUrl.set(key, entry);
+      } else if ((sourceRank[entry.source] ?? 9) < (sourceRank[existing.source] ?? 9)) {
+        byUrl.set(key, { ...entry, meetingDate: entry.meetingDate || existing.meetingDate || '' });
+      } else if (!existing.meetingDate && entry.meetingDate) {
+        byUrl.set(key, { ...existing, meetingDate: entry.meetingDate });
       }
     });
     return Array.from(byUrl.values()).sort((a, b) => b.timestamp - a.timestamp);
@@ -891,12 +1001,28 @@ export function ChatGalleryModal({
     }
   }, [searchQuery, hasMoreOlderChat, loadingOlderChat, hasMoreMemos, (chatMessages || []).length, (memos || []).length]);
 
+  // Keeps auto-loading older chat history while the 사진 tab is active and still short of a
+  // decent first page -- unaffected by the tab-aware effect below (which only targets link count
+  // once the 링크 tab is open).
   React.useEffect(() => {
-    if (!asPage || (searchQuery || '').trim()) return;
+    if (!asPage || (searchQuery || '').trim() || activeTab !== 'photos') return;
     if (typeof onLoadOlderChat !== 'function' || !hasMoreOlderChat || loadingOlderChat) return;
     if ((sharedPhotos || []).length >= 60) return;
     onLoadOlderChat();
-  }, [asPage, searchQuery, hasMoreOlderChat, loadingOlderChat, (sharedPhotos || []).length, (chatMessages || []).length]);
+  }, [asPage, searchQuery, activeTab, hasMoreOlderChat, loadingOlderChat, (sharedPhotos || []).length, (chatMessages || []).length]);
+
+  // Was missing entirely: the 사진 tab's auto-load above only ever watches photo count, so once
+  // it had loaded "enough" photos it stopped pulling in older chat/memo history for good --
+  // switching to the 링크 tab afterward saw whatever links happened to already be in that
+  // photo-sized window and nothing more, with no way to pull in additional history (그 tab had no
+  // "더보기" button of its own either -- see below). Links can come from BOTH chat and memos, so
+  // this drains both independently once the 링크 tab is actually open.
+  React.useEffect(() => {
+    if (!asPage || (searchQuery || '').trim() || activeTab !== 'links') return;
+    if ((sharedLinks || []).length >= 50) return;
+    if (typeof onLoadOlderChat === 'function' && hasMoreOlderChat && !loadingOlderChat) onLoadOlderChat();
+    if (typeof onLoadMoreMemos === 'function' && hasMoreMemos) onLoadMoreMemos();
+  }, [asPage, searchQuery, activeTab, hasMoreOlderChat, loadingOlderChat, hasMoreMemos, (sharedLinks || []).length, (chatMessages || []).length, (memos || []).length]);
 
   const displayPhotoTabCount = (typeof totalGalleryCount === 'number' && totalGalleryCount > (sharedPhotos || []).length)
     ? totalGalleryCount
@@ -907,10 +1033,22 @@ export function ChatGalleryModal({
   };
   const handlePasteGalleryUpload = async e => {
     if (e) e.stopPropagation();
-    const files = await readClipboardImageFiles();
+    const files = await readClipboardImageFiles(showToast);
     if (files && files.length > 0) {
-      await uploadFiles(files);
+      // Show what will be uploaded and let the user confirm instead of uploading immediately --
+      // handleConfirmPastePreview does the actual upload once confirmed.
+      setIsMenuOpen(false);
+      setPastePreview({ files, previewUrls: files.map(f => URL.createObjectURL(f)) });
     }
+  };
+  // previewUrls are revoked by the cleanup effect above once pastePreview changes (including
+  // back to null here) -- no need to revoke them again in these two handlers.
+  const handleCancelPastePreview = () => setPastePreview(null);
+  const handleConfirmPastePreview = async () => {
+    if (!pastePreview) return;
+    const files = pastePreview.files;
+    setPastePreview(null);
+    await uploadFiles(files);
   };
   const uploadFiles = async files => {
     if (!files.length || typeof onUploadImages !== 'function') return;
@@ -924,14 +1062,18 @@ export function ChatGalleryModal({
     await uploadFiles(files);
   };
   // Lets '이미지 업로드' accept a clipboard-pasted image too, not just the file picker -- active
-  // for as long as the 갤러리 페이지 is open, so Ctrl+V uploads directly without opening the menu.
+  // for as long as the 갤러리 페이지 is open. Routes through the same preview/confirm modal as
+  // the 붙여넣기 button (handlePasteGalleryUpload) rather than uploading straight from the paste
+  // event -- otherwise a stray Ctrl+V uploads whatever happens to be on the clipboard with no
+  // chance to back out.
   React.useEffect(() => {
     if (typeof onUploadImages !== 'function') return;
     const handlePaste = e => {
       const files = getImageFilesFromClipboardEvent(e);
       if (!files.length) return;
       e.preventDefault();
-      uploadFiles(files);
+      setIsMenuOpen(false);
+      setPastePreview({ files, previewUrls: files.map(f => URL.createObjectURL(f)) });
     };
     document.addEventListener('paste', handlePaste);
     return () => document.removeEventListener('paste', handlePaste);
@@ -956,12 +1098,44 @@ export function ChatGalleryModal({
         xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24",
         fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
       }, /*#__PURE__*/React.createElement("circle", { cx: "6", cy: "12", r: "3" }), /*#__PURE__*/React.createElement("circle", { cx: "18", cy: "6", r: "3" }), /*#__PURE__*/React.createElement("circle", { cx: "18", cy: "18", r: "3" }), /*#__PURE__*/React.createElement("path", { d: "M8.7 10.7l6.6-3.4" }), /*#__PURE__*/React.createElement("path", { d: "M8.7 13.3l6.6 3.4" }));
-  const renderShortcutIcon = () => /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24",
-    fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
-  }, /*#__PURE__*/React.createElement("path", { d: "M15 3h6v6" }),
-     /*#__PURE__*/React.createElement("path", { d: "M10 14 21 3" }),
-     /*#__PURE__*/React.createElement("path", { d: "M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" }));
+
+  // Paste preview/confirm modal -- shown after clicking '붙여넣기' and before the clipboard
+  // image(s) actually upload, so the user can see what's about to be attached.
+  const pastePreviewModal = pastePreview ? /*#__PURE__*/React.createElement("div", {
+    className: "modal-overlay",
+    style: { zIndex: 30000 },
+    onClick: handleCancelPastePreview
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "modal-container confirm-dialog-modal",
+    onClick: e => e.stopPropagation(),
+    style: { maxWidth: '360px', borderRadius: '12px' }
+  },
+    /*#__PURE__*/React.createElement("h3", {
+      style: { fontSize: '1.05rem', fontWeight: 800, marginBottom: '12px', color: 'var(--text-main)', textAlign: 'center' }
+    }, `클립보드 이미지 ${pastePreview.previewUrls.length}장을 붙여넣을까요?`),
+    /*#__PURE__*/React.createElement("div", {
+      style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(76px, 1fr))', gap: '8px', marginBottom: '16px', maxHeight: '50vh', overflowY: 'auto' }
+    }, pastePreview.previewUrls.map((url, i) => /*#__PURE__*/React.createElement("img", {
+      key: i,
+      src: url,
+      alt: "붙여넣을 이미지 미리보기",
+      style: { width: '100%', aspectRatio: '1 / 1', objectFit: 'cover', borderRadius: '10px', backgroundColor: 'var(--bg-primary)' }
+    }))),
+    /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '10px', justifyContent: 'center' } },
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "btn btn-secondary",
+        onClick: handleCancelPastePreview,
+        style: { flex: 1, height: '36px', fontSize: '0.85rem' }
+      }, "취소"),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "btn btn-action-dark",
+        onClick: handleConfirmPastePreview,
+        style: { flex: 1, height: '36px', fontSize: '0.85rem' }
+      }, "업로드")
+    )
+  )) : null;
 
   const galleryShellStyle = asPage ? {
     position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1005,
@@ -989,7 +1163,7 @@ export function ChatGalleryModal({
     position: 'relative', overflow: 'hidden'
   };
 
-  return /*#__PURE__*/React.createElement("div", {
+  const galleryTree = /*#__PURE__*/React.createElement("div", {
     className: asPage ? "gallery-page-container" : "modal-overlay",
     onClick: asPage ? undefined : onClose,
     style: galleryShellStyle
@@ -1051,7 +1225,7 @@ export function ChatGalleryModal({
   /*#__PURE__*/React.createElement("input", {
     ref: uploadInputRef,
     type: "file",
-    accept: "image/*",
+    accept: "image/jpeg, image/png, image/gif, image/webp, image/heic, image/heif, image/*",
     multiple: true,
     onChange: handleUploadChange,
     style: { display: 'none' }
@@ -1111,13 +1285,15 @@ export function ChatGalleryModal({
         /*#__PURE__*/React.createElement("button", {
           type: "button",
           className: "btn btn-action btn-action-outline",
+          disabled: !hasClipboardImage,
           onClick: handlePasteGalleryUpload,
+          title: hasClipboardImage ? undefined : '클립보드에 붙여넣을 이미지가 없습니다.',
           style: {
             padding: '4px 10px',
             fontSize: '0.76rem',
             fontWeight: 900,
             borderRadius: '8px',
-            cursor: 'pointer',
+            cursor: hasClipboardImage ? 'pointer' : 'default',
             flexShrink: 0,
             whiteSpace: 'nowrap'
           }
@@ -1132,17 +1308,6 @@ export function ChatGalleryModal({
         /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
           /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "공유하기"),
           /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "현재 갤러리 캘린더 공유")
-        )
-      ),
-      typeof onOpenShortcut === 'function' && /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        className: "admin-side-menu-item",
-        onClick: () => { setIsMenuOpen(false); onOpenShortcut(); }
-      },
-        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, renderShortcutIcon()),
-        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
-          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "바로가기"),
-          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "홈 화면에 빠르게 접근")
         )
       )
     ),
@@ -1232,13 +1397,34 @@ export function ChatGalleryModal({
       display: 'flex', flexDirection: 'column', gap: '12px', boxSizing: 'border-box',
       minWidth: 0
     }
-  }, activeTab === 'links' ? (
+  }, activeTab === 'links' ? /*#__PURE__*/React.createElement(React.Fragment, null,
     filteredLinks.length === 0 ? /*#__PURE__*/React.createElement("div", {
       style: { textAlign: 'center', color: 'var(--text-muted)', padding: '40px 0', fontSize: '0.88rem' }
     }, searchQuery ? "검색 결과가 없습니다." : "공유된 링크가 없습니다.") : filteredLinks.map(item => /*#__PURE__*/React.createElement("div", {
       key: item.messageId,
       style: { width: '100%' }
-    }, /*#__PURE__*/React.createElement(LinkPreviewCard, { url: item.url, fallbackTitle: item.text ? removeFirstUrl(item.text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : '', cachedData: item.linkPreview })))
+    }, /*#__PURE__*/React.createElement(LinkPreviewCard, { url: item.url, fallbackTitle: item.text ? removeFirstUrl(item.text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : '', cachedData: item.linkPreview, stretch: true }))),
+    (hasMoreOlderChat || hasMoreMemos) && !(searchQuery || '').trim() && /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => {
+        if (typeof onLoadOlderChat === 'function' && hasMoreOlderChat && !loadingOlderChat) onLoadOlderChat();
+        if (typeof onLoadMoreMemos === 'function' && hasMoreMemos) onLoadMoreMemos();
+      },
+      disabled: !!loadingOlderChat,
+      style: {
+        width: '100%',
+        marginTop: '4px',
+        padding: '12px 0',
+        border: 'none',
+        borderRadius: '8px',
+        backgroundColor: 'color-mix(in srgb, var(--bg-primary) 96%, black)',
+        color: 'var(--text-main)',
+        fontSize: '0.85rem',
+        fontWeight: 700,
+        cursor: loadingOlderChat ? 'wait' : 'pointer',
+        textAlign: 'center'
+      }
+    }, loadingOlderChat ? '이전 링크를 불러오는 중…' : '이전 링크 더 보기')
   ) : /*#__PURE__*/React.createElement(React.Fragment, null,
     filteredPhotos.length === 0 ? /*#__PURE__*/React.createElement("div", {
       style: { textAlign: 'center', color: 'var(--text-muted)', padding: '40px 0', fontSize: '0.88rem' }
@@ -1259,6 +1445,8 @@ export function ChatGalleryModal({
       }
     }, filteredPhotos.map((photo, idx) => /*#__PURE__*/React.createElement("img", {
       key: `${photo.messageId || photo.source || 'photo'}-${photo.meetingDate || ''}-${photo.directMediaUrl ? 'direct' : photo.imageIndex}-${photo.timestamp || idx}`,
+      "data-photo-url": photo.full || photo.thumb,
+      "data-message-id": photo.messageId || photo.sourceMessageId,
       src: (photo.thumb && String(photo.thumb)) || (photo.full && String(photo.full)) || '',
       alt: "공유사진",
       loading: "lazy",
@@ -1299,6 +1487,7 @@ export function ChatGalleryModal({
       }
     }, loadingOlderChat ? '이전 사진을 불러오는 중…' : '이전 사진·링크 더 보기')
   ))));
+  return pastePreviewModal ? /*#__PURE__*/React.createElement(React.Fragment, null, galleryTree, pastePreviewModal) : galleryTree;
 }
 
   if (typeof window !== 'undefined') {

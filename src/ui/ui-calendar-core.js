@@ -2034,6 +2034,8 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
   };
 
   return /*#__PURE__*/React.createElement("div", {
+    id: `memo-${memo.id}`,
+    "data-memo-id": memo.id,
     onClick: (e) => {
       const t = e.target;
       if (t && t.closest && t.closest('input, textarea, select, button, a, [data-stop-card-open]')) return;

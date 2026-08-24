@@ -63,10 +63,6 @@ function extractFirstUrl(...args) {
   const f = __gatherUiDeps().extractFirstUrl || GATHER_APP_UTILS.extractFirstUrl;
   return typeof f === 'function' ? f(...args) : undefined;
 }
-function extractLeadingMemoDate(...args) {
-  const f = __gatherUiDeps().extractLeadingMemoDate || GATHER_APP_UTILS.extractLeadingMemoDate;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
 function formatChatDividerDate(...args) {
   const f = __gatherUiDeps().formatChatDividerDate || GATHER_APP_UTILS.formatChatDividerDate;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -139,6 +135,10 @@ function getPlaceCategoryById(...args) {
   const f = __gatherUiDeps().getPlaceCategoryById || GATHER_APP_UTILS.getPlaceCategoryById;
   return typeof f === 'function' ? f(...args) : undefined;
 }
+function getPlaceMemoEntryForDate(...args) {
+  const f = __gatherUiDeps().getPlaceMemoEntryForDate || GATHER_APP_UTILS.getPlaceMemoEntryForDate;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
 function getPlaceCategoryIcon(...args) {
   const f = __gatherUiDeps().getPlaceCategoryIcon || GATHER_APP_UTILS.getPlaceCategoryIcon;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -195,20 +195,20 @@ function normalizePlaceDateForSort(...args) {
   const f = __gatherUiDeps().normalizePlaceDateForSort || GATHER_APP_UTILS.normalizePlaceDateForSort;
   return typeof f === 'function' ? f(...args) : undefined;
 }
-function parseVisitEntriesFromMemo(...args) {
-  const f = __gatherUiDeps().parseVisitEntriesFromMemo || GATHER_APP_UTILS.parseVisitEntriesFromMemo;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function reformatMemoIntoDateLines(...args) {
-  const f = __gatherUiDeps().reformatMemoIntoDateLines || GATHER_APP_UTILS.reformatMemoIntoDateLines;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
 function removeFirstUrl(...args) {
   const f = __gatherUiDeps().removeFirstUrl || GATHER_APP_UTILS.removeFirstUrl;
   return typeof f === 'function' ? f(...args) : undefined;
 }
+function removePlaceMemoEntry(...args) {
+  const f = __gatherUiDeps().removePlaceMemoEntry || GATHER_APP_UTILS.removePlaceMemoEntry;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
 function sortVisitEntriesRecentFirst(...args) {
   const f = __gatherUiDeps().sortVisitEntriesRecentFirst || GATHER_APP_UTILS.sortVisitEntriesRecentFirst;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function toMemoDateFormat(...args) {
+  const f = __gatherUiDeps().toMemoDateFormat || GATHER_APP_UTILS.toMemoDateFormat;
   return typeof f === 'function' ? f(...args) : undefined;
 }
 function trimLatLngOutliers(...args) {
@@ -474,7 +474,7 @@ const MONTH_NAMES = GATHER_APP_CALENDAR_DATA.MONTH_NAMES || ['1월','2월','3월
 const PRESET_COLORS = GATHER_APP_CONSTANTS.PRESET_COLORS || [];
 const DEFAULT_EXPENSE_CATEGORIES = GATHER_APP_CONSTANTS.DEFAULT_EXPENSE_CATEGORIES || [];
 const DEFAULT_PLACE_CATEGORIES = GATHER_APP_CONSTANTS.DEFAULT_PLACE_CATEGORIES || GATHER_APP_UTILS.DEFAULT_PLACE_CATEGORIES || [];
-const EMOJI_CATEGORIES = GATHER_APP_CONSTANTS.EMOJI_CATEGORIES || [];
+const EMOJI_CATEGORIES = GATHER_APP_CHAT_DATA.EMOJI_CATEGORIES || [];
 const INCOME_EXPENSE_CATEGORY = GATHER_APP_UTILS.INCOME_EXPENSE_CATEGORY || { id: 'income', name: '수입', color: '#16A34A' };
 const PLACE_MAP_DEFAULT_CENTER = __gatherUiDeps().PLACE_MAP_DEFAULT_CENTER || [37.5665, 126.978];
 const PLACE_MAP_DEFAULT_ZOOM = __gatherUiDeps().PLACE_MAP_DEFAULT_ZOOM || 11;
@@ -516,6 +516,10 @@ function getMessageImageEntries(...args) {
 }
 function getMessageDirectMediaEntry(...args) {
   const f = __gatherUiDeps().getMessageDirectMediaEntry || GATHER_APP_UTILS.getMessageDirectMediaEntry;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function resolveMeetingPhotoDisplay(...args) {
+  const f = __gatherUiDeps().resolveMeetingPhotoDisplay || GATHER_APP_UTILS.resolveMeetingPhotoDisplay;
   return typeof f === 'function' ? f(...args) : undefined;
 }
 function renderTextWithUrlBadge(...args) {
@@ -697,7 +701,13 @@ function useClipboardHasImage(active) {
           if (state === 'denied') { if (!cancelled) setHasImage(false); return; }
           if (state === 'prompt') return;
         }
-        const items = await navigator.clipboard.read();
+        // Bounded the same way the actual paste handler is (readClipboardImageFiles in
+        // app-main.js) -- some mobile browsers can hang clipboard.read() indefinitely instead of
+        // resolving/rejecting, which would otherwise strand this background check forever.
+        const items = await Promise.race([
+          navigator.clipboard.read(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('clipboard read timed out')), 5000))
+        ]);
         const found = items.some(item => item.types.some(t => t.startsWith('image/')));
         if (!cancelled) setHasImage(found);
       } catch (e) {
@@ -733,6 +743,10 @@ export function DateModal({
   onReorderExpenses,
   onAddMeetingPhotos,
   onDeleteMeetingPhoto,
+  onFindChatMessageById,
+  onLoadOlderChat,
+  hasMoreOlderChat = false,
+  loadingOlderChat = false,
   onSavePlace,
   onDeletePlace,
   onDelete,
@@ -758,8 +772,6 @@ export function DateModal({
   const getActiveParticipants = __deps.getActiveParticipants;
   const getCalendarPlaces = __deps.getCalendarPlaces;
   const getPlaceCategories = __deps.getPlaceCategories;
-  const extractLeadingMemoDate = __deps.extractLeadingMemoDate;
-  const parseVisitEntriesFromMemo = __deps.parseVisitEntriesFromMemo;
   const sortVisitEntriesRecentFirst = __deps.sortVisitEntriesRecentFirst;
   const normalizePlaceAddress = __deps.normalizePlaceAddress;
   const normalizePlaceDateForSort = __deps.normalizePlaceDateForSort;
@@ -791,6 +803,18 @@ export function DateModal({
   const [placeResults, setPlaceResults] = React.useState([]);
   const [selectedPlace, setSelectedPlace] = React.useState(null);
   const [placeMemo, setPlaceMemo] = React.useState('');
+  // Once 장소 메모 wraps past a single line, the 추가/취소/수정 buttons no longer fit comfortably
+  // beside it -- even on PC, not just the <480px mobile breakpoint that already stacks every other
+  // field's actions below it (see .date-modal-field-with-actions in app.css). Measured off the
+  // textarea's own scrollHeight (its content height regardless of screen width) rather than a
+  // viewport media query, since this is about the memo text itself overflowing, not the device.
+  const placeMemoTextareaRef = React.useRef(null);
+  const [isPlaceMemoWrapped, setIsPlaceMemoWrapped] = React.useState(false);
+  React.useLayoutEffect(() => {
+    const el = placeMemoTextareaRef.current;
+    if (!el) return;
+    setIsPlaceMemoWrapped(el.scrollHeight > 48);
+  }, [placeMemo]);
   const [placeAlias, setPlaceAlias] = React.useState('');
   const [placeCategoryId, setPlaceCategoryId] = React.useState(() => getPlaceCategories(calendar)[0]?.id || 'etc');
   const [placeVisitStatus, setPlaceVisitStatus] = React.useState('visited');
@@ -976,6 +1000,11 @@ export function DateModal({
         lng: selectedPlace.lng,
         categoryId: placeCategoryId || selectedPlace.categoryId || 'etc',
         memo: cleanMemo,
+        // This field always represents just THIS date's note (brand new place, an existing place
+        // reused for another date, or an already-linked place being re-edited) -- memoOp:'upsert'
+        // tells handleSavePlace (app-main.js) to merge it into the target place's per-date memo
+        // stack instead of overwriting the whole memo with just this one note.
+        memoOp: 'upsert',
         visitStatus: placeVisitStatus === 'planned' ? 'planned' : 'visited',
         visitDate: dateStr,
         // Not set while editing a place already linked to this date (editingLinkedPlaceId) --
@@ -1044,11 +1073,11 @@ export function DateModal({
     setPlaceCategoryId(place.categoryId || getPlaceCategories(calendar)[0]?.id || 'etc');
     setPlaceQuery(place.name);
     setPlaceResults([]);
-    // Prefill with the place's existing memo instead of leaving the field blank -- typing into
-    // what looks empty risked burying/duplicating earlier notes on this place once saved.
-    // handleSavePlace (app-main.js) recognizes when what comes back still starts with this same
-    // text (a continuation) and uses it as-is instead of appending a new dated line on top of it.
-    setPlaceMemo(place.memo || '');
+    // Leave blank rather than prefilling the place's existing memo -- this field now always holds
+    // just THIS date's note, which handleSavePlaceClick below upserts into the place's per-date
+    // memo stack (see app-main.js's handleSavePlace, memoOp:'upsert') without disturbing its other
+    // dates' entries.
+    setPlaceMemo('');
   };
 
   const handleSubmit = async (e) => {
@@ -1124,9 +1153,87 @@ export function DateModal({
   const parseFlexibleDateTokens = __deps.parseFlexibleDateTokens;
   const dateStrToHashtag = __deps.dateStrToHashtag;
 
+  // A 일정 사진's sourceMessageId can point at a chat message older than whatever's currently
+  // paginated into `chatMessages` (that array only holds the live-loaded window here -- unlike
+  // the Gallery page, this modal has no "load more" of its own to widen it), which made
+  // resolveMeetingPhotoDisplay below silently fall back to the archival snapshot's stale tags
+  // whenever that happened. Fetch any missing source messages directly by id (same lookup
+  // Gallery's own tag-save path already uses) and fold them in below.
+  const [fetchedSourceMessages, setFetchedSourceMessages] = React.useState({});
+  const fetchedSourceIdsRef = React.useRef(new Set());
+  React.useEffect(() => {
+    if (typeof onFindChatMessageById !== 'function') return;
+    const loadedIds = new Set((chatMessages || []).map(m => m && m.id).filter(Boolean));
+    const missingIds = Array.from(new Set(
+      (Array.isArray(confirmedMeetingEntry?.photos) ? confirmedMeetingEntry.photos : [])
+        .map(p => p && p.sourceMessageId)
+        .filter(id => id && !loadedIds.has(id) && !fetchedSourceIdsRef.current.has(id))
+    ));
+    if (missingIds.length === 0) return;
+    missingIds.forEach(id => fetchedSourceIdsRef.current.add(id));
+    let cancelled = false;
+    Promise.all(missingIds.map(id => Promise.resolve(onFindChatMessageById(id)).then(msg => [id, msg]))).then(pairs => {
+      if (cancelled) return;
+      const found = pairs.filter(([, msg]) => msg);
+      if (found.length === 0) return;
+      setFetchedSourceMessages(prev => {
+        const next = { ...prev };
+        found.forEach(([id, msg]) => { next[id] = msg; });
+        return next;
+      });
+    });
+    return () => { cancelled = true; };
+  }, [confirmedMeetingEntry, chatMessages, onFindChatMessageById]);
+  const chatMessagesWithFetchedSources = React.useMemo(() => {
+    const extra = Object.values(fetchedSourceMessages);
+    return extra.length === 0 ? chatMessages : [...(chatMessages || []), ...extra];
+  }, [chatMessages, fetchedSourceMessages]);
+
+  // meetingPhotos below also finds photos purely by scanning chatMessages for this date's
+  // hashtag (no sourceMessageId to fetch by, unlike the archival-copy case above) -- but outside
+  // the 채팅/갤러리 view, the live chat listener only keeps the most recent ~10 messages loaded
+  // (see app-main.js's chatLimit), so a tagged photo sitting further back than that was silently
+  // invisible here even though the exact same tag scan on the Gallery page (which keeps a much
+  // wider window, and pages further back on its own) found it. Page back through chat history,
+  // same "이전 채팅 더보기" mechanism Gallery already uses, until either there's nothing older
+  // left or the oldest loaded message is already older than this date -- at that point every
+  // message that could possibly carry this date's hashtag has been loaded.
+  //
+  // Runs as soon as the modal opens, not gated on activeTab === 'photo': the 사진 tab's own count
+  // badge reads meetingPhotos.length too, so if this only fired once the user actually clicked
+  // into that tab, the badge would show a too-low count (whatever fit in the narrow initial
+  // window) right up until the click, then visibly jump once the wider scan finished -- exactly
+  // the "숫자뱃지가 1로 나왔다가 누르면 12로 바뀐다" bug report. olderChatMessages is cached at
+  // the app level (app-main.js), so this only pays real Firestore-read cost once per date range
+  // per session, not on every single date click.
+  React.useEffect(() => {
+    if (typeof onLoadOlderChat !== 'function' || !hasMoreOlderChat || loadingOlderChat) return;
+    const oldestLoadedTs = chatMessages && chatMessages.length > 0 ? Number(chatMessages[0].timestamp || 0) : 0;
+    const targetDayStartTs = new Date(`${dateStr}T00:00:00`).getTime();
+    if (!oldestLoadedTs || !Number.isFinite(targetDayStartTs) || oldestLoadedTs > targetDayStartTs) {
+      onLoadOlderChat();
+    }
+  }, [dateStr, hasMoreOlderChat, loadingOlderChat, onLoadOlderChat, chatMessages]);
+
   const meetingPhotos = React.useMemo(() => {
+    // An auto-linked 일정 사진 (sourceMessageId set) is only a reference/archival copy of a real
+    // chat photo -- its own imageUrl/thumbUrl/tags fields are a snapshot from whenever it was
+    // linked, and a later tag edit (e.g. from the Gallery page's Lightbox) writes to the SOURCE
+    // MESSAGE, not back onto this snapshot (see handleSaveImageTags in app-main.js). Gallery
+    // already resolves the live values via resolveMeetingPhotoDisplay before displaying; this tab
+    // didn't, so the exact same photo could show different tags depending on which page you
+    // opened it from. Resolving here keeps this tab's thumbnails and Lightbox in sync with it.
     const directPhotos = (Array.isArray(confirmedMeetingEntry?.photos) ? confirmedMeetingEntry.photos : [])
-      .filter(photo => photo && (photo.imageUrl || photo.thumbUrl));
+      .filter(photo => photo && (photo.imageUrl || photo.thumbUrl))
+      .map(photo => {
+        const resolved = resolveMeetingPhotoDisplay(photo, chatMessagesWithFetchedSources) || {};
+        return {
+          ...photo,
+          imageUrl: resolved.imageUrl || photo.imageUrl,
+          thumbUrl: resolved.thumbUrl || photo.thumbUrl,
+          tags: resolved.tags != null ? resolved.tags : photo.tags
+        };
+      });
 
     const directUrls = new Set(directPhotos.map(p => p.imageUrl || p.thumbUrl).filter(Boolean));
     const targetTag = typeof dateStrToHashtag === 'function' ? dateStrToHashtag(dateStr) : (dateStr ? dateStr.replace(/-/g, '').slice(2) : '');
@@ -1179,7 +1286,7 @@ export function DateModal({
     });
 
     return [...directPhotos, ...chatPhotos].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-  }, [confirmedMeetingEntry, chatMessages, dateStr]);
+  }, [confirmedMeetingEntry, chatMessages, chatMessagesWithFetchedSources, dateStr]);
   const meetingPhotoInputRef = React.useRef(null);
   const [isSavingMeetingPhotos, setIsSavingMeetingPhotos] = React.useState(false);
   const hasClipboardImage = useClipboardHasImage(activeTab === 'photo');
@@ -1247,7 +1354,7 @@ export function DateModal({
   const handlePasteMeetingPhotos = async () => {
     if (typeof onAddMeetingPhotos !== 'function' || isSavingMeetingPhotos) return;
     try {
-      const files = await readClipboardImageFiles();
+      const files = await readClipboardImageFiles(showToast);
       if (files && files.length > 0) {
         // Show what will be uploaded and let the user confirm instead of uploading immediately --
         // handleConfirmPasteMeetingPhotos does the actual upload once confirmed.
@@ -1280,24 +1387,19 @@ export function DateModal({
 
   React.useEffect(() => {
     if (activeTab !== 'photo' || typeof onAddMeetingPhotos !== 'function') return;
-    const handlePaste = async (e) => {
+    // Same preview/confirm gate as the 붙여넣기 button (handlePasteMeetingPhotos) -- this used to
+    // upload straight from the paste event with no confirmation step, so a stray Ctrl+V (or an
+    // image left on the clipboard from something unrelated) could add a photo the user never
+    // meant to attach.
+    const handlePaste = (e) => {
       const files = getImageFilesFromClipboardEvent(e);
       if (!files || !files.length) return;
       e.preventDefault();
-      setIsSavingMeetingPhotos(true);
-      try {
-        // See handleMeetingPhotoFiles above for why no toast is shown for the resolved result.
-        await Promise.resolve(onAddMeetingPhotos(dateStr, files));
-      } catch (err) {
-        console.error('Clipboard paste meeting photo failed:', err);
-        showToast('사진 추가 실패', 'error');
-      } finally {
-        setIsSavingMeetingPhotos(false);
-      }
+      setPastePreview({ files, previewUrls: files.map(f => URL.createObjectURL(f)) });
     };
     document.addEventListener('paste', handlePaste);
     return () => document.removeEventListener('paste', handlePaste);
-  }, [activeTab, dateStr, onAddMeetingPhotos]);
+  }, [activeTab, onAddMeetingPhotos]);
 
   const handleDeleteMeetingPhoto = photo => {
     if (!photo?.id || typeof onDeleteMeetingPhoto !== 'function') return;
@@ -1628,7 +1730,6 @@ export function DateModal({
       expenseCategoryInput: expenseCategoryInput || getExpenseCategories(calendar)[0]?.id || 'etc'
     });
     // mount only
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const [hasInteracted, setHasInteracted] = React.useState(false);
   const markDirty = React.useCallback(() => setHasInteracted(true), []);
@@ -2266,25 +2367,30 @@ export function DateModal({
           }, "장소 메모 입력"),
           /*#__PURE__*/React.createElement("div", {
             className: "date-modal-field-with-actions",
-            style: { display: 'flex', gap: '8px', alignItems: 'flex-start' }
+            style: { display: 'flex', gap: '8px', alignItems: 'flex-start', flexDirection: isPlaceMemoWrapped ? 'column' : 'row' }
           },
             /*#__PURE__*/React.createElement(AutoGrowTextarea, {
               className: "form-input",
-              style: { flex: 1, padding: '8px 12px' },
+              style: { flex: 1, width: isPlaceMemoWrapped ? '100%' : undefined, padding: '8px 12px' },
               minHeight: 44,
               maxHeight: 480,
+              textareaRef: placeMemoTextareaRef,
               placeholder: "메모 입력 (선택, '26.02.12' 또는 URL 입력 가능)",
               maxLength: 2000,
               value: placeMemo,
               disabled: isSavingPlace,
               onChange: e => setPlaceMemo(e.target.value)
             }),
-            /*#__PURE__*/React.createElement("div", { className: "date-modal-field-actions" },
+            /*#__PURE__*/React.createElement("div", {
+              className: "date-modal-field-actions",
+              style: isPlaceMemoWrapped ? { width: '100%' } : undefined
+            },
               /*#__PURE__*/React.createElement(FormAddEditActionButtons, {
                 isEditing: !!editingLinkedPlaceId,
                 isSaving: isSavingPlace,
                 disabled: !selectedPlace,
                 alignSelf: 'flex-start',
+                flexGrow: isPlaceMemoWrapped,
                 onCancel: () => {
                   setEditingLinkedPlaceId(null);
                   setSelectedPlace(null);
@@ -2342,54 +2448,32 @@ export function DateModal({
             /*#__PURE__*/React.createElement("span", { style: { fontWeight: 800, fontSize: '0.88rem', color: 'var(--text-main)' } }, place.alias || place.name),
             place.alias && place.name && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.72rem', color: 'var(--text-muted)' } }, place.name),
             place.address && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.74rem', color: 'var(--text-muted)' } }, getDisplayPlaceAddress(place)),
-            /* Memo — in DateModal's '장소' tab, filter to display ONLY the memo entry corresponding to THIS dateStr */
+            /* Memo — in DateModal's '장소' tab, show ONLY the memo entry for THIS dateStr; the
+               full per-place history (every date's entry) is shown on the 장소 페이지 instead. */
             place.memo && (() => {
-              const targetNorm = typeof normalizePlaceDateForSort === 'function' ? (normalizePlaceDateForSort(dateStr) || dateStr) : dateStr;
-              let entries = parseVisitEntriesFromMemo(place.memo);
-              if (entries.length > 0) {
-                const dateEntries = entries.filter(en => {
-                  const enNorm = typeof normalizePlaceDateForSort === 'function' ? normalizePlaceDateForSort(en.date) : en.date;
-                  return enNorm === targetNorm;
-                });
-                if (dateEntries.length > 0) {
-                  return /*#__PURE__*/React.createElement("div", {
-                    style: { display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '0.78rem', color: 'var(--text-main)', lineHeight: 1.45 }
-                  }, dateEntries.map((en, idx) => /*#__PURE__*/React.createElement("div", {
-                    key: `${en.date}_${idx}`,
-                    style: { wordBreak: 'break-word' }
-                  }, renderTextWithUrlBadge(en.note ? `${en.date} ${en.note}` : en.date))));
-                }
-              } else {
-                const leading = typeof extractLeadingMemoDate === 'function' ? extractLeadingMemoDate(place.memo) : '';
-                if (leading) {
-                  const leadingNorm = typeof normalizePlaceDateForSort === 'function' ? normalizePlaceDateForSort(leading) : leading;
-                  if (leadingNorm === targetNorm) {
-                    const rest = String(place.memo).replace(String(leading), '').replace(/^\s*\/?\s*/, '').trim();
-                    return /*#__PURE__*/React.createElement("div", {
-                      style: { fontSize: '0.78rem', color: 'var(--text-main)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.45 }
-                    }, renderTextWithUrlBadge(rest ? `${leading} ${rest}` : leading));
-                  }
-                } else {
-                  return /*#__PURE__*/React.createElement("div", {
-                    style: { fontSize: '0.78rem', color: 'var(--text-main)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.45 }
-                  }, renderTextWithUrlBadge(place.memo));
-                }
-              }
-              return null;
+              const dateNote = getPlaceMemoEntryForDate(place.memo, dateStr);
+              if (!dateNote) return null;
+              const memoDate = typeof toMemoDateFormat === 'function' ? toMemoDateFormat(dateStr) : dateStr;
+              return /*#__PURE__*/React.createElement("div", {
+                style: { fontSize: '0.78rem', color: 'var(--text-main)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.45 }
+              }, renderTextWithUrlBadge(`${memoDate} ${dateNote}`));
             })(),
             !adminMode && /*#__PURE__*/React.createElement("div", {
               style: { position: 'absolute', top: '10px', right: '10px' }
             }, /*#__PURE__*/React.createElement(ItemEditDeleteActions, {
               onEdit: () => {
                 const sp = { name: place.name, address: place.address || '', lat: place.lat, lng: place.lng, categoryId: place.categoryId || 'etc' };
-                const memoLines = reformatMemoIntoDateLines(place.memo || '');
+                // Prefill with ONLY this date's note, not the place's whole memo history -- this
+                // field always represents a single date's entry, upserted back into the stack on
+                // save (see handleSavePlaceClick's memoOp:'upsert').
+                const dateNote = getPlaceMemoEntryForDate(place.memo || '', dateStr);
                 const catId = place.categoryId || 'etc';
                 const visit = place.visitStatus === 'planned' ? 'planned' : 'visited';
                 setEditingLinkedPlaceId(place.id);
                 setSelectedPlace(sp);
                 setPlaceQuery(place.name || '');
                 setPlaceAlias(place.alias || '');
-                setPlaceMemo(memoLines);
+                setPlaceMemo(dateNote);
                 setPlaceCategoryId(catId);
                 setPlaceVisitStatus(visit);
                 setPlaceResults([]);
@@ -2397,7 +2481,7 @@ export function DateModal({
                 snapshotFormBaseline({
                   ...formBaselineRef.current,
                   editingLinkedPlaceId: place.id,
-                  placeMemo: memoLines,
+                  placeMemo: dateNote,
                   placeAlias: place.alias || '',
                   placeQuery: place.name || '',
                   selectedPlaceKey: String(sp.id || '') + '|' + String(sp.name || '') + '|' + String(sp.lat || '') + '|' + String(sp.lng || ''),
@@ -2412,19 +2496,7 @@ export function DateModal({
                     const targetNorm = normalizePlaceDateForSort(dateStr) || dateStr;
                     let nextVisitDate = place.visitDate || '';
                     if (nextVisitDate === dateStr || normalizePlaceDateForSort(nextVisitDate) === targetNorm) nextVisitDate = '';
-                    let nextMemo = String(place.memo || '');
-                    const entries = parseVisitEntriesFromMemo(nextMemo);
-                    if (entries.length >= 2) {
-                      nextMemo = entries
-                        .filter(en => normalizePlaceDateForSort(en.date) !== targetNorm)
-                        .map(en => en.note ? `${en.date} ${en.note}` : en.date)
-                        .join(' / ');
-                    } else {
-                      const leading = extractLeadingMemoDate(nextMemo);
-                      if (leading && normalizePlaceDateForSort(leading) === targetNorm) {
-                        nextMemo = nextMemo.replace(/^\s*\d{2,4}[.-]\d{2}[.-]\d{2}\s*/, '').replace(/^\/\s*/, '').trim();
-                      }
-                    }
+                    const nextMemo = removePlaceMemoEntry(place.memo || '', dateStr);
                     if (typeof onSavePlace === 'function') {
                       const ok = await Promise.resolve(onSavePlace({
                         id: place.id, name: place.name, alias: place.alias || '',
@@ -2784,11 +2856,18 @@ export function DateModal({
               setActiveLightbox({
                 urls: meetingPhotos.map(p => p.imageUrl || p.thumbUrl),
                 index,
-                meta: meetingPhotos.map(p => (
-                  p.source === 'chat-tag'
-                    ? { timestamp: p.createdAt, tags: p.tags, messageId: p.sourceMessageId, imageIndex: p.sourceImageIndex }
-                    : { timestamp: p.createdAt, tags: p.tags, source: 'meeting', sourceMessageId: p.sourceMessageId, sourceImageIndex: p.sourceImageIndex, meetingDate: dateStr, photoId: p.id }
-                ))
+                meta: meetingPhotos.map(p => ({
+                  timestamp: p.createdAt,
+                  tags: p.tags,
+                  source: p.source || 'meeting',
+                  uploadSource: p.uploadSource || (p.source === 'chat-tag' ? 'chat' : 'meeting'),
+                  messageId: p.sourceMessageId || p.messageId,
+                  imageIndex: p.sourceImageIndex ?? p.imageIndex,
+                  sourceMessageId: p.sourceMessageId,
+                  sourceImageIndex: p.sourceImageIndex,
+                  meetingDate: dateStr,
+                  photoId: p.id
+                }))
               });
             } else {
               const url = photo.imageUrl || photo.thumbUrl;

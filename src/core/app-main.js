@@ -3777,36 +3777,120 @@ function App() {
   // location based on meta.source. directMediaUrl (an image pasted as a bare URL in chat/memo
   // text) has no clean single-item target to mutate, so it's left unsupported (Lightbox hides
   // the edit/delete buttons for it).
+  const findPhotoTargetByUrl = async (imageUrl, preferredMsgId, preferredDateStr, preferredPhotoId) => {
+    if (!imageUrl) return null;
+    if (preferredMsgId) {
+      const msg = await findChatMessageById(preferredMsgId);
+      if (msg) {
+        const getEntries = typeof getMessageImageEntries === 'function' ? getMessageImageEntries : null;
+        const entries = getEntries ? getEntries(msg) : [];
+        const idx = entries.findIndex(e => e.full === imageUrl || e.thumb === imageUrl || e.imageUrl === imageUrl);
+        if (idx >= 0) return { type: 'chat', messageId: msg.id, imageIndex: idx };
+      }
+    }
+    const localMsg = (allChatMessages || []).find(m => {
+      const getEntries = typeof getMessageImageEntries === 'function' ? getMessageImageEntries : null;
+      const entries = getEntries ? getEntries(m) : [];
+      return entries.some(e => e.full === imageUrl || e.thumb === imageUrl || e.imageUrl === imageUrl);
+    });
+    if (localMsg) {
+      const getEntries = typeof getMessageImageEntries === 'function' ? getMessageImageEntries : null;
+      const entries = getEntries ? getEntries(localMsg) : [];
+      const idx = entries.findIndex(e => e.full === imageUrl || e.thumb === imageUrl || e.imageUrl === imageUrl);
+      if (idx >= 0) return { type: 'chat', messageId: localMsg.id, imageIndex: idx };
+    }
+
+    const localMemo = (memos || []).find(m => {
+      const urls = Array.isArray(m.imageUrls) ? m.imageUrls : (m.imageUrl ? [m.imageUrl] : []);
+      const thumbs = Array.isArray(m.thumbUrls) ? m.thumbUrls : (m.thumbUrl ? [m.thumbUrl] : []);
+      return urls.includes(imageUrl) || thumbs.includes(imageUrl);
+    });
+    if (localMemo) {
+      const urls = Array.isArray(localMemo.imageUrls) ? localMemo.imageUrls : (localMemo.imageUrl ? [localMemo.imageUrl] : []);
+      const thumbs = Array.isArray(localMemo.thumbUrls) ? localMemo.thumbUrls : (localMemo.thumbUrl ? [localMemo.thumbUrl] : []);
+      let idx = urls.indexOf(imageUrl);
+      if (idx < 0) idx = thumbs.indexOf(imageUrl);
+      return { type: 'memo', memoId: localMemo.id, imageIndex: Math.max(0, idx) };
+    }
+
+    const meetings = getConfirmedMeetings(activeCal);
+    let targetMeeting = null;
+    let targetPhoto = null;
+    if (preferredDateStr && isValidDateString(preferredDateStr)) {
+      const m = meetings.find(item => item.date === preferredDateStr);
+      if (m && Array.isArray(m.photos)) {
+        targetPhoto = m.photos.find(p => (preferredPhotoId && p.id === preferredPhotoId) || p.imageUrl === imageUrl || p.thumbUrl === imageUrl);
+        if (targetPhoto) targetMeeting = m;
+      }
+    }
+    if (!targetMeeting) {
+      for (const m of meetings) {
+        if (!Array.isArray(m.photos)) continue;
+        const p = m.photos.find(item => (preferredPhotoId && item.id === preferredPhotoId) || item.imageUrl === imageUrl || item.thumbUrl === imageUrl);
+        if (p) {
+          targetMeeting = m;
+          targetPhoto = p;
+          break;
+        }
+      }
+    }
+    if (targetMeeting && targetPhoto) {
+      return { type: 'meeting', dateStr: targetMeeting.date, photoId: targetPhoto.id, photo: targetPhoto };
+    }
+
+    return null;
+  };
+
+  const focusElementWithShake = el => {
+    if (!el) return false;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    el.classList.remove('chat-search-focused-bubble');
+    void el.offsetWidth;
+    el.classList.add('chat-search-focused-bubble');
+    setTimeout(() => {
+      el.classList.remove('chat-search-focused-bubble');
+    }, 2200);
+    return true;
+  };
+
   const handleDeletePhoto = async meta => {
     if (!meta || meta.directMediaUrl) return false;
     const imageUrl = meta.imageUrl || meta.full || meta.thumb;
     const msgId = meta.messageId || meta.sourceMessageId;
     const imgIdx = Number.isInteger(meta.imageIndex) ? meta.imageIndex : (Number.isInteger(meta.sourceImageIndex) ? meta.sourceImageIndex : 0);
+    const dateStr = meta.meetingDate;
+    const photoId = meta.photoId;
 
-    // 1. If it's explicitly a memo photo
     if (meta.source === 'memo' && msgId) {
       const ok = await handleDeleteMemoPhoto(msgId, imgIdx);
       if (ok) return true;
     }
 
-    // 2. If it's a meeting photo
-    if (meta.source === 'meeting' || meta.photoId || meta.meetingDate) {
-      if (meta.sourceMessageId && Number.isInteger(meta.sourceImageIndex)) {
-        const okChat = await handleDeleteChatMessagePhoto(meta.sourceMessageId, meta.sourceImageIndex);
-        if (okChat) return true;
-      }
-      const okMeeting = await handleDeleteMeetingPhoto(meta.meetingDate, meta.photoId, imageUrl);
+    if ((meta.source === 'meeting' || meta.uploadSource === 'meeting' || dateStr || photoId) && !meta.sourceMessageId) {
+      const okMeeting = await handleDeleteMeetingPhoto(dateStr, photoId, imageUrl);
       if (okMeeting) return true;
     }
 
-    // 3. If it's a chat photo or chat-tag photo
-    if (msgId && (meta.source === 'chat' || meta.source === 'chat-tag' || meta.sourceMessageId || meta.messageId)) {
-      const ok = await handleDeleteChatMessagePhoto(msgId, imgIdx);
-      if (ok) return true;
+    if (msgId) {
+      const okChat = await handleDeleteChatMessagePhoto(msgId, imgIdx);
+      if (okChat) return true;
     }
 
-    // 4. Fallback search across all meeting photos by imageUrl/photoId
-    const okMeetingFallback = await handleDeleteMeetingPhoto(meta.meetingDate, meta.photoId, imageUrl);
+    const target = await findPhotoTargetByUrl(imageUrl, msgId, dateStr, photoId);
+    if (target) {
+      if (target.type === 'chat') {
+        const ok = await handleDeleteChatMessagePhoto(target.messageId, target.imageIndex);
+        if (ok) return true;
+      } else if (target.type === 'memo') {
+        const ok = await handleDeleteMemoPhoto(target.memoId, target.imageIndex);
+        if (ok) return true;
+      } else if (target.type === 'meeting') {
+        const ok = await handleDeleteMeetingPhoto(target.dateStr, target.photoId, imageUrl);
+        if (ok) return true;
+      }
+    }
+
+    const okMeetingFallback = await handleDeleteMeetingPhoto(dateStr, photoId, imageUrl);
     if (okMeetingFallback) return true;
 
     showToast('삭제 대상 사진을 찾지 못했습니다.', 'error', 4000);
@@ -3818,39 +3902,45 @@ function App() {
     const imageUrl = meta.imageUrl || meta.full || meta.thumb;
     const msgId = meta.messageId || meta.sourceMessageId;
     const imgIdx = Number.isInteger(meta.imageIndex) ? meta.imageIndex : (Number.isInteger(meta.sourceImageIndex) ? meta.sourceImageIndex : 0);
+    const dateStr = meta.meetingDate;
+    const photoId = meta.photoId;
 
     if (meta.source === 'memo' && msgId) {
       const res = await handleReplaceMemoPhoto(msgId, imgIdx, file);
       if (res) return res;
     }
 
-    if (meta.source === 'meeting' || meta.photoId || meta.meetingDate) {
-      if (meta.sourceMessageId && Number.isInteger(meta.sourceImageIndex)) {
-        const resChat = await handleReplaceChatMessagePhoto(meta.sourceMessageId, meta.sourceImageIndex, file);
-        if (resChat) return resChat;
-      }
-      const resMeeting = await handleReplaceMeetingPhoto(meta.meetingDate, meta.photoId, file, imageUrl);
+    if ((meta.source === 'meeting' || meta.uploadSource === 'meeting' || dateStr || photoId) && !meta.sourceMessageId) {
+      const resMeeting = await handleReplaceMeetingPhoto(dateStr, photoId, file, imageUrl);
       if (resMeeting) return resMeeting;
     }
 
-    if (msgId && (meta.source === 'chat' || meta.source === 'chat-tag' || meta.sourceMessageId || meta.messageId)) {
-      const res = await handleReplaceChatMessagePhoto(msgId, imgIdx, file);
-      if (res) return res;
+    if (msgId) {
+      const resChat = await handleReplaceChatMessagePhoto(msgId, imgIdx, file);
+      if (resChat) return resChat;
     }
 
-    const resFallback = await handleReplaceMeetingPhoto(meta.meetingDate, meta.photoId, file, imageUrl);
+    const target = await findPhotoTargetByUrl(imageUrl, msgId, dateStr, photoId);
+    if (target) {
+      if (target.type === 'chat') {
+        const res = await handleReplaceChatMessagePhoto(target.messageId, target.imageIndex, file);
+        if (res) return res;
+      } else if (target.type === 'memo') {
+        const res = await handleReplaceMemoPhoto(target.memoId, target.imageIndex, file);
+        if (res) return res;
+      } else if (target.type === 'meeting') {
+        const res = await handleReplaceMeetingPhoto(target.dateStr, target.photoId, file, imageUrl);
+        if (res) return res;
+      }
+    }
+
+    const resFallback = await handleReplaceMeetingPhoto(dateStr, photoId, file, imageUrl);
     if (resFallback) return resFallback;
 
     showToast('교체 대상 사진을 찾지 못했습니다.', 'error', 4000);
     return false;
   };
 
-  // "이 사진이 있는 채팅으로 이동" -- same pattern already used by the admin/global search
-  // modals' onOpenChatMessage, reused here so the Lightbox info panel's source line jumps to
-  // the actual chat bubble consistently with search results. Chat only keeps a recent window
-  // loaded by default (see loadOlderChatMessages) -- an image message far enough back wouldn't
-  // exist in the DOM yet, so this pages older history in (same as scrolling up manually) until
-  // the target bubble shows up or there's nothing left to load.
   const handleJumpToChatMessage = messageId => {
     if (!messageId) return;
     setActiveLightbox(null);
@@ -3866,38 +3956,44 @@ function App() {
     }, 350);
   };
 
-  // Ordinal ("몇 번째 말풍선인지") for the Lightbox source label -- counted directly against
-  // Firestore so it's accurate even before the message's page of chat history has loaded.
   const handleGetChatMessageOrdinal = timestamp => {
     if (!activeCalId || !timestamp) return Promise.resolve(null);
     return fetchMessageOrdinal(activeCalId, timestamp);
   };
 
-  // Ordinal ("몇 번째 사진인지") for a gallery-uploaded photo's Lightbox source label
-  // ("갤러리 #20") -- unlike the chat ordinal above this counts PHOTOS, not messages, since a
-  // single gallery upload can chunk into several multi-photo messages.
   const handleGetGalleryPhotoOrdinal = (messageId, imageIndex) => {
     if (!activeCalId || !messageId) return Promise.resolve(null);
     return fetchGalleryPhotoOrdinal(activeCalId, messageId, imageIndex);
   };
 
-  // "메모로 이동" -- reuses the sharedMemo mechanism MemoView already renders as a banner card
-  // above the list (see the ?memo= deep-link effect above), so no MemoView changes are needed.
   const handleJumpToMemo = async memoId => {
     if (!memoId) return;
     setActiveLightbox(null);
     const local = (memos || []).find(m => m.id === memoId);
-    if (local) {
-      setSharedMemo(local);
-      changeView('memo');
-      return;
+    if (local) setSharedMemo(local);
+    else {
+      const fetched = await findMemoById(memoId);
+      if (fetched) setSharedMemo(fetched);
     }
-    const fetched = await findMemoById(memoId);
-    if (fetched) setSharedMemo(fetched);
     changeView('memo');
+    setTimeout(() => {
+      const el = document.querySelector(`[data-memo-id="${memoId}"], #memo-${memoId}`);
+      if (el) focusElementWithShake(el);
+    }, 350);
   };
 
-  // "일정으로 이동" -- opens that date's DateModal, optionally straight on its 사진 tab.
+  const handleJumpToGallery = (messageId, imageIndex, imageUrl) => {
+    setActiveLightbox(null);
+    changeView('gallery');
+    setTimeout(() => {
+      let el = imageUrl ? document.querySelector(`[data-photo-url="${CSS.escape(imageUrl)}"]`) : null;
+      if (!el && messageId) {
+        el = document.querySelector(`[data-message-id="${messageId}"]`);
+      }
+      if (el) focusElementWithShake(el);
+    }, 350);
+  };
+
   const handleJumpToMeetingDate = (dateStr, initialTab = null) => {
     if (!dateStr) return;
     setActiveLightbox(null);
@@ -3905,6 +4001,10 @@ function App() {
     setSelectedDate(dateStr);
     setIsModalOpen(true);
     changeView('calendar');
+    setTimeout(() => {
+      const el = document.querySelector(`[data-date-str="${dateStr}"]`);
+      if (el) focusElementWithShake(el);
+    }, 350);
   };
 
   const handleSavePlace = (placeData) => {
@@ -4642,6 +4742,7 @@ function App() {
         onJumpToChatMessage: handleJumpToChatMessage,
         onJumpToMemo: handleJumpToMemo,
         onJumpToMeetingDate: handleJumpToMeetingDate,
+        onJumpToGallery: handleJumpToGallery,
         onGetChatMessageOrdinal: handleGetChatMessageOrdinal,
         onGetGalleryPhotoOrdinal: handleGetGalleryPhotoOrdinal,
         onRequestConfirm: showConfirmDialog

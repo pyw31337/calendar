@@ -917,7 +917,7 @@ function ZoomOutIcon({ size = 15 } = {}) {
   );
 }
 
-export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, onPromoteImageUrl, onSaveImageTags, onSearchTag, onDeletePhoto, onReplacePhoto, onJumpToChatMessage, onJumpToMemo, onJumpToMeetingDate, onGetChatMessageOrdinal, onGetGalleryPhotoOrdinal, onRequestConfirm }) {
+export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, onPromoteImageUrl, onSaveImageTags, onSearchTag, onDeletePhoto, onReplacePhoto, onJumpToChatMessage, onJumpToMemo, onJumpToMeetingDate, onJumpToGallery, onGetChatMessageOrdinal, onGetGalleryPhotoOrdinal, onRequestConfirm }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const SmallXIcon = __deps.SmallXIcon;
@@ -1177,48 +1177,66 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
   }, [showInfo, currentMeta, onGetGalleryPhotoOrdinal]);
   const sourceInfo = React.useMemo(() => {
     if (!currentMeta) return null;
-    // A photo tagged with a date hashtag is auto-linked onto that date's meeting record (see
-    // linkTaggedImageToMeetingDates, app-main.js) while still being a real chat/gallery message --
-    // Gallery's dedup keeps the chat/gallery copy (source stays whatever it was) but carries the
-    // meetingDate over, so this checks meetingDate directly rather than requiring source==='meeting'
-    // (which only the DateModal 사진 tab's own archival-reference entries actually have).
-    if (currentMeta.source === 'meeting' || currentMeta.meetingDate) {
-      const dateParts = currentMeta.meetingDate ? getShortTitleParts(currentMeta.meetingDate) : null;
+
+    const formatScheduleLabel = (dateStr) => {
+      if (!dateStr || !isValidDateString(dateStr)) return '';
+      const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+      const [y, m, d] = dateStr.split('-').map(Number);
+      const dt = new Date(y, m - 1, d);
+      const yy = String(y).slice(-2);
+      const mm = String(m).padStart(2, '0');
+      const dd = String(d).padStart(2, '0');
+      const dayName = dayNames[dt.getDay()];
+      return `일정 ${yy}.${mm}.${dd}(${dayName})`;
+    };
+
+    let targetMeetingDate = currentMeta.meetingDate || (currentMeta.photoId && currentMeta.photoId.match(/\d{4}-\d{2}-\d{2}/)?.[0]);
+    if (!targetMeetingDate && currentMeta.tags) {
+      const dateMatch = String(currentMeta.tags).match(/(?:#|^|\s)(20\d{2}-\d{2}-\d{2}|\d{6})(?:\s|$)/);
+      if (dateMatch) {
+        const rawToken = dateMatch[1];
+        if (rawToken.length === 6) {
+          targetMeetingDate = `20${rawToken.slice(0, 2)}-${rawToken.slice(2, 4)}-${rawToken.slice(4, 6)}`;
+        } else {
+          targetMeetingDate = rawToken;
+        }
+      }
+    }
+
+    if (currentMeta.source === 'meeting' || currentMeta.uploadSource === 'meeting' || targetMeetingDate) {
+      const dateStr = targetMeetingDate || (currentMeta.timestamp ? new Date(currentMeta.timestamp).toISOString().slice(0, 10) : (typeof getTodayYmd === 'function' ? getTodayYmd() : ''));
+      const label = formatScheduleLabel(dateStr) || `일정 ${dateStr || ''}`;
       return {
-        label: dateParts ? `일정 ${dateParts.year}${dateParts.rest}` : '일정 사진으로 업로드됨',
-        onClick: (onJumpToMeetingDate && currentMeta.meetingDate) ? () => onJumpToMeetingDate(currentMeta.meetingDate, 'photo') : null
+        label: label,
+        onClick: (onJumpToMeetingDate && dateStr) ? () => onJumpToMeetingDate(dateStr, 'photo') : null
       };
     }
+
     if (currentMeta.source === 'memo') {
+      const msgId = currentMeta.messageId || currentMeta.sourceMessageId;
       return {
-        label: '메모에서 업로드됨',
-        onClick: (onJumpToMemo && currentMeta.messageId) ? () => onJumpToMemo(currentMeta.messageId) : null
+        label: '메모',
+        onClick: (onJumpToMemo && msgId) ? () => onJumpToMemo(msgId) : null
       };
     }
-    // Default: chat -- distinguishes composer-typed messages from the gallery's own "이미지
-    // 업로드" menu action and DateModal's own "일정 사진 추가" button (see
-    // handleUploadGalleryImages/handleAddMeetingPhotos' uploadSource marker). Falls back to the
-    // generic label until the relevant ordinal above resolves.
-    // 'gallery'/'meeting' uploadSource photos are never rendered in the chat feed (see
-    // ChatRoomView's render filter + onMessageCreate's push-skip) -- there is no chat bubble to
-    // jump to, so their source chip stays a plain (non-clickable) label.
-    if (currentMeta.uploadSource === 'gallery') {
+
+    if (currentMeta.uploadSource === 'gallery' || currentMeta.source === 'gallery') {
       const galleryKey = currentMeta.messageId != null ? `${currentMeta.messageId}_${currentMeta.imageIndex || 0}` : null;
       const galleryOrdinal = galleryKey != null ? galleryOrdinalCache[galleryKey] : null;
+      const msgId = currentMeta.messageId != null ? currentMeta.messageId : currentMeta.sourceMessageId;
       return {
-        label: typeof galleryOrdinal === 'number' ? `갤러리 #${galleryOrdinal}` : '갤러리에서 업로드됨',
-        onClick: null
+        label: typeof galleryOrdinal === 'number' ? `갤러리 #${galleryOrdinal}` : '갤러리',
+        onClick: (onJumpToGallery && (msgId != null || currentUrl)) ? () => onJumpToGallery(msgId, currentMeta.imageIndex, currentUrl) : null
       };
     }
-    if (currentMeta.uploadSource === 'meeting') {
-      return { label: '일정 사진으로 업로드됨', onClick: null };
-    }
-    const ordinal = currentMeta.messageId != null ? chatOrdinalCache[currentMeta.messageId] : null;
+
+    const msgId = currentMeta.messageId != null ? currentMeta.messageId : currentMeta.sourceMessageId;
+    const ordinal = msgId != null ? chatOrdinalCache[msgId] : null;
     return {
       label: typeof ordinal === 'number' ? `채팅 #${ordinal}` : '채팅',
-      onClick: (onJumpToChatMessage && currentMeta.messageId) ? () => onJumpToChatMessage(currentMeta.messageId) : null
+      onClick: (onJumpToChatMessage && msgId) ? () => onJumpToChatMessage(msgId) : null
     };
-  }, [currentMeta, onJumpToChatMessage, onJumpToMemo, onJumpToMeetingDate, chatOrdinalCache, galleryOrdinalCache]);
+  }, [currentMeta, currentUrl, onJumpToChatMessage, onJumpToMemo, onJumpToMeetingDate, onJumpToGallery, chatOrdinalCache, galleryOrdinalCache]);
   const replacePhotoInputRef = React.useRef(null);
   const [isReplacingPhoto, setIsReplacingPhoto] = React.useState(false);
   const [isDeletingPhoto, setIsDeletingPhoto] = React.useState(false);
