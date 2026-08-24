@@ -27,12 +27,22 @@ function showBootStatus(msg) {
 function loadScriptOnce(src, timeoutMs = 8000) {
   return new Promise((resolve, reject) => {
     let settled = false;
+    const el = document.createElement('script');
     const timer = setTimeout(() => {
       if (settled) return;
       settled = true;
+      // A PC Whale user's console showed "Firebase is already defined in the global scope"
+      // followed by Firestore permanently refusing to reapply its transport settings -- traced
+      // to exactly this: a slow-but-not-actually-failed request outliving its timeout, so
+      // loadScriptWithRetry fires a second <script> tag for the same file while the first is
+      // still in flight, and BOTH eventually execute (each redefining window.firebase from
+      // scratch). Detaching this element's handlers and removing it from the document before
+      // rejecting stops it from executing later if the response does eventually arrive.
+      el.onload = null;
+      el.onerror = null;
+      el.remove();
       reject(new Error(`script load timed out: ${src}`));
     }, timeoutMs);
-    const el = document.createElement('script');
     el.src = src;
     el.onload = () => {
       if (settled) return;
