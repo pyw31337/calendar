@@ -741,7 +741,12 @@ function App() {
   };
   const [activeCalId, setActiveCalId] = React.useState(() => {
     const requestedId = getCalendarIdFromURL();
-    return requestedId && isAllowedCalendarId(requestedId) ? requestedId : 'kkot';
+    if (requestedId && isAllowedCalendarId(requestedId)) return requestedId;
+    try {
+      const savedId = window.localStorage?.getItem('gather_last_active_cal_id');
+      if (savedId && isAllowedCalendarId(savedId)) return savedId;
+    } catch (_) {}
+    return 'cw';
   });
   const [cloudReloadToken, setCloudReloadToken] = React.useState(0);
   const [currentMonthDate, setCurrentMonthDate] = React.useState(new Date());
@@ -2967,6 +2972,7 @@ function App() {
       return;
     }
     setActiveCalId(id);
+    try { window.localStorage?.setItem('gather_last_active_cal_id', id); } catch (_) {}
     window.history.replaceState({}, '', getCalendarShareUrl(id));
   };
   const guardLoadedCalendar = (message = 'Firebase 데이터를 불러온 뒤 다시 시도해 주세요.') => {
