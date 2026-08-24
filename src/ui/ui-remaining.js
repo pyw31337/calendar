@@ -63,6 +63,10 @@ function extractFirstUrl(...args) {
   const f = __gatherUiDeps().extractFirstUrl || GATHER_APP_UTILS.extractFirstUrl;
   return typeof f === 'function' ? f(...args) : undefined;
 }
+function extractAllUrlInfos(...args) {
+  const f = __gatherUiDeps().extractAllUrlInfos || GATHER_APP_UTILS.extractAllUrlInfos;
+  return typeof f === 'function' ? f(...args) : [];
+}
 function extractLeadingMemoDate(...args) {
   const f = __gatherUiDeps().extractLeadingMemoDate || GATHER_APP_UTILS.extractLeadingMemoDate;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -686,6 +690,19 @@ export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox,
 
   const firstUrl = extractFirstUrl(text);
   const mediaInfo = getDirectChatMediaInfo(firstUrl);
+  // A bubble with several plain webpage links (not a multi-image-link message, which is handled
+  // separately below) used to only ever preview firstUrl -- every other link in the same message
+  // was left as plain clickable text with no card. firstUrl always leads the list (and keeps its
+  // message-level cachedData below) so a single-link message renders byte-identical to before;
+  // any further distinct URLs extractAllUrlInfos finds are appended, each getting its own live-
+  // fetched (globally cached by URL, see fetchLinkPreview) preview card.
+  const allPreviewUrls = React.useMemo(() => {
+    const list = firstUrl ? [firstUrl] : [];
+    extractAllUrlInfos(text).forEach(info => {
+      if (!list.includes(info.url)) list.push(info.url);
+    });
+    return list;
+  }, [text, firstUrl]);
   const [failed, setFailed] = React.useState(false);
   React.useEffect(() => {
     setFailed(false);
@@ -804,11 +821,12 @@ export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox,
       : textNode;
     return /*#__PURE__*/React.createElement(React.Fragment, null,
       cappedTextNode,
-      firstUrl && /*#__PURE__*/React.createElement(LinkPreviewCard, {
-        url: firstUrl,
-        fallbackTitle: text ? removeFirstUrl(text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : '',
-        cachedData: linkPreview
-      })
+      allPreviewUrls.map((url, idx) => /*#__PURE__*/React.createElement(LinkPreviewCard, {
+        key: url,
+        url,
+        fallbackTitle: (idx === 0 && text) ? removeFirstUrl(text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : '',
+        cachedData: idx === 0 ? linkPreview : undefined
+      }))
     );
   }
 
