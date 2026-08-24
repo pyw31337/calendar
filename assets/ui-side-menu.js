@@ -470,7 +470,7 @@ const MONTH_NAMES = GATHER_APP_CALENDAR_DATA.MONTH_NAMES || ['1월','2월','3월
 const PRESET_COLORS = GATHER_APP_CONSTANTS.PRESET_COLORS || [];
 const DEFAULT_EXPENSE_CATEGORIES = GATHER_APP_CONSTANTS.DEFAULT_EXPENSE_CATEGORIES || [];
 const DEFAULT_PLACE_CATEGORIES = GATHER_APP_CONSTANTS.DEFAULT_PLACE_CATEGORIES || GATHER_APP_UTILS.DEFAULT_PLACE_CATEGORIES || [];
-const EMOJI_CATEGORIES = GATHER_APP_CONSTANTS.EMOJI_CATEGORIES || [];
+const EMOJI_CATEGORIES = GATHER_APP_CHAT_DATA.EMOJI_CATEGORIES || [];
 const INCOME_EXPENSE_CATEGORY = GATHER_APP_UTILS.INCOME_EXPENSE_CATEGORY || { id: 'income', name: '수입', color: '#16A34A' };
 const PLACE_MAP_DEFAULT_CENTER = __gatherUiDeps().PLACE_MAP_DEFAULT_CENTER || [37.5665, 126.978];
 const PLACE_MAP_DEFAULT_ZOOM = __gatherUiDeps().PLACE_MAP_DEFAULT_ZOOM || 11;
@@ -675,8 +675,7 @@ export function SharedSideMenuSettings({
   onDecreaseFont,
   onIncreaseFont,
   isChatNotifyEnabled,
-  onToggleChatNotifications,
-  onTestChatNotification
+  onToggleChatNotifications
 }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -717,13 +716,7 @@ export function SharedSideMenuSettings({
         "채팅알림"
       ),
       /*#__PURE__*/React.createElement(ToggleSwitch, { checked: !!isChatNotifyEnabled, onChange: onToggleChatNotifications, label: "채팅알림" })
-    ),
-    typeof onTestChatNotification === 'function' && /*#__PURE__*/React.createElement("button", {
-      type: "button",
-      className: "btn btn-secondary",
-      onClick: onTestChatNotification,
-      style: { width: '100%', marginTop: '8px', fontSize: '0.85rem', fontWeight: 700 }
-    }, "알림 테스트")
+    )
   );
 }
 
@@ -737,7 +730,6 @@ export function MainSideMenu({
   onOpenSettings,
   onOpenAnniversaries,
   onOpenShare,
-  onCreateShortcut,
   onOpenAdmin,
   isDarkTheme,
   onToggleTheme,
@@ -746,7 +738,6 @@ export function MainSideMenu({
   onIncreaseFont,
   isChatNotifyEnabled,
   onToggleChatNotifications,
-  onTestChatNotification,
   onUpdateWeatherLocation,
   onDeleteRecentLocation,
   showToast,
@@ -762,7 +753,6 @@ export function MainSideMenu({
   const MapCogIcon = __deps.MapCogIcon;
   const GiftIcon = __deps.GiftIcon;
   const LockIcon = __deps.LockIcon;
-  const ExternalLinkIcon = __deps.ExternalLinkIcon;
   const WeatherBadge = __deps.WeatherBadge;
   const WeatherLocationModal = __deps.WeatherLocationModal;
 
@@ -779,6 +769,9 @@ export function MainSideMenu({
       setIsScrollingActive(false);
     }, 1200);
   };
+  React.useEffect(() => () => {
+    if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+  }, []);
   return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     className: "admin-side-menu-overlay",
     onClick: onClose
@@ -943,8 +936,7 @@ export function MainSideMenu({
       onDecreaseFont: onDecreaseFont,
       onIncreaseFont: onIncreaseFont,
       isChatNotifyEnabled: isChatNotifyEnabled,
-      onToggleChatNotifications: onToggleChatNotifications,
-      onTestChatNotification: onTestChatNotification
+      onToggleChatNotifications: onToggleChatNotifications
     }),
     /* Group 4: share + shortcut */
     /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-list", style: { borderTop: '1px solid var(--border-subtle, #E2E8F0)', borderBottom: 'none', paddingTop: '6px', marginTop: '2px' } },
@@ -956,16 +948,6 @@ export function MainSideMenu({
         /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M3 12a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M15 6a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M15 18a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M8.7 10.7l6.6 -3.4", "M8.7 13.3l6.6 3.4"] })),
         /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
           /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "공유하기")
-        )
-      ),
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        className: "admin-side-menu-item",
-        onClick: () => handle(onCreateShortcut)
-      },
-        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement(ExternalLinkIcon, null)),
-        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
-          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "바로가기")
         )
       )
     ),

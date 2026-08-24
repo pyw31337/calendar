@@ -470,7 +470,7 @@ const MONTH_NAMES = GATHER_APP_CALENDAR_DATA.MONTH_NAMES || ['1월','2월','3월
 const PRESET_COLORS = GATHER_APP_CONSTANTS.PRESET_COLORS || [];
 const DEFAULT_EXPENSE_CATEGORIES = GATHER_APP_CONSTANTS.DEFAULT_EXPENSE_CATEGORIES || [];
 const DEFAULT_PLACE_CATEGORIES = GATHER_APP_CONSTANTS.DEFAULT_PLACE_CATEGORIES || GATHER_APP_UTILS.DEFAULT_PLACE_CATEGORIES || [];
-const EMOJI_CATEGORIES = GATHER_APP_CONSTANTS.EMOJI_CATEGORIES || [];
+const EMOJI_CATEGORIES = GATHER_APP_CHAT_DATA.EMOJI_CATEGORIES || [];
 const INCOME_EXPENSE_CATEGORY = GATHER_APP_UTILS.INCOME_EXPENSE_CATEGORY || { id: 'income', name: '수입', color: '#16A34A' };
 const PLACE_MAP_DEFAULT_CENTER = __gatherUiDeps().PLACE_MAP_DEFAULT_CENTER || [37.5665, 126.978];
 const PLACE_MAP_DEFAULT_ZOOM = __gatherUiDeps().PLACE_MAP_DEFAULT_ZOOM || 11;
@@ -799,12 +799,13 @@ export function SimpleBottomSheetPicker({ title, value, options, onSelect, place
   );
 }
 
-export function PhotoGallery({ chatMessages, calendar = null, totalGalleryCount, onViewAll, showToast, onPromoteImageUrl, onSaveImageTags, onSearchTag }) {
+export function PhotoGallery({ chatMessages, calendar = null, totalGalleryCount, onViewAll, showToast, onPromoteImageUrl, onSaveImageTags, onSearchTag, onDeletePhoto, onReplacePhoto, onJumpToChatMessage, onJumpToMemo, onJumpToMeetingDate, onGetChatMessageOrdinal, onGetGalleryPhotoOrdinal, onRequestConfirm }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
   const GalleryIcon = __deps.GalleryIcon;
   const Lightbox = __comp.Lightbox || __deps.Lightbox;
+  const resolveMeetingPhotoDisplay = __deps.resolveMeetingPhotoDisplay;
   const SectionCountBadge = __comp.SectionCountBadge;
   const SectionToggleButton = __comp.SectionToggleButton;
 
@@ -818,6 +819,7 @@ export function PhotoGallery({ chatMessages, calendar = null, totalGalleryCount,
       const entries = directEntry ? [...getMessageImageEntries(msg), directEntry] : getMessageImageEntries(msg);
       return entries.map((entry, i) => ({
         ...entry,
+        source: 'chat',
         key: `${msg.id}_${entry.directMediaUrl ? 'direct' : i}`,
         timestamp: msg.timestamp
       }));
@@ -826,26 +828,45 @@ export function PhotoGallery({ chatMessages, calendar = null, totalGalleryCount,
     getConfirmedMeetings(calendar).forEach(meeting => {
       const photos = Array.isArray(meeting?.photos) ? meeting.photos : [];
       photos.forEach((photo, index) => {
-        const full = String(photo?.imageUrl || photo?.full || '');
-        const thumb = String(photo?.thumbUrl || photo?.thumb || full);
+        // Auto-linked entries (sourceMessageId set) are references to a real chat photo --
+        // resolve the live imageUrl/thumbUrl/tags from that source message so this tile always
+        // matches the chat original exactly.
+        const resolved = resolveMeetingPhotoDisplay ? resolveMeetingPhotoDisplay(photo, chatMessages) : null;
+        const full = String(resolved?.imageUrl || photo?.imageUrl || photo?.full || '');
+        const thumb = String(resolved?.thumbUrl || photo?.thumbUrl || photo?.thumb || full);
         if (!full && !thumb) return;
         meetingEntries.push({
           full: full || thumb,
           thumb: thumb || full,
           imageIndex: index,
           messageId: null,
+          photoId: photo?.id || '',
+          sourceMessageId: photo?.sourceMessageId || '',
+          sourceImageIndex: Number.isInteger(photo?.sourceImageIndex) ? photo.sourceImageIndex : null,
           timestamp: Number(photo?.createdAt || photo?.updatedAt || meeting?.confirmedAt || 0),
-          tags: '',
+          tags: String(resolved?.tags ?? photo?.tags ?? ''),
           directMediaUrl: '',
+          source: 'meeting',
+          meetingDate: meeting.date || '',
           key: `meeting_${meeting.date || 'date'}_${photo?.id || index}`
         });
       });
     });
-    return [...chatEntries, ...meetingEntries].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+    // Tagging a photo with a date auto-links a copy of it onto that date's meeting record (see
+    // linkTaggedImageToMeetingDates in app-main.js), so the same photo can appear in both lists
+    // above -- collapse by URL, preferring the chat copy (its tag editor writes back to a real
+    // message) so this strip never shows the same photo twice.
+    const byUrl = new Map();
+    [...chatEntries, ...meetingEntries].forEach(entry => {
+      const key = entry.full || entry.thumb;
+      if (!key) return;
+      if (!byUrl.has(key) || entry.source === 'chat') byUrl.set(key, entry);
+    });
+    return Array.from(byUrl.values()).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
   }, [chatMessages, calendar]);
 
   const badgeCount = (typeof totalGalleryCount === 'number' && totalGalleryCount > 0)
-    ? totalGalleryCount
+    ? Math.max(totalGalleryCount, photoEntries.length)
     : photoEntries.length;
   const displayedEntries = photoEntries
     .filter(e => (e && ((e.thumb && String(e.thumb)) || (e.full && String(e.full)))))
@@ -893,7 +914,7 @@ export function PhotoGallery({ chatMessages, calendar = null, totalGalleryCount,
           referrerPolicy: 'no-referrer',
           onClick: () => setLightbox({
             urls: displayedEntries.map(e => e.full),
-            meta: displayedEntries.map(e => ({ timestamp: e.timestamp, messageId: e.messageId, imageIndex: e.imageIndex, thumb: e.thumb, tags: e.tags, directMediaUrl: e.directMediaUrl })),
+            meta: displayedEntries.map(e => ({ timestamp: e.timestamp, messageId: e.messageId, imageIndex: e.imageIndex, thumb: e.thumb, tags: e.tags, directMediaUrl: e.directMediaUrl, source: e.source, uploadSource: e.uploadSource, meetingDate: e.meetingDate, photoId: e.photoId, sourceMessageId: e.sourceMessageId, sourceImageIndex: e.sourceImageIndex })),
             index: idx
           }),
           style: { width: '100%', aspectRatio: '1 / 1', objectFit: 'cover', borderRadius: 'var(--radius-sm)', cursor: 'pointer' }
@@ -926,7 +947,15 @@ export function PhotoGallery({ chatMessages, calendar = null, totalGalleryCount,
       showToast,
       onPromoteImageUrl,
       onSaveImageTags,
-      onSearchTag
+      onSearchTag,
+      onDeletePhoto,
+      onReplacePhoto,
+      onJumpToChatMessage,
+      onJumpToMemo,
+      onJumpToMeetingDate,
+      onGetChatMessageOrdinal,
+      onGetGalleryPhotoOrdinal,
+      onRequestConfirm
     })
   );
 }

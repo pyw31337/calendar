@@ -866,7 +866,7 @@ export function PhotoGallery({ chatMessages, calendar = null, totalGalleryCount,
   }, [chatMessages, calendar]);
 
   const badgeCount = (typeof totalGalleryCount === 'number' && totalGalleryCount > 0)
-    ? totalGalleryCount
+    ? Math.max(totalGalleryCount, photoEntries.length)
     : photoEntries.length;
   const displayedEntries = photoEntries
     .filter(e => (e && ((e.thumb && String(e.thumb)) || (e.full && String(e.full)))))

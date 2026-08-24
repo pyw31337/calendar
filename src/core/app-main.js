@@ -4641,16 +4641,18 @@ function App() {
     const directUrls = new Set();
     (activeCal?.confirmedMeeting || []).forEach(m => {
       (m.photos || []).forEach(p => {
-        const u = p && (p.imageUrl || p.thumbUrl);
+        const u = p && (p.imageUrl || p.thumbUrl || p.full || p.thumb);
         if (u && !directUrls.has(u)) {
           directUrls.add(u);
           count++;
         }
       });
     });
-    (allChatMessages || []).forEach(msg => {
+    const allMsgs = (allChatMessages && allChatMessages.length > 0) ? allChatMessages : (chatMessages || []);
+    allMsgs.forEach(msg => {
       const getEntries = typeof getMessageImageEntries === 'function' ? getMessageImageEntries : null;
-      const entries = getEntries ? getEntries(msg) : [];
+      const getDirect = typeof getAllDirectMediaImageEntries === 'function' ? getAllDirectMediaImageEntries : (typeof getMessageDirectMediaEntry === 'function' ? m => [getMessageDirectMediaEntry(m)].filter(Boolean) : () => []);
+      const entries = getEntries ? [...getEntries(msg), ...getDirect(msg)] : [];
       if (entries.length > 0) {
         entries.forEach(e => {
           const u = e.full || e.thumb || e.imageUrl;
@@ -4666,6 +4668,23 @@ function App() {
           count++;
         }
       }
+    });
+    (memos || []).forEach(memo => {
+      const asMsg = {
+        id: memo.id, text: memo.text || memo.content || memo.body || '',
+        imageUrl: memo.imageUrl, imageUrls: memo.imageUrls, thumbUrl: memo.thumbUrl, thumbUrls: memo.thumbUrls,
+        timestamp: memo.updatedAt || memo.createdAt || 0, participantId: memo.participantId || ''
+      };
+      const getEntries = typeof getMessageImageEntries === 'function' ? getMessageImageEntries : null;
+      const getDirect = typeof getAllDirectMediaImageEntries === 'function' ? getAllDirectMediaImageEntries : () => [];
+      const entries = getEntries ? [...getEntries(asMsg), ...getDirect(asMsg)] : [];
+      entries.forEach(e => {
+        const u = e.full || e.thumb || e.imageUrl;
+        if (u && !directUrls.has(u)) {
+          directUrls.add(u);
+          count++;
+        }
+      });
     });
     return count;
   })();
@@ -4963,7 +4982,7 @@ function App() {
   }), /*#__PURE__*/React.createElement(PhotoGallery, {
     chatMessages: (galleryPreviewMessages && galleryPreviewMessages.length > 0) ? galleryPreviewMessages : allChatMessages,
     calendar: activeCal,
-    totalGalleryCount: totalGalleryCount,
+    totalGalleryCount: mainMenuGalleryCount,
     onViewAll: () => changeView('gallery'),
     showToast: showToast,
     onPromoteImageUrl: handlePromoteInlineChatImage,
