@@ -865,11 +865,22 @@ function __setFirebaseDb(v){ firebaseDb = v; if (typeof window!=="undefined") wi
 
 let firebaseStorage = null;
 
+// Set whenever attemptFirebaseInit() ends up NOT producing a usable firebaseDb, with enough
+// detail to tell apart "script never loaded" from "loaded but threw" from an actual SDK error
+// code/message. Four rounds of guessing at this from code alone (timeouts, retries, a bad API
+// key) each failed to actually fix the recurring "연결 오류" report, because none of them were
+// backed by the real error -- this exists so the next report carries hard evidence instead of
+// another theory. Also mirrored onto window.__gatherFirebaseInitError for direct DevTools
+// inspection regardless of how a consumer imports it.
+let firebaseInitError = null;
+function __setFirebaseInitError(v) { firebaseInitError = v; if (typeof window !== "undefined") window.__gatherFirebaseInitError = v; }
+
 // Pulled into its own function so the background retry loop below can re-run it after a fresh
 // SDK load, not just once at module evaluation time. Returns true once firebaseDb is actually
 // usable.
 function attemptFirebaseInit() {
-  if (!ENABLE_FIRESTORE_SYNC || typeof firebase === 'undefined') return false;
+  if (!ENABLE_FIRESTORE_SYNC) { __setFirebaseInitError('ENABLE_FIRESTORE_SYNC=false'); return false; }
+  if (typeof firebase === 'undefined') { __setFirebaseInitError('SDK 스크립트 미로딩 (window.firebase undefined)'); return false; }
   try {
     if (!firebase.apps.length) {
       firebase.initializeApp(firebaseConfig);
@@ -884,6 +895,8 @@ function attemptFirebaseInit() {
     }
     bindGatherFirebaseDeps();
   } catch (e) {
+    const detail = (e && (e.code || e.message)) ? String(e.code || e.message) : String(e);
+    __setFirebaseInitError(`initializeApp/firestore() 예외: ${detail}`);
     console.warn('Firebase init notice:', e);
     return false;
   }
@@ -898,6 +911,8 @@ function attemptFirebaseInit() {
   } catch (e) {
     console.warn('Firebase Storage init notice (falling back to inline base64 images):', e);
   }
+  if (!firebaseDb) __setFirebaseInitError('firebase.firestore()가 falsy 값을 반환함 (원인 불명)');
+  else __setFirebaseInitError(null);
   return Boolean(firebaseDb);
 }
 
@@ -2491,6 +2506,7 @@ export {
   firebaseConfig,
   firebaseDb,
   __setFirebaseDb,
+  firebaseInitError,
   firebaseStorage,
   isStorageDisabled,
   lastStorageHealthCheckAt,

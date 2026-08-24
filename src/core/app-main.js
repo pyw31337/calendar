@@ -430,6 +430,7 @@ import {
   firebaseConfig,
   firebaseDb,
   __setFirebaseDb,
+  firebaseInitError,
   firebaseStorage,
   isStorageDisabled,
   lastStorageHealthCheckAt,
@@ -1540,7 +1541,12 @@ function App() {
 
   React.useEffect(() => {
     if (firebaseDb) return;
-    showToast('연결 오류', 'error', 5000);
+    // The exact reason (script never loaded vs. an SDK exception vs. its code/message) is
+    // included directly in the toast text -- not just console.warn -- so a screenshot of this
+    // toast is itself the diagnostic. Shown longer than a normal toast so there's time to read
+    // and capture it before it disappears.
+    const detail = firebaseInitError ? ` (${firebaseInitError})` : ' (원인 미상)';
+    showToast(`연결 오류${detail}`, 'error', 15000);
   }, []);
   const activeCalLoaded = calendars.some(c => c && c.id === activeCalId && isUsableCalendarRecord(c));
   const activeCalendarFromState = calendars.find(c => c.id === activeCalId);
