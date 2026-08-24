@@ -1,8 +1,674 @@
 /**
  * Lightbox + LightboxInfoPanel (P4-3).
  */
-(function () {
-function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSearchTag, showToast }) {
+
+/* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
+const GATHER_APP_CALENDAR_DATA = window.GATHER_APP_CALENDAR_DATA || {};
+const GATHER_APP_CHAT_DATA = window.GATHER_APP_CHAT_DATA || {};
+const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
+const GATHER_APP_CONSTANTS = window.GATHER_APP_CONSTANTS || {};
+const GATHER_APP_CONFIG = window.GATHER_APP_CONFIG || {};
+function __gatherUiDeps() { return window.GATHER_UI_DEPS || {}; }
+function getActiveAvailabilities(calendar) {
+  const f = __gatherUiDeps().getActiveAvailabilities || GATHER_APP_UTILS.getActiveAvailabilities;
+  return typeof f === 'function' ? f(calendar) : [];
+}
+function getActiveParticipants(calendar) {
+  const f = __gatherUiDeps().getActiveParticipants || GATHER_APP_UTILS.getActiveParticipants;
+  return typeof f === 'function' ? f(calendar) : [];
+}
+function getCalendarPolls(calendar) {
+  const f = __gatherUiDeps().getCalendarPolls || GATHER_APP_UTILS.getCalendarPolls;
+  return typeof f === 'function' ? f(calendar) : [];
+}
+function getCalendarPlaces(calendar) {
+  const f = __gatherUiDeps().getCalendarPlaces || GATHER_APP_UTILS.getCalendarPlaces;
+  return typeof f === 'function' ? f(calendar) : [];
+}
+function useChatSendGuard(onSend, canSend) {
+  const f = __gatherUiDeps().useChatSendGuard;
+  return typeof f === 'function' ? f(onSend, canSend) : onSend;
+}
+function computeKoreanHolidaysForYear(year) {
+  const f = __gatherUiDeps().computeKoreanHolidaysForYear;
+  return typeof f === 'function' ? f(year) : [];
+}
+function getFooterFamilyLinks() {
+  return __gatherUiDeps().FOOTER_FAMILY_LINKS || [];
+}
+
+/* __fb() bridge */
+function __fb() {
+  const deps = __gatherUiDeps();
+  if (deps && typeof deps.getDb === 'function') {
+    try { const d = deps.getDb(); if (d) return d; } catch (e) {}
+  }
+  return (typeof window !== 'undefined' && window.__gatherFirebaseDb) || null;
+}
+
+function getStoredChatParticipantId(...args) {
+  const fn = (window.GATHER_APP_NOTIFICATIONS || {}).getStoredChatParticipantId;
+  return typeof fn === 'function' ? fn(...args) : '';
+}
+function setStoredChatParticipantId(...args) {
+  const fn = (window.GATHER_APP_NOTIFICATIONS || {}).setStoredChatParticipantId;
+  return typeof fn === 'function' ? fn(...args) : undefined;
+}
+
+function extractExpenseTimePrefix(...args) {
+  const f = __gatherUiDeps().extractExpenseTimePrefix || GATHER_APP_UTILS.extractExpenseTimePrefix;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function extractFirstUrl(...args) {
+  const f = __gatherUiDeps().extractFirstUrl || GATHER_APP_UTILS.extractFirstUrl;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function extractLeadingMemoDate(...args) {
+  const f = __gatherUiDeps().extractLeadingMemoDate || GATHER_APP_UTILS.extractLeadingMemoDate;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function formatChatDividerDate(...args) {
+  const f = __gatherUiDeps().formatChatDividerDate || GATHER_APP_UTILS.formatChatDividerDate;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function formatChatTime(...args) {
+  const f = __gatherUiDeps().formatChatTime || GATHER_APP_UTILS.formatChatTime;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function formatCommentDate(...args) {
+  const f = __gatherUiDeps().formatCommentDate || GATHER_APP_UTILS.formatCommentDate;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function formatDateWithDayName(...args) {
+  const f = __gatherUiDeps().formatDateWithDayName || GATHER_APP_UTILS.formatDateWithDayName;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function formatPlaceBadgeDate(...args) {
+  const f = __gatherUiDeps().formatPlaceBadgeDate || GATHER_APP_UTILS.formatPlaceBadgeDate;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function formatPollDeadline(...args) {
+  const f = __gatherUiDeps().formatPollDeadline || GATHER_APP_UTILS.formatPollDeadline;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function formatRegisteredAt(...args) {
+  const f = __gatherUiDeps().formatRegisteredAt || GATHER_APP_UTILS.formatRegisteredAt;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function formatShortDateWithDayName(...args) {
+  const f = __gatherUiDeps().formatShortDateWithDayName || GATHER_APP_UTILS.formatShortDateWithDayName;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getActivePollOptions(...args) {
+  const f = __gatherUiDeps().getActivePollOptions || GATHER_APP_UTILS.getActivePollOptions;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getActivityLogStamp(...args) {
+  const f = __gatherUiDeps().getActivityLogStamp || GATHER_APP_UTILS.getActivityLogStamp;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getContrastTextColor(...args) {
+  const f = __gatherUiDeps().getContrastTextColor || GATHER_APP_UTILS.getContrastTextColor;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getDisplayExpenseCategory(...args) {
+  const f = __gatherUiDeps().getDisplayExpenseCategory || GATHER_APP_UTILS.getDisplayExpenseCategory;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getDisplayPlaceAddress(...args) {
+  const f = __gatherUiDeps().getDisplayPlaceAddress || GATHER_APP_UTILS.getDisplayPlaceAddress;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getExpenseCategories(...args) {
+  const f = __gatherUiDeps().getExpenseCategories || GATHER_APP_UTILS.getExpenseCategories;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getExpenseCategory(...args) {
+  const f = __gatherUiDeps().getExpenseCategory || GATHER_APP_UTILS.getExpenseCategory;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getExpenseCategoryIcon(...args) {
+  const f = __gatherUiDeps().getExpenseCategoryIcon || GATHER_APP_UTILS.getExpenseCategoryIcon;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getExpenseCategoryLabel(...args) {
+  const f = __gatherUiDeps().getExpenseCategoryLabel || GATHER_APP_UTILS.getExpenseCategoryLabel;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getPlaceCategoryById(...args) {
+  const f = __gatherUiDeps().getPlaceCategoryById || GATHER_APP_UTILS.getPlaceCategoryById;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getPlaceCategoryIcon(...args) {
+  const f = __gatherUiDeps().getPlaceCategoryIcon || GATHER_APP_UTILS.getPlaceCategoryIcon;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getPlaceCategoryLabel(...args) {
+  const f = __gatherUiDeps().getPlaceCategoryLabel || GATHER_APP_UTILS.getPlaceCategoryLabel;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function isDomesticLatLng(...args) {
+  const f = __gatherUiDeps().isDomesticLatLng || GATHER_APP_UTILS.isDomesticLatLng;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function isExpenseIncomeEntry(...args) {
+  const f = __gatherUiDeps().isExpenseIncomeEntry || GATHER_APP_UTILS.isExpenseIncomeEntry;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function isInternalTestCalendarId(...args) {
+  const f = __gatherUiDeps().isInternalTestCalendarId || GATHER_APP_UTILS.isInternalTestCalendarId;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function isPollClosed(...args) {
+  const f = __gatherUiDeps().isPollClosed || GATHER_APP_UTILS.isPollClosed;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function isTombstone(...args) {
+  const f = __gatherUiDeps().isTombstone || GATHER_APP_UTILS.isTombstone;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function isValidCalendarId(...args) {
+  const f = __gatherUiDeps().isValidCalendarId || GATHER_APP_UTILS.isValidCalendarId;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function isValidDateString(...args) {
+  const f = __gatherUiDeps().isValidDateString || GATHER_APP_UTILS.isValidDateString;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function normalizeColorValue(...args) {
+  const f = __gatherUiDeps().normalizeColorValue || GATHER_APP_UTILS.normalizeColorValue;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function normalizeExpenseCategories(...args) {
+  const f = __gatherUiDeps().normalizeExpenseCategories || GATHER_APP_UTILS.normalizeExpenseCategories;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function normalizePlaceAddressForSave(...args) {
+  const f = __gatherUiDeps().normalizePlaceAddressForSave || GATHER_APP_UTILS.normalizePlaceAddressForSave;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function normalizePlaceCategories(...args) {
+  const f = __gatherUiDeps().normalizePlaceCategories || GATHER_APP_UTILS.normalizePlaceCategories;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function normalizePlaceDateForSort(...args) {
+  const f = __gatherUiDeps().normalizePlaceDateForSort || GATHER_APP_UTILS.normalizePlaceDateForSort;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function parseVisitEntriesFromMemo(...args) {
+  const f = __gatherUiDeps().parseVisitEntriesFromMemo || GATHER_APP_UTILS.parseVisitEntriesFromMemo;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function reformatMemoIntoDateLines(...args) {
+  const f = __gatherUiDeps().reformatMemoIntoDateLines || GATHER_APP_UTILS.reformatMemoIntoDateLines;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function removeFirstUrl(...args) {
+  const f = __gatherUiDeps().removeFirstUrl || GATHER_APP_UTILS.removeFirstUrl;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function sortVisitEntriesRecentFirst(...args) {
+  const f = __gatherUiDeps().sortVisitEntriesRecentFirst || GATHER_APP_UTILS.sortVisitEntriesRecentFirst;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function trimLatLngOutliers(...args) {
+  const f = __gatherUiDeps().trimLatLngOutliers || GATHER_APP_UTILS.trimLatLngOutliers;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+
+function appendChatImageFiles(...args) {
+  const f = __gatherUiDeps().appendChatImageFiles || GATHER_APP_UTILS.appendChatImageFiles;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function autoGrowTextarea(...args) {
+  const f = __gatherUiDeps().autoGrowTextarea || GATHER_APP_UTILS.autoGrowTextarea;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function buildActivityLogsFromAvailabilities(...args) {
+  const f = __gatherUiDeps().buildActivityLogsFromAvailabilities || GATHER_APP_UTILS.buildActivityLogsFromAvailabilities;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function buildAdminDashboardMetrics(...args) {
+  const f = __gatherUiDeps().buildAdminDashboardMetrics || GATHER_APP_UTILS.buildAdminDashboardMetrics;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function buildFieldChangeNote(...args) {
+  const f = __gatherUiDeps().buildFieldChangeNote || GATHER_APP_UTILS.buildFieldChangeNote;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function changeAdminPasswordRemote(...args) {
+  const f = __gatherUiDeps().changeAdminPasswordRemote || GATHER_APP_UTILS.changeAdminPasswordRemote;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function clearAdminSession(...args) {
+  const f = __gatherUiDeps().clearAdminSession || GATHER_APP_UTILS.clearAdminSession;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function cloneCalendarList(...args) {
+  const f = __gatherUiDeps().cloneCalendarList || GATHER_APP_UTILS.cloneCalendarList;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function computeCalendarSearchMatches(...args) {
+  const f = __gatherUiDeps().computeCalendarSearchMatches || GATHER_APP_UTILS.computeCalendarSearchMatches;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function createCalendarBackupPayload(...args) {
+  const f = __gatherUiDeps().createCalendarBackupPayload || GATHER_APP_UTILS.createCalendarBackupPayload;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function createDefaultCalendar(...args) {
+  const f = __gatherUiDeps().createDefaultCalendar || GATHER_APP_UTILS.createDefaultCalendar;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function createMemoActivityLog(...args) {
+  const f = __gatherUiDeps().createMemoActivityLog || GATHER_APP_UTILS.createMemoActivityLog;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function createPollActivityLog(...args) {
+  const f = __gatherUiDeps().createPollActivityLog || GATHER_APP_UTILS.createPollActivityLog;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function deleteActivityLogsAfterTimestamp(...args) {
+  const f = __gatherUiDeps().deleteActivityLogsAfterTimestamp || GATHER_APP_UTILS.deleteActivityLogsAfterTimestamp;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function deleteAllChatImagesFromStorage(...args) {
+  const f = __gatherUiDeps().deleteAllChatImagesFromStorage || GATHER_APP_UTILS.deleteAllChatImagesFromStorage;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function deleteMessageRest(...args) {
+  const f = __gatherUiDeps().deleteMessageRest || GATHER_APP_UTILS.deleteMessageRest;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function describeImageProcessingFailures(...args) {
+  const f = __gatherUiDeps().describeImageProcessingFailures || GATHER_APP_UTILS.describeImageProcessingFailures;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function doesPlaceMatchDate(...args) {
+  const f = __gatherUiDeps().doesPlaceMatchDate || GATHER_APP_UTILS.doesPlaceMatchDate;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function downloadJsonFile(...args) {
+  const f = __gatherUiDeps().downloadJsonFile || GATHER_APP_UTILS.downloadJsonFile;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function exportCalendarConfirmedMeetingsToICS(...args) {
+  const f = __gatherUiDeps().exportCalendarConfirmedMeetingsToICS || GATHER_APP_UTILS.exportCalendarConfirmedMeetingsToICS;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function extractCalendarsFromBackup(...args) {
+  const f = __gatherUiDeps().extractCalendarsFromBackup || GATHER_APP_UTILS.extractCalendarsFromBackup;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function fetchActivityLogsFromFirestore(...args) {
+  const f = __gatherUiDeps().fetchActivityLogsFromFirestore || GATHER_APP_UTILS.fetchActivityLogsFromFirestore;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function fetchChatMessagesRest(...args) {
+  const f = __gatherUiDeps().fetchChatMessagesRest || GATHER_APP_UTILS.fetchChatMessagesRest;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function fetchImageShareDocument(...args) {
+  const f = __gatherUiDeps().fetchImageShareDocument || GATHER_APP_UTILS.fetchImageShareDocument;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function fetchRecentMessagesRest(...args) {
+  const f = __gatherUiDeps().fetchRecentMessagesRest || GATHER_APP_UTILS.fetchRecentMessagesRest;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function fetchSingleCalendarWithRest(...args) {
+  const f = __gatherUiDeps().fetchSingleCalendarWithRest || GATHER_APP_UTILS.fetchSingleCalendarWithRest;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function fetchSubcollectionCount(...args) {
+  const f = __gatherUiDeps().fetchSubcollectionCount || GATHER_APP_UTILS.fetchSubcollectionCount;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function fetchWithTimeout(...args) {
+  const f = __gatherUiDeps().fetchWithTimeout || GATHER_APP_UTILS.fetchWithTimeout;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function formatLogTimestamp(...args) {
+  const f = __gatherUiDeps().formatLogTimestamp || GATHER_APP_UTILS.formatLogTimestamp;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getAdminSearchFilterFromUrl(...args) {
+  const f = __gatherUiDeps().getAdminSearchFilterFromUrl || GATHER_APP_UTILS.getAdminSearchFilterFromUrl;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getAdminSearchQueryFromUrl(...args) {
+  const f = __gatherUiDeps().getAdminSearchQueryFromUrl || GATHER_APP_UTILS.getAdminSearchQueryFromUrl;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getAdminSearchResultTargetUrl(...args) {
+  const f = __gatherUiDeps().getAdminSearchResultTargetUrl || GATHER_APP_UTILS.getAdminSearchResultTargetUrl;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getAdminSelectedCalendarIdFromUrl(...args) {
+  const f = __gatherUiDeps().getAdminSelectedCalendarIdFromUrl || GATHER_APP_UTILS.getAdminSelectedCalendarIdFromUrl;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getAdminSession(...args) {
+  const f = __gatherUiDeps().getAdminSession || GATHER_APP_UTILS.getAdminSession;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getImageFilesFromClipboardEvent(...args) {
+  const f = __gatherUiDeps().getImageFilesFromClipboardEvent || GATHER_APP_UTILS.getImageFilesFromClipboardEvent;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getKnownPlaceParticipantNames(...args) {
+  const f = __gatherUiDeps().getKnownPlaceParticipantNames || GATHER_APP_UTILS.getKnownPlaceParticipantNames;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getPlaceCategoryMarkerContent(...args) {
+  const f = __gatherUiDeps().getPlaceCategoryMarkerContent || GATHER_APP_UTILS.getPlaceCategoryMarkerContent;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getSolarFromLunar(...args) {
+  const f = __gatherUiDeps().getSolarFromLunar || GATHER_APP_UTILS.getSolarFromLunar;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getWeatherIcon(...args) {
+  const f = __gatherUiDeps().getWeatherIcon || GATHER_APP_UTILS.getWeatherIcon;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function isAdminRestoreRoute(...args) {
+  const f = __gatherUiDeps().isAdminRestoreRoute || GATHER_APP_UTILS.isAdminRestoreRoute;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function listAllCalendarsRemote(...args) {
+  const f = __gatherUiDeps().listAllCalendarsRemote || GATHER_APP_UTILS.listAllCalendarsRemote;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function mergeCalendarCollections(...args) {
+  const f = __gatherUiDeps().mergeCalendarCollections || GATHER_APP_UTILS.mergeCalendarCollections;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function mergePollRecord(...args) {
+  const f = __gatherUiDeps().mergePollRecord || GATHER_APP_UTILS.mergePollRecord;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function normalizeCalendarForSave(...args) {
+  const f = __gatherUiDeps().normalizeCalendarForSave || GATHER_APP_UTILS.normalizeCalendarForSave;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function normalizePollOptionInput(...args) {
+  const f = __gatherUiDeps().normalizePollOptionInput || GATHER_APP_UTILS.normalizePollOptionInput;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function processImageFilesSequentially(...args) {
+  const f = __gatherUiDeps().processImageFilesSequentially || GATHER_APP_UTILS.processImageFilesSequentially;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function pushSingleCloudCalendar(...args) {
+  const f = __gatherUiDeps().pushSingleCloudCalendar || GATHER_APP_UTILS.pushSingleCloudCalendar;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function resolveMemoImageBatch(...args) {
+  const f = __gatherUiDeps().resolveMemoImageBatch || GATHER_APP_UTILS.resolveMemoImageBatch;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function sanitizeMemoForFirestore(...args) {
+  const f = __gatherUiDeps().sanitizeMemoForFirestore || GATHER_APP_UTILS.sanitizeMemoForFirestore;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function setAdminSession(...args) {
+  const f = __gatherUiDeps().setAdminSession || GATHER_APP_UTILS.setAdminSession;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function sha256Hex(...args) {
+  const f = __gatherUiDeps().sha256Hex || GATHER_APP_UTILS.sha256Hex;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function subscribeUserToPushWithPermission(...args) {
+  const f = __gatherUiDeps().subscribeUserToPushWithPermission || GATHER_APP_UTILS.subscribeUserToPushWithPermission;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function translateKoreanToEnglish(...args) {
+  const f = __gatherUiDeps().translateKoreanToEnglish || GATHER_APP_UTILS.translateKoreanToEnglish;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function unsubscribeUserFromPush(...args) {
+  const f = __gatherUiDeps().unsubscribeUserFromPush || GATHER_APP_UTILS.unsubscribeUserFromPush;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function validateBackupCalendars(...args) {
+  const f = __gatherUiDeps().validateBackupCalendars || GATHER_APP_UTILS.validateBackupCalendars;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function validateCalendarShape(...args) {
+  const f = __gatherUiDeps().validateCalendarShape || GATHER_APP_UTILS.validateCalendarShape;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function verifyAdminPasswordRemote(...args) {
+  const f = __gatherUiDeps().verifyAdminPasswordRemote || GATHER_APP_UTILS.verifyAdminPasswordRemote;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+
+const ADMIN_MESSAGE_LIVE_LIMIT = (__gatherUiDeps().ADMIN_MESSAGE_LIVE_LIMIT
+  || (window.__GATHER_ADMIN_LIMITS && window.__GATHER_ADMIN_LIMITS.ADMIN_MESSAGE_LIVE_LIMIT)
+  || 50);
+const ADMIN_MEMO_LIVE_LIMIT = (__gatherUiDeps().ADMIN_MEMO_LIVE_LIMIT
+  || (window.__GATHER_ADMIN_LIMITS && window.__GATHER_ADMIN_LIMITS.ADMIN_MEMO_LIVE_LIMIT)
+  || 50);
+
+const PEEKALINK_HOUR_BUCKET_MS = Number.isFinite(GATHER_APP_CHAT_DATA.PEEKALINK_HOUR_BUCKET_MS) ? GATHER_APP_CHAT_DATA.PEEKALINK_HOUR_BUCKET_MS : 3600000;
+const PEEKALINK_FREE_HOURLY_LIMIT = Number.isFinite(GATHER_APP_CHAT_DATA.PEEKALINK_FREE_HOURLY_LIMIT) ? GATHER_APP_CHAT_DATA.PEEKALINK_FREE_HOURLY_LIMIT : 50;
+const ENABLE_FIRESTORE_WRITES = (window.GATHER_APP_CONFIG || {}).ENABLE_FIRESTORE_WRITES !== false;
+const GLOBAL_SEARCH_HISTORY_LIMIT = 100;
+const EXPENSE_ACTIVITY_ACTIONS = GATHER_APP_CONSTANTS.EXPENSE_ACTIVITY_ACTIONS || [];
+const IMAGE_TAG_ACTIVITY_ACTIONS = GATHER_APP_CONSTANTS.IMAGE_TAG_ACTIVITY_ACTIONS || [];
+const MEETING_ACTIVITY_ACTIONS = GATHER_APP_CONSTANTS.MEETING_ACTIVITY_ACTIONS || [];
+const PLACE_ACTIVITY_ACTIONS = GATHER_APP_CONSTANTS.PLACE_ACTIVITY_ACTIONS || [];
+const POLL_ACTIVITY_ACTIONS = GATHER_APP_CONSTANTS.POLL_ACTIVITY_ACTIONS || [];
+const KAKAO_CATEGORY_GROUP_TO_PLACE_CATEGORY = GATHER_APP_CONSTANTS.KAKAO_CATEGORY_GROUP_TO_PLACE_CATEGORY || {};
+const KOREAN_LUNAR_HOLIDAY_DATES = GATHER_APP_CALENDAR_DATA.KOREAN_LUNAR_HOLIDAY_DATES || {};
+const KOREAN_TEMPORARY_HOLIDAYS = GATHER_APP_CALENDAR_DATA.KOREAN_TEMPORARY_HOLIDAYS || [];
+const KOREAN_FIXED_HOLIDAYS = GATHER_APP_CALENDAR_DATA.KOREAN_FIXED_HOLIDAYS || [];
+const KOREAN_SOLAR_TERMS = GATHER_APP_CALENDAR_DATA.KOREAN_SOLAR_TERMS || [];
+const MONTH_NAMES = GATHER_APP_CALENDAR_DATA.MONTH_NAMES || ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+const PRESET_COLORS = GATHER_APP_CONSTANTS.PRESET_COLORS || [];
+const DEFAULT_EXPENSE_CATEGORIES = GATHER_APP_CONSTANTS.DEFAULT_EXPENSE_CATEGORIES || [];
+const DEFAULT_PLACE_CATEGORIES = GATHER_APP_CONSTANTS.DEFAULT_PLACE_CATEGORIES || GATHER_APP_UTILS.DEFAULT_PLACE_CATEGORIES || [];
+const EMOJI_CATEGORIES = GATHER_APP_CHAT_DATA.EMOJI_CATEGORIES || [];
+const INCOME_EXPENSE_CATEGORY = GATHER_APP_UTILS.INCOME_EXPENSE_CATEGORY || { id: 'income', name: '수입', color: '#16A34A' };
+const PLACE_MAP_DEFAULT_CENTER = __gatherUiDeps().PLACE_MAP_DEFAULT_CENTER || [37.5665, 126.978];
+const PLACE_MAP_DEFAULT_ZOOM = __gatherUiDeps().PLACE_MAP_DEFAULT_ZOOM || 11;
+const PLACE_MARKER_SIZE = __gatherUiDeps().PLACE_MARKER_SIZE || 28;
+const CONFETTI_Z_INDEX = 9999;
+const DEADLINE_PICKER_MONTH_NAMES = GATHER_APP_CALENDAR_DATA.MONTH_NAMES || ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+
+function getKoreanSolarTermsForYear(...args) {
+  const f = __gatherUiDeps().getKoreanSolarTermsForYear || GATHER_APP_UTILS.getKoreanSolarTermsForYear;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function useTapRevealedMsgId(...args) {
+  const f = __gatherUiDeps().useTapRevealedMsgId || GATHER_APP_UTILS.useTapRevealedMsgId;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getTrulyConfirmedMeetings(...args) {
+  const f = __gatherUiDeps().getTrulyConfirmedMeetings || GATHER_APP_UTILS.getTrulyConfirmedMeetings;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getConfirmedMeetings(...args) {
+  const f = __gatherUiDeps().getConfirmedMeetings || GATHER_APP_UTILS.getConfirmedMeetings;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getHolidayNamesForDate(...args) {
+  const f = __gatherUiDeps().getHolidayNamesForDate || GATHER_APP_UTILS.getHolidayNamesForDate;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getAnniversariesForDate(...args) {
+  const f = __gatherUiDeps().getAnniversariesForDate || GATHER_APP_UTILS.getAnniversariesForDate;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getPinnedNotices(...args) {
+  const f = __gatherUiDeps().getPinnedNotices || GATHER_APP_UTILS.getPinnedNotices;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getMessageImageEntries(...args) {
+  const f = __gatherUiDeps().getMessageImageEntries || GATHER_APP_UTILS.getMessageImageEntries;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getMessageDirectMediaEntry(...args) {
+  const f = __gatherUiDeps().getMessageDirectMediaEntry || GATHER_APP_UTILS.getMessageDirectMediaEntry;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function renderTextWithUrlBadge(...args) {
+  const f = __gatherUiDeps().renderTextWithUrlBadge || GATHER_APP_UTILS.renderTextWithUrlBadge;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function renderChatMessageBody(...args) {
+  const f = __gatherUiDeps().renderChatMessageBody || GATHER_APP_UTILS.renderChatMessageBody;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function parseTextWithLinks(...args) {
+  const f = __gatherUiDeps().parseTextWithLinks || GATHER_APP_UTILS.parseTextWithLinks;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function highlightKeyword(...args) {
+  const f = __gatherUiDeps().highlightKeyword || GATHER_APP_UTILS.highlightKeyword;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function highlightTextWithYellowMarker(...args) {
+  const f = __gatherUiDeps().highlightTextWithYellowMarker || GATHER_APP_UTILS.highlightTextWithYellowMarker;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function copyTextToClipboard(...args) {
+  const f = __gatherUiDeps().copyTextToClipboard || GATHER_APP_UTILS.copyTextToClipboard;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getCalendarShareUrl(...args) {
+  const f = __gatherUiDeps().getCalendarShareUrl || GATHER_APP_UTILS.getCalendarShareUrl;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getViewShareUrl(...args) {
+  const f = __gatherUiDeps().getViewShareUrl || GATHER_APP_UTILS.getViewShareUrl;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getMemoItemShareUrl(...args) {
+  const f = __gatherUiDeps().getMemoItemShareUrl || GATHER_APP_UTILS.getMemoItemShareUrl;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function buildLightboxImageInfo(...args) {
+  const f = __gatherUiDeps().buildLightboxImageInfo || GATHER_APP_UTILS.buildLightboxImageInfo;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function normalizeTagsForDisplay(...args) {
+  const f = __gatherUiDeps().normalizeTagsForDisplay || GATHER_APP_UTILS.normalizeTagsForDisplay;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getRecentEmojis(...args) {
+  const f = __gatherUiDeps().getRecentEmojis || GATHER_APP_UTILS.getRecentEmojis;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function addRecentEmoji(...args) {
+  const f = __gatherUiDeps().addRecentEmoji || GATHER_APP_UTILS.addRecentEmoji;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function fetchLinkPreview(...args) {
+  const f = __gatherUiDeps().fetchLinkPreview || GATHER_APP_UTILS.fetchLinkPreview;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function useLinkPreview(...args) {
+  const f = __gatherUiDeps().useLinkPreview || GATHER_APP_UTILS.useLinkPreview;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function useScrollHideHeader(...args) {
+  const f = __gatherUiDeps().useScrollHideHeader || GATHER_APP_UTILS.useScrollHideHeader;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function loadLeaflet(...args) {
+  const f = __gatherUiDeps().loadLeaflet || GATHER_APP_UTILS.loadLeaflet;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function loadLeafletMarkerCluster(...args) {
+  const f = __gatherUiDeps().loadLeafletMarkerCluster || GATHER_APP_UTILS.loadLeafletMarkerCluster;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function buildPlaceMarkerHtml(...args) {
+  const f = __gatherUiDeps().buildPlaceMarkerHtml || GATHER_APP_UTILS.buildPlaceMarkerHtml;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function panMapToFitMarkerPopup(...args) {
+  const f = __gatherUiDeps().panMapToFitMarkerPopup || GATHER_APP_UTILS.panMapToFitMarkerPopup;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getPlaceCategories(...args) {
+  const f = __gatherUiDeps().getPlaceCategories || GATHER_APP_UTILS.getPlaceCategories;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getPlaceSortDateKey(...args) {
+  const f = __gatherUiDeps().getPlaceSortDateKey || GATHER_APP_UTILS.getPlaceSortDateKey;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getPlaceExternalMapUrl(...args) {
+  const f = __gatherUiDeps().getPlaceExternalMapUrl || GATHER_APP_UTILS.getPlaceExternalMapUrl;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function extractKnownParticipantNames(...args) {
+  const f = __gatherUiDeps().extractKnownParticipantNames || GATHER_APP_UTILS.extractKnownParticipantNames;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getChatLastReadTimestamp(...args) {
+  const f = __gatherUiDeps().getChatLastReadTimestamp || GATHER_APP_UTILS.getChatLastReadTimestamp;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function setChatLastReadTimestamp(...args) {
+  const f = __gatherUiDeps().setChatLastReadTimestamp || GATHER_APP_UTILS.setChatLastReadTimestamp;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function isDateConfirmedMeeting(...args) {
+  const f = __gatherUiDeps().isDateConfirmedMeeting || GATHER_APP_UTILS.isDateConfirmedMeeting;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function calculateDday(...args) {
+  const f = __gatherUiDeps().calculateDday || GATHER_APP_UTILS.calculateDday;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function formatChatHeaderTitle(...args) {
+  const f = __gatherUiDeps().formatChatHeaderTitle || GATHER_APP_UTILS.formatChatHeaderTitle;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getShortTitleParts(...args) {
+  const f = __gatherUiDeps().getShortTitleParts || GATHER_APP_UTILS.getShortTitleParts;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function isEmojiOnlyChatText(...args) {
+  const f = __gatherUiDeps().isEmojiOnlyChatText || GATHER_APP_UTILS.isEmojiOnlyChatText;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function twemojiImageUrl(...args) {
+  const f = __gatherUiDeps().twemojiImageUrl || GATHER_APP_UTILS.twemojiImageUrl;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getDirectChatMediaInfo(...args) {
+  const f = __gatherUiDeps().getDirectChatMediaInfo || GATHER_APP_UTILS.getDirectChatMediaInfo;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getPollOptionVoterIds(...args) {
+  const f = __gatherUiDeps().getPollOptionVoterIds || GATHER_APP_UTILS.getPollOptionVoterIds;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getPollTotalVoteCount(...args) {
+  const f = __gatherUiDeps().getPollTotalVoteCount || GATHER_APP_UTILS.getPollTotalVoteCount;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getCalendarActivityLogs(...args) {
+  const f = __gatherUiDeps().getCalendarActivityLogs || GATHER_APP_UTILS.getCalendarActivityLogs;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getCalendarAccentColor(...args) {
+  const f = __gatherUiDeps().getCalendarAccentColor || GATHER_APP_UTILS.getCalendarAccentColor;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getAnniversaryDisplayColor(...args) {
+  const f = __gatherUiDeps().getAnniversaryDisplayColor || GATHER_APP_UTILS.getAnniversaryDisplayColor;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+
+
+export function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSearchTag, showToast, sourceInfo = null, showZoomControls = false, zoomLevel = 100, zoomMin = 50, zoomMax = 300, onZoomIn, onZoomOut, onZoomReset }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const SmallXIcon = __deps.SmallXIcon;
@@ -15,7 +681,7 @@ function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSearchTag
   const [confirmDeleteTag, setConfirmDeleteTag] = React.useState(null);
   const [isDeletingTag, setIsDeletingTag] = React.useState(false);
   React.useEffect(() => { setTagInput(''); }, [tags]);
-  if (!info.dateLabel && !info.typeLabel && !onSaveTags) return null;
+  if (!info.dateLabel && !info.typeLabel && !onSaveTags && !sourceInfo && !showZoomControls) return null;
   const MAX_TAGS = 10;
   const handleSaveTags = async () => {
     if (!onSaveTags || isSavingTags) return;
@@ -56,8 +722,8 @@ function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSearchTag
     className: "lightbox-info-panel",
     style: {
       position: 'absolute', left: 0, right: 0, bottom: 0, minWidth: '190px',
-      padding: '14px 14px 12px',
-      background: 'linear-gradient(to top, rgba(0,0,0,0.82), rgba(0,0,0,0.45) 60%, transparent)',
+      padding: '34px 14px 12px',
+      background: 'linear-gradient(to top, rgba(0,0,0,0.84) 0%, rgba(0,0,0,0.84) 55%, rgba(0,0,0,0.5) 82%, transparent)',
       borderRadius: '0 0 12px 12px',
       color: '#FFFFFF', fontSize: '0.76rem', lineHeight: 1.7,
       display: 'flex', flexDirection: 'column', gap: '4px',
@@ -69,18 +735,79 @@ function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSearchTag
       /*#__PURE__*/React.createElement("span", { style: labelStyle }, "업로드"),
       /*#__PURE__*/React.createElement("span", { style: { wordBreak: 'break-all' } }, info.dateLabel)
     ),
-    info.typeLabel && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' } },
-      /*#__PURE__*/React.createElement("span", { style: labelStyle }, "파일정보"),
-      /*#__PURE__*/React.createElement("span", {
-        style: {
-          display: 'inline-flex', alignItems: 'center', padding: '1px 8px', borderRadius: 'var(--radius-full)',
-          border: '1px solid #FFFFFF', color: '#FFFFFF', fontSize: '0.68rem', fontWeight: 800
-        }
-      }, info.typeLabel),
-      /*#__PURE__*/React.createElement("span", null, "/"),
-      /*#__PURE__*/React.createElement("span", null, info.sizeLabel || '-'),
-      /*#__PURE__*/React.createElement("span", null, "/"),
-      /*#__PURE__*/React.createElement("span", null, info.dimensionLabel || '-')
+    sourceInfo && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px', alignItems: 'center' } },
+      /*#__PURE__*/React.createElement("span", { style: labelStyle }, "출처"),
+      sourceInfo.onClick
+        ? /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          onClick: e => { e.stopPropagation(); sourceInfo.onClick(); },
+          style: {
+            border: 'none', background: 'none', padding: 0, color: '#93C5FD', fontSize: 'inherit',
+            fontWeight: 800, textDecoration: 'underline', cursor: 'pointer'
+          }
+        }, sourceInfo.label)
+        : /*#__PURE__*/React.createElement("span", null, sourceInfo.label)
+    ),
+    (info.typeLabel || showZoomControls) && /*#__PURE__*/React.createElement("div", {
+      style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }
+    },
+      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', minWidth: 0 } },
+        info.typeLabel && /*#__PURE__*/React.createElement(React.Fragment, null,
+          /*#__PURE__*/React.createElement("span", { style: labelStyle }, "파일정보"),
+          /*#__PURE__*/React.createElement("span", {
+            style: {
+              display: 'inline-flex', alignItems: 'center', padding: '1px 8px', borderRadius: 'var(--radius-full)',
+              border: '1px solid #FFFFFF', color: '#FFFFFF', fontSize: '0.68rem', fontWeight: 800
+            }
+          }, info.typeLabel),
+          /*#__PURE__*/React.createElement("span", null, "/"),
+          /*#__PURE__*/React.createElement("span", null, info.sizeLabel || '-'),
+          /*#__PURE__*/React.createElement("span", null, "/"),
+          /*#__PURE__*/React.createElement("span", null, info.dimensionLabel || '-')
+        )
+      ),
+      // PC-only zoom controls -- on the same line as 파일정보 (right-aligned) rather than its own
+      // row, so it doesn't leave an awkward gap between 파일정보 and 해시태그 below.
+      showZoomControls && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 } },
+        /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          onClick: onZoomOut,
+          disabled: zoomLevel <= zoomMin,
+          "aria-label": "축소",
+          title: "축소",
+          style: {
+            width: '26px', height: '26px', borderRadius: '50%', border: 'none',
+            background: 'rgba(15,23,42,0.62)', color: '#FFFFFF', display: 'flex',
+            alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '0.72rem',
+            opacity: zoomLevel <= zoomMin ? 0.5 : 1
+          }
+        }, /*#__PURE__*/React.createElement(ZoomOutIcon, { size: 13 })),
+        /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          onClick: onZoomReset,
+          disabled: zoomLevel === 100,
+          "aria-label": "100%로 초기화",
+          title: "100%로 초기화",
+          style: {
+            minWidth: '34px', textAlign: 'center', color: '#FFFFFF', fontSize: '0.7rem',
+            fontWeight: 700, padding: '3px 2px', borderRadius: '10px', border: 'none',
+            background: 'rgba(15,23,42,0.62)', cursor: zoomLevel === 100 ? 'default' : 'pointer'
+          }
+        }, `${zoomLevel}%`),
+        /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          onClick: onZoomIn,
+          disabled: zoomLevel >= zoomMax,
+          "aria-label": "확대",
+          title: "확대",
+          style: {
+            width: '26px', height: '26px', borderRadius: '50%', border: 'none',
+            background: 'rgba(15,23,42,0.62)', color: '#FFFFFF', display: 'flex',
+            alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '0.72rem',
+            opacity: zoomLevel >= zoomMax ? 0.5 : 1
+          }
+        }, /*#__PURE__*/React.createElement(ZoomInIcon, { size: 13 }))
+      )
     ),
     /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' } },
       /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', minWidth: 0 } },
@@ -115,7 +842,7 @@ function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSearchTag
           flexShrink: 0, height: '30px', padding: '0 10px', borderRadius: 'var(--radius-full)',
           border: '1px solid rgba(255,255,255,0.32)', background: 'rgba(255,255,255,0.14)',
           color: '#FFFFFF', display: 'inline-flex', alignItems: 'center', gap: '5px',
-          cursor: 'pointer', fontSize: '0.72rem', fontWeight: 800, backdropFilter: 'blur(6px)'
+          cursor: 'pointer', fontSize: '0.72rem', fontWeight: 800, WebkitBackdropFilter: 'blur(6px)', backdropFilter: 'blur(6px)'
         }
       }, /*#__PURE__*/React.createElement(LinkIcon, { size: 14 }), "URL")
     ),
@@ -163,10 +890,38 @@ function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSearchTag
   }));
 }
 
-function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, onPromoteImageUrl, onSaveImageTags, onSearchTag }) {
+// PC-only zoom controls for the photo action row -- scoped to this file since they're not part
+// of the shared icon set used elsewhere. Zoom-out is the same lucide zoom-in glyph minus its
+// vertical stroke (matching lucide's own zoom-in/zoom-out pair).
+function ZoomInIcon({ size = 15 } = {}) {
+  const React = window.React;
+  return /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg", width: String(size), height: String(size), viewBox: "0 0 24 24",
+    fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
+  },
+    /*#__PURE__*/React.createElement("circle", { cx: "11", cy: "11", r: "8" }),
+    /*#__PURE__*/React.createElement("line", { x1: "21", x2: "16.65", y1: "21", y2: "16.65" }),
+    /*#__PURE__*/React.createElement("line", { x1: "11", x2: "11", y1: "8", y2: "14" }),
+    /*#__PURE__*/React.createElement("line", { x1: "8", x2: "14", y1: "11", y2: "11" })
+  );
+}
+function ZoomOutIcon({ size = 15 } = {}) {
+  const React = window.React;
+  return /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg", width: String(size), height: String(size), viewBox: "0 0 24 24",
+    fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
+  },
+    /*#__PURE__*/React.createElement("circle", { cx: "11", cy: "11", r: "8" }),
+    /*#__PURE__*/React.createElement("line", { x1: "21", x2: "16.65", y1: "21", y2: "16.65" }),
+    /*#__PURE__*/React.createElement("line", { x1: "8", x2: "14", y1: "11", y2: "11" })
+  );
+}
+
+export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, onPromoteImageUrl, onSaveImageTags, onSearchTag, onDeletePhoto, onReplacePhoto, onJumpToChatMessage, onJumpToMemo, onJumpToMeetingDate, onGetChatMessageOrdinal, onGetGalleryPhotoOrdinal, onRequestConfirm }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const SmallXIcon = __deps.SmallXIcon;
+  const PencilIcon = __deps.PencilIcon;
   const ImageUrlModal = __deps.ImageUrlModal;
   const LightboxInfoPanel = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LightboxInfoPanel;
   const buildLightboxImageInfo = __deps.buildLightboxImageInfo;
@@ -176,6 +931,108 @@ function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, onPromote
   const [imageUrlModalOpen, setImageUrlModalOpen] = React.useState(false);
   const [imageDimensions, setImageDimensions] = React.useState({});
   const [displayUrls, setDisplayUrls] = React.useState(urls);
+  // Zoom is PC-only -- mobile already has native pinch-to-zoom on the image, and a live
+  // matchMedia listener (not a one-time read) so the buttons correctly appear/disappear if a
+  // desktop window is resized narrow or a tablet is rotated while the lightbox is open.
+  const [isDesktop, setIsDesktop] = React.useState(() => typeof window !== 'undefined' && window.matchMedia && !window.matchMedia('(max-width: 640px)').matches);
+  React.useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return undefined;
+    const mq = window.matchMedia('(max-width: 640px)');
+    const onChange = () => setIsDesktop(!mq.matches);
+    if (mq.addEventListener) mq.addEventListener('change', onChange);
+    else if (mq.addListener) mq.addListener(onChange);
+    return () => {
+      if (mq.removeEventListener) mq.removeEventListener('change', onChange);
+      else if (mq.removeListener) mq.removeListener(onChange);
+    };
+  }, []);
+  // ZOOM_DEFAULT (100%, fit-view) is the neutral/reset value -- ZOOM_MIN lets the user zoom
+  // further OUT than that too (shrinking the photo within its frame), so it's no longer the
+  // floor the way it was when 100% was both the minimum and the default.
+  const ZOOM_MIN = 50;
+  const ZOOM_MAX = 300;
+  const ZOOM_STEP = 25;
+  const ZOOM_DEFAULT = 100;
+  const [zoomLevel, setZoomLevel] = React.useState(ZOOM_DEFAULT);
+  // Drag-to-pan once zoomed past fit-view -- panOffset is a screen-pixel translate applied
+  // before the scale (see zoomImageStyle below), so it stays 1:1 with cursor movement regardless
+  // of zoom level. Reset to {0,0} on every zoom-button click rather than trying to re-clamp the
+  // existing offset against the new scale -- simpler and avoids the image appearing to jump to
+  // an now-invalid position when zooming out.
+  const [panOffset, setPanOffset] = React.useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = React.useState(false);
+  const zoomedImgRef = React.useRef(null);
+  const panStartRef = React.useRef(null);
+  const isPanningRef = React.useRef(false);
+  // Reset to 100% whenever the visible photo changes, so zoom never carries over onto a
+  // different image (which would show it pre-cropped/enlarged with no visual cue why).
+  React.useEffect(() => { setZoomLevel(ZOOM_DEFAULT); setPanOffset({ x: 0, y: 0 }); }, [index]);
+  const handleZoomIn = e => {
+    e.stopPropagation();
+    setPanOffset({ x: 0, y: 0 });
+    setZoomLevel(prev => Math.min(ZOOM_MAX, prev + ZOOM_STEP));
+  };
+  const handleZoomOut = e => {
+    e.stopPropagation();
+    setPanOffset({ x: 0, y: 0 });
+    setZoomLevel(prev => Math.max(ZOOM_MIN, prev - ZOOM_STEP));
+  };
+  // Clicking the percentage readout itself jumps straight back to 100%, regardless of which
+  // direction it was zoomed.
+  const handleZoomReset = e => {
+    e.stopPropagation();
+    setPanOffset({ x: 0, y: 0 });
+    setZoomLevel(ZOOM_DEFAULT);
+  };
+  // Clamped so the image can't be dragged entirely off-screen -- bounds come from the actual
+  // rendered (post-scale) image box vs. the lightbox's own viewport cap (92vw / 82vh, matching
+  // the maxWidth/maxHeight used everywhere below), not a fixed guess, so it works the same at
+  // any zoom level or original photo aspect ratio. Gated on ZOOM_DEFAULT rather than ZOOM_MIN --
+  // below 100% the photo is smaller than its frame with nothing to pan to, so panning only makes
+  // sense once zoomed in past fit-view.
+  const handlePanStart = (clientX, clientY) => {
+    if (!isDesktop || zoomLevel <= ZOOM_DEFAULT) return;
+    panStartRef.current = { x: clientX, y: clientY, startX: panOffset.x, startY: panOffset.y };
+    isPanningRef.current = true;
+    wasDraggedRef.current = false;
+    setIsPanning(true);
+  };
+  const handlePanMove = (clientX, clientY) => {
+    if (!isPanningRef.current || !panStartRef.current) return;
+    if (Math.abs(clientX - panStartRef.current.x) > 5 || Math.abs(clientY - panStartRef.current.y) > 5) {
+      // Reuses the same ref handleImageTap already checks to distinguish a drag from a tap, so
+      // releasing the mouse after panning doesn't also toggle the info panel off.
+      wasDraggedRef.current = true;
+    }
+    const el = zoomedImgRef.current;
+    const rect = el ? el.getBoundingClientRect() : null;
+    const maxOffsetX = rect ? Math.max(0, (rect.width - window.innerWidth * 0.92) / 2) : 0;
+    const maxOffsetY = rect ? Math.max(0, (rect.height - window.innerHeight * 0.82) / 2) : 0;
+    const rawX = panStartRef.current.startX + (clientX - panStartRef.current.x);
+    const rawY = panStartRef.current.startY + (clientY - panStartRef.current.y);
+    setPanOffset({
+      x: Math.min(maxOffsetX, Math.max(-maxOffsetX, rawX)),
+      y: Math.min(maxOffsetY, Math.max(-maxOffsetY, rawY))
+    });
+  };
+  const handlePanEnd = () => {
+    if (!isPanningRef.current) return;
+    isPanningRef.current = false;
+    panStartRef.current = null;
+    setIsPanning(false);
+  };
+  const handleZoomedImageMouseDown = e => {
+    if (!isDesktop || zoomLevel <= ZOOM_DEFAULT) return;
+    e.stopPropagation();
+    handlePanStart(e.clientX, e.clientY);
+  };
+  const zoomImageStyle = isDesktop && zoomLevel !== ZOOM_DEFAULT
+    ? {
+        transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoomLevel / 100})`,
+        transition: isPanning ? 'none' : 'transform 150ms ease',
+        cursor: isPanning ? 'grabbing' : 'grab'
+      }
+    : undefined;
   const lightboxHistoryRef = React.useRef(false);
   React.useEffect(() => {
     try {
@@ -221,14 +1078,42 @@ function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, onPromote
   // shows the result immediately instead of only after the Lightbox is closed and reopened.
   const [tagOverrides, setTagOverrides] = React.useState({});
   const currentMeta = meta && meta[index];
-  const tagOverrideKey = currentMeta ? `${currentMeta.messageId}_${currentMeta.directMediaUrl ? 'direct' : currentMeta.imageIndex}` : null;
+  // 'meeting' entries never carry a messageId (they're archival copies stored on the
+  // confirmedMeeting record, not a chat message -- see linkTaggedImageToMeetingDates in
+  // app-main.js), so they need meetingDate+photoId to identify which photo instead. 'memo'
+  // entries DO carry a truthy messageId (the memo's own id), but that id only resolves against
+  // the messages collection, not memos -- tags there are a whole-memo field with no single-photo
+  // target, so editing is intentionally left disabled rather than silently failing to save.
+  const isMeetingPhoto = currentMeta?.source === 'meeting' && !!currentMeta?.meetingDate && !!currentMeta?.photoId;
+  // Was keyed on source === 'chat' specifically, which left tag editing silently disabled for
+  // any directMediaUrl entry (a link pasted as plain text in a message, single or multi-image --
+  // see DirectChatMediaText) since those never set `source` at all. Reworked to mirror
+  // canEditPhoto's structure below: 'meeting' is the one case needing isMeetingPhoto, 'memo' stays
+  // explicitly disabled (a memo's tags are a whole-memo field, no single-photo target to write
+  // to -- see the comment above), and everything else (chat, chat-tag, or an untagged
+  // directMediaUrl entry) just needs a real messageId to write handleSaveImageTags' update to.
+  const canEditTags = currentMeta && (
+    currentMeta.source === 'meeting' ? isMeetingPhoto :
+    currentMeta.source === 'memo' ? false :
+    currentMeta.messageId != null
+  );
+  // Was `${messageId}_${directMediaUrl ? 'direct' : imageIndex}` -- the literal string 'direct'
+  // collapsed every directMediaUrl slide of the SAME message onto one shared key, so saving a tag
+  // on one external image in a multi-image-link message made the just-saved override show on
+  // every other image in that message too (until the Lightbox was closed and reopened and this
+  // stale local override was no longer consulted). Keying on the URL itself keeps each slide's
+  // optimistic override distinct, matching how the actual save (getDirectMediaTagKey) already
+  // keys directMediaTags per-URL in Firestore.
+  const tagOverrideKey = currentMeta
+    ? (isMeetingPhoto ? `meeting_${currentMeta.meetingDate}_${currentMeta.photoId}` : `${currentMeta.messageId}_${currentMeta.directMediaUrl || currentMeta.imageIndex}`)
+    : null;
   const currentTags = (tagOverrideKey && tagOverrideKey in tagOverrides) ? tagOverrides[tagOverrideKey] : (currentMeta?.tags || '');
   // Mirrors handleSaveImageTags' own parse/dedupe/limit rules so the optimistic override shown
   // here matches what actually got persisted, without needing the save call to round-trip it.
   const normalizeTagsForDisplay = text => Array.from(new Set(
     String(text || '').split(/[,\s#]+/).map(t => t.trim()).filter(Boolean)
-  )).slice(0, 20).join(' ');
-  const saveCurrentTags = onSaveImageTags && currentMeta?.messageId != null
+  )).slice(0, 10).join(' ');
+  const saveCurrentTags = onSaveImageTags && canEditTags
     ? async tagsText => {
         const ok = await onSaveImageTags(currentMeta.messageId, currentMeta.imageIndex, tagsText, {
           ...currentMeta,
@@ -238,6 +1123,155 @@ function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, onPromote
         return ok;
       }
     : null;
+  // Unlike tag editing, memo photos DO have a clean single-item delete/replace target (their
+  // own imageUrls[imageIndex]), even though memo TAGS are a whole-memo field with no such
+  // target -- so this is intentionally broader than canEditTags above.
+  const canEditPhoto = !!(currentMeta && !currentMeta.directMediaUrl && (
+    currentMeta.source === 'meeting' ? isMeetingPhoto : currentMeta.messageId != null
+  ));
+  // "채팅 #117" -- the message's 1-based position in the calendar's full chat history, fetched
+  // on demand (Firestore count() aggregate, independent of how much chat history the client has
+  // paginated in) and cached per messageId so revisiting the same photo doesn't refetch it.
+  const chatOrdinalFetchedRef = React.useRef(new Set());
+  const [chatOrdinalCache, setChatOrdinalCache] = React.useState({});
+  React.useEffect(() => {
+    // Only fetch once the info panel is actually open -- it's the only place the label shows,
+    // and eagerly firing a count() query for every photo as the user swipes past it (most of
+    // which never get a second look) added real extra Firestore traffic for no visible benefit.
+    if (!showInfo) return;
+    if (!currentMeta || currentMeta.source === 'meeting' || currentMeta.source === 'memo' || currentMeta.meetingDate) return;
+    if (currentMeta.uploadSource === 'gallery') return; // uses the photo-ordinal fetch below instead
+    // 'meeting'-uploadSource photos are hidden from the chat feed (see ChatRoomView's render
+    // filter), so a chat ordinal for them is never shown/clickable -- no point fetching it.
+    if (currentMeta.uploadSource === 'meeting') return;
+    if (typeof onGetChatMessageOrdinal !== 'function') return;
+    const key = currentMeta.messageId;
+    const ts = currentMeta.timestamp;
+    if (!key || !ts || chatOrdinalFetchedRef.current.has(key)) return;
+    chatOrdinalFetchedRef.current.add(key);
+    let cancelled = false;
+    Promise.resolve(onGetChatMessageOrdinal(ts)).then(n => {
+      if (!cancelled && typeof n === 'number') setChatOrdinalCache(prev => ({ ...prev, [key]: n }));
+    });
+    return () => { cancelled = true; };
+  }, [showInfo, currentMeta, onGetChatMessageOrdinal]);
+  // "갤러리 #20" -- the photo's 1-based position among every photo ever uploaded through the
+  // gallery's own "이미지 업로드" action, counted (and cached) the same on-demand way as the
+  // chat ordinal above, but by photo rather than by message (see fetchGalleryPhotoOrdinal).
+  const galleryOrdinalFetchedRef = React.useRef(new Set());
+  const [galleryOrdinalCache, setGalleryOrdinalCache] = React.useState({});
+  React.useEffect(() => {
+    if (!showInfo) return;
+    if (!currentMeta || currentMeta.uploadSource !== 'gallery') return;
+    if (typeof onGetGalleryPhotoOrdinal !== 'function') return;
+    const messageId = currentMeta.messageId;
+    if (!messageId) return;
+    const key = `${messageId}_${currentMeta.imageIndex || 0}`;
+    if (galleryOrdinalFetchedRef.current.has(key)) return;
+    galleryOrdinalFetchedRef.current.add(key);
+    let cancelled = false;
+    Promise.resolve(onGetGalleryPhotoOrdinal(messageId, currentMeta.imageIndex)).then(n => {
+      if (!cancelled && typeof n === 'number') setGalleryOrdinalCache(prev => ({ ...prev, [key]: n }));
+    });
+    return () => { cancelled = true; };
+  }, [showInfo, currentMeta, onGetGalleryPhotoOrdinal]);
+  const sourceInfo = React.useMemo(() => {
+    if (!currentMeta) return null;
+    // A photo tagged with a date hashtag is auto-linked onto that date's meeting record (see
+    // linkTaggedImageToMeetingDates, app-main.js) while still being a real chat/gallery message --
+    // Gallery's dedup keeps the chat/gallery copy (source stays whatever it was) but carries the
+    // meetingDate over, so this checks meetingDate directly rather than requiring source==='meeting'
+    // (which only the DateModal 사진 tab's own archival-reference entries actually have).
+    if (currentMeta.source === 'meeting' || currentMeta.meetingDate) {
+      const dateParts = currentMeta.meetingDate ? getShortTitleParts(currentMeta.meetingDate) : null;
+      return {
+        label: dateParts ? `일정 ${dateParts.year}${dateParts.rest}` : '일정 사진으로 업로드됨',
+        onClick: (onJumpToMeetingDate && currentMeta.meetingDate) ? () => onJumpToMeetingDate(currentMeta.meetingDate, 'photo') : null
+      };
+    }
+    if (currentMeta.source === 'memo') {
+      return {
+        label: '메모에서 업로드됨',
+        onClick: (onJumpToMemo && currentMeta.messageId) ? () => onJumpToMemo(currentMeta.messageId) : null
+      };
+    }
+    // Default: chat -- distinguishes composer-typed messages from the gallery's own "이미지
+    // 업로드" menu action and DateModal's own "일정 사진 추가" button (see
+    // handleUploadGalleryImages/handleAddMeetingPhotos' uploadSource marker). Falls back to the
+    // generic label until the relevant ordinal above resolves.
+    // 'gallery'/'meeting' uploadSource photos are never rendered in the chat feed (see
+    // ChatRoomView's render filter + onMessageCreate's push-skip) -- there is no chat bubble to
+    // jump to, so their source chip stays a plain (non-clickable) label.
+    if (currentMeta.uploadSource === 'gallery') {
+      const galleryKey = currentMeta.messageId != null ? `${currentMeta.messageId}_${currentMeta.imageIndex || 0}` : null;
+      const galleryOrdinal = galleryKey != null ? galleryOrdinalCache[galleryKey] : null;
+      return {
+        label: typeof galleryOrdinal === 'number' ? `갤러리 #${galleryOrdinal}` : '갤러리에서 업로드됨',
+        onClick: null
+      };
+    }
+    if (currentMeta.uploadSource === 'meeting') {
+      return { label: '일정 사진으로 업로드됨', onClick: null };
+    }
+    const ordinal = currentMeta.messageId != null ? chatOrdinalCache[currentMeta.messageId] : null;
+    return {
+      label: typeof ordinal === 'number' ? `채팅 #${ordinal}` : '채팅',
+      onClick: (onJumpToChatMessage && currentMeta.messageId) ? () => onJumpToChatMessage(currentMeta.messageId) : null
+    };
+  }, [currentMeta, onJumpToChatMessage, onJumpToMemo, onJumpToMeetingDate, chatOrdinalCache, galleryOrdinalCache]);
+  const replacePhotoInputRef = React.useRef(null);
+  const [isReplacingPhoto, setIsReplacingPhoto] = React.useState(false);
+  const [isDeletingPhoto, setIsDeletingPhoto] = React.useState(false);
+  const replacePhotoWithFile = async file => {
+    if (!file || !onReplacePhoto || !currentMeta || isReplacingPhoto) return;
+    setIsReplacingPhoto(true);
+    try {
+      const nextUrl = await onReplacePhoto({ ...currentMeta, imageUrl: currentUrl }, file);
+      if (nextUrl && typeof nextUrl === 'string') {
+        setDisplayUrls(prev => prev.map((item, i) => i === index ? nextUrl : item));
+      }
+    } finally {
+      setIsReplacingPhoto(false);
+    }
+  };
+  const handleReplacePhotoFile = async event => {
+    const file = event.target.files && event.target.files[0];
+    event.target.value = '';
+    await replacePhotoWithFile(file);
+  };
+  // Lets 사진 교체 accept a clipboard-pasted image too, not just the file picker -- active
+  // whenever this photo is editable, so Ctrl+V while the Lightbox is open replaces the photo
+  // currently on screen directly (no need to click the pencil button first).
+  React.useEffect(() => {
+    if (!canEditPhoto || !onReplacePhoto) return;
+    const handlePaste = e => {
+      const files = getImageFilesFromClipboardEvent(e);
+      if (!files.length) return;
+      e.preventDefault();
+      replacePhotoWithFile(files[0]);
+    };
+    document.addEventListener('paste', handlePaste);
+    return () => document.removeEventListener('paste', handlePaste);
+  }, [canEditPhoto, onReplacePhoto, currentMeta, currentUrl, index, isReplacingPhoto]);
+  const handleDeletePhotoClick = () => {
+    if (!onDeletePhoto || !currentMeta || isDeletingPhoto) return;
+    const confirmAction = async () => {
+      setIsDeletingPhoto(true);
+      try {
+        const ok = await onDeletePhoto({ ...currentMeta, imageUrl: currentUrl });
+        // No good way to remove just this one entry from the static urls/meta snapshot the
+        // parent handed in -- close and let the next open reflect live data instead.
+        if (ok) closeLightbox();
+      } finally {
+        setIsDeletingPhoto(false);
+      }
+    };
+    if (typeof onRequestConfirm === 'function') {
+      onRequestConfirm('사진 삭제', '이 사진을 삭제하시겠습니까?', confirmAction);
+    } else if (window.confirm('이 사진을 삭제하시겠습니까?')) {
+      confirmAction();
+    }
+  };
   const ensureCurrentShareUrl = async url => {
     if (typeof url !== 'string' || !url.startsWith('data:')) return url;
     if (typeof onPromoteImageUrl !== 'function') throw new Error('No image URL promotion handler');
@@ -352,10 +1386,19 @@ function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, onPromote
   };
   // Mouse move/up are tracked at the document level (unlike touchmove/touchend, which keep
   // firing on their original target even once the finger leaves it) so the drag keeps working
-  // if the cursor leaves the image area mid-drag.
+  // if the cursor leaves the image area mid-drag. Pan-dragging (zoomed image) and slide-nav
+  // dragging (carousel) are mutually exclusive -- handleZoomedImageMouseDown stops the mousedown
+  // from ever reaching the carousel container while zoomed, so isPanningRef alone is enough to
+  // route move/up to the right handler here.
   React.useEffect(() => {
-    const onMouseMove = e => handleDragMove(e.clientX);
-    const onMouseUp = () => handleDragEnd();
+    const onMouseMove = e => {
+      if (isPanningRef.current) { handlePanMove(e.clientX, e.clientY); return; }
+      handleDragMove(e.clientX);
+    };
+    const onMouseUp = () => {
+      if (isPanningRef.current) { handlePanEnd(); return; }
+      handleDragEnd();
+    };
     document.addEventListener('mousemove', onMouseMove);
     document.addEventListener('mouseup', onMouseUp);
     return () => {
@@ -380,34 +1423,83 @@ function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, onPromote
     closeLightbox();
   };
 
+  // Shared by both the carousel's "current" slot and the single-image layout below --
+  // top-right pencil (교체)/X (삭제) buttons, reusing the same icons already used for editing
+  // elsewhere in the app (Places/Memo pencil, tag-delete X). Zoom controls used to live at the
+  // left end of this same row, but were moved into LightboxInfoPanel (directly above the URL
+  // button) per user request, so this row is gated on canEditPhoto alone again.
+  const renderPhotoActions = () => showInfo && canEditPhoto && /*#__PURE__*/React.createElement("div", {
+    style: { position: 'absolute', top: '8px', right: '8px', display: 'flex', alignItems: 'center', gap: '6px', zIndex: 10 },
+    onClick: e => e.stopPropagation()
+  },
+    canEditPhoto && onReplacePhoto && /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => replacePhotoInputRef.current && replacePhotoInputRef.current.click(),
+      disabled: isReplacingPhoto || isDeletingPhoto,
+      "aria-label": "사진 편집",
+      title: "사진 교체",
+      style: {
+        width: '30px', height: '30px', borderRadius: '50%', border: 'none',
+        background: 'rgba(15,23,42,0.62)', color: '#FFFFFF', display: 'flex',
+        alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '0.72rem',
+        opacity: (isReplacingPhoto || isDeletingPhoto) ? 0.5 : 1
+      }
+    }, isReplacingPhoto ? '...' : /*#__PURE__*/React.createElement(PencilIcon, { size: 15 })),
+    canEditPhoto && onDeletePhoto && /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: handleDeletePhotoClick,
+      disabled: isReplacingPhoto || isDeletingPhoto,
+      "aria-label": "사진 삭제",
+      title: "사진 삭제",
+      style: {
+        width: '30px', height: '30px', borderRadius: '50%', border: 'none',
+        background: 'rgba(15,23,42,0.62)', color: '#FFFFFF', display: 'flex',
+        alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '0.72rem',
+        opacity: (isReplacingPhoto || isDeletingPhoto) ? 0.5 : 1
+      }
+    }, isDeletingPhoto ? '...' : /*#__PURE__*/React.createElement(SmallXIcon, { size: 15 }))
+  );
+
   const renderSlide = (url, slot) => /*#__PURE__*/React.createElement("div", {
     style: { width: '33.3333%', flexShrink: 0, height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }
   }, url && (slot === 'current' ? /*#__PURE__*/React.createElement("div", {
     style: { position: 'relative', display: 'inline-flex', maxWidth: '100%', maxHeight: '100%' },
     onClick: handleImageTap
   }, /*#__PURE__*/React.createElement("img", {
+    ref: zoomedImgRef,
     src: url,
     alt: "원본 이미지",
     "data-slide": slot,
     draggable: false,
+    decoding: 'async',
     referrerPolicy: 'no-referrer',
     onLoad: e => recordImageDimensions(url, e),
+    onMouseDown: handleZoomedImageMouseDown,
     style: {
       maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: '12px',
-      display: 'block'
+      display: 'block', ...zoomImageStyle
     }
-  }), showInfo && /*#__PURE__*/React.createElement(LightboxInfoPanel, {
+  }), renderPhotoActions(), showInfo && /*#__PURE__*/React.createElement(LightboxInfoPanel, {
     info: currentInfo,
     tags: currentTags,
     onSaveTags: saveCurrentTags,
     onSearchTag: onSearchTag,
     onOpenUrl: () => setImageUrlModalOpen(true),
-    showToast: showToast
+    showToast: showToast,
+    sourceInfo: sourceInfo,
+    showZoomControls: isDesktop,
+    zoomLevel: zoomLevel,
+    zoomMin: ZOOM_MIN,
+    zoomMax: ZOOM_MAX,
+    onZoomIn: handleZoomIn,
+    onZoomOut: handleZoomOut,
+    onZoomReset: handleZoomReset
   })) : /*#__PURE__*/React.createElement("img", {
     src: url,
     alt: "원본 이미지",
     "data-slide": slot,
     draggable: false,
+    decoding: 'async',
     referrerPolicy: 'no-referrer',
     onLoad: e => recordImageDimensions(url, e),
     onClick: e => e.stopPropagation(),
@@ -421,12 +1513,19 @@ function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, onPromote
     onClick: handleOverlayClick,
     style: {
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-      backgroundColor: 'rgba(15, 23, 42, 0.92)', backdropFilter: 'blur(8px)', zIndex: 50000,
+      backgroundColor: 'rgba(15, 23, 42, 0.92)', WebkitBackdropFilter: 'blur(8px)', backdropFilter: 'blur(8px)', zIndex: 50000,
       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
       width: '100%', maxWidth: '100%', overflow: 'hidden',
       userSelect: 'none'
     }
-  }, /*#__PURE__*/React.createElement("button", {
+  }, /*#__PURE__*/React.createElement("input", {
+    ref: replacePhotoInputRef,
+    type: "file",
+    accept: "image/jpeg, image/png, image/gif, image/webp, image/heic, image/heif, image/*",
+    onClick: e => e.stopPropagation(),
+    onChange: handleReplacePhotoFile,
+    style: { display: 'none' }
+  }), /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: e => { e.stopPropagation(); closeLightbox(); },
     "aria-label": "닫기",
@@ -490,22 +1589,33 @@ function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, onPromote
     style: { position: 'relative', display: 'inline-flex', maxWidth: '92vw', maxHeight: '82vh' },
     onClick: handleImageTap
   }, /*#__PURE__*/React.createElement("img", {
+    ref: zoomedImgRef,
     src: currentUrl,
     alt: "원본 이미지",
     draggable: false,
+    decoding: 'async',
     referrerPolicy: 'no-referrer',
     onLoad: e => recordImageDimensions(currentUrl, e),
+    onMouseDown: handleZoomedImageMouseDown,
     style: {
       maxWidth: '92vw', maxHeight: '82vh', borderRadius: '12px', objectFit: 'contain',
-      display: 'block'
+      display: 'block', ...zoomImageStyle
     }
-  }), showInfo && /*#__PURE__*/React.createElement(LightboxInfoPanel, {
+  }), renderPhotoActions(), showInfo && /*#__PURE__*/React.createElement(LightboxInfoPanel, {
     info: currentInfo,
     tags: currentTags,
     onSaveTags: saveCurrentTags,
     onSearchTag: onSearchTag,
     onOpenUrl: () => setImageUrlModalOpen(true),
-    showToast: showToast
+    showToast: showToast,
+    sourceInfo: sourceInfo,
+    showZoomControls: isDesktop,
+    zoomLevel: zoomLevel,
+    zoomMin: ZOOM_MIN,
+    zoomMax: ZOOM_MAX,
+    onZoomIn: handleZoomIn,
+    onZoomOut: handleZoomOut,
+    onZoomReset: handleZoomReset
   })),
   total > 1 && (() => {
     const maxVisibleDots = 10;
@@ -563,8 +1673,9 @@ function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, onPromote
   return ReactDOM.createPortal(lightboxNode, document.body);
 }
 
+  if (typeof window !== 'undefined') {
   window.GATHER_UI_COMPONENTS = Object.assign({}, window.GATHER_UI_COMPONENTS || {}, {
     LightboxInfoPanel: LightboxInfoPanel,
-    Lightbox: Lightbox
+    Lightbox: Lightbox,
   });
-})();
+}

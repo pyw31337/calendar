@@ -3455,22 +3455,26 @@ function App() {
     }
   };
 
-  const handleDeleteMeetingPhoto = (dateStr, photoId) => {
-    if (!activeCal || !isValidDateString(dateStr) || !photoId) return false;
+  const handleDeleteMeetingPhoto = (dateStr, photoId, imageUrl) => {
+    if (!activeCal) return false;
     const existingMeetings = getConfirmedMeetings(activeCal);
-    const meetingIndex = existingMeetings.findIndex(m => m.date === dateStr);
+    let meetingIndex = isValidDateString(dateStr) ? existingMeetings.findIndex(m => m.date === dateStr) : -1;
+    if (meetingIndex < 0) {
+      meetingIndex = existingMeetings.findIndex(m => (m.photos || []).some(p => (photoId && p.id === photoId) || (imageUrl && (p.imageUrl === imageUrl || p.thumbUrl === imageUrl))));
+    }
     if (meetingIndex < 0) return false;
     const meeting = existingMeetings[meetingIndex];
     const existingPhotos = Array.isArray(meeting.photos) ? meeting.photos : [];
-    const deletedPhoto = existingPhotos.find(photo => photo.id === photoId);
+    const deletedPhoto = existingPhotos.find(p => (photoId && p.id === photoId) || (imageUrl && (p.imageUrl === imageUrl || p.thumbUrl === imageUrl)));
     if (!deletedPhoto) return false;
     deleteChatImageFromStorage(deletedPhoto.imageUrl);
     deleteChatImageFromStorage(deletedPhoto.thumbUrl);
     const now = Date.now();
     const nextConfirmedMeetings = existingMeetings.map((m, i) => i === meetingIndex
-      ? { ...m, photos: existingPhotos.filter(photo => photo.id !== photoId) }
+      ? { ...m, photos: existingPhotos.filter(p => p !== deletedPhoto && p.id !== deletedPhoto.id) }
       : m);
-    const photoLog = createActivityLog(activeCal.id, 'photo_delete', dateStr, '', now, '일정 사진 삭제');
+    const targetDate = meeting.date || dateStr;
+    const photoLog = createActivityLog(activeCal.id, 'photo_delete', targetDate, '', now, '일정 사진 삭제');
     const updatedCal = {
       ...activeCal,
       confirmedMeeting: nextConfirmedMeetings,
@@ -3482,14 +3486,17 @@ function App() {
     return updateCalendars(nextCalendars, '사진 삭제완료', 'delete', updatedCal.id, 'settings', photoLog ? [photoLog] : []);
   };
 
-  const handleReplaceMeetingPhoto = async (dateStr, photoId, file) => {
-    if (!activeCal || !isValidDateString(dateStr) || !photoId || !file) return false;
+  const handleReplaceMeetingPhoto = async (dateStr, photoId, file, imageUrl) => {
+    if (!activeCal || !file) return false;
     const existingMeetings = getConfirmedMeetings(activeCal);
-    const meetingIndex = existingMeetings.findIndex(m => m.date === dateStr);
+    let meetingIndex = isValidDateString(dateStr) ? existingMeetings.findIndex(m => m.date === dateStr) : -1;
+    if (meetingIndex < 0) {
+      meetingIndex = existingMeetings.findIndex(m => (m.photos || []).some(p => (photoId && p.id === photoId) || (imageUrl && (p.imageUrl === imageUrl || p.thumbUrl === imageUrl))));
+    }
     if (meetingIndex < 0) return false;
     const meeting = existingMeetings[meetingIndex];
     const existingPhotos = Array.isArray(meeting.photos) ? meeting.photos : [];
-    const targetPhoto = existingPhotos.find(photo => photo.id === photoId);
+    const targetPhoto = existingPhotos.find(p => (photoId && p.id === photoId) || (imageUrl && (p.imageUrl === imageUrl || p.thumbUrl === imageUrl)));
     if (!targetPhoto) return false;
     const compressed = await prepareGalleryImageUploads([file], '사진 교체 준비 중...');
     if (!compressed.length) { setChatUploadProgress(null); return false; }
@@ -3502,7 +3509,7 @@ function App() {
       const prevThumbUrl = targetPhoto.thumbUrl;
       const now = Date.now();
       const nextConfirmedMeetings = existingMeetings.map((m, i) => i === meetingIndex
-        ? { ...m, photos: existingPhotos.map(photo => photo.id === photoId ? { ...photo, imageUrl: resolved.imageUrl, thumbUrl: resolved.thumbUrl || resolved.imageUrl } : photo) }
+        ? { ...m, photos: existingPhotos.map(photo => (photo === targetPhoto || (photoId && photo.id === photoId)) ? { ...photo, imageUrl: resolved.imageUrl, thumbUrl: resolved.thumbUrl || resolved.imageUrl } : photo) }
         : m);
       const updatedCal = {
         ...activeCal,
@@ -3770,31 +3777,72 @@ function App() {
   // location based on meta.source. directMediaUrl (an image pasted as a bare URL in chat/memo
   // text) has no clean single-item target to mutate, so it's left unsupported (Lightbox hides
   // the edit/delete buttons for it).
-  const handleDeletePhoto = meta => {
+  const handleDeletePhoto = async meta => {
     if (!meta || meta.directMediaUrl) return false;
-    if (meta.source === 'meeting') {
-      // An auto-linked 일정 사진 is the same photo as its chat original -- deleting it here
-      // deletes the real photo (and every other date it's linked to, via
-      // unlinkMeetingPhotoReferences), not just this one date's reference to it. Only a
-      // manually-uploaded 일정 사진 (no sourceMessageId) is deleted as its own standalone thing.
-      if (meta.sourceMessageId && Number.isInteger(meta.sourceImageIndex)) {
-        return handleDeleteChatMessagePhoto(meta.sourceMessageId, meta.sourceImageIndex);
-      }
-      return handleDeleteMeetingPhoto(meta.meetingDate, meta.photoId);
+    const imageUrl = meta.imageUrl || meta.full || meta.thumb;
+    const msgId = meta.messageId || meta.sourceMessageId;
+    const imgIdx = Number.isInteger(meta.imageIndex) ? meta.imageIndex : (Number.isInteger(meta.sourceImageIndex) ? meta.sourceImageIndex : 0);
+
+    // 1. If it's explicitly a memo photo
+    if (meta.source === 'memo' && msgId) {
+      const ok = await handleDeleteMemoPhoto(msgId, imgIdx);
+      if (ok) return true;
     }
-    if (meta.source === 'memo') return handleDeleteMemoPhoto(meta.messageId, meta.imageIndex);
-    return handleDeleteChatMessagePhoto(meta.messageId, meta.imageIndex);
+
+    // 2. If it's a meeting photo
+    if (meta.source === 'meeting' || meta.photoId || meta.meetingDate) {
+      if (meta.sourceMessageId && Number.isInteger(meta.sourceImageIndex)) {
+        const okChat = await handleDeleteChatMessagePhoto(meta.sourceMessageId, meta.sourceImageIndex);
+        if (okChat) return true;
+      }
+      const okMeeting = await handleDeleteMeetingPhoto(meta.meetingDate, meta.photoId, imageUrl);
+      if (okMeeting) return true;
+    }
+
+    // 3. If it's a chat photo or chat-tag photo
+    if (msgId && (meta.source === 'chat' || meta.source === 'chat-tag' || meta.sourceMessageId || meta.messageId)) {
+      const ok = await handleDeleteChatMessagePhoto(msgId, imgIdx);
+      if (ok) return true;
+    }
+
+    // 4. Fallback search across all meeting photos by imageUrl/photoId
+    const okMeetingFallback = await handleDeleteMeetingPhoto(meta.meetingDate, meta.photoId, imageUrl);
+    if (okMeetingFallback) return true;
+
+    showToast('삭제 대상 사진을 찾지 못했습니다.', 'error', 4000);
+    return false;
   };
-  const handleReplacePhoto = (meta, file) => {
-    if (!meta || meta.directMediaUrl) return false;
-    if (meta.source === 'meeting') {
-      if (meta.sourceMessageId && Number.isInteger(meta.sourceImageIndex)) {
-        return handleReplaceChatMessagePhoto(meta.sourceMessageId, meta.sourceImageIndex, file);
-      }
-      return handleReplaceMeetingPhoto(meta.meetingDate, meta.photoId, file);
+
+  const handleReplacePhoto = async (meta, file) => {
+    if (!meta || meta.directMediaUrl || !file) return false;
+    const imageUrl = meta.imageUrl || meta.full || meta.thumb;
+    const msgId = meta.messageId || meta.sourceMessageId;
+    const imgIdx = Number.isInteger(meta.imageIndex) ? meta.imageIndex : (Number.isInteger(meta.sourceImageIndex) ? meta.sourceImageIndex : 0);
+
+    if (meta.source === 'memo' && msgId) {
+      const res = await handleReplaceMemoPhoto(msgId, imgIdx, file);
+      if (res) return res;
     }
-    if (meta.source === 'memo') return handleReplaceMemoPhoto(meta.messageId, meta.imageIndex, file);
-    return handleReplaceChatMessagePhoto(meta.messageId, meta.imageIndex, file);
+
+    if (meta.source === 'meeting' || meta.photoId || meta.meetingDate) {
+      if (meta.sourceMessageId && Number.isInteger(meta.sourceImageIndex)) {
+        const resChat = await handleReplaceChatMessagePhoto(meta.sourceMessageId, meta.sourceImageIndex, file);
+        if (resChat) return resChat;
+      }
+      const resMeeting = await handleReplaceMeetingPhoto(meta.meetingDate, meta.photoId, file, imageUrl);
+      if (resMeeting) return resMeeting;
+    }
+
+    if (msgId && (meta.source === 'chat' || meta.source === 'chat-tag' || meta.sourceMessageId || meta.messageId)) {
+      const res = await handleReplaceChatMessagePhoto(msgId, imgIdx, file);
+      if (res) return res;
+    }
+
+    const resFallback = await handleReplaceMeetingPhoto(meta.meetingDate, meta.photoId, file, imageUrl);
+    if (resFallback) return resFallback;
+
+    showToast('교체 대상 사진을 찾지 못했습니다.', 'error', 4000);
+    return false;
   };
 
   // "이 사진이 있는 채팅으로 이동" -- same pattern already used by the admin/global search
