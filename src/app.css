@@ -2147,6 +2147,14 @@ select.form-select {
   gap: 8px;
   min-height: 128px;
 }
+/* overflow must stay visible here -- verified via isolated real-component reproduction that
+   overflow:hidden on this element (an auto-row-height grid) caused Chromium to occasionally
+   collapse the grid's computed row height to ~2px right after activeTab changes the card
+   labels/values (총 수입 -> 8월 수입 etc.), clipping the entire card content to nothing even
+   though the DOM/text were still fully present -- this was the actual cause of "정산페이지 요약
+   카드가 안 보인다". The cards have transparent backgrounds so there's nothing that needs
+   corner-clipping against the grid's own border-radius, making overflow:hidden here pure risk
+   with no visual benefit. */
 .settlement-metric-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -2154,7 +2162,7 @@ select.form-select {
   border: 1px solid var(--border-subtle);
   border-radius: 16px;
   background-color: var(--bg-card);
-  overflow: hidden;
+  overflow: visible;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 .settlement-metric-card {
