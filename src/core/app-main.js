@@ -431,6 +431,7 @@ import {
   firebaseDb,
   __setFirebaseDb,
   firebaseInitError,
+  firebaseRetryExhausted,
   firebaseStorage,
   isStorageDisabled,
   lastStorageHealthCheckAt,
@@ -1541,12 +1542,30 @@ function App() {
 
   React.useEffect(() => {
     if (firebaseDb) return;
-    // The exact reason (script never loaded vs. an SDK exception vs. its code/message) is
-    // included directly in the toast text -- not just console.warn -- so a screenshot of this
-    // toast is itself the diagnostic. Shown longer than a normal toast so there's time to read
-    // and capture it before it disappears.
-    const detail = firebaseInitError ? ` (${firebaseInitError})` : ' (원인 미상)';
-    showToast(`연결 오류${detail}`, 'error', 15000);
+    // Firing this immediately on the first failed attempt was itself the bug: a live report
+    // showed real-time chat sync working perfectly (a message sent from a phone appeared
+    // instantly on a PC browser) at the exact moment this toast was on screen saying "연결
+    // 오류" -- the background retry (app-firebase-data.js) had already quietly recovered
+    // firebaseDb by then, but this effect only ever checked its value once, at mount, so the
+    // toast kept reporting a failure that was no longer true. Poll instead: skip the toast
+    // entirely if firebaseDb resolves shortly after, and only show it once
+    // firebaseRetryExhausted is actually true (every retry genuinely gave up, ~10 minutes) --
+    // that is a real, final failure worth interrupting the user for.
+    if (firebaseRetryExhausted) {
+      const detail = firebaseInitError ? ` (${firebaseInitError})` : ' (원인 미상)';
+      showToast(`연결 오류${detail}`, 'error', 15000);
+      return;
+    }
+    let cancelled = false;
+    const pollId = setInterval(() => {
+      if (cancelled || firebaseDb) { clearInterval(pollId); return; }
+      if (firebaseRetryExhausted) {
+        clearInterval(pollId);
+        const detail = firebaseInitError ? ` (${firebaseInitError})` : ' (원인 미상)';
+        showToast(`연결 오류${detail}`, 'error', 15000);
+      }
+    }, 2000);
+    return () => { cancelled = true; clearInterval(pollId); };
   }, []);
   const activeCalLoaded = calendars.some(c => c && c.id === activeCalId && isUsableCalendarRecord(c));
   const activeCalendarFromState = calendars.find(c => c.id === activeCalId);

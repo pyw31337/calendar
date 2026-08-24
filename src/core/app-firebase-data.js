@@ -918,6 +918,16 @@ function attemptFirebaseInit() {
 
 const firebaseReadyOnFirstTry = attemptFirebaseInit();
 
+// Set true only once every recovery path has genuinely given up (or, if the background retry
+// loop below never even starts, immediately -- nothing will ever bring firebaseDb back up in
+// that case). Lets consumers (the "연결 오류" toast in app-main.js) tell a REAL, final failure
+// apart from a merely-still-retrying first attempt -- see the note above __setFirebaseInitError
+// for why that distinction turned out to matter: a live report showed the toast firing on the
+// very first attempt while the app had already (or was about to) recover in the background,
+// making a normal transient hiccup look like a persistent outage.
+let firebaseRetryExhausted = false;
+function __setFirebaseRetryExhausted(v) { firebaseRetryExhausted = v; if (typeof window !== "undefined") window.__gatherFirebaseRetryExhausted = v; }
+
 // main.jsx's own boot-time loader (loadFirebaseSdk) already retries a few times before giving up,
 // but "gave up" used to mean permanently stuck without Firestore for the rest of that page
 // load/session -- realtime data, sends, uploads all silently degrade to the local cache/base64
@@ -951,8 +961,13 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined' && !firebas
   let bgAttempts = 0;
   const bgRetryTimer = setInterval(async () => {
     bgAttempts += 1;
-    if (firebaseDb || bgAttempts > FIREBASE_BG_RETRY_MAX_ATTEMPTS) {
+    if (firebaseDb) {
       clearInterval(bgRetryTimer);
+      return;
+    }
+    if (bgAttempts > FIREBASE_BG_RETRY_MAX_ATTEMPTS) {
+      clearInterval(bgRetryTimer);
+      __setFirebaseRetryExhausted(true);
       return;
     }
     try {
@@ -968,6 +983,10 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined' && !firebas
       // Best-effort background retry -- stay silent and let the next tick try again.
     }
   }, FIREBASE_BG_RETRY_INTERVAL_MS);
+} else if (!firebaseReadyOnFirstTry) {
+  // No retry loop will ever run here (SSR/non-browser context, or ENABLE_FIRESTORE_SYNC off) --
+  // nothing more is coming, so this is already the final state.
+  __setFirebaseRetryExhausted(true);
 }
 
 let isStorageDisabled = false;
@@ -2509,6 +2528,7 @@ export {
   firebaseDb,
   __setFirebaseDb,
   firebaseInitError,
+  firebaseRetryExhausted,
   firebaseStorage,
   isStorageDisabled,
   lastStorageHealthCheckAt,
