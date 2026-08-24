@@ -26,11 +26,12 @@ const browserSrcGlobals = {
 
 export default [
   {
-    // Build output, and the legacy pre-Vite delivery mirror (assets/ +
-    // public/assets/) which src/index.html (the real Vite entry) never
-    // references -- see copy-static-to-dist.mjs / check-asset-mirrors.mjs.
-    // Neither is source anyone edits directly.
-    ignores: ['dist/**', 'node_modules/**', 'assets/**', 'public/**', 'functions/node_modules/**', 'share/**']
+    // Build output, the legacy pre-Vite delivery mirror (assets/ + public/assets/) which
+    // src/index.html (the real Vite entry) never references, and public-vite/ (static files
+    // copied verbatim into dist/ by copy-static-to-dist.mjs, e.g. vendored third-party SDKs) --
+    // see copy-static-to-dist.mjs / check-asset-mirrors.mjs. None of these are source anyone
+    // edits directly.
+    ignores: ['dist/**', 'node_modules/**', 'assets/**', 'public/**', 'public-vite/**', 'functions/node_modules/**', 'share/**']
   },
   js.configs.recommended,
   {
