@@ -1500,6 +1500,22 @@ function App() {
     };
 
     unsubscribe = firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).onSnapshot(doc => {
+      // Hard evidence for the next "다른 기기에 실시간 반영 안 됨" report instead of another
+      // guess: if this stays fromCache:true forever on an affected device, the listener's
+      // connection to the server never actually came up (persistence keeps showing the last
+      // locally-cached snapshot indefinitely in that case) -- readable from DevTools console via
+      // window.__gatherCalendarSyncDiag without needing repro steps from the user.
+      try {
+        if (typeof window !== 'undefined') {
+          window.__gatherCalendarSyncDiag = {
+            calendarId: activeCalId,
+            fromCache: doc.metadata.fromCache,
+            hasPendingWrites: doc.metadata.hasPendingWrites,
+            docUpdatedAt: doc.exists ? (doc.data()?.calendar?.updatedAt || null) : null,
+            receivedAt: Date.now()
+          };
+        }
+      } catch (_) {}
       const result = getCloudDocCalendar(doc, activeCalId);
       if (result && !isSavingRef.current) {
         applyLoadedCalendar(result.calendar, result.lastModified || Date.now(), true);
