@@ -6706,9 +6706,47 @@ function App() {
     : Math.max(allChatMessages.length, (chatMessages || []).length);
   const mainMenuChatLatestTimestamp = allChatMessages.length > 0 ? allChatMessages[allChatMessages.length - 1].timestamp : 0;
   const mainMenuChatHasUnread = mainMenuChatLatestTimestamp > getChatLastReadTimestamp(activeCalId);
+  const localGalleryCount = (() => {
+    let count = 0;
+    const directUrls = new Set();
+    (activeCal?.confirmedMeeting || []).forEach(m => {
+      (m.photos || []).forEach(p => {
+        const u = p && (p.imageUrl || p.thumbUrl);
+        if (u && !directUrls.has(u)) {
+          directUrls.add(u);
+          count++;
+        }
+      });
+    });
+    (allChatMessages || []).forEach(msg => {
+      const getEntries = typeof getMessageImageEntries === 'function' ? getMessageImageEntries : null;
+      const entries = getEntries ? getEntries(msg) : [];
+      if (entries.length > 0) {
+        entries.forEach(e => {
+          const u = e.full || e.thumb || e.imageUrl;
+          if (u && !directUrls.has(u)) {
+            directUrls.add(u);
+            count++;
+          }
+        });
+      } else {
+        const u = msg.imageUrl || msg.thumbUrl;
+        if (u && !directUrls.has(u)) {
+          directUrls.add(u);
+          count++;
+        }
+      }
+    });
+    return count;
+  })();
+
   const mainMenuMemoCount = (typeof totalMemoCount === 'number' && totalMemoCount >= 0)
     ? totalMemoCount
     : (memos || []).length;
+  const mainMenuGalleryCount = (typeof totalGalleryCount === 'number' && totalGalleryCount >= 0)
+    ? Math.max(totalGalleryCount, localGalleryCount)
+    : localGalleryCount;
+  const mainMenuPlaceCount = getCalendarPlaces(activeCal).length;
 
   // Each confirmed meeting gets its own banner bubble on the calendar, and stays up through
   // the day of the meeting itself -- only today-or-future confirmations show.
@@ -6814,6 +6852,8 @@ function App() {
   }, mainMenuMemoCount))))), isMainSideMenuOpen && /*#__PURE__*/React.createElement(MainSideMenu, {
     calendar: activeCal,
     anniversaries: anniversaries,
+    galleryCount: mainMenuGalleryCount,
+    placeCount: mainMenuPlaceCount,
     onClose: () => setIsMainSideMenuOpen(false),
     onOpenManual: () => {
       setIsGuideOpen(true);
