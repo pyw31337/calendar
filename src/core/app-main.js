@@ -3001,7 +3001,9 @@ function App() {
         updatedAt: now
       });
     }
-    const activityLog = createActivityLog(activeCal.id, action, dateStr, participantId, now, cleanNote);
+    const partName = (getActiveParticipants(activeCal).find(p => p.id === participantId) || {}).name || participantId;
+    const logNote = `[참여자: ${partName}] ${cleanNote ? `[메모: ${cleanNote}]` : '[참석]'}`;
+    const activityLog = createActivityLog(activeCal.id, action, dateStr, participantId, now, logNote);
     const updatedCal = {
       ...activeCal,
       updatedAt: now,

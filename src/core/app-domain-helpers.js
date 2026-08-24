@@ -1433,13 +1433,17 @@ function buildFieldChangeNote(label, changes, maxLen = 300) {
 }
 
 function createActivityLog(calendarId, action, dateStr, participantId, timestamp = Date.now(), note = '') {
+  let richNote = sanitizeText(note, 2000);
+  if (dateStr && richNote && !richNote.includes('[일자:')) {
+    richNote = `[일자: ${dateStr}] ${richNote}`;
+  }
   return normalizeActivityLog(calendarId, {
     id: `${calendarId}_${dateStr}_${participantId}_${action}_${timestamp}_${Math.random().toString(36).slice(2, 8)}`,
     calendarId,
-    participantId,
+    participantId: sanitizeText(participantId || '', 120),
     date: dateStr,
     action,
-    note,
+    note: richNote,
     timestamp
   });
 }
