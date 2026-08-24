@@ -927,8 +927,17 @@ function attemptFirebaseInit() {
       // ad-blockers/browser quirks since it's just repeated plain HTTP requests instead of a
       // persistent bidirectional connection. Worth the small latency cost everywhere given
       // auto-detect's false negative here. Must be called before any other Firestore operation.
+      //
+      // A live PC Whale console showed this exact call throwing "experimentalForceLongPolling and
+      // experimentalAutoDetectLongPolling cannot be used together" on every single page load, not
+      // just on a retried/duplicate call -- merge:true was merging our forceLongPolling on top of
+      // the SDK's own baked-in default of experimentalAutoDetectLongPolling:true, so the two
+      // always collided. Caught by the try/catch below, so this silently never took effect on ANY
+      // browser (mobile just happened to work fine on Firestore's untouched default transport;
+      // PC Whale didn't). Passing both flags explicitly, without merge, is what actually applies
+      // forced long-polling instead of just failing quietly.
       if (!firestoreSettingsApplied) {
-        firebase.firestore().settings({ experimentalForceLongPolling: true, merge: true });
+        firebase.firestore().settings({ experimentalForceLongPolling: true, experimentalAutoDetectLongPolling: false });
         firestoreSettingsApplied = true;
       }
     } catch (settingsErr) {
