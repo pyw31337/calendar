@@ -2091,12 +2091,13 @@ function subscribeAnniversaries(calId, onSnapshot, onError) {
 
 
 const firebaseConfig = {
-  apiKey: "AIzaSyD-GatherCalendarAppLiveKey2026",
+  apiKey: "AIzaSyAEtPNOA2IxUwEt62SSEG1FKdv1g2pQVMI",
   authDomain: "metro-live-2918e.firebaseapp.com",
   projectId: "metro-live-2918e",
   storageBucket: "metro-live-2918e.firebasestorage.app",
   messagingSenderId: "154827314076",
-  appId: "1:154827314076:web:gathercalendar2026"
+  appId: "1:154827314076:web:9cf0148e89914033c5ee59",
+  measurementId: "G-JF0HTXZVV0"
 };
 let firebaseDb = null;
 let firebaseStorage = null;
