@@ -668,7 +668,7 @@ function getAnniversaryDisplayColor(...args) {
 }
 
 
-export function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSearchTag, showToast, sourceInfo = null, showZoomControls = false, zoomLevel = 100, zoomMin = 100, zoomMax = 300, onZoomIn, onZoomOut }) {
+export function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSearchTag, showToast, sourceInfo = null, showZoomControls = false, zoomLevel = 100, zoomMin = 50, zoomMax = 300, onZoomIn, onZoomOut, onZoomReset }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const SmallXIcon = __deps.SmallXIcon;
@@ -782,11 +782,16 @@ export function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSe
             opacity: zoomLevel <= zoomMin ? 0.5 : 1
           }
         }, /*#__PURE__*/React.createElement(ZoomOutIcon, { size: 13 })),
-        /*#__PURE__*/React.createElement("span", {
+        /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          onClick: onZoomReset,
+          disabled: zoomLevel === 100,
+          "aria-label": "100%로 초기화",
+          title: "100%로 초기화",
           style: {
             minWidth: '34px', textAlign: 'center', color: '#FFFFFF', fontSize: '0.7rem',
-            fontWeight: 700, padding: '3px 2px', borderRadius: '10px',
-            background: 'rgba(15,23,42,0.62)'
+            fontWeight: 700, padding: '3px 2px', borderRadius: '10px', border: 'none',
+            background: 'rgba(15,23,42,0.62)', cursor: zoomLevel === 100 ? 'default' : 'pointer'
           }
         }, `${zoomLevel}%`),
         /*#__PURE__*/React.createElement("button", {
@@ -941,10 +946,14 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
       else if (mq.removeListener) mq.removeListener(onChange);
     };
   }, []);
-  const ZOOM_MIN = 100;
+  // ZOOM_DEFAULT (100%, fit-view) is the neutral/reset value -- ZOOM_MIN lets the user zoom
+  // further OUT than that too (shrinking the photo within its frame), so it's no longer the
+  // floor the way it was when 100% was both the minimum and the default.
+  const ZOOM_MIN = 50;
   const ZOOM_MAX = 300;
   const ZOOM_STEP = 25;
-  const [zoomLevel, setZoomLevel] = React.useState(ZOOM_MIN);
+  const ZOOM_DEFAULT = 100;
+  const [zoomLevel, setZoomLevel] = React.useState(ZOOM_DEFAULT);
   // Drag-to-pan once zoomed past fit-view -- panOffset is a screen-pixel translate applied
   // before the scale (see zoomImageStyle below), so it stays 1:1 with cursor movement regardless
   // of zoom level. Reset to {0,0} on every zoom-button click rather than trying to re-clamp the
@@ -955,9 +964,9 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
   const zoomedImgRef = React.useRef(null);
   const panStartRef = React.useRef(null);
   const isPanningRef = React.useRef(false);
-  // Reset to fit-view whenever the visible photo changes, so zoom never carries over onto a
+  // Reset to 100% whenever the visible photo changes, so zoom never carries over onto a
   // different image (which would show it pre-cropped/enlarged with no visual cue why).
-  React.useEffect(() => { setZoomLevel(ZOOM_MIN); setPanOffset({ x: 0, y: 0 }); }, [index]);
+  React.useEffect(() => { setZoomLevel(ZOOM_DEFAULT); setPanOffset({ x: 0, y: 0 }); }, [index]);
   const handleZoomIn = e => {
     e.stopPropagation();
     setPanOffset({ x: 0, y: 0 });
@@ -968,12 +977,21 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
     setPanOffset({ x: 0, y: 0 });
     setZoomLevel(prev => Math.max(ZOOM_MIN, prev - ZOOM_STEP));
   };
+  // Clicking the percentage readout itself jumps straight back to 100%, regardless of which
+  // direction it was zoomed.
+  const handleZoomReset = e => {
+    e.stopPropagation();
+    setPanOffset({ x: 0, y: 0 });
+    setZoomLevel(ZOOM_DEFAULT);
+  };
   // Clamped so the image can't be dragged entirely off-screen -- bounds come from the actual
   // rendered (post-scale) image box vs. the lightbox's own viewport cap (92vw / 82vh, matching
   // the maxWidth/maxHeight used everywhere below), not a fixed guess, so it works the same at
-  // any zoom level or original photo aspect ratio.
+  // any zoom level or original photo aspect ratio. Gated on ZOOM_DEFAULT rather than ZOOM_MIN --
+  // below 100% the photo is smaller than its frame with nothing to pan to, so panning only makes
+  // sense once zoomed in past fit-view.
   const handlePanStart = (clientX, clientY) => {
-    if (!isDesktop || zoomLevel <= ZOOM_MIN) return;
+    if (!isDesktop || zoomLevel <= ZOOM_DEFAULT) return;
     panStartRef.current = { x: clientX, y: clientY, startX: panOffset.x, startY: panOffset.y };
     isPanningRef.current = true;
     wasDraggedRef.current = false;
@@ -1004,11 +1022,11 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
     setIsPanning(false);
   };
   const handleZoomedImageMouseDown = e => {
-    if (!isDesktop || zoomLevel <= ZOOM_MIN) return;
+    if (!isDesktop || zoomLevel <= ZOOM_DEFAULT) return;
     e.stopPropagation();
     handlePanStart(e.clientX, e.clientY);
   };
-  const zoomImageStyle = isDesktop && zoomLevel !== ZOOM_MIN
+  const zoomImageStyle = isDesktop && zoomLevel !== ZOOM_DEFAULT
     ? {
         transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoomLevel / 100})`,
         transition: isPanning ? 'none' : 'transform 150ms ease',
@@ -1474,7 +1492,8 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
     zoomMin: ZOOM_MIN,
     zoomMax: ZOOM_MAX,
     onZoomIn: handleZoomIn,
-    onZoomOut: handleZoomOut
+    onZoomOut: handleZoomOut,
+    onZoomReset: handleZoomReset
   })) : /*#__PURE__*/React.createElement("img", {
     src: url,
     alt: "원본 이미지",
@@ -1595,7 +1614,8 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
     zoomMin: ZOOM_MIN,
     zoomMax: ZOOM_MAX,
     onZoomIn: handleZoomIn,
-    onZoomOut: handleZoomOut
+    onZoomOut: handleZoomOut,
+    onZoomReset: handleZoomReset
   })),
   total > 1 && (() => {
     const maxVisibleDots = 10;
