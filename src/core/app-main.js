@@ -4106,7 +4106,7 @@ function App() {
       categoryId: mp('categoryId', cleanCategoryId),
       memo: nextMemo,
       visitStatus: mp('visitStatus', cleanVisitStatus),
-      visitDate: mp('visitDate', cleanVisitDate),
+      visitDate: cleanVisitDate || mp('visitDate', ''),
       sourcePlaceId: mp('sourcePlaceId', sourcePlaceIdForSave || (isEditing && !mergeTargetPlace ? (existingPlaces.find(p => p.id === placeData.id) || {}).sourcePlaceId : '') || ''),
       updatedAt: now
     };
@@ -4153,6 +4153,7 @@ function App() {
       activityLogs: placeActivityLog ? [...getCalendarActivityLogs(activeCal), placeActivityLog] : getCalendarActivityLogs(activeCal)
     };
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
+    writePlacesToFirestore(activeCal.id, nextPlaces).catch(e => console.warn('Subcollection places write failed:', e));
     return updateCalendars(nextCalendars, isEditing ? '장소 수정완료' : '장소 등록완료', 'success', updatedCal.id, 'settings', placeActivityLog ? [placeActivityLog] : []);
   };
   const handleDeletePlace = (placeId) => {
