@@ -2202,7 +2202,14 @@ function App() {
   const handleSendChatMessage = async () => {
     const hasText = !!chatInput.trim();
     const imageCount = chatImages.length;
-    if ((!hasText && imageCount === 0) || !chatParticipantId) return;
+    if (!chatParticipantId) {
+      showToast('참여자를 선택해 주세요.', 'error');
+      return;
+    }
+    if (!hasText && imageCount === 0) {
+      showToast('메시지 내용 또는 사진을 입력해 주세요.', 'error');
+      return;
+    }
     setIsChatSubmitting(true);
     setChatUploadProgress({
       pct: 3,

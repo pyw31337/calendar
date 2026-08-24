@@ -2083,7 +2083,6 @@ export function DateModal({
               /*#__PURE__*/React.createElement(FormAddEditActionButtons, {
                 isEditing: !!participantId && dateEntries.some(en => en.participantId === participantId),
                 isSaving: isSubmitting,
-                disabled: !participantId,
                 onCancel: () => {
                   setParticipantId('');
                   setNote('');
@@ -2388,7 +2387,6 @@ export function DateModal({
               /*#__PURE__*/React.createElement(FormAddEditActionButtons, {
                 isEditing: !!editingLinkedPlaceId,
                 isSaving: isSavingPlace,
-                disabled: !selectedPlace,
                 alignSelf: 'flex-start',
                 flexGrow: isPlaceMemoWrapped,
                 onCancel: () => {

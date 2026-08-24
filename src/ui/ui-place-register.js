@@ -1118,7 +1118,6 @@ export function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, on
       /*#__PURE__*/React.createElement(FormAddEditActionButtons, {
         isEditing: !!editingPlace,
         isSaving: saving,
-        disabled: !selected,
         flexGrow: true,
         onCancel: onClose,
         onSubmit: handleSubmit

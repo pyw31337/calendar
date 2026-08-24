@@ -910,7 +910,10 @@ export function AdminModal({
     if (e && e.nativeEvent && e.nativeEvent.isComposing) return;
     const latestName = newNameInputRef.current ? newNameInputRef.current.value : newName;
     const trimmed = sanitizeText(latestName, 40);
-    if (!trimmed) return;
+    if (!trimmed) {
+      if (showToast) showToast('참여자 이름을 입력해 주세요.', 'error');
+      return;
+    }
     const newParticipant = {
       id: `${calendar.id}_p_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
       name: trimmed,
@@ -947,7 +950,7 @@ export function AdminModal({
 
     // Validate titles & names
     if (!title.trim()) {
-      if (showToast) showToast('캘린더명 필요', 'error'); else alert('캘린더명 필요');
+      if (showToast) showToast('캘린더 제목을 입력해 주세요.', 'error'); else alert('캘린더 제목을 입력해 주세요.');
       setIsSubmitting(false);
       return;
     }
@@ -955,7 +958,7 @@ export function AdminModal({
     const activeParticipantsList = participants.filter(p => !isTombstone(p));
     const activeNames = activeParticipantsList.map(p => p.name.trim().toLowerCase());
     if (new Set(activeNames).size !== activeNames.length) {
-      if (showToast) showToast('참여자 이름 중복', 'error'); else alert('참여자 이름 중복');
+      if (showToast) showToast('동일한 참여자 이름이 이미 존재합니다.', 'error'); else alert('동일한 참여자 이름이 이미 존재합니다.');
       setIsSubmitting(false);
       return;
     }

@@ -2005,7 +2005,10 @@ export function PollModal({ calendar, poll, onSave, onClose, showToast, onReques
     if (isSubmitting || isClosed) return;
     const latest = newOptionInputRef.current ? newOptionInputRef.current.value : newOption;
     const parsed = normalizePollOptionInput(latest);
-    if (!parsed.text) return;
+    if (!parsed.text) {
+      if (showToast) showToast('투표 항목 내용을 입력해 주세요.', 'error');
+      return;
+    }
     setOptions(prev => [...prev, {
       id: `${poll?.id || calendar.id + '_poll'}_opt_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
       text: parsed.text,
@@ -2113,8 +2116,12 @@ export function PollModal({ calendar, poll, onSave, onClose, showToast, onReques
       };
     }).filter(option => isTombstone(option) || sanitizeText(option.text, 120));
     const activeOptionCount = normalizedOptions.filter(option => !isTombstone(option)).length;
-    if (!cleanTitle || activeOptionCount === 0) {
-      if (showToast) showToast('투표명·옵션 필요', 'error'); else alert('투표명·옵션 필요');
+    if (!cleanTitle) {
+      if (showToast) showToast('투표 제목을 입력해 주세요.', 'error'); else alert('투표 제목을 입력해 주세요.');
+      return;
+    }
+    if (activeOptionCount === 0) {
+      if (showToast) showToast('투표 항목을 1개 이상 추가해 주세요.', 'error'); else alert('투표 항목을 1개 이상 추가해 주세요.');
       return;
     }
     setIsSubmitting(true);
