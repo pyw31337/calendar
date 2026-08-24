@@ -6042,7 +6042,7 @@ function uploadChatImageAssets(calendarId, compressed, index, onBytes, timeoutMs
     // ever firing (the SDK is still waiting on a dead connection) -- without a bound here, the
     // whole send/edit flow would hang forever with no way for the user to recover. Time out and
     // fall back to inline base64 for that image instead.
-    const runUpload = (blob, ref, taskKey, contentType) => {
+    const runUploadOnce = (blob, ref, taskKey, contentType) => {
       let settled = false;
       return new Promise((resolveOne) => {
         const settle = value => { if (settled) return; settled = true; resolveOne(value); };
@@ -6059,6 +6059,15 @@ function uploadChatImageAssets(calendarId, compressed, index, onBytes, timeoutMs
           }
         });
       });
+    };
+    // One retry before giving up -- a single failed/timed-out attempt (a brief mobile network
+    // hiccup) used to permanently drop that photo to the low-quality ~600px/48KB base64 fallback
+    // with no second chance, which is exactly what produced reports of meeting/gallery photos
+    // saved at 600x450 / ~33KB. Same fix pattern as loadScriptWithRetry in main.jsx.
+    const runUpload = async (blob, ref, taskKey, contentType) => {
+      const first = await runUploadOnce(blob, ref, taskKey, contentType);
+      if (first) return first;
+      return runUploadOnce(blob, ref, taskKey, contentType);
     };
 
     Promise.all([
@@ -7662,7 +7671,7 @@ function uploadMemoImageAssets(calendarId, compressed, index, onBytes, timeoutMs
     const originalRef = firebaseStorage.ref(`${basePath}_original_${compressed.originalBlob.size}b.${originalMeta.ext}`);
     const thumbRef = firebaseStorage.ref(`${basePath}_thumb_${compressed.thumbnailBlob.size}b.${thumbMeta.ext}`);
 
-    const runUpload = (blob, ref, taskKey, contentType) => {
+    const runUploadOnce = (blob, ref, taskKey, contentType) => {
       let settled = false;
       return new Promise((resolveOne) => {
         const settle = value => { if (settled) return; settled = true; resolveOne(value); };
@@ -7679,6 +7688,12 @@ function uploadMemoImageAssets(calendarId, compressed, index, onBytes, timeoutMs
           }
         });
       });
+    };
+    // One retry before giving up -- see the matching comment in uploadChatImageAssets.
+    const runUpload = async (blob, ref, taskKey, contentType) => {
+      const first = await runUploadOnce(blob, ref, taskKey, contentType);
+      if (first) return first;
+      return runUploadOnce(blob, ref, taskKey, contentType);
     };
 
     Promise.all([
