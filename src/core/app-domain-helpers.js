@@ -969,14 +969,25 @@ function getConfirmedMeetings(calendar) {
 // rather than a generated id.
 function unionConfirmedMeetings(calendar, subcollectionMeetings) {
   const byDate = new Map();
-  // Subcollection entries go in FIRST so the calendar's own (local, possibly just-written)
-  // entries overwrite them on a shared date -- see unionPlaces' identical comment just above for
-  // the full reasoning. Processing subcollection data last previously let the live listener's
-  // still-stale snapshot silently overwrite a freshly-uploaded 일정 사진 for that date on every
-  // render until the listener caught up, which is exactly why an uploaded meeting photo could
-  // flash a "저장완료" toast and then not actually show up.
-  (Array.isArray(subcollectionMeetings) ? subcollectionMeetings : []).forEach(m => { if (m?.date) byDate.set(m.date, m); });
   getConfirmedMeetings(calendar).forEach(m => { if (m?.date) byDate.set(m.date, m); });
+  (Array.isArray(subcollectionMeetings) ? subcollectionMeetings : []).forEach(subM => {
+    if (!subM?.date) return;
+    const existing = byDate.get(subM.date);
+    if (!existing) {
+      byDate.set(subM.date, subM);
+    } else {
+      const subConfirmed = subM.confirmed !== false;
+      const existingConfirmed = existing.confirmed !== false;
+      const subTime = Number(subM.confirmedAt || subM.updatedAt || 0);
+      const existingTime = Number(existing.confirmedAt || existing.updatedAt || 0);
+
+      if ((subConfirmed && !existingConfirmed) || (subTime >= existingTime)) {
+        byDate.set(subM.date, { ...existing, ...subM });
+      } else {
+        byDate.set(subM.date, { ...subM, ...existing });
+      }
+    }
+  });
   return Array.from(byDate.values());
 }
 

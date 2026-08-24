@@ -511,6 +511,7 @@ function mergeCalendarRecord(existing, incoming) {
     activityLogs: mergeActivityLogs(base.activityLogs || [], next.activityLogs || [], base.id || next.id, participantIds),
     polls: mergePolls(base.polls || [], next.polls || [], base.id || next.id, participantIds),
     deletedActivityLogIds: mergeDeletedActivityLogIds(base.deletedActivityLogIds || [], next.deletedActivityLogIds || []),
+    confirmedMeeting: mergeConfirmedMeetings(base.confirmedMeeting || [], next.confirmedMeeting || []),
     updatedAt: mergedUpdatedAt || next.updatedAt || base.updatedAt || null,
     revision: mergedRevision
   };
