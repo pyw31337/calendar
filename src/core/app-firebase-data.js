@@ -895,6 +895,22 @@ function attemptFirebaseInit() {
     }
     __setFirebaseDb(firebase.firestore());
     try {
+      // Some networks/browsers (corporate proxies, privacy-hardened browsers like Whale with
+      // built-in ad/tracker blocking) allow a single request-response call (the initial doc
+      // read, a write) through but silently break Firestore's persistent WebChannel streaming
+      // connection -- the one onSnapshot() depends on to push other clients' writes back down.
+      // That produces exactly this failure shape: edits save fine and even read back correctly
+      // on the very next reload, but a live onSnapshot listener on another device never fires
+      // for them, so calendars drift apart until something forces a fresh read. Firestore's own
+      // documented fix is autoDetectLongPolling -- probe once at startup and use long-polling
+      // instead of WebChannel if the streaming transport looks unreliable; falls back to the
+      // normal fast path everywhere else, so this is safe to always set, not just for suspected
+      // environments. Must be called before any other Firestore operation.
+      firebase.firestore().settings({ experimentalAutoDetectLongPolling: true, merge: true });
+    } catch (settingsErr) {
+      console.warn('Firestore settings init notice:', settingsErr);
+    }
+    try {
       firebase.firestore().enablePersistence({ synchronizeTabs: true }).catch(function (err) {
         console.warn('Firestore persistence notice:', err && err.code || err);
       });
