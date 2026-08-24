@@ -901,12 +901,18 @@ function attemptFirebaseInit() {
       // connection -- the one onSnapshot() depends on to push other clients' writes back down.
       // That produces exactly this failure shape: edits save fine and even read back correctly
       // on the very next reload, but a live onSnapshot listener on another device never fires
-      // for them, so calendars drift apart until something forces a fresh read. Firestore's own
-      // documented fix is autoDetectLongPolling -- probe once at startup and use long-polling
-      // instead of WebChannel if the streaming transport looks unreliable; falls back to the
-      // normal fast path everywhere else, so this is safe to always set, not just for suspected
-      // environments. Must be called before any other Firestore operation.
-      firebase.firestore().settings({ experimentalAutoDetectLongPolling: true, merge: true });
+      // for them, so calendars drift apart until something forces a fresh read.
+      //
+      // experimentalAutoDetectLongPolling (probe once, fall back to long-polling only if the
+      // streaming transport looks unreliable) was tried first and confirmed still not enough on
+      // the actually-affected PC Whale browser -- its auto-detection heuristic apparently doesn't
+      // catch whatever Whale is doing to the connection. experimentalForceLongPolling skips that
+      // heuristic and always uses long-polling, which is slower to establish and slightly
+      // chattier per update than native streaming, but works through far more proxies/
+      // ad-blockers/browser quirks since it's just repeated plain HTTP requests instead of a
+      // persistent bidirectional connection. Worth the small latency cost everywhere given
+      // auto-detect's false negative here. Must be called before any other Firestore operation.
+      firebase.firestore().settings({ experimentalForceLongPolling: true, merge: true });
     } catch (settingsErr) {
       console.warn('Firestore settings init notice:', settingsErr);
     }
