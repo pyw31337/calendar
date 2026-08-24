@@ -729,16 +729,17 @@ export function SearchCategoryTabs({ tabs, activeKey, onSelect, containerStyle, 
       overflow: 'hidden',
       ...tabTextStyle
     }
-  }, tab.label, countBadgeClassName
-    ? /*#__PURE__*/React.createElement("span", { className: countBadgeClassName, style: countBadgeStyle }, tab.count)
-    : /*#__PURE__*/React.createElement("span", {
-        style: {
-          display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '18px', height: '18px',
-          borderRadius: '50%', backgroundColor: activeKey === tab.key ? '#2563EB' : '#E2E8F0',
-          color: activeKey === tab.key ? '#FFFFFF' : '#475569', fontSize: '0.68rem', fontWeight: 'bold', padding: '0 4px',
-          ...countBadgeStyle
-        }
-      }, tab.count))));
+  }, tab.label, /*#__PURE__*/React.createElement("span", {
+      className: countBadgeClassName || undefined,
+      style: {
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '18px', height: '18px',
+        borderRadius: '50%',
+        backgroundColor: (tab.count || 0) >= 1 ? '#2563EB' : '#E2E8F0',
+        color: (tab.count || 0) >= 1 ? '#FFFFFF' : '#475569',
+        fontSize: '0.68rem', fontWeight: 'bold', padding: '0 4px',
+        ...countBadgeStyle
+      }
+    }, tab.count))));
 }
 
 export function SimpleBottomSheetPicker({ title, value, options, onSelect, placeholder, disabled, style, className = "form-select" }) {

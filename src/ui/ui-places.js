@@ -1643,15 +1643,34 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
           options: [
             {
               value: 'all',
-              label: /*#__PURE__*/React.createElement(React.Fragment, null, "전체 ", /*#__PURE__*/React.createElement("span", { className: "section-count-badge" }, searchedPlaces.length))
+              label: /*#__PURE__*/React.createElement(React.Fragment, null, "전체 ", /*#__PURE__*/React.createElement("span", {
+                style: {
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '18px', height: '18px',
+                  borderRadius: '50%',
+                  backgroundColor: searchedPlaces.length >= 1 ? '#2563EB' : '#E2E8F0',
+                  color: searchedPlaces.length >= 1 ? '#FFFFFF' : '#475569',
+                  fontSize: '0.72rem', fontWeight: 'bold', padding: '0 5px', marginLeft: '4px'
+                }
+              }, searchedPlaces.length))
             },
-            ...categories.map(category => ({
-              value: category.id,
-              label: /*#__PURE__*/React.createElement(React.Fragment, null,
-                `${getPlaceCategoryIcon(category)} ${category.name} `,
-                /*#__PURE__*/React.createElement("span", { className: "section-count-badge" }, countsByCategory[category.id] || 0)
-              )
-            }))
+            ...categories.map(category => {
+              const cCount = countsByCategory[category.id] || 0;
+              return {
+                value: category.id,
+                label: /*#__PURE__*/React.createElement(React.Fragment, null,
+                  `${getPlaceCategoryIcon(category)} ${category.name} `,
+                  /*#__PURE__*/React.createElement("span", {
+                    style: {
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '18px', height: '18px',
+                      borderRadius: '50%',
+                      backgroundColor: cCount >= 1 ? '#2563EB' : '#E2E8F0',
+                      color: cCount >= 1 ? '#FFFFFF' : '#475569',
+                      fontSize: '0.72rem', fontWeight: 'bold', padding: '0 5px', marginLeft: '4px'
+                    }
+                  }, cCount)
+                )
+              };
+            })
           ],
           onSelect: setCategoryFilter
         }),

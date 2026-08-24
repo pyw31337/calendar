@@ -2652,10 +2652,21 @@ export function GlobalSearchModal({
       }, isMobile && SimpleBottomSheetPicker ? /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
         title: "검색 카테고리 선택",
         value: activeTab,
-        options: tabDefs.map(t => ({
-          value: t.key,
-          label: /*#__PURE__*/React.createElement(React.Fragment, null, `${t.label} `, /*#__PURE__*/React.createElement("span", { className: "section-count-badge" }, t.count))
-        })),
+        options: tabDefs.map(t => {
+          const hasCount = (t.count || 0) >= 1;
+          return {
+            value: t.key,
+            label: /*#__PURE__*/React.createElement(React.Fragment, null, `${t.label} `, /*#__PURE__*/React.createElement("span", {
+              style: {
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '18px', height: '18px',
+                borderRadius: '50%',
+                backgroundColor: hasCount ? '#2563EB' : '#E2E8F0',
+                color: hasCount ? '#FFFFFF' : '#475569',
+                fontSize: '0.72rem', fontWeight: 'bold', padding: '0 5px', marginLeft: '4px'
+              }
+            }, t.count))
+          };
+        }),
         onSelect: setActiveTab
       }) : /*#__PURE__*/React.createElement(SearchCategoryTabs, { tabs: tabDefs, activeKey: activeTab, onSelect: setActiveTab, containerStyle: { width: '100%' } })),
 

@@ -63,10 +63,6 @@ function extractFirstUrl(...args) {
   const f = __gatherUiDeps().extractFirstUrl || GATHER_APP_UTILS.extractFirstUrl;
   return typeof f === 'function' ? f(...args) : undefined;
 }
-function extractLeadingMemoDate(...args) {
-  const f = __gatherUiDeps().extractLeadingMemoDate || GATHER_APP_UTILS.extractLeadingMemoDate;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
 function formatChatDividerDate(...args) {
   const f = __gatherUiDeps().formatChatDividerDate || GATHER_APP_UTILS.formatChatDividerDate;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -195,16 +191,16 @@ function normalizePlaceDateForSort(...args) {
   const f = __gatherUiDeps().normalizePlaceDateForSort || GATHER_APP_UTILS.normalizePlaceDateForSort;
   return typeof f === 'function' ? f(...args) : undefined;
 }
-function parseVisitEntriesFromMemo(...args) {
-  const f = __gatherUiDeps().parseVisitEntriesFromMemo || GATHER_APP_UTILS.parseVisitEntriesFromMemo;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function reformatMemoIntoDateLines(...args) {
-  const f = __gatherUiDeps().reformatMemoIntoDateLines || GATHER_APP_UTILS.reformatMemoIntoDateLines;
+function parsePlaceMemoEntries(...args) {
+  const f = __gatherUiDeps().parsePlaceMemoEntries || GATHER_APP_UTILS.parsePlaceMemoEntries;
   return typeof f === 'function' ? f(...args) : undefined;
 }
 function removeFirstUrl(...args) {
   const f = __gatherUiDeps().removeFirstUrl || GATHER_APP_UTILS.removeFirstUrl;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function removePlaceMemoEntry(...args) {
+  const f = __gatherUiDeps().removePlaceMemoEntry || GATHER_APP_UTILS.removePlaceMemoEntry;
   return typeof f === 'function' ? f(...args) : undefined;
 }
 function sortVisitEntriesRecentFirst(...args) {
@@ -213,6 +209,10 @@ function sortVisitEntriesRecentFirst(...args) {
 }
 function trimLatLngOutliers(...args) {
   const f = __gatherUiDeps().trimLatLngOutliers || GATHER_APP_UTILS.trimLatLngOutliers;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function upsertPlaceMemoEntry(...args) {
+  const f = __gatherUiDeps().upsertPlaceMemoEntry || GATHER_APP_UTILS.upsertPlaceMemoEntry;
   return typeof f === 'function' ? f(...args) : undefined;
 }
 
@@ -356,10 +356,6 @@ function getImageFilesFromClipboardEvent(...args) {
   const f = __gatherUiDeps().getImageFilesFromClipboardEvent || GATHER_APP_UTILS.getImageFilesFromClipboardEvent;
   return typeof f === 'function' ? f(...args) : undefined;
 }
-function getKnownPlaceParticipantNames(...args) {
-  const f = __gatherUiDeps().getKnownPlaceParticipantNames || GATHER_APP_UTILS.getKnownPlaceParticipantNames;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
 function getPlaceCategoryMarkerContent(...args) {
   const f = __gatherUiDeps().getPlaceCategoryMarkerContent || GATHER_APP_UTILS.getPlaceCategoryMarkerContent;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -470,7 +466,7 @@ const MONTH_NAMES = GATHER_APP_CALENDAR_DATA.MONTH_NAMES || ['1월','2월','3월
 const PRESET_COLORS = GATHER_APP_CONSTANTS.PRESET_COLORS || [];
 const DEFAULT_EXPENSE_CATEGORIES = GATHER_APP_CONSTANTS.DEFAULT_EXPENSE_CATEGORIES || [];
 const DEFAULT_PLACE_CATEGORIES = GATHER_APP_CONSTANTS.DEFAULT_PLACE_CATEGORIES || GATHER_APP_UTILS.DEFAULT_PLACE_CATEGORIES || [];
-const EMOJI_CATEGORIES = GATHER_APP_CONSTANTS.EMOJI_CATEGORIES || [];
+const EMOJI_CATEGORIES = GATHER_APP_CHAT_DATA.EMOJI_CATEGORIES || [];
 const INCOME_EXPENSE_CATEGORY = GATHER_APP_UTILS.INCOME_EXPENSE_CATEGORY || { id: 'income', name: '수입', color: '#16A34A' };
 const PLACE_MAP_DEFAULT_CENTER = __gatherUiDeps().PLACE_MAP_DEFAULT_CENTER || [37.5665, 126.978];
 const PLACE_MAP_DEFAULT_ZOOM = __gatherUiDeps().PLACE_MAP_DEFAULT_ZOOM || 11;
@@ -606,10 +602,6 @@ function getPlaceExternalMapUrl(...args) {
   const f = __gatherUiDeps().getPlaceExternalMapUrl || GATHER_APP_UTILS.getPlaceExternalMapUrl;
   return typeof f === 'function' ? f(...args) : undefined;
 }
-function extractKnownParticipantNames(...args) {
-  const f = __gatherUiDeps().extractKnownParticipantNames || GATHER_APP_UTILS.extractKnownParticipantNames;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
 function getChatLastReadTimestamp(...args) {
   const f = __gatherUiDeps().getChatLastReadTimestamp || GATHER_APP_UTILS.getChatLastReadTimestamp;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -680,8 +672,7 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
   const PLACE_MAP_DEFAULT_CENTER = __deps.PLACE_MAP_DEFAULT_CENTER;
   const PLACE_MAP_DEFAULT_ZOOM = __deps.PLACE_MAP_DEFAULT_ZOOM;
   const getPlaceExternalMapUrl = __deps.getPlaceExternalMapUrl;
-  const extractLeadingMemoDate = __deps.extractLeadingMemoDate;
-  const parseVisitEntriesFromMemo = __deps.parseVisitEntriesFromMemo;
+  const parsePlaceMemoEntries = __deps.parsePlaceMemoEntries;
   const sortVisitEntriesRecentFirst = __deps.sortVisitEntriesRecentFirst;
 
   const containerRef = React.useRef(null);
@@ -878,12 +869,9 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
       headerEl.appendChild(actionsEl);
       popupNode.appendChild(headerEl);
 
-      const visitEntries = parseVisitEntriesFromMemo(place.memo);
-      const memoDate = extractLeadingMemoDate(place.memo);
-      const memoWithoutDate = memoDate ? place.memo.replace(memoDate, '').trim() : place.memo;
-      const displayVisitEntries = visitEntries.length > 0
-        ? sortVisitEntriesRecentFirst(visitEntries)
-        : (memoDate ? [{ date: memoDate, note: memoWithoutDate }] : []);
+      const memoEntries = parsePlaceMemoEntries(place.memo);
+      const displayVisitEntries = sortVisitEntriesRecentFirst(memoEntries.filter(e => e.date));
+      const memoWithoutDate = memoEntries.filter(e => !e.date).map(e => e.note).join('\n');
 
       if (displayVisitEntries.length > 0 || place.memo) {
         const dividerEl = document.createElement('hr');
@@ -1139,10 +1127,10 @@ export function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showT
   const getCalendarPlaces = __deps.getCalendarPlaces;
   const getPlaceCategories = __deps.getPlaceCategories;
 const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
-  const extractLeadingMemoDate = __deps.extractLeadingMemoDate;
-  const parseVisitEntriesFromMemo = __deps.parseVisitEntriesFromMemo;
+  const parsePlaceMemoEntries = __deps.parsePlaceMemoEntries;
   const sortVisitEntriesRecentFirst = __deps.sortVisitEntriesRecentFirst;
-  const extractKnownParticipantNames = __deps.extractKnownParticipantNames;
+  const upsertPlaceMemoEntry = __deps.upsertPlaceMemoEntry;
+  const removePlaceMemoEntry = __deps.removePlaceMemoEntry;
   const getPlaceExternalMapUrl = __deps.getPlaceExternalMapUrl;
 
   // A plain `const isMobile = window.matchMedia(...).matches` read once per render only reflects
@@ -1184,6 +1172,10 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
   const [listSearchQuery, setListSearchQuery] = React.useState('');
   const [isPlacesMenuOpen, setIsPlacesMenuOpen] = React.useState(false);
   const [isSearchOpen, setIsSearchOpen] = React.useState(false);
+  // Per-date memo entry being edited inline (comment-style), keyed `${placeId}::${entry.date}` so
+  // only one entry across all place cards is in edit mode at a time.
+  const [editingMemoEntryKey, setEditingMemoEntryKey] = React.useState(null);
+  const [editingMemoEntryText, setEditingMemoEntryText] = React.useState('');
 
   React.useEffect(() => {
     if (placesInitialQuery) {
@@ -1254,7 +1246,59 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
     setEditingPlace(place);
     setIsRegisterOpen(true);
   };
-  
+
+  // Per-date memo entry edit/delete -- mirrors MemoCard's comment edit/delete (ui-calendar-core.js)
+  // but without a participant field, since a place-memo entry isn't attributed to one person.
+  const handleStartEditPlaceMemoEntry = (place, entry) => {
+    setEditingMemoEntryKey(`${place.id}::${entry.date}`);
+    setEditingMemoEntryText(entry.note || '');
+  };
+  const handleCancelEditPlaceMemoEntry = () => {
+    setEditingMemoEntryKey(null);
+    setEditingMemoEntryText('');
+  };
+  const handleSavePlaceMemoEntry = async (place, entry) => {
+    const text = editingMemoEntryText.trim();
+    if (!text) return;
+    const nextMemo = upsertPlaceMemoEntry(place.memo || '', entry.date, text);
+    const ok = await Promise.resolve(onSavePlace({
+      id: place.id, name: place.name, alias: place.alias || '',
+      address: place.address || '', lat: place.lat, lng: place.lng,
+      categoryId: place.categoryId || 'etc', memo: nextMemo,
+      visitStatus: place.visitStatus === 'planned' ? 'planned' : 'visited',
+      visitDate: place.visitDate || ''
+    }));
+    if (ok !== false) {
+      showToast('메모가 수정되었습니다.', 'success');
+      setEditingMemoEntryKey(null);
+      setEditingMemoEntryText('');
+    } else {
+      showToast('메모 수정에 실패했습니다.', 'error');
+    }
+  };
+  const handleDeletePlaceMemoEntry = (place, entry) => {
+    const label = formatPlaceBadgeDate(entry.date) || entry.date;
+    onRequestConfirm('메모 삭제', `"${label}" 메모를 삭제하시겠습니까?`, async () => {
+      const nextMemo = removePlaceMemoEntry(place.memo || '', entry.date);
+      const ok = await Promise.resolve(onSavePlace({
+        id: place.id, name: place.name, alias: place.alias || '',
+        address: place.address || '', lat: place.lat, lng: place.lng,
+        categoryId: place.categoryId || 'etc', memo: nextMemo,
+        visitStatus: place.visitStatus === 'planned' ? 'planned' : 'visited',
+        visitDate: place.visitDate || ''
+      }));
+      if (ok !== false) {
+        showToast('메모가 삭제되었습니다.', 'success');
+        if (editingMemoEntryKey === `${place.id}::${entry.date}`) {
+          setEditingMemoEntryKey(null);
+          setEditingMemoEntryText('');
+        }
+      } else {
+        showToast('메모 삭제에 실패했습니다.', 'error');
+      }
+    });
+  };
+
   // Click on list item focuses marker. Since scrollBodyRef scrolls only the place list container
   // now, scrolling is focused on list container or we can ignore scrolling if map is fixed!
   // Wait, let's keep the smooth scroll to top of list container if list scrolls.
@@ -1343,8 +1387,6 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
     }
     return true;
   });
-  
-  const knownParticipantNames = getKnownPlaceParticipantNames(calendar);
 
   return /*#__PURE__*/React.createElement("div", {
     className: "places-view-container",
@@ -1601,15 +1643,34 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
           options: [
             {
               value: 'all',
-              label: /*#__PURE__*/React.createElement(React.Fragment, null, "전체 ", /*#__PURE__*/React.createElement("span", { className: "section-count-badge" }, searchedPlaces.length))
+              label: /*#__PURE__*/React.createElement(React.Fragment, null, "전체 ", /*#__PURE__*/React.createElement("span", {
+                style: {
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '18px', height: '18px',
+                  borderRadius: '50%',
+                  backgroundColor: searchedPlaces.length >= 1 ? '#2563EB' : '#E2E8F0',
+                  color: searchedPlaces.length >= 1 ? '#FFFFFF' : '#475569',
+                  fontSize: '0.72rem', fontWeight: 'bold', padding: '0 5px', marginLeft: '4px'
+                }
+              }, searchedPlaces.length))
             },
-            ...categories.map(category => ({
-              value: category.id,
-              label: /*#__PURE__*/React.createElement(React.Fragment, null,
-                `${getPlaceCategoryIcon(category)} ${category.name} `,
-                /*#__PURE__*/React.createElement("span", { className: "section-count-badge" }, countsByCategory[category.id] || 0)
-              )
-            }))
+            ...categories.map(category => {
+              const cCount = countsByCategory[category.id] || 0;
+              return {
+                value: category.id,
+                label: /*#__PURE__*/React.createElement(React.Fragment, null,
+                  `${getPlaceCategoryIcon(category)} ${category.name} `,
+                  /*#__PURE__*/React.createElement("span", {
+                    style: {
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '18px', height: '18px',
+                      borderRadius: '50%',
+                      backgroundColor: cCount >= 1 ? '#2563EB' : '#E2E8F0',
+                      color: cCount >= 1 ? '#FFFFFF' : '#475569',
+                      fontSize: '0.72rem', fontWeight: 'bold', padding: '0 5px', marginLeft: '4px'
+                    }
+                  }, cCount)
+                )
+              };
+            })
           ],
           onSelect: setCategoryFilter
         }),
@@ -1684,13 +1745,9 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
         }, places.length === 0 ? "등록된 장소가 없습니다. 우측 상단 아이콘을 눌러 추가해 보세요." : "검색 조건에 맞는 장소가 없습니다.") :
         filteredPlaces.map(place => {
           const category = categoryMap[place.categoryId] || categoryMap.etc;
-          const memoDate = extractLeadingMemoDate(place.memo);
-          const visitEntries = parseVisitEntriesFromMemo(place.memo);
-          const memoWithoutDate = memoDate ? place.memo.replace(memoDate, '').trim() : place.memo;
-          const participantNames = extractKnownParticipantNames(place.memo, knownParticipantNames);
-          const displayVisitEntries = visitEntries.length > 0
-            ? sortVisitEntriesRecentFirst(visitEntries)
-            : (memoDate ? [{ date: memoDate, note: memoWithoutDate }] : []);
+          const memoEntries = parsePlaceMemoEntries(place.memo);
+          const displayVisitEntries = sortVisitEntriesRecentFirst(memoEntries.filter(e => e.date));
+          const memoWithoutDate = memoEntries.filter(e => !e.date).map(e => e.note).join('\n');
           const isPlaceFocused = !!(focusPlace && focusPlace.id === place.id);
           return /*#__PURE__*/React.createElement("div", {
             key: place.id,
@@ -1771,7 +1828,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
                   color: place.visitStatus === 'planned' ? '#2563EB' : '#16A34A'
                 }
               }, place.visitStatus === 'planned' ? '방문예정' : '방문'),
-              visitEntries.length > 0 && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 700 } }, `총 ${visitEntries.length}회 방문`)
+              displayVisitEntries.length > 0 && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 700 } }, `총 ${displayVisitEntries.length}회 방문`)
             ),
             
             /* Name & Address -- alias is the list display name when set; official name shown underneath */
@@ -1781,20 +1838,68 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
               place.address && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.74rem', color: 'var(--text-muted)' } }, getDisplayPlaceAddress(place))
             ),
             
-            /* Visits history log or plain memo */
+            /* Visits history log (one row per date, newest first) or plain dateless memo --
+               each row mirrors MemoCard's comment rows (ui-calendar-core.js): a gray capsule with
+               edit/delete, minus the participant dot since a place-memo entry isn't attributed to
+               one person. */
             displayVisitEntries.length > 0
               ? /*#__PURE__*/React.createElement("div", {
-                  style: {
-                    display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '2px',
-                    backgroundColor: 'var(--bg-primary)', borderRadius: 'var(--radius-md)', padding: '8px 10px'
+                  style: { display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '2px' },
+                  onClick: e => e.stopPropagation()
+                }, displayVisitEntries.map((entry, idx) => {
+                  const entryKey = `${place.id}::${entry.date}`;
+                  const isEditingEntry = editingMemoEntryKey === entryKey;
+                  if (isEditingEntry) {
+                    return /*#__PURE__*/React.createElement("div", {
+                      key: idx,
+                      style: { display: 'flex', flexDirection: 'column', gap: '6px', backgroundColor: 'var(--bg-primary)', borderRadius: 'var(--radius-md)', padding: '8px 10px' }
+                    },
+                      /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)' } }, formatPlaceBadgeDate(entry.date) || entry.date),
+                      /*#__PURE__*/React.createElement("input", {
+                        type: "text",
+                        value: editingMemoEntryText,
+                        autoFocus: true,
+                        onChange: e => setEditingMemoEntryText(e.target.value),
+                        onKeyDown: e => {
+                          if (e.key === 'Enter') {
+                            if (e.nativeEvent && e.nativeEvent.isComposing) return;
+                            e.preventDefault();
+                            handleSavePlaceMemoEntry(place, entry);
+                          } else if (e.key === 'Escape') {
+                            handleCancelEditPlaceMemoEntry();
+                          }
+                        },
+                        style: { width: '100%', height: '32px', fontSize: '0.8rem', border: '1px solid var(--border-subtle)', borderRadius: '6px', padding: '0 8px', backgroundColor: 'var(--bg-card)', color: 'var(--text-main)', outline: 'none', boxSizing: 'border-box' }
+                      }),
+                      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '6px', justifyContent: 'flex-end' } },
+                        /*#__PURE__*/React.createElement("button", {
+                          type: "button", onClick: handleCancelEditPlaceMemoEntry,
+                          style: { height: '28px', padding: '0 10px', borderRadius: '6px', border: '1px solid var(--border-subtle)', background: 'none', color: 'var(--text-muted)', fontSize: '0.76rem', fontWeight: 700, cursor: 'pointer' }
+                        }, "취소"),
+                        /*#__PURE__*/React.createElement("button", {
+                          type: "button", onClick: () => handleSavePlaceMemoEntry(place, entry),
+                          disabled: !editingMemoEntryText.trim(),
+                          style: { height: '28px', padding: '0 10px', borderRadius: '6px', border: 'none', backgroundColor: 'var(--accent-primary)', color: '#FFFFFF', fontSize: '0.76rem', fontWeight: 700, cursor: 'pointer', opacity: editingMemoEntryText.trim() ? 1 : 0.5 }
+                        }, "수정")
+                      )
+                    );
                   }
-                }, displayVisitEntries.map((entry, idx) => /*#__PURE__*/React.createElement("div", {
-                  key: idx,
-                  className: "place-visit-entry"
-                },
-                  /*#__PURE__*/React.createElement("span", { className: "place-visit-entry-date" }, formatPlaceBadgeDate(entry.date) || entry.date),
-                  /*#__PURE__*/React.createElement("span", { className: "place-visit-entry-note" }, entry.note)
-                )))
+                  return /*#__PURE__*/React.createElement("div", {
+                    key: idx,
+                    style: { display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: 'var(--bg-primary)', borderRadius: '8px', padding: '6px 10px' }
+                  },
+                    /*#__PURE__*/React.createElement("span", { className: "place-visit-entry-date", style: { flexShrink: 0 } }, formatPlaceBadgeDate(entry.date) || entry.date),
+                    /*#__PURE__*/React.createElement("span", { style: { flex: 1, minWidth: 0, fontSize: '0.78rem', color: 'var(--text-main)', wordBreak: 'break-word' } }, entry.note),
+                    /*#__PURE__*/React.createElement("button", {
+                      type: "button", onClick: () => handleStartEditPlaceMemoEntry(place, entry), title: "메모 편집", "aria-label": "메모 편집",
+                      style: { background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', color: '#64748B', flexShrink: 0 }
+                    }, /*#__PURE__*/React.createElement(PencilIcon, { size: 12 })),
+                    /*#__PURE__*/React.createElement("button", {
+                      type: "button", onClick: () => handleDeletePlaceMemoEntry(place, entry), title: "메모 삭제", "aria-label": "메모 삭제",
+                      style: { background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', color: '#64748B', flexShrink: 0 }
+                    }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 12 }))
+                  );
+                }))
               : memoWithoutDate && /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.78rem', color: 'var(--text-main)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px' } }, renderTextWithUrlBadge(memoWithoutDate))
           );
         })
