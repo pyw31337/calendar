@@ -3070,7 +3070,9 @@ export function AdminDashboard({ initialCalendars }) {
     )),
 
     /* Inner PollModal to Edit/Create Polls from AdminDashboard */
-    isPollModalOpen && editingPollCalId && /*#__PURE__*/React.createElement(PollModal, {
+    (() => {
+      const PollComp = PollModal || (typeof window !== 'undefined' && window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PollModal) || (typeof window !== 'undefined' && window.GATHER_UI_DEPS && window.GATHER_UI_DEPS.PollModal);
+      return isPollModalOpen && editingPollCalId && PollComp ? /*#__PURE__*/React.createElement(PollComp, {
       calendar: serverCalendars.find(c => c.id === editingPollCalId),
       poll: editingPoll,
       onRequestConfirm: requestConfirm,
@@ -3112,7 +3114,8 @@ export function AdminDashboard({ initialCalendars }) {
         setEditingPollCalId(null);
       },
       showToast: showAdminToast
-    }),
+    }) : null;
+  })(),
 
     /* Generic layer-popup confirm dialog (replaces window.confirm) */
     confirmDialog && /*#__PURE__*/React.createElement(ConfirmDialog, {

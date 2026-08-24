@@ -2160,6 +2160,10 @@ export function PollModal({ calendar, poll, onSave, onClose, showToast, onReques
     className: "participant-add-row",
     style: { display: 'flex', gap: '6px', marginBottom: '8px' }
   }, /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    className: "form-input participant-add-input",
+    style: { flex: 1, minWidth: 0 },
+    placeholder: isClosed ? "마감된 투표에는 후보를 추가할 수 없습니다" : "예: 천왕역모아엘가 https://place.map.kakao.com/...",
     value: newOption,
     disabled: isSubmitting || isClosed,
     maxLength: 220,

@@ -1583,17 +1583,20 @@ export function AdminModal({
     /* TAB 5: CALENDAR-BASED SCHEDULE DELETION      */
     /* ========================================== */
     /* Inner PollModal to Edit/Create Polls */
-    isPollModalOpen && /*#__PURE__*/React.createElement(PollModal, {
-      calendar: calendar,
-      poll: editingPoll,
-      onRequestConfirm: onRequestConfirm,
-      onSave: handleSavePollFromAdmin,
-      onClose: () => {
-        setIsPollModalOpen(false);
-        setEditingPoll(null);
-      },
-      showToast: showToast
-    })
+    (() => {
+      const PollComp = PollModal || (typeof window !== 'undefined' && window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PollModal) || (typeof window !== 'undefined' && window.GATHER_UI_DEPS && window.GATHER_UI_DEPS.PollModal);
+      return isPollModalOpen && PollComp ? /*#__PURE__*/React.createElement(PollComp, {
+        calendar: calendar,
+        poll: editingPoll,
+        onRequestConfirm: onRequestConfirm,
+        onSave: handleSavePollFromAdmin,
+        onClose: () => {
+          setIsPollModalOpen(false);
+          setEditingPoll(null);
+        },
+        showToast: showToast
+      }) : null;
+    })()
   ));
 }
 
