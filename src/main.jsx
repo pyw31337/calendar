@@ -21,12 +21,31 @@ function showBootStatus(msg) {
 // the same site in a regular tab worked fine. Retrying (like the HEIC CDN fallbacks and boot()'s
 // own dynamic-import reload already do elsewhere in this app) turns that transient failure into a
 // short delay instead of a silent, permanent no-data state.
-function loadScriptOnce(src) {
+// Bounded so a script request that neither fires onload nor onerror (stalls indefinitely on a
+// bad connection instead of failing outright) can't hang loadFirebaseSdk forever -- without this
+// a single stuck request meant boot() never reached __gatherStartApp() at all.
+function loadScriptOnce(src, timeoutMs = 8000) {
   return new Promise((resolve, reject) => {
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      reject(new Error(`script load timed out: ${src}`));
+    }, timeoutMs);
     const el = document.createElement('script');
     el.src = src;
-    el.onload = () => resolve();
-    el.onerror = () => reject(new Error(`script load failed: ${src}`));
+    el.onload = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve();
+    };
+    el.onerror = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      reject(new Error(`script load failed: ${src}`));
+    };
     document.head.appendChild(el);
   });
 }
@@ -55,9 +74,13 @@ async function loadFirebaseSdk() {
 async function boot() {
   try {
     showBootStatus('모여라 캘린더 불러오는 중…');
-    // Kicked off alongside the dynamic imports below (not awaited yet) so a successful load adds
-    // zero extra latency -- only awaited right before app-main.js needs window.firebase to exist.
-    const firebaseSdkReady = loadFirebaseSdk();
+    // Loaded and awaited FIRST, before any of the dynamic imports below -- an earlier version
+    // kicked this off in parallel with them to save a little latency, but that meant it was
+    // competing for bandwidth with ~30 concurrent chunk fetches on a slow/cold mobile connection
+    // (exactly the condition this retry logic exists for), which made Firebase fail to load more
+    // often, not less. Loading it first and alone most closely matches the original behavior
+    // (a render-blocking <script> in <head>, which reliably worked) while still adding retries.
+    await loadFirebaseSdk();
     await Promise.all([
       import('./core/app-constants.js'),
       import('./core/app-config.js'),
@@ -96,10 +119,9 @@ async function boot() {
     const root = document.getElementById('root');
     if (root) root.dataset.booted = '1';
     window.__GATHER_BOOT_READY__ = true;
-    // app-firebase-data.js's top-level code (evaluated as part of this import, before app-main.js's
-    // own top-level code runs) calls firebase.initializeApp() immediately, so window.firebase must
-    // already exist by this point.
-    await firebaseSdkReady;
+    // firebase SDK is already fully loaded (awaited above, before any imports started), so
+    // app-firebase-data.js's top-level firebase.initializeApp() call (evaluated as part of this
+    // import) can safely assume window.firebase exists.
     await import('./core/app-main.js');
     if (typeof window.__gatherStartApp === 'function') window.__gatherStartApp();
     try { sessionStorage.removeItem(BOOT_RETRY_KEY); } catch (_) {}
