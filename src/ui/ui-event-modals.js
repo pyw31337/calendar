@@ -716,6 +716,7 @@ export function AnniversaryModal({
 
   // Migrated bulk register availability states
   const [bulkParticipantId, setBulkParticipantId] = React.useState('');
+  const [isBulkParticipantSheetOpen, setIsBulkParticipantSheetOpen] = React.useState(false);
   const [bulkWeekday, setBulkWeekday] = React.useState(1);
   const [bulkNote, setBulkNote] = React.useState('');
   const [isBulkSubmitting, setIsBulkSubmitting] = React.useState(false);
@@ -730,10 +731,7 @@ export function AnniversaryModal({
   });
 
   const participants = getActiveParticipants(calendar);
-
-  // Years option range
-  const months = Array.from({ length: 12 }, (_, i) => i + 1);
-  const days = Array.from({ length: 31 }, (_, i) => i + 1);
+  const bulkParticipant = participants.find(p => p.id === bulkParticipantId) || null;
 
   const handleEditClick = (ann) => {
     setEditingId(ann.id);
@@ -919,12 +917,13 @@ export function AnniversaryModal({
         xmlns: "http://www.w3.org/2000/svg", width: "18", height: "18", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2"
       }, /*#__PURE__*/React.createElement("circle", { cx: "12", cy: "12", r: "10" }), /*#__PURE__*/React.createElement("polyline", { points: "12 6 12 12 16 14" })), "기념일 & 반복 일정 설정"),
 
-      /* Close button */
+      /* Close button -- matches the plain (no circular background) icon-only style every other
+         modal's close button uses (see PollModal/AdminModal above). */
       /*#__PURE__*/React.createElement("button", {
         type: "button",
         onClick: requestClose,
-        style: { width: '30px', height: '30px', borderRadius: '50%', border: 'none', background: 'var(--border-subtle)', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }
-      }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 16 }))
+        style: { background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer', display: 'flex', alignItems: 'center' }
+      }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }))
     ),
 
     /* Modal Navigation Tabs */
@@ -1048,15 +1047,13 @@ export function AnniversaryModal({
           /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px' } },
             [['yearly', '매년 특정일자 반복 (생일 등)'], ['dday', '기준일 D-Day (커플, 시험 등)']].map(([typeVal, label]) => /*#__PURE__*/React.createElement("label", {
               key: typeVal,
+              className: "anniversary-type-option",
               style: {
                 flex: 1,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '8px 10px',
                 backgroundColor: newType === typeVal ? 'rgba(59,130,246,0.06)' : 'var(--bg-primary)',
                 border: '1px solid ' + (newType === typeVal ? '#3B82F6' : 'var(--border-subtle)'),
                 borderRadius: 'var(--radius-md)',
+                padding: '8px 10px',
                 fontSize: '0.76rem',
                 cursor: 'pointer',
                 fontWeight: newType === typeVal ? 'bold' : 'normal'
@@ -1079,28 +1076,24 @@ export function AnniversaryModal({
         newType === 'yearly' && /*#__PURE__*/React.createElement("div", {
           style: { display: 'flex', flexDirection: 'column', gap: '10px', padding: '10px', border: '1px solid var(--border-subtle)', borderRadius: '10px', backgroundColor: 'var(--bg-primary)' }
         },
-          /* Month / Day Selectors Row */
-          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px' } },
-            /* Month */
-            /*#__PURE__*/React.createElement("div", { style: { flex: 1 } },
-              /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '3px' } }, "월"),
-              /*#__PURE__*/React.createElement("select", {
-                className: "form-input",
-                value: yearlyMonth,
-                onChange: e => setYearlyMonth(Number(e.target.value)),
-                style: { width: '100%' }
-              }, months.map(m => /*#__PURE__*/React.createElement("option", { key: m, value: m }, `${m}월`)))
-            ),
-            /* Day */
-            /*#__PURE__*/React.createElement("div", { style: { flex: 1 } },
-              /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '3px' } }, "일"),
-              /*#__PURE__*/React.createElement("select", {
-                className: "form-input",
-                value: yearlyDay,
-                onChange: e => setYearlyDay(Number(e.target.value)),
-                style: { width: '100%' }
-              }, days.map(d => /*#__PURE__*/React.createElement("option", { key: d, value: d }, `${d}일`)))
-            )
+          /* Month / Day picker -- reuses the same shared DeadlineDateTimePicker bottom-sheet
+             grid used everywhere else in the app (poll deadline, D-Day target date, etc.)
+             instead of native <select> elements, so this looks and behaves consistently with
+             the rest of the app. It's a full-date picker, so a fixed leap year (2024) stands in
+             for the year here since only month/day repeat annually -- 2024 specifically so Feb
+             29 stays selectable for leap-day anniversaries; the year itself is discarded on
+             change and never stored. */
+          /*#__PURE__*/React.createElement("div", null,
+            /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '3px' } }, "월 / 일"),
+            /*#__PURE__*/React.createElement(DeadlineDateTimePicker, {
+              dateOnly: true,
+              value: `2024-${String(yearlyMonth).padStart(2, '0')}-${String(yearlyDay).padStart(2, '0')}`,
+              onChange: v => {
+                const [, mm, dd] = v.split('-');
+                setYearlyMonth(Number(mm));
+                setYearlyDay(Number(dd));
+              }
+            })
           ),
           /* Lunar / Leap month settings */
           /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '14px', marginTop: '4px', flexWrap: 'wrap' } },
@@ -1192,24 +1185,46 @@ export function AnniversaryModal({
 
         /* Participant & Weekday Select row */
         /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } },
-          /* Participant picker */
-          /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
-            title: "참여자 선택",
-            placeholder: "참여자 선택",
-            value: bulkParticipantId,
+          /* Participant picker -- same personal-color-circle + name button/sheet used by
+             DateModal's participant picker, instead of the plain text-only SimpleBottomSheetPicker. */
+          /*#__PURE__*/React.createElement("button", {
+            type: "button",
+            className: "form-select",
             disabled: isBulkSubmitting,
-            onSelect: setBulkParticipantId,
-            options: participants.map(p => ({ value: p.id, label: p.name })),
-            style: { flex: '1 1 140px' }
-          }),
-          /* Weekday picker */
+            style: {
+              flex: '1 1 140px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              gap: '8px', textAlign: 'left', cursor: isBulkSubmitting ? 'default' : 'pointer'
+            },
+            onClick: () => { if (!isBulkSubmitting) setIsBulkParticipantSheetOpen(true); }
+          },
+            /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, overflow: 'hidden' } },
+              bulkParticipant && /*#__PURE__*/React.createElement("span", {
+                className: "form-select-color-indicator",
+                style: { backgroundColor: bulkParticipant.color }
+              }),
+              /*#__PURE__*/React.createElement("span", {
+                style: {
+                  fontWeight: 700, color: bulkParticipant ? 'var(--text-main)' : 'var(--text-muted)',
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+                }
+              }, bulkParticipant ? bulkParticipant.name : '참여자 선택')
+            ),
+            /*#__PURE__*/React.createElement("svg", {
+              xmlns: "http://www.w3.org/2000/svg", width: "18", height: "18", viewBox: "0 0 24 24",
+              fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round",
+              className: "form-select-chevron", "aria-hidden": "true"
+            }, /*#__PURE__*/React.createElement("path", { d: "M6 9l6 6l6 -6" }))
+          ),
+          /* Weekday picker -- 일요일 rendered in red like every other Sunday-labeled UI in the app. */
           /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
             title: "요일 선택",
             placeholder: "요일 선택",
             value: bulkWeekday,
             disabled: isBulkSubmitting,
             onSelect: v => setBulkWeekday(Number(v)),
-            options: ['일', '월', '화', '수', '목', '금', '토'].map((label, idx) => ({ value: idx, label: `매주 ${label}요일` })),
+            options: ['일', '월', '화', '수', '목', '금', '토'].map((label, idx) => ({
+              value: idx, label: `매주 ${label}요일`, color: idx === 0 ? '#EF4444' : undefined
+            })),
             style: { flex: '1 1 100px' }
           })
         ),
@@ -1260,7 +1275,43 @@ export function AnniversaryModal({
     )
   ));
 
-  return ReactDOM.createPortal(portalContent, document.body);
+  // Bottom-sheet rule: never nest under ResizableModalContainer (CSS transform traps fixed) --
+  // portaled as its own sibling rather than embedded inside portalContent's JSX tree.
+  const bulkParticipantSheet = isBulkParticipantSheetOpen && /*#__PURE__*/React.createElement("div", {
+    className: "bottom-sheet-overlay",
+    onClick: () => setIsBulkParticipantSheetOpen(false)
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bottom-sheet",
+    onClick: e => e.stopPropagation()
+  },
+    /*#__PURE__*/React.createElement("div", { className: "bottom-sheet-header" },
+      /*#__PURE__*/React.createElement("h4", null, "참여자 선택"),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        style: { background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '1.2rem', cursor: 'pointer' },
+        onClick: () => setIsBulkParticipantSheetOpen(false)
+      }, "✕")
+    ),
+    /*#__PURE__*/React.createElement("div", { className: "bottom-sheet-body" },
+      participants.map(p => /*#__PURE__*/React.createElement("button", {
+        key: p.id,
+        type: "button",
+        className: "bottom-sheet-item",
+        onClick: () => {
+          setBulkParticipantId(p.id);
+          setIsBulkParticipantSheetOpen(false);
+        }
+      }, /*#__PURE__*/React.createElement("span", {
+        className: "color-dot",
+        style: { backgroundColor: p.color, width: '12px', height: '12px' }
+      }), /*#__PURE__*/React.createElement("span", { style: { fontWeight: 700 } }, p.name)))
+    )
+  ));
+
+  return /*#__PURE__*/React.createElement(React.Fragment, null,
+    ReactDOM.createPortal(portalContent, document.body),
+    bulkParticipantSheet && ReactDOM.createPortal(bulkParticipantSheet, document.body)
+  );
 }
 
 export function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {

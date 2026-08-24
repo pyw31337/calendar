@@ -769,7 +769,7 @@ export function SimpleBottomSheetPicker({ title, value, options, onSelect, place
         type: "button",
         className: "bottom-sheet-item",
         onClick: () => { onSelect(opt.value); setIsOpen(false); }
-      }, opt.label))
+      }, opt.color ? /*#__PURE__*/React.createElement("span", { style: { color: opt.color } }, opt.label) : opt.label))
     )
   ));
   return /*#__PURE__*/React.createElement(React.Fragment, null,

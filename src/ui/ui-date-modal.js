@@ -2917,7 +2917,6 @@ export function DateModal({
     onClick: () => setIsSheetOpen(false)
   }, /*#__PURE__*/React.createElement("div", {
     className: "bottom-sheet",
-    style: { maxHeight: '70vh' },
     onClick: e => e.stopPropagation()
   },
     /*#__PURE__*/React.createElement("div", { className: "bottom-sheet-header" },
