@@ -861,7 +861,18 @@ export function PhotoGallery({ chatMessages, calendar = null, totalGalleryCount,
     [...chatEntries, ...meetingEntries].forEach(entry => {
       const key = entry.full || entry.thumb;
       if (!key) return;
-      if (!byUrl.has(key) || entry.source === 'chat') byUrl.set(key, entry);
+      if (!byUrl.has(key)) {
+        byUrl.set(key, { ...entry });
+      } else {
+        const existing = byUrl.get(key);
+        if (entry.meetingDate) existing.meetingDate = entry.meetingDate;
+        if (entry.photoId) existing.photoId = entry.photoId;
+        if (entry.sourceMessageId) existing.sourceMessageId = entry.sourceMessageId;
+        if (Number.isInteger(entry.sourceImageIndex)) existing.sourceImageIndex = entry.sourceImageIndex;
+        if (entry.source === 'meeting' && existing.source !== 'meeting' && !existing.messageId) {
+          byUrl.set(key, { ...existing, ...entry });
+        }
+      }
     });
     return Array.from(byUrl.values()).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
   }, [chatMessages, calendar]);

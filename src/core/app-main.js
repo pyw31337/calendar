@@ -3455,23 +3455,37 @@ function App() {
     }
   };
 
+  const isSameImageUrl = (url1, url2) => {
+    if (!url1 || !url2) return false;
+    if (url1 === url2) return true;
+    const c1 = String(url1).split('?')[0];
+    const c2 = String(url2).split('?')[0];
+    return c1 === c2;
+  };
+
+  const photoMatchesUrl = (p, targetUrl) => {
+    if (!p || !targetUrl) return false;
+    const urls = [p.imageUrl, p.thumbUrl, p.full, p.thumb, p.url].filter(Boolean);
+    return urls.some(u => isSameImageUrl(u, targetUrl));
+  };
+
   const handleDeleteMeetingPhoto = (dateStr, photoId, imageUrl) => {
     if (!activeCal) return false;
     const existingMeetings = getConfirmedMeetings(activeCal);
     let meetingIndex = isValidDateString(dateStr) ? existingMeetings.findIndex(m => m.date === dateStr) : -1;
     if (meetingIndex < 0) {
-      meetingIndex = existingMeetings.findIndex(m => (m.photos || []).some(p => (photoId && p.id === photoId) || (imageUrl && (p.imageUrl === imageUrl || p.thumbUrl === imageUrl))));
+      meetingIndex = existingMeetings.findIndex(m => (m.photos || []).some(p => (photoId && p.id === photoId) || photoMatchesUrl(p, imageUrl)));
     }
     if (meetingIndex < 0) return false;
     const meeting = existingMeetings[meetingIndex];
     const existingPhotos = Array.isArray(meeting.photos) ? meeting.photos : [];
-    const deletedPhoto = existingPhotos.find(p => (photoId && p.id === photoId) || (imageUrl && (p.imageUrl === imageUrl || p.thumbUrl === imageUrl)));
+    const deletedPhoto = existingPhotos.find(p => (photoId && p.id === photoId) || photoMatchesUrl(p, imageUrl));
     if (!deletedPhoto) return false;
     deleteChatImageFromStorage(deletedPhoto.imageUrl);
     deleteChatImageFromStorage(deletedPhoto.thumbUrl);
     const now = Date.now();
     const nextConfirmedMeetings = existingMeetings.map((m, i) => i === meetingIndex
-      ? { ...m, photos: existingPhotos.filter(p => p !== deletedPhoto && p.id !== deletedPhoto.id) }
+      ? { ...m, photos: existingPhotos.filter(p => p !== deletedPhoto && p.id !== deletedPhoto.id && !photoMatchesUrl(p, imageUrl)) }
       : m);
     const targetDate = meeting.date || dateStr;
     const photoLog = createActivityLog(activeCal.id, 'photo_delete', targetDate, '', now, '일정 사진 삭제');
@@ -3595,7 +3609,6 @@ function App() {
     if (!messageId || !Number.isInteger(imageIndex)) return false;
     const sourceMessage = await findChatMessageById(messageId);
     if (!sourceMessage) {
-      showToast('삭제 대상 이미지를 찾지 못했습니다.', 'error', 4000);
       return false;
     }
     const entries = getMessageImageEntries(sourceMessage);
@@ -3711,7 +3724,6 @@ function App() {
     if (!memoId || !Number.isInteger(imageIndex)) return false;
     const memo = await findMemoById(memoId);
     if (!memo) {
-      showToast('삭제 대상 이미지를 찾지 못했습니다.', 'error', 4000);
       return false;
     }
     const urls = Array.isArray(memo.imageUrls) ? memo.imageUrls : (memo.imageUrl ? [memo.imageUrl] : []);
