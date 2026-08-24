@@ -46,7 +46,7 @@ service cloud.firestore {
     function hasValidRevision(calendarDocId) {
       return !exists(/databases/$(database)/documents/calendars/$(calendarDocId))
         ? request.resource.data.revision == 1
-        : request.resource.data.revision == resource.data.revision + 1;
+        : request.resource.data.revision > resource.data.revision;
     }
 
     match /calendars/{calendarDocId} {
