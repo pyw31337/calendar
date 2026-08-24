@@ -1208,7 +1208,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
       const label = formatScheduleLabel(dateStr) || `일정 ${dateStr || ''}`;
       return {
         label: label,
-        onClick: (onJumpToMeetingDate && dateStr) ? () => onJumpToMeetingDate(dateStr, 'photo') : null
+        onClick: (onJumpToMeetingDate && dateStr) ? () => { closeLightbox(); onJumpToMeetingDate(dateStr, 'photo'); } : null
       };
     }
 
@@ -1216,7 +1216,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
       const msgId = currentMeta.messageId || currentMeta.sourceMessageId;
       return {
         label: '메모',
-        onClick: (onJumpToMemo && msgId) ? () => onJumpToMemo(msgId) : null
+        onClick: (onJumpToMemo && msgId) ? () => { closeLightbox(); onJumpToMemo(msgId); } : null
       };
     }
 
@@ -1226,7 +1226,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
       const msgId = currentMeta.messageId != null ? currentMeta.messageId : currentMeta.sourceMessageId;
       return {
         label: typeof galleryOrdinal === 'number' ? `갤러리 #${galleryOrdinal}` : '갤러리',
-        onClick: (onJumpToGallery && (msgId != null || currentUrl)) ? () => onJumpToGallery(msgId, currentMeta.imageIndex, currentUrl) : null
+        onClick: (onJumpToGallery && (msgId != null || currentUrl)) ? () => { closeLightbox(); onJumpToGallery(msgId, currentMeta.imageIndex, currentUrl); } : null
       };
     }
 
@@ -1234,9 +1234,9 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
     const ordinal = msgId != null ? chatOrdinalCache[msgId] : null;
     return {
       label: typeof ordinal === 'number' ? `채팅 #${ordinal}` : '채팅',
-      onClick: (onJumpToChatMessage && msgId) ? () => onJumpToChatMessage(msgId) : null
+      onClick: (onJumpToChatMessage && msgId) ? () => { closeLightbox(); onJumpToChatMessage(msgId); } : null
     };
-  }, [currentMeta, currentUrl, onJumpToChatMessage, onJumpToMemo, onJumpToMeetingDate, onJumpToGallery, chatOrdinalCache, galleryOrdinalCache]);
+  }, [currentMeta, currentUrl, closeLightbox, onJumpToChatMessage, onJumpToMemo, onJumpToMeetingDate, onJumpToGallery, chatOrdinalCache, galleryOrdinalCache]);
   const replacePhotoInputRef = React.useRef(null);
   const [isReplacingPhoto, setIsReplacingPhoto] = React.useState(false);
   const [isDeletingPhoto, setIsDeletingPhoto] = React.useState(false);

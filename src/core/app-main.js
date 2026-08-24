@@ -5142,6 +5142,7 @@ function App() {
     onJumpToChatMessage: handleJumpToChatMessage,
     onJumpToMemo: handleJumpToMemo,
     onJumpToMeetingDate: handleJumpToMeetingDate,
+    onJumpToGallery: handleJumpToGallery,
     onGetChatMessageOrdinal: handleGetChatMessageOrdinal,
     onGetGalleryPhotoOrdinal: handleGetGalleryPhotoOrdinal,
     onRequestConfirm: showConfirmDialog
