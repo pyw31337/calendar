@@ -66,17 +66,22 @@ async function loadScriptWithRetry(src, timeoutMs, attempts = 3, delayMs = 700) 
 // compat scripts, which only extend that existing global, can run -- kept sequential to match the
 // same execution order the removed <head> <script> tags guaranteed by HTML parse order.
 //
-// Per-file timeouts, not one flat value: firebase-firestore-compat.js is ~340KB, about 8-12x the
-// other two files (~29KB / ~40KB). A flat 8s timeout (this file's original value) is plenty for the
-// small files but is comfortably shorter than a real slow-but-working mobile connection needs for
-// 340KB -- that mismatch was giving up on (and showing an error toast for) connections that were
-// simply slow, not actually broken, which is worse than the original plain <script> tag this
-// replaced (browsers don't impose a short timeout on script loads by default, so it would have just
-// kept waiting and eventually succeeded).
+// Vendored under vendor/ (see public-vite/vendor/, copied into dist/ by
+// copy-static-to-dist.mjs) and loaded as a same-origin relative path instead of from
+// www.gstatic.com. A live diagnostic report (the "연결 오류" toast now includes the actual
+// failure reason -- see app-firebase-data.js's attemptFirebaseInit) confirmed a real device
+// consistently got `window.firebase undefined` even after every timeout/retry adjustment tried
+// here, meaning the SDK script itself was never reaching that browser at all -- something on
+// that network path (DNS-level filtering, a privacy resolver, an extension) was blocking
+// www.gstatic.com specifically, while the site's own origin loaded fine. No amount of waiting or
+// retrying fixes a route that's actually blocked; serving these files from the same origin as
+// the rest of the app removes the separate CDN dependency entirely. Per-file timeouts are kept
+// (not one flat value) since firebase-firestore-compat.js is ~340KB, about 8-12x the other two
+// files (~29KB / ~40KB).
 async function loadFirebaseSdk() {
-  await loadScriptWithRetry('https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js', 12000);
-  await loadScriptWithRetry('https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js', 30000);
-  await loadScriptWithRetry('https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js', 15000);
+  await loadScriptWithRetry('vendor/firebase-app-compat.js', 12000);
+  await loadScriptWithRetry('vendor/firebase-firestore-compat.js', 30000);
+  await loadScriptWithRetry('vendor/firebase-storage-compat.js', 15000);
 }
 
 async function boot() {

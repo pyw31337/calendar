@@ -932,10 +932,12 @@ const firebaseReadyOnFirstTry = attemptFirebaseInit();
 if (typeof window !== 'undefined' && typeof document !== 'undefined' && !firebaseReadyOnFirstTry && ENABLE_FIRESTORE_SYNC) {
   const FIREBASE_BG_RETRY_INTERVAL_MS = 20000;
   const FIREBASE_BG_RETRY_MAX_ATTEMPTS = 30; // ~10 minutes before giving up for good this session
+  // Same-origin vendored copies -- see the matching note in main.jsx's loadFirebaseSdk for why
+  // these no longer point at www.gstatic.com.
   const FIREBASE_SDK_URLS = [
-    'https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js',
-    'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js',
-    'https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js'
+    'vendor/firebase-app-compat.js',
+    'vendor/firebase-firestore-compat.js',
+    'vendor/firebase-storage-compat.js'
   ];
   const loadFirebaseScriptOnce = (src, timeoutMs) => new Promise((resolve, reject) => {
     let settled = false;
