@@ -883,10 +883,25 @@ let firebaseStorage = null;
 let firebaseInitError = null;
 function __setFirebaseInitError(v) { firebaseInitError = v; if (typeof window !== "undefined") window.__gatherFirebaseInitError = v; }
 
+// PC 웨일 실사용자 콘솔에서 확인된 실제 원인: attemptFirebaseInit()이 백그라운드 재시도 루프를 통해
+// 두 번째로 실행되면 firebase.firestore().settings(...)도 다시 호출되는데, Firestore SDK는 같은
+// 인스턴스에 settings()가 두 번째로 호출되는 걸 merge:true로 감싸도 "experimentalForceLongPolling
+// and experimentalAutoDetectLongPolling cannot be used together"로 거부한다 (이미 시작된 스트림에
+// 대해 재적용을 시도하면서 내부적으로 두 옵션이 동시에 해석되는 경우). 이 예외가 나면 그 재시도에서
+// 실시간 리스너가 아예 붙지 못한 채로 firestoreDb 참조만 재사용되어, onSnapshot이 평생 한 번도
+// 호출되지 않는 상태로 남는다. settings()는 세션당 정확히 한 번만 적용되면 되므로 여기서 막는다.
+let firestoreSettingsApplied = false;
+
 // Pulled into its own function so the background retry loop below can re-run it after a fresh
 // SDK load, not just once at module evaluation time. Returns true once firebaseDb is actually
 // usable.
 function attemptFirebaseInit() {
+  // Already have a live instance from an earlier successful call -- nothing left to do. Without
+  // this, a late-executing duplicate SDK script (see the loadScriptOnce fix in main.jsx) that
+  // resets window.firebase to a brand-new object would make a later re-run of this function call
+  // firebase.initializeApp()/firebase.firestore() again and silently swap firebaseDb out from
+  // under any already-attached onSnapshot listeners.
+  if (firebaseDb) return true;
   if (!ENABLE_FIRESTORE_SYNC) { __setFirebaseInitError('ENABLE_FIRESTORE_SYNC=false'); return false; }
   if (typeof firebase === 'undefined') { __setFirebaseInitError('SDK 스크립트 미로딩 (window.firebase undefined)'); return false; }
   try {
@@ -912,7 +927,10 @@ function attemptFirebaseInit() {
       // ad-blockers/browser quirks since it's just repeated plain HTTP requests instead of a
       // persistent bidirectional connection. Worth the small latency cost everywhere given
       // auto-detect's false negative here. Must be called before any other Firestore operation.
-      firebase.firestore().settings({ experimentalForceLongPolling: true, merge: true });
+      if (!firestoreSettingsApplied) {
+        firebase.firestore().settings({ experimentalForceLongPolling: true, merge: true });
+        firestoreSettingsApplied = true;
+      }
     } catch (settingsErr) {
       console.warn('Firestore settings init notice:', settingsErr);
     }
@@ -1001,12 +1019,23 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined' && !firebas
       return;
     }
     try {
-      // Reloading an already-loaded script is harmless here (firebase-app-compat.js's own
-      // !firebase.apps.length guard, and the browser's own HTTP cache once one attempt actually
-      // succeeds) -- always retrying all three keeps this simple and avoids having to detect
-      // exactly which of the three partially loaded last time.
-      for (const url of FIREBASE_SDK_URLS) {
-        await loadFirebaseScriptOnce(url, 15000);
+      // If window.firebase already exists, some earlier script tag (e.g. the deferred CDN
+      // <script> in index.html, just slow rather than truly failed on this connection) has
+      // already finished loading in the background since our first attempt. Injecting another
+      // copy on top of it here is what produced the real, evidenced bug: a PC Whale user's
+      // console showed "Firebase is already defined in the global scope" from the duplicate
+      // load, immediately followed by Firestore rejecting the second settings() call
+      // ("experimentalForceLongPolling and experimentalAutoDetectLongPolling cannot be used
+      // together"), which left the realtime listener permanently unable to attach. Only inject
+      // fresh script tags when nothing has loaded yet.
+      if (typeof firebase === 'undefined') {
+        // Reloading an already-loaded script is harmless here (firebase-app-compat.js's own
+        // !firebase.apps.length guard, and the browser's own HTTP cache once one attempt actually
+        // succeeds) -- always retrying all three keeps this simple and avoids having to detect
+        // exactly which of the three partially loaded last time.
+        for (const url of FIREBASE_SDK_URLS) {
+          await loadFirebaseScriptOnce(url, 15000);
+        }
       }
       if (attemptFirebaseInit()) clearInterval(bgRetryTimer);
     } catch (e) {
