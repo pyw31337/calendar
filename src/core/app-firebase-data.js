@@ -1318,18 +1318,22 @@ async function fetchSingleCloudCalendar(calId, retryCount = FIREBASE_LOAD_MAX_AT
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     try {
       if (firebaseDb) {
-        const doc = await Promise.race([
-          firebaseDb.collection('calendars').doc(`cal_${calId}`).get(),
-          waitForTimeout(timeoutMs, `Firestore fetch timeout after ${timeoutMs}ms`)
-        ]);
-        if (doc.exists) {
-          const data = doc.data();
-          if (data && data.calendar && data.calendar.id === calId) {
-            return {
-              calendar: data.calendar,
-              lastModified: data.lastModified || data.calendar.updatedAt || 0
-            };
+        try {
+          const doc = await Promise.race([
+            firebaseDb.collection('calendars').doc(`cal_${calId}`).get({ source: 'server' }),
+            waitForTimeout(timeoutMs, `Firestore fetch timeout after ${timeoutMs}ms`)
+          ]);
+          if (doc && doc.exists) {
+            const data = doc.data();
+            if (data && data.calendar && data.calendar.id === calId) {
+              return {
+                calendar: data.calendar,
+                lastModified: data.lastModified || data.calendar.updatedAt || 0
+              };
+            }
           }
+        } catch (e) {
+          console.warn(`Firestore SDK server fetch notice for cal_${calId}, trying REST fallback:`, e);
         }
       }
       const restResult = await fetchSingleCalendarWithRest(calId, timeoutMs);
@@ -1671,7 +1675,7 @@ async function fetchPlacesFromFirestore(calendarId) {
   const basePath = `calendars/cal_${calendarId}/places`;
   try {
     if (firebaseDb) {
-      const snap = await firebaseDb.collection('calendars').doc(`cal_${calendarId}`).collection('places').get();
+      const snap = await firebaseDb.collection('calendars').doc(`cal_${calendarId}`).collection('places').get({ source: 'server' });
       return snap.docs.map(doc => doc.data());
     }
   } catch (e) {
@@ -1735,7 +1739,7 @@ async function fetchConfirmedMeetingsFromFirestore(calendarId) {
   const basePath = `calendars/cal_${calendarId}/confirmedMeetings`;
   try {
     if (firebaseDb) {
-      const snap = await firebaseDb.collection('calendars').doc(`cal_${calendarId}`).collection('confirmedMeetings').get();
+      const snap = await firebaseDb.collection('calendars').doc(`cal_${calendarId}`).collection('confirmedMeetings').get({ source: 'server' });
       return snap.docs.map(doc => doc.data());
     }
   } catch (e) {
