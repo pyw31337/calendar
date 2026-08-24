@@ -1,7 +1,7 @@
 {
   "id": "/calendar/?id=jhair",
-  "name": "모여라 캘린더 · jhair",
-  "short_name": "모여라 · jhair",
+  "name": "💈 제이헤어 캘린더",
+  "short_name": "제이헤어 캘린더",
   "description": "사모임 참여자들의 가능 날짜를 캘린더에 표기하고 전원 모임 가능한 날짜를 한눈에 파악해보세요.",
   "start_url": "./?id=jhair",
   "scope": "./",
