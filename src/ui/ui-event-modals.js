@@ -1620,7 +1620,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {
       style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', marginBottom: isCollapsed ? 0 : '10px' }
     }, /*#__PURE__*/React.createElement("strong", {
       style: { fontSize: '0.92rem', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }
-    }, /*#__PURE__*/React.createElement(CalendarCheckIcon, null), formatDateWithDayName(row.meeting.date)), /*#__PURE__*/React.createElement("span", {
+    }, /*#__PURE__*/React.createElement(CalendarCheckIcon, null), formatShortDateWithDayName(row.meeting.date)), /*#__PURE__*/React.createElement("span", {
       style: { display: 'inline-flex', alignItems: 'center', gap: '6px', marginLeft: 'auto', whiteSpace: 'nowrap' }
     }, /*#__PURE__*/React.createElement("span", {
       // Capsule badge (not plain colored text) so this per-date total reads distinctly from the
@@ -1633,7 +1633,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {
     }, row.net >= 0 ? '+' : '-', Math.abs(row.net).toLocaleString(), "원"), /*#__PURE__*/React.createElement(SectionToggleButton, {
       collapsed: isCollapsed,
       onToggle: () => toggleDailyRow(row.meeting.date),
-      label: `${formatDateWithDayName(row.meeting.date)} 정산`
+      label: `${formatShortDateWithDayName(row.meeting.date)} 정산`
     }))), !isCollapsed && /*#__PURE__*/React.createElement("div", {
       style: { display: 'flex', flexDirection: 'column', gap: '8px' }
     }, row.items.map(item => renderItemRow({ ...item, date: row.meeting.date }, false))));
