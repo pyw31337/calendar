@@ -2791,7 +2791,7 @@ export function EditMessageModal({
   const fileInputRefEdit = React.useRef(null);
   const [imageProcessingEdit, setImageProcessingEdit] = React.useState(null);
   const editTextareaRef = React.useRef(null);
-  React.useEffect(() => autoGrowTextarea(editTextareaRef.current, 240), []);
+  React.useEffect(() => autoGrowTextarea(editTextareaRef.current, 5000), []);
 
   const handleFileChangeEdit = async (e) => {
     const files = e.target.files;
@@ -2893,24 +2893,25 @@ export function EditMessageModal({
   }, /*#__PURE__*/React.createElement(ResizableModalContainer, {
     className: "modal-container",
     onClick: e => e.stopPropagation(),
-    style: { width: '90%', maxWidth: '400px', padding: '16px', borderRadius: '12px' }
+    style: { width: '90%', maxWidth: '400px', borderRadius: '12px' }
   }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: '14px',
-      borderBottom: '1px solid var(--border-subtle)',
-      paddingBottom: '8px'
-    }
+    className: "modal-header",
+    style: { padding: '16px', marginBottom: 0 }
   }, /*#__PURE__*/React.createElement("h3", {
     style: { fontSize: '1rem', fontWeight: 800, color: 'var(--text-main)', margin: 0 }
   }, "채팅 수정"), /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: () => { if (!isSubmitting) requestClose(); },
     style: { background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer', display: 'flex', alignItems: 'center' }
-  }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }))), /*#__PURE__*/React.createElement("div", {
-    style: { display: 'flex', flexDirection: 'column', gap: '12px' }
+  }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }))),
+  // .modal-body handles the actual grow-then-scroll behavior (flex:1 1 auto, min-height:0,
+  // overflow-y:auto, capped by .modal-container's own visualViewport-aware max-height set in
+  // ResizableModalContainer) -- so this modal naturally grows taller with the message's content,
+  // up to the visible screen height, and only then scrolls internally. The header/footer stay
+  // pinned outside this scrolling region so the 취소/수정 buttons are never clipped off-screen.
+  /*#__PURE__*/React.createElement("div", {
+    className: "modal-body",
+    style: { padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }
   },
   images.length > 0 ? /*#__PURE__*/React.createElement("div", {
     style: { display: 'flex', flexWrap: 'wrap', gap: '8px', alignSelf: 'flex-start' }
@@ -2934,9 +2935,7 @@ export function EditMessageModal({
   })))) : null,
   /*#__PURE__*/React.createElement("div", {
     style: {
-      display: 'flex',
-      alignItems: 'flex-end',
-      gap: '8px',
+      position: 'relative',
       backgroundColor: 'var(--bg-primary)',
       border: '1px solid var(--border-subtle)',
       borderRadius: '12px',
@@ -2948,15 +2947,16 @@ export function EditMessageModal({
     value: text,
     onChange: e => {
       setText(e.target.value);
-      autoGrowTextarea(e.target, 240);
+      // No practical cap here -- the textarea itself should keep growing with the message
+      // (matching how long the bubble's content actually is); .modal-body's own scroll (see
+      // above) is what takes over once the whole modal no longer fits the screen.
+      autoGrowTextarea(e.target, 5000);
     },
     onPaste: handlePasteImagesEdit,
     style: {
-      flex: 1,
-      minWidth: 0,
-      height: '80px',
+      display: 'block',
+      width: '100%',
       minHeight: '80px',
-      maxHeight: '240px',
       resize: 'none',
       border: 'none',
       backgroundColor: 'transparent',
@@ -2965,7 +2965,11 @@ export function EditMessageModal({
       fontFamily: 'inherit',
       outline: 'none',
       boxSizing: 'border-box',
-      overflowY: 'auto'
+      // Reserved so typed/pasted text never runs underneath the emoji/사진첨부 buttons floating
+      // over the bottom-right corner (see below) -- those buttons used to sit in their own flex
+      // column next to the textarea, permanently eating ~80px of its width even on short replies.
+      paddingRight: '76px',
+      paddingBottom: '4px'
     }
   }), /*#__PURE__*/React.createElement("input", {
     ref: fileInputRefEdit,
@@ -2974,54 +2978,60 @@ export function EditMessageModal({
     multiple: true,
     style: { position: 'absolute', width: '1px', height: '1px', padding: 0, margin: '-1px', overflow: 'hidden', clip: 'rect(0,0,0,0)', border: 0 },
     onChange: handleFileChangeEdit
-  }), /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    onClick: () => setIsEmojiPickerOpen(true),
-    title: "이모티콘 추가",
-    style: {
-      width: '32px',
-      height: '32px',
-      borderRadius: '50%',
-      border: '1px solid var(--border-subtle)',
-      backgroundColor: 'var(--bg-card)',
-      cursor: 'pointer',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      flexShrink: 0,
-      padding: 0,
-      color: '#64748B'
-    }
-  }, /*#__PURE__*/React.createElement(EmojiPickerIcon, null)), /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    onClick: () => fileInputRefEdit.current && fileInputRefEdit.current.click(),
-    title: "사진 첨부",
-    style: {
-      width: '32px',
-      height: '32px',
-      borderRadius: '50%',
-      border: '1px solid var(--border-subtle)',
-      backgroundColor: 'var(--bg-card)',
-      cursor: 'pointer',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      flexShrink: 0,
-      padding: 0,
-      color: 'var(--text-muted)'
-    }
-  }, /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg",
-    width: "16",
-    height: "16",
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    strokeWidth: "2",
-    strokeLinecap: "round",
-    strokeLinejoin: "round"
-  }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), /*#__PURE__*/React.createElement("path", { d: "M15 8h.01" }), /*#__PURE__*/React.createElement("path", { d: "M12.5 21h-6.5a3 3 0 0 1 -3 -3v-12a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v6.5" }), /*#__PURE__*/React.createElement("path", { d: "M3 16l5 -5c.928 -.893 2.072 -.893 3 0l4 4" }), /*#__PURE__*/React.createElement("path", { d: "M14 14l1 -1c.67 -.644 1.45 -.824 2.182 -.54" }), /*#__PURE__*/React.createElement("path", { d: "M16 19h6" }), /*#__PURE__*/React.createElement("path", { d: "M19 16v6" })))), /*#_PURE_*/React.createElement("div", {
-    style: { display: 'flex', gap: '8px', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: { position: 'absolute', right: '8px', bottom: '8px', display: 'flex', gap: '6px' }
+  },
+    /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => setIsEmojiPickerOpen(true),
+      title: "이모티콘 추가",
+      style: {
+        width: '32px',
+        height: '32px',
+        borderRadius: '50%',
+        border: '1px solid var(--border-subtle)',
+        backgroundColor: 'var(--bg-card)',
+        cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
+        padding: 0,
+        color: '#64748B'
+      }
+    }, /*#__PURE__*/React.createElement(EmojiPickerIcon, null)),
+    /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => fileInputRefEdit.current && fileInputRefEdit.current.click(),
+      title: "사진 첨부",
+      style: {
+        width: '32px',
+        height: '32px',
+        borderRadius: '50%',
+        border: '1px solid var(--border-subtle)',
+        backgroundColor: 'var(--bg-card)',
+        cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
+        padding: 0,
+        color: 'var(--text-muted)'
+      }
+    }, /*#__PURE__*/React.createElement("svg", {
+      xmlns: "http://www.w3.org/2000/svg",
+      width: "16",
+      height: "16",
+      viewBox: "0 0 24 24",
+      fill: "none",
+      stroke: "currentColor",
+      strokeWidth: "2",
+      strokeLinecap: "round",
+      strokeLinejoin: "round"
+    }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), /*#__PURE__*/React.createElement("path", { d: "M15 8h.01" }), /*#__PURE__*/React.createElement("path", { d: "M12.5 21h-6.5a3 3 0 0 1 -3 -3v-12a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v6.5" }), /*#__PURE__*/React.createElement("path", { d: "M3 16l5 -5c.928 -.893 2.072 -.893 3 0l4 4" }), /*#__PURE__*/React.createElement("path", { d: "M14 14l1 -1c.67 -.644 1.45 -.824 2.182 -.54" }), /*#__PURE__*/React.createElement("path", { d: "M16 19h6" }), /*#__PURE__*/React.createElement("path", { d: "M19 16v6" }))))
+  )), /*#__PURE__*/React.createElement("div", {
+    className: "modal-footer",
+    style: { padding: '16px', justifyContent: 'space-between', alignItems: 'center' }
   },
     /* Participant reassignment -- fixes a message posted under the wrong participant */
     /*#__PURE__*/React.createElement(ParticipantPickerButton, {
@@ -3034,17 +3044,17 @@ export function EditMessageModal({
         className: "btn btn-secondary",
         disabled: isSubmitting,
         onClick: onClose,
-        style: { height: '34px', fontSize: '0.85rem', padding: '0 14px' }
+        style: { height: '44px', minHeight: '44px', fontSize: '0.85rem', padding: '0 16px' }
       }, "취소"),
       /*#__PURE__*/React.createElement("button", {
         type: "button",
         className: "btn btn-poll-create",
         disabled: isSubmitting || (!text.trim() && images.length === 0),
         onClick: handleSave,
-        style: { height: '34px', fontSize: '0.85rem', padding: '0 16px', opacity: (text.trim() || images.length > 0) && !isSubmitting ? 1 : 0.6 }
+        style: { height: '44px', minHeight: '44px', fontSize: '0.85rem', padding: '0 16px', opacity: (text.trim() || images.length > 0) && !isSubmitting ? 1 : 0.6 }
       }, isSubmitting ? '...' : "수정")
     )
-  )))), isPartSheetOpen && /*#__PURE__*/React.createElement(ChatParticipantSheet, {
+  ))), isPartSheetOpen && /*#__PURE__*/React.createElement(ChatParticipantSheet, {
     calendar: calendar,
     selectedId: participantId,
     onSelect: id => { setParticipantId(id); setIsPartSheetOpen(false); },
