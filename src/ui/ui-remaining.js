@@ -1065,7 +1065,7 @@ export function DeadlineDateTimePicker({ value, onChange, disabled, dateOnly = f
                 if (pDay > dim) setPDay(dim);
               },
               style: {
-                padding: '6px 4px', borderRadius: '8px',
+                padding: '6px 4px', borderRadius: 'var(--radius-sm)',
                 border: pMonth === idx ? '2px solid var(--accent-primary)' : '1px solid var(--border-subtle)',
                 background: pMonth === idx ? 'rgba(99, 102, 241, 0.15)' : 'var(--bg-card)',
                 color: pMonth === idx ? 'var(--accent-primary)' : 'var(--text-main)',
@@ -1086,7 +1086,7 @@ export function DeadlineDateTimePicker({ value, onChange, disabled, dateOnly = f
               return /*#__PURE__*/React.createElement('button', {
                 key: day, type: 'button', onClick: () => setPDay(day),
                 style: {
-                  padding: '6px 0', borderRadius: '8px',
+                  padding: '6px 0', borderRadius: 'var(--radius-sm)',
                   border: isSelected ? '2px solid var(--accent-primary)' : '1px solid transparent',
                   background: isSelected ? 'rgba(99, 102, 241, 0.15)' : 'transparent',
                   color: isSelected ? 'var(--accent-primary)' : 'var(--text-main)',
@@ -1230,7 +1230,7 @@ export function PlacesSection({ calendar, onViewAll }) {
         style: {
           position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 500, width: '100%',
           backgroundColor: 'color-mix(in srgb, var(--bg-primary) 96%, black)',
-          border: 'none', borderRadius: '0 0 8px 8px', padding: '8px 0',
+          border: 'none', borderRadius: '0 0 var(--radius-md) var(--radius-md)', padding: '8px 0',
           fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--text-main)',
           cursor: 'pointer', textAlign: 'center'
         }

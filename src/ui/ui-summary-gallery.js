@@ -939,7 +939,7 @@ export function PhotoGallery({ chatMessages, calendar = null, totalGalleryCount,
           width: '100%',
           backgroundColor: 'color-mix(in srgb, var(--bg-primary) 96%, black)',
           border: 'none',
-          borderRadius: '8px',
+          borderRadius: 'var(--radius-md)',
           padding: '8px 0',
           marginTop: '10px',
           fontSize: '0.85rem',
@@ -1276,7 +1276,7 @@ export function SummaryList({
         onClick: () => setAllListLimit(prev => prev + step),
         style: {
           width: '100%', marginTop: '4px', marginBottom: '6px', padding: '10px 0',
-          border: 'none', borderRadius: '8px',
+          border: 'none', borderRadius: 'var(--radius-md)',
           backgroundColor: 'color-mix(in srgb, var(--bg-primary) 96%, black)',
           color: 'var(--text-main)', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer', textAlign: 'center'
         }
@@ -1389,7 +1389,7 @@ export function SummaryList({
         onClick: () => setConfirmedListLimit(prev => prev + step),
         style: {
           width: '100%', marginTop: '4px', marginBottom: '6px', padding: '10px 0',
-          border: 'none', borderRadius: '8px',
+          border: 'none', borderRadius: 'var(--radius-md)',
           backgroundColor: 'color-mix(in srgb, var(--bg-primary) 96%, black)',
           color: 'var(--text-main)', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer', textAlign: 'center'
         }

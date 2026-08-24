@@ -992,7 +992,7 @@ export function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, on
          Places in particular can take several seconds on a cold start, so this exists to make
          that wait read as "still working" instead of a frozen button label. */
       searchStage && /*#__PURE__*/React.createElement("div", {
-        style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', borderRadius: '8px', backgroundColor: 'rgba(59, 130, 246, 0.06)' }
+        style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', borderRadius: 'var(--radius-md)', backgroundColor: 'rgba(59, 130, 246, 0.06)' }
       },
         /*#__PURE__*/React.createElement("span", { className: "calendar-spinner", style: { flexShrink: 0 } }),
         /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.8rem', color: 'var(--text-muted)' } }, SEARCH_TIER_LABELS[searchStage] || '검색 중...')
@@ -1000,7 +1000,7 @@ export function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, on
 
       /* Search results */
       results.length > 0 && /*#__PURE__*/React.createElement("div", {
-        style: { display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '160px', overflowY: 'auto', border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '4px' }
+        style: { display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '160px', overflowY: 'auto', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '4px' }
       }, results.map(r => /*#__PURE__*/React.createElement("button", {
         key: r.id,
         type: "button",
@@ -1016,7 +1016,7 @@ export function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, on
          they picked the right branch/listing before saving. */
       selected && /*#__PURE__*/React.createElement("div", {
         style: {
-          padding: '10px 12px', borderRadius: '8px', backgroundColor: 'rgba(59, 130, 246, 0.08)',
+          padding: '10px 12px', borderRadius: 'var(--radius-md)', backgroundColor: 'rgba(59, 130, 246, 0.08)',
           border: '1px solid rgba(59, 130, 246, 0.2)', display: 'flex', flexDirection: 'column', gap: '4px'
         }
       },

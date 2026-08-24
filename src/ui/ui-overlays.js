@@ -678,7 +678,7 @@ export function ImageUploadOverlay({ pct, remainingSec, label, current, total })
   return /*#__PURE__*/React.createElement('div', {
     style: { position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.45)', zIndex: 100000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }
   }, /*#__PURE__*/React.createElement('div', {
-    style: { backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: '14px', padding: '24px 28px', width: '260px', maxWidth: '100%', textAlign: 'center', boxShadow: '0 10px 30px rgba(0,0,0,0.25)' }
+    style: { backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '24px 28px', width: '260px', maxWidth: '100%', textAlign: 'center', boxShadow: '0 10px 30px rgba(0,0,0,0.25)' }
   },
     /*#__PURE__*/React.createElement('div', { style: { fontWeight: 800, fontSize: '0.95rem', color: 'var(--text-main)', marginBottom: '4px' } }, `${label || '사진 전송 중...'}${countSuffix}`),
     /*#__PURE__*/React.createElement('div', { style: { fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '14px' } },
@@ -697,7 +697,7 @@ export function ImageProcessingOverlay({ current, total, fileName, pct, remainin
   return /*#__PURE__*/React.createElement('div', {
     style: { position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.45)', zIndex: 100000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }
   }, /*#__PURE__*/React.createElement('div', {
-    style: { backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: '14px', padding: '24px 28px', width: '260px', maxWidth: '100%', textAlign: 'center', boxShadow: '0 10px 30px rgba(0,0,0,0.25)' }
+    style: { backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '24px 28px', width: '260px', maxWidth: '100%', textAlign: 'center', boxShadow: '0 10px 30px rgba(0,0,0,0.25)' }
   },
     /*#__PURE__*/React.createElement('div', { style: { fontWeight: 800, fontSize: '0.95rem', color: 'var(--text-main)', marginBottom: '4px' } }, '사진 변환 중...'),
     /*#__PURE__*/React.createElement('div', { style: { fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '14px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } },
@@ -719,7 +719,7 @@ export function EmojiGridButton({ emoji, onSelect }) {
     onClick: () => onSelect(emoji),
     style: {
       width: '38px', height: '38px', border: 'none', background: 'none', cursor: 'pointer',
-      display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '8px',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 'var(--radius-md)',
       padding: 0, fontSize: '1.3rem', lineHeight: 1
     }
   }, imgFailed

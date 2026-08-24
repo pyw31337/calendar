@@ -690,7 +690,7 @@ export function UserManualOverlay({ calendar, onClose }) {
     style: {
       width: '42px',
       height: '42px',
-      borderRadius: '14px',
+      borderRadius: 'var(--radius-md)',
       background: 'linear-gradient(135deg, #EEF2FF, #FDF2F8)',
       color: '#4F46E5',
       display: 'flex',
@@ -711,7 +711,7 @@ export function UserManualOverlay({ calendar, onClose }) {
         key: day,
         style: {
           minHeight: '56px',
-          borderRadius: '14px',
+          borderRadius: 'var(--radius-md)',
           border: day === 22 ? '1px solid #10B981' : day === 15 ? '1px solid #7C3AED' : '1px solid var(--border-subtle)',
           background: day === 22 ? '#ECFDF5' : day === 15 ? '#FAF5FF' : 'var(--bg-primary)',
           padding: '8px',
@@ -743,7 +743,7 @@ export function UserManualOverlay({ calendar, onClose }) {
       desc: '본인을 고르고 시간·장소 메모를 남긴 뒤 추가하세요.',
       icon: /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0", "M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2"] }),
       preview: /*#__PURE__*/React.createElement("div", {
-        style: { border: '1px solid var(--border-subtle)', borderRadius: '18px', overflow: 'hidden', background: 'var(--bg-card)' }
+        style: { border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', overflow: 'hidden', background: 'var(--bg-card)' }
       }, /*#__PURE__*/React.createElement("div", {
         style: { padding: '13px 16px', background: '#F5EAFE', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 900 }
       }, "26.08.22(토)", /*#__PURE__*/React.createElement("span", { style: { color: '#64748B' } }, "×")), /*#__PURE__*/React.createElement("div", {
@@ -751,7 +751,7 @@ export function UserManualOverlay({ calendar, onClose }) {
       }, /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.75rem', fontWeight: 900, color: '#64748B' } }, "참여자 선택"), /*#__PURE__*/React.createElement("div", {
         style: { height: '42px', border: '1px solid var(--border-subtle)', borderRadius: '999px', display: 'flex', alignItems: 'center', padding: '0 14px', gap: '8px', fontWeight: 800 }
       }, /*#__PURE__*/React.createElement("span", { style: { width: 9, height: 9, borderRadius: '50%', backgroundColor: sampleParticipant.color } }), sampleParticipant.name), /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.75rem', fontWeight: 900, color: '#64748B' } }, "메모 입력"), /*#__PURE__*/React.createElement("div", {
-        style: { border: '1px solid var(--border-subtle)', borderRadius: '12px', padding: '11px 12px', color: '#64748B', fontSize: '0.82rem' }
+        style: { border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '11px 12px', color: '#64748B', fontSize: '0.82rem' }
       }, "예: 1시 이후 가능, 차량 운전 가능"), /*#__PURE__*/React.createElement("button", {
         type: "button",
         className: "btn btn-primary",
@@ -765,11 +765,11 @@ export function UserManualOverlay({ calendar, onClose }) {
       preview: /*#__PURE__*/React.createElement("div", {
         style: { display: 'flex', flexDirection: 'column', gap: '8px' }
       }, /*#__PURE__*/React.createElement("div", {
-        style: { border: '1px solid #10B981', background: '#ECFDF5', borderRadius: '16px', padding: '12px', display: 'flex', justifyContent: 'space-between', gap: '10px', alignItems: 'center' }
+        style: { border: '1px solid #10B981', background: '#ECFDF5', borderRadius: 'var(--radius-md)', padding: '12px', display: 'flex', justifyContent: 'space-between', gap: '10px', alignItems: 'center' }
       }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", { style: { color: '#10B981', fontWeight: 900, marginBottom: '7px' } }, "전원 참석 가능"), /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: '5px' } }, participantBadge(sampleParticipant), participantBadge(sampleParticipant2), participantBadge(sampleParticipant3))), /*#__PURE__*/React.createElement("span", {
         style: { padding: '6px 10px', borderRadius: '999px', background: '#10B981', color: '#FFFFFF', fontSize: '0.75rem', fontWeight: 900, whiteSpace: 'nowrap' }
       }, "전원")), /*#__PURE__*/React.createElement("div", {
-        style: { border: '1px solid transparent', background: 'linear-gradient(var(--bg-card), var(--bg-card)) padding-box, var(--accent-gradient) border-box', borderRadius: '16px', padding: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }
+        style: { border: '1px solid transparent', background: 'linear-gradient(var(--bg-card), var(--bg-card)) padding-box, var(--accent-gradient) border-box', borderRadius: 'var(--radius-md)', padding: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }
       }, /*#__PURE__*/React.createElement("strong", { style: { color: '#4F46E5' } }, "[모임확정] 26.08.22 (토)"), /*#__PURE__*/React.createElement("span", {
         style: { padding: '5px 10px', borderRadius: '999px', background: 'linear-gradient(135deg, #6366F1, #EC4899)', color: '#FFFFFF', fontWeight: 900, fontSize: '0.75rem' }
       }, "D-11")))
@@ -804,7 +804,7 @@ export function UserManualOverlay({ calendar, onClose }) {
       background: 'var(--bg-card)',
       color: 'var(--text-main)',
       border: '1px solid var(--border-subtle)',
-      borderRadius: '28px',
+      borderRadius: 'var(--radius-md)',
       boxShadow: '0 30px 80px rgba(0, 0, 0, 0.32)',
       padding: 'clamp(18px, 3vw, 30px)'
     }
@@ -825,7 +825,7 @@ export function UserManualOverlay({ calendar, onClose }) {
     style: { display: 'grid', gridTemplateColumns: '1fr', gap: '10px' }, className: 'manual-steps'
   }, stepCards.map(step => /*#__PURE__*/React.createElement("article", {
     key: step.title,
-    style: { border: '1px solid var(--border-subtle)', borderRadius: '22px', background: 'linear-gradient(180deg, var(--bg-card), var(--bg-primary))', padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px', minHeight: '100%' }
+    style: { border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', background: 'linear-gradient(180deg, var(--bg-card), var(--bg-primary))', padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px', minHeight: '100%' }
   }, /*#__PURE__*/React.createElement("div", {
     style: { display: 'flex', alignItems: 'flex-start', gap: '12px' }
   }, /*#__PURE__*/React.createElement(StepIcon, null, step.icon), /*#__PURE__*/React.createElement("div", {
@@ -835,9 +835,9 @@ export function UserManualOverlay({ calendar, onClose }) {
   }, step.title), /*#__PURE__*/React.createElement("p", {
     style: { margin: '7px 0 0', color: 'var(--text-muted)', fontSize: '0.86rem', lineHeight: 1.55 }
   }, step.desc))), /*#__PURE__*/React.createElement("div", {
-    style: { marginTop: 'auto', borderRadius: '18px', background: 'var(--bg-primary)', border: '1px solid var(--border-subtle)', padding: '12px', overflow: 'hidden' }
+    style: { marginTop: 'auto', borderRadius: 'var(--radius-md)', background: 'var(--bg-primary)', border: '1px solid var(--border-subtle)', padding: '12px', overflow: 'hidden' }
   }, step.preview)))), /*#__PURE__*/React.createElement("div", {
-    style: { marginTop: '16px', padding: '14px 16px', borderRadius: '18px', background: 'rgba(59, 130, 246, 0.1)', color: '#2563EB', fontSize: '0.88rem', fontWeight: 500, lineHeight: 1.5 }
+    style: { marginTop: '16px', padding: '14px 16px', borderRadius: 'var(--radius-md)', background: 'rgba(59, 130, 246, 0.1)', color: '#2563EB', fontSize: '0.88rem', fontWeight: 500, lineHeight: 1.5 }
   }, "팁: 날짜는 여러 개 미리 등록해 두면 모임 잡기가 빨라집니다."))), document.body);
 }
 

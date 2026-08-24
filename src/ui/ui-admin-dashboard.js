@@ -1874,7 +1874,7 @@ export function AdminDashboard({ initialCalendars }) {
       color: isActive ? '#059669' : '#64748B',
       borderBottom: isActive ? '3px solid #059669' : '3px solid transparent',
       backgroundColor: isActive ? '#ECFDF5' : 'transparent',
-      borderRadius: '6px 6px 0 0',
+      borderRadius: 'var(--radius-md) var(--radius-md) 0 0',
       cursor: 'pointer',
       outline: 'none',
       transition: 'all 0.2s ease',
@@ -2014,7 +2014,7 @@ export function AdminDashboard({ initialCalendars }) {
       style: {
         position: 'fixed', bottom: '32px', left: '50%', transform: 'translateX(-50%)', zIndex: 99999,
         backgroundColor: toast.type === 'error' ? '#EF4444' : '#3ECF8E', color: toast.type === 'error' ? '#FFFFFF' : '#000000',
-        padding: '12px 24px', borderRadius: '12px', fontSize: '0.88rem', fontWeight: 'bold', boxShadow: '0 10px 25px -5px rgba(15,23,42,0.35)',
+        padding: '12px 24px', borderRadius: 'var(--radius-md)', fontSize: '0.88rem', fontWeight: 'bold', boxShadow: '0 10px 25px -5px rgba(15,23,42,0.35)',
         textAlign: 'center', wordBreak: 'break-all', whiteSpace: 'pre-wrap', maxWidth: '380px', width: '90%', boxSizing: 'border-box'
       }
     }, toast.message),
@@ -2222,7 +2222,7 @@ export function AdminDashboard({ initialCalendars }) {
         onSubmit: handleChangePassword,
         onClick: e => e.stopPropagation(),
         className: "modal-container",
-        style: { maxWidth: '340px', padding: '20px', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '12px' }
+        style: { maxWidth: '340px', padding: '20px', borderRadius: 'var(--radius-md)', display: 'flex', flexDirection: 'column', gap: '12px' }
       },
         /*#__PURE__*/React.createElement("h3", { style: { fontSize: '1.05rem', fontWeight: 800, color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(LockIcon, null), "관리자 비밀번호 변경"),
         /*#__PURE__*/React.createElement("input", {
@@ -2252,10 +2252,10 @@ export function AdminDashboard({ initialCalendars }) {
 
     /* Main Content Area */
     error && /*#__PURE__*/React.createElement("div", {
-      style: { color: '#EF4444', border: '1px solid #EF4444', backgroundColor: '#1A0B0B', marginBottom: '18px', padding: '14px', borderRadius: '8px', fontSize: '0.88rem', fontWeight: 'bold' }
+      style: { color: '#EF4444', border: '1px solid #EF4444', backgroundColor: '#1A0B0B', marginBottom: '18px', padding: '14px', borderRadius: 'var(--radius-md)', fontSize: '0.88rem', fontWeight: 'bold' }
     }, error),
     isAdminListLoading && !error && /*#__PURE__*/React.createElement("div", {
-      style: { color: '#64748B', border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)', marginBottom: '18px', padding: '14px', borderRadius: '8px', fontSize: '0.88rem', fontWeight: 700 }
+      style: { color: '#64748B', border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)', marginBottom: '18px', padding: '14px', borderRadius: 'var(--radius-md)', fontSize: '0.88rem', fontWeight: 700 }
     }, "관리자 캘린더 목록을 불러오는 중…"),
 
     /* ================================================================= */
@@ -2331,7 +2331,7 @@ export function AdminDashboard({ initialCalendars }) {
               )
             )
           ),
-          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'flex-start', gap: '8px', marginTop: '14px', padding: '10px', borderRadius: '8px', backgroundColor: '#F0FDF4', border: '1px solid #BBF7D0' } },
+          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'flex-start', gap: '8px', marginTop: '14px', padding: '10px', borderRadius: 'var(--radius-md)', backgroundColor: '#F0FDF4', border: '1px solid #BBF7D0' } },
             /*#__PURE__*/React.createElement(ShieldCheckIcon, null),
             /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.78rem', color: '#166534', lineHeight: 1.6 } },
               /*#__PURE__*/React.createElement("strong", null, "API 키 보호: "),
@@ -2760,7 +2760,7 @@ export function AdminDashboard({ initialCalendars }) {
         /*#__PURE__*/React.createElement("section", { className: "recovery-timeline-card", style: styles.card },
           /* Warning banner */
           /*#__PURE__*/React.createElement("div", {
-            style: { backgroundColor: '#FEF2F2', border: '1px solid #FCA5A5', borderRadius: '8px', padding: '12px 14px', color: '#B91C1C', fontSize: '0.8rem', lineHeight: '1.5', marginBottom: '16px' }
+            style: { backgroundColor: '#FEF2F2', border: '1px solid #FCA5A5', borderRadius: 'var(--radius-md)', padding: '12px 14px', color: '#B91C1C', fontSize: '0.8rem', lineHeight: '1.5', marginBottom: '16px' }
           },
             /*#__PURE__*/React.createElement("span", { style: { fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '4px', verticalAlign: 'middle' } }, /*#__PURE__*/React.createElement(AlertTriangleIcon, null), "통합 시점 복구 경고: "),
             "캘린더의 일정, 투표 기록 뿐만 아니라 해당 캘린더에 전송된 채팅 로그를 포함하는 복구 타임라인입니다. 복구 지점 이후 변경된 데이터 롤백 및 시간 외 전송 메시지는 DB에서 실시간 삭제 처리됩니다."
@@ -2780,7 +2780,7 @@ export function AdminDashboard({ initialCalendars }) {
               marginBottom: '12px',
               padding: '12px',
               backgroundColor: '#F1F5F9',
-              borderRadius: '8px',
+              borderRadius: 'var(--radius-md)',
               border: '1px solid #E2E8F0'
             }
           },
@@ -2836,7 +2836,7 @@ export function AdminDashboard({ initialCalendars }) {
 
           /* Log list -- the page itself scrolls, so this doesn't need its own scrollbox */
           /*#__PURE__*/React.createElement("div", {
-            style: { border: '1px solid #E2E8F0', borderRadius: '8px', padding: '8px', backgroundColor: '#F8FAFC' }
+            style: { border: '1px solid #E2E8F0', borderRadius: 'var(--radius-md)', padding: '8px', backgroundColor: '#F8FAFC' }
           },
             filteredTimeline.length === 0 ?
             /*#__PURE__*/React.createElement("div", { style: { padding: '30px', color: '#64748B', fontSize: '0.82rem', textAlign: 'center' } }, "조건에 맞는 타임라인 로그가 존재하지 않습니다.") :
@@ -3001,7 +3001,7 @@ export function AdminDashboard({ initialCalendars }) {
 
         /* Message list -- the page itself scrolls, so this doesn't need its own scrollbox */
         /*#__PURE__*/React.createElement("div", {
-          style: { border: '1px solid #E2E8F0', borderRadius: '8px', padding: '8px', backgroundColor: '#F8FAFC' }
+          style: { border: '1px solid #E2E8F0', borderRadius: 'var(--radius-md)', padding: '8px', backgroundColor: '#F8FAFC' }
         },
           filteredMessages.length === 0 ? /*#__PURE__*/React.createElement("div", { style: { padding: '30px', color: '#64748B', fontSize: '0.82rem', textAlign: 'center' } }, "표시할 채팅 내역이 없습니다.") :
           filteredMessages.map(msg => {

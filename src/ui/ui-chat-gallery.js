@@ -1108,7 +1108,7 @@ export function ChatGalleryModal({
   }, /*#__PURE__*/React.createElement("div", {
     className: "modal-container confirm-dialog-modal",
     onClick: e => e.stopPropagation(),
-    style: { maxWidth: '360px', borderRadius: '12px' }
+    style: { maxWidth: '360px', borderRadius: 'var(--radius-md)' }
   },
     /*#__PURE__*/React.createElement("h3", {
       style: { fontSize: '1.05rem', fontWeight: 800, marginBottom: '12px', color: 'var(--text-main)', textAlign: 'center' }
@@ -1292,7 +1292,7 @@ export function ChatGalleryModal({
             padding: '4px 10px',
             fontSize: '0.76rem',
             fontWeight: 900,
-            borderRadius: '8px',
+            borderRadius: 'var(--radius-md)',
             cursor: hasClipboardImage ? 'pointer' : 'default',
             flexShrink: 0,
             whiteSpace: 'nowrap'
@@ -1359,7 +1359,7 @@ export function ChatGalleryModal({
       onClick: () => setActiveTab(tab[0]),
       style: {
         border: 'none',
-        borderRadius: '8px',
+        borderRadius: 'var(--radius-md)',
         padding: '8px 10px',
         background: activeTab === tab[0] ? 'var(--accent-primary)' : 'transparent',
         color: activeTab === tab[0] ? '#FFFFFF' : 'var(--text-muted)',
@@ -1416,7 +1416,7 @@ export function ChatGalleryModal({
         marginTop: '4px',
         padding: '12px 0',
         border: 'none',
-        borderRadius: '8px',
+        borderRadius: 'var(--radius-md)',
         backgroundColor: 'color-mix(in srgb, var(--bg-primary) 96%, black)',
         color: 'var(--text-main)',
         fontSize: '0.85rem',
@@ -1477,7 +1477,7 @@ export function ChatGalleryModal({
         marginTop: '4px',
         padding: '12px 0',
         border: 'none',
-        borderRadius: '8px',
+        borderRadius: 'var(--radius-md)',
         backgroundColor: 'color-mix(in srgb, var(--bg-primary) 96%, black)',
         color: 'var(--text-main)',
         fontSize: '0.85rem',

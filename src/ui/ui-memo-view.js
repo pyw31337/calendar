@@ -1280,7 +1280,7 @@ export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoad
           style: {
             background: 'none', border: 'none', cursor: 'pointer', padding: '6px',
             color: isSearchOpen ? 'var(--accent-primary)' : 'var(--text-muted)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '8px'
+            display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 'var(--radius-md)'
           }
         }, /*#__PURE__*/React.createElement("svg", {
           xmlns: "http://www.w3.org/2000/svg", width: "22", height: "22", viewBox: "0 0 24 24",
@@ -1337,7 +1337,7 @@ export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoad
         className: "chat-search-focused-bubble",
         style: {
           width: '100%', maxWidth: '520px', margin: '0 auto', boxSizing: 'border-box',
-          borderRadius: '16px', padding: '10px',
+          borderRadius: 'var(--radius-md)', padding: '10px',
           boxShadow: '0 6px 18px rgba(79, 70, 229, 0.14)',
           display: 'flex', flexDirection: 'column', gap: '8px'
         }
@@ -1380,7 +1380,7 @@ export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoad
           margin: '0 auto',
           backgroundColor: newColor,
           border: '1px solid ' + getBorderColor(newColor),
-          borderRadius: '12px',
+          borderRadius: 'var(--radius-md)',
           padding: '12px',
           boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
           display: 'flex',
@@ -1725,7 +1725,7 @@ export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoad
           width: '100%',
           backgroundColor: 'var(--bg-primary)',
           border: '1px solid var(--border-subtle)',
-          borderRadius: '8px',
+          borderRadius: 'var(--radius-md)',
           padding: '10px 0',
           fontSize: '0.85rem',
           fontWeight: 'bold',
@@ -1759,7 +1759,7 @@ export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoad
           width: '100%', maxWidth: '520px',
           backgroundColor: editColor,
           border: '1px solid ' + getBorderColor(editColor),
-          borderRadius: '12px',
+          borderRadius: 'var(--radius-md)',
           boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04)',
           display: 'flex', flexDirection: 'column', gap: '12px',
           padding: '16px', boxSizing: 'border-box',

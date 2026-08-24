@@ -4595,7 +4595,7 @@ function App() {
         backgroundColor: toast.type === 'delete' ? '#EF4444' : toast.type === 'success' ? '#10B981' : '#3B82F6',
         color: '#FFFFFF',
         padding: '12px 24px',
-        borderRadius: '12px',
+        borderRadius: 'var(--radius-md)',
         boxShadow: '0 12px 32px rgba(0,0,0,0.25)',
         fontSize: '0.95rem',
         fontWeight: '800',
@@ -6970,7 +6970,7 @@ function renderChatMessageImages(msg, setActiveLightbox, singleImageStyle = {}) 
       onClick: () => setActiveLightbox && setActiveLightbox({ urls: displayUrls, index: 0, meta }),
       style: {
         display: 'block',
-        borderRadius: '8px',
+        borderRadius: 'var(--radius-md)',
         cursor: 'pointer',
         objectFit: 'contain',
         width: '100%',

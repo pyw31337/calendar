@@ -839,16 +839,16 @@ export function NotificationPermissionHelpModal({ onClose, onRetry, showToast })
     className: "modal-body",
     style: { display: 'flex', flexDirection: 'column', gap: '14px' }
   }, /*#__PURE__*/React.createElement("div", {
-    style: { display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '14px', borderRadius: '16px', background: 'rgba(59, 130, 246, 0.1)', color: '#1D4ED8' }
+    style: { display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '14px', borderRadius: 'var(--radius-md)', background: 'rgba(59, 130, 246, 0.1)', color: '#1D4ED8' }
   }, /*#__PURE__*/React.createElement("span", {
-    style: { display: 'inline-flex', width: '34px', height: '34px', borderRadius: '12px', background: '#2563EB', color: '#FFFFFF', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }
+    style: { display: 'inline-flex', width: '34px', height: '34px', borderRadius: 'var(--radius-sm)', background: '#2563EB', color: '#FFFFFF', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }
   }, /*#__PURE__*/React.createElement(BellIcon, null)), /*#__PURE__*/React.createElement("div", {
     style: { fontSize: '0.86rem', lineHeight: 1.55, fontWeight: 700 }
   }, browserLabel, "에서 현재 알림 권한 상태는 ", /*#__PURE__*/React.createElement("strong", null, statusLabel), "입니다. 채팅알림을 받으려면 이 사이트의 알림 권한이 허용되어야 합니다.")),
   isPermissionBlocked && /*#__PURE__*/React.createElement("div", {
     style: {
       padding: '12px 14px',
-      borderRadius: '14px',
+      borderRadius: 'var(--radius-md)',
       background: 'rgba(239, 68, 68, 0.1)',
       color: '#B91C1C',
       border: '1px solid rgba(239, 68, 68, 0.22)',
@@ -860,7 +860,7 @@ export function NotificationPermissionHelpModal({ onClose, onRetry, showToast })
   canRequestPermission && /*#__PURE__*/React.createElement("div", {
     style: {
       padding: '12px 14px',
-      borderRadius: '14px',
+      borderRadius: 'var(--radius-md)',
       background: 'rgba(16, 185, 129, 0.1)',
       color: '#047857',
       border: '1px solid rgba(16, 185, 129, 0.22)',
@@ -872,7 +872,7 @@ export function NotificationPermissionHelpModal({ onClose, onRetry, showToast })
     style: { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '8px' }
   }, diagnostics.map(item => /*#__PURE__*/React.createElement("div", {
     key: item.label,
-    style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 11px', borderRadius: '12px', background: 'var(--bg-primary)', border: '1px solid var(--border-subtle)', minWidth: 0 }
+    style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 11px', borderRadius: 'var(--radius-md)', background: 'var(--bg-primary)', border: '1px solid var(--border-subtle)', minWidth: 0 }
   }, /*#__PURE__*/React.createElement("span", {
     style: { width: '9px', height: '9px', borderRadius: '999px', background: item.ok ? '#10B981' : '#EF4444', flexShrink: 0 }
   }), /*#__PURE__*/React.createElement("span", {
@@ -885,7 +885,7 @@ export function NotificationPermissionHelpModal({ onClose, onRetry, showToast })
     style: { display: 'flex', flexDirection: 'column', gap: '8px' }
   }, steps.map((step, idx) => /*#__PURE__*/React.createElement("div", {
     key: step,
-    style: { display: 'grid', gridTemplateColumns: '28px minmax(0, 1fr)', gap: '8px', alignItems: 'start', padding: '10px 12px', borderRadius: '12px', background: 'var(--bg-primary)', border: '1px solid var(--border-subtle)', color: 'var(--text-main)', fontSize: '0.86rem', lineHeight: 1.45 }
+    style: { display: 'grid', gridTemplateColumns: '28px minmax(0, 1fr)', gap: '8px', alignItems: 'start', padding: '10px 12px', borderRadius: 'var(--radius-md)', background: 'var(--bg-primary)', border: '1px solid var(--border-subtle)', color: 'var(--text-main)', fontSize: '0.86rem', lineHeight: 1.45 }
   }, /*#__PURE__*/React.createElement("span", {
     style: { display: 'inline-flex', width: '22px', height: '22px', borderRadius: '50%', background: '#0F172A', color: '#FFFFFF', alignItems: 'center', justifyContent: 'center', fontSize: '0.72rem', fontWeight: 900 }
   }, idx + 1), /*#__PURE__*/React.createElement("span", null, step)))), /*#__PURE__*/React.createElement("p", {
