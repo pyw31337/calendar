@@ -21,6 +21,7 @@
     "ops:clean-stress": "node scripts/firebase-clean-stress-docs.mjs",
     "restore:rehearsal": "node scripts/restore-rehearsal.mjs",
     "smoke:live": "node scripts/live-smoke-check.mjs",
+    "smoke:browser": "node scripts/browser-smoke-test.mjs",
     "check:required-symbols": "node scripts/check-required-symbols.mjs",
     "check:isolation": "node scripts/check-calendar-isolation.mjs",
     "check:share-urls": "node scripts/check-share-urls.mjs",
@@ -44,6 +45,7 @@
     "@vitejs/plugin-react": "^4.2.1",
     "eslint": "^10.9.0",
     "globals": "^17.11.0",
+    "playwright": "1.56.1",
     "vite": "^5.1.4"
   }
 }
