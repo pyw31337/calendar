@@ -1047,23 +1047,10 @@ setTimeout(() => {
 // tab is hidden: in Safari/Whale/Samsung-style mobile lifecycles, the browser can freeze before
 // the matching enableNetwork() runs, which briefly makes the app look like every calendar record
 // vanished. Keeping the last usable snapshot visible is more important than background thrift.
-const VISIBILITY_RECONNECT_THRESHOLD_MS = 60000;
-let lastHiddenAt = 0;
 if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') {
-      lastHiddenAt = Date.now();
-      return;
-    }
     if (document.visibilityState !== 'visible' || !firebaseDb) return;
-    const hiddenFor = lastHiddenAt ? (Date.now() - lastHiddenAt) : 0;
-    if (hiddenFor >= VISIBILITY_RECONNECT_THRESHOLD_MS) {
-      firebaseDb.disableNetwork()
-        .catch(() => {})
-        .then(() => firebaseDb.enableNetwork())
-        .catch(e => { console.warn('Firestore reconnect notice:', e); });
-      return;
-    }
+    firebaseDb.enableNetwork().catch(() => {});
   });
 }
 
@@ -2535,8 +2522,6 @@ export {
   lastStorageHealthOk,
   STORAGE_HEALTH_RECHECK_COOLDOWN_MS,
   checkFirebaseStorageHealth,
-  VISIBILITY_RECONNECT_THRESHOLD_MS,
-  lastHiddenAt,
   fetchSingleCalendarWithRest,
   fetchRecentMessagesRest,
   fetchChatMessagesRest,

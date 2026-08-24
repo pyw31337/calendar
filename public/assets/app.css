@@ -48,7 +48,7 @@
    user-facing app (header, calendar, modals, forms); the staff-only admin pages style
    themselves with hardcoded colors rather than these tokens and are not part of this pass. */
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
+  :root[data-theme="dark"] {
     --bg-primary: #0B1120;
     --bg-secondary: #131B2E;
     --bg-card: #131B2E;
@@ -69,23 +69,23 @@
      .btn-secondary/.btn-danger/.form-input alone cover most of the app including admin
      screens (they're shared utility classes), and .day-cell covers the calendar grid,
      the single most central, most-used surface in the app. */
-  :root:not([data-theme="light"]) .day-cell { background: #1B2540; }
-  :root:not([data-theme="light"]) .day-cell:hover { background: #212D4D; }
-  :root:not([data-theme="light"]) .day-cell.today { background: #1E2648; }
-  :root:not([data-theme="light"]) .day-cell.all-available { background: #0F2E22; border-color: #10B981; animation: cell-glow-available 2.5s ease-in-out infinite alternate; }
-  :root:not([data-theme="light"]) .day-cell.confirmed-meeting { background: #241B3D; border-color: #9333EA; animation: cell-glow-confirmed 2.5s ease-in-out infinite alternate; }
-  :root:not([data-theme="light"]) .btn-secondary { background: #1B2540; color: var(--text-main); }
-  :root:not([data-theme="light"]) .btn-secondary:hover { background: #232F49; }
-  :root:not([data-theme="light"]) .btn-danger { background: #2D1518; border-color: #7F1D1D; color: #F87171; }
-  :root:not([data-theme="light"]) .btn-danger:hover { background: #3A1A1E; }
-  :root:not([data-theme="light"]) .form-select,
-  :root:not([data-theme="light"]) .form-input { background: #1B2540; }
-  :root:not([data-theme="light"]) .poll-progress { background: #1B2540; }
-  :root:not([data-theme="light"]) .modal-header.is-confirmed-theme,
-  :root:not([data-theme="light"]) .modal-footer.is-confirmed-theme { background-color: #241B3D; }
-  :root:not([data-theme="light"]) .modal-header.is-all-available-theme,
-  :root:not([data-theme="light"]) .modal-footer.is-all-available-theme { background-color: #0F2E22; }
-  :root:not([data-theme="light"]) .poll-list-row { background-color: #1B2540; border-color: #232F49; }
+  :root[data-theme="dark"] .day-cell { background: #1B2540; }
+  :root[data-theme="dark"] .day-cell:hover { background: #212D4D; }
+  :root[data-theme="dark"] .day-cell.today { background: #1E2648; }
+  :root[data-theme="dark"] .day-cell.all-available { background: #0F2E22; border-color: #10B981; animation: cell-glow-available 2.5s ease-in-out infinite alternate; }
+  :root[data-theme="dark"] .day-cell.confirmed-meeting { background: #241B3D; border-color: #9333EA; animation: cell-glow-confirmed 2.5s ease-in-out infinite alternate; }
+  :root[data-theme="dark"] .btn-secondary { background: #1B2540; color: var(--text-main); }
+  :root[data-theme="dark"] .btn-secondary:hover { background: #232F49; }
+  :root[data-theme="dark"] .btn-danger { background: #2D1518; border-color: #7F1D1D; color: #F87171; }
+  :root[data-theme="dark"] .btn-danger:hover { background: #3A1A1E; }
+  :root[data-theme="dark"] .form-select,
+  :root[data-theme="dark"] .form-input { background: #1B2540; }
+  :root[data-theme="dark"] .poll-progress { background: #1B2540; }
+  :root[data-theme="dark"] .modal-header.is-confirmed-theme,
+  :root[data-theme="dark"] .modal-footer.is-confirmed-theme { background-color: #241B3D; }
+  :root[data-theme="dark"] .modal-header.is-all-available-theme,
+  :root[data-theme="dark"] .modal-footer.is-all-available-theme { background-color: #0F2E22; }
+  :root[data-theme="dark"] .poll-list-row { background-color: #1B2540; border-color: #232F49; }
 }
 :root[data-theme="dark"] .day-cell { background: #1B2540; }
 :root[data-theme="dark"] .day-cell:hover { background: #212D4D; }
@@ -158,7 +158,7 @@
    specificity (root attribute + .admin-scope + target class) wins over the plain
    ":root[data-theme] .foo" rules above regardless of source order. */
 :root[data-theme="dark"] .admin-scope,
-:root:not([data-theme="light"]) .admin-scope {
+:root[data-theme="dark"] .admin-scope {
   --bg-primary: #F8FAFC;
   --bg-secondary: #FFFFFF;
   --bg-card: #FFFFFF;
@@ -175,48 +175,48 @@
   color-scheme: light;
 }
 :root[data-theme="dark"] .admin-scope .day-cell,
-:root:not([data-theme="light"]) .admin-scope .day-cell { background: #FFFFFF; }
+:root[data-theme="dark"] .admin-scope .day-cell { background: #FFFFFF; }
 :root[data-theme="dark"] .admin-scope .day-cell:hover,
-:root:not([data-theme="light"]) .admin-scope .day-cell:hover { background: #EEF2FF; }
+:root[data-theme="dark"] .admin-scope .day-cell:hover { background: #EEF2FF; }
 :root[data-theme="dark"] .admin-scope .day-cell.today,
-:root:not([data-theme="light"]) .admin-scope .day-cell.today { background: #EEF2FF; }
+:root[data-theme="dark"] .admin-scope .day-cell.today { background: #EEF2FF; }
 :root[data-theme="dark"] .admin-scope .day-cell.all-available,
-:root:not([data-theme="light"]) .admin-scope .day-cell.all-available { background: #ECFDF5; border-color: #10B981; }
+:root[data-theme="dark"] .admin-scope .day-cell.all-available { background: #ECFDF5; border-color: #10B981; }
 :root[data-theme="dark"] .admin-scope .day-cell.confirmed-meeting,
-:root:not([data-theme="light"]) .admin-scope .day-cell.confirmed-meeting { background: #FAF5FF; border-color: #9333EA; }
+:root[data-theme="dark"] .admin-scope .day-cell.confirmed-meeting { background: #FAF5FF; border-color: #9333EA; }
 :root[data-theme="dark"] .admin-scope .btn-secondary,
-:root:not([data-theme="light"]) .admin-scope .btn-secondary { background: #F8FAFC; color: var(--text-main); }
+:root[data-theme="dark"] .admin-scope .btn-secondary { background: #F8FAFC; color: var(--text-main); }
 :root[data-theme="dark"] .admin-scope .btn-secondary:hover,
-:root:not([data-theme="light"]) .admin-scope .btn-secondary:hover { background: #EEF2FF; }
+:root[data-theme="dark"] .admin-scope .btn-secondary:hover { background: #EEF2FF; }
 :root[data-theme="dark"] .admin-scope .btn-danger,
-:root:not([data-theme="light"]) .admin-scope .btn-danger { background: #FEF2F2; border-color: #FECACA; color: #DC2626; }
+:root[data-theme="dark"] .admin-scope .btn-danger { background: #FEF2F2; border-color: #FECACA; color: #DC2626; }
 :root[data-theme="dark"] .admin-scope .btn-danger:hover,
-:root:not([data-theme="light"]) .admin-scope .btn-danger:hover { background: #FEE2E2; }
+:root[data-theme="dark"] .admin-scope .btn-danger:hover { background: #FEE2E2; }
 :root[data-theme="dark"] .admin-scope .form-select,
 :root[data-theme="dark"] .admin-scope .form-input,
-:root:not([data-theme="light"]) .admin-scope .form-select,
-:root:not([data-theme="light"]) .admin-scope .form-input { background: #FFFFFF; }
+:root[data-theme="dark"] .admin-scope .form-select,
+:root[data-theme="dark"] .admin-scope .form-input { background: #FFFFFF; }
 :root[data-theme="dark"] .admin-scope .status-badge,
 :root[data-theme="dark"] .admin-scope .date-item-badge,
-:root:not([data-theme="light"]) .admin-scope .status-badge,
-:root:not([data-theme="light"]) .admin-scope .date-item-badge { filter: none; }
+:root[data-theme="dark"] .admin-scope .status-badge,
+:root[data-theme="dark"] .admin-scope .date-item-badge { filter: none; }
 :root[data-theme="dark"] .admin-scope .date-item-btn:hover,
-:root:not([data-theme="light"]) .admin-scope .date-item-btn:hover { background: #EEF2FF; }
+:root[data-theme="dark"] .admin-scope .date-item-btn:hover { background: #EEF2FF; }
 :root[data-theme="dark"] .admin-scope .date-item-btn.is-confirmed,
-:root:not([data-theme="light"]) .admin-scope .date-item-btn.is-confirmed { border-color: #E9D5FF; background: #FAF5FF; }
+:root[data-theme="dark"] .admin-scope .date-item-btn.is-confirmed { border-color: #E9D5FF; background: #FAF5FF; }
 :root[data-theme="dark"] .admin-scope .date-item-btn.is-available,
-:root:not([data-theme="light"]) .admin-scope .date-item-btn.is-available { border-color: #DBEAFE; background: #F8FAFC; }
+:root[data-theme="dark"] .admin-scope .date-item-btn.is-available { border-color: #DBEAFE; background: #F8FAFC; }
 /* .admin-scope only resets tokens for its own descendants -- body itself is an ANCESTOR of
    it, so body's background-color: var(--bg-primary) below still reads the dark value from
    :root unless it's told (via :has()) that an .admin-scope is present somewhere inside it. */
 :root[data-theme="dark"] body:has(.admin-scope),
-:root:not([data-theme="light"]) body:has(.admin-scope) { background-color: #F8FAFC; background-image: none; }
+:root[data-theme="dark"] body:has(.admin-scope) { background-color: #F8FAFC; background-image: none; }
 /* The document/viewport scrollbar's color follows the ROOT element's color-scheme, not
    body's or .admin-scope's -- :root[data-theme="dark"] sets color-scheme: dark above, which
    painted a dark scrollbar (and dark native form-control chrome) across the whole page even
    though .admin-scope's own background was already fixed to light. */
 :root[data-theme="dark"]:has(.admin-scope),
-:root:not([data-theme="light"]):has(.admin-scope) { color-scheme: light; }
+:root[data-theme="dark"]:has(.admin-scope) { color-scheme: light; }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 [hidden] { display: none !important; }
@@ -423,6 +423,7 @@ body:has(.admin-login-gate) {
 .place-visit-entry-date {
   flex-shrink: 0;
   font-weight: 700;
+  font-size: 0.78rem;
   color: var(--text-muted);
 }
 .place-visit-entry-note {
@@ -1381,8 +1382,7 @@ select.form-select {
   background: #F5F3FF;
   box-shadow: inset 0 0 0 1px rgba(139, 92, 246, 0.08);
 }
-:root[data-theme="dark"] .poll-option-row.is-confirmed-winner,
-:root:not([data-theme="light"]) .poll-option-row.is-confirmed-winner {
+:root[data-theme="dark"] .poll-option-row.is-confirmed-winner {
   border-color: #A78BFA;
   background: rgba(139, 92, 246, 0.16);
   box-shadow: inset 0 0 0 1px rgba(167, 139, 250, 0.12);
@@ -1397,7 +1397,7 @@ select.form-select {
 .poll-sortable-row.is-dragging {
   transform: rotate(-0.7deg) scale(1.025);
   border-color: rgba(37, 99, 235, 0.38);
-  background: #FFFFFF;
+  background: var(--bg-card);
   box-shadow: 0 18px 35px rgba(15, 23, 42, 0.22);
   z-index: 5;
   opacity: 0.9;
@@ -1450,7 +1450,7 @@ select.form-select {
   white-space: nowrap;
 }
 :root[data-theme="dark"] .poll-confirmed-badge,
-:root:not([data-theme="light"]) .poll-confirmed-badge {
+:root[data-theme="dark"] .poll-confirmed-badge {
   background: #A78BFA;
   color: #111827;
 }
@@ -1557,13 +1557,6 @@ select.form-select {
   from { transform: translate(-50%, 18px); opacity: 0.85; }
   to { transform: translate(-50%, 0); opacity: 1; }
 }
-/* Brief flash on the chat bubble a global-search result navigates to, so it's obvious
-   which message was jumped to once the view scrolls it into place. */
-@keyframes search-result-flash {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(79, 70, 229, 0); }
-  15%, 60% { box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.5); }
-}
-.search-result-flash { animation: search-result-flash 1.6s ease; border-radius: var(--radius-md); }
 .poll-voter-sheet-header {
   display: flex;
   align-items: center;
@@ -1592,8 +1585,8 @@ select.form-select {
 .poll-voter-option:hover, .poll-voter-option:focus-visible { background: #EEF2FF; border-color: var(--accent-primary); }
 :root[data-theme="dark"] .poll-voter-option:hover,
 :root[data-theme="dark"] .poll-voter-option:focus-visible,
-:root:not([data-theme="light"]) .poll-voter-option:hover,
-:root:not([data-theme="light"]) .poll-voter-option:focus-visible { background: #212D4D; border-color: var(--accent-primary); }
+:root[data-theme="dark"] .poll-voter-option:hover,
+:root[data-theme="dark"] .poll-voter-option:focus-visible { background: #212D4D; border-color: var(--accent-primary); }
 @media (max-width: 640px) {
   .poll-option-row {
     grid-template-columns: 1fr;
@@ -1636,6 +1629,10 @@ select.form-select {
   height: 20px;
   padding: 0 6px;
   border-radius: var(--radius-full);
+  /* Plain fallback first (ignored by browsers that support color-mix, kept as-is by those that
+     don't -- an unsupported color-mix() value makes the whole declaration invalid, so it never
+     overwrites this one) so the badge still has a visible pill background everywhere. */
+  background: rgba(100, 116, 139, 0.16);
   background: color-mix(in srgb, currentColor 16%, transparent);
   color: currentColor;
   font-size: 0.72rem;
@@ -1667,7 +1664,7 @@ select.form-select {
   color: #334155;
 }
 :root[data-theme="dark"] .section-toggle-btn:hover,
-:root:not([data-theme="light"]) .section-toggle-btn:hover {
+:root[data-theme="dark"] .section-toggle-btn:hover {
   background: var(--border-subtle);
   color: var(--text-main);
 }
@@ -1769,8 +1766,8 @@ select.form-select {
   gap: 8px;
 }
 .admin-top-bar {
-  background-color: #FFFFFF;
-  border-bottom: 1px solid #E2E8F0;
+  background-color: var(--bg-card);
+  border-bottom: 1px solid var(--border-subtle);
   margin: -24px 0 0;
   padding-top: 24px;
   box-sizing: border-box;
@@ -1830,8 +1827,8 @@ select.form-select {
   height: 100%;
   max-height: 100%;
   min-height: 0;
-  background: #FFFFFF;
-  color: #0F172A;
+  background: var(--bg-card);
+  color: var(--text-main);
   box-shadow: -12px 0 34px rgba(15, 23, 42, 0.12);
   padding: 22px 16px 16px;
   display: flex;
@@ -1910,8 +1907,8 @@ select.form-select {
   flex-direction: column;
   gap: 0;
   padding: 8px 0;
-  border-top: 1px solid #E2E8F0;
-  border-bottom: 1px solid #E2E8F0;
+  border-top: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
 }
 .admin-side-menu-item {
   width: 100%;
@@ -2032,7 +2029,7 @@ select.form-select {
   flex-shrink: 0;
 }
 :root[data-theme="dark"] .admin-side-menu-setting-icon,
-:root:not([data-theme="light"]) .admin-side-menu-setting-icon {
+:root[data-theme="dark"] .admin-side-menu-setting-icon {
   color: #CBD5E1;
   background: #1B2540;
 }
@@ -2046,7 +2043,7 @@ select.form-select {
   width: 30px;
   height: 30px;
   border-radius: 50%;
-  border: 1px solid #E2E8F0;
+  border: 1px solid var(--border-subtle);
   background: #F8FAFC;
   color: #0F172A;
   display: inline-flex;
@@ -2095,7 +2092,7 @@ select.form-select {
 .admin-tab-bar {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  border-top: 1px solid #E2E8F0;
+  border-top: 1px solid var(--border-subtle);
   padding: 6px 12px 0;
   gap: 0;
   min-width: 0;
@@ -2153,26 +2150,35 @@ select.form-select {
 .settlement-metric-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
+  gap: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+  background-color: var(--bg-card);
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  flex-shrink: 0;
 }
 .settlement-metric-card {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   min-width: 0;
-  padding: 12px 10px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 12px;
-  background-color: var(--bg-card);
+  padding: 14px 12px;
+  border-right: 1px solid var(--border-subtle);
+  background-color: transparent;
+  box-sizing: border-box;
+}
+.settlement-metric-card:last-child {
+  border-right: none;
 }
 .settlement-metric-card-label {
   display: flex;
   align-items: center;
   gap: 6px;
   min-width: 0;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   font-weight: 800;
-  color: #64748B;
+  color: var(--text-main);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2183,14 +2189,14 @@ select.form-select {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  letter-spacing: -0.01em;
 }
 @media (max-width: 480px) {
   .settlement-metric-card {
-    padding: 10px 6px;
-    gap: 4px;
+    padding: 12px 6px;
+    gap: 6px;
   }
   .settlement-metric-card-label {
-    font-size: 0.6rem;
     gap: 3px;
   }
   .settlement-metric-card-value {
@@ -2301,10 +2307,10 @@ select.form-select {
 :root[data-theme="dark"] .date-item-btn.is-available { border-color: #1D4ED8; background: #16233E; }
 :root[data-theme="dark"] .date-item-btn.is-all { border-color: #065F46; background: #0F2E22; }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .date-item-btn:hover { background: #1E2A4D; }
-  :root:not([data-theme="light"]) .date-item-btn.is-confirmed { border-color: #5B21B6; background: #241B3D; }
-  :root:not([data-theme="light"]) .date-item-btn.is-available { border-color: #1D4ED8; background: #16233E; }
-  :root:not([data-theme="light"]) .date-item-btn.is-all { border-color: #065F46; background: #0F2E22; }
+  :root[data-theme="dark"] .date-item-btn:hover { background: #1E2A4D; }
+  :root[data-theme="dark"] .date-item-btn.is-confirmed { border-color: #5B21B6; background: #241B3D; }
+  :root[data-theme="dark"] .date-item-btn.is-available { border-color: #1D4ED8; background: #16233E; }
+  :root[data-theme="dark"] .date-item-btn.is-all { border-color: #065F46; background: #0F2E22; }
 }
 
 /* Capsule Memo Badge */
@@ -2392,36 +2398,36 @@ select.form-select {
   background-color: #212D4D;
 }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .date-item-badge.is-past {
+  :root[data-theme="dark"] .date-item-badge.is-past {
     background: #1B2540 !important;
     color: #CBD5E1 !important;
     border: 1px solid #34405C !important;
   }
-  :root:not([data-theme="light"]) .date-item-badge.is-confirmed {
+  :root[data-theme="dark"] .date-item-badge.is-confirmed {
     background: #3B1E69 !important;
     color: #E9D5FF !important;
     border: 1px solid #8B5CF6 !important;
   }
-  :root:not([data-theme="light"]) .date-item-badge.is-available {
+  :root[data-theme="dark"] .date-item-badge.is-available {
     background: #1D315C !important;
     color: #BFDBFE !important;
     border: 1px solid #3B82F6 !important;
   }
-  :root:not([data-theme="light"]) .date-item-badge.is-all {
+  :root[data-theme="dark"] .date-item-badge.is-all {
     background: #0F3A2A !important;
     color: #A7F3D0 !important;
     border: 1px solid #10B981 !important;
   }
-  :root:not([data-theme="light"]) .confirmed-meeting-label-badge {
+  :root[data-theme="dark"] .confirmed-meeting-label-badge {
     background-color: transparent;
     color: #C4B5FD;
     border: none;
     box-shadow: none;
   }
-  :root:not([data-theme="light"]) .search-result-row {
+  :root[data-theme="dark"] .search-result-row {
     background-color: #1B2540;
   }
-  :root:not([data-theme="light"]) .search-result-row:hover {
+  :root[data-theme="dark"] .search-result-row:hover {
     background-color: #212D4D;
   }
 }
@@ -2546,7 +2552,8 @@ select.form-select {
 }
 .bottom-sheet-header h4 { font-size: 1rem; font-weight: 800; margin: 0; }
 .bottom-sheet-body {
-  padding: 12px 20px 24px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;
+  padding: 12px 20px calc(24px + env(safe-area-inset-bottom, 0px));
+  overflow-y: auto; display: flex; flex-direction: column; gap: 8px;
 }
 /* 백드롭 규칙: 항목 글자는 참여자 선택과 같이 굵고 진하게 */
 .bottom-sheet-item {
@@ -2592,17 +2599,28 @@ select.form-select {
 /* Modal Overlay & Card */
 .modal-overlay {
   position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.6);
-  -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 16px;
+  -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 1000;
+  padding: max(16px, env(safe-area-inset-top, 0px)) 0 max(16px, env(safe-area-inset-bottom, 0px));
   overflow-x: hidden;
+  box-sizing: border-box;
 }
-.modal-container {
+.modal-container,
+.modal {
   background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
   width: 100%; max-width: 480px; box-shadow: var(--shadow-lg); overflow: hidden; overflow-x: hidden; color: var(--text-main);
   max-height: min(92vh, 860px); max-height: min(92dvh, 860px);
   display: flex; flex-direction: column;
+  min-height: 0;
 }
-.modal-container > form {
+.modal-container > form,
+.modal > form {
   display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; overflow: hidden;
+}
+.modal-container > .modal-header,
+.modal > .modal-header,
+.modal-container > form > .modal-header,
+.modal > form > .modal-header {
+  flex: 0 0 auto;
 }
 .modal-header { padding: var(--space-5); border-bottom: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: space-between; background: var(--bg-primary); flex: 0 0 auto; }
 .modal-body {
@@ -2610,15 +2628,92 @@ select.form-select {
   overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
   flex: 1 1 auto; min-height: 0;
 }
+.modal-container > .modal-body,
+.modal > .modal-body,
+.modal-container > form > .modal-body,
+.modal > form > .modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+}
 .modal-footer { padding: var(--space-5); border-top: 1px solid var(--border-subtle); display: flex; justify-content: flex-end; gap: 10px; background: var(--bg-primary); flex: 0 0 auto; }
+.modal-container > .modal-footer,
+.modal > .modal-footer,
+.modal-container > form > .modal-footer,
+.modal > form > .modal-footer {
+  flex: 0 0 auto;
+}
+
+.memo-edit-modal-container {
+  max-height: min(92vh, 780px);
+  max-height: min(92dvh, 780px);
+  overflow: hidden !important;
+  min-height: 0;
+}
+.memo-edit-modal-header,
+.memo-edit-modal-footer {
+  flex: 0 0 auto;
+  min-height: 0;
+}
+.memo-edit-modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-right: 2px;
+}
+.memo-edit-textarea {
+  font-size: 0.82rem;
+  max-height: min(48vh, 480px) !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
 @media (max-width: 640px) {
-  .modal-overlay { align-items: center; padding: 12px; }
-  .modal-container { max-height: calc(100vh - 24px); max-height: calc(100dvh - 24px); }
+  .modal-overlay {
+    align-items: center;
+    justify-content: center;
+    padding-top: max(10px, env(safe-area-inset-top, 0px));
+    padding-bottom: max(10px, env(safe-area-inset-bottom, 0px));
+    padding-left: 0;
+    padding-right: 0;
+    box-sizing: border-box;
+    min-height: 100vh;
+    min-height: 100svh;
+  }
+  .modal-container,
+  .modal {
+    margin: 10px;
+    width: calc(100% - 20px);
+    max-width: calc(100% - 20px);
+    box-sizing: border-box;
+    max-height: calc(100vh - 20px);
+    max-height: calc(100svh - 20px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+    max-height: min(
+      calc(100svh - 20px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)),
+      var(--gather-vv-modal-max, 860px)
+    );
+  }
   .modal-header { padding: 18px; }
   .modal-body { padding: 18px; gap: 14px; }
   .modal-footer {
-    padding: 18px 18px max(18px, env(safe-area-inset-bottom));
+    padding: 18px 18px max(18px, env(safe-area-inset-bottom, 0px));
     position: sticky; bottom: 0; z-index: 1;
+  }
+  .memo-edit-modal-container {
+    max-height: calc(100svh - 20px);
+    max-height: min(calc(100svh - 20px), var(--gather-vv-modal-max, 780px));
+  }
+  .memo-edit-modal-footer {
+    padding-bottom: max(0px, env(safe-area-inset-bottom, 0px));
+  }
+  .memo-edit-textarea {
+    max-height: min(38svh, 360px) !important;
   }
 }
 
@@ -2641,7 +2736,7 @@ select.form-select {
    screens so the message never needs to truncate. */
 .admin-chat-row {
   display: flex; align-items: center; gap: 8px 12px;
-  border-bottom: 1px solid #E2E8F0; padding: 10px 6px;
+  border-bottom: 1px solid var(--border-subtle); padding: 10px 6px;
 }
 .admin-chat-header { display: flex; align-items: center; gap: 8px; flex-shrink: 0; flex-wrap: wrap; }
 .admin-chat-text {
@@ -3048,6 +3143,12 @@ select.form-select {
 /* Sidebar scrollbar hiding and activation during movement */
 .admin-side-menu {
   overflow-y: auto;
+  /* Firefox has no per-state (hover/active) scrollbar styling like the ::-webkit-scrollbar
+     rules below -- scrollbar-color only takes one static thumb/track pair -- so this can't
+     replicate the auto-hide-until-scrolling behavior exactly, but at least gives Firefox a
+     thin scrollbar instead of the full-width OS default. */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(100, 116, 139, 0.4) transparent;
 }
 .admin-side-menu::-webkit-scrollbar {
   width: 6px;
@@ -3237,10 +3338,6 @@ textarea.form-input {
 }
 
 
-.place-card-row.is-place-focused {
-  border-color: var(--accent-primary, #4F46E5) !important;
-}
-
 /* Main side menu: unified row spacing + graphic manual banner */
 .admin-side-menu .admin-side-menu-item {
   min-height: 42px;
@@ -3301,6 +3398,7 @@ textarea.form-input {
   align-items: center;
   justify-content: center;
   flex: 0 0 40px;
+  -webkit-backdrop-filter: blur(4px);
   backdrop-filter: blur(4px);
 }
 .admin-side-menu .main-side-menu-manual-banner-text {
@@ -3367,7 +3465,316 @@ textarea.form-input {
 
 /* SharedSideMenuSettings: divider above 다크모드 on every side menu */
 .admin-side-menu .shared-side-menu-settings {
-  border-top: 1px solid var(--border-subtle, #E2E8F0) !important;
+  border-top: 1px solid var(--border-subtle) !important;
   margin-top: 2px;
   padding-top: 8px !important;
+}
+
+
+/* ===== P6-56 mobile + dark polish ===== */
+.date-modal-attendance-row { min-width: 0; }
+.date-modal-attendance-note .url-capsule-badge,
+.date-modal-attendance-note a { max-width: 100%; }
+
+@media (max-width: 380px) {
+  .date-modal-attendance-row {
+    padding: 10px 10px 10px 10px !important;
+    padding-right: 48px !important;
+  }
+  .date-modal-attendance-note {
+    padding-left: 16px !important;
+    font-size: 0.74rem !important;
+  }
+  .modal-container,
+  .modal { margin: 10px; width: calc(100% - 20px); max-width: calc(100% - 20px); box-sizing: border-box; }
+  .modal-container:has(.modal-header),
+  .modal-container:has(form),
+  .modal:has(.modal-header),
+  .modal:has(form) {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+  .weekday-label { font-size: 0.7rem; }
+  .day-cell { min-height: 52px; }
+  .url-capsule-badge {
+    max-width: min(100%, 240px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .poll-card, .memo-card-hover, .search-result-row { min-width: 0; }
+  .main-header-title, .header-title {
+    max-width: 46vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+[data-theme="dark"] .btn-secondary,
+:root[data-theme="dark"] .btn-secondary {
+  background: #1B2540; color: var(--text-main); border-color: var(--border-subtle);
+}
+[data-theme="dark"] .form-input,
+[data-theme="dark"] input.form-input,
+[data-theme="dark"] textarea.form-input,
+[data-theme="dark"] select.form-input,
+:root[data-theme="dark"] .form-input,
+:root[data-theme="dark"] input.form-input,
+:root[data-theme="dark"] textarea.form-input,
+:root[data-theme="dark"] select.form-input {
+  background: #131B2E !important;
+  color: var(--text-main) !important;
+  border-color: var(--border-subtle) !important;
+}
+[data-theme="dark"] .form-input::placeholder,
+:root[data-theme="dark"] .form-input::placeholder {
+  color: var(--text-light) !important;
+}
+[data-theme="dark"] .modal-container,
+[data-theme="dark"] .modal,
+[data-theme="dark"] .bottom-sheet,
+:root[data-theme="dark"] .modal-container,
+:root[data-theme="dark"] .modal,
+:root[data-theme="dark"] .bottom-sheet {
+  background: var(--bg-card); color: var(--text-main);
+}
+[data-theme="dark"] .toast,
+:root[data-theme="dark"] .toast {
+  background: #1B2540; color: var(--text-main); border-color: var(--border-subtle);
+}
+[data-theme="dark"] .url-capsule-badge,
+:root[data-theme="dark"] .url-capsule-badge {
+  background: #1B2540 !important; color: #A5B4FC !important; border-color: #312E81 !important;
+}
+
+
+/* ===== P6-57 dark mode surfaces ===== */
+.link-preview-card {
+  border-color: var(--border-subtle) !important;
+  background: var(--bg-card) !important;
+}
+.poll-deadline-badge.is-open { background: #EFF6FF; color: #2563EB; }
+.poll-deadline-badge.is-closed { background: #FEE2E2; color: #DC2626; }
+:root[data-theme="dark"] .poll-deadline-badge.is-open,
+:root[data-theme="dark"] .poll-deadline-badge.is-open {
+  background: #1E3A5F; color: #93C5FD;
+}
+:root[data-theme="dark"] .poll-deadline-badge.is-closed,
+:root[data-theme="dark"] .poll-deadline-badge.is-closed {
+  background: #3F1D1D; color: #FCA5A5;
+}
+:root[data-theme="dark"] .admin-side-menu,
+:root[data-theme="dark"] .admin-side-menu {
+  background: #131B2E !important;
+  color: var(--text-main) !important;
+  box-shadow: -12px 0 34px rgba(0, 0, 0, 0.45);
+}
+:root[data-theme="dark"] .admin-side-menu-title,
+:root[data-theme="dark"] .admin-side-menu-title { color: var(--text-main) !important; }
+:root[data-theme="dark"] .admin-side-menu-item,
+:root[data-theme="dark"] .admin-side-menu-item { color: var(--text-main); }
+:root[data-theme="dark"] .admin-side-menu-item-desc,
+:root[data-theme="dark"] .admin-side-menu-item-desc { color: var(--text-muted); }
+:root[data-theme="dark"] .admin-side-menu-item:hover,
+:root[data-theme="dark"] .admin-side-menu-item:focus-visible,
+:root[data-theme="dark"] .admin-side-menu-item:hover,
+:root[data-theme="dark"] .admin-side-menu-item:focus-visible { background: #1B2540; }
+:root[data-theme="dark"] .admin-side-menu-close-btn,
+:root[data-theme="dark"] .admin-side-menu-close-btn { color: var(--text-muted); }
+:root[data-theme="dark"] .admin-side-menu-font-btn,
+:root[data-theme="dark"] .admin-side-menu-font-btn {
+  background: #1B2540; color: var(--text-main); border-color: var(--border-subtle);
+}
+:root[data-theme="dark"] .settlement-base-budget-card,
+:root[data-theme="dark"] .settlement-base-budget-card {
+  background: #0F2E22 !important; border-color: #14532D !important;
+}
+:root[data-theme="dark"] .settlement-base-budget-card strong,
+:root[data-theme="dark"] .settlement-base-budget-card strong { color: #86EFAC !important; }
+:root[data-theme="dark"] .poll-progress,
+:root[data-theme="dark"] .poll-progress,
+:root[data-theme="dark"] .admin-progress,
+:root[data-theme="dark"] .admin-progress { background: #1B2540 !important; }
+:root[data-theme="dark"] a.link-preview-card,
+:root[data-theme="dark"] a.link-preview-card {
+  border-color: var(--border-subtle) !important;
+}
+
+
+/* ===== P6-58 side menu dark + dim + font btn ===== */
+:root[data-theme="dark"] .admin-side-menu-overlay,
+:root[data-theme="dark"] .admin-side-menu-overlay,
+:root[data-theme="dark"] .modal-overlay,
+:root[data-theme="dark"] .modal-overlay,
+:root[data-theme="dark"] .bottom-sheet-overlay,
+:root[data-theme="dark"] .bottom-sheet-overlay {
+  background: #0f172acc !important;
+}
+
+:root[data-theme="dark"] .admin-side-menu-item-icon,
+:root[data-theme="dark"] .admin-side-menu-item-icon {
+  background: #1B2540 !important;
+  color: #E2E8F0 !important;
+}
+:root[data-theme="dark"] .admin-side-menu-item:hover .admin-side-menu-item-icon,
+:root[data-theme="dark"] .admin-side-menu-item:focus-visible .admin-side-menu-item-icon,
+:root[data-theme="dark"] .admin-side-menu-item:hover .admin-side-menu-item-icon,
+:root[data-theme="dark"] .admin-side-menu-item:focus-visible .admin-side-menu-item-icon {
+  background: #243152 !important;
+  color: #F8FAFC !important;
+}
+
+:root[data-theme="dark"] .admin-side-menu-setting-row,
+:root[data-theme="dark"] .admin-side-menu-setting-row {
+  color: #E2E8F0 !important;
+}
+:root[data-theme="dark"] .admin-side-menu-setting-label,
+:root[data-theme="dark"] .admin-side-menu-setting-label {
+  color: #F1F5F9 !important;
+}
+:root[data-theme="dark"] .admin-side-menu-font-value,
+:root[data-theme="dark"] .admin-side-menu-font-value {
+  color: #F1F5F9 !important;
+}
+:root[data-theme="dark"] .admin-side-menu-setting-icon,
+:root[data-theme="dark"] .admin-side-menu-setting-icon {
+  background: #1B2540 !important;
+  color: #E2E8F0 !important;
+}
+
+.admin-side-menu-font-btn {
+  line-height: 1 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 !important;
+  text-align: center !important;
+}
+.admin-side-menu-font-btn > * {
+  display: block;
+  line-height: 1;
+  transform: translateY(-0.5px);
+}
+
+
+/* ===== P6-59 dark dividers ===== */
+:root[data-theme="dark"] .admin-side-menu-list,
+:root[data-theme="dark"] .admin-side-menu-list,
+:root[data-theme="dark"] .admin-side-menu .shared-side-menu-settings,
+:root[data-theme="dark"] .admin-side-menu .shared-side-menu-settings {
+  border-top-color: var(--border-subtle) !important;
+  border-bottom-color: var(--border-subtle) !important;
+}
+:root[data-theme="dark"] .admin-side-menu,
+:root[data-theme="dark"] .admin-side-menu {
+  --border-subtle: #232F49;
+}
+:root[data-theme="dark"] .summary-section-divider,
+:root[data-theme="dark"] .summary-section-divider,
+:root[data-theme="dark"] .admin-tab-bar,
+:root[data-theme="dark"] .admin-tab-bar {
+  border-color: var(--border-subtle) !important;
+}
+:root[data-theme="dark"] .admin-poll-row,
+:root[data-theme="dark"] .admin-poll-row {
+  border-color: var(--border-subtle) !important;
+  background-color: var(--bg-primary) !important;
+}
+
+
+/* ===== P6-61 mobile field stack ===== */
+.date-modal-field-actions {
+  display: inline-flex;
+  gap: 8px;
+  flex-shrink: 0;
+  align-items: stretch;
+}
+.date-modal-attendance-note { max-width: 100%; }
+
+@media (max-width: 480px) {
+  .date-modal-field-with-actions {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 8px !important;
+  }
+  .date-modal-field-with-actions > .form-input,
+  .date-modal-field-with-actions > textarea.form-input,
+  .date-modal-field-with-actions > textarea {
+    width: 100% !important;
+    flex: none !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+  }
+  .date-modal-field-actions {
+    display: flex !important;
+    width: 100% !important;
+    gap: 8px !important;
+  }
+  .date-modal-field-actions .btn {
+    flex: 1 1 0 !important;
+    min-width: 0 !important;
+    height: 44px !important;
+    justify-content: center !important;
+  }
+  .date-modal-attendance-row { padding-right: 44px !important; }
+  .date-modal-attendance-note {
+    padding-left: 16px !important;
+    width: 100% !important;
+  }
+}
+
+
+/* ===== P6-69 confirm dialog content padding ===== */
+.modal-container.confirm-dialog-modal {
+  padding: 20px !important;
+  max-width: min(320px, calc(100% - 20px)) !important;
+  width: auto !important;
+  box-sizing: border-box;
+}
+.confirm-dialog-actions {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  box-sizing: border-box;
+}
+.confirm-dialog-actions .btn {
+  flex: 1 1 0;
+  min-width: 0;
+}
+@media (max-width: 640px) {
+  .modal-body {
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+  .modal-footer {
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+}
+
+
+/* ===== P6-77 dark residual surfaces ===== */
+:root[data-theme="dark"] .admin-top-bar,
+:root[data-theme="dark"] .admin-side-menu,
+:root[data-theme="dark"] .poll-sortable-row.is-dragging {
+  background: #131B2E !important;
+  color: var(--text-main) !important;
+}
+:root[data-theme="dark"] .admin-menu-toggle-btn { color: var(--text-main); }
+
+
+/* ===== P6-77 user manual mobile ===== */
+.manual-mobile-friendly { padding: 14px 14px 18px !important; }
+.manual-mobile-friendly h2 { font-size: 1.25rem !important; line-height: 1.25 !important; word-break: keep-all; }
+.manual-mobile-friendly p { word-break: keep-all; line-height: 1.45 !important; }
+@media (max-width: 640px) {
+  .manual-mobile-friendly {
+    max-height: min(78svh, calc(100svh - 80px)) !important;
+  }
+  .manual-mobile-friendly article {
+    padding: 12px !important;
+    border-radius: 14px !important;
+  }
+  .manual-mobile-friendly article h3 { font-size: 0.95rem !important; }
+  .manual-mobile-friendly article p { font-size: 0.82rem !important; margin-top: 4px !important; }
 }

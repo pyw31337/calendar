@@ -438,8 +438,6 @@ import {
   lastStorageHealthOk,
   STORAGE_HEALTH_RECHECK_COOLDOWN_MS,
   checkFirebaseStorageHealth,
-  VISIBILITY_RECONNECT_THRESHOLD_MS,
-  lastHiddenAt,
   fetchSingleCalendarWithRest,
   fetchRecentMessagesRest,
   fetchChatMessagesRest,
@@ -1442,9 +1440,9 @@ function App() {
     const cacheHit = restoredFromCache || (calendarsRef.current || []).some(c => c && c.id === activeCalId && isUsableCalendarRecord(c));
     setIsInitialDataLoading(!cacheHit);
 
-    const applyLoadedCalendar = (cloudCal, cloudLastMod = Date.now()) => {
+    const applyLoadedCalendar = (cloudCal, cloudLastMod = Date.now(), forceApply = false) => {
       if (!isMounted || !cloudCal || cloudCal.id !== activeCalId) return false;
-      if (cloudLastMod < getMetaLastModified(serverRevisionRef.current, activeCalId)) return false;
+      if (!forceApply && cloudLastMod < getMetaLastModified(serverRevisionRef.current, activeCalId)) return false;
       hasLoadedCloudCalendar = true;
       setIsInitialDataLoading(false);
       setCalendarsState(prevCals => {
@@ -1453,7 +1451,8 @@ function App() {
           ? prevCals.map(c => c.id === activeCalId ? cloneCalendar(cloudCal) : c)
           : [cloneCalendar(cloudCal), ...prevCals];
         saveLocalCache(nextCals);
-        serverRevisionRef.current = updateMetaLastModified(serverRevisionRef.current, activeCalId, cloudLastMod);
+        const targetMod = Math.max(cloudLastMod || 0, Date.now());
+        serverRevisionRef.current = updateMetaLastModified(serverRevisionRef.current, activeCalId, targetMod);
         saveLocalMeta(serverRevisionRef.current);
         return nextCals;
       });
@@ -1593,32 +1592,44 @@ function App() {
   React.useEffect(() => {
     if (!firebaseDb || !activeCalId) return undefined;
     let lastRefreshAt = 0;
-    const refreshFromResume = () => {
+    const refreshFromResume = async () => {
       if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
-      // Once a real calendar record is already loaded, the live onSnapshot listener above (and
-      // the module-level visibilitychange handler that force-cycles disableNetwork/enableNetwork
-      // after a long-enough background stint -- see VISIBILITY_RECONNECT_THRESHOLD_MS) are already
-      // responsible for keeping it in sync; Firestore's own SDK reconnects that stream on its own.
-      // Bumping cloudReloadToken here unconditionally used to tear down and recreate that listener
-      // AND restart the fetch/retry loop (with its own "N차 재시도 중"/"서버 재연결 중" toasts) on
-      // every single focus/visibility/online/pageshow event -- including a plain alt-tab back with
-      // a perfectly healthy connection -- which is what made those toasts show up so often. Only
-      // fall through to the retry path below for the case it actually exists for: the initial load
-      // never finished (activeCalLoaded is still false) and this resume is a good opportunity to
-      // retry it.
-      if (activeCalLoaded) return;
       const now = Date.now();
       if (now - lastRefreshAt < 1200) return;
       lastRefreshAt = now;
-      const restored = restoreActiveCalendarFromCache();
-      if (!restored) {
-        setIsInitialDataLoading(true);
+      if (activeCalId && isAllowedCalendarId(activeCalId)) {
+        try {
+          const fresh = await fetchSingleCalendarWithRest(activeCalId, 5000);
+          if (fresh?.calendar && applyLoadedCalendar(fresh.calendar, fresh.lastModified || Date.now(), true)) {
+            if (activeView === 'calendar' || activeView === 'places' || activeView === 'settlement') {
+              fetchPlacesFromFirestore(activeCalId).then(list => { if (isMounted) setPlacesSubcollection(list); }).catch(() => {});
+              fetchConfirmedMeetingsFromFirestore(activeCalId).then(list => { if (isMounted) setConfirmedMeetingsSubcollection(list); }).catch(() => {});
+            }
+            if (activeView === 'memo') {
+              fetchMemosRest(activeCalId, memosLimit).then(list => {
+                if (isMounted) {
+                  setMemos(list);
+                  setHasMoreMemos(list.length >= memosLimit);
+                }
+              }).catch(() => {});
+            }
+            return;
+          }
+        } catch (e) {
+          console.warn('refreshFromResume REST fetch notice:', e);
+        }
       }
-      setCloudReloadToken(token => token + 1);
+      if (!activeCalLoaded) {
+        const restored = restoreActiveCalendarFromCache();
+        if (!restored) {
+          setIsInitialDataLoading(true);
+        }
+        setCloudReloadToken(token => token + 1);
+      }
     };
     const onVisible = () => {
       if (document.visibilityState === 'visible') {
-        setTimeout(refreshFromResume, 400);
+        setTimeout(refreshFromResume, 200);
       }
     };
     document.addEventListener('visibilitychange', onVisible);

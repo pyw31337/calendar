@@ -903,7 +903,29 @@ function notifyMeetingReminder(calendar, meeting, whenLabel) {
 // register unconditionally: browsers without service worker support simply skip this.
 if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js').catch(e => console.warn('Service worker registration failed:', e));
+    navigator.serviceWorker.register('sw.js').then(reg => {
+      try { reg.update(); } catch (_) {}
+    }).catch(e => console.warn('Service worker registration failed:', e));
+  });
+
+  if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && navigator.serviceWorker.ready) {
+        navigator.serviceWorker.ready.then(reg => {
+          try { reg.update(); } catch (_) {}
+        }).catch(() => {});
+      }
+    });
+  }
+
+  let swRefreshing = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!swRefreshing) {
+      swRefreshing = true;
+      if (typeof window !== 'undefined' && window.location) {
+        window.location.reload();
+      }
+    }
   });
 }
 
