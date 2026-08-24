@@ -444,19 +444,14 @@ function mergeAvailabilityRecord(existing, incoming) {
   if (!incomingClone) return existingClone;
   const existingStamp = getItemStamp(existingClone);
   const incomingStamp = getItemStamp(incomingClone);
-  if (incomingStamp > existingStamp) {
+  if (incomingStamp >= existingStamp) {
     return {
       ...existingClone,
       ...incomingClone,
       deletedAt: incomingClone.deletedAt || null
     };
   }
-  if (existingStamp > incomingStamp) return existingClone;
-  return {
-    ...incomingClone,
-    ...existingClone,
-    deletedAt: existingClone.deletedAt || incomingClone.deletedAt || null
-  };
+  return existingClone;
 }
 
 function mergeCalendarRecord(existing, incoming) {
