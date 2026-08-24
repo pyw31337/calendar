@@ -863,8 +863,13 @@ let firebaseDb = null;
 function __setFirebaseDb(v){ firebaseDb = v; if (typeof window!=="undefined") window.__gatherFirebaseDb = v; }
 
 let firebaseStorage = null;
-try {
-  if (ENABLE_FIRESTORE_SYNC && typeof firebase !== 'undefined') {
+
+// Pulled into its own function so the background retry loop below can re-run it after a fresh
+// SDK load, not just once at module evaluation time. Returns true once firebaseDb is actually
+// usable.
+function attemptFirebaseInit() {
+  if (!ENABLE_FIRESTORE_SYNC || typeof firebase === 'undefined') return false;
+  try {
     if (!firebase.apps.length) {
       firebase.initializeApp(firebaseConfig);
     }
@@ -877,20 +882,74 @@ try {
       console.warn('Firestore persistence init notice:', persistErr);
     }
     bindGatherFirebaseDeps();
+  } catch (e) {
+    console.warn('Firebase init notice:', e);
+    return false;
   }
-} catch (e) {
-  console.warn('Firebase init notice:', e);
+  try {
+    // Chat images are uploaded here when available (see uploadChatImageAssets); every call site
+    // falls back to embedding a compressed base64 image directly in the message document if this
+    // is unavailable (bucket not provisioned on this project/plan, offline, etc.), so a Storage
+    // outage degrades image quality/cost rather than breaking the chat feature outright.
+    if (!firebaseStorage && firebase.apps.length) {
+      firebaseStorage = firebase.storage();
+    }
+  } catch (e) {
+    console.warn('Firebase Storage init notice (falling back to inline base64 images):', e);
+  }
+  return Boolean(firebaseDb);
 }
-try {
-  // Chat images are uploaded here when available (see uploadChatImageAssets); every call site
-  // falls back to embedding a compressed base64 image directly in the message document if this
-  // is unavailable (bucket not provisioned on this project/plan, offline, etc.), so a Storage
-  // outage degrades image quality/cost rather than breaking the chat feature outright.
-  if (ENABLE_FIRESTORE_SYNC && typeof firebase !== 'undefined' && firebase.apps.length) {
-    firebaseStorage = firebase.storage();
-  }
-} catch (e) {
-  console.warn('Firebase Storage init notice (falling back to inline base64 images):', e);
+
+const firebaseReadyOnFirstTry = attemptFirebaseInit();
+
+// main.jsx's own boot-time loader (loadFirebaseSdk) already retries a few times before giving up,
+// but "gave up" used to mean permanently stuck without Firestore for the rest of that page
+// load/session -- realtime data, sends, uploads all silently degrade to the local cache/base64
+// fallbacks, recoverable only by the user manually reloading, repeatedly, until a load happens to
+// land during a good moment on their connection. On a connection that's degraded rather than
+// truly offline, that first attempt can keep failing every single time it's tried right at page
+// load while still being perfectly capable of succeeding a little later. This keeps retrying in
+// the background on a slow cooldown instead: every consumer of firebaseDb elsewhere in the app
+// already depends on its live value (subscriptions re-run, `if (firebaseDb) ...` checks re-read
+// it), so once this successfully sets it, the app picks the connection back up on its own with no
+// further wiring and no reload required.
+if (typeof window !== 'undefined' && typeof document !== 'undefined' && !firebaseReadyOnFirstTry && ENABLE_FIRESTORE_SYNC) {
+  const FIREBASE_BG_RETRY_INTERVAL_MS = 20000;
+  const FIREBASE_BG_RETRY_MAX_ATTEMPTS = 30; // ~10 minutes before giving up for good this session
+  const FIREBASE_SDK_URLS = [
+    'https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js',
+    'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js',
+    'https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js'
+  ];
+  const loadFirebaseScriptOnce = (src, timeoutMs) => new Promise((resolve, reject) => {
+    let settled = false;
+    const timer = setTimeout(() => { if (settled) return; settled = true; reject(new Error('timeout')); }, timeoutMs);
+    const el = document.createElement('script');
+    el.src = src;
+    el.onload = () => { if (settled) return; settled = true; clearTimeout(timer); resolve(); };
+    el.onerror = () => { if (settled) return; settled = true; clearTimeout(timer); reject(new Error('load failed')); };
+    document.head.appendChild(el);
+  });
+  let bgAttempts = 0;
+  const bgRetryTimer = setInterval(async () => {
+    bgAttempts += 1;
+    if (firebaseDb || bgAttempts > FIREBASE_BG_RETRY_MAX_ATTEMPTS) {
+      clearInterval(bgRetryTimer);
+      return;
+    }
+    try {
+      // Reloading an already-loaded script is harmless here (firebase-app-compat.js's own
+      // !firebase.apps.length guard, and the browser's own HTTP cache once one attempt actually
+      // succeeds) -- always retrying all three keeps this simple and avoids having to detect
+      // exactly which of the three partially loaded last time.
+      for (const url of FIREBASE_SDK_URLS) {
+        await loadFirebaseScriptOnce(url, 15000);
+      }
+      if (attemptFirebaseInit()) clearInterval(bgRetryTimer);
+    } catch (e) {
+      // Best-effort background retry -- stay silent and let the next tick try again.
+    }
+  }, FIREBASE_BG_RETRY_INTERVAL_MS);
 }
 
 let isStorageDisabled = false;
