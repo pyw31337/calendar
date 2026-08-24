@@ -1026,8 +1026,7 @@ export function DeadlineDateTimePicker({ value, onChange, disabled, dateOnly = f
       disabled,
       style: {
         width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px',
-        cursor: disabled ? 'default' : 'pointer', textAlign: 'left',
-        fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-main)', height: '42px', boxSizing: 'border-box'
+        cursor: disabled ? 'default' : 'pointer', textAlign: 'left'
       },
       onClick: openPicker
     },

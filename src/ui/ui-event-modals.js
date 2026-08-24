@@ -2273,6 +2273,14 @@ export function PollModal({ calendar, poll, onSave, onClose, showToast, onReques
     disabled: isSubmitting,
     style: { opacity: isSubmitting ? 0.75 : 1, cursor: isSubmitting ? 'wait' : 'pointer' }
   }, isSubmitting ? "\uC800\uC7A5 \uC911..." : "\uD22C\uD45C \uC800\uC7A5")))));
+
+  // Portaled to document.body (like the other layer popups in this file) so this modal's own
+  // position:fixed dim overlay is never clipped/contained by an ancestor modal's
+  // ResizableModalContainer (e.g. AdminModal's admin-settings-modal, which sets overflow:hidden) --
+  // without this, opening PollModal from inside another modal made the outer modal collapse to
+  // just its border while this one rendered confined to the outer modal's box instead of covering
+  // the full viewport with its own dim.
+  return ReactDOM.createPortal(modalEl, document.body);
 }
 
   if (typeof window !== 'undefined') {
