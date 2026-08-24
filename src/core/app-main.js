@@ -1502,7 +1502,7 @@ function App() {
     unsubscribe = firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).onSnapshot(doc => {
       const result = getCloudDocCalendar(doc, activeCalId);
       if (result && !isSavingRef.current) {
-        applyLoadedCalendar(result.calendar, result.lastModified || Date.now());
+        applyLoadedCalendar(result.calendar, result.lastModified || Date.now(), true);
       }
     }, err => {
       console.warn(`Firestore realtime sync notice for cal_${activeCalId}:`, err);

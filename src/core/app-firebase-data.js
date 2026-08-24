@@ -453,9 +453,9 @@ function mergeAvailabilityRecord(existing, incoming) {
   }
   if (existingStamp > incomingStamp) return existingClone;
   return {
-    ...existingClone,
     ...incomingClone,
-    deletedAt: incomingClone.deletedAt || existingClone.deletedAt || null
+    ...existingClone,
+    deletedAt: existingClone.deletedAt || incomingClone.deletedAt || null
   };
 }
 
