@@ -1056,7 +1056,7 @@ export function AnniversaryModal({
                 padding: '8px 10px',
                 backgroundColor: newType === typeVal ? 'rgba(59,130,246,0.06)' : 'var(--bg-primary)',
                 border: '1px solid ' + (newType === typeVal ? '#3B82F6' : 'var(--border-subtle)'),
-                borderRadius: '8px',
+                borderRadius: 'var(--radius-md)',
                 fontSize: '0.76rem',
                 cursor: 'pointer',
                 fontWeight: newType === typeVal ? 'bold' : 'normal'
@@ -1538,7 +1538,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {
   const renderItemRow = (item, showDate = false) => /*#__PURE__*/React.createElement("div", {
     key: item.id || `${item.date}_${item.createdAt}_${item.amount}`,
     onClick: () => onSelectDate && onSelectDate(item.date),
-    style: { display: 'flex', flexDirection: 'column', gap: '5px', padding: '10px 12px', border: '0', borderRadius: '12px', backgroundColor: 'var(--bg-card)', cursor: onSelectDate ? 'pointer' : 'default' }
+    style: { display: 'flex', flexDirection: 'column', gap: '5px', padding: '10px 12px', border: '0', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-card)', cursor: onSelectDate ? 'pointer' : 'default' }
   }, /*#__PURE__*/React.createElement("div", {
     style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }
   }, /*#__PURE__*/React.createElement("div", {
@@ -1577,7 +1577,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {
   const totalContent = /*#__PURE__*/React.createElement("div", {
     style: { display: 'flex', flexDirection: 'column', gap: '12px' }
   }, /*#__PURE__*/React.createElement("section", {
-    style: { border: '1px solid var(--border-subtle)', borderRadius: '14px', padding: '12px', background: 'var(--bg-primary)' }
+    style: { border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '12px', background: 'var(--bg-primary)' }
   }, /*#__PURE__*/React.createElement("h4", {
     style: { margin: '0 0 10px', fontSize: '0.92rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '6px' }
   }, /*#__PURE__*/React.createElement(ChartBarIcon, null), "카테고리별 지출"), categoryTotals.length === 0 ? /*#__PURE__*/React.createElement("div", {
@@ -1594,7 +1594,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {
   }, item.total.toLocaleString(), "원")))), /*#__PURE__*/React.createElement("section", {
     style: { display: 'flex', flexDirection: 'column', gap: '8px' }
   }, baseBudget > 0 && /*#__PURE__*/React.createElement("div", {
-    className: 'settlement-base-budget-card', style: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: '10px', alignItems: 'center', padding: '10px 12px', border: '1px solid #BBF7D0', borderRadius: '12px', background: '#F0FDF4' }
+    className: 'settlement-base-budget-card', style: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: '10px', alignItems: 'center', padding: '10px 12px', border: '1px solid #BBF7D0', borderRadius: 'var(--radius-md)', background: '#F0FDF4' }
   }, /*#__PURE__*/React.createElement("div", {
     style: { display: 'flex', flexDirection: 'column', gap: '4px' }
   }, /*#__PURE__*/React.createElement("strong", {
@@ -1615,7 +1615,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {
     const isCollapsed = !!collapsedDailyRows[row.meeting.date];
     return /*#__PURE__*/React.createElement("section", {
       key: row.meeting.date,
-      style: { border: '0', borderRadius: '14px', padding: '12px', backgroundColor: 'var(--bg-primary)' }
+      style: { border: '0', borderRadius: 'var(--radius-md)', padding: '12px', backgroundColor: 'var(--bg-primary)' }
     }, /*#__PURE__*/React.createElement("div", {
       style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', marginBottom: isCollapsed ? 0 : '10px' }
     }, /*#__PURE__*/React.createElement("strong", {
@@ -1858,7 +1858,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {
             monthNames.map((name, idx) => /*#__PURE__*/React.createElement("button", {
               key: idx, type: "button", onClick: () => setPickerMonth(idx),
               style: {
-                padding: '6px 4px', borderRadius: '8px',
+                padding: '6px 4px', borderRadius: 'var(--radius-sm)',
                 border: pickerMonth === idx ? '2px solid var(--accent-primary)' : '1px solid var(--border-subtle)',
                 background: pickerMonth === idx ? 'rgba(99, 102, 241, 0.15)' : 'var(--bg-card)',
                 color: pickerMonth === idx ? 'var(--accent-primary)' : 'var(--text-main)',

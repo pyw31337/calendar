@@ -1112,7 +1112,7 @@ export function AdminModal({
   }, /*#__PURE__*/React.createElement(ResizableModalContainer, {
     className: "modal-container admin-settings-modal",
     onClick: e => e.stopPropagation(),
-    style: { maxWidth: '760px', width: '95vw', display: 'flex', flexDirection: 'column', height: 'min(90vh, 720px)', maxHeight: 'min(720px, calc(100svh - 24px), calc(100vh - 24px))', borderRadius: '16px', overflow: 'hidden' }
+    style: { maxWidth: '760px', width: '95vw', display: 'flex', flexDirection: 'column', height: 'min(90vh, 720px)', maxHeight: 'min(720px, calc(100svh - 24px), calc(100vh - 24px))', borderRadius: 'var(--radius-md)', overflow: 'hidden' }
   },
     /* Header */
     /*#__PURE__*/React.createElement("div", {
@@ -1186,7 +1186,7 @@ export function AdminModal({
         },
           /* Section 1: Calendar Profile & Participants */
           /*#__PURE__*/React.createElement("div", {
-            style: { border: '1px solid var(--border-subtle)', borderRadius: '12px', padding: '16px', backgroundColor: 'var(--bg-card)' }
+            style: { border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '16px', backgroundColor: 'var(--bg-card)' }
           },
             /*#__PURE__*/React.createElement("h4", { style: { fontSize: '0.92rem', fontWeight: 800, color: 'var(--text-main)', margin: '0 0 14px 0', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(SettingsIcon, null), "프로필 설정"),
 
@@ -1281,7 +1281,7 @@ export function AdminModal({
 
           /* Section 2: Polls Creation & List */
           /*#__PURE__*/React.createElement("div", {
-            style: { border: '1px solid var(--border-subtle)', borderRadius: '12px', padding: '16px', backgroundColor: 'var(--bg-card)' }
+            style: { border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '16px', backgroundColor: 'var(--bg-card)' }
           },
             /* Header */
             /*#__PURE__*/React.createElement("div", {
@@ -1303,7 +1303,7 @@ export function AdminModal({
               getCalendarPolls(calendar).map(poll => /*#__PURE__*/React.createElement("div", {
                 key: poll.id,
                 className: 'admin-log-row poll-list-row settings-poll-row',
-                style: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px 8px', borderRadius: '8px', padding: '10px 12px' }
+                style: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px 8px', borderRadius: 'var(--radius-md)', padding: '10px 12px' }
               },
                 /* Left info */
                 /*#__PURE__*/React.createElement("div", { className: "admin-poll-row-main", style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '2px', minWidth: 0, flex: '1 1 160px' } },
@@ -1342,7 +1342,7 @@ export function AdminModal({
       activeTab === 'recovery' && /*#__PURE__*/React.createElement(React.Fragment, null,
         /* Info alert */
         /*#__PURE__*/React.createElement("div", {
-          style: { backgroundColor: '#FEF3C7', border: '1px solid #FDE68A', borderRadius: '8px', padding: '12px 14px', color: '#92400E', fontSize: '0.8rem', lineHeight: '1.5' }
+          style: { backgroundColor: '#FEF3C7', border: '1px solid #FDE68A', borderRadius: 'var(--radius-md)', padding: '12px 14px', color: '#92400E', fontSize: '0.8rem', lineHeight: '1.5' }
         },
           /*#__PURE__*/React.createElement("span", { style: { fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '4px', verticalAlign: 'middle' } }, /*#__PURE__*/React.createElement(AlertTriangleIcon, null), "데이터 유실 방지 경고: "),
           "특정 시점으로 데이터를 복구(롤백)하면, 그 시점 이후에 수행된 모든 일정 등록 및 변경 사항과 투표 기록이 되돌아갑니다. 복구하기 전 현재 상태의 백업이 필요하다면 백업 저장 기능을 이용해 주세요."
@@ -1363,7 +1363,7 @@ export function AdminModal({
 
         /* Log Timeline */
         /*#__PURE__*/React.createElement("div", {
-          style: { border: '1px solid var(--border-subtle)', borderRadius: '12px', padding: '16px', backgroundColor: 'var(--bg-card)', display: 'flex', flexDirection: 'column' }
+          style: { border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '16px', backgroundColor: 'var(--bg-card)', display: 'flex', flexDirection: 'column' }
         },
           /*#__PURE__*/React.createElement("h4", { style: { fontSize: '0.92rem', fontWeight: 800, color: 'var(--text-main)', margin: '0 0 12px 0', display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(HourglassIcon, null), "시점복구"),
 
@@ -1864,7 +1864,7 @@ export function AdminCreateCalendarModal({ onCreate, onClose }) {
       onSubmit: handleSubmit,
       onClick: e => e.stopPropagation(),
       className: "modal-container",
-      style: { maxWidth: '360px', padding: '20px', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '12px' }
+      style: { maxWidth: '360px', padding: '20px', borderRadius: 'var(--radius-md)', display: 'flex', flexDirection: 'column', gap: '12px' }
     },
       /*#__PURE__*/React.createElement("h3", { style: { fontSize: '1.05rem', fontWeight: 800, color: '#0F172A' } }, "+ 새 캘린더 생성"),
       /*#__PURE__*/React.createElement("div", null,
@@ -1919,7 +1919,7 @@ export function AdminRestorePhraseModal({ onConfirm, onClose }) {
       onSubmit: handleSubmit,
       onClick: e => e.stopPropagation(),
       className: "modal-container",
-      style: { maxWidth: '380px', padding: '20px', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '12px' }
+      style: { maxWidth: '380px', padding: '20px', borderRadius: 'var(--radius-md)', display: 'flex', flexDirection: 'column', gap: '12px' }
     },
       /*#__PURE__*/React.createElement("h3", { style: { fontSize: '1.05rem', fontWeight: 800, color: '#0F172A' } }, "운영 데이터 복구 확인"),
       /*#__PURE__*/React.createElement("p", { style: { fontSize: '0.85rem', color: '#475569', lineHeight: '1.5' } },

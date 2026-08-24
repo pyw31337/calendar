@@ -1071,7 +1071,7 @@ export function LinkPreviewCard({ url, fallbackTitle, cachedData, stretch = fals
       gap: '8px',
       marginTop: '6px',
       border: '1px solid var(--border-subtle)',
-      borderRadius: '8px',
+      borderRadius: 'var(--radius-md)',
       overflow: 'hidden',
       textDecoration: 'none',
       color: 'inherit',
@@ -1121,7 +1121,7 @@ export function LinkPreviewProgressOverlay({ progress, remainingSec }) {
     },
       /*#__PURE__*/React.createElement("div", {
         className: "modal-container",
-        style: { width: '100%', maxWidth: '360px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px', backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: '12px' }
+        style: { width: '100%', maxWidth: '360px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px', backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)' }
       },
         /*#__PURE__*/React.createElement("h3", { style: { fontSize: '1rem', fontWeight: 800, textAlign: 'center', margin: 0, color: 'var(--text-main)' } }, "링크 미리보기 가져오는 중"),
         /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.8rem', color: 'var(--text-muted)', textAlign: 'center' } }, "웹페이지 정보를 분석하고 있습니다."),
@@ -1179,7 +1179,7 @@ export function DeleteConfirmModal({
   }, /*#__PURE__*/React.createElement(ResizableModalContainer, {
     className: "modal-container",
     onClick: e => e.stopPropagation(),
-    style: { maxWidth: '320px', padding: '20px', borderRadius: '12px' }
+    style: { maxWidth: '320px', padding: '20px', borderRadius: 'var(--radius-md)' }
   }, /*#__PURE__*/React.createElement("div", {
     style: { textAlign: 'center', marginBottom: '20px' }
   }, /*#__PURE__*/React.createElement("h3", {
@@ -1254,7 +1254,7 @@ export function AdminLoginGate({ children }) {
     /*#__PURE__*/React.createElement("form", {
       onSubmit: handleSubmit,
       className: "modal-container",
-      style: { maxWidth: '320px', padding: '28px', borderRadius: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }
+      style: { maxWidth: '320px', padding: '28px', borderRadius: 'var(--radius-md)', display: 'flex', flexDirection: 'column', gap: '14px' }
     },
       /*#__PURE__*/React.createElement("div", { style: { fontSize: '1.1rem', fontWeight: 800, color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(LockIcon, null), "관리자 인증"),
       /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.82rem', color: 'var(--text-muted)' } }, "비밀번호를 입력해 주세요."),
@@ -1484,7 +1484,7 @@ export function StickyVideoBox({ stickyVideo, onClose, onGoToChat }) {
       width: `${effectiveFloatWidth}px`,
       height: `${effectiveFloatHeight + STICKY_VIDEO_CONTROLS_HEIGHT}px`,
       zIndex: 40000,
-      borderRadius: '12px',
+      borderRadius: 'var(--radius-md)',
       overflow: 'hidden',
       background: '#000',
       boxShadow: '0 12px 32px rgba(0,0,0,0.4)'
@@ -1536,7 +1536,7 @@ export function StickyVideoBox({ stickyVideo, onClose, onGoToChat }) {
       color: '#FFFFFF',
       backgroundColor: 'rgba(255,255,255,0.14)',
       border: 'none',
-      borderRadius: '8px',
+      borderRadius: 'var(--radius-md)',
       cursor: 'pointer'
     }
   }, '채팅으로 이동'), /*#__PURE__*/React.createElement('button', {
@@ -1553,7 +1553,7 @@ export function StickyVideoBox({ stickyVideo, onClose, onGoToChat }) {
       color: '#FFFFFF',
       backgroundColor: 'rgba(255,255,255,0.14)',
       border: 'none',
-      borderRadius: '8px',
+      borderRadius: 'var(--radius-md)',
       cursor: 'pointer'
     }
   }, '✕'))), hostRef.current);
@@ -1614,7 +1614,7 @@ export function OperationProgressOverlay({ title, detail, pct }) {
   return /*#__PURE__*/React.createElement('div', {
     style: { position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.48)', zIndex: 100000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }
   }, /*#__PURE__*/React.createElement('div', {
-    style: { backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: '16px', padding: '24px 28px', width: '300px', maxWidth: '100%', textAlign: 'center', boxShadow: '0 16px 42px rgba(0,0,0,0.28)' }
+    style: { backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '24px 28px', width: '300px', maxWidth: '100%', textAlign: 'center', boxShadow: '0 16px 42px rgba(0,0,0,0.28)' }
   },
     /*#__PURE__*/React.createElement('div', { style: { fontWeight: 900, fontSize: '1rem', color: 'var(--text-main)', marginBottom: '6px' } }, title || '작업 처리 중...'),
     /*#__PURE__*/React.createElement('div', { style: { fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '14px', lineHeight: 1.45 } }, detail || '서버 응답을 기다리고 있습니다.'),

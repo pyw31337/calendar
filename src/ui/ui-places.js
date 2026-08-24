@@ -1437,7 +1437,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
           className: "visit-filter-toggle-desktop",
           style: {
             display: 'flex', alignItems: 'center', gap: '2px',
-            backgroundColor: 'var(--bg-primary)', padding: '3px', borderRadius: '10px',
+            backgroundColor: 'var(--bg-primary)', padding: '3px', borderRadius: 'var(--radius-md)',
             border: '1px solid var(--border-subtle)'
           }
         },
@@ -1445,7 +1445,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
             type: "button",
             onClick: () => setVisitFilter('all'),
             style: {
-              padding: '4px 10px', fontSize: '0.75rem', fontWeight: 800, borderRadius: '8px', border: 'none', cursor: 'pointer',
+              padding: '4px 10px', fontSize: '0.75rem', fontWeight: 800, borderRadius: 'var(--radius-sm)', border: 'none', cursor: 'pointer',
               backgroundColor: visitFilter === 'all' ? '#4F46E5' : 'transparent',
               color: visitFilter === 'all' ? '#FFFFFF' : 'var(--text-muted)'
             }
@@ -1454,7 +1454,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
             type: "button",
             onClick: () => setVisitFilter('visited'),
             style: {
-              padding: '4px 10px', fontSize: '0.75rem', fontWeight: 800, borderRadius: '8px', border: 'none', cursor: 'pointer',
+              padding: '4px 10px', fontSize: '0.75rem', fontWeight: 800, borderRadius: 'var(--radius-sm)', border: 'none', cursor: 'pointer',
               backgroundColor: visitFilter === 'visited' ? '#4F46E5' : 'transparent',
               color: visitFilter === 'visited' ? '#FFFFFF' : 'var(--text-muted)'
             }
@@ -1463,7 +1463,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
             type: "button",
             onClick: () => setVisitFilter('planned'),
             style: {
-              padding: '4px 10px', fontSize: '0.75rem', fontWeight: 800, borderRadius: '8px', border: 'none', cursor: 'pointer',
+              padding: '4px 10px', fontSize: '0.75rem', fontWeight: 800, borderRadius: 'var(--radius-sm)', border: 'none', cursor: 'pointer',
               backgroundColor: visitFilter === 'planned' ? '#4F46E5' : 'transparent',
               color: visitFilter === 'planned' ? '#FFFFFF' : 'var(--text-muted)'
             }
@@ -1684,7 +1684,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
             height: '44px',
             boxSizing: 'border-box',
             padding: '3px',
-            borderRadius: '12px',
+            borderRadius: 'var(--radius-md)',
             border: '1px solid var(--border-subtle)',
             backgroundColor: 'var(--bg-card)',
             flexShrink: 0
@@ -1699,7 +1699,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
               padding: '0 12px',
               fontSize: '0.8rem',
               fontWeight: 900,
-              borderRadius: '9px',
+              borderRadius: 'var(--radius-sm)',
               border: 'none',
               cursor: 'pointer',
               backgroundColor: visitFilter === 'visited' ? '#4F46E5' : 'transparent',
@@ -1716,7 +1716,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
               padding: '0 12px',
               fontSize: '0.8rem',
               fontWeight: 900,
-              borderRadius: '9px',
+              borderRadius: 'var(--radius-sm)',
               border: 'none',
               cursor: 'pointer',
               backgroundColor: visitFilter === 'planned' ? '#4F46E5' : 'transparent',
@@ -1886,7 +1886,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
                   }
                   return /*#__PURE__*/React.createElement("div", {
                     key: idx,
-                    style: { display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: 'var(--bg-primary)', borderRadius: '8px', padding: '6px 10px' }
+                    style: { display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: 'var(--bg-primary)', borderRadius: 'var(--radius-md)', padding: '6px 10px' }
                   },
                     /*#__PURE__*/React.createElement("span", { className: "place-visit-entry-date", style: { flexShrink: 0 } }, formatPlaceBadgeDate(entry.date) || entry.date),
                     /*#__PURE__*/React.createElement("span", { style: { flex: 1, minWidth: 0, fontSize: '0.78rem', color: 'var(--text-main)', wordBreak: 'break-word' } }, entry.note),

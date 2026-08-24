@@ -1072,7 +1072,7 @@ export function CalendarGrid({
             MONTH_NAMES.map((name, idx) => /*#__PURE__*/React.createElement("button", {
               key: idx, type: "button", onClick: () => setPickerMonth(idx),
               style: {
-                padding: '6px 4px', borderRadius: '8px',
+                padding: '6px 4px', borderRadius: 'var(--radius-sm)',
                 border: pickerMonth === idx ? '2px solid var(--accent-primary)' : '1px solid var(--border-subtle)',
                 background: pickerMonth === idx ? 'rgba(99, 102, 241, 0.15)' : 'var(--bg-card)',
                 color: pickerMonth === idx ? 'var(--accent-primary)' : 'var(--text-main)',
@@ -1552,7 +1552,7 @@ export function CommentsSection({
   /*#__PURE__*/React.createElement("div", {
     style: {
       backgroundColor: 'var(--bg-primary)',
-      borderRadius: '12px',
+      borderRadius: 'var(--radius-md)',
       padding: '12px',
       minHeight: '48px'
     }
@@ -1636,7 +1636,7 @@ export function CommentsSection({
         }),
         /* Bubble container */
         /*#__PURE__*/React.createElement('div', {
-          style: { backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '10px 12px', fontSize: '0.85rem', lineHeight: '1.4', color: 'var(--text-main)', wordBreak: 'keep-all', overflowWrap: 'break-word', whiteSpace: 'pre-wrap', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', position: 'relative', zIndex: 1 }
+          style: { backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '10px 12px', fontSize: '0.85rem', lineHeight: '1.4', color: 'var(--text-main)', wordBreak: 'keep-all', overflowWrap: 'break-word', whiteSpace: 'pre-wrap', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', position: 'relative', zIndex: 1 }
         }, bubbleContent)
       )
     );
@@ -1649,7 +1649,7 @@ export function CommentsSection({
       width: '100%',
       backgroundColor: 'color-mix(in srgb, var(--bg-primary) 96%, black)',
       border: 'none',
-      borderRadius: '8px',
+      borderRadius: 'var(--radius-md)',
       padding: '8px 0',
       fontSize: '0.85rem',
       fontWeight: 'bold',
@@ -1664,7 +1664,7 @@ export function CommentsSection({
     style: {
       backgroundColor: 'var(--bg-card)',
       border: '1px solid var(--border-subtle)',
-      borderRadius: '12px',
+      borderRadius: 'var(--radius-md)',
       padding: '12px',
       marginTop: '12px',
       display: 'flex',
@@ -1719,7 +1719,7 @@ export function CommentsSection({
         width: '60px',
         height: '60px',
         objectFit: 'cover',
-        borderRadius: '8px',
+        borderRadius: 'var(--radius-md)',
         display: 'block'
       }
     }), /*#__PURE__*/React.createElement("button", {
@@ -2057,7 +2057,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
     style: {
       backgroundColor: memo.color || 'var(--bg-card)',
       border: '0',
-      borderRadius: '12px',
+      borderRadius: 'var(--radius-md)',
       padding: '12px',
       cursor: 'pointer',
       boxShadow: '0 2px 5px rgba(0,0,0,0.03)',
@@ -2154,7 +2154,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
         marginTop: '8px',
         padding: '8px 12px',
         border: 'none',
-        borderRadius: '8px',
+        borderRadius: 'var(--radius-md)',
         background: 'var(--bg-primary)',
         color: 'var(--text-main)',
         fontSize: '0.78rem',
@@ -2236,7 +2236,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
         onClick: e => e.stopPropagation(),
         style: {
           display: 'flex', alignItems: 'center', gap: '8px',
-          backgroundColor: 'rgba(148, 163, 184, 0.14)', borderRadius: '8px', padding: '6px 8px'
+          backgroundColor: 'rgba(148, 163, 184, 0.14)', borderRadius: 'var(--radius-sm)', padding: '6px 8px'
         }
       },
         /*#__PURE__*/React.createElement("span", {
@@ -2906,7 +2906,7 @@ export function EditMessageModal({
   }, /*#__PURE__*/React.createElement(ResizableModalContainer, {
     className: "modal-container",
     onClick: e => e.stopPropagation(),
-    style: { width: '90%', maxWidth: '400px', borderRadius: '12px' }
+    style: { width: '90%', maxWidth: '400px', borderRadius: 'var(--radius-md)' }
   }, /*#__PURE__*/React.createElement("div", {
     className: "modal-header",
     style: { padding: '16px', marginBottom: 0 }
@@ -2939,7 +2939,7 @@ export function EditMessageModal({
       width: '80px',
       height: '80px',
       objectFit: 'cover',
-      borderRadius: '8px',
+      borderRadius: 'var(--radius-md)',
       display: 'block',
       border: '1px solid var(--border-subtle)'
     }
@@ -2951,7 +2951,7 @@ export function EditMessageModal({
       position: 'relative',
       backgroundColor: 'var(--bg-primary)',
       border: '1px solid var(--border-subtle)',
-      borderRadius: '12px',
+      borderRadius: 'var(--radius-md)',
       padding: '8px'
     }
   }, /*#__PURE__*/React.createElement("textarea", {

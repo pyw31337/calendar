@@ -708,7 +708,7 @@ export function UpdateAvailableBanner() {
       position: 'fixed', left: '50%', bottom: '20px', transform: 'translateX(-50%)',
       zIndex: 100000, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px',
       backgroundColor: '#0F172A', color: '#FFFFFF', padding: '10px 12px 10px 16px',
-      borderRadius: '12px', boxShadow: '0 12px 32px rgba(0,0,0,0.28)',
+      borderRadius: 'var(--radius-md)', boxShadow: '0 12px 32px rgba(0,0,0,0.28)',
       fontSize: '0.85rem', fontWeight: 700, width: '90%', maxWidth: '380px',
       boxSizing: 'border-box'
     }
@@ -719,7 +719,7 @@ export function UpdateAvailableBanner() {
         type: "button",
         onClick: () => window.location.reload(),
         style: {
-          backgroundColor: '#4F46E5', color: '#FFFFFF', border: 'none', borderRadius: '8px',
+          backgroundColor: '#4F46E5', color: '#FFFFFF', border: 'none', borderRadius: 'var(--radius-md)',
           padding: '6px 14px', fontSize: '0.82rem', fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap'
         }
       }, "새로고침"),
@@ -796,7 +796,7 @@ export function ImageShareViewer({ shareId }) {
         maxWidth: '100%',
         maxHeight: 'calc(100dvh - 96px)',
         objectFit: 'contain',
-        borderRadius: '14px',
+        borderRadius: 'var(--radius-md)',
         boxShadow: '0 24px 80px rgba(0,0,0,0.35)'
       }
     }),
@@ -948,7 +948,7 @@ export function MemoShareModal({ memo, calendarId, onClose, showToast }) {
   qrDataUrl && /*#__PURE__*/React.createElement("div", {
     style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', marginTop: '16px' }
   },
-    /*#__PURE__*/React.createElement("img", { src: qrDataUrl, alt: "메모 공유 QR코드", style: { borderRadius: '8px', border: '1px solid var(--border-subtle)' } }),
+    /*#__PURE__*/React.createElement("img", { src: qrDataUrl, alt: "메모 공유 QR코드", style: { borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' } }),
     /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.76rem', color: 'var(--text-muted)' } }, "QR코드를 카메라로 스캔해 접속하세요")
   )))), document.body);
 }

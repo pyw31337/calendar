@@ -724,7 +724,7 @@ export function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSe
       position: 'absolute', left: 0, right: 0, bottom: 0, minWidth: '190px',
       padding: '34px 14px 12px',
       background: 'linear-gradient(to top, rgba(0,0,0,0.84) 0%, rgba(0,0,0,0.84) 55%, rgba(0,0,0,0.5) 82%, transparent)',
-      borderRadius: '0 0 12px 12px',
+      borderRadius: '0 0 var(--radius-md) var(--radius-md)',
       color: '#FFFFFF', fontSize: '0.76rem', lineHeight: 1.7,
       display: 'flex', flexDirection: 'column', gap: '4px',
       pointerEvents: 'auto'
@@ -1494,7 +1494,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
     onLoad: e => recordImageDimensions(url, e),
     onMouseDown: handleZoomedImageMouseDown,
     style: {
-      maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: '12px',
+      maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: 'var(--radius-md)',
       display: 'block', ...zoomImageStyle
     }
   }), renderPhotoActions(), showInfo && /*#__PURE__*/React.createElement(LightboxInfoPanel, {
@@ -1522,7 +1522,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
     onLoad: e => recordImageDimensions(url, e),
     onClick: e => e.stopPropagation(),
     style: {
-      maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: '12px'
+      maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: 'var(--radius-md)'
     }
   })));
 
@@ -1616,7 +1616,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
     onLoad: e => recordImageDimensions(currentUrl, e),
     onMouseDown: handleZoomedImageMouseDown,
     style: {
-      maxWidth: '92vw', maxHeight: '82vh', borderRadius: '12px', objectFit: 'contain',
+      maxWidth: '92vw', maxHeight: '82vh', borderRadius: 'var(--radius-md)', objectFit: 'contain',
       display: 'block', ...zoomImageStyle
     }
   }), renderPhotoActions(), showInfo && /*#__PURE__*/React.createElement(LightboxInfoPanel, {

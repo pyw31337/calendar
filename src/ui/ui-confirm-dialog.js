@@ -710,7 +710,7 @@ function getDeps() { return window.GATHER_UI_DEPS || {}; }
     }, React.createElement(ResizableModalContainer, {
       className: 'modal-container confirm-dialog-modal',
       onClick: function (e) { e.stopPropagation(); },
-      style: { maxWidth: '320px', borderRadius: '12px' }
+      style: { maxWidth: '320px', borderRadius: 'var(--radius-md)' }
     }, React.createElement('div', { className: 'confirm-dialog-body', style: { textAlign: 'center', marginBottom: '16px' } },
       title ? React.createElement('h3', {
         style: { fontSize: '1.05rem', fontWeight: 800, marginBottom: '8px', color: 'var(--text-main)' }

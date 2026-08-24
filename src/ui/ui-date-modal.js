@@ -1855,7 +1855,7 @@ export function DateModal({
       onClick: e => { e.preventDefault(); e.stopPropagation(); setActiveTab('participant'); },
       style: {
         border: 'none',
-        borderRadius: '8px',
+        borderRadius: 'var(--radius-md)',
         padding: '7px 4px',
         background: activeTab === 'participant' ? 'var(--accent-primary)' : 'transparent',
         color: activeTab === 'participant' ? '#FFFFFF' : 'var(--text-muted)',
@@ -1886,7 +1886,7 @@ export function DateModal({
       onClick: e => { e.preventDefault(); e.stopPropagation(); setActiveTab('meeting'); },
       style: {
         border: 'none',
-        borderRadius: '8px',
+        borderRadius: 'var(--radius-md)',
         padding: '7px 4px',
         background: activeTab === 'meeting' ? 'var(--accent-primary)' : 'transparent',
         color: activeTab === 'meeting' ? '#FFFFFF' : 'var(--text-muted)',
@@ -1917,7 +1917,7 @@ export function DateModal({
       onClick: e => { e.preventDefault(); e.stopPropagation(); setActiveTab('settlement'); },
       style: {
         border: 'none',
-        borderRadius: '8px',
+        borderRadius: 'var(--radius-md)',
         padding: '7px 4px',
         background: activeTab === 'settlement' ? 'var(--accent-primary)' : 'transparent',
         color: activeTab === 'settlement' ? '#FFFFFF' : 'var(--text-muted)',
@@ -1948,7 +1948,7 @@ export function DateModal({
       onClick: e => { e.preventDefault(); e.stopPropagation(); setActiveTab('photo'); },
       style: {
         border: 'none',
-        borderRadius: '8px',
+        borderRadius: 'var(--radius-md)',
         padding: '7px 4px',
         background: activeTab === 'photo' ? 'var(--accent-primary)' : 'transparent',
         color: activeTab === 'photo' ? '#FFFFFF' : 'var(--text-muted)',
@@ -2002,7 +2002,7 @@ export function DateModal({
             color: displayColor,
             border: `1px solid ${displayColor}30`,
             borderLeft: `4px solid ${displayColor}`,
-            borderRadius: '8px',
+            borderRadius: 'var(--radius-md)',
             fontSize: '0.82rem',
             fontWeight: 'bold'
           }
@@ -2115,7 +2115,7 @@ export function DateModal({
             padding: '8px',
             backgroundColor: 'var(--bg-primary)',
             border: '1px solid var(--border-subtle)',
-            borderRadius: '12px'
+            borderRadius: 'var(--radius-md)'
           }
         }, dateEntries.map(entry => {
           const part = activeParticipants.find(p => p.id === entry.participantId);
@@ -2189,7 +2189,7 @@ export function DateModal({
       ),
       !adminMode && typeof onConfirmMeeting === 'function' && /*#__PURE__*/React.createElement("div", {
         className: "gamified-confirm-wrap",
-        style: { marginTop: '4px', overflow: 'hidden', borderRadius: '14px' }
+        style: { marginTop: '4px', overflow: 'hidden', borderRadius: 'var(--radius-md)' }
       }, /*#__PURE__*/React.createElement("button", {
         type: "button",
         className: !isConfirmed && isAllAvailable ? 'btn-gamified-confirm' : 'btn-meeting-confirm-plain',
@@ -2203,7 +2203,7 @@ export function DateModal({
           finally { setIsSubmitting(false); }
         },
         style: {
-          width: '100%', marginTop: '12px', padding: '12px 16px', borderRadius: '12px',
+          width: '100%', marginTop: '12px', padding: '12px 16px', borderRadius: 'var(--radius-md)',
           fontWeight: 800, fontSize: '0.92rem', cursor: isSubmitting ? 'wait' : 'pointer',
           ...((!isConfirmed && isAllAvailable) ? {} : isConfirmed ? {
             border: '1.5px solid rgb(239, 68, 68)',
@@ -2256,7 +2256,7 @@ export function DateModal({
         /* Search progress overlay */
         isPlaceLoading && /*#__PURE__*/React.createElement("div", {
           style: {
-            padding: '12px 14px', borderRadius: '8px', border: '1px solid var(--border-subtle)',
+            padding: '12px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)',
             backgroundColor: 'var(--bg-primary)', display: 'flex', flexDirection: 'column', gap: '6px'
           }
         },
@@ -2279,7 +2279,7 @@ export function DateModal({
         existingPlaceSuggestions.length > 0 && /*#__PURE__*/React.createElement("div", {
           style: {
             display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '180px', overflowY: 'auto',
-            border: '1px solid rgba(79, 70, 229, 0.35)', borderRadius: '8px', padding: '6px', backgroundColor: 'rgba(79, 70, 229, 0.06)'
+            border: '1px solid rgba(79, 70, 229, 0.35)', borderRadius: 'var(--radius-md)', padding: '6px', backgroundColor: 'rgba(79, 70, 229, 0.06)'
           }
         },
           /*#__PURE__*/React.createElement("div", {
@@ -2301,7 +2301,7 @@ export function DateModal({
         placeResults.length > 0 && /*#__PURE__*/React.createElement("div", {
           style: {
             display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '180px', overflowY: 'auto',
-            border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '6px', backgroundColor: 'var(--bg-primary)'
+            border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '6px', backgroundColor: 'var(--bg-primary)'
           }
         }, placeResults.map(r => /*#__PURE__*/React.createElement("button", {
           key: r.id,
@@ -2317,7 +2317,7 @@ export function DateModal({
         /* Selected place preview card */
         selectedPlace && /*#__PURE__*/React.createElement("div", {
           style: {
-            padding: '10px 12px', borderRadius: '8px', backgroundColor: 'rgba(59, 130, 246, 0.08)',
+            padding: '10px 12px', borderRadius: 'var(--radius-md)', backgroundColor: 'rgba(59, 130, 246, 0.08)',
             border: '1px solid rgba(59, 130, 246, 0.2)', display: 'flex', flexDirection: 'column', gap: '4px'
           }
         },
@@ -2414,7 +2414,7 @@ export function DateModal({
         }, `등록된 장소 (${registeredPlaces.length}곳)`),
         /* List */
         registeredPlaces.length === 0 ? /*#__PURE__*/React.createElement("div", {
-          style: { textAlign: 'center', color: 'var(--text-muted)', padding: '24px 0', fontSize: '0.82rem', border: '1px dashed var(--border-subtle)', borderRadius: '12px' }
+          style: { textAlign: 'center', color: 'var(--text-muted)', padding: '24px 0', fontSize: '0.82rem', border: '1px dashed var(--border-subtle)', borderRadius: 'var(--radius-md)' }
         }, "등록된 장소가 없습니다.") : /*#__PURE__*/React.createElement("div", {
           className: "date-modal-places-list",
           style: { display: 'flex', flexDirection: 'column', gap: '8px', flex: '1 1 auto', minHeight: '80px', overflow: 'visible' }
@@ -2431,7 +2431,7 @@ export function DateModal({
               padding: '12px 14px',
               backgroundColor: 'var(--bg-card)',
               border: '1px solid var(--border-subtle)',
-              borderRadius: '12px',
+              borderRadius: 'var(--radius-md)',
               position: 'relative'
             }
           },
@@ -2532,7 +2532,7 @@ export function DateModal({
     activeTab === 'settlement' && /*#__PURE__*/React.createElement(React.Fragment, null,
       /* Profit/Loss Info Badge */
       /*#__PURE__*/React.createElement("div", {
-        style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderRadius: '12px', border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)', marginBottom: '12px' }
+        style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)', marginBottom: '12px' }
       },
         /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)' } }, "총 정산 요약"),
         (() => {
@@ -2684,7 +2684,7 @@ export function DateModal({
               backgroundColor: 'var(--bg-card)',
               border: '1px solid var(--border-subtle)',
               borderColor: editingExpenseId === expense.id ? 'var(--accent-primary)' : (dragOverExpenseId === expense.id ? 'var(--accent-primary)' : 'var(--border-subtle)'),
-              borderRadius: '12px',
+              borderRadius: 'var(--radius-md)',
               cursor: 'pointer',
               boxSizing: 'border-box'
             }
@@ -2826,7 +2826,7 @@ export function DateModal({
       ),
       /* Empty State or Photo Grid */
       meetingPhotos.length === 0 ? /*#__PURE__*/React.createElement("div", {
-        style: { textAlign: 'center', color: 'var(--text-muted)', padding: '24px 0', fontSize: '0.82rem', border: '1px dashed var(--border-subtle)', borderRadius: '12px' }
+        style: { textAlign: 'center', color: 'var(--text-muted)', padding: '24px 0', fontSize: '0.82rem', border: '1px dashed var(--border-subtle)', borderRadius: 'var(--radius-md)' }
       }, "등록된 사진이 없습니다.") : /*#__PURE__*/React.createElement("div", {
         style: {
           display: 'grid',
@@ -2957,7 +2957,7 @@ export function DateModal({
   }, /*#__PURE__*/React.createElement("div", {
     className: "modal-container confirm-dialog-modal",
     onClick: e => e.stopPropagation(),
-    style: { maxWidth: '360px', borderRadius: '12px' }
+    style: { maxWidth: '360px', borderRadius: 'var(--radius-md)' }
   },
     /*#__PURE__*/React.createElement("h3", {
       style: { fontSize: '1.05rem', fontWeight: 800, marginBottom: '12px', color: 'var(--text-main)', textAlign: 'center' }

@@ -1255,7 +1255,7 @@ export function ChatRoomView({
         zIndex: 1,
         backgroundColor: 'var(--bg-card)',
         border: '1px solid var(--border-subtle)',
-        borderRadius: '12px',
+        borderRadius: 'var(--radius-md)',
         padding: isEmojiOnlyMessage ? '12px 16px' : '8px 12px',
         fontSize: isEmojiOnlyMessage ? '4rem' : '0.9rem',
         lineHeight: isEmojiOnlyMessage ? 1 : '1.4',
@@ -1313,7 +1313,7 @@ export function ChatRoomView({
         zIndex: 1,
         backgroundColor: 'var(--bg-card)',
         border: '1px solid var(--border-subtle)',
-        borderRadius: '12px',
+        borderRadius: 'var(--radius-md)',
         padding: isEmojiOnlyMessage ? '12px 16px' : '8px 12px',
         fontSize: isEmojiOnlyMessage ? '4rem' : '0.9rem',
         lineHeight: isEmojiOnlyMessage ? 1 : '1.4',
@@ -1542,7 +1542,7 @@ export function ChatRoomView({
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      borderRadius: '8px'
+      borderRadius: 'var(--radius-md)'
     }
   }, /*#__PURE__*/React.createElement(ThreeLinesIcon, { size: 22 })))), /*#__PURE__*/React.createElement("div", {
     style: { flex: 1, position: 'relative', minHeight: 0 }
@@ -1563,7 +1563,7 @@ export function ChatRoomView({
     style: {
       position: 'sticky', top: 0, zIndex: 6,
       display: 'flex', flexDirection: 'column', gap: '8px',
-      backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: '8px',
+      backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)',
       padding: '10px 12px', marginBottom: '12px', boxShadow: 'var(--shadow-md)'
     }
   },
@@ -1597,7 +1597,7 @@ export function ChatRoomView({
     style: {
       position: 'sticky', top: 0, zIndex: 6,
       display: 'flex', flexDirection: 'column', gap: '8px',
-      backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: '8px',
+      backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)',
       padding: '10px 12px', marginBottom: '12px', boxShadow: 'var(--shadow-md)'
     }
   },
@@ -1607,7 +1607,7 @@ export function ChatRoomView({
       key: notice.id,
       style: {
         display: 'flex', alignItems: 'flex-start', gap: '8px',
-        backgroundColor: '#FEF3C7', border: '1px solid #FDE68A', borderRadius: '8px',
+        backgroundColor: '#FEF3C7', border: '1px solid #FDE68A', borderRadius: 'var(--radius-md)',
         padding: '10px 12px', fontSize: '0.82rem', color: '#92400E', lineHeight: '1.5'
       }
     },
@@ -1640,7 +1640,7 @@ export function ChatRoomView({
     key: notice.id,
     style: {
       display: 'flex', alignItems: 'flex-start', gap: '8px',
-      backgroundColor: '#FEF3C7', border: '1px solid #FDE68A', borderRadius: '8px',
+      backgroundColor: '#FEF3C7', border: '1px solid #FDE68A', borderRadius: 'var(--radius-md)',
       padding: '10px 12px', fontSize: '0.82rem', color: '#92400E', lineHeight: '1.5'
     }
   },
@@ -1742,7 +1742,7 @@ export function ChatRoomView({
       style: {
         backgroundColor: 'var(--bg-card)',
         border: '1px solid var(--border-subtle)',
-        borderRadius: '12px',
+        borderRadius: 'var(--radius-md)',
         padding: '12px',
         display: 'flex',
         flexDirection: 'column',
@@ -1812,7 +1812,7 @@ export function ChatRoomView({
           width: '60px',
           height: '60px',
           objectFit: 'cover',
-          borderRadius: '8px',
+          borderRadius: 'var(--radius-md)',
           display: 'block'
         }
       }), /*#__PURE__*/React.createElement(ImageThumbRemoveButton, {

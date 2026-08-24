@@ -785,7 +785,7 @@ function getDeps() { return window.GATHER_UI_DEPS || {}; }
       React.createElement('img', {
         src: qrDataUrl,
         alt: '캘린더 초대 QR코드',
-        style: { borderRadius: '8px', border: '1px solid var(--border-subtle)' }
+        style: { borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }
       }),
       React.createElement('span', {
         style: { fontSize: '0.76rem', color: 'var(--text-muted)' }
