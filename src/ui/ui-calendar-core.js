@@ -478,7 +478,7 @@ const MONTH_NAMES = GATHER_APP_CALENDAR_DATA.MONTH_NAMES || ['1월','2월','3월
 const PRESET_COLORS = GATHER_APP_CONSTANTS.PRESET_COLORS || [];
 const DEFAULT_EXPENSE_CATEGORIES = GATHER_APP_CONSTANTS.DEFAULT_EXPENSE_CATEGORIES || [];
 const DEFAULT_PLACE_CATEGORIES = GATHER_APP_CONSTANTS.DEFAULT_PLACE_CATEGORIES || GATHER_APP_UTILS.DEFAULT_PLACE_CATEGORIES || [];
-const EMOJI_CATEGORIES = GATHER_APP_CONSTANTS.EMOJI_CATEGORIES || [];
+const EMOJI_CATEGORIES = GATHER_APP_CHAT_DATA.EMOJI_CATEGORIES || [];
 const INCOME_EXPENSE_CATEGORY = GATHER_APP_UTILS.INCOME_EXPENSE_CATEGORY || { id: 'income', name: '수입', color: '#16A34A' };
 const PLACE_MAP_DEFAULT_CENTER = __gatherUiDeps().PLACE_MAP_DEFAULT_CENTER || [37.5665, 126.978];
 const PLACE_MAP_DEFAULT_ZOOM = __gatherUiDeps().PLACE_MAP_DEFAULT_ZOOM || 11;
@@ -2763,6 +2763,8 @@ export function EditMessageModal({
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
   const ChatParticipantSheet = __comp.ChatParticipantSheet || __deps.ChatParticipantSheet;
+  const EmojiPickerIcon = __comp.EmojiPickerIcon || __deps.EmojiPickerIcon;
+  const EmojiPickerSheet = __comp.EmojiPickerSheet || __deps.EmojiPickerSheet;
   const ImageProcessingOverlay = __comp.ImageProcessingOverlay || __deps.ImageProcessingOverlay;
   const ImageThumbRemoveButton = __comp.ImageThumbRemoveButton || __deps.ImageThumbRemoveButton;
   const ParticipantPickerButton = __comp.ParticipantPickerButton || __deps.ParticipantPickerButton;
@@ -2774,6 +2776,7 @@ export function EditMessageModal({
   const [text, setText] = React.useState(message.text || '');
   const [participantId, setParticipantId] = React.useState(message.participantId || '');
   const [isPartSheetOpen, setIsPartSheetOpen] = React.useState(false);
+  const [isEmojiPickerOpen, setIsEmojiPickerOpen] = React.useState(false);
   const part = (calendar.participants || []).find(p => p.id === participantId);
   const [images, setImages] = React.useState(() => {
     const urls = Array.isArray(message.imageUrls) && message.imageUrls.length > 0
@@ -2844,6 +2847,45 @@ export function EditMessageModal({
     }
   };
 
+  const insertEmojiIntoEditInput = (emoji) => {
+    const textarea = editTextareaRef.current;
+    const start = textarea ? (textarea.selectionStart ?? text.length) : text.length;
+    const end = textarea ? (textarea.selectionEnd ?? text.length) : text.length;
+    const next = text.slice(0, start) + emoji + text.slice(end);
+    setText(next);
+    if (textarea) {
+      requestAnimationFrame(() => {
+        textarea.focus();
+        const pos = start + emoji.length;
+        textarea.setSelectionRange(pos, pos);
+      });
+    }
+  };
+
+  // Mirrors the main composer's handlePasteImagesChat -- the edit textarea had no paste handler
+  // at all before this, so Ctrl+V (or a right-click "이미지 복사" paste) here silently did
+  // nothing while the same gesture in the composer attached the image with a progress overlay.
+  const handlePasteImagesEdit = async (e) => {
+    const pastedFiles = getImageFilesFromClipboardEvent(e);
+    if (pastedFiles.length === 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      await appendChatImageFiles({
+        files: pastedFiles,
+        currentCount: images.length,
+        setImageProcessing: setImageProcessingEdit,
+        setChatImages: setImages,
+        showToast
+      });
+    } catch (err) {
+      console.error('handlePasteImagesEdit unexpected error:', err);
+      if (showToast) showToast('붙여넣은 사진 첨부 중 오류', 'error', 5000);
+    } finally {
+      setImageProcessingEdit(null);
+    }
+  };
+
   return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     className: "modal-overlay",
     onClick: e => { if (!isSubmitting) overlayOnClick(e); },
@@ -2908,6 +2950,7 @@ export function EditMessageModal({
       setText(e.target.value);
       autoGrowTextarea(e.target, 240);
     },
+    onPaste: handlePasteImagesEdit,
     style: {
       flex: 1,
       minWidth: 0,
@@ -2932,6 +2975,24 @@ export function EditMessageModal({
     style: { position: 'absolute', width: '1px', height: '1px', padding: 0, margin: '-1px', overflow: 'hidden', clip: 'rect(0,0,0,0)', border: 0 },
     onChange: handleFileChangeEdit
   }), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => setIsEmojiPickerOpen(true),
+    title: "이모티콘 추가",
+    style: {
+      width: '32px',
+      height: '32px',
+      borderRadius: '50%',
+      border: '1px solid var(--border-subtle)',
+      backgroundColor: 'var(--bg-card)',
+      cursor: 'pointer',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexShrink: 0,
+      padding: 0,
+      color: '#64748B'
+    }
+  }, /*#__PURE__*/React.createElement(EmojiPickerIcon, null)), /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: () => fileInputRefEdit.current && fileInputRefEdit.current.click(),
     title: "사진 첨부",
@@ -2988,6 +3049,9 @@ export function EditMessageModal({
     selectedId: participantId,
     onSelect: id => { setParticipantId(id); setIsPartSheetOpen(false); },
     onClose: () => setIsPartSheetOpen(false)
+  }), isEmojiPickerOpen && /*#__PURE__*/React.createElement(EmojiPickerSheet, {
+    onSelect: insertEmojiIntoEditInput,
+    onClose: () => setIsEmojiPickerOpen(false)
   }), imageProcessingEdit && /*#__PURE__*/React.createElement(ImageProcessingOverlay, imageProcessingEdit));
 }
 
