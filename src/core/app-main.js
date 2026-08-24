@@ -1632,6 +1632,11 @@ function App() {
         setTimeout(refreshFromResume, 200);
       }
     };
+    if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(regs => {
+        regs.forEach(r => r.update());
+      }).catch(() => {});
+    }
     document.addEventListener('visibilitychange', onVisible);
     window.addEventListener('focus', refreshFromResume);
     window.addEventListener('online', refreshFromResume);

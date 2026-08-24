@@ -10,7 +10,7 @@
 // static, rarely-changing assets (icons, the per-calendar manifests), which is enough to (a)
 // satisfy PWA installability's usual expectation of a service worker and (b) let those specific
 // assets resolve instantly/offline without touching the freshness of the app itself.
-const STATIC_CACHE = 'moyeora-static-v2';
+const STATIC_CACHE = 'moyeora-static-v3';
 const STATIC_ASSETS = [
   'favicon.ico',
   'manifest.json',
