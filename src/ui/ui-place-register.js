@@ -832,6 +832,32 @@ export function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, on
   // explicit "검색" submit for every query change. Debounced so a fast typist doesn't fire one
   // request per keystroke, skipped entirely right after handleSelectResult fills the field with
   // the chosen result's own name (nothing new to search for at that point).
+  const existingPlaceSuggestions = React.useMemo(() => {
+    const trimmed = query.trim();
+    if (selected && selected.name === trimmed) return [];
+    if (trimmed.length < 2) return [];
+    const q = trimmed.toLowerCase();
+    return getCalendarPlaces(calendar)
+      .filter(p => !editingPlace || p.id !== editingPlace.id)
+      .filter(p => (p.name || '').toLowerCase().includes(q) || (p.alias || '').toLowerCase().includes(q))
+      .slice(0, 8);
+  }, [query, selected, calendar, editingPlace]);
+
+  const handleSelectExistingPlace = place => {
+    const name = place.alias || place.name;
+    setSelected({
+      id: place.id,
+      name,
+      address: getDisplayPlaceAddress(place) || place.name || '',
+      lat: place.lat,
+      lng: place.lng
+    });
+    setQuery(name);
+    setResults([]);
+    if (place.alias) setAlias(place.alias);
+    if (place.categoryId) setCategoryId(place.categoryId);
+  };
+
   React.useEffect(() => {
     const trimmed = query.trim();
     if (selected && selected.name === trimmed) return undefined;
@@ -996,6 +1022,29 @@ export function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, on
       },
         /*#__PURE__*/React.createElement("span", { className: "calendar-spinner", style: { flexShrink: 0 } }),
         /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.8rem', color: 'var(--text-muted)' } }, SEARCH_TIER_LABELS[searchStage] || '검색 중...')
+      ),
+
+      /* Already registered places section */
+      existingPlaceSuggestions.length > 0 && /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '160px', overflowY: 'auto',
+          border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '6px',
+          backgroundColor: 'var(--bg-primary)'
+        }
+      },
+        /*#__PURE__*/React.createElement("div", {
+          style: { fontSize: '0.72rem', fontWeight: 800, color: 'var(--accent-primary)', padding: '2px 6px' }
+        }, "이미 등록된 장소"),
+        existingPlaceSuggestions.map(p => /*#__PURE__*/React.createElement("button", {
+          key: p.id,
+          type: "button",
+          onClick: () => handleSelectExistingPlace(p),
+          style: { textAlign: 'left', padding: '8px 10px', borderRadius: '6px', border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '2px' },
+          className: "place-result-item"
+        },
+          /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-main)' } }, p.alias || p.name),
+          /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.72rem', color: 'var(--text-muted)' } }, getDisplayPlaceAddress(p) || p.name)
+        ))
       ),
 
       /* Search results */
