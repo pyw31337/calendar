@@ -823,8 +823,10 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
       const nameEl = document.createElement('div');
       nameEl.style.fontWeight = '800';
       nameEl.style.fontSize = '0.85rem';
-      nameEl.style.marginBottom = '2px';
-      nameEl.textContent = place.name || '이름 없음';
+      const displayName = (place.alias && place.alias !== place.name)
+        ? `${place.name || ''} (${place.alias})`
+        : (place.alias || place.name || '이름 없음');
+      nameEl.textContent = displayName;
       infoEl.appendChild(nameEl);
       if (place.address) {
         const addrEl = document.createElement('div');

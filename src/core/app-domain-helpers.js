@@ -220,21 +220,31 @@ function deduplicateCalendarPlaces(places) {
     if (!p1 || !p1.id || mergedIds.has(p1.id)) continue;
 
     let mergedPlace = { ...p1 };
-    const name1 = (p1.alias || p1.name || '').trim().toLowerCase();
+    const officialName1 = (p1.name || '').trim().toLowerCase();
+    const displayName1 = (p1.alias || p1.name || '').trim().toLowerCase();
+    const address1 = (p1.address || '').trim().toLowerCase();
     const source1 = (p1.sourcePlaceId || '').trim();
 
     for (let j = i + 1; j < places.length; j++) {
       const p2 = places[j];
       if (!p2 || !p2.id || mergedIds.has(p2.id)) continue;
-      const name2 = (p2.alias || p2.name || '').trim().toLowerCase();
+      const officialName2 = (p2.name || '').trim().toLowerCase();
+      const displayName2 = (p2.alias || p2.name || '').trim().toLowerCase();
+      const address2 = (p2.address || '').trim().toLowerCase();
       const source2 = (p2.sourcePlaceId || '').trim();
 
-      const isSameSource = source1 && source2 && source1 === source2;
-      const isSameName = name1 && name2 && name1 === name2;
+      const isSameSource = (source1 && source2 && source1 === source2) || (source1 && source1 === p2.id) || (source2 && source2 === p1.id);
+      const isSameOfficialName = officialName1 && officialName2 && officialName1 === officialName2;
+      const isSameDisplayName = displayName1 && displayName2 && displayName1 === displayName2;
+      const isSameAddress = address1 && address2 && address1 === address2 && (
+        officialName1 === officialName2 || displayName1 === displayName2 ||
+        (officialName1 && officialName2 && (officialName1.includes(officialName2) || officialName2.includes(officialName1)))
+      );
 
-      if (isSameSource || isSameName) {
+      if (isSameSource || isSameOfficialName || isSameDisplayName || isSameAddress) {
         mergedIds.add(p2.id);
         mergedPlace.memo = mergePlaceMemos(mergedPlace.memo, p2.memo);
+        if (!mergedPlace.alias && p2.alias) mergedPlace.alias = p2.alias;
         if (p2.visitStatus === 'visited') mergedPlace.visitStatus = 'visited';
         if (!mergedPlace.visitDate && p2.visitDate) mergedPlace.visitDate = p2.visitDate;
         if (!mergedPlace.address && p2.address) mergedPlace.address = p2.address;

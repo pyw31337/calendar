@@ -4101,11 +4101,10 @@ function App() {
     // ui-date-modal.js) pass the place's own id through as sourcePlaceId, since a private/
     // informal place (e.g. "서준네") often isn't findable in Kakao/Google's business directories
     // at all and so never gets a real external sourcePlaceId of its own.
-    const mergeTargetPlace = (!isEditing && cleanSourcePlaceId)
-      ? (existingPlaces.find(p => p.sourcePlaceId && p.sourcePlaceId === cleanSourcePlaceId)
-        || existingPlaces.find(p => p.id === cleanSourcePlaceId))
-        || null
-      : null;
+    const candidateTargetId = cleanSourcePlaceId && cleanSourcePlaceId !== placeData.id ? cleanSourcePlaceId : '';
+    const mergeTargetPlace = candidateTargetId
+      ? (existingPlaces.find(p => p.id !== placeData.id && ((p.sourcePlaceId && p.sourcePlaceId === candidateTargetId) || p.id === candidateTargetId)))
+      : (existingPlaces.find(p => p.id !== placeData.id && cleanName && ((p.name && p.name.trim().toLowerCase() === cleanName.trim().toLowerCase()) || (p.alias && p.alias.trim().toLowerCase() === cleanName.trim().toLowerCase()))));
     if (mergeTargetPlace) {
       isEditing = true;
       placeData = { ...placeData, id: mergeTargetPlace.id };
