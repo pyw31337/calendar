@@ -1879,11 +1879,13 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
                       }),
                       /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '6px', justifyContent: 'flex-end' } },
                         /*#__PURE__*/React.createElement("button", {
-                          type: "button", onClick: handleCancelEditPlaceMemoEntry,
+                          type: "button",
+                          onClick: e => { e.stopPropagation(); handleCancelEditPlaceMemoEntry(); },
                           style: { height: '28px', padding: '0 10px', borderRadius: '6px', border: '1px solid var(--border-subtle)', background: 'none', color: 'var(--text-muted)', fontSize: '0.76rem', fontWeight: 700, cursor: 'pointer' }
                         }, "취소"),
                         /*#__PURE__*/React.createElement("button", {
-                          type: "button", onClick: () => handleSavePlaceMemoEntry(place, entry),
+                          type: "button",
+                          onClick: e => { e.stopPropagation(); handleSavePlaceMemoEntry(place, entry); },
                           disabled: !editingMemoEntryText.trim(),
                           style: { height: '28px', padding: '0 10px', borderRadius: '6px', border: 'none', backgroundColor: 'var(--accent-primary)', color: '#FFFFFF', fontSize: '0.76rem', fontWeight: 700, cursor: 'pointer', opacity: editingMemoEntryText.trim() ? 1 : 0.5 }
                         }, "수정")
