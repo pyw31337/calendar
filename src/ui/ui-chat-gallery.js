@@ -771,8 +771,40 @@ export function ChatGalleryModal({
   const hasClipboardImage = useClipboardHasImage(true);
   const [pastePreview, setPastePreview] = React.useState(null); // { files, previewUrls } | null
   const brokenPhotoKeysRef = React.useRef(new Set());
+  const brokenPhotoUrlsRef = React.useRef(new Set());
   const [brokenPhotoRevision, setBrokenPhotoRevision] = React.useState(0);
   const getPhotoKey = photo => photo?.mediaKey || photo?.refKey || `${photo?.messageId || photo?.photoId || photo?.sourceMessageId || ''}_${photo?.imageIndex ?? photo?.sourceImageIndex ?? ''}`;
+  const normalizeBrokenPhotoUrl = value => {
+    const url = String(value || '').trim();
+    if (!url) return '';
+    return url.split(/[?#]/)[0];
+  };
+  const isBrokenPhotoValue = value => {
+    const url = normalizeBrokenPhotoUrl(value);
+    return !!url && brokenPhotoUrlsRef.current.has(url);
+  };
+  const markBrokenPhoto = (photo, brokenInfo = {}) => {
+    const key = photo?.mediaKey || photo?.refKey || getPhotoKey(photo);
+    const urls = [
+      photo?.full,
+      photo?.thumb,
+      brokenInfo?.src,
+      brokenInfo?.fallbackSrc,
+      brokenInfo?.currentSrc
+    ].map(normalizeBrokenPhotoUrl).filter(Boolean);
+    let changed = false;
+    if (key && !brokenPhotoKeysRef.current.has(key)) {
+      brokenPhotoKeysRef.current.add(key);
+      changed = true;
+    }
+    urls.forEach(url => {
+      if (!brokenPhotoUrlsRef.current.has(url)) {
+        brokenPhotoUrlsRef.current.add(url);
+        changed = true;
+      }
+    });
+    if (changed) setBrokenPhotoRevision(prev => prev + 1);
+  };
   React.useEffect(() => () => {
     // Safety net if the component unmounts (e.g. gallery closed) while the preview is still open.
     if (pastePreview) pastePreview.previewUrls.forEach(url => { try { URL.revokeObjectURL(url); } catch (e) {} });
@@ -980,13 +1012,14 @@ export function ChatGalleryModal({
       return matchTags || matchText;
     });
   }, [sharedPhotos, searchQuery]);
-  const visiblePhotos = React.useMemo(() => filteredPhotos.filter(photo => !brokenPhotoKeysRef.current.has(photo.mediaKey || photo.refKey || getPhotoKey(photo))), [filteredPhotos, brokenPhotoRevision]);
-
-  const handleBrokenPhoto = photo => {
+  const visiblePhotos = React.useMemo(() => filteredPhotos.filter(photo => {
     const key = photo.mediaKey || photo.refKey || getPhotoKey(photo);
-    if (!key || brokenPhotoKeysRef.current.has(key)) return;
-    brokenPhotoKeysRef.current.add(key);
-    setBrokenPhotoRevision(prev => prev + 1);
+    if (key && brokenPhotoKeysRef.current.has(key)) return false;
+    return !isBrokenPhotoValue(photo.full) && !isBrokenPhotoValue(photo.thumb);
+  }), [filteredPhotos, brokenPhotoRevision]);
+
+  const handleBrokenPhoto = (photo, brokenInfo = {}) => {
+    markBrokenPhoto(photo, brokenInfo);
     if (typeof onDeletePhoto !== 'function') return;
     const isMeetingReference = !!photo.sourceMessageId && Number.isInteger(photo.sourceImageIndex)
       && (photo.source === 'meeting' || photo.uploadSource === 'meeting' || photo.meetingDate || photo.photoId);
@@ -1477,7 +1510,7 @@ export function ChatGalleryModal({
         index: idx,
           meta: visiblePhotos.map(p => ({ timestamp: p.timestamp, messageId: p.messageId, imageIndex: p.imageIndex, thumb: p.thumb, tags: p.tags, directMediaUrl: p.directMediaUrl, source: p.source, uploadSource: p.uploadSource, meetingDate: p.meetingDate, photoId: p.photoId, sourceMessageId: p.sourceMessageId, sourceImageIndex: p.sourceImageIndex }))
       }),
-      onBroken: () => handleBrokenPhoto(photo),
+      onBroken: (e, brokenInfo) => handleBrokenPhoto(photo, brokenInfo),
       style: {
         width: '100%',
         maxWidth: '100%',

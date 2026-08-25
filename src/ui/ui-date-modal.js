@@ -752,7 +752,39 @@ export function DateModal({
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const noteInputRef = React.useRef(null);
   const brokenMeetingPhotoKeysRef = React.useRef(new Set());
+  const brokenMeetingPhotoUrlsRef = React.useRef(new Set());
   const [brokenMeetingPhotoRevision, setBrokenMeetingPhotoRevision] = React.useState(0);
+  const normalizeBrokenMeetingPhotoUrl = value => {
+    const url = String(value || '').trim();
+    if (!url) return '';
+    return url.split(/[?#]/)[0];
+  };
+  const isBrokenMeetingPhotoValue = value => {
+    const url = normalizeBrokenMeetingPhotoUrl(value);
+    return !!url && brokenMeetingPhotoUrlsRef.current.has(url);
+  };
+  const markBrokenMeetingPhoto = (photo, brokenInfo = {}) => {
+    const key = photo?.refKey || photo?.mediaKey || photo?.id || photo?.imageUrl || photo?.thumbUrl;
+    const urls = [
+      photo?.imageUrl,
+      photo?.thumbUrl,
+      brokenInfo?.src,
+      brokenInfo?.fallbackSrc,
+      brokenInfo?.currentSrc
+    ].map(normalizeBrokenMeetingPhotoUrl).filter(Boolean);
+    let changed = false;
+    if (key && !brokenMeetingPhotoKeysRef.current.has(key)) {
+      brokenMeetingPhotoKeysRef.current.add(key);
+      changed = true;
+    }
+    urls.forEach(url => {
+      if (!brokenMeetingPhotoUrlsRef.current.has(url)) {
+        brokenMeetingPhotoUrlsRef.current.add(url);
+        changed = true;
+      }
+    });
+    if (changed) setBrokenMeetingPhotoRevision(prev => prev + 1);
+  };
   const activeParticipants = getActiveParticipants(calendar);
   const dateEntries = getActiveAvailabilities(calendar).filter(e => e.date === dateStr);
   const dateAnns = getAnniversariesForDate(dateStr, anniversaries);
@@ -1280,14 +1312,15 @@ export function DateModal({
     return [...directPhotos, ...chatPhotos].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   }, [confirmedMeetingEntry, chatMessages, chatMessagesWithFetchedSources, dateStr]);
   const visibleMeetingPhotos = React.useMemo(
-    () => meetingPhotos.filter(photo => !brokenMeetingPhotoKeysRef.current.has(photo.refKey || photo.mediaKey || photo.id || photo.imageUrl || photo.thumbUrl)),
+    () => meetingPhotos.filter(photo => {
+      const key = photo.refKey || photo.mediaKey || photo.id || photo.imageUrl || photo.thumbUrl;
+      if (key && brokenMeetingPhotoKeysRef.current.has(key)) return false;
+      return !isBrokenMeetingPhotoValue(photo.imageUrl) && !isBrokenMeetingPhotoValue(photo.thumbUrl);
+    }),
     [meetingPhotos, brokenMeetingPhotoRevision]
   );
-  const handleBrokenMeetingPhoto = photo => {
-    const key = photo?.refKey || photo?.mediaKey || photo?.id || photo?.imageUrl || photo?.thumbUrl;
-    if (!key || brokenMeetingPhotoKeysRef.current.has(key)) return;
-    brokenMeetingPhotoKeysRef.current.add(key);
-    setBrokenMeetingPhotoRevision(prev => prev + 1);
+  const handleBrokenMeetingPhoto = (photo, brokenInfo = {}) => {
+    markBrokenMeetingPhoto(photo, brokenInfo);
     const isMeetingReference = !!photo?.sourceMessageId && Number.isInteger(photo?.sourceImageIndex)
       && (photo?.source === 'meeting' || photo?.uploadSource === 'meeting' || photo?.meetingDate || photo?.photoId);
       const deletionMeta = {
@@ -2882,7 +2915,7 @@ export function DateModal({
           loading: "lazy",
           decoding: "async",
           referrerPolicy: "no-referrer",
-          onBroken: () => handleBrokenMeetingPhoto(photo),
+          onBroken: (e, brokenInfo) => handleBrokenMeetingPhoto(photo, brokenInfo),
           onClick: () => {
             if (typeof setActiveLightbox === 'function') {
               // Lightbox expects { urls, index, meta } (array-shaped, for prev/next

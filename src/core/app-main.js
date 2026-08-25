@@ -4099,26 +4099,6 @@ function App() {
       if (okChat) return true;
     }
 
-    if (isMeetingPhotoMeta) {
-      // Legacy fallback for meeting-only entries that do not have a canonical source asset
-      // pointer. New uploads should almost always route through the shared chat/message asset
-      // path above so one delete removes the photo everywhere.
-      const okMeeting = await handleDeleteMeetingPhoto(dateStr, photoId, imageUrl, {
-        restoreSourceMessageId: meta.sourceMessageId,
-        restoreSourceImageIndex: meta.sourceImageIndex,
-        restoreSourceTags: originalTags,
-        mediaKey,
-        refKey
-      });
-      if (okMeeting) return true;
-      return false;
-    }
-
-    if (msgId && !isMeetingPhotoMeta) {
-      const okChat = await handleDeleteChatMessagePhoto(msgId, imgIdx);
-      if (okChat) return true;
-    }
-
     const target = await findPhotoTargetByUrl(imageUrl, msgId, dateStr, photoId);
     if (target) {
       if (target.type === 'chat') {
@@ -4137,6 +4117,26 @@ function App() {
         });
         if (ok) return true;
       }
+    }
+
+    if (msgId) {
+      const okChat = await handleDeleteChatMessagePhoto(msgId, imgIdx);
+      if (okChat) return true;
+    }
+
+    if (isMeetingPhotoMeta) {
+      // Legacy fallback for meeting-only entries that do not have a canonical source asset
+      // pointer. New uploads should almost always route through the shared chat/message asset
+      // path above so one delete removes the photo everywhere.
+      const okMeeting = await handleDeleteMeetingPhoto(dateStr, photoId, imageUrl, {
+        restoreSourceMessageId: meta.sourceMessageId,
+        restoreSourceImageIndex: meta.sourceImageIndex,
+        restoreSourceTags: originalTags,
+        mediaKey,
+        refKey
+      });
+      if (okMeeting) return true;
+      return false;
     }
 
     const okMeetingFallback = await handleDeleteMeetingPhoto(dateStr, photoId, imageUrl, {

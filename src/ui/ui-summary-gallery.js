@@ -829,7 +829,39 @@ export function PhotoGallery({ chatMessages, calendar = null, totalGalleryCount,
   const [collapsed, setCollapsed] = React.useState(false);
   const [lightbox, setLightbox] = React.useState(null);
   const brokenPhotoKeysRef = React.useRef(new Set());
+  const brokenPhotoUrlsRef = React.useRef(new Set());
   const [brokenPhotoRevision, setBrokenPhotoRevision] = React.useState(0);
+  const normalizeBrokenPhotoUrl = value => {
+    const url = String(value || '').trim();
+    if (!url) return '';
+    return url.split(/[?#]/)[0];
+  };
+  const isBrokenPhotoValue = value => {
+    const url = normalizeBrokenPhotoUrl(value);
+    return !!url && brokenPhotoUrlsRef.current.has(url);
+  };
+  const markBrokenPhoto = (photo, brokenInfo = {}) => {
+    const key = photo?.mediaKey || photo?.refKey || photo?.key;
+    const urls = [
+      photo?.full,
+      photo?.thumb,
+      brokenInfo?.src,
+      brokenInfo?.fallbackSrc,
+      brokenInfo?.currentSrc
+    ].map(normalizeBrokenPhotoUrl).filter(Boolean);
+    let changed = false;
+    if (key && !brokenPhotoKeysRef.current.has(key)) {
+      brokenPhotoKeysRef.current.add(key);
+      changed = true;
+    }
+    urls.forEach(url => {
+      if (!brokenPhotoUrlsRef.current.has(url)) {
+        brokenPhotoUrlsRef.current.add(url);
+        changed = true;
+      }
+    });
+    if (changed) setBrokenPhotoRevision(prev => prev + 1);
+  };
 
   const photoEntries = React.useMemo(() => {
     const sorted = [...(chatMessages || [])].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
@@ -902,13 +934,14 @@ export function PhotoGallery({ chatMessages, calendar = null, totalGalleryCount,
     });
     return Array.from(byUrl.values()).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
   }, [chatMessages, calendar]);
-  const visibleEntries = React.useMemo(() => photoEntries.filter(entry => !brokenPhotoKeysRef.current.has(entry.mediaKey || entry.refKey || entry.full || entry.thumb)), [photoEntries, brokenPhotoRevision]);
+  const visibleEntries = React.useMemo(() => photoEntries.filter(entry => {
+    const key = entry.mediaKey || entry.refKey || entry.full || entry.thumb;
+    if (key && brokenPhotoKeysRef.current.has(key)) return false;
+    return !isBrokenPhotoValue(entry.full) && !isBrokenPhotoValue(entry.thumb);
+  }), [photoEntries, brokenPhotoRevision]);
 
-  const handleBrokenPhoto = photo => {
-    const key = photo?.mediaKey || photo?.refKey || photo?.key;
-    if (!key || brokenPhotoKeysRef.current.has(key)) return;
-    brokenPhotoKeysRef.current.add(key);
-    setBrokenPhotoRevision(prev => prev + 1);
+  const handleBrokenPhoto = (photo, brokenInfo = {}) => {
+    markBrokenPhoto(photo, brokenInfo);
     if (typeof onDeletePhoto !== 'function') return;
     const isMeetingReference = !!photo.sourceMessageId && Number.isInteger(photo.sourceImageIndex)
       && (photo.source === 'meeting' || photo.uploadSource === 'meeting' || photo.meetingDate || photo.photoId);
@@ -984,7 +1017,7 @@ export function PhotoGallery({ chatMessages, calendar = null, totalGalleryCount,
             meta: displayedEntries.map(e => ({ timestamp: e.timestamp, messageId: e.messageId, imageIndex: e.imageIndex, thumb: e.thumb, tags: e.tags, directMediaUrl: e.directMediaUrl, source: e.source, uploadSource: e.uploadSource, meetingDate: e.meetingDate, photoId: e.photoId, sourceMessageId: e.sourceMessageId, sourceImageIndex: e.sourceImageIndex })),
             index: idx
           }),
-          onBroken: () => handleBrokenPhoto(entry),
+          onBroken: (e, brokenInfo) => handleBrokenPhoto(entry, brokenInfo),
           style: { width: '100%', aspectRatio: '1 / 1', objectFit: 'cover', borderRadius: 'var(--radius-sm)', cursor: 'pointer' }
         }))
       ),
