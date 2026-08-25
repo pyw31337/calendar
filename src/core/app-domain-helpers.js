@@ -255,15 +255,17 @@ function mergePlaceMemos(memoA, memoB) {
   const entriesB = parsePlaceMemoEntries(textB);
   const combinedMap = new Map();
 
-  [...entriesA, ...entriesB].forEach(entry => {
+  // Primary entries (textA) win for any given date
+  entriesA.forEach(entry => {
+    const key = entry.date || 'dateless';
+    combinedMap.set(key, entry.note || '');
+  });
+
+  // Secondary entries (textB) only add notes for dates not present in primary entries
+  entriesB.forEach(entry => {
     const key = entry.date || 'dateless';
     if (!combinedMap.has(key)) {
       combinedMap.set(key, entry.note || '');
-    } else {
-      const existing = combinedMap.get(key);
-      if (entry.note && !existing.includes(entry.note)) {
-        combinedMap.set(key, existing ? `${existing}\n${entry.note}` : entry.note);
-      }
     }
   });
 
@@ -315,7 +317,10 @@ function deduplicateCalendarPlaces(places) {
 
       if (isSameSource || isSameOfficialName || isSameDisplayName || isSameAddress) {
         mergedIds.add(p2.id);
-        mergedPlace.memo = mergePlaceMemos(mergedPlace.memo, p2.memo);
+        const p1IsNewer = (mergedPlace.updatedAt || 0) >= (p2.updatedAt || 0);
+        const newerMemo = p1IsNewer ? mergedPlace.memo : p2.memo;
+        const olderMemo = p1IsNewer ? p2.memo : mergedPlace.memo;
+        mergedPlace.memo = mergePlaceMemos(newerMemo, olderMemo);
         if (!mergedPlace.alias && p2.alias) mergedPlace.alias = p2.alias;
         if (p2.visitStatus === 'visited') mergedPlace.visitStatus = 'visited';
         if (!mergedPlace.visitDate && p2.visitDate) mergedPlace.visitDate = p2.visitDate;
