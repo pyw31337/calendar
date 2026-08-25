@@ -35,6 +35,8 @@ import {
   normalizePlaceAddressForSave,
   getDisplayPlaceAddress,
   normalizePlaces,
+  deduplicateCalendarPlaces,
+  mergePlaceMemos,
   getCalendarPlaces,
   unionPlaces,
   MEMO_DATE_RE,
