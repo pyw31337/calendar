@@ -1836,7 +1836,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
                   color: (derivePlaceVisitStatus ? derivePlaceVisitStatus(place) : place.visitStatus) === 'planned' ? '#2563EB' : '#16A34A'
                 }
               }, (derivePlaceVisitStatus ? derivePlaceVisitStatus(place) : place.visitStatus) === 'planned' ? '방문예정' : '방문'),
-              displayVisitEntries.length > 0 && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 700 } }, `총 ${countPlaceVisits ? countPlaceVisits(place, displayVisitEntries, category) : displayVisitEntries.length}회 방문`)
+              displayVisitEntries.length > 0 && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 700 } }, `총 ${countPlaceVisits ? countPlaceVisits(place, displayVisitEntries, category) : displayVisitEntries.length}회 ${(derivePlaceVisitStatus ? derivePlaceVisitStatus(place) : place.visitStatus) === 'planned' ? '방문예정' : '방문'}`)
             ),
             
             /* Name & Address -- alias is the list display name when set; official name shown underneath */

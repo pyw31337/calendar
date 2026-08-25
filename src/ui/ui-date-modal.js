@@ -2300,21 +2300,13 @@ export function DateModal({
           /*#__PURE__*/React.createElement("label", {
             style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '6px' }
           }, "카테고리"),
-          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'stretch', gap: '10px' } },
-            /*#__PURE__*/React.createElement("div", { style: { flex: 1, minWidth: 0 } },
-              /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
-                title: "카테고리 선택",
-                value: placeCategoryId,
-                options: getPlaceCategories(calendar).map(c => ({ value: c.id, label: getPlaceCategoryLabel(c) })),
-                onSelect: setPlaceCategoryId,
-                placeholder: "카테고리 선택"
-              })
-            ),
-            /*#__PURE__*/React.createElement(SegmentedToggle, {
-              ariaLabel: "방문/방문예정 전환",
-              value: placeVisitStatus,
-              onChange: v => setPlaceVisitStatus(v),
-              options: [{ value: 'visited', label: '방문' }, { value: 'planned', label: '예정' }]
+          /*#__PURE__*/React.createElement("div", { style: { width: '100%' } },
+            /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
+              title: "카테고리 선택",
+              value: placeCategoryId,
+              options: getPlaceCategories(calendar).map(c => ({ value: c.id, label: getPlaceCategoryLabel(c) })),
+              onSelect: setPlaceCategoryId,
+              placeholder: "카테고리 선택"
             })
           )
         ),
