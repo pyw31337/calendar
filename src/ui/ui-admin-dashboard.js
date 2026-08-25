@@ -554,10 +554,6 @@ function getMemoItemShareUrl(...args) {
   const f = __gatherUiDeps().getMemoItemShareUrl || GATHER_APP_UTILS.getMemoItemShareUrl;
   return typeof f === 'function' ? f(...args) : undefined;
 }
-function buildLightboxImageInfo(...args) {
-  const f = __gatherUiDeps().buildLightboxImageInfo || GATHER_APP_UTILS.buildLightboxImageInfo;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
 function normalizeTagsForDisplay(...args) {
   const f = __gatherUiDeps().normalizeTagsForDisplay || GATHER_APP_UTILS.normalizeTagsForDisplay;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -2302,7 +2298,7 @@ export function AdminDashboard({ initialCalendars }) {
         /*#__PURE__*/React.createElement("div", { style: styles.cardTitle, "data-collapse-anchor": "true", "data-collapse-key": "metrics-external-services", "data-collapse-label": "외부 서비스 연동 현황" },
           /*#__PURE__*/React.createElement("span", { style: { display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(ExternalLinkIcon, null), "외부 서비스 연동 현황")
         ),
-        /*#__PURE__*/React.createElement("div", { style: { border: '1px solid #E2E8F0', borderRadius: '10px', padding: '14px', backgroundColor: '#F8FAFC' } },
+      /*#__PURE__*/React.createElement("div", { style: { border: '1px solid #E2E8F0', borderRadius: '10px', padding: '14px', backgroundColor: '#F8FAFC' } },
           /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' } },
             /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.9rem', fontWeight: 'bold', color: '#0F172A' } }, "Peekalink (링크 미리보기 / OpenGraph)"),
             /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.7rem', padding: '2px 8px', borderRadius: 'var(--radius-full)', backgroundColor: '#DCFCE7', color: '#16A34A', fontWeight: 'bold' } }, "통합 캐시 사용 중")
@@ -2330,9 +2326,9 @@ export function AdminDashboard({ initialCalendars }) {
             /*#__PURE__*/React.createElement(ShieldCheckIcon, null),
             /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.78rem', color: '#166534', lineHeight: 1.6 } },
               /*#__PURE__*/React.createElement("strong", null, "API 키 보호: "),
-              "이 서비스는 백엔드가 없는 정적 사이트라 Peekalink API 키가 브라우저 소스에 그대로 노출되는 문제가 있었습니다. 이제는 Cloud Function 프록시(peekalinkProxy)를 통해서만 Peekalink를 호출하도록 변경되어, 키는 서버(Functions 코드)에만 존재하고 브라우저에는 전혀 전송되지 않습니다. 무료 요금제 사용량(시간당 한도)은 아래 ",
-              /*#__PURE__*/React.createElement("strong", null, "데이터 사용량"),
-              " 섹션에서 확인할 수 있습니다."
+              "이 서비스는 백엔드가 없는 정적 사이트라 Peekalink API 키가 브라우저 소스에 그대로 노출되는 문제가 있었습니다. 이제는 Cloud Function 프록시(peekalinkProxy)를 통해서만 Peekalink를 호출하도록 변경되어, 키는 서버(Functions 코드)에만 존재하고 브라우저에 전송되지 않습니다. 무료 요금제 한도는 아래 ",
+              /*#__PURE__*/React.createElement("strong", null, "사용량"),
+              "에서 확인할 수 있습니다."
             )
           )
         )

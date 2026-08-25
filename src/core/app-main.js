@@ -1796,7 +1796,7 @@ function App() {
     }
     const chatLimit = (activeView === 'chat' || activeView === 'gallery')
       ? CHAT_LIVE_MESSAGE_LIMIT
-      : Math.min(10, CHAT_LIVE_MESSAGE_LIMIT);
+      : CHAT_LIVE_MESSAGE_LIMIT;
     if (!firebaseDb) {
       fetchChatMessagesRest(activeCalId).then(list => setChatMessages(list.slice(-chatLimit)));
       return;

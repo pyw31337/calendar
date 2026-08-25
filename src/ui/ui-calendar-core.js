@@ -1466,7 +1466,13 @@ export function CommentsSection({
       return next;
     });
   };
-  const hasAnyChat = totalChatCount > 0 || recentMessages.length > 0;
+  const previewRecentMessages = React.useMemo(() => {
+    const sourceMessages = Array.isArray(chatMessages) ? chatMessages : [];
+    const visibleMessages = sourceMessages.filter(msg => msg.uploadSource !== 'meeting' && msg.uploadSource !== 'gallery');
+    if (visibleMessages.length > 0) return visibleMessages.slice(-5);
+    return sourceMessages.length > 0 ? [sourceMessages[sourceMessages.length - 1]] : [];
+  }, [chatMessages]);
+  const hasAnyChat = totalChatCount > 0 || chatMessages.length > 0;
   const emptyChatMessage = hasAnyChat ? '표시할 최근 채팅이 없습니다.' : '등록된 채팅이 없습니다.';
   const openFullChat = (event) => {
     if (event) {
@@ -1525,11 +1531,9 @@ export function CommentsSection({
   // 일정탭('meeting')/갤러리페이지('gallery')에서 올린 사진은 참조용 실제 채팅 메시지
   // 문서로 저장되지만 채팅 피드에는 노출되지 않아야 함 -- ChatRoomView(ui-chat-room.js)의
   // 같은 필터를 이 메인화면 채팅 미리보기 위젯에도 동일하게 적용.
-  const visibleRecentMessages = recentMessages.filter(msg => msg.uploadSource !== 'meeting' && msg.uploadSource !== 'gallery');
-  const reversed = [...visibleRecentMessages].reverse();
   const messagesToShow = isCollapsed
-    ? (reversed.length > 0 ? [reversed[reversed.length - 1]] : [])
-    : reversed;
+    ? previewRecentMessages.slice(-1)
+    : previewRecentMessages;
 
   return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("section", {
     style: { textAlign: 'left' }
@@ -1584,7 +1588,7 @@ export function CommentsSection({
       padding: '12px',
       minHeight: '48px'
     }
-  }, visibleRecentMessages.length === 0 ? /*#__PURE__*/React.createElement("div", {
+  }, messagesToShow.length === 0 ? /*#__PURE__*/React.createElement("div", {
     style: { color: 'var(--text-muted)', fontSize: '0.85rem', padding: '8px 0', textAlign: 'center' }
   }, emptyChatMessage) : /*#__PURE__*/React.createElement("div", {
     style: { display: 'flex', flexDirection: 'column', gap: '10px' }
