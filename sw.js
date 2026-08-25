@@ -10,7 +10,7 @@
 // static, rarely-changing assets (icons, the per-calendar manifests), which is enough to (a)
 // satisfy PWA installability's usual expectation of a service worker and (b) let those specific
 // assets resolve instantly/offline without touching the freshness of the app itself.
-const STATIC_CACHE = 'moyeora-static-v3';
+const STATIC_CACHE = 'moyeora-static-v4';
 const STATIC_ASSETS = [
   'favicon.ico',
   'manifest.json',
@@ -60,7 +60,12 @@ self.addEventListener('fetch', event => {
   // CDN in front of Pages is a separate layer, already invalidated as part of every deploy), so a
   // resumed/reloaded tab always gets the index.html that matches whatever is actually live right
   // now instead of whatever happened to be cached from up to 10 minutes ago.
-  if (req.mode === 'navigate' || req.url.endsWith('/index.html')) {
+  const accept = req.headers.get('accept') || '';
+  const isDocument = req.mode === 'navigate'
+    || req.destination === 'document'
+    || req.url.endsWith('/index.html')
+    || (accept.includes('text/html') && (req.url.endsWith('/calendar/') || req.url.endsWith('/calendar')));
+  if (isDocument) {
     event.respondWith(fetch(req, { cache: 'no-store' }).catch(() => Response.error()));
     return;
   }

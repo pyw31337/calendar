@@ -674,31 +674,59 @@ export function UpdateAvailableBanner() {
   const [updateAvailable, setUpdateAvailable] = React.useState(false);
   const [dismissed, setDismissed] = React.useState(false);
   React.useEffect(() => {
-    let initialVersionTag = null;
+    let initialBuildId = null;
     let cancelled = false;
-    const checkForUpdate = () => {
-      fetch(location.href, { method: 'HEAD', cache: 'no-store' }).then(res => {
-        const versionTag = res.headers.get('etag') || res.headers.get('last-modified');
-        if (!versionTag || cancelled) return;
-        if (initialVersionTag === null) {
-          initialVersionTag = versionTag;
-          return;
+    const extractBuildId = (html) => {
+      if (!html || typeof html !== 'string') return null;
+      const m = html.match(/app-main-[A-Za-z0-9_-]+\.js/) || html.match(/index-[A-Za-z0-9_-]+\.js/);
+      return m ? m[0] : null;
+    };
+    const currentBuildId = (() => {
+      try {
+        const scripts = document.querySelectorAll('script[src]');
+        for (const s of scripts) {
+          const src = s.getAttribute('src') || '';
+          const m = src.match(/app-main-[A-Za-z0-9_-]+\.js/);
+          if (m) return m[0];
         }
-        if (versionTag !== initialVersionTag) setUpdateAvailable(true);
-      }).catch(() => {
-        // Offline, or the request was blocked -- just retry on the next interval/visibility tick.
-      });
+        const links = document.querySelectorAll('link[rel="modulepreload"]');
+        for (const l of links) {
+          const href = l.getAttribute('href') || '';
+          const m = href.match(/app-main-[A-Za-z0-9_-]+\.js/);
+          if (m) return m[0];
+        }
+      } catch (_) {}
+      return null;
+    })();
+    const checkForUpdate = () => {
+      fetch(location.href.split('#')[0], { method: 'GET', cache: 'no-store', credentials: 'same-origin' })
+        .then(res => res.text())
+        .then(html => {
+          if (cancelled) return;
+          const liveId = extractBuildId(html);
+          if (!liveId) return;
+          if (initialBuildId === null) initialBuildId = liveId;
+          const baseline = currentBuildId || initialBuildId;
+          if (baseline && liveId !== baseline) setUpdateAvailable(true);
+        })
+        .catch(() => {});
     };
     checkForUpdate();
-    const intervalId = setInterval(checkForUpdate, 10 * 60 * 1000);
+    const intervalId = setInterval(() => {
+      if (document.visibilityState === 'visible') checkForUpdate();
+    }, 45 * 1000);
     const onVisibilityChange = () => {
       if (document.visibilityState === 'visible') checkForUpdate();
     };
     document.addEventListener('visibilitychange', onVisibilityChange);
+    window.addEventListener('focus', checkForUpdate);
+    window.addEventListener('online', checkForUpdate);
     return () => {
       cancelled = true;
       clearInterval(intervalId);
       document.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener('focus', checkForUpdate);
+      window.removeEventListener('online', checkForUpdate);
     };
   }, []);
 

@@ -165,7 +165,13 @@ async function boot() {
     if (!alreadyRetried) {
       try { sessionStorage.setItem(BOOT_RETRY_KEY, '1'); } catch (_) {}
       showBootStatus('불러오는 중… (자동 재시도)');
-      window.location.reload();
+      try {
+        const u = new URL(window.location.href);
+        u.searchParams.set('_boot', String(Date.now()));
+        window.location.replace(u.toString());
+      } catch (_) {
+        window.location.reload();
+      }
       return;
     }
     showBootStatus('로딩 실패. 새로고침 해주세요.');
