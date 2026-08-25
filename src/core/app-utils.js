@@ -525,11 +525,25 @@ const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
     return normalizeMemoDateMatch(String(memo || '').match(MEMO_DATE_RE));
   }
 
+  function getMemoDateMatches(text) {
+    const str = String(text || '');
+    if (!str) return [];
+    const src = (MEMO_DATE_RE && MEMO_DATE_RE.source) ? MEMO_DATE_RE.source : '(\\d{4}|\\d{2})[.-](\\d{2})[.-](\\d{2})';
+    const regex = new RegExp(src, 'g');
+    const matches = [];
+    let match;
+    while ((match = regex.exec(str)) !== null) {
+      if (normalizeMemoDateMatch(match)) {
+        matches.push(match);
+      }
+    }
+    return matches;
+  }
+
   function parseVisitEntriesFromMemo(memo) {
     const text = String(memo || '').trim();
     if (!text) return [];
-    const dateMatches = [...text.matchAll(new RegExp(MEMO_DATE_RE, 'g'))]
-      .filter(match => normalizeMemoDateMatch(match));
+    const dateMatches = getMemoDateMatches(text);
     if (dateMatches.length < 2) return [];
     return dateMatches.map((match, idx) => {
       const segmentEnd = idx + 1 < dateMatches.length ? dateMatches[idx + 1].index : text.length;
@@ -561,8 +575,7 @@ const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
   function parsePlaceMemoEntries(memo) {
     const text = String(memo || '').trim();
     if (!text) return [];
-    const dateMatches = [...text.matchAll(new RegExp(MEMO_DATE_RE, 'g'))]
-      .filter(match => normalizeMemoDateMatch(match));
+    const dateMatches = getMemoDateMatches(text);
     if (dateMatches.length === 0) return [{ date: '', note: text }];
     const entries = dateMatches.map((match, idx) => {
       const segmentEnd = idx + 1 < dateMatches.length ? dateMatches[idx + 1].index : text.length;

@@ -291,13 +291,27 @@ const normalizeMemoDateMatch = GATHER_APP_UTILS.normalizeMemoDateMatch || functi
   if (y.length === 4) y = y.slice(2);
   return `${y}.${m}.${d}`;
 };
+const getMemoDateMatches = GATHER_APP_UTILS.getMemoDateMatches || function getMemoDateMatches(text) {
+  const str = String(text || '');
+  if (!str) return [];
+  const src = (MEMO_DATE_RE && MEMO_DATE_RE.source) ? MEMO_DATE_RE.source : '(\\d{4}|\\d{2})[.-](\\d{2})[.-](\\d{2})';
+  const regex = new RegExp(src, 'g');
+  const matches = [];
+  let match;
+  while ((match = regex.exec(str)) !== null) {
+    if (normalizeMemoDateMatch(match)) {
+      matches.push(match);
+    }
+  }
+  return matches;
+};
 const extractLeadingMemoDate = GATHER_APP_UTILS.extractLeadingMemoDate || function extractLeadingMemoDate(memo) {
   return normalizeMemoDateMatch(String(memo || "").match(MEMO_DATE_RE));
 };
 const parseVisitEntriesFromMemo = GATHER_APP_UTILS.parseVisitEntriesFromMemo || function parseVisitEntriesFromMemo(memo) {
   const text = String(memo || "").trim();
   if (!text) return [];
-  const dateMatches = [...text.matchAll(new RegExp(MEMO_DATE_RE, "g"))].filter(m => normalizeMemoDateMatch(m));
+  const dateMatches = getMemoDateMatches(text);
   if (dateMatches.length < 2) return [];
   return dateMatches.map((match, idx) => {
     const segmentEnd = idx + 1 < dateMatches.length ? dateMatches[idx + 1].index : text.length;
@@ -324,7 +338,7 @@ const sortVisitEntriesRecentFirst = GATHER_APP_UTILS.sortVisitEntriesRecentFirst
 const parsePlaceMemoEntries = GATHER_APP_UTILS.parsePlaceMemoEntries || function parsePlaceMemoEntries(memo) {
   const text = String(memo || "").trim();
   if (!text) return [];
-  const dateMatches = [...text.matchAll(new RegExp(MEMO_DATE_RE, "g"))].filter(m => normalizeMemoDateMatch(m));
+  const dateMatches = getMemoDateMatches(text);
   if (dateMatches.length === 0) return [{ date: '', note: text }];
   const entries = dateMatches.map((match, idx) => {
     const segmentEnd = idx + 1 < dateMatches.length ? dateMatches[idx + 1].index : text.length;
