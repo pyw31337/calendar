@@ -23,7 +23,8 @@ const BUDGETS = [
 // Bumped from 1_050_000 alongside the app-main bump above -- splitting ui-views doesn't reduce
 // total bytes downloaded (same 6 files, just two output files instead of one), so this total
 // needed headroom of its own to keep pace with app-main's.
-const TOTAL_JS_MAX_BYTES = 1_080_000;
+// Bumped from 1_080_000 after icon DEPS sync fix (chat React #130) — was ~9 bytes over.
+const TOTAL_JS_MAX_BYTES = 1_090_000;
 
 function fail(message) {
   console.error(`[check-dist-budget] ${message}`);
