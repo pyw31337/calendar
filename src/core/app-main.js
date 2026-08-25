@@ -4089,7 +4089,7 @@ function App() {
     const cleanAlias = sanitizeText(placeData.alias || '', 80);
     const cleanMemo = sanitizeText(placeData.memo || '', 2000);
     const cleanVisitStatus = placeData.visitStatus === 'planned' ? 'planned' : 'visited';
-    const cleanVisitDate = cleanVisitStatus === 'visited' && isValidDateString(placeData.visitDate) ? placeData.visitDate : '';
+    const cleanVisitDate = isValidDateString(placeData.visitDate) ? placeData.visitDate : '';
     const cleanSourcePlaceId = sanitizeText(placeData.sourcePlaceId || '', 120);
     // Same business, different save -- a place picked from a live search result (Kakao/Google
     // Places/Nominatim, see sourcePlaceId) that already exists somewhere in this calendar (any
