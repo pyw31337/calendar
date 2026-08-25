@@ -888,25 +888,27 @@ export function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, on
       return;
     }
     setSaving(true);
-    const ok = await onSave({
-      id: editingPlace ? editingPlace.id : undefined,
-      name: selected.name || query.trim(),
-      alias: sanitizeText(alias.trim(), 80),
-      address: selected.address || '',
-      lat: selected.lat,
-      lng: selected.lng,
-      categoryId,
-      memo: memo.trim(),
-      visitStatus,
-      visitDate: visitStatus === 'visited' ? visitDate : '',
-      // Lets handleSavePlace recognize this exact business (by its Kakao/Google/Nominatim search
-      // result id) if it's already registered from a DateModal date (or a previous 장소 페이지
-      // save), and link onto that record instead of creating a duplicate. Empty while editing an
-      // existing place (selected is rebuilt from the place record then, not a fresh search pick).
-      sourcePlaceId: selected.id || ''
-    });
-    setSaving(false);
-    if (ok !== false) onClose();
+    try {
+      const ok = await onSave({
+        id: editingPlace ? editingPlace.id : undefined,
+        name: selected.name || query.trim(),
+        alias: sanitizeText(alias.trim(), 80),
+        address: selected.address || '',
+        lat: selected.lat,
+        lng: selected.lng,
+        categoryId,
+        memo: memo.trim(),
+        visitStatus,
+        visitDate: visitStatus === 'visited' ? visitDate : '',
+        sourcePlaceId: selected.id || ''
+      });
+      if (ok !== false) onClose();
+    } catch (err) {
+      console.error('[PlaceRegisterModal] Save failed:', err);
+      showToast('장소 저장 중 오류가 발생했습니다.', 'error');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleDeleteClick = () => {

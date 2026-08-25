@@ -4159,7 +4159,9 @@ function App() {
     } else {
       nextPlaces = [...existingPlaces, { id: `place_${activeCal.id}_${now}_${Math.random().toString(36).slice(2, 7)}`, ...editedFields, createdAt: now }];
     }
-    nextPlaces = deduplicateCalendarPlaces(nextPlaces);
+    if (typeof deduplicateCalendarPlaces === 'function') {
+      nextPlaces = deduplicateCalendarPlaces(nextPlaces);
+    }
     const prevPlace = isEditing ? existingPlaces.find(p => p.id === placeData.id) : null;
     const displayLabel = cleanAlias || cleanName || '장소';
     const placeCats = getPlaceCategories(activeCal);
