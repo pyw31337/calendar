@@ -1619,11 +1619,12 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
       !isMobile && /*#__PURE__*/React.createElement("div", { className: "place-category-tabs-desktop-only" },
         /*#__PURE__*/React.createElement(SearchCategoryTabs, {
           tabs: [
-            { key: 'all', label: '전체', count: searchedPlaces.length },
+            { key: 'all', label: '전체', count: searchedPlaces.length, color: '#2563EB' },
             ...categories.map(category => ({
               key: category.id,
               label: `${getPlaceCategoryIcon(category)} ${category.name}`,
-              count: countsByCategory[category.id] || 0
+              count: countsByCategory[category.id] || 0,
+              color: category.color
             }))
           ],
           activeKey: categoryFilter,
@@ -1665,7 +1666,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
                     style: {
                       display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '18px', height: '18px',
                       borderRadius: '50%',
-                      backgroundColor: cCount >= 1 ? '#2563EB' : '#E2E8F0',
+                      backgroundColor: cCount >= 1 ? (category.color || '#2563EB') : '#E2E8F0',
                       color: cCount >= 1 ? '#FFFFFF' : '#475569',
                       fontSize: '0.72rem', fontWeight: 'bold', padding: '0 5px', marginLeft: '4px'
                     }
