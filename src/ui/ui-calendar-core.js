@@ -1466,6 +1466,15 @@ export function CommentsSection({
       return next;
     });
   };
+  const hasAnyChat = totalChatCount > 0 || recentMessages.length > 0;
+  const emptyChatMessage = hasAnyChat ? '표시할 최근 채팅이 없습니다.' : '등록된 채팅이 없습니다.';
+  const openFullChat = (event) => {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    if (typeof onMore === 'function') onMore();
+  };
 
   const [imageProcessing, setImageProcessing] = React.useState(null);
 
@@ -1532,6 +1541,7 @@ export function CommentsSection({
       justifyContent: 'space-between',
       alignItems: 'center',
       marginBottom: '10px',
+      gap: '8px',
       cursor: 'pointer'
     },
     onClick: toggleCommentsSection
@@ -1542,11 +1552,29 @@ export function CommentsSection({
     title: hasUnreadChat ? '읽지 않은 채팅이 있습니다' : '모두 읽었습니다',
     className: `main-menu-badge${hasUnreadChat ? ' is-unread' : ''}`
   }, totalChatCount)),
-  /*#__PURE__*/React.createElement(SectionToggleButton, {
-    collapsed: isCollapsed,
-    onToggle: toggleCommentsSection,
-    label: isCollapsed ? "채팅 펼치기" : "채팅 접기"
-  })),
+  /*#__PURE__*/React.createElement("div", {
+    style: { marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '2px', flexShrink: 0 }
+  },
+    /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: openFullChat,
+      style: {
+        background: 'none',
+        border: 'none',
+        color: '#3B82F6',
+        fontSize: '0.78rem',
+        fontWeight: 800,
+        cursor: 'pointer',
+        padding: '4px 6px',
+        whiteSpace: 'nowrap'
+      }
+    }, "전체보기"),
+    /*#__PURE__*/React.createElement(SectionToggleButton, {
+      collapsed: isCollapsed,
+      onToggle: toggleCommentsSection,
+      label: isCollapsed ? "채팅 펼치기" : "채팅 접기"
+    })
+  )),
   /* List Background Panel -- one continuous gray canvas the individual white message
      bubbles float on, instead of each message having its own separate gray card */
   /*#__PURE__*/React.createElement("div", {
@@ -1558,7 +1586,7 @@ export function CommentsSection({
     }
   }, visibleRecentMessages.length === 0 ? /*#__PURE__*/React.createElement("div", {
     style: { color: 'var(--text-muted)', fontSize: '0.85rem', padding: '8px 0', textAlign: 'center' }
-  }, "등록된 채팅이 없습니다.") : /*#__PURE__*/React.createElement("div", {
+  }, emptyChatMessage) : /*#__PURE__*/React.createElement("div", {
     style: { display: 'flex', flexDirection: 'column', gap: '10px' }
   }, messagesToShow.map(msg => {
     const p = participantsMap[msg.participantId];
@@ -1641,23 +1669,6 @@ export function CommentsSection({
       )
     );
   }),
-  /* Full Width "이전 채팅 더보기" Button at bottom of list */
-  recentMessages.length > 0 && /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    onClick: onMore,
-    style: {
-      width: '100%',
-      backgroundColor: 'color-mix(in srgb, var(--bg-primary) 96%, black)',
-      border: 'none',
-      borderRadius: 'var(--radius-md)',
-      padding: '8px 0',
-      fontSize: '0.85rem',
-      fontWeight: 'bold',
-      color: 'var(--text-main)',
-      cursor: 'pointer',
-      textAlign: 'center'
-    }
-  }, "이전 채팅 더보기")
   )),
   /* Input row */
   /*#__PURE__*/React.createElement("div", {

@@ -339,6 +339,15 @@ function deduplicateCalendarPlaces(places) {
         mergedPlace.updatedAt = Math.max(mergedPlace.updatedAt || 0, p2.updatedAt || 0);
       }
     }
+    // Keep the visible visit date in sync with the newest dated memo entry so a merged place
+    // with date-only saves doesn't keep showing whichever visit happened to be written first.
+    const memoDates = parsePlaceMemoEntries(mergedPlace.memo)
+      .map(entry => normalizePlaceDateForSort(entry.date))
+      .filter(Boolean);
+    if (memoDates.length > 0) {
+      const latestMemoDate = memoDates.reduce((latest, date) => (!latest || date > latest ? date : latest), '');
+      if (latestMemoDate) mergedPlace.visitDate = latestMemoDate;
+    }
     mergedList.push(mergedPlace);
   }
   return mergedList;
@@ -360,119 +369,21 @@ function unionPlaces(calendar, subcollectionPlaces) {
 
 // Bulk-imported places (e.g. from a Google My Maps export) often carry their whole visit history
 // jammed into one memo string, one "YY.MM.DD 누구랑 뭐했는지" entry per line, joined with " / ".
-// These helpers pull that history back out at render time rather than storing it as a separate
-// structured field -- memo stays the single source of truth, and a memo that was never
-// multi-entry in the first place (no leading date, or just one) renders exactly as typed.
-//
-// Dates are recognized in any of YY.MM.DD / YYYY.MM.DD / YY-MM-DD / YYYY-MM-DD (2 or 4 digit
-// year, "." or "-" separator) since real memos in the wild mix all of these -- the match is
-// always normalized back to the canonical 'YY.MM.DD' shape below so every other place-date
-// helper (normalizePlaceDateForSort, formatPlaceBadgeDate, the sort comparator in PlacesView)
-// keeps working against the one shape they already expect, without having to touch them.
-const MEMO_DATE_RE = GATHER_APP_UTILS.MEMO_DATE_RE || /(\d{4}|\d{2})[.-](\d{2})[.-](\d{2})/;
-const normalizeMemoDateMatch = GATHER_APP_UTILS.normalizeMemoDateMatch || function normalizeMemoDateMatch(match) {
-  if (!match) return null;
-  let [, y, m, d] = match;
-  const mm = Number(m), dd = Number(d);
-  if (mm < 1 || mm > 12 || dd < 1 || dd > 31) return null;
-  if (y.length === 4) y = y.slice(2);
-  return `${y}.${m}.${d}`;
-};
-const getMemoDateMatches = GATHER_APP_UTILS.getMemoDateMatches || function getMemoDateMatches(text) {
-  const str = String(text || '');
-  if (!str) return [];
-  const src = (MEMO_DATE_RE && MEMO_DATE_RE.source) ? MEMO_DATE_RE.source : '(\\d{4}|\\d{2})[.-](\\d{2})[.-](\\d{2})';
-  const regex = new RegExp(src, 'g');
-  const matches = [];
-  let match;
-  while ((match = regex.exec(str)) !== null) {
-    if (normalizeMemoDateMatch(match)) {
-      matches.push(match);
-    }
-  }
-  return matches;
-};
-const extractLeadingMemoDate = GATHER_APP_UTILS.extractLeadingMemoDate || function extractLeadingMemoDate(memo) {
-  return normalizeMemoDateMatch(String(memo || "").match(MEMO_DATE_RE));
-};
-const parseVisitEntriesFromMemo = GATHER_APP_UTILS.parseVisitEntriesFromMemo || function parseVisitEntriesFromMemo(memo) {
-  const text = String(memo || "").trim();
-  if (!text) return [];
-  const dateMatches = getMemoDateMatches(text);
-  if (dateMatches.length < 2) return [];
-  return dateMatches.map((match, idx) => {
-    const segmentEnd = idx + 1 < dateMatches.length ? dateMatches[idx + 1].index : text.length;
-    const note = text.slice(match.index + match[0].length, segmentEnd).trim().replace(/^\/\s*/, "").replace(/\s*\/\s*$/, "");
-    return { date: normalizeMemoDateMatch(match), note };
-  });
-};
-const reformatMemoIntoDateLines = GATHER_APP_UTILS.reformatMemoIntoDateLines || function reformatMemoIntoDateLines(memo) {
-  const entries = parseVisitEntriesFromMemo(memo);
-  if (entries.length === 0) return String(memo || "");
-  return entries.map(entry => (entry.note ? `${entry.date} ${entry.note}` : entry.date)).join("\n");
-};
-const sortVisitEntriesRecentFirst = GATHER_APP_UTILS.sortVisitEntriesRecentFirst || function sortVisitEntriesRecentFirst(entries) {
-  return (entries || []).slice().sort((a, b) => {
-    const dateA = normalizePlaceDateForSort(a.date) || "";
-    const dateB = normalizePlaceDateForSort(b.date) || "";
-    return dateB.localeCompare(dateA);
-  });
-};
-// Place memo as a stack of per-date entries -- one entry per visit, addressable/editable/deletable
-// individually (unlike parseVisitEntriesFromMemo above, which only kicks in once 2+ dates already
-// exist, since it exists purely to reformat run-on strings for display). A place's very first memo
-// entry is a single-date parse result here, not an empty array.
-const parsePlaceMemoEntries = GATHER_APP_UTILS.parsePlaceMemoEntries || function parsePlaceMemoEntries(memo) {
-  const text = String(memo || "").trim();
-  if (!text) return [];
-  const dateMatches = getMemoDateMatches(text);
-  if (dateMatches.length === 0) return [{ date: '', note: text }];
-  const entries = dateMatches.map((match, idx) => {
-    const segmentEnd = idx + 1 < dateMatches.length ? dateMatches[idx + 1].index : text.length;
-    const note = text.slice(match.index + match[0].length, segmentEnd).trim().replace(/^\/\s*/, "").replace(/\s*\/\s*$/, "");
-    return { date: normalizeMemoDateMatch(match), note };
-  });
-  const cleaned = entries.filter(e => !(e.date && !e.note));
-  return cleaned.length > 0 ? cleaned : entries;
-};
-const serializePlaceMemoEntries = GATHER_APP_UTILS.serializePlaceMemoEntries || function serializePlaceMemoEntries(entries) {
-  return (entries || [])
-    .filter(entry => entry && (entry.date || entry.note))
-    .map(entry => (entry.date ? (entry.note ? `${entry.date} ${entry.note}` : entry.date) : entry.note))
-    .join('\n');
-};
-const toMemoDateFormat = GATHER_APP_UTILS.toMemoDateFormat || function toMemoDateFormat(dateStr) {
-  const match = String(dateStr || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  return match ? `${match[1].slice(2)}.${match[2]}.${match[3]}` : (extractLeadingMemoDate(dateStr) || String(dateStr || ''));
-};
-// Replaces this date's entry if one already exists (edit), otherwise appends a new one (add) --
-// this is the single write path for place memos now, used both for a brand-new visit note and for
-// editing/continuing an existing one, so the memo string never accumulates duplicate date lines.
-const upsertPlaceMemoEntry = GATHER_APP_UTILS.upsertPlaceMemoEntry || function upsertPlaceMemoEntry(existingMemo, dateStr, note) {
-  const cleanNote = String(note || '').trim();
-  if (!cleanNote) return String(existingMemo || '');
-  const targetNorm = normalizePlaceDateForSort(dateStr);
-  const memoDate = toMemoDateFormat(dateStr);
-  const entries = parsePlaceMemoEntries(existingMemo);
-  const idx = entries.findIndex(entry => normalizePlaceDateForSort(entry.date) === targetNorm);
-  if (idx >= 0) entries[idx] = { date: entries[idx].date || memoDate, note: cleanNote };
-  else if (entries.length === 1 && !entries[0].date) entries[0] = { date: memoDate, note: cleanNote };
-  else entries.push({ date: memoDate, note: cleanNote });
-  return serializePlaceMemoEntries(entries);
-};
-const removePlaceMemoEntry = GATHER_APP_UTILS.removePlaceMemoEntry || function removePlaceMemoEntry(existingMemo, dateStr) {
-  const targetNorm = normalizePlaceDateForSort(dateStr);
-  const entries = parsePlaceMemoEntries(existingMemo).filter(entry => normalizePlaceDateForSort(entry.date) !== targetNorm);
-  return serializePlaceMemoEntries(entries);
-};
-const getPlaceMemoEntryForDate = GATHER_APP_UTILS.getPlaceMemoEntryForDate || function getPlaceMemoEntryForDate(memo, dateStr) {
-  const targetNorm = normalizePlaceDateForSort(dateStr);
-  const entries = parsePlaceMemoEntries(memo);
-  const entry = entries.find(e => normalizePlaceDateForSort(e.date) === targetNorm);
-  if (entry) return entry.note;
-  if (entries.length === 1 && !entries[0].date) return entries[0].note;
-  return '';
-};
+// These helpers are shared with app-utils; this module just reuses the same implementation so the
+// merged place logic stays in sync without duplicating the parser in two bundles.
+const MEMO_DATE_RE = GATHER_APP_UTILS.MEMO_DATE_RE;
+const normalizeMemoDateMatch = GATHER_APP_UTILS.normalizeMemoDateMatch;
+const getMemoDateMatches = GATHER_APP_UTILS.getMemoDateMatches;
+const extractLeadingMemoDate = GATHER_APP_UTILS.extractLeadingMemoDate;
+const parseVisitEntriesFromMemo = GATHER_APP_UTILS.parseVisitEntriesFromMemo;
+const reformatMemoIntoDateLines = GATHER_APP_UTILS.reformatMemoIntoDateLines;
+const sortVisitEntriesRecentFirst = GATHER_APP_UTILS.sortVisitEntriesRecentFirst;
+const parsePlaceMemoEntries = GATHER_APP_UTILS.parsePlaceMemoEntries;
+const serializePlaceMemoEntries = GATHER_APP_UTILS.serializePlaceMemoEntries;
+const toMemoDateFormat = GATHER_APP_UTILS.toMemoDateFormat;
+const upsertPlaceMemoEntry = GATHER_APP_UTILS.upsertPlaceMemoEntry;
+const removePlaceMemoEntry = GATHER_APP_UTILS.removePlaceMemoEntry;
+const getPlaceMemoEntryForDate = GATHER_APP_UTILS.getPlaceMemoEntryForDate;
 
 const KNOWN_PLACE_PARTICIPANT_NAME_TAGS = [
   '영우', '유리', '서준', '광석', '수진', '아윤', '현석', '효진',

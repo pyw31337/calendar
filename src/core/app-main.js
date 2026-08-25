@@ -3972,6 +3972,9 @@ function App() {
 
     if (isMeetingPhotoMeta) {
       if (meta.sourceMessageId && Number.isInteger(meta.sourceImageIndex)) {
+        // Auto-linked 일정 사진 are derived from a real chat image tag, so deleting the
+        // meeting copy must also clear the source tag; otherwise the reference can be rebuilt
+        // later and the broken thumbnail comes back on refresh.
         const okUnlink = await handleSaveImageTags(meta.sourceMessageId, meta.sourceImageIndex, '', {
           source: 'meeting',
           uploadSource: 'meeting',
@@ -3982,7 +3985,9 @@ function App() {
           sourceMessageId: meta.sourceMessageId,
           sourceImageIndex: meta.sourceImageIndex
         });
-        if (okUnlink) return true;
+        if (!okUnlink) {
+          console.warn('Failed to clear source tags while deleting a meeting photo reference.');
+        }
       }
       const okMeeting = await handleDeleteMeetingPhoto(dateStr, photoId, imageUrl);
       if (okMeeting) return true;

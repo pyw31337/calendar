@@ -1261,16 +1261,16 @@ export function DateModal({
     const isMeetingReference = !!photo?.sourceMessageId && Number.isInteger(photo?.sourceImageIndex)
       && (photo?.source === 'meeting' || photo?.uploadSource === 'meeting' || photo?.meetingDate || photo?.photoId);
     const deletionMeta = {
-      source: isMeetingReference ? 'chat' : (photo.source || 'meeting'),
-      uploadSource: isMeetingReference ? 'chat' : (photo.uploadSource || (photo.source === 'chat-tag' ? 'chat' : 'meeting')),
+      source: isMeetingReference ? 'meeting' : (photo.source || 'meeting'),
+      uploadSource: isMeetingReference ? 'meeting' : (photo.uploadSource || (photo.source === 'chat-tag' ? 'chat' : 'meeting')),
       imageUrl: photo.imageUrl || photo.thumbUrl || '',
       thumbUrl: photo.thumbUrl || photo.imageUrl || '',
       sourceMessageId: photo.sourceMessageId,
       sourceImageIndex: photo.sourceImageIndex,
       messageId: isMeetingReference ? photo.sourceMessageId : (photo.messageId || photo.sourceMessageId),
       imageIndex: isMeetingReference ? photo.sourceImageIndex : (Number.isInteger(photo.imageIndex) ? photo.imageIndex : photo.sourceImageIndex),
-      meetingDate: isMeetingReference ? '' : dateStr,
-      photoId: isMeetingReference ? '' : photo.id
+      meetingDate: isMeetingReference ? (photo.meetingDate || dateStr) : dateStr,
+      photoId: isMeetingReference ? (photo.photoId || photo.id) : photo.id
     };
     const cleanup = typeof onDeletePhoto === 'function'
       ? Promise.resolve(onDeletePhoto(deletionMeta))
@@ -1399,7 +1399,7 @@ export function DateModal({
       setIsSavingMeetingPhotos(true);
       try {
         const deletionMeta = {
-          source: photo.source || 'meeting',
+          source: 'meeting',
           uploadSource: photo.uploadSource || (photo.source === 'chat-tag' ? 'chat' : 'meeting'),
           imageUrl: photo.imageUrl || photo.thumbUrl || '',
           thumbUrl: photo.thumbUrl || photo.imageUrl || '',
@@ -1875,7 +1875,7 @@ export function DateModal({
       }
     },
       "참여자",
-      /*#__PURE__*/React.createElement("span", {
+      dateEntries.length > 0 && /*#__PURE__*/React.createElement("span", {
         style: {
           fontSize: '0.68rem',
           padding: '1px 5px',
@@ -1884,7 +1884,7 @@ export function DateModal({
           color: activeTab === 'participant' ? '#FFFFFF' : 'var(--text-muted)',
           fontWeight: 'bold'
         }
-      }, dateEntries.length > 0 ? dateEntries.length : '없음')
+      }, dateEntries.length)
     ),
     /* Tab 2: 장소 */
     /*#__PURE__*/React.createElement("button", {
@@ -1906,7 +1906,7 @@ export function DateModal({
       }
     },
       "장소",
-      /*#__PURE__*/React.createElement("span", {
+      registeredPlaces.length > 0 && /*#__PURE__*/React.createElement("span", {
         style: {
           fontSize: '0.68rem',
           padding: '1px 5px',
@@ -1915,7 +1915,7 @@ export function DateModal({
           color: activeTab === 'meeting' ? '#FFFFFF' : 'var(--text-muted)',
           fontWeight: 'bold'
         }
-      }, registeredPlaces.length > 0 ? registeredPlaces.length : '없음')
+      }, registeredPlaces.length)
     ),
     /* Tab 3: 정산 */
     /*#__PURE__*/React.createElement("button", {
@@ -1937,7 +1937,7 @@ export function DateModal({
       }
     },
       "정산",
-      /*#__PURE__*/React.createElement("span", {
+      expenses.length > 0 && /*#__PURE__*/React.createElement("span", {
         style: {
           fontSize: '0.68rem',
           padding: '1px 5px',
@@ -1946,7 +1946,7 @@ export function DateModal({
           color: activeTab === 'settlement' ? '#FFFFFF' : 'var(--text-muted)',
           fontWeight: 'bold'
         }
-      }, expenses.length > 0 ? expenses.length : '없음')
+      }, expenses.length)
     ),
     /* Tab 4: 사진 */
     /*#__PURE__*/React.createElement("button", {
@@ -1968,7 +1968,7 @@ export function DateModal({
       }
     },
       "사진",
-      /*#__PURE__*/React.createElement("span", {
+      meetingPhotos.length > 0 && /*#__PURE__*/React.createElement("span", {
         style: {
           fontSize: '0.68rem',
           padding: '1px 5px',
@@ -1977,7 +1977,7 @@ export function DateModal({
           color: activeTab === 'photo' ? '#FFFFFF' : 'var(--text-muted)',
           fontWeight: 'bold'
         }
-      }, meetingPhotos.length > 0 ? meetingPhotos.length : '없음')
+      }, meetingPhotos.length)
     )
   )), /*#__PURE__*/React.createElement("form", {
     onSubmit: e => {

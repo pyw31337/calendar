@@ -726,54 +726,51 @@ export function MediaThumb({
   const primarySrc = String(src || '').trim();
   const secondarySrc = String(fallbackSrc || '').trim();
   const [currentSrc, setCurrentSrc] = React.useState(() => primarySrc || secondarySrc || '');
-  const imgRef = React.useRef(null);
-  const brokenHandledRef = React.useRef(false);
+  const [isBroken, setIsBroken] = React.useState(false);
 
   React.useEffect(() => {
     setCurrentSrc(primarySrc || secondarySrc || '');
-    brokenHandledRef.current = false;
+    setIsBroken(false);
   }, [primarySrc, secondarySrc]);
-
-  const finalizeBroken = e => {
-    if (brokenHandledRef.current) return;
-    brokenHandledRef.current = true;
-    const target = e && e.currentTarget ? e.currentTarget : imgRef.current;
-    if (target && target.style) {
-      target.style.display = 'none';
-    }
-    if (typeof onBroken === 'function') {
-      onBroken(e, { src: primarySrc, fallbackSrc: secondarySrc, currentSrc });
-    }
-  };
 
   const handleError = e => {
     if (secondarySrc && currentSrc !== secondarySrc) {
       setCurrentSrc(secondarySrc);
       return;
     }
-    finalizeBroken(e);
+    setIsBroken(true);
+    if (typeof onBroken === 'function') onBroken(e, { src: primarySrc, fallbackSrc: secondarySrc, currentSrc });
   };
 
-  React.useEffect(() => {
-    if (!currentSrc) return;
-    let cancelled = false;
-    const inspectCurrentImage = () => {
-      if (cancelled || brokenHandledRef.current) return;
-      const el = imgRef.current;
-      if (!el || !el.complete) return;
-      if (el.naturalWidth > 0) return;
-      handleError({ currentTarget: el });
-    };
-    const timer = window.setTimeout(inspectCurrentImage, 1200);
-    const el = imgRef.current;
-    if (el && typeof el.decode === 'function') {
-      el.decode().then(inspectCurrentImage).catch(inspectCurrentImage);
-    }
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-    };
-  }, [currentSrc, primarySrc, secondarySrc]);
+  if (isBroken) {
+    return /*#__PURE__*/React.createElement("div", {
+      ...rest,
+      role: "img",
+      "aria-label": alt || "이미지를 불러오지 못했습니다.",
+      style: {
+        ...style,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: style.backgroundColor || 'var(--bg-primary)',
+        color: 'var(--text-muted)',
+        overflow: 'hidden',
+        boxSizing: 'border-box'
+      }
+    }, /*#__PURE__*/React.createElement("svg", {
+      xmlns: "http://www.w3.org/2000/svg",
+      width: "32",
+      height: "32",
+      viewBox: "0 0 24 24",
+      fill: "none",
+      stroke: "currentColor",
+      strokeWidth: "2",
+      strokeLinecap: "round",
+      strokeLinejoin: "round",
+      className: "lucide lucide-image-off-icon lucide-image-off",
+      style: { flexShrink: 0, opacity: 0.92 }
+    }, /*#__PURE__*/React.createElement("line", { x1: "2", x2: "22", y1: "2", y2: "22" }), /*#__PURE__*/React.createElement("path", { d: "M10.41 10.41a2 2 0 1 1-2.83-2.83" }), /*#__PURE__*/React.createElement("line", { x1: "13.5", x2: "6", y1: "13.5", y2: "21" }), /*#__PURE__*/React.createElement("line", { x1: "18", x2: "21", y1: "12", y2: "15" }), /*#__PURE__*/React.createElement("path", { d: "M3.59 3.59A1.99 1.99 0 0 0 3 5v14a2 2 0 0 0 2 2h14c.55 0 1.052-.22 1.41-.59" }), /*#__PURE__*/React.createElement("path", { d: "M21 15V5a2 2 0 0 0-2-2H9" })));
+  }
 
   if (!currentSrc) return null;
 
@@ -788,7 +785,6 @@ export function MediaThumb({
     onClick,
     onLoad,
     onError: handleError,
-    ref: imgRef,
     style
   });
 }

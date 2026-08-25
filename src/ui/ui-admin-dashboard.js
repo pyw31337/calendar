@@ -2433,7 +2433,7 @@ export function AdminDashboard({ initialCalendars }) {
                 /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.75rem', marginLeft: '6px', color: '#64748B' } }, item.count, "/", stat.participants.length, "명 가능")
               ),
               item.count >= stat.participants.length ? /*#__PURE__*/React.createElement("span", { className: "date-item-badge", style: { background: '#DCFCE7', color: '#16A34A', fontSize: '0.7rem', border: '1px solid #86EFAC' } }, "전원") :
-              /*#__PURE__*/React.createElement("span", { className: "date-item-badge", style: { fontSize: '0.7rem', backgroundColor: '#F1F5F9', color: '#64748B' } }, item.count, "명")
+              item.count > 0 ? /*#__PURE__*/React.createElement("span", { className: "date-item-badge", style: { fontSize: '0.7rem', backgroundColor: '#F1F5F9', color: '#64748B' } }, item.count, "명") : null
             ))
           ))
         ),

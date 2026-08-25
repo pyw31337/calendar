@@ -578,6 +578,9 @@ const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
   // Structured per-date memo stack: unlike parseVisitEntriesFromMemo (which only parses when 2+
   // dates are present, since it exists purely to reformat run-on memo strings for display), this
   // always returns one entry per date so a place's very first memo entry is addressable too.
+  // Blank notes are valid now because a date-only save still needs to preserve the visit date;
+  // when the same date appears more than once, keep one representative entry and prefer the first
+  // non-empty note.
   function parsePlaceMemoEntries(memo) {
     const text = String(memo || '').trim();
     if (!text) return [];
@@ -591,14 +594,26 @@ const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
         .replace(/\s*\/\s*$/, '');
       return { date: normalizeMemoDateMatch(match), note };
     });
-    // A dated entry with an empty note is parsing noise, not a real visit -- typically a
-    // duplicated/typo'd date token sitting right before the real "date note" pair in legacy
-    // run-on memo text (e.g. "... 26.08.22 26.08.22 실제메모..."). Left in, it would silently win
-    // every date lookup below (Array.find/findIndex return the first match), hiding the real note
-    // for that date. New saves never produce one (upsertPlaceMemoEntry requires a non-empty note),
-    // so this only ever strips pre-existing noise.
-    const cleaned = entries.filter(e => !(e.date && !e.note));
-    return cleaned.length > 0 ? cleaned : entries;
+    const datedEntriesByKey = new Map();
+    const datelessEntries = [];
+    entries.forEach(entry => {
+      const cleanNote = String(entry.note || '').trim();
+      const dateKey = normalizePlaceDateForSort(entry.date) || '';
+      if (!dateKey) {
+        if (cleanNote) datelessEntries.push({ date: '', note: cleanNote });
+        return;
+      }
+      const existing = datedEntriesByKey.get(dateKey);
+      if (!existing) {
+        datedEntriesByKey.set(dateKey, { date: entry.date, note: cleanNote });
+        return;
+      }
+      if (!existing.note && cleanNote) {
+        existing.date = entry.date || existing.date;
+        existing.note = cleanNote;
+      }
+    });
+    return [...datedEntriesByKey.values(), ...datelessEntries];
   }
 
   function getTodayString() {
@@ -698,8 +713,8 @@ const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
 
   function upsertPlaceMemoEntry(existingMemo, dateStr, note) {
     const cleanNote = String(note || '').trim();
-    if (!cleanNote) return String(existingMemo || '');
     const targetNorm = normalizePlaceDateForSort(dateStr);
+    if (!targetNorm) return String(existingMemo || '');
     const memoDate = toMemoDateFormat(dateStr);
     const entries = parsePlaceMemoEntries(existingMemo);
     const idx = entries.findIndex(entry => normalizePlaceDateForSort(entry.date) === targetNorm);

@@ -492,7 +492,20 @@ body:has(.admin-login-gate) {
 .main-menu-badge,
 .section-count-badge,
 .dday-badge,
-.poll-voter-badge {
+.poll-voter-badge,
+.date-item-badge,
+.confirmed-meeting-label-badge,
+.poll-confirmed-badge,
+.poll-deadline-badge,
+.url-capsule-badge,
+.lightbox-tag-badge,
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  line-height: 1;
+  box-sizing: border-box;
   transition: transform var(--motion-fast) var(--motion-ease-spring), filter var(--motion-fast) ease;
 }
 .participant-badge:hover,
@@ -810,6 +823,7 @@ button, input, textarea, select {
   border-radius: 9999px;
   font-size: 0.68rem;
   font-weight: 800;
+  line-height: 1;
   background-color: var(--border-subtle);
   color: var(--text-muted);
 }
@@ -1266,7 +1280,7 @@ select.form-select {
 
 .participant-badge {
   display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: var(--radius-full);
-  font-size: 0.72rem; font-weight: 700; line-height: 1.2; box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+  font-size: 0.72rem; font-weight: 700; line-height: 1; box-shadow: 0 1px 3px rgba(0,0,0,0.12);
 }
 
 /* Own-message edit/delete controls: hidden by default, revealed on hover (desktop) or
@@ -2351,7 +2365,7 @@ select.form-select {
 .memo-capsule-badge {
   display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px;
   border-radius: var(--radius-full); font-size: 0.75rem; font-weight: 700;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1); line-height: 1.3;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1); line-height: 1;
 }
 .confirmed-meeting-label-badge {
   background-color: var(--bg-card);
@@ -2372,7 +2386,7 @@ select.form-select {
 /* D-day capsule on the confirmed-meeting banner */
 .dday-badge {
   display: inline-flex; align-items: center; flex-shrink: 0; padding: 4px 12px;
-  border-radius: var(--radius-full); font-size: 0.75rem; font-weight: 800; line-height: 1.3;
+  border-radius: var(--radius-full); font-size: 0.75rem; font-weight: 800; line-height: 1;
   color: #FFFFFF; background: var(--accent-gradient); box-shadow: 0 1px 3px rgba(0,0,0,0.15);
 }
 @media (min-width: 640px) {
@@ -2395,6 +2409,12 @@ select.form-select {
 }
 
 .date-item-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  line-height: 1;
+  box-sizing: border-box;
   font-size: 0.72rem;
   padding: 4px 10px;
   border-radius: 9999px;
@@ -3609,6 +3629,13 @@ textarea.form-input {
 }
 .poll-deadline-badge.is-open { background: #EFF6FF; color: #2563EB; }
 .poll-deadline-badge.is-closed { background: #FEE2E2; color: #DC2626; }
+.poll-deadline-badge {
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
 :root[data-theme="dark"] .poll-deadline-badge.is-open,
 :root[data-theme="dark"] .poll-deadline-badge.is-open {
   background: #1E3A5F; color: #93C5FD;

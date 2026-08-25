@@ -974,8 +974,8 @@ export function ChatGalleryModal({
     const isMeetingReference = !!photo.sourceMessageId && Number.isInteger(photo.sourceImageIndex)
       && (photo.source === 'meeting' || photo.uploadSource === 'meeting' || photo.meetingDate || photo.photoId);
     const deletionMeta = {
-      source: isMeetingReference ? 'chat' : (photo.source || 'chat'),
-      uploadSource: isMeetingReference ? 'chat' : (photo.uploadSource || (photo.source === 'memo' ? 'memo' : 'chat')),
+      source: isMeetingReference ? 'meeting' : (photo.source || 'chat'),
+      uploadSource: isMeetingReference ? 'meeting' : (photo.uploadSource || (photo.source === 'memo' ? 'memo' : 'chat')),
       imageUrl: photo.full || photo.thumb || '',
       thumbUrl: photo.thumb || photo.full || '',
       messageId: isMeetingReference ? photo.sourceMessageId : (photo.messageId || photo.sourceMessageId || ''),
@@ -984,8 +984,8 @@ export function ChatGalleryModal({
         : (Number.isInteger(photo.imageIndex) ? photo.imageIndex : (Number.isInteger(photo.sourceImageIndex) ? photo.sourceImageIndex : 0)),
       sourceMessageId: photo.sourceMessageId || '',
       sourceImageIndex: Number.isInteger(photo.sourceImageIndex) ? photo.sourceImageIndex : null,
-      meetingDate: isMeetingReference ? '' : (photo.meetingDate || ''),
-      photoId: isMeetingReference ? '' : (photo.photoId || '')
+      meetingDate: isMeetingReference ? (photo.meetingDate || '') : (photo.meetingDate || ''),
+      photoId: isMeetingReference ? (photo.photoId || '') : (photo.photoId || '')
     };
     Promise.resolve(onDeletePhoto(deletionMeta)).catch(err => console.warn('Broken gallery photo cleanup failed:', err));
   };

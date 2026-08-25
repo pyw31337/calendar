@@ -670,10 +670,13 @@ function getAnniversaryDisplayColor(...args) {
 
 export function SectionCountBadge({ count }) {
   const React = window.React;
+  const normalizedCount = Number(count || 0);
+
+  if (!Number.isFinite(normalizedCount) || normalizedCount <= 0) return null;
 
   return /*#__PURE__*/React.createElement("span", {
     className: "section-count-badge"
-  }, count);
+  }, normalizedCount);
 }
 
 export function SectionToggleButton({ collapsed, onToggle, label }) {
@@ -713,33 +716,45 @@ export function SearchCategoryTabs({ tabs, activeKey, onSelect, containerStyle, 
 
   return /*#__PURE__*/React.createElement("div", {
     style: { display: 'grid', gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))`, overflow: 'hidden', borderBottom: '1px solid #E2E8F0', ...containerStyle }
-  }, tabs.map(tab => /*#__PURE__*/React.createElement("button", {
-    key: tab.key,
-    type: "button",
-    onClick: () => onSelect(tab.key),
-    style: {
-      minWidth: 0,
-      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-      padding: tabPadding || '10px 4px', fontSize: '0.82rem', fontWeight: 800,
-      background: 'none', border: 'none', cursor: 'pointer',
-      color: activeKey === tab.key ? '#2563EB' : '#64748B',
-      borderBottom: activeKey === tab.key ? '3px solid #2563EB' : '3px solid transparent',
-      marginBottom: '-1px',
-      whiteSpace: 'nowrap',
-      overflow: 'hidden',
-      ...tabTextStyle
-    }
-  }, tab.label, /*#__PURE__*/React.createElement("span", {
-      className: countBadgeClassName || undefined,
+  }, tabs.map(tab => {
+    const count = Number(tab.count || 0);
+    return /*#__PURE__*/React.createElement("button", {
+      key: tab.key,
+      type: "button",
+      onClick: () => onSelect(tab.key),
       style: {
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '20px', height: '18px',
-        borderRadius: '9999px',
-        backgroundColor: (tab.count || 0) >= 1 ? (tab.color || tab.badgeColor || '#2563EB') : '#E2E8F0',
-        color: (tab.count || 0) >= 1 ? '#FFFFFF' : '#475569',
-        fontSize: '0.68rem', fontWeight: 'bold', padding: '0 6px',
-        ...countBadgeStyle
+        minWidth: 0,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+        padding: tabPadding || '10px 4px', fontSize: '0.82rem', fontWeight: 800,
+        background: 'none', border: 'none', cursor: 'pointer',
+        color: activeKey === tab.key ? '#2563EB' : '#64748B',
+        borderBottom: activeKey === tab.key ? '3px solid #2563EB' : '3px solid transparent',
+        marginBottom: '-1px',
+        whiteSpace: 'nowrap',
+        overflow: 'hidden',
+        ...tabTextStyle
       }
-    }, tab.count))));
+    }, tab.label, count > 0 && /*#__PURE__*/React.createElement("span", {
+        className: countBadgeClassName || undefined,
+        style: {
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          verticalAlign: 'middle',
+          lineHeight: 1,
+          minWidth: '20px',
+          height: '18px',
+          borderRadius: '9999px',
+          backgroundColor: tab.color || tab.badgeColor || '#2563EB',
+          color: '#FFFFFF',
+          fontSize: '0.68rem',
+          fontWeight: 'bold',
+          padding: '0 6px',
+          boxSizing: 'border-box',
+          ...countBadgeStyle
+        }
+      }, count));
+  }));
 }
 
 export function SimpleBottomSheetPicker({ title, value, options, onSelect, placeholder, disabled, style, className = "form-select" }) {
@@ -889,8 +904,8 @@ export function PhotoGallery({ chatMessages, calendar = null, totalGalleryCount,
     const isMeetingReference = !!photo.sourceMessageId && Number.isInteger(photo.sourceImageIndex)
       && (photo.source === 'meeting' || photo.uploadSource === 'meeting' || photo.meetingDate || photo.photoId);
     const deletionMeta = {
-      source: isMeetingReference ? 'chat' : (photo.source || 'chat'),
-      uploadSource: isMeetingReference ? 'chat' : (photo.uploadSource || (photo.source === 'memo' ? 'memo' : 'chat')),
+      source: isMeetingReference ? 'meeting' : (photo.source || 'chat'),
+      uploadSource: isMeetingReference ? 'meeting' : (photo.uploadSource || (photo.source === 'memo' ? 'memo' : 'chat')),
       imageUrl: photo.full || photo.thumb || '',
       thumbUrl: photo.thumb || photo.full || '',
       messageId: isMeetingReference ? photo.sourceMessageId : (photo.messageId || photo.sourceMessageId || ''),
@@ -899,8 +914,8 @@ export function PhotoGallery({ chatMessages, calendar = null, totalGalleryCount,
         : (Number.isInteger(photo.imageIndex) ? photo.imageIndex : (Number.isInteger(photo.sourceImageIndex) ? photo.sourceImageIndex : 0)),
       sourceMessageId: photo.sourceMessageId || '',
       sourceImageIndex: Number.isInteger(photo.sourceImageIndex) ? photo.sourceImageIndex : null,
-      meetingDate: isMeetingReference ? '' : (photo.meetingDate || ''),
-      photoId: isMeetingReference ? '' : (photo.photoId || '')
+      meetingDate: isMeetingReference ? (photo.meetingDate || '') : (photo.meetingDate || ''),
+      photoId: isMeetingReference ? (photo.photoId || '') : (photo.photoId || '')
     };
     Promise.resolve(onDeletePhoto(deletionMeta)).catch(err => console.warn('Broken gallery preview cleanup failed:', err));
   };
