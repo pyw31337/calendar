@@ -1461,13 +1461,17 @@ export function CommentsSection({
       return next;
     });
   };
+  const previewSourceMessages = React.useMemo(() => {
+    const liveMessages = Array.isArray(chatMessages) ? chatMessages.filter(Boolean) : [];
+    if (liveMessages.length > 0) return liveMessages;
+    return Array.isArray(recentMessages) ? recentMessages.filter(Boolean).slice().reverse() : [];
+  }, [chatMessages, recentMessages]);
   const previewRecentMessages = React.useMemo(() => {
-    const sourceMessages = Array.isArray(chatMessages) ? chatMessages : [];
-    const visibleMessages = sourceMessages.filter(msg => msg.uploadSource !== 'meeting' && msg.uploadSource !== 'gallery');
+    const visibleMessages = previewSourceMessages.filter(msg => msg.uploadSource !== 'meeting' && msg.uploadSource !== 'gallery');
     if (visibleMessages.length > 0) return visibleMessages.slice(-5);
-    return sourceMessages.length > 0 ? [sourceMessages[sourceMessages.length - 1]] : [];
-  }, [chatMessages]);
-  const hasAnyChat = totalChatCount > 0 || chatMessages.length > 0;
+    return previewSourceMessages.length > 0 ? [previewSourceMessages[previewSourceMessages.length - 1]] : [];
+  }, [previewSourceMessages]);
+  const hasAnyChat = totalChatCount > 0 || previewSourceMessages.length > 0;
   const emptyChatMessage = hasAnyChat ? '표시할 최근 채팅이 없습니다.' : '등록된 채팅이 없습니다.';
   const openFullChat = (event) => {
     if (event) {
@@ -1602,12 +1606,6 @@ export function CommentsSection({
       /*#__PURE__*/React.createElement('path', { d: 'M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4' }),
       /*#__PURE__*/React.createElement('path', { d: 'M13.5 6.5l4 4' })
     );
-    const deleteSvg = /*#__PURE__*/React.createElement('svg', { xmlns: 'http://www.w3.org/2000/svg', width: '14', height: '14', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '2', strokeLinecap: 'round', strokeLinejoin: 'round' },
-      /*#__PURE__*/React.createElement('path', { stroke: 'none', d: 'M0 0h24v24H0z', fill: 'none' }),
-      /*#__PURE__*/React.createElement('line', { x1: '18', y1: '6', x2: '6', y2: '18' }),
-      /*#__PURE__*/React.createElement('line', { x1: '6', y1: '6', x2: '18', y2: '18' })
-    );
-
     /* === UNIFIED CARD LAYOUT (badge + edit/delete on one header row, full-width bubble
        below, single-line timestamp bottom-right) === */
     return /*#__PURE__*/React.createElement('div', {
@@ -1647,7 +1645,7 @@ export function CommentsSection({
             /*#__PURE__*/React.createElement('button', {
               type: 'button', onClick: () => onDeleteMessage && onDeleteMessage(msg), title: '삭제',
               style: { width: '22px', height: '22px', border: 'none', background: 'none', padding: 0, cursor: 'pointer', color: '#94A3B8', display: 'flex', alignItems: 'center', justifyContent: 'center' }
-            }, deleteSvg)
+            }, /*#__PURE__*/React.createElement(TrashIcon, { size: 14 }))
           ) : null
         )
       ),

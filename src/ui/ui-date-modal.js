@@ -2693,7 +2693,7 @@ export function DateModal({
                   color: 'var(--text-muted)'
                 },
                 onClick: event => handleDeleteExpenseClick(event, expense.id)
-              }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 14 }))
+              }, /*#__PURE__*/React.createElement(TrashIcon, { size: 14 }))
             ),
             /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '4px', minWidth: 0 } },
               /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' } },

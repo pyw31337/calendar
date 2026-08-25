@@ -1191,17 +1191,7 @@ export function ChatRoomView({
           alignItems: 'center',
           justifyContent: 'flex-end'
         }
-      }, /*#__PURE__*/React.createElement("svg", {
-        xmlns: "http://www.w3.org/2000/svg",
-        width: "13",
-        height: "13",
-        viewBox: "0 0 24 24",
-        fill: "none",
-        stroke: "currentColor",
-        strokeWidth: "2",
-        strokeLinecap: "round",
-        strokeLinejoin: "round"
-      }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), /*#__PURE__*/React.createElement("path", { d: "M18 6l-12 12" }), /*#__PURE__*/React.createElement("path", { d: "M6 6l12 12" }))),
+      }, /*#__PURE__*/React.createElement(TrashIcon, { size: 13 })),
       /* Bottom: Edit button + Timestamp */
       /*#__PURE__*/React.createElement("div", {
         style: {
