@@ -931,6 +931,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
   const [imageUrlModalOpen, setImageUrlModalOpen] = React.useState(false);
   const [imageDimensions, setImageDimensions] = React.useState({});
   const [displayUrls, setDisplayUrls] = React.useState(urls);
+  const [imageLoadFailed, setImageLoadFailed] = React.useState(false);
   // Zoom is PC-only -- mobile already has native pinch-to-zoom on the image, and a live
   // matchMedia listener (not a one-time read) so the buttons correctly appear/disappear if a
   // desktop window is resized narrow or a tablet is rotated while the lightbox is open.
@@ -1059,8 +1060,11 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
     onClose();
   };
   React.useEffect(() => { setDisplayUrls(urls); }, [urls]);
-  React.useEffect(() => { setShowInfo(false); }, [index]);
+  React.useEffect(() => { setShowInfo(false); setImageLoadFailed(false); }, [index]);
   const currentUrl = displayUrls[index] || urls[index];
+  React.useEffect(() => {
+    setImageLoadFailed(false);
+  }, [currentUrl]);
   const currentInfo = React.useMemo(
     () => {
       const base = buildLightboxImageInfo(currentUrl, meta && meta[index] && meta[index].timestamp);
@@ -1440,6 +1444,15 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
     }
     closeLightbox();
   };
+  const handleCurrentImageError = () => {
+    const thumbUrl = String(currentMeta && currentMeta.thumb || '').trim();
+    const current = String(currentUrl || '').trim();
+    if (thumbUrl && thumbUrl !== current) {
+      setDisplayUrls(prev => prev.map((item, i) => i === index ? thumbUrl : item));
+      return;
+    }
+    setImageLoadFailed(true);
+  };
 
   // Shared by both the carousel's "current" slot and the single-image layout below --
   // top-right pencil (교체)/X (삭제) buttons, reusing the same icons already used for editing
@@ -1478,53 +1491,83 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
     }, isDeletingPhoto ? '...' : /*#__PURE__*/React.createElement(SmallXIcon, { size: 15 }))
   );
 
-  const renderSlide = (url, slot) => /*#__PURE__*/React.createElement("div", {
-    style: { width: '33.3333%', flexShrink: 0, height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }
-  }, url && (slot === 'current' ? /*#__PURE__*/React.createElement("div", {
-    style: { position: 'relative', display: 'inline-flex', maxWidth: '100%', maxHeight: '100%' },
-    onClick: handleImageTap
-  }, /*#__PURE__*/React.createElement("img", {
-    ref: zoomedImgRef,
-    src: url,
-    alt: "원본 이미지",
-    "data-slide": slot,
-    draggable: false,
-    decoding: 'async',
-    referrerPolicy: 'no-referrer',
-    onLoad: e => recordImageDimensions(url, e),
-    onMouseDown: handleZoomedImageMouseDown,
-    style: {
-      maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: 'var(--radius-md)',
-      display: 'block', ...zoomImageStyle
+  const renderSlide = (url, slot) => {
+    const wrapperStyle = { width: '33.3333%', flexShrink: 0, height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' };
+    if (!url) return /*#__PURE__*/React.createElement("div", { style: wrapperStyle });
+
+    if (slot === 'current') {
+      if (imageLoadFailed) {
+        return /*#__PURE__*/React.createElement("div", { style: wrapperStyle }, /*#__PURE__*/React.createElement("div", {
+          style: {
+            width: '100%',
+            maxWidth: '100%',
+            maxHeight: '100%',
+            aspectRatio: '1 / 1',
+            borderRadius: 'var(--radius-md)',
+            backgroundColor: 'var(--bg-card)',
+            border: '1px dashed var(--border-subtle)',
+            color: 'var(--text-muted)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '24px',
+            textAlign: 'center',
+            fontSize: '0.9rem',
+            fontWeight: 700
+          }
+        }, "이미지를 불러오지 못했습니다."));
+      }
+
+      return /*#__PURE__*/React.createElement("div", { style: wrapperStyle }, /*#__PURE__*/React.createElement("div", {
+        style: { position: 'relative', display: 'inline-flex', maxWidth: '100%', maxHeight: '100%' },
+        onClick: handleImageTap
+      }, /*#__PURE__*/React.createElement("img", {
+        ref: zoomedImgRef,
+        src: url,
+        alt: "원본 이미지",
+        "data-slide": slot,
+        draggable: false,
+        decoding: 'async',
+        referrerPolicy: 'no-referrer',
+        onLoad: e => recordImageDimensions(url, e),
+        onError: handleCurrentImageError,
+        onMouseDown: handleZoomedImageMouseDown,
+        style: {
+          maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: 'var(--radius-md)',
+          display: 'block', ...zoomImageStyle
+        }
+      }), renderPhotoActions(), showInfo && /*#__PURE__*/React.createElement(LightboxInfoPanel, {
+        info: currentInfo,
+        tags: currentTags,
+        onSaveTags: saveCurrentTags,
+        onSearchTag: onSearchTag,
+        onOpenUrl: () => setImageUrlModalOpen(true),
+        showToast: showToast,
+        sourceInfo: sourceInfo,
+        showZoomControls: isDesktop,
+        zoomLevel: zoomLevel,
+        zoomMin: ZOOM_MIN,
+        zoomMax: ZOOM_MAX,
+        onZoomIn: handleZoomIn,
+        onZoomOut: handleZoomOut,
+        onZoomReset: handleZoomReset
+      })));
     }
-  }), renderPhotoActions(), showInfo && /*#__PURE__*/React.createElement(LightboxInfoPanel, {
-    info: currentInfo,
-    tags: currentTags,
-    onSaveTags: saveCurrentTags,
-    onSearchTag: onSearchTag,
-    onOpenUrl: () => setImageUrlModalOpen(true),
-    showToast: showToast,
-    sourceInfo: sourceInfo,
-    showZoomControls: isDesktop,
-    zoomLevel: zoomLevel,
-    zoomMin: ZOOM_MIN,
-    zoomMax: ZOOM_MAX,
-    onZoomIn: handleZoomIn,
-    onZoomOut: handleZoomOut,
-    onZoomReset: handleZoomReset
-  })) : /*#__PURE__*/React.createElement("img", {
-    src: url,
-    alt: "원본 이미지",
-    "data-slide": slot,
-    draggable: false,
-    decoding: 'async',
-    referrerPolicy: 'no-referrer',
-    onLoad: e => recordImageDimensions(url, e),
-    onClick: e => e.stopPropagation(),
-    style: {
-      maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: 'var(--radius-md)'
-    }
-  })));
+
+    return /*#__PURE__*/React.createElement("div", { style: wrapperStyle }, /*#__PURE__*/React.createElement("img", {
+      src: url,
+      alt: "원본 이미지",
+      "data-slide": slot,
+      draggable: false,
+      decoding: 'async',
+      referrerPolicy: 'no-referrer',
+      onLoad: e => recordImageDimensions(url, e),
+      onClick: e => e.stopPropagation(),
+      style: {
+        maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: 'var(--radius-md)'
+      }
+    }));
+  };
 
   const lightboxNode = /*#__PURE__*/React.createElement("div", {
     className: "lightbox-overlay",

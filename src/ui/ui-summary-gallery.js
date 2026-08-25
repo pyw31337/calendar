@@ -806,12 +806,15 @@ export function PhotoGallery({ chatMessages, calendar = null, totalGalleryCount,
   const __comp = window.GATHER_UI_COMPONENTS || {};
   const GalleryIcon = __deps.GalleryIcon;
   const Lightbox = __comp.Lightbox || __deps.Lightbox;
+  const MediaThumb = __comp.MediaThumb || __deps.MediaThumb;
   const resolveMeetingPhotoDisplay = __deps.resolveMeetingPhotoDisplay;
   const SectionCountBadge = __comp.SectionCountBadge;
   const SectionToggleButton = __comp.SectionToggleButton;
 
   const [collapsed, setCollapsed] = React.useState(false);
   const [lightbox, setLightbox] = React.useState(null);
+  const brokenPhotoKeysRef = React.useRef(new Set());
+  const [brokenPhotoRevision, setBrokenPhotoRevision] = React.useState(0);
 
   const photoEntries = React.useMemo(() => {
     const sorted = [...(chatMessages || [])].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
@@ -876,11 +879,36 @@ export function PhotoGallery({ chatMessages, calendar = null, totalGalleryCount,
     });
     return Array.from(byUrl.values()).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
   }, [chatMessages, calendar]);
+  const visibleEntries = React.useMemo(() => photoEntries.filter(entry => !brokenPhotoKeysRef.current.has(entry.key)), [photoEntries, brokenPhotoRevision]);
+
+  const handleBrokenPhoto = photo => {
+    if (!photo?.key || brokenPhotoKeysRef.current.has(photo.key)) return;
+    brokenPhotoKeysRef.current.add(photo.key);
+    setBrokenPhotoRevision(prev => prev + 1);
+    if (typeof onDeletePhoto !== 'function') return;
+    const isMeetingReference = !!photo.sourceMessageId && Number.isInteger(photo.sourceImageIndex)
+      && (photo.source === 'meeting' || photo.uploadSource === 'meeting' || photo.meetingDate || photo.photoId);
+    const deletionMeta = {
+      source: isMeetingReference ? 'chat' : (photo.source || 'chat'),
+      uploadSource: isMeetingReference ? 'chat' : (photo.uploadSource || (photo.source === 'memo' ? 'memo' : 'chat')),
+      imageUrl: photo.full || photo.thumb || '',
+      thumbUrl: photo.thumb || photo.full || '',
+      messageId: isMeetingReference ? photo.sourceMessageId : (photo.messageId || photo.sourceMessageId || ''),
+      imageIndex: isMeetingReference
+        ? photo.sourceImageIndex
+        : (Number.isInteger(photo.imageIndex) ? photo.imageIndex : (Number.isInteger(photo.sourceImageIndex) ? photo.sourceImageIndex : 0)),
+      sourceMessageId: photo.sourceMessageId || '',
+      sourceImageIndex: Number.isInteger(photo.sourceImageIndex) ? photo.sourceImageIndex : null,
+      meetingDate: isMeetingReference ? '' : (photo.meetingDate || ''),
+      photoId: isMeetingReference ? '' : (photo.photoId || '')
+    };
+    Promise.resolve(onDeletePhoto(deletionMeta)).catch(err => console.warn('Broken gallery preview cleanup failed:', err));
+  };
 
   const badgeCount = (typeof totalGalleryCount === 'number' && totalGalleryCount > 0)
-    ? Math.max(totalGalleryCount, photoEntries.length)
-    : photoEntries.length;
-  const displayedEntries = photoEntries
+    ? Math.max(totalGalleryCount, visibleEntries.length)
+    : visibleEntries.length;
+  const displayedEntries = visibleEntries
     .filter(e => (e && ((e.thumb && String(e.thumb)) || (e.full && String(e.full)))))
     .slice(0, 12);
   const openGalleryPage = () => { if (typeof onViewAll === 'function') onViewAll(); };
@@ -917,9 +945,10 @@ export function PhotoGallery({ chatMessages, calendar = null, totalGalleryCount,
       /*#__PURE__*/React.createElement("div", {
         style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(80px, 100%), 1fr))', gap: '6px', marginTop: '12px' }
       },
-        displayedEntries.map((entry, idx) => /*#__PURE__*/React.createElement("img", {
+        displayedEntries.map((entry, idx) => /*#__PURE__*/React.createElement(MediaThumb, {
           key: entry.key,
           src: (entry.thumb && String(entry.thumb)) || (entry.full && String(entry.full)) || '',
+          fallbackSrc: (entry.full && String(entry.full)) || (entry.thumb && String(entry.thumb)) || '',
           alt: "채팅에 첨부된 사진",
           loading: "lazy",
           decoding: "async",
@@ -929,6 +958,7 @@ export function PhotoGallery({ chatMessages, calendar = null, totalGalleryCount,
             meta: displayedEntries.map(e => ({ timestamp: e.timestamp, messageId: e.messageId, imageIndex: e.imageIndex, thumb: e.thumb, tags: e.tags, directMediaUrl: e.directMediaUrl, source: e.source, uploadSource: e.uploadSource, meetingDate: e.meetingDate, photoId: e.photoId, sourceMessageId: e.sourceMessageId, sourceImageIndex: e.sourceImageIndex })),
             index: idx
           }),
+          onBroken: () => handleBrokenPhoto(entry),
           style: { width: '100%', aspectRatio: '1 / 1', objectFit: 'cover', borderRadius: 'var(--radius-sm)', cursor: 'pointer' }
         }))
       ),

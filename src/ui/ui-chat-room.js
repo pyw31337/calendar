@@ -1995,6 +1995,7 @@ export function ChatRoomView({
     chatMessages: chatMessages,
     onClose: () => setIsChatGalleryOpen(false),
     setActiveLightbox: setActiveLightbox,
+    onDeletePhoto: onDeletePhoto,
     hasMoreOlderChat: hasMoreOlderChat,
     loadingOlderChat: loadingOlderChat,
     onLoadOlderChat: onLoadOlderChat,

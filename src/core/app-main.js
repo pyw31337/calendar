@@ -4835,6 +4835,7 @@ function App() {
           if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 공유 정보를 확인해 주세요.')) setIsShareOpen(true);
         },
         setActiveLightbox: setActiveLightbox,
+        onDeletePhoto: handleDeletePhoto,
         hasMoreOlderChat: hasMoreOlderChat,
         loadingOlderChat: loadingOlderChat,
         onLoadOlderChat: loadOlderChatMessages,
@@ -5121,6 +5122,7 @@ function App() {
       if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 공유 정보를 확인해 주세요.')) setIsShareOpen(true);
     },
     setActiveLightbox: setActiveLightbox,
+    onDeletePhoto: handleDeletePhoto,
     showToast: showToast
   }), isGuideOpen && /*#__PURE__*/React.createElement(UserManualOverlay, {
     calendar: activeCal,

@@ -8,7 +8,6 @@ const GATHER_APP_CHAT_DATA = window.GATHER_APP_CHAT_DATA || {};
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
 const GATHER_APP_CONSTANTS = window.GATHER_APP_CONSTANTS || {};
 const GATHER_APP_CONFIG = window.GATHER_APP_CONFIG || {};
-const NO_IMAGE_ICON_DATA_URI = 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-image-off-icon lucide-image-off"><line x1="2" x2="22" y1="2" y2="22"/><path d="M10.41 10.41a2 2 0 1 1-2.83-2.83"/><line x1="13.5" x2="6" y1="13.5" y2="21"/><line x1="18" x2="21" y1="12" y2="15"/><path d="M3.59 3.59A1.99 1.99 0 0 0 3 5v14a2 2 0 0 0 2 2h14c.55 0 1.052-.22 1.41-.59"/><path d="M21 15V5a2 2 0 0 0-2-2H9"/></svg>');
 function __gatherUiDeps() { return window.GATHER_UI_DEPS || {}; }
 function getActiveAvailabilities(calendar) {
   const f = __gatherUiDeps().getActiveAvailabilities || GATHER_APP_UTILS.getActiveAvailabilities;
@@ -727,6 +726,7 @@ export function DateModal({
   const LineHeightIcon = __deps.LineHeightIcon;
   const SegmentedToggle = __deps.SegmentedToggle;
   const SimpleBottomSheetPicker = __comp.SimpleBottomSheetPicker || __deps.SimpleBottomSheetPicker;
+  const MediaThumb = __comp.MediaThumb || __deps.MediaThumb;
   const UrlCapsuleBadge = __deps.UrlCapsuleBadge;
   const SmallXIcon = __deps.SmallXIcon;
   const getActiveParticipants = __deps.getActiveParticipants;
@@ -749,6 +749,8 @@ export function DateModal({
   const [isSheetOpen, setIsSheetOpen] = React.useState(false);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const noteInputRef = React.useRef(null);
+  const brokenMeetingPhotoKeysRef = React.useRef(new Set());
+  const [brokenMeetingPhotoRevision, setBrokenMeetingPhotoRevision] = React.useState(0);
   const activeParticipants = getActiveParticipants(calendar);
   const dateEntries = getActiveAvailabilities(calendar).filter(e => e.date === dateStr);
   const dateAnns = getAnniversariesForDate(dateStr, anniversaries);
@@ -1247,6 +1249,36 @@ export function DateModal({
 
     return [...directPhotos, ...chatPhotos].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   }, [confirmedMeetingEntry, chatMessages, chatMessagesWithFetchedSources, dateStr]);
+  const visibleMeetingPhotos = React.useMemo(
+    () => meetingPhotos.filter(photo => !brokenMeetingPhotoKeysRef.current.has(photo.id || photo.imageUrl || photo.thumbUrl)),
+    [meetingPhotos, brokenMeetingPhotoRevision]
+  );
+  const handleBrokenMeetingPhoto = photo => {
+    const key = photo?.id || photo?.imageUrl || photo?.thumbUrl;
+    if (!key || brokenMeetingPhotoKeysRef.current.has(key)) return;
+    brokenMeetingPhotoKeysRef.current.add(key);
+    setBrokenMeetingPhotoRevision(prev => prev + 1);
+    const isMeetingReference = !!photo?.sourceMessageId && Number.isInteger(photo?.sourceImageIndex)
+      && (photo?.source === 'meeting' || photo?.uploadSource === 'meeting' || photo?.meetingDate || photo?.photoId);
+    const deletionMeta = {
+      source: isMeetingReference ? 'chat' : (photo.source || 'meeting'),
+      uploadSource: isMeetingReference ? 'chat' : (photo.uploadSource || (photo.source === 'chat-tag' ? 'chat' : 'meeting')),
+      imageUrl: photo.imageUrl || photo.thumbUrl || '',
+      thumbUrl: photo.thumbUrl || photo.imageUrl || '',
+      sourceMessageId: photo.sourceMessageId,
+      sourceImageIndex: photo.sourceImageIndex,
+      messageId: isMeetingReference ? photo.sourceMessageId : (photo.messageId || photo.sourceMessageId),
+      imageIndex: isMeetingReference ? photo.sourceImageIndex : (Number.isInteger(photo.imageIndex) ? photo.imageIndex : photo.sourceImageIndex),
+      meetingDate: isMeetingReference ? '' : dateStr,
+      photoId: isMeetingReference ? '' : photo.id
+    };
+    const cleanup = typeof onDeletePhoto === 'function'
+      ? Promise.resolve(onDeletePhoto(deletionMeta))
+      : (typeof onDeleteMeetingPhoto === 'function'
+        ? Promise.resolve(onDeleteMeetingPhoto(dateStr, photo.id, deletionMeta.imageUrl))
+        : Promise.resolve(false));
+    cleanup.catch(err => console.warn('Broken meeting photo cleanup failed:', err));
+  };
   const meetingPhotoInputRef = React.useRef(null);
   const [isSavingMeetingPhotos, setIsSavingMeetingPhotos] = React.useState(false);
   const hasClipboardImage = useClipboardHasImage(activeTab === 'photo');
@@ -2758,7 +2790,7 @@ export function DateModal({
       },
         /*#__PURE__*/React.createElement("label", {
           style: { fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-muted)' }
-        }, `등록된 사진 (${meetingPhotos.length}장)`),
+        }, `등록된 사진 (${visibleMeetingPhotos.length}장)`),
         !adminMode && /*#__PURE__*/React.createElement("div", {
           style: { display: 'flex', alignItems: 'center', gap: '6px' }
         },
@@ -2794,7 +2826,7 @@ export function DateModal({
         )
       ),
       /* Empty State or Photo Grid */
-      meetingPhotos.length === 0 ? /*#__PURE__*/React.createElement("div", {
+      visibleMeetingPhotos.length === 0 ? /*#__PURE__*/React.createElement("div", {
         style: { textAlign: 'center', color: 'var(--text-muted)', padding: '24px 0', fontSize: '0.82rem', border: '1px dashed var(--border-subtle)', borderRadius: 'var(--radius-md)' }
       }, "등록된 사진이 없습니다.") : /*#__PURE__*/React.createElement("div", {
         style: {
@@ -2802,24 +2834,18 @@ export function DateModal({
           gridTemplateColumns: 'repeat(auto-fill, minmax(76px, 1fr))',
           gap: '8px'
         }
-      }, meetingPhotos.map((photo, index) => /*#__PURE__*/React.createElement("div", {
+      }, visibleMeetingPhotos.map((photo, index) => /*#__PURE__*/React.createElement("div", {
         key: photo.id || `${photo.imageUrl}_${index}`,
         style: { position: 'relative', minWidth: 0 }
       },
-        /*#__PURE__*/React.createElement("img", {
+        /*#__PURE__*/React.createElement(MediaThumb, {
           src: photo.thumbUrl || photo.imageUrl,
+          fallbackSrc: photo.imageUrl || photo.thumbUrl,
           alt: "일정 사진",
           loading: "lazy",
           decoding: "async",
           referrerPolicy: "no-referrer",
-          onError: e => {
-            e.currentTarget.onerror = null;
-            e.currentTarget.src = NO_IMAGE_ICON_DATA_URI;
-            e.currentTarget.style.color = 'var(--text-muted)';
-            e.currentTarget.style.objectFit = 'contain';
-            e.currentTarget.style.padding = '12px';
-            e.currentTarget.style.backgroundColor = '#F1F5F9';
-          },
+          onBroken: () => handleBrokenMeetingPhoto(photo),
           onClick: () => {
             if (typeof setActiveLightbox === 'function') {
               // Lightbox expects { urls, index, meta } (array-shaped, for prev/next
@@ -2831,9 +2857,9 @@ export function DateModal({
               // route through source:'meeting' + sourceMessageId/sourceImageIndex/
               // meetingDate/photoId (see handleDeletePhoto/handleSaveImageTags in app-main.js).
               setActiveLightbox({
-                urls: meetingPhotos.map(p => p.imageUrl || p.thumbUrl),
+                urls: visibleMeetingPhotos.map(p => p.imageUrl || p.thumbUrl),
                 index,
-                meta: meetingPhotos.map(p => ({
+                meta: visibleMeetingPhotos.map(p => ({
                   timestamp: p.createdAt,
                   tags: p.tags,
                   source: p.source || 'meeting',

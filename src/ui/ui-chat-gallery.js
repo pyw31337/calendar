@@ -735,7 +735,8 @@ export function ChatGalleryModal({
   onIncreaseFont,
   isChatNotifyEnabled,
   onToggleChatNotifications,
-  showToast
+  showToast,
+  onDeletePhoto = null
 }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -747,6 +748,7 @@ export function ChatGalleryModal({
   const InlineSearchBar = __comp.InlineSearchBar || __deps.InlineSearchBar;
   const LinkPreviewCard = __deps.LinkPreviewCard || __comp.LinkPreviewCard;
   const MenuIcon = __deps.MenuIcon || __comp.MenuIcon;
+  const MediaThumb = __comp.MediaThumb || __deps.MediaThumb;
   const getMessageImageEntries = __deps.getMessageImageEntries;
   const resolveMeetingPhotoDisplay = __deps.resolveMeetingPhotoDisplay;
   const removeFirstUrl = __deps.removeFirstUrl;
@@ -760,6 +762,8 @@ export function ChatGalleryModal({
   const uploadInputRef = React.useRef(null);
   const hasClipboardImage = useClipboardHasImage(true);
   const [pastePreview, setPastePreview] = React.useState(null); // { files, previewUrls } | null
+  const brokenPhotoKeysRef = React.useRef(new Set());
+  const [brokenPhotoRevision, setBrokenPhotoRevision] = React.useState(0);
   React.useEffect(() => () => {
     // Safety net if the component unmounts (e.g. gallery closed) while the preview is still open.
     if (pastePreview) pastePreview.previewUrls.forEach(url => { try { URL.revokeObjectURL(url); } catch (e) {} });
@@ -947,6 +951,31 @@ export function ChatGalleryModal({
       return matchTags || matchText;
     });
   }, [sharedPhotos, searchQuery]);
+  const visiblePhotos = React.useMemo(() => filteredPhotos.filter(photo => !brokenPhotoKeysRef.current.has(photo.key)), [filteredPhotos, brokenPhotoRevision]);
+
+  const handleBrokenPhoto = photo => {
+    if (!photo?.key || brokenPhotoKeysRef.current.has(photo.key)) return;
+    brokenPhotoKeysRef.current.add(photo.key);
+    setBrokenPhotoRevision(prev => prev + 1);
+    if (typeof onDeletePhoto !== 'function') return;
+    const isMeetingReference = !!photo.sourceMessageId && Number.isInteger(photo.sourceImageIndex)
+      && (photo.source === 'meeting' || photo.uploadSource === 'meeting' || photo.meetingDate || photo.photoId);
+    const deletionMeta = {
+      source: isMeetingReference ? 'chat' : (photo.source || 'chat'),
+      uploadSource: isMeetingReference ? 'chat' : (photo.uploadSource || (photo.source === 'memo' ? 'memo' : 'chat')),
+      imageUrl: photo.full || photo.thumb || '',
+      thumbUrl: photo.thumb || photo.full || '',
+      messageId: isMeetingReference ? photo.sourceMessageId : (photo.messageId || photo.sourceMessageId || ''),
+      imageIndex: isMeetingReference
+        ? photo.sourceImageIndex
+        : (Number.isInteger(photo.imageIndex) ? photo.imageIndex : (Number.isInteger(photo.sourceImageIndex) ? photo.sourceImageIndex : 0)),
+      sourceMessageId: photo.sourceMessageId || '',
+      sourceImageIndex: Number.isInteger(photo.sourceImageIndex) ? photo.sourceImageIndex : null,
+      meetingDate: isMeetingReference ? '' : (photo.meetingDate || ''),
+      photoId: isMeetingReference ? '' : (photo.photoId || '')
+    };
+    Promise.resolve(onDeletePhoto(deletionMeta)).catch(err => console.warn('Broken gallery photo cleanup failed:', err));
+  };
 
   // Search must scan the full history: drain older chat pages (and memo pages) while a query is active.
   React.useEffect(() => {
@@ -965,9 +994,9 @@ export function ChatGalleryModal({
   React.useEffect(() => {
     if (!asPage || (searchQuery || '').trim() || activeTab !== 'photos') return;
     if (typeof onLoadOlderChat !== 'function' || !hasMoreOlderChat || loadingOlderChat) return;
-    if ((sharedPhotos || []).length >= 60) return;
+    if ((visiblePhotos || []).length >= 60) return;
     onLoadOlderChat();
-  }, [asPage, searchQuery, activeTab, hasMoreOlderChat, loadingOlderChat, (sharedPhotos || []).length, (chatMessages || []).length]);
+  }, [asPage, searchQuery, activeTab, hasMoreOlderChat, loadingOlderChat, (visiblePhotos || []).length, (chatMessages || []).length]);
 
   // Was missing entirely: the 사진 tab's auto-load above only ever watches photo count, so once
   // it had loaded "enough" photos it stopped pulling in older chat/memo history for good --
@@ -982,9 +1011,9 @@ export function ChatGalleryModal({
     if (typeof onLoadMoreMemos === 'function' && hasMoreMemos) onLoadMoreMemos();
   }, [asPage, searchQuery, activeTab, hasMoreOlderChat, loadingOlderChat, hasMoreMemos, (sharedLinks || []).length, (chatMessages || []).length, (memos || []).length]);
 
-  const displayPhotoTabCount = (typeof totalGalleryCount === 'number' && totalGalleryCount > (sharedPhotos || []).length)
+  const displayPhotoTabCount = (typeof totalGalleryCount === 'number' && totalGalleryCount > (visiblePhotos || []).length)
     ? totalGalleryCount
-    : (sharedPhotos || []).length;
+    : (visiblePhotos || []).length;
 
   const handleUploadClick = () => {
     if (uploadInputRef.current) uploadInputRef.current.click();
@@ -1309,7 +1338,7 @@ export function ChatGalleryModal({
     }
   }, [['photos', '사진'], ['links', '링크']].map(tab => {
     const count = tab[0] === 'photos'
-      ? ((searchQuery || '').trim() ? filteredPhotos.length : displayPhotoTabCount)
+      ? ((searchQuery || '').trim() ? visiblePhotos.length : displayPhotoTabCount)
       : filteredLinks.length;
     return /*#__PURE__*/React.createElement("button", {
       key: tab[0],
@@ -1384,7 +1413,7 @@ export function ChatGalleryModal({
       }
     }, loadingOlderChat ? '이전 링크를 불러오는 중…' : '이전 링크 더 보기')
   ) : /*#__PURE__*/React.createElement(React.Fragment, null,
-    filteredPhotos.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    visiblePhotos.length === 0 ? /*#__PURE__*/React.createElement("div", {
       style: { textAlign: 'center', color: 'var(--text-muted)', padding: '40px 0', fontSize: '0.88rem' }
     }, searchQuery
       ? "검색 결과가 없습니다."
@@ -1401,20 +1430,22 @@ export function ChatGalleryModal({
         width: '100%',
         alignContent: 'start'
       }
-    }, filteredPhotos.map((photo, idx) => /*#__PURE__*/React.createElement("img", {
+    }, visiblePhotos.map((photo, idx) => /*#__PURE__*/React.createElement(MediaThumb, {
       key: `${photo.messageId || photo.source || 'photo'}-${photo.meetingDate || ''}-${photo.directMediaUrl ? 'direct' : photo.imageIndex}-${photo.timestamp || idx}`,
       "data-photo-url": photo.full || photo.thumb,
       "data-message-id": photo.messageId || photo.sourceMessageId,
       src: (photo.thumb && String(photo.thumb)) || (photo.full && String(photo.full)) || '',
+      fallbackSrc: (photo.full && String(photo.full)) || (photo.thumb && String(photo.thumb)) || '',
       alt: "공유사진",
       loading: "lazy",
       decoding: "async",
       referrerPolicy: 'no-referrer',
       onClick: () => setActiveLightbox && setActiveLightbox({
-        urls: filteredPhotos.map(p => p.full),
+        urls: visiblePhotos.map(p => p.full),
         index: idx,
-        meta: filteredPhotos.map(p => ({ timestamp: p.timestamp, messageId: p.messageId, imageIndex: p.imageIndex, thumb: p.thumb, tags: p.tags, directMediaUrl: p.directMediaUrl, source: p.source, uploadSource: p.uploadSource, meetingDate: p.meetingDate, photoId: p.photoId, sourceMessageId: p.sourceMessageId, sourceImageIndex: p.sourceImageIndex }))
+        meta: visiblePhotos.map(p => ({ timestamp: p.timestamp, messageId: p.messageId, imageIndex: p.imageIndex, thumb: p.thumb, tags: p.tags, directMediaUrl: p.directMediaUrl, source: p.source, uploadSource: p.uploadSource, meetingDate: p.meetingDate, photoId: p.photoId, sourceMessageId: p.sourceMessageId, sourceImageIndex: p.sourceImageIndex }))
       }),
+      onBroken: () => handleBrokenPhoto(photo),
       style: {
         width: '100%',
         maxWidth: '100%',
