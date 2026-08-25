@@ -2357,6 +2357,23 @@ function buildCalendarConfirmedMeetingsICS(calendar, events) {
   return lines.join('\r\n');
 }
 
+function getPhotoFileTypeLabel(photo) {
+  const rawUrl = [photo?.imageUrl, photo?.thumbUrl, photo?.full, photo?.thumb]
+    .find(value => typeof value === 'string' && value.trim()) || '';
+  if (!rawUrl) return 'unknown';
+  if (/^data:image\//i.test(rawUrl)) {
+    const match = rawUrl.match(/^data:image\/([a-z0-9.+-]+);/i);
+    if (!match) return 'image';
+    const mimeType = match[1].toLowerCase().split('+')[0];
+    return mimeType === 'jpeg' ? 'jpg' : mimeType;
+  }
+  const cleaned = rawUrl.split('?')[0].split('#')[0];
+  const match = cleaned.match(/\.([a-z0-9]+)$/i);
+  if (!match) return 'unknown';
+  const ext = match[1].toLowerCase();
+  return ext === 'jpeg' ? 'jpg' : ext;
+}
+
 // Per-date description: the admin's own confirmation note plus every participant's memo for
 // that date, same content the old per-row export used to show.
 function buildConfirmedMeetingDescription(calendar, dateStr) {
@@ -2418,6 +2435,7 @@ function buildAdminDashboardMetrics(calendarsList) {
     const participantIds = new Set(participants.map(participant => participant.id));
     const schedules = getActiveAvailabilities(cal);
     const polls = getCalendarPolls(cal);
+    const meetings = getConfirmedMeetings(cal);
     const pollMetrics = polls.reduce((acc, poll) => {
       const options = getActivePollOptions(poll);
       const optionIds = new Set(options.map(option => option.id));
@@ -2470,6 +2488,17 @@ function buildAdminDashboardMetrics(calendarsList) {
     const deletedCount = storedAvailabilities - schedules.length;
     const sizeBytes = estimateFirestoreDocumentSize(cal);
     const confirmedCount = getTrulyConfirmedMeetings(cal).length;
+    const photoDateBuckets = [];
+    let photoCount = 0;
+    meetings.forEach(meeting => {
+      const photos = Array.isArray(meeting.photos) ? meeting.photos : [];
+      if (photos.length === 0) return;
+      photoCount += photos.length;
+      photoDateBuckets.push({ date: meeting.date, count: photos.length });
+    });
+    const photoTopDates = photoDateBuckets
+      .sort((a, b) => b.count - a.count || a.date.localeCompare(b.date))
+      .slice(0, 5);
     return {
       calendar: cal,
       participants,
@@ -2490,7 +2519,9 @@ function buildAdminDashboardMetrics(calendarsList) {
       storedAvailabilities,
       deletedCount,
       sizeBytes,
-      sizePercent: Math.round(sizeBytes / 1048576 * 1000) / 10
+      sizePercent: Math.round(sizeBytes / 1048576 * 1000) / 10,
+      photoCount,
+      photoTopDates
     };
   });
   const allSchedules = calendarStats.flatMap(stat => stat.schedules.map(item => ({ ...item, calendarId: stat.calendar.id })));
@@ -2500,11 +2531,13 @@ function buildAdminDashboardMetrics(calendarsList) {
   const totalPollOptions = calendarStats.reduce((sum, stat) => sum + stat.pollOptionCount, 0);
   const totalPollVotes = calendarStats.reduce((sum, stat) => sum + stat.pollVoteCount, 0);
   const totalConfirmedMeetings = calendarStats.reduce((sum, stat) => sum + stat.confirmedCount, 0);
+  const totalPhotos = calendarStats.reduce((sum, stat) => sum + stat.photoCount, 0);
   const uniqueDateCount = new Set(allSchedules.map(item => `${item.calendarId}_${item.date}`)).size;
   const upcomingCount = allSchedules.filter(item => item.date >= todayStr).length;
   const memoCount = allSchedules.filter(item => item.note).length;
   const maxSchedules = Math.max(1, ...calendarStats.map(stat => stat.schedules.length));
   const maxMonthCount = Math.max(1, ...calendarStats.flatMap(stat => stat.monthStats.map(item => item.count)));
+  const latestCalendarUpdatedAt = Math.max(0, ...calendarStats.map(stat => Number(stat.calendar?.updatedAt || 0)));
   const qualityWarnings = calendarStats.flatMap(stat => {
     const warnings = [];
     if (stat.sizePercent >= 75) warnings.push(`${stat.calendar.id}: Firestore 문서 크기 ${stat.sizePercent}%`);
@@ -2523,11 +2556,13 @@ function buildAdminDashboardMetrics(calendarsList) {
     totalPollOptions,
     totalPollVotes,
     totalConfirmedMeetings,
+    totalPhotos,
     uniqueDateCount,
     upcomingCount,
     memoCount,
     maxSchedules,
     maxMonthCount,
+    latestCalendarUpdatedAt,
     qualityWarnings,
     serviceUsage: buildServiceUsageMetrics(calendarStats)
   };

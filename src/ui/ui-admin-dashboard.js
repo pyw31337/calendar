@@ -2277,6 +2277,7 @@ export function AdminDashboard({ initialCalendars }) {
             { key: 'memo', label: '메모 일정 수', val: dashboard.memoCount, perCal: stat => stat.memoCount, unit: '건' },
             { key: 'confirmed', label: '확정 모임 수', val: dashboard.totalConfirmedMeetings, perCal: stat => stat.confirmedCount, unit: '건' },
             { key: 'chatMessages', label: '총 채팅 메시지', val: dashboard.calendarStats.reduce((sum, stat) => sum + (adminMsgTotal[stat.calendar.id] != null ? adminMsgTotal[stat.calendar.id] : (messagesMap[stat.calendar.id] || []).length), 0), perCal: stat => (adminMsgTotal[stat.calendar.id] != null ? adminMsgTotal[stat.calendar.id] : (messagesMap[stat.calendar.id] || []).length), unit: '건' },
+            { key: 'photoTotal', label: '총 일정 사진', val: dashboard.totalPhotos, perCal: stat => stat.photoCount, unit: '장' },
             { key: 'polls', label: '총 투표 수', val: dashboard.totalPolls, perCal: stat => stat.pollCount, unit: '건' },
             { key: 'pollVotes', label: '총 투표자 수', val: dashboard.totalPollVotes, perCal: stat => stat.pollVoteCount, unit: '명' }
           ].map(box => {
@@ -2311,9 +2312,9 @@ export function AdminDashboard({ initialCalendars }) {
             /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.7rem', padding: '2px 8px', borderRadius: 'var(--radius-full)', backgroundColor: '#DCFCE7', color: '#16A34A', fontWeight: 'bold' } }, "통합 캐시 사용 중")
           ),
           /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.8rem', color: '#64748B', marginTop: '8px', lineHeight: 1.6 } },
-            "채팅/메모/정산에서 붙여넣은 링크의 제목·설명·이미지를 가져오는 데 사용됩니다. 이제 캘린더별로 각각 요청하지 않고, URL당 한 번만 조회한 뒤 결과를 ",
-            /*#__PURE__*/React.createElement("strong", null, "모든 캘린더가 공유하는 서버 캐시"),
-            "(Firestore linkPreviews 컬렉션)에 저장해 재사용합니다."
+            "채팅/메모/정산 링크의 제목·설명·이미지를 가져옵니다. URL당 1회만 조회해 모든 캘린더가 공유하는 ",
+            /*#__PURE__*/React.createElement("strong", null, "Firestore 캐시"),
+            "에 저장합니다."
           ),
           /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '16px', marginTop: '12px', flexWrap: 'wrap' } },
             /*#__PURE__*/React.createElement("div", null,
@@ -2333,9 +2334,7 @@ export function AdminDashboard({ initialCalendars }) {
             /*#__PURE__*/React.createElement(ShieldCheckIcon, null),
             /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.78rem', color: '#166534', lineHeight: 1.6 } },
               /*#__PURE__*/React.createElement("strong", null, "API 키 보호: "),
-              "이 서비스는 백엔드가 없는 정적 사이트라 Peekalink API 키가 브라우저 소스에 그대로 노출되는 문제가 있었습니다. 이제는 Cloud Function 프록시(peekalinkProxy)를 통해서만 Peekalink를 호출하도록 변경되어, 키는 서버(Functions 코드)에만 존재하고 브라우저에 전송되지 않습니다. 무료 요금제 한도는 아래 ",
-              /*#__PURE__*/React.createElement("strong", null, "사용량"),
-              "에서 확인할 수 있습니다."
+              "Peekalink는 Cloud Function 프록시(peekalinkProxy)로만 호출됩니다. 키는 서버에만 있고 브라우저에는 노출되지 않습니다."
             )
           )
         )
