@@ -727,6 +727,7 @@ export function ChatRoomView({
   const __comp = window.GATHER_UI_COMPONENTS || {};
   const BackArrowIcon = __deps.BackArrowIcon;
   const SmallXIcon = __deps.SmallXIcon;
+  const TrashIcon = __deps.TrashIcon;
   const PencilIcon = __deps.PencilIcon;
   const ThreeLinesIcon = __deps.ThreeLinesIcon;
   const MegaphoneIcon = __deps.MegaphoneIcon;
@@ -1617,7 +1618,7 @@ export function ChatRoomView({
         onClick: () => onRemovePinnedNotice && onRemovePinnedNotice(notice.id),
         title: "공지 삭제",
         style: { background: 'none', border: 'none', cursor: 'pointer', color: '#92400E', flexShrink: 0, display: 'flex', alignItems: 'center' }
-      }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 16 }))
+      }, /*#__PURE__*/React.createElement(TrashIcon, { size: 16 }))
     )),
     /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px' } },
       /*#__PURE__*/React.createElement("button", {

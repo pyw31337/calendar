@@ -727,6 +727,7 @@ export function DateModal({
   const SegmentedToggle = __deps.SegmentedToggle;
   const SimpleBottomSheetPicker = __comp.SimpleBottomSheetPicker || __deps.SimpleBottomSheetPicker;
   const MediaThumb = __comp.MediaThumb || __deps.MediaThumb;
+  const SectionCountBadge = __comp.SectionCountBadge || __deps.SectionCountBadge;
   const UrlCapsuleBadge = __deps.UrlCapsuleBadge;
   const SmallXIcon = __deps.SmallXIcon;
   const getActiveParticipants = __deps.getActiveParticipants;
@@ -1413,8 +1414,7 @@ export function DateModal({
         const ok = typeof onDeletePhoto === 'function'
           ? await Promise.resolve(onDeletePhoto(deletionMeta))
           : await Promise.resolve(onDeleteMeetingPhoto(dateStr, photo.id, deletionMeta.imageUrl));
-        if (ok !== false) showToast('사진이 삭제되었습니다.', 'success');
-        else showToast('사진 삭제 실패', 'error');
+        if (ok === false) showToast('사진 삭제 실패', 'error');
       } finally {
         setIsSavingMeetingPhotos(false);
       }
@@ -1873,18 +1873,9 @@ export function DateModal({
         justifyContent: 'center',
         gap: '4px'
       }
-    },
+      },
       "참여자",
-      dateEntries.length > 0 && /*#__PURE__*/React.createElement("span", {
-        style: {
-          fontSize: '0.68rem',
-          padding: '1px 5px',
-          borderRadius: '999px',
-          backgroundColor: activeTab === 'participant' ? 'rgba(255,255,255,0.2)' : 'var(--border-subtle)',
-          color: activeTab === 'participant' ? '#FFFFFF' : 'var(--text-muted)',
-          fontWeight: 'bold'
-        }
-      }, dateEntries.length)
+      /*#__PURE__*/React.createElement(SectionCountBadge, { count: dateEntries.length })
     ),
     /* Tab 2: 장소 */
     /*#__PURE__*/React.createElement("button", {
@@ -1904,18 +1895,9 @@ export function DateModal({
         justifyContent: 'center',
         gap: '4px'
       }
-    },
+      },
       "장소",
-      registeredPlaces.length > 0 && /*#__PURE__*/React.createElement("span", {
-        style: {
-          fontSize: '0.68rem',
-          padding: '1px 5px',
-          borderRadius: '999px',
-          backgroundColor: activeTab === 'meeting' ? 'rgba(255,255,255,0.2)' : 'var(--border-subtle)',
-          color: activeTab === 'meeting' ? '#FFFFFF' : 'var(--text-muted)',
-          fontWeight: 'bold'
-        }
-      }, registeredPlaces.length)
+      /*#__PURE__*/React.createElement(SectionCountBadge, { count: registeredPlaces.length })
     ),
     /* Tab 3: 정산 */
     /*#__PURE__*/React.createElement("button", {
@@ -1935,18 +1917,9 @@ export function DateModal({
         justifyContent: 'center',
         gap: '4px'
       }
-    },
+      },
       "정산",
-      expenses.length > 0 && /*#__PURE__*/React.createElement("span", {
-        style: {
-          fontSize: '0.68rem',
-          padding: '1px 5px',
-          borderRadius: '999px',
-          backgroundColor: activeTab === 'settlement' ? 'rgba(255,255,255,0.2)' : 'var(--border-subtle)',
-          color: activeTab === 'settlement' ? '#FFFFFF' : 'var(--text-muted)',
-          fontWeight: 'bold'
-        }
-      }, expenses.length)
+      /*#__PURE__*/React.createElement(SectionCountBadge, { count: expenses.length })
     ),
     /* Tab 4: 사진 */
     /*#__PURE__*/React.createElement("button", {
@@ -1966,18 +1939,9 @@ export function DateModal({
         justifyContent: 'center',
         gap: '4px'
       }
-    },
+      },
       "사진",
-      meetingPhotos.length > 0 && /*#__PURE__*/React.createElement("span", {
-        style: {
-          fontSize: '0.68rem',
-          padding: '1px 5px',
-          borderRadius: '999px',
-          backgroundColor: activeTab === 'photo' ? 'rgba(255,255,255,0.2)' : 'var(--border-subtle)',
-          color: activeTab === 'photo' ? '#FFFFFF' : 'var(--text-muted)',
-          fontWeight: 'bold'
-        }
-      }, meetingPhotos.length)
+      /*#__PURE__*/React.createElement(SectionCountBadge, { count: meetingPhotos.length })
     )
   )), /*#__PURE__*/React.createElement("form", {
     onSubmit: e => {
@@ -2535,18 +2499,24 @@ export function DateModal({
           const hasSettlementData = expenses.length > 0;
           const netAmount = -expenseTotal;
           const isNegative = netAmount < 0;
+          if (!hasSettlementData) return null;
           return /*#__PURE__*/React.createElement("span", {
             style: {
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              verticalAlign: 'middle',
+              lineHeight: 1,
               fontSize: '0.78rem',
               fontWeight: 600,
               padding: '3px 9px',
               borderRadius: '999px',
               whiteSpace: 'nowrap',
-              backgroundColor: !hasSettlementData ? 'var(--bg-card)' : isNegative ? '#FEF2F2' : '#F0FDF4',
-              border: `1px solid ${!hasSettlementData ? 'var(--border-subtle)' : isNegative ? '#FCA5A5' : '#BBF7D0'}`,
-              color: !hasSettlementData ? 'var(--text-muted)' : isNegative ? '#DC2626' : '#16A34A'
+              backgroundColor: isNegative ? '#FEF2F2' : '#F0FDF4',
+              border: `1px solid ${isNegative ? '#FCA5A5' : '#BBF7D0'}`,
+              color: isNegative ? '#DC2626' : '#16A34A'
             }
-          }, hasSettlementData ? `${isNegative ? '-' : '+'}${Math.abs(netAmount).toLocaleString()}원` : '없음');
+          }, `${isNegative ? '-' : '+'}${Math.abs(netAmount).toLocaleString()}원`);
         })()
       ),
 
@@ -2887,28 +2857,6 @@ export function DateModal({
             cursor: 'pointer'
           }
         }),
-        !adminMode && typeof onDeleteMeetingPhoto === 'function' && /*#__PURE__*/React.createElement("button", {
-          type: "button",
-          onClick: e => { e.preventDefault(); e.stopPropagation(); handleDeleteMeetingPhoto(photo); },
-          disabled: isSavingMeetingPhotos,
-          "aria-label": "일정 사진 삭제",
-          style: {
-            position: 'absolute',
-            top: '-7px',
-            right: '-7px',
-            width: '22px',
-            height: '22px',
-            borderRadius: '999px',
-            border: '1px solid rgba(239,68,68,0.45)',
-            backgroundColor: 'var(--bg-card)',
-            color: '#EF4444',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: 0,
-            cursor: 'pointer'
-          }
-        }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 13 }))
       )))
     )
   ))));

@@ -672,6 +672,7 @@ export function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSe
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const SmallXIcon = __deps.SmallXIcon;
+  const TrashIcon = __deps.TrashIcon;
   const LinkIcon = __deps.LinkIcon;
   const ConfirmDialog = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ConfirmDialog) || __deps.ConfirmDialog;
 
@@ -681,7 +682,7 @@ export function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSe
   const [confirmDeleteTag, setConfirmDeleteTag] = React.useState(null);
   const [isDeletingTag, setIsDeletingTag] = React.useState(false);
   React.useEffect(() => { setTagInput(''); }, [tags]);
-  if (!info.dateLabel && !info.typeLabel && !onSaveTags && !sourceInfo && !showZoomControls) return null;
+  if (!info.dateLabel && !info.typeLabel && !onSaveTags && !sourceInfo) return null;
   const MAX_TAGS = 10;
   const handleSaveTags = async () => {
     if (!onSaveTags || isSavingTags) return;
@@ -748,7 +749,7 @@ export function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSe
         }, sourceInfo.label)
         : /*#__PURE__*/React.createElement("span", null, sourceInfo.label)
     ),
-    (info.typeLabel || showZoomControls) && /*#__PURE__*/React.createElement("div", {
+    info.typeLabel && /*#__PURE__*/React.createElement("div", {
       style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }
     },
       /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', minWidth: 0 } },
@@ -766,48 +767,6 @@ export function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSe
           /*#__PURE__*/React.createElement("span", null, info.dimensionLabel || '-')
         )
       ),
-      // PC-only zoom controls -- on the same line as 파일정보 (right-aligned) rather than its own
-      // row, so it doesn't leave an awkward gap between 파일정보 and 해시태그 below.
-      showZoomControls && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 } },
-        /*#__PURE__*/React.createElement("button", {
-          type: "button",
-          onClick: onZoomOut,
-          disabled: zoomLevel <= zoomMin,
-          "aria-label": "축소",
-          title: "축소",
-          style: {
-            width: '26px', height: '26px', borderRadius: '50%', border: 'none',
-            background: 'rgba(15,23,42,0.62)', color: '#FFFFFF', display: 'flex',
-            alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '0.72rem',
-            opacity: zoomLevel <= zoomMin ? 0.5 : 1
-          }
-        }, /*#__PURE__*/React.createElement(ZoomOutIcon, { size: 13 })),
-        /*#__PURE__*/React.createElement("button", {
-          type: "button",
-          onClick: onZoomReset,
-          disabled: zoomLevel === 100,
-          "aria-label": "100%로 초기화",
-          title: "100%로 초기화",
-          style: {
-            minWidth: '34px', textAlign: 'center', color: '#FFFFFF', fontSize: '0.7rem',
-            fontWeight: 700, padding: '3px 2px', borderRadius: '10px', border: 'none',
-            background: 'rgba(15,23,42,0.62)', cursor: zoomLevel === 100 ? 'default' : 'pointer'
-          }
-        }, `${zoomLevel}%`),
-        /*#__PURE__*/React.createElement("button", {
-          type: "button",
-          onClick: onZoomIn,
-          disabled: zoomLevel >= zoomMax,
-          "aria-label": "확대",
-          title: "확대",
-          style: {
-            width: '26px', height: '26px', borderRadius: '50%', border: 'none',
-            background: 'rgba(15,23,42,0.62)', color: '#FFFFFF', display: 'flex',
-            alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '0.72rem',
-            opacity: zoomLevel >= zoomMax ? 0.5 : 1
-          }
-        }, /*#__PURE__*/React.createElement(ZoomInIcon, { size: 13 }))
-      )
     ),
     /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' } },
       /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', minWidth: 0 } },
@@ -832,7 +791,7 @@ export function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSe
             alignItems: 'center', justifyContent: 'center', padding: 0, cursor: 'pointer',
             flexShrink: 0
           }
-        }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 12 }))))
+        }, /*#__PURE__*/React.createElement(TrashIcon, { size: 10 }))))
       ),
       /*#__PURE__*/React.createElement("button", {
         type: "button",
@@ -921,6 +880,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const SmallXIcon = __deps.SmallXIcon;
+  const TrashIcon = __deps.TrashIcon;
   const PencilIcon = __deps.PencilIcon;
   const ImageUrlModal = __deps.ImageUrlModal;
   const LightboxInfoPanel = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LightboxInfoPanel;
@@ -1455,40 +1415,127 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
   };
 
   // Shared by both the carousel's "current" slot and the single-image layout below --
-  // top-right pencil (교체)/X (삭제) buttons, reusing the same icons already used for editing
-  // elsewhere in the app (Places/Memo pencil, tag-delete X). Zoom controls used to live at the
-  // left end of this same row, but were moved into LightboxInfoPanel (directly above the URL
-  // button) per user request, so this row is gated on canEditPhoto alone again.
-  const renderPhotoActions = () => showInfo && canEditPhoto && /*#__PURE__*/React.createElement("div", {
-    style: { position: 'absolute', top: '8px', right: '8px', display: 'flex', alignItems: 'center', gap: '6px', zIndex: 10 },
+  // left-aligned edit/delete buttons plus centered zoom controls on the same row.
+  const renderPhotoActions = () => (showInfo && (canEditPhoto || isDesktop)) && /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: 'absolute',
+      top: '8px',
+      left: '8px',
+      right: '8px',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      zIndex: 10,
+      pointerEvents: 'none'
+    },
     onClick: e => e.stopPropagation()
   },
-    canEditPhoto && onReplacePhoto && /*#__PURE__*/React.createElement("button", {
-      type: "button",
-      onClick: () => replacePhotoInputRef.current && replacePhotoInputRef.current.click(),
-      disabled: isReplacingPhoto || isDeletingPhoto,
-      "aria-label": "사진 편집",
-      title: "사진 교체",
+    /*#__PURE__*/React.createElement("div", {
+      style: { display: 'flex', alignItems: 'center', gap: '6px', pointerEvents: 'auto' }
+    },
+      canEditPhoto && onDeletePhoto && /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: handleDeletePhotoClick,
+        disabled: isReplacingPhoto || isDeletingPhoto,
+        "aria-label": "사진 삭제",
+        title: "사진 삭제",
+        style: {
+          width: '30px', height: '30px', borderRadius: '50%', border: 'none',
+          background: 'rgba(15,23,42,0.62)', color: '#FFFFFF', display: 'flex',
+          alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '0.72rem',
+          opacity: (isReplacingPhoto || isDeletingPhoto) ? 0.5 : 1
+        }
+      }, isDeletingPhoto ? '...' : /*#__PURE__*/React.createElement(TrashIcon, { size: 15 })),
+      canEditPhoto && onReplacePhoto && /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: () => replacePhotoInputRef.current && replacePhotoInputRef.current.click(),
+        disabled: isReplacingPhoto || isDeletingPhoto,
+        "aria-label": "사진 편집",
+        title: "사진 교체",
+        style: {
+          width: '30px', height: '30px', borderRadius: '50%', border: 'none',
+          background: 'rgba(15,23,42,0.62)', color: '#FFFFFF', display: 'flex',
+          alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '0.72rem',
+          opacity: (isReplacingPhoto || isDeletingPhoto) ? 0.5 : 1
+        }
+      }, isReplacingPhoto ? '...' : /*#__PURE__*/React.createElement(PencilIcon, { size: 15 }))
+    ),
+    isDesktop && /*#__PURE__*/React.createElement("div", {
       style: {
-        width: '30px', height: '30px', borderRadius: '50%', border: 'none',
-        background: 'rgba(15,23,42,0.62)', color: '#FFFFFF', display: 'flex',
-        alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '0.72rem',
-        opacity: (isReplacingPhoto || isDeletingPhoto) ? 0.5 : 1
+        position: 'absolute',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '6px',
+        pointerEvents: 'auto'
       }
-    }, isReplacingPhoto ? '...' : /*#__PURE__*/React.createElement(PencilIcon, { size: 15 })),
-    canEditPhoto && onDeletePhoto && /*#__PURE__*/React.createElement("button", {
-      type: "button",
-      onClick: handleDeletePhotoClick,
-      disabled: isReplacingPhoto || isDeletingPhoto,
-      "aria-label": "사진 삭제",
-      title: "사진 삭제",
-      style: {
-        width: '30px', height: '30px', borderRadius: '50%', border: 'none',
-        background: 'rgba(15,23,42,0.62)', color: '#FFFFFF', display: 'flex',
-        alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '0.72rem',
-        opacity: (isReplacingPhoto || isDeletingPhoto) ? 0.5 : 1
-      }
-    }, isDeletingPhoto ? '...' : /*#__PURE__*/React.createElement(SmallXIcon, { size: 15 }))
+    },
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: handleZoomOut,
+        disabled: zoomLevel <= ZOOM_MIN,
+        "aria-label": "축소",
+        title: "축소",
+        style: {
+          width: '30px',
+          height: '30px',
+          borderRadius: '50%',
+          border: 'none',
+          background: 'rgba(15,23,42,0.62)',
+          color: '#FFFFFF',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          fontSize: '0.72rem',
+          opacity: zoomLevel <= ZOOM_MIN ? 0.5 : 1
+        }
+      }, /*#__PURE__*/React.createElement(ZoomOutIcon, { size: 14 })),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: handleZoomReset,
+        disabled: zoomLevel === ZOOM_DEFAULT,
+        "aria-label": "100%로 초기화",
+        title: "100%로 초기화",
+        style: {
+          width: '30px',
+          height: '30px',
+          borderRadius: '50%',
+          border: 'none',
+          background: 'rgba(15,23,42,0.62)',
+          color: '#FFFFFF',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: zoomLevel === ZOOM_DEFAULT ? 'default' : 'pointer',
+          fontSize: '0.62rem',
+          fontWeight: 900,
+          opacity: zoomLevel === ZOOM_DEFAULT ? 0.7 : 1
+        }
+      }, `${zoomLevel}%`),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: handleZoomIn,
+        disabled: zoomLevel >= ZOOM_MAX,
+        "aria-label": "확대",
+        title: "확대",
+        style: {
+          width: '30px',
+          height: '30px',
+          borderRadius: '50%',
+          border: 'none',
+          background: 'rgba(15,23,42,0.62)',
+          color: '#FFFFFF',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          fontSize: '0.72rem',
+          opacity: zoomLevel >= ZOOM_MAX ? 0.5 : 1
+        }
+      }, /*#__PURE__*/React.createElement(ZoomInIcon, { size: 14 }))
+    )
   );
 
   const renderSlide = (url, slot) => {

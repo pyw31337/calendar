@@ -769,6 +769,7 @@ export function WeatherLocationModal({ onClose, onSelectLocation, onDeleteRecent
   const __deps = window.GATHER_UI_DEPS || {};
   const ResizableModalContainer = __deps.ResizableModalContainer;
   const SmallXIcon = __deps.SmallXIcon;
+  const TrashIcon = __deps.TrashIcon;
   const SettingsIcon = __deps.SettingsIcon;
 
   const [query, setQuery] = React.useState('');
@@ -912,7 +913,7 @@ export function WeatherLocationModal({ onClose, onSelectLocation, onDeleteRecent
                   padding: 0,
                   lineHeight: 1
                 }
-              }, "×")
+              }, /*#__PURE__*/React.createElement(TrashIcon, { size: 9 }))
             )
           )
         )

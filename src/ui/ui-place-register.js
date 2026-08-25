@@ -686,6 +686,7 @@ export function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, on
   const __comp = window.GATHER_UI_COMPONENTS || {};
   const ResizableModalContainer = __deps.ResizableModalContainer;
   const SmallXIcon = __deps.SmallXIcon;
+  const TrashIcon = __deps.TrashIcon;
   const AutoGrowTextarea = __deps.AutoGrowTextarea;
   const FormAddEditActionButtons = __deps.FormAddEditActionButtons;
   const PlaceSectionIcon = __deps.PlaceSectionIcon;
@@ -1150,10 +1151,10 @@ export function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, on
       editingPlace && /*#__PURE__*/React.createElement("button", {
         type: "button",
         className: "btn btn-danger",
-        style: { height: '44px', minHeight: '44px', flexShrink: 0 },
+        style: { height: '44px', minHeight: '44px', flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: '6px' },
         onClick: handleDeleteClick,
         disabled: saving
-      }, "삭제"),
+      }, /*#__PURE__*/React.createElement(TrashIcon, { size: 14 }), "삭제"),
       /*#__PURE__*/React.createElement(FormAddEditActionButtons, {
         isEditing: !!editingPlace,
         isSaving: saving,

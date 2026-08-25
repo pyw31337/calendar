@@ -1133,6 +1133,7 @@ export function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showT
   const PencilIcon = __deps.PencilIcon;
   const SearchIcon = __deps.SearchIcon;
   const SmallXIcon = __deps.SmallXIcon;
+  const TrashIcon = __deps.TrashIcon;
   const ThreeLinesIcon = __deps.ThreeLinesIcon;
   const getCalendarPlaces = __deps.getCalendarPlaces;
   const getPlaceCategories = __deps.getPlaceCategories;
@@ -1923,7 +1924,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
                     /*#__PURE__*/React.createElement("button", {
                       type: "button", onClick: (e) => { e.stopPropagation(); handleDeletePlaceMemoEntry(place, entry); }, title: "메모 삭제", "aria-label": "메모 삭제",
                       style: { background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', color: '#64748B', flexShrink: 0 }
-                    }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 12 }))
+                    }, /*#__PURE__*/React.createElement(TrashIcon, { size: 12 }))
                   );
                 }))
               : memoWithoutDate && /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.78rem', color: 'var(--text-main)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px' } }, renderTextWithUrlBadge(memoWithoutDate))

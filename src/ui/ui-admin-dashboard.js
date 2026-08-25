@@ -703,6 +703,7 @@ export function AdminDashboard({ initialCalendars }) {
   const SettingsIcon = __comp.SettingsIcon || __deps.SettingsIcon;
   const ShieldCheckIcon = __comp.ShieldCheckIcon || __deps.ShieldCheckIcon;
   const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
+  const TrashIcon = __comp.TrashIcon || __deps.TrashIcon;
   const TrophyIcon = __comp.TrophyIcon || __deps.TrophyIcon;
   const fetchSubcollectionCount = __deps.fetchSubcollectionCount;
   const sanitizeText = __deps.sanitizeText;
@@ -2010,13 +2011,7 @@ export function AdminDashboard({ initialCalendars }) {
   },
     /* Toast Alert */
     toast && /*#__PURE__*/React.createElement("div", {
-      className: "toast",
-      style: {
-        position: 'fixed', bottom: '32px', left: '50%', transform: 'translateX(-50%)', zIndex: 99999,
-        backgroundColor: toast.type === 'error' ? '#EF4444' : '#3ECF8E', color: toast.type === 'error' ? '#FFFFFF' : '#000000',
-        padding: '12px 24px', borderRadius: 'var(--radius-md)', fontSize: '0.88rem', fontWeight: 'bold', boxShadow: '0 10px 25px -5px rgba(15,23,42,0.35)',
-        textAlign: 'center', wordBreak: 'break-all', whiteSpace: 'pre-wrap', maxWidth: '380px', width: '90%', boxSizing: 'border-box'
-      }
+      className: `toast ${toast.type === 'error' ? 'is-delete' : 'is-success'}`
     }, toast.message),
 
     /* Header + Tabs, attached into one flush top bar (no outer box/margin, like the main
@@ -2585,7 +2580,7 @@ export function AdminDashboard({ initialCalendars }) {
                 /*#__PURE__*/React.createElement("button", {
                   type: "button", className: "btn btn-danger", style: { padding: '4px 10px', height: '44px', display: 'flex', alignItems: 'center' },
                   onClick: () => requestConfirm('참여자 삭제', `"${p.name}" 참여자를 삭제하시겠습니까?`, () => handleUpdatePart(p.id, { removedAt: Date.now() }))
-                }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 16 }))
+                }, /*#__PURE__*/React.createElement(TrashIcon, { size: 16 }))
               ))
 	            )
 	          ),
@@ -2640,7 +2635,7 @@ export function AdminDashboard({ initialCalendars }) {
 	                  className: "btn btn-danger",
 	                  style: { padding: '4px 10px', height: '44px', display: 'flex', alignItems: 'center' },
 	                  onClick: () => handleRemoveExpenseCategory(category.id)
-	                }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 16 }))
+                }, /*#__PURE__*/React.createElement(TrashIcon, { size: 16 }))
 	              ))
 	            )
 	          ),
@@ -2695,7 +2690,7 @@ export function AdminDashboard({ initialCalendars }) {
 	                  className: "btn btn-danger",
 	                  style: { padding: '4px 10px', height: '44px', display: 'flex', alignItems: 'center' },
 	                  onClick: () => handleRemovePlaceCategory(category.id)
-	                }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 16 }))
+                }, /*#__PURE__*/React.createElement(TrashIcon, { size: 16 }))
 	              ))
 	            )
 	          ),
@@ -2741,9 +2736,9 @@ export function AdminDashboard({ initialCalendars }) {
                 }, "수정"),
                 /* Delete */
                 /*#__PURE__*/React.createElement("button", {
-                  type: "button", className: "btn btn-danger", title: "삭제", style: { padding: '4px 10px', fontSize: '0.75rem' },
+                  type: "button", className: "btn btn-danger", title: "삭제", style: { padding: '4px 10px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '4px' },
                   onClick: () => handleDeletePollFromAdminPage(selectedCalId, poll)
-                }, "삭제")
+                }, /*#__PURE__*/React.createElement(TrashIcon, { size: 14 }), "삭제")
               )
             ))
           )
@@ -3033,7 +3028,7 @@ export function AdminDashboard({ initialCalendars }) {
                   type: "button", className: "btn btn-danger", title: "삭제",
                   onClick: () => handleDeleteMessageDirect(msg.calId, msg),
                   style: { width: '26px', height: '26px', padding: 0, flexShrink: 0 }
-                }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 14 }))
+                }, /*#__PURE__*/React.createElement(TrashIcon, { size: 14 }))
               )
             );
           }),

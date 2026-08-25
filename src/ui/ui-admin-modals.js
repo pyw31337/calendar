@@ -768,6 +768,7 @@ export function AdminModal({
   const ResizableModalContainer = __comp.ResizableModalContainer || __deps.ResizableModalContainer;
   const SettingsIcon = __comp.SettingsIcon || __deps.SettingsIcon;
   const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
+  const TrashIcon = __comp.TrashIcon || __deps.TrashIcon;
   const getActiveParticipants = typeof __deps.getActiveParticipants === 'function'
     ? __deps.getActiveParticipants
     : (typeof GATHER_APP_UTILS !== 'undefined' && typeof GATHER_APP_UTILS.getActiveParticipants === 'function'
@@ -1269,7 +1270,7 @@ export function AdminModal({
                     type: "button", className: "btn btn-danger", disabled: isSubmitting, title: "삭제",
                     style: { width: '30px', height: '30px', padding: 0, flexShrink: 0 },
                     onClick: () => onRequestConfirm('참여자 삭제', `"${p.name}" 참여자를 삭제하시겠습니까?`, () => updateParticipant(p.id, { removedAt: Date.now() }))
-                  }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 16 }))
+                  }, /*#__PURE__*/React.createElement(TrashIcon, { size: 16 }))
                 ))
               )
             ),
@@ -1331,7 +1332,7 @@ export function AdminModal({
                     title: "삭제",
                     onClick: () => handleDeletePollFromAdmin(poll),
                     style: { width: '30px', height: '30px', padding: 0, flexShrink: 0 }
-                  }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 16 }))
+                  }, /*#__PURE__*/React.createElement(TrashIcon, { size: 16 }))
                 )
               ))
             )
@@ -1576,7 +1577,7 @@ export function AdminModal({
                 if (typeof onDeleteLog !== 'function') return;
                 onRequestConfirm('로그 삭제', confirmText, () => onDeleteLog(log));
               }
-            }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 16 }))));
+            }, /*#__PURE__*/React.createElement(TrashIcon, { size: 16 }))));
           }));
         })()
       )

@@ -1805,6 +1805,33 @@ export function SmallXIcon({ size = 24 } = {}) {
   }));
 }
 
+export function TrashIcon({ size = 24 } = {}) {
+  const React = window.React;
+
+  return /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: String(size),
+    height: String(size),
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    "strokeWidth": "2",
+    "strokeLinecap": "round",
+    "strokeLinejoin": "round",
+    className: "lucide lucide-trash2-icon lucide-trash-2"
+  }, /*#__PURE__*/React.createElement("path", {
+    d: "M10 11v6"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M14 11v6"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M3 6h18"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
+  }));
+}
+
 export function PlaceSectionIcon({ size = 20 } = {}) {
   const React = window.React;
 
@@ -1948,6 +1975,7 @@ export function DicesIcon({ size = 14 }) {
     LineHeightIcon: LineHeightIcon,
     MegaphoneIcon: MegaphoneIcon,
     SmallXIcon: SmallXIcon,
+    TrashIcon: TrashIcon,
     PlaceSectionIcon: PlaceSectionIcon,
     ThreeLinesIcon: ThreeLinesIcon,
     PlaceCategoryMarkerIcon: PlaceCategoryMarkerIcon,

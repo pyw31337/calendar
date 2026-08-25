@@ -693,6 +693,7 @@ export function AnniversaryModal({
   const SegmentedToggle = __comp.SegmentedToggle || __deps.SegmentedToggle;
   const SimpleBottomSheetPicker = __comp.SimpleBottomSheetPicker || __deps.SimpleBottomSheetPicker;
   const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
+  const TrashIcon = __comp.TrashIcon || __deps.TrashIcon;
   const getActiveParticipants = __deps.getActiveParticipants;
   const { requestClose, overlayOnClick, markSaved } = useModalDirtyGuard(onClose, onRequestConfirm);
 
@@ -1019,7 +1020,7 @@ export function AnniversaryModal({
                 handleDeleteAnniversary(ann);
               },
               style: { width: '28px', height: '28px', padding: 0, flexShrink: 0 }
-            }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 14 }))
+      }, /*#__PURE__*/React.createElement(TrashIcon, { size: 14 }))
           ))
       ),
 
@@ -1965,6 +1966,7 @@ export function PollModal({ calendar, poll, onSave, onClose, showToast, onReques
   const ResizableModalContainer = __comp.ResizableModalContainer || __deps.ResizableModalContainer;
   const SectionToggleButton = __comp.SectionToggleButton || __deps.SectionToggleButton;
   const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
+  const TrashIcon = __comp.TrashIcon || __deps.TrashIcon;
   const sanitizeText = __deps.sanitizeText;
   const { requestClose, overlayOnClick, markSaved } = useModalDirtyGuard(onClose, onRequestConfirm);
 
@@ -2316,7 +2318,7 @@ export function PollModal({ calendar, poll, onSave, onClose, showToast, onReques
         performDelete();
       }
     }
-  }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 })))))), /*#__PURE__*/React.createElement("div", {
+    }, /*#__PURE__*/React.createElement(TrashIcon, { size: 20 })))))), /*#__PURE__*/React.createElement("div", {
     className: "modal-footer"
   }, /*#__PURE__*/React.createElement("button", {
     type: "button",

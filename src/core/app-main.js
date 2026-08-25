@@ -582,15 +582,44 @@ function App() {
     };
   }, []);
 
-  const showToast = (message, type = 'info', duration = 3000) => {
+  const showToast = (message, type = 'info', duration = 3000, action = null) => {
     if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+    const toastId = `toast_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const normalizedAction = typeof action === 'function'
+      ? { label: '되돌리기', onAction: action, onExpire: null }
+      : (action && typeof action === 'object'
+        ? {
+            label: action.label || action.actionLabel || '되돌리기',
+            onAction: typeof action.onAction === 'function' ? action.onAction : null,
+            onExpire: typeof action.onExpire === 'function' ? action.onExpire : null
+          }
+        : null);
     setToast({
+      id: toastId,
       message,
-      type
+      type,
+      actionLabel: normalizedAction?.label || null,
+      onAction: normalizedAction?.onAction || null
     });
-    toastTimeoutRef.current = setTimeout(() => {
-      setToast(t => t?.message === message ? null : t);
+    toastTimeoutRef.current = setTimeout(async () => {
+      try {
+        if (normalizedAction?.onExpire) {
+          await normalizedAction.onExpire();
+        }
+      } catch (err) {
+        console.warn('Toast onExpire failed:', err);
+      } finally {
+        setToast(t => t?.id === toastId ? null : t);
+      }
     }, duration);
+    return toastId;
+  };
+  const showUndoableDeleteToast = (message, onUndo, onExpire, duration = 5000) => {
+    return showToast(message, 'delete', duration, {
+      label: '되돌리기',
+      onAction: onUndo,
+      onExpire
+    });
   };
 
   const runWithOperationProgress = async ({ title, detail, delay = 1000 } = {}, task) => {
@@ -733,7 +762,9 @@ function App() {
       serverRevisionRef.current = updateMetaLastModified(serverRevisionRef.current, currentCal.id, now);
       saveLocalCache(normalizedCalendars);
       saveLocalMeta(serverRevisionRef.current);
-      showToast(toastMsg, toastType, 3000);
+      if (toastMsg !== null && toastMsg !== undefined && toastMsg !== '') {
+        showToast(toastMsg, toastType, 3000);
+      }
       return true;
     } catch (err) {
       console.error('updateCalendars failed:', err);
@@ -2122,6 +2153,23 @@ function App() {
     setOlderChatMessages(prev => prev.map(patchMessage));
     setGalleryPreviewMessages(prev => prev.map(patchMessage));
   };
+  const upsertLocalChatMessage = message => {
+    if (!message?.id) return;
+    const upsertMessage = prev => {
+      const idx = prev.findIndex(item => item.id === message.id);
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = { ...next[idx], ...message };
+        return next;
+      }
+      const next = [...prev, message];
+      next.sort((a, b) => (Number(a.timestamp) || 0) - (Number(b.timestamp) || 0) || String(a.id || '').localeCompare(String(b.id || '')));
+      return next;
+    };
+    setChatMessages(upsertMessage);
+    setOlderChatMessages(upsertMessage);
+    setGalleryPreviewMessages(upsertMessage);
+  };
   const removeLocalChatMessage = messageId => {
     const dropMessage = prev => prev.filter(m => m.id !== messageId);
     setChatMessages(dropMessage);
@@ -2825,22 +2873,7 @@ function App() {
     const photoLogs = validDates.map((dateStr, index) => (
       createActivityLog(activeCal.id, 'photo_create', dateStr, '', now + index, '사진 날짜 태그 연결')
     )).filter(Boolean);
-    const updatedCal = {
-      ...activeCal,
-      confirmedMeeting: Array.from(byDate.values()).sort((a, b) => String(a.date || '').localeCompare(String(b.date || ''))),
-      updatedAt: now,
-      revision: (activeCal.revision || 0) + 1,
-      activityLogs: photoLogs.length > 0 ? [...getCalendarActivityLogs(activeCal), ...photoLogs] : getCalendarActivityLogs(activeCal)
-    };
-    const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-    await updateCalendars(
-      nextCalendars,
-      linkedCount > 0 ? `${linkedCount}건 일정 사진 연결완료` : '일정 사진 연결 정리완료',
-      'success',
-      updatedCal.id,
-      'settings',
-      photoLogs
-    );
+    await commitConfirmedMeetings(Array.from(byDate.values()).sort((a, b) => String(a.date || '').localeCompare(String(b.date || ''))), linkedCount > 0 ? `${linkedCount}건 일정 사진 연결완료` : '일정 사진 연결 정리완료', photoLogs);
     return linkedCount;
   };
 
@@ -2862,14 +2895,7 @@ function App() {
     )).slice(0, 10);
     const cleanTags = sanitizeText(parseTagTokens(tagsText).join(' '), 100);
     const nextPhotos = photos.map((p, i) => i === photoIndex ? { ...p, tags: cleanTags } : p);
-    const updatedCal = {
-      ...activeCal,
-      confirmedMeeting: existingMeetings.map(m => m.date === meetingDate ? { ...meeting, photos: nextPhotos } : m),
-      updatedAt: Date.now(),
-      revision: (activeCal.revision || 0) + 1
-    };
-    const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-    return updateCalendars(nextCalendars, '태그 저장완료', 'success', updatedCal.id, 'settings');
+    return commitConfirmedMeetings(existingMeetings.map(m => m.date === meetingDate ? { ...meeting, photos: nextPhotos } : m), '태그 저장완료');
   };
 
   const handleSaveImageTags = async (messageId, imageIndex, tagsText, meta = {}) => {
@@ -3234,6 +3260,23 @@ function App() {
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
     return updateCalendars(nextCalendars, '삭제완료', 'delete', updatedCal.id, 'availability', activityLogs);
   };
+  const cloneConfirmedMeetings = meetings => meetings.map(meeting => ({
+    ...meeting,
+    photos: Array.isArray(meeting.photos) ? meeting.photos.map(photo => ({ ...photo })) : []
+  }));
+  const commitConfirmedMeetings = (nextConfirmedMeetings, toastMessage = null, activityLogs = [], warnLabel = 'write', toastType = 'success') => {
+    const updatedCal = {
+      ...activeCal,
+      confirmedMeeting: nextConfirmedMeetings,
+      updatedAt: Date.now(),
+      revision: (activeCal.revision || 0) + 1,
+      activityLogs: activityLogs.length > 0 ? [...getCalendarActivityLogs(activeCal), ...activityLogs] : getCalendarActivityLogs(activeCal)
+    };
+    const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
+    setConfirmedMeetingsSubcollection(nextConfirmedMeetings);
+    writeConfirmedMeetingsToFirestore(activeCal.id, nextConfirmedMeetings).catch(err => console.warn(`Subcollection confirmedMeetings ${warnLabel} failed:`, err));
+    return updateCalendars(nextCalendars, toastMessage, toastType, updatedCal.id, 'settings', activityLogs);
+  };
   const handleConfirmMeeting = (dateStr, note) => {
     if (!activeCal || !isValidDateString(dateStr)) return false;
     const now = Date.now();
@@ -3273,17 +3316,7 @@ function App() {
     const action = isAlreadyConfirmed ? 'meeting_cancel' : 'meeting_confirm';
     const logNote = sanitizeText(note || '', 500) || (isAlreadyConfirmed ? '모임 확정 취소됨' : '모임 확정됨');
     const meetingLog = createActivityLog(activeCal.id, action, dateStr, '', now, logNote);
-    const updatedCal = {
-      ...activeCal,
-      confirmedMeeting: nextConfirmedMeetings,
-      updatedAt: now,
-      revision: (activeCal.revision || 0) + 1,
-      activityLogs: meetingLog ? [...getCalendarActivityLogs(activeCal), meetingLog] : getCalendarActivityLogs(activeCal)
-    };
-    const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-    setConfirmedMeetingsSubcollection(nextConfirmedMeetings);
-    writeConfirmedMeetingsToFirestore(activeCal.id, nextConfirmedMeetings).catch(e => console.warn('Subcollection confirmedMeetings write failed:', e));
-    return updateCalendars(nextCalendars, isAlreadyConfirmed ? '모임 확정 취소' : '모임 확정', 'success', updatedCal.id, 'settings', meetingLog ? [meetingLog] : []);
+    return commitConfirmedMeetings(nextConfirmedMeetings, isAlreadyConfirmed ? '모임 확정 취소' : '모임 확정', meetingLog ? [meetingLog] : []);
   };
   // Saved via saveMode 'settings' like confirmedMeeting itself -- mergeCalendarSettingsDelta
   // does a blind {...server, ...incoming} for fields it doesn't explicitly preserve/merge (see
@@ -3360,15 +3393,7 @@ function App() {
       expenseLogNote = sanitizeText(`${fmtAmt(cleanAmount)} ${cleanLabel || cleanUrl} · ${expCatName(cleanCategoryId)}`, 300);
     }
     const expenseActivityLog = createActivityLog(activeCal.id, isEditing ? 'expense_update' : 'expense_create', dateStr, '', now, expenseLogNote);
-    const updatedCal = {
-      ...activeCal,
-      confirmedMeeting: nextConfirmedMeetings,
-      updatedAt: now,
-      revision: (activeCal.revision || 0) + 1,
-      activityLogs: expenseActivityLog ? [...getCalendarActivityLogs(activeCal), expenseActivityLog] : getCalendarActivityLogs(activeCal)
-    };
-    const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-    return updateCalendars(nextCalendars, '지출 저장완료', 'success', updatedCal.id, 'settings', expenseActivityLog ? [expenseActivityLog] : []);
+    return commitConfirmedMeetings(nextConfirmedMeetings, '지출 저장완료', expenseActivityLog ? [expenseActivityLog] : []);
   };
   const handleDeleteExpense = (dateStr, expenseId) => {
     // Confirm rule: UI layer (DateModal) shows confirm once. Do not confirm again here.
@@ -3388,15 +3413,7 @@ function App() {
       120
     );
     const expenseActivityLog = createActivityLog(activeCal.id, 'expense_delete', dateStr, '', now, expenseLogNote);
-    const updatedCal = {
-      ...activeCal,
-      confirmedMeeting: nextConfirmedMeetings,
-      updatedAt: now,
-      revision: (activeCal.revision || 0) + 1,
-      activityLogs: expenseActivityLog ? [...getCalendarActivityLogs(activeCal), expenseActivityLog] : getCalendarActivityLogs(activeCal)
-    };
-    const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-    return updateCalendars(nextCalendars, '지출 삭제완료', 'success', updatedCal.id, 'settings', expenseActivityLog ? [expenseActivityLog] : []);
+    return commitConfirmedMeetings(nextConfirmedMeetings, '지출 삭제완료', expenseActivityLog ? [expenseActivityLog] : []);
   };
 
   const handleReorderExpenses = (dateStr, orderedExpenseIds) => {
@@ -3423,14 +3440,7 @@ function App() {
     if (same) return true;
     const now = Date.now();
     const nextConfirmedMeetings = existingMeetings.map((m, i) => i === meetingIndex ? { ...m, expenses: nextExpenses } : m);
-    const updatedCal = {
-      ...activeCal,
-      confirmedMeeting: nextConfirmedMeetings,
-      updatedAt: now,
-      revision: (activeCal.revision || 0) + 1
-    };
-    const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-    return updateCalendars(nextCalendars, '지출 순서 저장완료', 'success', updatedCal.id, 'settings', []);
+    return commitConfirmedMeetings(nextConfirmedMeetings, '지출 순서 저장완료');
   };
 
   // Uploaded through the exact same chat-message pipeline as every other photo in the app (see
@@ -3511,18 +3521,9 @@ function App() {
         ? { ...m, photos: [...(Array.isArray(m.photos) ? m.photos : []), ...newRefs], amount: m.amount || null }
         : m);
       const photoLog = createActivityLog(activeCal.id, 'photo_create', dateStr, '', now, `${newRefs.length}장 일정 사진 추가`);
-      const updatedCal = {
-        ...activeCal,
-        confirmedMeeting: nextConfirmedMeetings,
-        updatedAt: now,
-        revision: (activeCal.revision || 0) + 1,
-        activityLogs: photoLog ? [...getCalendarActivityLogs(activeCal), photoLog] : getCalendarActivityLogs(activeCal)
-      };
-      const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-      setConfirmedMeetingsSubcollection(nextConfirmedMeetings);
-      writeConfirmedMeetingsToFirestore(activeCal.id, nextConfirmedMeetings).catch(e => console.warn('Subcollection confirmedMeetings write failed:', e));
+      const ok = await commitConfirmedMeetings(nextConfirmedMeetings, '일정 사진 저장완료', photoLog ? [photoLog] : []);
       setChatUploadProgress({ pct: 100, remainingSec: 0, label: '일정 사진 저장 완료' });
-      return updateCalendars(nextCalendars, '일정 사진 저장완료', 'success', updatedCal.id, 'settings', photoLog ? [photoLog] : []);
+      return ok;
     } catch (err) {
       console.error('handleAddMeetingPhotos failed:', err);
       // Same reasoning as describeUpdateCalendarsFailure above (see its comment): a bare
@@ -3556,7 +3557,7 @@ function App() {
     return urls.some(u => isSameImageUrl(u, targetUrl));
   };
 
-  const handleDeleteMeetingPhoto = (dateStr, photoId, imageUrl) => {
+  const handleDeleteMeetingPhoto = (dateStr, photoId, imageUrl, options = {}) => {
     if (!activeCal) return false;
     const existingMeetings = getConfirmedMeetings(activeCal);
     let meetingIndex = isValidDateString(dateStr) ? existingMeetings.findIndex(m => m.date === dateStr) : -1;
@@ -3568,25 +3569,44 @@ function App() {
     const existingPhotos = Array.isArray(meeting.photos) ? meeting.photos : [];
     const deletedPhoto = existingPhotos.find(p => (photoId && p.id === photoId) || photoMatchesUrl(p, imageUrl));
     if (!deletedPhoto) return false;
-    deleteChatImageFromStorage(deletedPhoto.imageUrl);
-    deleteChatImageFromStorage(deletedPhoto.thumbUrl);
+    const previousMeetings = cloneConfirmedMeetings(existingMeetings);
     const now = Date.now();
     const nextConfirmedMeetings = existingMeetings.map((m, i) => i === meetingIndex
       ? { ...m, photos: existingPhotos.filter(p => p !== deletedPhoto && p.id !== deletedPhoto.id && !photoMatchesUrl(p, imageUrl)) }
       : m);
     const targetDate = meeting.date || dateStr;
     const photoLog = createActivityLog(activeCal.id, 'photo_delete', targetDate, '', now, '일정 사진 삭제');
-    const updatedCal = {
-      ...activeCal,
-      confirmedMeeting: nextConfirmedMeetings,
-      updatedAt: now,
-      revision: (activeCal.revision || 0) + 1,
-      activityLogs: photoLog ? [...getCalendarActivityLogs(activeCal), photoLog] : getCalendarActivityLogs(activeCal)
+    const ok = commitConfirmedMeetings(nextConfirmedMeetings, null, photoLog ? [photoLog] : [], 'write', 'delete');
+    const restoreSourceTags = typeof options.restoreSourceTags === 'string' ? options.restoreSourceTags : '';
+    const restoreSourceMessageId = options.restoreSourceMessageId || '';
+    const restoreSourceImageIndex = Number.isInteger(options.restoreSourceImageIndex) ? options.restoreSourceImageIndex : null;
+    const undoDelete = async () => {
+      try {
+        const restoredMeetings = cloneConfirmedMeetings(previousMeetings);
+        await commitConfirmedMeetings(restoredMeetings, null, [], 'restore');
+        if (restoreSourceMessageId && Number.isInteger(restoreSourceImageIndex) && restoreSourceTags) {
+          await handleSaveImageTags(restoreSourceMessageId, restoreSourceImageIndex, restoreSourceTags, {
+            source: 'meeting',
+            uploadSource: 'meeting',
+            meetingDate: targetDate,
+            photoId: deletedPhoto.id,
+            imageUrl: deletedPhoto.imageUrl || imageUrl,
+            thumbUrl: deletedPhoto.thumbUrl || deletedPhoto.imageUrl || imageUrl,
+            sourceMessageId: restoreSourceMessageId,
+            sourceImageIndex: restoreSourceImageIndex
+          });
+        }
+        showToast('일정 사진 복원완료', 'success', 3000);
+      } catch (err) {
+        console.error('handleDeleteMeetingPhoto undo failed:', err);
+        showToast('일정 사진 복원 실패', 'error', 4000);
+      }
     };
-    const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-    setConfirmedMeetingsSubcollection(nextConfirmedMeetings);
-    writeConfirmedMeetingsToFirestore(activeCal.id, nextConfirmedMeetings).catch(e => console.warn('Subcollection confirmedMeetings write failed:', e));
-    return updateCalendars(nextCalendars, '사진 삭제완료', 'delete', updatedCal.id, 'settings', photoLog ? [photoLog] : []);
+    return ok.then(result => {
+      if (!result) return false;
+      showUndoableDeleteToast('일정 사진이 삭제되었습니다.', undoDelete, null, 5000);
+      return true;
+    });
   };
 
   const handleReplaceMeetingPhoto = async (dateStr, photoId, file, imageUrl) => {
@@ -3610,18 +3630,10 @@ function App() {
       if (!resolved) throw new Error('Replacement upload returned no result');
       const prevImageUrl = targetPhoto.imageUrl;
       const prevThumbUrl = targetPhoto.thumbUrl;
-      const now = Date.now();
       const nextConfirmedMeetings = existingMeetings.map((m, i) => i === meetingIndex
         ? { ...m, photos: existingPhotos.map(photo => (photo === targetPhoto || (photoId && photo.id === photoId)) ? { ...photo, imageUrl: resolved.imageUrl, thumbUrl: resolved.thumbUrl || resolved.imageUrl } : photo) }
         : m);
-      const updatedCal = {
-        ...activeCal,
-        confirmedMeeting: nextConfirmedMeetings,
-        updatedAt: now,
-        revision: (activeCal.revision || 0) + 1
-      };
-      const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-      const ok = await updateCalendars(nextCalendars, '사진 교체완료', 'success', updatedCal.id, 'settings');
+      const ok = await commitConfirmedMeetings(nextConfirmedMeetings, '사진 교체완료');
       if (ok) {
         deleteChatImageFromStorage(prevImageUrl);
         deleteChatImageFromStorage(prevThumbUrl);
@@ -3684,16 +3696,7 @@ function App() {
       return { ...meeting, photos: nextPhotos };
     });
     if (!changed) return;
-    const updatedCal = {
-      ...activeCal,
-      confirmedMeeting: nextConfirmedMeetings,
-      updatedAt: Date.now(),
-      revision: (activeCal.revision || 0) + 1
-    };
-    const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-    setConfirmedMeetingsSubcollection(nextConfirmedMeetings);
-    writeConfirmedMeetingsToFirestore(activeCal.id, nextConfirmedMeetings).catch(err => console.warn('Subcollection confirmedMeetings write failed:', err));
-    await updateCalendars(nextCalendars, '일정 사진 연결 정리완료', 'success', updatedCal.id, 'settings');
+    await commitConfirmedMeetings(nextConfirmedMeetings, '일정 사진 연결 정리완료');
   };
 
   const handleDeleteChatMessagePhoto = async (messageId, imageIndex) => {
@@ -3709,6 +3712,12 @@ function App() {
     const nextThumbs = entries.filter((_, i) => i !== imageIndex).map(e => e.thumb);
     const nextTags = entries.filter((_, i) => i !== imageIndex).map(e => e.tags || '');
     const remainingText = String(sourceMessage.text || '').trim();
+    const previousMeetings = cloneConfirmedMeetings(getConfirmedMeetings(activeCal));
+    const sourceSnapshot = JSON.parse(JSON.stringify(sourceMessage));
+    const finalizeStorageDeletion = () => {
+      deleteChatImageFromStorage(target.full);
+      if (target.thumb !== target.full) deleteChatImageFromStorage(target.thumb);
+    };
     try {
       if (nextUrls.length === 0 && !remainingText) {
         // No images and no text left -- nothing to keep, remove the whole message.
@@ -3736,9 +3745,39 @@ function App() {
         patchLocalChatMessage(messageId, data);
         await unlinkMeetingPhotoReferences(messageId, imageIndex);
       }
-      deleteChatImageFromStorage(target.full);
-      if (target.thumb !== target.full) deleteChatImageFromStorage(target.thumb);
-      showToast('사진 삭제완료', 'success');
+      const isWholeDelete = nextUrls.length === 0 && !remainingText;
+      const canUndo = firebaseDb || !isWholeDelete;
+      const restoreDeletedPhoto = async () => {
+        try {
+          if (isWholeDelete) {
+            if (!firebaseDb) {
+              throw new Error('REST 환경에서는 전체 메시지 되돌리기를 지원하지 않습니다.');
+            }
+            await firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages').doc(messageId).set(sanitizeMessageForFirestore(sourceSnapshot));
+            upsertLocalChatMessage(sourceSnapshot);
+          } else {
+            const restoreData = sanitizeMessageForFirestore(sourceSnapshot);
+            if (firebaseDb) {
+              await withTimeout(firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages').doc(messageId).set(restoreData), 9000, 'photo delete restore write');
+            } else {
+              const ok = await updateMessageRest(activeCalId, messageId, restoreData);
+              if (!ok) throw new Error('Photo delete REST restore failed');
+            }
+            patchLocalChatMessage(messageId, restoreData);
+          }
+          const restoredMeetings = cloneConfirmedMeetings(previousMeetings);
+          await commitConfirmedMeetings(restoredMeetings, null, [], 'restore');
+          showToast('사진 삭제를 되돌렸습니다.', 'success', 3000);
+        } catch (err) {
+          console.error('handleDeleteChatMessagePhoto undo failed:', err);
+          showToast('사진 복원 실패', 'error', 4000);
+        }
+      };
+      if (canUndo) {
+        showUndoableDeleteToast('사진이 삭제되었습니다.', restoreDeletedPhoto, finalizeStorageDeletion, 5000);
+      } else {
+        showToast('사진이 삭제되었습니다.', 'delete', 5000, { onExpire: finalizeStorageDeletion });
+      }
       return true;
     } catch (err) {
       console.error('handleDeleteChatMessagePhoto failed:', err);
@@ -3824,13 +3863,25 @@ function App() {
     const removedThumb = thumbs[imageIndex] || removedUrl;
     const nextUrls = urls.filter((_, i) => i !== imageIndex);
     const nextThumbs = thumbs.filter((_, i) => i !== imageIndex);
+    const memoSnapshot = JSON.parse(JSON.stringify(memo));
+    const finalizeStorageDeletion = () => {
+      deleteChatImageFromStorage(removedUrl);
+      if (removedThumb !== removedUrl) deleteChatImageFromStorage(removedThumb);
+    };
     try {
       const data = sanitizeMemoForFirestore({ imageUrls: nextUrls, thumbUrls: nextThumbs, imageUrl: nextUrls[0] || null, thumbUrl: nextThumbs[0] || null });
       await firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('memos').doc(memoId).update(data);
       setMemos(prev => prev.map(m => m.id === memoId ? { ...m, ...data } : m));
-      deleteChatImageFromStorage(removedUrl);
-      if (removedThumb !== removedUrl) deleteChatImageFromStorage(removedThumb);
-      showToast('사진 삭제완료', 'success');
+      showUndoableDeleteToast('사진이 삭제되었습니다.', async () => {
+        try {
+          await firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('memos').doc(memoId).set(sanitizeMemoForFirestore(memoSnapshot));
+          setMemos(prev => prev.map(m => m.id === memoId ? { ...m, ...memoSnapshot } : m));
+          showToast('사진 삭제를 되돌렸습니다.', 'success', 3000);
+        } catch (err) {
+          console.error('handleDeleteMemoPhoto undo failed:', err);
+          showToast('사진 복원 실패', 'error', 4000);
+        }
+      }, finalizeStorageDeletion, 5000);
       return true;
     } catch (err) {
       console.error('handleDeleteMemoPhoto failed:', err);
@@ -3964,6 +4015,7 @@ function App() {
     const dateStr = meta.meetingDate;
     const photoId = meta.photoId;
     const isMeetingPhotoMeta = meta.source === 'meeting' || meta.uploadSource === 'meeting' || dateStr || photoId;
+    const originalTags = typeof meta.tags === 'string' ? meta.tags : '';
 
     if (meta.source === 'memo' && msgId) {
       const ok = await handleDeleteMemoPhoto(msgId, imgIdx);
@@ -3989,7 +4041,11 @@ function App() {
           console.warn('Failed to clear source tags while deleting a meeting photo reference.');
         }
       }
-      const okMeeting = await handleDeleteMeetingPhoto(dateStr, photoId, imageUrl);
+      const okMeeting = await handleDeleteMeetingPhoto(dateStr, photoId, imageUrl, {
+        restoreSourceMessageId: meta.sourceMessageId,
+        restoreSourceImageIndex: meta.sourceImageIndex,
+        restoreSourceTags: originalTags
+      });
       if (okMeeting) return true;
       return false;
     }
@@ -4008,12 +4064,20 @@ function App() {
         const ok = await handleDeleteMemoPhoto(target.memoId, target.imageIndex);
         if (ok) return true;
       } else if (target.type === 'meeting') {
-        const ok = await handleDeleteMeetingPhoto(target.dateStr, target.photoId, imageUrl);
+        const ok = await handleDeleteMeetingPhoto(target.dateStr, target.photoId, imageUrl, {
+          restoreSourceMessageId: target.sourceMessageId,
+          restoreSourceImageIndex: target.sourceImageIndex,
+          restoreSourceTags: originalTags
+        });
         if (ok) return true;
       }
     }
 
-    const okMeetingFallback = await handleDeleteMeetingPhoto(dateStr, photoId, imageUrl);
+    const okMeetingFallback = await handleDeleteMeetingPhoto(dateStr, photoId, imageUrl, {
+      restoreSourceMessageId: meta.sourceMessageId,
+      restoreSourceImageIndex: meta.sourceImageIndex,
+      restoreSourceTags: originalTags
+    });
     if (okMeetingFallback) return true;
 
     showToast('삭제 대상 사진을 찾지 못했습니다.', 'error', 4000);
@@ -4701,32 +4765,22 @@ function App() {
       onClose: () => setIsChatSheetOpen(false)
     }),
     toast && /*#__PURE__*/React.createElement("div", {
-      className: "toast",
-      style: {
-        position: 'fixed',
-        bottom: '32px',
-        left: '50%',
-        transform: 'translateX(-50%)',
-        zIndex: 99999,
-        backgroundColor: toast.type === 'delete' ? '#EF4444' : toast.type === 'success' ? '#10B981' : '#3B82F6',
-        color: '#FFFFFF',
-        padding: '12px 24px',
-        borderRadius: 'var(--radius-md)',
-        boxShadow: '0 12px 32px rgba(0,0,0,0.25)',
-        fontSize: '0.95rem',
-        fontWeight: '800',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: '8px',
-        textAlign: 'center',
-        wordBreak: 'break-all',
-        whiteSpace: 'pre-wrap',
-        maxWidth: '380px',
-        width: '90%',
-        boxSizing: 'border-box'
-      }
-    }, toast.message),
+      className: `toast ${(toast.type === 'delete' || toast.type === 'error') ? 'is-delete' : 'is-success'}`
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "toast-message"
+    }, toast.message), toast.onAction && /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => {
+        const action = toast.onAction;
+        setToast(null);
+        if (toastTimeoutRef.current) {
+          clearTimeout(toastTimeoutRef.current);
+          toastTimeoutRef.current = null;
+        }
+        Promise.resolve(action()).catch(console.warn);
+      },
+      className: "toast-action"
+    }, toast.actionLabel)),
     isNotificationHelpOpen && /*#__PURE__*/React.createElement(NotificationPermissionHelpModal, {
       onClose: () => setIsNotificationHelpOpen(false),
       onRetry: handleMainToggleNotifications,

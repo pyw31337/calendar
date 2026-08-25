@@ -964,7 +964,7 @@ export function ItemEditDeleteActions({ onEdit, onDelete, editTitle = '수정', 
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
   const PencilIcon = __comp.PencilIcon || __deps.PencilIcon;
-  const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
+  const TrashIcon = __comp.TrashIcon || __deps.TrashIcon;
 
   return /*#__PURE__*/React.createElement("div", {
     className: "item-edit-delete-actions",
@@ -990,7 +990,7 @@ export function ItemEditDeleteActions({ onEdit, onDelete, editTitle = '수정', 
         padding: 0, cursor: 'pointer', color: 'var(--text-muted)',
         display: 'flex', alignItems: 'center', justifyContent: 'center'
       }
-    }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 14 }))
+    }, /*#__PURE__*/React.createElement(TrashIcon, { size: 14 }))
   );
 }
 

@@ -1932,6 +1932,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
   const PencilIcon = __comp.PencilIcon || __deps.PencilIcon;
   const ShareIcon = __comp.ShareIcon || __deps.ShareIcon;
   const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
+  const TrashIcon = __comp.TrashIcon || __deps.TrashIcon;
   const sanitizeText = __deps.sanitizeText;
   const extractFirstUrl = __deps.extractFirstUrl;
 
@@ -2263,7 +2264,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
         /*#__PURE__*/React.createElement("button", {
           type: "button", onClick: e => handleDeleteComment(e, comment), title: "삭제", "aria-label": "댓글 삭제",
           style: { background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', color: '#64748B', flexShrink: 0 }
-        }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 12 }))
+        }, /*#__PURE__*/React.createElement(TrashIcon, { size: 12 }))
       );
     })),
 

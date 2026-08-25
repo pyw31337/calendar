@@ -682,6 +682,7 @@ export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoad
   const __comp = window.GATHER_UI_COMPONENTS || {};
   const BackArrowIcon = __deps.BackArrowIcon;
   const SmallXIcon = __deps.SmallXIcon;
+  const TrashIcon = __deps.TrashIcon;
   const ResizableModalContainer = __deps.ResizableModalContainer;
   const ChatGalleryModal = __comp.ChatGalleryModal || __deps.ChatGalleryModal;
   const ChatParticipantSheet = __comp.ChatParticipantSheet || __deps.ChatParticipantSheet;
@@ -1616,7 +1617,7 @@ export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoad
                     alignItems: 'center', justifyContent: 'center', padding: 0, cursor: 'pointer',
                     flexShrink: 0
                   }
-                }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 12 }))))
+                }, /*#__PURE__*/React.createElement(TrashIcon, { size: 12 }))))
               ),
 
               /* Save & Close buttons formatted using DateModal styles */
@@ -1976,9 +1977,17 @@ export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoad
             editTags.map(tag => /*#__PURE__*/React.createElement("span", {
               key: tag,
               style: {
-                display: 'inline-flex', alignItems: 'center', gap: '6px', borderRadius: 'var(--radius-full)',
-                padding: '3px 4px 3px 10px', fontSize: '0.72rem', fontWeight: 900, lineHeight: 1,
-                border: '1px solid var(--border-subtle)', color: 'var(--text-main)', background: 'var(--bg-primary)'
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                borderRadius: 'var(--radius-full)',
+                padding: '3px 4px 3px 10px',
+                fontSize: '0.72rem',
+                fontWeight: 900,
+                lineHeight: 1,
+                border: '1px solid var(--border-subtle)',
+                color: 'var(--text-main)',
+                background: 'var(--bg-primary)'
               }
             }, `#${tag}`, /*#__PURE__*/React.createElement("button", {
               type: "button",
@@ -2001,12 +2010,20 @@ export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoad
                 setEditTags(nextTags);
               },
               style: {
-                width: '17px', height: '17px', border: 0, borderRadius: '50%',
-                background: 'var(--border-subtle)', color: 'var(--text-main)', display: 'inline-flex',
-                alignItems: 'center', justifyContent: 'center', padding: 0, cursor: 'pointer',
+                width: '17px',
+                height: '17px',
+                border: 0,
+                borderRadius: '50%',
+                background: 'var(--border-subtle)',
+                color: 'var(--text-main)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: 0,
+                cursor: 'pointer',
                 flexShrink: 0
               }
-            }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 12 }))))
+            }, /*#__PURE__*/React.createElement(TrashIcon, { size: 12 }))))
           ),
 
           /* Save / Delete / Cancel Actions using DateModal layout styles */
@@ -2022,9 +2039,12 @@ export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoad
                 whiteSpace: 'nowrap',
                 cursor: 'pointer',
                 padding: '10px 20px',
-                marginRight: 'auto' // Align delete button to the left
+                marginRight: 'auto',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px'
               }
-            }, "삭제"),
+            }, /*#__PURE__*/React.createElement(TrashIcon, { size: 14 }), "삭제"),
             
             /* Cancel */
             /*#__PURE__*/React.createElement("button", {
