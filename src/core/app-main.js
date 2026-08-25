@@ -4196,6 +4196,7 @@ function App() {
       activityLogs: placeActivityLog ? [...getCalendarActivityLogs(activeCal), placeActivityLog] : getCalendarActivityLogs(activeCal)
     };
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
+    setPlacesSubcollection(nextPlaces);
     writePlacesToFirestore(activeCal.id, nextPlaces).catch(e => console.warn('Subcollection places write failed:', e));
     return updateCalendars(nextCalendars, isEditing ? '장소 수정완료' : '장소 등록완료', 'success', updatedCal.id, 'settings', placeActivityLog ? [placeActivityLog] : []);
   };
@@ -4222,6 +4223,7 @@ function App() {
       activityLogs: placeActivityLog ? [...getCalendarActivityLogs(activeCal), placeActivityLog] : getCalendarActivityLogs(activeCal)
     };
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
+    setPlacesSubcollection(nextPlaces);
     return updateCalendars(nextCalendars, '장소 삭제완료', 'delete', updatedCal.id, 'settings', placeActivityLog ? [placeActivityLog] : []);
   };
   const handleDeleteActivityLog = log => {
