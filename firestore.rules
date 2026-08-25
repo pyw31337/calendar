@@ -273,7 +273,7 @@ service cloud.firestore {
       // are immutable once written (create + point-in-time-recovery delete only, no update).
       match /activityLogs/{logId} {
         allow get, list: if isCalendarDoc(calendarDocId);
-        allow create: if isCalendarDoc(calendarDocId)
+        allow create, update: if isCalendarDoc(calendarDocId)
           && request.resource.data.keys().hasOnly(['id', 'calendarId', 'participantId', 'date', 'action', 'note', 'timestamp'])
           && request.resource.data.id is string
           && request.resource.data.id.size() <= 200

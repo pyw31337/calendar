@@ -338,8 +338,8 @@ function getCalendarPlaces(calendar) {
 // { ...calendar, places: subcollectionPlaces } would silently drop pre-migration entries.
 function unionPlaces(calendar, subcollectionPlaces) {
   const byId = new Map();
-  (Array.isArray(subcollectionPlaces) ? subcollectionPlaces : []).forEach(p => { if (p?.id) byId.set(p.id, p); });
   getCalendarPlaces(calendar).forEach(p => { if (p?.id) byId.set(p.id, p); });
+  (Array.isArray(subcollectionPlaces) ? subcollectionPlaces : []).forEach(p => { if (p?.id) byId.set(p.id, p); });
   return deduplicateCalendarPlaces(Array.from(byId.values()));
 }
 
