@@ -4036,25 +4036,18 @@ function App() {
       if (ok) return true;
     }
 
-    if (isMeetingPhotoMeta) {
-      if (meta.sourceMessageId && Number.isInteger(meta.sourceImageIndex)) {
-        // Auto-linked 일정 사진 are derived from a real chat image tag, so deleting the
-        // meeting copy must also clear the source tag; otherwise the reference can be rebuilt
-        // later and the broken thumbnail comes back on refresh.
-        const okUnlink = await handleSaveImageTags(meta.sourceMessageId, meta.sourceImageIndex, '', {
-          source: 'meeting',
-          uploadSource: 'meeting',
-          meetingDate: dateStr,
-          photoId,
-          imageUrl,
-          thumbUrl: meta.thumbUrl || meta.thumb || imageUrl,
-          sourceMessageId: meta.sourceMessageId,
-          sourceImageIndex: meta.sourceImageIndex
-        });
-      if (!okUnlink) {
-        console.warn('Failed to clear source tags while deleting a meeting photo reference.');
-      }
+    if (meta.sourceMessageId && Number.isInteger(meta.sourceImageIndex)) {
+      // Meeting-tab photos are a view onto the shared image asset, not a separate owner.
+      // When we know the source message + image index, delete the canonical asset first so
+      // the photo disappears from chat, gallery, and every linked meeting in one step.
+      const okChat = await handleDeleteChatMessagePhoto(meta.sourceMessageId, meta.sourceImageIndex);
+      if (okChat) return true;
     }
+
+    if (isMeetingPhotoMeta) {
+      // Legacy fallback for meeting-only entries that do not have a canonical source asset
+      // pointer. New uploads should almost always route through the shared chat/message asset
+      // path above so one delete removes the photo everywhere.
       const okMeeting = await handleDeleteMeetingPhoto(dateStr, photoId, imageUrl, {
         restoreSourceMessageId: meta.sourceMessageId,
         restoreSourceImageIndex: meta.sourceImageIndex,
@@ -4117,6 +4110,14 @@ function App() {
     if (meta.source === 'memo' && msgId) {
       const res = await handleReplaceMemoPhoto(msgId, imgIdx, file);
       if (res) return res;
+    }
+
+    if (meta.sourceMessageId && Number.isInteger(meta.sourceImageIndex)) {
+      // As with delete, the shared source image is the canonical asset. Replacing it there
+      // keeps chat, gallery, and meeting views visually identical without having to patch each
+      // view independently.
+      const resChat = await handleReplaceChatMessagePhoto(meta.sourceMessageId, meta.sourceImageIndex, file);
+      if (resChat) return resChat;
     }
 
     if ((meta.source === 'meeting' || meta.uploadSource === 'meeting' || dateStr || photoId) && !meta.sourceMessageId) {
