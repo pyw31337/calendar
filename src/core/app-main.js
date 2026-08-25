@@ -607,7 +607,7 @@ function App() {
           await normalizedAction.onExpire();
         }
       } catch (err) {
-        console.warn('Toast onExpire failed:', err);
+        console.warn(err);
       } finally {
         setToast(t => t?.id === toastId ? null : t);
       }

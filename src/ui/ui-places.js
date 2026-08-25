@@ -1133,7 +1133,7 @@ export function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showT
   const PencilIcon = __deps.PencilIcon;
   const SearchIcon = __deps.SearchIcon;
   const SmallXIcon = __deps.SmallXIcon;
-  const TrashIcon = __deps.TrashIcon;
+  const TrashIcon = __comp.TrashIcon || __deps.TrashIcon;
   const ThreeLinesIcon = __deps.ThreeLinesIcon;
   const getCalendarPlaces = __deps.getCalendarPlaces;
   const getPlaceCategories = __deps.getPlaceCategories;
