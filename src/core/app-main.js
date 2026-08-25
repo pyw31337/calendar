@@ -1783,10 +1783,11 @@ function App() {
     };
   }, [activeCalId, activeView, firebaseDb]);
 
-  // Anniversaries: only while calendar view needs them
+  // Anniversaries: always live (like chat/places) so an addition on another device shows up
+  // immediately even while this tab is sitting on a different view, not just after switching
+  // back to the calendar tab.
   React.useEffect(() => {
     if (!activeCalId || !firebaseDb) return;
-    if (activeView !== 'calendar') return;
     let isMounted = true;
     const unsub = subscribeAnniversaries(activeCalId, snapshot => {
         if (!isMounted) return;
@@ -1800,7 +1801,7 @@ function App() {
         });
       });
     return () => { isMounted = false; unsub(); };
-  }, [activeCalId, activeView, firebaseDb]);
+  }, [activeCalId, firebaseDb]);
 
   // Places + confirmed meetings: calendar / places / settlement only
   React.useEffect(() => {
@@ -1857,6 +1858,8 @@ function App() {
   // Pinned memos are fetched separately and unbounded -- pinning is a deliberate, self-limiting
   // action, and keeping it a separate always-live query means an old pinned memo can never
   // silently fall out of view just because it's outside the paginated recent window.
+  // Kept subscribed regardless of activeView (like chat/places) so a memo added on another
+  // device shows up immediately even while this tab is on a different view.
   React.useEffect(() => {
     setMemosLimit(MEMOS_PAGE_SIZE);
   }, [activeCalId]);
@@ -1865,10 +1868,6 @@ function App() {
     if (!activeCalId) {
       setMemos([]);
       setHasMoreMemos(false);
-      return;
-    }
-    // Memos only while memo view is open
-    if (activeView !== 'memo') {
       return;
     }
     if (!firebaseDb) {
@@ -1918,7 +1917,7 @@ function App() {
       unsubscribePinned();
       unsubscribeRecent();
     };
-  }, [activeCalId, memosLimit, activeView, firebaseDb]);
+  }, [activeCalId, memosLimit, firebaseDb]);
 
   // Dynamic body padding override for full-screen subviews (chat, settlement, memo)
   React.useEffect(() => {
