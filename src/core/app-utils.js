@@ -472,9 +472,15 @@ const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
 
   function normalizePlaceDateForSort(dateStr) {
     if (!dateStr) return null;
-    if (isValidDateString(dateStr)) return dateStr;
-    const match = String(dateStr).match(/^(\d{2})\.(\d{2})\.(\d{2})$/);
-    return match ? `20${match[1]}-${match[2]}-${match[3]}` : null;
+    const str = String(dateStr).trim();
+    if (isValidDateString(str)) return str;
+    const match = str.match(/(\d{4}|\d{2})[.-](\d{2})[.-](\d{2})/);
+    if (!match) return null;
+    let [, y, m, d] = match;
+    if (y.length === 2) y = '20' + y;
+    const mm = Number(m), dd = Number(d);
+    if (mm < 1 || mm > 12 || dd < 1 || dd > 31) return null;
+    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
   }
 
   function formatPlaceBadgeDate(dateStr) {
