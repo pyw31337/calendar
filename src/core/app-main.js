@@ -2045,6 +2045,27 @@ function App() {
     return () => { cancelled = true; };
   }, [activeCalId, isInitialDataLoading]);
 
+  // Main-screen chat preview safety net:
+  // if the count says chat history exists but the live recent window is still empty,
+  // hydrate the newest messages once so the summary widget can render at least the latest
+  // chat instead of a blank state.
+  React.useEffect(() => {
+    if (!activeCalId || isInitialDataLoading) return;
+    if (typeof totalChatCount !== 'number' || totalChatCount <= 0) return;
+    if ((chatMessages || []).length > 0 || (olderChatMessages || []).length > 0) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const list = await fetchRecentChatMessages(activeCalId, CHAT_LIVE_MESSAGE_LIMIT);
+        if (cancelled || !Array.isArray(list) || list.length === 0) return;
+        setChatMessages(prev => (Array.isArray(prev) && prev.length > 0) ? prev : list.slice(-CHAT_LIVE_MESSAGE_LIMIT));
+      } catch (err) {
+        console.warn('chat preview hydration failed:', err);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [activeCalId, isInitialDataLoading, totalChatCount, chatMessages.length, olderChatMessages.length]);
+
   React.useEffect(() => {
     // Same reasoning as above -- wait for the initial calendar document load to finish before
     // spending a paginated Firestore scan on gallery-preview thumbnails.
