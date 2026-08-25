@@ -146,6 +146,7 @@ import {
   parseSharePathFromLocation,
   getCalendarIdFromURL,
   getRawCalendarIdFromURL,
+  getCalendarMonthFromURL,
   normalizeCalendarUrlParams,
   getAppBaseUrl,
   getCalendarShareUrl,
@@ -753,7 +754,12 @@ function App() {
     return 'cw';
   });
   const [cloudReloadToken, setCloudReloadToken] = React.useState(0);
-  const [currentMonthDate, setCurrentMonthDate] = React.useState(new Date());
+  const [currentMonthDate, setCurrentMonthDate] = React.useState(() => {
+    const requestedMonth = getCalendarMonthFromURL();
+    return requestedMonth
+      ? new Date(requestedMonth.year, requestedMonth.month - 1, 1)
+      : new Date();
+  });
   const [selectedDate, setSelectedDate] = React.useState(null);
   const [isModalOpen, setIsModalOpen] = React.useState(false);
   // Lets a Lightbox "이동" action (from handleJumpToMeetingDate) open DateModal straight on
@@ -1401,6 +1407,23 @@ function App() {
     const qs = params.toString();
     const newUrl = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
     window.history.pushState({}, '', newUrl);
+  };
+  const syncCurrentMonthInUrl = nextDate => {
+    if (!(nextDate instanceof Date) || Number.isNaN(nextDate.getTime())) return;
+    const params = new URLSearchParams(window.location.search);
+    const keepId = params.get('id') || params.get('cal');
+    params.delete('id');
+    params.delete('cal');
+    if (keepId) params.set('id', keepId);
+    params.set('year', String(nextDate.getFullYear()));
+    params.set('month', String(nextDate.getMonth() + 1).padStart(2, '0'));
+    const qs = params.toString();
+    const newUrl = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
+    window.history.replaceState({}, '', newUrl);
+  };
+  const setCurrentMonthAndSync = nextDate => {
+    setCurrentMonthDate(nextDate);
+    syncCurrentMonthInUrl(nextDate);
   };
   if (isAdminDashboardRoute()) {
     return /*#__PURE__*/React.createElement(AdminLoginGate, null,
@@ -4504,6 +4527,7 @@ function App() {
       onDeleteExpense: handleDeleteExpense,
       onReorderExpenses: handleReorderExpenses,
       onAddMeetingPhotos: handleAddMeetingPhotos,
+      onDeletePhoto: handleDeletePhoto,
       onDeleteMeetingPhoto: handleDeleteMeetingPhoto,
       onFindChatMessageById: findChatMessageById,
       onLoadOlderChat: loadOlderChatMessages,
@@ -5145,10 +5169,10 @@ function App() {
     calendar: activeCal,
     isLoading: isInitialDataLoading,
     monthDate: currentMonthDate,
-    onPrevMonth: () => setCurrentMonthDate(new Date(currentMonthDate.getFullYear(), currentMonthDate.getMonth() - 1, 1)),
-    onNextMonth: () => setCurrentMonthDate(new Date(currentMonthDate.getFullYear(), currentMonthDate.getMonth() + 1, 1)),
-    onToday: () => setCurrentMonthDate(new Date()),
-    onJumpToMonth: (y, m) => setCurrentMonthDate(new Date(y, m, 1)),
+    onPrevMonth: () => setCurrentMonthAndSync(new Date(currentMonthDate.getFullYear(), currentMonthDate.getMonth() - 1, 1)),
+    onNextMonth: () => setCurrentMonthAndSync(new Date(currentMonthDate.getFullYear(), currentMonthDate.getMonth() + 1, 1)),
+    onToday: () => setCurrentMonthAndSync(new Date()),
+    onJumpToMonth: (y, m) => setCurrentMonthAndSync(new Date(y, m, 1)),
     onSelectDate: d => {
       if (!guardLoadedCalendar()) return;
       setSelectedDate(d);

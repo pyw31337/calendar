@@ -8,6 +8,7 @@ const GATHER_APP_CHAT_DATA = window.GATHER_APP_CHAT_DATA || {};
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
 const GATHER_APP_CONSTANTS = window.GATHER_APP_CONSTANTS || {};
 const GATHER_APP_CONFIG = window.GATHER_APP_CONFIG || {};
+const NO_IMAGE_ICON_DATA_URI = 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-image-off-icon lucide-image-off"><line x1="2" x2="22" y1="2" y2="22"/><path d="M10.41 10.41a2 2 0 1 1-2.83-2.83"/><line x1="13.5" x2="6" y1="13.5" y2="21"/><line x1="18" x2="21" y1="12" y2="15"/><path d="M3.59 3.59A1.99 1.99 0 0 0 3 5v14a2 2 0 0 0 2 2h14c.55 0 1.052-.22 1.41-.59"/><path d="M21 15V5a2 2 0 0 0-2-2H9"/></svg>');
 function __gatherUiDeps() { return window.GATHER_UI_DEPS || {}; }
 function getActiveAvailabilities(calendar) {
   const f = __gatherUiDeps().getActiveAvailabilities || GATHER_APP_UTILS.getActiveAvailabilities;
@@ -700,6 +701,7 @@ export function DateModal({
   onDeleteExpense,
   onReorderExpenses,
   onAddMeetingPhotos,
+  onDeletePhoto,
   onDeleteMeetingPhoto,
   onFindChatMessageById,
   onLoadOlderChat,
@@ -1360,11 +1362,25 @@ export function DateModal({
   }, [activeTab, onAddMeetingPhotos]);
 
   const handleDeleteMeetingPhoto = photo => {
-    if (!photo?.id || typeof onDeleteMeetingPhoto !== 'function') return;
+    if (!photo || (typeof onDeletePhoto !== 'function' && typeof onDeleteMeetingPhoto !== 'function')) return;
     onRequestConfirm('일정 사진 삭제', '이 일정 사진을 삭제하시겠습니까?', async () => {
       setIsSavingMeetingPhotos(true);
       try {
-        const ok = await Promise.resolve(onDeleteMeetingPhoto(dateStr, photo.id));
+        const deletionMeta = {
+          source: photo.source || 'meeting',
+          uploadSource: photo.uploadSource || (photo.source === 'chat-tag' ? 'chat' : 'meeting'),
+          imageUrl: photo.imageUrl || photo.thumbUrl || '',
+          thumbUrl: photo.thumbUrl || photo.imageUrl || '',
+          sourceMessageId: photo.sourceMessageId,
+          sourceImageIndex: photo.sourceImageIndex,
+          messageId: photo.messageId || photo.sourceMessageId,
+          imageIndex: Number.isInteger(photo.imageIndex) ? photo.imageIndex : photo.sourceImageIndex,
+          meetingDate: dateStr,
+          photoId: photo.id
+        };
+        const ok = typeof onDeletePhoto === 'function'
+          ? await Promise.resolve(onDeletePhoto(deletionMeta))
+          : await Promise.resolve(onDeleteMeetingPhoto(dateStr, photo.id, deletionMeta.imageUrl));
         if (ok !== false) showToast('사진이 삭제되었습니다.', 'success');
         else showToast('사진 삭제 실패', 'error');
       } finally {
@@ -2798,7 +2814,8 @@ export function DateModal({
           referrerPolicy: "no-referrer",
           onError: e => {
             e.currentTarget.onerror = null;
-            e.currentTarget.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="%2394A3B8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="9" y1="9" x2="15" y2="15"/><line x1="15" y1="9" x2="9" y2="15"/></svg>';
+            e.currentTarget.src = NO_IMAGE_ICON_DATA_URI;
+            e.currentTarget.style.color = 'var(--text-muted)';
             e.currentTarget.style.objectFit = 'contain';
             e.currentTarget.style.padding = '12px';
             e.currentTarget.style.backgroundColor = '#F1F5F9';

@@ -1341,6 +1341,16 @@ function getRawCalendarIdFromURL() {
   return urlParams.get('id') || urlParams.get('cal') || (share && share.calendarId) || '';
 }
 
+function getCalendarMonthFromURL() {
+  const params = new URLSearchParams(window.location.search);
+  let year = Number(params.get('year'));
+  const month = Number(params.get('month'));
+  if (!Number.isFinite(year) || !Number.isFinite(month)) return null;
+  if (year < 100) year += 2000;
+  if (year < 2000 || year > 2099 || month < 1 || month > 12) return null;
+  return { year, month };
+}
+
 function normalizeCalendarUrlParams() {
   try {
     const url = new URL(window.location.href);
@@ -1349,6 +1359,14 @@ function normalizeCalendarUrlParams() {
       url.searchParams.delete('id');
       url.searchParams.delete('cal');
       url.searchParams.set('id', id);
+    }
+    const monthInfo = getCalendarMonthFromURL();
+    if (monthInfo) {
+      url.searchParams.set('year', String(monthInfo.year));
+      url.searchParams.set('month', String(monthInfo.month).padStart(2, '0'));
+    } else {
+      url.searchParams.delete('year');
+      url.searchParams.delete('month');
     }
     const cleaned = url.pathname + url.search + url.hash;
     const current = window.location.pathname + window.location.search + window.location.hash;
@@ -2032,6 +2050,7 @@ export {
   parseSharePathFromLocation,
   getCalendarIdFromURL,
   getRawCalendarIdFromURL,
+  getCalendarMonthFromURL,
   normalizeCalendarUrlParams,
   getAppBaseUrl,
   getCalendarShareUrl,
