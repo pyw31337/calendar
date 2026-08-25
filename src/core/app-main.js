@@ -3963,18 +3963,33 @@ function App() {
     const imgIdx = Number.isInteger(meta.imageIndex) ? meta.imageIndex : (Number.isInteger(meta.sourceImageIndex) ? meta.sourceImageIndex : 0);
     const dateStr = meta.meetingDate;
     const photoId = meta.photoId;
+    const isMeetingPhotoMeta = meta.source === 'meeting' || meta.uploadSource === 'meeting' || dateStr || photoId;
 
     if (meta.source === 'memo' && msgId) {
       const ok = await handleDeleteMemoPhoto(msgId, imgIdx);
       if (ok) return true;
     }
 
-    if ((meta.source === 'meeting' || meta.uploadSource === 'meeting' || dateStr || photoId) && !meta.sourceMessageId) {
+    if (isMeetingPhotoMeta) {
+      if (meta.sourceMessageId && Number.isInteger(meta.sourceImageIndex)) {
+        const okUnlink = await handleSaveImageTags(meta.sourceMessageId, meta.sourceImageIndex, '', {
+          source: 'meeting',
+          uploadSource: 'meeting',
+          meetingDate: dateStr,
+          photoId,
+          imageUrl,
+          thumbUrl: meta.thumbUrl || meta.thumb || imageUrl,
+          sourceMessageId: meta.sourceMessageId,
+          sourceImageIndex: meta.sourceImageIndex
+        });
+        if (okUnlink) return true;
+      }
       const okMeeting = await handleDeleteMeetingPhoto(dateStr, photoId, imageUrl);
       if (okMeeting) return true;
+      return false;
     }
 
-    if (msgId) {
+    if (msgId && !isMeetingPhotoMeta) {
       const okChat = await handleDeleteChatMessagePhoto(msgId, imgIdx);
       if (okChat) return true;
     }
