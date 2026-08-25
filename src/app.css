@@ -3351,28 +3351,20 @@ select.form-select {
   user-select: none;
 }
 
-.date-modal-places-list,
+.date-modal-places-list {
+  overflow: visible !important;
+}
 .date-modal-settlement-list {
   overflow: visible !important;
-  padding-bottom: 48px !important;
-  margin-bottom: 32px !important;
+  padding-bottom: 24px !important;
+  margin-bottom: 16px !important;
 }
-.date-modal-tab-bottom-spacer,
-.date-modal-global-bottom-spacer {
-  height: 48px !important;
-  min-height: 48px !important;
+.date-modal-settlement-bottom-spacer {
+  height: 28px !important;
+  min-height: 28px !important;
   flex-shrink: 0 !important;
   display: block !important;
   width: 100% !important;
-  clear: both !important;
-}
-.modal-body::after {
-  content: '' !important;
-  display: block !important;
-  height: 48px !important;
-  min-height: 48px !important;
-  width: 100% !important;
-  flex-shrink: 0 !important;
   clear: both !important;
 }
 .expense-sortable-row {

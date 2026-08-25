@@ -2172,8 +2172,7 @@ export function DateModal({
         }
       }, (!isConfirmed && isAllAvailable)
         ? /*#__PURE__*/React.createElement(GamifiedConfirmButtonContent, { label: "모임 확정" })
-        : (isConfirmed ? '모임 취소' : '모임 확정'))),
-      /*#__PURE__*/React.createElement("div", { className: "date-modal-tab-bottom-spacer", style: { height: '48px', minHeight: '48px', width: '100%', flexShrink: 0 } })
+        : (isConfirmed ? '모임 취소' : '모임 확정')))
     )),
 
     /* Tab 2 Content: 장소 */
@@ -2473,8 +2472,7 @@ export function DateModal({
               }
             }))
           );
-        })),
-        /*#__PURE__*/React.createElement("div", { className: "date-modal-tab-bottom-spacer", style: { height: '48px', minHeight: '48px', width: '100%', flexShrink: 0 } })
+        }))
       )
     ),
 
@@ -2718,9 +2716,13 @@ export function DateModal({
               )
             )
           );
+        }),
+        /* Dedicated 28px bottom spacer ONLY for settlement list when expenses exist */
+        /*#__PURE__*/React.createElement("div", {
+          className: "date-modal-settlement-bottom-spacer",
+          style: { height: '28px', minHeight: '28px', width: '100%', flexShrink: 0, clear: 'both' }
         })
-      ),
-      /*#__PURE__*/React.createElement("div", { className: "date-modal-tab-bottom-spacer", style: { height: '48px', minHeight: '48px', width: '100%', flexShrink: 0 } })
+      )
     ),
 
     /* Tab 4 Content: 사진 */
@@ -2857,11 +2859,8 @@ export function DateModal({
             cursor: 'pointer'
           }
         }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 13 }))
-      ))),
-      /*#__PURE__*/React.createElement("div", { className: "date-modal-tab-bottom-spacer", style: { height: '48px', minHeight: '48px', width: '100%', flexShrink: 0 } })
-    ),
-    /* Global bottom spacer for all tabs inside modal-body */
-    /*#__PURE__*/React.createElement("div", { className: "date-modal-global-bottom-spacer", style: { height: '48px', minHeight: '48px', width: '100%', flexShrink: 0, display: 'block', clear: 'both' } })
+      )))
+    )
   ))));
 
   // Bottom-sheet rule: never nest under ResizableModalContainer (CSS transform traps fixed).
