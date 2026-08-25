@@ -904,7 +904,7 @@ export function AnniversaryModal({
     style: { zIndex: 11000 }
   }, /*#__PURE__*/React.createElement(ResizableModalContainer, {
     className: "modal-container",
-    style: { maxWidth: '440px', width: '90%', animation: 'modalFadeIn 0.2s ease', backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)' },
+    style: { maxWidth: '440px', width: '90%', backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)' },
     onClick: e => e.stopPropagation()
   },
     /* Modal Header */

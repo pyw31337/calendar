@@ -564,7 +564,10 @@ function App() {
   }, [calendars]);
   const [toast, setToast] = React.useState(null);
   const [operationProgress, setOperationProgress] = React.useState(null);
-  const toastTimeoutRef = React.useRef(null);
+  const toastControllerRef = React.useRef(null);
+  if (!toastControllerRef.current) {
+    toastControllerRef.current = GATHER_APP_UTILS.createToastLifecycle(setToast);
+  }
   const operationTimersRef = React.useRef({ delay: null, interval: null, hide: null });
   const clearOperationTimers = () => {
     const timers = operationTimersRef.current;
@@ -575,51 +578,15 @@ function App() {
   };
   React.useEffect(() => {
     return () => {
-      if (toastTimeoutRef.current) {
-        clearTimeout(toastTimeoutRef.current);
-      }
+      toastControllerRef.current.clearToastTimers();
       clearOperationTimers();
     };
   }, []);
 
-  const showToast = (message, type = 'info', duration = 3000, action = null) => {
-    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
-    const toastId = `toast_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-    const normalizedAction = typeof action === 'function'
-      ? { label: '되돌리기', onAction: action, onExpire: null }
-      : (action && typeof action === 'object'
-        ? {
-            label: action.label || action.actionLabel || '되돌리기',
-            onAction: typeof action.onAction === 'function' ? action.onAction : null,
-            onExpire: typeof action.onExpire === 'function' ? action.onExpire : null
-          }
-        : null);
-    setToast({
-      id: toastId,
-      message,
-      type,
-      actionLabel: normalizedAction?.label || null,
-      onAction: normalizedAction?.onAction || null
-    });
-    toastTimeoutRef.current = setTimeout(async () => {
-      try {
-        if (normalizedAction?.onExpire) {
-          await normalizedAction.onExpire();
-        }
-      } catch (err) {
-        console.warn(err);
-      } finally {
-        setToast(t => t?.id === toastId ? null : t);
-      }
-    }, duration);
-    return toastId;
-  };
+  const showToast = toastControllerRef.current.showToast;
+  const dismissToast = toastControllerRef.current.dismissToast;
   const showUndoableDeleteToast = (message, onUndo, onExpire, duration = 5000) => {
-    return showToast(message, 'delete', duration, {
-      label: '되돌리기',
-      onAction: onUndo,
-      onExpire
-    });
+    return showToast(message, 'delete', duration, onUndo, onExpire);
   };
 
   const runWithOperationProgress = async ({ title, detail, delay = 1000 } = {}, task) => {
@@ -3776,7 +3743,7 @@ function App() {
       if (canUndo) {
         showUndoableDeleteToast('사진이 삭제되었습니다.', restoreDeletedPhoto, finalizeStorageDeletion, 5000);
       } else {
-        showToast('사진이 삭제되었습니다.', 'delete', 5000, { onExpire: finalizeStorageDeletion });
+        showToast('사진이 삭제되었습니다.', 'delete', 5000, null, finalizeStorageDeletion);
       }
       return true;
     } catch (err) {
@@ -4765,22 +4732,18 @@ function App() {
       onClose: () => setIsChatSheetOpen(false)
     }),
     toast && /*#__PURE__*/React.createElement("div", {
-      className: `toast ${(toast.type === 'delete' || toast.type === 'error') ? 'is-delete' : 'is-success'}`
+      className: `toast ${(toast.type === 'delete' || toast.type === 'error') ? 'is-delete' : 'is-success'} ${toast.isExiting ? 'is-exiting' : ''}`
     }, /*#__PURE__*/React.createElement("span", {
       className: "toast-message"
     }, toast.message), toast.onAction && /*#__PURE__*/React.createElement("button", {
       type: "button",
       onClick: () => {
         const action = toast.onAction;
-        setToast(null);
-        if (toastTimeoutRef.current) {
-          clearTimeout(toastTimeoutRef.current);
-          toastTimeoutRef.current = null;
-        }
+        dismissToast();
         Promise.resolve(action()).catch(console.warn);
       },
       className: "toast-action"
-    }, toast.actionLabel)),
+    }, "되돌리기")),
     isNotificationHelpOpen && /*#__PURE__*/React.createElement(NotificationPermissionHelpModal, {
       onClose: () => setIsNotificationHelpOpen(false),
       onRetry: handleMainToggleNotifications,

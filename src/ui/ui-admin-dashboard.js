@@ -709,6 +709,10 @@ export function AdminDashboard({ initialCalendars }) {
   const [loadedAt, setLoadedAt] = React.useState(null);
   const [error, setError] = React.useState('');
   const [toast, setToast] = React.useState(null);
+  const toastControllerRef = React.useRef(null);
+  if (!toastControllerRef.current) {
+    toastControllerRef.current = GATHER_APP_UTILS.createToastLifecycle(setToast);
+  }
   const importInputRef = React.useRef(null);
   const isRestoreMode = isAdminRestoreRoute();
 
@@ -774,10 +778,13 @@ export function AdminDashboard({ initialCalendars }) {
 
   const lastSyncedRef = React.useRef(null);
 
-  const showAdminToast = (message, type = 'success', duration = 3000) => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), duration);
-  };
+  React.useEffect(() => {
+    return () => {
+      toastControllerRef.current.clearToastTimers();
+    };
+  }, []);
+
+  const showAdminToast = toastControllerRef.current.showToast;
 
   // Generic layer-popup confirm dialog (replaces window.confirm across this page)
   const [confirmDialog, setConfirmDialog] = React.useState(null);
@@ -2007,7 +2014,7 @@ export function AdminDashboard({ initialCalendars }) {
   },
     /* Toast Alert */
     toast && /*#__PURE__*/React.createElement("div", {
-      className: `toast ${toast.type === 'error' ? 'is-delete' : 'is-success'}`
+      className: `toast ${toast.type === 'error' ? 'is-delete' : 'is-success'} ${toast.isExiting ? 'is-exiting' : ''}`
     }, toast.message),
 
     /* Header + Tabs, attached into one flush top bar (no outer box/margin, like the main

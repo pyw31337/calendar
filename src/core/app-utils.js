@@ -835,6 +835,47 @@ const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
     return m + '/' + d + ' (' + dayNames[date.getDay()] + ') ' + hh + ':' + mm;
   }
 
+  function createToastLifecycle(setToast) {
+    var timer = null;
+    function clearToastTimers() {
+      if (timer) {
+        clearTimeout(timer);
+        timer = null;
+      }
+    }
+    function dismissToast() {
+      clearToastTimers();
+      setToast(function (prev) { return prev ? Object.assign({}, prev, { isExiting: true }) : prev; });
+      timer = setTimeout(function () {
+        timer = null;
+        setToast(null);
+      }, 180);
+    }
+    function showToast(message, type, duration, onAction, onExpire) {
+      if (type === void 0) type = 'info';
+      if (duration === void 0) duration = 3000;
+      if (onAction === void 0) onAction = null;
+      if (onExpire === void 0) onExpire = null;
+      clearToastTimers();
+      setToast({
+        message: message,
+        type: type,
+        onAction: typeof onAction === 'function' ? onAction : null,
+        isExiting: false
+      });
+      timer = setTimeout(function () {
+        if (typeof onExpire === 'function') {
+          Promise.resolve(onExpire())
+            .catch(function (err) { return console.warn(err); })
+            .finally(function () { dismissToast(); });
+          return;
+        }
+        dismissToast();
+      }, duration);
+    }
+    return { showToast: showToast, dismissToast: dismissToast, clearToastTimers: clearToastTimers };
+  }
+
   export const GATHER_APP_UTILS = Object.freeze({
     getContrastTextColor,
     formatDateWithDayName,
@@ -924,6 +965,7 @@ const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
     getActivePollOptions,
     isPollClosed,
     formatPollDeadline,
+    createToastLifecycle,
     getMemoItemShareUrl
   });
 

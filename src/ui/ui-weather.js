@@ -829,7 +829,7 @@ export function WeatherLocationModal({ onClose, onSelectLocation, onDeleteRecent
     style: { zIndex: 12000 }
   }, /*#__PURE__*/React.createElement(ResizableModalContainer, {
     className: "modal-container",
-    style: { maxWidth: '380px', width: '90%', animation: 'modalFadeIn 0.2s ease', backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)' },
+    style: { maxWidth: '380px', width: '90%', backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)' },
     onClick: e => e.stopPropagation()
   },
     /* Header */

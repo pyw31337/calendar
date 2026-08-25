@@ -1764,7 +1764,6 @@ export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoad
           boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04)',
           display: 'flex', flexDirection: 'column', gap: '12px',
           padding: '16px', boxSizing: 'border-box',
-          animation: 'modalFadeIn 0.2s ease'
         }
       },
         /* Header: Title & Pin */
