@@ -2506,7 +2506,7 @@ function App() {
       }
       if (ok) {
         deleteAllChatImagesFromStorage(deletingMessage);
-        unlinkMeetingPhotoReferences(id, null).catch(err => console.warn('unlinkMeetingPhotoReferences skipped:', err));
+        await unlinkMeetingPhotoReferences(id, null);
         if (!firebaseDb) {
           fetchChatMessagesRest(calId).then(list => setChatMessages(list));
         }
@@ -3691,6 +3691,8 @@ function App() {
       revision: (activeCal.revision || 0) + 1
     };
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
+    setConfirmedMeetingsSubcollection(nextConfirmedMeetings);
+    writeConfirmedMeetingsToFirestore(activeCal.id, nextConfirmedMeetings).catch(err => console.warn('Subcollection confirmedMeetings write failed:', err));
     await updateCalendars(nextCalendars, '일정 사진 연결 정리완료', 'success', updatedCal.id, 'settings');
   };
 
@@ -3716,7 +3718,7 @@ function App() {
           await deleteMessageRest(activeCalId, messageId);
         }
         removeLocalChatMessage(messageId);
-        unlinkMeetingPhotoReferences(messageId, null).catch(err => console.warn('unlinkMeetingPhotoReferences skipped:', err));
+        await unlinkMeetingPhotoReferences(messageId, null);
       } else {
         const data = sanitizeMessageForFirestore({
           imageUrls: nextUrls,
@@ -3732,7 +3734,7 @@ function App() {
           if (!ok) throw new Error('Photo delete REST update failed');
         }
         patchLocalChatMessage(messageId, data);
-        unlinkMeetingPhotoReferences(messageId, imageIndex).catch(err => console.warn('unlinkMeetingPhotoReferences skipped:', err));
+        await unlinkMeetingPhotoReferences(messageId, imageIndex);
       }
       deleteChatImageFromStorage(target.full);
       if (target.thumb !== target.full) deleteChatImageFromStorage(target.thumb);
