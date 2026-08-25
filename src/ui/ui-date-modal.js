@@ -730,6 +730,7 @@ export function DateModal({
   const SectionCountBadge = __comp.SectionCountBadge || __deps.SectionCountBadge;
   const UrlCapsuleBadge = __deps.UrlCapsuleBadge;
   const SmallXIcon = __deps.SmallXIcon;
+  const TrashIcon = __comp.TrashIcon || __deps.TrashIcon;
   const getActiveParticipants = __deps.getActiveParticipants;
   const getCalendarPlaces = __deps.getCalendarPlaces;
   const getPlaceCategories = __deps.getPlaceCategories;

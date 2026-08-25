@@ -1400,6 +1400,7 @@ export function CommentsSection({
   const ImageProcessingOverlay = __comp.ImageProcessingOverlay || __deps.ImageProcessingOverlay;
   const Lightbox = __comp.Lightbox || __deps.Lightbox;
   const SectionToggleButton = __comp.SectionToggleButton || __deps.SectionToggleButton;
+  const TrashIcon = __comp.TrashIcon || __deps.TrashIcon;
   const getActiveParticipants = __deps.getActiveParticipants;
   const autoGrowTextarea = __deps.autoGrowTextarea;
 
