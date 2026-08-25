@@ -4833,6 +4833,13 @@ function App() {
         onBack: () => changeView('calendar'),
         onSavePlace: handleSavePlace,
         onDeletePlace: handleDeletePlace,
+        onSelectDate: (dateStr) => {
+          const canonicalDate = normalizePlaceDateForSort(dateStr);
+          if (canonicalDate) {
+            setSelectedDate(canonicalDate);
+            setIsModalOpen(true);
+          }
+        },
         showToast: showToast,
         onRequestConfirm: showConfirmDialog,
         placesInitialQuery: placesInitialQuery,

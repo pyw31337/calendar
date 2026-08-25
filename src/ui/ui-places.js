@@ -660,7 +660,7 @@ function getAnniversaryDisplayColor(...args) {
 }
 
 
-export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom = false, resizeSignal, preferDomesticBounds = false, focusPlace = null }) {
+export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom = false, resizeSignal, preferDomesticBounds = false, focusPlace = null, onSelectDate }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const getCalendarPlaces = __deps.getCalendarPlaces;
@@ -897,6 +897,14 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
           rowEl.style.fontSize = '0.72rem';
           rowEl.style.color = '#334155';
           rowEl.style.padding = '4px 0';
+          rowEl.style.cursor = 'pointer';
+          rowEl.title = `${formatPlaceBadgeDate(entry.date) || entry.date} 일정 열기`;
+          rowEl.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (typeof onSelectDate === 'function' && entry.date) {
+              onSelectDate(entry.date);
+            }
+          });
 
           if (isMobileViewport) {
             // Mobile layout: Date one line, note next line, separator line at the bottom
@@ -1109,7 +1117,7 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
   }, "지도를 불러오는 중..."));
 }
 
-export function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, onRequestConfirm, placesInitialQuery, setPlacesInitialQuery, isDarkTheme, onToggleTheme, fontScalePercent, onDecreaseFont, onIncreaseFont, isChatNotifyEnabled, onToggleChatNotifications, onSharePlaces }) {
+export function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, onRequestConfirm, placesInitialQuery, setPlacesInitialQuery, isDarkTheme, onToggleTheme, fontScalePercent, onDecreaseFont, onIncreaseFont, isChatNotifyEnabled, onToggleChatNotifications, onSharePlaces, onSelectDate }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -1516,7 +1524,8 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
         scrollWheelZoom: true,
         resizeSignal: `${mapExpanded}_${mapHeight}`,
         focusPlace,
-        onSelectPlace: handleSelectPlaceOnMap
+        onSelectPlace: handleSelectPlaceOnMap,
+        onSelectDate: onSelectDate
       }),
       
       /* Centered Grip Handle + Right Resizer Handle Control Bar */
@@ -1897,16 +1906,22 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
                   }
                   return /*#__PURE__*/React.createElement("div", {
                     key: idx,
-                    style: { display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: 'var(--bg-primary)', borderRadius: 'var(--radius-md)', padding: '6px 10px' }
+                    onClick: () => {
+                      if (typeof onSelectDate === 'function' && entry.date) {
+                        onSelectDate(entry.date);
+                      }
+                    },
+                    title: `${formatPlaceBadgeDate(entry.date) || entry.date} 일정 열기`,
+                    style: { display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: 'var(--bg-primary)', borderRadius: 'var(--radius-md)', padding: '6px 10px', cursor: 'pointer' }
                   },
-                    /*#__PURE__*/React.createElement("span", { className: "place-visit-entry-date", style: { flexShrink: 0 } }, formatPlaceBadgeDate(entry.date) || entry.date),
+                    /*#__PURE__*/React.createElement("span", { className: "place-visit-entry-date", style: { flexShrink: 0, fontWeight: 700 } }, formatPlaceBadgeDate(entry.date) || entry.date),
                     /*#__PURE__*/React.createElement("span", { style: { flex: 1, minWidth: 0, fontSize: '0.78rem', color: 'var(--text-main)', wordBreak: 'break-word' } }, entry.note),
                     /*#__PURE__*/React.createElement("button", {
-                      type: "button", onClick: () => handleStartEditPlaceMemoEntry(place, entry), title: "메모 편집", "aria-label": "메모 편집",
+                      type: "button", onClick: (e) => { e.stopPropagation(); handleStartEditPlaceMemoEntry(place, entry); }, title: "메모 편집", "aria-label": "메모 편집",
                       style: { background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', color: '#64748B', flexShrink: 0 }
                     }, /*#__PURE__*/React.createElement(PencilIcon, { size: 12 })),
                     /*#__PURE__*/React.createElement("button", {
-                      type: "button", onClick: () => handleDeletePlaceMemoEntry(place, entry), title: "메모 삭제", "aria-label": "메모 삭제",
+                      type: "button", onClick: (e) => { e.stopPropagation(); handleDeletePlaceMemoEntry(place, entry); }, title: "메모 삭제", "aria-label": "메모 삭제",
                       style: { background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', color: '#64748B', flexShrink: 0 }
                     }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 12 }))
                   );
