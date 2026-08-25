@@ -29,13 +29,8 @@ function useChatSendGuard(onSend, canSend) {
   const f = __gatherUiDeps().useChatSendGuard;
   return typeof f === 'function' ? f(onSend, canSend) : onSend;
 }
-function useModalDirtyGuard(onClose, onRequestConfirm, message) {
-  const f = __gatherUiDeps().useModalDirtyGuard;
-  return typeof f === 'function' ? f(onClose, onRequestConfirm, message) : {
-    requestClose: onClose,
-    overlayOnClick: e => { if (e.target === e.currentTarget) onClose(); },
-    markSaved: () => {}
-  };
+function useModalDirtyGuard(...args) {
+  return __gatherUiDeps().useModalDirtyGuard(...args);
 }
 function computeKoreanHolidaysForYear(year) {
   const f = __gatherUiDeps().computeKoreanHolidaysForYear;
@@ -779,8 +774,6 @@ export function AdminModal({
     : (typeof GATHER_APP_UTILS !== 'undefined' && typeof GATHER_APP_UTILS.sanitizeText === 'function'
       ? GATHER_APP_UTILS.sanitizeText
       : function (s, n) { var v = String(s == null ? '' : s); return typeof n === 'number' ? v.slice(0, n) : v; });
-  const { requestClose, overlayOnClick, markSaved } = useModalDirtyGuard(onClose, onRequestConfirm);
-
   const [activeTab, setActiveTab] = React.useState('settings'); // 'settings', 'recovery', 'logs'
 
   // recovery/logs only — avoid loading full activityLogs when opening 일반/설정
@@ -892,6 +885,20 @@ export function AdminModal({
   const [newName, setNewName] = React.useState('');
   const newNameInputRef = React.useRef(null);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const adminSettingsDirtySnapshot = () => JSON.stringify([
+    title,
+    description,
+    newName,
+    participants.map(p => [p.id, p.name, p.color, p.removedAt ? 1 : 0])
+  ]);
+  const { requestClose, overlayOnClick } = useModalDirtyGuard(
+    onClose,
+    onRequestConfirm,
+    undefined,
+    true,
+    adminSettingsDirtySnapshot,
+    calendar?.id || 'calendar'
+  );
 
   // Poll sub-modal states inside AdminModal
   const [editingPoll, setEditingPoll] = React.useState(null);

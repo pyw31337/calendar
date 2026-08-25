@@ -29,13 +29,8 @@ function useChatSendGuard(onSend, canSend) {
   const f = __gatherUiDeps().useChatSendGuard;
   return typeof f === 'function' ? f(onSend, canSend) : onSend;
 }
-function useModalDirtyGuard(onClose, onRequestConfirm, message) {
-  const f = __gatherUiDeps().useModalDirtyGuard;
-  return typeof f === 'function' ? f(onClose, onRequestConfirm, message) : {
-    requestClose: onClose,
-    overlayOnClick: e => { if (e.target === e.currentTarget) onClose(); },
-    markSaved: () => {}
-  };
+function useModalDirtyGuard(...args) {
+  return __gatherUiDeps().useModalDirtyGuard(...args);
 }
 function computeKoreanHolidaysForYear(year) {
   const f = __gatherUiDeps().computeKoreanHolidaysForYear;
@@ -731,12 +726,6 @@ export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoad
 
   // Editing Memo State
   const [editingMemo, setEditingMemo] = React.useState(null);
-  // MemoView itself never unmounts while the editor is open (unlike every other modal in this
-  // app, which is its own component that mounts fresh on open) -- passing active:!!editingMemo
-  // scopes the dirty-tracking listener to just the time the editor is actually shown, so typing
-  // in the page's own "새 메모" composer or search box elsewhere doesn't get picked up, and the
-  // dirty flag resets correctly each time a different memo is opened for editing.
-  const memoEditorDirtyGuard = useModalDirtyGuard(() => setEditingMemo(null), onRequestConfirm, undefined, !!editingMemo);
   const [editTitle, setEditTitle] = React.useState('');
   const [editText, setEditText] = React.useState('');
   const editMemoTextareaRef = React.useRef(null);
@@ -758,6 +747,27 @@ export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoad
   const [isComposerPartOpen, setIsComposerPartOpen] = React.useState(false);
   const [editParticipantId, setEditParticipantId] = React.useState('');
   const [isEditPartOpen, setIsEditPartOpen] = React.useState(false);
+  const memoEditorDirtySnapshot = () => JSON.stringify([
+    editTitle,
+    editText,
+    editColor,
+    editIsPinned,
+    editTags,
+    editTagInput,
+    editParticipantId,
+    editImages.map(img => [img.original, img.thumbnail, img.isExisting ? 1 : 0])
+  ]);
+  // MemoView stays mounted while the inline editor is open, so pass the active flag and the
+  // current memo id as a baseline reset key to keep dirty tracking scoped to the memo being
+  // edited rather than the page's surrounding composer/search state.
+  const memoEditorDirtyGuard = useModalDirtyGuard(
+    () => setEditingMemo(null),
+    onRequestConfirm,
+    undefined,
+    !!editingMemo,
+    memoEditorDirtySnapshot,
+    editingMemo?.id || 'new'
+  );
 
   // Emoji Picker States
   const [isComposerEmojiOpen, setIsComposerEmojiOpen] = React.useState(false);

@@ -29,13 +29,8 @@ function useChatSendGuard(onSend, canSend) {
   const f = __gatherUiDeps().useChatSendGuard;
   return typeof f === 'function' ? f(onSend, canSend) : onSend;
 }
-function useModalDirtyGuard(onClose, onRequestConfirm, message) {
-  const f = __gatherUiDeps().useModalDirtyGuard;
-  return typeof f === 'function' ? f(onClose, onRequestConfirm, message) : {
-    requestClose: onClose,
-    overlayOnClick: e => { if (e.target === e.currentTarget) onClose(); },
-    markSaved: () => {}
-  };
+function useModalDirtyGuard(...args) {
+  return __gatherUiDeps().useModalDirtyGuard(...args);
 }
 function computeKoreanHolidaysForYear(year) {
   const f = __gatherUiDeps().computeKoreanHolidaysForYear;
@@ -701,7 +696,6 @@ export function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, on
   const fetchWithTimeout = __deps.fetchWithTimeout;
   const firebaseConfig = __deps.firebaseConfig || window.firebaseConfig;
   const KAKAO_CATEGORY_GROUP_TO_PLACE_CATEGORY = __deps.KAKAO_CATEGORY_GROUP_TO_PLACE_CATEGORY || {};
-  const { requestClose, overlayOnClick } = useModalDirtyGuard(onClose, onRequestConfirm);
 
   const categories = getPlaceCategories(calendar);
   const [query, setQuery] = React.useState(editingPlace ? (editingPlace.name || '') : '');
@@ -729,6 +723,23 @@ export function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, on
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   });
   const [saving, setSaving] = React.useState(false);
+  const placeDirtySnapshot = () => JSON.stringify([
+    query,
+    selected ? [selected.id || '', selected.name || '', selected.address || '', selected.lat || '', selected.lng || ''] : '',
+    alias,
+    memo,
+    categoryId,
+    visitStatus,
+    visitDate
+  ]);
+  const { requestClose, overlayOnClick } = useModalDirtyGuard(
+    onClose,
+    onRequestConfirm,
+    undefined,
+    true,
+    placeDirtySnapshot,
+    editingPlace?.id || 'new'
+  );
   // Which tier of the fallback chain a manual (non-auto) search is currently waiting on --
   // null outside of a manual search. Drives the progress indicator below the search field so a
   // slow tier (e.g. a cold-started googlePlacesSearchProxy) reads as "still working", not frozen.

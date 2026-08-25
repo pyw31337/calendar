@@ -29,13 +29,8 @@ function useChatSendGuard(onSend, canSend) {
   const f = __gatherUiDeps().useChatSendGuard;
   return typeof f === 'function' ? f(onSend, canSend) : onSend;
 }
-function useModalDirtyGuard(onClose, onRequestConfirm, message) {
-  const f = __gatherUiDeps().useModalDirtyGuard;
-  return typeof f === 'function' ? f(onClose, onRequestConfirm, message) : {
-    requestClose: onClose,
-    overlayOnClick: e => { if (e.target === e.currentTarget) onClose(); },
-    markSaved: () => {}
-  };
+function useModalDirtyGuard(...args) {
+  return __gatherUiDeps().useModalDirtyGuard(...args);
 }
 function computeKoreanHolidaysForYear(year) {
   const f = __gatherUiDeps().computeKoreanHolidaysForYear;
@@ -2800,7 +2795,6 @@ export function EditMessageModal({
   const ResizableModalContainer = __comp.ResizableModalContainer || __deps.ResizableModalContainer;
   const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
   const autoGrowTextarea = __deps.autoGrowTextarea;
-  const { requestClose, overlayOnClick } = useModalDirtyGuard(onClose, onRequestConfirm);
 
   const [text, setText] = React.useState(message.text || '');
   const [participantId, setParticipantId] = React.useState(message.participantId || '');
@@ -2821,6 +2815,19 @@ export function EditMessageModal({
   const [imageProcessingEdit, setImageProcessingEdit] = React.useState(null);
   const editTextareaRef = React.useRef(null);
   React.useEffect(() => autoGrowTextarea(editTextareaRef.current, 5000), []);
+  const editMessageDirtySnapshot = () => JSON.stringify([
+    text,
+    participantId,
+    images.map(img => [img.original, img.thumbnail, img.isExisting ? 1 : 0])
+  ]);
+  const { requestClose, overlayOnClick } = useModalDirtyGuard(
+    onClose,
+    onRequestConfirm,
+    undefined,
+    true,
+    editMessageDirtySnapshot,
+    message?.id || 'new'
+  );
 
   const handleFileChangeEdit = async (e) => {
     const files = e.target.files;

@@ -29,13 +29,8 @@ function useChatSendGuard(onSend, canSend) {
   const f = __gatherUiDeps().useChatSendGuard;
   return typeof f === 'function' ? f(onSend, canSend) : onSend;
 }
-function useModalDirtyGuard(onClose, onRequestConfirm, message) {
-  const f = __gatherUiDeps().useModalDirtyGuard;
-  return typeof f === 'function' ? f(onClose, onRequestConfirm, message) : {
-    requestClose: onClose,
-    overlayOnClick: e => { if (e.target === e.currentTarget) onClose(); },
-    markSaved: () => {}
-  };
+function useModalDirtyGuard(...args) {
+  return __gatherUiDeps().useModalDirtyGuard(...args);
 }
 function computeKoreanHolidaysForYear(year) {
   const f = __gatherUiDeps().computeKoreanHolidaysForYear;
@@ -695,8 +690,6 @@ export function AnniversaryModal({
   const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
   const TrashIcon = __comp.TrashIcon || __deps.TrashIcon;
   const getActiveParticipants = __deps.getActiveParticipants;
-  const { requestClose, overlayOnClick, markSaved } = useModalDirtyGuard(onClose, onRequestConfirm);
-
   const [activeTab, setActiveTab] = React.useState('list'); // 'list', 'add', 'bulk'
   const [editingId, setEditingId] = React.useState(null); // null when registering a new anniversary
   
@@ -730,6 +723,29 @@ export function AnniversaryModal({
     d.setDate(d.getDate() + 56); // 8 weeks ahead
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   });
+  const anniversaryDirtySnapshot = () => JSON.stringify([
+    newTitle,
+    newType,
+    yearlyMonth,
+    yearlyDay,
+    isLunar,
+    isLeap,
+    targetDate,
+    ddayMode,
+    bulkParticipantId,
+    bulkWeekday,
+    bulkNote,
+    bulkStartDate,
+    bulkEndDate
+  ]);
+  const { requestClose, overlayOnClick } = useModalDirtyGuard(
+    onClose,
+    onRequestConfirm,
+    undefined,
+    true,
+    anniversaryDirtySnapshot,
+    editingId || 'new'
+  );
 
   const participants = getActiveParticipants(calendar);
   const bulkParticipant = participants.find(p => p.id === bulkParticipantId) || null;
@@ -785,7 +801,6 @@ export function AnniversaryModal({
 
       await __fb().collection('calendars').doc('cal_' + calendarId).collection('anniversaries').doc(anniversaryId).set(annData);
       showToast(editingId ? '기념일이 수정되었습니다.' : '기념일이 등록되었습니다.', 'success');
-      markSaved();
 
       // Reset form
       setNewTitle('');
@@ -1968,8 +1983,6 @@ export function PollModal({ calendar, poll, onSave, onClose, showToast, onReques
   const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
   const TrashIcon = __comp.TrashIcon || __deps.TrashIcon;
   const sanitizeText = __deps.sanitizeText;
-  const { requestClose, overlayOnClick, markSaved } = useModalDirtyGuard(onClose, onRequestConfirm);
-
   const now = Date.now();
   const isEditing = Boolean(poll?.id);
   // Once a poll's deadline has passed, adding new candidates no longer makes sense (voting is
@@ -1999,6 +2012,26 @@ export function PollModal({ calendar, poll, onSave, onClose, showToast, onReques
   const [dragOverOptionId, setDragOverOptionId] = React.useState('');
   const newOptionInputRef = React.useRef(null);
   const pointerSortRef = React.useRef({ sourceId: '', targetId: '', startX: 0, startY: 0, active: false });
+  const pollDirtySnapshot = () => JSON.stringify([
+    title,
+    description,
+    deadlineInput,
+    newOption,
+    options.map(option => [
+      option.id,
+      option.inputValue ?? `${option.text}${option.url ? ' ' + option.url : ''}`,
+      option.removedAt ? 1 : 0,
+      option.updatedAt || 0
+    ])
+  ]);
+  const { requestClose, overlayOnClick } = useModalDirtyGuard(
+    onClose,
+    onRequestConfirm,
+    undefined,
+    true,
+    pollDirtySnapshot,
+    poll?.id || 'new'
+  );
   const handleAddOption = e => {
     if (e) {
       e.preventDefault();

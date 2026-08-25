@@ -7262,49 +7262,41 @@ function useTapRevealedMsgId() {
   return revealedId;
 }
 
-// Tracks whether the user has actually typed/edited a text field (not merely clicked a
-// toggle/radio/checkbox/dropdown, tapped a search result, or tapped around) since a modal opened,
-// and exposes a single backdrop-click/close-button handler built on top of that: closes
-// immediately when nothing was typed, or routes through onRequestConfirm ("저장하지 않은 내용이
-// 있습니다...") when it was -- so a stray tap on the dim background never silently discards text
-// someone was mid-way through writing, while a pure click-only interaction (picking a search
-// result, toggling 방문/예정, choosing a category) never triggers an unnecessary confirmation.
-// Listens at the document level (not scoped to the modal's own DOM) since every modal in this app
-// is effectively singular/blocking while open -- see DateModal's own bespoke field-diff version
-// of this same idea (formBaselineRef/requestClose) for the original reference implementation this
-// generalizes for every other form modal. `active` defaults to true, which is correct for the
-// common case (a modal component that mounts fresh each time it opens and unmounts on close) --
-// pass `active` explicitly only for a modal that's really an always-mounted conditional block
-// inside a persistent page (e.g. MemoView's inline memo editor), so the listener doesn't pick up
-// typing elsewhere on that page and the dirty flag resets on each open rather than only once ever.
-function useModalDirtyGuard(onClose, onRequestConfirm, message, active = true) {
-  const dirtyRef = React.useRef(false);
+// Snapshot-based close guard for layer popups: capture the draft state when a modal becomes
+// active (or when a caller explicitly resets the baseline) and only ask for confirmation when
+// the current snapshot no longer matches that baseline. This keeps "opened then immediately
+// closed" silent, but still catches actual unsaved edits across text fields, toggles, selects,
+// reorders, and other non-text controls.
+function useModalDirtyGuard(onClose, onRequestConfirm, message, active = true, getSnapshot = null, resetKey = '') {
+  const baselineRef = React.useRef('');
+  const snapshotRef = React.useRef(getSnapshot);
+  snapshotRef.current = getSnapshot;
+  const readSnapshot = React.useCallback(() => {
+    const fn = snapshotRef.current;
+    if (typeof fn !== 'function') return '';
+    try {
+      return String(fn() ?? '');
+    } catch (e) {
+      return '';
+    }
+  }, []);
   React.useEffect(() => {
     if (!active) return undefined;
-    dirtyRef.current = false;
-    const handler = e => {
-      const target = e.target;
-      const tag = target && target.tagName;
-      if (tag !== 'TEXTAREA' && tag !== 'INPUT') return;
-      const type = (target.type || 'text').toLowerCase();
-      if (/^(checkbox|radio|range|color|file|submit|button|reset|image)$/.test(type)) return;
-      dirtyRef.current = true;
-    };
-    document.addEventListener('input', handler, true);
-    return () => document.removeEventListener('input', handler, true);
-  }, [active]);
+    baselineRef.current = readSnapshot();
+    return undefined;
+  }, [active, resetKey, readSnapshot]);
   const requestClose = React.useCallback(() => {
-    if (dirtyRef.current && typeof onRequestConfirm === 'function') {
-      onRequestConfirm('닫기 확인', message || '저장하지 않은 내용이 있습니다. 닫으시겠습니까?', () => onClose());
+    if (readSnapshot() !== baselineRef.current && typeof onRequestConfirm === 'function') {
+      onRequestConfirm('닫기 확인', message || '저장하지 않은 내용이 있습니다. 닫으시겠습니까?', onClose);
       return;
     }
     onClose();
-  }, [onClose, onRequestConfirm, message]);
+  }, [onClose, onRequestConfirm, message, readSnapshot]);
   const overlayOnClick = React.useCallback(e => {
     if (e.target !== e.currentTarget) return;
     requestClose();
   }, [requestClose]);
-  return { requestClose, overlayOnClick, markSaved: () => { dirtyRef.current = false; } };
+  return { requestClose, overlayOnClick };
 }
 
 // De-dupes rapid double-taps / pointerdown+click event duplication firing onSend() twice for the
