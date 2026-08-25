@@ -3258,6 +3258,7 @@ function App() {
       activityLogs: meetingLog ? [...getCalendarActivityLogs(activeCal), meetingLog] : getCalendarActivityLogs(activeCal)
     };
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
+    setConfirmedMeetingsSubcollection(nextConfirmedMeetings);
     writeConfirmedMeetingsToFirestore(activeCal.id, nextConfirmedMeetings).catch(e => console.warn('Subcollection confirmedMeetings write failed:', e));
     return updateCalendars(nextCalendars, isAlreadyConfirmed ? '모임 확정 취소' : '모임 확정', 'success', updatedCal.id, 'settings', meetingLog ? [meetingLog] : []);
   };
@@ -3495,6 +3496,8 @@ function App() {
         activityLogs: photoLog ? [...getCalendarActivityLogs(activeCal), photoLog] : getCalendarActivityLogs(activeCal)
       };
       const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
+      setConfirmedMeetingsSubcollection(nextConfirmedMeetings);
+      writeConfirmedMeetingsToFirestore(activeCal.id, nextConfirmedMeetings).catch(e => console.warn('Subcollection confirmedMeetings write failed:', e));
       setChatUploadProgress({ pct: 100, remainingSec: 0, label: '일정 사진 저장 완료' });
       return updateCalendars(nextCalendars, '일정 사진 저장완료', 'success', updatedCal.id, 'settings', photoLog ? [photoLog] : []);
     } catch (err) {
@@ -3558,6 +3561,8 @@ function App() {
       activityLogs: photoLog ? [...getCalendarActivityLogs(activeCal), photoLog] : getCalendarActivityLogs(activeCal)
     };
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
+    setConfirmedMeetingsSubcollection(nextConfirmedMeetings);
+    writeConfirmedMeetingsToFirestore(activeCal.id, nextConfirmedMeetings).catch(e => console.warn('Subcollection confirmedMeetings write failed:', e));
     return updateCalendars(nextCalendars, '사진 삭제완료', 'delete', updatedCal.id, 'settings', photoLog ? [photoLog] : []);
   };
 
@@ -4499,6 +4504,7 @@ function App() {
       onDeleteExpense: handleDeleteExpense,
       onReorderExpenses: handleReorderExpenses,
       onAddMeetingPhotos: handleAddMeetingPhotos,
+      onDeleteMeetingPhoto: handleDeleteMeetingPhoto,
       onFindChatMessageById: findChatMessageById,
       onLoadOlderChat: loadOlderChatMessages,
       hasMoreOlderChat: hasMoreOlderChat,
