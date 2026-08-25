@@ -2356,8 +2356,6 @@ export function PollModal({ calendar, poll, onSave, onClose, showToast, onReques
       const performDelete = () => setOptions(prev => prev.map(item => item.id === option.id ? { ...item, removedAt: Date.now(), updatedAt: Date.now() } : item));
       if (onRequestConfirm) {
         onRequestConfirm('투표 항목 삭제', `"${option.text || '빈 항목'}" 항목을 삭제하시겠습니까?`, performDelete);
-      } else if (window.confirm(`"${option.text || '빈 항목'}" 항목을 삭제하시겠습니까?`)) {
-        performDelete();
       }
     }
     }, /*#__PURE__*/React.createElement(TrashIcon, { size: 20 })))))), /*#__PURE__*/React.createElement("div", {

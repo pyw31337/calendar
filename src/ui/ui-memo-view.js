@@ -1106,10 +1106,6 @@ export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoad
 
     if (onRequestConfirm) {
       onRequestConfirm('메모 삭제', '이 메모를 삭제하시겠습니까?', action);
-    } else {
-      if (confirm('이 메모를 삭제하시겠습니까?')) {
-        action();
-      }
     }
   };
 

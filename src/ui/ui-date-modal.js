@@ -1112,10 +1112,9 @@ export function DateModal({
     if (!onDeleteDate) return;
     onRequestConfirm('날짜 초기화', `${getDeleteDateLabel(dateStr)}의 모든 참석/장소/정산 내역을 삭제하고 선택 가능 날짜에서 제외하시겠습니까?`, async () => {
       setIsSubmitting(true);
-      await onDeleteDate(dateStr);
+      const ok = await onDeleteDate(dateStr);
       setIsSubmitting(false);
-      showToast('날짜가 초기화되었습니다.', 'success');
-      onClose();
+      if (ok !== false) onClose();
     });
   };
 

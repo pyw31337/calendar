@@ -930,11 +930,6 @@ export function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, on
         onDelete(editingPlace.id);
         onClose();
       });
-    } else {
-      if (confirm(`"${editingPlace.name || '이 장소'}"를 삭제하시겠습니까?`)) {
-        onDelete(editingPlace.id);
-        onClose();
-      }
     }
   };
 

@@ -3215,28 +3215,62 @@ function App() {
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
     return updateCalendars(nextCalendars, '삭제완료', 'delete', updatedCal.id, 'availability', activityLog ? [activityLog] : []);
   };
-  const handleDeleteAllForDate = dateStr => {
+  const handleDeleteAllForDate = async dateStr => {
     if (!activeCal || !isValidDateString(dateStr)) return false;
     const now = Date.now();
-    const activeEntries = (activeCal.availabilities || []).filter(e => e.date === dateStr && !isTombstone(e));
+    const currentCal = calendarsRef.current.find(c => c.id === activeCal.id) || activeCal;
+    const activeEntries = (currentCal.availabilities || []).filter(e => e.date === dateStr && !isTombstone(e));
     if (activeEntries.length === 0) return false;
-    const nextAvail = (activeCal.availabilities || []).map(e => e.date === dateStr ? {
+    const deletedSnapshot = activeEntries.map(entry => ({ ...entry }));
+    const nextAvail = (currentCal.availabilities || []).map(e => e.date === dateStr ? {
       ...e,
       deletedAt: now,
       updatedAt: now
     } : e);
     const activityLogs = activeEntries.map((entry, index) =>
-      createActivityLog(activeCal.id, 'delete', dateStr, entry.participantId, now + index, entry.note || '')
+      createActivityLog(currentCal.id, 'delete', dateStr, entry.participantId, now + index, entry.note || '')
     ).filter(Boolean);
     const updatedCal = {
-      ...activeCal,
+      ...currentCal,
       updatedAt: now,
-      revision: (activeCal.revision || 0) + 1,
+      revision: (currentCal.revision || 0) + 1,
       availabilities: nextAvail,
-      activityLogs: [...getCalendarActivityLogs(activeCal), ...activityLogs]
+      activityLogs: [...getCalendarActivityLogs(currentCal), ...activityLogs]
     };
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-    return updateCalendars(nextCalendars, '삭제완료', 'delete', updatedCal.id, 'availability', activityLogs);
+    const ok = await updateCalendars(nextCalendars, null, null, updatedCal.id, 'availability', activityLogs);
+    if (!ok) return false;
+    showUndoableDeleteToast('날짜가 초기화되었습니다.', async () => {
+      try {
+        const restoreNow = Date.now();
+        const latestCal = calendarsRef.current.find(c => c.id === updatedCal.id) || updatedCal;
+        const deletedKeys = new Set(deletedSnapshot.map(entry => `${entry.date}::${entry.participantId}`));
+        const restoredAvail = (latestCal.availabilities || []).map(entry => {
+          const key = `${entry.date}::${entry.participantId}`;
+          if (!deletedKeys.has(key)) return entry;
+          const snapshot = deletedSnapshot.find(item => `${item.date}::${item.participantId}` === key);
+          return snapshot
+            ? { ...entry, ...snapshot, deletedAt: null, updatedAt: restoreNow }
+            : { ...entry, deletedAt: null, updatedAt: restoreNow };
+        });
+        const restoreLogs = deletedSnapshot.map((entry, index) =>
+          createActivityLog(updatedCal.id, 'update', dateStr, entry.participantId, restoreNow + index, entry.note || '')
+        ).filter(Boolean);
+        const restoredCal = {
+          ...latestCal,
+          updatedAt: restoreNow,
+          revision: (latestCal.revision || 0) + 1,
+          availabilities: restoredAvail,
+          activityLogs: restoreLogs.length > 0 ? [...getCalendarActivityLogs(latestCal), ...restoreLogs] : getCalendarActivityLogs(latestCal)
+        };
+        const nextCalendarsRestore = calendarsRef.current.map(c => c.id === restoredCal.id ? restoredCal : c);
+        await updateCalendars(nextCalendarsRestore, '날짜 초기화를 되돌렸습니다.', 'success', restoredCal.id, 'availability', restoreLogs);
+      } catch (err) {
+        console.error('handleDeleteAllForDate undo failed:', err);
+        showToast('날짜 복원 실패', 'error', 4000);
+      }
+    }, null, 5000);
+    return true;
   };
   const cloneConfirmedMeetings = meetings => meetings.map(meeting => ({
     ...meeting,

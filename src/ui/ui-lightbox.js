@@ -1261,8 +1261,6 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
     };
     if (typeof onRequestConfirm === 'function') {
       onRequestConfirm('사진 삭제', '이 사진을 삭제하시겠습니까?', confirmAction);
-    } else if (window.confirm('이 사진을 삭제하시겠습니까?')) {
-      confirmAction();
     }
   };
   const ensureCurrentShareUrl = async url => {

@@ -2006,8 +2006,6 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
     };
     if (typeof onRequestConfirm === 'function') {
       onRequestConfirm('댓글 삭제', message, doDelete);
-    } else if (window.confirm(message)) {
-      doDelete();
     }
   };
 
