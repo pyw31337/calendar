@@ -2365,7 +2365,7 @@ export function DateModal({
           style: { textAlign: 'center', color: 'var(--text-muted)', padding: '24px 0', fontSize: '0.82rem', border: '1px dashed var(--border-subtle)', borderRadius: 'var(--radius-md)' }
         }, "등록된 장소가 없습니다.") : /*#__PURE__*/React.createElement("div", {
           className: "date-modal-places-list",
-          style: { display: 'flex', flexDirection: 'column', gap: '8px', flex: '1 1 auto', minHeight: '80px', overflow: 'visible' }
+          style: { display: 'flex', flexDirection: 'column', gap: '8px', flex: '1 1 auto', minHeight: '80px', overflow: 'visible', paddingBottom: '20px' }
         }, registeredPlaces.map(place => {
           const category = getPlaceCategoryById(calendar, place.categoryId) || { id: 'etc', name: '기타', color: 'var(--text-muted)' };
           const catColor = category.color || '#64748B';
@@ -2588,7 +2588,7 @@ export function DateModal({
         className: "date-modal-settlement-list",
         style: {
           display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '10px',
-          flex: '1 1 auto', minHeight: '80px', overflow: 'visible'
+          flex: '1 1 auto', minHeight: '80px', overflow: 'visible', paddingBottom: '20px'
         }
       },
         expenses.map(expense => {

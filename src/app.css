@@ -3354,6 +3354,7 @@ select.form-select {
 .date-modal-places-list,
 .date-modal-settlement-list {
   overflow: visible !important;
+  padding-bottom: 24px !important;
 }
 .expense-sortable-row {
   border: 1px solid var(--border-subtle) !important;
