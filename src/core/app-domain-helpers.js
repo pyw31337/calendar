@@ -4,8 +4,8 @@
  * app-main.js가 정적 import로 불러와 쓰며, Vite manualChunks(vite.config.js)에서 별도
  * 청크로 분리해 app-main 청크의 번들 예산 압박을 줄이는 것이 이 분리의 목적.
  */
+import { GATHER_APP_UTILS } from './app-utils.js';
 const GATHER_APP_CONSTANTS = window.GATHER_APP_CONSTANTS || {};
-const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
 // firebaseConfig/firebaseDb live in app-main.js (firebaseDb is mutable, reassigned by
 // __setFirebaseDb once Firestore finishes loading) -- both mirror to these window globals in
 // lockstep there, so this module reads through window instead of importing live bindings back.
