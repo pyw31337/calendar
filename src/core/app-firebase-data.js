@@ -678,8 +678,8 @@ const INITIAL_CALENDARS = ['kkot', 'cw'].map(id => ({
   updatedAt: 0
 }));
 
-const GATHER_LOCAL_CACHE_KEY = 'gather_calendars_cache_v4';
-const GATHER_LOCAL_META_KEY = 'gather_calendars_meta_v4';
+const GATHER_LOCAL_CACHE_KEY = 'gather_calendars_cache_v5';
+const GATHER_LOCAL_META_KEY = 'gather_calendars_meta_v5';
 
 function __gatherSafeLocalStorage() {
   try { return window.localStorage; } catch (_) { return null; }
@@ -691,7 +691,7 @@ function loadLocalCache() {
   try {
     const ls = __gatherSafeLocalStorage();
     if (!ls) return [];
-    ['v1', 'cache_v1', 'cache_v2', 'cache_v3'].forEach(v => {
+    ['v1', 'cache_v1', 'cache_v2', 'cache_v3', 'cache_v4'].forEach(v => {
       try { ls.removeItem(`gather_calendars_${v}`); } catch (_) {}
     });
     const raw = ls.getItem(GATHER_LOCAL_CACHE_KEY);
