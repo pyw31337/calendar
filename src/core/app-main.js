@@ -8795,6 +8795,8 @@ function bindGatherUiDeps() {
     upsertPlaceMemoEntry: typeof upsertPlaceMemoEntry === 'function' ? upsertPlaceMemoEntry : null,
     removePlaceMemoEntry: typeof removePlaceMemoEntry === 'function' ? removePlaceMemoEntry : null,
     getPlaceMemoEntryForDate: typeof getPlaceMemoEntryForDate === 'function' ? getPlaceMemoEntryForDate : null,
+    derivePlaceVisitStatus: typeof derivePlaceVisitStatus === 'function' ? derivePlaceVisitStatus : null,
+    countPlaceVisits: typeof countPlaceVisits === 'function' ? countPlaceVisits : null,
     extractKnownParticipantNames: typeof extractKnownParticipantNames === 'function' ? extractKnownParticipantNames : null,
     getPlaceExternalMapUrl: typeof getPlaceExternalMapUrl === 'function' ? getPlaceExternalMapUrl : null,
     loadLeaflet: typeof loadLeaflet === 'function' ? loadLeaflet : null,
