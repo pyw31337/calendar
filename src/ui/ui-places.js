@@ -1659,11 +1659,11 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
               value: 'all',
               label: /*#__PURE__*/React.createElement(React.Fragment, null, "전체 ", /*#__PURE__*/React.createElement("span", {
                 style: {
-                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '18px', height: '18px',
-                  borderRadius: '50%',
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '20px', height: '18px',
+                  borderRadius: '9999px',
                   backgroundColor: searchedPlaces.length >= 1 ? '#2563EB' : '#E2E8F0',
                   color: searchedPlaces.length >= 1 ? '#FFFFFF' : '#475569',
-                  fontSize: '0.72rem', fontWeight: 'bold', padding: '0 5px', marginLeft: '4px'
+                  fontSize: '0.72rem', fontWeight: 'bold', padding: '0 6px', marginLeft: '4px'
                 }
               }, searchedPlaces.length))
             },
@@ -1675,11 +1675,11 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
                   `${getPlaceCategoryIcon(category)} ${category.name} `,
                   /*#__PURE__*/React.createElement("span", {
                     style: {
-                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '18px', height: '18px',
-                      borderRadius: '50%',
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '20px', height: '18px',
+                      borderRadius: '9999px',
                       backgroundColor: cCount >= 1 ? (category.color || '#2563EB') : '#E2E8F0',
                       color: cCount >= 1 ? '#FFFFFF' : '#475569',
-                      fontSize: '0.72rem', fontWeight: 'bold', padding: '0 5px', marginLeft: '4px'
+                      fontSize: '0.72rem', fontWeight: 'bold', padding: '0 6px', marginLeft: '4px'
                     }
                   }, cCount)
                 )

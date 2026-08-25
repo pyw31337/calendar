@@ -732,11 +732,11 @@ export function SearchCategoryTabs({ tabs, activeKey, onSelect, containerStyle, 
   }, tab.label, /*#__PURE__*/React.createElement("span", {
       className: countBadgeClassName || undefined,
       style: {
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '18px', height: '18px',
-        borderRadius: '50%',
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '20px', height: '18px',
+        borderRadius: '9999px',
         backgroundColor: (tab.count || 0) >= 1 ? (tab.color || tab.badgeColor || '#2563EB') : '#E2E8F0',
         color: (tab.count || 0) >= 1 ? '#FFFFFF' : '#475569',
-        fontSize: '0.68rem', fontWeight: 'bold', padding: '0 4px',
+        fontSize: '0.68rem', fontWeight: 'bold', padding: '0 6px',
         ...countBadgeStyle
       }
     }, tab.count))));

@@ -2658,11 +2658,11 @@ export function GlobalSearchModal({
             value: t.key,
             label: /*#__PURE__*/React.createElement(React.Fragment, null, `${t.label} `, /*#__PURE__*/React.createElement("span", {
               style: {
-                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '18px', height: '18px',
-                borderRadius: '50%',
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '20px', height: '18px',
+                borderRadius: '9999px',
                 backgroundColor: hasCount ? '#2563EB' : '#E2E8F0',
                 color: hasCount ? '#FFFFFF' : '#475569',
-                fontSize: '0.72rem', fontWeight: 'bold', padding: '0 5px', marginLeft: '4px'
+                fontSize: '0.72rem', fontWeight: 'bold', padding: '0 6px', marginLeft: '4px'
               }
             }, t.count))
           };
