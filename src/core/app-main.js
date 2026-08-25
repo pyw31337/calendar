@@ -2056,9 +2056,9 @@ function App() {
     let cancelled = false;
     (async () => {
       try {
-        const list = await fetchRecentChatMessages(activeCalId, CHAT_LIVE_MESSAGE_LIMIT);
+        const list = await fetchRecentMessagesRest(activeCalId);
         if (cancelled || !Array.isArray(list) || list.length === 0) return;
-        setChatMessages(prev => (Array.isArray(prev) && prev.length > 0) ? prev : list.slice(-CHAT_LIVE_MESSAGE_LIMIT));
+        setChatMessages(prev => (Array.isArray(prev) && prev.length > 0) ? prev : list.slice().reverse());
       } catch (err) {
         console.warn('chat preview hydration failed:', err);
       }
