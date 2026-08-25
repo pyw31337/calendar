@@ -1191,15 +1191,23 @@ export function DateModal({
       .filter(photo => photo && (photo.imageUrl || photo.thumbUrl))
       .map(photo => {
         const resolved = resolveMeetingPhotoDisplay(photo, chatMessagesWithFetchedSources) || {};
+        const mediaKey = resolved.mediaKey
+          || photo.mediaKey
+          || (photo.sourceMessageId && Number.isInteger(photo.sourceImageIndex)
+            ? `chat:${photo.sourceMessageId}:${photo.sourceImageIndex}`
+            : `meeting:${dateStr}:${photo.id || 'photo'}`);
+        const refKey = resolved.refKey || photo.refKey || `meeting:${dateStr}:${photo.id || 'photo'}`;
         return {
           ...photo,
           imageUrl: resolved.imageUrl || photo.imageUrl,
           thumbUrl: resolved.thumbUrl || photo.thumbUrl,
-          tags: resolved.tags != null ? resolved.tags : photo.tags
+          tags: resolved.tags != null ? resolved.tags : photo.tags,
+          mediaKey,
+          refKey
         };
       });
 
-    const directUrls = new Set(directPhotos.map(p => p.imageUrl || p.thumbUrl).filter(Boolean));
+    const directKeys = new Set(directPhotos.map(p => p.mediaKey || p.refKey || p.id).filter(Boolean));
     const targetTag = typeof dateStrToHashtag === 'function' ? dateStrToHashtag(dateStr) : (dateStr ? dateStr.replace(/-/g, '').slice(2) : '');
 
     const chatPhotos = [];
@@ -1213,8 +1221,9 @@ export function DateModal({
           const matchesTag = (targetTag && tags.includes(targetTag)) || parsedDates.includes(dateStr);
           if (matchesTag) {
             const url = entry.full || entry.thumb || entry.imageUrl;
-            if (url && !directUrls.has(url)) {
-              directUrls.add(url);
+            const key = entry.mediaKey || entry.refKey || url;
+            if (url && key && !directKeys.has(key)) {
+              directKeys.add(key);
               chatPhotos.push({
                 id: `chat_photo_${msg.id}_${idx}`,
                 imageUrl: url,
@@ -1223,7 +1232,9 @@ export function DateModal({
                 source: 'chat-tag',
                 sourceMessageId: msg.id,
                 sourceImageIndex: idx,
-                tags: tags
+                tags: tags,
+                mediaKey: entry.mediaKey || key,
+                refKey: entry.refKey || `chat:${msg.id}:${idx}`
               });
             }
           }
@@ -1233,8 +1244,9 @@ export function DateModal({
         const tags = (Array.isArray(msg.imageTags) ? msg.imageTags[0] : '') || msg.tags || '';
         const parsedDates = typeof parseFlexibleDateTokens === 'function' ? parseFlexibleDateTokens(tags) : [];
         const matchesTag = (targetTag && tags.includes(targetTag)) || parsedDates.includes(dateStr);
-        if (imageUrl && matchesTag && !directUrls.has(imageUrl)) {
-          directUrls.add(imageUrl);
+        const fallbackKey = `chat:${msg.id}:0`;
+        if (imageUrl && matchesTag && !directKeys.has(fallbackKey)) {
+          directKeys.add(fallbackKey);
           chatPhotos.push({
             id: `chat_photo_${msg.id}_0`,
             imageUrl: imageUrl,
@@ -1243,7 +1255,9 @@ export function DateModal({
             source: 'chat-tag',
             sourceMessageId: msg.id,
             sourceImageIndex: 0,
-            tags: tags
+            tags: tags,
+            mediaKey: fallbackKey,
+            refKey: fallbackKey
           });
         }
       }
@@ -1252,28 +1266,30 @@ export function DateModal({
     return [...directPhotos, ...chatPhotos].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   }, [confirmedMeetingEntry, chatMessages, chatMessagesWithFetchedSources, dateStr]);
   const visibleMeetingPhotos = React.useMemo(
-    () => meetingPhotos.filter(photo => !brokenMeetingPhotoKeysRef.current.has(photo.id || photo.imageUrl || photo.thumbUrl)),
+    () => meetingPhotos.filter(photo => !brokenMeetingPhotoKeysRef.current.has(photo.refKey || photo.mediaKey || photo.id || photo.imageUrl || photo.thumbUrl)),
     [meetingPhotos, brokenMeetingPhotoRevision]
   );
   const handleBrokenMeetingPhoto = photo => {
-    const key = photo?.id || photo?.imageUrl || photo?.thumbUrl;
+    const key = photo?.refKey || photo?.mediaKey || photo?.id || photo?.imageUrl || photo?.thumbUrl;
     if (!key || brokenMeetingPhotoKeysRef.current.has(key)) return;
     brokenMeetingPhotoKeysRef.current.add(key);
     setBrokenMeetingPhotoRevision(prev => prev + 1);
     const isMeetingReference = !!photo?.sourceMessageId && Number.isInteger(photo?.sourceImageIndex)
       && (photo?.source === 'meeting' || photo?.uploadSource === 'meeting' || photo?.meetingDate || photo?.photoId);
-    const deletionMeta = {
-      source: isMeetingReference ? 'meeting' : (photo.source || 'meeting'),
-      uploadSource: isMeetingReference ? 'meeting' : (photo.uploadSource || (photo.source === 'chat-tag' ? 'chat' : 'meeting')),
-      imageUrl: photo.imageUrl || photo.thumbUrl || '',
-      thumbUrl: photo.thumbUrl || photo.imageUrl || '',
-      sourceMessageId: photo.sourceMessageId,
-      sourceImageIndex: photo.sourceImageIndex,
-      messageId: isMeetingReference ? photo.sourceMessageId : (photo.messageId || photo.sourceMessageId),
-      imageIndex: isMeetingReference ? photo.sourceImageIndex : (Number.isInteger(photo.imageIndex) ? photo.imageIndex : photo.sourceImageIndex),
-      meetingDate: isMeetingReference ? (photo.meetingDate || dateStr) : dateStr,
-      photoId: isMeetingReference ? (photo.photoId || photo.id) : photo.id
-    };
+      const deletionMeta = {
+        source: isMeetingReference ? 'meeting' : (photo.source || 'meeting'),
+        uploadSource: isMeetingReference ? 'meeting' : (photo.uploadSource || (photo.source === 'chat-tag' ? 'chat' : 'meeting')),
+        imageUrl: photo.imageUrl || photo.thumbUrl || '',
+        thumbUrl: photo.thumbUrl || photo.imageUrl || '',
+        sourceMessageId: photo.sourceMessageId,
+        sourceImageIndex: photo.sourceImageIndex,
+        messageId: isMeetingReference ? photo.sourceMessageId : (photo.messageId || photo.sourceMessageId),
+        imageIndex: isMeetingReference ? photo.sourceImageIndex : (Number.isInteger(photo.imageIndex) ? photo.imageIndex : photo.sourceImageIndex),
+        meetingDate: isMeetingReference ? (photo.meetingDate || dateStr) : dateStr,
+        photoId: isMeetingReference ? (photo.photoId || photo.id) : photo.id,
+        mediaKey: photo.mediaKey || '',
+        refKey: photo.refKey || photo.id || ''
+      };
     const cleanup = typeof onDeletePhoto === 'function'
       ? Promise.resolve(onDeletePhoto(deletionMeta))
       : (typeof onDeleteMeetingPhoto === 'function'

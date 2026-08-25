@@ -1731,6 +1731,7 @@ function getMessageImageEntries(msg) {
   // Prefer multi-image arrays; fall back to legacy singular fields.
   // Do NOT require thumbnails — slimMessageForClient may drop oversized base64 thumbs
   // while keeping https Storage imageUrls. Requiring thumbs looked like data loss.
+  const sourceHint = msg?.uploadSource === 'memo' ? 'memo' : 'chat';
   const urls = Array.isArray(msg.imageUrls) && msg.imageUrls.length > 0
     ? msg.imageUrls.filter(u => typeof u === 'string' && u)
     : (typeof msg.imageUrl === 'string' && msg.imageUrl ? [msg.imageUrl] : []);
@@ -1745,6 +1746,11 @@ function getMessageImageEntries(msg) {
     const full = urls[i] || thumbs[i];
     const thumb = thumbs[i] || urls[i];
     if (!full && !thumb) continue;
+    const keys = getMediaIdentityKeys({
+      messageId: msg.id,
+      imageIndex: i,
+      source: sourceHint
+    }, { source: sourceHint, messageId: msg.id });
     entries.push({
       full: full || thumb,
       thumb: thumb || full,
@@ -1752,9 +1758,11 @@ function getMessageImageEntries(msg) {
       messageId: msg.id,
       timestamp: msg.timestamp,
       tags: tags[i] || '',
+      mediaKey: keys.mediaKey,
+      refKey: keys.refKey,
       // Callers building non-chat entries (e.g. memo pseudo-messages) override `source`
       // explicitly -- see ui-chat-gallery.js/ui-summary-gallery.js's sharedPhotos/photoEntries.
-      source: 'chat',
+      source: sourceHint,
       uploadSource: msg.uploadSource || null
     });
   }
@@ -1781,10 +1789,74 @@ function getDirectMediaTagsForUrl(msg, url) {
   return '';
 }
 
+function getMediaIdentityKeys(photo = {}, opts = {}) {
+  const sourceHint = String(opts.source || photo?.source || photo?.uploadSource || '').toLowerCase();
+  const messageId = typeof photo?.messageId === 'string' && photo.messageId
+    ? photo.messageId
+    : (typeof photo?.sourceMessageId === 'string' && photo.sourceMessageId ? photo.sourceMessageId : '');
+  const imageIndex = Number.isInteger(photo?.imageIndex)
+    ? photo.imageIndex
+    : (Number.isInteger(photo?.sourceImageIndex) ? photo.sourceImageIndex : null);
+  const meetingDate = typeof photo?.meetingDate === 'string' && photo.meetingDate
+    ? photo.meetingDate
+    : (typeof opts.meetingDate === 'string' && opts.meetingDate ? opts.meetingDate : '');
+  const photoId = typeof photo?.photoId === 'string' && photo.photoId
+    ? photo.photoId
+    : (typeof photo?.id === 'string' && photo.id ? photo.id : '');
+  const directMediaUrl = typeof photo?.directMediaUrl === 'string' && photo.directMediaUrl
+    ? photo.directMediaUrl
+    : '';
+  const directKey = directMediaUrl ? getDirectMediaTagKey(directMediaUrl) : '';
+  const isMeetingReference = sourceHint === 'meeting' || photo?.uploadSource === 'meeting' || !!meetingDate || !!photoId;
+  const isMemo = sourceHint === 'memo' || photo?.uploadSource === 'memo';
+  const baseSource = isMeetingReference ? 'meeting' : (isMemo ? 'memo' : (sourceHint || 'chat'));
+
+  if (directKey) {
+    const ownerKey = messageId || opts.messageId || photoId || meetingDate || 'url';
+    const key = `${baseSource}:${ownerKey}:direct:${directKey}`;
+    return { mediaKey: key, refKey: key };
+  }
+
+  if (isMeetingReference && photo?.sourceMessageId && Number.isInteger(photo?.sourceImageIndex)) {
+    const mediaKey = `chat:${photo.sourceMessageId}:${photo.sourceImageIndex}`;
+    const refKey = `meeting:${meetingDate || 'date'}:${photoId || photo.sourceMessageId}:${photo.sourceImageIndex}`;
+    return { mediaKey, refKey };
+  }
+
+  if (isMeetingReference) {
+    const key = `meeting:${meetingDate || 'date'}:${photoId || messageId || 'photo'}`;
+    return { mediaKey: key, refKey: key };
+  }
+
+  if (messageId && Number.isInteger(imageIndex)) {
+    const key = `${baseSource}:${messageId}:${imageIndex}`;
+    return { mediaKey: key, refKey: key };
+  }
+
+  if (messageId) {
+    const key = `${baseSource}:${messageId}:0`;
+    return { mediaKey: key, refKey: key };
+  }
+
+  if (photoId || meetingDate) {
+    const key = `${baseSource}:${photoId || meetingDate || 'photo'}`;
+    return { mediaKey: key, refKey: key };
+  }
+
+  const key = `${baseSource}:unknown`;
+  return { mediaKey: key, refKey: key };
+}
+
 function getMessageDirectMediaEntry(msg) {
   const firstUrl = extractFirstUrl(msg?.text || '');
   const mediaInfo = getDirectChatMediaInfo(firstUrl);
   if (!mediaInfo || mediaInfo.type !== 'image') return null;
+  const sourceHint = msg?.uploadSource === 'memo' ? 'memo' : 'chat';
+  const keys = getMediaIdentityKeys({
+    messageId: msg.id,
+    imageIndex: 0,
+    directMediaUrl: mediaInfo.url
+  }, { source: sourceHint, messageId: msg.id });
   return {
     full: mediaInfo.url,
     thumb: mediaInfo.url,
@@ -1793,8 +1865,10 @@ function getMessageDirectMediaEntry(msg) {
     timestamp: msg.timestamp,
     tags: getDirectMediaTagsForUrl(msg, mediaInfo.url),
     directMediaUrl: mediaInfo.url,
-    source: 'chat',
-    uploadSource: msg.uploadSource || null
+    source: sourceHint,
+    uploadSource: msg.uploadSource || null,
+    mediaKey: keys.mediaKey,
+    refKey: keys.refKey
   };
 }
 
@@ -2012,6 +2086,7 @@ export {
   getMessageImageEntries,
   getDirectMediaTagKey,
   getDirectMediaTagsForUrl,
+  getMediaIdentityKeys,
   getMessageDirectMediaEntry,
   formatBytes,
   getDataUrlInfo

@@ -13,6 +13,12 @@ export default defineConfig({
   build: {
     outDir: path.resolve(__dirname, 'dist'),
     emptyOutDir: true,
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        passes: 2
+      }
+    },
     cssCodeSplit: true,
     rollupOptions: {
       output: {

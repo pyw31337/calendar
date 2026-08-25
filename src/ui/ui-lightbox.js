@@ -514,6 +514,10 @@ function getMessageDirectMediaEntry(...args) {
   const f = __gatherUiDeps().getMessageDirectMediaEntry || GATHER_APP_UTILS.getMessageDirectMediaEntry;
   return typeof f === 'function' ? f(...args) : undefined;
 }
+function getMediaIdentityKeys(...args) {
+  const f = __gatherUiDeps().getMediaIdentityKeys || GATHER_APP_UTILS.getMediaIdentityKeys;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
 function renderTextWithUrlBadge(...args) {
   const f = __gatherUiDeps().renderTextWithUrlBadge || GATHER_APP_UTILS.renderTextWithUrlBadge;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -1042,6 +1046,9 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
   // shows the result immediately instead of only after the Lightbox is closed and reopened.
   const [tagOverrides, setTagOverrides] = React.useState({});
   const currentMeta = meta && meta[index];
+  const currentIdentity = currentMeta
+    ? (getMediaIdentityKeys(currentMeta, { source: currentMeta.source, meetingDate: currentMeta.meetingDate }) || {})
+    : {};
   // 'meeting' entries never carry a messageId (they're archival copies stored on the
   // confirmedMeeting record, not a chat message -- see linkTaggedImageToMeetingDates in
   // app-main.js), so they need meetingDate+photoId to identify which photo instead. 'memo'
@@ -1069,7 +1076,11 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
   // optimistic override distinct, matching how the actual save (getDirectMediaTagKey) already
   // keys directMediaTags per-URL in Firestore.
   const tagOverrideKey = currentMeta
-    ? (isMeetingPhoto ? `meeting_${currentMeta.meetingDate}_${currentMeta.photoId}` : `${currentMeta.messageId}_${currentMeta.directMediaUrl || currentMeta.imageIndex}`)
+    ? (isMeetingPhoto
+      ? (currentMeta.sourceMessageId && Number.isInteger(currentMeta.sourceImageIndex)
+        ? (currentIdentity.mediaKey || `meeting_${currentMeta.meetingDate}_${currentMeta.photoId}`)
+        : (currentIdentity.refKey || currentIdentity.mediaKey || `meeting_${currentMeta.meetingDate}_${currentMeta.photoId}`))
+      : (currentIdentity.refKey || currentIdentity.mediaKey || `${currentMeta.messageId}_${currentMeta.directMediaUrl || currentMeta.imageIndex}`))
     : null;
   const currentTags = (tagOverrideKey && tagOverrideKey in tagOverrides) ? tagOverrides[tagOverrideKey] : (currentMeta?.tags || '');
   // Mirrors handleSaveImageTags' own parse/dedupe/limit rules so the optimistic override shown
@@ -1130,7 +1141,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
     if (typeof onGetGalleryPhotoOrdinal !== 'function') return;
     const messageId = currentMeta.messageId;
     if (!messageId) return;
-    const key = `${messageId}_${currentMeta.imageIndex || 0}`;
+    const key = currentIdentity.refKey || currentIdentity.mediaKey || `${messageId}_${currentMeta.imageIndex || 0}`;
     if (galleryOrdinalFetchedRef.current.has(key)) return;
     galleryOrdinalFetchedRef.current.add(key);
     let cancelled = false;

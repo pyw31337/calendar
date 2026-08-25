@@ -839,7 +839,6 @@ export function PhotoGallery({ chatMessages, calendar = null, totalGalleryCount,
       return entries.map((entry, i) => ({
         ...entry,
         source: 'chat',
-        key: `${msg.id}_${entry.directMediaUrl ? 'direct' : i}`,
         timestamp: msg.timestamp
       }));
     });
@@ -854,6 +853,12 @@ export function PhotoGallery({ chatMessages, calendar = null, totalGalleryCount,
         const full = String(resolved?.imageUrl || photo?.imageUrl || photo?.full || '');
         const thumb = String(resolved?.thumbUrl || photo?.thumbUrl || photo?.thumb || full);
         if (!full && !thumb) return;
+        const mediaKey = resolved?.mediaKey
+          || photo?.mediaKey
+          || (photo?.sourceMessageId && Number.isInteger(photo?.sourceImageIndex)
+            ? `chat:${photo.sourceMessageId}:${photo.sourceImageIndex}`
+            : `meeting:${meeting.date || 'date'}:${photo?.id || index}`);
+        const refKey = resolved?.refKey || photo?.refKey || `meeting:${meeting.date || 'date'}:${photo?.id || index}`;
         meetingEntries.push({
           full: full || thumb,
           thumb: thumb || full,
@@ -867,7 +872,8 @@ export function PhotoGallery({ chatMessages, calendar = null, totalGalleryCount,
           directMediaUrl: '',
           source: 'meeting',
           meetingDate: meeting.date || '',
-          key: `meeting_${meeting.date || 'date'}_${photo?.id || index}`
+          mediaKey,
+          refKey
         });
       });
     });
@@ -877,13 +883,15 @@ export function PhotoGallery({ chatMessages, calendar = null, totalGalleryCount,
     // message) so this strip never shows the same photo twice.
     const byUrl = new Map();
     [...chatEntries, ...meetingEntries].forEach(entry => {
-      const key = entry.full || entry.thumb;
+      const key = entry.mediaKey || entry.refKey || entry.full || entry.thumb;
       if (!key) return;
       if (!byUrl.has(key)) {
         byUrl.set(key, { ...entry });
       } else {
         const existing = byUrl.get(key);
-        if (entry.meetingDate) existing.meetingDate = entry.meetingDate;
+        if (entry.meetingDate) {
+          existing.meetingDate = existing.meetingDate || entry.meetingDate;
+        }
         if (entry.photoId) existing.photoId = entry.photoId;
         if (entry.sourceMessageId) existing.sourceMessageId = entry.sourceMessageId;
         if (Number.isInteger(entry.sourceImageIndex)) existing.sourceImageIndex = entry.sourceImageIndex;
@@ -894,11 +902,12 @@ export function PhotoGallery({ chatMessages, calendar = null, totalGalleryCount,
     });
     return Array.from(byUrl.values()).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
   }, [chatMessages, calendar]);
-  const visibleEntries = React.useMemo(() => photoEntries.filter(entry => !brokenPhotoKeysRef.current.has(entry.key)), [photoEntries, brokenPhotoRevision]);
+  const visibleEntries = React.useMemo(() => photoEntries.filter(entry => !brokenPhotoKeysRef.current.has(entry.mediaKey || entry.refKey || entry.full || entry.thumb)), [photoEntries, brokenPhotoRevision]);
 
   const handleBrokenPhoto = photo => {
-    if (!photo?.key || brokenPhotoKeysRef.current.has(photo.key)) return;
-    brokenPhotoKeysRef.current.add(photo.key);
+    const key = photo?.mediaKey || photo?.refKey || photo?.key;
+    if (!key || brokenPhotoKeysRef.current.has(key)) return;
+    brokenPhotoKeysRef.current.add(key);
     setBrokenPhotoRevision(prev => prev + 1);
     if (typeof onDeletePhoto !== 'function') return;
     const isMeetingReference = !!photo.sourceMessageId && Number.isInteger(photo.sourceImageIndex)
@@ -915,7 +924,9 @@ export function PhotoGallery({ chatMessages, calendar = null, totalGalleryCount,
       sourceMessageId: photo.sourceMessageId || '',
       sourceImageIndex: Number.isInteger(photo.sourceImageIndex) ? photo.sourceImageIndex : null,
       meetingDate: isMeetingReference ? (photo.meetingDate || '') : (photo.meetingDate || ''),
-      photoId: isMeetingReference ? (photo.photoId || '') : (photo.photoId || '')
+      photoId: isMeetingReference ? (photo.photoId || '') : (photo.photoId || ''),
+      mediaKey: photo.mediaKey || '',
+      refKey: photo.refKey || ''
     };
     Promise.resolve(onDeletePhoto(deletionMeta)).catch(err => console.warn('Broken gallery preview cleanup failed:', err));
   };
@@ -961,7 +972,7 @@ export function PhotoGallery({ chatMessages, calendar = null, totalGalleryCount,
         style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(80px, 100%), 1fr))', gap: '6px', marginTop: '12px' }
       },
         displayedEntries.map((entry, idx) => /*#__PURE__*/React.createElement(MediaThumb, {
-          key: entry.key,
+          key: entry.mediaKey || entry.refKey || entry.full || entry.thumb,
           src: (entry.thumb && String(entry.thumb)) || (entry.full && String(entry.full)) || '',
           fallbackSrc: (entry.full && String(entry.full)) || (entry.thumb && String(entry.thumb)) || '',
           alt: "채팅에 첨부된 사진",

@@ -197,6 +197,7 @@ import {
   getMessageImageEntries,
   getDirectMediaTagKey,
   getDirectMediaTagsForUrl,
+  getMediaIdentityKeys,
   getMessageDirectMediaEntry,
   formatBytes,
   getDataUrlInfo,
@@ -2822,15 +2823,25 @@ function App() {
         byDate.set(dateStr, meeting);
         return;
       }
+      const photoId = `photo_${activeCal.id}_${dateStr}_${now}_${index}_${Math.random().toString(36).slice(2, 7)}`;
+      const keys = getMediaIdentityKeys({
+        sourceMessageId,
+        sourceImageIndex,
+        meetingDate: dateStr,
+        photoId,
+        source: 'meeting'
+      }, { source: 'meeting', meetingDate: dateStr });
       photos.push({
-        id: `photo_${activeCal.id}_${dateStr}_${now}_${index}_${Math.random().toString(36).slice(2, 7)}`,
+        id: photoId,
         imageUrl: photo.imageUrl,
         thumbUrl: photo.thumbUrl || photo.imageUrl,
         createdAt: now + index,
         source: 'lightbox-tag',
         sourceMessageId,
         sourceImageIndex,
-        tags: cleanTags || ''
+        tags: cleanTags || '',
+        mediaKey: keys.mediaKey,
+        refKey: keys.refKey
       });
       byDate.set(dateStr, { ...meeting, photos, amount: meeting.amount || null });
       linkedCount += 1;
@@ -2852,7 +2863,7 @@ function App() {
     const existingMeetings = getConfirmedMeetings(activeCal);
     const meeting = existingMeetings.find(m => m.date === meetingDate);
     const photos = Array.isArray(meeting?.photos) ? meeting.photos : [];
-    const photoIndex = photos.findIndex(p => p?.id === photoId);
+    const photoIndex = photos.findIndex(p => p?.id === photoId || p?.refKey === photoId || p?.mediaKey === photoId);
     if (!meeting || photoIndex === -1) {
       showToast('태그 저장 대상 사진을 찾지 못했습니다.', 'error', 4000);
       return false;
@@ -3464,16 +3475,25 @@ function App() {
           if (!sent) throw new Error(`Meeting photo save failed ${i + 1}/${chunks.length}`);
           newMessageId = sent.id || null;
         }
+        const photoIdPrefix = `photo_${activeCal.id}_${dateStr}_${now}_${i}`;
         chunkImages.forEach((img, idx) => {
+          const photoId = `${photoIdPrefix}_${idx}_${Math.random().toString(36).slice(2, 7)}`;
+          const keys = getMediaIdentityKeys({
+            source: 'meeting',
+            meetingDate: dateStr,
+            photoId
+          }, { source: 'meeting', meetingDate: dateStr });
           newRefs.push({
-            id: `photo_${activeCal.id}_${dateStr}_${now}_${i}_${idx}_${Math.random().toString(36).slice(2, 7)}`,
+            id: photoId,
             imageUrl: img.imageUrl,
             thumbUrl: img.thumbUrl || img.imageUrl,
             createdAt: now + i,
             source: 'lightbox-tag',
             sourceMessageId: newMessageId || '',
             sourceImageIndex: idx,
-            tags: dateStrToHashtag(dateStr)
+            tags: dateStrToHashtag(dateStr),
+            mediaKey: keys.mediaKey,
+            refKey: keys.refKey
           });
         });
       }
@@ -3524,17 +3544,32 @@ function App() {
     return urls.some(u => isSameImageUrl(u, targetUrl));
   };
 
+  const photoMatchesIdentity = (p, identityKey) => {
+    if (!p || !identityKey) return false;
+    return p.id === identityKey || p.refKey === identityKey || p.mediaKey === identityKey;
+  };
+
   const handleDeleteMeetingPhoto = (dateStr, photoId, imageUrl, options = {}) => {
     if (!activeCal) return false;
     const existingMeetings = getConfirmedMeetings(activeCal);
     let meetingIndex = isValidDateString(dateStr) ? existingMeetings.findIndex(m => m.date === dateStr) : -1;
     if (meetingIndex < 0) {
-      meetingIndex = existingMeetings.findIndex(m => (m.photos || []).some(p => (photoId && p.id === photoId) || photoMatchesUrl(p, imageUrl)));
+      meetingIndex = existingMeetings.findIndex(m => (m.photos || []).some(p => (
+        (photoId && photoMatchesIdentity(p, photoId))
+        || photoMatchesIdentity(p, options.refKey)
+        || photoMatchesIdentity(p, options.mediaKey)
+        || photoMatchesUrl(p, imageUrl)
+      )));
     }
     if (meetingIndex < 0) return false;
     const meeting = existingMeetings[meetingIndex];
     const existingPhotos = Array.isArray(meeting.photos) ? meeting.photos : [];
-    const deletedPhoto = existingPhotos.find(p => (photoId && p.id === photoId) || photoMatchesUrl(p, imageUrl));
+    const deletedPhoto = existingPhotos.find(p => (
+      (photoId && photoMatchesIdentity(p, photoId))
+      || photoMatchesIdentity(p, options.refKey)
+      || photoMatchesIdentity(p, options.mediaKey)
+      || photoMatchesUrl(p, imageUrl)
+    ));
     if (!deletedPhoto) return false;
     const previousMeetings = cloneConfirmedMeetings(existingMeetings);
     const now = Date.now();
@@ -3576,17 +3611,27 @@ function App() {
     });
   };
 
-  const handleReplaceMeetingPhoto = async (dateStr, photoId, file, imageUrl) => {
+  const handleReplaceMeetingPhoto = async (dateStr, photoId, file, imageUrl, options = {}) => {
     if (!activeCal || !file) return false;
     const existingMeetings = getConfirmedMeetings(activeCal);
     let meetingIndex = isValidDateString(dateStr) ? existingMeetings.findIndex(m => m.date === dateStr) : -1;
     if (meetingIndex < 0) {
-      meetingIndex = existingMeetings.findIndex(m => (m.photos || []).some(p => (photoId && p.id === photoId) || (imageUrl && (p.imageUrl === imageUrl || p.thumbUrl === imageUrl))));
+      meetingIndex = existingMeetings.findIndex(m => (m.photos || []).some(p => (
+        (photoId && photoMatchesIdentity(p, photoId))
+        || photoMatchesIdentity(p, options.refKey)
+        || photoMatchesIdentity(p, options.mediaKey)
+        || (imageUrl && (p.imageUrl === imageUrl || p.thumbUrl === imageUrl))
+      )));
     }
     if (meetingIndex < 0) return false;
     const meeting = existingMeetings[meetingIndex];
     const existingPhotos = Array.isArray(meeting.photos) ? meeting.photos : [];
-    const targetPhoto = existingPhotos.find(p => (photoId && p.id === photoId) || (imageUrl && (p.imageUrl === imageUrl || p.thumbUrl === imageUrl)));
+    const targetPhoto = existingPhotos.find(p => (
+      (photoId && photoMatchesIdentity(p, photoId))
+      || photoMatchesIdentity(p, options.refKey)
+      || photoMatchesIdentity(p, options.mediaKey)
+      || (imageUrl && (p.imageUrl === imageUrl || p.thumbUrl === imageUrl))
+    ));
     if (!targetPhoto) return false;
     const compressed = await prepareGalleryImageUploads([file], '사진 교체 준비 중...');
     if (!compressed.length) { setChatUploadProgress(null); return false; }
@@ -3598,7 +3643,7 @@ function App() {
       const prevImageUrl = targetPhoto.imageUrl;
       const prevThumbUrl = targetPhoto.thumbUrl;
       const nextConfirmedMeetings = existingMeetings.map((m, i) => i === meetingIndex
-        ? { ...m, photos: existingPhotos.map(photo => (photo === targetPhoto || (photoId && photo.id === photoId)) ? { ...photo, imageUrl: resolved.imageUrl, thumbUrl: resolved.thumbUrl || resolved.imageUrl } : photo) }
+        ? { ...m, photos: existingPhotos.map(photo => (photo === targetPhoto || (photoId && photoMatchesIdentity(photo, photoId))) ? { ...photo, imageUrl: resolved.imageUrl, thumbUrl: resolved.thumbUrl || resolved.imageUrl } : photo) }
         : m);
       const ok = await commitConfirmedMeetings(nextConfirmedMeetings, '사진 교체완료');
       if (ok) {
@@ -3906,7 +3951,7 @@ function App() {
         const getEntries = typeof getMessageImageEntries === 'function' ? getMessageImageEntries : null;
         const entries = getEntries ? getEntries(msg) : [];
         const idx = entries.findIndex(e => e.full === imageUrl || e.thumb === imageUrl || e.imageUrl === imageUrl);
-        if (idx >= 0) return { type: 'chat', messageId: msg.id, imageIndex: idx };
+        if (idx >= 0) return { type: 'chat', messageId: msg.id, imageIndex: idx, mediaKey: entries[idx]?.mediaKey || '', refKey: entries[idx]?.refKey || '' };
       }
     }
     const localMsg = (allChatMessages || []).find(m => {
@@ -3918,7 +3963,7 @@ function App() {
       const getEntries = typeof getMessageImageEntries === 'function' ? getMessageImageEntries : null;
       const entries = getEntries ? getEntries(localMsg) : [];
       const idx = entries.findIndex(e => e.full === imageUrl || e.thumb === imageUrl || e.imageUrl === imageUrl);
-      if (idx >= 0) return { type: 'chat', messageId: localMsg.id, imageIndex: idx };
+      if (idx >= 0) return { type: 'chat', messageId: localMsg.id, imageIndex: idx, mediaKey: entries[idx]?.mediaKey || '', refKey: entries[idx]?.refKey || '' };
     }
 
     const localMemo = (memos || []).find(m => {
@@ -3931,7 +3976,7 @@ function App() {
       const thumbs = Array.isArray(localMemo.thumbUrls) ? localMemo.thumbUrls : (localMemo.thumbUrl ? [localMemo.thumbUrl] : []);
       let idx = urls.indexOf(imageUrl);
       if (idx < 0) idx = thumbs.indexOf(imageUrl);
-      return { type: 'memo', memoId: localMemo.id, imageIndex: Math.max(0, idx) };
+      return { type: 'memo', memoId: localMemo.id, imageIndex: Math.max(0, idx), mediaKey: `memo:${localMemo.id}:${Math.max(0, idx)}`, refKey: `memo:${localMemo.id}:${Math.max(0, idx)}` };
     }
 
     const meetings = getConfirmedMeetings(activeCal);
@@ -3956,7 +4001,7 @@ function App() {
       }
     }
     if (targetMeeting && targetPhoto) {
-      return { type: 'meeting', dateStr: targetMeeting.date, photoId: targetPhoto.id, photo: targetPhoto };
+      return { type: 'meeting', dateStr: targetMeeting.date, photoId: targetPhoto.id, photo: targetPhoto, mediaKey: targetPhoto.mediaKey || '', refKey: targetPhoto.refKey || '' };
     }
 
     return null;
@@ -3981,6 +4026,8 @@ function App() {
     const imgIdx = Number.isInteger(meta.imageIndex) ? meta.imageIndex : (Number.isInteger(meta.sourceImageIndex) ? meta.sourceImageIndex : 0);
     const dateStr = meta.meetingDate;
     const photoId = meta.photoId;
+    const mediaKey = meta.mediaKey || meta.originMediaKey || '';
+    const refKey = meta.refKey || '';
     const isMeetingPhotoMeta = meta.source === 'meeting' || meta.uploadSource === 'meeting' || dateStr || photoId;
     const originalTags = typeof meta.tags === 'string' ? meta.tags : '';
 
@@ -4004,14 +4051,16 @@ function App() {
           sourceMessageId: meta.sourceMessageId,
           sourceImageIndex: meta.sourceImageIndex
         });
-        if (!okUnlink) {
-          console.warn('Failed to clear source tags while deleting a meeting photo reference.');
-        }
+      if (!okUnlink) {
+        console.warn('Failed to clear source tags while deleting a meeting photo reference.');
       }
+    }
       const okMeeting = await handleDeleteMeetingPhoto(dateStr, photoId, imageUrl, {
         restoreSourceMessageId: meta.sourceMessageId,
         restoreSourceImageIndex: meta.sourceImageIndex,
-        restoreSourceTags: originalTags
+        restoreSourceTags: originalTags,
+        mediaKey,
+        refKey
       });
       if (okMeeting) return true;
       return false;
@@ -4034,7 +4083,9 @@ function App() {
         const ok = await handleDeleteMeetingPhoto(target.dateStr, target.photoId, imageUrl, {
           restoreSourceMessageId: target.sourceMessageId,
           restoreSourceImageIndex: target.sourceImageIndex,
-          restoreSourceTags: originalTags
+          restoreSourceTags: originalTags,
+          mediaKey: target.mediaKey,
+          refKey: target.refKey
         });
         if (ok) return true;
       }
@@ -4043,7 +4094,9 @@ function App() {
     const okMeetingFallback = await handleDeleteMeetingPhoto(dateStr, photoId, imageUrl, {
       restoreSourceMessageId: meta.sourceMessageId,
       restoreSourceImageIndex: meta.sourceImageIndex,
-      restoreSourceTags: originalTags
+      restoreSourceTags: originalTags,
+      mediaKey,
+      refKey
     });
     if (okMeetingFallback) return true;
 
@@ -4058,6 +4111,8 @@ function App() {
     const imgIdx = Number.isInteger(meta.imageIndex) ? meta.imageIndex : (Number.isInteger(meta.sourceImageIndex) ? meta.sourceImageIndex : 0);
     const dateStr = meta.meetingDate;
     const photoId = meta.photoId;
+    const mediaKey = meta.mediaKey || meta.originMediaKey || '';
+    const refKey = meta.refKey || '';
 
     if (meta.source === 'memo' && msgId) {
       const res = await handleReplaceMemoPhoto(msgId, imgIdx, file);
@@ -4065,7 +4120,7 @@ function App() {
     }
 
     if ((meta.source === 'meeting' || meta.uploadSource === 'meeting' || dateStr || photoId) && !meta.sourceMessageId) {
-      const resMeeting = await handleReplaceMeetingPhoto(dateStr, photoId, file, imageUrl);
+      const resMeeting = await handleReplaceMeetingPhoto(dateStr, photoId, file, imageUrl, { mediaKey, refKey });
       if (resMeeting) return resMeeting;
     }
 
@@ -4083,12 +4138,12 @@ function App() {
         const res = await handleReplaceMemoPhoto(target.memoId, target.imageIndex, file);
         if (res) return res;
       } else if (target.type === 'meeting') {
-        const res = await handleReplaceMeetingPhoto(target.dateStr, target.photoId, file, imageUrl);
+        const res = await handleReplaceMeetingPhoto(target.dateStr, target.photoId, file, imageUrl, { mediaKey: target.mediaKey, refKey: target.refKey });
         if (res) return res;
       }
     }
 
-    const resFallback = await handleReplaceMeetingPhoto(dateStr, photoId, file, imageUrl);
+    const resFallback = await handleReplaceMeetingPhoto(dateStr, photoId, file, imageUrl, { mediaKey, refKey });
     if (resFallback) return resFallback;
 
     showToast('교체 대상 사진을 찾지 못했습니다.', 'error', 4000);
@@ -7061,12 +7116,21 @@ function resolveMeetingPhotoDisplay(photo, chatMessages) {
     thumbUrl: photo?.thumbUrl || photo?.thumb || photo?.imageUrl || photo?.full || '',
     tags: String(photo?.tags || '')
   };
-  if (!photo?.sourceMessageId || !Number.isInteger(photo?.sourceImageIndex)) return fallback;
+  const fallbackKeys = getMediaIdentityKeys(photo, { source: 'meeting', meetingDate: photo?.meetingDate || '' });
+  if (!photo?.sourceMessageId || !Number.isInteger(photo?.sourceImageIndex)) {
+    return { ...fallback, ...fallbackKeys };
+  }
   const sourceMessage = (Array.isArray(chatMessages) ? chatMessages : []).find(m => m && m.id === photo.sourceMessageId);
-  if (!sourceMessage) return fallback;
+  if (!sourceMessage) return { ...fallback, ...fallbackKeys };
   const entry = getMessageImageEntries(sourceMessage)[photo.sourceImageIndex];
-  if (!entry) return fallback;
-  return { imageUrl: entry.full, thumbUrl: entry.thumb, tags: entry.tags || '' };
+  if (!entry) return { ...fallback, ...fallbackKeys };
+  return {
+    imageUrl: entry.full,
+    thumbUrl: entry.thumb,
+    tags: entry.tags || '',
+    mediaKey: entry.mediaKey || fallbackKeys.mediaKey,
+    refKey: fallbackKeys.refKey
+  };
 }
 
 
@@ -8718,6 +8782,7 @@ function bindGatherUiDeps() {
     WeatherLocationModal: typeof WeatherLocationModal === 'function' ? WeatherLocationModal : null,
     ChatGalleryModal: typeof ChatGalleryModal === 'function' ? ChatGalleryModal : null,
     getMessageImageEntries: typeof getMessageImageEntries === 'function' ? getMessageImageEntries : null,
+    getMediaIdentityKeys: typeof getMediaIdentityKeys === 'function' ? getMediaIdentityKeys : null,
     resolveMeetingPhotoDisplay: typeof resolveMeetingPhotoDisplay === 'function' ? resolveMeetingPhotoDisplay : null,
     MemoView: typeof MemoView === 'function' ? MemoView : null,
     ChatRoomView: typeof ChatRoomView === 'function' ? ChatRoomView : null,

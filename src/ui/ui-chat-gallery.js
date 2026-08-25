@@ -71,6 +71,10 @@ function extractAllUrlInfosLoose(...args) {
   const f = __gatherUiDeps().extractAllUrlInfosLoose || GATHER_APP_UTILS.extractAllUrlInfosLoose;
   return typeof f === 'function' ? f(...args) : [];
 }
+function getDirectMediaTagKey(...args) {
+  const f = __gatherUiDeps().getDirectMediaTagKey || GATHER_APP_UTILS.getDirectMediaTagKey;
+  return typeof f === 'function' ? f(...args) : '';
+}
 function extractLeadingMemoDate(...args) {
   const f = __gatherUiDeps().extractLeadingMemoDate || GATHER_APP_UTILS.extractLeadingMemoDate;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -669,6 +673,7 @@ function getDirectMediaTagsForUrl(...args) {
 // already does via getMessageImageEntries.
 function getAllDirectMediaImageEntries(msgLike) {
   if (!msgLike?.text) return [];
+  const sourceHint = msgLike?.uploadSource === 'memo' ? 'memo' : 'chat';
   return extractAllUrlInfosLoose(msgLike.text)
     .filter(info => getDirectChatMediaInfo(info.url)?.type === 'image')
     .map((info, idx) => ({
@@ -679,7 +684,10 @@ function getAllDirectMediaImageEntries(msgLike) {
       timestamp: msgLike.timestamp,
       tags: getDirectMediaTagsForUrl(msgLike, info.url),
       directMediaUrl: info.url,
-      uploadSource: msgLike.uploadSource || null
+      uploadSource: msgLike.uploadSource || null,
+      source: sourceHint,
+      mediaKey: `${sourceHint}:${msgLike.id || 'msg'}:direct:${getDirectMediaTagKey(info.url)}`,
+      refKey: `${sourceHint}:${msgLike.id || 'msg'}:direct:${getDirectMediaTagKey(info.url)}`
     }));
 }
 function getPollOptionVoterIds(...args) {
@@ -764,7 +772,7 @@ export function ChatGalleryModal({
   const [pastePreview, setPastePreview] = React.useState(null); // { files, previewUrls } | null
   const brokenPhotoKeysRef = React.useRef(new Set());
   const [brokenPhotoRevision, setBrokenPhotoRevision] = React.useState(0);
-  const getPhotoKey = photo => `${photo?.messageId || photo?.photoId || photo?.sourceMessageId || ''}_${photo?.imageIndex ?? photo?.sourceImageIndex ?? ''}`;
+  const getPhotoKey = photo => photo?.mediaKey || photo?.refKey || `${photo?.messageId || photo?.photoId || photo?.sourceMessageId || ''}_${photo?.imageIndex ?? photo?.sourceImageIndex ?? ''}`;
   React.useEffect(() => () => {
     // Safety net if the component unmounts (e.g. gallery closed) while the preview is still open.
     if (pastePreview) pastePreview.previewUrls.forEach(url => { try { URL.revokeObjectURL(url); } catch (e) {} });
@@ -867,7 +875,8 @@ export function ChatGalleryModal({
       const asMsg = {
         id: memo.id, text: memo.text || memo.content || memo.body || '',
         imageUrl: memo.imageUrl, imageUrls: memo.imageUrls, thumbUrl: memo.thumbUrl, thumbUrls: memo.thumbUrls,
-        timestamp: memo.updatedAt || memo.createdAt || 0, participantId: memo.participantId || ''
+        timestamp: memo.updatedAt || memo.createdAt || 0, participantId: memo.participantId || '',
+        uploadSource: 'memo'
       };
       const entries = [...getMessageImageEntries(asMsg), ...getAllDirectMediaImageEntries(asMsg)];
       entries.forEach(entry => {
@@ -891,6 +900,12 @@ export function ChatGalleryModal({
         const full = String(resolved?.imageUrl || photo?.imageUrl || photo?.full || '');
         const thumb = String(resolved?.thumbUrl || photo?.thumbUrl || photo?.thumb || full);
         if (!full && !thumb) return;
+        const mediaKey = resolved?.mediaKey
+          || photo?.mediaKey
+          || (photo?.sourceMessageId && Number.isInteger(photo?.sourceImageIndex)
+            ? `chat:${photo.sourceMessageId}:${photo.sourceImageIndex}`
+            : `meeting:${meeting.date || 'date'}:${photo?.id || index}`);
+        const refKey = resolved?.refKey || photo?.refKey || `meeting:${meeting.date || 'date'}:${photo?.id || index}`;
         list.push({
           full: full || thumb,
           thumb: thumb || full,
@@ -904,7 +919,9 @@ export function ChatGalleryModal({
           text: `${meeting.date || ''} 일정 사진`,
           participantId: '',
           source: 'meeting',
-          meetingDate: meeting.date || ''
+          meetingDate: meeting.date || '',
+          mediaKey,
+          refKey
         });
       });
     });
@@ -923,15 +940,15 @@ export function ChatGalleryModal({
     const byUrl = new Map();
     const sourceRank = { chat: 0, memo: 1, meeting: 2 };
     list.forEach(entry => {
-      const key = entry.full || entry.thumb;
+      const key = entry.mediaKey || entry.refKey || entry.full || entry.thumb;
       if (!key) return;
       const existing = byUrl.get(key);
       if (!existing) {
-        byUrl.set(key, entry);
+        byUrl.set(key, { ...entry });
       } else if ((sourceRank[entry.source] ?? 9) < (sourceRank[existing.source] ?? 9)) {
         byUrl.set(key, { ...entry, meetingDate: entry.meetingDate || existing.meetingDate || '' });
       } else if (!existing.meetingDate && entry.meetingDate) {
-        byUrl.set(key, { ...existing, meetingDate: entry.meetingDate });
+        existing.meetingDate = entry.meetingDate;
       }
     });
     return Array.from(byUrl.values()).sort((a, b) => b.timestamp - a.timestamp);
@@ -963,10 +980,10 @@ export function ChatGalleryModal({
       return matchTags || matchText;
     });
   }, [sharedPhotos, searchQuery]);
-  const visiblePhotos = React.useMemo(() => filteredPhotos.filter(photo => !brokenPhotoKeysRef.current.has(getPhotoKey(photo))), [filteredPhotos, brokenPhotoRevision]);
+  const visiblePhotos = React.useMemo(() => filteredPhotos.filter(photo => !brokenPhotoKeysRef.current.has(photo.mediaKey || photo.refKey || getPhotoKey(photo))), [filteredPhotos, brokenPhotoRevision]);
 
   const handleBrokenPhoto = photo => {
-    const key = getPhotoKey(photo);
+    const key = photo.mediaKey || photo.refKey || getPhotoKey(photo);
     if (!key || brokenPhotoKeysRef.current.has(key)) return;
     brokenPhotoKeysRef.current.add(key);
     setBrokenPhotoRevision(prev => prev + 1);
@@ -985,7 +1002,9 @@ export function ChatGalleryModal({
       sourceMessageId: photo.sourceMessageId || '',
       sourceImageIndex: Number.isInteger(photo.sourceImageIndex) ? photo.sourceImageIndex : null,
       meetingDate: isMeetingReference ? (photo.meetingDate || '') : (photo.meetingDate || ''),
-      photoId: isMeetingReference ? (photo.photoId || '') : (photo.photoId || '')
+      photoId: isMeetingReference ? (photo.photoId || '') : (photo.photoId || ''),
+      mediaKey: photo.mediaKey || '',
+      refKey: photo.refKey || getPhotoKey(photo)
     };
     Promise.resolve(onDeletePhoto(deletionMeta)).catch(err => console.warn('Broken gallery photo cleanup failed:', err));
   };
@@ -1444,7 +1463,7 @@ export function ChatGalleryModal({
         alignContent: 'start'
       }
     }, visiblePhotos.map((photo, idx) => /*#__PURE__*/React.createElement(MediaThumb, {
-      key: `${photo.messageId || photo.source || 'photo'}-${photo.meetingDate || ''}-${photo.directMediaUrl ? 'direct' : photo.imageIndex}-${photo.timestamp || idx}`,
+      key: photo.mediaKey || photo.refKey || `${photo.messageId || photo.source || 'photo'}-${photo.meetingDate || ''}-${photo.directMediaUrl ? 'direct' : photo.imageIndex}-${photo.timestamp || idx}`,
       "data-photo-url": photo.full || photo.thumb,
       "data-message-id": photo.messageId || photo.sourceMessageId,
       src: (photo.thumb && String(photo.thumb)) || (photo.full && String(photo.full)) || '',
@@ -1456,7 +1475,7 @@ export function ChatGalleryModal({
       onClick: () => setActiveLightbox && setActiveLightbox({
         urls: visiblePhotos.map(p => p.full),
         index: idx,
-        meta: visiblePhotos.map(p => ({ timestamp: p.timestamp, messageId: p.messageId, imageIndex: p.imageIndex, thumb: p.thumb, tags: p.tags, directMediaUrl: p.directMediaUrl, source: p.source, uploadSource: p.uploadSource, meetingDate: p.meetingDate, photoId: p.photoId, sourceMessageId: p.sourceMessageId, sourceImageIndex: p.sourceImageIndex }))
+          meta: visiblePhotos.map(p => ({ timestamp: p.timestamp, messageId: p.messageId, imageIndex: p.imageIndex, thumb: p.thumb, tags: p.tags, directMediaUrl: p.directMediaUrl, source: p.source, uploadSource: p.uploadSource, meetingDate: p.meetingDate, photoId: p.photoId, sourceMessageId: p.sourceMessageId, sourceImageIndex: p.sourceImageIndex }))
       }),
       onBroken: () => handleBrokenPhoto(photo),
       style: {
