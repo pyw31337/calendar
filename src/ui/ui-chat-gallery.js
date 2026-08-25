@@ -710,49 +710,7 @@ function getAnniversaryDisplayColor(...args) {
 // unsupported or inconclusive, and specifically avoids calling clipboard.read() while
 // permission is still 'prompt' so merely rendering the button never pops a permission dialog.
 function useClipboardHasImage(active) {
-  const React = window.React;
-  const [hasImage, setHasImage] = React.useState(true);
-  React.useEffect(() => {
-    if (!active || typeof navigator === 'undefined' || !navigator.clipboard || typeof navigator.clipboard.read !== 'function') {
-      return undefined;
-    }
-    let cancelled = false;
-    const check = async () => {
-      try {
-        if (navigator.permissions && typeof navigator.permissions.query === 'function') {
-          let state = 'granted';
-          try {
-            state = (await navigator.permissions.query({ name: 'clipboard-read' })).state;
-          } catch (e) {
-            // Permission name not recognized (Firefox) -- fall through to a direct read attempt.
-          }
-          if (state === 'denied') { if (!cancelled) setHasImage(false); return; }
-          if (state === 'prompt') return;
-        }
-        // Bounded the same way the actual paste handler is (readClipboardImageFiles in
-        // app-main.js) -- some mobile browsers can hang clipboard.read() indefinitely instead of
-        // resolving/rejecting, which would otherwise strand this background check forever.
-        const items = await Promise.race([
-          navigator.clipboard.read(),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('clipboard read timed out')), 5000))
-        ]);
-        const found = items.some(item => item.types.some(t => t.startsWith('image/')));
-        if (!cancelled) setHasImage(found);
-      } catch (e) {
-        // Read blocked/unsupported right now -- leave the button as-is rather than disabling
-        // it over an inconclusive check.
-      }
-    };
-    check();
-    window.addEventListener('focus', check);
-    document.addEventListener('visibilitychange', check);
-    return () => {
-      cancelled = true;
-      window.removeEventListener('focus', check);
-      document.removeEventListener('visibilitychange', check);
-    };
-  }, [active]);
-  return hasImage;
+  return true;
 }
 
 export function ChatGalleryModal({
