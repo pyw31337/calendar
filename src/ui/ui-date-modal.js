@@ -2172,7 +2172,8 @@ export function DateModal({
         }
       }, (!isConfirmed && isAllAvailable)
         ? /*#__PURE__*/React.createElement(GamifiedConfirmButtonContent, { label: "모임 확정" })
-        : (isConfirmed ? '모임 취소' : '모임 확정')))
+        : (isConfirmed ? '모임 취소' : '모임 확정'))),
+      /*#__PURE__*/React.createElement("div", { className: "date-modal-tab-bottom-spacer", style: { height: '36px', width: '100%', flexShrink: 0 } })
     )),
 
     /* Tab 2 Content: 장소 */
@@ -2472,7 +2473,8 @@ export function DateModal({
               }
             }))
           );
-        }))
+        })),
+        /*#__PURE__*/React.createElement("div", { className: "date-modal-tab-bottom-spacer", style: { height: '36px', width: '100%', flexShrink: 0 } })
       )
     ),
 
@@ -2588,7 +2590,7 @@ export function DateModal({
         className: "date-modal-settlement-list",
         style: {
           display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '10px',
-          flex: '1 1 auto', minHeight: '80px', overflow: 'visible', paddingBottom: '20px'
+          flex: '1 1 auto', minHeight: '80px', overflow: 'visible', paddingBottom: '36px', marginBottom: '24px'
         }
       },
         expenses.map(expense => {
@@ -2717,7 +2719,8 @@ export function DateModal({
             )
           );
         })
-      )
+      ),
+      /*#__PURE__*/React.createElement("div", { className: "date-modal-tab-bottom-spacer", style: { height: '36px', width: '100%', flexShrink: 0 } })
     ),
 
     /* Tab 4 Content: 사진 */
@@ -2854,7 +2857,8 @@ export function DateModal({
             cursor: 'pointer'
           }
         }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 13 }))
-      )))
+      ))),
+      /*#__PURE__*/React.createElement("div", { className: "date-modal-tab-bottom-spacer", style: { height: '36px', width: '100%', flexShrink: 0 } })
     )
   ))));
 

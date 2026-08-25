@@ -3354,7 +3354,16 @@ select.form-select {
 .date-modal-places-list,
 .date-modal-settlement-list {
   overflow: visible !important;
-  padding-bottom: 24px !important;
+  padding-bottom: 36px !important;
+  margin-bottom: 24px !important;
+}
+.date-modal-tab-bottom-spacer {
+  height: 36px !important;
+  min-height: 36px !important;
+  flex-shrink: 0 !important;
+  display: block !important;
+  width: 100% !important;
+  clear: both;
 }
 .expense-sortable-row {
   border: 1px solid var(--border-subtle) !important;
