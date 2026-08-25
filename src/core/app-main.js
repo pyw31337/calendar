@@ -37,6 +37,8 @@ import {
   normalizePlaces,
   deduplicateCalendarPlaces,
   mergePlaceMemos,
+  derivePlaceVisitStatus,
+  countPlaceVisits,
   getCalendarPlaces,
   unionPlaces,
   MEMO_DATE_RE,
@@ -4145,7 +4147,7 @@ function App() {
       lng: mergeTargetPlace ? mergeTargetPlace.lng : placeData.lng,
       categoryId: mp('categoryId', cleanCategoryId),
       memo: nextMemo,
-      visitStatus: mp('visitStatus', cleanVisitStatus),
+      visitStatus: derivePlaceVisitStatus({ memo: nextMemo }),
       visitDate: cleanVisitDate || mp('visitDate', ''),
       sourcePlaceId: mp('sourcePlaceId', sourcePlaceIdForSave || (isEditing && !mergeTargetPlace ? (existingPlaces.find(p => p.id === placeData.id) || {}).sourcePlaceId : '') || ''),
       updatedAt: now

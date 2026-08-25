@@ -595,6 +595,79 @@ const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
     return cleaned.length > 0 ? cleaned : entries;
   }
 
+  function getTodayString() {
+    const now = new Date();
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const dd = String(now.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
+  function derivePlaceVisitStatus(place, todayStr = getTodayString()) {
+    const memoText = String(place?.memo || '').trim();
+    if (!memoText) return 'planned';
+
+    const entries = parsePlaceMemoEntries(memoText);
+    const datedEntries = entries.filter(e => e && e.date);
+
+    if (datedEntries.length === 0) {
+      return 'planned';
+    }
+
+    const todayNorm = normalizePlaceDateForSort(todayStr) || '';
+
+    const hasPastOrTodayVisit = datedEntries.some(e => {
+      const dNorm = normalizePlaceDateForSort(e.date);
+      return dNorm && dNorm <= todayNorm;
+    });
+
+    return hasPastOrTodayVisit ? 'visited' : 'planned';
+  }
+
+  function parseDateStringToTimestamp(dateStr) {
+    if (!dateStr) return null;
+    const match = String(dateStr).match(/^(\d{2,4})[.-](\d{1,2})[.-](\d{1,2})$/);
+    if (!match) return null;
+    let [, y, m, d] = match;
+    if (y.length === 2) y = '20' + y;
+    const dateObj = new Date(Number(y), Number(m) - 1, Number(d));
+    return isNaN(dateObj.getTime()) ? null : dateObj.getTime();
+  }
+
+  function countPlaceVisits(place, visitEntries, category) {
+    const entries = Array.isArray(visitEntries) ? visitEntries.filter(e => e && e.date) : parsePlaceMemoEntries(place?.memo).filter(e => e && e.date);
+    if (entries.length === 0) return 0;
+
+    const catName = category?.name || place?.categoryName || '';
+    const catId = category?.id || place?.categoryId || '';
+    const isStayCategory = catId === 'hotel' || catId === 'stay' || catName === '숙박' || catName === '숙소';
+
+    if (!isStayCategory) {
+      return entries.length;
+    }
+
+    const timestamps = entries
+      .map(e => parseDateStringToTimestamp(e.date))
+      .filter(ts => ts !== null)
+      .sort((a, b) => a - b);
+
+    if (timestamps.length === 0) return entries.length;
+
+    const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+    let stayCount = 1;
+
+    for (let i = 1; i < timestamps.length; i++) {
+      const prevTs = timestamps[i - 1];
+      const currTs = timestamps[i];
+      const diffDays = Math.round((currTs - prevTs) / ONE_DAY_MS);
+      if (diffDays > 1) {
+        stayCount++;
+      }
+    }
+
+    return stayCount;
+  }
+
   function serializePlaceMemoEntries(entries) {
     return (entries || [])
       .filter(entry => entry && (entry.date || entry.note))
@@ -804,6 +877,10 @@ const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
     toMemoDateFormat,
     upsertPlaceMemoEntry,
     removePlaceMemoEntry,
+    getMemoDateMatches,
+    getTodayString,
+    derivePlaceVisitStatus,
+    countPlaceVisits,
     getPlaceMemoEntryForDate,
     trimLatLngOutliers,
     parseSharePathFromLocation,

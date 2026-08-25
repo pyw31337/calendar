@@ -1133,6 +1133,8 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
   const sortVisitEntriesRecentFirst = __deps.sortVisitEntriesRecentFirst;
   const upsertPlaceMemoEntry = __deps.upsertPlaceMemoEntry;
   const removePlaceMemoEntry = __deps.removePlaceMemoEntry;
+  const derivePlaceVisitStatus = __deps.derivePlaceVisitStatus;
+  const countPlaceVisits = __deps.countPlaceVisits;
   const getPlaceExternalMapUrl = __deps.getPlaceExternalMapUrl;
 
   // A plain `const isMobile = window.matchMedia(...).matches` read once per render only reflects
@@ -1830,11 +1832,11 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
               /*#__PURE__*/React.createElement("span", {
                 style: {
                   fontSize: '0.66rem', fontWeight: 700, padding: '2px 7px', borderRadius: 'var(--radius-full)',
-                  backgroundColor: place.visitStatus === 'planned' ? 'rgba(59, 130, 246, 0.12)' : 'rgba(16, 185, 129, 0.12)',
-                  color: place.visitStatus === 'planned' ? '#2563EB' : '#16A34A'
+                  backgroundColor: (derivePlaceVisitStatus ? derivePlaceVisitStatus(place) : place.visitStatus) === 'planned' ? 'rgba(59, 130, 246, 0.12)' : 'rgba(16, 185, 129, 0.12)',
+                  color: (derivePlaceVisitStatus ? derivePlaceVisitStatus(place) : place.visitStatus) === 'planned' ? '#2563EB' : '#16A34A'
                 }
-              }, place.visitStatus === 'planned' ? '방문예정' : '방문'),
-              displayVisitEntries.length > 0 && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 700 } }, `총 ${displayVisitEntries.length}회 방문`)
+              }, (derivePlaceVisitStatus ? derivePlaceVisitStatus(place) : place.visitStatus) === 'planned' ? '방문예정' : '방문'),
+              displayVisitEntries.length > 0 && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 700 } }, `총 ${countPlaceVisits ? countPlaceVisits(place, displayVisitEntries, category) : displayVisitEntries.length}회 방문`)
             ),
             
             /* Name & Address -- alias is the list display name when set; official name shown underneath */

@@ -153,6 +153,79 @@ const getDisplayPlaceAddress = GATHER_APP_UTILS.getDisplayPlaceAddress || functi
 // meaningful, but a place can also be dropped by raw coordinates with no name/address at all.
 // visitStatus distinguishes an already-visited place from one that's only planned; visitDate is
 // only meaningful (and only ever shown) when visitStatus is 'visited'.
+function getTodayString() {
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function derivePlaceVisitStatus(place, todayStr = getTodayString()) {
+  const memoText = String(place?.memo || '').trim();
+  if (!memoText) return 'planned';
+
+  const entries = parsePlaceMemoEntries(memoText);
+  const datedEntries = entries.filter(e => e && e.date);
+
+  if (datedEntries.length === 0) {
+    return 'planned';
+  }
+
+  const todayNorm = normalizePlaceDateForSort(todayStr) || '';
+
+  const hasPastOrTodayVisit = datedEntries.some(e => {
+    const dNorm = normalizePlaceDateForSort(e.date);
+    return dNorm && dNorm <= todayNorm;
+  });
+
+  return hasPastOrTodayVisit ? 'visited' : 'planned';
+}
+
+function parseDateStringToTimestamp(dateStr) {
+  if (!dateStr) return null;
+  const match = String(dateStr).match(/^(\d{2,4})[.-](\d{1,2})[.-](\d{1,2})$/);
+  if (!match) return null;
+  let [, y, m, d] = match;
+  if (y.length === 2) y = '20' + y;
+  const dateObj = new Date(Number(y), Number(m) - 1, Number(d));
+  return isNaN(dateObj.getTime()) ? null : dateObj.getTime();
+}
+
+function countPlaceVisits(place, visitEntries, category) {
+  const entries = Array.isArray(visitEntries) ? visitEntries.filter(e => e && e.date) : parsePlaceMemoEntries(place?.memo).filter(e => e && e.date);
+  if (entries.length === 0) return 0;
+
+  const catName = category?.name || place?.categoryName || '';
+  const catId = category?.id || place?.categoryId || '';
+  const isStayCategory = catId === 'hotel' || catId === 'stay' || catName === '숙박' || catName === '숙소';
+
+  if (!isStayCategory) {
+    return entries.length;
+  }
+
+  const timestamps = entries
+    .map(e => parseDateStringToTimestamp(e.date))
+    .filter(ts => ts !== null)
+    .sort((a, b) => a - b);
+
+  if (timestamps.length === 0) return entries.length;
+
+  const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+  let stayCount = 1;
+
+  for (let i = 1; i < timestamps.length; i++) {
+    const prevTs = timestamps[i - 1];
+    const currTs = timestamps[i];
+    const diffDays = Math.round((currTs - prevTs) / ONE_DAY_MS);
+    if (diffDays > 1) {
+      stayCount++;
+    }
+  }
+
+  return stayCount;
+}
+
 function normalizePlaces(places) {
   return (Array.isArray(places) ? places : [])
     .filter(place => place && Number.isFinite(Number(place.lat)) && Number.isFinite(Number(place.lng)))
@@ -160,13 +233,12 @@ function normalizePlaces(places) {
       id: sanitizeText(place.id || '', 80) || `place_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
       name: sanitizeText(place.name || '', 80),
       alias: sanitizeText(place.alias || '', 80),
-      // 표시·저장 포맷 통일. 병합 키로 쓰지 않음(id만).
       address: normalizePlaceAddressForSave(place.address || '', place.lat, place.lng),
       lat: Number(place.lat),
       lng: Number(place.lng),
       categoryId: sanitizeText(place.categoryId || 'etc', 40),
       memo: sanitizeText(place.memo || '', 2000),
-      visitStatus: place.visitStatus === 'planned' ? 'planned' : 'visited',
+      visitStatus: derivePlaceVisitStatus(place),
       visitDate: isValidDateString(place.visitDate) ? place.visitDate : '',
       createdAt: Number(place.createdAt) || Date.now(),
       updatedAt: Number(place.updatedAt) || Number(place.createdAt) || Date.now()
@@ -1871,6 +1943,9 @@ export {
   mergePlaceMemos,
   deduplicateCalendarPlaces,
   getMemoDateMatches,
+  getTodayString,
+  derivePlaceVisitStatus,
+  countPlaceVisits,
   sanitizeMessageForFirestore,
   sanitizeMemoForFirestore,
   slimMessageForClient,

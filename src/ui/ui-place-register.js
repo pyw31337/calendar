@@ -1108,30 +1108,18 @@ export function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, on
         }, "비우면 검색된 공식 명칭이 그대로 표시됩니다.")
       ),
 
-      /* Category picker + 방문/예정 toggle */
+      /* Category picker */
       /*#__PURE__*/React.createElement("div", null,
         /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#64748B', marginBottom: '4px' } }, "카테고리"),
-        /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'stretch', gap: '10px' } },
-          /*#__PURE__*/React.createElement("div", { style: { flex: 1, minWidth: 0 } },
-            /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
-              title: "카테고리 선택",
-              value: categoryId,
-              options: categoryOptions,
-              onSelect: setCategoryId,
-              placeholder: "카테고리 선택"
-            })
-          ),
-          /*#__PURE__*/React.createElement(SegmentedToggle, {
-            ariaLabel: "방문/방문예정 전환",
-            value: visitStatus,
-            onChange: v => setVisitStatus(v),
-            options: [{ value: 'visited', label: '방문' }, { value: 'planned', label: '예정' }]
+        /*#__PURE__*/React.createElement("div", { style: { width: '100%' } },
+          /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
+            title: "카테고리 선택",
+            value: categoryId,
+            options: categoryOptions,
+            onSelect: setCategoryId,
+            placeholder: "카테고리 선택"
           })
         )
-        // The separate 방문일자 date input used to live here -- removed now that visitDate is
-        // derived automatically from whatever date the memo text itself contains (see
-        // handleMemoChange below), so there was nothing left for it to let the user set that
-        // typing the date into the memo doesn't already cover.
       ),
 
       /* Memo field */
