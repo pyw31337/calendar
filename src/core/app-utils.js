@@ -630,43 +630,53 @@ const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
     return hasPastOrTodayVisit ? 'visited' : 'planned';
   }
 
-  function parseDateStringToTimestamp(dateStr) {
-    if (!dateStr) return null;
-    const match = String(dateStr).match(/^(\d{2,4})[.-](\d{1,2})[.-](\d{1,2})$/);
-    if (!match) return null;
-    let [, y, m, d] = match;
-    if (y.length === 2) y = '20' + y;
-    const dateObj = new Date(Number(y), Number(m) - 1, Number(d));
-    return isNaN(dateObj.getTime()) ? null : dateObj.getTime();
+  function isAccommodationCategory(place, category) {
+    const catId = String(category?.id || place?.categoryId || '').toLowerCase();
+    const catName = String(category?.name || place?.categoryName || '').toLowerCase();
+    return (
+      catId === 'lodging' ||
+      catId === 'hotel' ||
+      catId === 'stay' ||
+      catId === 'accommodation' ||
+      catName.includes('숙박') ||
+      catName.includes('숙소') ||
+      catName.includes('캠핑') ||
+      catName.includes('펜션') ||
+      catName.includes('리조트') ||
+      catName.includes('호텔')
+    );
+  }
+
+  function parseDateToDaysNumber(dateStr) {
+    const norm = normalizePlaceDateForSort(dateStr);
+    if (!norm) return null;
+    const parts = norm.split('-').map(Number);
+    if (parts.length !== 3 || parts.some(isNaN)) return null;
+    const [y, m, d] = parts;
+    return Math.floor(Date.UTC(y, m - 1, d) / (24 * 60 * 60 * 1000));
   }
 
   function countPlaceVisits(place, visitEntries, category) {
-    const entries = Array.isArray(visitEntries) ? visitEntries.filter(e => e && e.date) : parsePlaceMemoEntries(place?.memo).filter(e => e && e.date);
+    const rawEntries = Array.isArray(visitEntries) && visitEntries.length > 0
+      ? visitEntries
+      : parsePlaceMemoEntries(place?.memo);
+    const entries = rawEntries.filter(e => e && e.date);
     if (entries.length === 0) return 0;
 
-    const catName = category?.name || place?.categoryName || '';
-    const catId = category?.id || place?.categoryId || '';
-    const isStayCategory = catId === 'hotel' || catId === 'stay' || catName === '숙박' || catName === '숙소';
-
-    if (!isStayCategory) {
+    if (!isAccommodationCategory(place, category)) {
       return entries.length;
     }
 
-    const timestamps = entries
-      .map(e => parseDateStringToTimestamp(e.date))
-      .filter(ts => ts !== null)
+    const days = entries
+      .map(e => parseDateToDaysNumber(e.date))
+      .filter(d => d !== null)
       .sort((a, b) => a - b);
 
-    if (timestamps.length === 0) return entries.length;
+    if (days.length === 0) return entries.length;
 
-    const ONE_DAY_MS = 24 * 60 * 60 * 1000;
     let stayCount = 1;
-
-    for (let i = 1; i < timestamps.length; i++) {
-      const prevTs = timestamps[i - 1];
-      const currTs = timestamps[i];
-      const diffDays = Math.round((currTs - prevTs) / ONE_DAY_MS);
-      if (diffDays > 1) {
+    for (let i = 1; i < days.length; i++) {
+      if (days[i] - days[i - 1] > 1) {
         stayCount++;
       }
     }
