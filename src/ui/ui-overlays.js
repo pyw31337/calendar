@@ -37,8 +37,6 @@ function getFooterFamilyLinks() {
   return __gatherUiDeps().FOOTER_FAMILY_LINKS || [];
 }
 
-const NO_IMAGE_ICON_DATA_URI = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-image-off-icon lucide-image-off"><line x1="2" x2="22" y1="2" y2="22"/><path d="M10.41 10.41a2 2 0 1 1-2.83-2.83"/><line x1="13.5" x2="6" y1="13.5" y2="21"/><line x1="18" x2="21" y1="12" y2="15"/><path d="M3.59 3.59A1.99 1.99 0 0 0 3 5v14a2 2 0 0 0 2 2h14c.55 0 1.052-.22 1.41-.59"/><path d="M21 15V5a2 2 0 0 0-2-2H9"/></svg>');
-
 /* __fb() bridge */
 function __fb() {
   const deps = __gatherUiDeps();
@@ -728,26 +726,54 @@ export function MediaThumb({
   const primarySrc = String(src || '').trim();
   const secondarySrc = String(fallbackSrc || '').trim();
   const [currentSrc, setCurrentSrc] = React.useState(() => primarySrc || secondarySrc || '');
+  const imgRef = React.useRef(null);
+  const brokenHandledRef = React.useRef(false);
 
   React.useEffect(() => {
     setCurrentSrc(primarySrc || secondarySrc || '');
+    brokenHandledRef.current = false;
   }, [primarySrc, secondarySrc]);
+
+  const finalizeBroken = e => {
+    if (brokenHandledRef.current) return;
+    brokenHandledRef.current = true;
+    const target = e && e.currentTarget ? e.currentTarget : imgRef.current;
+    if (target && target.style) {
+      target.style.display = 'none';
+    }
+    if (typeof onBroken === 'function') {
+      onBroken(e, { src: primarySrc, fallbackSrc: secondarySrc, currentSrc });
+    }
+  };
 
   const handleError = e => {
     if (secondarySrc && currentSrc !== secondarySrc) {
       setCurrentSrc(secondarySrc);
       return;
     }
-    if (typeof onBroken === 'function') {
-      onBroken(e, { src: primarySrc, fallbackSrc: secondarySrc, currentSrc });
-      return;
-    }
-    if (currentSrc !== NO_IMAGE_ICON_DATA_URI) {
-      setCurrentSrc(NO_IMAGE_ICON_DATA_URI);
-      return;
-    }
-    e.currentTarget.style.display = 'none';
+    finalizeBroken(e);
   };
+
+  React.useEffect(() => {
+    if (!currentSrc) return;
+    let cancelled = false;
+    const inspectCurrentImage = () => {
+      if (cancelled || brokenHandledRef.current) return;
+      const el = imgRef.current;
+      if (!el || !el.complete) return;
+      if (el.naturalWidth > 0) return;
+      handleError({ currentTarget: el });
+    };
+    const timer = window.setTimeout(inspectCurrentImage, 1200);
+    const el = imgRef.current;
+    if (el && typeof el.decode === 'function') {
+      el.decode().then(inspectCurrentImage).catch(inspectCurrentImage);
+    }
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [currentSrc, primarySrc, secondarySrc]);
 
   if (!currentSrc) return null;
 
@@ -762,6 +788,7 @@ export function MediaThumb({
     onClick,
     onLoad,
     onError: handleError,
+    ref: imgRef,
     style
   });
 }
