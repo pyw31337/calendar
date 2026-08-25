@@ -4156,10 +4156,9 @@ function App() {
         ? existingPlaces.map(p => p.id === placeData.id ? { ...p, ...editedFields } : p)
         : [...existingPlaces, { id: placeData.id, ...editedFields, createdAt: now }];
     } else {
-      // RULE: 주소/좌표/이름으로 기존 장소와 합치지 않음.
-      // 같은 단지에 도은네·은우네·서준네처럼 별칭·메모가 다른 장소는 각각 별도 문서.
       nextPlaces = [...existingPlaces, { id: `place_${activeCal.id}_${now}_${Math.random().toString(36).slice(2, 7)}`, ...editedFields, createdAt: now }];
     }
+    nextPlaces = deduplicateCalendarPlaces(nextPlaces);
     const prevPlace = isEditing ? existingPlaces.find(p => p.id === placeData.id) : null;
     const displayLabel = cleanAlias || cleanName || '장소';
     const placeCats = getPlaceCategories(activeCal);

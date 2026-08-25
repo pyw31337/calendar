@@ -1757,7 +1757,10 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
             "data-place-id": place.id,
             role: "button",
             tabIndex: 0,
-            onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleSelectPlaceOnMap(place); } },
+            onKeyDown: (e) => {
+              if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'BUTTON')) return;
+              if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleSelectPlaceOnMap(place); }
+            },
             style: {
               display: 'flex', flexDirection: 'column', gap: '4px',
               padding: '10px 12px', position: 'relative',
@@ -1861,6 +1864,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
                         autoFocus: true,
                         onChange: e => setEditingMemoEntryText(e.target.value),
                         onKeyDown: e => {
+                          e.stopPropagation();
                           if (e.key === 'Enter') {
                             if (e.nativeEvent && e.nativeEvent.isComposing) return;
                             e.preventDefault();

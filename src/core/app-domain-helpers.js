@@ -172,8 +172,83 @@ function normalizePlaces(places) {
       updatedAt: Number(place.updatedAt) || Number(place.createdAt) || Date.now()
     }));
 }
+function mergePlaceMemos(memoA, memoB) {
+  const textA = String(memoA || '').trim();
+  const textB = String(memoB || '').trim();
+  if (!textA) return textB;
+  if (!textB) return textA;
+  if (textA === textB) return textA;
+
+  const entriesA = parsePlaceMemoEntries(textA);
+  const entriesB = parsePlaceMemoEntries(textB);
+  const combinedMap = new Map();
+
+  [...entriesA, ...entriesB].forEach(entry => {
+    const key = entry.date || 'dateless';
+    if (!combinedMap.has(key)) {
+      combinedMap.set(key, entry.note || '');
+    } else {
+      const existing = combinedMap.get(key);
+      if (entry.note && !existing.includes(entry.note)) {
+        combinedMap.set(key, existing ? `${existing}\n${entry.note}` : entry.note);
+      }
+    }
+  });
+
+  const mergedEntries = [];
+  combinedMap.forEach((note, date) => {
+    mergedEntries.push({ date: date === 'dateless' ? '' : date, note });
+  });
+
+  const sorted = sortVisitEntriesRecentFirst(mergedEntries.filter(e => e.date));
+  const dateless = mergedEntries.filter(e => !e.date);
+
+  const formattedLines = [
+    ...sorted.map(e => (e.note ? `${e.date} ${e.note}` : e.date)),
+    ...dateless.map(e => e.note)
+  ];
+  return formattedLines.join('\n');
+}
+
+function deduplicateCalendarPlaces(places) {
+  if (!Array.isArray(places) || places.length < 2) return places || [];
+  const mergedList = [];
+  const mergedIds = new Set();
+
+  for (let i = 0; i < places.length; i++) {
+    const p1 = places[i];
+    if (!p1 || !p1.id || mergedIds.has(p1.id)) continue;
+
+    let mergedPlace = { ...p1 };
+    const name1 = (p1.alias || p1.name || '').trim().toLowerCase();
+    const source1 = (p1.sourcePlaceId || '').trim();
+
+    for (let j = i + 1; j < places.length; j++) {
+      const p2 = places[j];
+      if (!p2 || !p2.id || mergedIds.has(p2.id)) continue;
+      const name2 = (p2.alias || p2.name || '').trim().toLowerCase();
+      const source2 = (p2.sourcePlaceId || '').trim();
+
+      const isSameSource = source1 && source2 && source1 === source2;
+      const isSameName = name1 && name2 && name1 === name2;
+
+      if (isSameSource || isSameName) {
+        mergedIds.add(p2.id);
+        mergedPlace.memo = mergePlaceMemos(mergedPlace.memo, p2.memo);
+        if (p2.visitStatus === 'visited') mergedPlace.visitStatus = 'visited';
+        if (!mergedPlace.visitDate && p2.visitDate) mergedPlace.visitDate = p2.visitDate;
+        if (!mergedPlace.address && p2.address) mergedPlace.address = p2.address;
+        if (!mergedPlace.sourcePlaceId && p2.sourcePlaceId) mergedPlace.sourcePlaceId = p2.sourcePlaceId;
+        mergedPlace.updatedAt = Math.max(mergedPlace.updatedAt || 0, p2.updatedAt || 0);
+      }
+    }
+    mergedList.push(mergedPlace);
+  }
+  return mergedList;
+}
+
 function getCalendarPlaces(calendar) {
-  return normalizePlaces(calendar?.places);
+  return deduplicateCalendarPlaces(normalizePlaces(calendar?.places));
 }
 // Unions the calendar document's own embedded places (legacy entries, and anything not yet
 // backfilled into the subcollection) with places fetched from the places subcollection -- same
@@ -181,18 +256,9 @@ function getCalendarPlaces(calendar) {
 // { ...calendar, places: subcollectionPlaces } would silently drop pre-migration entries.
 function unionPlaces(calendar, subcollectionPlaces) {
   const byId = new Map();
-  // Subcollection entries go in FIRST so the calendar's own (local, possibly just-written)
-  // entries overwrite them on a shared id -- not the other way around. The live subcollection
-  // listener only re-fires after its own write round-trips, so right after an optimistic local
-  // update (see updateCalendars' setCalendarsState) the listener's snapshot is still the OLD
-  // data; processing it last would let that stale snapshot silently overwrite the fresh local
-  // write for that id every render until the listener catches up -- exactly the bug where a
-  // newly added place/photo would flash in and then vanish. If the write actually failed,
-  // updateCalendars rolls the local state back to the pre-write calendar, so local data is
-  // always the one that should win here.
   (Array.isArray(subcollectionPlaces) ? subcollectionPlaces : []).forEach(p => { if (p?.id) byId.set(p.id, p); });
   getCalendarPlaces(calendar).forEach(p => { if (p?.id) byId.set(p.id, p); });
-  return Array.from(byId.values());
+  return deduplicateCalendarPlaces(Array.from(byId.values()));
 }
 
 // Bulk-imported places (e.g. from a Google My Maps export) often carry their whole visit history
