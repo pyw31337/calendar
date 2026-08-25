@@ -9095,6 +9095,22 @@ function bindGatherUiDeps() {
 }
 bindGatherUiDeps();
 
+// Icons live in ui-icons.js → GATHER_UI_COMPONENTS. Fill DEPS from COMPONENTS for any *Icon
+// still missing (e.g. TrashIcon) so ChatRoomView message actions do not hit React #130.
+(function syncIconsFromComponents() {
+  const c = window.GATHER_UI_COMPONENTS || {};
+  const d = window.GATHER_UI_DEPS || {};
+  let changed = false;
+  Object.keys(c).forEach((key) => {
+    if (!key.endsWith('Icon')) return;
+    if (typeof c[key] !== 'function') return;
+    if (typeof d[key] === 'function') return;
+    d[key] = c[key];
+    changed = true;
+  });
+  if (changed) window.GATHER_UI_DEPS = d;
+})();
+
 
 function __gatherStartApp() {
 try {

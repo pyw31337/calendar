@@ -675,13 +675,13 @@ export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoad
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
-  const BackArrowIcon = __deps.BackArrowIcon;
-  const SmallXIcon = __deps.SmallXIcon;
-  const TrashIcon = __deps.TrashIcon;
+  const BackArrowIcon = __comp.BackArrowIcon || __deps.BackArrowIcon;
+  const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
+  const TrashIcon = __comp.TrashIcon || __deps.TrashIcon;
   const ResizableModalContainer = __deps.ResizableModalContainer;
   const ChatGalleryModal = __comp.ChatGalleryModal || __deps.ChatGalleryModal;
   const ChatParticipantSheet = __comp.ChatParticipantSheet || __deps.ChatParticipantSheet;
-  const EmojiPickerIcon = __deps.EmojiPickerIcon;
+  const EmojiPickerIcon = __comp.EmojiPickerIcon || __deps.EmojiPickerIcon;
   const EmojiPickerSheet = __comp.EmojiPickerSheet || __deps.EmojiPickerSheet;
   const ImageProcessingOverlay = __comp.ImageProcessingOverlay || __deps.ImageProcessingOverlay;
   const ImageThumbRemoveButton = __comp.ImageThumbRemoveButton || __deps.ImageThumbRemoveButton;
