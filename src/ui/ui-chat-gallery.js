@@ -764,6 +764,7 @@ export function ChatGalleryModal({
   const [pastePreview, setPastePreview] = React.useState(null); // { files, previewUrls } | null
   const brokenPhotoKeysRef = React.useRef(new Set());
   const [brokenPhotoRevision, setBrokenPhotoRevision] = React.useState(0);
+  const getPhotoKey = photo => `${photo?.messageId || photo?.photoId || photo?.sourceMessageId || ''}_${photo?.imageIndex ?? photo?.sourceImageIndex ?? ''}`;
   React.useEffect(() => () => {
     // Safety net if the component unmounts (e.g. gallery closed) while the preview is still open.
     if (pastePreview) pastePreview.previewUrls.forEach(url => { try { URL.revokeObjectURL(url); } catch (e) {} });
@@ -850,7 +851,12 @@ export function ChatGalleryModal({
     (chatMessages || []).forEach(msg => {
       const entries = [...getMessageImageEntries(msg), ...getAllDirectMediaImageEntries(msg)];
       entries.forEach(entry => {
-        list.push({ ...entry, text: msg.text || '', participantId: msg.participantId || '', source: 'chat' });
+        list.push({
+          ...entry,
+          text: msg.text || '',
+          participantId: msg.participantId || '',
+          source: 'chat'
+        });
       });
     });
     (memos || []).forEach(memo => {
@@ -865,7 +871,13 @@ export function ChatGalleryModal({
       };
       const entries = [...getMessageImageEntries(asMsg), ...getAllDirectMediaImageEntries(asMsg)];
       entries.forEach(entry => {
-        list.push({ ...entry, tags: memoTagsDisplay, text: asMsg.text || '', participantId: asMsg.participantId || '', source: 'memo' });
+        list.push({
+          ...entry,
+          tags: memoTagsDisplay,
+          text: asMsg.text || '',
+          participantId: asMsg.participantId || '',
+          source: 'memo'
+        });
       });
     });
     getConfirmedMeetings(calendar).forEach(meeting => {
@@ -951,11 +963,12 @@ export function ChatGalleryModal({
       return matchTags || matchText;
     });
   }, [sharedPhotos, searchQuery]);
-  const visiblePhotos = React.useMemo(() => filteredPhotos.filter(photo => !brokenPhotoKeysRef.current.has(photo.key)), [filteredPhotos, brokenPhotoRevision]);
+  const visiblePhotos = React.useMemo(() => filteredPhotos.filter(photo => !brokenPhotoKeysRef.current.has(getPhotoKey(photo))), [filteredPhotos, brokenPhotoRevision]);
 
   const handleBrokenPhoto = photo => {
-    if (!photo?.key || brokenPhotoKeysRef.current.has(photo.key)) return;
-    brokenPhotoKeysRef.current.add(photo.key);
+    const key = getPhotoKey(photo);
+    if (!key || brokenPhotoKeysRef.current.has(key)) return;
+    brokenPhotoKeysRef.current.add(key);
     setBrokenPhotoRevision(prev => prev + 1);
     if (typeof onDeletePhoto !== 'function') return;
     const isMeetingReference = !!photo.sourceMessageId && Number.isInteger(photo.sourceImageIndex)
