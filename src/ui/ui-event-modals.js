@@ -818,8 +818,17 @@ export function AnniversaryModal({
     onRequestConfirm('기념일 삭제', `"${ann.title}" 기념일을 삭제하시겠습니까?`, async () => {
       try {
         const calendarId = calendar.id;
+        const annSnapshot = JSON.parse(JSON.stringify(ann));
         await __fb().collection('calendars').doc('cal_' + calendarId).collection('anniversaries').doc(ann.id).delete();
-        showToast('기념일이 삭제되었습니다.', 'success');
+        showToast('기념일이 삭제되었습니다.', 'delete', 5000, async () => {
+          try {
+            await __fb().collection('calendars').doc('cal_' + calendarId).collection('anniversaries').doc(ann.id).set(annSnapshot);
+            showToast('기념일 삭제를 되돌렸습니다.', 'success', 3000);
+          } catch (restoreErr) {
+            console.error('Anniversary restore error:', restoreErr);
+            showToast('기념일 복원 실패', 'error', 4000);
+          }
+        });
         if (editingId === ann.id) {
           setEditingId(null);
           setNewTitle('');

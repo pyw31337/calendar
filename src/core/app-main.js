@@ -4564,7 +4564,7 @@ function App() {
       revision: (activeCal.revision || 0) + 1
     };
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-    return updateCalendars(nextCalendars, '자주 찾는 지역이 삭제되었습니다.', 'success', updatedCal.id, 'settings');
+    return updateCalendars(nextCalendars, '자주 찾는 지역이 삭제되었습니다.', 'delete', updatedCal.id, 'settings');
   };
   const handleAddPinnedNotice = (text, authorName) => {
     if (!guardLoadedCalendar()) return false;

@@ -1291,6 +1291,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
   };
   const handleDeletePlaceMemoEntry = (place, entry) => {
     const label = formatPlaceBadgeDate(entry.date) || entry.date;
+    const placeSnapshot = JSON.parse(JSON.stringify(place));
     onRequestConfirm('메모 삭제', `"${label}" 메모를 삭제하시겠습니까?`, async () => {
       const nextMemo = removePlaceMemoEntry(place.memo || '', entry.date);
       const ok = await Promise.resolve(onSavePlace({
@@ -1301,7 +1302,14 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
         visitDate: place.visitDate || ''
       }));
       if (ok !== false) {
-        showToast('메모가 삭제되었습니다.', 'success');
+        showToast('메모가 삭제되었습니다.', 'delete', 5000, async () => {
+          const restored = await Promise.resolve(onSavePlace(placeSnapshot));
+          if (restored !== false) {
+            showToast('메모 삭제를 되돌렸습니다.', 'success', 3000);
+          } else {
+            showToast('메모 복원 실패', 'error', 4000);
+          }
+        });
         if (editingMemoEntryKey === `${place.id}::${entry.date}`) {
           setEditingMemoEntryKey(null);
           setEditingMemoEntryText('');

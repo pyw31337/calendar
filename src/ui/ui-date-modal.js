@@ -1084,11 +1084,26 @@ export function DateModal({
     if (!onDelete) return;
     const part = activeParticipants.find(p => p.id === entry.participantId);
     const nameLabel = part ? part.name : '참여자';
+    const entrySnapshot = JSON.parse(JSON.stringify(entry));
     onRequestConfirm('참석 삭제', `"${nameLabel}"님의 참석 기록을 삭제하시겠습니까?`, async () => {
       setIsSubmitting(true);
       const ok = await onDelete(dateStr, entry.participantId);
       setIsSubmitting(false);
-      if (ok !== false) showToast('참석 기록이 삭제되었습니다.', 'success');
+      if (ok !== false) {
+        showToast('참석 기록이 삭제되었습니다.', 'delete', 5000, async () => {
+          try {
+            setIsSubmitting(true);
+            const restored = await onSave(dateStr, entrySnapshot.participantId, entrySnapshot.note || '');
+            setIsSubmitting(false);
+            if (restored !== false) showToast('참석 삭제를 되돌렸습니다.', 'success', 3000);
+            else showToast('참석 복원 실패', 'error', 4000);
+          } catch (restoreErr) {
+            setIsSubmitting(false);
+            console.error('Attendance restore failed:', restoreErr);
+            showToast('참석 복원 실패', 'error', 4000);
+          }
+        });
+      }
       else showToast('삭제에 실패했습니다.', 'error');
     });
   };
@@ -1523,6 +1538,7 @@ export function DateModal({
     e.stopPropagation();
     if (!onDeleteExpense) return;
     const target = expenses.find(exp => exp.id === expenseId);
+    const expenseSnapshot = JSON.parse(JSON.stringify(target || null));
     const rawLabel = String(target?.label || target?.url || '').trim();
     const shortLabel = rawLabel.length > 24 ? rawLabel.slice(0, 24) + '…' : rawLabel;
     const kind = Number(target?.amount) < 0 ? '수입' : '지출';
@@ -1538,7 +1554,24 @@ export function DateModal({
         showToast('삭제에 실패했습니다.', 'error');
         return;
       }
-      showToast('정산 내역이 삭제되었습니다.', 'success');
+      showToast('정산 내역이 삭제되었습니다.', 'delete', 5000, async () => {
+        try {
+          setIsSavingExpense(true);
+          const restored = await onSaveExpense(dateStr, {
+            id: expenseSnapshot?.id || expenseId,
+            label: expenseSnapshot?.label || expenseSnapshot?.url || '',
+            amount: Number(expenseSnapshot?.amount) || 0,
+            categoryId: expenseSnapshot?.categoryId || expenseCategoryInput
+          });
+          setIsSavingExpense(false);
+          if (restored !== false) showToast('정산 삭제를 되돌렸습니다.', 'success', 3000);
+          else showToast('정산 복원 실패', 'error', 4000);
+        } catch (restoreErr) {
+          setIsSavingExpense(false);
+          console.error('Expense restore failed:', restoreErr);
+          showToast('정산 복원 실패', 'error', 4000);
+        }
+      });
       if (editingExpenseId === expenseId) {
         setEditingExpenseId(null);
         setExpenseLabelInput('');
@@ -2467,6 +2500,24 @@ export function DateModal({
                 });
               },
               onDelete: () => {
+                const placeSnapshot = JSON.parse(JSON.stringify(place));
+                const canRestorePlace = typeof onSavePlace === 'function';
+                const restorePlace = async () => {
+                  if (!canRestorePlace) return false;
+                  try {
+                    setIsSavingPlace(true);
+                    const restored = await Promise.resolve(onSavePlace(placeSnapshot));
+                    setIsSavingPlace(false);
+                    if (restored !== false) showToast('장소 삭제를 되돌렸습니다.', 'success', 3000);
+                    else showToast('장소 복원 실패', 'error', 4000);
+                    return restored;
+                  } catch (restoreErr) {
+                    setIsSavingPlace(false);
+                    console.error('Place restore failed:', restoreErr);
+                    showToast('장소 복원 실패', 'error', 4000);
+                    return false;
+                  }
+                };
                 onRequestConfirm('장소 삭제', `"${place.alias || place.name}" 장소를 이 날짜에서 해제하시겠습니까?`, async () => {
                   setIsSavingPlace(true);
                   try {
@@ -2483,18 +2534,18 @@ export function DateModal({
                         visitDate: nextVisitDate
                       }));
                       if (ok !== false) {
-                        showToast('이 날짜에서 장소가 해제되었습니다.', 'success');
+                        showToast('이 날짜에서 장소가 해제되었습니다.', 'delete', 5000, canRestorePlace ? restorePlace : null);
                         if (editingLinkedPlaceId === place.id) {
                           setEditingLinkedPlaceId(null); setSelectedPlace(null);
                           setPlaceQuery(''); setPlaceAlias(''); setPlaceMemo('');
                         }
                       } else if (onDeletePlace) {
                         await Promise.resolve(onDeletePlace(place.id));
-                        showToast('장소가 삭제되었습니다.', 'success');
+                        showToast('장소가 삭제되었습니다.', 'delete', 5000, canRestorePlace ? restorePlace : null);
                       }
                     } else if (onDeletePlace) {
                       await Promise.resolve(onDeletePlace(place.id));
-                      showToast('장소가 삭제되었습니다.', 'success');
+                      showToast('장소가 삭제되었습니다.', 'delete', 5000, canRestorePlace ? restorePlace : null);
                     }
                   } finally { setIsSavingPlace(false); }
                 });

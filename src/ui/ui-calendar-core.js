@@ -1990,13 +1990,19 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
       ? `${authorName}님의 '${snippet}' 댓글을 삭제하시겠습니까?`
       : `${authorName}님의 댓글을 삭제하시겠습니까?`;
     const doDelete = () => {
-      onCommentsChange(comments.filter(c => c.id !== commentId));
+      const previousComments = comments.slice();
+      onCommentsChange(previousComments.filter(c => c.id !== commentId));
       if (editingCommentId === commentId) {
         setEditingCommentId(null);
         setCommentText('');
         setIsCommentComposerOpen(false);
       }
-      if (typeof showToast === 'function') showToast('댓글이 삭제되었습니다', 'success');
+      if (typeof showToast === 'function') {
+        showToast('댓글이 삭제되었습니다', 'delete', 5000, () => {
+          onCommentsChange(previousComments);
+          if (typeof showToast === 'function') showToast('댓글 삭제를 되돌렸습니다', 'success', 3000);
+        });
+      }
     };
     if (typeof onRequestConfirm === 'function') {
       onRequestConfirm('댓글 삭제', message, doDelete);

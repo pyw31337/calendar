@@ -1055,6 +1055,7 @@ export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoad
         const calendarId = calendar.id;
         const stamp = Date.now();
         const participantId = getStoredChatParticipantId(calendarId, calendar) || 'anonymous';
+        const memoSnapshot = JSON.parse(JSON.stringify(memo));
 
         await __fb().collection('calendars').doc('cal_' + calendarId).collection('memos').doc(memo.id).delete();
 
@@ -1072,7 +1073,30 @@ export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoad
           await pushSingleCloudCalendar(nextCal, stamp, 18, null, 'settings', [activityLog]);
         }
 
-        showToast('메모가 삭제되었습니다.', 'success');
+        showToast('메모가 삭제되었습니다.', 'delete', 5000, async () => {
+          try {
+            const restoreStamp = Date.now();
+            await __fb().collection('calendars').doc('cal_' + calendarId).collection('memos').doc(memo.id).set(sanitizeMemoForFirestore(memoSnapshot));
+            const restoreNote = memoSnapshot.title
+              ? `복원: 제목: ${memoSnapshot.title}`
+              : `복원: ${String(memoSnapshot.text || '').slice(0, 30)}...`;
+            const restoreActivityLog = createMemoActivityLog(calendarId, 'memo_update', participantId, restoreStamp, restoreNote);
+            if (restoreActivityLog) {
+              await __fb().collection('calendars').doc('cal_' + calendarId).collection('activityLogs').doc(restoreActivityLog.id).set(restoreActivityLog);
+              const nextCal = {
+                ...calendar,
+                updatedAt: restoreStamp,
+                revision: (calendar.revision || 0) + 1
+              };
+              await pushSingleCloudCalendar(nextCal, restoreStamp, 18, null, 'settings', [restoreActivityLog]);
+            }
+            setEditingMemo(null);
+            showToast('메모 삭제를 되돌렸습니다.', 'success', 3000);
+          } catch (err) {
+            console.error('Failed to restore deleted memo:', err);
+            showToast('메모 복원 실패', 'error', 4000);
+          }
+        });
         setEditingMemo(null);
       } catch (err) {
         console.error('Failed to delete memo:', err);
