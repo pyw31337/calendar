@@ -750,6 +750,11 @@ export function ChatGalleryModal({
   galleryCount = 0,
   placeCount = 0,
   memoCount = 0,
+  chatLastAuthor = null,
+  settlementLastDate = null,
+  galleryLastDate = null,
+  placeLastName = null,
+  memoLastTitleWord = null,
   showToast,
   onDeletePhoto = null,
   syncStatus = null
