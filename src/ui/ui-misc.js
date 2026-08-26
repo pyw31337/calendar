@@ -1084,7 +1084,7 @@ export function ChatSideMenu({
       onClose: onClose,
       onOpenShare: onOpenShare,
       onOpenSettings: onOpenAppSettings,
-      shareLabel: '공유하기'
+      shareLabel: '공유'
     }),
   )));
 }

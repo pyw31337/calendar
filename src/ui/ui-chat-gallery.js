@@ -1148,11 +1148,10 @@ export function ChatGalleryModal({
   const renderGalleryUploadIcon = () => /*#__PURE__*/React.createElement("svg", {
     xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24",
     fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
-  }, /*#__PURE__*/React.createElement("rect", { width: "18", height: "18", x: "3", y: "3", rx: "2", ry: "2" }),
-     /*#__PURE__*/React.createElement("circle", { cx: "9", cy: "9", r: "2" }),
-     /*#__PURE__*/React.createElement("path", { d: "m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" }),
-     /*#__PURE__*/React.createElement("path", { d: "M12 8v8" }),
-     /*#__PURE__*/React.createElement("path", { d: "M8 12h8" }));
+  }, /*#__PURE__*/React.createElement("path", { d: "M10.3 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10l-3.1-3.1a2 2 0 0 0-2.814.014L6 21" }),
+     /*#__PURE__*/React.createElement("path", { d: "m14 19.5 3-3 3 3" }),
+     /*#__PURE__*/React.createElement("path", { d: "M17 22v-5.5" }),
+     /*#__PURE__*/React.createElement("circle", { cx: "9", cy: "9", r: "2" }));
   const renderShareIcon = () => MenuIcon
     ? /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M3 12a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M15 6a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M15 18a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M8.7 10.7l6.6 -3.4", "M8.7 13.3l6.6 3.4"] })
     : /*#__PURE__*/React.createElement("svg", {
@@ -1374,7 +1373,7 @@ export function ChatGalleryModal({
       onClose: () => setIsMenuOpen(false),
       onOpenShare: onOpenShare,
       onOpenSettings: onOpenAppSettings,
-      shareLabel: '공유하기'
+      shareLabel: '공유'
     })
   )),
   isSearchOpen && /*#__PURE__*/React.createElement(InlineSearchBar, {

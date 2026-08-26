@@ -1376,6 +1376,10 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
           className: "admin-side-menu-item",
           onClick: () => { setIsMemoMenuOpen(false); setIsSearchOpen(true); }
         },
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", {
+            xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24",
+            fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
+          }, /*#__PURE__*/React.createElement("path", { d: "M10.7 20H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H20a2 2 0 0 1 2 2v4.1" }), /*#__PURE__*/React.createElement("path", { d: "m21 21-1.9-1.9" }), /*#__PURE__*/React.createElement("circle", { cx: "17", cy: "17", r: "3" }))),
           /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
             /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "메모 검색")
           )
@@ -1394,7 +1398,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
         onClose: () => setIsMemoMenuOpen(false),
         onOpenShare: onOpenShare,
         onOpenSettings: onOpenAppSettings,
-        shareLabel: '공유하기'
+        shareLabel: '공유'
       })
     )),
 

@@ -2036,6 +2036,10 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
         className: "admin-side-menu-item",
         onClick: () => { setIsSettlementMenuOpen(false); handleGenerateShareImage(); }
       },
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", {
+          xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24",
+          fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
+        }, /*#__PURE__*/React.createElement("path", { d: "M3 11h3.75a2 2 0 0 1 1.6.8l.45.6a4 4 0 0 0 6.4 0l.45-.6a2 2 0 0 1 1.6-.8H21" }), /*#__PURE__*/React.createElement("path", { d: "M3 7h18" }), /*#__PURE__*/React.createElement("rect", { x: "3", y: "3", width: "18", height: "18", rx: "2" }))),
         /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
           /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "정산 카드")
         )
@@ -2054,7 +2058,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
       onClose: () => setIsSettlementMenuOpen(false),
       onOpenShare: onOpenShare,
       onOpenSettings: onOpenAppSettings,
-      shareLabel: '공유하기'
+      shareLabel: '공유'
     })
   ))
   ));

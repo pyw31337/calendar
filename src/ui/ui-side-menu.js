@@ -847,7 +847,7 @@ export function SharedAppNavBlock({
   );
 }
 
-export function SharedSideMenuFooter({ onClose, onOpenShare, onOpenSettings, shareLabel = '공유하기' }) {
+export function SharedSideMenuFooter({ onClose, onOpenShare, onOpenSettings, shareLabel = '공유' }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const MenuIcon = __deps.MenuIcon;
@@ -1103,7 +1103,7 @@ export function MainSideMenu({
       onClose: onClose,
       onOpenShare: onOpenShare,
       onOpenSettings: onOpenAppSettings,
-      shareLabel: '공유하기'
+      shareLabel: '공유'
     }),
     /* Group 5: admin */
     /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-list", style: { marginTop: 'auto', borderTop: '1px solid var(--border-subtle, #E2E8F0)', borderBottom: 'none', paddingTop: '6px' } },

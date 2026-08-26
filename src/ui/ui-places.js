@@ -2018,7 +2018,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
         onClose: () => setIsPlacesMenuOpen(false),
         onOpenShare: onSharePlaces,
         onOpenSettings: onOpenAppSettings,
-        shareLabel: '공유하기'
+        shareLabel: '공유'
       })
     )),
     isRegisterOpen && /*#__PURE__*/React.createElement(PlaceRegisterModal, {

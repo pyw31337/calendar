@@ -5152,7 +5152,25 @@ function App() {
   const navChatCount = (typeof totalChatCount === 'number' && totalChatCount >= 0)
     ? totalChatCount
     : Math.max((typeof allChatMessages !== 'undefined' && allChatMessages ? allChatMessages.length : 0), (chatMessages || []).length);
-  const navGalleryCount = (typeof totalGalleryCount === 'number' && totalGalleryCount >= 0) ? totalGalleryCount : 0;
+  const navGalleryCount = (() => {
+    if (typeof totalGalleryCount === 'number' && totalGalleryCount > 0) return totalGalleryCount;
+    // fallback while REST count is loading — count unique image urls in loaded messages
+    const seen = new Set();
+    let count = 0;
+    const msgs = (typeof allChatMessages !== 'undefined' && allChatMessages) ? allChatMessages : (chatMessages || []);
+    for (const msg of msgs) {
+      if (!msg) continue;
+      const list = [];
+      if (Array.isArray(msg.imageUrls)) list.push(...msg.imageUrls);
+      if (msg.imageUrl) list.push(msg.imageUrl);
+      if (Array.isArray(msg.thumbUrls)) list.push(...msg.thumbUrls);
+      if (msg.thumbUrl) list.push(msg.thumbUrl);
+      for (const u of list) {
+        if (u && typeof u === 'string' && !seen.has(u)) { seen.add(u); count++; }
+      }
+    }
+    return count;
+  })();
   const navMemoCount = (typeof totalMemoCount === 'number' && totalMemoCount >= 0) ? totalMemoCount : (memos || []).length;
   const navPlaceCount = (activeCal && Array.isArray(activeCal.places)) ? activeCal.places.filter(p => p && !p.deletedAt).length : 0;
   const navSettlementBadge = activeCal && typeof calculateSettlementBalance === 'function' && typeof formatBalanceBadge === 'function'
