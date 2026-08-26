@@ -816,6 +816,7 @@ export function EmojiPickerSheet({ onSelect, onClose }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const EmojiGridButton = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.EmojiGridButton) || __deps.EmojiGridButton;
+  const sheetPanelRef = React.useRef(null);
 
   const [recents, setRecents] = React.useState(() => getRecentEmojis());
   const handlePick = (emoji) => {
@@ -829,6 +830,74 @@ export function EmojiPickerSheet({ onSelect, onClose }) {
       emojis.map((e, i) => /*#__PURE__*/React.createElement(EmojiGridButton, { key: `${key}-${i}`, emoji: e, onSelect: handlePick }))
     )
   );
+
+  // Keep chat input (main section or chat room) visible above the sheet
+  React.useEffect(() => {
+    const root = document.documentElement;
+    root.classList.add('emoji-sheet-open');
+
+    const findPanels = () => {
+      const list = [];
+      document.querySelectorAll('.chat-composer, [data-chat-input-panel="1"]').forEach(el => list.push(el));
+      return list;
+    };
+
+    const updateLift = () => {
+      const panel = sheetPanelRef.current;
+      let h = 0;
+      if (panel) {
+        h = Math.ceil(panel.getBoundingClientRect().height);
+      }
+      if (!h || h < 80) {
+        h = Math.min(Math.round(window.innerHeight * 0.5), 420);
+      }
+      root.style.setProperty('--emoji-sheet-h', h + 'px');
+
+      findPanels().forEach(el => {
+        el.classList.add('emoji-sheet-lifted');
+        // scroll-margin so scrollIntoView leaves room above the sheet
+        el.style.scrollMarginBottom = (h + 16) + 'px';
+      });
+
+      // Prefer the focused field's panel, else first panel
+      const active = document.activeElement;
+      let target = null;
+      if (active && active.closest) {
+        target = active.closest('.chat-composer, [data-chat-input-panel="1"]');
+      }
+      if (!target) target = document.querySelector('.chat-composer.emoji-sheet-lifted, [data-chat-input-panel="1"].emoji-sheet-lifted');
+      if (target && typeof target.scrollIntoView === 'function') {
+        try {
+          target.scrollIntoView({ block: 'end', behavior: 'smooth', inline: 'nearest' });
+        } catch (_) {
+          try { target.scrollIntoView(false); } catch (__) {}
+        }
+      }
+    };
+
+    const raf = requestAnimationFrame(() => {
+      updateLift();
+      requestAnimationFrame(updateLift);
+    });
+    // sheet layout may settle after fonts/images
+    const t1 = setTimeout(updateLift, 50);
+    const t2 = setTimeout(updateLift, 200);
+    window.addEventListener('resize', updateLift);
+
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(t1);
+      clearTimeout(t2);
+      window.removeEventListener('resize', updateLift);
+      root.classList.remove('emoji-sheet-open');
+      root.style.removeProperty('--emoji-sheet-h');
+      findPanels().forEach(el => {
+        el.classList.remove('emoji-sheet-lifted');
+        el.style.scrollMarginBottom = '';
+      });
+    };
+  }, []);
+
   const sheet = /*#__PURE__*/React.createElement('div', {
     className: 'bottom-sheet-overlay emoji-sheet-overlay',
     onClick: onClose,
@@ -836,10 +905,10 @@ export function EmojiPickerSheet({ onSelect, onClose }) {
       background: 'transparent',
       backgroundColor: 'transparent',
       backdropFilter: 'none',
-      WebkitBackdropFilter: 'none',
-      // keep sheet at bottom; do not dim the page so composer stays visible
+      WebkitBackdropFilter: 'none'
     }
   }, /*#__PURE__*/React.createElement('div', {
+    ref: sheetPanelRef,
     className: 'bottom-sheet emoji-sheet',
     onClick: e => e.stopPropagation(),
     style: { maxHeight: '60vh', boxShadow: '0 -8px 30px rgba(0,0,0,0.18)' }

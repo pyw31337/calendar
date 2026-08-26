@@ -1688,6 +1688,7 @@ export function CommentsSection({
   )),
   /* Input row */
   /*#__PURE__*/React.createElement("div", {
+    "data-chat-input-panel": "1",
     style: {
       backgroundColor: 'var(--bg-card)',
       border: '1px solid var(--border-subtle)',
@@ -1697,7 +1698,9 @@ export function CommentsSection({
       display: 'flex',
       flexDirection: 'column',
       gap: '10px',
-      boxSizing: 'border-box'
+      boxSizing: 'border-box',
+      position: 'relative',
+      zIndex: isEmojiPickerOpen ? 13050 : 'auto'
     }
   },
     /* Textarea at top */

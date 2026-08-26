@@ -3916,3 +3916,25 @@ textarea.form-input {
 .bottom-sheet-overlay.emoji-sheet-overlay .emoji-sheet {
   pointer-events: auto;
 }
+
+
+/* When emoji sheet is open: keep chat inputs above the sheet */
+html.emoji-sheet-open {
+  --emoji-sheet-h: 45vh;
+}
+html.emoji-sheet-open .chat-composer.emoji-sheet-lifted {
+  z-index: 13050 !important;
+}
+html.emoji-sheet-open [data-chat-input-panel="1"].emoji-sheet-lifted {
+  z-index: 13050;
+  /* Extra space so the page can scroll the panel just above the sheet */
+  margin-bottom: calc(var(--emoji-sheet-h, 45vh) + 12px);
+}
+.bottom-sheet-overlay.emoji-sheet-overlay {
+  /* Clicks outside the sheet still close; inputs lifted above via z-index */
+  z-index: 12000;
+}
+.bottom-sheet-overlay.emoji-sheet-overlay .emoji-sheet {
+  z-index: 12001;
+  position: relative;
+}
