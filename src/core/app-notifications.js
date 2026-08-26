@@ -36,22 +36,17 @@ function isNotificationSupported() {
     return typeof window.matchMedia === 'function' && window.matchMedia('(display-mode: standalone)').matches;
   }
 
-  // The one reliable way to catch the iOS false-positive-permission case before the user
-  // believes notifications are on: actually try to construct a Notification. A regular
-  // (non-installed) iOS browser tab throws here even when Notification.permission says
-  // 'granted'. Every "turn notifications on" code path should probe with this before
-  // subscribing, not just check Notification.permission.
+  // iOS can report Notification.permission === 'granted' in a regular browser tab even
+  // though push delivery is still impossible until the site is running as a Home Screen app.
+  // That is the only case we hard-block here. For Android/desktop browsers, the actual
+  // subscription attempt is the reliable capability test, and we avoid forcing a
+  // Notification() constructor probe because some mobile Chrome/PWA environments can reject
+  // it even when real push notifications still work.
   async function probeNotificationCapability() {
     if (!isNotificationSupported()) return { ok: false, reason: 'unsupported' };
     if (Notification.permission !== 'granted') return { ok: false, reason: 'permission-not-granted' };
     if (isIOSDevice() && !isInstalledStandalonePwa()) return { ok: false, reason: 'ios-not-installed' };
-    try {
-      const probe = new Notification(' ', { silent: true, tag: 'notif-probe' });
-      probe.close();
-      return { ok: true };
-    } catch (e) {
-      return { ok: false, reason: isIOSDevice() ? 'ios-not-installed' : 'probe-failed' };
-    }
+    return { ok: true };
   }
 
   async function requestChatNotificationPermission() {
