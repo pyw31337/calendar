@@ -743,6 +743,7 @@ export function ChatGalleryModal({
   onIncreaseFont,
   isChatNotifyEnabled,
   onToggleChatNotifications,
+  onOpenAppSettings = null,
   showToast,
   onDeletePhoto = null
 }) {
@@ -1352,20 +1353,9 @@ export function ChatGalleryModal({
           }
         }, "붙여넣기")
       ),
-      typeof onOpenShare === 'function' && /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        className: "admin-side-menu-item",
-        onClick: () => { setIsMenuOpen(false); onOpenShare(); }
-      },
-        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, renderShareIcon()),
-        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
-          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "공유하기"),
-          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "현재 갤러리 캘린더 공유")
-        )
-      )
     ),
-    /*#__PURE__*/React.createElement(SharedSideMenuFooter, {
-      onClose: onClose,
+    typeof SharedSideMenuFooter === 'function' && /*#__PURE__*/React.createElement(SharedSideMenuFooter, {
+      onClose: () => setIsMenuOpen(false),
       onOpenShare: onOpenShare,
       onOpenSettings: onOpenAppSettings,
       shareLabel: '공유하기'

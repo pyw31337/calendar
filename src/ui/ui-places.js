@@ -1988,7 +1988,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
             /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "새 장소 추가하기")
           )
         ),
-        /*#__PURE__*/React.createElement("button", {
+        false && /*#__PURE__*/React.createElement("button", {
           type: "button", className: "admin-side-menu-item",
           onClick: () => {
             setIsPlacesMenuOpen(false);
@@ -2004,8 +2004,8 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
           )
         )
       ),
-      /*#__PURE__*/React.createElement(SharedSideMenuFooter, {
-        onClose: onClose,
+      typeof SharedSideMenuFooter === 'function' && /*#__PURE__*/React.createElement(SharedSideMenuFooter, {
+        onClose: () => setIsPlacesMenuOpen(false),
         onOpenShare: onSharePlaces,
         onOpenSettings: onOpenAppSettings,
         shareLabel: '공유하기'

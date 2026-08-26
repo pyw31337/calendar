@@ -5149,8 +5149,60 @@ function App() {
     operationProgress && !chatUploadProgress && /*#__PURE__*/React.createElement(OperationProgressOverlay, operationProgress),
     chatUploadProgress && /*#__PURE__*/React.createElement(ImageUploadOverlay, chatUploadProgress)
   );
+  const sharedAppOverlays = /*#__PURE__*/React.createElement(React.Fragment, null,
+    isAppSettingsOpen && /*#__PURE__*/React.createElement(AppSettingsModal, {
+      onClose: () => setIsAppSettingsOpen(false),
+      isDarkTheme: isDarkTheme,
+      onToggleTheme: toggleTheme,
+      fontScalePercent: fontScalePercent,
+      onDecreaseFont: () => setFontScalePercent(prev => Math.max(80, prev - 10)),
+      onIncreaseFont: () => setFontScalePercent(prev => Math.min(130, prev + 10)),
+      isNotifPermissionGranted: mainNotifPermission === 'granted',
+      isMasterNotifyEnabled: mainNotifPermission === 'granted' && mainChatNotifyEnabled,
+      onToggleMasterNotify: async () => {
+        await handleMainToggleNotifications();
+        if (typeof setNotifGuideSeen === 'function') setNotifGuideSeen(true);
+        setMainNotifPermission(isNotificationSupported() ? Notification.permission : 'unsupported');
+        setMainChatNotifyEnabled(isChatNotifyEnabledForCalendar(activeCalId));
+      },
+      notifyChannels: notifyChannels,
+      onToggleNotifyChannel: (key) => {
+        if (typeof setNotifyChannel !== 'function') return;
+        const next = setNotifyChannel(key, !(notifyChannels && notifyChannels[key]));
+        setNotifyChannelsState(next);
+        if (key === 'chat' && typeof setChatNotifyEnabledForCalendar === 'function') {
+          setChatNotifyEnabledForCalendar(activeCalId, !!(next && next.chat));
+          setMainChatNotifyEnabled(!!(next && next.chat));
+        }
+      },
+      helpSteps: typeof getNotificationPermissionHelpSteps === 'function' ? getNotificationPermissionHelpSteps() : []
+    }),
+    isNotifOnboardingOpen && /*#__PURE__*/React.createElement(NotificationOnboardingModal, {
+      onClose: () => {
+        if (typeof setNotifGuideSeen === 'function') setNotifGuideSeen(true);
+        setIsNotifOnboardingOpen(false);
+      },
+      isMasterNotifyEnabled: mainNotifPermission === 'granted' && mainChatNotifyEnabled,
+      onToggleMasterNotify: async () => {
+        await handleMainToggleNotifications();
+        if (typeof setNotifGuideSeen === 'function') setNotifGuideSeen(true);
+        setMainNotifPermission(isNotificationSupported() ? Notification.permission : 'unsupported');
+        setMainChatNotifyEnabled(isChatNotifyEnabledForCalendar(activeCalId));
+        if (isNotificationSupported() && Notification.permission === 'granted') {
+          setIsNotifOnboardingOpen(false);
+        }
+      },
+      helpSteps: typeof getNotificationPermissionHelpSteps === 'function' ? getNotificationPermissionHelpSteps() : [],
+      browserLabel: typeof getBrowserLabelForNotifications === 'function' ? getBrowserLabelForNotifications() : '브라우저'
+    }),
+    isNotificationHelpOpen && /*#__PURE__*/React.createElement(NotificationPermissionHelpModal, {
+      onClose: () => setIsNotificationHelpOpen(false),
+      onRetry: handleMainToggleNotifications,
+      showToast: showToast
+    })
+  );
   if (activeView === 'chat') {
-    return withStickyVideo(/*#__PURE__*/React.createElement("div", { className: "chat-view-container" }, /*#__PURE__*/React.createElement(ChatRoomView, {
+    return withStickyVideo(/*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", { className: "chat-view-container" }, /*#__PURE__*/React.createElement(ChatRoomView, {
       calendar: activeCal,
       chatMessages: allChatMessages,
       loadingOlderChat: loadingOlderChat,
@@ -5204,42 +5256,58 @@ function App() {
       onGetGalleryPhotoOrdinal: handleGetGalleryPhotoOrdinal,
       onRequestConfirm: showConfirmDialog,
       externalFocusMessageId: externalFocusMsgId
-    })));
+    })), sharedAppOverlays));
   }
 
   if (activeView === 'settlement') {
-    return withStickyVideo(/*#__PURE__*/React.createElement(SettlementSummaryModal, {
-      calendar: activeCal,
-      onBack: () => changeView('calendar'),
-      onSelectDate: d => {
-        setSelectedDate(d);
-        setIsModalOpen(true);
-        changeView('calendar');
-      }
-    }));
+    return withStickyVideo(/*#__PURE__*/React.createElement(React.Fragment, null,
+      /*#__PURE__*/React.createElement(SettlementSummaryModal, {
+        calendar: activeCal,
+        onBack: () => changeView('calendar'),
+        onSelectDate: d => {
+          setSelectedDate(d);
+          setIsModalOpen(true);
+          changeView('calendar');
+        },
+        onOpenShare: () => {
+          if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 공유 정보를 확인해 주세요.')) setIsShareOpen(true);
+        },
+        onOpenAppSettings: () => setIsAppSettingsOpen(true)
+      }),
+      isShareOpen && activeCal && /*#__PURE__*/React.createElement(ShareModal, {
+        calendar: activeCal,
+        shareType: "settlement",
+        showToast: showToast,
+        onClose: () => setIsShareOpen(false)
+      }),
+      sharedAppOverlays
+    ));
   }
 
   if (activeView === 'memo') {
-    return withStickyVideo(/*#__PURE__*/React.createElement(MemoView, {
-      calendar: activeCal,
-      memos: memos,
-      hasMoreMemos: hasMoreMemos,
-      totalMemoCount: totalMemoCount,
-      onLoadMoreMemos: () => setMemosLimit(prev => prev + MEMOS_PAGE_SIZE),
-      onBack: () => changeView('calendar'),
-      showToast: showToast,
-      isDarkTheme: isDarkTheme,
-      onRequestConfirm: showConfirmDialog,
-      sharedMemo: sharedMemo,
-      chatMessages: chatMessages,
-      setActiveLightbox: setActiveLightbox,
-      onDismissSharedMemo: () => {
-        setSharedMemo(null);
-        const url = new URL(window.location.href);
-        url.searchParams.delete('memo');
-        window.history.replaceState({}, '', url);
-      }
-    }));
+    return withStickyVideo(/*#__PURE__*/React.createElement(React.Fragment, null,
+      /*#__PURE__*/React.createElement(MemoView, {
+        calendar: activeCal,
+        memos: memos,
+        hasMoreMemos: hasMoreMemos,
+        totalMemoCount: totalMemoCount,
+        onLoadMoreMemos: () => setMemosLimit(prev => prev + MEMOS_PAGE_SIZE),
+        onBack: () => changeView('calendar'),
+        showToast: showToast,
+        isDarkTheme: isDarkTheme,
+        onRequestConfirm: showConfirmDialog,
+        sharedMemo: sharedMemo,
+        chatMessages: chatMessages,
+        setActiveLightbox: setActiveLightbox,
+        onDismissSharedMemo: () => {
+          setSharedMemo(null);
+          const url = new URL(window.location.href);
+          url.searchParams.delete('memo');
+          window.history.replaceState({}, '', url);
+        }
+      }),
+      sharedAppOverlays
+    ));
   }
 
   if (activeView === 'gallery') {
@@ -5291,7 +5359,8 @@ function App() {
         onGetChatMessageOrdinal: handleGetChatMessageOrdinal,
         onGetGalleryPhotoOrdinal: handleGetGalleryPhotoOrdinal,
         onRequestConfirm: showConfirmDialog
-      }) : null
+      }) : null,
+      sharedAppOverlays
     ));
   }
 
@@ -5328,7 +5397,8 @@ function App() {
         shareType: "places",
         showToast: showToast,
         onClose: () => setIsPlacesShareOpen(false)
-      })
+      }),
+      sharedAppOverlays
     ));
   }
 

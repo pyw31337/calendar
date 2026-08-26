@@ -2005,6 +2005,43 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {
         style: { flex: 1, textAlign: 'center', textDecoration: 'none' }
       }, "다운로드")
     )
+  )),
+  isSettlementMenuOpen && /*#__PURE__*/React.createElement("div", {
+    className: "admin-side-menu-overlay",
+    style: { zIndex: 12000 },
+    onClick: () => setIsSettlementMenuOpen(false)
+  }, /*#__PURE__*/React.createElement("nav", {
+    className: "admin-side-menu",
+    "aria-label": "정산 메뉴",
+    onClick: e => e.stopPropagation()
+  },
+    /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-header" },
+      /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-brand" },
+        /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-copy" },
+          /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-title" }, "정산 메뉴")
+        )
+      ),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button", className: "admin-side-menu-close-btn", onClick: () => setIsSettlementMenuOpen(false), "aria-label": "닫기"
+      }, "✕")
+    ),
+    /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-list", style: { borderBottom: 'none', paddingTop: '6px' } },
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "admin-side-menu-item",
+        onClick: () => { setIsSettlementMenuOpen(false); handleGenerateShareImage(); }
+      },
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "정산 카드")
+        )
+      )
+    ),
+    typeof SharedSideMenuFooter === 'function' && /*#__PURE__*/React.createElement(SharedSideMenuFooter, {
+      onClose: () => setIsSettlementMenuOpen(false),
+      onOpenShare: onOpenShare,
+      onOpenSettings: onOpenAppSettings,
+      shareLabel: '공유하기'
+    })
   ))
   ));
 }

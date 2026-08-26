@@ -1091,29 +1091,8 @@ export function ChatSideMenu({
           /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "공지 등록 및 고정 관리")
         )
       ),
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        className: "admin-side-menu-item",
-        onClick: () => { onClose(); handle(onOpenShare); }
-      },
-        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", {
-          xmlns: "http://www.w3.org/2000/svg",
-          width: "20",
-          height: "20",
-          viewBox: "0 0 24 24",
-          fill: "none",
-          stroke: "currentColor",
-          strokeWidth: "2",
-          strokeLinecap: "round",
-          strokeLinejoin: "round"
-        }, /*#__PURE__*/React.createElement("path", { d: "M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" }), /*#__PURE__*/React.createElement("polyline", { points: "16 6 12 2 8 6" }), /*#__PURE__*/React.createElement("line", { x1: "12", x2: "12", y1: "2", y2: "15" }))),
-        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
-          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "공유하기"),
-          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "채팅방 공유 URL 복사")
-        )
-      )
     ),
-    /*#__PURE__*/React.createElement(SharedSideMenuFooter, {
+    typeof SharedSideMenuFooter === 'function' && /*#__PURE__*/React.createElement(SharedSideMenuFooter, {
       onClose: onClose,
       onOpenShare: onOpenShare,
       onOpenSettings: onOpenAppSettings,

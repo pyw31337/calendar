@@ -1046,7 +1046,7 @@ export function MainSideMenu({
       )
     ),
 /* Group 3+4: 공유하기 + 설정 */
-    /*#__PURE__*/React.createElement(SharedSideMenuFooter, {
+    typeof SharedSideMenuFooter === 'function' && /*#__PURE__*/React.createElement(SharedSideMenuFooter, {
       onClose: onClose,
       onOpenShare: onOpenShare,
       onOpenSettings: onOpenAppSettings,
