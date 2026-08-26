@@ -178,6 +178,41 @@ function isNotificationSupported() {
     return 'push-subscribe-failed';
   }
 
+
+  const NOTIF_GUIDE_SEEN_KEY = 'gather_notif_guide_seen_v1';
+  const NOTIF_CHANNELS_KEY = 'gather_notify_channels_v1';
+  function getNotifGuideSeen() {
+    try { return getLocalStorage().getItem(NOTIF_GUIDE_SEEN_KEY) === '1'; } catch (_) { return false; }
+  }
+  function setNotifGuideSeen(seen = true) {
+    try { getLocalStorage().setItem(NOTIF_GUIDE_SEEN_KEY, seen ? '1' : '0'); } catch (_) {}
+  }
+  function shouldShowNotifOnboarding() {
+    if (!isNotificationSupported()) return false;
+    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') return false;
+    if (getNotifGuideSeen()) return false;
+    return true;
+  }
+  function getDefaultNotifyChannels() {
+    return { chat: true, memo: true, poll: true, schedule: true };
+  }
+  function getNotifyChannels() {
+    try {
+      const raw = getLocalStorage().getItem(NOTIF_CHANNELS_KEY);
+      if (!raw) return getDefaultNotifyChannels();
+      const parsed = JSON.parse(raw);
+      return { ...getDefaultNotifyChannels(), ...(parsed && typeof parsed === 'object' ? parsed : {}) };
+    } catch (_) { return getDefaultNotifyChannels(); }
+  }
+  function setNotifyChannel(channel, enabled) {
+    const next = { ...getNotifyChannels(), [channel]: !!enabled };
+    try { getLocalStorage().setItem(NOTIF_CHANNELS_KEY, JSON.stringify(next)); } catch (_) {}
+    return next;
+  }
+  function isNotifyChannelEnabled(channel) {
+    return getNotifyChannels()[channel] !== false;
+  }
+
   function getBrowserLabelForNotifications() {
     if (typeof navigator === 'undefined') return '현재 브라우저';
     const ua = navigator.userAgent || '';
@@ -192,47 +227,76 @@ function isNotificationSupported() {
 
   function getNotificationPermissionHelpSteps() {
     const browser = getBrowserLabelForNotifications();
-    // Checked first, ahead of every browser-specific branch below -- on iOS, none of those
-    // "check your browser's notification settings" steps are the actual fix (iOS has no per-site
-    // browser notification setting for a non-installed tab at all), so showing them here would
-    // send the user down a dead end.
+    const isMobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '');
     if (isIOSDevice() && !isInstalledStandalonePwa()) {
       return [
-        'iOS(아이폰/아이패드)는 Safari 브라우저 탭에서는 채팅알림을 받을 수 없습니다 -- Apple 정책상 홈 화면에 추가된 앱에서만 가능합니다.',
-        'Safari 하단(또는 상단) 공유 버튼( ⬆️ )을 눌러 주세요.',
-        '"홈 화면에 추가"를 선택해 주세요.',
-        '홈 화면에 생긴 아이콘으로 앱을 다시 실행한 뒤, 채팅알림을 켜 주세요.'
+        '아이폰/아이패드는 Apple 정책상 일반 브라우저 탭에서는 알림을 받을 수 없습니다.',
+        'Safari에서 공유 버튼(□↑)을 누른 뒤 "홈 화면에 추가"를 선택하세요.',
+        '홈 화면 아이콘으로 다시 연 다음, 알림허용을 켜 주세요.',
+        '그래도 안 되면: 설정 앱 → 알림 → (이 앱)에서 알림을 허용해 주세요.'
+      ];
+    }
+    if (isIOSDevice() && isInstalledStandalonePwa()) {
+      return [
+        '홈 화면 앱으로 실행 중입니다. 아래에서 알림허용을 켜 주세요.',
+        '허용 팝업이 뜨면 "허용"을 선택하세요.',
+        '이미 거부했다면: 아이폰 설정 → 알림 → 해당 앱에서 알림을 다시 켜 주세요.'
       ];
     }
     if (browser === '삼성 인터넷') {
-      return [
-        '설정 → 사이트 및 다운로드 → 알림에서 pyw31337.github.io 알림을 허용하세요.',
-        '휴대폰 설정 → 앱 → 삼성 인터넷 → 배터리 → 제한 없음. 절전이면 푸시가 막힙니다.',
-        '휴대폰 설정 → 알림 → 삼성 인터넷 알림이 켜져 있는지 확인하세요.',
-        '채팅에서 내 이름 선택 → 채팅알림 재설정 → 「알림 테스트」로 확인하세요.'
-      ];
-    }
-    if (browser === 'Chrome') {
-      return [
-        '주소창 자물쇠 → 사이트 설정 → 알림 허용.',
-        'PC: Windows 알림/집중지원에서 Chrome 알림이 막혀 있지 않은지 확인.',
-        '모바일: 설정 → 앱 → Chrome → 알림 허용, 배터리 최적화 제한 없음.',
-        '채팅에서 내 이름 선택 후 「알림 테스트」로 확인하세요.'
+      return isMobile ? [
+        '아래 알림허용을 켠 뒤 팝업에서 "허용"을 선택하세요.',
+        '거부된 경우: 삼성 인터넷 메뉴 → 설정 → 사이트 권한 → 알림에서 이 사이트를 허용하세요.',
+        '기기 설정 → 알림 → 삼성 인터넷 알림도 확인해 주세요.'
+      ] : [
+        '아래 알림허용을 켠 뒤 "허용"을 선택하세요.',
+        '거부된 경우 주소창 사이트 설정 → 알림 → 허용으로 변경하세요.'
       ];
     }
     if (browser === '네이버 웨일') {
       return [
-        '주소창 왼쪽 자물쇠 아이콘 또는 브라우저 메뉴를 눌러 주세요.',
-        '사이트 설정에서 알림 권한을 허용으로 변경해 주세요.',
-        '페이지를 새로고침한 뒤 채팅알림을 다시 켜 주세요.'
+        '아래 알림허용을 켠 뒤 "허용"을 선택하세요.',
+        isMobile ? '거부된 경우: 웨일 설정 → 사이트 설정 → 알림에서 허용하세요.' : '거부된 경우: 주소창 자물쇠 → 사이트 설정 → 알림 → 허용.',
+        '기기 알림 설정에서 웨일 알림이 꺼져 있지 않은지 확인하세요.'
+      ];
+    }
+    if (browser === 'Chrome') {
+      return isMobile ? [
+        '아래 알림허용을 켠 뒤 "허용"을 선택하세요.',
+        '거부된 경우: Chrome 메뉴 → 설정 → 사이트 설정 → 알림 → 이 사이트 허용.',
+        'Android 설정 → 앱 → Chrome → 알림도 확인해 주세요.'
+      ] : [
+        '아래 알림허용을 켠 뒤 "허용"을 선택하세요.',
+        '거부된 경우: 주소창 자물쇠 → 사이트 설정 → 알림 → 허용.',
+        'chrome://settings/content/notifications 에서 차단 여부를 확인하세요.'
+      ];
+    }
+    if (browser === 'Safari') {
+      return [
+        'Mac Safari: 아래 알림허용을 켠 뒤 "허용"을 선택하세요.',
+        '거부된 경우: Safari 설정 → 웹사이트 → 알림에서 허용으로 바꾸세요.',
+        '시스템 설정 → 알림 → Safari 알림도 확인해 주세요.'
+      ];
+    }
+    if (browser === 'Firefox') {
+      return [
+        '아래 알림허용을 켠 뒤 "허용"을 선택하세요.',
+        '거부된 경우: 주소창 자물쇠 → 권한 → 알림 → 허용.'
+      ];
+    }
+    if (browser === 'Microsoft Edge') {
+      return [
+        '아래 알림허용을 켠 뒤 "허용"을 선택하세요.',
+        '거부된 경우: 주소창 자물쇠 → 사이트 권한 → 알림 → 허용.'
       ];
     }
     return [
-      '주소창의 자물쇠/사이트 정보 아이콘을 눌러 주세요.',
-      '알림 권한을 허용으로 변경해 주세요.',
-      '페이지를 새로고침한 뒤 채팅알림을 다시 켜 주세요.'
+      '아래 알림허용 스위치를 켠 뒤, 브라우저 팝업에서 "허용"을 선택하세요.',
+      (browser || '브라우저') + ' 설정에서 이 사이트의 알림이 차단되어 있지 않은지 확인해 주세요.',
+      '기기 시스템 알림 설정에서 해당 브라우저 알림이 꺼져 있지 않은지 확인해 주세요.'
     ];
   }
+
 
   export const GATHER_APP_NOTIFICATIONS = Object.freeze({
     isNotificationSupported,
@@ -247,6 +311,12 @@ function isNotificationSupported() {
     describePushSubscribeFailure,
     getNotificationDiagnostics,
     classifyPushSubscribeError,
+    getNotifGuideSeen,
+    setNotifGuideSeen,
+    shouldShowNotifOnboarding,
+    getNotifyChannels,
+    setNotifyChannel,
+    isNotifyChannelEnabled,
     getBrowserLabelForNotifications,
     getNotificationPermissionHelpSteps,
     isIOSDevice,

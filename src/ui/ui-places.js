@@ -1117,7 +1117,8 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
   }, "지도를 불러오는 중..."));
 }
 
-export function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, onRequestConfirm, placesInitialQuery, setPlacesInitialQuery, isDarkTheme, onToggleTheme, fontScalePercent, onDecreaseFont, onIncreaseFont, isChatNotifyEnabled, onToggleChatNotifications, onSharePlaces, onSelectDate }) {
+export function PlacesView({
+  onOpenAppSettings, calendar, onBack, onSavePlace, onDeletePlace, showToast, onRequestConfirm, placesInitialQuery, setPlacesInitialQuery, isDarkTheme, onToggleTheme, fontScalePercent, onDecreaseFont, onIncreaseFont, isChatNotifyEnabled, onToggleChatNotifications, onSharePlaces, onSelectDate }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -1128,6 +1129,7 @@ export function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showT
   const PlaceCategoryMarkerIcon = __deps.PlaceCategoryMarkerIcon;
   const InlineSearchBar = __comp.InlineSearchBar || __deps.InlineSearchBar;
   const SharedSideMenuSettings = __comp.SharedSideMenuSettings || __deps.SharedSideMenuSettings;
+  const SharedSideMenuFooter = __comp.SharedSideMenuFooter || __deps.SharedSideMenuFooter;
   const BackArrowIcon = __deps.BackArrowIcon;
   const BuildingIcon = __deps.BuildingIcon;
   const PencilIcon = __deps.PencilIcon;
@@ -2002,14 +2004,11 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
           )
         )
       ),
-      /*#__PURE__*/React.createElement(SharedSideMenuSettings, {
-        isDarkTheme: isDarkTheme,
-        onToggleTheme: onToggleTheme,
-        fontScalePercent: fontScalePercent,
-        onDecreaseFont: onDecreaseFont,
-        onIncreaseFont: onIncreaseFont,
-        isChatNotifyEnabled: isChatNotifyEnabled,
-        onToggleChatNotifications: onToggleChatNotifications
+      /*#__PURE__*/React.createElement(SharedSideMenuFooter, {
+        onClose: onClose,
+        onOpenShare: onSharePlaces,
+        onOpenSettings: onOpenAppSettings,
+        shareLabel: '공유하기'
       })
     )),
     isRegisterOpen && /*#__PURE__*/React.createElement(PlaceRegisterModal, {

@@ -110,6 +110,10 @@ import {
   classifyPushSubscribeError,
   getBrowserLabelForNotifications,
   getNotificationPermissionHelpSteps,
+  shouldShowNotifOnboarding,
+  setNotifGuideSeen,
+  getNotifyChannels,
+  setNotifyChannel,
   isIOSDevice,
   isInstalledStandalonePwa,
   probeNotificationCapability,
@@ -927,6 +931,17 @@ function App() {
   const [mainNotifPermission, setMainNotifPermission] = React.useState(() => (isNotificationSupported() ? Notification.permission : 'unsupported'));
   const [mainChatNotifyEnabled, setMainChatNotifyEnabled] = React.useState(() => isChatNotifyEnabledForCalendar(activeCalId));
   React.useEffect(() => {
+    if (typeof shouldShowNotifOnboarding !== 'function') return;
+    let timer = null;
+    try {
+      if (shouldShowNotifOnboarding()) {
+        timer = setTimeout(() => setIsNotifOnboardingOpen(true), 900);
+      }
+    } catch (_) {}
+    return () => { if (timer) clearTimeout(timer); };
+  }, []);
+
+  React.useEffect(() => {
     setMainChatNotifyEnabled(isChatNotifyEnabledForCalendar(activeCalId));
     setMainNotifPermission(isNotificationSupported() ? Notification.permission : 'unsupported');
   }, [activeCalId]);
@@ -1040,7 +1055,8 @@ function App() {
       console.warn('Main chat notification subscribe failed:', subscribeResult.reason);
       return;
     }
-    showToast('이 캘린더 채팅 알림 켜짐', 'success');
+    showToast('알림허용이 켜졌습니다', 'success');
+    if (typeof setNotifGuideSeen === 'function') setNotifGuideSeen(true);
   };
 
   const [adminActivityLogs, setAdminActivityLogs] = React.useState([]);
@@ -1049,6 +1065,9 @@ function App() {
   const [isPlacesShareOpen, setIsPlacesShareOpen] = React.useState(false);
   const [isMainSideMenuOpen, setIsMainSideMenuOpen] = React.useState(false);
   const [isNotificationHelpOpen, setIsNotificationHelpOpen] = React.useState(false);
+  const [isAppSettingsOpen, setIsAppSettingsOpen] = React.useState(false);
+  const [isNotifOnboardingOpen, setIsNotifOnboardingOpen] = React.useState(false);
+  const [notifyChannels, setNotifyChannelsState] = React.useState(() => (typeof getNotifyChannels === 'function' ? getNotifyChannels() : { chat: true, memo: true, poll: true, schedule: true }));
   const [isPollModalOpen, setIsPollModalOpen] = React.useState(false);
   const [editingPoll, setEditingPoll] = React.useState(null);
   const [voteTarget, setVoteTarget] = React.useState(null);
@@ -5075,6 +5094,53 @@ function App() {
       },
       className: "toast-action"
     }, "되돌리기")),
+
+    isAppSettingsOpen && /*#__PURE__*/React.createElement(AppSettingsModal, {
+      onClose: () => setIsAppSettingsOpen(false),
+      isDarkTheme: isDarkTheme,
+      onToggleTheme: toggleTheme,
+      fontScalePercent: fontScalePercent,
+      onDecreaseFont: () => setFontScalePercent(prev => Math.max(80, prev - 10)),
+      onIncreaseFont: () => setFontScalePercent(prev => Math.min(130, prev + 10)),
+      isNotifPermissionGranted: mainNotifPermission === 'granted',
+      isMasterNotifyEnabled: mainNotifPermission === 'granted' && mainChatNotifyEnabled,
+      onToggleMasterNotify: async () => {
+        await handleMainToggleNotifications();
+        if (typeof setNotifGuideSeen === 'function') setNotifGuideSeen(true);
+        setMainNotifPermission(isNotificationSupported() ? Notification.permission : 'unsupported');
+        setMainChatNotifyEnabled(isChatNotifyEnabledForCalendar(activeCalId));
+      },
+      notifyChannels: notifyChannels,
+      onToggleNotifyChannel: (key) => {
+        if (typeof setNotifyChannel !== 'function') return;
+        const next = setNotifyChannel(key, !(notifyChannels && notifyChannels[key]));
+        setNotifyChannelsState(next);
+        if (key === 'chat' && typeof setChatNotifyEnabledForCalendar === 'function') {
+          setChatNotifyEnabledForCalendar(activeCalId, !!(next && next.chat));
+          setMainChatNotifyEnabled(!!(next && next.chat));
+        }
+      },
+      helpSteps: typeof getNotificationPermissionHelpSteps === 'function' ? getNotificationPermissionHelpSteps() : []
+    }),
+    isNotifOnboardingOpen && /*#__PURE__*/React.createElement(NotificationOnboardingModal, {
+      onClose: () => {
+        if (typeof setNotifGuideSeen === 'function') setNotifGuideSeen(true);
+        setIsNotifOnboardingOpen(false);
+      },
+      isMasterNotifyEnabled: mainNotifPermission === 'granted' && mainChatNotifyEnabled,
+      onToggleMasterNotify: async () => {
+        await handleMainToggleNotifications();
+        if (typeof setNotifGuideSeen === 'function') setNotifGuideSeen(true);
+        setMainNotifPermission(isNotificationSupported() ? Notification.permission : 'unsupported');
+        setMainChatNotifyEnabled(isChatNotifyEnabledForCalendar(activeCalId));
+        if (isNotificationSupported() && Notification.permission === 'granted') {
+          setIsNotifOnboardingOpen(false);
+        }
+      },
+      helpSteps: typeof getNotificationPermissionHelpSteps === 'function' ? getNotificationPermissionHelpSteps() : [],
+      browserLabel: typeof getBrowserLabelForNotifications === 'function' ? getBrowserLabelForNotifications() : '브라우저'
+    }),
+
     isNotificationHelpOpen && /*#__PURE__*/React.createElement(NotificationPermissionHelpModal, {
       onClose: () => setIsNotificationHelpOpen(false),
       onRetry: handleMainToggleNotifications,
@@ -5126,6 +5192,7 @@ function App() {
       onIncreaseFont: () => setFontScalePercent(prev => Math.min(130, prev + 10)),
       isChatNotifyEnabled: mainNotifPermission === 'granted' && mainChatNotifyEnabled,
       onToggleChatNotifications: handleMainToggleNotifications,
+      onOpenAppSettings: () => setIsAppSettingsOpen(true),
       stickyVideoKey: stickyVideo ? stickyVideo.key : null,
       onActivateVideo: handleActivateChatVideo,
       onDeletePhoto: handleDeletePhoto,
@@ -5202,6 +5269,7 @@ function App() {
         onIncreaseFont: () => setFontScalePercent(prev => Math.min(130, prev + 10)),
         isChatNotifyEnabled: mainNotifPermission === 'granted' && mainChatNotifyEnabled,
         onToggleChatNotifications: handleMainToggleNotifications,
+        onOpenAppSettings: () => setIsAppSettingsOpen(true),
         showToast: showToast
       }),
       activeLightbox ? /*#__PURE__*/React.createElement(Lightbox, {
@@ -5252,6 +5320,7 @@ function App() {
         onIncreaseFont: () => setFontScalePercent(prev => Math.min(130, prev + 10)),
         isChatNotifyEnabled: mainNotifPermission === 'granted' && mainChatNotifyEnabled,
         onToggleChatNotifications: handleMainToggleNotifications,
+        onOpenAppSettings: () => setIsAppSettingsOpen(true),
         onSharePlaces: () => setIsPlacesShareOpen(true)
       }),
       isPlacesShareOpen && activeCal && /*#__PURE__*/React.createElement(ShareModal, {
@@ -5482,6 +5551,7 @@ function App() {
     onIncreaseFont: () => setFontScalePercent(prev => Math.min(130, prev + 10)),
     isChatNotifyEnabled: mainNotifPermission === 'granted' && mainChatNotifyEnabled,
     onToggleChatNotifications: handleMainToggleNotifications,
+    onOpenAppSettings: () => setIsAppSettingsOpen(true),
     onUpdateWeatherLocation: handleUpdateWeatherLocation,
     onDeleteRecentLocation: handleDeleteRecentWeatherLocation,
     showToast: showToast
@@ -7820,7 +7890,16 @@ function ChatParticipantSheet(props) {
   const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ChatParticipantSheet;
   return typeof C === 'function' ? React.createElement(C, props) : null;
 }
+function AppSettingsModal(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AppSettingsModal;
+  return C ? React.createElement(C, props) : null;
+}
+function NotificationOnboardingModal(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.NotificationOnboardingModal;
+  return C ? React.createElement(C, props) : null;
+}
 function NotificationPermissionHelpModal(props) {
+
   const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.NotificationPermissionHelpModal;
   return typeof C === 'function' ? React.createElement(C, props) : null;
 }

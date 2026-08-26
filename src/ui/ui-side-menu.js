@@ -668,6 +668,153 @@ function getAnniversaryDisplayColor(...args) {
 }
 
 
+export function AppSettingsModal({
+  onClose, isDarkTheme, onToggleTheme, fontScalePercent, onDecreaseFont, onIncreaseFont,
+  isNotifPermissionGranted, isMasterNotifyEnabled, onToggleMasterNotify,
+  notifyChannels, onToggleNotifyChannel, helpSteps
+}) {
+  const React = window.React;
+  const __deps = window.GATHER_UI_DEPS || {};
+  const SmallXIcon = __deps.SmallXIcon;
+  const ToggleSwitch = __deps.ToggleSwitch;
+  const MoonStarsIcon = __deps.MoonStarsIcon;
+  const TextResizeIcon = __deps.TextResizeIcon;
+  const BellIcon = __deps.BellIcon;
+  const channels = [
+    { key: 'chat', label: '채팅 알림' },
+    { key: 'memo', label: '메모 알림' },
+    { key: 'poll', label: '투표 알림' },
+    { key: 'schedule', label: '일정 알림' }
+  ];
+  return /*#__PURE__*/React.createElement("div", { className: "modal-overlay", onClick: onClose, style: { zIndex: 12000 } },
+    /*#__PURE__*/React.createElement("div", {
+      className: "modal-container", onClick: e => e.stopPropagation(),
+      style: { maxWidth: '400px', width: '92%', backgroundColor: 'var(--bg-card)', borderRadius: '16px', border: '1px solid var(--border-subtle)', overflow: 'hidden' }
+    },
+      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid var(--border-subtle)' } },
+        /*#__PURE__*/React.createElement("span", { style: { fontWeight: 900, fontSize: '0.98rem' } }, "설정"),
+        /*#__PURE__*/React.createElement("button", { type: "button", onClick: onClose, style: { background: 'none', border: 'none', cursor: 'pointer', color: '#64748B', display: 'flex' } },
+          SmallXIcon ? /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }) : "✕")
+      ),
+      /*#__PURE__*/React.createElement("div", { style: { padding: '12px 16px 20px', display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '70vh', overflowY: 'auto' } },
+        /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-setting-row", style: { padding: '10px 0' } },
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-label" },
+            /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-icon" }, MoonStarsIcon && /*#__PURE__*/React.createElement(MoonStarsIcon, null)), "다크모드"),
+          ToggleSwitch && /*#__PURE__*/React.createElement(ToggleSwitch, { checked: !!isDarkTheme, onChange: onToggleTheme, label: "다크모드" })
+        ),
+        /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-setting-row", style: { padding: '10px 0' } },
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-label" },
+            /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-icon" }, TextResizeIcon && /*#__PURE__*/React.createElement(TextResizeIcon, null)), "글자크기"),
+          /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-font-controls" },
+            /*#__PURE__*/React.createElement("button", { type: "button", onClick: onDecreaseFont, className: "admin-side-menu-font-btn", "aria-label": "글자 크기 줄이기" }, "−"),
+            /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-font-value" }, (fontScalePercent || 100) + "%"),
+            /*#__PURE__*/React.createElement("button", { type: "button", onClick: onIncreaseFont, className: "admin-side-menu-font-btn", "aria-label": "글자 크기 늘리기" }, "+")
+          )
+        ),
+        /*#__PURE__*/React.createElement("div", { style: { height: '1px', background: 'var(--border-subtle)', margin: '8px 0' } }),
+        /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-setting-row", style: { padding: '10px 0' } },
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-label" },
+            /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-icon" }, BellIcon && /*#__PURE__*/React.createElement(BellIcon, null)), "알림허용"),
+          ToggleSwitch && /*#__PURE__*/React.createElement(ToggleSwitch, { checked: !!isMasterNotifyEnabled, onChange: onToggleMasterNotify, label: "알림허용" })
+        ),
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.45, padding: '0 2px 8px' } },
+          isNotifPermissionGranted ? "브라우저 알림이 허용된 상태입니다. 아래에서 종류별로 켤 수 있습니다." : "스위치를 켜면 브라우저 알림 허용 요청이 표시됩니다."),
+        channels.map(ch => /*#__PURE__*/React.createElement("div", {
+          key: ch.key, className: "admin-side-menu-setting-row",
+          style: { padding: '8px 0 8px 8px', opacity: isMasterNotifyEnabled ? 1 : 0.45 }
+        },
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-label", style: { fontSize: '0.88rem' } }, ch.label),
+          ToggleSwitch && /*#__PURE__*/React.createElement(ToggleSwitch, {
+            checked: !!(notifyChannels && notifyChannels[ch.key]),
+            onChange: () => onToggleNotifyChannel && onToggleNotifyChannel(ch.key),
+            label: ch.label
+          })
+        )),
+        Array.isArray(helpSteps) && helpSteps.length > 0 && /*#__PURE__*/React.createElement("div", {
+          style: { marginTop: '12px', padding: '12px', borderRadius: '12px', background: 'var(--bg-primary)', border: '1px solid var(--border-subtle)', fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.5 }
+        },
+          /*#__PURE__*/React.createElement("div", { style: { fontWeight: 800, color: 'var(--text-main)', marginBottom: '6px' } }, "설정 안내"),
+          /*#__PURE__*/React.createElement("ol", { style: { margin: 0, paddingLeft: '18px' } },
+            helpSteps.map((step, i) => /*#__PURE__*/React.createElement("li", { key: i, style: { marginBottom: '4px' } }, step))
+          )
+        )
+      )
+    )
+  );
+}
+
+export function NotificationOnboardingModal({ onClose, isMasterNotifyEnabled, onToggleMasterNotify, helpSteps, browserLabel }) {
+  const React = window.React;
+  const __deps = window.GATHER_UI_DEPS || {};
+  const SmallXIcon = __deps.SmallXIcon;
+  const ToggleSwitch = __deps.ToggleSwitch;
+  const BellIcon = __deps.BellIcon;
+  return /*#__PURE__*/React.createElement("div", { className: "modal-overlay", style: { zIndex: 13000 } },
+    /*#__PURE__*/React.createElement("div", {
+      className: "modal-container", onClick: e => e.stopPropagation(),
+      style: { maxWidth: '400px', width: '92%', backgroundColor: 'var(--bg-card)', borderRadius: '16px', border: '1px solid var(--border-subtle)', overflow: 'hidden' }
+    },
+      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid var(--border-subtle)' } },
+        /*#__PURE__*/React.createElement("span", { style: { fontWeight: 900, fontSize: '0.98rem', display: 'flex', alignItems: 'center', gap: '6px' } },
+          BellIcon && /*#__PURE__*/React.createElement(BellIcon, null), "알림 허용 안내"),
+        /*#__PURE__*/React.createElement("button", { type: "button", onClick: onClose, style: { background: 'none', border: 'none', cursor: 'pointer', color: '#64748B', display: 'flex' } },
+          SmallXIcon ? /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }) : "✕")
+      ),
+      /*#__PURE__*/React.createElement("div", { style: { padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px' } },
+        /*#__PURE__*/React.createElement("div", {
+          className: "admin-side-menu-setting-row",
+          style: { padding: '14px 12px', borderRadius: '12px', background: 'var(--bg-primary)', border: '1px solid var(--border-subtle)' }
+        },
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-label", style: { fontWeight: 800 } }, "알림허용"),
+          ToggleSwitch && /*#__PURE__*/React.createElement(ToggleSwitch, { checked: !!isMasterNotifyEnabled, onChange: onToggleMasterNotify, label: "알림허용" })
+        ),
+        /*#__PURE__*/React.createElement("p", { style: { margin: 0, fontSize: '0.84rem', color: 'var(--text-main)', lineHeight: 1.55 } },
+          "채팅·메모·일정·투표 등 새 소식이 등록될 때 알림을 받으려면 알림허용이 필요합니다."),
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.5 } },
+          /*#__PURE__*/React.createElement("div", { style: { fontWeight: 800, color: 'var(--text-main)', marginBottom: '6px' } }, (browserLabel || '브라우저') + " 설정 안내"),
+          /*#__PURE__*/React.createElement("ol", { style: { margin: 0, paddingLeft: '18px' } },
+            (helpSteps || []).map((step, i) => /*#__PURE__*/React.createElement("li", { key: i, style: { marginBottom: '4px' } }, step))
+          )
+        ),
+        /*#__PURE__*/React.createElement("button", { type: "button", className: "btn btn-action-dark btn-action", onClick: onClose, style: { width: '100%', marginTop: '4px' } }, "확인")
+      )
+    )
+  );
+}
+
+export function SharedSideMenuFooter({ onClose, onOpenShare, onOpenSettings, shareLabel = '공유하기' }) {
+  const React = window.React;
+  const __deps = window.GATHER_UI_DEPS || {};
+  const MenuIcon = __deps.MenuIcon;
+  const handle = action => { if (typeof action === 'function') action(); };
+  return /*#__PURE__*/React.createElement("div", {
+    className: "admin-side-menu-list",
+    style: { borderTop: '1px solid var(--border-subtle, #E2E8F0)', borderBottom: 'none', paddingTop: '6px', marginTop: '2px' }
+  },
+    typeof onOpenShare === 'function' && /*#__PURE__*/React.createElement("button", {
+      type: "button", className: "admin-side-menu-item",
+      onClick: () => { handle(onClose); handle(onOpenShare); }
+    },
+      /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, MenuIcon ? /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M3 12a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M15 6a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M15 18a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M8.7 10.7l6.6 -3.4", "M8.7 13.3l6.6 3.4"] }) : "↗"),
+      /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, shareLabel)
+      )
+    ),
+    typeof onOpenSettings === 'function' && /*#__PURE__*/React.createElement("button", {
+      type: "button", className: "admin-side-menu-item",
+      onClick: () => { handle(onClose); handle(onOpenSettings); }
+    },
+      /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", {
+        xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24",
+        fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
+      }, /*#__PURE__*/React.createElement("path", { d: "M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" }), /*#__PURE__*/React.createElement("circle", { cx: "12", cy: "12", r: "3" }))),
+      /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "설정")
+      )
+    )
+  );
+}
+
 export function SharedSideMenuSettings({
   isDarkTheme,
   onToggleTheme,
@@ -721,6 +868,7 @@ export function SharedSideMenuSettings({
 }
 
 export function MainSideMenu({
+  onOpenAppSettings,
   calendar,
   anniversaries = [],
   galleryCount = 0,
@@ -751,6 +899,7 @@ export function MainSideMenu({
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const SharedSideMenuSettings = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SharedSideMenuSettings) || __deps.SharedSideMenuSettings;
+  const SharedSideMenuFooter = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SharedSideMenuFooter) || __deps.SharedSideMenuFooter;
   const SmallXIcon = __deps.SmallXIcon;
   const MenuIcon = __deps.MenuIcon;
   const CalendarCogIcon = __deps.CalendarCogIcon;
@@ -896,29 +1045,13 @@ export function MainSideMenu({
         /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" }, /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title", style: { display: "flex", alignItems: "center", gap: "6px" } }, "메모", memoCount > 0 && /*#__PURE__*/React.createElement("span", { className: "main-menu-badge", style: { backgroundColor: "var(--border-subtle)", color: "var(--text-muted)", marginLeft: "4px" } }, memoCount)))
       )
     ),
-/* Group 3: theme / font / notify (divider owned by SharedSideMenuSettings) */
-    /*#__PURE__*/React.createElement(SharedSideMenuSettings, {
-      isDarkTheme: isDarkTheme,
-      onToggleTheme: onToggleTheme,
-      fontScalePercent: fontScalePercent,
-      onDecreaseFont: onDecreaseFont,
-      onIncreaseFont: onIncreaseFont,
-      isChatNotifyEnabled: isChatNotifyEnabled,
-      onToggleChatNotifications: onToggleChatNotifications
+/* Group 3+4: 공유하기 + 설정 */
+    /*#__PURE__*/React.createElement(SharedSideMenuFooter, {
+      onClose: onClose,
+      onOpenShare: onOpenShare,
+      onOpenSettings: onOpenAppSettings,
+      shareLabel: '공유하기'
     }),
-    /* Group 4: share + shortcut */
-    /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-list", style: { borderTop: '1px solid var(--border-subtle, #E2E8F0)', borderBottom: 'none', paddingTop: '6px', marginTop: '2px' } },
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        className: "admin-side-menu-item",
-        onClick: () => handle(onOpenShare)
-      },
-        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M3 12a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M15 6a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M15 18a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M8.7 10.7l6.6 -3.4", "M8.7 13.3l6.6 3.4"] })),
-        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
-          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "공유하기")
-        )
-      )
-    ),
     /* Group 5: admin */
     /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-list", style: { marginTop: 'auto', borderTop: '1px solid var(--border-subtle, #E2E8F0)', borderBottom: 'none', paddingTop: '6px' } },
       /*#__PURE__*/React.createElement("button", {
@@ -947,6 +1080,9 @@ export function MainSideMenu({
   if (typeof window !== 'undefined') {
   window.GATHER_UI_COMPONENTS = Object.assign({}, window.GATHER_UI_COMPONENTS || {}, {
     SharedSideMenuSettings: SharedSideMenuSettings,
+    SharedSideMenuFooter: SharedSideMenuFooter,
+    AppSettingsModal: AppSettingsModal,
+    NotificationOnboardingModal: NotificationOnboardingModal,
     MainSideMenu: MainSideMenu,
   });
 }

@@ -721,6 +721,8 @@ export function ChatRoomView({
   onGetGalleryPhotoOrdinal,
   onRequestConfirm,
   externalFocusMessageId = null
+,
+  onOpenAppSettings
 }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -1980,7 +1982,8 @@ export function ChatRoomView({
     onDecreaseFont: onDecreaseFont,
     onIncreaseFont: onIncreaseFont,
     isChatNotifyEnabled: isChatNotifyEnabled,
-    onToggleChatNotifications: onToggleChatNotifications
+    onToggleChatNotifications: onToggleChatNotifications,
+    onOpenAppSettings: onOpenAppSettings
   }),
   isChatGalleryOpen && /*#__PURE__*/React.createElement(ChatGalleryModal, {
     chatMessages: chatMessages,

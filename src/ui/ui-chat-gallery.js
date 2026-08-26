@@ -753,6 +753,7 @@ export function ChatGalleryModal({
   const SmallXIcon = __deps.SmallXIcon;
   const BackArrowIcon = __deps.BackArrowIcon;
   const SharedSideMenuSettings = __comp.SharedSideMenuSettings || __deps.SharedSideMenuSettings;
+  const SharedSideMenuFooter = __comp.SharedSideMenuFooter || __deps.SharedSideMenuFooter;
   const InlineSearchBar = __comp.InlineSearchBar || __deps.InlineSearchBar;
   const LinkPreviewCard = __deps.LinkPreviewCard || __comp.LinkPreviewCard;
   const MenuIcon = __deps.MenuIcon || __comp.MenuIcon;
@@ -1363,14 +1364,11 @@ export function ChatGalleryModal({
         )
       )
     ),
-    /*#__PURE__*/React.createElement(SharedSideMenuSettings, {
-      isDarkTheme: isDarkTheme,
-      onToggleTheme: onToggleTheme,
-      fontScalePercent: fontScalePercent,
-      onDecreaseFont: onDecreaseFont,
-      onIncreaseFont: onIncreaseFont,
-      isChatNotifyEnabled: isChatNotifyEnabled,
-      onToggleChatNotifications: onToggleChatNotifications
+    /*#__PURE__*/React.createElement(SharedSideMenuFooter, {
+      onClose: onClose,
+      onOpenShare: onOpenShare,
+      onOpenSettings: onOpenAppSettings,
+      shareLabel: '공유하기'
     })
   )),
   isSearchOpen && /*#__PURE__*/React.createElement(InlineSearchBar, {

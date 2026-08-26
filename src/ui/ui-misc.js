@@ -982,6 +982,7 @@ export function MemoShareModal({ memo, calendarId, onClose, showToast }) {
 }
 
 export function ChatSideMenu({
+  onOpenAppSettings,
   onClose,
   onOpenSearch,
   onOpenNoticeSettings,
@@ -1001,6 +1002,7 @@ export function ChatSideMenu({
   const SmallXIcon = __deps.SmallXIcon;
   const MegaphoneIcon = __deps.MegaphoneIcon;
   const SharedSideMenuSettings = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SharedSideMenuSettings) || __deps.SharedSideMenuSettings;
+  const SharedSideMenuFooter = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SharedSideMenuFooter) || __deps.SharedSideMenuFooter;
 
   const handle = action => {
     if (typeof action === 'function') action();
@@ -1111,14 +1113,11 @@ export function ChatSideMenu({
         )
       )
     ),
-    /*#__PURE__*/React.createElement(SharedSideMenuSettings, {
-      isDarkTheme: isDarkTheme,
-      onToggleTheme: onToggleTheme,
-      fontScalePercent: fontScalePercent,
-      onDecreaseFont: onDecreaseFont,
-      onIncreaseFont: onIncreaseFont,
-      isChatNotifyEnabled: isChatNotifyEnabled,
-      onToggleChatNotifications: onToggleChatNotifications
+    /*#__PURE__*/React.createElement(SharedSideMenuFooter, {
+      onClose: onClose,
+      onOpenShare: onOpenShare,
+      onOpenSettings: onOpenAppSettings,
+      shareLabel: '공유하기'
     }),
   )));
 }
