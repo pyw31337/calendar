@@ -743,6 +743,7 @@ export function ChatRoomView({
   const EmojiPickerIcon = __comp.EmojiPickerIcon || __deps.EmojiPickerIcon;
   const ChatGalleryModal = __comp.ChatGalleryModal || __deps.ChatGalleryModal;
   const SyncStatusChip = __comp.SyncStatusChip || __deps.SyncStatusChip;
+  const SyncStatusBanner = __comp.SyncStatusBanner || __deps.SyncStatusBanner;
   const ChatSideMenu = __comp.ChatSideMenu || __deps.ChatSideMenu;
   const EmojiPickerSheet = __comp.EmojiPickerSheet || __deps.EmojiPickerSheet;
   const ImageProcessingOverlay = __comp.ImageProcessingOverlay || __deps.ImageProcessingOverlay;
@@ -1552,7 +1553,9 @@ export function ChatRoomView({
       padding: '8px 16px 0',
       flexShrink: 0
     }
-  }, /*#__PURE__*/React.createElement(SyncStatusChip, {
+  }, SyncStatusBanner ? /*#__PURE__*/React.createElement(SyncStatusBanner, {
+    syncStatus: syncStatus
+  }) : /*#__PURE__*/React.createElement(SyncStatusChip, {
     syncStatus: syncStatus
   })), /*#__PURE__*/React.createElement("div", {
     style: { flex: 1, position: 'relative', minHeight: 0 }

@@ -730,6 +730,7 @@ export function DateModal({
   const MediaThumb = __comp.MediaThumb || __deps.MediaThumb;
   const SectionCountBadge = __comp.SectionCountBadge || __deps.SectionCountBadge;
   const SyncStatusChip = __comp.SyncStatusChip || __deps.SyncStatusChip;
+  const SyncStatusBanner = __comp.SyncStatusBanner || __deps.SyncStatusBanner;
   const UrlCapsuleBadge = __deps.UrlCapsuleBadge;
   const SmallXIcon = __deps.SmallXIcon;
   const TrashIcon = __comp.TrashIcon || __deps.TrashIcon;
@@ -1938,7 +1939,9 @@ export function DateModal({
       padding: '0 16px 2px',
       flexShrink: 0
     }
-  }, /*#__PURE__*/React.createElement(SyncStatusChip, {
+  }, SyncStatusBanner ? /*#__PURE__*/React.createElement(SyncStatusBanner, {
+    syncStatus: syncStatus
+  }) : /*#__PURE__*/React.createElement(SyncStatusChip, {
     syncStatus: syncStatus
   })), /*#__PURE__*/React.createElement("div", {
     style: {

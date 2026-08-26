@@ -1133,6 +1133,7 @@ export function PlacesView({
   const SharedAppNavBlock = __comp.SharedAppNavBlock || __deps.SharedAppNavBlock;
   const WeatherBadge = __comp.WeatherBadge || __deps.WeatherBadge;
   const SyncStatusChip = __comp.SyncStatusChip || __deps.SyncStatusChip;
+  const SyncStatusBanner = __comp.SyncStatusBanner || __deps.SyncStatusBanner;
   const BackArrowIcon = __deps.BackArrowIcon;
   const BuildingIcon = __deps.BuildingIcon;
   const PencilIcon = __deps.PencilIcon;
@@ -1510,12 +1511,12 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
     ),
     syncStatus && /*#__PURE__*/React.createElement("div", {
       style: {
-        display: 'flex',
-        justifyContent: 'flex-end',
         padding: '8px 16px 0',
         flexShrink: 0
       }
-    }, /*#__PURE__*/React.createElement(SyncStatusChip, {
+    }, SyncStatusBanner ? /*#__PURE__*/React.createElement(SyncStatusBanner, {
+      syncStatus: syncStatus
+    }) : /*#__PURE__*/React.createElement(SyncStatusChip, {
       syncStatus: syncStatus
     })),
 

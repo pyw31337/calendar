@@ -766,6 +766,7 @@ export function ChatGalleryModal({
   const WeatherBadge = __comp.WeatherBadge || __deps.WeatherBadge;
   const InlineSearchBar = __comp.InlineSearchBar || __deps.InlineSearchBar;
   const SyncStatusChip = __comp.SyncStatusChip || __deps.SyncStatusChip;
+  const SyncStatusBanner = __comp.SyncStatusBanner || __deps.SyncStatusBanner;
   const LinkPreviewCard = __deps.LinkPreviewCard || __comp.LinkPreviewCard;
   const MenuIcon = __deps.MenuIcon || __comp.MenuIcon;
   const MediaThumb = __comp.MediaThumb || __deps.MediaThumb;
@@ -1292,7 +1293,9 @@ export function ChatGalleryModal({
       padding: asPage ? '8px 20px 0' : '8px 16px 0',
       flexShrink: 0
     }
-  }, /*#__PURE__*/React.createElement(SyncStatusChip, {
+  }, SyncStatusBanner ? /*#__PURE__*/React.createElement(SyncStatusBanner, {
+    syncStatus: syncStatus
+  }) : /*#__PURE__*/React.createElement(SyncStatusChip, {
     syncStatus: syncStatus
   })),
   /*#__PURE__*/React.createElement("input", {

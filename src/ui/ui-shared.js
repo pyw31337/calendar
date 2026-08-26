@@ -1650,13 +1650,18 @@ export function ToggleSwitch({ checked, onChange, label }) {
   }));
 }
 
-export function SyncStatusChip({ syncStatus = null, className = '', style = null }) {
-  const React = window.React;
+function getSyncStatusMeta(syncStatus = null) {
   const status = String(syncStatus?.status || 'live');
   const label = String(syncStatus?.label || '동기화됨');
   const lastSyncedText = String(syncStatus?.lastSyncedText || '').trim();
   const detail = String(syncStatus?.detail || '').trim();
   const title = [label, lastSyncedText ? `최근 ${lastSyncedText}` : '', detail].filter(Boolean).join(' · ') || label;
+  return { status, label, lastSyncedText, detail, title };
+}
+
+export function SyncStatusChip({ syncStatus = null, className = '', style = null }) {
+  const React = window.React;
+  const { status, label, lastSyncedText, title } = getSyncStatusMeta(syncStatus);
   const mergedClassName = ['sync-status-chip', `is-${status}`, className].filter(Boolean).join(' ');
 
   return /*#__PURE__*/React.createElement("span", {
@@ -1678,6 +1683,41 @@ export function SyncStatusChip({ syncStatus = null, className = '', style = null
       lastSyncedText && /*#__PURE__*/React.createElement("span", {
         className: "sync-status-chip__time"
       }, `· ${lastSyncedText}`)
+    )
+  );
+}
+
+export function SyncStatusBanner({ syncStatus = null, className = '', style = null }) {
+  const React = window.React;
+  const { status, label, lastSyncedText, detail, title } = getSyncStatusMeta(syncStatus);
+  const mergedClassName = ['sync-status-banner', `is-${status}`, className].filter(Boolean).join(' ');
+
+  return /*#__PURE__*/React.createElement("div", {
+    role: "status",
+    className: mergedClassName,
+    title: title,
+    style: style || undefined
+  },
+    /*#__PURE__*/React.createElement("span", {
+      className: "sync-status-banner__dot",
+      "aria-hidden": "true"
+    }),
+    /*#__PURE__*/React.createElement("div", {
+      className: "sync-status-banner__content"
+    },
+      /*#__PURE__*/React.createElement("div", {
+        className: "sync-status-banner__headline"
+      },
+        /*#__PURE__*/React.createElement("span", {
+          className: "sync-status-banner__label"
+        }, label),
+        lastSyncedText && /*#__PURE__*/React.createElement("span", {
+          className: "sync-status-banner__time"
+        }, `최근 ${lastSyncedText}`)
+      ),
+      detail && /*#__PURE__*/React.createElement("div", {
+        className: "sync-status-banner__detail"
+      }, detail)
     )
   );
 }
@@ -1713,6 +1753,7 @@ export function Footer() {
     ItemEditDeleteActions: ItemEditDeleteActions,
     GamifiedConfirmButtonContent: GamifiedConfirmButtonContent,
     SyncStatusChip: SyncStatusChip,
+    SyncStatusBanner: SyncStatusBanner,
     LinkPreviewCard: LinkPreviewCard,
     LinkPreviewProgressOverlay: LinkPreviewProgressOverlay,
     DeleteConfirmModal: DeleteConfirmModal,
