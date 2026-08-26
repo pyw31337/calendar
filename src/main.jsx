@@ -174,7 +174,8 @@ async function boot() {
       }
       return;
     }
-    showBootStatus('로딩 실패. 새로고침 해주세요.');
+    const detail = (err && (err.message || String(err))) || '';
+    showBootStatus('로딩 실패. 새로고침 해주세요.' + (detail ? `<div style="margin-top:8px;font-size:12px;opacity:.75;max-width:320px;text-align:center;word-break:break-word;">${detail.replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]))}</div>` : ''));
   }
 }
 
