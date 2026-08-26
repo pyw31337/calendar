@@ -622,63 +622,53 @@ function App() {
   React.useEffect(() => {
     const motionQuery = window.matchMedia?.('(prefers-reduced-motion: reduce)');
     const interactiveSelector = [
-      'button',
-      'a.btn',
-      '.btn',
-      '.btn-primary',
-      '.btn-secondary',
-      '.btn-danger',
-      '.btn-action',
-      '.modal-close-btn',
-      '.icon-btn',
-      '.section-toggle-btn',
-      '.chat-msg-action',
-      '.day-cell',
-      '.date-item-btn',
-      '.poll-card',
-      '.poll-option-row',
-      '.recent-log-row',
-      '.search-result-row',
-      '.bottom-sheet-item',
-      '.poll-voter-option',
-      '.main-menu-item',
-      '.admin-side-menu-item',
-      '.admin-menu-toggle-btn',
-      '.places-list-item',
-      '.summary-title.is-toggleable',
-      '[role="button"]'
+      'button', 'a[href]', 'a.btn', '[role="button"]', '.btn',
+      '.day-cell', '.date-item-btn', '.section-toggle-btn',
+      '.main-menu-item', '.admin-side-menu-item', '.admin-menu-toggle-btn',
+      '.places-list-item', '.summary-title.is-toggleable',
+      '.poll-card', '.poll-option-row', '.poll-voter-option',
+      '.recent-log-row', '.search-result-row', '.bottom-sheet-item',
+      '.chat-msg-action', '.modal-close-btn', '.icon-btn'
     ].join(',');
-
-    const layoutTransformBlocklist = [
-      '.chat-composer',
-      '.chat-room-header',
-      '.memo-view-header',
-      '.places-view-header',
-      '.gallery-page-header',
-      '.inline-search-bar',
-      '.admin-side-menu',
-      '.modal-overlay'
+    const blockShell = [
+      '.chat-composer', '.chat-room-header', '.memo-view-header',
+      '.places-view-header', '.gallery-page-header', '.inline-search-bar',
+      '.modal-overlay', '.admin-side-menu-overlay'
     ].join(',');
-
     let pressedEl = null;
     const clearPress = () => {
       if (!pressedEl) return;
       pressedEl.classList.remove('is-pressing');
       pressedEl = null;
     };
-
+    const resolveTarget = raw => {
+      if (!raw || typeof raw.closest !== 'function') return null;
+      if (raw.closest('input, textarea, select, [contenteditable="true"]')) return null;
+      let target = raw.closest(interactiveSelector);
+      if (!target) {
+        let el = raw.nodeType === 1 ? raw : raw.parentElement;
+        while (el && el !== document.body && el !== document.documentElement) {
+          try {
+            const st = window.getComputedStyle(el);
+            if (st && st.cursor === 'pointer' && el.tagName !== 'LABEL') {
+              target = el;
+              break;
+            }
+          } catch (_) {}
+          el = el.parentElement;
+        }
+      }
+      if (!target) return null;
+      if (target.disabled || target.getAttribute('aria-disabled') === 'true') return null;
+      if (target.closest('[data-no-press-feedback]')) return null;
+      if (target.classList.contains('poll-drag-handle')) return null;
+      if (target.matches && target.matches(blockShell)) return null;
+      return target;
+    };
     const handlePointerDown = event => {
       if (event.pointerType === 'mouse' && event.button !== 0) return;
-      const raw = event.target;
-      if (!raw || typeof raw.closest !== 'function') return;
-      if (raw.closest('input, textarea, select, [contenteditable="true"]')) return;
-      const target = raw.closest(interactiveSelector);
+      const target = resolveTarget(event.target);
       if (!target) return;
-      if (target.disabled || target.getAttribute('aria-disabled') === 'true') return;
-      if (target.closest('[data-no-press-feedback]')) return;
-      if (target.classList.contains('poll-drag-handle')) return;
-      if (target.matches(layoutTransformBlocklist)) return;
-
       clearPress();
       pressedEl = target;
       target.classList.add('is-pressing');
@@ -688,13 +678,12 @@ function App() {
         }
       } catch (_) {}
     };
-
     const handlePointerEnd = () => clearPress();
-
     document.addEventListener('pointerdown', handlePointerDown, { capture: true, passive: true });
     document.addEventListener('pointerup', handlePointerEnd, { capture: true, passive: true });
     document.addEventListener('pointercancel', handlePointerEnd, { capture: true, passive: true });
     document.addEventListener('lostpointercapture', handlePointerEnd, { capture: true, passive: true });
+    document.addEventListener('touchend', handlePointerEnd, { capture: true, passive: true });
     window.addEventListener('blur', handlePointerEnd);
     return () => {
       clearPress();
@@ -702,6 +691,7 @@ function App() {
       document.removeEventListener('pointerup', handlePointerEnd, { capture: true });
       document.removeEventListener('pointercancel', handlePointerEnd, { capture: true });
       document.removeEventListener('lostpointercapture', handlePointerEnd, { capture: true });
+      document.removeEventListener('touchend', handlePointerEnd, { capture: true });
       window.removeEventListener('blur', handlePointerEnd);
     };
   }, []);

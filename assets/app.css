@@ -440,125 +440,83 @@ body:has(.admin-login-gate) {
     border-top: 1px solid var(--border-subtle);
   }
 }
-/* ===== Global press feedback (all interactive controls) =====
-   JS adds .is-pressing on pointerdown (capture). CSS :active is a fallback. */
+/* ===== Global press feedback (universal) ===== */
 button:not(:disabled),
 .btn,
-.btn-primary,
-.btn-secondary,
-.btn-danger,
-.btn-action,
-.btn-action-dark,
-.btn-poll-create,
-.modal-close-btn,
-.icon-btn,
-.section-toggle-btn,
-.chat-composer button,
-.chat-toolbar button,
-.chat-msg-action,
+[role="button"],
+a.btn,
 .day-cell,
 .date-item-btn,
-.poll-card,
-.poll-option-row,
-.recent-log-row,
-.search-result-row,
-.bottom-sheet-item,
-.poll-voter-option,
+.section-toggle-btn,
 .main-menu-item,
 .admin-side-menu-item,
 .admin-menu-toggle-btn,
 .places-list-item,
 .summary-title.is-toggleable,
-.gallery-page-header button,
-.memo-view-header button,
-.places-view-header button,
-[role="button"],
-a.btn {
+.poll-card,
+.poll-option-row,
+.poll-voter-option,
+.recent-log-row,
+.search-result-row,
+.bottom-sheet-item,
+.chat-msg-action,
+.modal-close-btn,
+.icon-btn {
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
   transform-origin: center center;
   transition:
-    transform 0.34s cubic-bezier(0.34, 1.56, 0.64, 1),
-    box-shadow 0.2s ease,
-    filter 0.16s ease,
-    background-color 0.2s ease,
-    border-color 0.2s ease,
-    color 0.2s ease,
-    opacity 0.2s ease;
+    transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1),
+    filter 0.14s ease,
+    box-shadow 0.18s ease,
+    background-color 0.18s ease,
+    opacity 0.18s ease;
 }
-
 button.is-pressing:not(:disabled),
 .btn.is-pressing,
-.btn-primary.is-pressing,
-.btn-secondary.is-pressing,
-.btn-danger.is-pressing,
-.btn-action.is-pressing,
-.btn-action-dark.is-pressing,
-.btn-poll-create.is-pressing,
-.modal-close-btn.is-pressing,
-.icon-btn.is-pressing,
-.section-toggle-btn.is-pressing,
-.chat-composer button.is-pressing,
-.chat-toolbar button.is-pressing,
-.chat-msg-action.is-pressing,
+[role="button"].is-pressing,
+a.btn.is-pressing,
 .day-cell.is-pressing,
 .date-item-btn.is-pressing,
-.poll-card.is-pressing,
-.poll-option-row.is-pressing,
-.recent-log-row.is-pressing,
-.search-result-row.is-pressing,
-.bottom-sheet-item.is-pressing,
-.poll-voter-option.is-pressing,
+.section-toggle-btn.is-pressing,
 .main-menu-item.is-pressing,
 .admin-side-menu-item.is-pressing,
 .admin-menu-toggle-btn.is-pressing,
 .places-list-item.is-pressing,
 .summary-title.is-toggleable.is-pressing,
-.gallery-page-header button.is-pressing,
-.memo-view-header button.is-pressing,
-.places-view-header button.is-pressing,
-[role="button"].is-pressing,
-a.btn.is-pressing {
-  transform: translate3d(0, 2px, 0) scale(0.86) !important;
-  filter: brightness(0.93) !important;
-  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.16) !important;
-  transition-duration: 0.06s !important;
+.poll-card.is-pressing,
+.poll-option-row.is-pressing,
+.poll-voter-option.is-pressing,
+.recent-log-row.is-pressing,
+.search-result-row.is-pressing,
+.bottom-sheet-item.is-pressing,
+.chat-msg-action.is-pressing,
+.modal-close-btn.is-pressing,
+.icon-btn.is-pressing,
+.is-pressing {
+  transform: translate3d(0, 1px, 0) scale(0.92) !important;
+  filter: brightness(0.92) !important;
+  transition-duration: 0.05s !important;
   transition-timing-function: ease-out !important;
 }
-
-.btn-primary.is-pressing,
-.btn-action-dark.is-pressing,
-.btn-poll-create.is-pressing {
-  transform: translate3d(0, 3px, 0) scale(0.82) !important;
+.day-cell.is-pressing {
+  transform: scale(0.94) !important;
+  filter: brightness(0.94) !important;
 }
-
 button:not(:disabled):active,
 .btn:active,
-.section-toggle-btn:active,
-.summary-title.is-toggleable:active,
+[role="button"]:active,
 .day-cell:active,
 .date-item-btn:active,
-[role="button"]:active {
-  transform: translate3d(0, 2px, 0) scale(0.86);
-  filter: brightness(0.93);
+.main-menu-item:active,
+.admin-side-menu-item:active,
+.section-toggle-btn:active {
+  transform: translate3d(0, 1px, 0) scale(0.92);
+  filter: brightness(0.92);
 }
-
 @media (prefers-reduced-motion: reduce) {
-  button:not(:disabled),
-  .btn,
-  .section-toggle-btn,
-  .day-cell,
-  .date-item-btn,
-  .summary-title.is-toggleable,
-  [role="button"] {
-    transition: none !important;
-  }
-  .is-pressing,
-  button:active,
-  .btn:active,
-  [role="button"]:active {
-    transform: none !important;
-    filter: none !important;
+  button:not(:disabled), .btn, [role="button"], .day-cell, .date-item-btn, .is-pressing {
+    transition: none !important; transform: none !important; filter: none !important;
   }
 }
 

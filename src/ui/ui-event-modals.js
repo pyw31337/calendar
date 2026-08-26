@@ -926,9 +926,16 @@ export function AnniversaryModal({
   const anniversaryPanelInner = /*#__PURE__*/React.createElement(React.Fragment, null,
     /* Modal Navigation Tabs */
     /*#__PURE__*/React.createElement("div", {
-      style: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', borderBottom: '1px solid var(--border-subtle)' }
+      style: {
+        display: 'grid',
+        gridTemplateColumns: 'repeat(3, 1fr)',
+        gap: '6px',
+        width: '100%',
+        padding: '10px 12px 8px',
+        boxSizing: 'border-box',
+        flexShrink: 0
+      }
     },
-      /* Tab list */
       [['list', '목록'], ['add', '등록'], ['bulk', '반복']].map(([id, label]) => /*#__PURE__*/React.createElement("button", {
         key: id,
         type: "button",
@@ -943,14 +950,18 @@ export function AnniversaryModal({
           }
         },
         style: {
-          padding: '12px 6px',
           border: 'none',
-          background: 'none',
-          fontSize: '0.82rem',
-          fontWeight: activeTab === id ? '900' : '600',
-          color: activeTab === id ? '#3B82F6' : 'var(--text-muted)',
-          borderBottom: activeTab === id ? '2px solid #3B82F6' : 'none',
-          cursor: 'pointer'
+          borderRadius: 'var(--radius-md)',
+          padding: '7px 4px',
+          background: activeTab === id ? 'var(--accent-primary)' : 'transparent',
+          color: activeTab === id ? '#FFFFFF' : 'var(--text-muted)',
+          fontWeight: 800,
+          fontSize: '0.8rem',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '4px'
         }
       }, label))
     ),
