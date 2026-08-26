@@ -622,7 +622,9 @@ function App() {
   React.useEffect(() => {
     const motionQuery = window.matchMedia?.('(prefers-reduced-motion: reduce)');
     const interactiveSelector = [
-      'button',
+      'button:not(:disabled)',
+      'a.btn',
+      '.btn',
       '.day-cell',
       '.date-item-btn',
       '.poll-card',
@@ -631,16 +633,41 @@ function App() {
       '.search-result-row',
       '.bottom-sheet-item',
       '.poll-voter-option',
+      '.main-menu-item',
+      '.admin-side-menu-item',
+      '.places-list-item',
+      '.chat-msg-action',
       '[role="button"]'
     ].join(',');
 
-    const handlePointerDown = event => {
-      const target = event.target?.closest?.(interactiveSelector);
-      if (!target || target.closest('.admin-scope')) return;
-      target.classList.add('is-pressing');
-      window.setTimeout(() => target.classList.remove('is-pressing'), 170);
+    let pressedEl = null;
+    const clearPress = () => {
+      if (!pressedEl) return;
+      pressedEl.classList.remove('is-pressing');
+      pressedEl = null;
+    };
 
-      if (motionQuery?.matches || target.matches('input, textarea, select')) return;
+    const handlePointerDown = event => {
+      if (event.pointerType === 'mouse' && event.button !== 0) return;
+      const target = event.target?.closest?.(interactiveSelector);
+      if (!target || target.closest('[data-no-press-feedback]')) return;
+      if (target.disabled || target.getAttribute('aria-disabled') === 'true') return;
+      if (target.closest('.poll-drag-handle, input, textarea, select, [contenteditable="true"]')) return;
+
+      clearPress();
+      pressedEl = target;
+      target.classList.add('is-pressing');
+      try {
+        if (target.setPointerCapture && event.pointerId != null) {
+          target.setPointerCapture(event.pointerId);
+        }
+      } catch (_) {}
+
+      if (motionQuery?.matches) return;
+      if (!target.classList.contains('btn') && target.tagName !== 'BUTTON') return;
+      if (getComputedStyle(target).position === 'static') {
+        target.style.position = 'relative';
+      }
       const rect = target.getBoundingClientRect();
       const ripple = document.createElement('span');
       ripple.className = 'motion-ripple';
@@ -650,8 +677,21 @@ function App() {
       ripple.addEventListener('animationend', () => ripple.remove(), { once: true });
     };
 
+    const handlePointerEnd = () => clearPress();
+
     document.addEventListener('pointerdown', handlePointerDown, { passive: true });
-    return () => document.removeEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('pointerup', handlePointerEnd, { passive: true });
+    document.addEventListener('pointercancel', handlePointerEnd, { passive: true });
+    document.addEventListener('lostpointercapture', handlePointerEnd, { passive: true });
+    window.addEventListener('blur', handlePointerEnd);
+    return () => {
+      clearPress();
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('pointerup', handlePointerEnd);
+      document.removeEventListener('pointercancel', handlePointerEnd);
+      document.removeEventListener('lostpointercapture', handlePointerEnd);
+      window.removeEventListener('blur', handlePointerEnd);
+    };
   }, []);
 
   // ---- Generic Confirm Dialog ----

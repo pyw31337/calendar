@@ -440,6 +440,36 @@ body:has(.admin-login-gate) {
     border-top: 1px solid var(--border-subtle);
   }
 }
+/* Global press feedback */
+button:not(:disabled),
+.btn,
+.day-cell,
+.date-item-btn,
+.poll-card,
+.poll-option-row,
+.recent-log-row,
+.search-result-row,
+.bottom-sheet-item,
+.poll-voter-option,
+.main-menu-item,
+.admin-side-menu-item,
+.places-list-item,
+.chat-msg-action,
+[role="button"] {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition:
+    transform 0.28s cubic-bezier(0.34, 1.45, 0.64, 1),
+    box-shadow 0.22s ease,
+    filter 0.22s ease,
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease,
+    opacity 0.2s ease;
+  transform-origin: center center;
+  will-change: transform;
+}
+button.is-pressing:not(:disabled),
 .btn.is-pressing,
 .day-cell.is-pressing,
 .date-item-btn.is-pressing,
@@ -450,8 +480,46 @@ body:has(.admin-login-gate) {
 .bottom-sheet-item.is-pressing,
 .poll-voter-option.is-pressing,
 .main-menu-item.is-pressing,
+.admin-side-menu-item.is-pressing,
+.places-list-item.is-pressing,
+.chat-msg-action.is-pressing,
 [role="button"].is-pressing {
-  transform: translate3d(0, 1px, 0) scale(0.985);
+  transform: translate3d(0, 1.5px, 0) scale(0.955);
+  filter: brightness(0.97);
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.12) !important;
+  transition-duration: 0.08s;
+  transition-timing-function: cubic-bezier(0.2, 0.0, 0.2, 1);
+}
+.btn-primary.is-pressing,
+.btn-action-dark.is-pressing,
+.btn-poll-create.is-pressing {
+  transform: translate3d(0, 2px, 0) scale(0.94);
+  filter: brightness(0.95);
+}
+@media (prefers-reduced-motion: reduce) {
+  button:not(:disabled),
+  .btn,
+  .day-cell,
+  .date-item-btn,
+  .poll-card,
+  .poll-option-row,
+  .recent-log-row,
+  .search-result-row,
+  .bottom-sheet-item,
+  .poll-voter-option,
+  .main-menu-item,
+  .admin-side-menu-item,
+  .places-list-item,
+  .chat-msg-action,
+  [role="button"] {
+    transition: none !important;
+    will-change: auto;
+  }
+  button.is-pressing:not(:disabled),
+  .is-pressing {
+    transform: none !important;
+    filter: none !important;
+  }
 }
 .motion-ripple {
   position: absolute;
