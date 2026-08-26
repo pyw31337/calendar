@@ -5149,6 +5149,23 @@ function App() {
     operationProgress && !chatUploadProgress && /*#__PURE__*/React.createElement(OperationProgressOverlay, operationProgress),
     chatUploadProgress && /*#__PURE__*/React.createElement(ImageUploadOverlay, chatUploadProgress)
   );
+  const navChatCount = (typeof totalChatCount === 'number' && totalChatCount >= 0)
+    ? totalChatCount
+    : Math.max((typeof allChatMessages !== 'undefined' && allChatMessages ? allChatMessages.length : 0), (chatMessages || []).length);
+  const navGalleryCount = (typeof totalGalleryCount === 'number' && totalGalleryCount >= 0) ? totalGalleryCount : 0;
+  const navMemoCount = (typeof totalMemoCount === 'number' && totalMemoCount >= 0) ? totalMemoCount : (memos || []).length;
+  const navPlaceCount = (activeCal && Array.isArray(activeCal.places)) ? activeCal.places.filter(p => p && !p.deletedAt).length : 0;
+  const navSettlementBadge = activeCal && typeof calculateSettlementBalance === 'function' && typeof formatBalanceBadge === 'function'
+    ? formatBalanceBadge(calculateSettlementBalance(activeCal))
+    : null;
+  const navMenuProps = {
+    onChangeView: changeView,
+    chatCount: navChatCount,
+    settlementBadge: navSettlementBadge,
+    galleryCount: navGalleryCount,
+    placeCount: navPlaceCount,
+    memoCount: navMemoCount
+  };
   const sharedAppOverlays = /*#__PURE__*/React.createElement(React.Fragment, null,
     isAppSettingsOpen && /*#__PURE__*/React.createElement(AppSettingsModal, {
       onClose: () => setIsAppSettingsOpen(false),
@@ -5245,6 +5262,7 @@ function App() {
       isChatNotifyEnabled: mainNotifPermission === 'granted' && mainChatNotifyEnabled,
       onToggleChatNotifications: handleMainToggleNotifications,
       onOpenAppSettings: () => setIsAppSettingsOpen(true),
+      ...navMenuProps,
       stickyVideoKey: stickyVideo ? stickyVideo.key : null,
       onActivateVideo: handleActivateChatVideo,
       onDeletePhoto: handleDeletePhoto,
@@ -5272,7 +5290,8 @@ function App() {
         onOpenShare: () => {
           if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 공유 정보를 확인해 주세요.')) setIsShareOpen(true);
         },
-        onOpenAppSettings: () => setIsAppSettingsOpen(true)
+        onOpenAppSettings: () => setIsAppSettingsOpen(true),
+        ...navMenuProps
       }),
       isShareOpen && activeCal && /*#__PURE__*/React.createElement(ShareModal, {
         calendar: activeCal,
@@ -5304,7 +5323,12 @@ function App() {
           const url = new URL(window.location.href);
           url.searchParams.delete('memo');
           window.history.replaceState({}, '', url);
-        }
+        },
+        onOpenShare: () => {
+          if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 공유 정보를 확인해 주세요.')) setIsShareOpen(true);
+        },
+        onOpenAppSettings: () => setIsAppSettingsOpen(true),
+        ...navMenuProps
       }),
       sharedAppOverlays
     ));
@@ -5338,7 +5362,8 @@ function App() {
         isChatNotifyEnabled: mainNotifPermission === 'granted' && mainChatNotifyEnabled,
         onToggleChatNotifications: handleMainToggleNotifications,
         onOpenAppSettings: () => setIsAppSettingsOpen(true),
-        showToast: showToast
+        showToast: showToast,
+        ...navMenuProps
       }),
       activeLightbox ? /*#__PURE__*/React.createElement(Lightbox, {
         urls: activeLightbox.urls,
@@ -5390,7 +5415,8 @@ function App() {
         isChatNotifyEnabled: mainNotifPermission === 'granted' && mainChatNotifyEnabled,
         onToggleChatNotifications: handleMainToggleNotifications,
         onOpenAppSettings: () => setIsAppSettingsOpen(true),
-        onSharePlaces: () => setIsPlacesShareOpen(true)
+        onSharePlaces: () => setIsPlacesShareOpen(true),
+        ...navMenuProps
       }),
       isPlacesShareOpen && activeCal && /*#__PURE__*/React.createElement(ShareModal, {
         calendar: activeCal,

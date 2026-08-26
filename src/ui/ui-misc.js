@@ -988,14 +988,12 @@ export function ChatSideMenu({
   onOpenNoticeSettings,
   onOpenGallery,
   onOpenShare,
-  isDarkTheme,
-  onToggleTheme,
-  fontScalePercent,
-  onDecreaseFont,
-  onIncreaseFont,
-  isChatNotifyEnabled,
-  onToggleChatNotifications,
-  onChangeView
+  onChangeView,
+  chatCount = 0,
+  settlementBadge = null,
+  galleryCount = 0,
+  placeCount = 0,
+  memoCount = 0
 }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -1003,6 +1001,7 @@ export function ChatSideMenu({
   const MegaphoneIcon = __deps.MegaphoneIcon;
   const SharedSideMenuSettings = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SharedSideMenuSettings) || __deps.SharedSideMenuSettings;
   const SharedSideMenuFooter = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SharedSideMenuFooter) || __deps.SharedSideMenuFooter;
+  const SharedAppNavBlock = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SharedAppNavBlock) || __deps.SharedAppNavBlock;
 
   const handle = action => {
     if (typeof action === 'function') action();
@@ -1045,39 +1044,20 @@ export function ChatSideMenu({
           }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }))
         )
     ),
-    /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-list" },
+    /*#__PURE__*/React.createElement("div", {
+    className: "admin-side-menu-list",
+    style: { borderBottom: 'none', paddingTop: '6px' }
+  },
       /*#__PURE__*/React.createElement("button", {
         type: "button",
         className: "admin-side-menu-item",
         onClick: () => { onClose(); handle(onOpenSearch); }
       },
         /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", {
-          xmlns: "http://www.w3.org/2000/svg",
-          width: "20",
-          height: "20",
-          viewBox: "0 0 24 24",
-          fill: "none",
-          stroke: "currentColor",
-          strokeWidth: "2",
-          strokeLinecap: "round",
-          strokeLinejoin: "round"
+          xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2"
         }, /*#__PURE__*/React.createElement("circle", { cx: "11", cy: "11", r: "8" }), /*#__PURE__*/React.createElement("path", { d: "m21 21-4.3-4.3" }))),
         /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
-          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "대화검색"),
-          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "채팅 메시지 검색")
-        )
-      ),
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        className: "admin-side-menu-item",
-        onClick: () => { onClose(); handle(onOpenGallery); }
-      },
-        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", {
-          xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2"
-        }, /*#__PURE__*/React.createElement("rect", { width: "18", height: "18", x: "3", y: "3", rx: "2", ry: "2" }), /*#__PURE__*/React.createElement("circle", { cx: "9", cy: "9", r: "2" }), /*#__PURE__*/React.createElement("path", { d: "m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" }))),
-        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
-          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "갤러리"),
-          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "채팅 사진 및 링크")
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "대화검색")
         )
       ),
       /*#__PURE__*/React.createElement("button", {
@@ -1087,11 +1067,19 @@ export function ChatSideMenu({
       },
         /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement(MegaphoneIcon, { size: 20 })),
         /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
-          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "공지사항"),
-          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "공지 등록 및 고정 관리")
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "공지사항")
         )
-      ),
+      )
     ),
+    typeof SharedAppNavBlock === 'function' && /*#__PURE__*/React.createElement(SharedAppNavBlock, {
+      onClose: onClose,
+      onChangeView: onChangeView,
+      chatCount: chatCount,
+      settlementBadge: settlementBadge,
+      galleryCount: galleryCount,
+      placeCount: placeCount,
+      memoCount: memoCount
+    }),
     typeof SharedSideMenuFooter === 'function' && /*#__PURE__*/React.createElement(SharedSideMenuFooter, {
       onClose: onClose,
       onOpenShare: onOpenShare,

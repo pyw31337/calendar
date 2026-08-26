@@ -723,6 +723,12 @@ export function ChatRoomView({
   externalFocusMessageId = null
 ,
   onOpenAppSettings
+,
+  chatCount = 0,
+  settlementBadge = null,
+  galleryCount = 0,
+  placeCount = 0,
+  memoCount = 0
 }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -1983,7 +1989,13 @@ export function ChatRoomView({
     onIncreaseFont: onIncreaseFont,
     isChatNotifyEnabled: isChatNotifyEnabled,
     onToggleChatNotifications: onToggleChatNotifications,
-    onOpenAppSettings: onOpenAppSettings
+    onOpenAppSettings: onOpenAppSettings,
+    onChangeView: onChangeView,
+    chatCount: chatCount,
+    settlementBadge: settlementBadge,
+    galleryCount: galleryCount,
+    placeCount: placeCount,
+    memoCount: memoCount
   }),
   isChatGalleryOpen && /*#__PURE__*/React.createElement(ChatGalleryModal, {
     chatMessages: chatMessages,

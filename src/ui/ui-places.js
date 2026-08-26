@@ -1118,7 +1118,7 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
 }
 
 export function PlacesView({
-  onOpenAppSettings, calendar, onBack, onSavePlace, onDeletePlace, showToast, onRequestConfirm, placesInitialQuery, setPlacesInitialQuery, isDarkTheme, onToggleTheme, fontScalePercent, onDecreaseFont, onIncreaseFont, isChatNotifyEnabled, onToggleChatNotifications, onSharePlaces, onSelectDate }) {
+  onOpenAppSettings, onChangeView, chatCount = 0, settlementBadge = null, galleryCount = 0, placeCount = 0, memoCount = 0, calendar, onBack, onSavePlace, onDeletePlace, showToast, onRequestConfirm, placesInitialQuery, setPlacesInitialQuery, isDarkTheme, onToggleTheme, fontScalePercent, onDecreaseFont, onIncreaseFont, isChatNotifyEnabled, onToggleChatNotifications, onSharePlaces, onSelectDate }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -1130,6 +1130,7 @@ export function PlacesView({
   const InlineSearchBar = __comp.InlineSearchBar || __deps.InlineSearchBar;
   const SharedSideMenuSettings = __comp.SharedSideMenuSettings || __deps.SharedSideMenuSettings;
   const SharedSideMenuFooter = __comp.SharedSideMenuFooter || __deps.SharedSideMenuFooter;
+  const SharedAppNavBlock = __comp.SharedAppNavBlock || __deps.SharedAppNavBlock;
   const BackArrowIcon = __deps.BackArrowIcon;
   const BuildingIcon = __deps.BuildingIcon;
   const PencilIcon = __deps.PencilIcon;
@@ -2004,6 +2005,15 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
           )
         )
       ),
+      typeof SharedAppNavBlock === 'function' && /*#__PURE__*/React.createElement(SharedAppNavBlock, {
+        onClose: () => setIsPlacesMenuOpen(false),
+        onChangeView: onChangeView,
+        chatCount: chatCount,
+        settlementBadge: settlementBadge,
+        galleryCount: galleryCount,
+        placeCount: placeCount,
+        memoCount: memoCount
+      }),
       typeof SharedSideMenuFooter === 'function' && /*#__PURE__*/React.createElement(SharedSideMenuFooter, {
         onClose: () => setIsPlacesMenuOpen(false),
         onOpenShare: onSharePlaces,

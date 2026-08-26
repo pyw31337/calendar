@@ -671,7 +671,7 @@ function getAnniversaryDisplayColor(...args) {
 }
 
 
-export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoadMoreMemos, onBack, showToast, isDarkTheme, onRequestConfirm, sharedMemo, onDismissSharedMemo, chatMessages, setActiveLightbox }) {
+export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoadMoreMemos, onBack, showToast, isDarkTheme, onRequestConfirm, sharedMemo, onDismissSharedMemo, chatMessages, setActiveLightbox, onOpenShare, onOpenAppSettings, onChangeView, chatCount = 0, settlementBadge = null, galleryCount = 0, placeCount = 0, memoCount = 0 }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -702,7 +702,11 @@ export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoad
   const [selectedTag, setSelectedTag] = React.useState('');
   // Header hides on scroll-down / reappears on scroll-up, matching the chat room header exactly.
   const { isHeaderVisible, onScroll: handleMemoScroll } = useScrollHideHeader();
-  const [isSearchOpen, setIsSearchOpen] = React.useState(false);
+    const SharedSideMenuFooter = (__comp && __comp.SharedSideMenuFooter) || (window.GATHER_UI_DEPS || {}).SharedSideMenuFooter;
+  const SharedAppNavBlock = (__comp && __comp.SharedAppNavBlock) || (window.GATHER_UI_DEPS || {}).SharedAppNavBlock;
+  const ThreeLinesIcon = (__comp && __comp.ThreeLinesIcon) || (window.GATHER_UI_DEPS || {}).ThreeLinesIcon;
+  const [isMemoMenuOpen, setIsMemoMenuOpen] = React.useState(false);
+const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   const memoSearchInputRef = React.useRef(null);
   React.useEffect(() => {
     if (isSearchOpen) memoSearchInputRef.current?.focus();
@@ -1302,21 +1306,20 @@ export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoad
       /*#__PURE__*/React.createElement("div", {
         style: { display: 'flex', alignItems: 'center', gap: '2px', flexShrink: 0 }
       },
-        /* Search button */
         /*#__PURE__*/React.createElement("button", {
           type: "button",
-          onClick: () => setIsSearchOpen(v => !v),
-          title: "검색",
-          "aria-label": "메모 검색",
+          onClick: () => setIsMemoMenuOpen(true),
+          title: "메뉴",
+          "aria-label": "메뉴",
           style: {
             background: 'none', border: 'none', cursor: 'pointer', padding: '6px',
-            color: isSearchOpen ? 'var(--accent-primary)' : 'var(--text-muted)',
+            color: 'var(--text-muted)',
             display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 'var(--radius-md)'
           }
-        }, /*#__PURE__*/React.createElement("svg", {
+        }, ThreeLinesIcon ? /*#__PURE__*/React.createElement(ThreeLinesIcon, { size: 20 }) : /*#__PURE__*/React.createElement("svg", {
           xmlns: "http://www.w3.org/2000/svg", width: "22", height: "22", viewBox: "0 0 24 24",
-          fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
-        }, /*#__PURE__*/React.createElement("circle", { cx: "11", cy: "11", r: "8" }), /*#__PURE__*/React.createElement("path", { d: "m21 21-4.3-4.3" })))
+          fill: "none", stroke: "currentColor", strokeWidth: "2"
+        }, /*#__PURE__*/React.createElement("path", { d: "M4 6h16" }), /*#__PURE__*/React.createElement("path", { d: "M4 12h16" }), /*#__PURE__*/React.createElement("path", { d: "M4 18h16" })))
       )
     ),
 
@@ -1347,6 +1350,53 @@ export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoad
         }, "닫기")
       )
     }),
+
+    isMemoMenuOpen && /*#__PURE__*/React.createElement("div", {
+      className: "admin-side-menu-overlay",
+      style: { zIndex: 12000 },
+      onClick: () => setIsMemoMenuOpen(false)
+    }, /*#__PURE__*/React.createElement("nav", {
+      className: "admin-side-menu",
+      "aria-label": "메모 메뉴",
+      onClick: e => e.stopPropagation()
+    },
+      /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-header" },
+        /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-brand" },
+          /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-copy" },
+            /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-title" }, "메모 메뉴")
+          )
+        ),
+        /*#__PURE__*/React.createElement("button", {
+          type: "button", className: "admin-side-menu-close-btn", onClick: () => setIsMemoMenuOpen(false), "aria-label": "닫기"
+        }, "✕")
+      ),
+      /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-list", style: { borderBottom: 'none', paddingTop: '6px' } },
+        /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          className: "admin-side-menu-item",
+          onClick: () => { setIsMemoMenuOpen(false); setIsSearchOpen(true); }
+        },
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
+            /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "메모 검색")
+          )
+        )
+      ),
+      typeof SharedAppNavBlock === 'function' && /*#__PURE__*/React.createElement(SharedAppNavBlock, {
+        onClose: () => setIsMemoMenuOpen(false),
+        onChangeView: onChangeView,
+        chatCount: chatCount,
+        settlementBadge: settlementBadge,
+        galleryCount: galleryCount,
+        placeCount: placeCount,
+        memoCount: memoCount
+      }),
+      typeof SharedSideMenuFooter === 'function' && /*#__PURE__*/React.createElement(SharedSideMenuFooter, {
+        onClose: () => setIsMemoMenuOpen(false),
+        onOpenShare: onOpenShare,
+        onOpenSettings: onOpenAppSettings,
+        shareLabel: '공유하기'
+      })
+    )),
 
     /* Main Scrollable Body */
     /*#__PURE__*/React.createElement("div", {

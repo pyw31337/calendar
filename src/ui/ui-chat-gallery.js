@@ -744,6 +744,12 @@ export function ChatGalleryModal({
   isChatNotifyEnabled,
   onToggleChatNotifications,
   onOpenAppSettings = null,
+  onChangeView = null,
+  chatCount = 0,
+  settlementBadge = null,
+  galleryCount = 0,
+  placeCount = 0,
+  memoCount = 0,
   showToast,
   onDeletePhoto = null
 }) {
@@ -755,6 +761,7 @@ export function ChatGalleryModal({
   const BackArrowIcon = __deps.BackArrowIcon;
   const SharedSideMenuSettings = __comp.SharedSideMenuSettings || __deps.SharedSideMenuSettings;
   const SharedSideMenuFooter = __comp.SharedSideMenuFooter || __deps.SharedSideMenuFooter;
+  const SharedAppNavBlock = __comp.SharedAppNavBlock || __deps.SharedAppNavBlock;
   const InlineSearchBar = __comp.InlineSearchBar || __deps.InlineSearchBar;
   const LinkPreviewCard = __deps.LinkPreviewCard || __comp.LinkPreviewCard;
   const MenuIcon = __deps.MenuIcon || __comp.MenuIcon;
@@ -1354,6 +1361,15 @@ export function ChatGalleryModal({
         }, "붙여넣기")
       ),
     ),
+    typeof SharedAppNavBlock === 'function' && /*#__PURE__*/React.createElement(SharedAppNavBlock, {
+      onClose: () => setIsMenuOpen(false),
+      onChangeView: onChangeView,
+      chatCount: chatCount,
+      settlementBadge: settlementBadge,
+      galleryCount: galleryCount,
+      placeCount: placeCount,
+      memoCount: memoCount
+    }),
     typeof SharedSideMenuFooter === 'function' && /*#__PURE__*/React.createElement(SharedSideMenuFooter, {
       onClose: () => setIsMenuOpen(false),
       onOpenShare: onOpenShare,
