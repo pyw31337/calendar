@@ -2542,6 +2542,10 @@ function App() {
         ok = await deleteMessageRest(calId, id);
       }
       if (ok) {
+        // Optimistic local remove: do not wait for onSnapshot. Messages loaded via
+        // "older chat" live in olderChatMessages; the live listener only rewrites
+        // chatMessages, so without this the bubble can stay until a full refresh.
+        removeLocalChatMessage(id);
         deleteAllChatImagesFromStorage(deletingMessage);
         await unlinkMeetingPhotoReferences(id, null);
         if (!firebaseDb) {
