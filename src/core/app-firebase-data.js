@@ -56,6 +56,7 @@ import {
   getDirectMediaTagKey,
   getDirectMediaTagsForUrl,
   getMessageDirectMediaEntry,
+  sanitizeMessageForFirestore,
   formatBytes,
   getDataUrlInfo,
 } from './app-domain-helpers.js';
@@ -1313,6 +1314,76 @@ async function sendChatMessageRest(calId, message) {
   }
 }
 
+async function writeCollectionDocumentRest(collectionName, calId, docId, data, method = 'update') {
+  try {
+    const cleanCollection = sanitizeText(collectionName || '', 80);
+    const cleanCalId = sanitizeText(calId || '', 64);
+    const cleanDocId = sanitizeText(docId || '', 180);
+    if (!cleanCollection || !isValidCalId(cleanCalId)) return false;
+    const baseUrl = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/calendars/cal_${cleanCalId}/${cleanCollection}`;
+    if (method === 'delete') {
+      if (!cleanDocId) return false;
+      const delRes = await fetch(`${baseUrl}/${cleanDocId}`, { method: 'DELETE' });
+      return delRes.ok ? { success: true, id: cleanDocId, transport: 'rest' } : false;
+    }
+
+    const cleanData = sanitizeMessageForFirestore(data);
+    const fields = Object.fromEntries(Object.entries(cleanData || {}).map(([key, value]) => [key, jsToFirestoreValue(value)]));
+    if (method === 'add') {
+      const addRes = await fetch(baseUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fields })
+      });
+      if (!addRes.ok) return false;
+      const addData = await addRes.json().catch(() => null);
+      const id = typeof addData?.name === 'string' ? addData.name.split('/').pop() : '';
+      return { success: true, id: id || null, transport: 'rest' };
+    }
+
+    if (!cleanDocId) return false;
+    const query = method === 'update'
+      ? `?${Object.keys(fields).map(key => `updateMask.fieldPaths=${encodeURIComponent(key)}`).join('&')}`
+      : '';
+    const patchRes = await fetch(`${baseUrl}/${cleanDocId}${query}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fields })
+    });
+    return patchRes.ok ? { success: true, id: cleanDocId, transport: 'rest' } : false;
+  } catch (err) {
+    console.warn('writeCollectionDocumentRest error:', err);
+    return false;
+  }
+}
+
+async function writeCollectionDocumentWithFallback(collectionName, calId, docId, data, method = 'update', warnLabel = 'write') {
+  const cleanCollection = sanitizeText(collectionName || '', 80);
+  const cleanData = method === 'delete' ? null : sanitizeMessageForFirestore(data);
+  if (firebaseDb) {
+    try {
+      const colRef = firebaseDb.collection('calendars').doc(`cal_${calId}`).collection(cleanCollection);
+      if (method === 'add') {
+        const ref = await colRef.add(cleanData);
+        return { success: true, id: ref.id, transport: 'sdk' };
+      }
+      if (method === 'delete') {
+        await colRef.doc(docId).delete();
+        return { success: true, id: docId, transport: 'sdk' };
+      }
+      if (method === 'set') {
+        await colRef.doc(docId).set(cleanData);
+        return { success: true, id: docId, transport: 'sdk' };
+      }
+      await colRef.doc(docId).update(cleanData);
+      return { success: true, id: docId, transport: 'sdk' };
+    } catch (err) {
+      console.warn(`Failed to ${warnLabel} for ${calId} via SDK, trying REST:`, err);
+    }
+  }
+  return writeCollectionDocumentRest(cleanCollection, calId, docId, data, method);
+}
+
 async function deleteMessageRest(calId, messageId) {
   try {
     const url = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/calendars/cal_${calId}/messages/${messageId}`;
@@ -1702,17 +1773,6 @@ function stripEmbeddedPlacesField(calendar) {
 async function writePlacesToFirestore(calendarId, places) {
   const validPlaces = Array.isArray(places) ? places.filter(p => p && typeof p.id === 'string' && p.id) : [];
   if (!validPlaces.length) return true;
-  if (firebaseDb) {
-    try {
-      const colRef = firebaseDb.collection('calendars').doc(`cal_${calendarId}`).collection('places');
-      const batch = firebaseDb.batch();
-      validPlaces.forEach(place => batch.set(colRef.doc(place.id), place));
-      await batch.commit();
-      return true;
-    } catch (e) {
-      console.warn(`Failed to write places for ${calendarId} via SDK, trying REST:`, e);
-    }
-  }
   try {
     const writes = validPlaces.map(place => ({
       update: {
@@ -1729,8 +1789,19 @@ async function writePlacesToFirestore(calendarId, places) {
     return res.ok;
   } catch (e) {
     console.warn(`Failed to write places for ${calendarId} via REST:`, e);
-    return false;
   }
+  if (firebaseDb) {
+    try {
+      const colRef = firebaseDb.collection('calendars').doc(`cal_${calendarId}`).collection('places');
+      const batch = firebaseDb.batch();
+      validPlaces.forEach(place => batch.set(colRef.doc(place.id), place));
+      await batch.commit();
+      return true;
+    } catch (e) {
+      console.warn(`Failed to write places for ${calendarId} via SDK:`, e);
+    }
+  }
+  return false;
 }
 async function fetchPlacesFromFirestore(calendarId) {
   const basePath = `calendars/cal_${calendarId}/places`;
@@ -1766,17 +1837,6 @@ function stripEmbeddedConfirmedMeetingField(calendar) {
 async function writeConfirmedMeetingsToFirestore(calendarId, meetings) {
   const validMeetings = Array.isArray(meetings) ? meetings.filter(m => m && typeof m.date === 'string' && m.date) : [];
   if (!validMeetings.length) return true;
-  if (firebaseDb) {
-    try {
-      const colRef = firebaseDb.collection('calendars').doc(`cal_${calendarId}`).collection('confirmedMeetings');
-      const batch = firebaseDb.batch();
-      validMeetings.forEach(meeting => batch.set(colRef.doc(meeting.date), meeting));
-      await batch.commit();
-      return true;
-    } catch (e) {
-      console.warn(`Failed to write confirmed meetings for ${calendarId} via SDK, trying REST:`, e);
-    }
-  }
   try {
     const writes = validMeetings.map(meeting => ({
       update: {
@@ -1793,8 +1853,19 @@ async function writeConfirmedMeetingsToFirestore(calendarId, meetings) {
     return res.ok;
   } catch (e) {
     console.warn(`Failed to write confirmed meetings for ${calendarId} via REST:`, e);
-    return false;
   }
+  if (firebaseDb) {
+    try {
+      const colRef = firebaseDb.collection('calendars').doc(`cal_${calendarId}`).collection('confirmedMeetings');
+      const batch = firebaseDb.batch();
+      validMeetings.forEach(meeting => batch.set(colRef.doc(meeting.date), meeting));
+      await batch.commit();
+      return true;
+    } catch (e) {
+      console.warn(`Failed to write confirmed meetings for ${calendarId} via SDK:`, e);
+    }
+  }
+  return false;
 }
 async function fetchConfirmedMeetingsFromFirestore(calendarId) {
   const basePath = `calendars/cal_${calendarId}/confirmedMeetings`;
@@ -2645,6 +2716,7 @@ export {
   fetchMemosRest,
   fetchAnniversariesRest,
   sendChatMessageRest,
+  writeCollectionDocumentWithFallback,
   deleteMessageRest,
   fetchMessageRest,
   updateMessageRest,

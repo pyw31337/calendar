@@ -463,6 +463,7 @@ import {
   fetchMemosRest,
   fetchAnniversariesRest,
   sendChatMessageRest,
+  writeCollectionDocumentWithFallback,
   deleteMessageRest,
   fetchMessageRest,
   updateMessageRest,
@@ -2504,11 +2505,8 @@ function App() {
         if (linkPreview) messageData.linkPreview = linkPreview;
         setChatUploadProgress({ pct: 90, remainingSec: 1, label: '채팅 저장 중...' });
         ok = await (async () => {
-          if (firebaseDb) {
-            await firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages').add(sanitizeMessageForFirestore(messageData));
-            return true;
-          }
-          return sendChatMessageRest(activeCalId, messageData);
+          const sent = await writeCollectionDocumentWithFallback('messages', activeCalId, '', messageData, 'add', '채팅 저장');
+          return Boolean(sent);
         })();
         if (ok) setChatUploadProgress({ pct: 100, remainingSec: 0, label: '전송 완료' });
       } else {
@@ -2539,12 +2537,8 @@ function App() {
             timestamp: baseTimestamp + i
           };
           if (i === 0 && linkPreview) messageData.linkPreview = linkPreview;
-          if (firebaseDb) {
-            await firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages').add(sanitizeMessageForFirestore(messageData));
-          } else {
-            const sent = await sendChatMessageRest(activeCalId, messageData);
-            if (!sent) throw new Error(`REST chat send failed for chunk ${i + 1}/${chunks.length}`);
-          }
+          const sent = await writeCollectionDocumentWithFallback('messages', activeCalId, '', messageData, 'add', '채팅 저장');
+          if (!sent) throw new Error(`Chat send failed for chunk ${i + 1}/${chunks.length}`);
         }
         ok = true;
         setChatUploadProgress({ pct: 100, remainingSec: 0, label: '전송 완료', current: imageCount, total: imageCount });
@@ -2637,12 +2631,8 @@ function App() {
           // Lightbox info panel can show "갤러리에서 업로드됨" instead of "채팅방에서 업로드됨".
           uploadSource: 'gallery'
         };
-        if (firebaseDb) {
-          await firebaseDb.collection('calendars').doc(`cal_${activeCal.id}`).collection('messages').add(sanitizeMessageForFirestore(messageData));
-        } else {
-          const sent = await sendChatMessageRest(activeCal.id, messageData);
-          if (!sent) throw new Error(`Gallery upload REST save failed ${i + 1}/${chunks.length}`);
-        }
+        const sent = await writeCollectionDocumentWithFallback('messages', activeCal.id, '', messageData, 'add', '갤러리 저장');
+        if (!sent) throw new Error(`Gallery upload save failed ${i + 1}/${chunks.length}`);
       }
       setChatUploadProgress({ pct: 100, remainingSec: 0, label: '갤러리 업로드 완료' });
       showToast('갤러리에 사진이 추가되었습니다.', 'success');
@@ -2665,13 +2655,8 @@ function App() {
     const { id, calId } = deletingMessage;
     const sourceSnapshot = JSON.parse(JSON.stringify(deletingMessage));
     try {
-      let ok = false;
-      if (firebaseDb) {
-        await firebaseDb.collection('calendars').doc(`cal_${calId}`).collection('messages').doc(id).delete();
-        ok = true;
-      } else {
-        ok = await deleteMessageRest(calId, id);
-      }
+      const deleted = await writeCollectionDocumentWithFallback('messages', calId, id, null, 'delete', '메시지 삭제');
+      const ok = Boolean(deleted);
       if (ok) {
         removeLocalChatMessage(id);
         await unlinkMeetingPhotoReferences(id, null);
@@ -2690,11 +2675,8 @@ function App() {
             if (typeof createData.timestamp !== 'number') createData.timestamp = Number(sourceSnapshot.timestamp) || Date.now();
             if (createData.text === undefined) createData.text = String(sourceSnapshot.text || '');
             const data = sanitizeMessageForFirestore(createData);
-            if (firebaseDb) {
-              await firebaseDb.collection('calendars').doc(`cal_${calId}`).collection('messages').doc(id).set(data);
-            } else {
-              throw new Error('REST 환경에서는 메시지 되돌리기를 지원하지 않습니다.');
-            }
+            const restored = await writeCollectionDocumentWithFallback('messages', calId, id, data, 'set', '메시지 복원');
+            if (!restored) throw new Error('Message restore failed');
             upsertLocalChatMessage({ ...sourceSnapshot, ...data, id });
             showToast('메시지 삭제를 되돌렸습니다.', 'success', 3000);
           } catch (err) {
@@ -2786,26 +2768,26 @@ function App() {
       };
       if (resolvedParticipantId !== editingMessage.participantId) data.participantId = resolvedParticipantId;
       let ok = false;
-      if (firebaseDb) {
-        await firebaseDb.collection('calendars').doc(`cal_${calId}`).collection('messages').doc(id).update(data);
-        if (extraChunks.length > 0) {
-          const baseTimestamp = (editingMessage.timestamp || Date.now()) + 1;
-          for (let i = 0; i < extraChunks.length; i++) {
-            const chunkImages = extraChunks[i];
-            await firebaseDb.collection('calendars').doc(`cal_${calId}`).collection('messages').add(sanitizeMessageForFirestore({
-              participantId: resolvedParticipantId,
-              text: '',
-              imageUrl: chunkImages[0].imageUrl,
-              thumbUrl: chunkImages[0].thumbUrl,
-              imageUrls: chunkImages.map(r => r.imageUrl),
-              thumbUrls: chunkImages.map(r => r.thumbUrl),
-              timestamp: baseTimestamp + i
-            }));
+      const updateResult = await writeCollectionDocumentWithFallback('messages', calId, id, data, 'update', '메시지 수정');
+      ok = Boolean(updateResult);
+      if (ok && extraChunks.length > 0) {
+        const baseTimestamp = (editingMessage.timestamp || Date.now()) + 1;
+        for (let i = 0; i < extraChunks.length; i++) {
+          const chunkImages = extraChunks[i];
+          const sent = await writeCollectionDocumentWithFallback('messages', calId, '', {
+            participantId: resolvedParticipantId,
+            text: '',
+            imageUrl: chunkImages[0].imageUrl,
+            thumbUrl: chunkImages[0].thumbUrl,
+            imageUrls: chunkImages.map(r => r.imageUrl),
+            thumbUrls: chunkImages.map(r => r.thumbUrl),
+            timestamp: baseTimestamp + i
+          }, 'add', '메시지 분할 저장');
+          if (!sent) {
+            ok = false;
+            break;
           }
         }
-        ok = true;
-      } else {
-        ok = await updateMessageRest(calId, id, data);
       }
       if (ok) {
         const previousRestore = {
@@ -2838,12 +2820,8 @@ function App() {
         showToast('메시지가 수정되었습니다.', 'success', 5000, async () => {
           try {
             const restoreData = sanitizeMessageForFirestore(previousRestore);
-            if (firebaseDb) {
-              await firebaseDb.collection('calendars').doc(`cal_${calId}`).collection('messages').doc(id).update(restoreData);
-            } else {
-              const restored = await updateMessageRest(calId, id, restoreData);
-              if (!restored) throw new Error('REST restore failed');
-            }
+            const restored = await writeCollectionDocumentWithFallback('messages', calId, id, restoreData, 'update', '메시지 복원');
+            if (!restored) throw new Error('Message restore failed');
             patchLocalChatMessage(id, restoreData);
             showToast('메시지 수정을 되돌렸습니다.', 'success', 3000);
           } catch (err) {
@@ -2915,12 +2893,8 @@ function App() {
         while (shareUrls.length <= targetIndex) shareUrls.push('');
         shareUrls[targetIndex] = shareUrl;
         const data = { imageShareUrls: shareUrls };
-        if (firebaseDb) {
-          await withTimeout(firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages').doc(sourceMessage.id).update(data), 9000, 'message share URL cache write');
-        } else {
-          const ok = await updateMessageRest(activeCalId, sourceMessage.id, data);
-          if (!ok) throw new Error('Message share URL cache update failed');
-        }
+        const ok = await writeCollectionDocumentWithFallback('messages', activeCalId, sourceMessage.id, data, 'update', '메시지 공유 URL 저장');
+        if (!ok) throw new Error('Message share URL cache update failed');
         patchLocalChatMessage(sourceMessage.id, data);
         setChatUploadProgress({ pct: 100, remainingSec: 0, label: 'URL 생성완료' });
         return { shareUrl, imageUrl: null };
@@ -3139,12 +3113,8 @@ function App() {
       return { imageTags: nextImageTags };
     })();
     try {
-      if (firebaseDb) {
-        await withTimeout(firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages').doc(messageId).update(data), 9000, 'image tags write');
-      } else {
-        const ok = await updateMessageRest(activeCalId, messageId, data);
-        if (!ok) throw new Error('Image tags update failed');
-      }
+      const ok = await writeCollectionDocumentWithFallback('messages', activeCalId, messageId, data, 'update', '이미지 태그 저장');
+      if (!ok) throw new Error('Image tags update failed');
       const now = Date.now();
       const added = nextTokens.filter(t => !prevTokens.includes(t));
       const removed = prevTokens.filter(t => !nextTokens.includes(t));
@@ -3738,15 +3708,9 @@ function App() {
           timestamp: now + i,
           uploadSource: 'meeting'
         };
-        let newMessageId = null;
-        if (firebaseDb) {
-          const ref = await firebaseDb.collection('calendars').doc(`cal_${activeCal.id}`).collection('messages').add(sanitizeMessageForFirestore(messageData));
-          newMessageId = ref.id;
-        } else {
-          const sent = await sendChatMessageRest(activeCal.id, messageData);
-          if (!sent) throw new Error(`Meeting photo save failed ${i + 1}/${chunks.length}`);
-          newMessageId = sent.id || null;
-        }
+        const sent = await writeCollectionDocumentWithFallback('messages', activeCal.id, '', messageData, 'add', '일정 사진 저장');
+        if (!sent || !sent.id) throw new Error(`Meeting photo save failed ${i + 1}/${chunks.length}`);
+        const newMessageId = sent.id;
         const photoIdPrefix = `photo_${activeCal.id}_${dateStr}_${now}_${i}`;
         chunkImages.forEach((img, idx) => {
           const photoId = `${photoIdPrefix}_${idx}_${Math.random().toString(36).slice(2, 7)}`;
@@ -4086,11 +4050,8 @@ function App() {
     };
     try {
       if (nextUrls.length === 0 && !remainingText) {
-        if (firebaseDb) {
-          await firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages').doc(messageId).delete();
-        } else {
-          await deleteMessageRest(activeCalId, messageId);
-        }
+        const deleted = await writeCollectionDocumentWithFallback('messages', activeCalId, messageId, null, 'delete', '메시지 삭제');
+        if (!deleted) throw new Error('Message delete failed');
         removeLocalChatMessage(messageId);
       } else {
         const data = sanitizeMessageForFirestore({
@@ -4100,12 +4061,8 @@ function App() {
           thumbUrl: nextThumbs[0] || null,
           imageTags: nextTags
         });
-        if (firebaseDb) {
-          await withTimeout(firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages').doc(messageId).update(data), 9000, 'photo delete write');
-        } else {
-          const ok = await updateMessageRest(activeCalId, messageId, data);
-          if (!ok) throw new Error('Photo delete REST update failed');
-        }
+        const ok = await writeCollectionDocumentWithFallback('messages', activeCalId, messageId, data, 'update', '사진 삭제');
+        if (!ok) throw new Error('Photo delete update failed');
         patchLocalChatMessage(messageId, data);
       }
 
@@ -4125,11 +4082,9 @@ function App() {
       const restoreDeletedPhoto = async () => {
         try {
           if (isWholeDelete) {
-            if (!firebaseDb) {
-              throw new Error('REST 환경에서는 전체 메시지 되돌리기를 지원하지 않습니다.');
-            }
             const createData = pickMessageFieldsForWrite(sourceSnapshot, { asCreate: true });
-            await firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages').doc(messageId).set(createData);
+            const restored = await writeCollectionDocumentWithFallback('messages', activeCalId, messageId, createData, 'set', '메시지 복원');
+            if (!restored) throw new Error('Message restore failed');
             upsertLocalChatMessage({ ...sourceSnapshot, ...createData, id: messageId });
           } else {
             const restoreData = pickMessageFieldsForWrite({
@@ -4142,12 +4097,8 @@ function App() {
               participantId: sourceSnapshot.participantId,
               linkPreview: sourceSnapshot.linkPreview
             }, { asCreate: false });
-            if (firebaseDb) {
-              await withTimeout(firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages').doc(messageId).update(restoreData), 9000, 'photo delete restore write');
-            } else {
-              const ok = await updateMessageRest(activeCalId, messageId, restoreData);
-              if (!ok) throw new Error('Photo delete REST restore failed');
-            }
+            const restored = await writeCollectionDocumentWithFallback('messages', activeCalId, messageId, restoreData, 'update', '사진 복원');
+            if (!restored) throw new Error('Photo delete restore failed');
             patchLocalChatMessage(messageId, { ...restoreData, id: messageId });
           }
           try {
@@ -4216,12 +4167,8 @@ function App() {
         imageUrl: nextUrls[0] || null,
         thumbUrl: nextThumbs[0] || null
       });
-      if (firebaseDb) {
-        await withTimeout(firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages').doc(messageId).update(data), 9000, 'photo replace write');
-      } else {
-        const ok = await updateMessageRest(activeCalId, messageId, data);
-        if (!ok) throw new Error('Photo replace REST update failed');
-      }
+      const ok = await writeCollectionDocumentWithFallback('messages', activeCalId, messageId, data, 'update', '사진 교체');
+      if (!ok) throw new Error('Photo replace update failed');
       patchLocalChatMessage(messageId, data);
       deleteChatImageFromStorage(target.full);
       if (target.thumb !== target.full) deleteChatImageFromStorage(target.thumb);
@@ -4275,11 +4222,13 @@ function App() {
     };
     try {
       const data = sanitizeMemoForFirestore({ imageUrls: nextUrls, thumbUrls: nextThumbs, imageUrl: nextUrls[0] || null, thumbUrl: nextThumbs[0] || null });
-      await firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('memos').doc(memoId).update(data);
+      const updated = await writeCollectionDocumentWithFallback('memos', activeCalId, memoId, data, 'update', '메모 사진 삭제');
+      if (!updated) throw new Error('Memo photo delete failed');
       setMemos(prev => prev.map(m => m.id === memoId ? { ...m, ...data } : m));
       showUndoableDeleteToast('사진이 삭제되었습니다.', async () => {
         try {
-          await firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('memos').doc(memoId).set(sanitizeMemoForFirestore(memoSnapshot));
+          const restored = await writeCollectionDocumentWithFallback('memos', activeCalId, memoId, sanitizeMemoForFirestore(memoSnapshot), 'set', '메모 사진 복원');
+          if (!restored) throw new Error('Memo photo restore failed');
           setMemos(prev => prev.map(m => m.id === memoId ? { ...m, ...memoSnapshot } : m));
           showToast('사진 삭제를 되돌렸습니다.', 'success', 3000);
         } catch (err) {
@@ -4317,7 +4266,8 @@ function App() {
       const nextUrls = urls.map((u, i) => i === imageIndex ? resolved.imageUrl : u);
       const nextThumbs = thumbs.map((t, i) => i === imageIndex ? (resolved.thumbUrl || resolved.imageUrl) : t);
       const data = sanitizeMemoForFirestore({ imageUrls: nextUrls, thumbUrls: nextThumbs, imageUrl: nextUrls[0] || null, thumbUrl: nextThumbs[0] || null });
-      await firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('memos').doc(memoId).update(data);
+      const updated = await writeCollectionDocumentWithFallback('memos', activeCalId, memoId, data, 'update', '메모 사진 교체');
+      if (!updated) throw new Error('Memo photo replace failed');
       setMemos(prev => prev.map(m => m.id === memoId ? { ...m, ...data } : m));
       deleteChatImageFromStorage(removedUrl);
       if (removedThumb !== removedUrl) deleteChatImageFromStorage(removedThumb);
@@ -7462,9 +7412,13 @@ async function migrateBase64ChatImagesForCalendar(calId, { maxMessages = 40 } = 
       }
       if (anyFail || !newUrls.length) { failed += 1; continue; }
       try {
-        await firebaseDb.collection('calendars').doc(`cal_${calId}`).collection('messages').doc(msg.id).update({
-          imageUrl: newUrls[0] || '', thumbUrl: newThumbs[0] || '', imageUrls: newUrls, thumbUrls: newThumbs
-        });
+        const updated = await writeCollectionDocumentWithFallback('messages', calId, msg.id, {
+          imageUrl: newUrls[0] || '',
+          thumbUrl: newThumbs[0] || '',
+          imageUrls: newUrls,
+          thumbUrls: newThumbs
+        }, 'update', '기존 이미지 마이그레이션');
+        if (!updated) throw new Error('Migration update failed');
         migrated += 1;
       } catch (e) {
         console.warn('migrate update failed', msg.id, e);
