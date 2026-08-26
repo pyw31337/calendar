@@ -280,6 +280,10 @@ function SyncStatusChip(props) {
   const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SyncStatusChip;
   return typeof C === 'function' ? React.createElement(C, props) : null;
 }
+function SyncStatusBanner(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SyncStatusBanner;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
 function Footer(props) {
   const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.Footer;
   return typeof C === 'function' ? React.createElement(C, props) : null;
@@ -5999,10 +6003,7 @@ function App() {
         window.location.href = `${window.location.pathname}?id=${activeCalId}`;
       }
     }
-  }, activeCal?.title), /*#__PURE__*/React.createElement(SyncStatusChip, {
-    syncStatus: syncStatus,
-    style: { flexShrink: 0 }
-  })))), /*#__PURE__*/React.createElement("div", {
+  }, activeCal?.title)))), /*#__PURE__*/React.createElement("div", {
     className: "header-actions"
   }, /*#__PURE__*/React.createElement("button", {
     className: "btn header-search-btn",
@@ -6021,7 +6022,14 @@ function App() {
     style: {
       padding: '10px'
     }
-  }, /*#__PURE__*/React.createElement(AdminFilledMenuIcon, null)))), activeCal?.description && /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(AdminFilledMenuIcon, null)))), syncStatus && /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: '0 16px 8px',
+      flexShrink: 0
+    }
+  }, /*#__PURE__*/React.createElement(SyncStatusBanner, {
+    syncStatus: syncStatus
+  })), activeCal?.description && /*#__PURE__*/React.createElement("div", {
     className: "calendar-desc"
   }, renderTextWithUrlBadge(activeCal.description)), /*#__PURE__*/React.createElement("div", {
     className: "main-menu-bar"
