@@ -1376,27 +1376,19 @@ export function ChatGalleryModal({
       ),
     ),
     typeof SharedAppNavBlock === 'function' && /*#__PURE__*/React.createElement(SharedAppNavBlock, {
-        onClose: typeof SharedAppNavBlock === 'function' && /*#__PURE__*/React.createElement(SharedAppNavBlock, {
       onClose: () => setIsMenuOpen(false),
       onChangeView: onChangeView,
       chatCount: chatCount,
       settlementBadge: settlementBadge,
       galleryCount: galleryCount,
       placeCount: placeCount,
-      memoCount: memoCount
+      memoCount: memoCount,
+      chatLastAuthor: chatLastAuthor,
+      settlementLastDate: settlementLastDate,
+      galleryLastDate: galleryLastDate,
+      placeLastName: placeLastName,
+      memoLastTitleWord: memoLastTitleWord
     }),
-        onChangeView: () => setIsMenuOpen(false),
-        chatCount: chatCount,
-        settlementBadge: settlementBadge,
-        galleryCount: galleryCount,
-        placeCount: placeCount,
-        memoCount: memoCount,
-        chatLastAuthor: chatLastAuthor,
-        settlementLastDate: settlementLastDate,
-        galleryLastDate: galleryLastDate,
-        placeLastName: placeLastName,
-        memoLastTitleWord: memoLastTitleWord
-      }),
     typeof SharedSideMenuFooter === 'function' && /*#__PURE__*/React.createElement(SharedSideMenuFooter, {
       onClose: () => setIsMenuOpen(false),
       onOpenShare: onOpenShare,

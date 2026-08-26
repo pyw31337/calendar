@@ -1401,16 +1401,8 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
         )
       ),
       typeof SharedAppNavBlock === 'function' && /*#__PURE__*/React.createElement(SharedAppNavBlock, {
-        onClose: typeof SharedAppNavBlock === 'function' && /*#__PURE__*/React.createElement(SharedAppNavBlock, {
         onClose: () => setIsMemoMenuOpen(false),
         onChangeView: onChangeView,
-        chatCount: chatCount,
-        settlementBadge: settlementBadge,
-        galleryCount: galleryCount,
-        placeCount: placeCount,
-        memoCount: memoCount
-      }),
-        onChangeView: () => setIsMemoMenuOpen(false),
         chatCount: chatCount,
         settlementBadge: settlementBadge,
         galleryCount: galleryCount,

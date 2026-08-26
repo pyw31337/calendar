@@ -2021,16 +2021,8 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
         )
       ),
       typeof SharedAppNavBlock === 'function' && /*#__PURE__*/React.createElement(SharedAppNavBlock, {
-        onClose: typeof SharedAppNavBlock === 'function' && /*#__PURE__*/React.createElement(SharedAppNavBlock, {
         onClose: () => setIsPlacesMenuOpen(false),
         onChangeView: onChangeView,
-        chatCount: chatCount,
-        settlementBadge: settlementBadge,
-        galleryCount: galleryCount,
-        placeCount: placeCount,
-        memoCount: memoCount
-      }),
-        onChangeView: () => setIsPlacesMenuOpen(false),
         chatCount: chatCount,
         settlementBadge: settlementBadge,
         galleryCount: galleryCount,

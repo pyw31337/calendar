@@ -1136,9 +1136,9 @@ export function SharedAppNavBlock({
         fontSize: "0.72rem",
         fontWeight: 700,
         lineHeight: 1.2,
-        padding: "3px 9px",
-        borderRadius: "999px",
-        backgroundColor: "var(--bg-card, #FFFFFF)",
+        padding: "4px 10px",
+        borderRadius: "var(--radius-md)",
+        backgroundColor: "var(--bg-primary, #F8FAFC)",
         border: "1px solid var(--border-subtle, #E2E8F0)",
         color: "var(--text-muted, #64748B)",
         boxSizing: "border-box"

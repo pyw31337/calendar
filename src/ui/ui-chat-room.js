@@ -1992,7 +1992,6 @@ export function ChatRoomView({
     isChatNotifyEnabled: isChatNotifyEnabled,
     onToggleChatNotifications: onToggleChatNotifications,
     onOpenAppSettings: onOpenAppSettings,
-    onChangeView: onChangeView,
     chatCount: chatCount,
     settlementBadge: settlementBadge,
     galleryCount: galleryCount,

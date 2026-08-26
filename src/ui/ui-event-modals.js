@@ -2061,27 +2061,19 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
       )
     ),
     typeof SharedAppNavBlock === 'function' && /*#__PURE__*/React.createElement(SharedAppNavBlock, {
-        onClose: typeof SharedAppNavBlock === 'function' && /*#__PURE__*/React.createElement(SharedAppNavBlock, {
       onClose: () => setIsSettlementMenuOpen(false),
       onChangeView: onChangeView,
       chatCount: chatCount,
       settlementBadge: settlementBadge,
       galleryCount: galleryCount,
       placeCount: placeCount,
-      memoCount: memoCount
+      memoCount: memoCount,
+      chatLastAuthor: chatLastAuthor,
+      settlementLastDate: settlementLastDate,
+      galleryLastDate: galleryLastDate,
+      placeLastName: placeLastName,
+      memoLastTitleWord: memoLastTitleWord
     }),
-        onChangeView: () => setIsSettlementMenuOpen(false),
-        chatCount: chatCount,
-        settlementBadge: settlementBadge,
-        galleryCount: galleryCount,
-        placeCount: placeCount,
-        memoCount: memoCount,
-        chatLastAuthor: chatLastAuthor,
-        settlementLastDate: settlementLastDate,
-        galleryLastDate: galleryLastDate,
-        placeLastName: placeLastName,
-        memoLastTitleWord: memoLastTitleWord
-      }),
     typeof SharedSideMenuFooter === 'function' && /*#__PURE__*/React.createElement(SharedSideMenuFooter, {
       onClose: () => setIsSettlementMenuOpen(false),
       onOpenShare: onOpenShare,
