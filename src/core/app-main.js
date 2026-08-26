@@ -276,6 +276,10 @@ function ToggleSwitch(props) {
   const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ToggleSwitch;
   return typeof C === 'function' ? React.createElement(C, props) : null;
 }
+function SyncStatusChip(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SyncStatusChip;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
 function Footer(props) {
   const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.Footer;
   return typeof C === 'function' ? React.createElement(C, props) : null;
@@ -1141,6 +1145,14 @@ function App() {
       return true;
     }
   });
+  const [isBrowserOnline, setIsBrowserOnline] = React.useState(() => {
+    try {
+      return typeof navigator === 'undefined' ? true : navigator.onLine !== false;
+    } catch (_) {
+      return true;
+    }
+  });
+  const [syncDiag, setSyncDiag] = React.useState(null);
   const initialLoadOverlayTimerRef = React.useRef(null);
   const initialLoadOverlayIntervalRef = React.useRef(null);
   React.useEffect(() => {
@@ -1170,6 +1182,23 @@ function App() {
       if (initialLoadOverlayIntervalRef.current) clearInterval(initialLoadOverlayIntervalRef.current);
     };
   }, [isInitialDataLoading, activeCalId]);
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const handleOnline = () => setIsBrowserOnline(true);
+    const handleOffline = () => setIsBrowserOnline(false);
+    try {
+      setIsBrowserOnline(typeof navigator === 'undefined' ? true : navigator.onLine !== false);
+    } catch (_) {}
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+  React.useEffect(() => {
+    setSyncDiag(null);
+  }, [activeCalId]);
 
   // Main header: fixed full-width bar with a menu row, hides on scroll-down and reappears on
   // scroll-up (same behavior as the chat room header). Refs below are scroll targets for the
@@ -1660,6 +1689,7 @@ function App() {
             docUpdatedAt: doc.exists ? (doc.data()?.calendar?.updatedAt || null) : null,
             receivedAt: Date.now()
           };
+          setSyncDiag(window.__gatherCalendarSyncDiag);
         }
       } catch (_) {}
       const result = getCloudDocCalendar(doc, activeCalId);
@@ -1668,6 +1698,17 @@ function App() {
       }
     }, err => {
       console.warn(`Firestore realtime sync notice for cal_${activeCalId}:`, err);
+      try {
+        setSyncDiag(prev => ({
+          ...(prev || {}),
+          calendarId: activeCalId,
+          fromCache: true,
+          hasPendingWrites: false,
+          docUpdatedAt: prev?.docUpdatedAt || null,
+          receivedAt: Date.now(),
+          error: err?.message || String(err || 'realtime sync error')
+        }));
+      } catch (_) {}
       if (isMounted) {
         restoreActiveCalendarFromCache();
         setIsInitialDataLoading(false);
@@ -1751,6 +1792,58 @@ function App() {
     places: unionPlaces(rawActiveCal, placesSubcollection),
     confirmedMeeting: unionConfirmedMeetings(rawActiveCal, confirmedMeetingsSubcollection)
   }), [rawActiveCal, placesSubcollection, confirmedMeetingsSubcollection]);
+  const syncStatus = React.useMemo(() => {
+    const formatSyncTimeLabel = ts => {
+      const ms = Number(ts) || 0;
+      if (!ms) return '';
+      const d = new Date(ms);
+      if (Number.isNaN(d.getTime())) return '';
+      return `${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    };
+    const lastSyncedAt = Number(syncDiag?.receivedAt || syncDiag?.docUpdatedAt || activeCal?.updatedAt || 0) || 0;
+    const lastSyncedText = formatSyncTimeLabel(lastSyncedAt);
+    const detail = syncDiag?.error
+      ? '동기화 응답이 지연되고 있습니다.'
+      : !firebaseDb
+      ? 'Firebase 연결이 아직 준비되지 않았습니다.'
+      : !isBrowserOnline
+      ? '네트워크 연결이 끊긴 상태입니다.'
+      : isInitialDataLoading
+      ? '최신 데이터를 불러오는 중입니다.'
+      : syncDiag?.hasPendingWrites
+      ? '저장한 변경사항을 서버에 반영하는 중입니다.'
+      : syncDiag?.fromCache || !syncDiag
+      ? '캐시된 데이터를 먼저 보여주는 중입니다.'
+      : '실시간으로 반영되는 상태입니다.';
+    let status = 'live';
+    let label = '동기화됨';
+    if (!firebaseDb) {
+      status = 'offline';
+      label = '연결 안 됨';
+    } else if (syncDiag?.error) {
+      status = 'error';
+      label = '연결 지연';
+    } else if (!isBrowserOnline) {
+      status = 'offline';
+      label = '오프라인';
+    } else if (isInitialDataLoading) {
+      status = 'loading';
+      label = '동기화 중';
+    } else if (syncDiag?.hasPendingWrites) {
+      status = 'saving';
+      label = '저장 대기';
+    } else if (syncDiag?.fromCache || !syncDiag) {
+      status = 'cache';
+      label = '캐시';
+    }
+    return {
+      status,
+      label,
+      detail,
+      lastSyncedText,
+      title: [label, lastSyncedText ? `최근 ${lastSyncedText}` : '', detail].filter(Boolean).join(' · ')
+    };
+  }, [activeCal?.updatedAt, firebaseDb, isBrowserOnline, isInitialDataLoading, syncDiag]);
   React.useEffect(() => {
     if (!firebaseDb || !activeCalId) return undefined;
     let lastRefreshAt = 0;
@@ -5057,6 +5150,7 @@ function App() {
       onDeletePlace: handleDeletePlace,
       showToast: showToast,
       onRequestConfirm: showConfirmDialog,
+      syncStatus: syncStatus,
       onClose: () => { setIsModalOpen(false); setDateModalInitialTab(null); },
       onParticipantClick: handleParticipantClick
     }),
@@ -5618,6 +5712,7 @@ function App() {
       onGetChatMessageOrdinal: handleGetChatMessageOrdinal,
       onGetGalleryPhotoOrdinal: handleGetGalleryPhotoOrdinal,
       onRequestConfirm: showConfirmDialog,
+      syncStatus: syncStatus,
       externalFocusMessageId: externalFocusMsgId
     })), sharedAppOverlays));
   }
@@ -5708,6 +5803,7 @@ function App() {
         onToggleChatNotifications: handleMainToggleNotifications,
         onOpenAppSettings: () => setIsAppSettingsOpen(true),
         showToast: showToast,
+        syncStatus: syncStatus,
         ...navMenuProps
       }),
       activeLightbox ? /*#__PURE__*/React.createElement(Lightbox, {
@@ -5761,6 +5857,7 @@ function App() {
         onToggleChatNotifications: handleMainToggleNotifications,
         onOpenAppSettings: () => setIsAppSettingsOpen(true),
         onSharePlaces: () => setIsPlacesShareOpen(true),
+        syncStatus: syncStatus,
         ...navMenuProps
       }),
       isPlacesShareOpen && activeCal && /*#__PURE__*/React.createElement(ShareModal, {
@@ -5879,7 +5976,10 @@ function App() {
         window.location.href = `${window.location.pathname}?id=${activeCalId}`;
       }
     }
-  }, activeCal?.title)))), /*#__PURE__*/React.createElement("div", {
+  }, activeCal?.title), /*#__PURE__*/React.createElement(SyncStatusChip, {
+    syncStatus: syncStatus,
+    style: { flexShrink: 0 }
+  })))), /*#__PURE__*/React.createElement("div", {
     className: "header-actions"
   }, /*#__PURE__*/React.createElement("button", {
     className: "btn header-search-btn",
@@ -6000,7 +6100,8 @@ function App() {
     onOpenAppSettings: () => setIsAppSettingsOpen(true),
     onUpdateWeatherLocation: handleUpdateWeatherLocation,
     onDeleteRecentLocation: handleDeleteRecentWeatherLocation,
-    showToast: showToast
+    showToast: showToast,
+    syncStatus: syncStatus
   }), isGalleryOpen && /*#__PURE__*/React.createElement(ChatGalleryModal, {
     calendar: activeCal,
     chatMessages: chatMessages,

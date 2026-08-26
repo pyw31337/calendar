@@ -1650,6 +1650,38 @@ export function ToggleSwitch({ checked, onChange, label }) {
   }));
 }
 
+export function SyncStatusChip({ syncStatus = null, className = '', style = null }) {
+  const React = window.React;
+  const status = String(syncStatus?.status || 'live');
+  const label = String(syncStatus?.label || '동기화됨');
+  const lastSyncedText = String(syncStatus?.lastSyncedText || '').trim();
+  const detail = String(syncStatus?.detail || '').trim();
+  const title = [label, lastSyncedText ? `최근 ${lastSyncedText}` : '', detail].filter(Boolean).join(' · ') || label;
+  const mergedClassName = ['sync-status-chip', `is-${status}`, className].filter(Boolean).join(' ');
+
+  return /*#__PURE__*/React.createElement("span", {
+    role: "status",
+    className: mergedClassName,
+    title: title,
+    style: style || undefined
+  },
+    /*#__PURE__*/React.createElement("span", {
+      className: "sync-status-chip__dot",
+      "aria-hidden": "true"
+    }),
+    /*#__PURE__*/React.createElement("span", {
+      className: "sync-status-chip__text"
+    },
+      /*#__PURE__*/React.createElement("span", {
+        className: "sync-status-chip__label"
+      }, label),
+      lastSyncedText && /*#__PURE__*/React.createElement("span", {
+        className: "sync-status-chip__time"
+      }, `· ${lastSyncedText}`)
+    )
+  );
+}
+
 export function Footer() {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -1680,6 +1712,7 @@ export function Footer() {
     SegmentedToggle: SegmentedToggle,
     ItemEditDeleteActions: ItemEditDeleteActions,
     GamifiedConfirmButtonContent: GamifiedConfirmButtonContent,
+    SyncStatusChip: SyncStatusChip,
     LinkPreviewCard: LinkPreviewCard,
     LinkPreviewProgressOverlay: LinkPreviewProgressOverlay,
     DeleteConfirmModal: DeleteConfirmModal,

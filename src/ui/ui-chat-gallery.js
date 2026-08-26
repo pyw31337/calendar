@@ -751,7 +751,8 @@ export function ChatGalleryModal({
   placeCount = 0,
   memoCount = 0,
   showToast,
-  onDeletePhoto = null
+  onDeletePhoto = null,
+  syncStatus = null
 }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -764,6 +765,7 @@ export function ChatGalleryModal({
   const SharedAppNavBlock = __comp.SharedAppNavBlock || __deps.SharedAppNavBlock;
   const WeatherBadge = __comp.WeatherBadge || __deps.WeatherBadge;
   const InlineSearchBar = __comp.InlineSearchBar || __deps.InlineSearchBar;
+  const SyncStatusChip = __comp.SyncStatusChip || __deps.SyncStatusChip;
   const LinkPreviewCard = __deps.LinkPreviewCard || __comp.LinkPreviewCard;
   const MenuIcon = __deps.MenuIcon || __comp.MenuIcon;
   const MediaThumb = __comp.MediaThumb || __deps.MediaThumb;
@@ -1283,6 +1285,16 @@ export function ChatGalleryModal({
           )
         )
   ),
+  syncStatus && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      justifyContent: 'flex-end',
+      padding: asPage ? '8px 20px 0' : '8px 16px 0',
+      flexShrink: 0
+    }
+  }, /*#__PURE__*/React.createElement(SyncStatusChip, {
+    syncStatus: syncStatus
+  })),
   /*#__PURE__*/React.createElement("input", {
     ref: uploadInputRef,
     type: "file",

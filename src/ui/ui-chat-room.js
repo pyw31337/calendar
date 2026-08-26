@@ -720,6 +720,7 @@ export function ChatRoomView({
   onGetChatMessageOrdinal,
   onGetGalleryPhotoOrdinal,
   onRequestConfirm,
+  syncStatus = null,
   externalFocusMessageId = null
 ,
   onOpenAppSettings
@@ -741,6 +742,7 @@ export function ChatRoomView({
   const MegaphoneIcon = __comp.MegaphoneIcon || __deps.MegaphoneIcon;
   const EmojiPickerIcon = __comp.EmojiPickerIcon || __deps.EmojiPickerIcon;
   const ChatGalleryModal = __comp.ChatGalleryModal || __deps.ChatGalleryModal;
+  const SyncStatusChip = __comp.SyncStatusChip || __deps.SyncStatusChip;
   const ChatSideMenu = __comp.ChatSideMenu || __deps.ChatSideMenu;
   const EmojiPickerSheet = __comp.EmojiPickerSheet || __deps.EmojiPickerSheet;
   const ImageProcessingOverlay = __comp.ImageProcessingOverlay || __deps.ImageProcessingOverlay;
@@ -1543,7 +1545,16 @@ export function ChatRoomView({
       justifyContent: 'center',
       borderRadius: 'var(--radius-md)'
     }
-  }, /*#__PURE__*/React.createElement(ThreeLinesIcon, { size: 22 })))), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(ThreeLinesIcon, { size: 22 })))), syncStatus && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      justifyContent: 'flex-end',
+      padding: '8px 16px 0',
+      flexShrink: 0
+    }
+  }, /*#__PURE__*/React.createElement(SyncStatusChip, {
+    syncStatus: syncStatus
+  })), /*#__PURE__*/React.createElement("div", {
     style: { flex: 1, position: 'relative', minHeight: 0 }
   }, /*#__PURE__*/React.createElement("div", {
     ref: chatMessagesContainerRef,

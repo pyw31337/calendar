@@ -1712,6 +1712,85 @@ select.form-select {
   font-weight: 800;
   line-height: 1;
 }
+.sync-status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  border: 1px solid transparent;
+  box-sizing: border-box;
+  vertical-align: middle;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+}
+.sync-status-chip__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background-color: currentColor;
+}
+.sync-status-chip__text {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  gap: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sync-status-chip__label,
+.sync-status-chip__time {
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1;
+}
+.sync-status-chip__time {
+  font-size: 0.64rem;
+  opacity: 0.82;
+}
+.sync-status-chip.is-loading {
+  background: rgba(79, 70, 229, 0.10);
+  color: #4338CA;
+  border-color: rgba(79, 70, 229, 0.18);
+}
+.sync-status-chip.is-live {
+  background: rgba(16, 185, 129, 0.10);
+  color: #059669;
+  border-color: rgba(16, 185, 129, 0.18);
+}
+.sync-status-chip.is-cache {
+  background: rgba(59, 130, 246, 0.10);
+  color: #2563EB;
+  border-color: rgba(59, 130, 246, 0.18);
+}
+.sync-status-chip.is-offline {
+  background: rgba(148, 163, 184, 0.14);
+  color: #475569;
+  border-color: rgba(148, 163, 184, 0.24);
+}
+.sync-status-chip.is-saving {
+  background: rgba(245, 158, 11, 0.12);
+  color: #B45309;
+  border-color: rgba(245, 158, 11, 0.22);
+}
+.sync-status-chip.is-error {
+  background: rgba(239, 68, 68, 0.12);
+  color: #DC2626;
+  border-color: rgba(239, 68, 68, 0.22);
+}
+.sync-status-chip.is-loading .sync-status-chip__dot,
+.sync-status-chip.is-saving .sync-status-chip__dot {
+  animation: sync-status-pulse 1.6s ease-in-out infinite;
+}
+@keyframes sync-status-pulse {
+  0%, 100% { transform: scale(0.9); opacity: 0.7; }
+  50% { transform: scale(1.1); opacity: 1; }
+}
 .summary-title.is-toggleable {
   cursor: pointer;
   user-select: none;

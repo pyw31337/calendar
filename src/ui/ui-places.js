@@ -1118,7 +1118,7 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
 }
 
 export function PlacesView({
-  onOpenAppSettings, onChangeView, chatCount = 0, settlementBadge = null, galleryCount = 0, placeCount = 0, memoCount = 0, chatLastAuthor = null, settlementLastDate = null, galleryLastDate = null, placeLastName = null, memoLastTitleWord = null, calendar, onBack, onSavePlace, onDeletePlace, showToast, onRequestConfirm, placesInitialQuery, setPlacesInitialQuery, isDarkTheme, onToggleTheme, fontScalePercent, onDecreaseFont, onIncreaseFont, isChatNotifyEnabled, onToggleChatNotifications, onSharePlaces, onSelectDate }) {
+  onOpenAppSettings, onChangeView, chatCount = 0, settlementBadge = null, galleryCount = 0, placeCount = 0, memoCount = 0, chatLastAuthor = null, settlementLastDate = null, galleryLastDate = null, placeLastName = null, memoLastTitleWord = null, calendar, onBack, onSavePlace, onDeletePlace, showToast, onRequestConfirm, placesInitialQuery, setPlacesInitialQuery, isDarkTheme, onToggleTheme, fontScalePercent, onDecreaseFont, onIncreaseFont, isChatNotifyEnabled, onToggleChatNotifications, onSharePlaces, onSelectDate, syncStatus = null }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -1132,6 +1132,7 @@ export function PlacesView({
   const SharedSideMenuFooter = __comp.SharedSideMenuFooter || __deps.SharedSideMenuFooter;
   const SharedAppNavBlock = __comp.SharedAppNavBlock || __deps.SharedAppNavBlock;
   const WeatherBadge = __comp.WeatherBadge || __deps.WeatherBadge;
+  const SyncStatusChip = __comp.SyncStatusChip || __deps.SyncStatusChip;
   const BackArrowIcon = __deps.BackArrowIcon;
   const BuildingIcon = __deps.BuildingIcon;
   const PencilIcon = __deps.PencilIcon;
@@ -1507,6 +1508,16 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
         }, /*#__PURE__*/React.createElement(ThreeLinesIcon, { size: 22 }))
       )
     ),
+    syncStatus && /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        justifyContent: 'flex-end',
+        padding: '8px 16px 0',
+        flexShrink: 0
+      }
+    }, /*#__PURE__*/React.createElement(SyncStatusChip, {
+      syncStatus: syncStatus
+    })),
 
     /* Slide-down search input bar (shared InlineSearchBar) */
     isSearchOpen && /*#__PURE__*/React.createElement(InlineSearchBar, {
