@@ -3781,13 +3781,29 @@ function App() {
     const remainingText = String(sourceMessage.text || '').trim();
     const previousMeetings = cloneConfirmedMeetings(getConfirmedMeetings(activeCal));
     const sourceSnapshot = JSON.parse(JSON.stringify(sourceMessage));
+    // Firestore messages rules only allow a fixed key set. Client snapshots often carry `id`
+    // and other local-only fields; writing those on undo caused permission-denied / restore fail.
+    const pickMessageFieldsForWrite = (msg, { asCreate = false } = {}) => {
+      const allowed = asCreate
+        ? ['participantId', 'text', 'timestamp', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageTags', 'uploadSource', 'linkPreview']
+        : ['text', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageShareUrls', 'imageTags', 'directMediaTags', 'participantId', 'linkPreview'];
+      const out = {};
+      for (const key of allowed) {
+        if (msg && msg[key] !== undefined) out[key] = msg[key];
+      }
+      if (asCreate) {
+        if (typeof out.participantId !== 'string') out.participantId = String(msg && msg.participantId || '');
+        if (typeof out.timestamp !== 'number') out.timestamp = Number(msg && msg.timestamp) || Date.now();
+        if (out.text === undefined) out.text = typeof (msg && msg.text) === 'string' ? msg.text : '';
+      }
+      return sanitizeMessageForFirestore(out);
+    };
     const finalizeStorageDeletion = () => {
       deleteChatImageFromStorage(target.full);
       if (target.thumb !== target.full) deleteChatImageFromStorage(target.thumb);
     };
     try {
       if (nextUrls.length === 0 && !remainingText) {
-        // No images and no text left -- nothing to keep, remove the whole message.
         if (firebaseDb) {
           await firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages').doc(messageId).delete();
         } else {
@@ -3820,20 +3836,34 @@ function App() {
             if (!firebaseDb) {
               throw new Error('REST 환경에서는 전체 메시지 되돌리기를 지원하지 않습니다.');
             }
-            await firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages').doc(messageId).set(sanitizeMessageForFirestore(sourceSnapshot));
-            upsertLocalChatMessage(sourceSnapshot);
+            const createData = pickMessageFieldsForWrite(sourceSnapshot, { asCreate: true });
+            await firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages').doc(messageId).set(createData);
+            upsertLocalChatMessage({ ...sourceSnapshot, ...createData, id: messageId });
           } else {
-            const restoreData = sanitizeMessageForFirestore(sourceSnapshot);
+            const restoreData = pickMessageFieldsForWrite({
+              imageUrls: Array.isArray(sourceSnapshot.imageUrls) ? sourceSnapshot.imageUrls : (sourceSnapshot.imageUrl ? [sourceSnapshot.imageUrl] : []),
+              thumbUrls: Array.isArray(sourceSnapshot.thumbUrls) ? sourceSnapshot.thumbUrls : (sourceSnapshot.thumbUrl ? [sourceSnapshot.thumbUrl] : []),
+              imageUrl: sourceSnapshot.imageUrl || (Array.isArray(sourceSnapshot.imageUrls) ? sourceSnapshot.imageUrls[0] : null) || null,
+              thumbUrl: sourceSnapshot.thumbUrl || (Array.isArray(sourceSnapshot.thumbUrls) ? sourceSnapshot.thumbUrls[0] : null) || null,
+              imageTags: Array.isArray(sourceSnapshot.imageTags) ? sourceSnapshot.imageTags : [],
+              text: sourceSnapshot.text,
+              participantId: sourceSnapshot.participantId,
+              linkPreview: sourceSnapshot.linkPreview
+            }, { asCreate: false });
             if (firebaseDb) {
-              await withTimeout(firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages').doc(messageId).set(restoreData), 9000, 'photo delete restore write');
+              await withTimeout(firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages').doc(messageId).update(restoreData), 9000, 'photo delete restore write');
             } else {
               const ok = await updateMessageRest(activeCalId, messageId, restoreData);
               if (!ok) throw new Error('Photo delete REST restore failed');
             }
-            patchLocalChatMessage(messageId, restoreData);
+            patchLocalChatMessage(messageId, { ...restoreData, id: messageId });
           }
-          const restoredMeetings = cloneConfirmedMeetings(previousMeetings);
-          await commitConfirmedMeetings(restoredMeetings, null, [], 'restore');
+          try {
+            const restoredMeetings = cloneConfirmedMeetings(previousMeetings);
+            await commitConfirmedMeetings(restoredMeetings, null, [], 'restore');
+          } catch (meetingErr) {
+            console.warn('handleDeleteChatMessagePhoto meeting restore notice:', meetingErr);
+          }
           showToast('사진 삭제를 되돌렸습니다.', 'success', 3000);
         } catch (err) {
           console.error('handleDeleteChatMessagePhoto undo failed:', err);
