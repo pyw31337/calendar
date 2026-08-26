@@ -631,6 +631,7 @@ function App() {
       '.btn-action',
       '.modal-close-btn',
       '.icon-btn',
+      '.section-toggle-btn',
       '.chat-msg-action',
       '.day-cell',
       '.date-item-btn',
@@ -644,7 +645,19 @@ function App() {
       '.admin-side-menu-item',
       '.admin-menu-toggle-btn',
       '.places-list-item',
+      '.summary-title.is-toggleable',
       '[role="button"]'
+    ].join(',');
+
+    const layoutTransformBlocklist = [
+      '.chat-composer',
+      '.chat-room-header',
+      '.memo-view-header',
+      '.places-view-header',
+      '.gallery-page-header',
+      '.inline-search-bar',
+      '.admin-side-menu',
+      '.modal-overlay'
     ].join(',');
 
     let pressedEl = null;
@@ -657,53 +670,38 @@ function App() {
     const handlePointerDown = event => {
       if (event.pointerType === 'mouse' && event.button !== 0) return;
       const raw = event.target;
-      if (!raw || !raw.closest) return;
-      if (raw.closest && raw.closest('input, textarea, select, [contenteditable="true"]')) return;
+      if (!raw || typeof raw.closest !== 'function') return;
+      if (raw.closest('input, textarea, select, [contenteditable="true"]')) return;
       const target = raw.closest(interactiveSelector);
-      if (!target || target.closest('[data-no-press-feedback]')) return;
+      if (!target) return;
       if (target.disabled || target.getAttribute('aria-disabled') === 'true') return;
-      if (target.classList && target.classList.contains('poll-drag-handle')) return;
-      if (target.matches && target.matches('.poll-drag-handle')) return;
+      if (target.closest('[data-no-press-feedback]')) return;
+      if (target.classList.contains('poll-drag-handle')) return;
+      if (target.matches(layoutTransformBlocklist)) return;
 
       clearPress();
       pressedEl = target;
       target.classList.add('is-pressing');
       try {
-        if (target.setPointerCapture && event.pointerId != null) {
+        if (typeof target.setPointerCapture === 'function' && event.pointerId != null) {
           target.setPointerCapture(event.pointerId);
         }
       } catch (_) {}
-
-      if (motionQuery?.matches) return;
-      if (target.tagName !== 'BUTTON' && !target.classList.contains('btn')) return;
-      try {
-        if (getComputedStyle(target).position === 'static') {
-          target.style.position = 'relative';
-        }
-      } catch (_) {}
-      const rect = target.getBoundingClientRect();
-      if (rect.width < 8 || rect.height < 8) return;
-      const ripple = document.createElement('span');
-      ripple.className = 'motion-ripple';
-      ripple.style.setProperty('--ripple-x', `${event.clientX - rect.left}px`);
-      ripple.style.setProperty('--ripple-y', `${event.clientY - rect.top}px`);
-      target.appendChild(ripple);
-      ripple.addEventListener('animationend', () => ripple.remove(), { once: true });
     };
 
     const handlePointerEnd = () => clearPress();
 
-    document.addEventListener('pointerdown', handlePointerDown, { passive: true });
-    document.addEventListener('pointerup', handlePointerEnd, { passive: true });
-    document.addEventListener('pointercancel', handlePointerEnd, { passive: true });
-    document.addEventListener('lostpointercapture', handlePointerEnd, { passive: true });
+    document.addEventListener('pointerdown', handlePointerDown, { capture: true, passive: true });
+    document.addEventListener('pointerup', handlePointerEnd, { capture: true, passive: true });
+    document.addEventListener('pointercancel', handlePointerEnd, { capture: true, passive: true });
+    document.addEventListener('lostpointercapture', handlePointerEnd, { capture: true, passive: true });
     window.addEventListener('blur', handlePointerEnd);
     return () => {
       clearPress();
-      document.removeEventListener('pointerdown', handlePointerDown);
-      document.removeEventListener('pointerup', handlePointerEnd);
-      document.removeEventListener('pointercancel', handlePointerEnd);
-      document.removeEventListener('lostpointercapture', handlePointerEnd);
+      document.removeEventListener('pointerdown', handlePointerDown, { capture: true });
+      document.removeEventListener('pointerup', handlePointerEnd, { capture: true });
+      document.removeEventListener('pointercancel', handlePointerEnd, { capture: true });
+      document.removeEventListener('lostpointercapture', handlePointerEnd, { capture: true });
       window.removeEventListener('blur', handlePointerEnd);
     };
   }, []);

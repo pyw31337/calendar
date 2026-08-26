@@ -440,9 +440,9 @@ body:has(.admin-login-gate) {
     border-top: 1px solid var(--border-subtle);
   }
 }
-/* Global press feedback — stronger scale + elastic release on every control */
+/* ===== Global press feedback (all interactive controls) =====
+   JS adds .is-pressing on pointerdown (capture). CSS :active is a fallback. */
 button:not(:disabled),
-button:not(:disabled)[type],
 .btn,
 .btn-primary,
 .btn-secondary,
@@ -452,6 +452,7 @@ button:not(:disabled)[type],
 .btn-poll-create,
 .modal-close-btn,
 .icon-btn,
+.section-toggle-btn,
 .chat-composer button,
 .chat-toolbar button,
 .chat-msg-action,
@@ -467,6 +468,7 @@ button:not(:disabled)[type],
 .admin-side-menu-item,
 .admin-menu-toggle-btn,
 .places-list-item,
+.summary-title.is-toggleable,
 .gallery-page-header button,
 .memo-view-header button,
 .places-view-header button,
@@ -474,19 +476,18 @@ button:not(:disabled)[type],
 a.btn {
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
+  transform-origin: center center;
   transition:
-    transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1),
-    box-shadow 0.22s ease,
-    filter 0.18s ease,
+    transform 0.34s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.2s ease,
+    filter 0.16s ease,
     background-color 0.2s ease,
     border-color 0.2s ease,
     color 0.2s ease,
-    opacity 0.2s ease !important;
-  transform-origin: center center;
-  will-change: transform;
+    opacity 0.2s ease;
 }
+
 button.is-pressing:not(:disabled),
-button.is-pressing:not(:disabled)[type],
 .btn.is-pressing,
 .btn-primary.is-pressing,
 .btn-secondary.is-pressing,
@@ -496,6 +497,7 @@ button.is-pressing:not(:disabled)[type],
 .btn-poll-create.is-pressing,
 .modal-close-btn.is-pressing,
 .icon-btn.is-pressing,
+.section-toggle-btn.is-pressing,
 .chat-composer button.is-pressing,
 .chat-toolbar button.is-pressing,
 .chat-msg-action.is-pressing,
@@ -511,54 +513,48 @@ button.is-pressing:not(:disabled)[type],
 .admin-side-menu-item.is-pressing,
 .admin-menu-toggle-btn.is-pressing,
 .places-list-item.is-pressing,
+.summary-title.is-toggleable.is-pressing,
 .gallery-page-header button.is-pressing,
 .memo-view-header button.is-pressing,
 .places-view-header button.is-pressing,
 [role="button"].is-pressing,
 a.btn.is-pressing {
-  transform: translate3d(0, 2px, 0) scale(0.88) !important;
-  filter: brightness(0.94) !important;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.18) !important;
-  transition-duration: 0.07s !important;
-  transition-timing-function: cubic-bezier(0.25, 0.1, 0.25, 1) !important;
+  transform: translate3d(0, 2px, 0) scale(0.86) !important;
+  filter: brightness(0.93) !important;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.16) !important;
+  transition-duration: 0.06s !important;
+  transition-timing-function: ease-out !important;
 }
+
 .btn-primary.is-pressing,
 .btn-action-dark.is-pressing,
 .btn-poll-create.is-pressing {
-  transform: translate3d(0, 3px, 0) scale(0.84) !important;
-  filter: brightness(0.92) !important;
+  transform: translate3d(0, 3px, 0) scale(0.82) !important;
 }
+
 button:not(:disabled):active,
 .btn:active,
+.section-toggle-btn:active,
+.summary-title.is-toggleable:active,
+.day-cell:active,
+.date-item-btn:active,
 [role="button"]:active {
-  transform: translate3d(0, 2px, 0) scale(0.88);
-  filter: brightness(0.94);
+  transform: translate3d(0, 2px, 0) scale(0.86);
+  filter: brightness(0.93);
 }
+
 @media (prefers-reduced-motion: reduce) {
   button:not(:disabled),
   .btn,
-  .modal-close-btn,
-  .icon-btn,
-  .chat-composer button,
+  .section-toggle-btn,
   .day-cell,
   .date-item-btn,
-  .poll-card,
-  .poll-option-row,
-  .recent-log-row,
-  .search-result-row,
-  .bottom-sheet-item,
-  .poll-voter-option,
-  .main-menu-item,
-  .admin-side-menu-item,
-  .places-list-item,
-  [role="button"],
-  a.btn {
+  .summary-title.is-toggleable,
+  [role="button"] {
     transition: none !important;
-    will-change: auto !important;
   }
-  button.is-pressing:not(:disabled),
   .is-pressing,
-  button:not(:disabled):active,
+  button:active,
   .btn:active,
   [role="button"]:active {
     transform: none !important;
@@ -1770,7 +1766,7 @@ select.form-select {
   padding: 0;
   border-radius: 50%;
   cursor: pointer;
-  transition: background-color 0.16s ease, color 0.16s ease;
+  transition: background-color 0.16s ease, color 0.16s ease, transform 0.34s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 .section-toggle-btn:hover {
   background: #F1F5F9;
