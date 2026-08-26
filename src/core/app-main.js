@@ -622,9 +622,16 @@ function App() {
   React.useEffect(() => {
     const motionQuery = window.matchMedia?.('(prefers-reduced-motion: reduce)');
     const interactiveSelector = [
-      'button:not(:disabled)',
+      'button',
       'a.btn',
       '.btn',
+      '.btn-primary',
+      '.btn-secondary',
+      '.btn-danger',
+      '.btn-action',
+      '.modal-close-btn',
+      '.icon-btn',
+      '.chat-msg-action',
       '.day-cell',
       '.date-item-btn',
       '.poll-card',
@@ -635,8 +642,8 @@ function App() {
       '.poll-voter-option',
       '.main-menu-item',
       '.admin-side-menu-item',
+      '.admin-menu-toggle-btn',
       '.places-list-item',
-      '.chat-msg-action',
       '[role="button"]'
     ].join(',');
 
@@ -649,10 +656,14 @@ function App() {
 
     const handlePointerDown = event => {
       if (event.pointerType === 'mouse' && event.button !== 0) return;
-      const target = event.target?.closest?.(interactiveSelector);
+      const raw = event.target;
+      if (!raw || !raw.closest) return;
+      if (raw.closest && raw.closest('input, textarea, select, [contenteditable="true"]')) return;
+      const target = raw.closest(interactiveSelector);
       if (!target || target.closest('[data-no-press-feedback]')) return;
       if (target.disabled || target.getAttribute('aria-disabled') === 'true') return;
-      if (target.closest('.poll-drag-handle, input, textarea, select, [contenteditable="true"]')) return;
+      if (target.classList && target.classList.contains('poll-drag-handle')) return;
+      if (target.matches && target.matches('.poll-drag-handle')) return;
 
       clearPress();
       pressedEl = target;
@@ -664,11 +675,14 @@ function App() {
       } catch (_) {}
 
       if (motionQuery?.matches) return;
-      if (!target.classList.contains('btn') && target.tagName !== 'BUTTON') return;
-      if (getComputedStyle(target).position === 'static') {
-        target.style.position = 'relative';
-      }
+      if (target.tagName !== 'BUTTON' && !target.classList.contains('btn')) return;
+      try {
+        if (getComputedStyle(target).position === 'static') {
+          target.style.position = 'relative';
+        }
+      } catch (_) {}
       const rect = target.getBoundingClientRect();
+      if (rect.width < 8 || rect.height < 8) return;
       const ripple = document.createElement('span');
       ripple.className = 'motion-ripple';
       ripple.style.setProperty('--ripple-x', `${event.clientX - rect.left}px`);
