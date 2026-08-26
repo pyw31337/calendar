@@ -5318,6 +5318,8 @@ function App() {
       // "2026-08-24" or ISO
       const m = ts.match(/^(\d{4})-(\d{2})-(\d{2})/);
       if (m) return `${m[2]}.${m[3]}`;
+      const md = ts.match(/^(?:\d{2}|\d{4})\.(\d{2})\.(\d{2})/);
+      if (md) return `${md[1]}.${md[2]}`;
       const parsed = Date.parse(ts);
       if (!Number.isNaN(parsed)) d = new Date(parsed);
     } else if (ts && typeof ts.toDate === 'function') {
