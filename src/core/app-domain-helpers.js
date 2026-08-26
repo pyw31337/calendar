@@ -752,6 +752,14 @@ function describePushSubscribeFailure(...args) {
   const f = (window.GATHER_APP_NOTIFICATIONS || {}).describePushSubscribeFailure;
   return typeof f === 'function' ? f(...args) : undefined;
 }
+function getOrCreateDeviceId(...args) {
+  const f = (window.GATHER_APP_NOTIFICATIONS || {}).getOrCreateDeviceId;
+  return typeof f === 'function' ? f(...args) : ('dev_' + Math.random().toString(36).slice(2, 10));
+}
+function getDeviceLabel(...args) {
+  const f = (window.GATHER_APP_NOTIFICATIONS || {}).getDeviceLabel;
+  return typeof f === 'function' ? f(...args) : '이 기기';
+}
 function getNotificationDiagnostics(...args) {
   const f = (window.GATHER_APP_NOTIFICATIONS || {}).getNotificationDiagnostics;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -880,16 +888,32 @@ async function subscribeUserToPush(calendarId, activeParticipantId, options = {}
       // sender" check server-side and making the admin's subscriber list wrong.
       const participantId = activeParticipantId;
       const subId = getSubscriptionHashId(subscription.endpoint);
+      const nowTs = Date.now();
+      let channelPrefs = { chat: true, memo: true, poll: true, schedule: true };
+      try {
+        if (typeof getNotifyChannels === 'function') channelPrefs = getNotifyChannels() || channelPrefs;
+      } catch (_) {}
+      const deviceId = typeof getOrCreateDeviceId === 'function' ? getOrCreateDeviceId() : ('dev_' + String(nowTs));
+      const deviceLabel = typeof getDeviceLabel === 'function' ? getDeviceLabel() : '이 기기';
       await window.__gatherFirebaseDb.collection('calendars').doc('cal_' + calendarId).collection('push_subscriptions').doc(subId).set({
         endpoint: subscription.endpoint,
         keys: {
           auth: arrayBufferToBase64(subscription.getKey('auth')),
           p256dh: arrayBufferToBase64(subscription.getKey('p256dh'))
         },
-        participantId: participantId,
-        createdAt: Date.now(),
-        userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
-        updatedAt: Date.now()
+        participantId: participantId || 'anonymous',
+        createdAt: nowTs,
+        userAgent: typeof navigator !== 'undefined' ? String(navigator.userAgent || '').slice(0, 600) : '',
+        updatedAt: nowTs,
+        lastSeenAt: nowTs,
+        deviceId: String(deviceId).slice(0, 80),
+        deviceLabel: String(deviceLabel).slice(0, 120),
+        channels: {
+          chat: channelPrefs.chat !== false,
+          memo: channelPrefs.memo !== false,
+          poll: channelPrefs.poll !== false,
+          schedule: channelPrefs.schedule !== false
+        }
       }, { merge: true });
       try {
         getLocalStorage().setItem('gather_push_health_' + calendarId, JSON.stringify({
@@ -913,9 +937,16 @@ async function ensurePushSubscriptionHealthy(calendarId, activeParticipantId) {
   if (!isNotificationSupported() || Notification.permission !== 'granted') {
     return { ok: false, reason: 'permission-not-granted' };
   }
-  if (typeof isChatNotifyEnabledForCalendar === 'function' && !isChatNotifyEnabledForCalendar(calendarId)) {
-    return { ok: false, reason: 'pref-disabled' };
-  }
+  // Prefer re-register whenever permission is granted; channel prefs are stored on the sub doc.
+  // Only skip when the user has explicitly muted this calendar's master chat-notify flag AND
+  // every channel is off.
+  try {
+    const ch = typeof getNotifyChannels === 'function' ? getNotifyChannels() : null;
+    const anyChannel = !ch || ch.chat !== false || ch.memo !== false || ch.poll !== false || ch.schedule !== false;
+    if (typeof isChatNotifyEnabledForCalendar === 'function' && !isChatNotifyEnabledForCalendar(calendarId) && !anyChannel) {
+      return { ok: false, reason: 'pref-disabled' };
+    }
+  } catch (_) {}
   try {
     const registration = await navigator.serviceWorker.ready;
     const subscription = registration.pushManager ? await registration.pushManager.getSubscription() : null;
@@ -2018,6 +2049,8 @@ export {
   setStoredChatParticipantId,
   describePushSubscribeFailure,
   getNotificationDiagnostics,
+  getDeviceLabel,
+  getOrCreateDeviceId,
   classifyPushSubscribeError,
   getBrowserLabelForNotifications,
   getNotificationPermissionHelpSteps,

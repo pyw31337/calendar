@@ -5168,7 +5168,7 @@ function App() {
         setMainChatNotifyEnabled(isChatNotifyEnabledForCalendar(activeCalId));
       },
       notifyChannels: notifyChannels,
-      onToggleNotifyChannel: (key) => {
+      onToggleNotifyChannel: async (key) => {
         if (typeof setNotifyChannel !== 'function') return;
         const next = setNotifyChannel(key, !(notifyChannels && notifyChannels[key]));
         setNotifyChannelsState(next);
@@ -5176,7 +5176,14 @@ function App() {
           setChatNotifyEnabledForCalendar(activeCalId, !!(next && next.chat));
           setMainChatNotifyEnabled(!!(next && next.chat));
         }
+        // Channel turned on → force re-register this device so server has channel prefs
+        if (next && next[key]) {
+          try { await handleForcePushReregister(); } catch (_) {}
+        }
       },
+      calendarId: activeCalId,
+      activeParticipantId: typeof getCurrentChatParticipantId === 'function' ? getCurrentChatParticipantId() : chatParticipantId,
+      onForcePushReregister: handleForcePushReregister,
       weatherLocation: activeCal && activeCal.weatherLocation,
       recentLocations: (activeCal && activeCal.recentLocations) || [],
       onUpdateWeatherLocation: handleUpdateWeatherLocation,
@@ -5263,7 +5270,7 @@ function App() {
         setMainChatNotifyEnabled(isChatNotifyEnabledForCalendar(activeCalId));
       },
       notifyChannels: notifyChannels,
-      onToggleNotifyChannel: (key) => {
+      onToggleNotifyChannel: async (key) => {
         if (typeof setNotifyChannel !== 'function') return;
         const next = setNotifyChannel(key, !(notifyChannels && notifyChannels[key]));
         setNotifyChannelsState(next);
@@ -5271,7 +5278,14 @@ function App() {
           setChatNotifyEnabledForCalendar(activeCalId, !!(next && next.chat));
           setMainChatNotifyEnabled(!!(next && next.chat));
         }
+        // Channel turned on → force re-register this device so server has channel prefs
+        if (next && next[key]) {
+          try { await handleForcePushReregister(); } catch (_) {}
+        }
       },
+      calendarId: activeCalId,
+      activeParticipantId: typeof getCurrentChatParticipantId === 'function' ? getCurrentChatParticipantId() : chatParticipantId,
+      onForcePushReregister: handleForcePushReregister,
       weatherLocation: activeCal && activeCal.weatherLocation,
       recentLocations: (activeCal && activeCal.recentLocations) || [],
       onUpdateWeatherLocation: handleUpdateWeatherLocation,

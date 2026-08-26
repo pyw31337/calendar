@@ -22,6 +22,54 @@ function ensureVapidConfigured() {
   vapidConfigured = true;
 }
 
+
+/** Shared push broadcast for a calendar's push_subscriptions */
+async function broadcastCalendarPush(calendarDocId, payloadObj, options = {}) {
+  ensureVapidConfigured();
+  const db = admin.firestore();
+  const skipParticipantId = options.skipParticipantId || null;
+  const channel = options.channel || 'chat'; // chat | memo | poll | schedule
+  const subSnap = await db.collection('calendars').doc(calendarDocId).collection('push_subscriptions').get();
+  if (subSnap.empty) {
+    console.log('No push subscriptions for', calendarDocId);
+    return { sent: 0 };
+  }
+  const payload = JSON.stringify(payloadObj);
+  const promises = [];
+  let skipped = 0;
+  subSnap.forEach(doc => {
+    const data = doc.data() || {};
+    if (skipParticipantId && data.participantId === skipParticipantId) {
+      skipped += 1;
+      return;
+    }
+    // Channel filter: legacy docs without channels → chat only
+    const ch = data.channels;
+    if (ch && typeof ch === 'object') {
+      if (ch[channel] === false) { skipped += 1; return; }
+    } else if (channel !== 'chat') {
+      skipped += 1;
+      return;
+    }
+    const pushSubscription = {
+      endpoint: data.endpoint,
+      keys: { auth: data.keys && data.keys.auth, p256dh: data.keys && data.keys.p256dh }
+    };
+    const p = webpush.sendNotification(pushSubscription, payload, { urgency: 'high' })
+      .then(() => console.log('Push ok', doc.id, channel))
+      .catch(err => {
+        console.error('Push fail', doc.id, err && err.statusCode);
+        if (err.statusCode === 410 || err.statusCode === 404 || err.statusCode === 400 || err.statusCode === 403) {
+          return doc.ref.delete();
+        }
+      });
+    promises.push(p);
+  });
+  await Promise.all(promises);
+  return { sent: promises.length, skipped };
+}
+
+
 exports.onMessageCreate = functions.runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).firestore
   .document('calendars/{calendarDocId}/messages/{messageId}')
   .onCreate(async (snapshot, context) => {
@@ -54,73 +102,13 @@ exports.onMessageCreate = functions.runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).
     const sender = participants.find(p => p.id === senderId) || { name: '알수없음' };
     const senderName = sender.name;
     
-    // 3. Format push payload
     const bodyText = message.text?.trim() || (message.imageUrls?.length || message.imageUrl ? '사진을 보냈습니다' : '새 메시지가 도착했습니다');
-    
-    const payload = JSON.stringify({
+    await broadcastCalendarPush(calendarDocId, {
       title: `${calendarTitle} · ${senderName}`,
       body: bodyText,
       url: `./?id=${calendarDocId.replace('cal_', '')}&view=chat`,
       tag: `chat-${calendarDocId}`
-    });
-    
-    // 4. Retrieve push subscriptions
-    const subSnap = await db.collection('calendars').doc(calendarDocId).collection('push_subscriptions').get();
-    if (subSnap.empty) {
-      console.log('No push subscriptions for calendar:', calendarDocId);
-      return;
-    }
-    
-    // 5. Broadcast push notifications to all participants except the sender
-    const promises = [];
-    let totalSubscriptions = 0;
-    let skippedSenderSubscriptions = 0;
-    subSnap.forEach(doc => {
-      const data = doc.data();
-      totalSubscriptions += 1;
-      
-      // Prevent echoing pushes back to the sender
-      if (data.participantId === senderId) {
-        skippedSenderSubscriptions += 1;
-        return;
-      }
-      
-      const pushSubscription = {
-        endpoint: data.endpoint,
-        keys: {
-          auth: data.keys?.auth,
-          p256dh: data.keys?.p256dh
-        }
-      };
-      
-      // urgency: 'high' tells the push service (FCM under the hood for Chrome/Android) this is
-      // worth waking the device for immediately -- without it, web-push sends no Urgency header
-      // at all, which FCM treats as normal priority and can defer for a long stretch under
-      // Android's battery-saving throttling even while the device has general connectivity
-      // elsewhere (e.g. the recipient actively using this same app in a foreground tab doesn't by
-      // itself flush a queued *background* push -- that's a separate OS-managed channel). A chat
-      // message notification is exactly the time-sensitive case high urgency exists for.
-      const p = webpush.sendNotification(pushSubscription, payload, { urgency: 'high' })
-        .then(() => {
-          console.log(`Push sent successfully to subscription: ${doc.id}`);
-        })
-        .catch(err => {
-          console.error(`Failed to send push to sub ${doc.id}:`, err);
-          // If endpoint is expired or unregistered (HTTP 410 or 404), clean it up from database
-          if (err.statusCode === 410 || err.statusCode === 404 || err.statusCode === 400 || err.statusCode === 403) {
-            console.log(`Removing expired subscription: ${doc.id}`);
-            return doc.ref.delete();
-          }
-        });
-      promises.push(p);
-    });
-    console.log(`Push subscription scan for ${calendarDocId}: total=${totalSubscriptions}, skippedSender=${skippedSenderSubscriptions}, targets=${promises.length}`);
-    if (promises.length === 0) {
-      console.log('No push targets after sender filtering:', calendarDocId);
-      return;
-    }
-    
-    await Promise.all(promises);
+    }, { skipParticipantId: senderId, channel: 'chat' });
   });
 
 // Mirrors the client's getAnniversariesForDate matching logic (index.html) so a lunar birthday
@@ -158,6 +146,71 @@ function isAnniversaryToday(ann, y, m, d) {
 // and pushes to every subscriber of a calendar with a match today. New Cloud Function; requires
 // `firebase deploy --only functions` to go live (unlike the rest of this app, which redeploys
 // automatically via GitHub Pages on merge to main).
+
+// Memo created → push (channel: memo)
+exports.onMemoCreate = functions.runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).firestore
+  .document('calendars/{calendarDocId}/memos/{memoId}')
+  .onCreate(async (snapshot, context) => {
+    const calendarDocId = context.params.calendarDocId;
+    const memo = snapshot.data() || {};
+    const db = admin.firestore();
+    const calendarSnap = await db.collection('calendars').doc(calendarDocId).get();
+    if (!calendarSnap.exists) return;
+    const calendarData = calendarSnap.data().calendar || {};
+    const calendarTitle = calendarData.title || '모여라 캘린더';
+    const author = memo.authorName || memo.participantName || '참여자';
+    const body = (memo.text || memo.title || '새 메모').toString().trim().slice(0, 120) || '새 메모가 등록되었습니다';
+    await broadcastCalendarPush(calendarDocId, {
+      title: `${calendarTitle} · 메모`,
+      body: `${author}: ${body}`,
+      url: `./?id=${calendarDocId.replace('cal_', '')}&view=memo`,
+      tag: `memo-${calendarDocId}-${context.params.memoId}`
+    }, { skipParticipantId: memo.participantId || memo.authorId || null, channel: 'memo' });
+  });
+
+// Confirmed meeting write → schedule channel
+exports.onConfirmedMeetingCreate = functions.runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).firestore
+  .document('calendars/{calendarDocId}/confirmedMeetings/{dateId}')
+  .onCreate(async (snapshot, context) => {
+    const calendarDocId = context.params.calendarDocId;
+    const after = snapshot.data() || {};
+    const db = admin.firestore();
+    const calendarSnap = await db.collection('calendars').doc(calendarDocId).get();
+    if (!calendarSnap.exists) return;
+    const calendarData = calendarSnap.data().calendar || {};
+    const calendarTitle = calendarData.title || '모여라 캘린더';
+    const dateLabel = context.params.dateId || after.date || '';
+    await broadcastCalendarPush(calendarDocId, {
+      title: `${calendarTitle} · 모임 확정`,
+      body: dateLabel ? `${dateLabel} 모임이 확정되었습니다` : '모임이 확정되었습니다',
+      url: `./?id=${calendarDocId.replace('cal_', '')}`,
+      tag: `schedule-${calendarDocId}-${dateLabel}`
+    }, { channel: 'schedule' });
+  });
+
+// Calendar document write → detect new polls
+exports.onCalendarDocWrite = functions.runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).firestore
+  .document('calendars/{calendarDocId}')
+  .onUpdate(async (change, context) => {
+    const beforeCal = (change.before.data() || {}).calendar || {};
+    const afterCal = (change.after.data() || {}).calendar || {};
+    const beforePolls = Array.isArray(beforeCal.polls) ? beforeCal.polls : [];
+    const afterPolls = Array.isArray(afterCal.polls) ? afterCal.polls : [];
+    const beforeIds = new Set(beforePolls.map(p => p && p.id).filter(Boolean));
+    const newPolls = afterPolls.filter(p => p && p.id && !beforeIds.has(p.id));
+    if (newPolls.length === 0) return;
+    const calendarDocId = context.params.calendarDocId;
+    const calendarTitle = afterCal.title || '모여라 캘린더';
+    for (const poll of newPolls) {
+      await broadcastCalendarPush(calendarDocId, {
+        title: `${calendarTitle} · 투표`,
+        body: poll.title ? `새 투표: ${poll.title}` : '새 투표가 등록되었습니다',
+        url: `./?id=${calendarDocId.replace('cal_', '')}`,
+        tag: `poll-${calendarDocId}-${poll.id}`
+      }, { channel: 'poll' });
+    }
+  });
+
 exports.sendAnniversaryReminders = functions.runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).pubsub.schedule('0 9 * * *').timeZone('Asia/Seoul').onRun(async () => {
   ensureVapidConfigured();
   const kstParts = new Intl.DateTimeFormat('en-CA', {

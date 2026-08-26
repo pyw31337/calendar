@@ -149,6 +149,44 @@ function isNotificationSupported() {
     return map[reason] || reason || '알 수 없는 오류';
   }
 
+
+  function getOrCreateDeviceId() {
+    try {
+      const ls = typeof localStorage !== 'undefined' ? localStorage : null;
+      if (!ls) return 'dev_' + Math.random().toString(36).slice(2, 10);
+      let id = ls.getItem('gather_device_id_v1');
+      if (!id) {
+        id = 'dev_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
+        ls.setItem('gather_device_id_v1', id);
+      }
+      return id;
+    } catch (_) {
+      return 'dev_anon';
+    }
+  }
+
+  function getDeviceLabel() {
+    try {
+      const ua = (typeof navigator !== 'undefined' && navigator.userAgent) ? navigator.userAgent : '';
+      let os = '기기';
+      if (/iPhone|iPad|iPod/i.test(ua)) os = 'iPhone/iPad';
+      else if (/Android/i.test(ua)) os = 'Android';
+      else if (/Mac OS X/i.test(ua)) os = 'Mac';
+      else if (/Windows/i.test(ua)) os = 'Windows';
+      else if (/Linux/i.test(ua)) os = 'Linux';
+      let browser = 'Browser';
+      if (/Edg\//i.test(ua)) browser = 'Edge';
+      else if (/SamsungBrowser/i.test(ua)) browser = 'Samsung';
+      else if (/Chrome\//i.test(ua) && !/Edg\//i.test(ua)) browser = 'Chrome';
+      else if (/Safari\//i.test(ua) && !/Chrome\//i.test(ua)) browser = 'Safari';
+      else if (/Firefox\//i.test(ua)) browser = 'Firefox';
+      const standalone = (typeof window !== 'undefined' && (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true));
+      return os + ' · ' + browser + (standalone ? ' (앱)' : '');
+    } catch (_) {
+      return '이 기기';
+    }
+  }
+
   function getNotificationDiagnostics() {
     const rows = [];
     const add = (label, ok, detail) => rows.push({ label, ok, detail });
@@ -309,6 +347,8 @@ function isNotificationSupported() {
     getStoredChatParticipantId,
     setStoredChatParticipantId,
     describePushSubscribeFailure,
+    getOrCreateDeviceId,
+    getDeviceLabel,
     getNotificationDiagnostics,
     classifyPushSubscribeError,
     getNotifGuideSeen,
