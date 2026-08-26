@@ -994,6 +994,11 @@ export function ChatSideMenu({
   galleryCount = 0,
   placeCount = 0,
   memoCount = 0,
+  chatLastAuthor = null,
+  settlementLastDate = null,
+  galleryLastDate = null,
+  placeLastName = null,
+  memoLastTitleWord = null,
   weatherLocation = null
 }) {
   const React = window.React;

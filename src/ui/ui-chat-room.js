@@ -729,7 +729,12 @@ export function ChatRoomView({
   settlementBadge = null,
   galleryCount = 0,
   placeCount = 0,
-  memoCount = 0
+  memoCount = 0,
+  chatLastAuthor = null,
+  settlementLastDate = null,
+  galleryLastDate = null,
+  placeLastName = null,
+  memoLastTitleWord = null
 }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -2010,7 +2015,12 @@ export function ChatRoomView({
     settlementBadge: settlementBadge,
     galleryCount: galleryCount,
     placeCount: placeCount,
-    memoCount: memoCount
+    memoCount: memoCount,
+    chatLastAuthor: chatLastAuthor,
+    settlementLastDate: settlementLastDate,
+    galleryLastDate: galleryLastDate,
+    placeLastName: placeLastName,
+    memoLastTitleWord: memoLastTitleWord
   }),
   isChatGalleryOpen && /*#__PURE__*/React.createElement(ChatGalleryModal, {
     chatMessages: chatMessages,
