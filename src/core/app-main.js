@@ -2533,6 +2533,7 @@ function App() {
   const handleConfirmDeleteMessage = async () => {
     if (!deletingMessage) return;
     const { id, calId } = deletingMessage;
+    const sourceSnapshot = JSON.parse(JSON.stringify(deletingMessage));
     try {
       let ok = false;
       if (firebaseDb) {
@@ -2542,16 +2543,40 @@ function App() {
         ok = await deleteMessageRest(calId, id);
       }
       if (ok) {
-        // Optimistic local remove: do not wait for onSnapshot. Messages loaded via
-        // "older chat" live in olderChatMessages; the live listener only rewrites
-        // chatMessages, so without this the bubble can stay until a full refresh.
         removeLocalChatMessage(id);
-        deleteAllChatImagesFromStorage(deletingMessage);
         await unlinkMeetingPhotoReferences(id, null);
         if (!firebaseDb) {
           fetchChatMessagesRest(calId).then(list => setChatMessages(list));
         }
-        showToast('삭제완료', 'success', 3000);
+        const finalizeStorage = () => { deleteAllChatImagesFromStorage(sourceSnapshot); };
+        const restoreMessage = async () => {
+          try {
+            const allowed = ['participantId', 'text', 'timestamp', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageTags', 'uploadSource', 'linkPreview'];
+            const createData = {};
+            for (const key of allowed) {
+              if (sourceSnapshot[key] !== undefined) createData[key] = sourceSnapshot[key];
+            }
+            if (typeof createData.participantId !== 'string') createData.participantId = String(sourceSnapshot.participantId || '');
+            if (typeof createData.timestamp !== 'number') createData.timestamp = Number(sourceSnapshot.timestamp) || Date.now();
+            if (createData.text === undefined) createData.text = String(sourceSnapshot.text || '');
+            const data = sanitizeMessageForFirestore(createData);
+            if (firebaseDb) {
+              await firebaseDb.collection('calendars').doc(`cal_${calId}`).collection('messages').doc(id).set(data);
+            } else {
+              throw new Error('REST 환경에서는 메시지 되돌리기를 지원하지 않습니다.');
+            }
+            upsertLocalChatMessage({ ...sourceSnapshot, ...data, id });
+            showToast('메시지 삭제를 되돌렸습니다.', 'success', 3000);
+          } catch (err) {
+            console.error('handleConfirmDeleteMessage undo failed:', err);
+            showToast('메시지 복원 실패', 'error', 4000);
+          }
+        };
+        if (firebaseDb) {
+          showUndoableDeleteToast('메시지가 삭제되었습니다.', restoreMessage, finalizeStorage, 5000);
+        } else {
+          showToast('삭제완료', 'delete', 3000, null, finalizeStorage);
+        }
       } else {
         showToast('삭제 실패', 'error', 3000);
       }
@@ -2653,22 +2678,49 @@ function App() {
         ok = await updateMessageRest(calId, id, data);
       }
       if (ok) {
-        // Clean up Storage only for images the user actually removed, not ones kept.
+        const previousRestore = {
+          text: editingMessage.text || '',
+          imageUrl: editingMessage.imageUrl || '',
+          thumbUrl: editingMessage.thumbUrl || '',
+          imageUrls: Array.isArray(editingMessage.imageUrls) ? editingMessage.imageUrls : (editingMessage.imageUrl ? [editingMessage.imageUrl] : []),
+          thumbUrls: Array.isArray(editingMessage.thumbUrls) ? editingMessage.thumbUrls : (editingMessage.thumbUrl ? [editingMessage.thumbUrl] : []),
+          imageTags: Array.isArray(editingMessage.imageTags) ? editingMessage.imageTags : [],
+          linkPreview: editingMessage.linkPreview || null,
+          participantId: editingMessage.participantId
+        };
         const originalEntries = Array.isArray(editingMessage.imageUrls) && editingMessage.imageUrls.length > 0
           ? editingMessage.imageUrls.map((url, idx) => ({ original: url, thumbnail: (editingMessage.thumbUrls || [])[idx] || url }))
           : (editingMessage.imageUrl ? [{ original: editingMessage.imageUrl, thumbnail: editingMessage.thumbUrl || editingMessage.imageUrl }] : []);
         const keptOriginals = new Set((newImages || []).filter(img => img.isExisting).map(img => img.original));
         const removedEntries = originalEntries.filter(entry => !keptOriginals.has(entry.original));
-        if (removedEntries.length > 0) {
-          deleteAllChatImagesFromStorage({
-            imageUrls: removedEntries.map(e => e.original),
-            thumbUrls: removedEntries.map(e => e.thumbnail)
-          });
-        }
+        const finalizeRemovedStorage = () => {
+          if (removedEntries.length > 0) {
+            deleteAllChatImagesFromStorage({
+              imageUrls: removedEntries.map(e => e.original),
+              thumbUrls: removedEntries.map(e => e.thumbnail)
+            });
+          }
+        };
+        patchLocalChatMessage(id, data);
         if (!firebaseDb) {
           fetchChatMessagesRest(calId).then(list => setChatMessages(list));
         }
-        showToast('수정완료', 'success', 3000);
+        showToast('메시지가 수정되었습니다.', 'success', 5000, async () => {
+          try {
+            const restoreData = sanitizeMessageForFirestore(previousRestore);
+            if (firebaseDb) {
+              await firebaseDb.collection('calendars').doc(`cal_${calId}`).collection('messages').doc(id).update(restoreData);
+            } else {
+              const restored = await updateMessageRest(calId, id, restoreData);
+              if (!restored) throw new Error('REST restore failed');
+            }
+            patchLocalChatMessage(id, restoreData);
+            showToast('메시지 수정을 되돌렸습니다.', 'success', 3000);
+          } catch (err) {
+            console.error('handleSaveEditMessage undo failed:', err);
+            showToast('수정 되돌리기 실패', 'error', 4000);
+          }
+        }, finalizeRemovedStorage);
       } else {
         showToast('수정 실패', 'error', 3000);
       }
@@ -3217,28 +3269,49 @@ function App() {
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
     return updateCalendars(nextCalendars, `${validDates.length}건 일괄 등록완료`, 'success', updatedCal.id, 'availability', activityLogs);
   };
-  const handleDeleteAvailability = (dateStr, participantId) => {
+  const handleDeleteAvailability = async (dateStr, participantId) => {
     if (!activeCal || !isValidDateString(dateStr)) return false;
     const activeParticipantIds = new Set(getActiveParticipants(activeCal).map(participant => participant.id));
     if (!activeParticipantIds.has(participantId)) return false;
     const now = Date.now();
     const targetEntry = (activeCal.availabilities || []).find(e => e.date === dateStr && e.participantId === participantId && !isTombstone(e));
     if (!targetEntry) return false;
+    const entrySnapshot = JSON.parse(JSON.stringify(targetEntry));
+    const calId = activeCal.id;
     const nextAvail = (activeCal.availabilities || []).map(e => e.date === dateStr && e.participantId === participantId ? {
-      ...e,
-      deletedAt: now,
-      updatedAt: now
+      ...e, deletedAt: now, updatedAt: now
     } : e);
     const activityLog = createActivityLog(activeCal.id, 'delete', dateStr, participantId, now, targetEntry.note || '');
     const updatedCal = {
-      ...activeCal,
-      updatedAt: now,
-      revision: (activeCal.revision || 0) + 1,
+      ...activeCal, updatedAt: now, revision: (activeCal.revision || 0) + 1,
       availabilities: nextAvail,
       activityLogs: activityLog ? [...getCalendarActivityLogs(activeCal), activityLog] : getCalendarActivityLogs(activeCal)
     };
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-    return updateCalendars(nextCalendars, '삭제완료', 'delete', updatedCal.id, 'availability', activityLog ? [activityLog] : []);
+    const ok = await updateCalendars(nextCalendars, null, null, updatedCal.id, 'availability', activityLog ? [activityLog] : []);
+    if (ok) {
+      showUndoableDeleteToast('참석이 삭제되었습니다.', async () => {
+        try {
+          const restoreNow = Date.now();
+          const latestCal = calendarsRef.current.find(c => c.id === calId) || updatedCal;
+          const restoredAvail = (latestCal.availabilities || []).map(e =>
+            (e.date === dateStr && e.participantId === participantId)
+              ? { ...entrySnapshot, deletedAt: null, updatedAt: restoreNow } : e);
+          const restoreLog = createActivityLog(calId, 'update', dateStr, participantId, restoreNow, entrySnapshot.note || '');
+          const restoredCal = {
+            ...latestCal, updatedAt: restoreNow, revision: (latestCal.revision || 0) + 1,
+            availabilities: restoredAvail,
+            activityLogs: restoreLog ? [...getCalendarActivityLogs(latestCal), restoreLog] : getCalendarActivityLogs(latestCal)
+          };
+          const next = calendarsRef.current.map(c => c.id === restoredCal.id ? restoredCal : c);
+          await updateCalendars(next, '참석 삭제를 되돌렸습니다.', 'success', restoredCal.id, 'availability', restoreLog ? [restoreLog] : []);
+        } catch (err) {
+          console.error('handleDeleteAvailability undo failed:', err);
+          showToast('참석 복원 실패', 'error', 4000);
+        }
+      }, null, 5000);
+    }
+    return ok;
   };
   const handleDeleteAllForDate = async dateStr => {
     if (!activeCal || !isValidDateString(dateStr)) return false;
@@ -3432,8 +3505,7 @@ function App() {
     const expenseActivityLog = createActivityLog(activeCal.id, isEditing ? 'expense_update' : 'expense_create', dateStr, '', now, expenseLogNote);
     return commitConfirmedMeetings(nextConfirmedMeetings, '지출 저장완료', expenseActivityLog ? [expenseActivityLog] : []);
   };
-  const handleDeleteExpense = (dateStr, expenseId) => {
-    // Confirm rule: UI layer (DateModal) shows confirm once. Do not confirm again here.
+  const handleDeleteExpense = async (dateStr, expenseId) => {
     if (!activeCal || !isValidDateString(dateStr)) return false;
     const existingMeetings = getConfirmedMeetings(activeCal);
     const meetingIndex = existingMeetings.findIndex(m => m.date === dateStr);
@@ -3441,7 +3513,7 @@ function App() {
     const meeting = existingMeetings[meetingIndex];
     const deletedExpense = (Array.isArray(meeting.expenses) ? meeting.expenses : []).find(e => e.id === expenseId);
     if (!deletedExpense) return false;
-
+    const previousMeetings = cloneConfirmedMeetings(existingMeetings);
     const nextExpenses = (Array.isArray(meeting.expenses) ? meeting.expenses : []).filter(e => e.id !== expenseId);
     const now = Date.now();
     const nextConfirmedMeetings = existingMeetings.map((m, i) => i === meetingIndex ? { ...m, expenses: nextExpenses } : m);
@@ -3450,7 +3522,18 @@ function App() {
       120
     );
     const expenseActivityLog = createActivityLog(activeCal.id, 'expense_delete', dateStr, '', now, expenseLogNote);
-    return commitConfirmedMeetings(nextConfirmedMeetings, '지출 삭제완료', expenseActivityLog ? [expenseActivityLog] : []);
+    const ok = await commitConfirmedMeetings(nextConfirmedMeetings, null, expenseActivityLog ? [expenseActivityLog] : []);
+    if (ok) {
+      showUndoableDeleteToast('지출이 삭제되었습니다.', async () => {
+        try {
+          await commitConfirmedMeetings(previousMeetings, '지출 삭제를 되돌렸습니다.', [], 'restore');
+        } catch (err) {
+          console.error('handleDeleteExpense undo failed:', err);
+          showToast('지출 복원 실패', 'error', 4000);
+        }
+      }, null, 5000);
+    }
+    return ok;
   };
 
   const handleReorderExpenses = (dateStr, orderedExpenseIds) => {
@@ -4426,31 +4509,54 @@ function App() {
     writePlacesToFirestore(activeCal.id, nextPlaces).catch(e => console.warn('Subcollection places write failed:', e));
     return updateCalendars(nextCalendars, isEditing ? '장소 수정완료' : '장소 등록완료', 'success', updatedCal.id, 'settings', placeActivityLog ? [placeActivityLog] : []);
   };
-  const handleDeletePlace = (placeId) => {
+  const handleDeletePlace = async (placeId) => {
     if (!activeCal || !placeId) return false;
+    const existingPlaces = getCalendarPlaces(activeCal);
+    const deletedPlace = existingPlaces.find(p => p.id === placeId);
+    if (!deletedPlace) return false;
+    const placeSnapshot = JSON.parse(JSON.stringify(deletedPlace));
+    const calId = activeCal.id;
     if (firebaseDb) {
       try {
-        firebaseDb.collection('calendars').doc(`cal_${activeCal.id}`).collection('places').doc(placeId).delete().catch(e => {});
+        await firebaseDb.collection('calendars').doc(`cal_${calId}`).collection('places').doc(placeId).delete();
       } catch (e) {
         console.warn('Failed to delete place from Firestore:', e);
       }
     }
-    const existingPlaces = getCalendarPlaces(activeCal);
-    const deletedPlace = existingPlaces.find(p => p.id === placeId);
-    if (!deletedPlace) return false;
     const now = Date.now();
     const nextPlaces = existingPlaces.filter(p => p.id !== placeId);
     const placeActivityLog = createActivityLog(activeCal.id, 'place_delete', '', '', now, deletedPlace.name || '장소');
     const updatedCal = {
-      ...activeCal,
-      places: nextPlaces,
-      updatedAt: now,
-      revision: (activeCal.revision || 0) + 1,
+      ...activeCal, places: nextPlaces, updatedAt: now, revision: (activeCal.revision || 0) + 1,
       activityLogs: placeActivityLog ? [...getCalendarActivityLogs(activeCal), placeActivityLog] : getCalendarActivityLogs(activeCal)
     };
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
     setPlacesSubcollection(nextPlaces);
-    return updateCalendars(nextCalendars, '장소 삭제완료', 'delete', updatedCal.id, 'settings', placeActivityLog ? [placeActivityLog] : []);
+    const ok = await updateCalendars(nextCalendars, null, null, updatedCal.id, 'settings', placeActivityLog ? [placeActivityLog] : []);
+    if (ok) {
+      showUndoableDeleteToast('장소가 삭제되었습니다.', async () => {
+        try {
+          const restoreNow = Date.now();
+          if (firebaseDb) {
+            const { id: _pid, ...placeBody } = placeSnapshot;
+            await firebaseDb.collection('calendars').doc(`cal_${calId}`).collection('places').doc(placeId).set({ ...placeBody, updatedAt: restoreNow });
+          }
+          const latestCal = calendarsRef.current.find(c => c.id === calId) || updatedCal;
+          const currentPlaces = getCalendarPlaces(latestCal);
+          const restoredPlaces = currentPlaces.some(p => p.id === placeId)
+            ? currentPlaces.map(p => p.id === placeId ? { ...placeSnapshot, updatedAt: restoreNow } : p)
+            : [...currentPlaces, { ...placeSnapshot, updatedAt: restoreNow }];
+          setPlacesSubcollection(restoredPlaces);
+          const restoredCal = { ...latestCal, places: restoredPlaces, updatedAt: restoreNow, revision: (latestCal.revision || 0) + 1 };
+          const next = calendarsRef.current.map(c => c.id === restoredCal.id ? restoredCal : c);
+          await updateCalendars(next, '장소 삭제를 되돌렸습니다.', 'success', restoredCal.id, 'settings');
+        } catch (err) {
+          console.error('handleDeletePlace undo failed:', err);
+          showToast('장소 복원 실패', 'error', 4000);
+        }
+      }, null, 5000);
+    }
+    return ok;
   };
   const handleDeleteActivityLog = log => {
     if (!activeCal || !log?.id) return false;
@@ -4674,22 +4780,43 @@ function App() {
   const handleRemovePinnedNotice = (noticeId) => {
     if (!guardLoadedCalendar()) return false;
     const target = getPinnedNotices(activeCal).find(n => n.id === noticeId);
-    const noticeText = target ? target.text : '';
+    if (!target) return false;
+    const noticeSnapshot = JSON.parse(JSON.stringify(target));
+    const noticeText = target.text || '';
     const shortText = noticeText.length > 30 ? noticeText.substring(0, 30) + '...' : noticeText;
+    const calId = activeCal.id;
     showConfirmDialog(
       '공지사항 삭제',
       `"${shortText}" 내용의 공지사항을 삭제하시겠습니까?`,
-      () => {
+      async () => {
         const now = Date.now();
         const updatedCal = {
           ...activeCal,
           pinnedNotices: getPinnedNotices(activeCal).filter(n => n.id !== noticeId),
-          pinnedNotice: null,
-          updatedAt: now,
-          revision: (activeCal.revision || 0) + 1
+          pinnedNotice: null, updatedAt: now, revision: (activeCal.revision || 0) + 1
         };
         const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-        updateCalendars(nextCalendars, '공지 삭제완료', 'success', updatedCal.id, 'settings');
+        const ok = await updateCalendars(nextCalendars, null, null, updatedCal.id, 'settings');
+        if (!ok) return;
+        showUndoableDeleteToast('공지가 삭제되었습니다.', async () => {
+          try {
+            const restoreNow = Date.now();
+            const latestCal = calendarsRef.current.find(c => c.id === calId) || updatedCal;
+            const notices = getPinnedNotices(latestCal);
+            const restoredNotices = notices.some(n => n.id === noticeId)
+              ? notices.map(n => n.id === noticeId ? noticeSnapshot : n)
+              : [...notices, noticeSnapshot];
+            const restoredCal = {
+              ...latestCal, pinnedNotices: restoredNotices, pinnedNotice: null,
+              updatedAt: restoreNow, revision: (latestCal.revision || 0) + 1
+            };
+            const next = calendarsRef.current.map(c => c.id === restoredCal.id ? restoredCal : c);
+            await updateCalendars(next, '공지 삭제를 되돌렸습니다.', 'success', restoredCal.id, 'settings');
+          } catch (err) {
+            console.error('handleRemovePinnedNotice undo failed:', err);
+            showToast('공지 복원 실패', 'error', 4000);
+          }
+        }, null, 5000);
       }
     );
   };
