@@ -5348,6 +5348,29 @@ function App() {
   const navSettlementLastDate = (() => {
     let bestTs = 0;
     let bestLabel = null;
+    let latestMeetingTs = 0;
+    let latestMeetingLabel = null;
+    const noteMeetingDate = (raw) => {
+      const label = formatMenuDate(raw);
+      if (!label) return;
+      let ts = 0;
+      if (typeof raw === 'number') ts = raw;
+      else if (raw && typeof raw.seconds === 'number') ts = raw.seconds * 1000;
+      else if (raw && typeof raw.toDate === 'function') {
+        try { ts = raw.toDate().getTime(); } catch (_) {}
+      } else if (typeof raw === 'string') {
+        const p = Date.parse(raw);
+        if (!Number.isNaN(p)) ts = p;
+      }
+      if (!ts) {
+        const p = Date.parse(String(raw).slice(0, 10));
+        if (!Number.isNaN(p)) ts = p;
+      }
+      if (ts > latestMeetingTs) {
+        latestMeetingTs = ts;
+        latestMeetingLabel = label;
+      }
+    };
     const consider = (raw, fallbackDateStr) => {
       let ts = 0;
       if (typeof raw === 'number') ts = raw;
@@ -5370,6 +5393,7 @@ function App() {
     const meetings = (activeCal && Array.isArray(activeCal.confirmedMeetings)) ? activeCal.confirmedMeetings : [];
     meetings.forEach(m => {
       if (!m || m.deletedAt) return;
+      noteMeetingDate(m.date || m.confirmedAt);
       const expenses = Array.isArray(m.expenses) ? m.expenses : [];
       const incomes = Array.isArray(m.incomes) ? m.incomes : [];
       if (expenses.length > 0 || incomes.length > 0) {
@@ -5389,7 +5413,7 @@ function App() {
       if (!e || e.deletedAt) return;
       consider(e.createdAt || e.timestamp || e.updatedAt, e.date);
     });
-    return bestLabel;
+    return bestLabel || latestMeetingLabel;
   })();
 
   const navGalleryLastDate = (() => {
