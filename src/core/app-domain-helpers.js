@@ -1807,7 +1807,9 @@ function getMediaIdentityKeys(photo = {}, opts = {}) {
     ? photo.directMediaUrl
     : '';
   const directKey = directMediaUrl ? getDirectMediaTagKey(directMediaUrl) : '';
-  const isMeetingReference = sourceHint === 'meeting' || photo?.uploadSource === 'meeting' || !!meetingDate || !!photoId;
+  const isMeetingReference = sourceHint === 'meeting'
+    || photo?.uploadSource === 'meeting'
+    || (sourceHint !== 'chat' && sourceHint !== 'gallery' && !messageId && (!!meetingDate || !!photoId));
   const isMemo = sourceHint === 'memo' || photo?.uploadSource === 'memo';
   const baseSource = isMeetingReference ? 'meeting' : (isMemo ? 'memo' : (sourceHint || 'chat'));
 

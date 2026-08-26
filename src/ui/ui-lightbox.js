@@ -1068,21 +1068,20 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
     currentMeta.source === 'memo' ? false :
     currentMeta.messageId != null
   );
-  // Was `${messageId}_${directMediaUrl ? 'direct' : imageIndex}` -- the literal string 'direct'
-  // collapsed every directMediaUrl slide of the SAME message onto one shared key, so saving a tag
-  // on one external image in a multi-image-link message made the just-saved override show on
-  // every other image in that message too (until the Lightbox was closed and reopened and this
-  // stale local override was no longer consulted). Keying on the URL itself keeps each slide's
-  // optimistic override distinct, matching how the actual save (getDirectMediaTagKey) already
-  // keys directMediaTags per-URL in Firestore.
   const tagOverrideKey = currentMeta
-    ? (isMeetingPhoto
-      ? (currentMeta.sourceMessageId && Number.isInteger(currentMeta.sourceImageIndex)
-        ? (currentIdentity.mediaKey || `meeting_${currentMeta.meetingDate}_${currentMeta.photoId}`)
-        : (currentIdentity.refKey || currentIdentity.mediaKey || `meeting_${currentMeta.meetingDate}_${currentMeta.photoId}`))
-      : (currentIdentity.refKey || currentIdentity.mediaKey || `${currentMeta.messageId}_${currentMeta.directMediaUrl || currentMeta.imageIndex}`))
+    ? [
+        'lb',
+        currentMeta.messageId || currentMeta.sourceMessageId || '',
+        Number.isInteger(currentMeta.imageIndex)
+          ? currentMeta.imageIndex
+          : (Number.isInteger(currentMeta.sourceImageIndex) ? currentMeta.sourceImageIndex : ''),
+        currentUrl || currentMeta.directMediaUrl || currentMeta.thumb || '',
+        currentMeta.photoId || currentMeta.meetingDate || ''
+      ].join('::')
     : null;
-  const currentTags = (tagOverrideKey && tagOverrideKey in tagOverrides) ? tagOverrides[tagOverrideKey] : (currentMeta?.tags || '');
+  const currentTags = (tagOverrideKey && Object.prototype.hasOwnProperty.call(tagOverrides, tagOverrideKey))
+    ? tagOverrides[tagOverrideKey]
+    : (currentMeta?.tags || '');
   // Mirrors handleSaveImageTags' own parse/dedupe/limit rules so the optimistic override shown
   // here matches what actually got persisted, without needing the save call to round-trip it.
   const normalizeTagsForDisplay = text => Array.from(new Set(
@@ -1593,6 +1592,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
           display: 'block', ...zoomImageStyle
         }
       }), renderPhotoActions(), showInfo && /*#__PURE__*/React.createElement(LightboxInfoPanel, {
+      key: tagOverrideKey || String(currentUrl || index),
         info: currentInfo,
         tags: currentTags,
         onSaveTags: saveCurrentTags,
@@ -1719,6 +1719,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
       display: 'block', ...zoomImageStyle
     }
   }), renderPhotoActions(), showInfo && /*#__PURE__*/React.createElement(LightboxInfoPanel, {
+      key: tagOverrideKey || String(currentUrl || index),
     info: currentInfo,
     tags: currentTags,
     onSaveTags: saveCurrentTags,
