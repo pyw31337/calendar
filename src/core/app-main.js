@@ -6174,17 +6174,7 @@ async function compressImageToDataUrls(file, { maxThumbBase64Length = MAX_CHAT_T
     }
   }
 
-  // Encodes `img` as a JPEG data URL guaranteed to fit within `budget`: steps down through
-  // `qualitySteps` at the current size first, and only if the lowest quality still doesn't fit
-  // does it shrink the longest side and retry from the top of the quality list.
-  // Quality-only stepping (the previous approach) could still exceed the cap on a busy/detailed
-  // photo, which -- multiplied across a multi-image batch that falls back to inline base64 --
-  // could push the whole Firestore document over its 1MiB hard limit and get the write rejected
-  // outright instead of degrading gracefully.
-  // Yields to the event loop (setTimeout over rAF -- this can run while the tab is backgrounded/
-  // hidden between images in a multi-attach batch, where rAF would simply stall) between each
-  // resize/quality attempt so a detailed photo's full step-ladder doesn't block the main thread
-  // (and the ImageProcessingOverlay progress UI) for one long unbroken stretch.
+  // Encodes `img` as a JPEG data URL within `budget` (fallback path only).
   const yieldToMain = () => new Promise(r => setTimeout(r, 0));
   const encodeWithinBudget = async (maxDimStart, qualitySteps, budget, minDim) => {
     let maxDim = maxDimStart;
@@ -6205,56 +6195,23 @@ async function compressImageToDataUrls(file, { maxThumbBase64Length = MAX_CHAT_T
         if (base64.length <= budget) return best;
         await yieldToMain();
       }
-      if (maxDim <= minDim) return best; // best effort: smallest size / lowest quality tried
+      if (maxDim <= minDim) return best;
       maxDim = Math.max(minDim, Math.round(maxDim * 0.75));
     }
   };
 
-  // This base64 (`original`) is discarded unread whenever the Storage upload below succeeds
-  // (the normal case) -- it only ever becomes the persisted imageUrl when that upload fails (see
-  // resolveImageUrls). It used to be compressed at a much larger budget (1200px / ~350KB) whenever
-  // Storage looked healthy going in, on the theory that upload would probably succeed -- but a
-  // single transient upload failure (slow mobile connection, brief Storage hiccup) would then
-  // permanently embed that huge base64 directly in the message document. Because chat's live
-  // "last 100 messages" listener (see the Real-time messages listener effect) downloads and
-  // re-parses every matching document on every page load for every visitor, one such message
-  // taxes everyone's load forever -- multiple of these accumulating in a single calendar's history
-  // measurably slowed chat loading for every user. So the fallback is always compressed at the
-  // same small, cheap-to-store budget the isStorageDisabled path already used, regardless of
-  // whether Storage looks reachable right now: if the upload does succeed, this is thrown away and
-  // the full-quality Storage blob is what actually gets used, so nothing is lost in the common
-  // case; if it fails, the degraded fallback is small enough to never become a load-time liability.
-  const original = await encodeWithinBudget(600, [0.85, 0.75, 0.65, 0.55, 0.45, 0.35], 48 * 1024, 320);
+  const preferStorage = !isStorageDisabled;
 
-  // 360px thumbnails keep chat/gallery previews crisp on high-DPI screens while remaining
-  // bounded. Storage normally serves the sharper 720px Blob below; this base64 thumbnail is the
-  // safe fallback when Storage upload is unavailable or still in progress.
-  const thumbnail = await encodeWithinBudget(360, [0.78, 0.68, 0.58, 0.48], maxThumbBase64Length, 180);
-
-  // High-quality blob for Firebase Storage (when storage is working): images already within the
-  // 1920px cap upload completely untouched (100% pixel-perfect, zero compression noise) as long
-  // as they're a reasonable file size; anything larger gets its longest side scaled down to 1920.
-  // The untouched-file threshold used to be 4MB, which let a same-dimension JPEG anywhere up to
-  // that size skip recompression entirely -- a fairly common case (a nice camera's own JPEG
-  // output, a downloaded photo) that made single-photo uploads feel slow independent of how many
-  // photos or how fast the connection was, since 2-4MB is a lot to push over typical mobile
-  // upload bandwidth (often far lower than download). Recompressing at quality 0.7 here still
-  // looks effectively identical for chat/gallery viewing while cutting that payload by roughly
-  // 70-85% in the common case, so lowering the bar to 2MB trades a compression pass most devices
-  // do in well under a second for a meaningfully shorter upload.
   const getHighQualityBlob = () => {
     if (isStorageDisabled) return Promise.resolve(null);
-
-    const maxDimHigh = 1920;
+    const maxDimHigh = 1440;
     const isOversized = img.width > maxDimHigh || img.height > maxDimHigh;
-
-    if (!isOversized && file.size <= 2 * 1024 * 1024) {
+    if (!isOversized && file.size <= 1.5 * 1024 * 1024) {
       return Promise.resolve(file);
     }
-
     return new Promise(res => {
       let w = img.width, h = img.height;
-      const isPng = (file.type === 'image/png' || file.name.toLowerCase().endsWith('.png'));
+      const isPng = (file.type === 'image/png' || (file.name || '').toLowerCase().endsWith('.png'));
       if (isOversized) {
         if (w > h) { h = Math.round(h * maxDimHigh / w); w = maxDimHigh; }
         else { w = Math.round(w * maxDimHigh / h); h = maxDimHigh; }
@@ -6263,11 +6220,8 @@ async function compressImageToDataUrls(file, { maxThumbBase64Length = MAX_CHAT_T
       canvas.width = w;
       canvas.height = h;
       canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-      if (isPng) {
-        canvas.toBlob(blob => res(blob), 'image/png');
-      } else {
-        canvas.toBlob(blob => res(blob), 'image/jpeg', 0.7);
-      }
+      if (isPng) canvas.toBlob(blob => res(blob), 'image/png');
+      else canvas.toBlob(blob => res(blob), 'image/jpeg', 0.72);
     });
   };
 
@@ -6275,7 +6229,7 @@ async function compressImageToDataUrls(file, { maxThumbBase64Length = MAX_CHAT_T
     if (isStorageDisabled) return Promise.resolve(null);
     return new Promise(res => {
       let w = img.width, h = img.height;
-      const maxDimThumb = 720; // Sharper Storage thumbnails for high-DPI chat and gallery previews
+      const maxDimThumb = 640;
       if (w > maxDimThumb || h > maxDimThumb) {
         if (w > h) { h = Math.round(h * maxDimThumb / w); w = maxDimThumb; }
         else { w = Math.round(w * maxDimThumb / h); h = maxDimThumb; }
@@ -6284,83 +6238,158 @@ async function compressImageToDataUrls(file, { maxThumbBase64Length = MAX_CHAT_T
       canvas.width = w;
       canvas.height = h;
       canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-      const isPng = (file.type === 'image/png' || file.name.toLowerCase().endsWith('.png'));
-      if (isPng) {
-        canvas.toBlob(blob => res(blob), 'image/png');
-      } else {
-        canvas.toBlob(blob => res(blob), 'image/jpeg', 0.86); // High quality JPEG thumbnail
-      }
+      const isPng = (file.type === 'image/png' || (file.name || '').toLowerCase().endsWith('.png'));
+      if (isPng) canvas.toBlob(blob => res(blob), 'image/png');
+      else canvas.toBlob(blob => res(blob), 'image/jpeg', 0.82);
     });
   };
+
+  let originalMeta = null;
+  let thumbnailMeta = null;
+  if (!preferStorage) {
+    originalMeta = await encodeWithinBudget(600, [0.85, 0.75, 0.65, 0.55, 0.45, 0.35], 48 * 1024, 320);
+    thumbnailMeta = await encodeWithinBudget(360, [0.78, 0.68, 0.58, 0.48], maxThumbBase64Length, 180);
+  }
 
   const highQualityBlob = await getHighQualityBlob();
   const highQualityThumbBlob = await getHighQualityThumbBlob();
 
-  // Also produce Blobs at the same size/quality actually chosen above, used to upload to
-  // Firebase Storage at send time (see uploadChatImageAssets) instead of embedding base64 in
-  // the message document. The base64 strings above are kept as the fallback if that upload fails.
   return new Promise((resolve) => {
-    const resolveAll = (origBlob, thumbBlob) => {
+    const objectUrls = [];
+    const finish = (origBlob, thumbBlob) => {
+      let originalStr = originalMeta ? originalMeta.base64 : null;
+      let thumbnailStr = thumbnailMeta ? thumbnailMeta.base64 : null;
+      if (preferStorage) {
+        const previewBlob = thumbBlob || origBlob || file;
+        try {
+          const previewUrl = URL.createObjectURL(previewBlob);
+          objectUrls.push(previewUrl);
+          originalStr = previewUrl;
+          thumbnailStr = previewUrl;
+        } catch (_) {
+          originalStr = originalStr || '';
+          thumbnailStr = thumbnailStr || originalStr;
+        }
+      }
       resolve({
-        original: original.base64,
-        thumbnail: thumbnail.base64,
+        original: originalStr,
+        thumbnail: thumbnailStr,
         originalBlob: origBlob,
-        thumbnailBlob: thumbBlob
+        thumbnailBlob: thumbBlob,
+        needsBase64Fallback: preferStorage,
+        _objectUrls: objectUrls
       });
     };
 
-    const getBase64OrigBlob = (cb) => {
+    const getOrig = (cb) => {
       if (highQualityBlob) cb(highQualityBlob);
-      else original.canvas.toBlob(blob => cb(blob), 'image/jpeg', original.quality);
+      else if (originalMeta && originalMeta.canvas) originalMeta.canvas.toBlob(blob => cb(blob), 'image/jpeg', originalMeta.quality);
+      else cb(file);
     };
-
-    const getBase64ThumbBlob = (cb) => {
+    const getThumb = (cb) => {
       if (highQualityThumbBlob) cb(highQualityThumbBlob);
-      else thumbnail.canvas.toBlob(blob => cb(blob), 'image/jpeg', thumbnail.quality);
+      else if (thumbnailMeta && thumbnailMeta.canvas) thumbnailMeta.canvas.toBlob(blob => cb(blob), 'image/jpeg', thumbnailMeta.quality);
+      else getOrig(cb);
     };
-
-    getBase64OrigBlob(origBlob => {
-      getBase64ThumbBlob(thumbBlob => {
-        resolveAll(origBlob, thumbBlob);
-      });
-    });
+    getOrig(origBlob => getThumb(thumbBlob => finish(origBlob, thumbBlob)));
   });
 }
 
-// Processes a batch of image files one at a time (bounds peak memory on large photos and gives
-// meaningful progress feedback), isolating failures per file so one bad file (unsupported
-// format, corrupt data, decode timeout) doesn't discard the others that succeeded.
-// Every image keeps the SAME fixed quality/size cap regardless of how many photos are in the
-// batch -- resolution/quality never degrades just because more photos were attached. The
-// Firestore 1MiB/doc limit is instead respected by splitting a large fallback batch across
-// multiple chat messages at send time (see chunkResolvedImagesForMessages), so quality only
-// ever depends on the individual photo, never on batch size.
+async function buildBase64FallbackFromCompressed(compressed) {
+  const blob = compressed.thumbnailBlob || compressed.originalBlob;
+  if (!blob) {
+    return {
+      original: typeof compressed.original === 'string' && compressed.original.startsWith('data:') ? compressed.original : null,
+      thumbnail: typeof compressed.thumbnail === 'string' && compressed.thumbnail.startsWith('data:') ? compressed.thumbnail : null
+    };
+  }
+  let bitmap = null;
+  try {
+    if (typeof createImageBitmap === 'function') bitmap = await createImageBitmap(blob);
+  } catch (_) { bitmap = null; }
+  if (!bitmap) {
+    const dataUrl = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+    return { original: dataUrl, thumbnail: dataUrl };
+  }
+  const encode = (maxDim, quality, budget) => {
+    let w = bitmap.width, h = bitmap.height;
+    if (w > maxDim || h > maxDim) {
+      if (w > h) { h = Math.round(h * maxDim / w); w = maxDim; }
+      else { w = Math.round(w * maxDim / h); h = maxDim; }
+    }
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    canvas.getContext('2d').drawImage(bitmap, 0, 0, w, h);
+    let best = canvas.toDataURL('image/jpeg', quality);
+    if (best.length > budget) best = canvas.toDataURL('image/jpeg', Math.max(0.35, quality - 0.2));
+    return best;
+  };
+  const original = encode(600, 0.7, 48 * 1024);
+  const thumbnail = encode(360, 0.65, 24 * 1024);
+  try { bitmap.close && bitmap.close(); } catch (_) {}
+  return { original, thumbnail };
+}
+
+function revokeCompressedObjectUrls(compressed) {
+  if (!compressed || !Array.isArray(compressed._objectUrls)) return;
+  compressed._objectUrls.forEach(u => {
+    try { URL.revokeObjectURL(u); } catch (_) {}
+  });
+  compressed._objectUrls = [];
+}
+
 async function processImageFilesSequentially(files, onProgress) {
-  // Re-check (rather than trusting only the one automatic probe ~1s after script load) so a
-  // session that started with a transient/false-negative health check gets a real chance to
-  // recover once its cooldown has passed, instead of staying stuck on the low-res fallback for
-  // every photo for the rest of the session.
   await checkFirebaseStorageHealth().catch(() => {});
-  const succeeded = [];
+  const list = Array.from(files || []);
+  const succeeded = new Array(list.length);
   const failed = [];
   const startedAt = Date.now();
-  for (let i = 0; i < files.length; i++) {
-    const file = files[i];
-    if (onProgress) {
-      const elapsedSec = (Date.now() - startedAt) / 1000;
-      const pct = Math.round((i / files.length) * 100);
-      const remainingSec = i > 0 ? Math.max(0, Math.round((elapsedSec / i) * (files.length - i))) : null;
-      onProgress({ current: i + 1, total: files.length, fileName: file.name, pct, remainingSec });
-    }
-    try {
-      const compressed = await compressImageToDataUrls(file);
-      succeeded.push(compressed);
-    } catch (err) {
-      failed.push({ fileName: file.name, error: err });
+  let completed = 0;
+  let cursor = 0;
+  const CONCURRENCY = Math.min(2, Math.max(1, list.length));
+
+  const report = (fileName) => {
+    if (!onProgress) return;
+    const elapsedSec = (Date.now() - startedAt) / 1000;
+    const pct = list.length ? Math.round((completed / list.length) * 100) : 100;
+    const remainingSec = completed > 0
+      ? Math.max(0, Math.round((elapsedSec / completed) * (list.length - completed)))
+      : null;
+    onProgress({
+      current: Math.min(list.length, completed + 1),
+      total: list.length,
+      fileName: fileName || null,
+      pct,
+      remainingSec
+    });
+  };
+
+  async function worker() {
+    while (true) {
+      const i = cursor++;
+      if (i >= list.length) return;
+      const file = list[i];
+      report(file && file.name);
+      try {
+        succeeded[i] = await compressImageToDataUrls(file);
+      } catch (err) {
+        failed.push({ fileName: file && file.name, error: err });
+        succeeded[i] = null;
+      }
+      completed += 1;
+      report(file && file.name);
     }
   }
-  if (onProgress) onProgress({ current: files.length, total: files.length, fileName: null, pct: 100, remainingSec: 0 });
-  return { succeeded, failed };
+
+  await Promise.all(Array.from({ length: CONCURRENCY }, () => worker()));
+  if (onProgress) onProgress({ current: list.length, total: list.length, fileName: null, pct: 100, remainingSec: 0 });
+  return { succeeded: succeeded.filter(Boolean), failed };
 }
 
 // Groups resolved images ({ imageUrl, thumbUrl }) into per-message chunks that stay safely
@@ -6719,14 +6748,35 @@ async function readClipboardImageFiles(showToast) {
 async function resolveImageUrls(calendarId, compressed, index, onBytes, uploadFn) {
   try {
     const uploaded = await uploadFn(calendarId, compressed, index, onBytes);
-    if (uploaded && uploaded.imageUrl && uploaded.thumbUrl) return uploaded;
+    if (uploaded && uploaded.imageUrl && uploaded.thumbUrl) {
+      revokeCompressedObjectUrls(compressed);
+      return uploaded;
+    }
   } catch (e) {
     console.warn('Image Storage upload attempt failed, falling back to base64 data URL:', e);
   }
-  if (compressed && (compressed.original || compressed.thumbnail)) {
+  let original = compressed && compressed.original;
+  let thumbnail = compressed && compressed.thumbnail;
+  const needsEncode = compressed && (
+    compressed.needsBase64Fallback
+    || (typeof original === 'string' && original.startsWith('blob:'))
+    || (typeof thumbnail === 'string' && thumbnail.startsWith('blob:'))
+    || !original
+  );
+  if (needsEncode) {
+    try {
+      const fb = await buildBase64FallbackFromCompressed(compressed);
+      original = fb.original || original;
+      thumbnail = fb.thumbnail || thumbnail || original;
+    } catch (err) {
+      console.warn('base64 fallback encode failed:', err);
+    }
+  }
+  revokeCompressedObjectUrls(compressed);
+  if (original || thumbnail) {
     return {
-      imageUrl: compressed.original || compressed.thumbnail,
-      thumbUrl: compressed.thumbnail || compressed.original
+      imageUrl: original || thumbnail,
+      thumbUrl: thumbnail || original
     };
   }
   throw new Error('이미지 처리 중 오류가 발생했습니다.');
@@ -6782,22 +6832,30 @@ async function resolveImageBatch(calendarId, compressedList, onProgress, uploadF
     reportUploadProgress();
   };
 
-  // Truly sequential per-image upload to prevent network starvation and timeouts
-  const results = [];
-  for (let idx = 0; idx < compressedList.length; idx++) {
-    currentIndex = idx + 1;
-    const c = compressedList[idx];
-    if (c.isExisting) {
-      compressionDone++;
-      reportCompressionProgress();
-      results.push({ imageUrl: c.original, thumbUrl: c.thumbnail });
-    } else {
-      const result = await resolveImageUrls(calendarId, c, idx, onBytes, uploadFn);
-      compressionDone++;
-      reportCompressionProgress();
-      results.push(result);
+  const results = new Array(compressedList.length);
+  let uploadCursor = 0;
+  const UPLOAD_CONCURRENCY = Math.min(2, Math.max(1, compressedList.length));
+
+  async function uploadWorker() {
+    while (true) {
+      const idx = uploadCursor++;
+      if (idx >= compressedList.length) return;
+      currentIndex = idx + 1;
+      const c = compressedList[idx];
+      if (c.isExisting) {
+        compressionDone++;
+        reportCompressionProgress();
+        results[idx] = { imageUrl: c.original, thumbUrl: c.thumbnail };
+      } else {
+        const result = await resolveImageUrls(calendarId, c, idx, onBytes, uploadFn);
+        compressionDone++;
+        reportCompressionProgress();
+        results[idx] = result;
+      }
     }
   }
+
+  await Promise.all(Array.from({ length: UPLOAD_CONCURRENCY }, () => uploadWorker()));
   if (onProgress) onProgress({ pct: 100, remainingSec: 0, current: total, total });
   return results;
 }
