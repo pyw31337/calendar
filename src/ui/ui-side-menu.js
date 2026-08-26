@@ -1173,7 +1173,7 @@ export function MainSideMenu({
 	            onClick: () => { onClose && onClose(); if (typeof onChangeView === 'function') onChangeView('calendar'); },
 	            style: {
 	              background: 'none', border: 'none', padding: 0, margin: 0,
-	              font: 'inherit', fontWeight: 'inherit', color: 'inherit',
+	              color: 'inherit',
 	              cursor: 'pointer', textAlign: 'left'
 	            }
 	          }, "메뉴")

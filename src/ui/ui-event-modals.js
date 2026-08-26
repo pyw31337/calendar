@@ -2032,7 +2032,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
             onClick: () => { setIsSettlementMenuOpen(false); if (typeof onChangeView === 'function') onChangeView('calendar'); else if (typeof onBack === 'function') onBack(); },
             style: {
               background: 'none', border: 'none', padding: 0, margin: 0,
-              font: 'inherit', fontWeight: 'inherit', color: 'inherit',
+              color: 'inherit',
               cursor: 'pointer', textAlign: 'left'
             }
           }, "정산")

@@ -1311,7 +1311,7 @@ export function ChatGalleryModal({
             onClick: () => { setIsMenuOpen(false); if (typeof onChangeView === 'function') onChangeView('calendar'); else if (typeof onClose === 'function') onClose(); },
             style: {
               background: 'none', border: 'none', padding: 0, margin: 0,
-              font: 'inherit', fontWeight: 'inherit', color: 'inherit',
+              color: 'inherit',
               cursor: 'pointer', textAlign: 'left'
             }
           }, "갤러리")

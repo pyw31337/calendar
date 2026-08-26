@@ -1975,6 +1975,15 @@ select.form-select {
   color: #0F172A;
   line-height: 1.2;
 }
+/* Title was switched to <button> — prevent UA/inline font:inherit from thinning weight */
+button.admin-side-menu-title {
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 900 !important;
+  color: inherit;
+  line-height: 1.2;
+  letter-spacing: inherit;
+}
 .admin-side-menu-subtitle {
   font-size: 0.68rem;
   font-weight: 800;

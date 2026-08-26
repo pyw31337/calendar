@@ -1966,7 +1966,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
               onClick: () => { setIsPlacesMenuOpen(false); if (typeof onChangeView === 'function') onChangeView('calendar'); else if (typeof onBack === 'function') onBack(); },
               style: {
                 background: 'none', border: 'none', padding: 0, margin: 0,
-                font: 'inherit', fontWeight: 'inherit', color: 'inherit',
+                color: 'inherit',
                 cursor: 'pointer', textAlign: 'left'
               }
             }, "장소")
