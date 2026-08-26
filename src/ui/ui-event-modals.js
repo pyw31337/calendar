@@ -1367,7 +1367,7 @@ export function AnniversaryModal({
   );
 }
 
-export function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {
+export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenShare, onOpenAppSettings }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -1381,6 +1381,9 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {
   const SectionToggleButton = __comp.SectionToggleButton || __deps.SectionToggleButton;
   const SegmentedToggle = __comp.SegmentedToggle || __deps.SegmentedToggle;
   const ShareIcon = __comp.ShareIcon || __deps.ShareIcon;
+  const SharedSideMenuFooter = __comp.SharedSideMenuFooter || __deps.SharedSideMenuFooter;
+  const ThreeLinesIcon = __comp.ThreeLinesIcon || __deps.ThreeLinesIcon;
+  const [isSettlementMenuOpen, setIsSettlementMenuOpen] = React.useState(false);
   const sanitizeText = __deps.sanitizeText;
   const extractFirstUrl = __deps.extractFirstUrl;
   const formatChatHeaderTitle = __deps.formatChatHeaderTitle;
@@ -1784,15 +1787,16 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {
     }
   }, formatChatHeaderTitle(calendar?.title), " 정산"), /*#__PURE__*/React.createElement("button", {
     type: "button",
-    onClick: handleGenerateShareImage,
-    title: "정산 결과 공유 이미지 생성",
+    onClick: () => setIsSettlementMenuOpen(true),
+    title: "메뉴",
+    "aria-label": "메뉴",
     style: {
       position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)',
       width: '32px', height: '32px', borderRadius: '50%', border: 'none',
       backgroundColor: 'transparent', cursor: 'pointer', display: 'flex',
       alignItems: 'center', justifyContent: 'center', color: '#64748B', padding: 0
     }
-  }, /*#__PURE__*/React.createElement(ShareIcon, { size: 16 }))), /*#__PURE__*/React.createElement("div", {
+  }, ThreeLinesIcon ? /*#__PURE__*/React.createElement(ThreeLinesIcon, { size: 20 }) : /*#__PURE__*/React.createElement(ShareIcon, { size: 16 }))), /*#__PURE__*/React.createElement("div", {
     className: "settlement-page-body",
     onScroll: handleSettlementScroll,
     style: { flex: '1 1 auto', overflowY: 'auto', padding: '72px 16px 16px', display: 'flex', flexDirection: 'column', gap: '14px' }
