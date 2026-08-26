@@ -1118,7 +1118,7 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
 }
 
 export function PlacesView({
-  onOpenAppSettings, onChangeView, chatCount = 0, settlementBadge = null, galleryCount = 0, placeCount = 0, memoCount = 0, calendar, onBack, onSavePlace, onDeletePlace, showToast, onRequestConfirm, placesInitialQuery, setPlacesInitialQuery, isDarkTheme, onToggleTheme, fontScalePercent, onDecreaseFont, onIncreaseFont, isChatNotifyEnabled, onToggleChatNotifications, onSharePlaces, onSelectDate }) {
+  onOpenAppSettings, onChangeView, chatCount = 0, settlementBadge = null, galleryCount = 0, placeCount = 0, memoCount = 0, chatLastAuthor = null, settlementLastDate = null, galleryLastDate = null, placeLastName = null, memoLastTitleWord = null, calendar, onBack, onSavePlace, onDeletePlace, showToast, onRequestConfirm, placesInitialQuery, setPlacesInitialQuery, isDarkTheme, onToggleTheme, fontScalePercent, onDecreaseFont, onIncreaseFont, isChatNotifyEnabled, onToggleChatNotifications, onSharePlaces, onSelectDate }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -2021,6 +2021,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
         )
       ),
       typeof SharedAppNavBlock === 'function' && /*#__PURE__*/React.createElement(SharedAppNavBlock, {
+        onClose: typeof SharedAppNavBlock === 'function' && /*#__PURE__*/React.createElement(SharedAppNavBlock, {
         onClose: () => setIsPlacesMenuOpen(false),
         onChangeView: onChangeView,
         chatCount: chatCount,
@@ -2028,6 +2029,18 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
         galleryCount: galleryCount,
         placeCount: placeCount,
         memoCount: memoCount
+      }),
+        onChangeView: () => setIsPlacesMenuOpen(false),
+        chatCount: chatCount,
+        settlementBadge: settlementBadge,
+        galleryCount: galleryCount,
+        placeCount: placeCount,
+        memoCount: memoCount,
+        chatLastAuthor: chatLastAuthor,
+        settlementLastDate: settlementLastDate,
+        galleryLastDate: galleryLastDate,
+        placeLastName: placeLastName,
+        memoLastTitleWord: memoLastTitleWord
       }),
       typeof SharedSideMenuFooter === 'function' && /*#__PURE__*/React.createElement(SharedSideMenuFooter, {
         onClose: () => setIsPlacesMenuOpen(false),

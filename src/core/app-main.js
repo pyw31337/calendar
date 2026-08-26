@@ -5245,13 +5245,165 @@ function App() {
   const navSettlementBadge = activeCal && typeof calculateSettlementBalance === 'function' && typeof formatBalanceBadge === 'function'
     ? formatBalanceBadge(calculateSettlementBalance(activeCal))
     : null;
+
+  // Side-menu trailing meta (latest activity snippets)
+  const formatMenuDate = (ts) => {
+    if (ts == null || ts === '') return null;
+    let d = null;
+    if (typeof ts === 'number') d = new Date(ts);
+    else if (typeof ts === 'string') {
+      // "2026-08-24" or ISO
+      const m = ts.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (m) return `${m[2]}.${m[3]}`;
+      const parsed = Date.parse(ts);
+      if (!Number.isNaN(parsed)) d = new Date(parsed);
+    } else if (ts && typeof ts.toDate === 'function') {
+      try { d = ts.toDate(); } catch (_) {}
+    } else if (ts && typeof ts.seconds === 'number') {
+      d = new Date(ts.seconds * 1000);
+    }
+    if (!d || Number.isNaN(d.getTime())) return null;
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${mm}.${dd}`;
+  };
+
+  const navChatLastAuthor = (() => {
+    const msgs = (typeof allChatMessages !== 'undefined' && allChatMessages && allChatMessages.length)
+      ? allChatMessages
+      : (chatMessages || []);
+    if (!msgs.length) return null;
+    const last = msgs[msgs.length - 1];
+    if (!last) return null;
+    const parts = (activeCal && Array.isArray(activeCal.participants)) ? activeCal.participants : [];
+    const p = parts.find(x => x && x.id === last.participantId);
+    const name = (p && p.name) || last.participantName || null;
+    if (!name) return null;
+    return { name: String(name), color: (p && p.color) || '#64748B' };
+  })();
+
+  const navSettlementLastDate = (() => {
+    let bestTs = 0;
+    let bestLabel = null;
+    const consider = (raw, fallbackDateStr) => {
+      let ts = 0;
+      if (typeof raw === 'number') ts = raw;
+      else if (raw && typeof raw.seconds === 'number') ts = raw.seconds * 1000;
+      else if (raw && typeof raw.toDate === 'function') {
+        try { ts = raw.toDate().getTime(); } catch (_) {}
+      } else if (typeof raw === 'string') {
+        const p = Date.parse(raw);
+        if (!Number.isNaN(p)) ts = p;
+      }
+      if (!ts && fallbackDateStr) {
+        const p = Date.parse(String(fallbackDateStr).slice(0, 10));
+        if (!Number.isNaN(p)) ts = p;
+      }
+      if (ts > bestTs) {
+        bestTs = ts;
+        bestLabel = formatMenuDate(ts) || formatMenuDate(fallbackDateStr);
+      }
+    };
+    const meetings = (activeCal && Array.isArray(activeCal.confirmedMeetings)) ? activeCal.confirmedMeetings : [];
+    meetings.forEach(m => {
+      if (!m || m.deletedAt) return;
+      (Array.isArray(m.expenses) ? m.expenses : []).forEach(e => {
+        if (!e || e.deletedAt) return;
+        consider(e.createdAt || e.timestamp || e.updatedAt, m.date || e.date);
+      });
+      (Array.isArray(m.incomes) ? m.incomes : []).forEach(e => {
+        if (!e || e.deletedAt) return;
+        consider(e.createdAt || e.timestamp || e.updatedAt, m.date || e.date);
+      });
+    });
+    const topExp = (activeCal && Array.isArray(activeCal.expenses)) ? activeCal.expenses : [];
+    topExp.forEach(e => {
+      if (!e || e.deletedAt) return;
+      consider(e.createdAt || e.timestamp || e.updatedAt, e.date);
+    });
+    return bestLabel;
+  })();
+
+  const navGalleryLastDate = (() => {
+    const msgs = (typeof allChatMessages !== 'undefined' && allChatMessages && allChatMessages.length)
+      ? allChatMessages
+      : (chatMessages || []);
+    for (let i = msgs.length - 1; i >= 0; i--) {
+      const msg = msgs[i];
+      if (!msg) continue;
+      const hasImg = !!(msg.imageUrl || msg.thumbUrl
+        || (Array.isArray(msg.imageUrls) && msg.imageUrls.length)
+        || (Array.isArray(msg.thumbUrls) && msg.thumbUrls.length));
+      if (!hasImg) continue;
+      return formatMenuDate(msg.timestamp || msg.createdAt);
+    }
+    return null;
+  })();
+
+  const navPlaceLastName = (() => {
+    const list = [];
+    if (activeCal && Array.isArray(activeCal.places)) {
+      activeCal.places.forEach(p => { if (p && !p.deletedAt) list.push(p); });
+    }
+    if (Array.isArray(placesSubcollection)) {
+      placesSubcollection.forEach(p => { if (p && !p.deletedAt) list.push(p); });
+    }
+    if (!list.length) return null;
+    const score = (p) => {
+      const raw = p.updatedAt || p.createdAt || p.timestamp || 0;
+      if (typeof raw === 'number') return raw;
+      if (raw && typeof raw.seconds === 'number') return raw.seconds * 1000;
+      if (raw && typeof raw.toDate === 'function') {
+        try { return raw.toDate().getTime(); } catch (_) { return 0; }
+      }
+      if (typeof raw === 'string') {
+        const n = Date.parse(raw);
+        return Number.isNaN(n) ? 0 : n;
+      }
+      return 0;
+    };
+    list.sort((a, b) => score(b) - score(a));
+    const top = list[0];
+    const name = (top.alias || top.name || top.placeName || top.title || '').trim();
+    return name || null;
+  })();
+
+  const navMemoLastTitleWord = (() => {
+    const list = Array.isArray(memos) ? memos.filter(m => m && !m.deletedAt) : [];
+    if (!list.length) return null;
+    const score = (m) => {
+      const raw = m.createdAt || m.timestamp || m.updatedAt || 0;
+      if (typeof raw === 'number') return raw;
+      if (raw && typeof raw.seconds === 'number') return raw.seconds * 1000;
+      if (raw && typeof raw.toDate === 'function') {
+        try { return raw.toDate().getTime(); } catch (_) { return 0; }
+      }
+      if (typeof raw === 'string') {
+        const n = Date.parse(raw);
+        return Number.isNaN(n) ? 0 : n;
+      }
+      return 0;
+    };
+    list.sort((a, b) => score(b) - score(a));
+    const top = list[0];
+    const title = String(top.title || top.text || top.content || '').trim();
+    if (!title) return null;
+    const word = title.split(/\s+/)[0];
+    return word ? word.slice(0, 12) : null;
+  })();
+
   const navMenuProps = {
     onChangeView: changeView,
     chatCount: navChatCount,
     settlementBadge: navSettlementBadge,
     galleryCount: navGalleryCount,
     placeCount: navPlaceCount,
-    memoCount: navMemoCount
+    memoCount: navMemoCount,
+    chatLastAuthor: navChatLastAuthor,
+    settlementLastDate: navSettlementLastDate,
+    galleryLastDate: navGalleryLastDate,
+    placeLastName: navPlaceLastName,
+    memoLastTitleWord: navMemoLastTitleWord
   };
   const sharedAppOverlays = /*#__PURE__*/React.createElement(React.Fragment, null,
     isAppSettingsOpen && /*#__PURE__*/React.createElement(AppSettingsModal, {
@@ -5708,6 +5860,11 @@ function App() {
     settlementBadge: activeCal && typeof calculateSettlementBalance === 'function' && typeof formatBalanceBadge === 'function'
       ? formatBalanceBadge(calculateSettlementBalance(activeCal))
       : null,
+    chatLastAuthor: navChatLastAuthor,
+    settlementLastDate: navSettlementLastDate,
+    galleryLastDate: navGalleryLastDate,
+    placeLastName: navPlaceLastName,
+    memoLastTitleWord: navMemoLastTitleWord,
     onClose: () => setIsMainSideMenuOpen(false),
     onOpenManual: () => {
       setIsGuideOpen(true);

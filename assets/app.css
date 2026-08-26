@@ -3938,3 +3938,14 @@ html.emoji-sheet-open [data-chat-input-panel="1"].emoji-sheet-lifted {
   z-index: 12001;
   position: relative;
 }
+
+
+/* Side menu trailing meta pills (last author / date / place / memo word) */
+.admin-side-menu-item .admin-side-menu-item-copy {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.side-menu-meta-pill {
+  margin-left: auto;
+  flex-shrink: 0;
+}

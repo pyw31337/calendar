@@ -1099,7 +1099,13 @@ export function SharedAppNavBlock({
   settlementBadge = null,
   galleryCount = 0,
   placeCount = 0,
-  memoCount = 0
+  memoCount = 0,
+  // Optional trailing meta pills (right edge of each row)
+  chatLastAuthor = null,       // { name, color }
+  settlementLastDate = null,   // "08.24"
+  galleryLastDate = null,      // "08.24"
+  placeLastName = null,        // "외룡캠핑장"
+  memoLastTitleWord = null     // "팽이버섯"
 }) {
   const React = window.React;
   const go = (view) => {
@@ -1113,6 +1119,43 @@ export function SharedAppNavBlock({
       : { marginLeft: "4px" }
   }, count) : null;
 
+  const metaPill = (text, styleExtra) => {
+    if (!text) return null;
+    const label = String(text).trim();
+    if (!label) return null;
+    return /*#__PURE__*/React.createElement("span", {
+      className: "side-menu-meta-pill",
+      title: label,
+      style: Object.assign({
+        marginLeft: "auto",
+        flexShrink: 0,
+        maxWidth: "7.2rem",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap",
+        fontSize: "0.72rem",
+        fontWeight: 700,
+        lineHeight: 1.2,
+        padding: "3px 9px",
+        borderRadius: "999px",
+        backgroundColor: "var(--bg-card, #FFFFFF)",
+        border: "1px solid var(--border-subtle, #E2E8F0)",
+        color: "var(--text-muted, #64748B)",
+        boxSizing: "border-box"
+      }, styleExtra || {})
+    }, label);
+  };
+
+  const chatAuthorPill = () => {
+    if (!chatLastAuthor || !chatLastAuthor.name) return null;
+    const color = chatLastAuthor.color || "#64748B";
+    return metaPill(chatLastAuthor.name, {
+      border: `1.5px solid ${color}`,
+      color: color,
+      backgroundColor: "#FFFFFF"
+    });
+  };
+
   return /*#__PURE__*/React.createElement("div", {
     className: "admin-side-menu-list",
     style: { borderTop: '1px solid var(--border-subtle, #E2E8F0)', borderBottom: 'none', paddingTop: '6px', marginTop: '2px' }
@@ -1121,7 +1164,8 @@ export function SharedAppNavBlock({
       /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2" }, /*#__PURE__*/React.createElement("path", { d: "M7.9 20A9 9 0 1 0 4 16.1L2 22Z" }))),
       /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
         /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title", style: { display: "flex", alignItems: "center", gap: "6px" } }, "채팅", badge(chatCount))
-      )
+      ),
+      chatAuthorPill()
     ),
     /*#__PURE__*/React.createElement("button", { type: "button", className: "admin-side-menu-item", onClick: () => go("settlement") },
       /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2" }, /*#__PURE__*/React.createElement("path", { d: "M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1" }), /*#__PURE__*/React.createElement("path", { d: "M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4" }))),
@@ -1132,58 +1176,29 @@ export function SharedAppNavBlock({
             style: { backgroundColor: settlementBadge.bgColor || "#64748B", color: "#FFFFFF", marginLeft: "4px" }
           }, settlementBadge.text)
         )
-      )
+      ),
+      metaPill(settlementLastDate)
     ),
     /*#__PURE__*/React.createElement("button", { type: "button", className: "admin-side-menu-item", onClick: () => go("gallery") },
       /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2" }, /*#__PURE__*/React.createElement("rect", { width: "18", height: "18", x: "3", y: "3", rx: "2", ry: "2" }), /*#__PURE__*/React.createElement("circle", { cx: "9", cy: "9", r: "2" }), /*#__PURE__*/React.createElement("path", { d: "m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" }))),
       /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
         /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title", style: { display: "flex", alignItems: "center", gap: "6px" } }, "갤러리", badge(galleryCount))
-      )
+      ),
+      metaPill(galleryLastDate)
     ),
     /*#__PURE__*/React.createElement("button", { type: "button", className: "admin-side-menu-item", onClick: () => go("places") },
       /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2" }, /*#__PURE__*/React.createElement("path", { d: "M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" }), /*#__PURE__*/React.createElement("circle", { cx: "12", cy: "10", r: "3" }))),
       /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
         /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title", style: { display: "flex", alignItems: "center", gap: "6px" } }, "장소", badge(placeCount))
-      )
+      ),
+      metaPill(placeLastName)
     ),
     /*#__PURE__*/React.createElement("button", { type: "button", className: "admin-side-menu-item", onClick: () => go("memo") },
       /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2" }, /*#__PURE__*/React.createElement("path", { d: "M12 20h9" }), /*#__PURE__*/React.createElement("path", { d: "M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" }))),
       /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
         /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title", style: { display: "flex", alignItems: "center", gap: "6px" } }, "메모", badge(memoCount))
-      )
-    )
-  );
-}
-
-export function SharedSideMenuFooter({ onClose, onOpenShare, onOpenSettings, shareLabel = '공유' }) {
-  const React = window.React;
-  const __deps = window.GATHER_UI_DEPS || {};
-  const MenuIcon = __deps.MenuIcon;
-  const handle = action => { if (typeof action === 'function') action(); };
-  return /*#__PURE__*/React.createElement("div", {
-    className: "admin-side-menu-list",
-    style: { borderTop: '1px solid var(--border-subtle, #E2E8F0)', borderBottom: 'none', paddingTop: '6px', marginTop: '2px' }
-  },
-    typeof onOpenShare === 'function' && /*#__PURE__*/React.createElement("button", {
-      type: "button", className: "admin-side-menu-item",
-      onClick: () => { handle(onClose); handle(onOpenShare); }
-    },
-      /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, MenuIcon ? /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M3 12a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M15 6a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M15 18a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M8.7 10.7l6.6 -3.4", "M8.7 13.3l6.6 3.4"] }) : "↗"),
-      /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
-        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, shareLabel)
-      )
-    ),
-    typeof onOpenSettings === 'function' && /*#__PURE__*/React.createElement("button", {
-      type: "button", className: "admin-side-menu-item",
-      onClick: () => { handle(onClose); handle(onOpenSettings); }
-    },
-      /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", {
-        xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24",
-        fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
-      }, /*#__PURE__*/React.createElement("path", { d: "M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" }), /*#__PURE__*/React.createElement("circle", { cx: "12", cy: "12", r: "3" }))),
-      /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
-        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "설정")
-      )
+      ),
+      metaPill(memoLastTitleWord)
     )
   );
 }
@@ -1250,6 +1265,11 @@ export function MainSideMenu({
   memoCount = 0,
   settlementCount = 0,
   settlementBadge = null,
+  chatLastAuthor = null,
+  settlementLastDate = null,
+  galleryLastDate = null,
+  placeLastName = null,
+  memoLastTitleWord = null,
   onClose,
   onOpenManual,
   onOpenSettings,
@@ -1390,7 +1410,12 @@ export function MainSideMenu({
       settlementBadge: settlementBadge,
       galleryCount: galleryCount,
       placeCount: placeCount,
-      memoCount: memoCount
+      memoCount: memoCount,
+      chatLastAuthor: chatLastAuthor,
+      settlementLastDate: settlementLastDate,
+      galleryLastDate: galleryLastDate,
+      placeLastName: placeLastName,
+      memoLastTitleWord: memoLastTitleWord
     }),
 /* Group 3+4: 공유하기 + 설정 */
     typeof SharedSideMenuFooter === 'function' && /*#__PURE__*/React.createElement(SharedSideMenuFooter, {
