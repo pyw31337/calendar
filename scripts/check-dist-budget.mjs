@@ -25,7 +25,8 @@ const BUDGETS = [
 // needed headroom of its own to keep pace with app-main's.
 // Bumped from 1_080_000 after icon DEPS sync fix (chat React #130) — was ~9 bytes over.
 // Bumped from 1_090_000 after side-menu nav + anniversary tab (~1.6KB over).
-const TOTAL_JS_MAX_BYTES = 1_100_000;
+// Bumped from 1_100_000 after notif onboarding + AppSettingsModal (~7.6KB over).
+const TOTAL_JS_MAX_BYTES = 1_120_000;
 
 function fail(message) {
   console.error(`[check-dist-budget] ${message}`);
