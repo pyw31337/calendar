@@ -63,6 +63,10 @@ function extractFirstUrl(...args) {
   const f = __gatherUiDeps().extractFirstUrl || GATHER_APP_UTILS.extractFirstUrl;
   return typeof f === 'function' ? f(...args) : undefined;
 }
+function getMediaIdentityKeys(...args) {
+  const f = __gatherUiDeps().getMediaIdentityKeys || GATHER_APP_UTILS.getMediaIdentityKeys;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
 function extractAllUrlInfos(...args) {
   const f = __gatherUiDeps().extractAllUrlInfos || GATHER_APP_UTILS.extractAllUrlInfos;
   return typeof f === 'function' ? f(...args) : [];
@@ -874,13 +878,33 @@ export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox,
         onClick: () => setActiveLightbox && setActiveLightbox({
           urls: [mediaInfo.url],
           index: 0,
+          mediaKey: getMediaIdentityKeys({
+            messageId: message?.id || '',
+            imageIndex: 0,
+            directMediaUrl: mediaInfo.url
+          }, { source: message?.uploadSource === 'memo' ? 'memo' : 'chat', messageId: message?.id || '' })?.mediaKey || '',
+          refKey: getMediaIdentityKeys({
+            messageId: message?.id || '',
+            imageIndex: 0,
+            directMediaUrl: mediaInfo.url
+          }, { source: message?.uploadSource === 'memo' ? 'memo' : 'chat', messageId: message?.id || '' })?.refKey || '',
           meta: [{
             timestamp: message?.timestamp || Date.now(),
             messageId: message?.id || '',
             imageIndex: 0,
             thumb: mediaInfo.url,
             tags: message?.directMediaTags || '',
-            directMediaUrl: mediaInfo.url
+            directMediaUrl: mediaInfo.url,
+            mediaKey: getMediaIdentityKeys({
+              messageId: message?.id || '',
+              imageIndex: 0,
+              directMediaUrl: mediaInfo.url
+            }, { source: message?.uploadSource === 'memo' ? 'memo' : 'chat', messageId: message?.id || '' })?.mediaKey || '',
+            refKey: getMediaIdentityKeys({
+              messageId: message?.id || '',
+              imageIndex: 0,
+              directMediaUrl: mediaInfo.url
+            }, { source: message?.uploadSource === 'memo' ? 'memo' : 'chat', messageId: message?.id || '' })?.refKey || ''
           }]
         }),
         style: { ...commonStyle, cursor: setActiveLightbox ? 'pointer' : 'default' }

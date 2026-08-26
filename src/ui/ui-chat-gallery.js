@@ -1539,7 +1539,7 @@ export function ChatGalleryModal({
       onClick: () => setActiveLightbox && setActiveLightbox({
         urls: visiblePhotos.map(p => p.full),
         index: idx,
-          meta: visiblePhotos.map(p => ({ timestamp: p.timestamp, messageId: p.messageId, imageIndex: p.imageIndex, thumb: p.thumb, tags: p.tags, directMediaUrl: p.directMediaUrl, source: p.source, uploadSource: p.uploadSource, meetingDate: p.meetingDate, photoId: p.photoId, sourceMessageId: p.sourceMessageId, sourceImageIndex: p.sourceImageIndex }))
+          meta: visiblePhotos.map(p => ({ timestamp: p.timestamp, messageId: p.messageId, imageIndex: p.imageIndex, thumb: p.thumb, tags: p.tags, directMediaUrl: p.directMediaUrl, source: p.source, uploadSource: p.uploadSource, meetingDate: p.meetingDate, photoId: p.photoId, sourceMessageId: p.sourceMessageId, sourceImageIndex: p.sourceImageIndex, mediaKey: p.mediaKey, refKey: p.refKey }))
       }),
       onBroken: (e, brokenInfo) => handleBrokenPhoto(photo, brokenInfo),
       style: {

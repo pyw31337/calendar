@@ -2109,7 +2109,7 @@ function App() {
         const entries = getMessageImageEntries(msg);
         setActiveLightbox({
           urls: entries.map(e => e.full),
-          meta: entries.map(e => ({ timestamp: msg.timestamp, messageId: msg.id, imageIndex: e.imageIndex, thumb: e.thumb, tags: e.tags, source: e.source, uploadSource: e.uploadSource })),
+          meta: entries.map(e => ({ timestamp: msg.timestamp, messageId: msg.id, imageIndex: e.imageIndex, thumb: e.thumb, tags: e.tags, source: e.source, uploadSource: e.uploadSource, mediaKey: e.mediaKey, refKey: e.refKey })),
           index: Number(imgParam) || 0
         });
       }
@@ -3825,8 +3825,28 @@ function App() {
     if (!photo || !identity || typeof identity !== 'object') return false;
     const keys = [identity.photoId, identity.refKey, identity.mediaKey].filter(Boolean);
     if (keys.some(key => photoMatchesIdentity(photo, key))) return true;
-    const urls = [identity.imageUrl, identity.thumbUrl].filter(Boolean);
+    const urls = [identity.imageUrl, identity.thumbUrl, identity.full, identity.thumb].filter(Boolean);
     return urls.some(url => photoMatchesUrl(photo, url));
+  };
+
+  const photoIdentityKeys = (identity = {}) => [identity.photoId, identity.refKey, identity.mediaKey].filter(Boolean);
+
+  const resolveImageEntryIndex = (entries, preferredIndex, identity = {}) => {
+    if (!Array.isArray(entries) || entries.length === 0) return -1;
+    const keys = photoIdentityKeys(identity);
+    const urls = [identity.imageUrl, identity.thumbUrl, identity.full, identity.thumb].filter(Boolean);
+    if (keys.length) {
+      const matchedByKey = entries.findIndex(entry => keys.some(key => photoMatchesIdentity(entry, key)));
+      if (matchedByKey >= 0) return matchedByKey;
+    }
+    if (urls.length) {
+      const matchedByUrl = entries.findIndex(entry => urls.some(url => entry.full === url || entry.thumb === url || entry.imageUrl === url));
+      if (matchedByUrl >= 0) return matchedByUrl;
+    }
+    const fallbackIndex = Number.isInteger(preferredIndex)
+      ? preferredIndex
+      : (Number.isInteger(identity.imageIndex) ? identity.imageIndex : (Number.isInteger(identity.sourceImageIndex) ? identity.sourceImageIndex : null));
+    return Number.isInteger(fallbackIndex) && fallbackIndex >= 0 && fallbackIndex < entries.length ? fallbackIndex : -1;
   };
 
   const handleDeleteMeetingPhoto = (dateStr, photoId, imageUrl, options = {}) => {
@@ -4316,33 +4336,43 @@ function App() {
   // location based on meta.source. directMediaUrl (an image pasted as a bare URL in chat/memo
   // text) has no clean single-item target to mutate, so it's left unsupported (Lightbox hides
   // the edit/delete buttons for it).
-  const findPhotoTargetByUrl = async (imageUrl, preferredMsgId, preferredDateStr, preferredPhotoId) => {
+  const findPhotoTargetByUrl = async (imageUrl, preferredMsgId, preferredDateStr, preferredPhotoId, preferredIdentity = {}) => {
     if (!imageUrl) return null;
     if (preferredMsgId) {
       const msg = await findChatMessageById(preferredMsgId);
       if (msg) {
         const getEntries = typeof getMessageImageEntries === 'function' ? getMessageImageEntries : null;
         const entries = getEntries ? getEntries(msg) : [];
-        const idx = entries.findIndex(e => e.full === imageUrl || e.thumb === imageUrl || e.imageUrl === imageUrl);
+        const idx = resolveImageEntryIndex(entries, preferredIdentity.imageIndex, {
+          ...preferredIdentity,
+          photoId: preferredPhotoId || preferredIdentity.photoId || '',
+          imageUrl,
+          thumbUrl: preferredIdentity.thumbUrl || imageUrl
+        });
         if (idx >= 0) return { type: 'chat', messageId: msg.id, imageIndex: idx, mediaKey: entries[idx]?.mediaKey || '', refKey: entries[idx]?.refKey || '' };
       }
     }
     const localMsg = (allChatMessages || []).find(m => {
       const getEntries = typeof getMessageImageEntries === 'function' ? getMessageImageEntries : null;
       const entries = getEntries ? getEntries(m) : [];
-      return entries.some(e => e.full === imageUrl || e.thumb === imageUrl || e.imageUrl === imageUrl);
+      return entries.some(e => e.full === imageUrl || e.thumb === imageUrl || e.imageUrl === imageUrl || photoMatchesIdentityPayload(e, preferredIdentity));
     });
     if (localMsg) {
       const getEntries = typeof getMessageImageEntries === 'function' ? getMessageImageEntries : null;
       const entries = getEntries ? getEntries(localMsg) : [];
-      const idx = entries.findIndex(e => e.full === imageUrl || e.thumb === imageUrl || e.imageUrl === imageUrl);
+      const idx = resolveImageEntryIndex(entries, preferredIdentity.imageIndex, {
+        ...preferredIdentity,
+        photoId: preferredPhotoId || preferredIdentity.photoId || '',
+        imageUrl,
+        thumbUrl: preferredIdentity.thumbUrl || imageUrl
+      });
       if (idx >= 0) return { type: 'chat', messageId: localMsg.id, imageIndex: idx, mediaKey: entries[idx]?.mediaKey || '', refKey: entries[idx]?.refKey || '' };
     }
 
     const localMemo = (memos || []).find(m => {
       const urls = Array.isArray(m.imageUrls) ? m.imageUrls : (m.imageUrl ? [m.imageUrl] : []);
       const thumbs = Array.isArray(m.thumbUrls) ? m.thumbUrls : (m.thumbUrl ? [m.thumbUrl] : []);
-      return urls.includes(imageUrl) || thumbs.includes(imageUrl);
+      return urls.includes(imageUrl) || thumbs.includes(imageUrl) || photoMatchesIdentityPayload(m, preferredIdentity);
     });
     if (localMemo) {
       const urls = Array.isArray(localMemo.imageUrls) ? localMemo.imageUrls : (localMemo.imageUrl ? [localMemo.imageUrl] : []);
@@ -4358,14 +4388,14 @@ function App() {
     if (preferredDateStr && isValidDateString(preferredDateStr)) {
       const m = meetings.find(item => item.date === preferredDateStr);
       if (m && Array.isArray(m.photos)) {
-        targetPhoto = m.photos.find(p => (preferredPhotoId && p.id === preferredPhotoId) || p.imageUrl === imageUrl || p.thumbUrl === imageUrl);
+        targetPhoto = m.photos.find(p => (preferredPhotoId && p.id === preferredPhotoId) || photoMatchesIdentityPayload(p, preferredIdentity) || p.imageUrl === imageUrl || p.thumbUrl === imageUrl);
         if (targetPhoto) targetMeeting = m;
       }
     }
     if (!targetMeeting) {
       for (const m of meetings) {
         if (!Array.isArray(m.photos)) continue;
-        const p = m.photos.find(item => (preferredPhotoId && item.id === preferredPhotoId) || item.imageUrl === imageUrl || item.thumbUrl === imageUrl);
+        const p = m.photos.find(item => (preferredPhotoId && item.id === preferredPhotoId) || photoMatchesIdentityPayload(item, preferredIdentity) || item.imageUrl === imageUrl || item.thumbUrl === imageUrl);
         if (p) {
           targetMeeting = m;
           targetPhoto = p;
@@ -4403,21 +4433,27 @@ function App() {
     const refKey = meta.refKey || '';
     const isMeetingPhotoMeta = meta.source === 'meeting' || meta.uploadSource === 'meeting' || dateStr || photoId;
     const originalTags = typeof meta.tags === 'string' ? meta.tags : '';
+    const preferredIdentity = { photoId, mediaKey, refKey, imageUrl, thumbUrl: meta.thumbUrl || meta.thumb || imageUrl, imageIndex: imgIdx, sourceImageIndex: meta.sourceImageIndex };
 
     if (meta.source === 'memo' && msgId) {
       const ok = await handleDeleteMemoPhoto(msgId, imgIdx);
       if (ok) return true;
     }
 
-    if (meta.sourceMessageId && Number.isInteger(meta.sourceImageIndex)) {
-      // Meeting-tab photos are a view onto the shared image asset, not a separate owner.
-      // When we know the source message + image index, delete the canonical asset first so
-      // the photo disappears from chat, gallery, and every linked meeting in one step.
-      const okChat = await handleDeleteChatMessagePhoto(meta.sourceMessageId, meta.sourceImageIndex);
-      if (okChat) return true;
+    if (meta.sourceMessageId) {
+      const sourceMessage = await findChatMessageById(meta.sourceMessageId);
+      const entries = sourceMessage ? getMessageImageEntries(sourceMessage) : [];
+      const resolvedIndex = resolveImageEntryIndex(entries, meta.sourceImageIndex, preferredIdentity);
+      if (resolvedIndex >= 0) {
+        // Meeting-tab photos are a view onto the shared image asset, not a separate owner.
+        // Delete the canonical asset first so the photo disappears from chat, gallery, and
+        // every linked meeting in one step.
+        const okChat = await handleDeleteChatMessagePhoto(meta.sourceMessageId, resolvedIndex);
+        if (okChat) return true;
+      }
     }
 
-    const target = await findPhotoTargetByUrl(imageUrl, msgId, dateStr, photoId);
+    const target = await findPhotoTargetByUrl(imageUrl, msgId, dateStr, photoId, preferredIdentity);
     if (target) {
       if (target.type === 'chat') {
         const ok = await handleDeleteChatMessagePhoto(target.messageId, target.imageIndex);
@@ -4479,18 +4515,24 @@ function App() {
     const photoId = meta.photoId;
     const mediaKey = meta.mediaKey || meta.originMediaKey || '';
     const refKey = meta.refKey || '';
+    const preferredIdentity = { photoId, mediaKey, refKey, imageUrl, thumbUrl: meta.thumbUrl || meta.thumb || imageUrl, imageIndex: imgIdx, sourceImageIndex: meta.sourceImageIndex };
 
     if (meta.source === 'memo' && msgId) {
       const res = await handleReplaceMemoPhoto(msgId, imgIdx, file);
       if (res) return res;
     }
 
-    if (meta.sourceMessageId && Number.isInteger(meta.sourceImageIndex)) {
-      // As with delete, the shared source image is the canonical asset. Replacing it there
-      // keeps chat, gallery, and meeting views visually identical without having to patch each
-      // view independently.
-      const resChat = await handleReplaceChatMessagePhoto(meta.sourceMessageId, meta.sourceImageIndex, file);
-      if (resChat) return resChat;
+    if (meta.sourceMessageId) {
+      const sourceMessage = await findChatMessageById(meta.sourceMessageId);
+      const entries = sourceMessage ? getMessageImageEntries(sourceMessage) : [];
+      const resolvedIndex = resolveImageEntryIndex(entries, meta.sourceImageIndex, preferredIdentity);
+      if (resolvedIndex >= 0) {
+        // As with delete, the shared source image is the canonical asset. Replacing it there
+        // keeps chat, gallery, and meeting views visually identical without having to patch each
+        // view independently.
+        const resChat = await handleReplaceChatMessagePhoto(meta.sourceMessageId, resolvedIndex, file);
+        if (resChat) return resChat;
+      }
     }
 
     if ((meta.source === 'meeting' || meta.uploadSource === 'meeting' || dateStr || photoId) && !meta.sourceMessageId) {
@@ -4503,7 +4545,7 @@ function App() {
       if (resChat) return resChat;
     }
 
-    const target = await findPhotoTargetByUrl(imageUrl, msgId, dateStr, photoId);
+    const target = await findPhotoTargetByUrl(imageUrl, msgId, dateStr, photoId, preferredIdentity);
     if (target) {
       if (target.type === 'chat') {
         const res = await handleReplaceChatMessagePhoto(target.messageId, target.imageIndex, file);
@@ -5134,7 +5176,7 @@ function App() {
           const entries = directMediaUrl && directEntry ? [directEntry] : getMessageImageEntries(msg);
           setActiveLightbox({
             urls: entries.map(e => e.full),
-            meta: entries.map(e => ({ timestamp: msg.timestamp, messageId: msg.id, imageIndex: e.imageIndex, thumb: e.thumb, tags: e.tags, directMediaUrl: e.directMediaUrl, source: e.source, uploadSource: e.uploadSource })),
+            meta: entries.map(e => ({ timestamp: msg.timestamp, messageId: msg.id, imageIndex: e.imageIndex, thumb: e.thumb, tags: e.tags, directMediaUrl: e.directMediaUrl, source: e.source, uploadSource: e.uploadSource, mediaKey: e.mediaKey, refKey: e.refKey })),
             index: directMediaUrl ? 0 : imageIndex
           });
         }, 350);
@@ -5164,7 +5206,7 @@ function App() {
           const entries = directMediaUrl && directEntry ? [directEntry] : getMessageImageEntries(msg);
           setActiveLightbox({
             urls: entries.map(e => e.full),
-            meta: entries.map(e => ({ timestamp: msg.timestamp, messageId: msg.id, imageIndex: e.imageIndex, thumb: e.thumb, tags: e.tags, directMediaUrl: e.directMediaUrl, source: e.source, uploadSource: e.uploadSource })),
+            meta: entries.map(e => ({ timestamp: msg.timestamp, messageId: msg.id, imageIndex: e.imageIndex, thumb: e.thumb, tags: e.tags, directMediaUrl: e.directMediaUrl, source: e.source, uploadSource: e.uploadSource, mediaKey: e.mediaKey, refKey: e.refKey })),
             index: directMediaUrl ? 0 : imageIndex
           });
         }, 350);
@@ -8011,7 +8053,7 @@ function renderChatMessageImages(msg, setActiveLightbox, singleImageStyle = {}) 
   if (entries.length === 0) return null;
   const thumbs = entries.map(e => e.thumb);
   const displayUrls = entries.map(e => e.full);
-  const meta = entries.map(e => ({ timestamp: msg.timestamp, messageId: msg.id, imageIndex: e.imageIndex, thumb: e.thumb, tags: e.tags, source: e.source, uploadSource: e.uploadSource }));
+  const meta = entries.map(e => ({ timestamp: msg.timestamp, messageId: msg.id, imageIndex: e.imageIndex, thumb: e.thumb, tags: e.tags, source: e.source, uploadSource: e.uploadSource, mediaKey: e.mediaKey, refKey: e.refKey }));
   if (thumbs.length === 1) {
     return /*#__PURE__*/React.createElement('img', {
       src: displayUrls[0] || thumbs[0],

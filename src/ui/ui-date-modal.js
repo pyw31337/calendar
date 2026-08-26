@@ -2939,7 +2939,9 @@ export function DateModal({
                   sourceMessageId: p.sourceMessageId,
                   sourceImageIndex: p.sourceImageIndex,
                   meetingDate: dateStr,
-                  photoId: p.id
+                  photoId: p.id,
+                  mediaKey: p.mediaKey,
+                  refKey: p.refKey
                 }))
               });
             } else {
