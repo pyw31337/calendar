@@ -5451,6 +5451,9 @@ function App() {
     settlementCount: Array.isArray(activeCal && activeCal.expenses)
       ? activeCal.expenses.filter(e => e && !e.deletedAt).length
       : 0,
+    settlementBadge: activeCal && typeof calculateSettlementBalance === 'function' && typeof formatBalanceBadge === 'function'
+      ? formatBalanceBadge(calculateSettlementBalance(activeCal))
+      : null,
     onClose: () => setIsMainSideMenuOpen(false),
     onOpenManual: () => {
       setIsGuideOpen(true);

@@ -728,6 +728,7 @@ export function MainSideMenu({
   chatCount = 0,
   memoCount = 0,
   settlementCount = 0,
+  settlementBadge = null,
   onClose,
   onOpenManual,
   onOpenSettings,
@@ -832,8 +833,47 @@ export function MainSideMenu({
 
         )
     ),
-    /* Group 1: manual (banner) + calendar + anniversary */
-        /* Group 2: 채팅 / 정산 / 갤러리 / 장소 / 메모 */
+    /* Group 1: manual (banner) + calendar settings */
+    /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-list", style: { borderTop: 'none', borderBottom: 'none', paddingTop: '4px' } },
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "admin-side-menu-item main-side-menu-manual-banner",
+        onClick: () => handle(onOpenManual)
+      },
+        /*#__PURE__*/React.createElement("span", { className: "main-side-menu-manual-banner-icon-wrap", "aria-hidden": "true" },
+          /*#__PURE__*/React.createElement("svg", {
+            xmlns: "http://www.w3.org/2000/svg", width: "22", height: "22", viewBox: "0 0 24 24",
+            fill: "none", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round", strokeLinejoin: "round"
+          },
+            /*#__PURE__*/React.createElement("path", { d: "M4 19.5A2.5 2.5 0 0 1 6.5 17H20" }),
+            /*#__PURE__*/React.createElement("path", { d: "M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" }),
+            /*#__PURE__*/React.createElement("path", { d: "M8 7h8" }),
+            /*#__PURE__*/React.createElement("path", { d: "M8 11h6" })
+          )
+        ),
+        /*#__PURE__*/React.createElement("span", { className: "main-side-menu-manual-banner-text" },
+          /*#__PURE__*/React.createElement("span", { className: "main-side-menu-manual-banner-title" }, "사용자 매뉴얼"),
+          /*#__PURE__*/React.createElement("span", { className: "main-side-menu-manual-banner-sub" }, "사용 방법 한눈에 보기")
+        ),
+        /*#__PURE__*/React.createElement("span", { className: "main-side-menu-manual-banner-chevron", "aria-hidden": "true" },
+          /*#__PURE__*/React.createElement("svg", {
+            xmlns: "http://www.w3.org/2000/svg", width: "18", height: "18", viewBox: "0 0 24 24",
+            fill: "none", stroke: "currentColor", strokeWidth: "2.2", strokeLinecap: "round", strokeLinejoin: "round"
+          }, /*#__PURE__*/React.createElement("path", { d: "m9 18 6-6-6-6" }))
+        )
+      ),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "admin-side-menu-item",
+        onClick: () => handle(onOpenSettings)
+      },
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement(CalendarCogIcon, null)),
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "캘린더 설정")
+        )
+      )
+    ),
+    /* Group 2: 채팅 / 정산 / 갤러리 / 장소 / 메모 */
     /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-list", style: { borderTop: "1px solid var(--border-subtle, #E2E8F0)", borderBottom: "none", paddingTop: "6px", marginTop: "2px" } },
       /*#__PURE__*/React.createElement("button", { type: "button", className: "admin-side-menu-item", onClick: () => { onClose && onClose(); if (onChangeView) onChangeView("chat"); } },
         /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2" }, /*#__PURE__*/React.createElement("path", { d: "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" }))),
