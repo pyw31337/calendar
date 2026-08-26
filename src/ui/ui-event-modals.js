@@ -965,6 +965,15 @@ export function AnniversaryModal({
         }
       }, label))
     ),
+    /*#__PURE__*/React.createElement("div", {
+      className: "anniversary-subtab-divider",
+      style: {
+        height: '1px',
+        width: '100%',
+        backgroundColor: 'var(--border-subtle, #E2E8F0)',
+        flexShrink: 0
+      }
+    }),
 
     /* Modal Scrollable Body */
     /*#__PURE__*/React.createElement("div", {
