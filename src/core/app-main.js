@@ -1861,21 +1861,32 @@ function App() {
     };
   }, [activeCalId, activeView, firebaseDb]);
 
-  // Anniversaries: always live (like chat/places) so an addition on another device shows up
-  // immediately even while this tab is sitting on a different view, not just after switching
-  // back to the calendar tab.
+  // Anniversaries: full collection (no orderBy) + client sort so docs without createdAt still show.
   React.useEffect(() => {
-    if (!activeCalId || !firebaseDb) return;
+    if (!activeCalId) return;
     let isMounted = true;
+    const sortAnns = list => {
+      const arr = Array.isArray(list) ? list.slice() : [];
+      arr.sort((a, b) => (Number(b.createdAt) || Number(b.updatedAt) || 0) - (Number(a.createdAt) || Number(a.updatedAt) || 0));
+      return arr;
+    };
+    fetchAnniversariesRest(activeCalId).then(list => {
+      if (isMounted && Array.isArray(list) && list.length > 0) {
+        setAnniversaries(prev => (prev && prev.length > 0 ? prev : sortAnns(list)));
+      }
+    }).catch(() => {});
+
+    if (!firebaseDb) return () => { isMounted = false; };
+
     const unsub = subscribeAnniversaries(activeCalId, snapshot => {
         if (!isMounted) return;
         const list = [];
         snapshot.forEach(doc => list.push({ id: doc.id, ...doc.data() }));
-        setAnniversaries(list);
+        setAnniversaries(sortAnns(list));
       }, err => {
         console.warn(`Firestore anniversaries subscription error:`, err);
         fetchAnniversariesRest(activeCalId).then(list => {
-          if (isMounted) setAnniversaries(list);
+          if (isMounted) setAnniversaries(sortAnns(list));
         });
       });
     return () => { isMounted = false; unsub(); };
@@ -5440,7 +5451,18 @@ function App() {
     },
     onOpenAnniversaries: () => {
       setIsMainSideMenuOpen(false);
-      if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 기념일 설정을 수정해 주세요.')) setIsAnniversariesOpen(true);
+      if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 기념일 설정을 수정해 주세요.')) {
+        setIsAnniversariesOpen(true);
+        if (activeCalId && typeof fetchAnniversariesRest === 'function') {
+          fetchAnniversariesRest(activeCalId).then(list => {
+            if (Array.isArray(list) && list.length > 0) {
+              setAnniversaries(list.slice().sort((a, b) =>
+                (Number(b.createdAt) || Number(b.updatedAt) || 0) - (Number(a.createdAt) || Number(a.updatedAt) || 0)
+              ));
+            }
+          }).catch(() => {});
+        }
+      }
     },
     onOpenShare: () => {
       setIsMainSideMenuOpen(false);

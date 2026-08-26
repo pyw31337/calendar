@@ -443,11 +443,8 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
   }
 
   function subscribeAnniversaries(calId, onSnapshot, onError) {
-    return subscribeCalSubcollection(
-      calId, 'anniversaries',
-      { orderBy: 'createdAt', direction: 'desc' },
-      onSnapshot, onError
-    );
+    // Do NOT orderBy createdAt: older docs may lack the field and are then invisible.
+    return subscribeCalSubcollection(calId, 'anniversaries', {}, onSnapshot, onError);
   }
 
   export const GATHER_FIREBASE_SERVICES = Object.freeze({

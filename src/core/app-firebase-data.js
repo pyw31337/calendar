@@ -853,7 +853,6 @@ function subscribeAnniversaries(calId, onSnapshot, onError) {
   }
   if (!firebaseDb || !calId) return function () {};
   return firebaseDb.collection('calendars').doc('cal_' + calId).collection('anniversaries')
-    .orderBy('createdAt', 'desc')
     .onSnapshot(onSnapshot, onError || function () {});
 }
 
@@ -1264,15 +1263,17 @@ async function fetchMemosRest(calId, recentLimit = null) {
 
 async function fetchAnniversariesRest(calId) {
   try {
-    const url = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/calendars/cal_${calId}/anniversaries?orderBy=createdAt%20desc`;
+    const url = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/calendars/cal_${calId}/anniversaries`;
     const res = await fetch(url);
     if (!res.ok) return [];
     const data = await res.json();
     const docs = data.documents || [];
-    return docs.map(doc => ({
+    const list = docs.map(doc => ({
       id: doc.name.split('/').pop(),
       ...firestoreDocumentToJs(doc)
     }));
+    list.sort((a, b) => (Number(b.createdAt) || Number(b.updatedAt) || 0) - (Number(a.createdAt) || Number(a.updatedAt) || 0));
+    return list;
   } catch (err) {
     console.warn('fetchAnniversariesRest error:', err);
     return [];
