@@ -2,6 +2,27 @@ import './react-globals.js';
 import './app.css';
 
 const BOOT_RETRY_KEY = 'gather_boot_auto_retry';
+const FIREBASE_SDK_VERSION = (() => {
+  if (typeof window !== 'undefined' && window.__GATHER_FIREBASE_SDK_VERSION) {
+    return window.__GATHER_FIREBASE_SDK_VERSION;
+  }
+  let version = '';
+  try {
+    const url = new URL(import.meta.url, window.location.href);
+    version = `${url.pathname.split('/').pop() || ''}${url.search || ''}`;
+  } catch (_) {
+    version = String(Date.now());
+  }
+  if (typeof window !== 'undefined') window.__GATHER_FIREBASE_SDK_VERSION = version;
+  return version;
+})();
+const firebaseScriptLoadPromises = new Map();
+
+function resolveFirebaseSdkUrl(src) {
+  const absolute = new URL(src, window.location.href);
+  absolute.searchParams.set('v', FIREBASE_SDK_VERSION);
+  return absolute.toString();
+}
 
 function showBootStatus(msg) {
   const root = document.getElementById('root');
@@ -25,7 +46,10 @@ function showBootStatus(msg) {
 // bad connection instead of failing outright) can't hang loadFirebaseSdk forever -- without this
 // a single stuck request meant boot() never reached __gatherStartApp() at all.
 function loadScriptOnce(src, timeoutMs = 8000) {
-  return new Promise((resolve, reject) => {
+  const resolvedSrc = resolveFirebaseSdkUrl(src);
+  const inflight = firebaseScriptLoadPromises.get(resolvedSrc);
+  if (inflight) return inflight;
+  const promise = new Promise((resolve, reject) => {
     let settled = false;
     const el = document.createElement('script');
     const timer = setTimeout(() => {
@@ -41,23 +65,28 @@ function loadScriptOnce(src, timeoutMs = 8000) {
       el.onload = null;
       el.onerror = null;
       el.remove();
-      reject(new Error(`script load timed out: ${src}`));
+      firebaseScriptLoadPromises.delete(resolvedSrc);
+      reject(new Error(`script load timed out: ${resolvedSrc}`));
     }, timeoutMs);
-    el.src = src;
+    el.src = resolvedSrc;
     el.onload = () => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      firebaseScriptLoadPromises.delete(resolvedSrc);
       resolve();
     };
     el.onerror = () => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      reject(new Error(`script load failed: ${src}`));
+      firebaseScriptLoadPromises.delete(resolvedSrc);
+      reject(new Error(`script load failed: ${resolvedSrc}`));
     };
     document.head.appendChild(el);
   });
+  firebaseScriptLoadPromises.set(resolvedSrc, promise);
+  return promise;
 }
 async function loadScriptWithRetry(src, timeoutMs, attempts = 3, delayMs = 700) {
   let lastErr;

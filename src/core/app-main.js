@@ -564,6 +564,18 @@ function AdminUnifiedSearchModal(props) {
   return typeof C === 'function' ? React.createElement(C, props) : null;
 }
 
+function getFirebaseStateVersion() {
+  if (typeof window === 'undefined') return 0;
+  return Number(window.__GATHER_FIREBASE_STATE_VERSION || 0) || 0;
+}
+
+function subscribeFirebaseStateChange(onStoreChange) {
+  if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') return () => {};
+  const handler = () => onStoreChange();
+  window.addEventListener('gather-firebase-state-change', handler);
+  return () => window.removeEventListener('gather-firebase-state-change', handler);
+}
+
 
 
 
@@ -605,6 +617,9 @@ function App() {
   const showRetryableUploadToast = (message, onRetry, duration = 5000) => {
     return showToast(message, 'error', duration, onRetry, null, '다시 시도');
   };
+  const firebaseConnectionVersion = typeof React.useSyncExternalStore === 'function'
+    ? React.useSyncExternalStore(subscribeFirebaseStateChange, getFirebaseStateVersion, getFirebaseStateVersion)
+    : 0;
 
   const runWithOperationProgress = async ({ title, detail, delay = 1000 } = {}, task) => {
     if (typeof task !== 'function') return undefined;
@@ -1828,10 +1843,13 @@ function App() {
     };
     const lastSyncedAt = Number(syncDiag?.receivedAt || syncDiag?.docUpdatedAt || activeCal?.updatedAt || 0) || 0;
     const lastSyncedText = formatSyncTimeLabel(lastSyncedAt);
+    const firebaseReconnectPending = !firebaseDb && !firebaseRetryExhausted;
     const detail = syncDiag?.error
       ? '동기화 응답이 지연되고 있습니다.'
+      : firebaseReconnectPending
+      ? (syncDiag?.fromCache || !syncDiag ? '캐시된 데이터를 먼저 보여주는 중이며 Firebase 연결을 다시 시도하는 중입니다.' : 'Firebase 연결을 다시 시도하는 중입니다.')
       : !firebaseDb
-      ? 'Firebase 연결이 아직 준비되지 않았습니다.'
+      ? 'Firebase 연결이 아직 확인되지 않았습니다.'
       : !isBrowserOnline
       ? '네트워크 연결이 끊긴 상태입니다.'
       : isInitialDataLoading
@@ -1844,8 +1862,13 @@ function App() {
     let status = 'live';
     let label = '동기화됨';
     if (!firebaseDb) {
-      status = 'offline';
-      label = '연결 안 됨';
+      if (firebaseRetryExhausted) {
+        status = 'offline';
+        label = '연결 안 됨';
+      } else {
+        status = 'loading';
+        label = '연결 확인 중';
+      }
     } else if (syncDiag?.error) {
       status = 'error';
       label = '연결 지연';
@@ -1869,7 +1892,7 @@ function App() {
       lastSyncedText,
       title: [label, lastSyncedText ? `최근 ${lastSyncedText}` : '', detail].filter(Boolean).join(' · ')
     };
-  }, [activeCal?.updatedAt, firebaseDb, isBrowserOnline, isInitialDataLoading, syncDiag]);
+  }, [activeCal?.updatedAt, firebaseConnectionVersion, firebaseDb, isBrowserOnline, isInitialDataLoading, syncDiag]);
   React.useEffect(() => {
     if (!firebaseDb || !activeCalId) return undefined;
     let lastRefreshAt = 0;

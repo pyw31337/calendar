@@ -869,7 +869,37 @@ const firebaseConfig = {
 };
 if (typeof window !== "undefined") window.__gatherFirebaseConfig = firebaseConfig;
 let firebaseDb = null;
-function __setFirebaseDb(v){ firebaseDb = v; if (typeof window!=="undefined") window.__gatherFirebaseDb = v; }
+if (typeof window !== 'undefined' && window.__GATHER_FIREBASE_STATE_VERSION == null) window.__GATHER_FIREBASE_STATE_VERSION = 0;
+function getFirebaseSdkVersion() {
+  if (typeof window !== 'undefined' && window.__GATHER_FIREBASE_SDK_VERSION) return window.__GATHER_FIREBASE_SDK_VERSION;
+  let version = '';
+  try {
+    const url = new URL(import.meta.url, window.location.href);
+    version = `${url.pathname.split('/').pop() || ''}${url.search || ''}`;
+  } catch (_) {
+    version = String(Date.now());
+  }
+  if (typeof window !== 'undefined') window.__GATHER_FIREBASE_SDK_VERSION = version;
+  return version;
+}
+function resolveFirebaseSdkUrl(src) {
+  const absolute = new URL(src, window.location.href);
+  absolute.searchParams.set('v', getFirebaseSdkVersion());
+  return absolute.toString();
+}
+function notifyFirebaseStateChange() {
+  if (typeof window === 'undefined') return;
+  window.__GATHER_FIREBASE_STATE_VERSION = Number(window.__GATHER_FIREBASE_STATE_VERSION || 0) + 1;
+  try {
+    window.dispatchEvent(new Event('gather-firebase-state-change'));
+  } catch (_) {}
+}
+function __setFirebaseDb(v){
+  if (firebaseDb === v) return;
+  firebaseDb = v;
+  if (typeof window!=="undefined") window.__gatherFirebaseDb = v;
+  notifyFirebaseStateChange();
+}
 
 let firebaseStorage = null;
 
@@ -881,7 +911,12 @@ let firebaseStorage = null;
 // another theory. Also mirrored onto window.__gatherFirebaseInitError for direct DevTools
 // inspection regardless of how a consumer imports it.
 let firebaseInitError = null;
-function __setFirebaseInitError(v) { firebaseInitError = v; if (typeof window !== "undefined") window.__gatherFirebaseInitError = v; }
+function __setFirebaseInitError(v) {
+  if (firebaseInitError === v) return;
+  firebaseInitError = v;
+  if (typeof window !== "undefined") window.__gatherFirebaseInitError = v;
+  notifyFirebaseStateChange();
+}
 
 // PC 웨일 실사용자 콘솔에서 확인된 실제 원인: attemptFirebaseInit()이 백그라운드 재시도 루프를 통해
 // 두 번째로 실행되면 firebase.firestore().settings(...)도 다시 호출되는데, Firestore SDK는 같은
@@ -983,7 +1018,12 @@ const firebaseReadyOnFirstTry = attemptFirebaseInit();
 // very first attempt while the app had already (or was about to) recover in the background,
 // making a normal transient hiccup look like a persistent outage.
 let firebaseRetryExhausted = false;
-function __setFirebaseRetryExhausted(v) { firebaseRetryExhausted = v; if (typeof window !== "undefined") window.__gatherFirebaseRetryExhausted = v; }
+function __setFirebaseRetryExhausted(v) {
+  if (firebaseRetryExhausted === v) return;
+  firebaseRetryExhausted = v;
+  if (typeof window !== "undefined") window.__gatherFirebaseRetryExhausted = v;
+  notifyFirebaseStateChange();
+}
 
 // main.jsx's own boot-time loader (loadFirebaseSdk) already retries a few times before giving up,
 // but "gave up" used to mean permanently stuck without Firestore for the rest of that page
@@ -1008,13 +1048,19 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined' && !firebas
   ];
   const loadFirebaseScriptOnce = (src, timeoutMs) => new Promise((resolve, reject) => {
     let settled = false;
+    const resolvedSrc = resolveFirebaseSdkUrl(src);
     const timer = setTimeout(() => { if (settled) return; settled = true; reject(new Error('timeout')); }, timeoutMs);
     const el = document.createElement('script');
-    el.src = src;
+    el.src = resolvedSrc;
     el.onload = () => { if (settled) return; settled = true; clearTimeout(timer); resolve(); };
     el.onerror = () => { if (settled) return; settled = true; clearTimeout(timer); reject(new Error('load failed')); };
     document.head.appendChild(el);
   });
+  const needsFirebaseSdkReload = () => (
+    typeof firebase === 'undefined' ||
+    typeof firebase.firestore !== 'function' ||
+    typeof firebase.storage !== 'function'
+  );
   let bgAttempts = 0;
   const bgRetryTimer = setInterval(async () => {
     bgAttempts += 1;
@@ -1028,20 +1074,12 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined' && !firebas
       return;
     }
     try {
-      // If window.firebase already exists, some earlier script tag (e.g. the deferred CDN
-      // <script> in index.html, just slow rather than truly failed on this connection) has
-      // already finished loading in the background since our first attempt. Injecting another
-      // copy on top of it here is what produced the real, evidenced bug: a PC Whale user's
-      // console showed "Firebase is already defined in the global scope" from the duplicate
-      // load, immediately followed by Firestore rejecting the second settings() call
-      // ("experimentalForceLongPolling and experimentalAutoDetectLongPolling cannot be used
-      // together"), which left the realtime listener permanently unable to attach. Only inject
-      // fresh script tags when nothing has loaded yet.
-      if (typeof firebase === 'undefined') {
-        // Reloading an already-loaded script is harmless here (firebase-app-compat.js's own
-        // !firebase.apps.length guard, and the browser's own HTTP cache once one attempt actually
-        // succeeds) -- always retrying all three keeps this simple and avoids having to detect
-        // exactly which of the three partially loaded last time.
+      // If the Firebase compat globals are missing OR incomplete, reload all three vendor files.
+      // A partial previous load (app-compat attached but firestore/storage did not, or a cached
+      // stale copy of one script survived a deploy) is exactly the kind of half-broken state that
+      // left the app stuck showing local cache with `연결 안 됨` forever: `firebase` existed, so
+      // the retry loop skipped reloading, but `firebase.firestore()` still failed every time.
+      if (needsFirebaseSdkReload()) {
         for (const url of FIREBASE_SDK_URLS) {
           await loadFirebaseScriptOnce(url, 15000);
         }
