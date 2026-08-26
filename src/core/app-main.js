@@ -5486,7 +5486,10 @@ function App() {
         bestLabel = formatMenuDate(ts) || formatMenuDate(fallbackDateStr);
       }
     };
-    const meetings = (activeCal && Array.isArray(activeCal.confirmedMeeting)) ? activeCal.confirmedMeeting : [];
+    const meetings = [
+      ...(activeCal && Array.isArray(activeCal.confirmedMeeting) ? activeCal.confirmedMeeting : []),
+      ...(Array.isArray(confirmedMeetingsSubcollection) ? confirmedMeetingsSubcollection : [])
+    ];
     meetings.forEach(m => {
       if (!m || m.deletedAt) return;
       noteMeetingDate(m.date || m.confirmedAt);

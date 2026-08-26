@@ -2142,6 +2142,10 @@ select.form-select {
   font-weight: 600;
   line-height: 1.2;
 }
+.side-menu-meta-pill {
+  vertical-align: middle;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
 .admin-side-menu-item-desc {
   font-size: 0.68rem;
   font-weight: 400;
@@ -3837,6 +3841,13 @@ textarea.form-input {
 :root[data-theme="dark"] .admin-side-menu-item:focus-visible .admin-side-menu-item-icon {
   background: #243152 !important;
   color: #F8FAFC !important;
+}
+:root[data-theme="dark"] .side-menu-meta-pill,
+:root[data-theme="dark"] .side-menu-meta-pill {
+  background: #1B2540 !important;
+  border-color: #334155 !important;
+  color: #CBD5E1 !important;
+  box-shadow: none;
 }
 
 :root[data-theme="dark"] .admin-side-menu-setting-row,

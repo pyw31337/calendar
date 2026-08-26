@@ -1473,7 +1473,9 @@ export function CommentsSection({
     return previewSourceMessages.length > 0 ? [previewSourceMessages[previewSourceMessages.length - 1]] : [];
   }, [previewSourceMessages]);
   const hasAnyChat = totalChatCount > 0 || previewSourceMessages.length > 0;
-  const emptyChatMessage = hasAnyChat ? '표시할 최근 채팅이 없습니다.' : '등록된 채팅이 없습니다.';
+  const emptyChatMessage = totalChatCount > 0
+    ? '최근 채팅을 불러오는 중…'
+    : (hasAnyChat ? '표시할 최근 채팅이 없습니다.' : '등록된 채팅이 없습니다.');
   const openFullChat = (event) => {
     if (event) {
       event.preventDefault();

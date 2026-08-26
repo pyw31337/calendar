@@ -1109,8 +1109,8 @@ export function SharedAppNavBlock({
 }) {
   const React = window.React;
   const go = (view) => {
-    if (typeof onClose === 'function') onClose();
     if (typeof onChangeView === 'function') onChangeView(view);
+    if (typeof onClose === 'function') onClose();
   };
   const badge = (count, muted = true) => count > 0 ? /*#__PURE__*/React.createElement("span", {
     className: "main-menu-badge",
@@ -1128,20 +1128,27 @@ export function SharedAppNavBlock({
       title: label,
       style: Object.assign({
         marginLeft: "auto",
+        alignSelf: "center",
         flexShrink: 0,
-        maxWidth: "7.2rem",
+        maxWidth: "8.25rem",
         overflow: "hidden",
         textOverflow: "ellipsis",
         whiteSpace: "nowrap",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        height: "26px",
+        minHeight: "26px",
+        padding: "0 10px",
         fontSize: "0.72rem",
-        fontWeight: 700,
-        lineHeight: 1.2,
-        padding: "4px 10px",
-        borderRadius: "var(--radius-md)",
+        fontWeight: 800,
+        lineHeight: 1,
+        borderRadius: "10px",
         backgroundColor: "var(--bg-primary, #F8FAFC)",
         border: "1px solid var(--border-subtle, #E2E8F0)",
         color: "var(--text-muted, #64748B)",
-        boxSizing: "border-box"
+        boxSizing: "border-box",
+        fontVariantNumeric: "tabular-nums"
       }, styleExtra || {})
     }, label);
   };
