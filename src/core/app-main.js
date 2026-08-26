@@ -5390,7 +5390,7 @@ function App() {
         bestLabel = formatMenuDate(ts) || formatMenuDate(fallbackDateStr);
       }
     };
-    const meetings = (activeCal && Array.isArray(activeCal.confirmedMeetings)) ? activeCal.confirmedMeetings : [];
+    const meetings = (activeCal && Array.isArray(activeCal.confirmedMeeting)) ? activeCal.confirmedMeeting : [];
     meetings.forEach(m => {
       if (!m || m.deletedAt) return;
       noteMeetingDate(m.date || m.confirmedAt);
