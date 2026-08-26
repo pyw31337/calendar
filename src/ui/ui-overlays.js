@@ -672,17 +672,35 @@ export function ImageUploadOverlay({ pct, remainingSec, label, current, total })
   const React = window.React;
 
   const clamped = Math.max(0, Math.min(100, pct || 0));
-  // Only worth showing "(n/총장수)" once there's more than one photo in the batch -- a single
-  // photo's own label ("사진 전송 중...") already says everything a "(1/1)" suffix would.
-  const countSuffix = total > 1 ? ` (${Math.min(current || 1, total)}/${total})` : '';
+  const hasQueue = total > 1;
+  const queueText = hasQueue ? `대기열 ${Math.min(current || 1, total)}/${total}` : '';
+  const remainingText = typeof remainingSec === 'number' ? `약 ${remainingSec}초 남음` : '';
   return /*#__PURE__*/React.createElement('div', {
     style: { position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.45)', zIndex: 100000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }
   }, /*#__PURE__*/React.createElement('div', {
-    style: { backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '24px 28px', width: '260px', maxWidth: '100%', textAlign: 'center', boxShadow: '0 10px 30px rgba(0,0,0,0.25)' }
+    style: { backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '22px 24px', width: '292px', maxWidth: '100%', textAlign: 'left', boxShadow: '0 10px 30px rgba(0,0,0,0.25)', display: 'flex', flexDirection: 'column', gap: '10px' }
   },
-    /*#__PURE__*/React.createElement('div', { style: { fontWeight: 800, fontSize: '0.95rem', color: 'var(--text-main)', marginBottom: '4px' } }, `${label || '사진 전송 중...'}${countSuffix}`),
-    /*#__PURE__*/React.createElement('div', { style: { fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '14px' } },
-      `${clamped}%${typeof remainingSec === 'number' ? ` · 약 ${remainingSec}초 남음` : ''}`),
+    /*#__PURE__*/React.createElement('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' } },
+      /*#__PURE__*/React.createElement('div', { style: { fontWeight: 900, fontSize: '0.95rem', color: 'var(--text-main)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, label || '사진 전송 중...'),
+      queueText && /*#__PURE__*/React.createElement('span', {
+        style: {
+          flexShrink: 0,
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '4px 10px',
+          borderRadius: '9999px',
+          backgroundColor: 'var(--bg-primary)',
+          color: 'var(--text-muted)',
+          border: '1px solid var(--border-subtle)',
+          fontSize: '0.72rem',
+          fontWeight: 900,
+          lineHeight: 1
+        }
+      }, queueText)
+    ),
+    /*#__PURE__*/React.createElement('div', { style: { fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.45 } },
+      `${clamped}%${remainingText ? ` · ${remainingText}` : ''}${hasQueue ? ' · 순차 저장 중' : ''}`),
     /*#__PURE__*/React.createElement('div', { style: { height: '8px', borderRadius: 'var(--radius-full)', backgroundColor: 'var(--border-subtle)', overflow: 'hidden' } },
       /*#__PURE__*/React.createElement('div', { style: { height: '100%', width: `${clamped}%`, backgroundColor: '#4F46E5', transition: 'width 0.2s ease', borderRadius: 'var(--radius-full)' } })
     )
@@ -694,14 +712,35 @@ export function ImageProcessingOverlay({ current, total, fileName, pct, remainin
 
   if (!total) return null;
   const clamped = typeof pct === 'number' ? Math.max(0, Math.min(100, pct)) : Math.min(100, Math.round((current / total) * 100));
+  const queueText = total > 1 ? `파일 ${Math.min(current || 1, total)}/${total}` : '';
+  const remainingText = typeof remainingSec === 'number' ? `약 ${remainingSec}초 남음` : '';
   return /*#__PURE__*/React.createElement('div', {
     style: { position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.45)', zIndex: 100000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }
   }, /*#__PURE__*/React.createElement('div', {
-    style: { backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '24px 28px', width: '260px', maxWidth: '100%', textAlign: 'center', boxShadow: '0 10px 30px rgba(0,0,0,0.25)' }
+    style: { backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '22px 24px', width: '292px', maxWidth: '100%', textAlign: 'left', boxShadow: '0 10px 30px rgba(0,0,0,0.25)', display: 'flex', flexDirection: 'column', gap: '10px' }
   },
-    /*#__PURE__*/React.createElement('div', { style: { fontWeight: 800, fontSize: '0.95rem', color: 'var(--text-main)', marginBottom: '4px' } }, '사진 변환 중...'),
-    /*#__PURE__*/React.createElement('div', { style: { fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '14px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } },
-      `${current}/${total}${fileName ? ` · ${fileName}` : ''} · ${clamped}%${typeof remainingSec === 'number' ? ` · 약 ${remainingSec}초 남음` : ''}`),
+    /*#__PURE__*/React.createElement('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' } },
+      /*#__PURE__*/React.createElement('div', { style: { fontWeight: 900, fontSize: '0.95rem', color: 'var(--text-main)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, '사진 변환 중...'),
+      queueText && /*#__PURE__*/React.createElement('span', {
+        style: {
+          flexShrink: 0,
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '4px 10px',
+          borderRadius: '9999px',
+          backgroundColor: 'var(--bg-primary)',
+          color: 'var(--text-muted)',
+          border: '1px solid var(--border-subtle)',
+          fontSize: '0.72rem',
+          fontWeight: 900,
+          lineHeight: 1
+        }
+      }, queueText)
+    ),
+    /*#__PURE__*/React.createElement('div', { style: { fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.45, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } },
+      `${clamped}%${remainingText ? ` · ${remainingText}` : ''}`),
+    fileName && /*#__PURE__*/React.createElement('div', { style: { fontSize: '0.72rem', color: 'var(--text-light)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, fileName),
     /*#__PURE__*/React.createElement('div', { style: { height: '8px', borderRadius: 'var(--radius-full)', backgroundColor: 'var(--border-subtle)', overflow: 'hidden' } },
       /*#__PURE__*/React.createElement('div', { style: { height: '100%', width: `${clamped}%`, backgroundColor: '#4F46E5', transition: 'width 0.2s ease', borderRadius: 'var(--radius-full)' } })
     )

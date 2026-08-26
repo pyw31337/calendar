@@ -600,7 +600,10 @@ function App() {
   const showToast = toastControllerRef.current.showToast;
   const dismissToast = toastControllerRef.current.dismissToast;
   const showUndoableDeleteToast = (message, onUndo, onExpire, duration = 5000) => {
-    return showToast(message, 'delete', duration, onUndo, onExpire);
+    return showToast(message, 'delete', duration, onUndo, onExpire, '되돌리기');
+  };
+  const showRetryableUploadToast = (message, onRetry, duration = 5000) => {
+    return showToast(message, 'error', duration, onRetry, null, '다시 시도');
   };
 
   const runWithOperationProgress = async ({ title, detail, delay = 1000 } = {}, task) => {
@@ -2671,11 +2674,11 @@ function App() {
         }
         // No success toast here -- the new message is immediately visible in the chat feed.
       } else {
-        showToast('등록 실패', 'error', 3000);
+        showRetryableUploadToast('등록 실패', () => handleSendChatMessage(), 5000);
       }
     } catch (err) {
       console.error('handleSendChatMessage failed:', err);
-      showToast('등록 실패', 'error', 3000);
+      showRetryableUploadToast('등록 실패', () => handleSendChatMessage(), 5000);
     } finally {
       setIsChatSubmitting(false);
       setChatUploadProgress(null);
@@ -2755,7 +2758,7 @@ function App() {
       return true;
     } catch (err) {
       console.error('handleUploadGalleryImages failed:', err);
-      showToast('갤러리 업로드 실패', 'error', 4000);
+      showRetryableUploadToast('갤러리 업로드 실패', () => handleUploadGalleryImages(files), 5000);
       return false;
     } finally {
       setTimeout(() => setChatUploadProgress(null), 250);
@@ -3030,7 +3033,7 @@ function App() {
         return { shareUrl, imageUrl: null };
       } catch (fallbackErr) {
         console.error('handlePromoteInlineChatImage failed:', fallbackErr);
-        showToast('이미지 URL 생성 실패', 'error', 4000);
+        showRetryableUploadToast('이미지 URL 생성 실패', () => handlePromoteInlineChatImage({ url, meta, index }), 5000);
         throw fallbackErr;
       }
     } finally {
@@ -3875,7 +3878,7 @@ function App() {
       // it looks like a plain message rather than a raw JSON/object dump.
       const rawMessage = err && typeof err.message === 'string' ? err.message.trim() : '';
       const detail = rawMessage && rawMessage.length <= 300 && !/[{}[\]]/.test(rawMessage) ? `: ${rawMessage}` : '';
-      showToast(`일정 사진 저장 실패${detail}`, 'error', 6000);
+      showRetryableUploadToast(`일정 사진 저장 실패${detail}`, () => handleAddMeetingPhotos(dateStr, files), 6000);
       return false;
     } finally {
       setTimeout(() => setChatUploadProgress(null), 250);
@@ -4044,7 +4047,7 @@ function App() {
       return ok ? resolved.imageUrl : false;
     } catch (err) {
       console.error('handleReplaceMeetingPhoto failed:', err);
-      showToast('사진 교체 실패', 'error', 4000);
+      showRetryableUploadToast('사진 교체 실패', () => handleReplaceMeetingPhoto(dateStr, photoId, file, imageUrl, options), 5000);
       return false;
     } finally {
       setTimeout(() => setChatUploadProgress(null), 250);
@@ -4292,7 +4295,7 @@ function App() {
       return resolved.imageUrl;
     } catch (err) {
       console.error('handleReplaceChatMessagePhoto failed:', err);
-      showToast('사진 교체 실패', 'error', 4000);
+      showRetryableUploadToast('사진 교체 실패', () => handleReplaceChatMessagePhoto(messageId, imageIndex, file), 5000);
       return false;
     } finally {
       setTimeout(() => setChatUploadProgress(null), 250);
@@ -4391,7 +4394,7 @@ function App() {
       return resolved.imageUrl;
     } catch (err) {
       console.error('handleReplaceMemoPhoto failed:', err);
-      showToast('사진 교체 실패', 'error', 4000);
+      showRetryableUploadToast('사진 교체 실패', () => handleReplaceMemoPhoto(memoId, imageIndex, file), 5000);
       return false;
     } finally {
       setTimeout(() => setChatUploadProgress(null), 250);
@@ -5330,7 +5333,7 @@ function App() {
         Promise.resolve(action()).catch(console.warn);
       },
       className: "toast-action"
-    }, "되돌리기")),
+    }, toast.actionLabel || "되돌리기")),
 
     isAppSettingsOpen && /*#__PURE__*/React.createElement(AppSettingsModal, {
       onClose: () => setIsAppSettingsOpen(false),

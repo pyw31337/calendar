@@ -2015,7 +2015,17 @@ export function AdminDashboard({ initialCalendars }) {
     /* Toast Alert */
     toast && /*#__PURE__*/React.createElement("div", {
       className: `toast ${toast.type === 'error' ? 'is-delete' : 'is-success'} ${toast.isExiting ? 'is-exiting' : ''}`
-    }, toast.message),
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "toast-message"
+    }, toast.message), toast.onAction && /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => {
+        const action = toast.onAction;
+        dismissToast();
+        Promise.resolve(action()).catch(console.warn);
+      },
+      className: "toast-action"
+    }, toast.actionLabel || "되돌리기")),
 
     /* Header + Tabs, attached into one flush top bar (no outer box/margin, like the main
        app's fixed header + .main-menu-bar underneath it) */

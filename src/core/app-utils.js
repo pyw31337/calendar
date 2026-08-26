@@ -851,16 +851,18 @@ const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
         setToast(null);
       }, 180);
     }
-    function showToast(message, type, duration, onAction, onExpire) {
+    function showToast(message, type, duration, onAction, onExpire, actionLabel) {
       if (type === void 0) type = 'info';
       if (duration === void 0) duration = 3000;
       if (onAction === void 0) onAction = null;
       if (onExpire === void 0) onExpire = null;
+      if (actionLabel === void 0) actionLabel = null;
       clearToastTimers();
       setToast({
         message: message,
         type: type,
         onAction: typeof onAction === 'function' ? onAction : null,
+        actionLabel: typeof actionLabel === 'string' && actionLabel.trim() ? actionLabel.trim() : null,
         isExiting: false
       });
       timer = setTimeout(function () {
