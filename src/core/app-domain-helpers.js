@@ -768,6 +768,26 @@ function getNotificationPermissionHelpSteps(...args) {
   const f = (window.GATHER_APP_NOTIFICATIONS || {}).getNotificationPermissionHelpSteps;
   return typeof f === 'function' ? f(...args) : undefined;
 }
+function shouldShowNotifOnboarding(...args) {
+  const f = (window.GATHER_APP_NOTIFICATIONS || {}).shouldShowNotifOnboarding;
+  return typeof f === 'function' ? f(...args) : false;
+}
+function setNotifGuideSeen(...args) {
+  const f = (window.GATHER_APP_NOTIFICATIONS || {}).setNotifGuideSeen;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getNotifyChannels(...args) {
+  const f = (window.GATHER_APP_NOTIFICATIONS || {}).getNotifyChannels;
+  return typeof f === 'function' ? f(...args) : { chat: true, memo: true, poll: true, schedule: true };
+}
+function setNotifyChannel(...args) {
+  const f = (window.GATHER_APP_NOTIFICATIONS || {}).setNotifyChannel;
+  return typeof f === 'function' ? f(...args) : { chat: true, memo: true, poll: true, schedule: true };
+}
+function isNotifyChannelEnabled(...args) {
+  const f = (window.GATHER_APP_NOTIFICATIONS || {}).isNotifyChannelEnabled;
+  return typeof f === 'function' ? f(...args) : true;
+}
 function isIOSDevice(...args) {
   const f = (window.GATHER_APP_NOTIFICATIONS || {}).isIOSDevice;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -2001,6 +2021,11 @@ export {
   classifyPushSubscribeError,
   getBrowserLabelForNotifications,
   getNotificationPermissionHelpSteps,
+  shouldShowNotifOnboarding,
+  setNotifGuideSeen,
+  getNotifyChannels,
+  setNotifyChannel,
+  isNotifyChannelEnabled,
   isIOSDevice,
   isInstalledStandalonePwa,
   probeNotificationCapability,
