@@ -3902,3 +3902,17 @@ textarea.form-input {
   .manual-mobile-friendly article h3 { font-size: 0.95rem !important; }
   .manual-mobile-friendly article p { font-size: 0.82rem !important; margin-top: 4px !important; }
 }
+
+
+/* Emoji sheet: never dim/blur the page (composer must stay readable) */
+.bottom-sheet-overlay.emoji-sheet-overlay,
+:root[data-theme="dark"] .bottom-sheet-overlay.emoji-sheet-overlay {
+  background: transparent !important;
+  background-color: transparent !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  pointer-events: auto;
+}
+.bottom-sheet-overlay.emoji-sheet-overlay .emoji-sheet {
+  pointer-events: auto;
+}

@@ -1667,6 +1667,24 @@ export function CommentsSection({
       )
     );
   }),
+  /* Full Width "이전 채팅 더보기" Button at bottom of list */
+  (messagesToShow.length > 0 || (totalChatCountProp || 0) > 0) && typeof onMore === 'function' && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: onMore,
+    style: {
+      width: '100%',
+      backgroundColor: 'color-mix(in srgb, var(--bg-primary) 96%, black)',
+      border: 'none',
+      borderRadius: 'var(--radius-md)',
+      padding: '8px 0',
+      marginTop: '4px',
+      fontSize: '0.85rem',
+      fontWeight: 'bold',
+      color: 'var(--text-main)',
+      cursor: 'pointer',
+      textAlign: 'center'
+    }
+  }, "이전 채팅 더보기")
   )),
   /* Input row */
   /*#__PURE__*/React.createElement("div", {

@@ -831,11 +831,18 @@ export function EmojiPickerSheet({ onSelect, onClose }) {
   );
   const sheet = /*#__PURE__*/React.createElement('div', {
     className: 'bottom-sheet-overlay emoji-sheet-overlay',
-    onClick: onClose
+    onClick: onClose,
+    style: {
+      background: 'transparent',
+      backgroundColor: 'transparent',
+      backdropFilter: 'none',
+      WebkitBackdropFilter: 'none',
+      // keep sheet at bottom; do not dim the page so composer stays visible
+    }
   }, /*#__PURE__*/React.createElement('div', {
     className: 'bottom-sheet emoji-sheet',
     onClick: e => e.stopPropagation(),
-    style: { maxHeight: '60vh' }
+    style: { maxHeight: '60vh', boxShadow: '0 -8px 30px rgba(0,0,0,0.18)' }
   },
     /*#__PURE__*/React.createElement('div', { className: 'bottom-sheet-header' },
       /*#__PURE__*/React.createElement('h4', null, '이모티콘'),
