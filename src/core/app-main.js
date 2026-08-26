@@ -3821,6 +3821,14 @@ function App() {
     return p.id === identityKey || p.refKey === identityKey || p.mediaKey === identityKey;
   };
 
+  const photoMatchesIdentityPayload = (photo, identity = {}) => {
+    if (!photo || !identity || typeof identity !== 'object') return false;
+    const keys = [identity.photoId, identity.refKey, identity.mediaKey].filter(Boolean);
+    if (keys.some(key => photoMatchesIdentity(photo, key))) return true;
+    const urls = [identity.imageUrl, identity.thumbUrl].filter(Boolean);
+    return urls.some(url => photoMatchesUrl(photo, url));
+  };
+
   const handleDeleteMeetingPhoto = (dateStr, photoId, imageUrl, options = {}) => {
     if (!activeCal) return false;
     const existingMeetings = getConfirmedMeetings(activeCal);
@@ -3854,6 +3862,14 @@ function App() {
     const restoreSourceTags = typeof options.restoreSourceTags === 'string' ? options.restoreSourceTags : '';
     const restoreSourceMessageId = options.restoreSourceMessageId || '';
     const restoreSourceImageIndex = Number.isInteger(options.restoreSourceImageIndex) ? options.restoreSourceImageIndex : null;
+    const shouldDeleteStorage = !restoreSourceMessageId && !deletedPhoto?.sourceMessageId;
+    const finalizeStorageDeletion = () => {
+      if (!shouldDeleteStorage) return;
+      deleteChatImageFromStorage(deletedPhoto.imageUrl || imageUrl);
+      if (deletedPhoto.thumbUrl && deletedPhoto.thumbUrl !== (deletedPhoto.imageUrl || imageUrl)) {
+        deleteChatImageFromStorage(deletedPhoto.thumbUrl);
+      }
+    };
     const undoDelete = async () => {
       try {
         const restoredMeetings = cloneConfirmedMeetings(previousMeetings);
@@ -3878,7 +3894,10 @@ function App() {
     };
     return ok.then(result => {
       if (!result) return false;
-      showUndoableDeleteToast('일정 사진이 삭제되었습니다.', undoDelete, null, 5000);
+      const onExpire = shouldDeleteStorage ? async () => {
+        finalizeStorageDeletion();
+      } : null;
+      showUndoableDeleteToast('일정 사진이 삭제되었습니다.', undoDelete, onExpire, 5000);
       return true;
     });
   };
@@ -3957,17 +3976,32 @@ function App() {
   // later index shifts down by one to track the now-renumbered imageUrls array. Pass
   // deletedImageIndex=null when the whole message was removed, dropping every reference to it
   // regardless of index.
-  const unlinkMeetingPhotoReferences = async (messageId, deletedImageIndex) => {
-    if (!activeCal || !messageId) return;
+  const unlinkMeetingPhotoReferences = async (messageId, deletedImageIndex, deletedPhoto = {}) => {
+    if (!activeCal || !messageId) return true;
     const existingMeetings = getConfirmedMeetings(activeCal);
     let changed = false;
+    const deletedIdentity = {
+      photoId: deletedPhoto.photoId || '',
+      mediaKey: deletedPhoto.mediaKey || '',
+      refKey: deletedPhoto.refKey || '',
+      imageUrl: deletedPhoto.imageUrl || '',
+      thumbUrl: deletedPhoto.thumbUrl || ''
+    };
     const nextConfirmedMeetings = existingMeetings.map(meeting => {
       const photos = Array.isArray(meeting.photos) ? meeting.photos : [];
       let meetingChanged = false;
       const nextPhotos = photos.reduce((acc, p) => {
-        if (p?.sourceMessageId !== messageId) { acc.push(p); return acc; }
-        if (deletedImageIndex === null || p.sourceImageIndex === deletedImageIndex) { meetingChanged = true; return acc; }
-        if (p.sourceImageIndex > deletedImageIndex) {
+        if (p?.sourceMessageId !== messageId) {
+          acc.push(p);
+          return acc;
+        }
+        const identityMatch = photoMatchesIdentityPayload(p, deletedIdentity);
+        const indexMatch = deletedImageIndex === null || p.sourceImageIndex === deletedImageIndex;
+        if (identityMatch || indexMatch) {
+          meetingChanged = true;
+          return acc;
+        }
+        if (Number.isInteger(deletedImageIndex) && p.sourceImageIndex > deletedImageIndex) {
           meetingChanged = true;
           acc.push({ ...p, sourceImageIndex: p.sourceImageIndex - 1 });
           return acc;
@@ -3979,8 +4013,12 @@ function App() {
       changed = true;
       return { ...meeting, photos: nextPhotos };
     });
-    if (!changed) return;
-    await commitConfirmedMeetings(nextConfirmedMeetings, '일정 사진 연결 정리완료');
+    if (!changed) return true;
+    const ok = await commitConfirmedMeetings(nextConfirmedMeetings, null, [], 'write', 'success');
+    if (!ok) {
+      throw new Error('일정 사진 연결 정리 실패');
+    }
+    return true;
   };
 
   const handleDeleteChatMessagePhoto = async (messageId, imageIndex) => {
@@ -3998,6 +4036,13 @@ function App() {
     const remainingText = String(sourceMessage.text || '').trim();
     const previousMeetings = cloneConfirmedMeetings(getConfirmedMeetings(activeCal));
     const sourceSnapshot = JSON.parse(JSON.stringify(sourceMessage));
+    const deletedPhotoIdentity = {
+      photoId: target.refKey || target.mediaKey || '',
+      mediaKey: target.mediaKey || '',
+      refKey: target.refKey || '',
+      imageUrl: target.full || '',
+      thumbUrl: target.thumb || ''
+    };
     // Firestore messages rules only allow a fixed key set. Client snapshots often carry `id`
     // and other local-only fields; writing those on undo caused permission-denied / restore fail.
     const pickMessageFieldsForWrite = (msg, { asCreate = false } = {}) => {
@@ -4027,7 +4072,6 @@ function App() {
           await deleteMessageRest(activeCalId, messageId);
         }
         removeLocalChatMessage(messageId);
-        await unlinkMeetingPhotoReferences(messageId, null);
       } else {
         const data = sanitizeMessageForFirestore({
           imageUrls: nextUrls,
@@ -4043,7 +4087,18 @@ function App() {
           if (!ok) throw new Error('Photo delete REST update failed');
         }
         patchLocalChatMessage(messageId, data);
-        await unlinkMeetingPhotoReferences(messageId, imageIndex);
+      }
+
+      let meetingCleanupOk = true;
+      try {
+        meetingCleanupOk = await unlinkMeetingPhotoReferences(
+          messageId,
+          nextUrls.length === 0 ? null : imageIndex,
+          deletedPhotoIdentity
+        );
+      } catch (cleanupErr) {
+        meetingCleanupOk = false;
+        console.warn('handleDeleteChatMessagePhoto meeting cleanup deferred:', cleanupErr);
       }
       const isWholeDelete = nextUrls.length === 0 && !remainingText;
       const canUndo = firebaseDb || !isWholeDelete;
@@ -4087,10 +4142,26 @@ function App() {
           showToast('사진 복원 실패', 'error', 4000);
         }
       };
+      const expireStorageDeletion = async () => {
+        if (!meetingCleanupOk) {
+          try {
+            meetingCleanupOk = await unlinkMeetingPhotoReferences(
+              messageId,
+              nextUrls.length === 0 ? null : imageIndex,
+              deletedPhotoIdentity
+            );
+          } catch (cleanupErr) {
+            meetingCleanupOk = false;
+            console.warn('handleDeleteChatMessagePhoto meeting cleanup retry failed:', cleanupErr);
+          }
+        }
+        if (!meetingCleanupOk) return;
+        finalizeStorageDeletion();
+      };
       if (canUndo) {
-        showUndoableDeleteToast('사진이 삭제되었습니다.', restoreDeletedPhoto, finalizeStorageDeletion, 5000);
+        showUndoableDeleteToast('사진이 삭제되었습니다.', restoreDeletedPhoto, expireStorageDeletion, 5000);
       } else {
-        showToast('사진이 삭제되었습니다.', 'delete', 5000, null, finalizeStorageDeletion);
+        showToast('사진이 삭제되었습니다.', 'delete', 5000, null, expireStorageDeletion);
       }
       return true;
     } catch (err) {
