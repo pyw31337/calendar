@@ -441,10 +441,6 @@ body:has(.admin-login-gate) {
   }
 }
 /* ===== Global press feedback (universal) ===== */
-/*
- * Any element that receives .is-pressing (via document pointer capture) scales down.
- * Listed selectors get smooth transition; unlisted still animate via .is-pressing.
- */
 button:not(:disabled),
 .btn,
 [role="button"],
@@ -457,13 +453,20 @@ a[href],
 .day-cell,
 .date-item-btn,
 .date-item-badge,
+.participant-badge,
 .section-toggle-btn,
 .main-menu-item,
 .admin-side-menu-item,
 .admin-menu-toggle-btn,
+.admin-side-menu-close-btn,
+.admin-side-menu-font-btn,
+.admin-side-menu-title,
 .places-list-item,
-.summary-title.is-toggleable,
+.summary-title,
+.polls-panel-header,
 .poll-card,
+.poll-header,
+.poll-title,
 .poll-option-row,
 .poll-voter-option,
 .recent-log-row,
@@ -473,14 +476,13 @@ a[href],
 .modal-close-btn,
 .icon-btn,
 .chat-keyboard-reopen-btn,
-.admin-side-menu-close-btn,
-.admin-side-menu-font-btn,
 .main-side-menu-manual-banner,
 .participant-chip,
 .category-chip,
 .place-category-tab,
 .memo-card,
 .gallery-thumb,
+.media-thumb,
 .lightbox-nav-btn,
 .tap-target,
 [data-pressable] {
@@ -495,27 +497,32 @@ a[href],
     opacity 0.18s ease;
 }
 
-/* Universal press visual — class alone is enough for any tappable node */
 .is-pressing {
   transform: translate3d(0, 1px, 0) scale(0.92) !important;
   filter: brightness(0.92) !important;
   transition-duration: 0.05s !important;
   transition-timing-function: ease-out !important;
 }
+/* Confirmed cells use transform animation — pause it so press scale is visible */
 .day-cell.is-pressing {
   transform: scale(0.94) !important;
   filter: brightness(0.94) !important;
+  animation: none !important;
+}
+.participant-badge.is-pressing,
+.media-thumb.is-pressing {
+  transform: scale(0.9) !important;
 }
 
 button:not(:disabled):active,
 .btn:active,
 [role="button"]:active,
-[role="tab"]:active,
 .day-cell:active,
 .date-item-btn:active,
-.main-menu-item:active,
-.admin-side-menu-item:active,
-.section-toggle-btn:active,
+.participant-badge:active,
+.summary-title:active,
+.polls-panel-header:active,
+.poll-card:active,
 [data-pressable]:active {
   transform: translate3d(0, 1px, 0) scale(0.92);
   filter: brightness(0.92);
@@ -532,7 +539,17 @@ button:not(:disabled):active,
     transition: none !important;
     transform: none !important;
     filter: none !important;
+    animation: none !important;
   }
+}
+
+/* Emoji picker: no dim/blur so the chat composer (typed emoji) stays readable */
+.bottom-sheet-overlay.emoji-sheet-overlay {
+  background: transparent !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  /* Soft top fade only above the sheet — keeps focus without hiding the input */
+  background-image: none !important;
 }
 
 .motion-ripple {

@@ -638,15 +638,20 @@ function App() {
       '.day-cell',
       '.date-item-btn',
       '.date-item-badge',
+      '.participant-badge',
       '.section-toggle-btn',
       '.main-menu-item',
       '.admin-side-menu-item',
       '.admin-menu-toggle-btn',
       '.admin-side-menu-close-btn',
       '.admin-side-menu-font-btn',
+      '.admin-side-menu-title',
       '.places-list-item',
-      '.summary-title.is-toggleable',
+      '.summary-title',
+      '.polls-panel-header',
       '.poll-card',
+      '.poll-header',
+      '.poll-title',
       '.poll-option-row',
       '.poll-voter-option',
       '.recent-log-row',
@@ -662,6 +667,7 @@ function App() {
       '.place-category-tab',
       '.memo-card',
       '.gallery-thumb',
+      '.media-thumb',
       '.lightbox-nav-btn',
       '.tap-target',
       '[data-pressable]'
@@ -703,7 +709,8 @@ function App() {
               const w = el.clientWidth || 0;
               const h = el.clientHeight || 0;
               // Skip full-width page-sized shells; keep chips/rows/cards
-              if (w > 0 && h > 0 && w <= 720 && h <= 320) {
+              // Allow wider section headers / day cells; still skip full-page shells
+              if (w > 0 && h > 0 && w <= 900 && h <= 480) {
                 target = el;
                 break;
               }

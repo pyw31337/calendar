@@ -776,6 +776,7 @@ export function MediaThumb({
 
   return /*#__PURE__*/React.createElement('img', {
     ...rest,
+    className: ['media-thumb', rest.className].filter(Boolean).join(' ') || 'media-thumb',
     src: currentSrc,
     alt,
     loading,
