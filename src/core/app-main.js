@@ -5778,6 +5778,7 @@ function App() {
   }
 
   if (activeView === 'gallery') {
+    // activeLightbox keeps the shared Lightbox mounted in the gallery page.
     return withStickyVideo(/*#__PURE__*/React.createElement(React.Fragment, null,
       /*#__PURE__*/React.createElement(ChatGalleryModal, {
         calendar: activeCal,
