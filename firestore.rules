@@ -401,6 +401,30 @@ service cloud.firestore {
     // Monthly Google Places API call count (해외 장소 검색 폴백), for the admin dashboard's usage
     // panel. Written only by googlePlacesSearchProxy via the Admin SDK (see functions/index.js),
     // same reasoning as kakaoLocalSearchStats above -- no client write path needed.
+
+    // Shared weather snapshot cache (1h TTL enforced client-side).
+    // Key = lat_lon rounded to 2 decimals, e.g. "37.57_126.98".
+    // Read: public (same as calendar weather badge). Write: small validated payload only.
+    match /weatherCache/{cellId} {
+      allow get: if true;
+      allow list: if false;
+      allow create, update: if cellId is string
+        && cellId.size() <= 32
+        && request.resource.data.keys().hasOnly(['temp', 'code', 'lat', 'lon', 'fetchedAt', 'name'])
+        && request.resource.data.temp is number
+        && request.resource.data.temp >= -80
+        && request.resource.data.temp <= 60
+        && request.resource.data.code is number
+        && request.resource.data.code >= 0
+        && request.resource.data.code <= 200
+        && request.resource.data.lat is number
+        && request.resource.data.lon is number
+        && request.resource.data.fetchedAt is number
+        && request.resource.data.fetchedAt > 0
+        && (!('name' in request.resource.data) || (request.resource.data.name is string && request.resource.data.name.size() <= 80));
+      allow delete: if false;
+    }
+
     match /appConfig/googlePlacesSearchStats {
       allow get: if true;
       allow list: if false;

@@ -668,58 +668,108 @@ function getAnniversaryDisplayColor(...args) {
 }
 
 
-const WEATHER_CACHE_LS_KEY = 'gather_weather_cache_v1';
 const WEATHER_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+/** In-memory L1 so multiple badges on the same page share one result without extra reads. */
+const __weatherMem = typeof Map !== 'undefined' ? new Map() : null;
 
 function weatherCacheKey(lat, lon) {
   return String(Number(lat).toFixed(2)) + '_' + String(Number(lon).toFixed(2));
 }
 
-function readWeatherCache(lat, lon) {
+function getFirebaseDb() {
   try {
-    const all = JSON.parse(localStorage.getItem(WEATHER_CACHE_LS_KEY) || '{}');
-    const entry = all[weatherCacheKey(lat, lon)];
-    if (!entry || entry.temp == null || entry.ts == null) return null;
-    const age = Date.now() - Number(entry.ts);
+    if (typeof window !== 'undefined' && window.__gatherFirebaseDb) return window.__gatherFirebaseDb;
+  } catch (_) {}
+  return null;
+}
+
+function readMemWeather(lat, lon) {
+  if (!__weatherMem) return null;
+  const entry = __weatherMem.get(weatherCacheKey(lat, lon));
+  if (!entry || entry.temp == null || entry.fetchedAt == null) return null;
+  const age = Date.now() - Number(entry.fetchedAt);
+  return {
+    temp: entry.temp,
+    code: entry.code,
+    fetchedAt: entry.fetchedAt,
+    fresh: age >= 0 && age < WEATHER_CACHE_TTL_MS
+  };
+}
+
+function writeMemWeather(lat, lon, temp, code, fetchedAt) {
+  if (!__weatherMem) return;
+  __weatherMem.set(weatherCacheKey(lat, lon), {
+    temp: temp,
+    code: code,
+    fetchedAt: fetchedAt != null ? fetchedAt : Date.now()
+  });
+}
+
+async function readServerWeather(lat, lon) {
+  const db = getFirebaseDb();
+  if (!db) return null;
+  try {
+    const snap = await db.collection('weatherCache').doc(weatherCacheKey(lat, lon)).get();
+    if (!snap || !snap.exists) return null;
+    const d = snap.data() || {};
+    if (d.temp == null || d.fetchedAt == null) return null;
+    const age = Date.now() - Number(d.fetchedAt);
     return {
-      temp: entry.temp,
-      code: entry.code,
-      ts: entry.ts,
+      temp: d.temp,
+      code: d.code,
+      fetchedAt: d.fetchedAt,
       fresh: age >= 0 && age < WEATHER_CACHE_TTL_MS
     };
-  } catch (_) {
+  } catch (err) {
+    console.warn('weather server read failed', err);
     return null;
   }
 }
 
-function writeWeatherCache(lat, lon, temp, code) {
+async function writeServerWeather(lat, lon, temp, code, name) {
+  const db = getFirebaseDb();
+  if (!db) return;
   try {
-    const all = JSON.parse(localStorage.getItem(WEATHER_CACHE_LS_KEY) || '{}');
-    const key = weatherCacheKey(lat, lon);
-    all[key] = { temp: temp, code: code, ts: Date.now() };
-    // prune entries older than 24h to keep storage small
-    const cutoff = Date.now() - 24 * 60 * 60 * 1000;
-    Object.keys(all).forEach(k => {
-      if (!all[k] || Number(all[k].ts) < cutoff) delete all[k];
-    });
-    localStorage.setItem(WEATHER_CACHE_LS_KEY, JSON.stringify(all));
-  } catch (_) { /* ignore quota */ }
+    const fetchedAt = Date.now();
+    await db.collection('weatherCache').doc(weatherCacheKey(lat, lon)).set({
+      temp: temp,
+      code: code,
+      lat: Number(Number(lat).toFixed(2)),
+      lon: Number(Number(lon).toFixed(2)),
+      fetchedAt: fetchedAt,
+      name: name ? String(name).slice(0, 80) : null
+    }, { merge: true });
+    writeMemWeather(lat, lon, temp, code, fetchedAt);
+  } catch (err) {
+    console.warn('weather server write failed', err);
+  }
+}
+
+async function fetchOpenMeteo(lat, lon) {
+  const res = await fetch(
+    'https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon + '&current=temperature_2m,weather_code'
+  );
+  if (!res.ok) throw new Error('날씨 정보 로드 실패');
+  const data = await res.json();
+  return {
+    temp: data.current.temperature_2m,
+    code: data.current.weather_code
+  };
 }
 
 export function WeatherBadge({ weatherLocation }) {
   const React = window.React;
 
   const effectiveLocation = weatherLocation || { name: '서울', lat: 37.566, lon: 126.9784 };
-  const cached0 = (effectiveLocation?.lat != null && effectiveLocation?.lon != null)
-    ? readWeatherCache(effectiveLocation.lat, effectiveLocation.lon)
+  const mem0 = (effectiveLocation?.lat != null && effectiveLocation?.lon != null)
+    ? readMemWeather(effectiveLocation.lat, effectiveLocation.lon)
     : null;
   const [weather, setWeather] = React.useState(() => {
-    if (cached0 && cached0.fresh) {
-      return { temp: cached0.temp, code: cached0.code, loading: false, error: null };
+    if (mem0 && mem0.fresh) {
+      return { temp: mem0.temp, code: mem0.code, loading: false, error: null };
     }
-    // stale cache: show immediately, refresh in background without "로딩 중"
-    if (cached0) {
-      return { temp: cached0.temp, code: cached0.code, loading: false, error: null };
+    if (mem0) {
+      return { temp: mem0.temp, code: mem0.code, loading: false, error: null };
     }
     return { temp: null, code: null, loading: true, error: null };
   });
@@ -731,42 +781,61 @@ export function WeatherBadge({ weatherLocation }) {
     }
 
     let active = true;
-    const cached = readWeatherCache(effectiveLocation.lat, effectiveLocation.lon);
+    const lat = effectiveLocation.lat;
+    const lon = effectiveLocation.lon;
+    const name = effectiveLocation.name || '';
 
-    // Within 1 hour: use cache only — no network
-    if (cached && cached.fresh) {
-      setWeather({ temp: cached.temp, code: cached.code, loading: false, error: null });
-      return () => { active = false; };
-    }
+    const apply = (temp, code) => {
+      if (!active) return;
+      setWeather({ temp: temp, code: code, loading: false, error: null });
+    };
 
-    // Stale or missing: if we have stale, keep showing it; only show loading when nothing to show
-    if (!cached) {
-      setWeather({ temp: null, code: null, loading: true, error: null });
-    }
+    const run = async () => {
+      // L1 memory
+      const mem = readMemWeather(lat, lon);
+      if (mem && mem.fresh) {
+        apply(mem.temp, mem.code);
+        return;
+      }
+      if (mem) apply(mem.temp, mem.code);
 
-    const fetchWeather = async () => {
+      // L2 Firestore shared cache (all users / devices)
+      const server = await readServerWeather(lat, lon);
+      if (!active) return;
+      if (server && server.fresh) {
+        writeMemWeather(lat, lon, server.temp, server.code, server.fetchedAt);
+        apply(server.temp, server.code);
+        return;
+      }
+      if (server && !mem) {
+        writeMemWeather(lat, lon, server.temp, server.code, server.fetchedAt);
+        apply(server.temp, server.code);
+      }
+      if (!mem && !server) {
+        setWeather({ temp: null, code: null, loading: true, error: null });
+      }
+
+      // L3 Open-Meteo — only when cache missing or older than 1h
       try {
-        const res = await fetch('https://api.open-meteo.com/v1/forecast?latitude=' + effectiveLocation.lat + '&longitude=' + effectiveLocation.lon + '&current=temperature_2m,weather_code');
-        if (!res.ok) throw new Error('날씨 정보 로드 실패');
-        const data = await res.json();
+        const live = await fetchOpenMeteo(lat, lon);
         if (!active) return;
-        const temp = data.current.temperature_2m;
-        const code = data.current.weather_code;
-        writeWeatherCache(effectiveLocation.lat, effectiveLocation.lon, temp, code);
-        setWeather({ temp: temp, code: code, loading: false, error: null });
+        writeMemWeather(lat, lon, live.temp, live.code, Date.now());
+        apply(live.temp, live.code);
+        // fire-and-forget server write so the next user hits cache
+        writeServerWeather(lat, lon, live.temp, live.code, name);
       } catch (err) {
         console.error('Weather fetch error:', err);
         if (!active) return;
-        // keep stale cache on failure
-        if (cached) {
-          setWeather({ temp: cached.temp, code: cached.code, loading: false, error: null });
+        if (server || mem) {
+          const fallback = server || mem;
+          apply(fallback.temp, fallback.code);
         } else {
           setWeather({ temp: null, code: null, loading: false, error: 'Fail' });
         }
       }
     };
 
-    fetchWeather();
+    run();
     return () => { active = false; };
   }, [effectiveLocation.lat, effectiveLocation.lon]);
 
