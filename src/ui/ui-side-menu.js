@@ -694,6 +694,16 @@ export function AppSettingsModal({
   const [weatherLoading, setWeatherLoading] = React.useState(false);
   const currentWeatherName = (weatherLocation && weatherLocation.name) || '서울';
 
+  const isKoreaResult = (loc) => {
+    if (!loc) return false;
+    const cc = String(loc.country_code || loc.countryCode || '').toUpperCase();
+    if (cc === 'KR') return true;
+    const country = String(loc.country || '');
+    if (/대한민국|South Korea|Korea, Republic|한국/i.test(country)) return true;
+    // open-meteo uses country_code
+    return false;
+  };
+
   const handleWeatherSearch = async (e) => {
     if (e) e.preventDefault();
     const cleanQuery = (weatherQuery || '').trim();
@@ -705,15 +715,16 @@ export function AppSettingsModal({
     try {
       const translated = typeof translateKoreanToEnglish === 'function' ? translateKoreanToEnglish(cleanQuery) : cleanQuery;
       let searchResults = [];
+      // Domestic only: countryCode=KR (open-meteo) / countrycodes=kr (nominatim)
       if (translated) {
-        const res = await fetch('https://geocoding-api.open-meteo.com/v1/search?name=' + encodeURIComponent(translated) + '&count=8&language=ko&format=json');
+        const res = await fetch('https://geocoding-api.open-meteo.com/v1/search?name=' + encodeURIComponent(translated) + '&count=12&language=ko&format=json&countryCode=KR');
         if (res.ok) {
           const data = await res.json();
-          searchResults = data.results || [];
+          searchResults = (data.results || []).filter(isKoreaResult);
         }
       }
       if (searchResults.length === 0) {
-        const res = await fetch('https://nominatim.openstreetmap.org/search?q=' + encodeURIComponent(cleanQuery) + '&format=json&limit=8&accept-language=ko');
+        const res = await fetch('https://nominatim.openstreetmap.org/search?q=' + encodeURIComponent(cleanQuery) + '&format=json&limit=12&accept-language=ko&countrycodes=kr');
         if (res.ok) {
           const data = await res.json();
           searchResults = (data || []).map((item, idx) => ({
@@ -721,14 +732,15 @@ export function AppSettingsModal({
             name: item.name || (item.display_name || '').split(',')[0],
             latitude: parseFloat(item.lat),
             longitude: parseFloat(item.lon),
-            country: (item.display_name || '').split(',').pop().trim(),
-            admin1: ''
+            country: '대한민국',
+            country_code: 'KR',
+            admin1: (item.display_name || '').split(',').slice(1, 2)[0]?.trim() || ''
           }));
         }
       }
       setWeatherResults(searchResults);
       if (searchResults.length === 0 && typeof showToast === 'function') {
-        showToast('일치하는 지역이 없습니다.', 'info');
+        showToast('국내에서 일치하는 지역이 없습니다.', 'info');
       }
     } catch (err) {
       console.error(err);
@@ -764,14 +776,19 @@ export function AppSettingsModal({
       /*#__PURE__*/React.createElement("div", { style: { padding: '12px 16px 20px', display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '70vh', overflowY: 'auto' } },
         /* Weather region — above dark mode */
         /*#__PURE__*/React.createElement("div", { style: { padding: '6px 0 12px', display: 'flex', flexDirection: 'column', gap: '8px' } },
-          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
-            /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-icon", style: { display: 'inline-flex', color: 'var(--text-muted)' } },
-              MapCogIcon ? /*#__PURE__*/React.createElement(MapCogIcon, { size: 18 }) : null
+          /*#__PURE__*/React.createElement("div", {
+            className: "admin-side-menu-setting-row",
+            style: { padding: '4px 0 2px', alignItems: 'center' }
+          },
+            /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-label" },
+              /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-icon" },
+                MapCogIcon ? /*#__PURE__*/React.createElement(MapCogIcon, { size: 20 }) : null
+              ),
+              "날씨 지역"
             ),
-            /*#__PURE__*/React.createElement("span", { style: { fontWeight: 800, fontSize: '0.9rem', color: 'var(--text-main)' } }, "날씨 지역")
-          ),
-          /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.78rem', color: 'var(--text-muted)' } },
-            "현재: ", /*#__PURE__*/React.createElement("strong", { style: { color: 'var(--text-main)' } }, currentWeatherName)
+            /*#__PURE__*/React.createElement("span", {
+              style: { fontSize: '0.82rem', color: 'var(--text-muted)', fontWeight: 600, flexShrink: 0 }
+            }, "현재 : ", /*#__PURE__*/React.createElement("span", { style: { color: 'var(--text-main)', fontWeight: 700 } }, currentWeatherName))
           ),
           /*#__PURE__*/React.createElement("form", {
             onSubmit: handleWeatherSearch,
@@ -824,7 +841,7 @@ export function AppSettingsModal({
                 border: '1px solid var(--border-subtle)', background: 'var(--bg-primary)',
                 color: 'var(--text-main)', cursor: 'pointer', fontSize: '0.82rem'
               }
-            }, loc.name, loc.admin1 ? ' · ' + loc.admin1 : '', loc.country ? ' · ' + loc.country : ''))
+            }, loc.name, loc.admin1 ? ' · ' + loc.admin1 : ''))
           )
         ),
         /*#__PURE__*/React.createElement("div", {
@@ -852,17 +869,25 @@ export function AppSettingsModal({
         ),
         /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.45, padding: '0 2px 8px' } },
           isNotifPermissionGranted ? "브라우저 알림이 허용된 상태입니다. 아래에서 종류별로 켤 수 있습니다." : "스위치를 켜면 브라우저 알림 허용 요청이 표시됩니다."),
-        channels.map(ch => /*#__PURE__*/React.createElement("div", {
-          key: ch.key, className: "admin-side-menu-setting-row",
-          style: { padding: '8px 0 8px 8px', opacity: isMasterNotifyEnabled ? 1 : 0.45 }
+        /*#__PURE__*/React.createElement("div", {
+          style: {
+            marginTop: '4px', padding: '4px 10px', borderRadius: '12px',
+            background: '#ffffff', border: '1px solid var(--border-subtle)',
+            opacity: isMasterNotifyEnabled ? 1 : 0.55
+          }
         },
-          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-label", style: { fontSize: '0.88rem' } }, ch.label),
-          ToggleSwitch && /*#__PURE__*/React.createElement(ToggleSwitch, {
-            checked: !!(notifyChannels && notifyChannels[ch.key]),
-            onChange: () => onToggleNotifyChannel && onToggleNotifyChannel(ch.key),
-            label: ch.label
-          })
-        )),
+          channels.map(ch => /*#__PURE__*/React.createElement("div", {
+            key: ch.key, className: "admin-side-menu-setting-row",
+            style: { padding: '10px 2px' }
+          },
+            /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-label", style: { fontSize: '0.88rem' } }, ch.label),
+            ToggleSwitch && /*#__PURE__*/React.createElement(ToggleSwitch, {
+              checked: !!(notifyChannels && notifyChannels[ch.key]),
+              onChange: () => onToggleNotifyChannel && onToggleNotifyChannel(ch.key),
+              label: ch.label
+            })
+          ))
+        ),
         Array.isArray(helpSteps) && helpSteps.length > 0 && /*#__PURE__*/React.createElement("div", {
           style: { marginTop: '12px', padding: '12px', borderRadius: '12px', background: 'var(--bg-primary)', border: '1px solid var(--border-subtle)', fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.5 }
         },
