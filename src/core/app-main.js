@@ -5120,6 +5120,11 @@ function App() {
           setMainChatNotifyEnabled(!!(next && next.chat));
         }
       },
+      weatherLocation: activeCal && activeCal.weatherLocation,
+      recentLocations: (activeCal && activeCal.recentLocations) || [],
+      onUpdateWeatherLocation: handleUpdateWeatherLocation,
+      onDeleteRecentLocation: handleDeleteRecentWeatherLocation,
+      showToast: showToast,
       helpSteps: typeof getNotificationPermissionHelpSteps === 'function' ? getNotificationPermissionHelpSteps() : []
     }),
     isNotifOnboardingOpen && /*#__PURE__*/React.createElement(NotificationOnboardingModal, {
@@ -5210,6 +5215,11 @@ function App() {
           setMainChatNotifyEnabled(!!(next && next.chat));
         }
       },
+      weatherLocation: activeCal && activeCal.weatherLocation,
+      recentLocations: (activeCal && activeCal.recentLocations) || [],
+      onUpdateWeatherLocation: handleUpdateWeatherLocation,
+      onDeleteRecentLocation: handleDeleteRecentWeatherLocation,
+      showToast: showToast,
       helpSteps: typeof getNotificationPermissionHelpSteps === 'function' ? getNotificationPermissionHelpSteps() : []
     }),
     isNotifOnboardingOpen && /*#__PURE__*/React.createElement(NotificationOnboardingModal, {
