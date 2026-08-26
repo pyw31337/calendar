@@ -5370,11 +5370,16 @@ function App() {
     const meetings = (activeCal && Array.isArray(activeCal.confirmedMeetings)) ? activeCal.confirmedMeetings : [];
     meetings.forEach(m => {
       if (!m || m.deletedAt) return;
-      (Array.isArray(m.expenses) ? m.expenses : []).forEach(e => {
+      const expenses = Array.isArray(m.expenses) ? m.expenses : [];
+      const incomes = Array.isArray(m.incomes) ? m.incomes : [];
+      if (expenses.length > 0 || incomes.length > 0) {
+        consider(m.date || m.confirmedAt);
+      }
+      expenses.forEach(e => {
         if (!e || e.deletedAt) return;
         consider(e.createdAt || e.timestamp || e.updatedAt, m.date || e.date);
       });
-      (Array.isArray(m.incomes) ? m.incomes : []).forEach(e => {
+      incomes.forEach(e => {
         if (!e || e.deletedAt) return;
         consider(e.createdAt || e.timestamp || e.updatedAt, m.date || e.date);
       });
