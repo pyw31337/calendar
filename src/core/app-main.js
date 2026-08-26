@@ -817,6 +817,7 @@ function App() {
   // its 사진 tab instead of the default 참여자 tab; null everywhere else.
   const [dateModalInitialTab, setDateModalInitialTab] = React.useState(null);
   const [isAdminOpen, setIsAdminOpen] = React.useState(false);
+  const [adminInitialTab, setAdminInitialTab] = React.useState('settings');
   const [isGlobalSearchOpen, setIsGlobalSearchOpen] = React.useState(false);
   const [globalSearchInitialQuery, setGlobalSearchInitialQuery] = React.useState('');
 
@@ -4953,6 +4954,11 @@ function App() {
     }),
     isAdminOpen && /*#__PURE__*/React.createElement(AdminModal, {
       anniversaries: anniversaries,
+      initialTab: adminInitialTab,
+      onOpenAnniversarySettings: () => {
+        setIsAdminOpen(false);
+        setIsAnniversariesOpen(true);
+      },
       calendar: { ...activeCal, activityLogs: unionActivityLogs(activeCal, adminActivityLogs) },
       allCalendars: calendars,
       onSelectCalendar: handleSelectCalendar,
@@ -4965,7 +4971,7 @@ function App() {
       onDeleteAllForDate: handleDeleteAllForDate,
       onBulkRegister: handleBulkRegisterAvailability,
       onRequestConfirm: showConfirmDialog,
-      onClose: () => setIsAdminOpen(false),
+      onClose: () => { setIsAdminOpen(false); setAdminInitialTab('settings'); },
       showToast: showToast,
       onDeleteLog: handleDeleteActivityLog,
       chatParticipantId: chatParticipantId,
@@ -5440,6 +5446,11 @@ function App() {
     anniversaries: anniversaries,
     galleryCount: mainMenuGalleryCount,
     placeCount: mainMenuPlaceCount,
+    chatCount: mainMenuChatCount,
+    memoCount: mainMenuMemoCount,
+    settlementCount: Array.isArray(activeCal && activeCal.expenses)
+      ? activeCal.expenses.filter(e => e && !e.deletedAt).length
+      : 0,
     onClose: () => setIsMainSideMenuOpen(false),
     onOpenManual: () => {
       setIsGuideOpen(true);
@@ -5447,7 +5458,7 @@ function App() {
     },
     onOpenSettings: () => {
       setIsMainSideMenuOpen(false);
-      if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 설정을 수정해 주세요.')) setIsAdminOpen(true);
+      if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 설정을 수정해 주세요.')) { setAdminInitialTab('settings'); setIsAdminOpen(true); }
     },
     onOpenAnniversaries: () => {
       setIsMainSideMenuOpen(false);

@@ -725,6 +725,9 @@ export function MainSideMenu({
   anniversaries = [],
   galleryCount = 0,
   placeCount = 0,
+  chatCount = 0,
+  memoCount = 0,
+  settlementCount = 0,
   onClose,
   onOpenManual,
   onOpenSettings,
@@ -830,105 +833,30 @@ export function MainSideMenu({
         )
     ),
     /* Group 1: manual (banner) + calendar + anniversary */
-    /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-list", style: { borderTop: 'none', borderBottom: 'none', paddingTop: '4px' } },
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        className: "admin-side-menu-item main-side-menu-manual-banner",
-        onClick: () => handle(onOpenManual)
-      },
-        /*#__PURE__*/React.createElement("span", { className: "main-side-menu-manual-banner-icon-wrap", "aria-hidden": "true" },
-          /*#__PURE__*/React.createElement("svg", {
-            xmlns: "http://www.w3.org/2000/svg", width: "22", height: "22", viewBox: "0 0 24 24",
-            fill: "none", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round", strokeLinejoin: "round"
-          },
-            /*#__PURE__*/React.createElement("path", { d: "M4 19.5A2.5 2.5 0 0 1 6.5 17H20" }),
-            /*#__PURE__*/React.createElement("path", { d: "M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" }),
-            /*#__PURE__*/React.createElement("path", { d: "M8 7h8" }),
-            /*#__PURE__*/React.createElement("path", { d: "M8 11h6" })
-          )
-        ),
-        /*#__PURE__*/React.createElement("span", { className: "main-side-menu-manual-banner-text" },
-          /*#__PURE__*/React.createElement("span", { className: "main-side-menu-manual-banner-title" }, "사용자 매뉴얼"),
-          /*#__PURE__*/React.createElement("span", { className: "main-side-menu-manual-banner-sub" }, "사용 방법 한눈에 보기")
-        ),
-        /*#__PURE__*/React.createElement("span", { className: "main-side-menu-manual-banner-chevron", "aria-hidden": "true" },
-          /*#__PURE__*/React.createElement("svg", {
-            xmlns: "http://www.w3.org/2000/svg", width: "18", height: "18", viewBox: "0 0 24 24",
-            fill: "none", stroke: "currentColor", strokeWidth: "2.2", strokeLinecap: "round", strokeLinejoin: "round"
-          }, /*#__PURE__*/React.createElement("path", { d: "m9 18 6-6-6-6" }))
-        )
+        /* Group 2: 채팅 / 정산 / 갤러리 / 장소 / 메모 */
+    /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-list", style: { borderTop: "1px solid var(--border-subtle, #E2E8F0)", borderBottom: "none", paddingTop: "6px", marginTop: "2px" } },
+      /*#__PURE__*/React.createElement("button", { type: "button", className: "admin-side-menu-item", onClick: () => { onClose && onClose(); if (onChangeView) onChangeView("chat"); } },
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2" }, /*#__PURE__*/React.createElement("path", { d: "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" }))),
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" }, /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title", style: { display: "flex", alignItems: "center", gap: "6px" } }, "채팅", chatCount > 0 && /*#__PURE__*/React.createElement("span", { className: "main-menu-badge", style: { backgroundColor: "var(--border-subtle)", color: "var(--text-muted)", marginLeft: "4px" } }, chatCount)))
       ),
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        className: "admin-side-menu-item",
-        onClick: () => handle(onOpenSettings)
-      },
-        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement(CalendarCogIcon, null)),
-        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
-          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "캘린더 설정")
-        )
+      /*#__PURE__*/React.createElement("button", { type: "button", className: "admin-side-menu-item", onClick: () => { onClose && onClose(); if (onChangeView) onChangeView("settlement"); } },
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2" }, /*#__PURE__*/React.createElement("path", { d: "M12 1v22" }), /*#__PURE__*/React.createElement("path", { d: "M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" }))),
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" }, /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title", style: { display: "flex", alignItems: "center", gap: "6px" } }, "정산", settlementCount > 0 && /*#__PURE__*/React.createElement("span", { className: "main-menu-badge", style: { backgroundColor: "var(--border-subtle)", color: "var(--text-muted)", marginLeft: "4px" } }, settlementCount)))
       ),
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        className: "admin-side-menu-item",
-        onClick: () => handle(onOpenAnniversaries)
-      },
-        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement(GiftIcon, null)),
-        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
-          /*#__PURE__*/React.createElement("span", {
-            className: "admin-side-menu-item-title",
-            style: { display: 'flex', alignItems: 'center', gap: '6px' }
-          }, "기념일 설정", anniversaries.length > 0 && /*#__PURE__*/React.createElement("span", {
-            className: "main-menu-badge",
-            style: {
-              backgroundColor: 'var(--border-subtle)',
-              color: 'var(--text-muted)',
-              marginLeft: '4px'
-            }
-          }, anniversaries.length))
-        )
+      /*#__PURE__*/React.createElement("button", { type: "button", className: "admin-side-menu-item", onClick: () => { onClose && onClose(); if (typeof onOpenGallery === "function") onOpenGallery(); else if (onChangeView) onChangeView("gallery"); } },
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2" }, /*#__PURE__*/React.createElement("rect", { width: "18", height: "18", x: "3", y: "3", rx: "2", ry: "2" }), /*#__PURE__*/React.createElement("circle", { cx: "9", cy: "9", r: "2" }), /*#__PURE__*/React.createElement("path", { d: "m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" }))),
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" }, /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title", style: { display: "flex", alignItems: "center", gap: "6px" } }, "갤러리", galleryCount > 0 && /*#__PURE__*/React.createElement("span", { className: "main-menu-badge", style: { backgroundColor: "var(--border-subtle)", color: "var(--text-muted)", marginLeft: "4px" } }, galleryCount)))
+      ),
+      /*#__PURE__*/React.createElement("button", { type: "button", className: "admin-side-menu-item", onClick: () => { onClose && onClose(); if (onChangeView) onChangeView("places"); } },
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2" }, /*#__PURE__*/React.createElement("path", { d: "M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" }), /*#__PURE__*/React.createElement("circle", { cx: "12", cy: "10", r: "3" }))),
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" }, /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title", style: { display: "flex", alignItems: "center", gap: "6px" } }, "장소", placeCount > 0 && /*#__PURE__*/React.createElement("span", { className: "main-menu-badge", style: { backgroundColor: "var(--border-subtle)", color: "var(--text-muted)", marginLeft: "4px" } }, placeCount)))
+      ),
+      /*#__PURE__*/React.createElement("button", { type: "button", className: "admin-side-menu-item", onClick: () => { onClose && onClose(); if (onChangeView) onChangeView("memo"); } },
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2" }, /*#__PURE__*/React.createElement("path", { d: "M12 20h9" }), /*#__PURE__*/React.createElement("path", { d: "M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" }))),
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" }, /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title", style: { display: "flex", alignItems: "center", gap: "6px" } }, "메모", memoCount > 0 && /*#__PURE__*/React.createElement("span", { className: "main-menu-badge", style: { backgroundColor: "var(--border-subtle)", color: "var(--text-muted)", marginLeft: "4px" } }, memoCount)))
       )
     ),
-    /* Group 2: gallery + places */
-    /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-list", style: { borderTop: '1px solid var(--border-subtle, #E2E8F0)', borderBottom: 'none', paddingTop: '6px', marginTop: '2px' } },
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        className: "admin-side-menu-item",
-        onClick: () => { onClose && onClose(); if (onChangeView) onChangeView('gallery'); }
-      },
-        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", {
-          xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2"
-        }, /*#__PURE__*/React.createElement("rect", { width: "18", height: "18", x: "3", y: "3", rx: "2", ry: "2" }), /*#__PURE__*/React.createElement("circle", { cx: "9", cy: "9", r: "2" }), /*#__PURE__*/React.createElement("path", { d: "m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" }))),
-        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
-          /*#__PURE__*/React.createElement("span", {
-            className: "admin-side-menu-item-title",
-            style: { display: 'flex', alignItems: 'center', gap: '6px' }
-          }, "갤러리", galleryCount > 0 && /*#__PURE__*/React.createElement("span", {
-            className: "main-menu-badge",
-            style: { backgroundColor: 'var(--border-subtle)', color: 'var(--text-muted)', marginLeft: '4px' }
-          }, galleryCount))
-        )
-      ),
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        className: "admin-side-menu-item",
-        onClick: () => { onClose && onClose(); if (onChangeView) onChangeView('places'); }
-      },
-        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", {
-          xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2"
-        }, /*#__PURE__*/React.createElement("path", { d: "M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" }), /*#__PURE__*/React.createElement("circle", { cx: "12", cy: "10", r: "3" }))),
-        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
-          /*#__PURE__*/React.createElement("span", {
-            className: "admin-side-menu-item-title",
-            style: { display: 'flex', alignItems: 'center', gap: '6px' }
-          }, "장소", placeCount > 0 && /*#__PURE__*/React.createElement("span", {
-            className: "main-menu-badge",
-            style: { backgroundColor: 'var(--border-subtle)', color: 'var(--text-muted)', marginLeft: '4px' }
-          }, placeCount))
-        )
-      )
-    ),
-    /* Group 3: theme / font / notify (divider owned by SharedSideMenuSettings) */
+/* Group 3: theme / font / notify (divider owned by SharedSideMenuSettings) */
     /*#__PURE__*/React.createElement(SharedSideMenuSettings, {
       isDarkTheme: isDarkTheme,
       onToggleTheme: onToggleTheme,

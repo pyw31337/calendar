@@ -720,6 +720,8 @@ function getAnniversaryDisplayColor(...args) {
 
 export function AdminModal({
   anniversaries = [],
+  initialTab = 'settings',
+  onOpenAnniversarySettings,
   calendar,
   allCalendars,
   onSelectCalendar,
@@ -774,7 +776,8 @@ export function AdminModal({
     : (typeof GATHER_APP_UTILS !== 'undefined' && typeof GATHER_APP_UTILS.sanitizeText === 'function'
       ? GATHER_APP_UTILS.sanitizeText
       : function (s, n) { var v = String(s == null ? '' : s); return typeof n === 'number' ? v.slice(0, n) : v; });
-  const [activeTab, setActiveTab] = React.useState('settings'); // 'settings', 'recovery', 'logs'
+  const [activeTab, setActiveTab] = React.useState(initialTab === 'anniversary' ? 'anniversary' : (initialTab || 'settings'));
+  React.useEffect(() => { if (initialTab) setActiveTab(initialTab === 'anniversary' ? 'anniversary' : initialTab); }, [initialTab]);
 
   // recovery/logs only — avoid loading full activityLogs when opening 일반/설정
   React.useEffect(() => {
@@ -1142,7 +1145,7 @@ export function AdminModal({
 
     /* Tab Menu Bar */
     /*#__PURE__*/React.createElement("div", {
-      style: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', borderBottom: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)', flexShrink: 0, minWidth: 0 }
+      style: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', borderBottom: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)', flexShrink: 0, minWidth: 0 }
     },
       /* Tab 1: General settings */
       /*#__PURE__*/React.createElement("button", {
@@ -1156,6 +1159,17 @@ export function AdminModal({
           cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
         }
       }, /*#__PURE__*/React.createElement("span", { className: "admin-tab-icon" }, /*#__PURE__*/React.createElement(CalendarCogIcon, null)), "일반"),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: () => setActiveTab('anniversary'),
+        style: {
+          padding: '12px 6px', fontSize: '0.82rem', fontWeight: 'bold', whiteSpace: 'nowrap',
+          color: activeTab === 'anniversary' ? '#2563EB' : '#64748B',
+          border: 'none', background: 'none',
+          borderBottom: activeTab === 'anniversary' ? '3px solid #2563EB' : '3px solid transparent',
+          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px'
+        }
+      }, /*#__PURE__*/React.createElement("span", { className: "admin-tab-icon" }, "🎂"), "기념일"),
       /* Tab 2: Log-based recovery */
       /*#__PURE__*/React.createElement("button", {
         type: "button",
@@ -1350,6 +1364,17 @@ export function AdminModal({
       /* ========================================== */
       /* TAB 3: POINT-IN-TIME LOG RECOVERY         */
       /* ========================================== */
+      activeTab === 'anniversary' && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '14px' } },
+        /*#__PURE__*/React.createElement("div", { style: { border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '16px', backgroundColor: 'var(--bg-card)' } },
+          /*#__PURE__*/React.createElement("h4", { style: { fontSize: '0.92rem', fontWeight: 800, color: 'var(--text-main)', margin: '0 0 10px 0' } }, "기념일 & 반복 일정"),
+          /*#__PURE__*/React.createElement("p", { style: { fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0 0 12px 0', lineHeight: 1.45 } }, "매년 돌아오는 생일·기념일, D-Day, 반복 일정을 관리합니다."),
+          (Array.isArray(anniversaries) && anniversaries.length > 0)
+            ? /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' } },
+                anniversaries.slice(0, 20).map(ann => /*#__PURE__*/React.createElement("div", { key: ann.id, style: { padding: '10px 12px', backgroundColor: 'var(--bg-primary)', borderRadius: '10px', border: '1px solid var(--border-subtle)', fontSize: '0.84rem', fontWeight: 700, color: 'var(--text-main)' } }, (ann.type === 'yearly' ? '🎂 ' : '🎁 ') + (ann.title || '기념일'))))
+            : /*#__PURE__*/React.createElement("div", { style: { padding: '16px', color: 'var(--text-muted)', fontSize: '0.82rem', textAlign: 'center', marginBottom: '12px' } }, "등록된 기념일이 없습니다."),
+          /*#__PURE__*/React.createElement("button", { type: "button", className: "btn btn-action-dark btn-action", onClick: () => { if (typeof onOpenAnniversarySettings === 'function') onOpenAnniversarySettings(); }, style: { width: '100%' } }, "기념일 등록 · 수정 · 반복 일정")
+        )
+      ),
       activeTab === 'recovery' && /*#__PURE__*/React.createElement(React.Fragment, null,
         /* Info alert */
         /*#__PURE__*/React.createElement("div", {
