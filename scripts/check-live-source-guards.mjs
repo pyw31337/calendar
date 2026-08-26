@@ -113,16 +113,17 @@ if (/setActiveTab\('calendar'\)|activeTab === 'calendar'/.test(adminModals)) {
 }
 
 const adminModalTabHandlers = [...adminModals.matchAll(/setActiveTab\('([^']+)'\)/g)].map(match => match[1]);
-const allowedAdminModalTabs = new Set(['settings', 'recovery', 'logs']);
+// 일반 / 기념일 / 복구 / 로그
+const allowedAdminModalTabs = new Set(['settings', 'anniversary', 'recovery', 'logs']);
 const unexpectedAdminModalTabs = adminModalTabHandlers.filter(tab => !allowedAdminModalTabs.has(tab));
 if (unexpectedAdminModalTabs.length > 0) {
   fail(`Calendar settings modal has unexpected tab handler(s): ${unexpectedAdminModalTabs.join(', ')}`);
 }
-if (adminModalTabHandlers.length !== 3) {
-  fail(`Calendar settings modal must render exactly 3 tabs (settings/recovery/logs), found ${adminModalTabHandlers.length}.`);
+if (adminModalTabHandlers.length !== 4) {
+  fail(`Calendar settings modal must render exactly 4 tabs (settings/anniversary/recovery/logs), found ${adminModalTabHandlers.length}.`);
 }
 
-for (const requiredTab of ["setActiveTab('settings')", "setActiveTab('recovery')", "setActiveTab('logs')"]) {
+for (const requiredTab of ["setActiveTab('settings')", "setActiveTab('anniversary')", "setActiveTab('recovery')", "setActiveTab('logs')"]) {
   if (!adminModals.includes(requiredTab)) {
     fail(`Calendar settings modal is missing required tab handler: ${requiredTab}`);
   }
