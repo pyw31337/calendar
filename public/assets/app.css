@@ -441,12 +441,22 @@ body:has(.admin-login-gate) {
   }
 }
 /* ===== Global press feedback (universal) ===== */
+/*
+ * Any element that receives .is-pressing (via document pointer capture) scales down.
+ * Listed selectors get smooth transition; unlisted still animate via .is-pressing.
+ */
 button:not(:disabled),
 .btn,
 [role="button"],
+[role="tab"],
+[role="option"],
+[role="menuitem"],
+[role="switch"],
 a.btn,
+a[href],
 .day-cell,
 .date-item-btn,
+.date-item-badge,
 .section-toggle-btn,
 .main-menu-item,
 .admin-side-menu-item,
@@ -461,7 +471,19 @@ a.btn,
 .bottom-sheet-item,
 .chat-msg-action,
 .modal-close-btn,
-.icon-btn {
+.icon-btn,
+.chat-keyboard-reopen-btn,
+.admin-side-menu-close-btn,
+.admin-side-menu-font-btn,
+.main-side-menu-manual-banner,
+.participant-chip,
+.category-chip,
+.place-category-tab,
+.memo-card,
+.gallery-thumb,
+.lightbox-nav-btn,
+.tap-target,
+[data-pressable] {
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
   transform-origin: center center;
@@ -472,27 +494,8 @@ a.btn,
     background-color 0.18s ease,
     opacity 0.18s ease;
 }
-button.is-pressing:not(:disabled),
-.btn.is-pressing,
-[role="button"].is-pressing,
-a.btn.is-pressing,
-.day-cell.is-pressing,
-.date-item-btn.is-pressing,
-.section-toggle-btn.is-pressing,
-.main-menu-item.is-pressing,
-.admin-side-menu-item.is-pressing,
-.admin-menu-toggle-btn.is-pressing,
-.places-list-item.is-pressing,
-.summary-title.is-toggleable.is-pressing,
-.poll-card.is-pressing,
-.poll-option-row.is-pressing,
-.poll-voter-option.is-pressing,
-.recent-log-row.is-pressing,
-.search-result-row.is-pressing,
-.bottom-sheet-item.is-pressing,
-.chat-msg-action.is-pressing,
-.modal-close-btn.is-pressing,
-.icon-btn.is-pressing,
+
+/* Universal press visual — class alone is enough for any tappable node */
 .is-pressing {
   transform: translate3d(0, 1px, 0) scale(0.92) !important;
   filter: brightness(0.92) !important;
@@ -503,20 +506,32 @@ a.btn.is-pressing,
   transform: scale(0.94) !important;
   filter: brightness(0.94) !important;
 }
+
 button:not(:disabled):active,
 .btn:active,
 [role="button"]:active,
+[role="tab"]:active,
 .day-cell:active,
 .date-item-btn:active,
 .main-menu-item:active,
 .admin-side-menu-item:active,
-.section-toggle-btn:active {
+.section-toggle-btn:active,
+[data-pressable]:active {
   transform: translate3d(0, 1px, 0) scale(0.92);
   filter: brightness(0.92);
 }
+
 @media (prefers-reduced-motion: reduce) {
-  button:not(:disabled), .btn, [role="button"], .day-cell, .date-item-btn, .is-pressing {
-    transition: none !important; transform: none !important; filter: none !important;
+  button:not(:disabled),
+  .btn,
+  [role="button"],
+  .day-cell,
+  .date-item-btn,
+  .is-pressing,
+  [data-pressable] {
+    transition: none !important;
+    transform: none !important;
+    filter: none !important;
   }
 }
 

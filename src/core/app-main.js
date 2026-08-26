@@ -626,37 +626,87 @@ function App() {
   React.useEffect(() => {
     const motionQuery = window.matchMedia?.('(prefers-reduced-motion: reduce)');
     const interactiveSelector = [
-      'button', 'a[href]', 'a.btn', '[role="button"]', '.btn',
-      '.day-cell', '.date-item-btn', '.section-toggle-btn',
-      '.main-menu-item', '.admin-side-menu-item', '.admin-menu-toggle-btn',
-      '.places-list-item', '.summary-title.is-toggleable',
-      '.poll-card', '.poll-option-row', '.poll-voter-option',
-      '.recent-log-row', '.search-result-row', '.bottom-sheet-item',
-      '.chat-msg-action', '.modal-close-btn', '.icon-btn'
+      'button',
+      'a[href]',
+      'a.btn',
+      '[role="button"]',
+      '[role="tab"]',
+      '[role="option"]',
+      '[role="menuitem"]',
+      '[role="switch"]',
+      '.btn',
+      '.day-cell',
+      '.date-item-btn',
+      '.date-item-badge',
+      '.section-toggle-btn',
+      '.main-menu-item',
+      '.admin-side-menu-item',
+      '.admin-menu-toggle-btn',
+      '.admin-side-menu-close-btn',
+      '.admin-side-menu-font-btn',
+      '.places-list-item',
+      '.summary-title.is-toggleable',
+      '.poll-card',
+      '.poll-option-row',
+      '.poll-voter-option',
+      '.recent-log-row',
+      '.search-result-row',
+      '.bottom-sheet-item',
+      '.chat-msg-action',
+      '.modal-close-btn',
+      '.icon-btn',
+      '.chat-keyboard-reopen-btn',
+      '.main-side-menu-manual-banner',
+      '.participant-chip',
+      '.category-chip',
+      '.place-category-tab',
+      '.memo-card',
+      '.gallery-thumb',
+      '.lightbox-nav-btn',
+      '.tap-target',
+      '[data-pressable]'
     ].join(',');
+    // Large shells that must NEVER be the press target themselves (children still ok)
     const blockShell = [
       '.chat-composer', '.chat-room-header', '.memo-view-header',
       '.places-view-header', '.gallery-page-header', '.inline-search-bar',
-      '.modal-overlay', '.admin-side-menu-overlay'
+      '.modal-overlay', '.admin-side-menu-overlay', '.app-container',
+      '.chat-room-container', '.memo-view-container', '.places-view-container',
+      '.admin-side-menu', '.admin-side-menu-list'
     ].join(',');
     let pressedEl = null;
     const clearPress = () => {
       if (!pressedEl) return;
-      pressedEl.classList.remove('is-pressing');
+      try { pressedEl.classList.remove('is-pressing'); } catch (_) {}
       pressedEl = null;
+    };
+    const isBlockShell = el => {
+      try { return el && el.matches && el.matches(blockShell); } catch (_) { return false; }
     };
     const resolveTarget = raw => {
       if (!raw || typeof raw.closest !== 'function') return null;
+      // Typing surfaces — no press scale
       if (raw.closest('input, textarea, select, [contenteditable="true"]')) return null;
+      // Prefer known interactive nodes
       let target = raw.closest(interactiveSelector);
+      // Fallback: nearest reasonably sized cursor:pointer (covers inline-styled divs/spans)
       if (!target) {
         let el = raw.nodeType === 1 ? raw : raw.parentElement;
-        while (el && el !== document.body && el !== document.documentElement) {
+        let depth = 0;
+        while (el && el !== document.body && el !== document.documentElement && depth < 12) {
+          depth += 1;
+          if (isBlockShell(el)) break;
+          if (el.tagName === 'LABEL') { el = el.parentElement; continue; }
           try {
             const st = window.getComputedStyle(el);
-            if (st && st.cursor === 'pointer' && el.tagName !== 'LABEL') {
-              target = el;
-              break;
+            if (st && st.cursor === 'pointer' && st.pointerEvents !== 'none') {
+              const w = el.clientWidth || 0;
+              const h = el.clientHeight || 0;
+              // Skip full-width page-sized shells; keep chips/rows/cards
+              if (w > 0 && h > 0 && w <= 720 && h <= 320) {
+                target = el;
+                break;
+              }
             }
           } catch (_) {}
           el = el.parentElement;
@@ -665,8 +715,8 @@ function App() {
       if (!target) return null;
       if (target.disabled || target.getAttribute('aria-disabled') === 'true') return null;
       if (target.closest('[data-no-press-feedback]')) return null;
-      if (target.classList.contains('poll-drag-handle')) return null;
-      if (target.matches && target.matches(blockShell)) return null;
+      if (target.classList && target.classList.contains('poll-drag-handle')) return null;
+      if (isBlockShell(target)) return null;
       return target;
     };
     const handlePointerDown = event => {
