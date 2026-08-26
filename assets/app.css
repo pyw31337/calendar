@@ -3428,6 +3428,22 @@ textarea.form-input {
   padding-top: 6px;
   padding-bottom: 6px;
 }
+
+/* Main side menu only: slightly looser row spacing (+8px). Subpage menus unchanged. */
+.admin-side-menu.main-side-menu .admin-side-menu-item {
+  min-height: 50px;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+.admin-side-menu.main-side-menu .admin-side-menu-list {
+  padding-top: 10px;
+  padding-bottom: 10px;
+  gap: 4px;
+}
+.admin-side-menu.main-side-menu .admin-side-menu-list + .admin-side-menu-list,
+.admin-side-menu.main-side-menu .admin-side-menu-list + div.admin-side-menu-list {
+  margin-top: 4px;
+}
 .admin-side-menu .main-side-menu-manual-banner {
   position: relative;
   overflow: hidden;

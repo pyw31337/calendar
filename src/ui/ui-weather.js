@@ -888,7 +888,17 @@ export function WeatherBadge({ weatherLocation }) {
     className: "weather-badge-hover"
   },
     /* Region Name */
-    /*#__PURE__*/React.createElement("span", { style: { maxWidth: '52px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, cleanName),
+    /*#__PURE__*/React.createElement("span", {
+      style: {
+        // Allow up to 5 Korean characters (e.g. 서울특별시) without ellipsis; longer names truncate.
+        maxWidth: (cleanName && cleanName.length > 5) ? '5.6em' : 'none',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap',
+        flexShrink: 1
+      },
+      title: cleanName
+    }, cleanName),
     /* Weather Icon */
     getWeatherIcon(weather.code),
     /* Temperature */

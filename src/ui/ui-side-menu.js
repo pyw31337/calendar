@@ -1156,7 +1156,7 @@ export function MainSideMenu({
     className: "admin-side-menu-overlay",
     onClick: onClose
   }, /*#__PURE__*/React.createElement("nav", {
-    className: "admin-side-menu" + (isScrollingActive ? " scroll-active" : ""),
+    className: "admin-side-menu main-side-menu" + (isScrollingActive ? " scroll-active" : ""),
     "aria-label": "메인 메뉴",
     onClick: e => e.stopPropagation(),
     onMouseMove: triggerScrollActive,
