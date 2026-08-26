@@ -678,7 +678,8 @@ export function AnniversaryModal({
   showToast,
   onRequestConfirm,
   onBulkRegister,
-  isDarkTheme
+  isDarkTheme,
+  embedded = false
 }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -922,41 +923,13 @@ export function AnniversaryModal({
     }
   };
 
-  const portalContent = /*#__PURE__*/React.createElement("div", {
-    className: "modal-overlay",
-    onClick: overlayOnClick,
-    style: { zIndex: 11000 }
-  }, /*#__PURE__*/React.createElement(ResizableModalContainer, {
-    className: "modal-container",
-    style: { maxWidth: '440px', width: '90%', backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)' },
-    onClick: e => e.stopPropagation()
-  },
-    /* Modal Header */
-    /*#__PURE__*/React.createElement("div", {
-      style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid var(--border-subtle)' }
-    },
-      /* Title */
-      /*#__PURE__*/React.createElement("span", {
-        style: { fontSize: '0.96rem', fontWeight: '900', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' }
-      }, /*#__PURE__*/React.createElement("svg", {
-        xmlns: "http://www.w3.org/2000/svg", width: "18", height: "18", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2"
-      }, /*#__PURE__*/React.createElement("circle", { cx: "12", cy: "12", r: "10" }), /*#__PURE__*/React.createElement("polyline", { points: "12 6 12 12 16 14" })), "기념일 & 반복 일정 설정"),
-
-      /* Close button -- matches the plain (no circular background) icon-only style every other
-         modal's close button uses (see PollModal/AdminModal above). */
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        onClick: requestClose,
-        style: { background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer', display: 'flex', alignItems: 'center' }
-      }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }))
-    ),
-
+  const anniversaryPanelInner = /*#__PURE__*/React.createElement(React.Fragment, null,
     /* Modal Navigation Tabs */
     /*#__PURE__*/React.createElement("div", {
       style: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', borderBottom: '1px solid var(--border-subtle)' }
     },
       /* Tab list */
-      [['list', '기념일 목록'], ['add', '기념일 등록'], ['bulk', '반복 일정']].map(([id, label]) => /*#__PURE__*/React.createElement("button", {
+      [['list', '목록'], ['add', '등록'], ['bulk', '반복']].map(([id, label]) => /*#__PURE__*/React.createElement("button", {
         key: id,
         type: "button",
         onClick: () => {
@@ -1298,7 +1271,36 @@ export function AnniversaryModal({
         }, isBulkSubmitting ? "등록 진행 중..." : "반복 일정 일괄 등록")
       )
     )
-  ));
+  );
+
+  const portalContent = embedded
+    ? /*#__PURE__*/React.createElement("div", {
+        style: { display: 'flex', flexDirection: 'column', minHeight: 0, width: '100%' }
+      }, anniversaryPanelInner)
+    : /*#__PURE__*/React.createElement("div", {
+        className: "modal-overlay",
+        onClick: overlayOnClick,
+        style: { zIndex: 11000 }
+      }, /*#__PURE__*/React.createElement(ResizableModalContainer, {
+        className: "modal-container",
+        style: { maxWidth: '440px', width: '90%', backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)' },
+        onClick: e => e.stopPropagation()
+      },
+        /*#__PURE__*/React.createElement("div", {
+          style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid var(--border-subtle)' }
+        },
+          /*#__PURE__*/React.createElement("span", {
+            style: { fontSize: '0.96rem', fontWeight: '900', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' }
+          }, /*#__PURE__*/React.createElement("svg", {
+            xmlns: "http://www.w3.org/2000/svg", width: "18", height: "18", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
+          }, /*#__PURE__*/React.createElement("path", { d: "M20 21v-8a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8" }), /*#__PURE__*/React.createElement("path", { d: "M4 16s.5-1 2-1 2.5 2 4 2 2.5-2 4-2 2.5 2 4 2 2-1 2-1" }), /*#__PURE__*/React.createElement("path", { d: "M2 21h20" }), /*#__PURE__*/React.createElement("path", { d: "M7 8v3" }), /*#__PURE__*/React.createElement("path", { d: "M12 8v3" }), /*#__PURE__*/React.createElement("path", { d: "M17 8v3" }), /*#__PURE__*/React.createElement("path", { d: "M7 4h.01" }), /*#__PURE__*/React.createElement("path", { d: "M12 4h.01" }), /*#__PURE__*/React.createElement("path", { d: "M17 4h.01" })), "기념일 & 반복 일정 설정"),
+          /*#__PURE__*/React.createElement("button", {
+            type: "button", onClick: requestClose,
+            style: { background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer', display: 'flex', alignItems: 'center' }
+          }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }))
+        ),
+        anniversaryPanelInner
+      ));
 
   // Bottom-sheet rule: never nest under ResizableModalContainer (CSS transform traps fixed) --
   // portaled as its own sibling rather than embedded inside portalContent's JSX tree.
@@ -1334,8 +1336,14 @@ export function AnniversaryModal({
   ));
 
   return /*#__PURE__*/React.createElement(React.Fragment, null,
-    ReactDOM.createPortal(portalContent, document.body),
-    bulkParticipantSheet && ReactDOM.createPortal(bulkParticipantSheet, document.body)
+    embedded
+      ? portalContent
+      : (typeof document !== 'undefined' && ReactDOM.createPortal
+        ? ReactDOM.createPortal(portalContent, document.body)
+        : portalContent),
+    bulkParticipantSheet && typeof document !== 'undefined' && ReactDOM.createPortal
+      ? ReactDOM.createPortal(bulkParticipantSheet, document.body)
+      : bulkParticipantSheet
   );
 }
 
