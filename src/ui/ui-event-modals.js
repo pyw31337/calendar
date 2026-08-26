@@ -2018,13 +2018,24 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
     onClick: () => setIsSettlementMenuOpen(false)
   }, /*#__PURE__*/React.createElement("nav", {
     className: "admin-side-menu",
-    "aria-label": "정산 메뉴",
+    "aria-label": "정산",
     onClick: e => e.stopPropagation()
   },
     /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-header" },
       /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-brand" },
         /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-copy" },
-          /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-title" }, "정산 메뉴")
+          /*#__PURE__*/React.createElement("button", {
+            type: "button",
+            className: "admin-side-menu-title",
+            title: "메인 화면으로 이동",
+            "aria-label": "메인 화면으로 이동",
+            onClick: () => { setIsSettlementMenuOpen(false); if (typeof onChangeView === 'function') onChangeView('calendar'); else if (typeof onBack === 'function') onBack(); },
+            style: {
+              background: 'none', border: 'none', padding: 0, margin: 0,
+              font: 'inherit', fontWeight: 'inherit', color: 'inherit',
+              cursor: 'pointer', textAlign: 'left'
+            }
+          }, "정산")
         )
       ),
       /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 } },

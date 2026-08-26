@@ -1165,7 +1165,18 @@ export function MainSideMenu({
 	    /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-header" },
 	      /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-brand" },
 	        /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-copy" },
-	          /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-title" }, "메뉴")
+	          /*#__PURE__*/React.createElement("button", {
+	            type: "button",
+	            className: "admin-side-menu-title",
+	            title: "메인 화면",
+	            "aria-label": "메인 화면",
+	            onClick: () => { onClose && onClose(); if (typeof onChangeView === 'function') onChangeView('calendar'); },
+	            style: {
+	              background: 'none', border: 'none', padding: 0, margin: 0,
+	              font: 'inherit', fontWeight: 'inherit', color: 'inherit',
+	              cursor: 'pointer', textAlign: 'left'
+	            }
+	          }, "메뉴")
 	        )
       ),
         /* Right container: Weather badge + Settings Icon + Close Button */

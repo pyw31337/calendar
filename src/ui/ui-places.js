@@ -1499,7 +1499,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
           type: "button",
           onClick: () => setIsPlacesMenuOpen(true),
           title: "메뉴",
-          "aria-label": "장소 메뉴",
+          "aria-label": "장소",
           style: {
             background: 'none', border: 'none', cursor: 'pointer', padding: '6px',
             color: '#64748B', display: 'flex', alignItems: 'center', justifyContent: 'center'
@@ -1958,7 +1958,18 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
       /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-header" },
         /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-brand" },
           /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-copy" },
-            /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-title" }, "장소 메뉴")
+            /*#__PURE__*/React.createElement("button", {
+              type: "button",
+              className: "admin-side-menu-title",
+              title: "메인 화면으로 이동",
+              "aria-label": "메인 화면으로 이동",
+              onClick: () => { setIsPlacesMenuOpen(false); if (typeof onChangeView === 'function') onChangeView('calendar'); else if (typeof onBack === 'function') onBack(); },
+              style: {
+                background: 'none', border: 'none', padding: 0, margin: 0,
+                font: 'inherit', fontWeight: 'inherit', color: 'inherit',
+                cursor: 'pointer', textAlign: 'left'
+              }
+            }, "장소")
           )
         ),
         /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 } },

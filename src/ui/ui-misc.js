@@ -1023,7 +1023,7 @@ export function ChatSideMenu({
     onClick: onClose
   }, /*#__PURE__*/React.createElement("nav", {
     className: "admin-side-menu" + (isScrollingActive ? " scroll-active" : ""),
-    "aria-label": "채팅 메뉴",
+    "aria-label": "채팅",
     onClick: e => e.stopPropagation(),
     onMouseMove: triggerScrollActive,
     onScroll: triggerScrollActive
@@ -1031,7 +1031,18 @@ export function ChatSideMenu({
     /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-header" },
       /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-brand" },
         /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-copy" },
-          /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-title" }, "채팅 메뉴")
+          /*#__PURE__*/React.createElement("button", {
+            type: "button",
+            className: "admin-side-menu-title",
+            title: "메인 화면으로 이동",
+            "aria-label": "메인 화면으로 이동",
+            onClick: () => { onClose && onClose(); if (typeof onChangeView === 'function') onChangeView('calendar'); },
+            style: {
+              background: 'none', border: 'none', padding: 0, margin: 0,
+              font: 'inherit', fontWeight: 'inherit', color: 'inherit',
+              cursor: 'pointer', textAlign: 'left'
+            }
+          }, "채팅")
         )
       ),
         /*#__PURE__*/React.createElement("div", {
