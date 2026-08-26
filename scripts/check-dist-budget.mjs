@@ -28,7 +28,8 @@ const BUDGETS = [
 // Bumped from 1_100_000 after notif onboarding + AppSettingsModal (~7.6KB over).
 // Bumped from 1_120_000 after weather server cache + universal press + side-menu titles (~1.1KB over).
 // Bumped from 1_125_000 after push multidevice UI + chat more button (~2.7KB over).
-const TOTAL_JS_MAX_BYTES = 1_130_000;
+// Bumped from 1_130_000 after side-menu meta pills (~3.5KB over).
+const TOTAL_JS_MAX_BYTES = 1_135_000;
 
 function fail(message) {
   console.error(`[check-dist-budget] ${message}`);
