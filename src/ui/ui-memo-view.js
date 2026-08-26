@@ -705,6 +705,7 @@ export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoad
     const SharedSideMenuFooter = (__comp && __comp.SharedSideMenuFooter) || (window.GATHER_UI_DEPS || {}).SharedSideMenuFooter;
   const SharedAppNavBlock = (__comp && __comp.SharedAppNavBlock) || (window.GATHER_UI_DEPS || {}).SharedAppNavBlock;
   const ThreeLinesIcon = (__comp && __comp.ThreeLinesIcon) || (window.GATHER_UI_DEPS || {}).ThreeLinesIcon;
+  const WeatherBadge = (__comp && __comp.WeatherBadge) || (window.GATHER_UI_DEPS || {}).WeatherBadge;
   const [isMemoMenuOpen, setIsMemoMenuOpen] = React.useState(false);
 const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   const memoSearchInputRef = React.useRef(null);
@@ -1366,9 +1367,12 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
             /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-title" }, "메모 메뉴")
           )
         ),
-        /*#__PURE__*/React.createElement("button", {
-          type: "button", className: "admin-side-menu-close-btn", onClick: () => setIsMemoMenuOpen(false), "aria-label": "닫기"
-        }, "✕")
+        /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 } },
+          WeatherBadge ? /*#__PURE__*/React.createElement(WeatherBadge, { weatherLocation: calendar && calendar.weatherLocation }) : null,
+          /*#__PURE__*/React.createElement("button", {
+            type: "button", className: "admin-side-menu-close-btn", onClick: () => setIsMemoMenuOpen(false), "aria-label": "닫기"
+          }, "✕")
+        )
       ),
       /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-list", style: { borderBottom: 'none', paddingTop: '6px' } },
         /*#__PURE__*/React.createElement("button", {

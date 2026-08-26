@@ -668,11 +668,61 @@ function getAnniversaryDisplayColor(...args) {
 }
 
 
+const WEATHER_CACHE_LS_KEY = 'gather_weather_cache_v1';
+const WEATHER_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+
+function weatherCacheKey(lat, lon) {
+  return String(Number(lat).toFixed(2)) + '_' + String(Number(lon).toFixed(2));
+}
+
+function readWeatherCache(lat, lon) {
+  try {
+    const all = JSON.parse(localStorage.getItem(WEATHER_CACHE_LS_KEY) || '{}');
+    const entry = all[weatherCacheKey(lat, lon)];
+    if (!entry || entry.temp == null || entry.ts == null) return null;
+    const age = Date.now() - Number(entry.ts);
+    return {
+      temp: entry.temp,
+      code: entry.code,
+      ts: entry.ts,
+      fresh: age >= 0 && age < WEATHER_CACHE_TTL_MS
+    };
+  } catch (_) {
+    return null;
+  }
+}
+
+function writeWeatherCache(lat, lon, temp, code) {
+  try {
+    const all = JSON.parse(localStorage.getItem(WEATHER_CACHE_LS_KEY) || '{}');
+    const key = weatherCacheKey(lat, lon);
+    all[key] = { temp: temp, code: code, ts: Date.now() };
+    // prune entries older than 24h to keep storage small
+    const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+    Object.keys(all).forEach(k => {
+      if (!all[k] || Number(all[k].ts) < cutoff) delete all[k];
+    });
+    localStorage.setItem(WEATHER_CACHE_LS_KEY, JSON.stringify(all));
+  } catch (_) { /* ignore quota */ }
+}
+
 export function WeatherBadge({ weatherLocation }) {
   const React = window.React;
 
-  const [weather, setWeather] = React.useState({ temp: null, code: null, loading: false, error: null });
   const effectiveLocation = weatherLocation || { name: '서울', lat: 37.566, lon: 126.9784 };
+  const cached0 = (effectiveLocation?.lat != null && effectiveLocation?.lon != null)
+    ? readWeatherCache(effectiveLocation.lat, effectiveLocation.lon)
+    : null;
+  const [weather, setWeather] = React.useState(() => {
+    if (cached0 && cached0.fresh) {
+      return { temp: cached0.temp, code: cached0.code, loading: false, error: null };
+    }
+    // stale cache: show immediately, refresh in background without "로딩 중"
+    if (cached0) {
+      return { temp: cached0.temp, code: cached0.code, loading: false, error: null };
+    }
+    return { temp: null, code: null, loading: true, error: null };
+  });
 
   React.useEffect(() => {
     if (!effectiveLocation?.lat || !effectiveLocation?.lon) {
@@ -681,23 +731,36 @@ export function WeatherBadge({ weatherLocation }) {
     }
 
     let active = true;
-    setWeather({ temp: null, code: null, loading: true, error: null });
+    const cached = readWeatherCache(effectiveLocation.lat, effectiveLocation.lon);
+
+    // Within 1 hour: use cache only — no network
+    if (cached && cached.fresh) {
+      setWeather({ temp: cached.temp, code: cached.code, loading: false, error: null });
+      return () => { active = false; };
+    }
+
+    // Stale or missing: if we have stale, keep showing it; only show loading when nothing to show
+    if (!cached) {
+      setWeather({ temp: null, code: null, loading: true, error: null });
+    }
 
     const fetchWeather = async () => {
       try {
-        const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${effectiveLocation.lat}&longitude=${effectiveLocation.lon}&current=temperature_2m,weather_code`);
+        const res = await fetch('https://api.open-meteo.com/v1/forecast?latitude=' + effectiveLocation.lat + '&longitude=' + effectiveLocation.lon + '&current=temperature_2m,weather_code');
         if (!res.ok) throw new Error('날씨 정보 로드 실패');
         const data = await res.json();
         if (!active) return;
-        setWeather({
-          temp: data.current.temperature_2m,
-          code: data.current.weather_code,
-          loading: false,
-          error: null
-        });
+        const temp = data.current.temperature_2m;
+        const code = data.current.weather_code;
+        writeWeatherCache(effectiveLocation.lat, effectiveLocation.lon, temp, code);
+        setWeather({ temp: temp, code: code, loading: false, error: null });
       } catch (err) {
         console.error('Weather fetch error:', err);
-        if (active) {
+        if (!active) return;
+        // keep stale cache on failure
+        if (cached) {
+          setWeather({ temp: cached.temp, code: cached.code, loading: false, error: null });
+        } else {
           setWeather({ temp: null, code: null, loading: false, error: 'Fail' });
         }
       }

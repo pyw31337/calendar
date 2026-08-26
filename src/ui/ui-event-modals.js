@@ -1384,6 +1384,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
   const SharedSideMenuFooter = __comp.SharedSideMenuFooter || __deps.SharedSideMenuFooter;
   const SharedAppNavBlock = __comp.SharedAppNavBlock || __deps.SharedAppNavBlock;
   const ThreeLinesIcon = __comp.ThreeLinesIcon || __deps.ThreeLinesIcon;
+  const WeatherBadge = __comp.WeatherBadge || __deps.WeatherBadge;
   const [isSettlementMenuOpen, setIsSettlementMenuOpen] = React.useState(false);
   const sanitizeText = __deps.sanitizeText;
   const extractFirstUrl = __deps.extractFirstUrl;
@@ -2026,9 +2027,12 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
           /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-title" }, "정산 메뉴")
         )
       ),
-      /*#__PURE__*/React.createElement("button", {
-        type: "button", className: "admin-side-menu-close-btn", onClick: () => setIsSettlementMenuOpen(false), "aria-label": "닫기"
-      }, "✕")
+      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 } },
+        WeatherBadge ? /*#__PURE__*/React.createElement(WeatherBadge, { weatherLocation: calendar && calendar.weatherLocation }) : null,
+        /*#__PURE__*/React.createElement("button", {
+          type: "button", className: "admin-side-menu-close-btn", onClick: () => setIsSettlementMenuOpen(false), "aria-label": "닫기"
+        }, "✕")
+      )
     ),
     /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-list", style: { borderBottom: 'none', paddingTop: '6px' } },
       /*#__PURE__*/React.createElement("button", {

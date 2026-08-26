@@ -762,6 +762,7 @@ export function ChatGalleryModal({
   const SharedSideMenuSettings = __comp.SharedSideMenuSettings || __deps.SharedSideMenuSettings;
   const SharedSideMenuFooter = __comp.SharedSideMenuFooter || __deps.SharedSideMenuFooter;
   const SharedAppNavBlock = __comp.SharedAppNavBlock || __deps.SharedAppNavBlock;
+  const WeatherBadge = __comp.WeatherBadge || __deps.WeatherBadge;
   const InlineSearchBar = __comp.InlineSearchBar || __deps.InlineSearchBar;
   const LinkPreviewCard = __deps.LinkPreviewCard || __comp.LinkPreviewCard;
   const MenuIcon = __deps.MenuIcon || __comp.MenuIcon;
@@ -1305,12 +1306,15 @@ export function ChatGalleryModal({
           /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-title" }, "갤러리 메뉴")
         )
       ),
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        className: "admin-side-menu-close-btn",
-        onClick: () => setIsMenuOpen(false),
-        "aria-label": "메뉴 닫기"
-      }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }))
+      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 } },
+        WeatherBadge ? /*#__PURE__*/React.createElement(WeatherBadge, { weatherLocation: calendar && calendar.weatherLocation }) : null,
+        /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          className: "admin-side-menu-close-btn",
+          onClick: () => setIsMenuOpen(false),
+          "aria-label": "메뉴 닫기"
+        }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }))
+      )
     ),
     /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-list" },
       /*#__PURE__*/React.createElement("button", {

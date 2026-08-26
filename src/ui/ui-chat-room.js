@@ -1974,6 +1974,7 @@ export function ChatRoomView({
     onClose: () => setIsEmojiPickerOpen(false)
   }),
   isChatSideMenuOpen && /*#__PURE__*/React.createElement(ChatSideMenu, {
+    weatherLocation: calendar && calendar.weatherLocation,
     onClose: () => setIsChatSideMenuOpen(false),
     onOpenSearch: () => { setIsSearchOpen(true); setSearchQuery(''); },
     onOpenNoticeSettings: () => {

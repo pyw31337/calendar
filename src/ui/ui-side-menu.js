@@ -845,7 +845,8 @@ export function AppSettingsModal({
           )
         ),
         /*#__PURE__*/React.createElement("div", {
-          style: { height: '1px', background: 'var(--border-subtle)', margin: '4px 0 8px' }
+          "aria-hidden": "true",
+          style: { height: '0', borderTop: '1px solid #E2E8F0', margin: '12px 0' }
         }),
         /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-setting-row", style: { padding: '10px 0' } },
           /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-label" },
@@ -861,7 +862,10 @@ export function AppSettingsModal({
             /*#__PURE__*/React.createElement("button", { type: "button", onClick: onIncreaseFont, className: "admin-side-menu-font-btn", "aria-label": "글자 크기 늘리기" }, "+")
           )
         ),
-        /*#__PURE__*/React.createElement("div", { style: { height: '1px', background: 'var(--border-subtle)', margin: '8px 0' } }),
+        /*#__PURE__*/React.createElement("div", {
+          "aria-hidden": "true",
+          style: { height: '0', borderTop: '1px solid #E2E8F0', margin: '12px 0' }
+        }),
         /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-setting-row", style: { padding: '10px 0' } },
           /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-label" },
             /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-icon" }, BellIcon && /*#__PURE__*/React.createElement(BellIcon, null)), "알림허용"),
@@ -889,7 +893,7 @@ export function AppSettingsModal({
           ))
         ),
         Array.isArray(helpSteps) && helpSteps.length > 0 && /*#__PURE__*/React.createElement("div", {
-          style: { marginTop: '12px', padding: '12px', borderRadius: '12px', background: 'var(--bg-primary)', border: '1px solid var(--border-subtle)', fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.5 }
+          style: { marginTop: '12px', padding: '12px', borderRadius: '12px', background: 'var(--bg-primary)', border: 'none', fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.5 }
         },
           /*#__PURE__*/React.createElement("div", { style: { fontWeight: 800, color: 'var(--text-main)', marginBottom: '6px' } }, "설정 안내"),
           /*#__PURE__*/React.createElement("ol", { style: { margin: 0, paddingLeft: '18px' } },

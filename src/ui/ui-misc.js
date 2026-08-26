@@ -993,11 +993,14 @@ export function ChatSideMenu({
   settlementBadge = null,
   galleryCount = 0,
   placeCount = 0,
-  memoCount = 0
+  memoCount = 0,
+  weatherLocation = null
 }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
+  const __comp = window.GATHER_UI_COMPONENTS || {};
   const SmallXIcon = __deps.SmallXIcon;
+  const WeatherBadge = __comp.WeatherBadge || __deps.WeatherBadge;
   const MegaphoneIcon = __deps.MegaphoneIcon;
   const SharedSideMenuSettings = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SharedSideMenuSettings) || __deps.SharedSideMenuSettings;
   const SharedSideMenuFooter = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SharedSideMenuFooter) || __deps.SharedSideMenuFooter;
@@ -1034,6 +1037,7 @@ export function ChatSideMenu({
         /*#__PURE__*/React.createElement("div", {
           style: { display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }
         },
+          WeatherBadge ? /*#__PURE__*/React.createElement(WeatherBadge, { weatherLocation: weatherLocation }) : null,
           /* Close Button */
           /*#__PURE__*/React.createElement("button", {
             type: "button",
