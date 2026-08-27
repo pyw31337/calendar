@@ -6602,23 +6602,31 @@ function App() {
   }
 
   if (activeView === 'settlement') {
-    return withStickyVideo(/*#__PURE__*/React.createElement(SettlementSummaryModal, {
-      calendar: activeCal,
-      onBack: () => changeView('calendar'),
-      onSelectDate: d => {
-        setSelectedDate(d);
-        setIsModalOpen(true);
-        changeView('calendar');
-      },
-      onOpenShare: () => {
-        if (typeof setIsShareOpen === 'function') setIsShareOpen(true);
-      },
-      onOpenAppSettings: () => {
-        if (typeof setIsAppSettingsOpen === 'function') setIsAppSettingsOpen(true);
-      },
-      onChangeView: changeView,
-      showToast: showToast
-    }));
+    return withStickyVideo(/*#__PURE__*/React.createElement(React.Fragment, null,
+      /*#__PURE__*/React.createElement(SettlementSummaryModal, {
+        calendar: activeCal,
+        onBack: () => changeView('calendar'),
+        onSelectDate: d => {
+          setSelectedDate(d);
+          setIsModalOpen(true);
+        },
+        onOpenShare: () => {
+          if (typeof setIsShareOpen === 'function') setIsShareOpen(true);
+        },
+        onOpenAppSettings: () => {
+          if (typeof setIsAppSettingsOpen === 'function') setIsAppSettingsOpen(true);
+        },
+        onChangeView: changeView,
+        showToast: showToast
+      }),
+      isShareOpen && activeCal && /*#__PURE__*/React.createElement(ShareModal, {
+        calendar: activeCal,
+        shareType: "settlement",
+        showToast: showToast,
+        onClose: () => setIsShareOpen(false)
+      }),
+      sharedAppOverlays
+    ));
   }
 
   if (activeView === 'memo') {

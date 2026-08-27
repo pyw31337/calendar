@@ -5702,7 +5702,6 @@ function App() {
         onSelectDate: d => {
           setSelectedDate(d);
           setIsModalOpen(true);
-          changeView('calendar');
         },
         onOpenShare: () => {
           if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 공유 정보를 확인해 주세요.')) setIsShareOpen(true);

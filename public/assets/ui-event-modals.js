@@ -2129,15 +2129,15 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
     className: "settlement-page-header",
     style: {
       position: 'fixed', top: 0, left: 0, right: 0, height: '56px',
-      display: 'flex', alignItems: 'center', gap: '10px', padding: '0 16px',
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px',
       backgroundColor: 'var(--bg-card)', borderBottom: '1px solid var(--border-subtle)',
       zIndex: 1010, transition: 'transform 0.3s ease',
       transform: isHeaderVisible ? 'translateY(0)' : 'translateY(-100%)'
     }
-  }, /*#__PURE__*/React.createElement("div", { style: { width: '22px', flexShrink: 0 } }), /*#__PURE__*/React.createElement("h3", {
+  }, /*#__PURE__*/React.createElement("div", { style: { width: '32px', flexShrink: 0 } }), /*#__PURE__*/React.createElement("h3", {
     style: {
       fontSize: '1.05rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '8px', margin: 0, color: 'var(--text-main)',
-      position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)'
+      position: 'absolute', left: '50%', transform: 'translateX(-50%)', pointerEvents: 'none'
     }
   }, formatChatHeaderTitle(calendar?.title), " 정산"), /*#__PURE__*/React.createElement("button", {
     type: "button",
@@ -2145,7 +2145,6 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
     title: "메뉴",
     "aria-label": "메뉴",
     style: {
-      position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)',
       width: '32px', height: '32px', borderRadius: '50%', border: 'none',
       backgroundColor: 'transparent', cursor: 'pointer', display: 'flex',
       alignItems: 'center', justifyContent: 'center', color: '#64748B', padding: 0

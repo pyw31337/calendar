@@ -697,6 +697,10 @@ summary.is-pressing,
   box-shadow: none !important;
   transition: transform 0.05s ease, opacity 0.05s ease, filter 0.05s ease !important;
 }
+.lightbox-nav-btn:active,
+.lightbox-nav-btn.is-pressing {
+  transform: translateY(-50%) scale(0.95) !important;
+}
 .motion-ripple {
   position: absolute;
   left: var(--ripple-x, 50%);
