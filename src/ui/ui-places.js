@@ -764,7 +764,7 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
           }
           const size = count < 10 ? 30 : count < 50 ? 36 : 42;
           return L.divIcon({
-            html: `<div style="width:100%;height:100%;border-radius:8px;background:#3B82F6;border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:12px;">${count}</div>`,
+            html: `<div style="width:100%;height:100%;border-radius:8px;background:#3B82F6;border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:0.75rem;">${count}</div>`,
             className: 'place-cluster-icon',
             iconSize: [size, size]
           });

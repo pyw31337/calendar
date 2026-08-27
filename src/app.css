@@ -1124,7 +1124,7 @@ button, input, textarea, select {
   input[type="search"],
   input[type="number"],
   textarea {
-    font-size: 16px !important;
+    font-size: 0.88rem !important;
   }
 }
 html {
@@ -3227,7 +3227,7 @@ select.form-select {
    fully hiding it, to leave more visual room for pins on small screens. */
 @media (max-width: 720px) {
   .leaflet-control-attribution {
-    font-size: 8px;
+    font-size: 0.5rem;
     line-height: 1.2;
     padding: 0 4px;
     max-width: 60vw;

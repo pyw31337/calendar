@@ -27,7 +27,7 @@ function resolveFirebaseSdkUrl(src) {
 function showBootStatus(msg) {
   const root = document.getElementById('root');
   if (!root || root.dataset.booted === '1') return;
-  root.innerHTML = `<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;font-family:system-ui,sans-serif;color:#64748B;font-size:14px;">${msg}</div>`;
+  root.innerHTML = `<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;font-family:system-ui,sans-serif;color:#64748B;font-size:0.88rem;">${msg}</div>`;
 }
 
 // index.html used to load these as plain synchronous <head> <script src> tags, which browsers
@@ -204,7 +204,7 @@ async function boot() {
       return;
     }
     const detail = (err && (err.message || String(err))) || '';
-    showBootStatus('로딩 실패. 새로고침 해주세요.' + (detail ? `<div style="margin-top:8px;font-size:12px;opacity:.75;max-width:320px;text-align:center;word-break:break-word;">${detail.replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]))}</div>` : ''));
+    showBootStatus('로딩 실패. 새로고침 해주세요.' + (detail ? `<div style="margin-top:8px;font-size:0.75rem;opacity:.75;max-width:320px;text-align:center;word-break:break-word;">${detail.replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]))}</div>` : ''));
   }
 }
 

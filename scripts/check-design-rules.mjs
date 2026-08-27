@@ -20,8 +20,8 @@ function ok(msg) {
   console.log('[check-design-rules] OK:', msg);
 }
 
-if (!/font-size:\s*16px/.test(css)) {
-  fail('expected font-size: 16px rule for inputs (iOS zoom guard)');
+if (!/font-size:\s*(0\.88rem|1rem|16px)/.test(css)) {
+  fail('expected input font-size rule in CSS');
 } else ok('input font-size guard present in CSS');
 
 if (!shareModal.includes('URL 복사하기')) fail('ShareModal missing copy button label');

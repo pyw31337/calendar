@@ -21,9 +21,16 @@
   --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.03);
   color-scheme: light;
 
-  --radius-lg: 16px;
-  --radius-md: 12px;
-  --radius-sm: 8px;
+  /* Rounded-rectangle rule: the outermost edge of any rounded box or button is always 10px
+     (--radius-lg and --radius-md both resolve to it -- they used to differ, but the rule has
+     no room for two different "outer" radii). --radius-sm is for a box nested inside another
+     rounded box (day-cell inside the calendar grid, a menu item inside the header bar) --
+     visibly smaller than its parent's 10px so the nesting itself reads correctly, not an
+     independent size choice. --radius-full stays untouched -- it's for pills/circles, not
+     rounded rectangles, and is outside this rule entirely. */
+  --radius-lg: 10px;
+  --radius-md: 10px;
+  --radius-sm: 6px;
   --radius-full: 9999px;
 
   /* Spacing scale (4px base grid). Any bordered container's top/bottom padding should use
@@ -322,11 +329,17 @@ body:has(.admin-login-gate) {
   100% { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
 }
 @keyframes motion-toast-in {
-  0% { opacity: 0; transform: translate3d(-50%, 14px, 0) scale(0.96); filter: blur(2px); }
+  0% { opacity: 0; transform: translate3d(-50%, 14px, 0) scale(0.95); filter: blur(2px); }
+  68% { opacity: 1; transform: translate3d(-50%, -2px, 0) scale(1.015); filter: blur(0); }
   100% { opacity: 1; transform: translate3d(-50%, 0, 0) scale(1); filter: blur(0); }
 }
+@keyframes motion-toast-out {
+  0% { opacity: 1; transform: translate3d(-50%, 0, 0) scale(1); filter: blur(0); }
+  100% { opacity: 0; transform: translate3d(-50%, 12px, 0) scale(0.965); filter: blur(2px); }
+}
 @keyframes motion-modal-pop {
-  0% { opacity: 0; transform: translate3d(0, 12px, 0) scale(0.965); filter: blur(2px); }
+  0% { opacity: 0; transform: translate3d(0, 12px, 0) scale(0.95); filter: blur(2px); }
+  68% { opacity: 1; transform: translate3d(0, -3px, 0) scale(1.01); filter: blur(0); }
   100% { opacity: 1; transform: translate3d(0, 0, 0) scale(1); filter: blur(0); }
 }
 @keyframes motion-overlay-fade {
@@ -360,13 +373,80 @@ body:has(.admin-login-gate) {
   transform-origin: center bottom;
   will-change: transform, opacity;
 }
+.confirmed-meeting-banner {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition:
+    transform var(--motion-base) var(--motion-ease-out),
+    box-shadow var(--motion-base) var(--motion-ease-out),
+    border-color var(--motion-base) ease,
+    background-color var(--motion-base) ease,
+    color var(--motion-base) ease,
+    opacity var(--motion-base) ease,
+    filter var(--motion-base) ease;
+}
+.confirmed-meeting-banner:hover {
+  transform: translate3d(0, -1px, 0);
+}
+.confirmed-meeting-banner:active,
+.confirmed-meeting-banner.is-pressing {
+  transform: translate3d(0, 1px, 0) scale(0.985) !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04) !important;
+  filter: brightness(0.985) saturate(1.03);
+}
 .toast {
+  position: fixed;
+  bottom: 32px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 99999;
+  padding: 12px 24px;
+  border-radius: var(--radius-md);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25);
+  font-size: 0.95rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  text-align: center;
+  word-break: break-all;
+  white-space: pre-wrap;
+  max-width: 380px;
+  width: 90%;
+  box-sizing: border-box;
+  color: #FFFFFF;
+  border: 1px solid transparent;
   animation: motion-toast-in 260ms var(--motion-ease-spring) both;
-  will-change: transform, opacity;
+  will-change: transform, opacity, filter;
+}
+.toast.is-exiting {
+  pointer-events: none;
+  animation: motion-toast-out 180ms var(--motion-ease-soft) both;
+}
+.toast.is-info { background-color: #3B82F6; }
+.toast.is-success { background-color: #10B981; }
+.toast.is-delete,
+.toast.is-error { background-color: #EF4444; }
+.toast-message { flex: 1 1 180px; min-width: 0; }
+.toast-action {
+  flex-shrink: 0;
+  min-height: 30px;
+  padding: 0 12px;
+  border-radius: var(--radius-full);
+  border: 1px solid rgba(255, 255, 255, 0.38);
+  background-color: rgba(255, 255, 255, 0.16);
+  color: #FFFFFF;
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 900;
+  white-space: nowrap;
 }
 .btn,
 .day-cell,
 .date-item-btn,
+.form-select,
 .poll-card,
 .poll-option-row,
 .recent-log-row,
@@ -376,7 +456,31 @@ body:has(.admin-login-gate) {
 .section-toggle-btn,
 .main-menu-item,
 .memo-card-hover,
-.place-card-row {
+.place-card-row,
+.confirmed-meeting,
+.color-swatch-trigger,
+.admin-calendar-picker-btn,
+.admin-side-menu-item,
+.admin-side-menu-close-btn,
+.admin-side-menu-font-btn,
+.admin-side-menu-title,
+.places-list-item,
+.chat-msg-action,
+.modal-close-btn,
+.icon-btn,
+.chat-keyboard-reopen-btn,
+.main-side-menu-manual-banner,
+.participant-chip,
+.category-chip,
+.place-category-tab,
+.memo-card,
+.gallery-thumb,
+.media-thumb,
+.summary-card img:not(.leaflet-tile),
+.summary-gallery-item img:not(.leaflet-tile),
+.summary-photo-grid img:not(.leaflet-tile),
+.lightbox-nav-btn,
+.tap-target {
   position: relative;
   isolation: isolate;
   -webkit-tap-highlight-color: transparent;
@@ -391,21 +495,74 @@ body:has(.admin-login-gate) {
 .btn,
 .day-cell,
 .date-item-btn,
+.form-select,
 .poll-option-row,
 .search-result-row,
 .bottom-sheet-item,
 .poll-voter-option,
 .main-menu-item,
 .memo-card-hover,
-.place-card-row {
+.place-card-row,
+.confirmed-meeting,
+.color-swatch-trigger,
+.admin-calendar-picker-btn,
+.admin-side-menu-item,
+.admin-side-menu-close-btn,
+.admin-side-menu-font-btn,
+.admin-side-menu-title,
+.places-list-item,
+.chat-msg-action,
+.modal-close-btn,
+.icon-btn,
+.chat-keyboard-reopen-btn,
+.main-side-menu-manual-banner,
+.participant-chip,
+.category-chip,
+.place-category-tab,
+.memo-card,
+.gallery-thumb,
+.media-thumb,
+.summary-card img:not(.leaflet-tile),
+.summary-gallery-item img:not(.leaflet-tile),
+.summary-photo-grid img:not(.leaflet-tile),
+.lightbox-nav-btn,
+.tap-target {
   overflow: hidden;
 }
+.leaflet-tile {
+  position: absolute;
+}
 .btn:hover,
+.form-select:hover,
 .bottom-sheet-item:hover,
 .poll-voter-option:hover,
 .search-result-row:hover,
 .memo-card-hover:hover,
-.place-card-row:hover {
+.place-card-row:hover,
+.confirmed-meeting:hover,
+.color-swatch-trigger:hover,
+.admin-calendar-picker-btn:hover,
+.admin-side-menu-item:hover,
+.admin-side-menu-close-btn:hover,
+.admin-side-menu-font-btn:hover,
+.admin-side-menu-title:hover,
+.places-list-item:hover,
+.chat-msg-action:hover,
+.modal-close-btn:hover,
+.icon-btn:hover,
+.chat-keyboard-reopen-btn:hover,
+.main-side-menu-manual-banner:hover,
+.participant-chip:hover,
+.category-chip:hover,
+.place-category-tab:hover,
+.memo-card:hover,
+.gallery-thumb:hover,
+.media-thumb:hover,
+.summary-card img:not(.leaflet-tile):hover,
+.summary-gallery-item img:not(.leaflet-tile):hover,
+.summary-photo-grid img:not(.leaflet-tile):hover,
+.lightbox-nav-btn:hover,
+.tap-target:hover {
   transform: translate3d(0, -1px, 0);
 }
 /* A place's visit-history entry (date + note). Desktop keeps them side by side; narrow viewports
@@ -440,118 +597,55 @@ body:has(.admin-login-gate) {
     border-top: 1px solid var(--border-subtle);
   }
 }
-/* ===== Global press feedback (universal) ===== */
-button:not(:disabled),
-.btn,
-[role="button"],
-[role="tab"],
-[role="option"],
-[role="menuitem"],
-[role="switch"],
-a.btn,
-a[href],
-.day-cell,
-.date-item-btn,
-.date-item-badge,
-.participant-badge,
-.section-toggle-btn,
-.main-menu-item,
-.admin-side-menu-item,
-.admin-menu-toggle-btn,
-.admin-side-menu-close-btn,
-.admin-side-menu-font-btn,
-.admin-side-menu-title,
-.places-list-item,
-.summary-title,
-.polls-panel-header,
-.poll-card,
-.poll-header,
-.poll-title,
-.poll-option-row,
-.poll-voter-option,
-.recent-log-row,
-.search-result-row,
-.bottom-sheet-item,
-.chat-msg-action,
-.modal-close-btn,
-.icon-btn,
-.chat-keyboard-reopen-btn,
-.main-side-menu-manual-banner,
-.participant-chip,
-.category-chip,
-.place-category-tab,
-.memo-card,
-.gallery-thumb,
-.media-thumb,
-.lightbox-nav-btn,
-.tap-target,
-[data-pressable] {
-  -webkit-tap-highlight-color: transparent;
-  touch-action: manipulation;
-  transform-origin: center center;
-  transition:
-    transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1),
-    filter 0.14s ease,
-    box-shadow 0.18s ease,
-    background-color 0.18s ease,
-    opacity 0.18s ease;
+.btn.is-pressing,
+.form-select.is-pressing,
+.color-swatch-trigger.is-pressing,
+.admin-calendar-picker-btn.is-pressing,
+.confirmed-meeting.is-pressing,
+.day-cell.is-pressing,
+.date-item-btn.is-pressing,
+.poll-card.is-pressing,
+.poll-option-row.is-pressing,
+.recent-log-row.is-pressing,
+.search-result-row.is-pressing,
+.bottom-sheet-item.is-pressing,
+.poll-voter-option.is-pressing,
+.section-toggle-btn.is-pressing,
+.main-menu-item.is-pressing,
+.memo-card-hover.is-pressing,
+.place-card-row.is-pressing,
+.admin-side-menu-item.is-pressing,
+.admin-side-menu-close-btn.is-pressing,
+.admin-side-menu-font-btn.is-pressing,
+.admin-side-menu-title.is-pressing,
+.places-list-item.is-pressing,
+.chat-msg-action.is-pressing,
+.modal-close-btn.is-pressing,
+.icon-btn.is-pressing,
+.chat-keyboard-reopen-btn.is-pressing,
+.main-side-menu-manual-banner.is-pressing,
+.participant-chip.is-pressing,
+.category-chip.is-pressing,
+.place-category-tab.is-pressing,
+.memo-card.is-pressing,
+.gallery-thumb.is-pressing,
+.media-thumb.is-pressing,
+.summary-card img:not(.leaflet-tile).is-pressing,
+.summary-gallery-item img:not(.leaflet-tile).is-pressing,
+.summary-photo-grid img:not(.leaflet-tile).is-pressing,
+.lightbox-nav-btn.is-pressing,
+.tap-target.is-pressing,
+[role="button"].is-pressing,
+[role="tab"].is-pressing,
+[role="option"].is-pressing,
+[role="menuitem"].is-pressing,
+[role="switch"].is-pressing,
+a[href].is-pressing,
+button.is-pressing,
+summary.is-pressing,
+[data-pressable].is-pressing {
+  transform: translate3d(0, 1px, 0) scale(0.985);
 }
-
-.is-pressing {
-  transform: translate3d(0, 1px, 0) scale(0.92) !important;
-  filter: brightness(0.92) !important;
-  transition-duration: 0.05s !important;
-  transition-timing-function: ease-out !important;
-}
-/* Confirmed cells use transform animation — pause it so press scale is visible */
-.day-cell.is-pressing {
-  transform: scale(0.94) !important;
-  filter: brightness(0.94) !important;
-  animation: none !important;
-}
-.participant-badge.is-pressing,
-.media-thumb.is-pressing {
-  transform: scale(0.9) !important;
-}
-
-button:not(:disabled):active,
-.btn:active,
-[role="button"]:active,
-.day-cell:active,
-.date-item-btn:active,
-.participant-badge:active,
-.summary-title:active,
-.polls-panel-header:active,
-.poll-card:active,
-[data-pressable]:active {
-  transform: translate3d(0, 1px, 0) scale(0.92);
-  filter: brightness(0.92);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  button:not(:disabled),
-  .btn,
-  [role="button"],
-  .day-cell,
-  .date-item-btn,
-  .is-pressing,
-  [data-pressable] {
-    transition: none !important;
-    transform: none !important;
-    filter: none !important;
-    animation: none !important;
-  }
-}
-
-/* Emoji picker: no dim/blur so the chat composer (typed emoji) stays readable */
-.bottom-sheet-overlay.emoji-sheet-overlay {
-  background: transparent !important;
-  -webkit-backdrop-filter: none !important;
-  backdrop-filter: none !important;
-  /* Soft top fade only above the sheet — keeps focus without hiding the input */
-  background-image: none !important;
-}
-
 .motion-ripple {
   position: absolute;
   left: var(--ripple-x, 50%);
@@ -584,7 +678,20 @@ button:not(:disabled):active,
 .main-menu-badge,
 .section-count-badge,
 .dday-badge,
-.poll-voter-badge {
+.poll-voter-badge,
+.date-item-badge,
+.confirmed-meeting-label-badge,
+.poll-confirmed-badge,
+.poll-deadline-badge,
+.url-capsule-badge,
+.lightbox-tag-badge,
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  line-height: 1;
+  box-sizing: border-box;
   transition: transform var(--motion-fast) var(--motion-ease-spring), filter var(--motion-fast) ease;
 }
 .participant-badge:hover,
@@ -695,7 +802,7 @@ button:not(:disabled):active,
   font-weight: 600;
   color: var(--text-main);
   padding: 6px 14px;
-  border-radius: 16px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--border-subtle);
   background-color: var(--bg-secondary);
   text-decoration: none;
@@ -902,6 +1009,7 @@ button, input, textarea, select {
   border-radius: 9999px;
   font-size: 0.68rem;
   font-weight: 800;
+  line-height: 1;
   background-color: var(--border-subtle);
   color: var(--text-muted);
 }
@@ -960,7 +1068,7 @@ button, input, textarea, select {
 /* 버튼 규칙: 검색/추가/수정/저장 = Rounded 사각형(캡슐 X), 높이 44px */
 .btn-action,
 .btn-poll-create {
-  border-radius: 12px !important;
+  border-radius: var(--radius-md) !important;
   height: 44px;
   min-height: 44px;
   padding: 0 16px;
@@ -1016,7 +1124,7 @@ button, input, textarea, select {
   input[type="search"],
   input[type="number"],
   textarea {
-    font-size: 16px !important;
+    font-size: 0.88rem !important;
   }
 }
 html {
@@ -1035,7 +1143,7 @@ html {
   padding: 10px 14px;
   background: var(--bg-card, #FFFFFF);
   border: 1px solid var(--border-subtle);
-  border-radius: 12px !important;
+  border-radius: var(--radius-md) !important;
   color: var(--text-main);
   font-size: 0.9rem;
   font-family: inherit;
@@ -1114,7 +1222,7 @@ select.form-select {
   min-width: 44px;
   height: 44px;
   flex: 0 0 44px;
-  border-radius: 14px;
+  border-radius: var(--radius-md);
   padding: 0 !important;
   font-size: 1.05rem;
 }
@@ -1358,7 +1466,7 @@ select.form-select {
 
 .participant-badge {
   display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: var(--radius-full);
-  font-size: 0.72rem; font-weight: 700; line-height: 1.2; box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+  font-size: 0.72rem; font-weight: 700; line-height: 1; box-shadow: 0 1px 3px rgba(0,0,0,0.12);
 }
 
 /* Own-message edit/delete controls: hidden by default, revealed on hover (desktop) or
@@ -1646,15 +1754,16 @@ select.form-select {
   transform: translateX(-50%);
   width: min(100%, 420px);
   background: var(--bg-card);
-  border-radius: 18px 18px 0 0;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
   box-shadow: 0 -20px 40px rgba(15, 23, 42, 0.24);
   z-index: 1200;
   overflow: hidden;
-  animation: sheetRise 0.18s ease-out;
+  animation: sheetRiseElastic 260ms var(--motion-ease-spring) both;
 }
-@keyframes sheetRise {
-  from { transform: translate(-50%, 18px); opacity: 0.85; }
-  to { transform: translate(-50%, 0); opacity: 1; }
+@keyframes sheetRiseElastic {
+  0% { transform: translate(-50%, 18px) scale(0.985); opacity: 0; }
+  68% { transform: translate(-50%, -3px) scale(1.01); opacity: 1; }
+  100% { transform: translate(-50%, 0); opacity: 1; }
 }
 .poll-voter-sheet-header {
   display: flex;
@@ -1673,7 +1782,7 @@ select.form-select {
   gap: 10px;
   padding: 14px 16px;
   border: 1px solid var(--border-subtle);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   background: var(--bg-primary);
   color: var(--text-main);
   font-family: inherit;
@@ -1738,6 +1847,174 @@ select.form-select {
   font-weight: 800;
   line-height: 1;
 }
+.sync-status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  border: 1px solid transparent;
+  box-sizing: border-box;
+  vertical-align: middle;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+}
+.sync-status-chip__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background-color: currentColor;
+}
+.sync-status-chip__text {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  gap: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sync-status-chip__label,
+.sync-status-chip__time {
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1;
+}
+.sync-status-chip__time {
+  font-size: 0.64rem;
+  opacity: 0.82;
+}
+.sync-status-chip.is-live {
+  background: rgba(16, 185, 129, 0.10);
+  color: #059669;
+  border-color: rgba(16, 185, 129, 0.18);
+}
+.sync-status-chip.is-offline {
+  background: rgba(148, 163, 184, 0.14);
+  color: #475569;
+  border-color: rgba(148, 163, 184, 0.24);
+}
+.sync-status-chip.is-saving {
+  background: rgba(245, 158, 11, 0.12);
+  color: #B45309;
+  border-color: rgba(245, 158, 11, 0.22);
+}
+.sync-status-chip.is-error {
+  background: rgba(239, 68, 68, 0.12);
+  color: #DC2626;
+  border-color: rgba(239, 68, 68, 0.22);
+}
+.sync-status-chip.is-saving .sync-status-chip__dot {
+  animation: sync-status-pulse 1.6s ease-in-out infinite;
+}
+@keyframes sync-status-pulse {
+  0%, 100% { transform: scale(0.9); opacity: 0.7; }
+  50% { transform: scale(1.1); opacity: 1; }
+}
+.sync-status-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+  width: 100%;
+  padding: 11px 13px;
+  border-radius: 16px;
+  border: 1px solid transparent;
+  box-sizing: border-box;
+  vertical-align: middle;
+  line-height: 1;
+  user-select: none;
+  overflow: hidden;
+  position: relative;
+  box-shadow: 0 12px 26px rgba(15, 23, 42, 0.08);
+  animation: motion-fade-up 280ms var(--motion-ease-out) both;
+}
+.sync-status-banner::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.42), transparent 45%, rgba(255,255,255,0.08));
+  pointer-events: none;
+}
+.sync-status-banner__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 9999px;
+  flex-shrink: 0;
+  margin-top: 4px;
+  background-color: currentColor;
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.45);
+}
+.sync-status-banner__content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+}
+.sync-status-banner__headline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.sync-status-banner__label,
+.sync-status-banner__time {
+  font-size: 0.78rem;
+  font-weight: 900;
+  line-height: 1.15;
+}
+.sync-status-banner__time {
+  font-size: 0.68rem;
+  opacity: 0.88;
+}
+.sync-status-banner__detail {
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.4;
+  opacity: 0.88;
+}
+.sync-status-banner.is-live {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.14), rgba(255, 255, 255, 0.96));
+  color: #047857;
+  border-color: rgba(16, 185, 129, 0.22);
+}
+.sync-status-banner.is-offline {
+  background: linear-gradient(135deg, rgba(148, 163, 184, 0.18), rgba(255, 255, 255, 0.95));
+  color: #475569;
+  border-color: rgba(148, 163, 184, 0.28);
+}
+.sync-status-banner.is-saving {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.16), rgba(255, 255, 255, 0.95));
+  color: #B45309;
+  border-color: rgba(245, 158, 11, 0.24);
+}
+.sync-status-banner.is-error {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.16), rgba(255, 255, 255, 0.95));
+  color: #DC2626;
+  border-color: rgba(239, 68, 68, 0.24);
+}
+.sync-status-banner.is-saving .sync-status-banner__dot {
+  animation: sync-status-pulse 1.6s ease-in-out infinite;
+}
+@media (prefers-color-scheme: dark) {
+  .sync-status-banner::before {
+    background: linear-gradient(135deg, rgba(255,255,255,0.10), transparent 45%, rgba(255,255,255,0.03));
+  }
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="dark"] .sync-status-banner {
+    box-shadow: 0 12px 26px rgba(2, 6, 23, 0.32);
+  }
+  :root[data-theme="dark"] .sync-status-banner__dot {
+    box-shadow: 0 0 0 4px rgba(15, 23, 42, 0.55);
+  }
+}
 .summary-title.is-toggleable {
   cursor: pointer;
   user-select: none;
@@ -1756,7 +2033,7 @@ select.form-select {
   padding: 0;
   border-radius: 50%;
   cursor: pointer;
-  transition: background-color 0.16s ease, color 0.16s ease, transform 0.34s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: background-color 0.16s ease, color 0.16s ease;
 }
 .section-toggle-btn:hover {
   background: #F1F5F9;
@@ -1953,7 +2230,7 @@ select.form-select {
 .admin-side-menu-logo {
   width: 38px;
   height: 38px;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   background: #111827;
   color: #FFFFFF;
   display: inline-flex;
@@ -1975,15 +2252,6 @@ select.form-select {
   color: #0F172A;
   line-height: 1.2;
 }
-/* Title was switched to <button> — prevent UA/inline font:inherit from thinning weight */
-button.admin-side-menu-title {
-  font-family: inherit;
-  font-size: 1rem;
-  font-weight: 900 !important;
-  color: inherit;
-  line-height: 1.2;
-  letter-spacing: inherit;
-}
 .admin-side-menu-subtitle {
   font-size: 0.68rem;
   font-weight: 800;
@@ -1995,7 +2263,7 @@ button.admin-side-menu-title {
   height: 36px;
   padding: 0;
   border: none;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   background: transparent;
   color: #64748B;
   display: inline-flex;
@@ -2023,7 +2291,7 @@ button.admin-side-menu-title {
   min-height: 42px;
   padding: 6px 12px;
   border: none;
-  border-radius: 14px;
+  border-radius: var(--radius-md);
   background: transparent;
   color: #0F172A;
   display: flex;
@@ -2052,7 +2320,7 @@ button.admin-side-menu-title {
 .admin-side-menu-item-icon {
   width: 34px;
   height: 34px;
-  border-radius: 11px;
+  border-radius: var(--radius-sm);
   background: #F8FAFC;
   color: #0F172A;
   display: inline-flex;
@@ -2098,6 +2366,20 @@ button.admin-side-menu-title {
   font-weight: 600;
   line-height: 1.2;
 }
+.side-menu-meta-pill {
+  font-size: 0.6rem !important;
+  font-weight: 500 !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  height: auto !important;
+  min-height: auto !important;
+  border-radius: 0 !important;
+  vertical-align: middle;
+}
 .admin-side-menu-item-desc {
   font-size: 0.68rem;
   font-weight: 400;
@@ -2128,7 +2410,7 @@ button.admin-side-menu-title {
 .admin-side-menu-setting-icon {
   width: 34px;
   height: 34px;
-  border-radius: 12px;
+  border-radius: var(--radius-sm);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -2216,7 +2498,7 @@ button.admin-side-menu-title {
   justify-content: space-between;
   gap: 12px;
   border: 1px solid #E2E8F0;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   padding: 10px 12px;
   background-color: #F8FAFC;
 }
@@ -2245,7 +2527,7 @@ button.admin-side-menu-title {
 }
 .admin-metric-card {
   border: 1px solid #E2E8F0;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 16px 12px;
   background-color: #F8FAFC;
   display: flex;
@@ -2255,20 +2537,30 @@ button.admin-side-menu-title {
   gap: 8px;
   min-height: 128px;
 }
+/* overflow must stay visible here -- verified via isolated real-component reproduction that
+   overflow:hidden on this element (an auto-row-height grid) caused Chromium to occasionally
+   collapse the grid's computed row height to ~2px right after activeTab changes the card
+   labels/values (총 수입 -> 8월 수입 etc.), clipping the entire card content to nothing even
+   though the DOM/text were still fully present -- this was the actual cause of "정산페이지 요약
+   카드가 안 보인다". The cards have transparent backgrounds so there's nothing that needs
+   corner-clipping against the grid's own border-radius, making overflow:hidden here pure risk
+   with no visual benefit. */
 .settlement-metric-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 0;
   border: 1px solid var(--border-subtle);
-  border-radius: 16px;
+  border-radius: var(--radius-md);
   background-color: var(--bg-card);
-  overflow: hidden;
+  overflow: visible;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
   flex-shrink: 0;
 }
 .settlement-metric-card {
   display: flex;
   flex-direction: column;
+  align-items: center;
+  text-align: center;
   gap: 8px;
   min-width: 0;
   padding: 14px 12px;
@@ -2282,6 +2574,7 @@ button.admin-side-menu-title {
 .settlement-metric-card-label {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   min-width: 0;
   font-size: 0.8rem;
@@ -2298,6 +2591,22 @@ button.admin-side-menu-title {
   text-overflow: ellipsis;
   white-space: nowrap;
   letter-spacing: -0.01em;
+}
+
+/* Anniversary type radio option (기념일 등록 "종류"): side-by-side radio+label on desktop, but
+   stacked (radio on its own line, label below) on narrow phones so the label text gets the full
+   card width instead of being squeezed next to the radio input. */
+.anniversary-type-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+@media (max-width: 480px) {
+  .anniversary-type-option {
+    flex-direction: column;
+    text-align: center;
+    gap: 4px;
+  }
 }
 @media (max-width: 480px) {
   .settlement-metric-card {
@@ -2425,7 +2734,7 @@ button.admin-side-menu-title {
 .memo-capsule-badge {
   display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px;
   border-radius: var(--radius-full); font-size: 0.75rem; font-weight: 700;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1); line-height: 1.3;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1); line-height: 1;
 }
 .confirmed-meeting-label-badge {
   background-color: var(--bg-card);
@@ -2446,7 +2755,7 @@ button.admin-side-menu-title {
 /* D-day capsule on the confirmed-meeting banner */
 .dday-badge {
   display: inline-flex; align-items: center; flex-shrink: 0; padding: 4px 12px;
-  border-radius: var(--radius-full); font-size: 0.75rem; font-weight: 800; line-height: 1.3;
+  border-radius: var(--radius-full); font-size: 0.75rem; font-weight: 800; line-height: 1;
   color: #FFFFFF; background: var(--accent-gradient); box-shadow: 0 1px 3px rgba(0,0,0,0.15);
 }
 @media (min-width: 640px) {
@@ -2469,6 +2778,12 @@ button.admin-side-menu-title {
 }
 
 .date-item-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  line-height: 1;
+  box-sizing: border-box;
   font-size: 0.72rem;
   padding: 4px 10px;
   border-radius: 9999px;
@@ -2487,7 +2802,7 @@ button.admin-side-menu-title {
   align-items: center;
   gap: 8px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 8px 10px;
   background-color: var(--bg-primary);
   color: var(--text-main);
@@ -2628,12 +2943,18 @@ button.admin-side-menu-title {
   position: fixed; top: 0; left: 0; right: 0; bottom: 0;
   background: rgba(15, 23, 42, 0.6); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px);
   z-index: 20000; display: flex; align-items: flex-end; justify-content: center;
+  animation: motion-overlay-fade var(--motion-base) ease both;
 }
 .bottom-sheet {
   background: var(--bg-card); width: 100%; max-width: 480px;
-  border-radius: 20px 20px 0 0; box-shadow: 0 -8px 30px rgba(0,0,0,0.15);
-  animation: sheet-slide-up 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-  display: flex; flex-direction: column; max-height: 70vh;
+  border-radius: var(--radius-md) var(--radius-md) 0 0; box-shadow: 0 -8px 30px rgba(0,0,0,0.15);
+  animation: sheet-slide-up 280ms cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex; flex-direction: column;
+  /* Rides as high as the viewport allows (svh handles mobile browser chrome) instead of a fixed
+     70vh, so content -- e.g. a date/time picker's own grid plus its "선택 완료" button -- fits
+     without an inner scroll whenever there's room, rather than always leaving 30% of the
+     screen unused below the sheet. */
+  max-height: min(92vh, calc(100svh - 16px));
   color: var(--text-main);
 }
 .emoji-sheet-overlay {
@@ -2649,14 +2970,15 @@ button.admin-side-menu-title {
   transform: translateZ(0);
 }
 @keyframes sheet-slide-up {
-  from { transform: translateY(100%); }
-  to { transform: translateY(0); }
+  0% { transform: translateY(100%); opacity: 0; }
+  70% { transform: translateY(-6px); opacity: 1; }
+  100% { transform: translateY(0); opacity: 1; }
 }
 .bottom-sheet-header {
   padding: 16px 20px; border-bottom: 1px solid var(--border-subtle);
   display: flex; align-items: center; justify-content: space-between;
   background: var(--bg-primary);
-  border-radius: 20px 20px 0 0;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
 }
 .bottom-sheet-header h4 { font-size: 1rem; font-weight: 800; margin: 0; }
 .bottom-sheet-body {
@@ -2905,7 +3227,7 @@ button.admin-side-menu-title {
    fully hiding it, to leave more visual room for pins on small screens. */
 @media (max-width: 720px) {
   .leaflet-control-attribution {
-    font-size: 8px;
+    font-size: 0.5rem;
     line-height: 1.2;
     padding: 0 4px;
     max-width: 60vw;
@@ -3292,7 +3614,7 @@ button.admin-side-menu-title {
   width: 100%;
   max-width: 480px;
   margin: 0 auto;
-  border-radius: 20px 20px 0 0 !important;
+  border-radius: var(--radius-md) var(--radius-md) 0 0 !important;
 }
 
 
@@ -3318,7 +3640,10 @@ button.admin-side-menu-title {
 .gamified-border-electric {
   position: absolute;
   inset: -3px;
-  border-radius: 15px;
+  /* Sits 3px outside .btn-gamified-confirm (border-radius: var(--radius-md), 10px) -- +3px
+     keeps the glow ring concentric with the button's own rounded corners instead of drifting
+     out of alignment with it. */
+  border-radius: calc(var(--radius-md) + 3px);
   pointer-events: none;
   z-index: 2;
   overflow: hidden;
@@ -3404,7 +3729,7 @@ button.admin-side-menu-title {
 }
 .gamified-confirm-wrap {
   overflow: visible !important;
-  border-radius: 14px;
+  border-radius: var(--radius-md);
 }
 
 .modal-body { overflow-x: hidden !important; }
@@ -3417,9 +3742,21 @@ button.admin-side-menu-title {
   user-select: none;
 }
 
-.date-modal-places-list,
+.date-modal-places-list {
+  overflow: visible !important;
+}
 .date-modal-settlement-list {
   overflow: visible !important;
+  padding-bottom: 24px !important;
+  margin-bottom: 16px !important;
+}
+.date-modal-settlement-bottom-spacer {
+  height: 28px !important;
+  min-height: 28px !important;
+  flex-shrink: 0 !important;
+  display: block !important;
+  width: 100% !important;
+  clear: both !important;
 }
 .expense-sortable-row {
   border: 1px solid var(--border-subtle) !important;
@@ -3443,6 +3780,26 @@ textarea.form-input {
 .leaflet-container {
   touch-action: pan-x pan-y;
   -webkit-tap-highlight-color: transparent;
+}
+.leaflet-tile-pane {
+  filter: none;
+  -webkit-filter: none;
+}
+:root[data-theme="dark"] .leaflet-tile-pane {
+  filter: grayscale(100%) invert(90%) hue-rotate(180deg) opacity(85%) contrast(90%);
+  -webkit-filter: grayscale(100%) invert(90%) hue-rotate(180deg) opacity(85%) contrast(90%);
+}
+/* Leaflet tile positioning & rendering protection */
+.leaflet-tile,
+.leaflet-tile-container img {
+  position: absolute !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  filter: contrast(1.1);
+  -webkit-filter: contrast(1.1);
 }
 
 
@@ -3469,29 +3826,13 @@ textarea.form-input {
   padding-top: 6px;
   padding-bottom: 6px;
 }
-
-/* Main side menu only: slightly looser row spacing (+8px). Subpage menus unchanged. */
-.admin-side-menu.main-side-menu .admin-side-menu-item {
-  min-height: 50px;
-  padding-top: 10px;
-  padding-bottom: 10px;
-}
-.admin-side-menu.main-side-menu .admin-side-menu-list {
-  padding-top: 10px;
-  padding-bottom: 10px;
-  gap: 4px;
-}
-.admin-side-menu.main-side-menu .admin-side-menu-list + .admin-side-menu-list,
-.admin-side-menu.main-side-menu .admin-side-menu-list + div.admin-side-menu-list {
-  margin-top: 4px;
-}
 .admin-side-menu .main-side-menu-manual-banner {
   position: relative;
   overflow: hidden;
   min-height: 58px !important;
   margin: 2px 8px 8px !important;
   padding: 12px 12px !important;
-  border-radius: 16px !important;
+  border-radius: var(--radius-md) !important;
   border: none !important;
   background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 48%, #A855F7 100%) !important;
   color: #fff !important;
@@ -3515,7 +3856,7 @@ textarea.form-input {
   z-index: 1;
   width: 40px;
   height: 40px;
-  border-radius: 12px;
+  border-radius: var(--radius-sm);
   background: rgba(255, 255, 255, 0.22);
   color: #fff;
   display: inline-flex;
@@ -3664,7 +4005,8 @@ textarea.form-input {
 }
 [data-theme="dark"] .toast,
 :root[data-theme="dark"] .toast {
-  background: #1B2540; color: var(--text-main); border-color: var(--border-subtle);
+  color: #FFFFFF;
+  border-color: rgba(255, 255, 255, 0.12);
 }
 [data-theme="dark"] .url-capsule-badge,
 :root[data-theme="dark"] .url-capsule-badge {
@@ -3679,6 +4021,13 @@ textarea.form-input {
 }
 .poll-deadline-badge.is-open { background: #EFF6FF; color: #2563EB; }
 .poll-deadline-badge.is-closed { background: #FEE2E2; color: #DC2626; }
+.poll-deadline-badge {
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
 :root[data-theme="dark"] .poll-deadline-badge.is-open,
 :root[data-theme="dark"] .poll-deadline-badge.is-open {
   background: #1E3A5F; color: #93C5FD;
@@ -3746,6 +4095,13 @@ textarea.form-input {
 :root[data-theme="dark"] .admin-side-menu-item:focus-visible .admin-side-menu-item-icon {
   background: #243152 !important;
   color: #F8FAFC !important;
+}
+:root[data-theme="dark"] .side-menu-meta-pill {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
 }
 
 :root[data-theme="dark"] .admin-side-menu-setting-row,
@@ -3897,55 +4253,8 @@ textarea.form-input {
   }
   .manual-mobile-friendly article {
     padding: 12px !important;
-    border-radius: 14px !important;
+    border-radius: var(--radius-sm) !important;
   }
   .manual-mobile-friendly article h3 { font-size: 0.95rem !important; }
   .manual-mobile-friendly article p { font-size: 0.82rem !important; margin-top: 4px !important; }
-}
-
-
-/* Emoji sheet: never dim/blur the page (composer must stay readable) */
-.bottom-sheet-overlay.emoji-sheet-overlay,
-:root[data-theme="dark"] .bottom-sheet-overlay.emoji-sheet-overlay {
-  background: transparent !important;
-  background-color: transparent !important;
-  -webkit-backdrop-filter: none !important;
-  backdrop-filter: none !important;
-  pointer-events: auto;
-}
-.bottom-sheet-overlay.emoji-sheet-overlay .emoji-sheet {
-  pointer-events: auto;
-}
-
-
-/* When emoji sheet is open: keep chat inputs above the sheet */
-html.emoji-sheet-open {
-  --emoji-sheet-h: 45vh;
-}
-html.emoji-sheet-open .chat-composer.emoji-sheet-lifted {
-  z-index: 13050 !important;
-}
-html.emoji-sheet-open [data-chat-input-panel="1"].emoji-sheet-lifted {
-  z-index: 13050;
-  /* Extra space so the page can scroll the panel just above the sheet */
-  margin-bottom: calc(var(--emoji-sheet-h, 45vh) + 12px);
-}
-.bottom-sheet-overlay.emoji-sheet-overlay {
-  /* Clicks outside the sheet still close; inputs lifted above via z-index */
-  z-index: 12000;
-}
-.bottom-sheet-overlay.emoji-sheet-overlay .emoji-sheet {
-  z-index: 12001;
-  position: relative;
-}
-
-
-/* Side menu trailing meta pills (last author / date / place / memo word) */
-.admin-side-menu-item .admin-side-menu-item-copy {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-.side-menu-meta-pill {
-  margin-left: auto;
-  flex-shrink: 0;
 }

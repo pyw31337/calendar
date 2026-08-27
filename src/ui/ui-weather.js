@@ -1047,7 +1047,7 @@ export function WeatherLocationModal({ onClose, onSelectLocation, onDeleteRecent
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: '9px',
+                  fontSize: '0.56rem',
                   fontWeight: 'bold',
                   cursor: 'pointer',
                   zIndex: 2,
