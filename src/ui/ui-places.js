@@ -708,34 +708,13 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
           tapTolerance: 15
         })
         .setView(PLACE_MAP_DEFAULT_CENTER, PLACE_MAP_DEFAULT_ZOOM);
-      // CartoDB Positron (free, no API key, same OSM data underneath) instead of the standard
-      // OSM tile style -- its muted greyscale/white basemap with minimal labels makes the
-      // colored category pins the only thing that actually pops, unlike the default style's
-      // busy roads/land-use colors competing with them for attention.
-      // CARTO Positron Basemap (Restored) -- clean light grayscale map with minimal labels
-      const cartoKey = (typeof window !== 'undefined' && (window.CARTO_API_KEY || (window.GATHER_APP_CONFIG && window.GATHER_APP_CONFIG.cartoApiKey))) || '';
-      const cartoUrl = `https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png${cartoKey ? `?api_key=${encodeURIComponent(cartoKey)}` : ''}`;
-      const baseTileLayer = L.tileLayer(cartoUrl, {
+      // 100% Permanent Free OpenStreetMap Tiles (Native Korean place names, maxNativeZoom 19, no API keys, no 14-day trial)
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
         maxNativeZoom: 19,
-        subdomains: 'abcd',
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-      });
-      let fallbackTriggered = false;
-      baseTileLayer.on('tileerror', () => {
-        if (fallbackTriggered) return;
-        fallbackTriggered = true;
-        try {
-          map.removeLayer(baseTileLayer);
-          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 19,
-            maxNativeZoom: 19,
-            subdomains: 'abc',
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          }).addTo(map);
-        } catch (e) {}
-      });
-      baseTileLayer.addTo(map);
+        subdomains: 'abc',
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+      }).addTo(map);
 
       let clusterAvailable = false;
       try {
