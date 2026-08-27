@@ -1830,69 +1830,54 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
           const isPlaceFocused = !!(focusPlace && focusPlace.id === place.id);
           return /*#__PURE__*/React.createElement("div", {
             key: place.id,
-            className: "place-card-row" + (isPlaceFocused ? " is-place-focused" : ""),
+            // Same purple-border + up/down-shake "you were just brought here" treatment used
+            // everywhere else in the app (see chat-search-focused-bubble/chat-search-shake).
+            className: "place-card-row" + (isPlaceFocused ? " chat-search-focused-bubble" : ""),
             "data-place-id": place.id,
-            "data-no-press-feedback": "1",
+            role: "button",
+            tabIndex: 0,
+            onKeyDown: (e) => {
+              if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'BUTTON')) return;
+              if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleSelectPlaceOnMap(place); }
+            },
             style: {
               display: 'flex', flexDirection: 'column', gap: '4px',
-              padding: '10px 48px 10px 12px', position: 'relative',
+              padding: '10px 12px', position: 'relative',
               border: '1px solid var(--border-subtle)',
               borderRadius: 'var(--radius-md)',
-              cursor: 'default',
+              cursor: 'pointer',
               backgroundColor: 'var(--bg-card)',
-              transition: 'border-color 0.15s ease, background-color 0.15s ease',
-              overflow: 'visible',
-              transform: 'none'
-            }
+              transition: 'border-color 0.15s ease, background-color 0.15s ease'
+            },
+            onClick: () => handleSelectPlaceOnMap(place)
           },
             /* Top-right absolute action buttons */
             /*#__PURE__*/React.createElement("div", {
-              className: "place-card-actions",
-              style: { position: 'absolute', top: '6px', right: '6px', display: 'flex', alignItems: 'center', gap: '2px', zIndex: 20, pointerEvents: 'auto' },
-              onClick: event => { event.preventDefault(); event.stopPropagation(); },
-              onPointerDown: event => { event.stopPropagation(); },
-              onMouseDown: event => { event.stopPropagation(); },
-              onTouchStart: event => { event.stopPropagation(); }
+              style: { position: 'absolute', top: '8px', right: '8px', display: 'flex', alignItems: 'center', gap: '4px' }
             },
               /*#__PURE__*/React.createElement("button", {
                 type: "button",
-                className: "place-card-action-btn",
                 onClick: event => {
-                  event.preventDefault();
                   event.stopPropagation();
-                  try {
-                    const url = typeof getPlaceExternalMapUrl === 'function' ? getPlaceExternalMapUrl(place) : (place && (place.url || place.mapUrl));
-                    if (url) window.open(url, '_blank', 'noopener,noreferrer');
-                    else if (showToast) showToast('연결된 업체 정보가 없습니다.', 'info');
-                  } catch (err) {
-                    console.error('place external map url', err);
-                    if (showToast) showToast('업체 정보를 열 수 없습니다.', 'error');
-                  }
+                  window.open(getPlaceExternalMapUrl(place), '_blank', 'noopener,noreferrer');
                 },
                 title: "업체보기",
                 style: {
                   width: '28px', height: '28px',
                   background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
-                  pointerEvents: 'auto'
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0
                 }
-              }, BuildingIcon ? /*#__PURE__*/React.createElement(BuildingIcon, { size: 14 }) : '🏢'),
+              }, /*#__PURE__*/React.createElement(BuildingIcon, { size: 14 })),
               /*#__PURE__*/React.createElement("button", {
                 type: "button",
-                className: "place-card-action-btn",
-                onClick: event => {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  handleEditPlace(place);
-                },
+                onClick: event => { event.stopPropagation(); handleEditPlace(place); },
                 title: "장소 수정",
                 style: {
                   width: '28px', height: '28px',
                   background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
-                  pointerEvents: 'auto'
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0
                 }
-              }, PencilIcon ? /*#__PURE__*/React.createElement(PencilIcon, { size: 14 }) : '✎')
+              }, /*#__PURE__*/React.createElement(PencilIcon, { size: 14 }))
             ),
             
             /* Category Label Capsule and Visit Info */
@@ -1929,16 +1914,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
             ),
             
             /* Name & Address -- alias is the list display name when set; official name shown underneath */
-            /*#__PURE__*/React.createElement("div", {
-              className: "place-card-select-area",
-              role: "button",
-              tabIndex: 0,
-              onClick: event => { event.stopPropagation(); handleSelectPlaceOnMap(place); },
-              onKeyDown: event => {
-                if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); handleSelectPlaceOnMap(place); }
-              },
-              style: { display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0, cursor: 'pointer' }
-            },
+            /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 } },
               /*#__PURE__*/React.createElement("span", { style: { fontWeight: 800, fontSize: '0.88rem', color: 'var(--text-main)' } }, (place.alias || place.name || '이름 없음')),
               place.alias && place.name && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.72rem', color: 'var(--text-muted)' } }, place.name),
               place.address && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.74rem', color: 'var(--text-muted)' } }, getDisplayPlaceAddress(place))
