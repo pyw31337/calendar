@@ -712,9 +712,10 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
       // OSM tile style -- its muted greyscale/white basemap with minimal labels makes the
       // colored category pins the only thing that actually pops, unlike the default style's
       // busy roads/land-use colors competing with them for attention.
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+      // Esri World Light Gray Base: Bright, minimal, clean basemap with simplified details (no cluttered labels/roads)
+      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+        maxZoom: 16,
+        attribution: '&copy; <a href="https://www.esri.com/">Esri</a> &copy; OpenStreetMap contributors'
       }).addTo(map);
 
       let clusterAvailable = false;
