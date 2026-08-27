@@ -476,9 +476,9 @@ body:has(.admin-login-gate) {
 .memo-card,
 .gallery-thumb,
 .media-thumb,
-.summary-card img,
-.summary-gallery-item img,
-.summary-photo-grid img,
+.summary-card img:not(.leaflet-tile),
+.summary-gallery-item img:not(.leaflet-tile),
+.summary-photo-grid img:not(.leaflet-tile),
 .lightbox-nav-btn,
 .tap-target {
   position: relative;
@@ -522,12 +522,15 @@ body:has(.admin-login-gate) {
 .memo-card,
 .gallery-thumb,
 .media-thumb,
-.summary-card img,
-.summary-gallery-item img,
-.summary-photo-grid img,
+.summary-card img:not(.leaflet-tile),
+.summary-gallery-item img:not(.leaflet-tile),
+.summary-photo-grid img:not(.leaflet-tile),
 .lightbox-nav-btn,
 .tap-target {
   overflow: hidden;
+}
+.leaflet-tile {
+  position: absolute;
 }
 .btn:hover,
 .form-select:hover,
@@ -555,9 +558,9 @@ body:has(.admin-login-gate) {
 .memo-card:hover,
 .gallery-thumb:hover,
 .media-thumb:hover,
-.summary-card img:hover,
-.summary-gallery-item img:hover,
-.summary-photo-grid img:hover,
+.summary-card img:not(.leaflet-tile):hover,
+.summary-gallery-item img:not(.leaflet-tile):hover,
+.summary-photo-grid img:not(.leaflet-tile):hover,
 .lightbox-nav-btn:hover,
 .tap-target:hover {
   transform: translate3d(0, -1px, 0);
@@ -627,9 +630,9 @@ body:has(.admin-login-gate) {
 .memo-card.is-pressing,
 .gallery-thumb.is-pressing,
 .media-thumb.is-pressing,
-.summary-card img.is-pressing,
-.summary-gallery-item img.is-pressing,
-.summary-photo-grid img.is-pressing,
+.summary-card img:not(.leaflet-tile).is-pressing,
+.summary-gallery-item img:not(.leaflet-tile).is-pressing,
+.summary-photo-grid img:not(.leaflet-tile).is-pressing,
 .lightbox-nav-btn.is-pressing,
 .tap-target.is-pressing,
 [role="button"].is-pressing,
@@ -3791,27 +3794,24 @@ textarea.form-input {
   -webkit-tap-highlight-color: transparent;
 }
 .leaflet-tile-pane {
-  filter: contrast(1.1);
-  -webkit-filter: contrast(1.1);
+  filter: none;
+  -webkit-filter: none;
 }
 :root[data-theme="dark"] .leaflet-tile-pane {
   filter: grayscale(100%) invert(90%) hue-rotate(180deg) opacity(85%) contrast(90%);
   -webkit-filter: grayscale(100%) invert(90%) hue-rotate(180deg) opacity(85%) contrast(90%);
 }
-/* Fix Leaflet subpixel white grid seam lines on Retina & scaled viewports */
-.leaflet-tile {
+/* Leaflet tile positioning & rendering protection */
+.leaflet-tile,
+.leaflet-tile-container img {
+  position: absolute !important;
   border: none !important;
-  outline: 1px solid transparent !important;
+  outline: none !important;
   box-shadow: none !important;
   margin: 0 !important;
   padding: 0 !important;
-  -webkit-backface-visibility: hidden;
-  backface-visibility: hidden;
-}
-.leaflet-tile-container img {
-  border: none !important;
-  margin: 0 !important;
-  padding: 0 !important;
+  filter: contrast(1.1);
+  -webkit-filter: contrast(1.1);
 }
 
 
