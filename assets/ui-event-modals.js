@@ -1737,8 +1737,9 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
     setIsSettlementMenuOpen(false);
     if (typeof onOpenCreateSettlement === 'function') {
       onOpenCreateSettlement();
+    } else {
+      setIsCreateSettlementOpen(true);
     }
-    setIsCreateSettlementOpen(true);
   };
 
   const { isHeaderVisible, onScroll: handleSettlementScroll } = useScrollHideHeader();
@@ -2656,7 +2657,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
           )
         ),
         React.createElement("span", { className: "admin-side-menu-item-copy" },
-          React.createElement("span", { className: "admin-side-menu-item-title", style: { fontWeight: 700, color: "var(--text-main)" } }, "정산생성")
+          React.createElement("span", { className: "admin-side-menu-item-title", style: { fontWeight: 700, color: "var(--text-main)" } }, "정산 생성")
         )
       ),
 

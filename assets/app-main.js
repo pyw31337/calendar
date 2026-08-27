@@ -6616,6 +6616,9 @@ function App() {
         onOpenAppSettings: () => {
           if (typeof setIsAppSettingsOpen === 'function') setIsAppSettingsOpen(true);
         },
+        onOpenCreateSettlement: () => {
+          if (typeof setIsCreateSettlementOpen === 'function') setIsCreateSettlementOpen(true);
+        },
         onChangeView: changeView,
         showToast: showToast
       }),
