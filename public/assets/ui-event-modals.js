@@ -1363,7 +1363,306 @@ export function AnniversaryModal({
   );
 }
 
-export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenShare, onOpenAppSettings, onChangeView, chatCount = 0, settlementBadge = null, galleryCount = 0, placeCount = 0, memoCount = 0, chatLastAuthor = null, settlementLastDate = null, galleryLastDate = null, placeLastName = null, memoLastTitleWord = null, showToast }) {
+/* CreateSettlementModal (1/N Custom Settlement Card Layer Popup) */
+export function CreateSettlementModal({ calendar, onClose, onSave, showToast }) {
+  const React = window.React;
+  const __deps = window.GATHER_UI_DEPS || {};
+  const __comp = window.GATHER_UI_COMPONENTS || {};
+  const ResizableModalContainer = __comp.ResizableModalContainer || __deps.ResizableModalContainer || function Shell(p) { return React.createElement('div', p, p.children); };
+  const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon || function () { return '×'; };
+  const getActiveParticipants = __deps.getActiveParticipants || (c => Array.isArray(c?.participants) ? c.participants.filter(p => !p.deletedAt && !p.removedAt) : []);
+  const getConfirmedMeetings = __deps.getConfirmedMeetings || (c => Array.isArray(c?.confirmedMeetings) ? c.confirmedMeetings : []);
+
+  const activeParticipants = getActiveParticipants(calendar);
+  const today = new Date();
+  const [title, setTitle] = React.useState('1/N 간편 송금');
+  const [selectedParticipantIds, setSelectedParticipantIds] = React.useState(() => activeParticipants.map(p => p.id || p.name));
+  const [bankName, setBankName] = React.useState('토스뱅크');
+  const [depositorName, setDepositorName] = React.useState('');
+  const [accountNumber, setAccountNumber] = React.useState('');
+  
+  // Month navigation
+  const [year, setYear] = React.useState(today.getFullYear());
+  const [month, setMonth] = React.useState(today.getMonth()); // 0..11
+  
+  // Selected transactions map { itemKey -> item }
+  const [checkedItems, setCheckedItems] = React.useState({});
+  
+  const BANK_OPTIONS = ['토스뱅크', '카카오뱅크', '신한은행', 'KB국민은행', 'NH농협은행', '우리은행', '하나은행', 'IBK기업은행', '카카오페이', '네이버페이', '기타'];
+
+  const monthStr = `${year}-${String(month + 1).padStart(2, '0')}`;
+  const confirmed = getConfirmedMeetings(calendar);
+
+  // Extract expense / income items for selected month
+  const monthlyExpenses = React.useMemo(() => {
+    const list = [];
+    confirmed.forEach(m => {
+      if (!m.date || !m.date.startsWith(monthStr)) return;
+      const exps = Array.isArray(m.expenses) ? m.expenses : [];
+      exps.forEach((exp, idx) => {
+        const key = `${m.date}_${exp.id || idx}_${exp.amount}`;
+        list.push({ ...exp, date: m.date, itemKey: key });
+      });
+    });
+    return list;
+  }, [confirmed, monthStr]);
+
+  // Dynamically calculate income, expense, 1/N per person
+  const { totalIncome, totalExpense, settlementPerPerson } = React.useMemo(() => {
+    let inc = 0;
+    let exp = 0;
+    Object.values(checkedItems).forEach(item => {
+      const amt = Number(item.amount || 0);
+      if (item.isIncome || amt > 0) inc += Math.abs(amt);
+      else exp += Math.abs(amt);
+    });
+    const count = Math.max(1, selectedParticipantIds.length);
+    const perPerson = Math.round(exp / count);
+    return { totalIncome: inc, totalExpense: exp, settlementPerPerson: perPerson };
+  }, [checkedItems, selectedParticipantIds.length]);
+
+  const toggleCheckItem = (item) => {
+    setCheckedItems(prev => {
+      const next = { ...prev };
+      if (next[item.itemKey]) delete next[item.itemKey];
+      else next[item.itemKey] = item;
+      return next;
+    });
+  };
+
+  const toggleParticipant = (id) => {
+    setSelectedParticipantIds(prev => {
+      if (prev.includes(id)) {
+        if (prev.length <= 1) return prev;
+        return prev.filter(x => x !== id);
+      }
+      return [...prev, id];
+    });
+  };
+
+  const handlePrevMonth = () => {
+    if (month === 0) { setYear(y => y - 1); setMonth(11); }
+    else setMonth(m => m - 1);
+  };
+
+  const handleNextMonth = () => {
+    if (month === 11) { setYear(y => y + 1); setMonth(0); }
+    else setMonth(m => m + 1);
+  };
+
+  const handleSave = () => {
+    if (!title.trim()) {
+      if (showToast) showToast('정산 타이틀을 입력해주세요.', 'warning');
+      return;
+    }
+    const newCard = {
+      id: `sc_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+      title: title.trim(),
+      status: 'active',
+      createdAt: new Date().toISOString(),
+      participants: selectedParticipantIds,
+      participantCount: selectedParticipantIds.length,
+      amount: totalExpense,
+      perPersonAmount: settlementPerPerson,
+      totalIncome: totalIncome,
+      bankName: bankName,
+      depositorName: depositorName.trim(),
+      accountNumber: accountNumber.trim(),
+      monthStr: monthStr,
+      checkedItemKeys: Object.keys(checkedItems)
+    };
+    if (typeof onSave === 'function') onSave(newCard);
+    if (showToast) showToast(`'${title}' 정산 카드가 생성되었습니다!`, 'success');
+    if (onClose) onClose();
+  };
+
+  return React.createElement('div', {
+    className: 'modal-overlay',
+    onClick: onClose,
+    style: { zIndex: 11000 }
+  }, React.createElement(ResizableModalContainer, {
+    className: 'modal-container',
+    style: { maxWidth: '520px', width: '92%', maxHeight: '90vh', display: 'flex', flexDirection: 'column' },
+    onClick: e => e.stopPropagation()
+  },
+    /* Modal Header */
+    React.createElement('div', {
+      className: 'modal-header',
+      style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 18px', borderBottom: '1px solid var(--border-subtle)' }
+    },
+      React.createElement('h3', { style: { fontSize: '1.05rem', fontWeight: 800, margin: 0, display: 'flex', alignItems: 'center', gap: '6px' } },
+        React.createElement('span', null, '➕'), '정산 생성 (1/N)'
+      ),
+      React.createElement('button', {
+        type: 'button', onClick: onClose,
+        style: { background: 'none', border: 'none', color: '#64748B', cursor: 'pointer' }
+      }, React.createElement(SmallXIcon, { size: 20 }))
+    ),
+    /* Modal Body */
+    React.createElement('div', {
+      className: 'modal-body',
+      style: { overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }
+    },
+      /* 1. Title Field */
+      React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '4px' } },
+        React.createElement('label', { style: { fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-main)' } }, '정산 타이틀'),
+        React.createElement('input', {
+          type: 'text', className: 'form-input', value: title,
+          onChange: e => setTitle(e.target.value), placeholder: '예: 1/N 간편 송금',
+          style: { width: '100%', borderRadius: '8px' }
+        })
+      ),
+
+      /* 2. Participants + Amount Row */
+      React.createElement('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' } },
+        React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '4px' } },
+          React.createElement('label', { style: { fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-main)' } }, '참여자 선택'),
+          React.createElement('div', {
+            style: {
+              display: 'flex', flexWrap: 'wrap', gap: '4px', padding: '6px',
+              border: '1px solid var(--border-subtle)', borderRadius: '8px', maxHeight: '90px', overflowY: 'auto', backgroundColor: 'var(--bg-primary)'
+            }
+          },
+            activeParticipants.map(p => {
+              const pId = p.id || p.name;
+              const isSelected = selectedParticipantIds.includes(pId);
+              return React.createElement('button', {
+                key: pId, type: 'button',
+                onClick: () => toggleParticipant(pId),
+                style: {
+                  padding: '3px 8px', borderRadius: '999px', fontSize: '0.72rem', fontWeight: 700,
+                  border: isSelected ? '1px solid #2563EB' : '1px solid var(--border-subtle)',
+                  backgroundColor: isSelected ? 'rgba(59, 130, 246, 0.15)' : 'var(--bg-card)',
+                  color: isSelected ? '#2563EB' : 'var(--text-muted)', cursor: 'pointer'
+                }
+              }, (isSelected ? '✓ ' : '') + p.name);
+            })
+          )
+        ),
+        React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '4px' } },
+          React.createElement('label', { style: { fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-main)' } }, '총 지출 금액'),
+          React.createElement('input', {
+            type: 'text', className: 'form-input', readOnly: true,
+            value: `${totalExpense.toLocaleString()}원`,
+            style: { width: '100%', borderRadius: '8px', backgroundColor: 'var(--bg-primary)', fontWeight: 800, color: '#DC2626' }
+          })
+        )
+      ),
+
+      /* 3. Account Info: Bank, Depositor, Account Number */
+      React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px', borderRadius: '8px', backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border-subtle)' } },
+        React.createElement('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' } },
+          React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '4px' } },
+            React.createElement('label', { style: { fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)' } }, '송금받을 은행'),
+            React.createElement('select', {
+              className: 'form-select', value: bankName, onChange: e => setBankName(e.target.value),
+              style: { width: '100%', borderRadius: '6px', fontSize: '0.82rem' }
+            }, BANK_OPTIONS.map(b => React.createElement('option', { key: b, value: b }, b)))
+          ),
+          React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '4px' } },
+            React.createElement('label', { style: { fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)' } }, '예금자명'),
+            React.createElement('input', {
+              type: 'text', className: 'form-input', value: depositorName,
+              onChange: e => setDepositorName(e.target.value), placeholder: '예: 홍길동',
+              style: { width: '100%', borderRadius: '6px', fontSize: '0.82rem' }
+            })
+          )
+        ),
+        React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '4px' } },
+          React.createElement('label', { style: { fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)' } }, '계좌번호'),
+          React.createElement('input', {
+            type: 'text', className: 'form-input', value: accountNumber,
+            onChange: e => setAccountNumber(e.target.value), placeholder: '계좌번호 입력',
+            style: { width: '100%', borderRadius: '6px', fontSize: '0.82rem' }
+          })
+        )
+      ),
+
+      /* 4. Divider & Summary Calculation Box */
+      React.createElement('div', {
+        style: {
+          display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px', padding: '10px 12px',
+          borderRadius: '8px', backgroundColor: 'rgba(59, 130, 246, 0.08)', border: '1px solid rgba(59, 130, 246, 0.2)', textAlign: 'center'
+        }
+      },
+        React.createElement('div', null,
+          React.createElement('div', { style: { fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700 } }, '총 수입'),
+          React.createElement('div', { style: { fontSize: '0.88rem', fontWeight: 800, color: '#16A34A' } }, `+${totalIncome.toLocaleString()}원`)
+        ),
+        React.createElement('div', null,
+          React.createElement('div', { style: { fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700 } }, '총 지출'),
+          React.createElement('div', { style: { fontSize: '0.88rem', fontWeight: 800, color: '#DC2626' } }, `-${totalExpense.toLocaleString()}원`)
+        ),
+        React.createElement('div', null,
+          React.createElement('div', { style: { fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700 } }, `정산 (1인당 / ${selectedParticipantIds.length}명)`),
+          React.createElement('div', { style: { fontSize: '0.92rem', fontWeight: 900, color: '#2563EB' } }, `${settlementPerPerson.toLocaleString()}원`)
+        )
+      ),
+
+      /* 5. Monthly Transaction Selector with Checkboxes */
+      React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px' } },
+        /* Month Nav Header */
+        React.createElement('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
+          React.createElement('label', { style: { fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-main)' } }, '일자별 지출/수입 항목 선택'),
+          React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '6px' } },
+            React.createElement('button', {
+              type: 'button', onClick: handlePrevMonth,
+              style: { padding: '2px 8px', borderRadius: '4px', border: '1px solid var(--border-subtle)', background: 'var(--bg-card)', cursor: 'pointer', fontSize: '0.8rem' }
+            }, '<'),
+            React.createElement('span', { style: { fontSize: '0.82rem', fontWeight: 800 } }, `${year}년 ${month + 1}월`),
+            React.createElement('button', {
+              type: 'button', onClick: handleNextMonth,
+              style: { padding: '2px 8px', borderRadius: '4px', border: '1px solid var(--border-subtle)', background: 'var(--bg-card)', cursor: 'pointer', fontSize: '0.8rem' }
+            }, '>')
+          )
+        ),
+        /* Checkbox List */
+        React.createElement('div', {
+          style: {
+            maxHeight: '180px', overflowY: 'auto', border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '6px', display: 'flex', flexDirection: 'column', gap: '4px'
+          }
+        },
+          monthlyExpenses.length === 0 ? React.createElement('div', { style: { padding: '16px', textAlignment: 'center', fontSize: '0.78rem', color: 'var(--text-muted)' } }, '해당 월에 등록된 내역이 없습니다.')
+            : monthlyExpenses.map(item => {
+              const isChecked = !!checkedItems[item.itemKey];
+              return React.createElement('label', {
+                key: item.itemKey,
+                style: {
+                  display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px', borderRadius: '6px',
+                  backgroundColor: isChecked ? 'rgba(59, 130, 246, 0.06)' : 'transparent', cursor: 'pointer', fontSize: '0.78rem'
+                }
+              },
+                React.createElement('input', {
+                  type: 'checkbox', checked: isChecked, onChange: () => toggleCheckItem(item),
+                  style: { width: '16px', height: '16px', cursor: 'pointer' }
+                }),
+                React.createElement('span', { style: { color: 'var(--text-muted)', fontWeight: 600 } }, item.date),
+                React.createElement('span', { style: { flex: 1, fontWeight: 700, color: 'var(--text-main)' } }, item.label || '지출 내역'),
+                React.createElement('strong', { style: { color: item.isIncome ? '#16A34A' : '#DC2626', fontWeight: 800 } },
+                  (item.isIncome ? '+' : '-') + Math.abs(item.amount).toLocaleString() + '원'
+                )
+              );
+            })
+        )
+      )
+    ),
+
+    /* Modal Footer */
+    React.createElement('div', {
+      className: 'modal-footer',
+      style: { padding: '12px 18px', borderTop: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'flex-end', gap: '8px' }
+    },
+      React.createElement('button', {
+        type: 'button', className: 'btn btn-secondary', onClick: onClose, style: { borderRadius: '8px' }
+      }, '취소'),
+      React.createElement('button', {
+        type: 'button', className: 'btn btn-primary', onClick: handleSave, style: { borderRadius: '8px', fontWeight: 800 }
+      }, '정산 생성하기')
+    )
+  ));
+}
+
+export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenShare, onOpenAppSettings, onChangeView, onOpenCreateSettlement, onToggleSettlementCardStatus, onDeleteSettlementCard, chatCount = 0, settlementBadge = null, galleryCount = 0, placeCount = 0, memoCount = 0, chatLastAuthor = null, settlementLastDate = null, galleryLastDate = null, placeLastName = null, memoLastTitleWord = null, showToast }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -1811,114 +2110,207 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
   }, card.value.toLocaleString(), "원")))),
   (() => {
     const getActiveParticipants = __deps.getActiveParticipants || (c => Array.isArray(c?.participants) ? c.participants.filter(p => !p.deletedAt && !p.removedAt) : []);
+    const getCalendarSettlementCards = __deps.getCalendarSettlementCards || (c => Array.isArray(c?.settlementCards) ? c.settlementCards : []);
     const activeParticipants = getActiveParticipants(calendar);
     const participantCount = Math.max(1, activeParticipants.length);
     const perPersonExpense = Math.round(displayExpense / participantCount);
 
-    return /*#__PURE__*/React.createElement("div", {
-      style: {
-        backgroundColor: 'var(--bg-card)',
-        border: '1px solid var(--border-subtle)',
-        borderRadius: 'var(--radius-md)',
-        padding: '12px 14px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '10px'
+    const customCards = getCalendarSettlementCards(calendar);
+
+    // If no custom cards exist yet, generate a default overall 1/N card
+    const displayCards = customCards.length > 0 ? customCards : [
+      {
+        id: 'default_settlement_card',
+        title: '1/N 간편 송금',
+        status: 'active',
+        participantCount: participantCount,
+        perPersonAmount: perPersonExpense,
+        amount: displayExpense,
+        bankName: '토스뱅크',
+        depositorName: '',
+        accountNumber: ''
       }
-    },
-      /* Header */
-      /*#__PURE__*/React.createElement("div", {
-        style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px' }
-      },
-        /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px' } },
-          /*#__PURE__*/React.createElement("span", { style: { fontSize: '1rem' } }, "💸"),
-          /*#__PURE__*/React.createElement("strong", { style: { fontSize: '0.88rem', color: 'var(--text-main)', fontWeight: 800 } }, "1/N 간편 송금")
-        ),
-        /*#__PURE__*/React.createElement("span", {
-          style: { fontSize: '0.74rem', color: 'var(--text-muted)', fontWeight: 700 }
-        }, `참여 멤버 ${participantCount}명 기준`)
-      ),
+    ];
 
-      /* Amount Display */
-      /*#__PURE__*/React.createElement("div", {
-        style: {
-          display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
-          backgroundColor: 'var(--bg-primary)', padding: '10px 12px', borderRadius: '8px'
+    const copyTextToClipboard = __deps.copyTextToClipboard || (async text => {
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(text);
+          return true;
         }
+      } catch (e) {}
+      return false;
+    });
+
+    const handleRemittanceAction = async (card, service) => {
+      const bank = card.bankName || '토스뱅크';
+      const account = card.accountNumber || '';
+      const name = card.depositorName || '';
+      const amount = card.perPersonAmount || perPersonExpense;
+      const cardTitle = card.title || '1/N 간편 송금';
+
+      const copyText = `[${calendar?.title || '모아엘가'} ${cardTitle}]\n• 1인당 입금 금액: ${amount.toLocaleString()}원\n• 입금 계좌: ${bank} ${account}${name ? ` (${name})` : ''}`;
+      
+      await copyTextToClipboard(copyText);
+
+      if (service === 'toss') {
+        const tossUrl = `supertoss://send?amount=${amount}&bank=${encodeURIComponent(bank)}&account=${encodeURIComponent(account)}`;
+        window.location.href = tossUrl;
+        if (showToast) showToast(`토스 앱으로 이동합니다! 계좌 정보가 복사되었습니다. (${amount.toLocaleString()}원)`, 'success');
+      } else if (service === 'kakao') {
+        const kakaoUrl = `kakaotalk://`;
+        window.location.href = kakaoUrl;
+        if (showToast) showToast(`카카오톡으로 이동합니다! 계좌/금액 복사 완료. (${amount.toLocaleString()}원)`, 'success');
+      } else if (service === 'naver') {
+        const naverUrl = `naverpay://`;
+        window.location.href = naverUrl;
+        if (showToast) showToast(`네이버 페이로 이동합니다! 계좌/금액 복사 완료. (${amount.toLocaleString()}원)`, 'success');
+      }
+    };
+
+    return React.createElement("div", {
+      style: { display: 'flex', flexDirection: 'column', gap: '10px' }
+    },
+      /* Section Header: Title & [+ 정산 생성] Button */
+      React.createElement("div", {
+        style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 2px' }
       },
-        /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 700 } }, "1인당 정산 금액"),
-        /*#__PURE__*/React.createElement("strong", { style: { fontSize: '1.05rem', color: '#2563EB', fontWeight: 900 } }, `${perPersonExpense.toLocaleString()}원`)
+        React.createElement("span", {
+          style: { fontSize: '0.86rem', fontWeight: 800, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' }
+        }, React.createElement("span", null, "💸"), "정산 카드 목록"),
+        React.createElement("button", {
+          type: "button",
+          className: "btn",
+          onClick: () => {
+            if (typeof onOpenCreateSettlement === 'function') onOpenCreateSettlement();
+          },
+          style: {
+            padding: '4px 10px', borderRadius: '6px', backgroundColor: 'var(--accent-primary, #4F46E5)',
+            color: '#FFFFFF', border: 'none', fontSize: '0.76rem', fontWeight: 800, cursor: 'pointer'
+          }
+        }, "+ 정산 생성")
       ),
 
-      /* Responsive Action Buttons */
-      /*#__PURE__*/React.createElement("div", {
-        style: { display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }
-      },
-        /* Toss Remittance Button */
-        /*#__PURE__*/React.createElement("button", {
-          type: "button",
-          className: "btn",
-          onClick: () => {
-            const tossUrl = `supertoss://send?amount=${perPersonExpense}`;
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-              navigator.clipboard.writeText(`${perPersonExpense}`).catch(() => {});
-            }
-            window.location.href = tossUrl;
-            if (typeof showToast === 'function') {
-              showToast(`토스 앱으로 연결합니다. (금액 ${perPersonExpense.toLocaleString()}원)`, 'info');
-            }
-          },
+      /* Custom Settlement Cards List */
+      displayCards.map(card => {
+        const isClosed = card.status === 'closed';
+        return React.createElement("div", {
+          key: card.id,
           style: {
-            flex: '1 1 120px', height: '36px', borderRadius: '8px',
-            backgroundColor: '#3182F6', color: '#FFFFFF', border: 'none',
-            fontSize: '0.82rem', fontWeight: 800, cursor: 'pointer',
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
+            backgroundColor: 'var(--bg-card)',
+            border: '1px solid var(--border-subtle)',
+            borderRadius: 'var(--radius-md)',
+            padding: '12px 14px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '10px',
+            opacity: isClosed ? 0.75 : 1
           }
-        }, "🔵 토스로 송금"),
+        },
+          /* Card Header: Title, Status Badge, Edit/Close/Delete Controls */
+          React.createElement("div", {
+            style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px' }
+          },
+            React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px' } },
+              React.createElement("strong", { style: { fontSize: '0.92rem', color: 'var(--text-main)', fontWeight: 800 } }, card.title || "1/N 간편 송금"),
+              React.createElement("span", {
+                style: {
+                  fontSize: '0.68rem', fontWeight: 800, padding: '2px 6px', borderRadius: '4px',
+                  backgroundColor: isClosed ? '#E2E8F0' : 'rgba(16, 185, 129, 0.15)',
+                  color: isClosed ? '#64748B' : '#059669'
+                }
+              }, isClosed ? "마감됨" : "진행중")
+            ),
+            React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px' } },
+              card.id !== 'default_settlement_card' && React.createElement("button", {
+                type: "button",
+                onClick: () => {
+                  if (typeof onToggleSettlementCardStatus === 'function') onToggleSettlementCardStatus(card.id);
+                },
+                style: {
+                  background: 'none', border: '1px solid var(--border-subtle)', borderRadius: '4px',
+                  fontSize: '0.72rem', color: 'var(--text-muted)', cursor: 'pointer', padding: '2px 6px'
+                }
+              }, isClosed ? "다시열기" : "마감하기"),
+              card.id !== 'default_settlement_card' && React.createElement("button", {
+                type: "button",
+                onClick: () => {
+                  if (typeof onDeleteSettlementCard === 'function') onDeleteSettlementCard(card.id);
+                },
+                style: {
+                  background: 'none', border: 'none', fontSize: '0.72rem', color: '#EF4444', cursor: 'pointer', padding: '2px 4px'
+                }
+              }, "삭제")
+            )
+          ),
 
-        /* Copy 1/N Amount Button */
-        /*#__PURE__*/React.createElement("button", {
-          type: "button",
-          className: "btn",
-          onClick: () => {
-            const text = `${perPersonExpense.toLocaleString()}원`;
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-              navigator.clipboard.writeText(text);
-            }
-            if (typeof showToast === 'function') {
-              showToast(`1/N 정산액 (${text})이 복사되었습니다.`, 'success');
+          /* Amount & Participant Row: Left (참여 멤버) / Right (1인당 정산 금액) */
+          React.createElement("div", {
+            style: {
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              backgroundColor: 'var(--bg-primary)', padding: '10px 12px', borderRadius: '8px'
             }
           },
-          style: {
-            flex: '1 1 100px', height: '36px', borderRadius: '8px',
-            backgroundColor: 'var(--bg-primary)', color: 'var(--text-main)', border: '1px solid var(--border-subtle)',
-            fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer',
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px'
-          }
-        }, "📋 금액 복사"),
+            React.createElement("span", { style: { fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 700 } }, `참여 멤버 ${card.participantCount || participantCount}명`),
+            React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-end' } },
+              React.createElement("span", { style: { fontSize: '0.68rem', color: 'var(--text-muted)' } }, "1인당 정산 금액"),
+              React.createElement("strong", { style: { fontSize: '1.05rem', color: '#2563EB', fontWeight: 900 } }, `${(card.perPersonAmount || perPersonExpense).toLocaleString()}원`)
+            )
+          ),
 
-        /* Copy Settlement Summary Text Button */
-        /*#__PURE__*/React.createElement("button", {
-          type: "button",
-          className: "btn",
-          onClick: () => {
-            const title = calendar?.title || '모임';
-            const summaryText = `[${title} 정산 안내]\n• 총 지출: ${displayExpense.toLocaleString()}원\n• 참여 인원: ${participantCount}명\n👉 1인당 보내실 금액: ${perPersonExpense.toLocaleString()}원`;
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-              navigator.clipboard.writeText(summaryText);
-            }
-            if (typeof showToast === 'function') {
-              showToast('정산 내역 요약문이 복사되었습니다.', 'success');
-            }
+          /* Account Info Banner if set */
+          (card.bankName || card.accountNumber) && React.createElement("div", {
+            style: { fontSize: '0.76rem', color: 'var(--text-muted)', backgroundColor: 'var(--bg-primary)', padding: '6px 10px', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '6px' }
           },
-          style: {
-            flex: '1 1 120px', height: '36px', borderRadius: '8px',
-            backgroundColor: 'rgba(16, 185, 129, 0.12)', color: '#059669', border: '1px solid rgba(16, 185, 129, 0.3)',
-            fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer',
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px'
-          }
-        }, "💬 정산 요약 복사")
-      )
+            React.createElement("span", null, "🏦"),
+            React.createElement("span", { style: { fontWeight: 700 } }, `${card.bankName || '토스뱅크'} ${card.accountNumber || ''} ${card.depositorName ? `(${card.depositorName})` : ''}`)
+          ),
+
+          /* 3 Remittance Buttons: Toss / Kakao / Naver */
+          React.createElement("div", {
+            style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginTop: '2px' }
+          },
+            /* Toss Button */
+            React.createElement("button", {
+              type: "button",
+              className: "btn",
+              onClick: () => handleRemittanceAction(card, 'toss'),
+              style: {
+                flex: '1 1 100px', height: '36px', borderRadius: '8px',
+                backgroundColor: '#3182F6', color: '#FFFFFF', border: 'none',
+                fontSize: '0.78rem', fontWeight: 800, cursor: 'pointer',
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px'
+              }
+            }, "🔵 토스로 송금"),
+
+            /* Kakao Remittance Button */
+            React.createElement("button", {
+              type: "button",
+              className: "btn",
+              onClick: () => handleRemittanceAction(card, 'kakao'),
+              style: {
+                flex: '1 1 100px', height: '36px', borderRadius: '8px',
+                backgroundColor: '#FEE500', color: '#191919', border: 'none',
+                fontSize: '0.78rem', fontWeight: 800, cursor: 'pointer',
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px'
+              }
+            }, "🟡 카카오로 송금"),
+
+            /* Naver Remittance Button */
+            React.createElement("button", {
+              type: "button",
+              className: "btn",
+              onClick: () => handleRemittanceAction(card, 'naver'),
+              style: {
+                flex: '1 1 100px', height: '36px', borderRadius: '8px',
+                backgroundColor: '#03C75A', color: '#FFFFFF', border: 'none',
+                fontSize: '0.78rem', fontWeight: 800, cursor: 'pointer',
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px'
+              }
+            }, "🟢 네이버로 송금")
+          )
+        );
+      })
     );
   })(),
   /*#__PURE__*/React.createElement(SegmentedToggle, {

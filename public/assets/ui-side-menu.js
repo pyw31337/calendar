@@ -256,6 +256,10 @@ function createCalendarBackupPayload(...args) {
   const f = __gatherUiDeps().createCalendarBackupPayload || GATHER_APP_UTILS.createCalendarBackupPayload;
   return typeof f === 'function' ? f(...args) : undefined;
 }
+function createCalendarDataBackupPayload(...args) {
+  const f = __gatherUiDeps().createCalendarDataBackupPayload || GATHER_APP_UTILS.createCalendarDataBackupPayload;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
 function createDefaultCalendar(...args) {
   const f = __gatherUiDeps().createDefaultCalendar || GATHER_APP_UTILS.createDefaultCalendar;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -298,6 +302,10 @@ function exportCalendarConfirmedMeetingsToICS(...args) {
 }
 function extractCalendarsFromBackup(...args) {
   const f = __gatherUiDeps().extractCalendarsFromBackup || GATHER_APP_UTILS.extractCalendarsFromBackup;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function extractCalendarBackupEntries(...args) {
+  const f = __gatherUiDeps().extractCalendarBackupEntries || GATHER_APP_UTILS.extractCalendarBackupEntries;
   return typeof f === 'function' ? f(...args) : undefined;
 }
 function fetchActivityLogsFromFirestore(...args) {
@@ -434,6 +442,14 @@ function unsubscribeUserFromPush(...args) {
 }
 function validateBackupCalendars(...args) {
   const f = __gatherUiDeps().validateBackupCalendars || GATHER_APP_UTILS.validateBackupCalendars;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function validateCalendarBackupEntries(...args) {
+  const f = __gatherUiDeps().validateCalendarBackupEntries || GATHER_APP_UTILS.validateCalendarBackupEntries;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function restoreCalendarBackupEntries(...args) {
+  const f = __gatherUiDeps().restoreCalendarBackupEntries || GATHER_APP_UTILS.restoreCalendarBackupEntries;
   return typeof f === 'function' ? f(...args) : undefined;
 }
 function validateCalendarShape(...args) {
@@ -675,7 +691,10 @@ export function AppSettingsModal({
   weatherLocation = null, recentLocations = [], onUpdateWeatherLocation, onDeleteRecentLocation, showToast,
   calendarId = null,
   activeParticipantId = null,
-  onForcePushReregister = null
+  onForcePushReregister = null,
+  calendar = null,
+  onRequestConfirm = null,
+  onRequestDataRefresh = null
 }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -703,7 +722,12 @@ export function AppSettingsModal({
   const [pushBusy, setPushBusy] = React.useState(false);
   const [pushStatus, setPushStatus] = React.useState(null); // { ok, reason, subId }
   const [deviceRows, setDeviceRows] = React.useState([]);
+  const [backupBusy, setBackupBusy] = React.useState(false);
+  const backupFileInputRef = React.useRef(null);
   const myDeviceId = React.useMemo(() => (typeof getOrCreateDeviceId === 'function' ? getOrCreateDeviceId() : null), []);
+  const currentCalendar = calendar && typeof calendar === 'object' ? calendar : null;
+  const currentCalendarId = currentCalendar?.id || calendarId || '';
+  const canUseBackup = !!currentCalendar && !!currentCalendarId;
 
   const refreshPushMeta = React.useCallback(async () => {
     const diag = typeof getNotificationDiagnostics === 'function' ? getNotificationDiagnostics() : null;
@@ -787,6 +811,88 @@ export function AppSettingsModal({
       await refreshPushMeta();
     } catch (e) {
       if (typeof showToast === 'function') showToast('삭제 실패', 'error');
+    }
+  };
+
+  const handleDownloadBackup = async () => {
+    if (backupBusy) return;
+    if (!canUseBackup || !currentCalendar) {
+      if (typeof showToast === 'function') showToast('백업할 캘린더를 찾지 못했습니다.', 'error');
+      return;
+    }
+    setBackupBusy(true);
+    try {
+      if (typeof showToast === 'function') showToast('백업 파일을 생성하는 중입니다.', 'info', 2500);
+      const payload = await createCalendarDataBackupPayload([currentCalendar], currentCalendarId);
+      const suffix = currentCalendarId || 'current';
+      const timestamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+      downloadJsonFile(`calendar-backup-${suffix}-${timestamp}.json`, payload);
+      if (typeof showToast === 'function') showToast('백업 다운로드가 완료되었습니다.', 'success');
+    } catch (err) {
+      console.error('createCalendarDataBackupPayload failed:', err);
+      if (typeof showToast === 'function') showToast('백업 다운로드에 실패했습니다.', 'error');
+    } finally {
+      setBackupBusy(false);
+    }
+  };
+
+  const handleRestoreBackupFile = async (event) => {
+    const file = event?.target?.files?.[0];
+    event.target.value = '';
+    if (!file || backupBusy) return;
+    if (!canUseBackup || !currentCalendar) {
+      if (typeof showToast === 'function') showToast('현재 캘린더를 찾지 못했습니다.', 'error');
+      return;
+    }
+    try {
+      const raw = await file.text();
+      const parsed = JSON.parse(raw);
+      const extracted = extractCalendarBackupEntries(parsed);
+      const { entries, error: validationError } = validateCalendarBackupEntries(extracted);
+      if (validationError) {
+        if (typeof showToast === 'function') showToast(validationError, 'error', 6000);
+        return;
+      }
+      if (!Array.isArray(entries) || entries.length !== 1) {
+        if (typeof showToast === 'function') showToast('이 화면에서는 현재 캘린더 1개 백업만 복구할 수 있습니다.', 'error', 6000);
+        return;
+      }
+      const entry = entries[0];
+      if (entry.calendar.id !== currentCalendarId) {
+        if (typeof showToast === 'function') showToast(`이 백업은 ${entry.calendar.id} 용입니다. 현재 캘린더(${currentCalendarId})와 다릅니다.`, 'error', 6000);
+        return;
+      }
+      const confirmMessage = `${currentCalendarId} 캘린더를 백업 파일 내용으로 복구합니다.\n채팅·메모·장소·사진·투표·정산·로그 데이터가 현재 서버 내용으로 교체됩니다.`;
+      const executeRestore = async () => {
+        if (backupBusy) return;
+        setBackupBusy(true);
+        try {
+          const result = await restoreCalendarBackupEntries([entry]);
+          if (!result || !result.ok) {
+            const failedLabel = result?.failed?.map(item => item.id || 'unknown').filter(Boolean).join(', ') || '복구';
+            if (typeof showToast === 'function') showToast(`${failedLabel} 실패`, 'error', 6000);
+            return;
+          }
+          if (typeof onRequestDataRefresh === 'function') {
+            try { onRequestDataRefresh(); } catch (_) {}
+          }
+          if (typeof showToast === 'function') showToast('백업 복구가 완료되었습니다.', 'success');
+        } catch (restoreErr) {
+          console.error('restoreCalendarBackupEntries failed:', restoreErr);
+          if (typeof showToast === 'function') showToast('복구 실패', 'error', 6000);
+        } finally {
+          setBackupBusy(false);
+        }
+      };
+      const confirmFn = typeof onRequestConfirm === 'function'
+        ? onRequestConfirm
+        : (title, message, onConfirm) => {
+            if (window.confirm(`${title}\n\n${message}`)) onConfirm();
+          };
+      confirmFn('백업 복구 확인', confirmMessage, executeRestore);
+    } catch (err) {
+      console.error('backup restore failed:', err);
+      if (typeof showToast === 'function') showToast('복구 실패', 'error', 6000);
     }
   };
 
@@ -1019,6 +1125,65 @@ export function AppSettingsModal({
             }, "삭제")
           ))
         ),
+        /*#__PURE__*/React.createElement("div", {
+          style: {
+            marginTop: '10px',
+            padding: '12px 14px',
+            borderRadius: '12px',
+            background: 'var(--bg-primary)',
+            border: '1px solid var(--border-subtle)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '10px'
+          }
+        },
+          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', flexWrap: 'wrap' } },
+            /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '2px' } },
+              /*#__PURE__*/React.createElement("div", { style: { fontWeight: 900, fontSize: '0.86rem', color: 'var(--text-main)' } }, "백업 / 복구"),
+              /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.4 } },
+                currentCalendarId ? `${currentCalendarId} 캘린더의 채팅·메모·장소·사진·투표·정산·로그를 함께 다룹니다.` : '현재 캘린더를 불러오지 못해 백업 기능을 사용할 수 없습니다.'
+              )
+            ),
+            /*#__PURE__*/React.createElement("span", {
+              style: {
+                fontSize: '0.68rem',
+                fontWeight: 800,
+                padding: '4px 10px',
+                borderRadius: '10px',
+                background: '#EEF2FF',
+                color: '#4F46E5',
+                border: '1px solid #C7D2FE',
+                whiteSpace: 'nowrap'
+              }
+            }, "현재 캘린더 전용")
+          ),
+          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } },
+            /*#__PURE__*/React.createElement("button", {
+              type: "button",
+              className: "btn btn-secondary",
+              onClick: handleDownloadBackup,
+              disabled: backupBusy || !canUseBackup,
+              style: { flex: '1 1 150px', minWidth: 0, fontSize: '0.8rem', fontWeight: 800 }
+            }, backupBusy ? '생성 중' : '현재 캘린더 백업'),
+            /*#__PURE__*/React.createElement("button", {
+              type: "button",
+              className: "btn btn-danger",
+              onClick: () => backupFileInputRef.current?.click(),
+              disabled: backupBusy || !canUseBackup,
+              style: { flex: '1 1 150px', minWidth: 0, fontSize: '0.8rem', fontWeight: 800 }
+            }, backupBusy ? '처리 중' : '백업 파일 복구')
+          ),
+          /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.72rem', color: 'var(--text-muted)', lineHeight: 1.55 } },
+            "복구 시 현재 캘린더의 서버 데이터가 백업 내용으로 교체됩니다. 파일은 채팅·메모·장소·사진·투표·정산·로그를 함께 포함합니다."
+          ),
+          /*#__PURE__*/React.createElement("input", {
+            ref: backupFileInputRef,
+            type: "file",
+            accept: "application/json,.json",
+            onChange: handleRestoreBackupFile,
+            style: { display: 'none' }
+          })
+        ),
         Array.isArray(helpSteps) && helpSteps.length > 0 && /*#__PURE__*/React.createElement("div", {
           style: { marginTop: '10px', padding: '12px', borderRadius: '12px', background: 'var(--bg-primary)', border: 'none', fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.5 }
         },
@@ -1154,6 +1319,26 @@ export function SharedAppNavBlock({
         /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title", style: { display: "flex", alignItems: "center", gap: "6px" } }, "채팅", badge(chatCount))
       ),
       chatAuthorPill()
+    ),
+    /* [정산 생성] Menu Item with '+' Icon */
+    /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      className: "admin-side-menu-item",
+      onClick: () => {
+        if (typeof onClose === 'function') onClose();
+        if (typeof onOpenCreateSettlement === 'function') onOpenCreateSettlement();
+        else go("settlement");
+      }
+    },
+      /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" },
+        /*#__PURE__*/React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.5", strokeLinecap: "round", strokeLinejoin: "round" },
+          /*#__PURE__*/React.createElement("line", { x1: "12", y1: "5", x2: "12", y2: "19" }),
+          /*#__PURE__*/React.createElement("line", { x1: "5", y1: "12", x2: "19", y2: "12" })
+        )
+      ),
+      /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title", style: { fontWeight: 800, color: "var(--accent-primary, #4F46E5)" } }, "정산 생성")
+      )
     ),
     /*#__PURE__*/React.createElement("button", { type: "button", className: "admin-side-menu-item", onClick: () => go("settlement") },
       /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2" }, /*#__PURE__*/React.createElement("path", { d: "M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1" }), /*#__PURE__*/React.createElement("path", { d: "M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4" }))),
@@ -1308,7 +1493,8 @@ export function MainSideMenu({
   onDeleteRecentLocation,
   showToast,
   onOpenGallery,
-  onChangeView
+  onChangeView,
+  onOpenCreateSettlement
 }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -1427,6 +1613,7 @@ export function MainSideMenu({
     typeof SharedAppNavBlock === 'function' && /*#__PURE__*/React.createElement(SharedAppNavBlock, {
       onClose: onClose,
       onChangeView: onChangeView,
+      onOpenCreateSettlement: onOpenCreateSettlement,
       chatCount: chatCount,
       settlementBadge: settlementBadge,
       galleryCount: galleryCount,

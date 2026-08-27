@@ -1320,6 +1320,26 @@ export function SharedAppNavBlock({
       ),
       chatAuthorPill()
     ),
+    /* [정산 생성] Menu Item with '+' Icon */
+    /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      className: "admin-side-menu-item",
+      onClick: () => {
+        if (typeof onClose === 'function') onClose();
+        if (typeof onOpenCreateSettlement === 'function') onOpenCreateSettlement();
+        else go("settlement");
+      }
+    },
+      /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" },
+        /*#__PURE__*/React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.5", strokeLinecap: "round", strokeLinejoin: "round" },
+          /*#__PURE__*/React.createElement("line", { x1: "12", y1: "5", x2: "12", y2: "19" }),
+          /*#__PURE__*/React.createElement("line", { x1: "5", y1: "12", x2: "19", y2: "12" })
+        )
+      ),
+      /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title", style: { fontWeight: 800, color: "var(--accent-primary, #4F46E5)" } }, "정산 생성")
+      )
+    ),
     /*#__PURE__*/React.createElement("button", { type: "button", className: "admin-side-menu-item", onClick: () => go("settlement") },
       /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2" }, /*#__PURE__*/React.createElement("path", { d: "M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1" }), /*#__PURE__*/React.createElement("path", { d: "M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4" }))),
       /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
@@ -1473,7 +1493,8 @@ export function MainSideMenu({
   onDeleteRecentLocation,
   showToast,
   onOpenGallery,
-  onChangeView
+  onChangeView,
+  onOpenCreateSettlement
 }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -1592,6 +1613,7 @@ export function MainSideMenu({
     typeof SharedAppNavBlock === 'function' && /*#__PURE__*/React.createElement(SharedAppNavBlock, {
       onClose: onClose,
       onChangeView: onChangeView,
+      onOpenCreateSettlement: onOpenCreateSettlement,
       chatCount: chatCount,
       settlementBadge: settlementBadge,
       galleryCount: galleryCount,

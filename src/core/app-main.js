@@ -1088,6 +1088,7 @@ function App() {
   const [isNotifOnboardingOpen, setIsNotifOnboardingOpen] = React.useState(false);
   const [notifyChannels, setNotifyChannelsState] = React.useState(() => (typeof getNotifyChannels === 'function' ? getNotifyChannels() : { chat: true, memo: true, poll: true, schedule: true }));
   const [isPollModalOpen, setIsPollModalOpen] = React.useState(false);
+  const [isCreateSettlementOpen, setIsCreateSettlementOpen] = React.useState(false);
   const [editingPoll, setEditingPoll] = React.useState(null);
   const [voteTarget, setVoteTarget] = React.useState(null);
   const [isGuideOpen, setIsGuideOpen] = React.useState(false);
@@ -4800,6 +4801,63 @@ function App() {
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
     return updateCalendars(nextCalendars, '투표 저장완료', 'success', updatedCal.id, 'polls', activityLog ? [activityLog] : []);
   };
+
+  const handleSaveSettlementCard = cardData => {
+    if (!guardLoadedCalendar('Firebase 데이터를 불러온 뒤 정산 카드를 저장해 주세요.')) return false;
+    const now = Date.now();
+    const existingCards = getCalendarSettlementCards(activeCal);
+    const idx = existingCards.findIndex(item => item.id === cardData?.id);
+    let nextCards;
+    if (idx >= 0) {
+      nextCards = existingCards.map((item, i) => i === idx ? { ...item, ...cardData, updatedAt: now } : item);
+    } else {
+      nextCards = [{ ...cardData, updatedAt: now, createdAt: cardData.createdAt || now }, ...existingCards];
+    }
+    const updatedCal = {
+      ...activeCal,
+      updatedAt: now,
+      revision: (activeCal.revision || 0) + 1,
+      settlementCards: nextCards
+    };
+    const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
+    return updateCalendars(nextCalendars, '정산 카드 저장완료', 'success', updatedCal.id, 'settlementCards');
+  };
+
+  const handleDeleteSettlementCard = cardId => {
+    if (!guardLoadedCalendar('Firebase 데이터를 불러온 뒤 삭제해 주세요.')) return false;
+    const now = Date.now();
+    const existingCards = getCalendarSettlementCards(activeCal);
+    const nextCards = existingCards.filter(item => item.id !== cardId);
+    const updatedCal = {
+      ...activeCal,
+      updatedAt: now,
+      revision: (activeCal.revision || 0) + 1,
+      settlementCards: nextCards
+    };
+    const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
+    return updateCalendars(nextCalendars, '정산 카드가 삭제되었습니다.', 'info', updatedCal.id, 'settlementCards');
+  };
+
+  const handleToggleSettlementCardStatus = cardId => {
+    if (!guardLoadedCalendar('Firebase 데이터를 불러온 뒤 변경해 주세요.')) return false;
+    const now = Date.now();
+    const existingCards = getCalendarSettlementCards(activeCal);
+    const nextCards = existingCards.map(item => {
+      if (item.id === cardId) {
+        const nextStatus = item.status === 'closed' ? 'active' : 'closed';
+        return { ...item, status: nextStatus, updatedAt: now };
+      }
+      return item;
+    });
+    const updatedCal = {
+      ...activeCal,
+      updatedAt: now,
+      revision: (activeCal.revision || 0) + 1,
+      settlementCards: nextCards
+    };
+    const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
+    return updateCalendars(nextCalendars, '정산 상태가 변경되었습니다.', 'info', updatedCal.id, 'settlementCards');
+  };
   const handleOpenVoteSheet = (poll, option) => {
     if (!guardLoadedCalendar('Firebase 데이터를 불러온 뒤 투표해 주세요.')) return false;
     if (isPollClosed(poll)) {
@@ -5491,6 +5549,7 @@ function App() {
 
   const navMenuProps = {
     onChangeView: changeView,
+    onOpenCreateSettlement: () => setIsCreateSettlementOpen(true),
     chatCount: navChatCount,
     settlementBadge: navSettlementBadge,
     galleryCount: navGalleryCount,
@@ -5503,6 +5562,12 @@ function App() {
     memoLastTitleWord: navMemoLastTitleWord
   };
   const sharedAppOverlays = /*#__PURE__*/React.createElement(React.Fragment, null,
+    isCreateSettlementOpen && activeCal && /*#__PURE__*/React.createElement(CreateSettlementModal, {
+      calendar: activeCal,
+      showToast: showToast,
+      onClose: () => setIsCreateSettlementOpen(false),
+      onSave: handleSaveSettlementCard
+    }),
     isAppSettingsOpen && /*#__PURE__*/React.createElement(AppSettingsModal, {
       onClose: () => setIsAppSettingsOpen(false),
       isDarkTheme: isDarkTheme,
@@ -5643,6 +5708,9 @@ function App() {
           if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 공유 정보를 확인해 주세요.')) setIsShareOpen(true);
         },
         onOpenAppSettings: () => setIsAppSettingsOpen(true),
+        onOpenCreateSettlement: () => setIsCreateSettlementOpen(true),
+        onToggleSettlementCardStatus: handleToggleSettlementCardStatus,
+        onDeleteSettlementCard: handleDeleteSettlementCard,
         showToast: showToast,
         ...navMenuProps
       }),
@@ -9776,6 +9844,8 @@ function bindGatherUiDeps() {
     ResizableModalContainer: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ResizableModalContainer) || (typeof ResizableModalContainer === 'function' ? ResizableModalContainer : null),
     SearchResultLogRow: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SearchResultLogRow) || (typeof SearchResultLogRow === 'function' ? SearchResultLogRow : null),
     SettlementSummaryModal: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SettlementSummaryModal) || (typeof SettlementSummaryModal === 'function' ? SettlementSummaryModal : null),
+    CreateSettlementModal: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CreateSettlementModal) || (typeof CreateSettlementModal === 'function' ? CreateSettlementModal : null),
+    getCalendarSettlementCards: typeof getCalendarSettlementCards === 'function' ? getCalendarSettlementCards : (window.GATHER_APP_UTILS || {}).getCalendarSettlementCards,
     getPlaceKakaoRouteUrl: typeof getPlaceKakaoRouteUrl === 'function' ? getPlaceKakaoRouteUrl : (window.GATHER_APP_UTILS || {}).getPlaceKakaoRouteUrl,
     getPlaceNaverRouteUrl: typeof getPlaceNaverRouteUrl === 'function' ? getPlaceNaverRouteUrl : (window.GATHER_APP_UTILS || {}).getPlaceNaverRouteUrl,
     getPlaceGoogleRouteUrl: typeof getPlaceGoogleRouteUrl === 'function' ? getPlaceGoogleRouteUrl : (window.GATHER_APP_UTILS || {}).getPlaceGoogleRouteUrl,
