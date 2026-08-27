@@ -111,6 +111,10 @@
     return isValidCalendarId(id);
   }
 
+  function isSettlementEnabledCalendarId(id) {
+    return typeof id === 'string' && isValidCalendarId(id);
+  }
+
   function stripUrlEdgePunctuation(value = '') {
     return String(value || '').replace(/[\s"'“”‘’`)\].,!?]+$/g, '');
   }
@@ -651,6 +655,7 @@
     isValidCalendarId,
     isInternalTestCalendarId,
     isAllowedCalendarId,
+    isSettlementEnabledCalendarId,
     stripUrlEdgePunctuation,
     extractFirstUrlInfo,
     extractFirstUrl,

@@ -110,12 +110,9 @@ const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
     return isValidCalendarId(id);
   }
 
-  const SETTLEMENT_ENABLED_CALENDAR_IDS = Array.isArray(GATHER_APP_CONSTANTS.SETTLEMENT_ENABLED_CALENDAR_IDS)
-    ? GATHER_APP_CONSTANTS.SETTLEMENT_ENABLED_CALENDAR_IDS
-    : ['jhair'];
-
   function isSettlementEnabledCalendarId(id) {
-    return typeof id === 'string' && SETTLEMENT_ENABLED_CALENDAR_IDS.includes(id);
+    if (typeof id !== 'string' || !id) return false;
+    return isValidCalendarId(id);
   }
 
   function stripUrlEdgePunctuation(value = '') {

@@ -26,8 +26,8 @@ function getCalendarPlaces(calendar) {
   return typeof f === 'function' ? f(calendar) : [];
 }
 function isSettlementEnabledCalendarId(...args) {
-  const f = __gatherUiDeps().isSettlementEnabledCalendarId || GATHER_APP_UTILS.isSettlementEnabledCalendarId;
-  return typeof f === 'function' ? f(...args) : false;
+  const f = __gatherUiDeps().isSettlementEnabledCalendarId || (window.GATHER_APP_UTILS || {}).isSettlementEnabledCalendarId;
+  return typeof f === 'function' ? f(...args) : true;
 }
 function useChatSendGuard(onSend, canSend) {
   const f = __gatherUiDeps().useChatSendGuard;

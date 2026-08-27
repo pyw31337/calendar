@@ -159,6 +159,10 @@ function isInternalTestCalendarId(...args) {
   const f = __gatherUiDeps().isInternalTestCalendarId || GATHER_APP_UTILS.isInternalTestCalendarId;
   return typeof f === 'function' ? f(...args) : undefined;
 }
+function isSettlementEnabledCalendarId(...args) {
+  const f = __gatherUiDeps().isSettlementEnabledCalendarId || (window.GATHER_APP_UTILS || {}).isSettlementEnabledCalendarId;
+  return typeof f === 'function' ? f(...args) : true;
+}
 function isPollClosed(...args) {
   const f = __gatherUiDeps().isPollClosed || GATHER_APP_UTILS.isPollClosed;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -1242,6 +1246,7 @@ export function SharedAppNavBlock({
   onClose,
   onChangeView,
   onOpenCreateSettlement,
+  showSettlement = true,
   chatCount = 0,
   settlementBadge = null,
   galleryCount = 0,
@@ -1322,7 +1327,7 @@ export function SharedAppNavBlock({
       chatAuthorPill()
     ),
     /* 4. 정산 */
-    /*#__PURE__*/React.createElement("button", { type: "button", className: "admin-side-menu-item", onClick: () => go("settlement") },
+    showSettlement && /*#__PURE__*/React.createElement("button", { type: "button", className: "admin-side-menu-item", onClick: () => go("settlement") },
       /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2" }, /*#__PURE__*/React.createElement("path", { d: "M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1" }), /*#__PURE__*/React.createElement("path", { d: "M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4" }))),
       /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
         /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title", style: { display: "flex", alignItems: "center", gap: "6px" } }, "정산",
@@ -1479,7 +1484,8 @@ export function MainSideMenu({
   showToast,
   onOpenGallery,
   onChangeView,
-  onOpenCreateSettlement
+  onOpenCreateSettlement,
+  showSettlement = true
 }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -1599,6 +1605,7 @@ export function MainSideMenu({
       onClose: onClose,
       onChangeView: onChangeView,
       onOpenCreateSettlement: onOpenCreateSettlement,
+      showSettlement: showSettlement,
       chatCount: chatCount,
       settlementBadge: settlementBadge,
       galleryCount: galleryCount,

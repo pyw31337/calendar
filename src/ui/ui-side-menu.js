@@ -160,8 +160,8 @@ function isInternalTestCalendarId(...args) {
   return typeof f === 'function' ? f(...args) : undefined;
 }
 function isSettlementEnabledCalendarId(...args) {
-  const f = __gatherUiDeps().isSettlementEnabledCalendarId || GATHER_APP_UTILS.isSettlementEnabledCalendarId;
-  return typeof f === 'function' ? f(...args) : undefined;
+  const f = __gatherUiDeps().isSettlementEnabledCalendarId || (window.GATHER_APP_UTILS || {}).isSettlementEnabledCalendarId;
+  return typeof f === 'function' ? f(...args) : true;
 }
 function isPollClosed(...args) {
   const f = __gatherUiDeps().isPollClosed || GATHER_APP_UTILS.isPollClosed;

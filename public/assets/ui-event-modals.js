@@ -25,6 +25,10 @@ function getCalendarPlaces(calendar) {
   const f = __gatherUiDeps().getCalendarPlaces || GATHER_APP_UTILS.getCalendarPlaces;
   return typeof f === 'function' ? f(calendar) : [];
 }
+function isSettlementEnabledCalendarId(...args) {
+  const f = __gatherUiDeps().isSettlementEnabledCalendarId || (window.GATHER_APP_UTILS || {}).isSettlementEnabledCalendarId;
+  return typeof f === 'function' ? f(...args) : true;
+}
 function useChatSendGuard(onSend, canSend) {
   const f = __gatherUiDeps().useChatSendGuard;
   return typeof f === 'function' ? f(onSend, canSend) : onSend;
@@ -1521,6 +1525,61 @@ export function CreateSettlementModal({ calendar, onClose, onSave, showToast }) 
       className: 'modal-body',
       style: { overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }
     },
+      React.createElement('div', {
+        style: {
+          background: 'linear-gradient(90deg, var(--settlement-hero-start), var(--settlement-hero-end))',
+          borderRadius: '16px',
+          padding: '14px',
+          color: 'var(--settlement-hero-text)',
+          boxShadow: '0 12px 24px rgba(91, 75, 235, 0.18)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '10px'
+        }
+      },
+        React.createElement('div', {
+          style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }
+        },
+          React.createElement('strong', {
+            style: { fontSize: '0.96rem', fontWeight: 900, color: 'var(--settlement-hero-text)' }
+          }, calendar?.title || '정산'),
+          React.createElement('span', {
+            style: {
+              fontSize: '0.72rem',
+              fontWeight: 800,
+              padding: '4px 8px',
+              borderRadius: '999px',
+              backgroundColor: 'rgba(255,255,255,0.16)',
+              color: 'var(--settlement-hero-text)'
+            }
+          }, `${year}년 ${month + 1}월`)
+        ),
+        React.createElement('div', {
+          style: {
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+            gap: '8px',
+            background: 'var(--settlement-hero-surface)',
+            borderRadius: '14px',
+            padding: '10px 12px',
+            color: 'var(--settlement-hero-surface-text)'
+          }
+        },
+          React.createElement('div', { style: { textAlign: 'center' } },
+            React.createElement('div', { style: { fontSize: '0.68rem', fontWeight: 800, color: 'var(--settlement-hero-surface-muted)' } }, '총 수입'),
+            React.createElement('div', { style: { fontSize: '0.9rem', fontWeight: 900, color: '#16A34A' } }, `${totalIncome.toLocaleString()}원`)
+          ),
+          React.createElement('div', { style: { textAlign: 'center' } },
+            React.createElement('div', { style: { fontSize: '0.68rem', fontWeight: 800, color: 'var(--settlement-hero-surface-muted)' } }, '총 지출'),
+            React.createElement('div', { style: { fontSize: '0.9rem', fontWeight: 900, color: '#DC2626' } }, `${totalExpense.toLocaleString()}원`)
+          ),
+          React.createElement('div', { style: { textAlign: 'center' } },
+            React.createElement('div', { style: { fontSize: '0.68rem', fontWeight: 800, color: 'var(--settlement-hero-surface-muted)' } }, '1인당'),
+            React.createElement('div', { style: { fontSize: '0.9rem', fontWeight: 900, color: '#E247A1' } }, `${settlementPerPerson.toLocaleString()}원`)
+          )
+        )
+      ),
+
       /* 1. Title Input */
       React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '4px' } },
         React.createElement('label', { style: { fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-main)' } }, '타이틀 입력'),
@@ -1732,9 +1791,14 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
   const sanitizeText = __deps.sanitizeText;
   const extractFirstUrl = __deps.extractFirstUrl;
   const formatChatHeaderTitle = __deps.formatChatHeaderTitle;
+  const canUseSettlement = isSettlementEnabledCalendarId(calendar?.id);
 
   const handleOpenCreateSettlement = () => {
     setIsSettlementMenuOpen(false);
+    if (!canUseSettlement) {
+      if (showToast) showToast('이 캘린더에서는 정산을 사용할 수 없습니다.', 'info');
+      return;
+    }
     if (typeof onOpenCreateSettlement === 'function') {
       onOpenCreateSettlement();
     } else {
@@ -2229,15 +2293,17 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
           return React.createElement("div", {
             key: card.id,
             style: {
-              backgroundColor: 'var(--bg-card)',
-              border: '1.5px solid #9333EA',
-              borderRadius: 'var(--radius-md)',
-              padding: '12px 14px',
+              background: 'linear-gradient(90deg, var(--settlement-hero-start), var(--settlement-hero-end))',
+              border: 'none',
+              borderRadius: '18px',
+              padding: '14px 14px 12px',
               display: 'flex',
               flexDirection: 'column',
-              gap: '10px',
+              gap: '12px',
               opacity: isClosed ? 0.75 : 1,
-              position: 'relative'
+              position: 'relative',
+              boxShadow: '0 14px 28px rgba(91, 75, 235, 0.22)',
+              color: 'var(--settlement-hero-text)'
             }
           },
             /* Card Header: (좌측끝) 1/N 간편 송금 [진행중] -------------- (우측끝) 우리은행 689-12-002245 박영우 [⚙️] */
@@ -2246,12 +2312,12 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
             },
               /* Left End: Title + Status Badge */
               React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px' } },
-                React.createElement("strong", { style: { fontSize: '0.92rem', color: 'var(--text-main)', fontWeight: 800 } }, card.title || "1/N 간편 송금"),
+                React.createElement("strong", { style: { fontSize: '0.92rem', color: 'var(--settlement-hero-text)', fontWeight: 900 } }, card.title || "1/N 간편 송금"),
                 React.createElement("span", {
                   style: {
                     fontSize: '0.68rem', fontWeight: 800, padding: '2px 6px', borderRadius: '4px',
-                    backgroundColor: isClosed ? '#E2E8F0' : 'rgba(16, 185, 129, 0.15)',
-                    color: isClosed ? '#64748B' : '#059669'
+                    backgroundColor: isClosed ? 'rgba(255,255,255,0.18)' : 'rgba(34, 197, 94, 0.22)',
+                    color: '#FFFFFF'
                   }
                 }, isClosed ? "마감됨" : "진행중")
               ),
@@ -2259,7 +2325,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
               /* Right End: Account Info Text + Cog Settings Button */
               React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px', marginLeft: 'auto', position: 'relative' } },
                 bankInfoText && React.createElement("span", {
-                  style: { fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }
+                  style: { fontSize: '0.78rem', color: 'var(--settlement-hero-muted)', fontWeight: 600 }
                 }, bankInfoText),
                 
                 /* Cog Settings Button */
@@ -2268,9 +2334,9 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
                   title: "정산 설정",
                   onClick: () => setOpenMenuCardId(prev => prev === card.id ? null : card.id),
                   style: {
-                    background: 'none', border: '1px solid var(--border-subtle)', borderRadius: '6px',
+                    background: 'var(--settlement-hero-action-bg)', border: '1px solid var(--settlement-hero-action-border)', borderRadius: '10px',
                     width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    color: 'var(--text-muted)', cursor: 'pointer', padding: 0
+                    color: 'var(--settlement-hero-action-text)', cursor: 'pointer', padding: 0
                   }
                 },
                   React.createElement("svg", {
@@ -2321,17 +2387,18 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
             React.createElement("div", {
               style: {
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                backgroundColor: 'var(--bg-primary)', padding: '10px 12px', borderRadius: '8px'
+                backgroundColor: 'var(--settlement-hero-surface)', padding: '12px 14px', borderRadius: '14px',
+                boxShadow: '0 6px 18px rgba(15, 23, 42, 0.06)'
               }
             },
               /* Left End: Personal Color Circle + Participant Name */
               React.createElement("div", {
                 style: { display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }
               },
-                activeParticipants.length === 0 ? React.createElement("span", { style: { fontSize: '0.8rem', color: 'var(--text-muted)' } }, "참여 멤버 없음")
+                activeParticipants.length === 0 ? React.createElement("span", { style: { fontSize: '0.8rem', color: 'var(--settlement-hero-surface-muted)' } }, "참여 멤버 없음")
                   : activeParticipants.map(p => React.createElement("div", {
                     key: p.id || p.name,
-                    style: { display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-main)' }
+                    style: { display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '0.82rem', fontWeight: 800, color: 'var(--settlement-hero-surface-text)' }
                   },
                     React.createElement("span", {
                       style: { width: '10px', height: '10px', borderRadius: '50%', backgroundColor: p.color || '#3B82F6', display: 'inline-block', flexShrink: 0 }
@@ -2342,8 +2409,8 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
 
               /* Right End: 1인당 정산 금액 */
               React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-end' } },
-                React.createElement("span", { style: { fontSize: '0.68rem', color: 'var(--text-muted)' } }, "1인당 정산 금액"),
-                React.createElement("strong", { style: { fontSize: '1.1rem', color: '#2563EB', fontWeight: 900 } }, `${(card.perPersonAmount || perPersonExpense).toLocaleString()}원`)
+                React.createElement("span", { style: { fontSize: '0.68rem', color: 'var(--settlement-hero-surface-muted)' } }, "1인당 정산 금액"),
+                React.createElement("strong", { style: { fontSize: '1.1rem', color: '#E247A1', fontWeight: 900 } }, `${(card.perPersonAmount || perPersonExpense).toLocaleString()}원`)
               )
             ),
 
@@ -2358,7 +2425,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
                 onClick: () => handleRemittanceAction(card, 'toss'),
                 style: {
                   flex: '1 1 100px', height: '36px', borderRadius: '8px',
-                  backgroundColor: '#3182F6', color: '#FFFFFF', border: 'none',
+                  backgroundColor: 'var(--settlement-hero-action-bg)', color: 'var(--settlement-hero-action-text)', border: '1px solid var(--settlement-hero-action-border)',
                   fontSize: '0.78rem', fontWeight: 800, cursor: 'pointer',
                   display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px'
                 }
@@ -2371,7 +2438,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
                 onClick: () => handleRemittanceAction(card, 'kakao'),
                 style: {
                   flex: '1 1 100px', height: '36px', borderRadius: '8px',
-                  backgroundColor: '#FEE500', color: '#191919', border: 'none',
+                  backgroundColor: 'var(--settlement-hero-action-bg)', color: 'var(--settlement-hero-action-text)', border: '1px solid var(--settlement-hero-action-border)',
                   fontSize: '0.78rem', fontWeight: 800, cursor: 'pointer',
                   display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px'
                 }
@@ -2384,7 +2451,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
                 onClick: () => handleRemittanceAction(card, 'naver'),
                 style: {
                   flex: '1 1 100px', height: '36px', borderRadius: '8px',
-                  backgroundColor: '#03C75A', color: '#FFFFFF', border: 'none',
+                  backgroundColor: 'var(--settlement-hero-action-bg)', color: 'var(--settlement-hero-action-text)', border: '1px solid var(--settlement-hero-action-border)',
                   fontSize: '0.78rem', fontWeight: 800, cursor: 'pointer',
                   display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px'
                 }
@@ -2680,6 +2747,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
       onClose: () => setIsSettlementMenuOpen(false),
       onChangeView: onChangeView,
       onOpenCreateSettlement: handleOpenCreateSettlement,
+      showSettlement: canUseSettlement,
       chatCount: chatCount,
       settlementBadge: settlementBadge,
       galleryCount: galleryCount,
@@ -2700,7 +2768,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
   ))),
 
   /* Create Settlement Layer Popup */
-  (isCreateSettlementOpen && React.createElement(CreateSettlementModalComp, {
+  (isCreateSettlementOpen && canUseSettlement && React.createElement(CreateSettlementModalComp, {
     calendar: calendar,
     onClose: () => setIsCreateSettlementOpen(false),
     onSave: (newCard) => {
