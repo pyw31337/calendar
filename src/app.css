@@ -391,8 +391,6 @@ body:has(.admin-login-gate) {
   .form-select,
   .color-swatch-trigger,
   .admin-calendar-picker-btn,
-  .calendar-card,
-  .summary-card,
   .confirmed-meeting,
   .day-cell,
   .date-item-btn,
@@ -422,6 +420,9 @@ body:has(.admin-login-gate) {
   .memo-card,
   .gallery-thumb,
   .media-thumb,
+  .summary-card img,
+  .summary-gallery-item img,
+  .summary-photo-grid img,
   .lightbox-nav-btn,
   .tap-target,
   [data-pressable]
@@ -455,8 +456,6 @@ body:has(.admin-login-gate) {
   .form-select,
   .color-swatch-trigger,
   .admin-calendar-picker-btn,
-  .calendar-card,
-  .summary-card,
   .confirmed-meeting,
   .day-cell,
   .date-item-btn,
@@ -486,6 +485,9 @@ body:has(.admin-login-gate) {
   .memo-card,
   .gallery-thumb,
   .media-thumb,
+  .summary-card img,
+  .summary-gallery-item img,
+  .summary-photo-grid img,
   .lightbox-nav-btn,
   .tap-target,
   [data-pressable]
@@ -510,8 +512,6 @@ body:has(.admin-login-gate) {
   .form-select,
   .color-swatch-trigger,
   .admin-calendar-picker-btn,
-  .calendar-card,
-  .summary-card,
   .confirmed-meeting,
   .day-cell,
   .date-item-btn,
@@ -541,6 +541,9 @@ body:has(.admin-login-gate) {
   .memo-card,
   .gallery-thumb,
   .media-thumb,
+  .summary-card img,
+  .summary-gallery-item img,
+  .summary-photo-grid img,
   .lightbox-nav-btn,
   .tap-target,
   [data-pressable]
@@ -563,8 +566,6 @@ body:has(.admin-login-gate) {
   .form-select,
   .color-swatch-trigger,
   .admin-calendar-picker-btn,
-  .calendar-card,
-  .summary-card,
   .confirmed-meeting,
   .day-cell,
   .date-item-btn,
@@ -594,6 +595,9 @@ body:has(.admin-login-gate) {
   .memo-card,
   .gallery-thumb,
   .media-thumb,
+  .summary-card img,
+  .summary-gallery-item img,
+  .summary-photo-grid img,
   .lightbox-nav-btn,
   .tap-target,
   [data-pressable]
@@ -665,8 +669,6 @@ body:has(.admin-login-gate) {
 .main-menu-item,
 .memo-card-hover,
 .place-card-row,
-.calendar-card,
-.summary-card,
 .confirmed-meeting,
 .color-swatch-trigger,
 .admin-calendar-picker-btn,
@@ -686,6 +688,9 @@ body:has(.admin-login-gate) {
 .memo-card,
 .gallery-thumb,
 .media-thumb,
+.summary-card img,
+.summary-gallery-item img,
+.summary-photo-grid img,
 .lightbox-nav-btn,
 .tap-target {
   position: relative;
@@ -710,8 +715,6 @@ body:has(.admin-login-gate) {
 .main-menu-item,
 .memo-card-hover,
 .place-card-row,
-.calendar-card,
-.summary-card,
 .confirmed-meeting,
 .color-swatch-trigger,
 .admin-calendar-picker-btn,
@@ -731,6 +734,9 @@ body:has(.admin-login-gate) {
 .memo-card,
 .gallery-thumb,
 .media-thumb,
+.summary-card img,
+.summary-gallery-item img,
+.summary-photo-grid img,
 .lightbox-nav-btn,
 .tap-target {
   overflow: hidden;
@@ -742,8 +748,6 @@ body:has(.admin-login-gate) {
 .search-result-row:hover,
 .memo-card-hover:hover,
 .place-card-row:hover,
-.calendar-card:hover,
-.summary-card:hover,
 .confirmed-meeting:hover,
 .color-swatch-trigger:hover,
 .admin-calendar-picker-btn:hover,
@@ -763,6 +767,9 @@ body:has(.admin-login-gate) {
 .memo-card:hover,
 .gallery-thumb:hover,
 .media-thumb:hover,
+.summary-card img:hover,
+.summary-gallery-item img:hover,
+.summary-photo-grid img:hover,
 .lightbox-nav-btn:hover,
 .tap-target:hover {
   transform: translate3d(0, -1px, 0);
@@ -803,8 +810,6 @@ body:has(.admin-login-gate) {
 .form-select.is-pressing,
 .color-swatch-trigger.is-pressing,
 .admin-calendar-picker-btn.is-pressing,
-.calendar-card.is-pressing,
-.summary-card.is-pressing,
 .confirmed-meeting.is-pressing,
 .day-cell.is-pressing,
 .date-item-btn.is-pressing,
@@ -834,6 +839,9 @@ body:has(.admin-login-gate) {
 .memo-card.is-pressing,
 .gallery-thumb.is-pressing,
 .media-thumb.is-pressing,
+.summary-card img.is-pressing,
+.summary-gallery-item img.is-pressing,
+.summary-photo-grid img.is-pressing,
 .lightbox-nav-btn.is-pressing,
 .tap-target.is-pressing,
 [role="button"].is-pressing,
@@ -3994,9 +4002,11 @@ textarea.form-input {
   touch-action: pan-x pan-y;
   -webkit-tap-highlight-color: transparent;
 }
-.leaflet-tile-pane {
-  filter: none;
-  -webkit-filter: none;
+.leaflet-tile-pane,
+.place-map-container,
+.place-map-view {
+  filter: contrast(1.1);
+  -webkit-filter: contrast(1.1);
 }
 :root[data-theme="dark"] .leaflet-tile-pane {
   filter: grayscale(100%) invert(90%) hue-rotate(180deg) opacity(85%) contrast(90%);
