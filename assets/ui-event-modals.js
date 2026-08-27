@@ -1363,7 +1363,7 @@ export function AnniversaryModal({
   );
 }
 
-/* CreateSettlementModal (1/N Custom Settlement Card Layer Popup) */
+/* CreateSettlementModal (정산 생성 Layer Popup) */
 export function CreateSettlementModal({ calendar, onClose, onSave, showToast }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -1380,6 +1380,8 @@ export function CreateSettlementModal({ calendar, onClose, onSave, showToast }) 
   const [bankName, setBankName] = React.useState('토스뱅크');
   const [depositorName, setDepositorName] = React.useState('');
   const [accountNumber, setAccountNumber] = React.useState('');
+  const [isAddingParticipant, setIsAddingParticipant] = React.useState(false);
+  const [newParticipantName, setNewParticipantName] = React.useState('');
   
   // Month navigation
   const [year, setYear] = React.useState(today.getFullYear());
@@ -1440,6 +1442,16 @@ export function CreateSettlementModal({ calendar, onClose, onSave, showToast }) 
     });
   };
 
+  const handleAddCustomParticipant = () => {
+    if (!newParticipantName.trim()) return;
+    const name = newParticipantName.trim();
+    if (!selectedParticipantIds.includes(name)) {
+      setSelectedParticipantIds(prev => [...prev, name]);
+    }
+    setNewParticipantName('');
+    setIsAddingParticipant(false);
+  };
+
   const handlePrevMonth = () => {
     if (month === 0) { setYear(y => y - 1); setMonth(11); }
     else setMonth(m => m - 1);
@@ -1490,9 +1502,7 @@ export function CreateSettlementModal({ calendar, onClose, onSave, showToast }) 
       className: 'modal-header',
       style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 18px', borderBottom: '1px solid var(--border-subtle)' }
     },
-      React.createElement('h3', { style: { fontSize: '1.05rem', fontWeight: 800, margin: 0, display: 'flex', alignItems: 'center', gap: '6px' } },
-        React.createElement('span', null, '➕'), '정산 생성 (1/N)'
-      ),
+      React.createElement('h3', { style: { fontSize: '1.05rem', fontWeight: 800, margin: 0 } }, '정산 생성'),
       React.createElement('button', {
         type: 'button', onClick: onClose,
         style: { background: 'none', border: 'none', color: '#64748B', cursor: 'pointer' }
@@ -1503,9 +1513,9 @@ export function CreateSettlementModal({ calendar, onClose, onSave, showToast }) 
       className: 'modal-body',
       style: { overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }
     },
-      /* 1. Title Field */
+      /* 1. Title Input */
       React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '4px' } },
-        React.createElement('label', { style: { fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-main)' } }, '정산 타이틀'),
+        React.createElement('label', { style: { fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-main)' } }, '타이틀 입력'),
         React.createElement('input', {
           type: 'text', className: 'form-input', value: title,
           onChange: e => setTitle(e.target.value), placeholder: '예: 1/N 간편 송금',
@@ -1513,7 +1523,7 @@ export function CreateSettlementModal({ calendar, onClose, onSave, showToast }) 
         })
       ),
 
-      /* 2. Participants + Amount Row */
+      /* 2. Participants Select + Expense Amount Row */
       React.createElement('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' } },
         React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '4px' } },
           React.createElement('label', { style: { fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-main)' } }, '참여자 선택'),
@@ -1523,19 +1533,16 @@ export function CreateSettlementModal({ calendar, onClose, onSave, showToast }) 
               border: '1px solid var(--border-subtle)', borderRadius: '8px', maxHeight: '90px', overflowY: 'auto', backgroundColor: 'var(--bg-primary)'
             }
           },
-            activeParticipants.map(p => {
-              const pId = p.id || p.name;
-              const isSelected = selectedParticipantIds.includes(pId);
+            selectedParticipantIds.map(pName => {
               return React.createElement('button', {
-                key: pId, type: 'button',
-                onClick: () => toggleParticipant(pId),
+                key: pName, type: 'button',
+                onClick: () => toggleParticipant(pName),
                 style: {
                   padding: '3px 8px', borderRadius: '999px', fontSize: '0.72rem', fontWeight: 700,
-                  border: isSelected ? '1px solid #2563EB' : '1px solid var(--border-subtle)',
-                  backgroundColor: isSelected ? 'rgba(59, 130, 246, 0.15)' : 'var(--bg-card)',
-                  color: isSelected ? '#2563EB' : 'var(--text-muted)', cursor: 'pointer'
+                  border: '1px solid #2563EB', backgroundColor: 'rgba(59, 130, 246, 0.15)',
+                  color: '#2563EB', cursor: 'pointer'
                 }
-              }, (isSelected ? '✓ ' : '') + p.name);
+              }, '✓ ' + pName);
             })
           )
         ),
@@ -1549,36 +1556,67 @@ export function CreateSettlementModal({ calendar, onClose, onSave, showToast }) 
         )
       ),
 
-      /* 3. Account Info: Bank, Depositor, Account Number */
-      React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px', borderRadius: '8px', backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border-subtle)' } },
-        React.createElement('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' } },
-          React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '4px' } },
-            React.createElement('label', { style: { fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)' } }, '송금받을 은행'),
-            React.createElement('select', {
-              className: 'form-select', value: bankName, onChange: e => setBankName(e.target.value),
-              style: { width: '100%', borderRadius: '6px', fontSize: '0.82rem' }
-            }, BANK_OPTIONS.map(b => React.createElement('option', { key: b, value: b }, b)))
-          ),
-          React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '4px' } },
-            React.createElement('label', { style: { fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)' } }, '예금자명'),
-            React.createElement('input', {
-              type: 'text', className: 'form-input', value: depositorName,
-              onChange: e => setDepositorName(e.target.value), placeholder: '예: 홍길동',
-              style: { width: '100%', borderRadius: '6px', fontSize: '0.82rem' }
-            })
-          )
+      /* 3. Add Participant Button */
+      React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '4px' } },
+        !isAddingParticipant ? React.createElement('button', {
+          type: 'button',
+          className: 'btn',
+          onClick: () => setIsAddingParticipant(true),
+          style: {
+            padding: '6px 12px', borderRadius: '6px', backgroundColor: 'var(--bg-primary)',
+            border: '1px dashed var(--border-subtle)', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-main)', cursor: 'pointer', textAlign: 'center'
+          }
+        }, '+ 참여자 추가')
+        : React.createElement('div', { style: { display: 'flex', gap: '6px' } },
+          React.createElement('input', {
+            type: 'text', className: 'form-input', value: newParticipantName,
+            onChange: e => setNewParticipantName(e.target.value), placeholder: '추가할 이름 입력',
+            style: { flex: 1, borderRadius: '6px', fontSize: '0.8rem' }
+          }),
+          React.createElement('button', {
+            type: 'button', className: 'btn btn-primary', onClick: handleAddCustomParticipant,
+            style: { padding: '4px 10px', fontSize: '0.78rem', borderRadius: '6px' }
+          }, '추가'),
+          React.createElement('button', {
+            type: 'button', className: 'btn btn-secondary', onClick: () => setIsAddingParticipant(false),
+            style: { padding: '4px 10px', fontSize: '0.78rem', borderRadius: '6px' }
+          }, '취소')
+        )
+      ),
+
+      /* 4. Bank Select & Depositor Input */
+      React.createElement('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' } },
+        React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '4px' } },
+          React.createElement('label', { style: { fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)' } }, '송금 받을 은행'),
+          React.createElement('select', {
+            className: 'form-select', value: bankName, onChange: e => setBankName(e.target.value),
+            style: { width: '100%', borderRadius: '6px', fontSize: '0.82rem' }
+          }, BANK_OPTIONS.map(b => React.createElement('option', { key: b, value: b }, b)))
         ),
         React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '4px' } },
-          React.createElement('label', { style: { fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)' } }, '계좌번호'),
+          React.createElement('label', { style: { fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)' } }, '예금자명'),
           React.createElement('input', {
-            type: 'text', className: 'form-input', value: accountNumber,
-            onChange: e => setAccountNumber(e.target.value), placeholder: '계좌번호 입력',
+            type: 'text', className: 'form-input', value: depositorName,
+            onChange: e => setDepositorName(e.target.value), placeholder: '예금주 입력',
             style: { width: '100%', borderRadius: '6px', fontSize: '0.82rem' }
           })
         )
       ),
 
-      /* 4. Divider & Summary Calculation Box */
+      /* 5. Account Number Input */
+      React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '4px' } },
+        React.createElement('label', { style: { fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)' } }, '계좌번호'),
+        React.createElement('input', {
+          type: 'text', className: 'form-input', value: accountNumber,
+          onChange: e => setAccountNumber(e.target.value), placeholder: '계좌번호 입력',
+          style: { width: '100%', borderRadius: '6px', fontSize: '0.82rem' }
+        })
+      ),
+
+      /* Divider */
+      React.createElement('hr', { style: { border: 'none', borderTop: '1px solid var(--border-subtle)', margin: '4px 0' } }),
+
+      /* 6. Summary Calculation Box: 총 수입 | 총 지출 | 정산(1/N) */
       React.createElement('div', {
         style: {
           display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px', padding: '10px 12px',
@@ -1599,7 +1637,7 @@ export function CreateSettlementModal({ calendar, onClose, onSave, showToast }) 
         )
       ),
 
-      /* 5. Monthly Transaction Selector with Checkboxes */
+      /* 7. Transaction List with Checkboxes */
       React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px' } },
         /* Month Nav Header */
         React.createElement('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
@@ -1622,7 +1660,7 @@ export function CreateSettlementModal({ calendar, onClose, onSave, showToast }) 
             maxHeight: '180px', overflowY: 'auto', border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '6px', display: 'flex', flexDirection: 'column', gap: '4px'
           }
         },
-          monthlyExpenses.length === 0 ? React.createElement('div', { style: { padding: '16px', textAlignment: 'center', fontSize: '0.78rem', color: 'var(--text-muted)' } }, '해당 월에 등록된 내역이 없습니다.')
+          monthlyExpenses.length === 0 ? React.createElement('div', { style: { padding: '16px', textAlign: 'center', fontSize: '0.78rem', color: 'var(--text-muted)' } }, '해당 월에 등록된 내역이 없습니다.')
             : monthlyExpenses.map(item => {
               const isChecked = !!checkedItems[item.itemKey];
               return React.createElement('label', {
@@ -2584,24 +2622,47 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
         }, "✕")
       )
     ),
-    /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-list", style: { borderBottom: 'none', paddingTop: '6px' } },
-      /*#__PURE__*/React.createElement("button", {
+    /* Group 1: 정산 생성 + 정산 카드 */
+    React.createElement("div", { className: "admin-side-menu-list", style: { borderBottom: 'none', paddingTop: '6px' } },
+      /* 1. 정산 생성 */
+      React.createElement("button", {
+        type: "button",
+        className: "admin-side-menu-item",
+        onClick: () => {
+          setIsSettlementMenuOpen(false);
+          if (typeof onOpenCreateSettlement === 'function') onOpenCreateSettlement();
+        }
+      },
+        React.createElement("span", { className: "admin-side-menu-item-icon" },
+          React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.5", strokeLinecap: "round", strokeLinejoin: "round" },
+            React.createElement("line", { x1: "12", y1: "5", x2: "12", y2: "19" }),
+            React.createElement("line", { x1: "5", y1: "12", x2: "19", y2: "12" })
+          )
+        ),
+        React.createElement("span", { className: "admin-side-menu-item-copy" },
+          React.createElement("span", { className: "admin-side-menu-item-title", style: { fontWeight: 700, color: "var(--text-main)" } }, "정산생성")
+        )
+      ),
+
+      /* 2. 정산 카드 */
+      React.createElement("button", {
         type: "button",
         className: "admin-side-menu-item",
         onClick: () => { setIsSettlementMenuOpen(false); handleGenerateShareImage(); }
       },
-        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", {
+        React.createElement("span", { className: "admin-side-menu-item-icon" }, React.createElement("svg", {
           xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24",
           fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
-        }, /*#__PURE__*/React.createElement("path", { d: "M3 11h3.75a2 2 0 0 1 1.6.8l.45.6a4 4 0 0 0 6.4 0l.45-.6a2 2 0 0 1 1.6-.8H21" }), /*#__PURE__*/React.createElement("path", { d: "M3 7h18" }), /*#__PURE__*/React.createElement("rect", { x: "3", y: "3", width: "18", height: "18", rx: "2" }))),
-        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
-          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "정산 카드")
+        }, React.createElement("path", { d: "M3 11h3.75a2 2 0 0 1 1.6.8l.45.6a4 4 0 0 0 6.4 0l.45-.6a2 2 0 0 1 1.6-.8H21" }), React.createElement("path", { d: "M3 7h18" }), React.createElement("rect", { x: "3", y: "3", width: "18", height: "18", rx: "2" }))),
+        React.createElement("span", { className: "admin-side-menu-item-copy" },
+          React.createElement("span", { className: "admin-side-menu-item-title" }, "정산 카드")
         )
       )
     ),
     typeof SharedAppNavBlock === 'function' && /*#__PURE__*/React.createElement(SharedAppNavBlock, {
       onClose: () => setIsSettlementMenuOpen(false),
       onChangeView: onChangeView,
+      onOpenCreateSettlement: onOpenCreateSettlement,
       chatCount: chatCount,
       settlementBadge: settlementBadge,
       galleryCount: galleryCount,
