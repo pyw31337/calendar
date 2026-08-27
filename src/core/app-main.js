@@ -9166,23 +9166,28 @@ function uploadMemoImageAssets(calendarId, compressed, index, onBytes, timeoutMs
 function getAnniversariesForDate(dateStr, anniversariesList) {
   if (!dateStr || !Array.isArray(anniversariesList)) return [];
   const [y, m, d] = dateStr.split('-').map(Number);
-  
+  if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) return [];
+
   const results = [];
   anniversariesList.forEach(ann => {
+    if (!ann || typeof ann !== 'object') return;
     if (ann.type === 'yearly') {
+      if (!ann.date || typeof ann.date !== 'string') return;
       if (ann.isLunar) {
         try {
           const cal = new KoreanLunarCalendar();
           const [lunarM, lunarD] = ann.date.split('-').map(Number);
-          cal.setLunarDate(y, lunarM, lunarD, !!ann.isLeap);
-          const solar = cal.getSolarCalendar();
-          if (solar && solar.year === y && solar.month === m && solar.day === d) {
-            results.push({
-              id: ann.id,
-              title: `${ann.title} (음)`,
-              badgeColor: '#EF4444',
-              icon: '🎂'
-            });
+          if (Number.isFinite(lunarM) && Number.isFinite(lunarD)) {
+            cal.setLunarDate(y, lunarM, lunarD, !!ann.isLeap);
+            const solar = cal.getSolarCalendar();
+            if (solar && solar.year === y && solar.month === m && solar.day === d) {
+              results.push({
+                id: ann.id,
+                title: `${ann.title || ''} (음)`,
+                badgeColor: '#EF4444',
+                icon: '🎂'
+              });
+            }
           }
         } catch (e) {
           console.warn('Lunar date calculation failed for', ann.title, e);
@@ -9192,7 +9197,7 @@ function getAnniversariesForDate(dateStr, anniversariesList) {
         if (solarM === m && solarD === d) {
           results.push({
             id: ann.id,
-            title: `${ann.title}`,
+            title: `${ann.title || ''}`,
             badgeColor: '#EF4444',
             icon: '🎂'
           });
@@ -9200,16 +9205,18 @@ function getAnniversariesForDate(dateStr, anniversariesList) {
       }
     } else if (ann.type === 'dday') {
       const targetStr = ann.targetDate;
+      if (!targetStr || typeof targetStr !== 'string') return;
       if (targetStr === dateStr) {
         results.push({
           id: ann.id,
-          title: `${ann.title} (D-Day)`,
+          title: `${ann.title || ''} (D-Day)`,
           badgeColor: '#3B82F6',
           icon: '🎁'
         });
       } else {
         const tDate = new Date(`${targetStr}T00:00:00`);
         const cDate = new Date(`${dateStr}T00:00:00`);
+        if (Number.isNaN(tDate.getTime()) || Number.isNaN(cDate.getTime())) return;
         const diffMs = cDate.getTime() - tDate.getTime();
         const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
         
@@ -9219,7 +9226,7 @@ function getAnniversariesForDate(dateStr, anniversariesList) {
             if (daysLeft === 100 || daysLeft === 50 || daysLeft === 10 || daysLeft === 30) {
               results.push({
                 id: ann.id,
-                title: `${ann.title} D-${daysLeft}`,
+                title: `${ann.title || ''} D-${daysLeft}`,
                 badgeColor: '#6366F1',
                 icon: '📅'
               });
@@ -9229,28 +9236,28 @@ function getAnniversariesForDate(dateStr, anniversariesList) {
           if (diffDays === 99) {
             results.push({
               id: ann.id,
-              title: `${ann.title} 100일`,
+              title: `${ann.title || ''} 100일`,
               badgeColor: '#EC4899',
               icon: '💖'
             });
           } else if (diffDays === 199) {
             results.push({
               id: ann.id,
-              title: `${ann.title} 200일`,
+              title: `${ann.title || ''} 200일`,
               badgeColor: '#EC4899',
               icon: '💖'
             });
           } else if (diffDays === 299) {
             results.push({
               id: ann.id,
-              title: `${ann.title} 300일`,
+              title: `${ann.title || ''} 300일`,
               badgeColor: '#EC4899',
               icon: '💖'
             });
           } else if (diffDays === 364) {
             results.push({
               id: ann.id,
-              title: `${ann.title} 1주년`,
+              title: `${ann.title || ''} 1주년`,
               badgeColor: '#EC4899',
               icon: '🎉'
             });
@@ -9258,7 +9265,7 @@ function getAnniversariesForDate(dateStr, anniversariesList) {
             const years = Math.round((diffDays + 1) / 365);
             results.push({
               id: ann.id,
-              title: `${ann.title} ${years}주년`,
+              title: `${ann.title || ''} ${years}주년`,
               badgeColor: '#EC4899',
               icon: '🎉'
             });
