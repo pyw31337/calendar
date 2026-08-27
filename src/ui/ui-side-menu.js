@@ -942,7 +942,7 @@ export function AppSettingsModal({
         ),
         /*#__PURE__*/React.createElement("div", {
           "aria-hidden": "true",
-          style: { height: '0', borderTop: '1px solid #E2E8F0', margin: '12px 0' }
+          style: { height: '0', borderTop: '1px solid var(--border-subtle)', margin: '12px 0' }
         }),
         /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-setting-row", style: { padding: '10px 0' } },
           /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-label" },
@@ -960,7 +960,7 @@ export function AppSettingsModal({
         ),
         /*#__PURE__*/React.createElement("div", {
           "aria-hidden": "true",
-          style: { height: '0', borderTop: '1px solid #E2E8F0', margin: '12px 0' }
+          style: { height: '0', borderTop: '1px solid var(--border-subtle)', margin: '12px 0' }
         }),
         /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-setting-row", style: { padding: '10px 0' } },
           /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-label" },
@@ -972,7 +972,7 @@ export function AppSettingsModal({
         /*#__PURE__*/React.createElement("div", {
           style: {
             marginTop: '4px', padding: '4px 10px', borderRadius: '12px',
-            background: '#ffffff', border: '1px solid var(--border-subtle)',
+            background: 'var(--bg-primary)', border: '1px solid var(--border-subtle)',
             opacity: isMasterNotifyEnabled ? 1 : 0.55
           }
         },
@@ -1013,7 +1013,7 @@ export function AppSettingsModal({
               type: "button",
               onClick: () => handleDeleteDevice(row),
               style: {
-                flexShrink: 0, border: '1px solid #FECACA', background: 'rgba(239,68,68,0.06)',
+                flexShrink: 0, border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.12)',
                 color: '#EF4444', borderRadius: '6px', padding: '3px 8px', fontWeight: 700, fontSize: '0.7rem', cursor: 'pointer'
               }
             }, "삭제")

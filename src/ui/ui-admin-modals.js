@@ -1359,7 +1359,7 @@ export function AdminModal({
                     onClick: () => { setEditingPoll(poll); setIsPollModalOpen(true); },
                     style: {
                       backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: '6px',
-                      padding: '4px 10px', fontSize: '0.75rem', cursor: 'pointer', color: '#334155'
+                      padding: '4px 10px', fontSize: '0.75rem', cursor: 'pointer', color: 'var(--text-main)'
                     }
                   }, "수정"),
                   /* Delete button */

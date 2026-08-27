@@ -2260,7 +2260,9 @@ function App() {
   // Main-screen chat preview safety net:
   // if the count says chat history exists but the live recent window is still empty,
   // hydrate the newest messages once so the summary widget can render at least the latest
-  // chat instead of a blank state.
+  // chat instead of a blank state. Prefer the SDK-backed recent-chat path here so a REST
+  // hiccup does not leave the summary looking empty even though the live listener/count are
+  // still healthy.
   React.useEffect(() => {
     if (!activeCalId || isInitialDataLoading) return;
     if (typeof totalChatCount !== 'number' || totalChatCount <= 0) return;
@@ -2268,9 +2270,9 @@ function App() {
     let cancelled = false;
     (async () => {
       try {
-        const list = await fetchRecentMessagesRest(activeCalId);
+        const list = await fetchRecentChatMessages(activeCalId, 5);
         if (cancelled || !Array.isArray(list) || list.length === 0) return;
-        setChatMessages(prev => (Array.isArray(prev) && prev.length > 0) ? prev : list.slice().reverse());
+        setChatMessages(prev => (Array.isArray(prev) && prev.length > 0) ? prev : list.slice());
       } catch (err) {
         console.warn('chat preview hydration failed:', err);
       }

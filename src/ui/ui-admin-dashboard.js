@@ -2695,7 +2695,7 @@ export function AdminDashboard({ initialCalendars }) {
             },
               /* Left */
               /*#__PURE__*/React.createElement("div", { className: "admin-poll-row-main" },
-                /*#__PURE__*/React.createElement("span", { className: "admin-poll-row-title", style: { fontSize: '0.86rem', fontWeight: 'bold', color: '#0F172A' } }, poll.title),
+                /*#__PURE__*/React.createElement("span", { className: "admin-poll-row-title", style: { fontSize: '0.86rem', fontWeight: 'bold', color: 'var(--text-main)' } }, poll.title),
                 /*#__PURE__*/React.createElement("span", { className: "admin-poll-row-meta", style: { fontSize: '0.72rem', color: '#64748B' } }, `${getActivePollOptions(poll).length}개 선택 항목 · 총 ${getPollTotalVoteCount(poll)}표${poll.deadline ? ` · 마감 ${formatPollDeadline(poll.deadline)}${isPollClosed(poll) ? ' (마감됨)' : ''}` : ''}`)
               ),
               /* Right */
