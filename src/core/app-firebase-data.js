@@ -305,12 +305,14 @@ function validateCalendarShape(calendar) {
   const availabilities = Array.isArray(calendar.availabilities) ? calendar.availabilities : [];
   const activityLogs = Array.isArray(calendar.activityLogs) ? calendar.activityLogs : [];
   const polls = Array.isArray(calendar.polls) ? calendar.polls : [];
+  const confirmedMeetings = normalizeConfirmedMeetingsForSave(calendar.confirmedMeeting || []);
 	  const deletedActivityLogIds = normalizeDeletedActivityLogIds(calendar.deletedActivityLogIds || []);
 	  const expenseCategories = normalizeExpenseCategories(calendar.expenseCategories);
 	  if (participants.length > 80) return '참여자가 너무 많습니다.';
 	  if (availabilities.length > 5000) return '일정 데이터가 너무 많습니다.';
 	  if (activityLogs.length > 5000) return '활동 로그가 너무 많습니다.';
 	  if (polls.length > 100) return '투표 데이터가 너무 많습니다.';
+	  if (confirmedMeetings.length > 5000) return '확정 모임 데이터가 너무 많습니다.';
 	  if (expenseCategories.length > 24) return '지출 카테고리가 너무 많습니다.';
   if (deletedActivityLogIds.length > 5000) return '삭제된 활동 로그 이력이 너무 많습니다.';
   const participantIds = new Set();
@@ -390,6 +392,7 @@ function normalizeCalendarForSave(calendar) {
   const participantIds = new Set(normalizedParticipants.map(participant => participant.id));
   const normalizedActivityLogs = mergeActivityLogs([], cloned.activityLogs || [], cloned.id, participantIds, idRedirects);
   const normalizedPolls = mergePolls([], cloned.polls || [], cloned.id, participantIds);
+  const normalizedConfirmedMeetings = normalizeConfirmedMeetingsForSave(cloned.confirmedMeeting || []);
   const deletedActivityLogIds = getDeletedActivityLogIds(cloned);
 
   return {
@@ -398,6 +401,7 @@ function normalizeCalendarForSave(calendar) {
 	    availabilities: Array.from(availabilityMap.values()),
 	    activityLogs: normalizedActivityLogs,
 	    polls: normalizedPolls,
+	    confirmedMeeting: normalizedConfirmedMeetings,
 	    expenseCategories: normalizeExpenseCategories(cloned.expenseCategories),
 	    places: normalizePlaces(cloned.places),
 	    placeCategories: normalizePlaceCategories(cloned.placeCategories),
@@ -552,12 +556,24 @@ function mergeCalendarAvailabilityDelta(serverCalendar, incomingCalendar, change
 
 function mergeConfirmedMeetings(serverList = [], incomingList = []) {
   const byDate = new Map();
-  (Array.isArray(serverList) ? serverList : []).forEach(m => { if (m?.date) byDate.set(m.date, m); });
+  (Array.isArray(serverList) ? serverList : []).forEach(m => {
+    const normalized = normalizeConfirmedMeetingRecord(m);
+    if (normalized?.date) byDate.set(normalized.date, normalized);
+  });
   (Array.isArray(incomingList) ? incomingList : []).forEach(m => {
-    if (m?.date) {
-      const existing = byDate.get(m.date);
-      byDate.set(m.date, existing ? { ...existing, ...m } : m);
+    const normalized = normalizeConfirmedMeetingRecord(m);
+    if (!normalized?.date) return;
+    const existing = byDate.get(normalized.date);
+    if (!existing) {
+      byDate.set(normalized.date, normalized);
+      return;
     }
+    byDate.set(normalized.date, {
+      ...existing,
+      ...normalized,
+      photos: mergeConfirmedMeetingItems(existing.photos, normalized.photos, photo => photo.id || photo.refKey || photo.mediaKey || photo.assetKey || photo.imageUrl || photo.thumbUrl),
+      expenses: mergeConfirmedMeetingItems(existing.expenses, normalized.expenses, expense => expense.id || `${expense.label || ''}|${expense.url || ''}|${expense.amount ?? ''}|${expense.categoryId || ''}|${expense.createdAt ?? ''}`)
+    });
   });
   return Array.from(byDate.values());
 }
@@ -1872,8 +1888,128 @@ function stripEmbeddedConfirmedMeetingField(calendar) {
   const { confirmedMeeting, ...rest } = calendar;
   return rest;
 }
+function normalizeConfirmedMeetingPhoto(photo) {
+  if (!photo || typeof photo !== 'object') return null;
+  const normalized = {};
+  const id = sanitizeText(photo.id || photo.photoId || '', 120);
+  const imageUrl = sanitizeText(photo.imageUrl || '', 2000);
+  const thumbUrl = sanitizeText(photo.thumbUrl || '', 2000);
+  const refKey = sanitizeText(photo.refKey || '', 220);
+  const mediaKey = sanitizeText(photo.mediaKey || '', 220);
+  const assetKey = sanitizeText(photo.assetKey || '', 220);
+  const source = sanitizeText(photo.source || '', 60);
+  const uploadSource = sanitizeText(photo.uploadSource || '', 60);
+  const tags = sanitizeText(photo.tags || '', 500);
+  const sourceMessageId = sanitizeText(photo.sourceMessageId || '', 180);
+  const sourceImageIndex = Number(photo.sourceImageIndex);
+  const imageIndex = Number(photo.imageIndex);
+  const createdAt = Number(photo.createdAt);
+  const updatedAt = Number(photo.updatedAt);
+  const meetingDate = sanitizeText(photo.meetingDate || '', 20);
+  if (id) normalized.id = id;
+  if (imageUrl) normalized.imageUrl = imageUrl;
+  if (thumbUrl) normalized.thumbUrl = thumbUrl;
+  if (refKey) normalized.refKey = refKey;
+  if (mediaKey) normalized.mediaKey = mediaKey;
+  if (assetKey) normalized.assetKey = assetKey;
+  if (source) normalized.source = source;
+  if (uploadSource) normalized.uploadSource = uploadSource;
+  if (tags) normalized.tags = tags;
+  if (sourceMessageId) normalized.sourceMessageId = sourceMessageId;
+  if (Number.isFinite(sourceImageIndex)) normalized.sourceImageIndex = Math.max(0, Math.round(sourceImageIndex));
+  if (Number.isFinite(imageIndex)) normalized.imageIndex = Math.max(0, Math.round(imageIndex));
+  if (Number.isFinite(createdAt)) normalized.createdAt = Math.max(0, Math.round(createdAt));
+  if (Number.isFinite(updatedAt)) normalized.updatedAt = Math.max(0, Math.round(updatedAt));
+  if (meetingDate && isValidDateString(meetingDate)) normalized.meetingDate = meetingDate;
+  return Object.keys(normalized).length ? normalized : null;
+}
+function normalizeConfirmedMeetingExpense(expense) {
+  if (!expense || typeof expense !== 'object') return null;
+  const normalized = {};
+  const id = sanitizeText(expense.id || '', 120);
+  const label = sanitizeText(expense.label || '', 120);
+  const url = sanitizeText(expense.url || '', 220);
+  const categoryId = sanitizeText(expense.categoryId || '', 80);
+  const amount = Number(expense.amount);
+  const order = Number(expense.order);
+  const createdAt = Number(expense.createdAt);
+  const updatedAt = Number(expense.updatedAt);
+  if (id) normalized.id = id;
+  if (label) normalized.label = label;
+  if (url) normalized.url = url;
+  if (categoryId) normalized.categoryId = categoryId;
+  if (Number.isFinite(amount)) normalized.amount = Math.round(amount);
+  if (Number.isFinite(order)) normalized.order = Math.max(0, Math.round(order));
+  if (Number.isFinite(createdAt)) normalized.createdAt = Math.max(0, Math.round(createdAt));
+  if (Number.isFinite(updatedAt)) normalized.updatedAt = Math.max(0, Math.round(updatedAt));
+  if (expense.linkPreview && typeof expense.linkPreview === 'object') {
+    const lp = { ...expense.linkPreview };
+    if (typeof lp.description === 'string' && lp.description.length > 280) lp.description = lp.description.slice(0, 280);
+    if (typeof lp.title === 'string' && lp.title.length > 120) lp.title = lp.title.slice(0, 120);
+    if (typeof lp.html === 'string') delete lp.html;
+    if (typeof lp.content === 'string') delete lp.content;
+    if (typeof lp.image === 'string' && lp.image.startsWith('data:') && lp.image.length > 2000) delete lp.image;
+    normalized.linkPreview = lp;
+  }
+  return Object.keys(normalized).length ? normalized : null;
+}
+function mergeConfirmedMeetingItems(existingItems, incomingItems, keyGetter) {
+  const byKey = new Map();
+  const addItem = (item) => {
+    if (!item) return;
+    const key = typeof keyGetter === 'function' ? keyGetter(item) : '';
+    if (!key) return;
+    const current = byKey.get(key);
+    byKey.set(key, current ? { ...current, ...item } : item);
+  };
+  (Array.isArray(existingItems) ? existingItems : []).forEach(addItem);
+  (Array.isArray(incomingItems) ? incomingItems : []).forEach(addItem);
+  return Array.from(byKey.values());
+}
+function normalizeConfirmedMeetingRecord(meeting) {
+  if (!meeting || typeof meeting !== 'object') return null;
+  const date = sanitizeText(meeting.date || '', 20);
+  if (!isValidDateString(date)) return null;
+  const normalized = {
+    date,
+    note: sanitizeText(meeting.note || '', 500),
+    photos: normalizeConfirmedMeetingPhotos(meeting.photos),
+    expenses: normalizeConfirmedMeetingExpenses(meeting.expenses)
+  };
+  if (meeting.confirmed === false) normalized.confirmed = false;
+  else if (meeting.confirmed === true) normalized.confirmed = true;
+  const confirmedAt = Number(meeting.confirmedAt);
+  const createdAt = Number(meeting.createdAt);
+  const updatedAt = Number(meeting.updatedAt);
+  if (Number.isFinite(confirmedAt)) normalized.confirmedAt = Math.max(0, Math.round(confirmedAt));
+  if (Number.isFinite(createdAt)) normalized.createdAt = Math.max(0, Math.round(createdAt));
+  if (Number.isFinite(updatedAt)) normalized.updatedAt = Math.max(0, Math.round(updatedAt));
+  if (meeting.amount === null) {
+    normalized.amount = null;
+  } else if (Number.isFinite(Number(meeting.amount))) {
+    normalized.amount = Math.round(Number(meeting.amount));
+  }
+  return normalized;
+}
+function normalizeConfirmedMeetingPhotos(photos) {
+  return mergeConfirmedMeetingItems(
+    [],
+    Array.isArray(photos) ? photos.map(normalizeConfirmedMeetingPhoto).filter(Boolean) : [],
+    photo => photo.id || photo.refKey || photo.mediaKey || photo.assetKey || photo.imageUrl || photo.thumbUrl
+  );
+}
+function normalizeConfirmedMeetingExpenses(expenses) {
+  return mergeConfirmedMeetingItems(
+    [],
+    Array.isArray(expenses) ? expenses.map(normalizeConfirmedMeetingExpense).filter(Boolean) : [],
+    expense => expense.id || `${expense.label || ''}|${expense.url || ''}|${expense.amount ?? ''}|${expense.categoryId || ''}|${expense.createdAt ?? ''}`
+  );
+}
+function normalizeConfirmedMeetingsForSave(meetings) {
+  return mergeConfirmedMeetings([], meetings);
+}
 async function writeConfirmedMeetingsToFirestore(calendarId, meetings) {
-  const validMeetings = Array.isArray(meetings) ? meetings.filter(m => m && typeof m.date === 'string' && m.date) : [];
+  const validMeetings = normalizeConfirmedMeetingsForSave(meetings);
   if (!validMeetings.length) return true;
   try {
     const writes = validMeetings.map(meeting => ({
