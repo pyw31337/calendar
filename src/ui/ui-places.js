@@ -1260,6 +1260,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
   // only one entry across all place cards is in edit mode at a time.
   const [editingMemoEntryKey, setEditingMemoEntryKey] = React.useState(null);
   const [editingMemoEntryText, setEditingMemoEntryText] = React.useState('');
+  const listScrollAnimRef = React.useRef(0);
 
   React.useEffect(() => {
     if (placesInitialQuery) {
@@ -1399,6 +1400,34 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
     focusTokenRef.current += 1;
     const fromMap = !!(options && options.fromMap);
     setFocusPlace({ id: place.id, token: focusTokenRef.current, fromMap });
+    const animateListScrollTo = (container, targetTop, durationMs = 180) => {
+      if (!container) return;
+      const reduceMotion = typeof window !== 'undefined'
+        && window.matchMedia
+        && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (reduceMotion || durationMs <= 0) {
+        container.scrollTop = targetTop;
+        return;
+      }
+      const startTop = container.scrollTop;
+      const delta = targetTop - startTop;
+      if (Math.abs(delta) < 4) {
+        container.scrollTop = targetTop;
+        return;
+      }
+      const token = ++listScrollAnimRef.current;
+      const startTime = performance.now();
+      const easeOutCubic = t => 1 - Math.pow(1 - t, 3);
+      const step = now => {
+        if (listScrollAnimRef.current !== token) return;
+        const progress = Math.min(1, (now - startTime) / durationMs);
+        container.scrollTop = startTop + (delta * easeOutCubic(progress));
+        if (progress < 1) {
+          requestAnimationFrame(step);
+        }
+      };
+      requestAnimationFrame(step);
+    };
     requestAnimationFrame(() => {
       try {
         const container = scrollBodyRef.current;
@@ -1418,11 +1447,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
         const anchor = Math.round(container.clientHeight * 0.28);
         const maxTop = Math.max(0, container.scrollHeight - container.clientHeight);
         const nextTop = Math.max(0, Math.min(maxTop, row.offsetTop - anchor));
-        if (typeof container.scrollTo === 'function') {
-          container.scrollTo({ top: nextTop, behavior: 'smooth' });
-        } else {
-          container.scrollTop = nextTop;
-        }
+        animateListScrollTo(container, nextTop, 180);
       } catch (e) {}
     });
   };
