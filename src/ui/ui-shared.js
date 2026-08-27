@@ -1662,6 +1662,7 @@ function getSyncStatusMeta(syncStatus = null) {
 export function SyncStatusChip({ syncStatus = null, className = '', style = null }) {
   const React = window.React;
   const { status, label, lastSyncedText, title } = getSyncStatusMeta(syncStatus);
+  if (!syncStatus || !['offline', 'saving', 'error'].includes(status)) return null;
   const mergedClassName = ['sync-status-chip', `is-${status}`, className].filter(Boolean).join(' ');
 
   return /*#__PURE__*/React.createElement("span", {
@@ -1690,6 +1691,7 @@ export function SyncStatusChip({ syncStatus = null, className = '', style = null
 export function SyncStatusBanner({ syncStatus = null, className = '', style = null }) {
   const React = window.React;
   const { status, label, lastSyncedText, detail, title } = getSyncStatusMeta(syncStatus);
+  if (!syncStatus || !['offline', 'saving', 'error'].includes(status)) return null;
   const mergedClassName = ['sync-status-banner', `is-${status}`, className].filter(Boolean).join(' ');
 
   return /*#__PURE__*/React.createElement("div", {

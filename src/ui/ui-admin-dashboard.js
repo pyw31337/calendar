@@ -1964,7 +1964,7 @@ export function AdminDashboard({ initialCalendars }) {
       limit: `${PEEKALINK_FREE_HOURLY_LIMIT}건/시간`,
       remaining: `${peekalinkRemaining}건 (매 정시 초기화)`,
       percent: peekalinkUsagePercent,
-      note: '무료 요금제는 누적 소진이 아닌 시간당 rate limit이며, 캐시 응답은 집계에서 제외'
+      note: '무료 요금제는 누적 소진이 아닌 시간당 rate limit이며, 동일 URL의 반복 조회는 집계에서 제외'
     },
     {
       label: '카카오맵 지도 검색 (오늘)',
@@ -2306,47 +2306,6 @@ export function AdminDashboard({ initialCalendars }) {
               /*#__PURE__*/React.createElement("div", { style: styles.metricValue }, box.val)
             );
           })
-        )
-      ),
-
-      /* External service integration status -- service-wide (통합관리), not per-calendar.
-         Surfaces the Peekalink link-preview dependency's shared cache size and the client-side
-         API key exposure risk, per the admin transparency requirement for external services. */
-      /*#__PURE__*/React.createElement("section", { style: styles.card },
-        /*#__PURE__*/React.createElement("div", { style: styles.cardTitle, "data-collapse-anchor": "true", "data-collapse-key": "metrics-external-services", "data-collapse-label": "외부 서비스 연동 현황" },
-          /*#__PURE__*/React.createElement("span", { style: { display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(ExternalLinkIcon, null), "외부 서비스 연동 현황")
-        ),
-      /*#__PURE__*/React.createElement("div", { style: { border: '1px solid #E2E8F0', borderRadius: '10px', padding: '14px', backgroundColor: '#F8FAFC' } },
-          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' } },
-            /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.9rem', fontWeight: 'bold', color: '#0F172A' } }, "Peekalink (링크 미리보기 / OpenGraph)"),
-            /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.7rem', padding: '2px 8px', borderRadius: 'var(--radius-full)', backgroundColor: '#DCFCE7', color: '#16A34A', fontWeight: 'bold' } }, "통합 캐시 사용 중")
-          ),
-          /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.8rem', color: '#64748B', marginTop: '8px', lineHeight: 1.6 } },
-            "채팅/메모/정산 링크의 제목·설명·이미지를 가져옵니다. URL당 1회만 조회해 모든 캘린더가 공유하는 ",
-            /*#__PURE__*/React.createElement("strong", null, "Firestore 캐시"),
-            "에 저장합니다."
-          ),
-          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '16px', marginTop: '12px', flexWrap: 'wrap' } },
-            /*#__PURE__*/React.createElement("div", null,
-              /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.72rem', color: '#94A3B8', fontWeight: 700 } }, "누적 캐시된 링크 수(추정)"),
-              /*#__PURE__*/React.createElement("div", { style: { fontSize: '1.3rem', fontWeight: 900, color: '#0F172A' } },
-                linkPreviewStats ? `${linkPreviewStats.cachedCount || 0}건` : '—'
-              )
-            ),
-            /*#__PURE__*/React.createElement("div", null,
-              /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.72rem', color: '#94A3B8', fontWeight: 700 } }, "최근 갱신"),
-              /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.85rem', color: '#334155', marginTop: '4px' } },
-                linkPreviewStats && linkPreviewStats.updatedAt ? new Date(linkPreviewStats.updatedAt).toLocaleString('ko-KR') : '아직 없음'
-              )
-            )
-          ),
-          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'flex-start', gap: '8px', marginTop: '14px', padding: '10px', borderRadius: 'var(--radius-md)', backgroundColor: '#F0FDF4', border: '1px solid #BBF7D0' } },
-            /*#__PURE__*/React.createElement(ShieldCheckIcon, null),
-            /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.78rem', color: '#166534', lineHeight: 1.6 } },
-              /*#__PURE__*/React.createElement("strong", null, "API 키 보호: "),
-              "Peekalink는 Cloud Function 프록시(peekalinkProxy)로만 호출됩니다. 키는 서버에만 있고 브라우저에는 노출되지 않습니다."
-            )
-          )
         )
       ),
 

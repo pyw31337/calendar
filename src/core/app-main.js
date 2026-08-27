@@ -1761,56 +1761,55 @@ function App() {
     };
     const lastSyncedAt = Number(syncDiag?.receivedAt || syncDiag?.docUpdatedAt || activeCal?.updatedAt || 0) || 0;
     const lastSyncedText = formatSyncTimeLabel(lastSyncedAt);
-    const firebaseReconnectPending = !firebaseDb && !firebaseRetryExhausted;
-    const detail = syncDiag?.error
-      ? '동기화 응답이 지연되고 있습니다.'
-      : firebaseReconnectPending
-      ? (syncDiag?.fromCache || !syncDiag ? '최신 데이터를 서버와 확인하는 중입니다.' : 'Firebase 연결을 다시 시도하는 중입니다.')
-      : !firebaseDb
-      ? 'Firebase 연결이 아직 확인되지 않았습니다.'
-      : !isBrowserOnline
-      ? '네트워크 연결이 끊긴 상태입니다.'
-      : isInitialDataLoading
-      ? '최신 데이터를 불러오는 중입니다.'
-      : syncDiag?.hasPendingWrites
-      ? '저장한 변경사항을 서버에 반영하는 중입니다.'
-      : syncDiag?.fromCache || !syncDiag
-      ? '최신 데이터를 서버와 확인하는 중입니다.'
-      : '실시간으로 반영되는 상태입니다.';
-    let status = 'live';
-    let label = '동기화됨';
+    if (!isBrowserOnline) {
+      const label = '오프라인';
+      const detail = '네트워크 연결이 끊긴 상태입니다.';
+      return {
+        status: 'offline',
+        label,
+        detail,
+        lastSyncedText,
+        title: [label, lastSyncedText ? `최근 ${lastSyncedText}` : '', detail].filter(Boolean).join(' · ')
+      };
+    }
     if (!firebaseDb) {
       if (firebaseRetryExhausted) {
-        status = 'offline';
-        label = '연결 안 됨';
-      } else {
-        status = 'loading';
-        label = '연결 확인 중';
+        const label = '연결 안 됨';
+        const detail = 'Firebase 연결이 복구되지 않았습니다.';
+        return {
+          status: 'offline',
+          label,
+          detail,
+          lastSyncedText,
+          title: [label, lastSyncedText ? `최근 ${lastSyncedText}` : '', detail].filter(Boolean).join(' · ')
+        };
       }
-    } else if (syncDiag?.error) {
-      status = 'error';
-      label = '연결 지연';
-    } else if (!isBrowserOnline) {
-      status = 'offline';
-      label = '오프라인';
-    } else if (isInitialDataLoading) {
-      status = 'loading';
-      label = '동기화 중';
-    } else if (syncDiag?.hasPendingWrites) {
-      status = 'saving';
-      label = '저장 대기';
-    } else if (syncDiag?.fromCache || !syncDiag) {
-      status = 'loading';
-      label = '동기화 확인 중';
+      return null;
     }
-    return {
-      status,
-      label,
-      detail,
-      lastSyncedText,
-      title: [label, lastSyncedText ? `최근 ${lastSyncedText}` : '', detail].filter(Boolean).join(' · ')
-    };
-  }, [activeCal?.updatedAt, firebaseConnectionVersion, firebaseDb, isBrowserOnline, isInitialDataLoading, syncDiag]);
+    if (syncDiag?.error) {
+      const label = '연결 지연';
+      const detail = '동기화 응답이 지연되고 있습니다.';
+      return {
+        status: 'error',
+        label,
+        detail,
+        lastSyncedText,
+        title: [label, lastSyncedText ? `최근 ${lastSyncedText}` : '', detail].filter(Boolean).join(' · ')
+      };
+    }
+    if (syncDiag?.hasPendingWrites) {
+      const label = '저장 대기';
+      const detail = '저장한 변경사항을 서버에 반영하는 중입니다.';
+      return {
+        status: 'saving',
+        label,
+        detail,
+        lastSyncedText,
+        title: [label, lastSyncedText ? `최근 ${lastSyncedText}` : '', detail].filter(Boolean).join(' · ')
+      };
+    }
+    return null;
+  }, [activeCal?.updatedAt, firebaseDb, firebaseRetryExhausted, isBrowserOnline, syncDiag]);
   React.useEffect(() => {
     if (!firebaseDb || !activeCalId) return undefined;
     let lastRefreshAt = 0;
