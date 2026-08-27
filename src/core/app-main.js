@@ -1008,21 +1008,26 @@ function App() {
       setMainChatNotifyEnabled(next);
       setChatNotifyEnabledForCalendar(activeCalId, next);
       if (next) {
-        const result = await subscribeUserToPushWithPermission(activeCalId, getCurrentChatParticipantId());
+        let result = await subscribeUserToPushWithPermission(activeCalId, getCurrentChatParticipantId());
+        if (result && !result.ok) {
+          await new Promise(r => setTimeout(r, 400));
+          result = await subscribeUserToPushWithPermission(activeCalId, getCurrentChatParticipantId());
+        }
         if (result && !result.ok) {
           setMainChatNotifyEnabled(false);
           setChatNotifyEnabledForCalendar(activeCalId, false);
           if (result.reason === 'permission-not-granted') {
             openNotificationHelp();
+          } else {
+            showToast(`알림 설정 실패 (${describePushSubscribeFailure(result.reason)})`, 'error', 5000);
           }
-          showToast(`푸시 등록 실패: ${describePushSubscribeFailure(result.reason)}`, 'error', 6000);
           console.warn('Main chat notification subscribe failed:', result.reason);
           return;
         }
       } else {
         await unsubscribeUserFromPush(activeCalId);
       }
-      showToast(next ? '이 캘린더 채팅 알림 켜짐' : '이 캘린더 채팅 알림 꺼짐', 'success');
+      showToast(next ? '알림이 켜졌습니다.' : '알림이 꺼졌습니다.', 'success');
       return;
     }
     if (Notification.permission === 'denied') {
@@ -1034,30 +1039,35 @@ function App() {
     setMainNotifPermission(result);
     if (result !== 'granted') {
       openNotificationHelp();
-      showToast('알림 권한을 허용해야 채팅알림을 받을 수 있습니다.', 'error', 6000);
+      showToast('알림 권한을 허용해야 알림을 받을 수 있습니다.', 'error', 6000);
       return;
     }
     const capability = await probeNotificationCapability();
     if (!capability.ok) {
       setMainNotifPermission('unsupported');
       openNotificationHelp();
-      showToast(capability.reason === 'ios-not-installed' ? 'iOS는 홈 화면에 추가한 앱에서만 채팅알림을 받을 수 있습니다.' : '이 브라우저에서는 알림을 표시할 수 없습니다.', 'error', 6000);
+      showToast(capability.reason === 'ios-not-installed' ? 'iOS는 홈 화면에 추가한 앱에서만 알림을 받을 수 있습니다.' : '이 브라우저에서는 알림을 표시할 수 없습니다.', 'error', 6000);
       return;
     }
     setChatNotifyEnabledForCalendar(activeCalId, true);
     setMainChatNotifyEnabled(true);
-    const subscribeResult = await subscribeUserToPushWithPermission(activeCalId, getCurrentChatParticipantId());
+    let subscribeResult = await subscribeUserToPushWithPermission(activeCalId, getCurrentChatParticipantId());
+    if (subscribeResult && !subscribeResult.ok) {
+      await new Promise(r => setTimeout(r, 400));
+      subscribeResult = await subscribeUserToPushWithPermission(activeCalId, getCurrentChatParticipantId());
+    }
     if (subscribeResult && !subscribeResult.ok) {
       setMainChatNotifyEnabled(false);
       setChatNotifyEnabledForCalendar(activeCalId, false);
       if (subscribeResult.reason === 'permission-not-granted') {
         openNotificationHelp();
+      } else {
+        showToast(`알림 설정 실패 (${describePushSubscribeFailure(subscribeResult.reason)})`, 'error', 5000);
       }
-      showToast(`푸시 등록 실패: ${describePushSubscribeFailure(subscribeResult.reason)}`, 'error', 6000);
       console.warn('Main chat notification subscribe failed:', subscribeResult.reason);
       return;
     }
-    showToast('알림허용이 켜졌습니다', 'success');
+    showToast('알림이 켜졌습니다.', 'success');
     if (typeof setNotifGuideSeen === 'function') setNotifGuideSeen(true);
   };
 
@@ -2169,7 +2179,7 @@ function App() {
         const entries = getMessageImageEntries(msg);
         setActiveLightbox({
           urls: entries.map(e => e.full),
-          meta: entries.map(e => ({ timestamp: msg.timestamp, messageId: msg.id, imageIndex: e.imageIndex, thumb: e.thumb, tags: e.tags, source: e.source, uploadSource: e.uploadSource, mediaKey: e.mediaKey, refKey: e.refKey })),
+          meta: entries.map(e => ({ timestamp: msg.timestamp, messageId: msg.id, imageIndex: e.imageIndex, thumb: e.thumb, tags: e.tags, source: e.source, uploadSource: e.uploadSource, assetKey: e.assetKey, mediaKey: e.mediaKey, refKey: e.refKey })),
           index: Number(imgParam) || 0
         });
       }
@@ -3080,6 +3090,7 @@ function App() {
         sourceMessageId,
         sourceImageIndex,
         tags: cleanTags || '',
+        assetKey: keys.assetKey,
         mediaKey: keys.mediaKey,
         refKey: keys.refKey
       });
@@ -3787,6 +3798,7 @@ function App() {
             sourceMessageId: newMessageId || '',
             sourceImageIndex: idx,
             tags: dateStrToHashtag(dateStr),
+            assetKey: keys.assetKey,
             mediaKey: keys.mediaKey,
             refKey: keys.refKey
           });
@@ -3841,18 +3853,18 @@ function App() {
 
   const photoMatchesIdentity = (p, identityKey) => {
     if (!p || !identityKey) return false;
-    return p.id === identityKey || p.refKey === identityKey || p.mediaKey === identityKey;
+    return p.id === identityKey || p.refKey === identityKey || p.mediaKey === identityKey || p.assetKey === identityKey;
   };
 
   const photoMatchesIdentityPayload = (photo, identity = {}) => {
     if (!photo || !identity || typeof identity !== 'object') return false;
-    const keys = [identity.photoId, identity.refKey, identity.mediaKey].filter(Boolean);
+    const keys = [identity.photoId, identity.refKey, identity.mediaKey, identity.assetKey].filter(Boolean);
     if (keys.some(key => photoMatchesIdentity(photo, key))) return true;
     const urls = [identity.imageUrl, identity.thumbUrl, identity.full, identity.thumb].filter(Boolean);
     return urls.some(url => photoMatchesUrl(photo, url));
   };
 
-  const photoIdentityKeys = (identity = {}) => [identity.photoId, identity.refKey, identity.mediaKey].filter(Boolean);
+  const photoIdentityKeys = (identity = {}) => [identity.photoId, identity.refKey, identity.mediaKey, identity.assetKey].filter(Boolean);
 
   const resolveImageEntryIndex = (entries, preferredIndex, identity = {}) => {
     if (!Array.isArray(entries) || entries.length === 0) return -1;
@@ -4358,7 +4370,7 @@ function App() {
           imageUrl,
           thumbUrl: preferredIdentity.thumbUrl || imageUrl
         });
-        if (idx >= 0) return { type: 'chat', messageId: msg.id, imageIndex: idx, mediaKey: entries[idx]?.mediaKey || '', refKey: entries[idx]?.refKey || '' };
+        if (idx >= 0) return { type: 'chat', messageId: msg.id, imageIndex: idx, assetKey: entries[idx]?.assetKey || entries[idx]?.mediaKey || '', mediaKey: entries[idx]?.mediaKey || '', refKey: entries[idx]?.refKey || '' };
       }
     }
     const localMsg = (allChatMessages || []).find(m => {
@@ -4375,7 +4387,7 @@ function App() {
         imageUrl,
         thumbUrl: preferredIdentity.thumbUrl || imageUrl
       });
-      if (idx >= 0) return { type: 'chat', messageId: localMsg.id, imageIndex: idx, mediaKey: entries[idx]?.mediaKey || '', refKey: entries[idx]?.refKey || '' };
+      if (idx >= 0) return { type: 'chat', messageId: localMsg.id, imageIndex: idx, assetKey: entries[idx]?.assetKey || entries[idx]?.mediaKey || '', mediaKey: entries[idx]?.mediaKey || '', refKey: entries[idx]?.refKey || '' };
     }
 
     const localMemo = (memos || []).find(m => {
@@ -4388,7 +4400,7 @@ function App() {
       const thumbs = Array.isArray(localMemo.thumbUrls) ? localMemo.thumbUrls : (localMemo.thumbUrl ? [localMemo.thumbUrl] : []);
       let idx = urls.indexOf(imageUrl);
       if (idx < 0) idx = thumbs.indexOf(imageUrl);
-      return { type: 'memo', memoId: localMemo.id, imageIndex: Math.max(0, idx), mediaKey: `memo:${localMemo.id}:${Math.max(0, idx)}`, refKey: `memo:${localMemo.id}:${Math.max(0, idx)}` };
+      return { type: 'memo', memoId: localMemo.id, imageIndex: Math.max(0, idx), assetKey: `memo:${localMemo.id}:${Math.max(0, idx)}`, mediaKey: `memo:${localMemo.id}:${Math.max(0, idx)}`, refKey: `memo:${localMemo.id}:${Math.max(0, idx)}` };
     }
 
     const meetings = getConfirmedMeetings(activeCal);
@@ -4413,7 +4425,7 @@ function App() {
       }
     }
     if (targetMeeting && targetPhoto) {
-      return { type: 'meeting', dateStr: targetMeeting.date, photoId: targetPhoto.id, photo: targetPhoto, mediaKey: targetPhoto.mediaKey || '', refKey: targetPhoto.refKey || '' };
+      return { type: 'meeting', dateStr: targetMeeting.date, photoId: targetPhoto.id, photo: targetPhoto, assetKey: targetPhoto.assetKey || targetPhoto.mediaKey || '', mediaKey: targetPhoto.mediaKey || '', refKey: targetPhoto.refKey || '' };
     }
 
     return null;
@@ -4442,7 +4454,7 @@ function App() {
     const refKey = meta.refKey || '';
     const isMeetingPhotoMeta = meta.source === 'meeting' || meta.uploadSource === 'meeting' || dateStr || photoId;
     const originalTags = typeof meta.tags === 'string' ? meta.tags : '';
-    const preferredIdentity = { photoId, mediaKey, refKey, imageUrl, thumbUrl: meta.thumbUrl || meta.thumb || imageUrl, imageIndex: imgIdx, sourceImageIndex: meta.sourceImageIndex };
+    const preferredIdentity = { photoId, mediaKey, refKey, assetKey: meta.assetKey || '', imageUrl, thumbUrl: meta.thumbUrl || meta.thumb || imageUrl, imageIndex: imgIdx, sourceImageIndex: meta.sourceImageIndex };
 
     if (meta.source === 'memo' && msgId) {
       const ok = await handleDeleteMemoPhoto(msgId, imgIdx);
@@ -4524,7 +4536,7 @@ function App() {
     const photoId = meta.photoId;
     const mediaKey = meta.mediaKey || meta.originMediaKey || '';
     const refKey = meta.refKey || '';
-    const preferredIdentity = { photoId, mediaKey, refKey, imageUrl, thumbUrl: meta.thumbUrl || meta.thumb || imageUrl, imageIndex: imgIdx, sourceImageIndex: meta.sourceImageIndex };
+    const preferredIdentity = { photoId, mediaKey, refKey, assetKey: meta.assetKey || '', imageUrl, thumbUrl: meta.thumbUrl || meta.thumb || imageUrl, imageIndex: imgIdx, sourceImageIndex: meta.sourceImageIndex };
 
     if (meta.source === 'memo' && msgId) {
       const res = await handleReplaceMemoPhoto(msgId, imgIdx, file);
@@ -5186,7 +5198,7 @@ function App() {
           const entries = directMediaUrl && directEntry ? [directEntry] : getMessageImageEntries(msg);
           setActiveLightbox({
             urls: entries.map(e => e.full),
-            meta: entries.map(e => ({ timestamp: msg.timestamp, messageId: msg.id, imageIndex: e.imageIndex, thumb: e.thumb, tags: e.tags, directMediaUrl: e.directMediaUrl, source: e.source, uploadSource: e.uploadSource, mediaKey: e.mediaKey, refKey: e.refKey })),
+            meta: entries.map(e => ({ timestamp: msg.timestamp, messageId: msg.id, imageIndex: e.imageIndex, thumb: e.thumb, tags: e.tags, directMediaUrl: e.directMediaUrl, source: e.source, uploadSource: e.uploadSource, assetKey: e.assetKey, mediaKey: e.mediaKey, refKey: e.refKey })),
             index: directMediaUrl ? 0 : imageIndex
           });
         }, 350);
@@ -5216,7 +5228,7 @@ function App() {
           const entries = directMediaUrl && directEntry ? [directEntry] : getMessageImageEntries(msg);
           setActiveLightbox({
             urls: entries.map(e => e.full),
-            meta: entries.map(e => ({ timestamp: msg.timestamp, messageId: msg.id, imageIndex: e.imageIndex, thumb: e.thumb, tags: e.tags, directMediaUrl: e.directMediaUrl, source: e.source, uploadSource: e.uploadSource, mediaKey: e.mediaKey, refKey: e.refKey })),
+            meta: entries.map(e => ({ timestamp: msg.timestamp, messageId: msg.id, imageIndex: e.imageIndex, thumb: e.thumb, tags: e.tags, directMediaUrl: e.directMediaUrl, source: e.source, uploadSource: e.uploadSource, assetKey: e.assetKey, mediaKey: e.mediaKey, refKey: e.refKey })),
             index: directMediaUrl ? 0 : imageIndex
           });
         }, 350);
@@ -8077,6 +8089,7 @@ function resolveMeetingPhotoDisplay(photo, chatMessages) {
     imageUrl: entry.full,
     thumbUrl: entry.thumb,
     tags: entry.tags || '',
+    assetKey: entry.assetKey || fallbackKeys.assetKey,
     mediaKey: entry.mediaKey || fallbackKeys.mediaKey,
     refKey: fallbackKeys.refKey
   };
@@ -8114,7 +8127,7 @@ function renderChatMessageImages(msg, setActiveLightbox, singleImageStyle = {}) 
   if (entries.length === 0) return null;
   const thumbs = entries.map(e => e.thumb);
   const displayUrls = entries.map(e => e.full);
-  const meta = entries.map(e => ({ timestamp: msg.timestamp, messageId: msg.id, imageIndex: e.imageIndex, thumb: e.thumb, tags: e.tags, source: e.source, uploadSource: e.uploadSource, mediaKey: e.mediaKey, refKey: e.refKey }));
+  const meta = entries.map(e => ({ timestamp: msg.timestamp, messageId: msg.id, imageIndex: e.imageIndex, thumb: e.thumb, tags: e.tags, source: e.source, uploadSource: e.uploadSource, assetKey: e.assetKey, mediaKey: e.mediaKey, refKey: e.refKey }));
   if (thumbs.length === 1) {
     return /*#__PURE__*/React.createElement('img', {
       src: displayUrls[0] || thumbs[0],

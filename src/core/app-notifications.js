@@ -164,21 +164,22 @@ function isNotificationSupported() {
     try {
       const ua = (typeof navigator !== 'undefined' && navigator.userAgent) ? navigator.userAgent : '';
       let os = '기기';
-      if (/iPhone|iPad|iPod/i.test(ua)) os = 'iPhone/iPad';
+      if (/iPhone|iPad|iPod/i.test(ua)) os = 'iOS';
       else if (/Android/i.test(ua)) os = 'Android';
-      else if (/Mac OS X/i.test(ua)) os = 'Mac';
+      else if (/Mac OS X|Macintosh/i.test(ua)) os = 'macOS';
       else if (/Windows/i.test(ua)) os = 'Windows';
       else if (/Linux/i.test(ua)) os = 'Linux';
-      let browser = 'Browser';
-      if (/Edg\//i.test(ua)) browser = 'Edge';
-      else if (/SamsungBrowser/i.test(ua)) browser = 'Samsung';
-      else if (/Chrome\//i.test(ua) && !/Edg\//i.test(ua)) browser = 'Chrome';
-      else if (/Safari\//i.test(ua) && !/Chrome\//i.test(ua)) browser = 'Safari';
+      let browser = '브라우저';
+      if (/Whale/i.test(ua)) browser = '네이버 웨일';
+      else if (/SamsungBrowser/i.test(ua)) browser = '삼성 인터넷';
+      else if (/Edg\//i.test(ua)) browser = 'Edge';
+      else if (/CriOS|Chrome\//i.test(ua) && !/Edg\//i.test(ua) && !/Whale/i.test(ua)) browser = 'Chrome';
+      else if (/Safari\//i.test(ua) && !/Chrome\//i.test(ua) && !/CriOS/i.test(ua) && !/Whale/i.test(ua)) browser = 'Safari';
       else if (/Firefox\//i.test(ua)) browser = 'Firefox';
       const standalone = (typeof window !== 'undefined' && (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true));
       return os + ' · ' + browser + (standalone ? ' (앱)' : '');
     } catch (_) {
-      return '이 기기';
+      return '현재 기기';
     }
   }
 

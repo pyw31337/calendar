@@ -732,13 +732,23 @@ export function AppSettingsModal({
         const rows = [];
         snap.forEach(doc => {
           const d = doc.data() || {};
+          const isThisDevice = myDeviceId && d.deviceId === myDeviceId;
+          let label = d.deviceLabel || '';
+          if (!label || label === '알 수 없는 기기') {
+            const currentLabel = (typeof getDeviceLabel === 'function') ? getDeviceLabel() : null;
+            if (isThisDevice && currentLabel) {
+              label = currentLabel;
+            } else {
+              return; // Hide legacy unknown device entries
+            }
+          }
           rows.push({
             id: doc.id,
             deviceId: d.deviceId || '',
-            deviceLabel: d.deviceLabel || '알 수 없는 기기',
+            deviceLabel: label.replace(/ · 이 기기$/, ''),
             lastSeenAt: d.lastSeenAt || d.updatedAt || d.createdAt || 0,
             participantId: d.participantId || '',
-            isThis: myDeviceId && d.deviceId === myDeviceId
+            isThis: isThisDevice
           });
         });
         rows.sort((a, b) => (b.lastSeenAt || 0) - (a.lastSeenAt || 0));
@@ -978,70 +988,41 @@ export function AppSettingsModal({
             })
           ))
         ),
-        Array.isArray(helpSteps) && helpSteps.length > 0 && /*#__PURE__*/React.createElement("div", {
-          style: { marginTop: '12px', padding: '12px', borderRadius: '12px', background: 'var(--bg-primary)', border: 'none', fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.5 }
-        },
-          
-        /* --- Push status + devices (P0/P1) --- */
-        /*#__PURE__*/React.createElement("div", {
-          style: { height: '1px', background: 'var(--border-subtle)', margin: '4px 0 8px' }
-        }),
-        /*#__PURE__*/React.createElement("div", {
+        deviceRows.length > 0 && /*#__PURE__*/React.createElement("div", {
           style: {
-            padding: '12px 14px', borderRadius: '12px', background: '#FFFFFF',
-            border: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column', gap: '10px'
+            marginTop: '10px', padding: '12px 14px', borderRadius: '12px', background: 'var(--bg-primary)',
+            border: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column', gap: '6px'
           }
         },
-          /*#__PURE__*/React.createElement("div", { style: { fontWeight: 800, fontSize: '0.88rem', color: 'var(--text-main)' } }, "이 기기 알림 상태"),
-          /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.8rem', color: 'var(--text-main)', lineHeight: 1.5 } },
-            pushStatus && pushStatus.ok
-              ? /*#__PURE__*/React.createElement("span", null, "✅ 구독 성공 — 이 기기로 푸시 알림을 받을 수 있습니다.")
-              : /*#__PURE__*/React.createElement("span", null,
-                  "⚠️ 구독 미완료",
-                  pushStatus && pushStatus.reason === 'permission' ? " (알림 권한 필요)" :
-                  pushStatus && pushStatus.reason === 'no-sub' ? " (푸시 구독 없음)" :
-                  pushStatus && pushStatus.reason === 'no-sw' ? " (서비스워커 없음)" : ""
-                )
-          ),
-          /*#__PURE__*/React.createElement("button", {
-            type: "button",
-            disabled: pushBusy,
-            onClick: handleForceReregister,
+          /*#__PURE__*/React.createElement("div", { style: { fontWeight: 800, fontSize: '0.82rem', color: 'var(--text-main)', marginBottom: '2px' } },
+            "등록된 기기 (", deviceRows.length, ")"),
+          deviceRows.map(row => /*#__PURE__*/React.createElement("div", {
+            key: row.id,
             style: {
-              width: '100%', padding: '10px 12px', borderRadius: '10px', border: 'none',
-              background: '#0F172A', color: '#fff', fontWeight: 800, fontSize: '0.84rem',
-              cursor: pushBusy ? 'wait' : 'pointer', opacity: pushBusy ? 0.7 : 1
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px',
+              padding: '6px 0', borderTop: '1px solid var(--border-subtle)', fontSize: '0.78rem'
             }
-          }, pushBusy ? '등록 중…' : '이 기기 알림 다시 등록'),
-          deviceRows.length > 0 && /*#__PURE__*/React.createElement("div", { style: { marginTop: '4px' } },
-            /*#__PURE__*/React.createElement("div", { style: { fontWeight: 800, fontSize: '0.82rem', marginBottom: '6px' } },
-              "등록된 기기 (", deviceRows.length, ")"),
-            deviceRows.map(row => /*#__PURE__*/React.createElement("div", {
-              key: row.id,
+          },
+            /*#__PURE__*/React.createElement("div", { style: { minWidth: 0 } },
+              /*#__PURE__*/React.createElement("div", { style: { fontWeight: 700, color: 'var(--text-main)' } },
+                row.deviceLabel, row.isThis ? ' (이 기기)' : ''),
+              /*#__PURE__*/React.createElement("div", { style: { color: 'var(--text-muted)', fontSize: '0.7rem', marginTop: '1px' } },
+                row.lastSeenAt ? ('최근 ' + new Date(row.lastSeenAt).toLocaleDateString('ko-KR')) : '')
+            ),
+            /*#__PURE__*/React.createElement("button", {
+              type: "button",
+              onClick: () => handleDeleteDevice(row),
               style: {
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px',
-                padding: '8px 0', borderTop: '1px solid var(--border-subtle)', fontSize: '0.78rem'
+                flexShrink: 0, border: '1px solid #FECACA', background: 'rgba(239,68,68,0.06)',
+                color: '#EF4444', borderRadius: '6px', padding: '3px 8px', fontWeight: 700, fontSize: '0.7rem', cursor: 'pointer'
               }
-            },
-              /*#__PURE__*/React.createElement("div", { style: { minWidth: 0 } },
-                /*#__PURE__*/React.createElement("div", { style: { fontWeight: 700, color: 'var(--text-main)' } },
-                  row.deviceLabel, row.isThis ? ' · 이 기기' : ''),
-                /*#__PURE__*/React.createElement("div", { style: { color: 'var(--text-muted)', marginTop: '2px' } },
-                  row.lastSeenAt ? ('최근 ' + new Date(row.lastSeenAt).toLocaleString('ko-KR')) : '')
-              ),
-              /*#__PURE__*/React.createElement("button", {
-                type: "button",
-                onClick: () => handleDeleteDevice(row),
-                style: {
-                  flexShrink: 0, border: '1px solid #FECACA', background: 'rgba(239,68,68,0.06)',
-                  color: '#EF4444', borderRadius: '8px', padding: '4px 10px', fontWeight: 700, fontSize: '0.72rem', cursor: 'pointer'
-                }
-              }, "삭제")
-            ))
-          )
+            }, "삭제")
+          ))
         ),
-
-/*#__PURE__*/React.createElement("div", { style: { fontWeight: 800, color: 'var(--text-main)', marginBottom: '6px' } }, "설정 안내"),
+        Array.isArray(helpSteps) && helpSteps.length > 0 && /*#__PURE__*/React.createElement("div", {
+          style: { marginTop: '10px', padding: '12px', borderRadius: '12px', background: 'var(--bg-primary)', border: 'none', fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.5 }
+        },
+          /*#__PURE__*/React.createElement("div", { style: { fontWeight: 800, color: 'var(--text-main)', marginBottom: '6px' } }, "설정 안내"),
           /*#__PURE__*/React.createElement("ol", { style: { margin: 0, paddingLeft: '18px' } },
             helpSteps.map((step, i) => /*#__PURE__*/React.createElement("li", { key: i, style: { marginBottom: '4px' } }, step))
           )
