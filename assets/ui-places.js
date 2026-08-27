@@ -708,11 +708,10 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
           tapTolerance: 15
         })
         .setView(PLACE_MAP_DEFAULT_CENTER, PLACE_MAP_DEFAULT_ZOOM);
-      // Custom MapTiler style integration (Style ID: 01a040c1-ec60-7ed9-af9a-adb73a754755)
+      // MapTiler Official Positron Style (Clean, bright, monotone map with native Korean labels)
       const maptilerKey = (typeof window !== 'undefined' && (window.MAPTILER_API_KEY || (window.GATHER_APP_CONFIG && window.GATHER_APP_CONFIG.maptilerApiKey))) || 'b45noTvSyt7Z3EozaXIa';
-      const maptilerStyleId = '01a040c1-ec60-7ed9-af9a-adb73a754755';
       if (maptilerKey) {
-        L.tileLayer(`https://api.maptiler.com/maps/${maptilerStyleId}/256/{z}/{x}/{y}.png?key=${encodeURIComponent(maptilerKey)}`, {
+        L.tileLayer(`https://api.maptiler.com/maps/positron/256/{z}/{x}/{y}.png?key=${encodeURIComponent(maptilerKey)}`, {
           maxZoom: 19,
           maxNativeZoom: 19,
           attribution: '&copy; <a href="https://www.maptiler.com/copyright/">MapTiler</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
