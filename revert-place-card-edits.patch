@@ -1,0 +1,354 @@
+diff --git a/assets/app.css b/assets/app.css
+index e365295..606c010 100644
+--- a/assets/app.css
++++ b/assets/app.css
+@@ -358,7 +358,8 @@ body:has(.admin-login-gate) {
+ .calendar-card,
+ .summary-card,
+ .poll-card,
+-.memo-card-hover {
++.memo-card-hover,
++.place-card-row {
+   animation: motion-fade-up var(--motion-slow) var(--motion-ease-out) both;
+   will-change: transform, opacity;
+ }
+@@ -455,6 +456,7 @@ body:has(.admin-login-gate) {
+ .section-toggle-btn,
+ .main-menu-item,
+ .memo-card-hover,
++.place-card-row,
+ .confirmed-meeting,
+ .color-swatch-trigger,
+ .admin-calendar-picker-btn,
+@@ -500,6 +502,7 @@ body:has(.admin-login-gate) {
+ .poll-voter-option,
+ .main-menu-item,
+ .memo-card-hover,
++.place-card-row,
+ .confirmed-meeting,
+ .color-swatch-trigger,
+ .admin-calendar-picker-btn,
+@@ -535,6 +538,7 @@ body:has(.admin-login-gate) {
+ .poll-voter-option:hover,
+ .search-result-row:hover,
+ .memo-card-hover:hover,
++.place-card-row:hover,
+ .confirmed-meeting:hover,
+ .color-swatch-trigger:hover,
+ .admin-calendar-picker-btn:hover,
+@@ -625,6 +629,8 @@ body:has(.admin-login-gate) {
+ .main-menu-item.is-pressing,
+ .memo-card-hover:active,
+ .memo-card-hover.is-pressing,
++.place-card-row:active,
++.place-card-row.is-pressing,
+ .admin-side-menu-item:active,
+ .admin-side-menu-item.is-pressing,
+ .admin-side-menu-close-btn:active,
+@@ -4303,61 +4309,3 @@ textarea.form-input {
+   .manual-mobile-friendly article h3 { font-size: 0.95rem !important; }
+   .manual-mobile-friendly article p { font-size: 0.82rem !important; margin-top: 4px !important; }
+ }
+-
+-
+-/* Place list cards: no press/scale — they are rows, not buttons */
+-.place-card-row:active,
+-.place-card-row.is-pressing,
+-.place-card-row:hover {
+-  transform: none !important;
+-}
+-.place-card-row .place-card-action-btn {
+-  position: relative;
+-  z-index: 3;
+-}
+-
+-/* Place list cards are rows, not pressable buttons */
+-.place-card-row,
+-.place-card-row:hover,
+-.place-card-row:active,
+-.place-card-row.is-pressing,
+-.place-card-row:focus,
+-.place-card-row:focus-visible {
+-  transform: none !important;
+-  filter: none !important;
+-  opacity: 1 !important;
+-  will-change: auto !important;
+-  isolation: auto !important;
+-  overflow: visible !important;
+-}
+-.place-card-actions {
+-  position: absolute !important;
+-  top: 6px !important;
+-  right: 6px !important;
+-  z-index: 20 !important;
+-  pointer-events: auto !important;
+-}
+-.place-card-action-btn {
+-  position: relative !important;
+-  z-index: 21 !important;
+-  pointer-events: auto !important;
+-  width: 36px !important;
+-  height: 36px !important;
+-  transform: none !important;
+-}
+-.place-card-action-btn:active,
+-.place-card-action-btn.is-pressing {
+-  transform: none !important;
+-}
+-
+-
+-.place-card-row.is-place-focused {
+-  border: 1.5px solid #7C3AED !important;
+-  background-color: rgba(124, 58, 237, 0.06) !important;
+-  animation: none !important;
+-  transform: none !important;
+-}
+-.place-card-row.chat-search-focused-bubble {
+-  animation: none !important;
+-  transform: none !important;
+-}
+diff --git a/public/assets/app.css b/public/assets/app.css
+index 4eae7d2..606c010 100644
+--- a/public/assets/app.css
++++ b/public/assets/app.css
+@@ -358,7 +358,8 @@ body:has(.admin-login-gate) {
+ .calendar-card,
+ .summary-card,
+ .poll-card,
+-.memo-card-hover {
++.memo-card-hover,
++.place-card-row {
+   animation: motion-fade-up var(--motion-slow) var(--motion-ease-out) both;
+   will-change: transform, opacity;
+ }
+@@ -455,6 +456,7 @@ body:has(.admin-login-gate) {
+ .section-toggle-btn,
+ .main-menu-item,
+ .memo-card-hover,
++.place-card-row,
+ .confirmed-meeting,
+ .color-swatch-trigger,
+ .admin-calendar-picker-btn,
+@@ -500,6 +502,7 @@ body:has(.admin-login-gate) {
+ .poll-voter-option,
+ .main-menu-item,
+ .memo-card-hover,
++.place-card-row,
+ .confirmed-meeting,
+ .color-swatch-trigger,
+ .admin-calendar-picker-btn,
+@@ -535,6 +538,7 @@ body:has(.admin-login-gate) {
+ .poll-voter-option:hover,
+ .search-result-row:hover,
+ .memo-card-hover:hover,
++.place-card-row:hover,
+ .confirmed-meeting:hover,
+ .color-swatch-trigger:hover,
+ .admin-calendar-picker-btn:hover,
+@@ -625,6 +629,8 @@ body:has(.admin-login-gate) {
+ .main-menu-item.is-pressing,
+ .memo-card-hover:active,
+ .memo-card-hover.is-pressing,
++.place-card-row:active,
++.place-card-row.is-pressing,
+ .admin-side-menu-item:active,
+ .admin-side-menu-item.is-pressing,
+ .admin-side-menu-close-btn:active,
+@@ -4303,49 +4309,3 @@ textarea.form-input {
+   .manual-mobile-friendly article h3 { font-size: 0.95rem !important; }
+   .manual-mobile-friendly article p { font-size: 0.82rem !important; margin-top: 4px !important; }
+ }
+-
+-
+-/* Place list cards: no press/scale — they are rows, not buttons */
+-.place-card-row:active,
+-.place-card-row.is-pressing,
+-.place-card-row:hover {
+-  transform: none !important;
+-}
+-.place-card-row .place-card-action-btn {
+-  position: relative;
+-  z-index: 3;
+-}
+-
+-/* Place list cards are rows, not pressable buttons */
+-.place-card-row,
+-.place-card-row:hover,
+-.place-card-row:active,
+-.place-card-row.is-pressing,
+-.place-card-row:focus,
+-.place-card-row:focus-visible {
+-  transform: none !important;
+-  filter: none !important;
+-  opacity: 1 !important;
+-  will-change: auto !important;
+-  isolation: auto !important;
+-  overflow: visible !important;
+-}
+-.place-card-actions {
+-  position: absolute !important;
+-  top: 6px !important;
+-  right: 6px !important;
+-  z-index: 20 !important;
+-  pointer-events: auto !important;
+-}
+-.place-card-action-btn {
+-  position: relative !important;
+-  z-index: 21 !important;
+-  pointer-events: auto !important;
+-  width: 36px !important;
+-  height: 36px !important;
+-  transform: none !important;
+-}
+-.place-card-action-btn:active,
+-.place-card-action-btn.is-pressing {
+-  transform: none !important;
+-}
+diff --git a/src/ui/ui-place-register.js b/src/ui/ui-place-register.js
+index 928957b..6a881f7 100644
+--- a/src/ui/ui-place-register.js
++++ b/src/ui/ui-place-register.js
+@@ -30,15 +30,7 @@ function useChatSendGuard(onSend, canSend) {
+   return typeof f === 'function' ? f(onSend, canSend) : onSend;
+ }
+ function useModalDirtyGuard(...args) {
+-  const f = (__gatherUiDeps() || {}).useModalDirtyGuard;
+-  if (typeof f === 'function') return f(...args);
+-  const onClose = args[0];
+-  return {
+-    requestClose: () => { if (typeof onClose === 'function') onClose(); },
+-    overlayOnClick: (e) => {
+-      if (e && e.target === e.currentTarget && typeof onClose === 'function') onClose();
+-    }
+-  };
++  return __gatherUiDeps().useModalDirtyGuard(...args);
+ }
+ function computeKoreanHolidaysForYear(year) {
+   const f = __gatherUiDeps().computeKoreanHolidaysForYear;
+@@ -691,12 +683,7 @@ export function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, on
+   const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon || function () { return '×'; };
+   const TrashIcon = __comp.TrashIcon || __deps.TrashIcon || function () { return '🗑'; };
+   const AutoGrowTextarea = __comp.AutoGrowTextarea || __deps.AutoGrowTextarea;
+-  const FormAddEditActionButtons = __comp.FormAddEditActionButtons || __deps.FormAddEditActionButtons || function FallbackActions({ isEditing, isSaving, onCancel, onSubmit, flexGrow }) {
+-    return React.createElement('div', { style: { display: 'flex', gap: '8px', flex: flexGrow ? 1 : undefined } },
+-      React.createElement('button', { type: 'button', onClick: onCancel, disabled: isSaving }, '취소'),
+-      React.createElement('button', { type: 'button', onClick: onSubmit, disabled: isSaving }, isSaving ? '저장 중...' : (isEditing ? '수정' : '추가'))
+-    );
+-  };
++  const FormAddEditActionButtons = __comp.FormAddEditActionButtons || __deps.FormAddEditActionButtons;
+   const PlaceSectionIcon = __comp.PlaceSectionIcon || __deps.PlaceSectionIcon;
+   const SegmentedToggle = __comp.SegmentedToggle || __deps.SegmentedToggle;
+   const SimpleBottomSheetPicker = __comp.SimpleBottomSheetPicker || __deps.SimpleBottomSheetPicker;
+diff --git a/src/ui/ui-places.js b/src/ui/ui-places.js
+index a4a27f5..b7106ac 100644
+--- a/src/ui/ui-places.js
++++ b/src/ui/ui-places.js
+@@ -1830,69 +1830,54 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
+           const isPlaceFocused = !!(focusPlace && focusPlace.id === place.id);
+           return /*#__PURE__*/React.createElement("div", {
+             key: place.id,
+-            className: "place-card-row" + (isPlaceFocused ? " is-place-focused" : ""),
++            // Same purple-border + up/down-shake "you were just brought here" treatment used
++            // everywhere else in the app (see chat-search-focused-bubble/chat-search-shake).
++            className: "place-card-row" + (isPlaceFocused ? " chat-search-focused-bubble" : ""),
+             "data-place-id": place.id,
+-            "data-no-press-feedback": "1",
++            role: "button",
++            tabIndex: 0,
++            onKeyDown: (e) => {
++              if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'BUTTON')) return;
++              if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleSelectPlaceOnMap(place); }
++            },
+             style: {
+               display: 'flex', flexDirection: 'column', gap: '4px',
+-              padding: '10px 48px 10px 12px', position: 'relative',
++              padding: '10px 12px', position: 'relative',
+               border: '1px solid var(--border-subtle)',
+               borderRadius: 'var(--radius-md)',
+-              cursor: 'default',
++              cursor: 'pointer',
+               backgroundColor: 'var(--bg-card)',
+-              transition: 'border-color 0.15s ease, background-color 0.15s ease',
+-              overflow: 'visible',
+-              transform: 'none'
+-            }
++              transition: 'border-color 0.15s ease, background-color 0.15s ease'
++            },
++            onClick: () => handleSelectPlaceOnMap(place)
+           },
+             /* Top-right absolute action buttons */
+             /*#__PURE__*/React.createElement("div", {
+-              className: "place-card-actions",
+-              style: { position: 'absolute', top: '6px', right: '6px', display: 'flex', alignItems: 'center', gap: '2px', zIndex: 20, pointerEvents: 'auto' },
+-              onClick: event => { event.preventDefault(); event.stopPropagation(); },
+-              onPointerDown: event => { event.stopPropagation(); },
+-              onMouseDown: event => { event.stopPropagation(); },
+-              onTouchStart: event => { event.stopPropagation(); }
++              style: { position: 'absolute', top: '8px', right: '8px', display: 'flex', alignItems: 'center', gap: '4px' }
+             },
+               /*#__PURE__*/React.createElement("button", {
+                 type: "button",
+-                className: "place-card-action-btn",
+                 onClick: event => {
+-                  event.preventDefault();
+                   event.stopPropagation();
+-                  try {
+-                    const url = typeof getPlaceExternalMapUrl === 'function' ? getPlaceExternalMapUrl(place) : (place && (place.url || place.mapUrl));
+-                    if (url) window.open(url, '_blank', 'noopener,noreferrer');
+-                    else if (showToast) showToast('연결된 업체 정보가 없습니다.', 'info');
+-                  } catch (err) {
+-                    console.error('place external map url', err);
+-                    if (showToast) showToast('업체 정보를 열 수 없습니다.', 'error');
+-                  }
++                  window.open(getPlaceExternalMapUrl(place), '_blank', 'noopener,noreferrer');
+                 },
+                 title: "업체보기",
+                 style: {
+                   width: '28px', height: '28px',
+                   background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8',
+-                  display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
+-                  pointerEvents: 'auto'
++                  display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0
+                 }
+-              }, BuildingIcon ? /*#__PURE__*/React.createElement(BuildingIcon, { size: 14 }) : '🏢'),
++              }, /*#__PURE__*/React.createElement(BuildingIcon, { size: 14 })),
+               /*#__PURE__*/React.createElement("button", {
+                 type: "button",
+-                className: "place-card-action-btn",
+-                onClick: event => {
+-                  event.preventDefault();
+-                  event.stopPropagation();
+-                  handleEditPlace(place);
+-                },
++                onClick: event => { event.stopPropagation(); handleEditPlace(place); },
+                 title: "장소 수정",
+                 style: {
+                   width: '28px', height: '28px',
+                   background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8',
+-                  display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
+-                  pointerEvents: 'auto'
++                  display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0
+                 }
+-              }, PencilIcon ? /*#__PURE__*/React.createElement(PencilIcon, { size: 14 }) : '✎')
++              }, /*#__PURE__*/React.createElement(PencilIcon, { size: 14 }))
+             ),
+             
+             /* Category Label Capsule and Visit Info */
+@@ -1929,16 +1914,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
+             ),
+             
+             /* Name & Address -- alias is the list display name when set; official name shown underneath */
+-            /*#__PURE__*/React.createElement("div", {
+-              className: "place-card-select-area",
+-              role: "button",
+-              tabIndex: 0,
+-              onClick: event => { event.stopPropagation(); handleSelectPlaceOnMap(place); },
+-              onKeyDown: event => {
+-                if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); handleSelectPlaceOnMap(place); }
+-              },
+-              style: { display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0, cursor: 'pointer' }
+-            },
++            /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 } },
+               /*#__PURE__*/React.createElement("span", { style: { fontWeight: 800, fontSize: '0.88rem', color: 'var(--text-main)' } }, (place.alias || place.name || '이름 없음')),
+               place.alias && place.name && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.72rem', color: 'var(--text-muted)' } }, place.name),
+               place.address && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.74rem', color: 'var(--text-muted)' } }, getDisplayPlaceAddress(place))

@@ -1313,39 +1313,7 @@ export function SharedAppNavBlock({
     className: "admin-side-menu-list",
     style: { borderTop: '1px solid var(--border-subtle, #E2E8F0)', borderBottom: 'none', paddingTop: '6px', marginTop: '2px' }
   },
-    /* 1. 정산생성 (+ Icon, dark text) */
-    /*#__PURE__*/React.createElement("button", {
-      type: "button",
-      className: "admin-side-menu-item",
-      onClick: () => {
-        if (typeof onClose === 'function') onClose();
-        if (typeof onOpenCreateSettlement === 'function') onOpenCreateSettlement();
-        else go("settlement");
-      }
-    },
-      /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" },
-        /*#__PURE__*/React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.5", strokeLinecap: "round", strokeLinejoin: "round" },
-          /*#__PURE__*/React.createElement("line", { x1: "12", y1: "5", x2: "12", y2: "19" }),
-          /*#__PURE__*/React.createElement("line", { x1: "5", y1: "12", x2: "19", y2: "12" })
-        )
-      ),
-      /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
-        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title", style: { fontWeight: 700, color: "var(--text-main)" } }, "정산생성")
-      )
-    ),
-    /* 2. 정산카드 */
-    /*#__PURE__*/React.createElement("button", { type: "button", className: "admin-side-menu-item", onClick: () => go("settlement") },
-      /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" },
-        /*#__PURE__*/React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2" },
-          /*#__PURE__*/React.createElement("rect", { width: "20", height: "14", x: "2", y: "5", rx: "2" }),
-          /*#__PURE__*/React.createElement("line", { x1: "2", x2: "22", y1: "10", y2: "10" })
-        )
-      ),
-      /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
-        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title", style: { fontWeight: 700, color: "var(--text-main)" } }, "정산카드")
-      )
-    ),
-    /* 3. 채팅 */
+    /* 1. 채팅 */
     /*#__PURE__*/React.createElement("button", { type: "button", className: "admin-side-menu-item", onClick: () => go("chat") },
       /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2" }, /*#__PURE__*/React.createElement("path", { d: "M7.9 20A9 9 0 1 0 4 16.1L2 22Z" }))),
       /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
