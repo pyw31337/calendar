@@ -1452,8 +1452,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
         style: {
           position: 'absolute', left: '50%', transform: 'translateX(-50%)',
           display: 'flex', alignItems: 'center', fontWeight: 800, fontSize: '0.95rem',
-          color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden',
-          textOverflow: 'ellipsis', maxWidth: 'calc(100vw - 220px)', pointerEvents: 'none'
+          color: 'var(--text-main)', whiteSpace: 'nowrap', pointerEvents: 'none'
         }
       }, calendar.title, " 장소"),
       
@@ -1929,6 +1928,43 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
                       )
                     );
                   }
+                  if (isMobile) {
+                    return /*#__PURE__*/React.createElement("div", {
+                      key: idx,
+                      onClick: () => {
+                        if (typeof onSelectDate === 'function' && entry.date) {
+                          onSelectDate(entry.date);
+                        }
+                      },
+                      title: `${formatPlaceBadgeDate(entry.date) || entry.date} 일정 열기`,
+                      className: "place-visit-entry-row-mobile",
+                      style: { display: 'flex', flexDirection: 'column', gap: '4px', backgroundColor: 'var(--bg-primary)', borderRadius: 'var(--radius-md)', padding: '8px 10px', cursor: 'pointer' }
+                    },
+                      /* Line 1: Date on left, Edit/Delete icons on right */
+                      /*#__PURE__*/React.createElement("div", {
+                        style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }
+                      },
+                        /*#__PURE__*/React.createElement("span", { className: "place-visit-entry-date", style: { fontWeight: 700, fontSize: '0.8rem', color: 'var(--text-main)' } }, formatPlaceBadgeDate(entry.date) || entry.date),
+                        /*#__PURE__*/React.createElement("div", {
+                          style: { display: 'flex', alignItems: 'center', gap: '8px' }
+                        },
+                          /*#__PURE__*/React.createElement("button", {
+                            type: "button", onClick: (e) => { e.stopPropagation(); handleStartEditPlaceMemoEntry(place, entry); }, title: "메모 편집", "aria-label": "메모 편집",
+                            style: { background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', color: '#64748B' }
+                          }, /*#__PURE__*/React.createElement(PencilIcon, { size: 14 })),
+                          /*#__PURE__*/React.createElement("button", {
+                            type: "button", onClick: (e) => { e.stopPropagation(); handleDeletePlaceMemoEntry(place, entry); }, title: "메모 삭제", "aria-label": "메모 삭제",
+                            style: { background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', color: '#64748B' }
+                          }, /*#__PURE__*/React.createElement(TrashIcon, { size: 14 }))
+                        )
+                      ),
+                      /* Line 2: Memo note full width below */
+                      entry.note && /*#__PURE__*/React.createElement("div", {
+                        style: { fontSize: '0.8rem', color: 'var(--text-main)', wordBreak: 'break-word', lineHeight: 1.45, width: '100%' }
+                      }, entry.note)
+                    );
+                  }
+
                   return /*#__PURE__*/React.createElement("div", {
                     key: idx,
                     onClick: () => {
@@ -1937,6 +1973,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
                       }
                     },
                     title: `${formatPlaceBadgeDate(entry.date) || entry.date} 일정 열기`,
+                    className: "place-visit-entry-row-desktop",
                     style: { display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: 'var(--bg-primary)', borderRadius: 'var(--radius-md)', padding: '6px 10px', cursor: 'pointer' }
                   },
                     /*#__PURE__*/React.createElement("span", { className: "place-visit-entry-date", style: { flexShrink: 0, fontWeight: 700 } }, formatPlaceBadgeDate(entry.date) || entry.date),
