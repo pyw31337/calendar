@@ -928,17 +928,6 @@ function App() {
   const [mainNotifPermission, setMainNotifPermission] = React.useState(() => (isNotificationSupported() ? Notification.permission : 'unsupported'));
   const [mainChatNotifyEnabled, setMainChatNotifyEnabled] = React.useState(() => isChatNotifyEnabledForCalendar(activeCalId));
   React.useEffect(() => {
-    if (typeof shouldShowNotifOnboarding !== 'function') return;
-    let timer = null;
-    try {
-      if (shouldShowNotifOnboarding()) {
-        timer = setTimeout(() => setIsNotifOnboardingOpen(true), 900);
-      }
-    } catch (_) {}
-    return () => { if (timer) clearTimeout(timer); };
-  }, []);
-
-  React.useEffect(() => {
     setMainChatNotifyEnabled(isChatNotifyEnabledForCalendar(activeCalId));
     setMainNotifPermission(isNotificationSupported() ? Notification.permission : 'unsupported');
   }, [activeCalId]);
