@@ -1622,6 +1622,18 @@ select.form-select {
   gap: 0;
   margin-bottom: 0;
 }
+.polls-section > section,
+.polls-section > section:hover,
+.polls-section > section:active,
+.polls-section > section.is-pressing,
+.polls-section .poll-card,
+.polls-section .poll-card:hover,
+.polls-section .poll-card:active,
+.polls-section .poll-card.is-pressing {
+  transform: none !important;
+  filter: none !important;
+  box-shadow: none !important;
+}
 .poll-card {
   background: var(--bg-primary);
   border-radius: var(--radius-md);

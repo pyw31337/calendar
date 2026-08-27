@@ -669,10 +669,6 @@ body:has(.admin-login-gate) {
 .day-cell.is-pressing,
 .date-item-btn:active,
 .date-item-btn.is-pressing,
-.poll-card:active,
-.poll-card.is-pressing,
-.poll-option-row:active,
-.poll-option-row.is-pressing,
 .recent-log-row:active,
 .recent-log-row.is-pressing,
 .search-result-row:active,
@@ -1625,6 +1621,18 @@ select.form-select {
   flex-direction: column;
   gap: 0;
   margin-bottom: 0;
+}
+.polls-section > section,
+.polls-section > section:hover,
+.polls-section > section:active,
+.polls-section > section.is-pressing,
+.polls-section .poll-card,
+.polls-section .poll-card:hover,
+.polls-section .poll-card:active,
+.polls-section .poll-card.is-pressing {
+  transform: none !important;
+  filter: none !important;
+  box-shadow: none !important;
 }
 .poll-card {
   background: var(--bg-primary);
