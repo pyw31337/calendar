@@ -6139,14 +6139,21 @@ function App() {
         key: meeting.date,
         className: "confirmed-meeting-banner",
         style: {
-          background: 'linear-gradient(var(--bg-card), var(--bg-card)) padding-box, var(--accent-gradient) border-box',
-          border: '1px solid transparent',
+          background: isDarkTheme
+            ? 'linear-gradient(90deg, #241B3D 0%, #4C1D95 55%, #9D174D 100%)'
+            : 'linear-gradient(90deg, #5B4BEB 0%, #8B3BDE 54%, #EC4899 100%)',
+          border: isDarkTheme ? '1px solid rgba(196, 181, 253, 0.22)' : '1px solid rgba(255, 255, 255, 0.18)',
           borderRadius: 'var(--radius-md)',
-        padding: '10px 14px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '8px',
-        cursor: 'pointer'
+          boxShadow: isDarkTheme ? '0 16px 30px rgba(3, 7, 18, 0.4)' : '0 14px 28px rgba(91, 75, 235, 0.22)',
+          padding: '10px 14px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '8px',
+          cursor: 'pointer',
+          color: '#FFFFFF',
+          position: 'relative',
+          overflow: 'hidden',
+          isolation: 'isolate'
       },
       onClick: () => {
         if (!guardLoadedCalendar()) return;
