@@ -1123,7 +1123,7 @@ export function PlacesView({
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
   const PlaceMapView = __comp.PlaceMapView || __deps.PlaceMapView;
-  const PlaceRegisterModal = __deps.PlaceRegisterModal;
+  const PlaceRegisterModal = __comp.PlaceRegisterModal || __deps.PlaceRegisterModal || (typeof window !== 'undefined' && window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PlaceRegisterModal);
   const SearchCategoryTabs = __deps.SearchCategoryTabs;
   const SimpleBottomSheetPicker = __deps.SimpleBottomSheetPicker;
   const PlaceCategoryMarkerIcon = __deps.PlaceCategoryMarkerIcon;
@@ -1944,7 +1944,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
                       /*#__PURE__*/React.createElement("div", {
                         style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }
                       },
-                        /*#__PURE__*/React.createElement("span", { className: "place-visit-entry-date", style: { fontWeight: 700, fontSize: '0.8rem', color: 'var(--text-main)' } }, formatPlaceBadgeDate(entry.date) || entry.date),
+                        /*#__PURE__*/React.createElement("span", { className: "place-visit-entry-date", style: { fontWeight: 700, fontSize: '0.74rem', color: 'var(--text-main)' } }, formatPlaceBadgeDate(entry.date) || entry.date),
                         /*#__PURE__*/React.createElement("div", {
                           style: { display: 'flex', alignItems: 'center', gap: '8px' }
                         },
@@ -1960,7 +1960,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
                       ),
                       /* Line 2: Memo note full width below */
                       entry.note && /*#__PURE__*/React.createElement("div", {
-                        style: { fontSize: '0.8rem', color: 'var(--text-main)', wordBreak: 'break-word', lineHeight: 1.45, width: '100%' }
+                        style: { fontSize: '0.74rem', color: 'var(--text-main)', wordBreak: 'break-word', lineHeight: 1.45, width: '100%' }
                       }, entry.note)
                     );
                   }
@@ -1976,8 +1976,8 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
                     className: "place-visit-entry-row-desktop",
                     style: { display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: 'var(--bg-primary)', borderRadius: 'var(--radius-md)', padding: '6px 10px', cursor: 'pointer' }
                   },
-                    /*#__PURE__*/React.createElement("span", { className: "place-visit-entry-date", style: { flexShrink: 0, fontWeight: 700 } }, formatPlaceBadgeDate(entry.date) || entry.date),
-                    /*#__PURE__*/React.createElement("span", { style: { flex: 1, minWidth: 0, fontSize: '0.78rem', color: 'var(--text-main)', wordBreak: 'break-word' } }, entry.note),
+                    /*#__PURE__*/React.createElement("span", { className: "place-visit-entry-date", style: { flexShrink: 0, fontWeight: 700, fontSize: '0.74rem' } }, formatPlaceBadgeDate(entry.date) || entry.date),
+                    /*#__PURE__*/React.createElement("span", { style: { flex: 1, minWidth: 0, fontSize: '0.74rem', color: 'var(--text-main)', wordBreak: 'break-word' } }, entry.note),
                     /*#__PURE__*/React.createElement("button", {
                       type: "button", onClick: (e) => { e.stopPropagation(); handleStartEditPlaceMemoEntry(place, entry); }, title: "메모 편집", "aria-label": "메모 편집",
                       style: { background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', color: '#64748B', flexShrink: 0 }
@@ -1988,7 +1988,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
                     }, /*#__PURE__*/React.createElement(TrashIcon, { size: 12 }))
                   );
                 }))
-              : memoWithoutDate && /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.78rem', color: 'var(--text-main)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px' } }, renderTextWithUrlBadge(memoWithoutDate))
+              : memoWithoutDate && /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.74rem', color: 'var(--text-main)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px' } }, renderTextWithUrlBadge(memoWithoutDate))
           );
         })
       )
@@ -2015,8 +2015,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
               onClick: () => { setIsPlacesMenuOpen(false); if (typeof onChangeView === 'function') onChangeView('calendar'); else if (typeof onBack === 'function') onBack(); },
               style: {
                 background: 'none', border: 'none', padding: 0, margin: 0,
-                color: 'inherit',
-                cursor: 'pointer', textAlign: 'left'
+                color: 'var(--text-main)', fontSize: '1.05rem', fontWeight: 800, cursor: 'pointer'
               }
             }, "장소")
           )
@@ -2090,15 +2089,18 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
         shareLabel: '공유'
       })
     )),
-    isRegisterOpen && /*#__PURE__*/React.createElement(PlaceRegisterModal, {
-      calendar,
-      editingPlace,
-      onClose: handleCloseModal,
-      onSave: onSavePlace,
-      onDelete: onDeletePlace,
-      showToast,
-      onRequestConfirm
-    })
+    (() => {
+      const PlaceRegisterModalComp = PlaceRegisterModal || (typeof window !== 'undefined' && window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PlaceRegisterModal) || (typeof window !== 'undefined' && window.GATHER_UI_DEPS && window.GATHER_UI_DEPS.PlaceRegisterModal);
+      return isRegisterOpen && PlaceRegisterModalComp ? /*#__PURE__*/React.createElement(PlaceRegisterModalComp, {
+        calendar,
+        editingPlace,
+        onClose: handleCloseModal,
+        onSave: onSavePlace,
+        onDelete: onDeletePlace,
+        showToast,
+        onRequestConfirm
+      }) : null;
+    })()
   );
 }
 
