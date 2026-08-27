@@ -2394,7 +2394,16 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
       );
     })(),
 
-    /* 2. Metric Grid (총수입 / 총지출 / 현재잔액) */
+    /* 2. SegmentedToggle (누적보기 / 일자별보기) - Positioned ABOVE Metric Grid */
+    /*#__PURE__*/React.createElement(SegmentedToggle, {
+      ariaLabel: "누적보기/일자별보기 전환",
+      value: activeTab,
+      onChange: v => setActiveTab(v),
+      style: { width: '100%', flexShrink: 0 },
+      options: [{ value: 'total', label: '누적보기' }, { value: 'daily', label: '일자별보기' }]
+    }),
+
+    /* 3. Metric Grid (총수입 / 총지출 / 현재잔액) */
     /*#__PURE__*/React.createElement("div", {
       className: "settlement-metric-grid"
     }, metricCards.map(card => /*#__PURE__*/React.createElement("div", {
@@ -2406,13 +2415,6 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
       className: "settlement-metric-card-value",
       style: { color: card.color }
     }, card.value.toLocaleString(), "원")))),
-  /*#__PURE__*/React.createElement(SegmentedToggle, {
-    ariaLabel: "누적보기/일자별보기 전환",
-    value: activeTab,
-    onChange: v => setActiveTab(v),
-    style: { width: '100%', flexShrink: 0 },
-    options: [{ value: 'total', label: '누적보기' }, { value: 'daily', label: '일자별보기' }]
-  }),
   activeTab === 'daily' && /*#__PURE__*/React.createElement("div", {
     className: "calendar-nav",
     style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '6px', marginBottom: '2px', flexShrink: 0 }
