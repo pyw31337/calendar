@@ -9616,28 +9616,37 @@ function panMapToFitMarkerPopup(map, marker, opts) {
     if (!map) return;
     const popup = marker.getPopup && marker.getPopup();
     const el = popup && popup.getElement && popup.getElement();
-    if (!el) return;
+    if (!el || !map.getContainer()) return;
     const mapRect = map.getContainer().getBoundingClientRect();
     const popupRect = el.getBoundingClientRect();
+    if (mapRect.height <= 0 || mapRect.width <= 0) return;
     let dx = 0;
     let dy = 0;
-    if (popupRect.top < mapRect.top + pad) {
-      dy = popupRect.top - (mapRect.top + pad);
-    } else if (popupRect.bottom > mapRect.bottom - pad) {
-      dy = popupRect.bottom - (mapRect.bottom - pad);
+    // If popup is taller than or close to map height, anchor top to top + pad and stop bouncing
+    if (popupRect.height >= mapRect.height - pad * 2) {
+      if (popupRect.top < mapRect.top + pad) {
+        dy = popupRect.top - (mapRect.top + pad);
+      }
+    } else {
+      if (popupRect.top < mapRect.top + pad) {
+        dy = popupRect.top - (mapRect.top + pad);
+      } else if (popupRect.bottom > mapRect.bottom - pad) {
+        dy = popupRect.bottom - (mapRect.bottom - pad);
+      }
     }
     if (popupRect.left < mapRect.left + pad) {
       dx = popupRect.left - (mapRect.left + pad);
     } else if (popupRect.right > mapRect.right - pad) {
       dx = popupRect.right - (mapRect.right - pad);
     }
-    if (dx !== 0 || dy !== 0) {
+    // Limit max single pan shift to 35% of map container height to prevent pushing marker off screen
+    const maxShiftY = mapRect.height * 0.35;
+    dy = Math.max(-maxShiftY, Math.min(maxShiftY, dy));
+    if (Math.abs(dx) > 2 || Math.abs(dy) > 2) {
       map.panBy([dx, dy], { animate: opts && opts.animate !== false });
     }
   };
   requestAnimationFrame(() => requestAnimationFrame(tryPan));
-  setTimeout(tryPan, 120);
-  setTimeout(tryPan, 320);
 }
 
 function PlaceMapView(props) {

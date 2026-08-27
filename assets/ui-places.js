@@ -899,8 +899,9 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
         // actual scrollable list of {date, note} rows here instead of one long run-on line.
         const historyWrap = document.createElement('div');
         historyWrap.style.marginTop = '4px';
-        historyWrap.style.maxHeight = '160px';
+        historyWrap.style.maxHeight = isMobileViewport ? '120px' : '165px';
         historyWrap.style.overflowY = 'auto';
+        historyWrap.style.webkitOverflowScrolling = 'touch';
         historyWrap.style.display = 'flex';
         historyWrap.style.flexDirection = 'column';
         historyWrap.style.gap = '4px';
@@ -1002,12 +1003,14 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
       // pattern already used for fitBounds below.
       marker.bindPopup(popupNode, {
         closeButton: false,
+        closeOnClick: false,
         minWidth: 220,
-        maxWidth: isMobileViewport ? Math.round(window.innerWidth * 0.8) : 480,
+        maxWidth: isMobileViewport ? Math.round(window.innerWidth * 0.82) : 460,
+        maxHeight: isMobileViewport ? 220 : 320,
         autoPan: true,
-        autoPanPadding: isMobileViewport ? [28, 56] : [48, 80],
-        autoPanPaddingTopLeft: isMobileViewport ? [24, 48] : [40, 72],
-        autoPanPaddingBottomRight: isMobileViewport ? [24, 40] : [40, 56],
+        autoPanPadding: isMobileViewport ? [14, 20] : [24, 36],
+        autoPanPaddingTopLeft: isMobileViewport ? [14, 20] : [24, 36],
+        autoPanPaddingBottomRight: isMobileViewport ? [14, 20] : [24, 36],
         keepInView: false
       });
       if (onSelectPlace) marker.on('click', () => onSelectPlace(place, { fromMap: true }));
