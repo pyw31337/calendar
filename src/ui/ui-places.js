@@ -1834,7 +1834,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
             // everywhere else in the app (see chat-search-focused-bubble/chat-search-shake).
             className: "place-card-row" + (isPlaceFocused ? " chat-search-focused-bubble" : ""),
             "data-place-id": place.id,
-            role: "button",
+            "data-no-press-feedback": "1",
             tabIndex: 0,
             onKeyDown: (e) => {
               if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'BUTTON')) return;
@@ -1853,31 +1853,50 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
           },
             /* Top-right absolute action buttons */
             /*#__PURE__*/React.createElement("div", {
-              style: { position: 'absolute', top: '8px', right: '8px', display: 'flex', alignItems: 'center', gap: '4px' }
+              className: "place-card-actions",
+              style: { position: 'absolute', top: '8px', right: '8px', display: 'flex', alignItems: 'center', gap: '4px', zIndex: 4 },
+              onClick: event => event.stopPropagation(),
+              onPointerDown: event => event.stopPropagation()
             },
               /*#__PURE__*/React.createElement("button", {
                 type: "button",
+                className: "place-card-action-btn",
                 onClick: event => {
+                  event.preventDefault();
                   event.stopPropagation();
-                  window.open(getPlaceExternalMapUrl(place), '_blank', 'noopener,noreferrer');
+                  try {
+                    const url = typeof getPlaceExternalMapUrl === 'function' ? getPlaceExternalMapUrl(place) : (place && (place.url || place.mapUrl));
+                    if (url) window.open(url, '_blank', 'noopener,noreferrer');
+                    else if (showToast) showToast('연결된 업체 정보가 없습니다.', 'info');
+                  } catch (err) {
+                    console.error('place external map url', err);
+                    if (showToast) showToast('업체 정보를 열 수 없습니다.', 'error');
+                  }
                 },
                 title: "업체보기",
                 style: {
                   width: '28px', height: '28px',
                   background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
+                  pointerEvents: 'auto'
                 }
-              }, /*#__PURE__*/React.createElement(BuildingIcon, { size: 14 })),
+              }, BuildingIcon ? /*#__PURE__*/React.createElement(BuildingIcon, { size: 14 }) : '🏢'),
               /*#__PURE__*/React.createElement("button", {
                 type: "button",
-                onClick: event => { event.stopPropagation(); handleEditPlace(place); },
+                className: "place-card-action-btn",
+                onClick: event => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  handleEditPlace(place);
+                },
                 title: "장소 수정",
                 style: {
                   width: '28px', height: '28px',
                   background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
+                  pointerEvents: 'auto'
                 }
-              }, /*#__PURE__*/React.createElement(PencilIcon, { size: 14 }))
+              }, PencilIcon ? /*#__PURE__*/React.createElement(PencilIcon, { size: 14 }) : '✎')
             ),
             
             /* Category Label Capsule and Visit Info */

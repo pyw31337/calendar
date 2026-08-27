@@ -30,7 +30,15 @@ function useChatSendGuard(onSend, canSend) {
   return typeof f === 'function' ? f(onSend, canSend) : onSend;
 }
 function useModalDirtyGuard(...args) {
-  return __gatherUiDeps().useModalDirtyGuard(...args);
+  const f = (__gatherUiDeps() || {}).useModalDirtyGuard;
+  if (typeof f === 'function') return f(...args);
+  const onClose = args[0];
+  return {
+    requestClose: () => { if (typeof onClose === 'function') onClose(); },
+    overlayOnClick: (e) => {
+      if (e && e.target === e.currentTarget && typeof onClose === 'function') onClose();
+    }
+  };
 }
 function computeKoreanHolidaysForYear(year) {
   const f = __gatherUiDeps().computeKoreanHolidaysForYear;
@@ -683,7 +691,12 @@ export function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, on
   const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon || function () { return '×'; };
   const TrashIcon = __comp.TrashIcon || __deps.TrashIcon || function () { return '🗑'; };
   const AutoGrowTextarea = __comp.AutoGrowTextarea || __deps.AutoGrowTextarea;
-  const FormAddEditActionButtons = __comp.FormAddEditActionButtons || __deps.FormAddEditActionButtons;
+  const FormAddEditActionButtons = __comp.FormAddEditActionButtons || __deps.FormAddEditActionButtons || function FallbackActions({ isEditing, isSaving, onCancel, onSubmit, flexGrow }) {
+    return React.createElement('div', { style: { display: 'flex', gap: '8px', flex: flexGrow ? 1 : undefined } },
+      React.createElement('button', { type: 'button', onClick: onCancel, disabled: isSaving }, '취소'),
+      React.createElement('button', { type: 'button', onClick: onSubmit, disabled: isSaving }, isSaving ? '저장 중...' : (isEditing ? '수정' : '추가'))
+    );
+  };
   const PlaceSectionIcon = __comp.PlaceSectionIcon || __deps.PlaceSectionIcon;
   const SegmentedToggle = __comp.SegmentedToggle || __deps.SegmentedToggle;
   const SimpleBottomSheetPicker = __comp.SimpleBottomSheetPicker || __deps.SimpleBottomSheetPicker;

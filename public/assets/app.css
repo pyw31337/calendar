@@ -538,7 +538,6 @@ body:has(.admin-login-gate) {
 .poll-voter-option:hover,
 .search-result-row:hover,
 .memo-card-hover:hover,
-.place-card-row:hover,
 .confirmed-meeting:hover,
 .color-swatch-trigger:hover,
 .admin-calendar-picker-btn:hover,
@@ -629,8 +628,6 @@ body:has(.admin-login-gate) {
 .main-menu-item.is-pressing,
 .memo-card-hover:active,
 .memo-card-hover.is-pressing,
-.place-card-row:active,
-.place-card-row.is-pressing,
 .admin-side-menu-item:active,
 .admin-side-menu-item.is-pressing,
 .admin-side-menu-close-btn:active,
@@ -4308,4 +4305,17 @@ textarea.form-input {
   }
   .manual-mobile-friendly article h3 { font-size: 0.95rem !important; }
   .manual-mobile-friendly article p { font-size: 0.82rem !important; margin-top: 4px !important; }
+}
+
+
+/* Place list cards: no press/scale — they are rows, not buttons */
+.place-card-row,
+.place-card-row:active,
+.place-card-row.is-pressing,
+.place-card-row:hover {
+  transform: none !important;
+}
+.place-card-row .place-card-action-btn {
+  position: relative;
+  z-index: 3;
 }
