@@ -2178,6 +2178,14 @@ select.form-select {
   cursor: pointer;
   user-select: none;
 }
+.summary-title.is-toggleable,
+.summary-title.is-toggleable:hover,
+.summary-title.is-toggleable:active,
+.summary-title.is-toggleable.is-pressing {
+  transform: none !important;
+  filter: none !important;
+  box-shadow: none !important;
+}
 .section-toggle-btn {
   margin-left: auto;
   width: 28px;
