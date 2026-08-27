@@ -742,6 +742,7 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
         chunkedLoading: true,
         showCoverageOnHover: false,
         spiderfyOnMaxZoom: true,
+        zoomToBoundsOnClick: false,
         disableClusteringAtZoom: 15,
         maxClusterRadius: 50,
         // Flat solid-color badge instead of the plugin's default ripple-ring style, to match the
@@ -770,6 +771,22 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
           });
         }
       }) : L.layerGroup();
+      if (clusterAvailable) {
+        markersLayerRef.current.on('clusterclick', e => {
+          const map = mapRef.current;
+          const cluster = e && e.layer;
+          if (!map || !cluster || typeof cluster.getLatLng !== 'function') return;
+          try {
+            if (e.originalEvent) {
+              L.DomEvent.preventDefault(e.originalEvent);
+              L.DomEvent.stopPropagation(e.originalEvent);
+            }
+          } catch (err) {}
+          const currentZoom = typeof map.getZoom === 'function' ? map.getZoom() : PLACE_MAP_DEFAULT_ZOOM;
+          const targetZoom = Math.min(currentZoom + 1, 15);
+          map.flyTo(cluster.getLatLng(), targetZoom, { animate: true, duration: 0.35 });
+        });
+      }
       markersLayerRef.current.addTo(map);
       setReady(true);
       try { map.invalidateSize({ animate: false }); } catch (e) {}
@@ -1966,8 +1983,9 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
                each row mirrors MemoCard's comment rows (ui-calendar-core.js): a gray capsule with
                edit/delete, minus the participant dot since a place-memo entry isn't attributed to
                one person. */
-            displayVisitEntries.length > 0
+                displayVisitEntries.length > 0
               ? /*#__PURE__*/React.createElement("div", {
+                  className: "place-memo-stack",
                   style: { display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '2px' },
                   onClick: e => e.stopPropagation()
                 }, displayVisitEntries.map((entry, idx) => {
@@ -2071,7 +2089,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
                     }, /*#__PURE__*/React.createElement(TrashIcon, { size: 12 }))
                   );
                 }))
-              : memoWithoutDate && /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.74rem', color: 'var(--text-main)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px' } }, renderTextWithUrlBadge(memoWithoutDate))
+              : memoWithoutDate && /*#__PURE__*/React.createElement("div", { className: "place-memo-stack", style: { fontSize: '0.74rem', color: 'var(--text-main)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px' } }, renderTextWithUrlBadge(memoWithoutDate))
           );
         })
       )

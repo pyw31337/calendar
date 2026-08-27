@@ -523,6 +523,7 @@ const ENABLE_FIRESTORE_WRITES = GATHER_APP_CONFIG.ENABLE_FIRESTORE_WRITES !== fa
 // while the subcollections are empty.
 const ENABLE_PLACES_SUBCOLLECTION_MIGRATION = GATHER_APP_CONFIG.ENABLE_PLACES_SUBCOLLECTION_MIGRATION === true;
 const PUBLIC_CALENDAR_IDS = Array.isArray(GATHER_APP_CONFIG.PUBLIC_CALENDAR_IDS) ? GATHER_APP_CONFIG.PUBLIC_CALENDAR_IDS : ['kkot', 'cw', 'jhair'];
+const SETTLEMENT_ENABLED_CALENDAR_IDS = Array.isArray(GATHER_APP_CONFIG.SETTLEMENT_ENABLED_CALENDAR_IDS) ? GATHER_APP_CONFIG.SETTLEMENT_ENABLED_CALENDAR_IDS : ['jhair'];
 const FIREBASE_LOAD_TIMEOUT_MS = readConfigNumber('FIREBASE_LOAD_TIMEOUT_MS', 8000);
 const FIREBASE_LOAD_MAX_ATTEMPTS = readConfigNumber('FIREBASE_LOAD_MAX_ATTEMPTS', 3);
 // Memos load newest-first in pages of this size instead of the whole collection at once, so a
@@ -1243,6 +1244,11 @@ function isAllowedCalendarId(id) {
   const f = (window.GATHER_APP_UTILS || {}).isAllowedCalendarId;
   if (typeof f === 'function') return f(id);
   return typeof id === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(id);
+}
+function isSettlementEnabledCalendarId(id) {
+  const f = (window.GATHER_APP_UTILS || {}).isSettlementEnabledCalendarId;
+  if (typeof f === 'function') return f(id);
+  return typeof id === 'string' && SETTLEMENT_ENABLED_CALENDAR_IDS.includes(id);
 }
 function sanitizeText(...args) {
   const f = (window.GATHER_APP_UTILS || {}).sanitizeText;
@@ -2110,6 +2116,7 @@ export {
   isValidCalendarId,
   isInternalTestCalendarId,
   isAllowedCalendarId,
+  isSettlementEnabledCalendarId,
   sanitizeText,
   stripUrlEdgePunctuation,
   describeFirebaseWriteError,

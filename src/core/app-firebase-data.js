@@ -650,6 +650,7 @@ function cloneCalendar(calendar) {
     availabilities: Array.isArray(calendar.availabilities) ? calendar.availabilities.map(cloneAvailability) : [],
     activityLogs: Array.isArray(calendar.activityLogs) ? calendar.activityLogs.map(cloneActivityLog) : [],
     polls: Array.isArray(calendar.polls) ? calendar.polls.map(clonePoll) : [],
+    settlementCards: Array.isArray(calendar.settlementCards) ? calendar.settlementCards.map(card => ({ ...card })) : [],
     deletedActivityLogIds: getDeletedActivityLogIds(calendar)
   };
 }
@@ -682,7 +683,7 @@ function mergeCalendarCollections(sourceList, targetList, options = {}) {
   });
   return Array.from(map.values());
 }
-const INITIAL_CALENDARS = ['kkot', 'cw'].map(id => ({
+const INITIAL_CALENDARS = ['kkot', 'cw', 'jhair'].map(id => ({
   id,
   title: '캘린더 불러오는 중...',
   description: 'Firebase에서 실시간 캘린더 데이터를 불러오는 중입니다.',
@@ -2405,6 +2406,27 @@ function getAdminSearchFilterFromUrl() {
 
 function createDefaultCalendar(id) {
   const now = Date.now();
+  const nowDate = new Date(now);
+  const monthStr = `${nowDate.getFullYear()}-${String(nowDate.getMonth() + 1).padStart(2, '0')}`;
+  const settlementCards = id === 'jhair'
+    ? [{
+      id: `${id}_settlement_seed`,
+      title: '1/N 간편 송금',
+      status: 'active',
+      createdAt: now,
+      updatedAt: now,
+      participants: ['참여자 1', '참여자 2', '참여자 3'],
+      participantCount: 3,
+      amount: 1616600,
+      totalIncome: 2681691,
+      perPersonAmount: 404150,
+      bankName: '우리은행',
+      depositorName: '박영우',
+      accountNumber: '1002-355-955722',
+      monthStr,
+      checkedItemKeys: []
+    }]
+    : [];
   return {
     id,
     title: `${id} 사모임 캘린더`,
@@ -2427,16 +2449,17 @@ function createDefaultCalendar(id) {
       color: '#10B981',
       updatedAt: now
     }],
-	    availabilities: [],
-	    activityLogs: [],
-	    polls: [],
-	    expenseCategories: DEFAULT_EXPENSE_CATEGORIES,
-	    places: [],
-	    placeCategories: DEFAULT_PLACE_CATEGORIES,
-	    settlementBaseBudget: 0,
-	    deletedActivityLogIds: []
-	  };
-	}
+    availabilities: [],
+    activityLogs: [],
+    polls: [],
+    settlementCards,
+    expenseCategories: DEFAULT_EXPENSE_CATEGORIES,
+    places: [],
+    placeCategories: DEFAULT_PLACE_CATEGORIES,
+    settlementBaseBudget: 0,
+    deletedActivityLogIds: []
+  };
+}
 
 function getMonthKey(dateStr) {
   return isValidDateString(dateStr) ? dateStr.slice(0, 7) : 'unknown';

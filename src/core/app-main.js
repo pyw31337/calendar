@@ -142,6 +142,7 @@ import {
   isValidCalendarId,
   isInternalTestCalendarId,
   isAllowedCalendarId,
+  isSettlementEnabledCalendarId,
   sanitizeText,
   stripUrlEdgePunctuation,
   describeFirebaseWriteError,
@@ -1743,7 +1744,16 @@ function App() {
     places: unionPlaces(rawActiveCal, placesSubcollection),
     confirmedMeeting: unionConfirmedMeetings(rawActiveCal, confirmedMeetingsSubcollection)
   }), [rawActiveCal, placesSubcollection, confirmedMeetingsSubcollection]);
+  const canUseSettlement = !!(activeCal && isSettlementEnabledCalendarId(activeCal.id || activeCalId));
   const syncStatus = null;
+  React.useEffect(() => {
+    if (activeView !== 'settlement') return;
+    if (!activeCalId || canUseSettlement) return;
+    if (typeof showToast === 'function') {
+      showToast('이 캘린더에서는 정산을 사용할 수 없습니다.', 'info');
+    }
+    changeView('calendar');
+  }, [activeView, activeCalId, canUseSettlement, changeView, showToast]);
   React.useEffect(() => {
     if (!firebaseDb || !activeCalId) return undefined;
     let lastRefreshAt = 0;
@@ -5363,7 +5373,7 @@ function App() {
   })();
   const navMemoCount = (typeof totalMemoCount === 'number' && totalMemoCount >= 0) ? totalMemoCount : (memos || []).length;
   const navPlaceCount = (activeCal && Array.isArray(activeCal.places)) ? activeCal.places.filter(p => p && !p.deletedAt).length : 0;
-  const navSettlementBadge = activeCal && typeof calculateSettlementBalance === 'function' && typeof formatBalanceBadge === 'function'
+  const navSettlementBadge = canUseSettlement && activeCal && typeof calculateSettlementBalance === 'function' && typeof formatBalanceBadge === 'function'
     ? formatBalanceBadge(calculateSettlementBalance(activeCal))
     : null;
 
@@ -5550,6 +5560,7 @@ function App() {
   const navMenuProps = {
     onChangeView: changeView,
     onOpenCreateSettlement: () => setIsCreateSettlementOpen(true),
+    showSettlement: canUseSettlement,
     chatCount: navChatCount,
     settlementBadge: navSettlementBadge,
     galleryCount: navGalleryCount,
@@ -5562,7 +5573,7 @@ function App() {
     memoLastTitleWord: navMemoLastTitleWord
   };
   const sharedAppOverlays = /*#__PURE__*/React.createElement(React.Fragment, null,
-    isCreateSettlementOpen && activeCal && /*#__PURE__*/React.createElement(CreateSettlementModal, {
+    isCreateSettlementOpen && activeCal && canUseSettlement && /*#__PURE__*/React.createElement(CreateSettlementModal, {
       calendar: activeCal,
       showToast: showToast,
       onClose: () => setIsCreateSettlementOpen(false),
@@ -5707,11 +5718,11 @@ function App() {
           if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 공유 정보를 확인해 주세요.')) setIsShareOpen(true);
         },
         onOpenAppSettings: () => setIsAppSettingsOpen(true),
-        onOpenCreateSettlement: () => setIsCreateSettlementOpen(true),
         onToggleSettlementCardStatus: handleToggleSettlementCardStatus,
         onDeleteSettlementCard: handleDeleteSettlementCard,
         showToast: showToast,
-        ...navMenuProps
+        ...navMenuProps,
+        onOpenCreateSettlement: undefined
       }),
       isShareOpen && activeCal && /*#__PURE__*/React.createElement(ShareModal, {
         calendar: activeCal,
@@ -6002,7 +6013,7 @@ function App() {
     onClick: () => changeView('chat')
   }, /*#__PURE__*/React.createElement("span", { className: "main-menu-icon" }, /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"] })), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-full" }, "채팅"), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-short" }, "채팅"), mainMenuChatCount > 0 && /*#__PURE__*/React.createElement("span", {
     className: `main-menu-badge${mainMenuChatHasUnread ? ' is-unread' : ''}`
-  }, mainMenuChatCount)), /*#__PURE__*/React.createElement("div", { className: "main-menu-sep" }), /*#__PURE__*/React.createElement("button", {
+  }, mainMenuChatCount)), canUseSettlement && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", { className: "main-menu-sep" }), /*#__PURE__*/React.createElement("button", {
     type: "button",
     className: "main-menu-item",
     onClick: () => {
@@ -6018,7 +6029,7 @@ function App() {
             color: '#FFFFFF'
           }
         }, badgeInfo.text);
-      })()), /*#__PURE__*/React.createElement("div", { className: "main-menu-sep" }), /*#__PURE__*/React.createElement("button", {
+      })()), /*#__PURE__*/React.createElement("div", { className: "main-menu-sep" })), /*#__PURE__*/React.createElement("button", {
     type: "button",
     className: "main-menu-item",
     onClick: () => {
@@ -6042,9 +6053,10 @@ function App() {
     chatLastAuthor: navChatLastAuthor,
     settlementLastDate: navSettlementLastDate,
     galleryLastDate: navGalleryLastDate,
-    placeLastName: navPlaceLastName,
-    memoLastTitleWord: navMemoLastTitleWord,
-    onClose: () => setIsMainSideMenuOpen(false),
+      placeLastName: navPlaceLastName,
+      memoLastTitleWord: navMemoLastTitleWord,
+      showSettlement: canUseSettlement,
+      onClose: () => setIsMainSideMenuOpen(false),
     onOpenManual: () => {
       setIsGuideOpen(true);
       setIsMainSideMenuOpen(false);
@@ -9958,6 +9970,7 @@ function bindGatherUiDeps() {
     SummaryList: typeof SummaryList === 'function' ? SummaryList : null,
     getActiveAvailabilities: typeof getActiveAvailabilities === 'function' ? getActiveAvailabilities : null,
     getCalendarPolls: typeof getCalendarPolls === 'function' ? getCalendarPolls : null,
+    isSettlementEnabledCalendarId: typeof isSettlementEnabledCalendarId === 'function' ? isSettlementEnabledCalendarId : null,
     computeKoreanHolidaysForYear: typeof computeKoreanHolidaysForYear === 'function' ? computeKoreanHolidaysForYear : null,
     getKoreanSolarTermsForYear: typeof getKoreanSolarTermsForYear === 'function' ? getKoreanSolarTermsForYear : null,
     getTrulyConfirmedMeetings: typeof getTrulyConfirmedMeetings === 'function' ? getTrulyConfirmedMeetings : null,

@@ -815,6 +815,16 @@ summary.is-pressing,
   box-sizing: border-box;
   transition: transform var(--motion-fast) var(--motion-ease-spring), filter var(--motion-fast) ease;
 }
+.memo-capsule-badge,
+.url-capsule-badge,
+.place-memo-stack {
+  mix-blend-mode: darken;
+}
+:root[data-theme="dark"] .memo-capsule-badge,
+:root[data-theme="dark"] .url-capsule-badge,
+:root[data-theme="dark"] .place-memo-stack {
+  mix-blend-mode: screen;
+}
 .participant-badge:hover,
 .memo-capsule-badge:hover,
 .poll-voter-badge:hover {
@@ -2645,6 +2655,30 @@ select.form-select {
   align-items: center;
   gap: 6px;
   flex: 0 0 auto;
+}
+:root {
+  --settlement-hero-start: #5B4BEB;
+  --settlement-hero-end: #EC4899;
+  --settlement-hero-text: #FFFFFF;
+  --settlement-hero-muted: rgba(255, 255, 255, 0.84);
+  --settlement-hero-surface: rgba(255, 255, 255, 0.94);
+  --settlement-hero-surface-text: #0F172A;
+  --settlement-hero-surface-muted: #64748B;
+  --settlement-hero-action-bg: rgba(15, 23, 42, 0.28);
+  --settlement-hero-action-border: rgba(255, 255, 255, 0.16);
+  --settlement-hero-action-text: #FFFFFF;
+}
+:root[data-theme="dark"] {
+  --settlement-hero-start: #23235E;
+  --settlement-hero-end: #7C3AED;
+  --settlement-hero-text: #F8FAFC;
+  --settlement-hero-muted: rgba(226, 232, 240, 0.82);
+  --settlement-hero-surface: rgba(15, 23, 42, 0.88);
+  --settlement-hero-surface-text: #F8FAFC;
+  --settlement-hero-surface-muted: #CBD5E1;
+  --settlement-hero-action-bg: rgba(15, 23, 42, 0.5);
+  --settlement-hero-action-border: rgba(148, 163, 184, 0.22);
+  --settlement-hero-action-text: #F8FAFC;
 }
 .admin-metric-card {
   border: 1px solid #E2E8F0;
