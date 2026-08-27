@@ -4349,3 +4349,15 @@ textarea.form-input {
 .place-card-action-btn.is-pressing {
   transform: none !important;
 }
+
+
+.place-card-row.is-place-focused {
+  border: 1.5px solid #7C3AED !important;
+  background-color: rgba(124, 58, 237, 0.06) !important;
+  animation: none !important;
+  transform: none !important;
+}
+.place-card-row.chat-search-focused-bubble {
+  animation: none !important;
+  transform: none !important;
+}

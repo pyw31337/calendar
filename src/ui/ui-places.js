@@ -1830,29 +1830,19 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
           const isPlaceFocused = !!(focusPlace && focusPlace.id === place.id);
           return /*#__PURE__*/React.createElement("div", {
             key: place.id,
-            // Same purple-border + up/down-shake "you were just brought here" treatment used
-            // everywhere else in the app (see chat-search-focused-bubble/chat-search-shake).
-            className: "place-card-row" + (isPlaceFocused ? " chat-search-focused-bubble" : ""),
+            className: "place-card-row" + (isPlaceFocused ? " is-place-focused" : ""),
             "data-place-id": place.id,
             "data-no-press-feedback": "1",
-            tabIndex: 0,
-            onKeyDown: (e) => {
-              if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'BUTTON')) return;
-              if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleSelectPlaceOnMap(place); }
-            },
             style: {
               display: 'flex', flexDirection: 'column', gap: '4px',
-              padding: '10px 12px', position: 'relative',
+              padding: '10px 48px 10px 12px', position: 'relative',
               border: '1px solid var(--border-subtle)',
               borderRadius: 'var(--radius-md)',
-              cursor: 'pointer',
+              cursor: 'default',
               backgroundColor: 'var(--bg-card)',
-              transition: 'border-color 0.15s ease, background-color 0.15s ease'
-            },
-            onClick: event => {
-              const target = event.target;
-              if (target && target.closest && target.closest('button, a, input, textarea, label, .place-card-actions, .place-card-action-btn')) return;
-              handleSelectPlaceOnMap(place);
+              transition: 'border-color 0.15s ease, background-color 0.15s ease',
+              overflow: 'visible',
+              transform: 'none'
             }
           },
             /* Top-right absolute action buttons */
@@ -1939,7 +1929,16 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
             ),
             
             /* Name & Address -- alias is the list display name when set; official name shown underneath */
-            /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 } },
+            /*#__PURE__*/React.createElement("div", {
+              className: "place-card-select-area",
+              role: "button",
+              tabIndex: 0,
+              onClick: event => { event.stopPropagation(); handleSelectPlaceOnMap(place); },
+              onKeyDown: event => {
+                if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); handleSelectPlaceOnMap(place); }
+              },
+              style: { display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0, cursor: 'pointer' }
+            },
               /*#__PURE__*/React.createElement("span", { style: { fontWeight: 800, fontSize: '0.88rem', color: 'var(--text-main)' } }, (place.alias || place.name || '이름 없음')),
               place.alias && place.name && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.72rem', color: 'var(--text-muted)' } }, place.name),
               place.address && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.74rem', color: 'var(--text-muted)' } }, getDisplayPlaceAddress(place))
