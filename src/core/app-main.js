@@ -1515,7 +1515,19 @@ function App() {
     const keepId = params.get('id') || params.get('cal');
     params.delete('id');
     params.delete('cal');
+    params.delete('date');
+    params.delete('msg');
+    params.delete('img');
+    params.delete('memo');
+    params.delete('place');
     if (keepId) params.set('id', keepId);
+    if (currentMonthDate instanceof Date && !Number.isNaN(currentMonthDate.getTime())) {
+      params.set('year', String(currentMonthDate.getFullYear()));
+      params.set('month', String(currentMonthDate.getMonth() + 1).padStart(2, '0'));
+    } else {
+      params.delete('year');
+      params.delete('month');
+    }
     if (view === 'calendar') {
       params.delete('view');
     } else {
@@ -6073,7 +6085,23 @@ function App() {
       setIsMainSideMenuOpen(false);
       if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 공유 정보를 확인해 주세요.')) setIsShareOpen(true);
     },
-    onOpenAdmin: () => window.open(`${window.location.pathname}?admin=1`, '_blank', 'noopener,noreferrer'),
+    onOpenAdmin: () => {
+      const adminUrl = new URL(window.location.href);
+      adminUrl.searchParams.delete('view');
+      adminUrl.searchParams.delete('msg');
+      adminUrl.searchParams.delete('img');
+      adminUrl.searchParams.delete('memo');
+      adminUrl.searchParams.delete('place');
+      adminUrl.searchParams.set('admin', '1');
+      if (activeCalId) {
+        adminUrl.searchParams.set('id', activeCalId);
+      }
+      if (currentMonthDate instanceof Date && !Number.isNaN(currentMonthDate.getTime())) {
+        adminUrl.searchParams.set('year', String(currentMonthDate.getFullYear()));
+        adminUrl.searchParams.set('month', String(currentMonthDate.getMonth() + 1).padStart(2, '0'));
+      }
+      window.open(adminUrl.toString(), '_blank', 'noopener,noreferrer');
+    },
     onOpenGallery: () => changeView('gallery'),
     onChangeView: changeView,
     isDarkTheme: isDarkTheme,
