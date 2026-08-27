@@ -1189,6 +1189,9 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
   const derivePlaceVisitStatus = __deps.derivePlaceVisitStatus;
   const countPlaceVisits = __deps.countPlaceVisits;
   const getPlaceExternalMapUrl = __deps.getPlaceExternalMapUrl;
+  const getPlaceKakaoRouteUrl = __deps.getPlaceKakaoRouteUrl;
+  const getPlaceNaverRouteUrl = __deps.getPlaceNaverRouteUrl;
+  const getPlaceGoogleRouteUrl = __deps.getPlaceGoogleRouteUrl;
 
   // A plain `const isMobile = window.matchMedia(...).matches` read once per render only reflects
   // reality by accident, whenever some unrelated state change happens to force a re-render after
@@ -1915,6 +1918,46 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
               /*#__PURE__*/React.createElement("span", { style: { fontWeight: 800, fontSize: '0.88rem', color: 'var(--text-main)' } }, (place.alias || place.name || '이름 없음')),
               place.alias && place.name && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.72rem', color: 'var(--text-muted)' } }, place.name),
               place.address && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.74rem', color: 'var(--text-muted)' } }, getDisplayPlaceAddress(place))
+            ),
+
+            /* Route Navigation Action Buttons Bar */
+            /*#__PURE__*/React.createElement("div", {
+              style: { display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px', flexWrap: 'wrap' },
+              onClick: e => e.stopPropagation()
+            },
+              /* Kakao Route Button */
+              /*#__PURE__*/React.createElement("a", {
+                href: getPlaceKakaoRouteUrl ? getPlaceKakaoRouteUrl(place) : getPlaceExternalMapUrl(place),
+                target: "_blank",
+                rel: "noopener noreferrer",
+                style: {
+                  display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 9px', borderRadius: '6px',
+                  backgroundColor: 'rgba(245, 158, 11, 0.12)', color: '#D97706', border: '1px solid rgba(245, 158, 11, 0.3)',
+                  fontSize: '0.72rem', fontWeight: 700, textDecoration: 'none', cursor: 'pointer'
+                }
+              }, "🧭 카카오 길찾기"),
+              /* Naver Route Button */
+              /*#__PURE__*/React.createElement("a", {
+                href: getPlaceNaverRouteUrl ? getPlaceNaverRouteUrl(place) : getPlaceExternalMapUrl(place),
+                target: "_blank",
+                rel: "noopener noreferrer",
+                style: {
+                  display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 9px', borderRadius: '6px',
+                  backgroundColor: 'rgba(16, 185, 129, 0.12)', color: '#059669', border: '1px solid rgba(16, 185, 129, 0.3)',
+                  fontSize: '0.72rem', fontWeight: 700, textDecoration: 'none', cursor: 'pointer'
+                }
+              }, "🧭 네이버 길찾기"),
+              /* Google Route Button */
+              /*#__PURE__*/React.createElement("a", {
+                href: getPlaceGoogleRouteUrl ? getPlaceGoogleRouteUrl(place) : getPlaceExternalMapUrl(place),
+                target: "_blank",
+                rel: "noopener noreferrer",
+                style: {
+                  display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 9px', borderRadius: '6px',
+                  backgroundColor: 'rgba(59, 130, 246, 0.12)', color: '#2563EB', border: '1px solid rgba(59, 130, 246, 0.3)',
+                  fontSize: '0.72rem', fontWeight: 700, textDecoration: 'none', cursor: 'pointer'
+                }
+              }, "구글 지도")
             ),
             
             /* Visits history log (one row per date, newest first) or plain dateless memo --

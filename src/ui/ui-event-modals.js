@@ -1363,7 +1363,7 @@ export function AnniversaryModal({
   );
 }
 
-export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenShare, onOpenAppSettings, onChangeView, chatCount = 0, settlementBadge = null, galleryCount = 0, placeCount = 0, memoCount = 0, chatLastAuthor = null, settlementLastDate = null, galleryLastDate = null, placeLastName = null, memoLastTitleWord = null }) {
+export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenShare, onOpenAppSettings, onChangeView, chatCount = 0, settlementBadge = null, galleryCount = 0, placeCount = 0, memoCount = 0, chatLastAuthor = null, settlementLastDate = null, galleryLastDate = null, placeLastName = null, memoLastTitleWord = null, showToast }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -1808,7 +1808,120 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
   }, /*#__PURE__*/React.createElement("span", { style: { color: card.color, display: 'inline-flex' } }, card.icon), card.label), /*#__PURE__*/React.createElement("div", {
     className: "settlement-metric-card-value",
     style: { color: card.color }
-  }, card.value.toLocaleString(), "원")))), /*#__PURE__*/React.createElement(SegmentedToggle, {
+  }, card.value.toLocaleString(), "원")))),
+  (() => {
+    const getActiveParticipants = __deps.getActiveParticipants || (c => Array.isArray(c?.participants) ? c.participants.filter(p => !p.deletedAt && !p.removedAt) : []);
+    const activeParticipants = getActiveParticipants(calendar);
+    const participantCount = Math.max(1, activeParticipants.length);
+    const perPersonExpense = Math.round(displayExpense / participantCount);
+
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        backgroundColor: 'var(--bg-card)',
+        border: '1px solid var(--border-subtle)',
+        borderRadius: 'var(--radius-md)',
+        padding: '12px 14px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '10px'
+      }
+    },
+      /* Header */
+      /*#__PURE__*/React.createElement("div", {
+        style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px' }
+      },
+        /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px' } },
+          /*#__PURE__*/React.createElement("span", { style: { fontSize: '1rem' } }, "💸"),
+          /*#__PURE__*/React.createElement("strong", { style: { fontSize: '0.88rem', color: 'var(--text-main)', fontWeight: 800 } }, "1/N 간편 송금")
+        ),
+        /*#__PURE__*/React.createElement("span", {
+          style: { fontSize: '0.74rem', color: 'var(--text-muted)', fontWeight: 700 }
+        }, `참여 멤버 ${participantCount}명 기준`)
+      ),
+
+      /* Amount Display */
+      /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
+          backgroundColor: 'var(--bg-primary)', padding: '10px 12px', borderRadius: '8px'
+        }
+      },
+        /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 700 } }, "1인당 정산 금액"),
+        /*#__PURE__*/React.createElement("strong", { style: { fontSize: '1.05rem', color: '#2563EB', fontWeight: 900 } }, `${perPersonExpense.toLocaleString()}원`)
+      ),
+
+      /* Responsive Action Buttons */
+      /*#__PURE__*/React.createElement("div", {
+        style: { display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }
+      },
+        /* Toss Remittance Button */
+        /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          className: "btn",
+          onClick: () => {
+            const tossUrl = `supertoss://send?amount=${perPersonExpense}`;
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+              navigator.clipboard.writeText(`${perPersonExpense}`).catch(() => {});
+            }
+            window.location.href = tossUrl;
+            if (typeof showToast === 'function') {
+              showToast(`토스 앱으로 연결합니다. (금액 ${perPersonExpense.toLocaleString()}원)`, 'info');
+            }
+          },
+          style: {
+            flex: '1 1 120px', height: '36px', borderRadius: '8px',
+            backgroundColor: '#3182F6', color: '#FFFFFF', border: 'none',
+            fontSize: '0.82rem', fontWeight: 800, cursor: 'pointer',
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
+          }
+        }, "🔵 토스로 송금"),
+
+        /* Copy 1/N Amount Button */
+        /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          className: "btn",
+          onClick: () => {
+            const text = `${perPersonExpense.toLocaleString()}원`;
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+              navigator.clipboard.writeText(text);
+            }
+            if (typeof showToast === 'function') {
+              showToast(`1/N 정산액 (${text})이 복사되었습니다.`, 'success');
+            }
+          },
+          style: {
+            flex: '1 1 100px', height: '36px', borderRadius: '8px',
+            backgroundColor: 'var(--bg-primary)', color: 'var(--text-main)', border: '1px solid var(--border-subtle)',
+            fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer',
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px'
+          }
+        }, "📋 금액 복사"),
+
+        /* Copy Settlement Summary Text Button */
+        /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          className: "btn",
+          onClick: () => {
+            const title = calendar?.title || '모임';
+            const summaryText = `[${title} 정산 안내]\n• 총 지출: ${displayExpense.toLocaleString()}원\n• 참여 인원: ${participantCount}명\n👉 1인당 보내실 금액: ${perPersonExpense.toLocaleString()}원`;
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+              navigator.clipboard.writeText(summaryText);
+            }
+            if (typeof showToast === 'function') {
+              showToast('정산 내역 요약문이 복사되었습니다.', 'success');
+            }
+          },
+          style: {
+            flex: '1 1 120px', height: '36px', borderRadius: '8px',
+            backgroundColor: 'rgba(16, 185, 129, 0.12)', color: '#059669', border: '1px solid rgba(16, 185, 129, 0.3)',
+            fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer',
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px'
+          }
+        }, "💬 정산 요약 복사")
+      )
+    );
+  })(),
+  /*#__PURE__*/React.createElement(SegmentedToggle, {
     ariaLabel: "누적보기/일자별보기 전환",
     value: activeTab,
     onChange: v => setActiveTab(v),

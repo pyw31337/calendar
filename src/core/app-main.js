@@ -517,6 +517,7 @@ import {
   estimateMonthlyOutboundBytes,
   buildServiceUsageMetrics,
   createCalendarBackupPayload,
+  createCalendarDataBackupPayload,
   downloadJsonFile,
   downloadTextFile,
   escapeICSText,
@@ -528,6 +529,9 @@ import {
   buildConfirmedMeetingDescription,
   exportCalendarConfirmedMeetingsToICS,
   extractCalendarsFromBackup,
+  extractCalendarBackupEntries,
+  validateCalendarBackupEntries,
+  restoreCalendarBackupEntries,
   validateBackupCalendars,
   buildAdminDashboardMetrics,
   CALENDAR_ACCENT_PALETTE,
@@ -5245,7 +5249,10 @@ function App() {
       onUpdateWeatherLocation: handleUpdateWeatherLocation,
       onDeleteRecentLocation: handleDeleteRecentWeatherLocation,
       showToast: showToast,
-      helpSteps: typeof getNotificationPermissionHelpSteps === 'function' ? getNotificationPermissionHelpSteps() : []
+      helpSteps: typeof getNotificationPermissionHelpSteps === 'function' ? getNotificationPermissionHelpSteps() : [],
+      calendar: activeCalLoaded ? activeCal : null,
+      onRequestConfirm: showConfirmDialog,
+      onRequestDataRefresh: () => setCloudReloadToken(token => token + 1)
     }),
     isNotifOnboardingOpen && /*#__PURE__*/React.createElement(NotificationOnboardingModal, {
       onClose: () => {
@@ -5533,7 +5540,10 @@ function App() {
       onUpdateWeatherLocation: handleUpdateWeatherLocation,
       onDeleteRecentLocation: handleDeleteRecentWeatherLocation,
       showToast: showToast,
-      helpSteps: typeof getNotificationPermissionHelpSteps === 'function' ? getNotificationPermissionHelpSteps() : []
+      helpSteps: typeof getNotificationPermissionHelpSteps === 'function' ? getNotificationPermissionHelpSteps() : [],
+      calendar: activeCalLoaded ? activeCal : null,
+      onRequestConfirm: showConfirmDialog,
+      onRequestDataRefresh: () => setCloudReloadToken(token => token + 1)
     }),
     isNotifOnboardingOpen && /*#__PURE__*/React.createElement(NotificationOnboardingModal, {
       onClose: () => {
@@ -5633,6 +5643,7 @@ function App() {
           if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 공유 정보를 확인해 주세요.')) setIsShareOpen(true);
         },
         onOpenAppSettings: () => setIsAppSettingsOpen(true),
+        showToast: showToast,
         ...navMenuProps
       }),
       isShareOpen && activeCal && /*#__PURE__*/React.createElement(ShareModal, {
@@ -9765,7 +9776,9 @@ function bindGatherUiDeps() {
     ResizableModalContainer: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ResizableModalContainer) || (typeof ResizableModalContainer === 'function' ? ResizableModalContainer : null),
     SearchResultLogRow: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SearchResultLogRow) || (typeof SearchResultLogRow === 'function' ? SearchResultLogRow : null),
     SettlementSummaryModal: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SettlementSummaryModal) || (typeof SettlementSummaryModal === 'function' ? SettlementSummaryModal : null),
-    ShareIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ShareIcon) || (typeof ShareIcon === 'function' ? ShareIcon : null),
+    getPlaceKakaoRouteUrl: typeof getPlaceKakaoRouteUrl === 'function' ? getPlaceKakaoRouteUrl : (window.GATHER_APP_UTILS || {}).getPlaceKakaoRouteUrl,
+    getPlaceNaverRouteUrl: typeof getPlaceNaverRouteUrl === 'function' ? getPlaceNaverRouteUrl : (window.GATHER_APP_UTILS || {}).getPlaceNaverRouteUrl,
+    getPlaceGoogleRouteUrl: typeof getPlaceGoogleRouteUrl === 'function' ? getPlaceGoogleRouteUrl : (window.GATHER_APP_UTILS || {}).getPlaceGoogleRouteUrl,
     fetchSubcollectionCount: typeof fetchSubcollectionCount === 'function' ? fetchSubcollectionCount : null,
     AdminCreateCalendarModal: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AdminCreateCalendarModal) || (typeof AdminCreateCalendarModal === 'function' ? AdminCreateCalendarModal : null),
     AdminFilledMenuIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AdminFilledMenuIcon) || (typeof AdminFilledMenuIcon === 'function' ? AdminFilledMenuIcon : null),
@@ -9903,6 +9916,7 @@ function bindGatherUiDeps() {
     cloneCalendarList: typeof cloneCalendarList === 'function' ? cloneCalendarList : null,
     computeCalendarSearchMatches: typeof computeCalendarSearchMatches === 'function' ? computeCalendarSearchMatches : null,
     createCalendarBackupPayload: typeof createCalendarBackupPayload === 'function' ? createCalendarBackupPayload : null,
+    createCalendarDataBackupPayload: typeof createCalendarDataBackupPayload === 'function' ? createCalendarDataBackupPayload : null,
     createDefaultCalendar: typeof createDefaultCalendar === 'function' ? createDefaultCalendar : null,
     createMemoActivityLog: typeof createMemoActivityLog === 'function' ? createMemoActivityLog : null,
     createPollActivityLog: typeof createPollActivityLog === 'function' ? createPollActivityLog : null,
@@ -9914,6 +9928,7 @@ function bindGatherUiDeps() {
     downloadJsonFile: typeof downloadJsonFile === 'function' ? downloadJsonFile : null,
     exportCalendarConfirmedMeetingsToICS: typeof exportCalendarConfirmedMeetingsToICS === 'function' ? exportCalendarConfirmedMeetingsToICS : null,
     extractCalendarsFromBackup: typeof extractCalendarsFromBackup === 'function' ? extractCalendarsFromBackup : null,
+    extractCalendarBackupEntries: typeof extractCalendarBackupEntries === 'function' ? extractCalendarBackupEntries : null,
     fetchActivityLogsFromFirestore: typeof fetchActivityLogsFromFirestore === 'function' ? fetchActivityLogsFromFirestore : null,
     fetchChatMessagesRest: typeof fetchChatMessagesRest === 'function' ? fetchChatMessagesRest : null,
     fetchImageShareDocument: typeof fetchImageShareDocument === 'function' ? fetchImageShareDocument : null,
@@ -9947,7 +9962,9 @@ function bindGatherUiDeps() {
     ensurePushSubscriptionHealthy: typeof ensurePushSubscriptionHealthy === 'function' ? ensurePushSubscriptionHealthy : null,
     translateKoreanToEnglish: typeof translateKoreanToEnglish === 'function' ? translateKoreanToEnglish : null,
     unsubscribeUserFromPush: typeof unsubscribeUserFromPush === 'function' ? unsubscribeUserFromPush : null,
+    validateCalendarBackupEntries: typeof validateCalendarBackupEntries === 'function' ? validateCalendarBackupEntries : null,
     validateBackupCalendars: typeof validateBackupCalendars === 'function' ? validateBackupCalendars : null,
+    restoreCalendarBackupEntries: typeof restoreCalendarBackupEntries === 'function' ? restoreCalendarBackupEntries : null,
     validateCalendarShape: typeof validateCalendarShape === 'function' ? validateCalendarShape : null,
     ADMIN_MESSAGE_LIVE_LIMIT: typeof ADMIN_MESSAGE_LIVE_LIMIT !== 'undefined' ? ADMIN_MESSAGE_LIVE_LIMIT : 50,
     ADMIN_MEMO_LIVE_LIMIT: typeof ADMIN_MEMO_LIVE_LIMIT !== 'undefined' ? ADMIN_MEMO_LIVE_LIMIT : 50,

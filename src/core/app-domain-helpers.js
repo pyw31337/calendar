@@ -492,6 +492,18 @@ function getGoogleMapPlaceUrl(...args) {
   const f = (window.GATHER_APP_UTILS || {}).getGoogleMapPlaceUrl;
   return typeof f === 'function' ? f(...args) : undefined;
 }
+function getPlaceKakaoRouteUrl(...args) {
+  const f = (window.GATHER_APP_UTILS || {}).getPlaceKakaoRouteUrl;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getPlaceNaverRouteUrl(...args) {
+  const f = (window.GATHER_APP_UTILS || {}).getPlaceNaverRouteUrl;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getPlaceGoogleRouteUrl(...args) {
+  const f = (window.GATHER_APP_UTILS || {}).getPlaceGoogleRouteUrl;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
 function getPlaceExternalMapUrl(...args) {
   const f = (window.GATHER_APP_UTILS || {}).getPlaceExternalMapUrl;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -2001,6 +2013,9 @@ export {
   getNaverMapSearchRegionHint,
   getNaverMapPlaceUrl,
   getGoogleMapPlaceUrl,
+  getPlaceKakaoRouteUrl,
+  getPlaceNaverRouteUrl,
+  getPlaceGoogleRouteUrl,
   getPlaceExternalMapUrl,
   readConfigNumber,
   readConfigObject,

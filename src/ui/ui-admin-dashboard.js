@@ -256,6 +256,10 @@ function createCalendarBackupPayload(...args) {
   const f = __gatherUiDeps().createCalendarBackupPayload || GATHER_APP_UTILS.createCalendarBackupPayload;
   return typeof f === 'function' ? f(...args) : undefined;
 }
+function createCalendarDataBackupPayload(...args) {
+  const f = __gatherUiDeps().createCalendarDataBackupPayload || GATHER_APP_UTILS.createCalendarDataBackupPayload;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
 function createDefaultCalendar(...args) {
   const f = __gatherUiDeps().createDefaultCalendar || GATHER_APP_UTILS.createDefaultCalendar;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -298,6 +302,10 @@ function exportCalendarConfirmedMeetingsToICS(...args) {
 }
 function extractCalendarsFromBackup(...args) {
   const f = __gatherUiDeps().extractCalendarsFromBackup || GATHER_APP_UTILS.extractCalendarsFromBackup;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function extractCalendarBackupEntries(...args) {
+  const f = __gatherUiDeps().extractCalendarBackupEntries || GATHER_APP_UTILS.extractCalendarBackupEntries;
   return typeof f === 'function' ? f(...args) : undefined;
 }
 function fetchActivityLogsFromFirestore(...args) {
@@ -434,6 +442,14 @@ function unsubscribeUserFromPush(...args) {
 }
 function validateBackupCalendars(...args) {
   const f = __gatherUiDeps().validateBackupCalendars || GATHER_APP_UTILS.validateBackupCalendars;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function validateCalendarBackupEntries(...args) {
+  const f = __gatherUiDeps().validateCalendarBackupEntries || GATHER_APP_UTILS.validateCalendarBackupEntries;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function restoreCalendarBackupEntries(...args) {
+  const f = __gatherUiDeps().restoreCalendarBackupEntries || GATHER_APP_UTILS.restoreCalendarBackupEntries;
   return typeof f === 'function' ? f(...args) : undefined;
 }
 function validateCalendarShape(...args) {
@@ -714,6 +730,7 @@ export function AdminDashboard({ initialCalendars }) {
     toastControllerRef.current = GATHER_APP_UTILS.createToastLifecycle(setToast);
   }
   const importInputRef = React.useRef(null);
+  const [backupBusy, setBackupBusy] = React.useState(false);
   const isRestoreMode = isAdminRestoreRoute();
 
   // Tab control state
@@ -1243,19 +1260,34 @@ export function AdminDashboard({ initialCalendars }) {
   };
 
   // Backup operations
-  const handleDownloadBackup = (calendarId = '') => {
-    const payload = createCalendarBackupPayload(calendarsList, calendarId);
-    if (!payload.calendars.length) {
-      showAdminToast('백업할 데이터 없음', 'error');
-      return;
+  const handleDownloadBackup = async (calendarId = '') => {
+    if (backupBusy) return;
+    setBackupBusy(true);
+    try {
+      if (!Array.isArray(calendarsList) || calendarsList.length === 0) {
+        showAdminToast('백업할 데이터 없음', 'error');
+        return;
+      }
+      showAdminToast('백업 파일을 생성하는 중입니다.', 'info', 1600);
+      const payload = await createCalendarDataBackupPayload(calendarsList, calendarId);
+      if (!payload.calendars.length) {
+        showAdminToast('백업할 데이터 없음', 'error');
+        return;
+      }
+      const suffix = calendarId || 'all';
+      const timestamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+      downloadJsonFile(`calendar-backup-${suffix}-${timestamp}.json`, payload);
+      showAdminToast(`${suffix} 백업 다운로드완료`);
+    } catch (err) {
+      console.error('handleDownloadBackup failed:', err);
+      showAdminToast('백업 다운로드 실패', 'error');
+    } finally {
+      setBackupBusy(false);
     }
-    const suffix = calendarId || 'all';
-    const timestamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
-    downloadJsonFile(`calendar-backup-${suffix}-${timestamp}.json`, payload);
-    showAdminToast(`${suffix} 백업 다운로드완료`);
   };
 
   const handleImportClick = () => {
+    if (backupBusy) return;
     if (!__fb() || !ENABLE_FIRESTORE_WRITES) {
       showAdminToast('쓰기 연결 없음', 'error');
       return;
@@ -1276,26 +1308,28 @@ export function AdminDashboard({ initialCalendars }) {
     return '';
   };
 
-  const performBackupRestore = async (calendars) => {
+  const performBackupRestore = async (entries) => {
     closeConfirmDialog();
-    const now = Date.now();
-    const results = [];
-    for (const calendar of calendars) {
-      const restoredCalendar = {
-        ...calendar,
-        updatedAt: now,
-        revision: (calendar.revision || 0) + 1
-      };
-      const saved = await pushSingleCloudCalendar(restoredCalendar, now, 18, null, 'restore');
-      results.push({ id: calendar.id, saved, calendar: restoredCalendar });
+    if (backupBusy) return;
+    setBackupBusy(true);
+    try {
+      const result = await restoreCalendarBackupEntries(entries);
+      if (!result || !result.ok) {
+        const failedIds = (result?.failed || []).map(item => item.id).filter(Boolean).join(', ') || '복구';
+        showAdminToast(`${failedIds} 실패`, 'error', 6000);
+        return;
+      }
+      const restoredCalendars = (result.results || []).map(item => item.calendar).filter(Boolean);
+      if (restoredCalendars.length > 0) {
+        setServerCalendars(prev => mergeCalendarCollections(prev, restoredCalendars, { replaceMatchingId: true }));
+      }
+      showAdminToast('데이터 복구완료');
+    } catch (err) {
+      console.error('performBackupRestore failed:', err);
+      showAdminToast('복구 실패', 'error', 6000);
+    } finally {
+      setBackupBusy(false);
     }
-    const failed = results.filter(result => !result.saved);
-    if (failed.length) {
-      showAdminToast(`${failed.map(result => result.id).join(', ')} 복구 실패`, 'error', 6000);
-      return;
-    }
-    setServerCalendars(prev => mergeCalendarCollections(prev, results.map(result => result.calendar), { replaceMatchingId: true }));
-    showAdminToast('데이터 복구완료');
   };
 
   const handleImportBackup = async (event) => {
@@ -1305,13 +1339,16 @@ export function AdminDashboard({ initialCalendars }) {
     try {
       const raw = await file.text();
       const parsed = JSON.parse(raw);
-      const { calendars, error: validationError } = validateBackupCalendars(extractCalendarsFromBackup(parsed));
+      const extractedEntries = extractCalendarBackupEntries(parsed);
+      const { calendars, entries, error: validationError } = validateCalendarBackupEntries(extractedEntries);
       if (validationError) {
         showAdminToast(validationError, 'error', 6000);
         return;
       }
-      const message = `${calendars.map(calendar => calendar.id).join(', ')} 데이터를 백업 파일 내용으로 복구합니다. 현재 Firestore 데이터가 해당 백업으로 교체됩니다. 계속할까요?`;
-      requestConfirm('데이터 복구 확인', message, () => performBackupRestore(calendars));
+      const targetIds = calendars.map(calendar => calendar.id).join(', ');
+      const hasCollections = Array.isArray(entries) && entries.some(entry => entry.collections && Object.keys(entry.collections || {}).length > 0);
+      const message = `${targetIds} 데이터를 백업 파일 내용으로 복구합니다. 현재 Firestore 데이터가 해당 백업으로 교체됩니다.${hasCollections ? ' 채팅·메모·장소·사진·투표·정산·로그도 함께 복구됩니다.' : ''} 계속할까요?`;
+      requestConfirm('데이터 복구 확인', message, () => performBackupRestore(entries));
     } catch (err) {
       console.error('Calendar backup import failed:', err);
       showAdminToast('복구 실패', 'error', 6000);
@@ -2909,12 +2946,12 @@ export function AdminDashboard({ initialCalendars }) {
 
       /* Original Backup card tools */
       /*#__PURE__*/React.createElement("section", { className: "recovery-backup-card", style: styles.card },
-        /*#__PURE__*/React.createElement("div", { className: "admin-section-header" },
+          /*#__PURE__*/React.createElement("div", { className: "admin-section-header" },
           /*#__PURE__*/React.createElement("div", { className: "summary-title" }, "JSON 백업관리"),
           /*#__PURE__*/React.createElement("div", { className: "admin-backup-actions", "data-collapse-anchor": "true", "data-collapse-key": "recovery-backup", "data-collapse-label": "JSON 백업관리" },
-            /*#__PURE__*/React.createElement("button", { className: "btn btn-secondary", onClick: () => handleDownloadBackup('') }, "전체 백업 다운로드"),
-            /*#__PURE__*/React.createElement("button", { className: isRestoreMode ? "btn btn-danger" : "btn btn-secondary", onClick: handleImportClick },
-              isRestoreMode ? "JSON 파일 불러오기" : "데이터 복구 모드 필요"
+            /*#__PURE__*/React.createElement("button", { className: "btn btn-secondary", onClick: () => handleDownloadBackup(''), disabled: backupBusy }, backupBusy ? "생성 중" : "전체 백업 다운로드"),
+            /*#__PURE__*/React.createElement("button", { className: isRestoreMode ? "btn btn-danger" : "btn btn-secondary", onClick: handleImportClick, disabled: backupBusy },
+              backupBusy ? "처리 중" : (isRestoreMode ? "JSON 파일 불러오기" : "데이터 복구 모드 필요")
             )
           )
         ),
@@ -2929,10 +2966,14 @@ export function AdminDashboard({ initialCalendars }) {
             /*#__PURE__*/React.createElement("div", { style: { color: '#64748B', fontSize: '0.78rem', margin: '4px 0 10px 0' } },
               `${stat.participants.length}명 참여자 · 활성일정 ${stat.schedules.length}건 · 투표 ${stat.pollCount}개`
             ),
+            /*#__PURE__*/React.createElement("div", { style: { color: '#64748B', fontSize: '0.76rem', margin: '0 0 10px 0', lineHeight: 1.45 } },
+              `채팅 ${adminMsgTotal[stat.calendar.id] != null ? adminMsgTotal[stat.calendar.id] : (messagesMap[stat.calendar.id] || []).length}건 · 메모 ${adminMemoTotal[stat.calendar.id] != null ? adminMemoTotal[stat.calendar.id] : (memosMap[stat.calendar.id] || []).length}건 · 장소 ${getCalendarPlaces(stat.calendar).length}건 · 사진 ${stat.photoCount}장`
+            ),
             /*#__PURE__*/React.createElement("button", {
               className: "btn btn-secondary", style: { fontSize: '0.76rem', padding: '4px 10px' },
-              onClick: () => handleDownloadBackup(stat.calendar.id)
-            }, `${stat.calendar.id} JSON 다운로드`)
+              onClick: () => handleDownloadBackup(stat.calendar.id),
+              disabled: backupBusy
+            }, backupBusy ? '생성 중' : `${stat.calendar.id} JSON 다운로드`)
           ))
         )
       )

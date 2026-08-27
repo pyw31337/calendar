@@ -790,6 +790,132 @@ function getDeps() { return window.GATHER_UI_DEPS || {}; }
       React.createElement('span', {
         style: { fontSize: '0.76rem', color: 'var(--text-muted)' }
       }, 'QR코드를 카메라로 스캔해 접속하세요')
+    ),
+
+    /* Step 3: Webcal / Google / Apple Live Calendar Subscription Section */
+    React.createElement('div', {
+      style: {
+        marginTop: '16px', paddingTop: '14px', borderTop: '1px solid var(--border-subtle)',
+        display: 'flex', flexDirection: 'column', gap: '8px'
+      }
+    },
+      React.createElement('label', {
+        style: { fontSize: '0.84rem', fontWeight: 800, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' }
+      }, React.createElement('span', { style: { fontSize: '0.95rem' } }, '📅'), '외부 캘린더 실시간 연동 (Webcal)'),
+      React.createElement('span', {
+        style: { fontSize: '0.74rem', color: 'var(--text-muted)', lineHeight: 1.4 }
+      }, '개인 구글 캘린더나 아이폰 캘린더에 모아엘가 모임 일정을 실시간으로 구독합니다.'),
+      React.createElement('div', {
+        style: { display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '2px' }
+      },
+        /* Google Calendar Add Button */
+        React.createElement('button', {
+          type: 'button',
+          className: 'btn',
+          onClick: function () {
+            const host = window.location.host;
+            const feedUrl = `webcal://${host}/feed/cal_${calendar.id}.ics`;
+            const gcalUrl = `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(feedUrl)}`;
+            window.open(gcalUrl, '_blank', 'noopener,noreferrer');
+            if (showToast) showToast('구글 캘린더 등록 페이지로 이동합니다.', 'info');
+          },
+          style: {
+            flex: '1 1 120px', height: '36px', borderRadius: '8px',
+            backgroundColor: 'rgba(59, 130, 246, 0.12)', color: '#2563EB', border: '1px solid rgba(59, 130, 246, 0.3)',
+            fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer',
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px'
+          }
+        }, '🌐 구글 캘린더 추가'),
+
+        /* Apple iCal Subscribe Button */
+        React.createElement('button', {
+          type: 'button',
+          className: 'btn',
+          onClick: function () {
+            const host = window.location.host;
+            const webcalUrl = `webcal://${host}/feed/cal_${calendar.id}.ics`;
+            window.location.href = webcalUrl;
+            if (showToast) showToast('기본 캘린더 앱으로 구독 요청을 보냅니다.', 'info');
+          },
+          style: {
+            flex: '1 1 120px', height: '36px', borderRadius: '8px',
+            backgroundColor: 'rgba(16, 185, 129, 0.12)', color: '#059669', border: '1px solid rgba(16, 185, 129, 0.3)',
+            fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer',
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px'
+          }
+        }, '🍎 애플 캘린더 구독'),
+
+        /* Copy Feed URL Button */
+        React.createElement('button', {
+          type: 'button',
+          className: 'btn',
+          onClick: async function () {
+            const host = window.location.host;
+            const feedUrl = `https://${host}/feed/cal_${calendar.id}.ics`;
+            const ok = await copyTextToClipboard(feedUrl);
+            if (showToast) showToast(ok ? '구독 주소 (.ics)가 복사되었습니다!' : '복사 실패', ok ? 'success' : 'error');
+          },
+          style: {
+            flex: '1 1 100px', height: '36px', borderRadius: '8px',
+            backgroundColor: 'var(--bg-primary)', color: 'var(--text-main)', border: '1px solid var(--border-subtle)',
+            fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer',
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px'
+          }
+        }, '📋 구독 주소 복사')
+      )
+    ),
+
+    /* Step 4: KakaoTalk / Native Web Share API Section */
+    React.createElement('div', {
+      style: {
+        marginTop: '14px', paddingTop: '12px', borderTop: '1px solid var(--border-subtle)',
+        display: 'flex', flexDirection: 'column', gap: '8px'
+      }
+    },
+      React.createElement('label', {
+        style: { fontSize: '0.84rem', fontWeight: 800, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' }
+      }, React.createElement('span', { style: { fontSize: '0.95rem' } }, '💬'), '카카오톡 & 앱으로 공유하기'),
+      React.createElement('div', {
+        style: { display: 'flex', gap: '6px', flexWrap: 'wrap' }
+      },
+        /* Native Web Share Button (if supported) */
+        typeof navigator !== 'undefined' && typeof navigator.share === 'function' && React.createElement('button', {
+          type: 'button',
+          className: 'btn',
+          onClick: function () {
+            navigator.share({
+              title: `${calendar?.title || '모아엘가'} 캘린더`,
+              text: `[${calendar?.title || '모아엘가'}] 캘린더 모임 일정과 장소를 확인해 보세요!`,
+              url: shareUrl
+            }).catch(function (e) {
+              console.warn('Native share cancelled:', e);
+            });
+          },
+          style: {
+            flex: '1 1 100%', height: '38px', borderRadius: '8px',
+            backgroundColor: '#FEE500', color: '#191919', border: 'none',
+            fontSize: '0.82rem', fontWeight: 800, cursor: 'pointer',
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
+          }
+        }, '💬 카카오톡 / 모바일 앱으로 공유하기'),
+
+        /* Custom Share Invitation Text Copy Button */
+        React.createElement('button', {
+          type: 'button',
+          className: 'btn',
+          onClick: async function () {
+            const text = `[${calendar?.title || '모아엘가'} 캘린더 초대]\n모임 일정 및 장소 확인하기:\n${shareUrl}`;
+            const ok = await copyTextToClipboard(text);
+            if (showToast) showToast(ok ? '초대 문구가 복사되었습니다! 카카오톡에 붙여넣어 공유하세요.' : '복사 실패', ok ? 'success' : 'error');
+          },
+          style: {
+            flex: '1 1 100%', height: '36px', borderRadius: '8px',
+            backgroundColor: 'var(--bg-primary)', color: 'var(--text-main)', border: '1px solid var(--border-subtle)',
+            fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer',
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px'
+          }
+        }, '✉️ 카톡용 초대 메시지문 복사')
+      )
     ))));
   }
 
