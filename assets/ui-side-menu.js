@@ -668,6 +668,581 @@ function getAnniversaryDisplayColor(...args) {
 }
 
 
+export function AppSettingsModal({
+  onClose, isDarkTheme, onToggleTheme, fontScalePercent, onDecreaseFont, onIncreaseFont,
+  isNotifPermissionGranted, isMasterNotifyEnabled, onToggleMasterNotify,
+  notifyChannels, onToggleNotifyChannel, helpSteps,
+  weatherLocation = null, recentLocations = [], onUpdateWeatherLocation, onDeleteRecentLocation, showToast,
+  calendarId = null,
+  activeParticipantId = null,
+  onForcePushReregister = null
+}) {
+  const React = window.React;
+  const __deps = window.GATHER_UI_DEPS || {};
+  const SmallXIcon = __deps.SmallXIcon;
+  const ToggleSwitch = __deps.ToggleSwitch;
+  const MoonStarsIcon = __deps.MoonStarsIcon;
+  const TextResizeIcon = __deps.TextResizeIcon;
+  const BellIcon = __deps.BellIcon;
+  const MapCogIcon = __deps.MapCogIcon;
+  const translateKoreanToEnglish = __deps.translateKoreanToEnglish;
+  const getNotificationDiagnostics = (window.GATHER_APP_NOTIFICATIONS || {}).getNotificationDiagnostics
+    || (window.GATHER_APP_DOMAIN_HELPERS || {}).getNotificationDiagnostics;
+  const getOrCreateDeviceId = (window.GATHER_APP_NOTIFICATIONS || {}).getOrCreateDeviceId
+    || (window.GATHER_APP_DOMAIN_HELPERS || {}).getOrCreateDeviceId;
+  const channels = [
+    { key: 'chat', label: '채팅 알림' },
+    { key: 'memo', label: '메모 알림' },
+    { key: 'poll', label: '투표 알림' },
+    { key: 'schedule', label: '일정 알림' }
+  ];
+  const [weatherQuery, setWeatherQuery] = React.useState('');
+  const [weatherResults, setWeatherResults] = React.useState([]);
+  const [weatherLoading, setWeatherLoading] = React.useState(false);
+  const currentWeatherName = (weatherLocation && weatherLocation.name) || '서울';
+  const [pushBusy, setPushBusy] = React.useState(false);
+  const [pushStatus, setPushStatus] = React.useState(null); // { ok, reason, subId }
+  const [deviceRows, setDeviceRows] = React.useState([]);
+  const myDeviceId = React.useMemo(() => (typeof getOrCreateDeviceId === 'function' ? getOrCreateDeviceId() : null), []);
+
+  const refreshPushMeta = React.useCallback(async () => {
+    const diag = typeof getNotificationDiagnostics === 'function' ? getNotificationDiagnostics() : null;
+    let status = { ok: false, reason: 'unknown', diag };
+    try {
+      if (typeof Notification === 'undefined' || Notification.permission !== 'granted') {
+        status = { ok: false, reason: 'permission', diag };
+      } else if (!('serviceWorker' in navigator) || !navigator.serviceWorker) {
+        status = { ok: false, reason: 'no-sw', diag };
+      } else {
+        const reg = await navigator.serviceWorker.ready;
+        const sub = reg.pushManager ? await reg.pushManager.getSubscription() : null;
+        if (!sub) status = { ok: false, reason: 'no-sub', diag };
+        else status = { ok: true, reason: 'subscribed', subId: String(sub.endpoint || '').slice(-24), diag };
+      }
+    } catch (e) {
+      status = { ok: false, reason: e?.message || 'error', diag };
+    }
+    setPushStatus(status);
+
+    // Device list from Firestore
+    try {
+      const db = typeof window !== 'undefined' ? window.__gatherFirebaseDb : null;
+      if (db && calendarId) {
+        const snap = await db.collection('calendars').doc('cal_' + calendarId).collection('push_subscriptions').get();
+        const rows = [];
+        snap.forEach(doc => {
+          const d = doc.data() || {};
+          rows.push({
+            id: doc.id,
+            deviceId: d.deviceId || '',
+            deviceLabel: d.deviceLabel || '알 수 없는 기기',
+            lastSeenAt: d.lastSeenAt || d.updatedAt || d.createdAt || 0,
+            participantId: d.participantId || '',
+            isThis: myDeviceId && d.deviceId === myDeviceId
+          });
+        });
+        rows.sort((a, b) => (b.lastSeenAt || 0) - (a.lastSeenAt || 0));
+        setDeviceRows(rows);
+      }
+    } catch (e) {
+      console.warn('push device list', e);
+    }
+  }, [calendarId, myDeviceId]);
+
+  React.useEffect(() => { refreshPushMeta(); }, [refreshPushMeta]);
+
+  const handleForceReregister = async () => {
+    if (pushBusy) return;
+    setPushBusy(true);
+    try {
+      if (typeof onForcePushReregister === 'function') {
+        const r = await onForcePushReregister();
+        if (typeof showToast === 'function') {
+          showToast(r && r.ok ? '이 기기 알림 구독을 다시 등록했습니다.' : ('구독 실패: ' + (r && r.reason || 'unknown')), r && r.ok ? 'success' : 'error');
+        }
+      }
+      await refreshPushMeta();
+    } finally {
+      setPushBusy(false);
+    }
+  };
+
+  const handleDeleteDevice = async (row) => {
+    if (!row || !calendarId) return;
+    try {
+      const db = window.__gatherFirebaseDb;
+      if (!db) return;
+      await db.collection('calendars').doc('cal_' + calendarId).collection('push_subscriptions').doc(row.id).delete();
+      if (typeof showToast === 'function') showToast('기기 구독을 삭제했습니다.', 'success');
+      await refreshPushMeta();
+    } catch (e) {
+      if (typeof showToast === 'function') showToast('삭제 실패', 'error');
+    }
+  };
+
+  const isKoreaResult = (loc) => {
+    if (!loc) return false;
+    const cc = String(loc.country_code || loc.countryCode || '').toUpperCase();
+    if (cc === 'KR') return true;
+    const country = String(loc.country || '');
+    if (/대한민국|South Korea|Korea, Republic|한국/i.test(country)) return true;
+    // open-meteo uses country_code
+    return false;
+  };
+
+  const handleWeatherSearch = async (e) => {
+    if (e) e.preventDefault();
+    const cleanQuery = (weatherQuery || '').trim();
+    if (!cleanQuery) {
+      if (typeof showToast === 'function') showToast('검색할 지역 이름을 입력해 주세요.', 'error');
+      return;
+    }
+    setWeatherLoading(true);
+    try {
+      const translated = typeof translateKoreanToEnglish === 'function' ? translateKoreanToEnglish(cleanQuery) : cleanQuery;
+      let searchResults = [];
+      // Domestic only: countryCode=KR (open-meteo) / countrycodes=kr (nominatim)
+      if (translated) {
+        const res = await fetch('https://geocoding-api.open-meteo.com/v1/search?name=' + encodeURIComponent(translated) + '&count=12&language=ko&format=json&countryCode=KR');
+        if (res.ok) {
+          const data = await res.json();
+          searchResults = (data.results || []).filter(isKoreaResult);
+        }
+      }
+      if (searchResults.length === 0) {
+        const res = await fetch('https://nominatim.openstreetmap.org/search?q=' + encodeURIComponent(cleanQuery) + '&format=json&limit=12&accept-language=ko&countrycodes=kr');
+        if (res.ok) {
+          const data = await res.json();
+          searchResults = (data || []).map((item, idx) => ({
+            id: 'nominatim_' + (item.place_id || idx),
+            name: item.name || (item.display_name || '').split(',')[0],
+            latitude: parseFloat(item.lat),
+            longitude: parseFloat(item.lon),
+            country: '대한민국',
+            country_code: 'KR',
+            admin1: (item.display_name || '').split(',').slice(1, 2)[0]?.trim() || ''
+          }));
+        }
+      }
+      setWeatherResults(searchResults);
+      if (searchResults.length === 0 && typeof showToast === 'function') {
+        showToast('국내에서 일치하는 지역이 없습니다.', 'info');
+      }
+    } catch (err) {
+      console.error(err);
+      if (typeof showToast === 'function') showToast('지역 검색에 실패했습니다.', 'error');
+    } finally {
+      setWeatherLoading(false);
+    }
+  };
+
+  const pickWeatherLocation = (loc) => {
+    if (!loc) return;
+    const normalized = {
+      name: loc.name || loc.admin1 || '선택한 지역',
+      lat: loc.latitude != null ? loc.latitude : loc.lat,
+      lon: loc.longitude != null ? loc.longitude : loc.lon
+    };
+    if (typeof onUpdateWeatherLocation === 'function') onUpdateWeatherLocation(normalized);
+    setWeatherQuery('');
+    setWeatherResults([]);
+    if (typeof showToast === 'function') showToast((normalized.name || '지역') + ' 날씨로 설정했습니다.', 'success');
+  };
+
+  return /*#__PURE__*/React.createElement("div", { className: "modal-overlay", onClick: onClose, style: { zIndex: 12000 } },
+    /*#__PURE__*/React.createElement("div", {
+      className: "modal-container", onClick: e => e.stopPropagation(),
+      style: { maxWidth: '400px', width: '92%', backgroundColor: 'var(--bg-card)', borderRadius: '16px', border: '1px solid var(--border-subtle)', overflow: 'hidden' }
+    },
+      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid var(--border-subtle)' } },
+        /*#__PURE__*/React.createElement("span", { style: { fontWeight: 900, fontSize: '0.98rem' } }, "설정"),
+        /*#__PURE__*/React.createElement("button", { type: "button", onClick: onClose, style: { background: 'none', border: 'none', cursor: 'pointer', color: '#64748B', display: 'flex' } },
+          SmallXIcon ? /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }) : "✕")
+      ),
+      /*#__PURE__*/React.createElement("div", { style: { padding: '12px 16px 20px', display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '70vh', overflowY: 'auto' } },
+        /* Weather region — above dark mode */
+        /*#__PURE__*/React.createElement("div", { style: { padding: '6px 0 12px', display: 'flex', flexDirection: 'column', gap: '8px' } },
+          /*#__PURE__*/React.createElement("div", {
+            className: "admin-side-menu-setting-row",
+            style: { padding: '4px 0 2px', alignItems: 'center' }
+          },
+            /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-label" },
+              /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-icon" },
+                MapCogIcon ? /*#__PURE__*/React.createElement(MapCogIcon, { size: 20 }) : null
+              ),
+              "날씨 지역"
+            ),
+            /*#__PURE__*/React.createElement("span", {
+              style: { fontSize: '0.82rem', color: 'var(--text-muted)', fontWeight: 600, flexShrink: 0 }
+            }, "현재 : ", /*#__PURE__*/React.createElement("span", { style: { color: 'var(--text-main)', fontWeight: 700 } }, currentWeatherName))
+          ),
+          /*#__PURE__*/React.createElement("form", {
+            onSubmit: handleWeatherSearch,
+            style: { display: 'flex', gap: '8px', alignItems: 'center' }
+          },
+            /*#__PURE__*/React.createElement("input", {
+              type: "text",
+              value: weatherQuery,
+              onChange: e => setWeatherQuery(e.target.value),
+              placeholder: "지역 이름 검색 (예: 구로구)",
+              style: {
+                flex: 1, minWidth: 0, padding: '10px 12px', borderRadius: '10px',
+                border: '1px solid var(--border-subtle)', background: 'var(--bg-primary)',
+                color: 'var(--text-main)', fontSize: '0.88rem', outline: 'none'
+              }
+            }),
+            /*#__PURE__*/React.createElement("button", {
+              type: "submit",
+              disabled: weatherLoading,
+              style: {
+                flexShrink: 0, padding: '10px 14px', borderRadius: '10px', border: 'none',
+                background: '#0f172a', color: '#fff', fontWeight: 700, fontSize: '0.82rem',
+                cursor: weatherLoading ? 'wait' : 'pointer'
+              }
+            }, weatherLoading ? '검색중' : '검색')
+          ),
+          recentLocations && recentLocations.length > 0 && /*#__PURE__*/React.createElement("div", {
+            style: { display: 'flex', flexWrap: 'wrap', gap: '6px' }
+          },
+            recentLocations.map((loc, idx) => /*#__PURE__*/React.createElement("button", {
+              key: idx,
+              type: "button",
+              onClick: () => pickWeatherLocation(loc),
+              style: {
+                padding: '5px 10px', fontSize: '0.72rem', borderRadius: '6px',
+                border: '1px solid var(--border-subtle)', background: 'var(--bg-primary)',
+                color: 'var(--text-main)', cursor: 'pointer'
+              }
+            }, loc.name))
+          ),
+          weatherResults && weatherResults.length > 0 && /*#__PURE__*/React.createElement("div", {
+            style: { display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '160px', overflowY: 'auto' }
+          },
+            weatherResults.map((loc, idx) => /*#__PURE__*/React.createElement("button", {
+              key: loc.id || idx,
+              type: "button",
+              onClick: () => pickWeatherLocation(loc),
+              style: {
+                textAlign: 'left', padding: '8px 10px', borderRadius: '8px',
+                border: '1px solid var(--border-subtle)', background: 'var(--bg-primary)',
+                color: 'var(--text-main)', cursor: 'pointer', fontSize: '0.82rem'
+              }
+            }, loc.name, loc.admin1 ? ' · ' + loc.admin1 : ''))
+          )
+        ),
+        /*#__PURE__*/React.createElement("div", {
+          "aria-hidden": "true",
+          style: { height: '0', borderTop: '1px solid #E2E8F0', margin: '12px 0' }
+        }),
+        /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-setting-row", style: { padding: '10px 0' } },
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-label" },
+            /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-icon" }, MoonStarsIcon && /*#__PURE__*/React.createElement(MoonStarsIcon, null)), "다크모드"),
+          ToggleSwitch && /*#__PURE__*/React.createElement(ToggleSwitch, { checked: !!isDarkTheme, onChange: onToggleTheme, label: "다크모드" })
+        ),
+        /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-setting-row", style: { padding: '10px 0' } },
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-label" },
+            /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-icon" }, TextResizeIcon && /*#__PURE__*/React.createElement(TextResizeIcon, null)), "글자크기"),
+          /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-font-controls" },
+            /*#__PURE__*/React.createElement("button", { type: "button", onClick: onDecreaseFont, className: "admin-side-menu-font-btn", "aria-label": "글자 크기 줄이기" }, "−"),
+            /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-font-value" }, (fontScalePercent || 100) + "%"),
+            /*#__PURE__*/React.createElement("button", { type: "button", onClick: onIncreaseFont, className: "admin-side-menu-font-btn", "aria-label": "글자 크기 늘리기" }, "+")
+          )
+        ),
+        /*#__PURE__*/React.createElement("div", {
+          "aria-hidden": "true",
+          style: { height: '0', borderTop: '1px solid #E2E8F0', margin: '12px 0' }
+        }),
+        /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-setting-row", style: { padding: '10px 0' } },
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-label" },
+            /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-icon" }, BellIcon && /*#__PURE__*/React.createElement(BellIcon, null)), "알림허용"),
+          ToggleSwitch && /*#__PURE__*/React.createElement(ToggleSwitch, { checked: !!isMasterNotifyEnabled, onChange: onToggleMasterNotify, label: "알림허용" })
+        ),
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.45, padding: '0 2px 8px' } },
+          isNotifPermissionGranted ? "브라우저 알림이 허용된 상태입니다. 아래에서 종류별로 켤 수 있습니다." : "스위치를 켜면 브라우저 알림 허용 요청이 표시됩니다."),
+        /*#__PURE__*/React.createElement("div", {
+          style: {
+            marginTop: '4px', padding: '4px 10px', borderRadius: '12px',
+            background: '#ffffff', border: '1px solid var(--border-subtle)',
+            opacity: isMasterNotifyEnabled ? 1 : 0.55
+          }
+        },
+          channels.map(ch => /*#__PURE__*/React.createElement("div", {
+            key: ch.key, className: "admin-side-menu-setting-row",
+            style: { padding: '10px 2px' }
+          },
+            /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-label", style: { fontSize: '0.88rem' } }, ch.label),
+            ToggleSwitch && /*#__PURE__*/React.createElement(ToggleSwitch, {
+              checked: !!(notifyChannels && notifyChannels[ch.key]),
+              onChange: () => onToggleNotifyChannel && onToggleNotifyChannel(ch.key),
+              label: ch.label
+            })
+          ))
+        ),
+        Array.isArray(helpSteps) && helpSteps.length > 0 && /*#__PURE__*/React.createElement("div", {
+          style: { marginTop: '12px', padding: '12px', borderRadius: '12px', background: 'var(--bg-primary)', border: 'none', fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.5 }
+        },
+          
+        /* --- Push status + devices (P0/P1) --- */
+        /*#__PURE__*/React.createElement("div", {
+          style: { height: '1px', background: 'var(--border-subtle)', margin: '4px 0 8px' }
+        }),
+        /*#__PURE__*/React.createElement("div", {
+          style: {
+            padding: '12px 14px', borderRadius: '12px', background: '#FFFFFF',
+            border: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column', gap: '10px'
+          }
+        },
+          /*#__PURE__*/React.createElement("div", { style: { fontWeight: 800, fontSize: '0.88rem', color: 'var(--text-main)' } }, "이 기기 알림 상태"),
+          /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.8rem', color: 'var(--text-main)', lineHeight: 1.5 } },
+            pushStatus && pushStatus.ok
+              ? /*#__PURE__*/React.createElement("span", null, "✅ 구독 성공 — 이 기기로 푸시 알림을 받을 수 있습니다.")
+              : /*#__PURE__*/React.createElement("span", null,
+                  "⚠️ 구독 미완료",
+                  pushStatus && pushStatus.reason === 'permission' ? " (알림 권한 필요)" :
+                  pushStatus && pushStatus.reason === 'no-sub' ? " (푸시 구독 없음)" :
+                  pushStatus && pushStatus.reason === 'no-sw' ? " (서비스워커 없음)" : ""
+                )
+          ),
+          /*#__PURE__*/React.createElement("button", {
+            type: "button",
+            disabled: pushBusy,
+            onClick: handleForceReregister,
+            style: {
+              width: '100%', padding: '10px 12px', borderRadius: '10px', border: 'none',
+              background: '#0F172A', color: '#fff', fontWeight: 800, fontSize: '0.84rem',
+              cursor: pushBusy ? 'wait' : 'pointer', opacity: pushBusy ? 0.7 : 1
+            }
+          }, pushBusy ? '등록 중…' : '이 기기 알림 다시 등록'),
+          deviceRows.length > 0 && /*#__PURE__*/React.createElement("div", { style: { marginTop: '4px' } },
+            /*#__PURE__*/React.createElement("div", { style: { fontWeight: 800, fontSize: '0.82rem', marginBottom: '6px' } },
+              "등록된 기기 (", deviceRows.length, ")"),
+            deviceRows.map(row => /*#__PURE__*/React.createElement("div", {
+              key: row.id,
+              style: {
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px',
+                padding: '8px 0', borderTop: '1px solid var(--border-subtle)', fontSize: '0.78rem'
+              }
+            },
+              /*#__PURE__*/React.createElement("div", { style: { minWidth: 0 } },
+                /*#__PURE__*/React.createElement("div", { style: { fontWeight: 700, color: 'var(--text-main)' } },
+                  row.deviceLabel, row.isThis ? ' · 이 기기' : ''),
+                /*#__PURE__*/React.createElement("div", { style: { color: 'var(--text-muted)', marginTop: '2px' } },
+                  row.lastSeenAt ? ('최근 ' + new Date(row.lastSeenAt).toLocaleString('ko-KR')) : '')
+              ),
+              /*#__PURE__*/React.createElement("button", {
+                type: "button",
+                onClick: () => handleDeleteDevice(row),
+                style: {
+                  flexShrink: 0, border: '1px solid #FECACA', background: 'rgba(239,68,68,0.06)',
+                  color: '#EF4444', borderRadius: '8px', padding: '4px 10px', fontWeight: 700, fontSize: '0.72rem', cursor: 'pointer'
+                }
+              }, "삭제")
+            ))
+          )
+        ),
+
+/*#__PURE__*/React.createElement("div", { style: { fontWeight: 800, color: 'var(--text-main)', marginBottom: '6px' } }, "설정 안내"),
+          /*#__PURE__*/React.createElement("ol", { style: { margin: 0, paddingLeft: '18px' } },
+            helpSteps.map((step, i) => /*#__PURE__*/React.createElement("li", { key: i, style: { marginBottom: '4px' } }, step))
+          )
+        )
+      )
+    )
+  );
+}
+
+export function NotificationOnboardingModal({ onClose, isMasterNotifyEnabled, onToggleMasterNotify, helpSteps, browserLabel }) {
+  const React = window.React;
+  const __deps = window.GATHER_UI_DEPS || {};
+  const SmallXIcon = __deps.SmallXIcon;
+  const ToggleSwitch = __deps.ToggleSwitch;
+  const BellIcon = __deps.BellIcon;
+  return /*#__PURE__*/React.createElement("div", { className: "modal-overlay", style: { zIndex: 13000 } },
+    /*#__PURE__*/React.createElement("div", {
+      className: "modal-container", onClick: e => e.stopPropagation(),
+      style: { maxWidth: '400px', width: '92%', backgroundColor: 'var(--bg-card)', borderRadius: '16px', border: '1px solid var(--border-subtle)', overflow: 'hidden' }
+    },
+      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid var(--border-subtle)' } },
+        /*#__PURE__*/React.createElement("span", { style: { fontWeight: 900, fontSize: '0.98rem', display: 'flex', alignItems: 'center', gap: '6px' } },
+          BellIcon && /*#__PURE__*/React.createElement(BellIcon, null), "알림 허용 안내"),
+        /*#__PURE__*/React.createElement("button", { type: "button", onClick: onClose, style: { background: 'none', border: 'none', cursor: 'pointer', color: '#64748B', display: 'flex' } },
+          SmallXIcon ? /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }) : "✕")
+      ),
+      /*#__PURE__*/React.createElement("div", { style: { padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px' } },
+        /*#__PURE__*/React.createElement("div", {
+          className: "admin-side-menu-setting-row",
+          style: { padding: '14px 12px', borderRadius: '12px', background: 'var(--bg-primary)', border: '1px solid var(--border-subtle)' }
+        },
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-label", style: { fontWeight: 800 } }, "알림허용"),
+          ToggleSwitch && /*#__PURE__*/React.createElement(ToggleSwitch, { checked: !!isMasterNotifyEnabled, onChange: onToggleMasterNotify, label: "알림허용" })
+        ),
+        /*#__PURE__*/React.createElement("p", { style: { margin: 0, fontSize: '0.84rem', color: 'var(--text-main)', lineHeight: 1.55 } },
+          "채팅·메모·일정·투표 등 새 소식이 등록될 때 알림을 받으려면 알림허용이 필요합니다."),
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.5 } },
+          /*#__PURE__*/React.createElement("div", { style: { fontWeight: 800, color: 'var(--text-main)', marginBottom: '6px' } }, (browserLabel || '브라우저') + " 설정 안내"),
+          /*#__PURE__*/React.createElement("ol", { style: { margin: 0, paddingLeft: '18px' } },
+            (helpSteps || []).map((step, i) => /*#__PURE__*/React.createElement("li", { key: i, style: { marginBottom: '4px' } }, step))
+          )
+        ),
+        /*#__PURE__*/React.createElement("button", { type: "button", className: "btn btn-action-dark btn-action", onClick: onClose, style: { width: '100%', marginTop: '4px' } }, "확인")
+      )
+    )
+  );
+}
+
+
+/** 공통 앱 네비: 채팅 / 정산 / 갤러리 / 장소 / 메모 */
+export function SharedAppNavBlock({
+  onClose,
+  onChangeView,
+  chatCount = 0,
+  settlementBadge = null,
+  galleryCount = 0,
+  placeCount = 0,
+  memoCount = 0,
+  // Optional trailing meta pills (right edge of each row)
+  chatLastAuthor = null,       // { name, color }
+  settlementLastDate = null,   // "08.24"
+  galleryLastDate = null,      // "08.24"
+  placeLastName = null,        // "외룡캠핑장"
+  memoLastTitleWord = null     // "팽이버섯"
+}) {
+  const React = window.React;
+  const go = (view) => {
+    if (typeof onChangeView === 'function') onChangeView(view);
+    if (typeof onClose === 'function') onClose();
+  };
+  const badge = (count, muted = true) => count > 0 ? /*#__PURE__*/React.createElement("span", {
+    className: "main-menu-badge",
+    style: muted
+      ? { backgroundColor: "var(--border-subtle)", color: "var(--text-muted)", marginLeft: "4px" }
+      : { marginLeft: "4px" }
+  }, count) : null;
+
+  const metaPill = (text, styleExtra) => {
+    if (!text) return null;
+    const label = String(text).trim();
+    if (!label) return null;
+    return /*#__PURE__*/React.createElement("span", {
+      className: "side-menu-meta-pill",
+      title: label,
+      style: Object.assign({
+        marginLeft: "auto",
+        alignSelf: "center",
+        flexShrink: 0,
+        maxWidth: "8.25rem",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "flex-end",
+        height: "auto",
+        minHeight: "auto",
+        padding: "0",
+        fontSize: "0.6rem",
+        fontWeight: 500,
+        lineHeight: 1.2,
+        borderRadius: "0",
+        backgroundColor: "transparent",
+        border: "none",
+        color: "var(--text-muted, #64748B)",
+        boxSizing: "border-box",
+        fontVariantNumeric: "tabular-nums"
+      }, styleExtra || {})
+    }, label);
+  };
+
+  const chatAuthorPill = () => {
+    if (!chatLastAuthor || !chatLastAuthor.name) return null;
+    const color = chatLastAuthor.color || "#64748B";
+    return metaPill(chatLastAuthor.name, {
+      border: "none",
+      color: color,
+      backgroundColor: "transparent"
+    });
+  };
+
+  return /*#__PURE__*/React.createElement("div", {
+    className: "admin-side-menu-list",
+    style: { borderTop: '1px solid var(--border-subtle, #E2E8F0)', borderBottom: 'none', paddingTop: '6px', marginTop: '2px' }
+  },
+    /*#__PURE__*/React.createElement("button", { type: "button", className: "admin-side-menu-item", onClick: () => go("chat") },
+      /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2" }, /*#__PURE__*/React.createElement("path", { d: "M7.9 20A9 9 0 1 0 4 16.1L2 22Z" }))),
+      /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title", style: { display: "flex", alignItems: "center", gap: "6px" } }, "채팅", badge(chatCount))
+      ),
+      chatAuthorPill()
+    ),
+    /*#__PURE__*/React.createElement("button", { type: "button", className: "admin-side-menu-item", onClick: () => go("settlement") },
+      /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2" }, /*#__PURE__*/React.createElement("path", { d: "M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1" }), /*#__PURE__*/React.createElement("path", { d: "M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4" }))),
+      /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title", style: { display: "flex", alignItems: "center", gap: "6px" } }, "정산",
+          settlementBadge && settlementBadge.text && /*#__PURE__*/React.createElement("span", {
+            className: "main-menu-badge",
+            style: { backgroundColor: settlementBadge.bgColor || "#64748B", color: "#FFFFFF", marginLeft: "4px" }
+          }, settlementBadge.text)
+        )
+      ),
+      metaPill(settlementLastDate)
+    ),
+    /*#__PURE__*/React.createElement("button", { type: "button", className: "admin-side-menu-item", onClick: () => go("gallery") },
+      /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2" }, /*#__PURE__*/React.createElement("rect", { width: "18", height: "18", x: "3", y: "3", rx: "2", ry: "2" }), /*#__PURE__*/React.createElement("circle", { cx: "9", cy: "9", r: "2" }), /*#__PURE__*/React.createElement("path", { d: "m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" }))),
+      /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title", style: { display: "flex", alignItems: "center", gap: "6px" } }, "갤러리", badge(galleryCount))
+      ),
+      metaPill(galleryLastDate)
+    ),
+    /*#__PURE__*/React.createElement("button", { type: "button", className: "admin-side-menu-item", onClick: () => go("places") },
+      /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2" }, /*#__PURE__*/React.createElement("path", { d: "M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" }), /*#__PURE__*/React.createElement("circle", { cx: "12", cy: "10", r: "3" }))),
+      /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title", style: { display: "flex", alignItems: "center", gap: "6px" } }, "장소", badge(placeCount))
+      ),
+      metaPill(placeLastName)
+    ),
+    /*#__PURE__*/React.createElement("button", { type: "button", className: "admin-side-menu-item", onClick: () => go("memo") },
+      /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2" }, /*#__PURE__*/React.createElement("path", { d: "M12 20h9" }), /*#__PURE__*/React.createElement("path", { d: "M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" }))),
+      /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title", style: { display: "flex", alignItems: "center", gap: "6px" } }, "메모", badge(memoCount))
+      ),
+      metaPill(memoLastTitleWord)
+    )
+  );
+}
+
+export function SharedSideMenuFooter({ onClose, onOpenShare, onOpenSettings, shareLabel = '공유' }) {
+  const React = window.React;
+  const __deps = window.GATHER_UI_DEPS || {};
+  const MenuIcon = __deps.MenuIcon;
+  const handle = action => { if (typeof action === 'function') action(); };
+  return /*#__PURE__*/React.createElement("div", {
+    className: "admin-side-menu-list",
+    style: { borderTop: '1px solid var(--border-subtle, #E2E8F0)', borderBottom: 'none', paddingTop: '6px', marginTop: '2px' }
+  },
+    typeof onOpenShare === 'function' && /*#__PURE__*/React.createElement("button", {
+      type: "button", className: "admin-side-menu-item",
+      onClick: () => { handle(onClose); handle(onOpenShare); }
+    },
+      /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, MenuIcon ? /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M3 12a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M15 6a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M15 18a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M8.7 10.7l6.6 -3.4", "M8.7 13.3l6.6 3.4"] }) : "↗"),
+      /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, shareLabel)
+      )
+    ),
+    typeof onOpenSettings === 'function' && /*#__PURE__*/React.createElement("button", {
+      type: "button", className: "admin-side-menu-item",
+      onClick: () => { handle(onClose); handle(onOpenSettings); }
+    },
+      /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", {
+        xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24",
+        fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
+      }, /*#__PURE__*/React.createElement("path", { d: "M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" }), /*#__PURE__*/React.createElement("circle", { cx: "12", cy: "12", r: "3" }))),
+      /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "설정")
+      )
+    )
+  );
+}
+
 export function SharedSideMenuSettings({
   isDarkTheme,
   onToggleTheme,
@@ -721,10 +1296,20 @@ export function SharedSideMenuSettings({
 }
 
 export function MainSideMenu({
+  onOpenAppSettings,
   calendar,
   anniversaries = [],
   galleryCount = 0,
   placeCount = 0,
+  chatCount = 0,
+  memoCount = 0,
+  settlementCount = 0,
+  settlementBadge = null,
+  chatLastAuthor = null,
+  settlementLastDate = null,
+  galleryLastDate = null,
+  placeLastName = null,
+  memoLastTitleWord = null,
   onClose,
   onOpenManual,
   onOpenSettings,
@@ -747,6 +1332,8 @@ export function MainSideMenu({
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const SharedSideMenuSettings = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SharedSideMenuSettings) || __deps.SharedSideMenuSettings;
+  const SharedSideMenuFooter = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SharedSideMenuFooter) || __deps.SharedSideMenuFooter;
+  const SharedAppNavBlock = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SharedAppNavBlock) || __deps.SharedAppNavBlock;
   const SmallXIcon = __deps.SmallXIcon;
   const MenuIcon = __deps.MenuIcon;
   const CalendarCogIcon = __deps.CalendarCogIcon;
@@ -756,7 +1343,6 @@ export function MainSideMenu({
   const WeatherBadge = __deps.WeatherBadge;
   const WeatherLocationModal = __deps.WeatherLocationModal;
 
-  const [isWeatherModalOpen, setIsWeatherModalOpen] = React.useState(false);
   const handle = action => {
     if (typeof action === 'function') action();
   };
@@ -776,7 +1362,7 @@ export function MainSideMenu({
     className: "admin-side-menu-overlay",
     onClick: onClose
   }, /*#__PURE__*/React.createElement("nav", {
-    className: "admin-side-menu" + (isScrollingActive ? " scroll-active" : ""),
+    className: "admin-side-menu main-side-menu" + (isScrollingActive ? " scroll-active" : ""),
     "aria-label": "메인 메뉴",
     onClick: e => e.stopPropagation(),
     onMouseMove: triggerScrollActive,
@@ -785,39 +1371,26 @@ export function MainSideMenu({
 	    /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-header" },
 	      /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-brand" },
 	        /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-copy" },
-	          /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-title" }, "메뉴")
+	          /*#__PURE__*/React.createElement("button", {
+	            type: "button",
+	            className: "admin-side-menu-title",
+	            title: "메인 화면",
+	            "aria-label": "메인 화면",
+	            onClick: () => { onClose && onClose(); if (typeof onChangeView === 'function') onChangeView('calendar'); },
+	            style: {
+	              background: 'none', border: 'none', padding: 0, margin: 0,
+	              color: 'inherit',
+	              cursor: 'pointer', textAlign: 'left'
+	            }
+	          }, "메뉴")
 	        )
       ),
         /* Right container: Weather badge + Settings Icon + Close Button */
         /*#__PURE__*/React.createElement("div", {
           style: { display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }
         },
-          /* Weather Badge */
+          /* Weather Badge only (region settings moved to AppSettingsModal) */
           /*#__PURE__*/React.createElement(WeatherBadge, { weatherLocation: calendar?.weatherLocation }),
-          /* Weather Settings */
-          /*#__PURE__*/React.createElement("button", {
-            type: "button",
-            className: "admin-side-menu-weather-settings-btn",
-            title: "날씨 지역 설정",
-            style: {
-              width: '28px',
-              height: '28px',
-              border: 'none',
-              borderRadius: '6px',
-              background: 'transparent',
-              color: '#64748B',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              padding: 0,
-              transition: 'background-color 0.16s ease, color 0.16s ease'
-            },
-            onClick: (e) => {
-              e.stopPropagation();
-              setIsWeatherModalOpen(true);
-            }
-          }, /*#__PURE__*/React.createElement(MapCogIcon, { size: 16 })),
           /* Close Button */
       /*#__PURE__*/React.createElement("button", {
         type: "button",
@@ -829,7 +1402,7 @@ export function MainSideMenu({
 
         )
     ),
-    /* Group 1: manual (banner) + calendar + anniversary */
+    /* Group 1: manual (banner) + calendar settings */
     /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-list", style: { borderTop: 'none', borderBottom: 'none', paddingTop: '4px' } },
       /*#__PURE__*/React.createElement("button", {
         type: "button",
@@ -867,90 +1440,30 @@ export function MainSideMenu({
         /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
           /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "캘린더 설정")
         )
-      ),
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        className: "admin-side-menu-item",
-        onClick: () => handle(onOpenAnniversaries)
-      },
-        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement(GiftIcon, null)),
-        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
-          /*#__PURE__*/React.createElement("span", {
-            className: "admin-side-menu-item-title",
-            style: { display: 'flex', alignItems: 'center', gap: '6px' }
-          }, "기념일 설정", anniversaries.length > 0 && /*#__PURE__*/React.createElement("span", {
-            className: "main-menu-badge",
-            style: {
-              backgroundColor: 'var(--border-subtle)',
-              color: 'var(--text-muted)',
-              marginLeft: '4px'
-            }
-          }, anniversaries.length))
-        )
       )
     ),
-    /* Group 2: gallery + places */
-    /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-list", style: { borderTop: '1px solid var(--border-subtle, #E2E8F0)', borderBottom: 'none', paddingTop: '6px', marginTop: '2px' } },
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        className: "admin-side-menu-item",
-        onClick: () => { onClose && onClose(); if (onChangeView) onChangeView('gallery'); }
-      },
-        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", {
-          xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2"
-        }, /*#__PURE__*/React.createElement("rect", { width: "18", height: "18", x: "3", y: "3", rx: "2", ry: "2" }), /*#__PURE__*/React.createElement("circle", { cx: "9", cy: "9", r: "2" }), /*#__PURE__*/React.createElement("path", { d: "m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" }))),
-        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
-          /*#__PURE__*/React.createElement("span", {
-            className: "admin-side-menu-item-title",
-            style: { display: 'flex', alignItems: 'center', gap: '6px' }
-          }, "갤러리", galleryCount > 0 && /*#__PURE__*/React.createElement("span", {
-            className: "main-menu-badge",
-            style: { backgroundColor: 'var(--border-subtle)', color: 'var(--text-muted)', marginLeft: '4px' }
-          }, galleryCount))
-        )
-      ),
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        className: "admin-side-menu-item",
-        onClick: () => { onClose && onClose(); if (onChangeView) onChangeView('places'); }
-      },
-        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", {
-          xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2"
-        }, /*#__PURE__*/React.createElement("path", { d: "M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" }), /*#__PURE__*/React.createElement("circle", { cx: "12", cy: "10", r: "3" }))),
-        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
-          /*#__PURE__*/React.createElement("span", {
-            className: "admin-side-menu-item-title",
-            style: { display: 'flex', alignItems: 'center', gap: '6px' }
-          }, "장소", placeCount > 0 && /*#__PURE__*/React.createElement("span", {
-            className: "main-menu-badge",
-            style: { backgroundColor: 'var(--border-subtle)', color: 'var(--text-muted)', marginLeft: '4px' }
-          }, placeCount))
-        )
-      )
-    ),
-    /* Group 3: theme / font / notify (divider owned by SharedSideMenuSettings) */
-    /*#__PURE__*/React.createElement(SharedSideMenuSettings, {
-      isDarkTheme: isDarkTheme,
-      onToggleTheme: onToggleTheme,
-      fontScalePercent: fontScalePercent,
-      onDecreaseFont: onDecreaseFont,
-      onIncreaseFont: onIncreaseFont,
-      isChatNotifyEnabled: isChatNotifyEnabled,
-      onToggleChatNotifications: onToggleChatNotifications
+    /* Group 2: 채팅 / 정산 / 갤러리 / 장소 / 메모 */
+    typeof SharedAppNavBlock === 'function' && /*#__PURE__*/React.createElement(SharedAppNavBlock, {
+      onClose: onClose,
+      onChangeView: onChangeView,
+      chatCount: chatCount,
+      settlementBadge: settlementBadge,
+      galleryCount: galleryCount,
+      placeCount: placeCount,
+      memoCount: memoCount,
+      chatLastAuthor: chatLastAuthor,
+      settlementLastDate: settlementLastDate,
+      galleryLastDate: galleryLastDate,
+      placeLastName: placeLastName,
+      memoLastTitleWord: memoLastTitleWord
     }),
-    /* Group 4: share + shortcut */
-    /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-list", style: { borderTop: '1px solid var(--border-subtle, #E2E8F0)', borderBottom: 'none', paddingTop: '6px', marginTop: '2px' } },
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        className: "admin-side-menu-item",
-        onClick: () => handle(onOpenShare)
-      },
-        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M3 12a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M15 6a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M15 18a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M8.7 10.7l6.6 -3.4", "M8.7 13.3l6.6 3.4"] })),
-        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
-          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "공유하기")
-        )
-      )
-    ),
+/* Group 3+4: 공유하기 + 설정 */
+    typeof SharedSideMenuFooter === 'function' && /*#__PURE__*/React.createElement(SharedSideMenuFooter, {
+      onClose: onClose,
+      onOpenShare: onOpenShare,
+      onOpenSettings: onOpenAppSettings,
+      shareLabel: '공유'
+    }),
     /* Group 5: admin */
     /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-list", style: { marginTop: 'auto', borderTop: '1px solid var(--border-subtle, #E2E8F0)', borderBottom: 'none', paddingTop: '6px' } },
       /*#__PURE__*/React.createElement("button", {
@@ -967,18 +1480,16 @@ export function MainSideMenu({
         )
       )
     )
-  )), isWeatherModalOpen && /*#__PURE__*/React.createElement(WeatherLocationModal, {
-    onClose: () => setIsWeatherModalOpen(false),
-    onSelectLocation: onUpdateWeatherLocation,
-    onDeleteRecentLocation: onDeleteRecentLocation,
-    showToast: showToast,
-    recentLocations: calendar?.recentLocations || []
-  }));
+  )));
 }
 
   if (typeof window !== 'undefined') {
   window.GATHER_UI_COMPONENTS = Object.assign({}, window.GATHER_UI_COMPONENTS || {}, {
     SharedSideMenuSettings: SharedSideMenuSettings,
+    SharedSideMenuFooter: SharedSideMenuFooter,
+    SharedAppNavBlock: SharedAppNavBlock,
+    AppSettingsModal: AppSettingsModal,
+    NotificationOnboardingModal: NotificationOnboardingModal,
     MainSideMenu: MainSideMenu,
   });
 }

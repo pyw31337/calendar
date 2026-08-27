@@ -2367,8 +2367,18 @@ select.form-select {
   line-height: 1.2;
 }
 .side-menu-meta-pill {
+  font-size: 0.6rem !important;
+  font-weight: 500 !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  height: auto !important;
+  min-height: auto !important;
+  border-radius: 0 !important;
   vertical-align: middle;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
 }
 .admin-side-menu-item-desc {
   font-size: 0.68rem;
@@ -4086,12 +4096,12 @@ textarea.form-input {
   background: #243152 !important;
   color: #F8FAFC !important;
 }
-:root[data-theme="dark"] .side-menu-meta-pill,
 :root[data-theme="dark"] .side-menu-meta-pill {
-  background: #1B2540 !important;
-  border-color: #334155 !important;
-  color: #CBD5E1 !important;
-  box-shadow: none;
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
 }
 
 :root[data-theme="dark"] .admin-side-menu-setting-row,

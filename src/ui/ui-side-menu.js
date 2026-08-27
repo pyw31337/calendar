@@ -1136,16 +1136,16 @@ export function SharedAppNavBlock({
         whiteSpace: "nowrap",
         display: "inline-flex",
         alignItems: "center",
-        justifyContent: "center",
-        height: "26px",
-        minHeight: "26px",
-        padding: "0 10px",
-        fontSize: "0.72rem",
-        fontWeight: 800,
-        lineHeight: 1,
-        borderRadius: "10px",
-        backgroundColor: "var(--bg-primary, #F8FAFC)",
-        border: "1px solid var(--border-subtle, #E2E8F0)",
+        justifyContent: "flex-end",
+        height: "auto",
+        minHeight: "auto",
+        padding: "0",
+        fontSize: "0.6rem",
+        fontWeight: 500,
+        lineHeight: 1.2,
+        borderRadius: "0",
+        backgroundColor: "transparent",
+        border: "none",
         color: "var(--text-muted, #64748B)",
         boxSizing: "border-box",
         fontVariantNumeric: "tabular-nums"
@@ -1157,9 +1157,9 @@ export function SharedAppNavBlock({
     if (!chatLastAuthor || !chatLastAuthor.name) return null;
     const color = chatLastAuthor.color || "#64748B";
     return metaPill(chatLastAuthor.name, {
-      border: `1.5px solid ${color}`,
+      border: "none",
       color: color,
-      backgroundColor: "#FFFFFF"
+      backgroundColor: "transparent"
     });
   };
 
