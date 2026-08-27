@@ -363,6 +363,13 @@ body:has(.admin-login-gate) {
   animation: motion-fade-up var(--motion-slow) var(--motion-ease-out) both;
   will-change: transform, opacity;
 }
+.confirmed-meeting-surface {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
 .modal-overlay {
   animation: motion-overlay-fade var(--motion-base) ease both;
 }
@@ -376,6 +383,9 @@ body:has(.admin-login-gate) {
 .confirmed-meeting-banner {
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
   transition:
     transform var(--motion-base) var(--motion-ease-out),
     box-shadow var(--motion-base) var(--motion-ease-out),
@@ -385,14 +395,62 @@ body:has(.admin-login-gate) {
     opacity var(--motion-base) ease,
     filter var(--motion-base) ease;
 }
+.confirmed-meeting-surface .confirmed-meeting-label-badge {
+  background: transparent !important;
+  color: #FFFFFF !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+.confirmed-meeting-surface .dday-badge:not(.is-past) {
+  background: rgba(0, 0, 0, 0.8) !important;
+  color: #e247a1 !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+:root[data-theme="dark"] .confirmed-meeting-surface .confirmed-meeting-label-badge {
+  background: transparent !important;
+  color: #FFFFFF !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+:root[data-theme="dark"] .confirmed-meeting-surface .dday-badge:not(.is-past) {
+  background: rgba(0, 0, 0, 0.8) !important;
+  color: #e247a1 !important;
+  border: none !important;
+  box-shadow: none !important;
+}
 .confirmed-meeting-banner:hover {
   transform: translate3d(0, -1px, 0);
 }
 .confirmed-meeting-banner:active,
 .confirmed-meeting-banner.is-pressing {
   transform: translate3d(0, 1px, 0) scale(0.985) !important;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04) !important;
-  filter: brightness(0.985) saturate(1.03);
+  box-shadow: none !important;
+  filter: none !important;
+}
+.confirmed-meeting-banner .confirmed-meeting-label-badge {
+  background: transparent !important;
+  color: #FFFFFF !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+.confirmed-meeting-banner .dday-badge {
+  background: rgba(0, 0, 0, 0.8) !important;
+  color: #e247a1 !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+:root[data-theme="dark"] .confirmed-meeting-banner .confirmed-meeting-label-badge {
+  background: transparent !important;
+  color: #FFFFFF !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+:root[data-theme="dark"] .confirmed-meeting-banner .dday-badge {
+  background: rgba(0, 0, 0, 0.8) !important;
+  color: #e247a1 !important;
+  border: none !important;
+  box-shadow: none !important;
 }
 .toast {
   position: fixed;
@@ -697,6 +755,14 @@ summary.is-pressing,
   box-shadow: none !important;
   transition: transform 0.05s ease, opacity 0.05s ease, filter 0.05s ease !important;
 }
+.place-card-row[data-no-press-feedback]:hover,
+.place-card-row[data-no-press-feedback]:active,
+.place-card-row[data-no-press-feedback].is-pressing {
+  transform: none !important;
+  opacity: 1 !important;
+  filter: none !important;
+  box-shadow: none !important;
+}
 .lightbox-nav-btn:active,
 .lightbox-nav-btn.is-pressing {
   transform: translateY(-50%) scale(0.95) !important;
@@ -748,6 +814,16 @@ summary.is-pressing,
   line-height: 1;
   box-sizing: border-box;
   transition: transform var(--motion-fast) var(--motion-ease-spring), filter var(--motion-fast) ease;
+}
+.memo-capsule-badge,
+.url-capsule-badge,
+.place-memo-stack {
+  mix-blend-mode: darken;
+}
+:root[data-theme="dark"] .memo-capsule-badge,
+:root[data-theme="dark"] .url-capsule-badge,
+:root[data-theme="dark"] .place-memo-stack {
+  mix-blend-mode: screen;
 }
 .participant-badge:hover,
 .memo-capsule-badge:hover,
@@ -2580,6 +2656,30 @@ select.form-select {
   gap: 6px;
   flex: 0 0 auto;
 }
+:root {
+  --settlement-hero-start: #5B4BEB;
+  --settlement-hero-end: #EC4899;
+  --settlement-hero-text: #FFFFFF;
+  --settlement-hero-muted: rgba(255, 255, 255, 0.84);
+  --settlement-hero-surface: rgba(255, 255, 255, 0.94);
+  --settlement-hero-surface-text: #0F172A;
+  --settlement-hero-surface-muted: #64748B;
+  --settlement-hero-action-bg: rgba(15, 23, 42, 0.28);
+  --settlement-hero-action-border: rgba(255, 255, 255, 0.16);
+  --settlement-hero-action-text: #FFFFFF;
+}
+:root[data-theme="dark"] {
+  --settlement-hero-start: #23235E;
+  --settlement-hero-end: #7C3AED;
+  --settlement-hero-text: #F8FAFC;
+  --settlement-hero-muted: rgba(226, 232, 240, 0.82);
+  --settlement-hero-surface: rgba(15, 23, 42, 0.88);
+  --settlement-hero-surface-text: #F8FAFC;
+  --settlement-hero-surface-muted: #CBD5E1;
+  --settlement-hero-action-bg: rgba(15, 23, 42, 0.5);
+  --settlement-hero-action-border: rgba(148, 163, 184, 0.22);
+  --settlement-hero-action-text: #F8FAFC;
+}
 .admin-metric-card {
   border: 1px solid #E2E8F0;
   border-radius: var(--radius-md);
@@ -2783,6 +2883,111 @@ select.form-select {
   :root[data-theme="dark"] .date-item-btn.is-confirmed { border-color: #5B21B6; background: #241B3D; }
   :root[data-theme="dark"] .date-item-btn.is-available { border-color: #1D4ED8; background: #16233E; }
   :root[data-theme="dark"] .date-item-btn.is-all { border-color: #065F46; background: #0F2E22; }
+}
+
+.date-item-btn.confirmed-meeting-card {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  border: none;
+  background: linear-gradient(90deg, #5B4BEB 0%, #8B3BDE 54%, #EC4899 100%);
+  color: #FFFFFF;
+  box-shadow: none;
+}
+.date-item-btn.confirmed-meeting-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(120deg, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0.08) 18%, rgba(255, 255, 255, 0) 42%, rgba(255, 255, 255, 0) 72%, rgba(255, 255, 255, 0.12) 100%);
+  opacity: 0.65;
+}
+.date-item-btn.confirmed-meeting-card:hover {
+  background: linear-gradient(90deg, #624DEB 0%, #9333EA 52%, #F43F5E 100%);
+  transform: translate3d(0, -2px, 0);
+  box-shadow: none;
+}
+.date-item-btn.confirmed-meeting-card:active,
+.date-item-btn.confirmed-meeting-card.is-pressing {
+  transform: translate3d(0, 1px, 0) scale(0.992) !important;
+  box-shadow: none !important;
+  filter: none !important;
+}
+.date-item-btn.confirmed-meeting-card.is-past {
+  background: linear-gradient(90deg, #E2E8F0 0%, #F8FAFC 100%) !important;
+  border: none !important;
+  color: #475569;
+  box-shadow: none;
+  opacity: 0.92;
+}
+:root[data-theme="dark"] .date-item-btn.confirmed-meeting-card {
+  background: linear-gradient(90deg, #5B4BEB 0%, #8B3BDE 54%, #EC4899 100%);
+  border: none;
+  box-shadow: none;
+}
+:root[data-theme="dark"] .date-item-btn.confirmed-meeting-card:hover {
+  background: linear-gradient(90deg, #624DEB 0%, #9333EA 52%, #F43F5E 100%);
+}
+:root[data-theme="dark"] .date-item-btn.confirmed-meeting-card.is-past {
+  background: linear-gradient(90deg, #1B2540 0%, #22304F 100%) !important;
+  border: none !important;
+  color: #CBD5E1;
+  box-shadow: none;
+  opacity: 0.92;
+}
+.date-item-btn.confirmed-meeting-card > div:first-child {
+  position: relative;
+  z-index: 1;
+}
+.date-item-btn.confirmed-meeting-card .confirmed-meeting-date,
+.confirmed-meeting-surface .confirmed-meeting-date {
+  color: #FFFFFF !important;
+  letter-spacing: -0.01em;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.16);
+}
+.date-item-btn.confirmed-meeting-card.is-past .confirmed-meeting-date {
+  color: #475569 !important;
+  text-shadow: none;
+}
+:root[data-theme="dark"] .date-item-btn.confirmed-meeting-card.is-past .confirmed-meeting-date {
+  color: #CBD5E1 !important;
+}
+.date-item-btn.confirmed-meeting-card .dday-badge:not(.is-past) {
+  background: rgba(0, 0, 0, 0.8) !important;
+  color: #e247a1 !important;
+  border: none !important;
+  box-shadow: none;
+}
+:root[data-theme="dark"] .date-item-btn.confirmed-meeting-card .dday-badge:not(.is-past) {
+  background: rgba(0, 0, 0, 0.8) !important;
+  color: #e247a1 !important;
+  border: none !important;
+  box-shadow: none;
+}
+.date-item-btn.confirmed-meeting-card .dday-badge.is-past {
+  background: #E2E8F0 !important;
+  color: #64748B !important;
+  border: none !important;
+  box-shadow: none;
+}
+:root[data-theme="dark"] .date-item-btn.confirmed-meeting-card .dday-badge.is-past {
+  background: #1B2540 !important;
+  color: #CBD5E1 !important;
+  border: 1px solid rgba(52, 64, 93, 0.9) !important;
+  box-shadow: none;
+}
+.date-item-btn.confirmed-meeting-card .memo-capsule-badge {
+  box-shadow: 0 8px 16px rgba(15, 23, 42, 0.10);
+}
+:root[data-theme="dark"] .date-item-btn.confirmed-meeting-card .memo-capsule-badge.is-past,
+.date-item-btn.confirmed-meeting-card .memo-capsule-badge.is-past {
+  background: transparent !important;
+  background-color: transparent !important;
+  border-color: currentColor !important;
+  box-shadow: none !important;
+}
+:root[data-theme="dark"] .date-item-btn.confirmed-meeting-card .memo-capsule-badge {
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.22);
 }
 
 /* Capsule Memo Badge */
