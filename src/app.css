@@ -4002,6 +4002,21 @@ textarea.form-input {
   filter: grayscale(100%) invert(90%) hue-rotate(180deg) opacity(85%) contrast(90%);
   -webkit-filter: grayscale(100%) invert(90%) hue-rotate(180deg) opacity(85%) contrast(90%);
 }
+/* Fix Leaflet subpixel white grid seam lines on Retina & scaled viewports */
+.leaflet-tile {
+  border: none !important;
+  outline: 1px solid transparent !important;
+  box-shadow: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+.leaflet-tile-container img {
+  border: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
 
 
 /* Main side menu: unified row spacing + graphic manual banner */
