@@ -1216,7 +1216,10 @@ function App() {
     (chatMessages || []).forEach(m => { if (m && m.id) byId.set(m.id, m); });
     return Array.from(byId.values()).sort((a, b) => Number(a.timestamp || 0) - Number(b.timestamp || 0));
   }, [olderChatMessages, chatMessages]);
-  const recentMessages = React.useMemo(() => allChatMessages.slice(-5).reverse(), [allChatMessages]);
+  const visibleChatMessages = React.useMemo(() => {
+    return allChatMessages.filter(msg => msg && msg.uploadSource !== 'meeting' && msg.uploadSource !== 'gallery');
+  }, [allChatMessages]);
+  const recentMessages = React.useMemo(() => visibleChatMessages.slice(-5).reverse(), [visibleChatMessages]);
   const [memos, setMemos] = React.useState([]);
   const [memosLimit, setMemosLimit] = React.useState(MEMOS_PAGE_SIZE);
   const [hasMoreMemos, setHasMoreMemos] = React.useState(false);
@@ -2168,7 +2171,7 @@ function App() {
     let cancelled = false;
     (async () => {
       const [msgCount, memoCount, galCount] = await Promise.all([
-        fetchSubcollectionCount(activeCalId, 'messages'),
+        fetchSubcollectionCount(activeCalId, 'messages', { excludeUploadSources: ['meeting', 'gallery'] }),
         fetchSubcollectionCount(activeCalId, 'memos'),
         fetchGalleryItemCount(activeCalId)
       ]);
@@ -2197,7 +2200,7 @@ function App() {
   React.useEffect(() => {
     if (!activeCalId || isInitialDataLoading) return;
     if (typeof totalChatCount !== 'number' || totalChatCount <= 0) return;
-    if ((chatMessages || []).length > 0 || (olderChatMessages || []).length > 0) return;
+    if (visibleChatMessages.length > 0) return;
     let cancelled = false;
     (async () => {
       try {
@@ -2209,7 +2212,7 @@ function App() {
       }
     })();
     return () => { cancelled = true; };
-  }, [activeCalId, isInitialDataLoading, totalChatCount, chatMessages.length, olderChatMessages.length]);
+  }, [activeCalId, isInitialDataLoading, totalChatCount, visibleChatMessages.length]);
 
   React.useEffect(() => {
     // Same reasoning as above -- wait for the initial calendar document load to finish before
@@ -5360,7 +5363,7 @@ function App() {
   );
   const navChatCount = (typeof totalChatCount === 'number' && totalChatCount >= 0)
     ? totalChatCount
-    : Math.max((typeof allChatMessages !== 'undefined' && allChatMessages ? allChatMessages.length : 0), (chatMessages || []).length);
+    : visibleChatMessages.length;
   const navGalleryCount = (() => {
     if (typeof totalGalleryCount === 'number' && totalGalleryCount > 0) return totalGalleryCount;
     // fallback while REST count is loading — count unique image urls in loaded messages
@@ -5411,9 +5414,7 @@ function App() {
   };
 
   const navChatLastAuthor = (() => {
-    const msgs = (typeof allChatMessages !== 'undefined' && allChatMessages && allChatMessages.length)
-      ? allChatMessages
-      : (chatMessages || []);
+    const msgs = visibleChatMessages;
     if (!msgs.length) return null;
     const last = msgs[msgs.length - 1];
     if (!last) return null;
@@ -5874,8 +5875,8 @@ function App() {
   const mainMenuPollCount = getCalendarPolls(activeCal).filter(poll => !isPollClosed(poll)).length;
   const mainMenuChatCount = (typeof totalChatCount === 'number' && totalChatCount >= 0)
     ? totalChatCount
-    : Math.max(allChatMessages.length, (chatMessages || []).length);
-  const mainMenuChatLatestTimestamp = allChatMessages.length > 0 ? allChatMessages[allChatMessages.length - 1].timestamp : 0;
+    : visibleChatMessages.length;
+  const mainMenuChatLatestTimestamp = visibleChatMessages.length > 0 ? visibleChatMessages[visibleChatMessages.length - 1].timestamp : 0;
   const mainMenuChatHasUnread = mainMenuChatLatestTimestamp > getChatLastReadTimestamp(activeCalId);
   const localGalleryCount = (() => {
     let count = 0;
@@ -6234,7 +6235,7 @@ function App() {
   }, /*#__PURE__*/React.createElement(CommentsSection, {
     calendar: activeCal,
     recentMessages: recentMessages,
-    chatMessages: allChatMessages,
+    chatMessages: visibleChatMessages,
     totalChatCount: totalChatCount,
     chatInput: chatInput,
     setChatInput: setChatInput,

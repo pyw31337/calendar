@@ -780,16 +780,21 @@ export function ChatRoomView({
   const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState('');
   const [searchFocusIndex, setSearchFocusIndex] = React.useState(0);
+  const visibleChatMessages = React.useMemo(() => {
+    return Array.isArray(chatMessages)
+      ? chatMessages.filter(msg => msg && msg.uploadSource !== 'meeting' && msg.uploadSource !== 'gallery')
+      : [];
+  }, [chatMessages]);
 
   // Ordered list of message IDs matching the current search query (for ▲▼ navigation)
   const searchMatchIds = React.useMemo(() => {
     if (!searchQuery) return [];
     const q = searchQuery.toLowerCase();
-    return chatMessages
+    return visibleChatMessages
       .filter(m => m.text && m.text.toLowerCase().includes(q))
       .map(m => m.id)
       .filter(id => !!id);
-  }, [chatMessages, searchQuery]);
+  }, [visibleChatMessages, searchQuery]);
 
   const clampedFocusIdx = searchMatchIds.length > 0
     ? Math.max(0, Math.min(searchFocusIndex, searchMatchIds.length - 1))
@@ -811,9 +816,9 @@ export function ChatRoomView({
   // Mirrors the same browser-storage key CommentsSection uses for its unread badge.
   const [priorReadTimestamp] = React.useState(() => getChatLastReadTimestamp(calendar.id));
   React.useEffect(() => {
-    const latest = chatMessages.length > 0 ? chatMessages[chatMessages.length - 1].timestamp : 0;
+    const latest = visibleChatMessages.length > 0 ? visibleChatMessages[visibleChatMessages.length - 1].timestamp : 0;
     if (latest > 0) setChatLastReadTimestamp(calendar.id, latest);
-  }, [calendar.id, chatMessages.length > 0 ? chatMessages[chatMessages.length - 1]?.timestamp : 0]);
+  }, [calendar.id, visibleChatMessages.length > 0 ? visibleChatMessages[visibleChatMessages.length - 1]?.timestamp : 0]);
 
   // Scroll-to-bottom floating button: shown once scrolled far enough away from the latest
   // message that swiping back down manually would be tedious.
@@ -823,16 +828,16 @@ export function ChatRoomView({
   // (scrolled away from the bottom), replacing the generic button with a labeled pill so a new
   // message doesn't go unnoticed. Clears once the user scrolls back near the bottom themselves.
   const [hasNewMessageBelow, setHasNewMessageBelow] = React.useState(false);
-  const prevMessageCountRef = React.useRef(chatMessages.length);
+  const prevMessageCountRef = React.useRef(visibleChatMessages.length);
   React.useEffect(() => {
-    const increased = chatMessages.length > prevMessageCountRef.current;
-    prevMessageCountRef.current = chatMessages.length;
+    const increased = visibleChatMessages.length > prevMessageCountRef.current;
+    prevMessageCountRef.current = visibleChatMessages.length;
     if (!increased) return;
     const el = chatMessagesContainerRef.current;
     if (!el) return;
     const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
     if (distanceFromBottom > 200) setHasNewMessageBelow(true);
-  }, [chatMessages.length]);
+  }, [visibleChatMessages.length]);
   // Confetti burst around a newly-sent bubble -- only for messages I just sent myself (not
   // ones arriving from other participants, and not the initial batch on mount). Anchors the
   // burst to the actual bubble's on-screen position via its data-msg-row-id, same pattern as
@@ -841,7 +846,7 @@ export function ChatRoomView({
   React.useEffect(() => {
     return; // Disabled chat confetti per user request
     // eslint-disable-next-line no-unreachable -- kept in place to make re-enabling easy later
-    const last = chatMessages[chatMessages.length - 1];
+    const last = visibleChatMessages[visibleChatMessages.length - 1];
     const prevId = prevLastMsgIdRef.current;
     prevLastMsgIdRef.current = last ? last.id : null;
     if (prevId === undefined || !last || last.id === prevId) return;
@@ -867,7 +872,7 @@ export function ChatRoomView({
         console.warn('Chat confetti error', err);
       }
     });
-  }, [chatMessages.length]);
+  }, [visibleChatMessages.length]);
   const handleScrollCombined = (e) => {
     if (handleChatScroll) handleChatScroll(e);
     const el = e.target;
@@ -1056,7 +1061,7 @@ export function ChatRoomView({
   let lastDateStr = '';
   let readMarkerInserted = false;
   const renderedMessages = [];
-  chatMessages.forEach((msg, idx) => {
+  visibleChatMessages.forEach((msg, idx) => {
     // 일정탭('meeting')/갤러리페이지('gallery')에서 올린 사진은 참조용 실제 채팅 메시지
     // 문서로 저장되긴 하지만(태그 편집·삭제·갤러리 정렬 번호 매기기가 이 문서를 가리킴),
     // 채팅 피드에는 노출되지 않아야 함 -- 갤러리/일정 레이어팝업 사진탭에서만 보여야 함.

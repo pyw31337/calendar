@@ -121,8 +121,127 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
     }
   }
 
-  async function fetchSubcollectionCount(calId, subName) {
+  async function countMessagesByUploadSource(calId, uploadSource) {
+    if (!isValidCalId(calId) || !uploadSource) return null;
+    const firebaseDb = getDb();
+    if (firebaseDb) {
+      try {
+        const ref = firebaseDb.collection('calendars').doc('cal_' + calId).collection('messages')
+          .where('uploadSource', '==', uploadSource);
+        if (typeof ref.count === 'function') {
+          const snap = await ref.count().get();
+          const n = Number(snap.data().count);
+          if (Number.isFinite(n) && n >= 0) return n;
+        }
+      } catch (err) {
+        console.warn('countMessagesByUploadSource sdk', uploadSource, err);
+      }
+    }
+    try {
+      const parentPath = 'projects/' + projectId() + '/databases/(default)/documents/calendars/cal_' + calId;
+      const url = 'https://firestore.googleapis.com/v1/' + parentPath + ':runAggregationQuery';
+      const aggBody = {
+        structuredAggregationQuery: {
+          structuredQuery: {
+            from: [{ collectionId: 'messages' }],
+            where: {
+              fieldFilter: {
+                field: { fieldPath: 'uploadSource' },
+                op: 'EQUAL',
+                value: { stringValue: uploadSource }
+              }
+            }
+          },
+          aggregations: [{ alias: 'total', count: {} }]
+        }
+      };
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(aggBody)
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const rows = Array.isArray(data) ? data : [data];
+        for (let i = 0; i < rows.length; i++) {
+          const row = rows[i];
+          const fields = row && row.result && row.result.aggregateFields;
+          const total = fields && fields.total;
+          if (total && total.integerValue != null) {
+            const n = Number(total.integerValue);
+            if (Number.isFinite(n) && n >= 0) return n;
+          }
+        }
+      } else {
+        console.warn('countMessagesByUploadSource rest status', res.status, uploadSource);
+      }
+    } catch (err) {
+      console.warn('countMessagesByUploadSource rest', uploadSource, err);
+    }
+    return null;
+  }
+
+  async function fetchMessagesByUploadSource(calId, uploadSource) {
+    if (!isValidCalId(calId) || !uploadSource) return null;
+    const firebaseDb = getDb();
+    if (firebaseDb) {
+      try {
+        const snap = await firebaseDb.collection('calendars').doc('cal_' + calId).collection('messages')
+          .where('uploadSource', '==', uploadSource).get();
+        const list = [];
+        snap.forEach(function (doc) { list.push(slimMessage({ id: doc.id, ...doc.data() })); });
+        return list;
+      } catch (err) {
+        console.warn('fetchMessagesByUploadSource sdk', uploadSource, err);
+      }
+    }
+    try {
+      const parentPath = 'projects/' + projectId() + '/databases/(default)/documents/calendars/cal_' + calId;
+      const url = 'https://firestore.googleapis.com/v1/' + parentPath + ':runQuery';
+      const body = {
+        structuredQuery: {
+          from: [{ collectionId: 'messages' }],
+          where: {
+            fieldFilter: {
+              field: { fieldPath: 'uploadSource' },
+              op: 'EQUAL',
+              value: { stringValue: uploadSource }
+            }
+          }
+        }
+      };
+      const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      if (!res.ok) {
+        console.warn('fetchMessagesByUploadSource rest status', res.status, uploadSource);
+        return null;
+      }
+      const data = await res.json();
+      const rows = Array.isArray(data) ? data : [data];
+      return rows.filter(function (row) { return row && row.document; }).map(function (row) {
+        return slimMessage({ id: row.document.name.split('/').pop(), ...docToJs(row.document) });
+      });
+    } catch (err) {
+      console.warn('fetchMessagesByUploadSource rest', uploadSource, err);
+      return null;
+    }
+  }
+
+  async function fetchSubcollectionCount(calId, subName, options = null) {
     if (!isValidCalId(calId) || !subName) return null;
+    const excludedUploadSources = subName === 'messages' && options && Array.isArray(options.excludeUploadSources)
+      ? Array.from(new Set(options.excludeUploadSources.map(source => String(source || '').trim()).filter(Boolean)))
+      : [];
+    if (excludedUploadSources.length > 0) {
+      const total = await fetchSubcollectionCount(calId, subName);
+      if (total == null) return null;
+      let excludedCount = 0;
+      for (const source of excludedUploadSources) {
+        const count = await countMessagesByUploadSource(calId, source);
+        if (count == null) return null;
+        excludedCount += count;
+      }
+      return Math.max(0, total - excludedCount);
+    }
     const firebaseDb = getDb();
     if (firebaseDb) {
       try {
@@ -177,6 +296,22 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
   async function fetchMessageOrdinal(calId, timestamp) {
     if (!isValidCalId(calId) || !Number.isFinite(Number(timestamp))) return null;
     const ts = Number(timestamp);
+    const excludedUploadSources = ['meeting', 'gallery'];
+    let excludedCount = 0;
+    for (let i = 0; i < excludedUploadSources.length; i++) {
+      const source = excludedUploadSources[i];
+      const docs = await fetchMessagesByUploadSource(calId, source);
+      if (docs == null) return null;
+      for (let j = 0; j < docs.length; j++) {
+        const rawTs = docs[j] && docs[j].timestamp;
+        const docTs = rawTs && typeof rawTs === 'object' && typeof rawTs.toDate === 'function'
+          ? rawTs.toDate().getTime()
+          : (rawTs && typeof rawTs.seconds === 'number'
+            ? rawTs.seconds * 1000
+            : Number(rawTs));
+        if (Number.isFinite(docTs) && docTs <= ts) excludedCount += 1;
+      }
+    }
     const firebaseDb = getDb();
     if (firebaseDb) {
       try {
@@ -185,7 +320,7 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
         if (typeof ref.count === 'function') {
           const snap = await ref.count().get();
           const n = Number(snap.data().count);
-          if (Number.isFinite(n) && n >= 0) return n;
+          if (Number.isFinite(n) && n >= 0) return Math.max(0, n - excludedCount);
         }
       } catch (err) {
         console.warn('fetchMessageOrdinal sdk', err);
@@ -223,7 +358,7 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
           const total = fields && fields.total;
           if (total && total.integerValue != null) {
             const n = Number(total.integerValue);
-            if (Number.isFinite(n) && n >= 0) return n;
+            if (Number.isFinite(n) && n >= 0) return Math.max(0, n - excludedCount);
           }
         }
       } else {
