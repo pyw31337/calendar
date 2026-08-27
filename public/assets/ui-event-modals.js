@@ -1687,6 +1687,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
 
   const { isHeaderVisible, onScroll: handleSettlementScroll } = useScrollHideHeader();
   const [activeTab, setActiveTab] = React.useState('total');
+  const [openMenuCardId, setOpenMenuCardId] = React.useState(null);
   const [collapsedDailyRows, setCollapsedDailyRows] = React.useState({});
   const categories = getExpenseCategories(calendar);
   const baseBudget = Number.isFinite(Number(calendar?.settlementBaseBudget)) ? Math.max(0, Math.round(Number(calendar.settlementBaseBudget))) : 0;
@@ -2093,226 +2094,263 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
       backgroundColor: 'transparent', cursor: 'pointer', display: 'flex',
       alignItems: 'center', justifyContent: 'center', color: '#64748B', padding: 0
     }
-  }, ThreeLinesIcon ? /*#__PURE__*/React.createElement(ThreeLinesIcon, { size: 20 }) : /*#__PURE__*/React.createElement(ShareIcon, { size: 16 }))), /*#__PURE__*/React.createElement("div", {
+  }, ThreeLinesIcon ? /*#__PURE__*/React.createElement(ThreeLinesIcon, { size: 20 }) : /*#__PURE__*/React.createElement(ShareIcon, { size: 16 }))),
+
+  /*#__PURE__*/React.createElement("div", {
     className: "settlement-page-body",
     onScroll: handleSettlementScroll,
     style: { flex: '1 1 auto', overflowY: 'auto', padding: '72px 16px 16px', display: 'flex', flexDirection: 'column', gap: '14px' }
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "settlement-metric-grid"
-  }, metricCards.map(card => /*#__PURE__*/React.createElement("div", {
-    key: card.label,
-    className: "settlement-metric-card"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "settlement-metric-card-label"
-  }, /*#__PURE__*/React.createElement("span", { style: { color: card.color, display: 'inline-flex' } }, card.icon), card.label), /*#__PURE__*/React.createElement("div", {
-    className: "settlement-metric-card-value",
-    style: { color: card.color }
-  }, card.value.toLocaleString(), "원")))),
-  (() => {
-    const getActiveParticipants = __deps.getActiveParticipants || (c => Array.isArray(c?.participants) ? c.participants.filter(p => !p.deletedAt && !p.removedAt) : []);
-    const getCalendarSettlementCards = __deps.getCalendarSettlementCards || (c => Array.isArray(c?.settlementCards) ? c.settlementCards : []);
-    const activeParticipants = getActiveParticipants(calendar);
-    const participantCount = Math.max(1, activeParticipants.length);
-    const perPersonExpense = Math.round(displayExpense / participantCount);
+  },
+    /* 1. Settlement Cards (Positioned ABOVE metrics grid) */
+    (() => {
+      const getActiveParticipants = __deps.getActiveParticipants || (c => Array.isArray(c?.participants) ? c.participants.filter(p => !p.deletedAt && !p.removedAt) : []);
+      const getCalendarSettlementCards = __deps.getCalendarSettlementCards || (c => Array.isArray(c?.settlementCards) ? c.settlementCards : []);
+      const activeParticipants = getActiveParticipants(calendar);
+      const participantCount = Math.max(1, activeParticipants.length);
+      const perPersonExpense = Math.round(displayExpense / participantCount);
 
-    const customCards = getCalendarSettlementCards(calendar);
+      const customCards = getCalendarSettlementCards(calendar);
 
-    // If no custom cards exist yet, generate a default overall 1/N card
-    const displayCards = customCards.length > 0 ? customCards : [
-      {
-        id: 'default_settlement_card',
-        title: '1/N 간편 송금',
-        status: 'active',
-        participantCount: participantCount,
-        perPersonAmount: perPersonExpense,
-        amount: displayExpense,
-        bankName: '토스뱅크',
-        depositorName: '',
-        accountNumber: ''
-      }
-    ];
-
-    const copyTextToClipboard = __deps.copyTextToClipboard || (async text => {
-      try {
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          await navigator.clipboard.writeText(text);
-          return true;
+      // If no custom cards exist yet, generate a default overall 1/N card
+      const displayCards = customCards.length > 0 ? customCards : [
+        {
+          id: 'default_settlement_card',
+          title: '1/N 간편 송금',
+          status: 'active',
+          participantCount: participantCount,
+          perPersonAmount: perPersonExpense,
+          amount: displayExpense,
+          bankName: '토스뱅크',
+          depositorName: '',
+          accountNumber: ''
         }
-      } catch (e) {}
-      return false;
-    });
+      ];
 
-    const handleRemittanceAction = async (card, service) => {
-      const bank = card.bankName || '토스뱅크';
-      const account = card.accountNumber || '';
-      const name = card.depositorName || '';
-      const amount = card.perPersonAmount || perPersonExpense;
-      const cardTitle = card.title || '1/N 간편 송금';
+      const copyTextToClipboard = __deps.copyTextToClipboard || (async text => {
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(text);
+            return true;
+          }
+        } catch (e) {}
+        return false;
+      });
 
-      const copyText = `[${calendar?.title || '모아엘가'} ${cardTitle}]\n• 1인당 입금 금액: ${amount.toLocaleString()}원\n• 입금 계좌: ${bank} ${account}${name ? ` (${name})` : ''}`;
-      
-      await copyTextToClipboard(copyText);
+      const handleRemittanceAction = async (card, service) => {
+        const bank = card.bankName || '토스뱅크';
+        const account = card.accountNumber || '';
+        const name = card.depositorName || '';
+        const amount = card.perPersonAmount || perPersonExpense;
+        const cardTitle = card.title || '1/N 간편 송금';
 
-      if (service === 'toss') {
-        const tossUrl = `supertoss://send?amount=${amount}&bank=${encodeURIComponent(bank)}&account=${encodeURIComponent(account)}`;
-        window.location.href = tossUrl;
-        if (showToast) showToast(`토스 앱으로 이동합니다! 계좌 정보가 복사되었습니다. (${amount.toLocaleString()}원)`, 'success');
-      } else if (service === 'kakao') {
-        const kakaoUrl = `kakaotalk://`;
-        window.location.href = kakaoUrl;
-        if (showToast) showToast(`카카오톡으로 이동합니다! 계좌/금액 복사 완료. (${amount.toLocaleString()}원)`, 'success');
-      } else if (service === 'naver') {
-        const naverUrl = `naverpay://`;
-        window.location.href = naverUrl;
-        if (showToast) showToast(`네이버 페이로 이동합니다! 계좌/금액 복사 완료. (${amount.toLocaleString()}원)`, 'success');
-      }
-    };
+        const copyText = `[${calendar?.title || '모아엘가'} ${cardTitle}]\n• 1인당 입금 금액: ${amount.toLocaleString()}원\n• 입금 계좌: ${bank} ${account}${name ? ` (${name})` : ''}`;
+        
+        await copyTextToClipboard(copyText);
 
-    return React.createElement("div", {
-      style: { display: 'flex', flexDirection: 'column', gap: '10px' }
-    },
-      /* Section Header: Title & [+ 정산 생성] Button */
-      React.createElement("div", {
-        style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 2px' }
+        if (service === 'toss') {
+          const tossUrl = `supertoss://send?amount=${amount}&bank=${encodeURIComponent(bank)}&account=${encodeURIComponent(account)}`;
+          window.location.href = tossUrl;
+          if (showToast) showToast(`토스 앱으로 이동합니다! 계좌 정보가 복사되었습니다. (${amount.toLocaleString()}원)`, 'success');
+        } else if (service === 'kakao') {
+          const kakaoUrl = `kakaotalk://`;
+          window.location.href = kakaoUrl;
+          if (showToast) showToast(`카카오톡으로 이동합니다! 계좌/금액 복사 완료. (${amount.toLocaleString()}원)`, 'success');
+        } else if (service === 'naver') {
+          const naverUrl = `naverpay://`;
+          window.location.href = naverUrl;
+          if (showToast) showToast(`네이버 페이로 이동합니다! 계좌/금액 복사 완료. (${amount.toLocaleString()}원)`, 'success');
+        }
+      };
+
+      return React.createElement("div", {
+        style: { display: 'flex', flexDirection: 'column', gap: '10px' }
       },
-        React.createElement("span", {
-          style: { fontSize: '0.86rem', fontWeight: 800, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' }
-        }, React.createElement("span", null, "💸"), "정산 카드 목록"),
-        React.createElement("button", {
-          type: "button",
-          className: "btn",
-          onClick: () => {
-            if (typeof onOpenCreateSettlement === 'function') onOpenCreateSettlement();
-          },
-          style: {
-            padding: '4px 10px', borderRadius: '6px', backgroundColor: 'var(--accent-primary, #4F46E5)',
-            color: '#FFFFFF', border: 'none', fontSize: '0.76rem', fontWeight: 800, cursor: 'pointer'
-          }
-        }, "+ 정산 생성")
-      ),
+        displayCards.map(card => {
+          const isClosed = card.status === 'closed';
+          const bankInfoText = [card.bankName, card.accountNumber, card.depositorName].filter(Boolean).join(' ');
+          const isMenuOpen = openMenuCardId === card.id;
 
-      /* Custom Settlement Cards List */
-      displayCards.map(card => {
-        const isClosed = card.status === 'closed';
-        return React.createElement("div", {
-          key: card.id,
-          style: {
-            backgroundColor: 'var(--bg-card)',
-            border: '1px solid var(--border-subtle)',
-            borderRadius: 'var(--radius-md)',
-            padding: '12px 14px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '10px',
-            opacity: isClosed ? 0.75 : 1
-          }
-        },
-          /* Card Header: Title, Status Badge, Edit/Close/Delete Controls */
-          React.createElement("div", {
-            style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px' }
-          },
-            React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px' } },
-              React.createElement("strong", { style: { fontSize: '0.92rem', color: 'var(--text-main)', fontWeight: 800 } }, card.title || "1/N 간편 송금"),
-              React.createElement("span", {
-                style: {
-                  fontSize: '0.68rem', fontWeight: 800, padding: '2px 6px', borderRadius: '4px',
-                  backgroundColor: isClosed ? '#E2E8F0' : 'rgba(16, 185, 129, 0.15)',
-                  color: isClosed ? '#64748B' : '#059669'
-                }
-              }, isClosed ? "마감됨" : "진행중")
-            ),
-            React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px' } },
-              card.id !== 'default_settlement_card' && React.createElement("button", {
-                type: "button",
-                onClick: () => {
-                  if (typeof onToggleSettlementCardStatus === 'function') onToggleSettlementCardStatus(card.id);
-                },
-                style: {
-                  background: 'none', border: '1px solid var(--border-subtle)', borderRadius: '4px',
-                  fontSize: '0.72rem', color: 'var(--text-muted)', cursor: 'pointer', padding: '2px 6px'
-                }
-              }, isClosed ? "다시열기" : "마감하기"),
-              card.id !== 'default_settlement_card' && React.createElement("button", {
-                type: "button",
-                onClick: () => {
-                  if (typeof onDeleteSettlementCard === 'function') onDeleteSettlementCard(card.id);
-                },
-                style: {
-                  background: 'none', border: 'none', fontSize: '0.72rem', color: '#EF4444', cursor: 'pointer', padding: '2px 4px'
-                }
-              }, "삭제")
-            )
-          ),
-
-          /* Amount & Participant Row: Left (참여 멤버) / Right (1인당 정산 금액) */
-          React.createElement("div", {
+          return React.createElement("div", {
+            key: card.id,
             style: {
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              backgroundColor: 'var(--bg-primary)', padding: '10px 12px', borderRadius: '8px'
+              backgroundColor: 'var(--bg-card)',
+              border: '1.5px solid #9333EA',
+              borderRadius: 'var(--radius-md)',
+              padding: '12px 14px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '10px',
+              opacity: isClosed ? 0.75 : 1,
+              position: 'relative'
             }
           },
-            React.createElement("span", { style: { fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 700 } }, `참여 멤버 ${card.participantCount || participantCount}명`),
-            React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-end' } },
-              React.createElement("span", { style: { fontSize: '0.68rem', color: 'var(--text-muted)' } }, "1인당 정산 금액"),
-              React.createElement("strong", { style: { fontSize: '1.05rem', color: '#2563EB', fontWeight: 900 } }, `${(card.perPersonAmount || perPersonExpense).toLocaleString()}원`)
+            /* Card Header: (좌측끝) 1/N 간편 송금 [진행중] -------------- (우측끝) 우리은행 689-12-002245 박영우 [⚙️] */
+            React.createElement("div", {
+              style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px' }
+            },
+              /* Left End: Title + Status Badge */
+              React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px' } },
+                React.createElement("strong", { style: { fontSize: '0.92rem', color: 'var(--text-main)', fontWeight: 800 } }, card.title || "1/N 간편 송금"),
+                React.createElement("span", {
+                  style: {
+                    fontSize: '0.68rem', fontWeight: 800, padding: '2px 6px', borderRadius: '4px',
+                    backgroundColor: isClosed ? '#E2E8F0' : 'rgba(16, 185, 129, 0.15)',
+                    color: isClosed ? '#64748B' : '#059669'
+                  }
+                }, isClosed ? "마감됨" : "진행중")
+              ),
+
+              /* Right End: Account Info Text + Cog Settings Button */
+              React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px', marginLeft: 'auto', position: 'relative' } },
+                bankInfoText && React.createElement("span", {
+                  style: { fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }
+                }, bankInfoText),
+                
+                /* Cog Settings Button */
+                React.createElement("button", {
+                  type: "button",
+                  title: "정산 설정",
+                  onClick: () => setOpenMenuCardId(prev => prev === card.id ? null : card.id),
+                  style: {
+                    background: 'none', border: '1px solid var(--border-subtle)', borderRadius: '6px',
+                    width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: 'var(--text-muted)', cursor: 'pointer', padding: 0
+                  }
+                },
+                  React.createElement("svg", {
+                    xmlns: "http://www.w3.org/2000/svg", width: "16", height: "16", viewBox: "0 0 24 24",
+                    fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
+                  },
+                    React.createElement("circle", { cx: "12", cy: "12", r: "3" }),
+                    React.createElement("path", { d: "M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" })
+                  )
+                ),
+
+                /* Dropdown Settings Menu */
+                isMenuOpen && React.createElement("div", {
+                  style: {
+                    position: 'absolute', right: 0, top: '34px', backgroundColor: 'var(--bg-card)',
+                    border: '1px solid var(--border-subtle)', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                    zIndex: 100, display: 'flex', flexDirection: 'column', minWidth: '110px', overflow: 'hidden'
+                  }
+                },
+                  React.createElement("button", {
+                    type: "button",
+                    onClick: () => {
+                      setOpenMenuCardId(null);
+                      if (typeof onToggleSettlementCardStatus === 'function') onToggleSettlementCardStatus(card.id);
+                    },
+                    style: {
+                      padding: '8px 12px', background: 'none', border: 'none', textAlign: 'left',
+                      fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-main)', cursor: 'pointer',
+                      borderBottom: '1px solid var(--border-subtle)'
+                    }
+                  }, isClosed ? "다시열기" : "마감하기"),
+                  React.createElement("button", {
+                    type: "button",
+                    onClick: () => {
+                      setOpenMenuCardId(null);
+                      if (typeof onDeleteSettlementCard === 'function') onDeleteSettlementCard(card.id);
+                    },
+                    style: {
+                      padding: '8px 12px', background: 'none', border: 'none', textAlign: 'left',
+                      fontSize: '0.78rem', fontWeight: 700, color: '#EF4444', cursor: 'pointer'
+                    }
+                  }, "삭제")
+                )
+              )
+            ),
+
+            /* Member & Amount Row: (좌측끝) (퍼스널 컬러 Circle) 박영우 -------------- (우측끝) 404,150원 */
+            React.createElement("div", {
+              style: {
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                backgroundColor: 'var(--bg-primary)', padding: '10px 12px', borderRadius: '8px'
+              }
+            },
+              /* Left End: Personal Color Circle + Participant Name */
+              React.createElement("div", {
+                style: { display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }
+              },
+                activeParticipants.length === 0 ? React.createElement("span", { style: { fontSize: '0.8rem', color: 'var(--text-muted)' } }, "참여 멤버 없음")
+                  : activeParticipants.map(p => React.createElement("div", {
+                    key: p.id || p.name,
+                    style: { display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-main)' }
+                  },
+                    React.createElement("span", {
+                      style: { width: '10px', height: '10px', borderRadius: '50%', backgroundColor: p.color || '#3B82F6', display: 'inline-block', flexShrink: 0 }
+                    }),
+                    p.name
+                  ))
+              ),
+
+              /* Right End: 1인당 정산 금액 */
+              React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-end' } },
+                React.createElement("span", { style: { fontSize: '0.68rem', color: 'var(--text-muted)' } }, "1인당 정산 금액"),
+                React.createElement("strong", { style: { fontSize: '1.1rem', color: '#2563EB', fontWeight: 900 } }, `${(card.perPersonAmount || perPersonExpense).toLocaleString()}원`)
+              )
+            ),
+
+            /* 3 Remittance Buttons: Toss / Kakao / Naver */
+            React.createElement("div", {
+              style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginTop: '2px' }
+            },
+              /* Toss Button */
+              React.createElement("button", {
+                type: "button",
+                className: "btn",
+                onClick: () => handleRemittanceAction(card, 'toss'),
+                style: {
+                  flex: '1 1 100px', height: '36px', borderRadius: '8px',
+                  backgroundColor: '#3182F6', color: '#FFFFFF', border: 'none',
+                  fontSize: '0.78rem', fontWeight: 800, cursor: 'pointer',
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px'
+                }
+              }, "🔵 토스로 송금"),
+
+              /* Kakao Remittance Button */
+              React.createElement("button", {
+                type: "button",
+                className: "btn",
+                onClick: () => handleRemittanceAction(card, 'kakao'),
+                style: {
+                  flex: '1 1 100px', height: '36px', borderRadius: '8px',
+                  backgroundColor: '#FEE500', color: '#191919', border: 'none',
+                  fontSize: '0.78rem', fontWeight: 800, cursor: 'pointer',
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px'
+                }
+              }, "🟡 카카오로 송금"),
+
+              /* Naver Remittance Button */
+              React.createElement("button", {
+                type: "button",
+                className: "btn",
+                onClick: () => handleRemittanceAction(card, 'naver'),
+                style: {
+                  flex: '1 1 100px', height: '36px', borderRadius: '8px',
+                  backgroundColor: '#03C75A', color: '#FFFFFF', border: 'none',
+                  fontSize: '0.78rem', fontWeight: 800, cursor: 'pointer',
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px'
+                }
+              }, "🟢 네이버로 송금")
             )
-          ),
+          );
+        })
+      );
+    })(),
 
-          /* Account Info Banner if set */
-          (card.bankName || card.accountNumber) && React.createElement("div", {
-            style: { fontSize: '0.76rem', color: 'var(--text-muted)', backgroundColor: 'var(--bg-primary)', padding: '6px 10px', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '6px' }
-          },
-            React.createElement("span", null, "🏦"),
-            React.createElement("span", { style: { fontWeight: 700 } }, `${card.bankName || '토스뱅크'} ${card.accountNumber || ''} ${card.depositorName ? `(${card.depositorName})` : ''}`)
-          ),
-
-          /* 3 Remittance Buttons: Toss / Kakao / Naver */
-          React.createElement("div", {
-            style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginTop: '2px' }
-          },
-            /* Toss Button */
-            React.createElement("button", {
-              type: "button",
-              className: "btn",
-              onClick: () => handleRemittanceAction(card, 'toss'),
-              style: {
-                flex: '1 1 100px', height: '36px', borderRadius: '8px',
-                backgroundColor: '#3182F6', color: '#FFFFFF', border: 'none',
-                fontSize: '0.78rem', fontWeight: 800, cursor: 'pointer',
-                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px'
-              }
-            }, "🔵 토스로 송금"),
-
-            /* Kakao Remittance Button */
-            React.createElement("button", {
-              type: "button",
-              className: "btn",
-              onClick: () => handleRemittanceAction(card, 'kakao'),
-              style: {
-                flex: '1 1 100px', height: '36px', borderRadius: '8px',
-                backgroundColor: '#FEE500', color: '#191919', border: 'none',
-                fontSize: '0.78rem', fontWeight: 800, cursor: 'pointer',
-                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px'
-              }
-            }, "🟡 카카오로 송금"),
-
-            /* Naver Remittance Button */
-            React.createElement("button", {
-              type: "button",
-              className: "btn",
-              onClick: () => handleRemittanceAction(card, 'naver'),
-              style: {
-                flex: '1 1 100px', height: '36px', borderRadius: '8px',
-                backgroundColor: '#03C75A', color: '#FFFFFF', border: 'none',
-                fontSize: '0.78rem', fontWeight: 800, cursor: 'pointer',
-                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px'
-              }
-            }, "🟢 네이버로 송금")
-          )
-        );
-      })
-    );
-  })(),
+    /* 2. Metric Grid (총수입 / 총지출 / 현재잔액) */
+    /*#__PURE__*/React.createElement("div", {
+      className: "settlement-metric-grid"
+    }, metricCards.map(card => /*#__PURE__*/React.createElement("div", {
+      key: card.label,
+      className: "settlement-metric-card"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "settlement-metric-card-label"
+    }, /*#__PURE__*/React.createElement("span", { style: { color: card.color, display: 'inline-flex' } }, card.icon), card.label), /*#__PURE__*/React.createElement("div", {
+      className: "settlement-metric-card-value",
+      style: { color: card.color }
+    }, card.value.toLocaleString(), "원")))),
   /*#__PURE__*/React.createElement(SegmentedToggle, {
     ariaLabel: "누적보기/일자별보기 전환",
     value: activeTab,

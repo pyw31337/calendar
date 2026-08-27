@@ -1241,17 +1241,17 @@ export function NotificationOnboardingModal({ onClose, isMasterNotifyEnabled, on
 export function SharedAppNavBlock({
   onClose,
   onChangeView,
+  onOpenCreateSettlement,
   chatCount = 0,
   settlementBadge = null,
   galleryCount = 0,
   placeCount = 0,
   memoCount = 0,
-  // Optional trailing meta pills (right edge of each row)
-  chatLastAuthor = null,       // { name, color }
-  settlementLastDate = null,   // "08.24"
-  galleryLastDate = null,      // "08.24"
-  placeLastName = null,        // "외룡캠핑장"
-  memoLastTitleWord = null     // "팽이버섯"
+  chatLastAuthor = null,
+  settlementLastDate = null,
+  galleryLastDate = null,
+  placeLastName = null,
+  memoLastTitleWord = null
 }) {
   const React = window.React;
   const go = (view) => {
@@ -1313,14 +1313,7 @@ export function SharedAppNavBlock({
     className: "admin-side-menu-list",
     style: { borderTop: '1px solid var(--border-subtle, #E2E8F0)', borderBottom: 'none', paddingTop: '6px', marginTop: '2px' }
   },
-    /*#__PURE__*/React.createElement("button", { type: "button", className: "admin-side-menu-item", onClick: () => go("chat") },
-      /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2" }, /*#__PURE__*/React.createElement("path", { d: "M7.9 20A9 9 0 1 0 4 16.1L2 22Z" }))),
-      /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
-        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title", style: { display: "flex", alignItems: "center", gap: "6px" } }, "채팅", badge(chatCount))
-      ),
-      chatAuthorPill()
-    ),
-    /* [정산 생성] Menu Item with '+' Icon */
+    /* 1. 정산생성 (+ Icon, dark text) */
     /*#__PURE__*/React.createElement("button", {
       type: "button",
       className: "admin-side-menu-item",
@@ -1337,9 +1330,30 @@ export function SharedAppNavBlock({
         )
       ),
       /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
-        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title", style: { fontWeight: 800, color: "var(--accent-primary, #4F46E5)" } }, "정산 생성")
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title", style: { fontWeight: 700, color: "var(--text-main)" } }, "정산생성")
       )
     ),
+    /* 2. 정산카드 */
+    /*#__PURE__*/React.createElement("button", { type: "button", className: "admin-side-menu-item", onClick: () => go("settlement") },
+      /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" },
+        /*#__PURE__*/React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2" },
+          /*#__PURE__*/React.createElement("rect", { width: "20", height: "14", x: "2", y: "5", rx: "2" }),
+          /*#__PURE__*/React.createElement("line", { x1: "2", x2: "22", y1: "10", y2: "10" })
+        )
+      ),
+      /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title", style: { fontWeight: 700, color: "var(--text-main)" } }, "정산카드")
+      )
+    ),
+    /* 3. 채팅 */
+    /*#__PURE__*/React.createElement("button", { type: "button", className: "admin-side-menu-item", onClick: () => go("chat") },
+      /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2" }, /*#__PURE__*/React.createElement("path", { d: "M7.9 20A9 9 0 1 0 4 16.1L2 22Z" }))),
+      /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title", style: { display: "flex", alignItems: "center", gap: "6px" } }, "채팅", badge(chatCount))
+      ),
+      chatAuthorPill()
+    ),
+    /* 4. 정산 */
     /*#__PURE__*/React.createElement("button", { type: "button", className: "admin-side-menu-item", onClick: () => go("settlement") },
       /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2" }, /*#__PURE__*/React.createElement("path", { d: "M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1" }), /*#__PURE__*/React.createElement("path", { d: "M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4" }))),
       /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
@@ -1352,6 +1366,7 @@ export function SharedAppNavBlock({
       ),
       metaPill(settlementLastDate)
     ),
+    /* 5. 갤러리 */
     /*#__PURE__*/React.createElement("button", { type: "button", className: "admin-side-menu-item", onClick: () => go("gallery") },
       /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2" }, /*#__PURE__*/React.createElement("rect", { width: "18", height: "18", x: "3", y: "3", rx: "2", ry: "2" }), /*#__PURE__*/React.createElement("circle", { cx: "9", cy: "9", r: "2" }), /*#__PURE__*/React.createElement("path", { d: "m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" }))),
       /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
@@ -1359,6 +1374,7 @@ export function SharedAppNavBlock({
       ),
       metaPill(galleryLastDate)
     ),
+    /* 6. 장소 */
     /*#__PURE__*/React.createElement("button", { type: "button", className: "admin-side-menu-item", onClick: () => go("places") },
       /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2" }, /*#__PURE__*/React.createElement("path", { d: "M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" }), /*#__PURE__*/React.createElement("circle", { cx: "12", cy: "10", r: "3" }))),
       /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
@@ -1366,6 +1382,7 @@ export function SharedAppNavBlock({
       ),
       metaPill(placeLastName)
     ),
+    /* 7. 메모 */
     /*#__PURE__*/React.createElement("button", { type: "button", className: "admin-side-menu-item", onClick: () => go("memo") },
       /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2" }, /*#__PURE__*/React.createElement("path", { d: "M12 20h9" }), /*#__PURE__*/React.createElement("path", { d: "M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" }))),
       /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
