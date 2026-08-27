@@ -1556,18 +1556,7 @@ export function ChatRoomView({
       justifyContent: 'center',
       borderRadius: 'var(--radius-md)'
     }
-  }, /*#__PURE__*/React.createElement(ThreeLinesIcon, { size: 22 })))), syncStatus && /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      justifyContent: 'flex-end',
-      padding: '8px 16px 0',
-      flexShrink: 0
-    }
-  }, SyncStatusBanner ? /*#__PURE__*/React.createElement(SyncStatusBanner, {
-    syncStatus: syncStatus
-  }) : /*#__PURE__*/React.createElement(SyncStatusChip, {
-    syncStatus: syncStatus
-  })), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(ThreeLinesIcon, { size: 22 })))), /*#__PURE__*/React.createElement("div", {
     style: { flex: 1, position: 'relative', minHeight: 0 }
   }, /*#__PURE__*/React.createElement("div", {
     ref: chatMessagesContainerRef,

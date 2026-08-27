@@ -1410,6 +1410,16 @@ export function CommentsSection({
     return acc;
   }, {});
   const selectedParticipant = participants.find(p => p.id === chatParticipantId);
+  const visibleChatMessages = React.useMemo(() => {
+    return Array.isArray(chatMessages)
+      ? chatMessages.filter(msg => msg && msg.uploadSource !== 'meeting' && msg.uploadSource !== 'gallery')
+      : [];
+  }, [chatMessages]);
+  const visibleRecentMessages = React.useMemo(() => {
+    return Array.isArray(recentMessages)
+      ? recentMessages.filter(msg => msg && msg.uploadSource !== 'meeting' && msg.uploadSource !== 'gallery')
+      : [];
+  }, [recentMessages]);
   const fileInputRef = React.useRef(null);
   const [isCollapsed, setIsCollapsed] = React.useState(true); // default closed
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = React.useState(false);
@@ -1441,12 +1451,11 @@ export function CommentsSection({
   const revealedMsgId = useTapRevealedMsgId();
 
   // Total chat count + read/unread badge, tracked locally per calendar (no server-side
-  // read state). chatMessages holds the most recent up to 100 messages, so its length is
-  // an accurate total as long as a calendar hasn't exceeded that many messages ever sent.
-  const totalChatCount = (typeof totalChatCountProp === 'number' && totalChatCountProp >= chatMessages.length)
+  // read state). visibleChatMessages only includes actual chat, not meeting/gallery photo docs.
+  const totalChatCount = (typeof totalChatCountProp === 'number' && totalChatCountProp >= visibleChatMessages.length)
     ? totalChatCountProp
-    : Math.max(chatMessages.length, typeof totalChatCountProp === 'number' ? totalChatCountProp : 0);
-  const latestChatTimestamp = chatMessages.length > 0 ? chatMessages[chatMessages.length - 1].timestamp : 0;
+    : Math.max(visibleChatMessages.length, typeof totalChatCountProp === 'number' ? totalChatCountProp : 0);
+  const latestChatTimestamp = visibleChatMessages.length > 0 ? visibleChatMessages[visibleChatMessages.length - 1].timestamp : 0;
   const [lastReadTimestamp, setLastReadTimestamp] = React.useState(() => getChatLastReadTimestamp(calendar.id));
   React.useEffect(() => {
     setLastReadTimestamp(getChatLastReadTimestamp(calendar.id));
@@ -1463,14 +1472,11 @@ export function CommentsSection({
     });
   };
   const previewSourceMessages = React.useMemo(() => {
-    const liveMessages = Array.isArray(chatMessages) ? chatMessages.filter(Boolean) : [];
-    if (liveMessages.length > 0) return liveMessages;
-    return Array.isArray(recentMessages) ? recentMessages.filter(Boolean).slice().reverse() : [];
-  }, [chatMessages, recentMessages]);
+    if (visibleChatMessages.length > 0) return visibleChatMessages;
+    return Array.isArray(visibleRecentMessages) ? visibleRecentMessages.filter(Boolean).slice().reverse() : [];
+  }, [visibleChatMessages, visibleRecentMessages]);
   const previewRecentMessages = React.useMemo(() => {
-    const visibleMessages = previewSourceMessages.filter(msg => msg.uploadSource !== 'meeting' && msg.uploadSource !== 'gallery');
-    if (visibleMessages.length > 0) return visibleMessages.slice(-5);
-    return previewSourceMessages.length > 0 ? [previewSourceMessages[previewSourceMessages.length - 1]] : [];
+    return previewSourceMessages.length > 0 ? previewSourceMessages.slice(-5) : [];
   }, [previewSourceMessages]);
   const hasAnyChat = totalChatCount > 0 || previewSourceMessages.length > 0;
   const emptyChatMessage = totalChatCount > 0

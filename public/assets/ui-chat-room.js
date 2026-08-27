@@ -1,8 +1,674 @@
 /**
  * Chat room view (P4-16)
  */
-(function () {
-function ChatRoomView({
+
+/* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
+const GATHER_APP_CALENDAR_DATA = window.GATHER_APP_CALENDAR_DATA || {};
+const GATHER_APP_CHAT_DATA = window.GATHER_APP_CHAT_DATA || {};
+const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
+const GATHER_APP_CONSTANTS = window.GATHER_APP_CONSTANTS || {};
+const GATHER_APP_CONFIG = window.GATHER_APP_CONFIG || {};
+function __gatherUiDeps() { return window.GATHER_UI_DEPS || {}; }
+function getActiveAvailabilities(calendar) {
+  const f = __gatherUiDeps().getActiveAvailabilities || GATHER_APP_UTILS.getActiveAvailabilities;
+  return typeof f === 'function' ? f(calendar) : [];
+}
+function getActiveParticipants(calendar) {
+  const f = __gatherUiDeps().getActiveParticipants || GATHER_APP_UTILS.getActiveParticipants;
+  return typeof f === 'function' ? f(calendar) : [];
+}
+function getCalendarPolls(calendar) {
+  const f = __gatherUiDeps().getCalendarPolls || GATHER_APP_UTILS.getCalendarPolls;
+  return typeof f === 'function' ? f(calendar) : [];
+}
+function getCalendarPlaces(calendar) {
+  const f = __gatherUiDeps().getCalendarPlaces || GATHER_APP_UTILS.getCalendarPlaces;
+  return typeof f === 'function' ? f(calendar) : [];
+}
+function useChatSendGuard(onSend, canSend) {
+  const f = __gatherUiDeps().useChatSendGuard;
+  return typeof f === 'function' ? f(onSend, canSend) : onSend;
+}
+function computeKoreanHolidaysForYear(year) {
+  const f = __gatherUiDeps().computeKoreanHolidaysForYear;
+  return typeof f === 'function' ? f(year) : [];
+}
+function getFooterFamilyLinks() {
+  return __gatherUiDeps().FOOTER_FAMILY_LINKS || [];
+}
+
+/* __fb() bridge */
+function __fb() {
+  const deps = __gatherUiDeps();
+  if (deps && typeof deps.getDb === 'function') {
+    try { const d = deps.getDb(); if (d) return d; } catch (e) {}
+  }
+  return (typeof window !== 'undefined' && window.__gatherFirebaseDb) || null;
+}
+
+function getStoredChatParticipantId(...args) {
+  const fn = (window.GATHER_APP_NOTIFICATIONS || {}).getStoredChatParticipantId;
+  return typeof fn === 'function' ? fn(...args) : '';
+}
+function setStoredChatParticipantId(...args) {
+  const fn = (window.GATHER_APP_NOTIFICATIONS || {}).setStoredChatParticipantId;
+  return typeof fn === 'function' ? fn(...args) : undefined;
+}
+
+function extractExpenseTimePrefix(...args) {
+  const f = __gatherUiDeps().extractExpenseTimePrefix || GATHER_APP_UTILS.extractExpenseTimePrefix;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function extractFirstUrl(...args) {
+  const f = __gatherUiDeps().extractFirstUrl || GATHER_APP_UTILS.extractFirstUrl;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function extractLeadingMemoDate(...args) {
+  const f = __gatherUiDeps().extractLeadingMemoDate || GATHER_APP_UTILS.extractLeadingMemoDate;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function formatChatDividerDate(...args) {
+  const f = __gatherUiDeps().formatChatDividerDate || GATHER_APP_UTILS.formatChatDividerDate;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function formatChatTime(...args) {
+  const f = __gatherUiDeps().formatChatTime || GATHER_APP_UTILS.formatChatTime;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function formatCommentDate(...args) {
+  const f = __gatherUiDeps().formatCommentDate || GATHER_APP_UTILS.formatCommentDate;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function formatDateWithDayName(...args) {
+  const f = __gatherUiDeps().formatDateWithDayName || GATHER_APP_UTILS.formatDateWithDayName;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function formatPlaceBadgeDate(...args) {
+  const f = __gatherUiDeps().formatPlaceBadgeDate || GATHER_APP_UTILS.formatPlaceBadgeDate;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function formatPollDeadline(...args) {
+  const f = __gatherUiDeps().formatPollDeadline || GATHER_APP_UTILS.formatPollDeadline;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function formatRegisteredAt(...args) {
+  const f = __gatherUiDeps().formatRegisteredAt || GATHER_APP_UTILS.formatRegisteredAt;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function formatShortDateWithDayName(...args) {
+  const f = __gatherUiDeps().formatShortDateWithDayName || GATHER_APP_UTILS.formatShortDateWithDayName;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getActivePollOptions(...args) {
+  const f = __gatherUiDeps().getActivePollOptions || GATHER_APP_UTILS.getActivePollOptions;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getActivityLogStamp(...args) {
+  const f = __gatherUiDeps().getActivityLogStamp || GATHER_APP_UTILS.getActivityLogStamp;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getContrastTextColor(...args) {
+  const f = __gatherUiDeps().getContrastTextColor || GATHER_APP_UTILS.getContrastTextColor;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getDisplayExpenseCategory(...args) {
+  const f = __gatherUiDeps().getDisplayExpenseCategory || GATHER_APP_UTILS.getDisplayExpenseCategory;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getDisplayPlaceAddress(...args) {
+  const f = __gatherUiDeps().getDisplayPlaceAddress || GATHER_APP_UTILS.getDisplayPlaceAddress;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getExpenseCategories(...args) {
+  const f = __gatherUiDeps().getExpenseCategories || GATHER_APP_UTILS.getExpenseCategories;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getExpenseCategory(...args) {
+  const f = __gatherUiDeps().getExpenseCategory || GATHER_APP_UTILS.getExpenseCategory;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getExpenseCategoryIcon(...args) {
+  const f = __gatherUiDeps().getExpenseCategoryIcon || GATHER_APP_UTILS.getExpenseCategoryIcon;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getExpenseCategoryLabel(...args) {
+  const f = __gatherUiDeps().getExpenseCategoryLabel || GATHER_APP_UTILS.getExpenseCategoryLabel;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getPlaceCategoryById(...args) {
+  const f = __gatherUiDeps().getPlaceCategoryById || GATHER_APP_UTILS.getPlaceCategoryById;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getPlaceCategoryIcon(...args) {
+  const f = __gatherUiDeps().getPlaceCategoryIcon || GATHER_APP_UTILS.getPlaceCategoryIcon;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getPlaceCategoryLabel(...args) {
+  const f = __gatherUiDeps().getPlaceCategoryLabel || GATHER_APP_UTILS.getPlaceCategoryLabel;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function isDomesticLatLng(...args) {
+  const f = __gatherUiDeps().isDomesticLatLng || GATHER_APP_UTILS.isDomesticLatLng;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function isExpenseIncomeEntry(...args) {
+  const f = __gatherUiDeps().isExpenseIncomeEntry || GATHER_APP_UTILS.isExpenseIncomeEntry;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function isInternalTestCalendarId(...args) {
+  const f = __gatherUiDeps().isInternalTestCalendarId || GATHER_APP_UTILS.isInternalTestCalendarId;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function isPollClosed(...args) {
+  const f = __gatherUiDeps().isPollClosed || GATHER_APP_UTILS.isPollClosed;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function isTombstone(...args) {
+  const f = __gatherUiDeps().isTombstone || GATHER_APP_UTILS.isTombstone;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function isValidCalendarId(...args) {
+  const f = __gatherUiDeps().isValidCalendarId || GATHER_APP_UTILS.isValidCalendarId;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function isValidDateString(...args) {
+  const f = __gatherUiDeps().isValidDateString || GATHER_APP_UTILS.isValidDateString;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function normalizeColorValue(...args) {
+  const f = __gatherUiDeps().normalizeColorValue || GATHER_APP_UTILS.normalizeColorValue;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function normalizeExpenseCategories(...args) {
+  const f = __gatherUiDeps().normalizeExpenseCategories || GATHER_APP_UTILS.normalizeExpenseCategories;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function normalizePlaceAddressForSave(...args) {
+  const f = __gatherUiDeps().normalizePlaceAddressForSave || GATHER_APP_UTILS.normalizePlaceAddressForSave;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function normalizePlaceCategories(...args) {
+  const f = __gatherUiDeps().normalizePlaceCategories || GATHER_APP_UTILS.normalizePlaceCategories;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function normalizePlaceDateForSort(...args) {
+  const f = __gatherUiDeps().normalizePlaceDateForSort || GATHER_APP_UTILS.normalizePlaceDateForSort;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function parseVisitEntriesFromMemo(...args) {
+  const f = __gatherUiDeps().parseVisitEntriesFromMemo || GATHER_APP_UTILS.parseVisitEntriesFromMemo;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function reformatMemoIntoDateLines(...args) {
+  const f = __gatherUiDeps().reformatMemoIntoDateLines || GATHER_APP_UTILS.reformatMemoIntoDateLines;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function removeFirstUrl(...args) {
+  const f = __gatherUiDeps().removeFirstUrl || GATHER_APP_UTILS.removeFirstUrl;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function sortVisitEntriesRecentFirst(...args) {
+  const f = __gatherUiDeps().sortVisitEntriesRecentFirst || GATHER_APP_UTILS.sortVisitEntriesRecentFirst;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function trimLatLngOutliers(...args) {
+  const f = __gatherUiDeps().trimLatLngOutliers || GATHER_APP_UTILS.trimLatLngOutliers;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+
+function appendChatImageFiles(...args) {
+  const f = __gatherUiDeps().appendChatImageFiles || GATHER_APP_UTILS.appendChatImageFiles;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function autoGrowTextarea(...args) {
+  const f = __gatherUiDeps().autoGrowTextarea || GATHER_APP_UTILS.autoGrowTextarea;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function buildActivityLogsFromAvailabilities(...args) {
+  const f = __gatherUiDeps().buildActivityLogsFromAvailabilities || GATHER_APP_UTILS.buildActivityLogsFromAvailabilities;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function buildAdminDashboardMetrics(...args) {
+  const f = __gatherUiDeps().buildAdminDashboardMetrics || GATHER_APP_UTILS.buildAdminDashboardMetrics;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function buildFieldChangeNote(...args) {
+  const f = __gatherUiDeps().buildFieldChangeNote || GATHER_APP_UTILS.buildFieldChangeNote;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function changeAdminPasswordRemote(...args) {
+  const f = __gatherUiDeps().changeAdminPasswordRemote || GATHER_APP_UTILS.changeAdminPasswordRemote;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function clearAdminSession(...args) {
+  const f = __gatherUiDeps().clearAdminSession || GATHER_APP_UTILS.clearAdminSession;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function cloneCalendarList(...args) {
+  const f = __gatherUiDeps().cloneCalendarList || GATHER_APP_UTILS.cloneCalendarList;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function computeCalendarSearchMatches(...args) {
+  const f = __gatherUiDeps().computeCalendarSearchMatches || GATHER_APP_UTILS.computeCalendarSearchMatches;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function createCalendarBackupPayload(...args) {
+  const f = __gatherUiDeps().createCalendarBackupPayload || GATHER_APP_UTILS.createCalendarBackupPayload;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function createDefaultCalendar(...args) {
+  const f = __gatherUiDeps().createDefaultCalendar || GATHER_APP_UTILS.createDefaultCalendar;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function createMemoActivityLog(...args) {
+  const f = __gatherUiDeps().createMemoActivityLog || GATHER_APP_UTILS.createMemoActivityLog;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function createPollActivityLog(...args) {
+  const f = __gatherUiDeps().createPollActivityLog || GATHER_APP_UTILS.createPollActivityLog;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function deleteActivityLogsAfterTimestamp(...args) {
+  const f = __gatherUiDeps().deleteActivityLogsAfterTimestamp || GATHER_APP_UTILS.deleteActivityLogsAfterTimestamp;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function deleteAllChatImagesFromStorage(...args) {
+  const f = __gatherUiDeps().deleteAllChatImagesFromStorage || GATHER_APP_UTILS.deleteAllChatImagesFromStorage;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function deleteMessageRest(...args) {
+  const f = __gatherUiDeps().deleteMessageRest || GATHER_APP_UTILS.deleteMessageRest;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function describeImageProcessingFailures(...args) {
+  const f = __gatherUiDeps().describeImageProcessingFailures || GATHER_APP_UTILS.describeImageProcessingFailures;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function doesPlaceMatchDate(...args) {
+  const f = __gatherUiDeps().doesPlaceMatchDate || GATHER_APP_UTILS.doesPlaceMatchDate;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function downloadJsonFile(...args) {
+  const f = __gatherUiDeps().downloadJsonFile || GATHER_APP_UTILS.downloadJsonFile;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function exportCalendarConfirmedMeetingsToICS(...args) {
+  const f = __gatherUiDeps().exportCalendarConfirmedMeetingsToICS || GATHER_APP_UTILS.exportCalendarConfirmedMeetingsToICS;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function extractCalendarsFromBackup(...args) {
+  const f = __gatherUiDeps().extractCalendarsFromBackup || GATHER_APP_UTILS.extractCalendarsFromBackup;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function fetchActivityLogsFromFirestore(...args) {
+  const f = __gatherUiDeps().fetchActivityLogsFromFirestore || GATHER_APP_UTILS.fetchActivityLogsFromFirestore;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function fetchChatMessagesRest(...args) {
+  const f = __gatherUiDeps().fetchChatMessagesRest || GATHER_APP_UTILS.fetchChatMessagesRest;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function fetchImageShareDocument(...args) {
+  const f = __gatherUiDeps().fetchImageShareDocument || GATHER_APP_UTILS.fetchImageShareDocument;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function fetchRecentMessagesRest(...args) {
+  const f = __gatherUiDeps().fetchRecentMessagesRest || GATHER_APP_UTILS.fetchRecentMessagesRest;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function fetchSingleCalendarWithRest(...args) {
+  const f = __gatherUiDeps().fetchSingleCalendarWithRest || GATHER_APP_UTILS.fetchSingleCalendarWithRest;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function fetchSubcollectionCount(...args) {
+  const f = __gatherUiDeps().fetchSubcollectionCount || GATHER_APP_UTILS.fetchSubcollectionCount;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function fetchWithTimeout(...args) {
+  const f = __gatherUiDeps().fetchWithTimeout || GATHER_APP_UTILS.fetchWithTimeout;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function formatLogTimestamp(...args) {
+  const f = __gatherUiDeps().formatLogTimestamp || GATHER_APP_UTILS.formatLogTimestamp;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getAdminSearchFilterFromUrl(...args) {
+  const f = __gatherUiDeps().getAdminSearchFilterFromUrl || GATHER_APP_UTILS.getAdminSearchFilterFromUrl;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getAdminSearchQueryFromUrl(...args) {
+  const f = __gatherUiDeps().getAdminSearchQueryFromUrl || GATHER_APP_UTILS.getAdminSearchQueryFromUrl;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getAdminSearchResultTargetUrl(...args) {
+  const f = __gatherUiDeps().getAdminSearchResultTargetUrl || GATHER_APP_UTILS.getAdminSearchResultTargetUrl;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getAdminSelectedCalendarIdFromUrl(...args) {
+  const f = __gatherUiDeps().getAdminSelectedCalendarIdFromUrl || GATHER_APP_UTILS.getAdminSelectedCalendarIdFromUrl;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getAdminSession(...args) {
+  const f = __gatherUiDeps().getAdminSession || GATHER_APP_UTILS.getAdminSession;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getImageFilesFromClipboardEvent(...args) {
+  const f = __gatherUiDeps().getImageFilesFromClipboardEvent || GATHER_APP_UTILS.getImageFilesFromClipboardEvent;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getKnownPlaceParticipantNames(...args) {
+  const f = __gatherUiDeps().getKnownPlaceParticipantNames || GATHER_APP_UTILS.getKnownPlaceParticipantNames;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getPlaceCategoryMarkerContent(...args) {
+  const f = __gatherUiDeps().getPlaceCategoryMarkerContent || GATHER_APP_UTILS.getPlaceCategoryMarkerContent;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getSolarFromLunar(...args) {
+  const f = __gatherUiDeps().getSolarFromLunar || GATHER_APP_UTILS.getSolarFromLunar;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getWeatherIcon(...args) {
+  const f = __gatherUiDeps().getWeatherIcon || GATHER_APP_UTILS.getWeatherIcon;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function isAdminRestoreRoute(...args) {
+  const f = __gatherUiDeps().isAdminRestoreRoute || GATHER_APP_UTILS.isAdminRestoreRoute;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function listAllCalendarsRemote(...args) {
+  const f = __gatherUiDeps().listAllCalendarsRemote || GATHER_APP_UTILS.listAllCalendarsRemote;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function mergeCalendarCollections(...args) {
+  const f = __gatherUiDeps().mergeCalendarCollections || GATHER_APP_UTILS.mergeCalendarCollections;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function mergePollRecord(...args) {
+  const f = __gatherUiDeps().mergePollRecord || GATHER_APP_UTILS.mergePollRecord;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function normalizeCalendarForSave(...args) {
+  const f = __gatherUiDeps().normalizeCalendarForSave || GATHER_APP_UTILS.normalizeCalendarForSave;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function normalizePollOptionInput(...args) {
+  const f = __gatherUiDeps().normalizePollOptionInput || GATHER_APP_UTILS.normalizePollOptionInput;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function processImageFilesSequentially(...args) {
+  const f = __gatherUiDeps().processImageFilesSequentially || GATHER_APP_UTILS.processImageFilesSequentially;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function pushSingleCloudCalendar(...args) {
+  const f = __gatherUiDeps().pushSingleCloudCalendar || GATHER_APP_UTILS.pushSingleCloudCalendar;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function resolveMemoImageBatch(...args) {
+  const f = __gatherUiDeps().resolveMemoImageBatch || GATHER_APP_UTILS.resolveMemoImageBatch;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function sanitizeMemoForFirestore(...args) {
+  const f = __gatherUiDeps().sanitizeMemoForFirestore || GATHER_APP_UTILS.sanitizeMemoForFirestore;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function setAdminSession(...args) {
+  const f = __gatherUiDeps().setAdminSession || GATHER_APP_UTILS.setAdminSession;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function sha256Hex(...args) {
+  const f = __gatherUiDeps().sha256Hex || GATHER_APP_UTILS.sha256Hex;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function subscribeUserToPushWithPermission(...args) {
+  const f = __gatherUiDeps().subscribeUserToPushWithPermission || GATHER_APP_UTILS.subscribeUserToPushWithPermission;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function translateKoreanToEnglish(...args) {
+  const f = __gatherUiDeps().translateKoreanToEnglish || GATHER_APP_UTILS.translateKoreanToEnglish;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function unsubscribeUserFromPush(...args) {
+  const f = __gatherUiDeps().unsubscribeUserFromPush || GATHER_APP_UTILS.unsubscribeUserFromPush;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function validateBackupCalendars(...args) {
+  const f = __gatherUiDeps().validateBackupCalendars || GATHER_APP_UTILS.validateBackupCalendars;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function validateCalendarShape(...args) {
+  const f = __gatherUiDeps().validateCalendarShape || GATHER_APP_UTILS.validateCalendarShape;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function verifyAdminPasswordRemote(...args) {
+  const f = __gatherUiDeps().verifyAdminPasswordRemote || GATHER_APP_UTILS.verifyAdminPasswordRemote;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+
+const ADMIN_MESSAGE_LIVE_LIMIT = (__gatherUiDeps().ADMIN_MESSAGE_LIVE_LIMIT
+  || (window.__GATHER_ADMIN_LIMITS && window.__GATHER_ADMIN_LIMITS.ADMIN_MESSAGE_LIVE_LIMIT)
+  || 50);
+const ADMIN_MEMO_LIVE_LIMIT = (__gatherUiDeps().ADMIN_MEMO_LIVE_LIMIT
+  || (window.__GATHER_ADMIN_LIMITS && window.__GATHER_ADMIN_LIMITS.ADMIN_MEMO_LIVE_LIMIT)
+  || 50);
+
+const PEEKALINK_HOUR_BUCKET_MS = Number.isFinite(GATHER_APP_CHAT_DATA.PEEKALINK_HOUR_BUCKET_MS) ? GATHER_APP_CHAT_DATA.PEEKALINK_HOUR_BUCKET_MS : 3600000;
+const PEEKALINK_FREE_HOURLY_LIMIT = Number.isFinite(GATHER_APP_CHAT_DATA.PEEKALINK_FREE_HOURLY_LIMIT) ? GATHER_APP_CHAT_DATA.PEEKALINK_FREE_HOURLY_LIMIT : 50;
+const ENABLE_FIRESTORE_WRITES = (window.GATHER_APP_CONFIG || {}).ENABLE_FIRESTORE_WRITES !== false;
+const GLOBAL_SEARCH_HISTORY_LIMIT = 100;
+const EXPENSE_ACTIVITY_ACTIONS = GATHER_APP_CONSTANTS.EXPENSE_ACTIVITY_ACTIONS || [];
+const IMAGE_TAG_ACTIVITY_ACTIONS = GATHER_APP_CONSTANTS.IMAGE_TAG_ACTIVITY_ACTIONS || [];
+const MEETING_ACTIVITY_ACTIONS = GATHER_APP_CONSTANTS.MEETING_ACTIVITY_ACTIONS || [];
+const PLACE_ACTIVITY_ACTIONS = GATHER_APP_CONSTANTS.PLACE_ACTIVITY_ACTIONS || [];
+const POLL_ACTIVITY_ACTIONS = GATHER_APP_CONSTANTS.POLL_ACTIVITY_ACTIONS || [];
+const KAKAO_CATEGORY_GROUP_TO_PLACE_CATEGORY = GATHER_APP_CONSTANTS.KAKAO_CATEGORY_GROUP_TO_PLACE_CATEGORY || {};
+const KOREAN_LUNAR_HOLIDAY_DATES = GATHER_APP_CALENDAR_DATA.KOREAN_LUNAR_HOLIDAY_DATES || {};
+const KOREAN_TEMPORARY_HOLIDAYS = GATHER_APP_CALENDAR_DATA.KOREAN_TEMPORARY_HOLIDAYS || [];
+const KOREAN_FIXED_HOLIDAYS = GATHER_APP_CALENDAR_DATA.KOREAN_FIXED_HOLIDAYS || [];
+const KOREAN_SOLAR_TERMS = GATHER_APP_CALENDAR_DATA.KOREAN_SOLAR_TERMS || [];
+const MONTH_NAMES = GATHER_APP_CALENDAR_DATA.MONTH_NAMES || ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+const PRESET_COLORS = GATHER_APP_CONSTANTS.PRESET_COLORS || [];
+const DEFAULT_EXPENSE_CATEGORIES = GATHER_APP_CONSTANTS.DEFAULT_EXPENSE_CATEGORIES || [];
+const DEFAULT_PLACE_CATEGORIES = GATHER_APP_CONSTANTS.DEFAULT_PLACE_CATEGORIES || GATHER_APP_UTILS.DEFAULT_PLACE_CATEGORIES || [];
+const EMOJI_CATEGORIES = GATHER_APP_CHAT_DATA.EMOJI_CATEGORIES || [];
+const INCOME_EXPENSE_CATEGORY = GATHER_APP_UTILS.INCOME_EXPENSE_CATEGORY || { id: 'income', name: '수입', color: '#16A34A' };
+const PLACE_MAP_DEFAULT_CENTER = __gatherUiDeps().PLACE_MAP_DEFAULT_CENTER || [37.5665, 126.978];
+const PLACE_MAP_DEFAULT_ZOOM = __gatherUiDeps().PLACE_MAP_DEFAULT_ZOOM || 11;
+const PLACE_MARKER_SIZE = __gatherUiDeps().PLACE_MARKER_SIZE || 28;
+const CONFETTI_Z_INDEX = 9999;
+const DEADLINE_PICKER_MONTH_NAMES = GATHER_APP_CALENDAR_DATA.MONTH_NAMES || ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+
+function getKoreanSolarTermsForYear(...args) {
+  const f = __gatherUiDeps().getKoreanSolarTermsForYear || GATHER_APP_UTILS.getKoreanSolarTermsForYear;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function useTapRevealedMsgId(...args) {
+  const f = __gatherUiDeps().useTapRevealedMsgId || GATHER_APP_UTILS.useTapRevealedMsgId;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getTrulyConfirmedMeetings(...args) {
+  const f = __gatherUiDeps().getTrulyConfirmedMeetings || GATHER_APP_UTILS.getTrulyConfirmedMeetings;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getConfirmedMeetings(...args) {
+  const f = __gatherUiDeps().getConfirmedMeetings || GATHER_APP_UTILS.getConfirmedMeetings;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getHolidayNamesForDate(...args) {
+  const f = __gatherUiDeps().getHolidayNamesForDate || GATHER_APP_UTILS.getHolidayNamesForDate;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getAnniversariesForDate(...args) {
+  const f = __gatherUiDeps().getAnniversariesForDate || GATHER_APP_UTILS.getAnniversariesForDate;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getPinnedNotices(...args) {
+  const f = __gatherUiDeps().getPinnedNotices || GATHER_APP_UTILS.getPinnedNotices;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getMessageImageEntries(...args) {
+  const f = __gatherUiDeps().getMessageImageEntries || GATHER_APP_UTILS.getMessageImageEntries;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getMessageDirectMediaEntry(...args) {
+  const f = __gatherUiDeps().getMessageDirectMediaEntry || GATHER_APP_UTILS.getMessageDirectMediaEntry;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function renderTextWithUrlBadge(...args) {
+  const f = __gatherUiDeps().renderTextWithUrlBadge || GATHER_APP_UTILS.renderTextWithUrlBadge;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function renderChatMessageBody(...args) {
+  const f = __gatherUiDeps().renderChatMessageBody || GATHER_APP_UTILS.renderChatMessageBody;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function parseTextWithLinks(...args) {
+  const f = __gatherUiDeps().parseTextWithLinks || GATHER_APP_UTILS.parseTextWithLinks;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function highlightKeyword(...args) {
+  const f = __gatherUiDeps().highlightKeyword || GATHER_APP_UTILS.highlightKeyword;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function highlightTextWithYellowMarker(...args) {
+  const f = __gatherUiDeps().highlightTextWithYellowMarker || GATHER_APP_UTILS.highlightTextWithYellowMarker;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function copyTextToClipboard(...args) {
+  const f = __gatherUiDeps().copyTextToClipboard || GATHER_APP_UTILS.copyTextToClipboard;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getCalendarShareUrl(...args) {
+  const f = __gatherUiDeps().getCalendarShareUrl || GATHER_APP_UTILS.getCalendarShareUrl;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getViewShareUrl(...args) {
+  const f = __gatherUiDeps().getViewShareUrl || GATHER_APP_UTILS.getViewShareUrl;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getMemoItemShareUrl(...args) {
+  const f = __gatherUiDeps().getMemoItemShareUrl || GATHER_APP_UTILS.getMemoItemShareUrl;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function buildLightboxImageInfo(...args) {
+  const f = __gatherUiDeps().buildLightboxImageInfo || GATHER_APP_UTILS.buildLightboxImageInfo;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function normalizeTagsForDisplay(...args) {
+  const f = __gatherUiDeps().normalizeTagsForDisplay || GATHER_APP_UTILS.normalizeTagsForDisplay;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getRecentEmojis(...args) {
+  const f = __gatherUiDeps().getRecentEmojis || GATHER_APP_UTILS.getRecentEmojis;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function addRecentEmoji(...args) {
+  const f = __gatherUiDeps().addRecentEmoji || GATHER_APP_UTILS.addRecentEmoji;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function fetchLinkPreview(...args) {
+  const f = __gatherUiDeps().fetchLinkPreview || GATHER_APP_UTILS.fetchLinkPreview;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function useLinkPreview(...args) {
+  const f = __gatherUiDeps().useLinkPreview || GATHER_APP_UTILS.useLinkPreview;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function useScrollHideHeader(...args) {
+  const f = __gatherUiDeps().useScrollHideHeader || GATHER_APP_UTILS.useScrollHideHeader;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function loadLeaflet(...args) {
+  const f = __gatherUiDeps().loadLeaflet || GATHER_APP_UTILS.loadLeaflet;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function loadLeafletMarkerCluster(...args) {
+  const f = __gatherUiDeps().loadLeafletMarkerCluster || GATHER_APP_UTILS.loadLeafletMarkerCluster;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function buildPlaceMarkerHtml(...args) {
+  const f = __gatherUiDeps().buildPlaceMarkerHtml || GATHER_APP_UTILS.buildPlaceMarkerHtml;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function panMapToFitMarkerPopup(...args) {
+  const f = __gatherUiDeps().panMapToFitMarkerPopup || GATHER_APP_UTILS.panMapToFitMarkerPopup;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getPlaceCategories(...args) {
+  const f = __gatherUiDeps().getPlaceCategories || GATHER_APP_UTILS.getPlaceCategories;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getPlaceSortDateKey(...args) {
+  const f = __gatherUiDeps().getPlaceSortDateKey || GATHER_APP_UTILS.getPlaceSortDateKey;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getPlaceExternalMapUrl(...args) {
+  const f = __gatherUiDeps().getPlaceExternalMapUrl || GATHER_APP_UTILS.getPlaceExternalMapUrl;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function extractKnownParticipantNames(...args) {
+  const f = __gatherUiDeps().extractKnownParticipantNames || GATHER_APP_UTILS.extractKnownParticipantNames;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getChatLastReadTimestamp(...args) {
+  const f = __gatherUiDeps().getChatLastReadTimestamp || GATHER_APP_UTILS.getChatLastReadTimestamp;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function setChatLastReadTimestamp(...args) {
+  const f = __gatherUiDeps().setChatLastReadTimestamp || GATHER_APP_UTILS.setChatLastReadTimestamp;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function isDateConfirmedMeeting(...args) {
+  const f = __gatherUiDeps().isDateConfirmedMeeting || GATHER_APP_UTILS.isDateConfirmedMeeting;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function calculateDday(...args) {
+  const f = __gatherUiDeps().calculateDday || GATHER_APP_UTILS.calculateDday;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function formatChatHeaderTitle(...args) {
+  const f = __gatherUiDeps().formatChatHeaderTitle || GATHER_APP_UTILS.formatChatHeaderTitle;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getShortTitleParts(...args) {
+  const f = __gatherUiDeps().getShortTitleParts || GATHER_APP_UTILS.getShortTitleParts;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function isEmojiOnlyChatText(...args) {
+  const f = __gatherUiDeps().isEmojiOnlyChatText || GATHER_APP_UTILS.isEmojiOnlyChatText;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function twemojiImageUrl(...args) {
+  const f = __gatherUiDeps().twemojiImageUrl || GATHER_APP_UTILS.twemojiImageUrl;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getDirectChatMediaInfo(...args) {
+  const f = __gatherUiDeps().getDirectChatMediaInfo || GATHER_APP_UTILS.getDirectChatMediaInfo;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getPollOptionVoterIds(...args) {
+  const f = __gatherUiDeps().getPollOptionVoterIds || GATHER_APP_UTILS.getPollOptionVoterIds;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getPollTotalVoteCount(...args) {
+  const f = __gatherUiDeps().getPollTotalVoteCount || GATHER_APP_UTILS.getPollTotalVoteCount;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getCalendarActivityLogs(...args) {
+  const f = __gatherUiDeps().getCalendarActivityLogs || GATHER_APP_UTILS.getCalendarActivityLogs;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getCalendarAccentColor(...args) {
+  const f = __gatherUiDeps().getCalendarAccentColor || GATHER_APP_UTILS.getCalendarAccentColor;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getAnniversaryDisplayColor(...args) {
+  const f = __gatherUiDeps().getAnniversaryDisplayColor || GATHER_APP_UTILS.getAnniversaryDisplayColor;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+
+
+export function ChatRoomView({
   calendar,
   chatMessages,
   loadingOlderChat,
@@ -45,18 +711,44 @@ function ChatRoomView({
   onOpenGallery,
   onChangeView,
   stickyVideoKey,
-  onReleaseSticky
+  onActivateVideo,
+  onDeletePhoto,
+  onReplacePhoto,
+  onJumpToChatMessage,
+  onJumpToMemo,
+  onJumpToMeetingDate,
+  onGetChatMessageOrdinal,
+  onGetGalleryPhotoOrdinal,
+  onRequestConfirm,
+  syncStatus = null,
+  externalFocusMessageId = null
+,
+  onOpenAppSettings
+,
+  chatCount = 0,
+  settlementBadge = null,
+  galleryCount = 0,
+  placeCount = 0,
+  memoCount = 0,
+  chatLastAuthor = null,
+  settlementLastDate = null,
+  galleryLastDate = null,
+  placeLastName = null,
+  memoLastTitleWord = null
 }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
-  const BackArrowIcon = __deps.BackArrowIcon;
-  const SmallXIcon = __deps.SmallXIcon;
-  const PencilIcon = __deps.PencilIcon;
-  const ThreeLinesIcon = __deps.ThreeLinesIcon;
-  const MegaphoneIcon = __deps.MegaphoneIcon;
-  const EmojiPickerIcon = __deps.EmojiPickerIcon;
+  const BackArrowIcon = __comp.BackArrowIcon || __deps.BackArrowIcon;
+  const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
+  const TrashIcon = __comp.TrashIcon || __deps.TrashIcon;
+  const PencilIcon = __comp.PencilIcon || __deps.PencilIcon;
+  const ThreeLinesIcon = __comp.ThreeLinesIcon || __deps.ThreeLinesIcon;
+  const MegaphoneIcon = __comp.MegaphoneIcon || __deps.MegaphoneIcon;
+  const EmojiPickerIcon = __comp.EmojiPickerIcon || __deps.EmojiPickerIcon;
   const ChatGalleryModal = __comp.ChatGalleryModal || __deps.ChatGalleryModal;
+  const SyncStatusChip = __comp.SyncStatusChip || __deps.SyncStatusChip;
+  const SyncStatusBanner = __comp.SyncStatusBanner || __deps.SyncStatusBanner;
   const ChatSideMenu = __comp.ChatSideMenu || __deps.ChatSideMenu;
   const EmojiPickerSheet = __comp.EmojiPickerSheet || __deps.EmojiPickerSheet;
   const ImageProcessingOverlay = __comp.ImageProcessingOverlay || __deps.ImageProcessingOverlay;
@@ -88,16 +780,21 @@ function ChatRoomView({
   const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState('');
   const [searchFocusIndex, setSearchFocusIndex] = React.useState(0);
+  const visibleChatMessages = React.useMemo(() => {
+    return Array.isArray(chatMessages)
+      ? chatMessages.filter(msg => msg && msg.uploadSource !== 'meeting' && msg.uploadSource !== 'gallery')
+      : [];
+  }, [chatMessages]);
 
   // Ordered list of message IDs matching the current search query (for ▲▼ navigation)
   const searchMatchIds = React.useMemo(() => {
     if (!searchQuery) return [];
     const q = searchQuery.toLowerCase();
-    return chatMessages
+    return visibleChatMessages
       .filter(m => m.text && m.text.toLowerCase().includes(q))
       .map(m => m.id)
       .filter(id => !!id);
-  }, [chatMessages, searchQuery]);
+  }, [visibleChatMessages, searchQuery]);
 
   const clampedFocusIdx = searchMatchIds.length > 0
     ? Math.max(0, Math.min(searchFocusIndex, searchMatchIds.length - 1))
@@ -119,9 +816,9 @@ function ChatRoomView({
   // Mirrors the same browser-storage key CommentsSection uses for its unread badge.
   const [priorReadTimestamp] = React.useState(() => getChatLastReadTimestamp(calendar.id));
   React.useEffect(() => {
-    const latest = chatMessages.length > 0 ? chatMessages[chatMessages.length - 1].timestamp : 0;
+    const latest = visibleChatMessages.length > 0 ? visibleChatMessages[visibleChatMessages.length - 1].timestamp : 0;
     if (latest > 0) setChatLastReadTimestamp(calendar.id, latest);
-  }, [calendar.id, chatMessages.length > 0 ? chatMessages[chatMessages.length - 1]?.timestamp : 0]);
+  }, [calendar.id, visibleChatMessages.length > 0 ? visibleChatMessages[visibleChatMessages.length - 1]?.timestamp : 0]);
 
   // Scroll-to-bottom floating button: shown once scrolled far enough away from the latest
   // message that swiping back down manually would be tedious.
@@ -131,16 +828,16 @@ function ChatRoomView({
   // (scrolled away from the bottom), replacing the generic button with a labeled pill so a new
   // message doesn't go unnoticed. Clears once the user scrolls back near the bottom themselves.
   const [hasNewMessageBelow, setHasNewMessageBelow] = React.useState(false);
-  const prevMessageCountRef = React.useRef(chatMessages.length);
+  const prevMessageCountRef = React.useRef(visibleChatMessages.length);
   React.useEffect(() => {
-    const increased = chatMessages.length > prevMessageCountRef.current;
-    prevMessageCountRef.current = chatMessages.length;
+    const increased = visibleChatMessages.length > prevMessageCountRef.current;
+    prevMessageCountRef.current = visibleChatMessages.length;
     if (!increased) return;
     const el = chatMessagesContainerRef.current;
     if (!el) return;
     const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
     if (distanceFromBottom > 200) setHasNewMessageBelow(true);
-  }, [chatMessages.length]);
+  }, [visibleChatMessages.length]);
   // Confetti burst around a newly-sent bubble -- only for messages I just sent myself (not
   // ones arriving from other participants, and not the initial batch on mount). Anchors the
   // burst to the actual bubble's on-screen position via its data-msg-row-id, same pattern as
@@ -148,7 +845,8 @@ function ChatRoomView({
   const prevLastMsgIdRef = React.useRef(undefined);
   React.useEffect(() => {
     return; // Disabled chat confetti per user request
-    const last = chatMessages[chatMessages.length - 1];
+    // eslint-disable-next-line no-unreachable -- kept in place to make re-enabling easy later
+    const last = visibleChatMessages[visibleChatMessages.length - 1];
     const prevId = prevLastMsgIdRef.current;
     prevLastMsgIdRef.current = last ? last.id : null;
     if (prevId === undefined || !last || last.id === prevId) return;
@@ -174,7 +872,7 @@ function ChatRoomView({
         console.warn('Chat confetti error', err);
       }
     });
-  }, [chatMessages.length]);
+  }, [visibleChatMessages.length]);
   const handleScrollCombined = (e) => {
     if (handleChatScroll) handleChatScroll(e);
     const el = e.target;
@@ -337,8 +1035,8 @@ function ChatRoomView({
   const handlePasteImagesChat = async (e) => {
     const pastedFiles = getImageFilesFromClipboardEvent(e);
     if (pastedFiles.length === 0) return;
-    const pastedText = e.clipboardData?.getData('text/plain') || '';
-    if (!pastedText) e.preventDefault();
+    e.preventDefault();
+    e.stopPropagation();
     try {
       await appendChatImageFiles({
         files: pastedFiles,
@@ -363,7 +1061,7 @@ function ChatRoomView({
   let lastDateStr = '';
   let readMarkerInserted = false;
   const renderedMessages = [];
-  chatMessages.forEach((msg, idx) => {
+  visibleChatMessages.forEach((msg, idx) => {
     // 일정탭('meeting')/갤러리페이지('gallery')에서 올린 사진은 참조용 실제 채팅 메시지
     // 문서로 저장되긴 하지만(태그 편집·삭제·갤러리 정렬 번호 매기기가 이 문서를 가리킴),
     // 채팅 피드에는 노출되지 않아야 함 -- 갤러리/일정 레이어팝업 사진탭에서만 보여야 함.
@@ -436,19 +1134,28 @@ function ChatRoomView({
     const isMe = msg.participantId === chatParticipantId;
     const timeStr = formatChatTime(msg.timestamp);
     const msgHasImages = !!(msg.imageUrl || (Array.isArray(msg.imageUrls) && msg.imageUrls.length > 0));
+    const msgImageCount = Array.isArray(msg.imageUrls) && msg.imageUrls.length > 0 ? msg.imageUrls.length : (msg.imageUrl ? 1 : 0);
     const msgDirectMediaInfo = getDirectChatMediaInfo(extractFirstUrl(msg.text || ''));
     const isEmbedMessage = msgDirectMediaInfo?.type === 'embed';
     // Wide enough that the embed's own .chat-media-resizable wrapper (see DirectChatMediaText)
     // has real headroom to drag-resize into on desktop, instead of immediately overflowing
     // this bubble's box the moment the user grows it past the old 820px ceiling.
     const chatBubbleMaxWidth = isEmbedMessage ? 'calc(100% - 60px)' : '65%';
+    const multiImageBubbleMaxWidth = msgImageCount >= 2
+      ? `min(65%, calc(${msgImageCount >= 12 ? 6 : msgImageCount >= 5 ? 5 : msgImageCount === 2 ? 2 : 3} * 76px + (${msgImageCount >= 12 ? 6 : msgImageCount >= 5 ? 5 : msgImageCount === 2 ? 2 : 3} - 1) * 4px + 24px))`
+      : chatBubbleMaxWidth;
+    const bubbleWrapperMaxWidth = (!isEmbedMessage && msgImageCount >= 2) ? multiImageBubbleMaxWidth : chatBubbleMaxWidth;
     const chatMediaStyle = isEmbedMessage
       ? { maxWidth: '760px', embedMaxWidth: '760px', portraitEmbedMaxWidth: '360px', maxHeight: '72vh', marginBottom: msg.text ? '10px' : '0' }
       : { maxWidth: '420px', maxHeight: '62vh', marginBottom: msg.text ? '10px' : '0' };
     const isEmojiOnlyMessage = isEmojiOnlyChatText(msg.text) && !msgHasImages;
     const rowId = msg.id || `msg-${idx}`;
     const isSearchMatch = searchQuery && msg.text && msg.text.toLowerCase().includes(searchQuery.toLowerCase());
-    const isSearchFocused = isSearchMatch && rowId === focusedMsgId;
+    // Focused either by in-chat text search (isSearchMatch + arrow-key navigation) or by an
+    // external jump-to-message request (Lightbox source link, admin/global search, ?msg= deep
+    // link -- see focusChatMessage in app-main.js) -- both render identically, the same purple
+    // border + up/down shake as the in-chat search feature has always used.
+    const isSearchFocused = (isSearchMatch && rowId === focusedMsgId) || (!!externalFocusMessageId && rowId === externalFocusMessageId);
     renderedMessages.push(/*#__PURE__*/React.createElement("div", {
       key: rowId,
       className: `msg-row-hover ${revealedMsgId === rowId ? 'msg-actions-revealed' : ''}`,
@@ -505,17 +1212,7 @@ function ChatRoomView({
           alignItems: 'center',
           justifyContent: 'flex-end'
         }
-      }, /*#__PURE__*/React.createElement("svg", {
-        xmlns: "http://www.w3.org/2000/svg",
-        width: "13",
-        height: "13",
-        viewBox: "0 0 24 24",
-        fill: "none",
-        stroke: "currentColor",
-        strokeWidth: "2",
-        strokeLinecap: "round",
-        strokeLinejoin: "round"
-      }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), /*#__PURE__*/React.createElement("path", { d: "M18 6l-12 12" }), /*#__PURE__*/React.createElement("path", { d: "M6 6l12 12" }))),
+      }, /*#__PURE__*/React.createElement(TrashIcon, { size: 13 })),
       /* Bottom: Edit button + Timestamp */
       /*#__PURE__*/React.createElement("div", {
         style: {
@@ -561,7 +1258,7 @@ function ChatRoomView({
       // shrink the bubble below its content's natural size (the classic flexbox overflow trap) --
       // without it, an oversized child (e.g. an embed sized by an imprecise vw estimate) can force
       // this box wider than message-row actually has room for.
-      style: { position: 'relative', maxWidth: chatBubbleMaxWidth, minWidth: 0, zIndex: 1, alignSelf: 'flex-end' }
+      style: { position: 'relative', maxWidth: bubbleWrapperMaxWidth, minWidth: 0, zIndex: 1, alignSelf: 'flex-end' }
     }, /*#__PURE__*/React.createElement("div", {
       key: isSearchFocused ? `bubble-focused-${rowId}` : undefined,
       className: isSearchFocused ? 'chat-search-focused-bubble' : (isSearchMatch ? 'chat-search-match-bubble' : ''),
@@ -570,7 +1267,7 @@ function ChatRoomView({
         zIndex: 1,
         backgroundColor: 'var(--bg-card)',
         border: '1px solid var(--border-subtle)',
-        borderRadius: '12px',
+        borderRadius: 'var(--radius-md)',
         padding: isEmojiOnlyMessage ? '12px 16px' : '8px 12px',
         fontSize: isEmojiOnlyMessage ? '4rem' : '0.9rem',
         lineHeight: isEmojiOnlyMessage ? 1 : '1.4',
@@ -585,7 +1282,7 @@ function ChatRoomView({
         // identically across Chrome/Whale/Safari/Firefox, unlike relying purely on width math.
         overflow: 'hidden'
       }
-    }, renderChatMessageBody(msg, setActiveLightbox, chatMediaStyle, searchQuery, stickyVideoKey, onReleaseSticky)), /*#__PURE__*/React.createElement("div", {
+    }, renderChatMessageBody(msg, setActiveLightbox, chatMediaStyle, searchQuery, stickyVideoKey, onActivateVideo)), /*#__PURE__*/React.createElement("div", {
       style: {
         position: 'absolute',
         right: '-7px',
@@ -619,7 +1316,7 @@ function ChatRoomView({
       }
     }))] : [/*#__PURE__*/React.createElement("div", {
       key: "bubble-wrapper",
-      style: { position: 'relative', maxWidth: chatBubbleMaxWidth, minWidth: 0, zIndex: 1 }
+      style: { position: 'relative', maxWidth: bubbleWrapperMaxWidth, minWidth: 0, zIndex: 1 }
     }, /*#__PURE__*/React.createElement("div", {
       key: isSearchFocused ? `bubble-focused-${rowId}` : undefined,
       className: isSearchFocused ? 'chat-search-focused-bubble' : (isSearchMatch ? 'chat-search-match-bubble' : ''),
@@ -628,7 +1325,7 @@ function ChatRoomView({
         zIndex: 1,
         backgroundColor: 'var(--bg-card)',
         border: '1px solid var(--border-subtle)',
-        borderRadius: '12px',
+        borderRadius: 'var(--radius-md)',
         padding: isEmojiOnlyMessage ? '12px 16px' : '8px 12px',
         fontSize: isEmojiOnlyMessage ? '4rem' : '0.9rem',
         lineHeight: isEmojiOnlyMessage ? 1 : '1.4',
@@ -643,7 +1340,7 @@ function ChatRoomView({
         // identically across Chrome/Whale/Safari/Firefox, unlike relying purely on width math.
         overflow: 'hidden'
       }
-    }, renderChatMessageBody(msg, setActiveLightbox, chatMediaStyle, searchQuery, stickyVideoKey, onReleaseSticky)), /*#__PURE__*/React.createElement("div", {
+    }, renderChatMessageBody(msg, setActiveLightbox, chatMediaStyle, searchQuery, stickyVideoKey, onActivateVideo)), /*#__PURE__*/React.createElement("div", {
       style: {
         position: 'absolute',
         left: '-7px',
@@ -857,9 +1554,20 @@ function ChatRoomView({
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      borderRadius: '8px'
+      borderRadius: 'var(--radius-md)'
     }
-  }, /*#__PURE__*/React.createElement(ThreeLinesIcon, { size: 22 })))), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(ThreeLinesIcon, { size: 22 })))), syncStatus && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      justifyContent: 'flex-end',
+      padding: '8px 16px 0',
+      flexShrink: 0
+    }
+  }, SyncStatusBanner ? /*#__PURE__*/React.createElement(SyncStatusBanner, {
+    syncStatus: syncStatus
+  }) : /*#__PURE__*/React.createElement(SyncStatusChip, {
+    syncStatus: syncStatus
+  })), /*#__PURE__*/React.createElement("div", {
     style: { flex: 1, position: 'relative', minHeight: 0 }
   }, /*#__PURE__*/React.createElement("div", {
     ref: chatMessagesContainerRef,
@@ -878,7 +1586,7 @@ function ChatRoomView({
     style: {
       position: 'sticky', top: 0, zIndex: 6,
       display: 'flex', flexDirection: 'column', gap: '8px',
-      backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: '8px',
+      backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)',
       padding: '10px 12px', marginBottom: '12px', boxShadow: 'var(--shadow-md)'
     }
   },
@@ -912,7 +1620,7 @@ function ChatRoomView({
     style: {
       position: 'sticky', top: 0, zIndex: 6,
       display: 'flex', flexDirection: 'column', gap: '8px',
-      backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: '8px',
+      backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)',
       padding: '10px 12px', marginBottom: '12px', boxShadow: 'var(--shadow-md)'
     }
   },
@@ -922,7 +1630,7 @@ function ChatRoomView({
       key: notice.id,
       style: {
         display: 'flex', alignItems: 'flex-start', gap: '8px',
-        backgroundColor: '#FEF3C7', border: '1px solid #FDE68A', borderRadius: '8px',
+        backgroundColor: '#FEF3C7', border: '1px solid #FDE68A', borderRadius: 'var(--radius-md)',
         padding: '10px 12px', fontSize: '0.82rem', color: '#92400E', lineHeight: '1.5'
       }
     },
@@ -932,7 +1640,7 @@ function ChatRoomView({
         onClick: () => onRemovePinnedNotice && onRemovePinnedNotice(notice.id),
         title: "공지 삭제",
         style: { background: 'none', border: 'none', cursor: 'pointer', color: '#92400E', flexShrink: 0, display: 'flex', alignItems: 'center' }
-      }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 16 }))
+      }, /*#__PURE__*/React.createElement(TrashIcon, { size: 16 }))
     )),
     /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px' } },
       /*#__PURE__*/React.createElement("button", {
@@ -955,7 +1663,7 @@ function ChatRoomView({
     key: notice.id,
     style: {
       display: 'flex', alignItems: 'flex-start', gap: '8px',
-      backgroundColor: '#FEF3C7', border: '1px solid #FDE68A', borderRadius: '8px',
+      backgroundColor: '#FEF3C7', border: '1px solid #FDE68A', borderRadius: 'var(--radius-md)',
       padding: '10px 12px', fontSize: '0.82rem', color: '#92400E', lineHeight: '1.5'
     }
   },
@@ -1040,11 +1748,12 @@ function ChatRoomView({
       position: 'fixed',
       left: 0,
       right: 0,
-      bottom: `${viewportBottom}px`,
+      // Sit above emoji sheet when open (CSS var set by EmojiPickerSheet)
+      bottom: `max(${viewportBottom}px, var(--emoji-sheet-h, 0px))`,
       backgroundColor: 'var(--bg-card)',
       borderTop: '1px solid var(--border-subtle)',
       padding: '12px 16px',
-      zIndex: 1012,
+      zIndex: isEmojiPickerOpen ? 13050 : 1012,
       flexShrink: 0,
       transform: (isHeaderVisible || viewportBottom > 80 || isInputFocused || !!(chatInput && String(chatInput).trim()) || (chatImages && chatImages.length > 0)) ? 'translateY(0)' : 'translateY(calc(100% + 12px))',
       opacity: (isHeaderVisible || viewportBottom > 80 || isInputFocused || !!(chatInput && String(chatInput).trim()) || (chatImages && chatImages.length > 0)) ? 1 : 0,
@@ -1057,7 +1766,7 @@ function ChatRoomView({
       style: {
         backgroundColor: 'var(--bg-card)',
         border: '1px solid var(--border-subtle)',
-        borderRadius: '12px',
+        borderRadius: 'var(--radius-md)',
         padding: '12px',
         display: 'flex',
         flexDirection: 'column',
@@ -1122,11 +1831,12 @@ function ChatRoomView({
       }, /*#__PURE__*/React.createElement("img", {
         src: img.thumbnail,
         alt: `첨부 미리보기 ${index + 1}`,
+        decoding: 'async',
         style: {
           width: '60px',
           height: '60px',
           objectFit: 'cover',
-          borderRadius: '8px',
+          borderRadius: 'var(--radius-md)',
           display: 'block'
         }
       }), /*#__PURE__*/React.createElement(ImageThumbRemoveButton, {
@@ -1137,7 +1847,7 @@ function ChatRoomView({
       /*#__PURE__*/React.createElement("input", {
         ref: fileInputRefChat,
         type: "file",
-        accept: "image/*",
+        accept: "image/jpeg, image/png, image/gif, image/webp, image/heic, image/heif, image/*",
         multiple: true,
         style: { position: 'absolute', width: '1px', height: '1px', padding: 0, margin: '-1px', overflow: 'hidden', clip: 'rect(0,0,0,0)', border: 0 },
         onChange: handleFileChangeChat
@@ -1274,13 +1984,22 @@ function ChatRoomView({
     showToast,
     onPromoteImageUrl,
     onSaveImageTags,
-    onSearchTag
+    onSearchTag,
+    onDeletePhoto,
+    onReplacePhoto,
+    onJumpToChatMessage,
+    onJumpToMemo,
+    onJumpToMeetingDate,
+    onGetChatMessageOrdinal,
+    onGetGalleryPhotoOrdinal,
+    onRequestConfirm
   }) : null), imageProcessingChat && /*#__PURE__*/React.createElement(ImageProcessingOverlay, imageProcessingChat),
   isEmojiPickerOpen && /*#__PURE__*/React.createElement(EmojiPickerSheet, {
     onSelect: insertEmojiIntoChatInput,
     onClose: () => setIsEmojiPickerOpen(false)
   }),
   isChatSideMenuOpen && /*#__PURE__*/React.createElement(ChatSideMenu, {
+    weatherLocation: calendar && calendar.weatherLocation,
     onClose: () => setIsChatSideMenuOpen(false),
     onOpenSearch: () => { setIsSearchOpen(true); setSearchQuery(''); },
     onOpenNoticeSettings: () => {
@@ -1295,12 +2014,24 @@ function ChatRoomView({
     onDecreaseFont: onDecreaseFont,
     onIncreaseFont: onIncreaseFont,
     isChatNotifyEnabled: isChatNotifyEnabled,
-    onToggleChatNotifications: onToggleChatNotifications
+    onToggleChatNotifications: onToggleChatNotifications,
+    onOpenAppSettings: onOpenAppSettings,
+    chatCount: chatCount,
+    settlementBadge: settlementBadge,
+    galleryCount: galleryCount,
+    placeCount: placeCount,
+    memoCount: memoCount,
+    chatLastAuthor: chatLastAuthor,
+    settlementLastDate: settlementLastDate,
+    galleryLastDate: galleryLastDate,
+    placeLastName: placeLastName,
+    memoLastTitleWord: memoLastTitleWord
   }),
   isChatGalleryOpen && /*#__PURE__*/React.createElement(ChatGalleryModal, {
     chatMessages: chatMessages,
     onClose: () => setIsChatGalleryOpen(false),
     setActiveLightbox: setActiveLightbox,
+    onDeletePhoto: onDeletePhoto,
     hasMoreOlderChat: hasMoreOlderChat,
     loadingOlderChat: loadingOlderChat,
     onLoadOlderChat: onLoadOlderChat,
@@ -1371,7 +2102,8 @@ function ChatRoomView({
   }));
 }
 
+  if (typeof window !== 'undefined') {
   window.GATHER_UI_COMPONENTS = Object.assign({}, window.GATHER_UI_COMPONENTS || {}, {
-    ChatRoomView: ChatRoomView
+    ChatRoomView: ChatRoomView,
   });
-})();
+}

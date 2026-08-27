@@ -1292,18 +1292,6 @@ export function ChatGalleryModal({
           )
         )
   ),
-  syncStatus && /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      justifyContent: 'flex-end',
-      padding: asPage ? '8px 20px 0' : '8px 16px 0',
-      flexShrink: 0
-    }
-  }, SyncStatusBanner ? /*#__PURE__*/React.createElement(SyncStatusBanner, {
-    syncStatus: syncStatus
-  }) : /*#__PURE__*/React.createElement(SyncStatusChip, {
-    syncStatus: syncStatus
-  })),
   /*#__PURE__*/React.createElement("input", {
     ref: uploadInputRef,
     type: "file",

@@ -1121,35 +1121,6 @@ function App() {
     }
   });
   const [syncDiag, setSyncDiag] = React.useState(null);
-  const initialLoadOverlayTimerRef = React.useRef(null);
-  const initialLoadOverlayIntervalRef = React.useRef(null);
-  React.useEffect(() => {
-    if (initialLoadOverlayTimerRef.current) clearTimeout(initialLoadOverlayTimerRef.current);
-    if (initialLoadOverlayIntervalRef.current) clearInterval(initialLoadOverlayIntervalRef.current);
-    initialLoadOverlayTimerRef.current = null;
-    initialLoadOverlayIntervalRef.current = null;
-    if (!isInitialDataLoading) {
-      setOperationProgress(prev => prev?.id === 'initial-load' ? null : prev);
-      return;
-    }
-    let pct = 22;
-    initialLoadOverlayTimerRef.current = setTimeout(() => {
-      setOperationProgress({
-        id: 'initial-load',
-        title: '캘린더 불러오는 중...',
-        detail: '최신 데이터를 동기화하고 있습니다.',
-        pct
-      });
-      initialLoadOverlayIntervalRef.current = setInterval(() => {
-        pct = Math.min(90, pct + (pct < 50 ? 12 : 5));
-        setOperationProgress(prev => prev?.id === 'initial-load' ? { ...prev, pct } : prev);
-      }, 400);
-    }, 280);
-    return () => {
-      if (initialLoadOverlayTimerRef.current) clearTimeout(initialLoadOverlayTimerRef.current);
-      if (initialLoadOverlayIntervalRef.current) clearInterval(initialLoadOverlayIntervalRef.current);
-    };
-  }, [isInitialDataLoading, activeCalId]);
   React.useEffect(() => {
     if (typeof window === 'undefined') return undefined;
     const handleOnline = () => setIsBrowserOnline(true);
@@ -1164,9 +1135,6 @@ function App() {
       window.removeEventListener('offline', handleOffline);
     };
   }, []);
-  React.useEffect(() => {
-    setSyncDiag(null);
-  }, [activeCalId]);
 
   // Main header: fixed full-width bar with a menu row, hides on scroll-down and reappears on
   // scroll-up (same behavior as the chat room header). Refs below are scroll targets for the
@@ -1598,10 +1566,10 @@ function App() {
     const cacheHit = restoredFromCache || (calendarsRef.current || []).some(c => c && c.id === activeCalId && isUsableCalendarRecord(c));
     setIsInitialDataLoading(!cacheHit);
 
-    const applyLoadedCalendar = (cloudCal, cloudLastMod = Date.now(), forceApply = false) => {
+    const applyLoadedCalendar = (cloudCal, cloudLastMod = Date.now(), forceApply = false, markLoaded = true) => {
       if (!isMounted || !cloudCal || cloudCal.id !== activeCalId) return false;
       if (!forceApply && cloudLastMod < getMetaLastModified(serverRevisionRef.current, activeCalId)) return false;
-      hasLoadedCloudCalendar = true;
+      if (markLoaded) hasLoadedCloudCalendar = true;
       setIsInitialDataLoading(false);
       setCalendarsState(prevCals => {
         const hasExisting = prevCals.some(c => c.id === activeCalId);
@@ -1667,7 +1635,11 @@ function App() {
       } catch (_) {}
       const result = getCloudDocCalendar(doc, activeCalId);
       if (result && !isSavingRef.current) {
-        applyLoadedCalendar(result.calendar, result.lastModified || Date.now(), true);
+        if (doc.metadata.fromCache) {
+          applyLoadedCalendar(result.calendar, result.lastModified || Date.now(), false, false);
+        } else {
+          applyLoadedCalendar(result.calendar, result.lastModified || Date.now(), true);
+        }
       }
     }, err => {
       console.warn(`Firestore realtime sync notice for cal_${activeCalId}:`, err);
@@ -5997,14 +5969,7 @@ function App() {
     style: {
       padding: '10px'
     }
-  }, /*#__PURE__*/React.createElement(AdminFilledMenuIcon, null)))), syncStatus && /*#__PURE__*/React.createElement("div", {
-    style: {
-      padding: '0 16px 8px',
-      flexShrink: 0
-    }
-  }, /*#__PURE__*/React.createElement(SyncStatusBanner, {
-    syncStatus: syncStatus
-  })), activeCal?.description && /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(AdminFilledMenuIcon, null)))), activeCal?.description && /*#__PURE__*/React.createElement("div", {
     className: "calendar-desc"
   }, renderTextWithUrlBadge(activeCal.description)), /*#__PURE__*/React.createElement("div", {
     className: "main-menu-bar"

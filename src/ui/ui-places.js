@@ -1601,17 +1601,6 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
         }, /*#__PURE__*/React.createElement(ThreeLinesIcon, { size: 22 }))
       )
     ),
-    syncStatus && /*#__PURE__*/React.createElement("div", {
-      style: {
-        padding: '8px 16px 0',
-        flexShrink: 0
-      }
-    }, SyncStatusBanner ? /*#__PURE__*/React.createElement(SyncStatusBanner, {
-      syncStatus: syncStatus
-    }) : /*#__PURE__*/React.createElement(SyncStatusChip, {
-      syncStatus: syncStatus
-    })),
-
     /* Slide-down search input bar (shared InlineSearchBar) */
     isSearchOpen && /*#__PURE__*/React.createElement(InlineSearchBar, {
       value: listSearchQuery,

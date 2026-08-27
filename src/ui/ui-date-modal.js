@@ -1937,18 +1937,7 @@ export function DateModal({
       padding: '2px 4px'
     },
     title: "닫기"
-  }, "✕"))), syncStatus && /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      justifyContent: 'flex-end',
-      padding: '0 16px 2px',
-      flexShrink: 0
-    }
-  }, SyncStatusBanner ? /*#__PURE__*/React.createElement(SyncStatusBanner, {
-    syncStatus: syncStatus
-  }) : /*#__PURE__*/React.createElement(SyncStatusChip, {
-    syncStatus: syncStatus
-  })), /*#__PURE__*/React.createElement("div", {
+  }, "✕"))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'grid',
       gridTemplateColumns: 'repeat(4, 1fr)',

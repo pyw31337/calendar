@@ -2,8 +2,7 @@
  * Firebase data access helpers (P3-2).
  * Loaded before app-main.js. Runtime deps: window.GATHER_FIREBASE_DEPS
  */
-(function () {
-  function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
+function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
   function isValidCalId(calId) {
     return typeof calId === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(calId);
   }
@@ -85,8 +84,164 @@
     }
   }
 
-  async function fetchSubcollectionCount(calId, subName) {
+  // Unlike fetchRecentChatMessages (which grabs the newest N messages regardless of content),
+  // this keeps paging through message history until at least minPhotoCount photos have been
+  // seen (or maxPages is hit) -- so a text-heavy recent stretch of chat doesn't starve the main
+  // screen's gallery widget of thumbnails even though the total photo count (fetchGalleryItemCount,
+  // same maxPages default) is much higher. Falls back to fetchRecentChatMessages when the SDK
+  // (needed for cursor-based startAfter pagination) isn't available.
+  async function fetchRecentGalleryMessages(calId, minPhotoCount, maxPages) {
+    if (!isValidCalId(calId)) return [];
+    const targetCount = Math.max(1, Number(minPhotoCount) || 12);
+    const pages = Math.max(1, Number(maxPages) || 8);
+    const firebaseDb = getDb();
+    if (!firebaseDb) return fetchRecentChatMessages(calId, 60);
+    try {
+      const collected = [];
+      let photoCount = 0;
+      let lastDoc = null;
+      for (let page = 0; page < pages && photoCount < targetCount; page++) {
+        let q = firebaseDb.collection('calendars').doc('cal_' + calId).collection('messages')
+          .orderBy('timestamp', 'desc').limit(80);
+        if (lastDoc) q = q.startAfter(lastDoc);
+        const snap = await q.get();
+        if (snap.empty) break;
+        snap.forEach(function (doc) {
+          const msg = slimMessage({ id: doc.id, ...doc.data() });
+          collected.push(msg);
+          photoCount += imageEntries(msg).length + (directEntry(msg) ? 1 : 0);
+        });
+        lastDoc = snap.docs[snap.docs.length - 1];
+        if (snap.size < 80) break;
+      }
+      return collected.reverse();
+    } catch (err) {
+      console.warn('fetchRecentGalleryMessages sdk', err);
+      return fetchRecentChatMessages(calId, 60);
+    }
+  }
+
+  async function countMessagesByUploadSource(calId, uploadSource) {
+    if (!isValidCalId(calId) || !uploadSource) return null;
+    const firebaseDb = getDb();
+    if (firebaseDb) {
+      try {
+        const ref = firebaseDb.collection('calendars').doc('cal_' + calId).collection('messages')
+          .where('uploadSource', '==', uploadSource);
+        if (typeof ref.count === 'function') {
+          const snap = await ref.count().get();
+          const n = Number(snap.data().count);
+          if (Number.isFinite(n) && n >= 0) return n;
+        }
+      } catch (err) {
+        console.warn('countMessagesByUploadSource sdk', uploadSource, err);
+      }
+    }
+    try {
+      const parentPath = 'projects/' + projectId() + '/databases/(default)/documents/calendars/cal_' + calId;
+      const url = 'https://firestore.googleapis.com/v1/' + parentPath + ':runAggregationQuery';
+      const aggBody = {
+        structuredAggregationQuery: {
+          structuredQuery: {
+            from: [{ collectionId: 'messages' }],
+            where: {
+              fieldFilter: {
+                field: { fieldPath: 'uploadSource' },
+                op: 'EQUAL',
+                value: { stringValue: uploadSource }
+              }
+            }
+          },
+          aggregations: [{ alias: 'total', count: {} }]
+        }
+      };
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(aggBody)
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const rows = Array.isArray(data) ? data : [data];
+        for (let i = 0; i < rows.length; i++) {
+          const row = rows[i];
+          const fields = row && row.result && row.result.aggregateFields;
+          const total = fields && fields.total;
+          if (total && total.integerValue != null) {
+            const n = Number(total.integerValue);
+            if (Number.isFinite(n) && n >= 0) return n;
+          }
+        }
+      } else {
+        console.warn('countMessagesByUploadSource rest status', res.status, uploadSource);
+      }
+    } catch (err) {
+      console.warn('countMessagesByUploadSource rest', uploadSource, err);
+    }
+    return null;
+  }
+
+  async function fetchMessagesByUploadSource(calId, uploadSource) {
+    if (!isValidCalId(calId) || !uploadSource) return null;
+    const firebaseDb = getDb();
+    if (firebaseDb) {
+      try {
+        const snap = await firebaseDb.collection('calendars').doc('cal_' + calId).collection('messages')
+          .where('uploadSource', '==', uploadSource).get();
+        const list = [];
+        snap.forEach(function (doc) { list.push(slimMessage({ id: doc.id, ...doc.data() })); });
+        return list;
+      } catch (err) {
+        console.warn('fetchMessagesByUploadSource sdk', uploadSource, err);
+      }
+    }
+    try {
+      const parentPath = 'projects/' + projectId() + '/databases/(default)/documents/calendars/cal_' + calId;
+      const url = 'https://firestore.googleapis.com/v1/' + parentPath + ':runQuery';
+      const body = {
+        structuredQuery: {
+          from: [{ collectionId: 'messages' }],
+          where: {
+            fieldFilter: {
+              field: { fieldPath: 'uploadSource' },
+              op: 'EQUAL',
+              value: { stringValue: uploadSource }
+            }
+          }
+        }
+      };
+      const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      if (!res.ok) {
+        console.warn('fetchMessagesByUploadSource rest status', res.status, uploadSource);
+        return null;
+      }
+      const data = await res.json();
+      const rows = Array.isArray(data) ? data : [data];
+      return rows.filter(function (row) { return row && row.document; }).map(function (row) {
+        return slimMessage({ id: row.document.name.split('/').pop(), ...docToJs(row.document) });
+      });
+    } catch (err) {
+      console.warn('fetchMessagesByUploadSource rest', uploadSource, err);
+      return null;
+    }
+  }
+
+  async function fetchSubcollectionCount(calId, subName, options = null) {
     if (!isValidCalId(calId) || !subName) return null;
+    const excludedUploadSources = subName === 'messages' && options && Array.isArray(options.excludeUploadSources)
+      ? Array.from(new Set(options.excludeUploadSources.map(source => String(source || '').trim()).filter(Boolean)))
+      : [];
+    if (excludedUploadSources.length > 0) {
+      const total = await fetchSubcollectionCount(calId, subName);
+      if (total == null) return null;
+      let excludedCount = 0;
+      for (const source of excludedUploadSources) {
+        const count = await countMessagesByUploadSource(calId, source);
+        if (count == null) return null;
+        excludedCount += count;
+      }
+      return Math.max(0, total - excludedCount);
+    }
     const firebaseDb = getDb();
     if (firebaseDb) {
       try {
@@ -131,6 +286,153 @@
       }
     } catch (err) {
       console.warn('fetchSubcollectionCount rest', subName, err);
+    }
+    return null;
+  }
+
+  // 1-based position of a message within the full chronological chat history, used by the
+  // Lightbox source label ("채팅방 #117") -- independent of how much of the chat is currently
+  // paginated into the client, since it counts directly against Firestore.
+  async function fetchMessageOrdinal(calId, timestamp) {
+    if (!isValidCalId(calId) || !Number.isFinite(Number(timestamp))) return null;
+    const ts = Number(timestamp);
+    const excludedUploadSources = ['meeting', 'gallery'];
+    let excludedCount = 0;
+    for (let i = 0; i < excludedUploadSources.length; i++) {
+      const source = excludedUploadSources[i];
+      const docs = await fetchMessagesByUploadSource(calId, source);
+      if (docs == null) return null;
+      for (let j = 0; j < docs.length; j++) {
+        const rawTs = docs[j] && docs[j].timestamp;
+        const docTs = rawTs && typeof rawTs === 'object' && typeof rawTs.toDate === 'function'
+          ? rawTs.toDate().getTime()
+          : (rawTs && typeof rawTs.seconds === 'number'
+            ? rawTs.seconds * 1000
+            : Number(rawTs));
+        if (Number.isFinite(docTs) && docTs <= ts) excludedCount += 1;
+      }
+    }
+    const firebaseDb = getDb();
+    if (firebaseDb) {
+      try {
+        const ref = firebaseDb.collection('calendars').doc('cal_' + calId).collection('messages')
+          .where('timestamp', '<=', ts);
+        if (typeof ref.count === 'function') {
+          const snap = await ref.count().get();
+          const n = Number(snap.data().count);
+          if (Number.isFinite(n) && n >= 0) return Math.max(0, n - excludedCount);
+        }
+      } catch (err) {
+        console.warn('fetchMessageOrdinal sdk', err);
+      }
+    }
+    try {
+      const parentPath = 'projects/' + projectId() + '/databases/(default)/documents/calendars/cal_' + calId;
+      const url = 'https://firestore.googleapis.com/v1/' + parentPath + ':runAggregationQuery';
+      const aggBody = {
+        structuredAggregationQuery: {
+          structuredQuery: {
+            from: [{ collectionId: 'messages' }],
+            where: {
+              fieldFilter: {
+                field: { fieldPath: 'timestamp' },
+                op: 'LESS_THAN_OR_EQUAL',
+                value: { doubleValue: ts }
+              }
+            }
+          },
+          aggregations: [{ alias: 'total', count: {} }]
+        }
+      };
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(aggBody)
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const rows = Array.isArray(data) ? data : [data];
+        for (let i = 0; i < rows.length; i++) {
+          const row = rows[i];
+          const fields = row && row.result && row.result.aggregateFields;
+          const total = fields && fields.total;
+          if (total && total.integerValue != null) {
+            const n = Number(total.integerValue);
+            if (Number.isFinite(n) && n >= 0) return Math.max(0, n - excludedCount);
+          }
+        }
+      } else {
+        console.warn('fetchMessageOrdinal rest status', res.status);
+      }
+    } catch (err) {
+      console.warn('fetchMessageOrdinal rest', err);
+    }
+    return null;
+  }
+
+  // 1-based position of a specific PHOTO among every photo ever uploaded through the gallery's
+  // own "이미지 업로드" action (uploadSource: 'gallery') -- used by the Lightbox source label
+  // ("갤러리 #20"). A single gallery upload can chunk into several messages with several photos
+  // each, so this sums photo counts across messages (ordered by timestamp) rather than counting
+  // messages the way fetchMessageOrdinal does for plain chat photos. Fetches the uploadSource==
+  // 'gallery' subset with a single-field equality filter -- deliberately not combined with a
+  // timestamp range filter in the same Firestore query, which would need a composite index this
+  // app doesn't define -- and does the ordering/summing client-side instead.
+  async function fetchGalleryPhotoOrdinal(calId, messageId, imageIndex) {
+    if (!isValidCalId(calId) || !messageId) return null;
+    const idx = Number.isInteger(imageIndex) ? imageIndex : 0;
+    const firebaseDb = getDb();
+    let docs = null;
+    if (firebaseDb) {
+      try {
+        const snap = await firebaseDb.collection('calendars').doc('cal_' + calId).collection('messages')
+          .where('uploadSource', '==', 'gallery').get();
+        docs = [];
+        snap.forEach(function (doc) { docs.push({ id: doc.id, ...doc.data() }); });
+      } catch (err) {
+        console.warn('fetchGalleryPhotoOrdinal sdk', err);
+      }
+    }
+    if (!docs) {
+      try {
+        const parentPath = 'projects/' + projectId() + '/databases/(default)/documents/calendars/cal_' + calId;
+        const url = 'https://firestore.googleapis.com/v1/' + parentPath + ':runQuery';
+        const body = {
+          structuredQuery: {
+            from: [{ collectionId: 'messages' }],
+            where: {
+              fieldFilter: {
+                field: { fieldPath: 'uploadSource' },
+                op: 'EQUAL',
+                value: { stringValue: 'gallery' }
+              }
+            }
+          }
+        };
+        const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        if (res.ok) {
+          const data = await res.json();
+          const rows = Array.isArray(data) ? data : [data];
+          docs = rows.filter(function (row) { return row && row.document; }).map(function (row) {
+            return { id: row.document.name.split('/').pop(), ...docToJs(row.document) };
+          });
+        } else {
+          console.warn('fetchGalleryPhotoOrdinal rest status', res.status);
+        }
+      } catch (err) {
+        console.warn('fetchGalleryPhotoOrdinal rest', err);
+      }
+    }
+    if (!docs) return null;
+    docs.sort(function (a, b) { return (Number(a.timestamp) || 0) - (Number(b.timestamp) || 0); });
+    let count = 0;
+    for (let i = 0; i < docs.length; i++) {
+      const doc = docs[i];
+      const photoCount = Array.isArray(doc.imageUrls) && doc.imageUrls.length > 0
+        ? doc.imageUrls.length
+        : (doc.imageUrl ? 1 : 0);
+      if (doc.id === messageId) return count + Math.min(idx, Math.max(0, photoCount - 1)) + 1;
+      count += photoCount;
     }
     return null;
   }
@@ -276,21 +578,21 @@
   }
 
   function subscribeAnniversaries(calId, onSnapshot, onError) {
-    return subscribeCalSubcollection(
-      calId, 'anniversaries',
-      { orderBy: 'createdAt', direction: 'desc' },
-      onSnapshot, onError
-    );
+    // Do NOT orderBy createdAt: older docs may lack the field and are then invisible.
+    return subscribeCalSubcollection(calId, 'anniversaries', {}, onSnapshot, onError);
   }
 
-  window.GATHER_FIREBASE_SERVICES = Object.freeze({
+  export const GATHER_FIREBASE_SERVICES = Object.freeze({
     version: '0.3.1-p3-4',
     ready: true,
     isScaffold: false,
     fetchChatMessagesRest: fetchChatMessagesRest,
     fetchRecentChatMessages: fetchRecentChatMessages,
+    fetchRecentGalleryMessages: fetchRecentGalleryMessages,
     fetchSubcollectionCount: fetchSubcollectionCount,
     fetchOlderChatMessages: fetchOlderChatMessages,
+    fetchMessageOrdinal: fetchMessageOrdinal,
+    fetchGalleryPhotoOrdinal: fetchGalleryPhotoOrdinal,
     fetchGalleryItemCount: fetchGalleryItemCount,
     subscribeCalSubcollection: subscribeCalSubcollection,
     subscribeMessages: subscribeMessages,
@@ -298,4 +600,7 @@
     subscribeMemos: subscribeMemos,
     subscribeAnniversaries: subscribeAnniversaries
   });
-})();
+
+if (typeof window !== 'undefined') {
+  window.GATHER_FIREBASE_SERVICES = GATHER_FIREBASE_SERVICES;
+}
