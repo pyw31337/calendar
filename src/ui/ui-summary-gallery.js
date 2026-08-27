@@ -1233,8 +1233,8 @@ export function SummaryList({
         key: e.participantId || p.id,
         className: "memo-capsule-badge",
         style: isPast ? {
-          backgroundColor: 'var(--bg-primary)',
-          color: 'var(--text-muted)',
+          backgroundColor: 'transparent',
+          color: p.color,
           border: `1px solid ${p.color}`,
           boxShadow: 'none'
         } : {

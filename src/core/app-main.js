@@ -6144,7 +6144,7 @@ function App() {
             : 'linear-gradient(90deg, #5B4BEB 0%, #8B3BDE 54%, #EC4899 100%)',
           border: 'none',
           borderRadius: 'var(--radius-md)',
-          boxShadow: isDarkTheme ? '0 16px 30px rgba(3, 7, 18, 0.4)' : '0 14px 28px rgba(91, 75, 235, 0.22)',
+          boxShadow: 'none',
           padding: '10px 14px',
           display: 'flex',
           flexDirection: 'column',
