@@ -4045,6 +4045,7 @@ function App() {
         if (!deleted) throw new Error('Message delete failed');
         removeLocalChatMessage(messageId);
       } else {
+        const deletePaths = nextUrls.length === 0 ? ['imageUrl', 'thumbUrl'] : [];
         const data = sanitizeMessageForFirestore({
           imageUrls: nextUrls,
           thumbUrls: nextThumbs,
@@ -4052,7 +4053,7 @@ function App() {
           thumbUrl: nextThumbs[0] || null,
           imageTags: nextTags
         });
-        const ok = await writeCollectionDocumentWithFallback('messages', activeCalId, messageId, data, 'update', '사진 삭제');
+        const ok = await writeCollectionDocumentWithFallback('messages', activeCalId, messageId, data, 'update', '사진 삭제', { deletePaths });
         if (!ok) throw new Error('Photo delete update failed');
         patchLocalChatMessage(messageId, data);
       }
@@ -4212,8 +4213,9 @@ function App() {
       if (removedThumb !== removedUrl) deleteChatImageFromStorage(removedThumb);
     };
     try {
+      const deletePaths = nextUrls.length === 0 ? ['imageUrl', 'thumbUrl'] : [];
       const data = sanitizeMemoForFirestore({ imageUrls: nextUrls, thumbUrls: nextThumbs, imageUrl: nextUrls[0] || null, thumbUrl: nextThumbs[0] || null });
-      const updated = await writeCollectionDocumentWithFallback('memos', activeCalId, memoId, data, 'update', '메모 사진 삭제');
+      const updated = await writeCollectionDocumentWithFallback('memos', activeCalId, memoId, data, 'update', '메모 사진 삭제', { deletePaths });
       if (!updated) throw new Error('Memo photo delete failed');
       setMemos(prev => prev.map(m => m.id === memoId ? { ...m, ...data } : m));
       showUndoableDeleteToast('사진이 삭제되었습니다.', async () => {
@@ -5918,7 +5920,7 @@ function App() {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   })();
   const visibleConfirmedMeetings = getTrulyConfirmedMeetings(activeCal)
-    .filter(m => m.date >= todayDateStrForBanner)
+    .filter(m => isValidDateString(m?.date) && m.date >= todayDateStrForBanner)
     .sort((a, b) => a.date.localeCompare(b.date));
 
   return withStickyVideo(/*#__PURE__*/React.createElement("div", {

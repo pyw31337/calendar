@@ -1369,11 +1369,14 @@ async function sendChatMessageRest(calId, message) {
   }
 }
 
-async function writeCollectionDocumentRest(collectionName, calId, docId, data, method = 'update') {
+async function writeCollectionDocumentRest(collectionName, calId, docId, data, method = 'update', deletePaths = []) {
   try {
     const cleanCollection = sanitizeText(collectionName || '', 80);
     const cleanCalId = sanitizeText(calId || '', 64);
     const cleanDocId = sanitizeText(docId || '', 180);
+    const cleanDeletePaths = Array.isArray(deletePaths)
+      ? [...new Set(deletePaths.map(path => sanitizeText(path || '', 120)).filter(Boolean))]
+      : [];
     if (!cleanCollection || !isValidCalId(cleanCalId)) return false;
     const baseUrl = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/calendars/cal_${cleanCalId}/${cleanCollection}`;
     if (method === 'delete') {
@@ -1383,7 +1386,12 @@ async function writeCollectionDocumentRest(collectionName, calId, docId, data, m
     }
 
     const cleanData = sanitizeMessageForFirestore(data);
-    const fields = Object.fromEntries(Object.entries(cleanData || {}).map(([key, value]) => [key, jsToFirestoreValue(value)]));
+    const deleteSet = new Set(cleanDeletePaths);
+    const fields = Object.fromEntries(
+      Object.entries(cleanData || {})
+        .filter(([key]) => !deleteSet.has(key))
+        .map(([key, value]) => [key, jsToFirestoreValue(value)])
+    );
     if (method === 'add') {
       const addRes = await fetch(baseUrl, {
         method: 'POST',
@@ -1398,7 +1406,7 @@ async function writeCollectionDocumentRest(collectionName, calId, docId, data, m
 
     if (!cleanDocId) return false;
     const query = method === 'update'
-      ? `?${Object.keys(fields).map(key => `updateMask.fieldPaths=${encodeURIComponent(key)}`).join('&')}`
+      ? `?${Array.from(new Set([...Object.keys(fields), ...cleanDeletePaths])).map(key => `updateMask.fieldPaths=${encodeURIComponent(key)}`).join('&')}`
       : '';
     const patchRes = await fetch(`${baseUrl}/${cleanDocId}${query}`, {
       method: 'PATCH',
@@ -1412,9 +1420,12 @@ async function writeCollectionDocumentRest(collectionName, calId, docId, data, m
   }
 }
 
-async function writeCollectionDocumentWithFallback(collectionName, calId, docId, data, method = 'update', warnLabel = 'write') {
+async function writeCollectionDocumentWithFallback(collectionName, calId, docId, data, method = 'update', warnLabel = 'write', options = {}) {
   const cleanCollection = sanitizeText(collectionName || '', 80);
   const cleanData = method === 'delete' ? null : sanitizeMessageForFirestore(data);
+  const cleanDeletePaths = Array.isArray(options?.deletePaths)
+    ? [...new Set(options.deletePaths.map(path => sanitizeText(path || '', 120)).filter(Boolean))]
+    : [];
   if (firebaseDb) {
     try {
       const colRef = firebaseDb.collection('calendars').doc(`cal_${calId}`).collection(cleanCollection);
@@ -1430,13 +1441,29 @@ async function writeCollectionDocumentWithFallback(collectionName, calId, docId,
         await colRef.doc(docId).set(cleanData);
         return { success: true, id: docId, transport: 'sdk' };
       }
-      await colRef.doc(docId).update(cleanData);
+      let updateData = cleanData;
+      if (cleanDeletePaths.length > 0) {
+        const fieldDelete = typeof firebase !== 'undefined'
+          && firebase.firestore
+          && firebase.firestore.FieldValue
+          && typeof firebase.firestore.FieldValue.delete === 'function'
+          ? firebase.firestore.FieldValue.delete()
+          : null;
+        if (!fieldDelete) {
+          throw new Error('Firestore field delete sentinel unavailable');
+        }
+        updateData = { ...cleanData };
+        cleanDeletePaths.forEach(path => {
+          updateData[path] = fieldDelete;
+        });
+      }
+      await colRef.doc(docId).update(updateData);
       return { success: true, id: docId, transport: 'sdk' };
     } catch (err) {
       console.warn(`Failed to ${warnLabel} for ${calId} via SDK, trying REST:`, err);
     }
   }
-  return writeCollectionDocumentRest(cleanCollection, calId, docId, data, method);
+  return writeCollectionDocumentRest(cleanCollection, calId, docId, data, method, cleanDeletePaths);
 }
 
 async function deleteMessageRest(calId, messageId) {
@@ -1464,21 +1491,24 @@ async function fetchMessageRest(calId, messageId) {
   }
 }
 
-async function updateMessageRest(calId, messageId, data) {
+async function updateMessageRest(calId, messageId, data, deletePaths = []) {
   try {
     const fields = {};
+    const cleanDeletePaths = Array.isArray(deletePaths)
+      ? new Set(deletePaths.map(path => sanitizeText(path || '', 120)).filter(Boolean))
+      : new Set();
     if (data.text !== undefined) fields.text = jsToFirestoreValue(data.text);
-    if (data.imageUrl !== undefined) fields.imageUrl = jsToFirestoreValue(data.imageUrl);
-    if (data.thumbUrl !== undefined) fields.thumbUrl = jsToFirestoreValue(data.thumbUrl);
-    if (data.imageUrls !== undefined) fields.imageUrls = jsToFirestoreValue(data.imageUrls);
-    if (data.thumbUrls !== undefined) fields.thumbUrls = jsToFirestoreValue(data.thumbUrls);
-    if (data.imageShareUrls !== undefined) fields.imageShareUrls = jsToFirestoreValue(data.imageShareUrls);
-    if (data.imageTags !== undefined) fields.imageTags = jsToFirestoreValue(data.imageTags);
-    if (data.directMediaTags !== undefined) fields.directMediaTags = jsToFirestoreValue(data.directMediaTags);
-    if (data.linkPreview !== undefined) fields.linkPreview = jsToFirestoreValue(data.linkPreview);
-    if (data.participantId !== undefined) fields.participantId = jsToFirestoreValue(data.participantId);
+    if (data.imageUrl !== undefined && !cleanDeletePaths.has('imageUrl')) fields.imageUrl = jsToFirestoreValue(data.imageUrl);
+    if (data.thumbUrl !== undefined && !cleanDeletePaths.has('thumbUrl')) fields.thumbUrl = jsToFirestoreValue(data.thumbUrl);
+    if (data.imageUrls !== undefined && !cleanDeletePaths.has('imageUrls')) fields.imageUrls = jsToFirestoreValue(data.imageUrls);
+    if (data.thumbUrls !== undefined && !cleanDeletePaths.has('thumbUrls')) fields.thumbUrls = jsToFirestoreValue(data.thumbUrls);
+    if (data.imageShareUrls !== undefined && !cleanDeletePaths.has('imageShareUrls')) fields.imageShareUrls = jsToFirestoreValue(data.imageShareUrls);
+    if (data.imageTags !== undefined && !cleanDeletePaths.has('imageTags')) fields.imageTags = jsToFirestoreValue(data.imageTags);
+    if (data.directMediaTags !== undefined && !cleanDeletePaths.has('directMediaTags')) fields.directMediaTags = jsToFirestoreValue(data.directMediaTags);
+    if (data.linkPreview !== undefined && !cleanDeletePaths.has('linkPreview')) fields.linkPreview = jsToFirestoreValue(data.linkPreview);
+    if (data.participantId !== undefined && !cleanDeletePaths.has('participantId')) fields.participantId = jsToFirestoreValue(data.participantId);
     if (Object.keys(fields).length === 0) return false;
-    const updateMask = Object.keys(fields).map(k => `updateMask.fieldPaths=${k}`).join('&');
+    const updateMask = Array.from(new Set([...Object.keys(fields), ...cleanDeletePaths])).map(k => `updateMask.fieldPaths=${encodeURIComponent(k)}`).join('&');
     const url = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/calendars/cal_${calId}/messages/${messageId}?${updateMask}`;
     const res = await fetch(url, {
       method: 'PATCH',

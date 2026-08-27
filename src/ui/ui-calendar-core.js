@@ -2082,7 +2082,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
     onClick: (e) => {
       const t = e.target;
       if (t && t.closest && t.closest('input, textarea, select, button, a, [data-stop-card-open]')) return;
-      onOpenEdit(memo);
+      if (typeof onOpenEdit === 'function') onOpenEdit(memo);
     },
     role: "button",
     tabIndex: 0,
@@ -2094,7 +2094,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
       if (t && t.closest && t.closest('input, textarea, select, button, a, [data-stop-card-open]')) return;
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
-        onOpenEdit(memo);
+        if (typeof onOpenEdit === 'function') onOpenEdit(memo);
       }
     },
     style: {
@@ -2732,7 +2732,7 @@ export function GlobalSearchModal({
           badgeName: msg.participantName,
           badgeColor: msg.participantColor,
           timeStr: formatLogTimestamp(msg.timestamp),
-          onClick: () => { onOpenChatMessage(msg.id); onClose(); }
+          onClick: () => { if (typeof onOpenChatMessage === 'function') onOpenChatMessage(msg.id); if (typeof onClose === 'function') onClose(); }
         }, highlightKeyword(msg.text || '', q)))
       ),
 

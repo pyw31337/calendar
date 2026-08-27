@@ -778,18 +778,24 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
       if (clusterAvailable) {
         markersLayerRef.current.on('clusterclick', e => {
           const cluster = e && e.layer;
-          if (!cluster || typeof cluster.zoomToBounds !== 'function') return;
+          const map = mapRef.current;
+          if (!cluster || !map) return;
           try {
             if (e.originalEvent) {
               L.DomEvent.preventDefault(e.originalEvent);
               L.DomEvent.stopPropagation(e.originalEvent);
             }
           } catch (err) {}
-          const isMobileViewport = window.innerWidth <= 720;
-          cluster.zoomToBounds({
-            padding: isMobileViewport ? [44, 56] : [28, 28],
-            maxZoom: 15
-          });
+          const currentZoom = typeof map.getZoom === 'function' ? map.getZoom() : 0;
+          const targetZoom = Math.min(currentZoom + 1, 15);
+          const clusterLatLng = typeof cluster.getLatLng === 'function' ? cluster.getLatLng() : null;
+          if (clusterLatLng && typeof map.setZoomAround === 'function') {
+            map.setZoomAround(clusterLatLng, targetZoom, { animate: true });
+            return;
+          }
+          if (clusterLatLng && typeof map.setView === 'function') {
+            map.setView(clusterLatLng, targetZoom, { animate: true });
+          }
         });
       }
       markersLayerRef.current.addTo(map);

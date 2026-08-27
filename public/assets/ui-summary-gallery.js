@@ -1153,7 +1153,7 @@ export function SummaryList({
   const sortedPartialDates = getSortedDates(partialAvailableDates.filter(d => d >= todayStr));
 
   // 3. Confirmed-meeting dates -- every date promoted to 모임확정, past or future.
-  const confirmedDates = getSortedDates(getTrulyConfirmedMeetings(calendar).map(m => m.date));
+  const confirmedDates = getSortedDates(getTrulyConfirmedMeetings(calendar).filter(m => isValidDateString(m?.date)).map(m => m.date));
 
   // '6인 이상 참석 가능' / '전원 참석 가능' / '모임 확정' only ever show when they have at least
   // one matching date -- an empty one hides its title entirely rather than rendering a

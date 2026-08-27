@@ -7134,7 +7134,7 @@ function App() {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   })();
   const visibleConfirmedMeetings = getTrulyConfirmedMeetings(activeCal)
-    .filter(m => m.date >= todayDateStrForBanner)
+    .filter(m => isValidDateString(m?.date) && m.date >= todayDateStrForBanner)
     .sort((a, b) => a.date.localeCompare(b.date));
 
   return withStickyVideo(/*#__PURE__*/React.createElement("div", {
