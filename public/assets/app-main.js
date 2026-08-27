@@ -9884,6 +9884,9 @@ const SettlementSummaryModal = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_
 const PollModal = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PollModal)
   ? window.GATHER_UI_COMPONENTS.PollModal
   : function PollModalFallback() { return null; };
+const CreateSettlementModal = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CreateSettlementModal)
+  ? window.GATHER_UI_COMPONENTS.CreateSettlementModal
+  : function CreateSettlementModalFallback() { return null; };
 
 
 

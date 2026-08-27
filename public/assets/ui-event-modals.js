@@ -1376,7 +1376,11 @@ export function CreateSettlementModal({ calendar, onClose, onSave, showToast }) 
   const activeParticipants = getActiveParticipants(calendar);
   const today = new Date();
   const [title, setTitle] = React.useState('1/N 간편 송금');
-  const [selectedParticipantIds, setSelectedParticipantIds] = React.useState(() => activeParticipants.map(p => p.id || p.name));
+  const [selectedParticipantIds, setSelectedParticipantIds] = React.useState(() => {
+    if (!Array.isArray(activeParticipants) || activeParticipants.length === 0) return ['참여자'];
+    const names = activeParticipants.map(p => typeof p === 'string' ? p : (p?.name || p?.id || '참여자')).filter(Boolean);
+    return names.length > 0 ? names : ['참여자'];
+  });
   const [bankName, setBankName] = React.useState('토스뱅크');
   const [depositorName, setDepositorName] = React.useState('');
   const [accountNumber, setAccountNumber] = React.useState('');
@@ -1398,12 +1402,16 @@ export function CreateSettlementModal({ calendar, onClose, onSave, showToast }) 
   // Extract expense / income items for selected month
   const monthlyExpenses = React.useMemo(() => {
     const list = [];
+    if (!Array.isArray(confirmed)) return list;
     confirmed.forEach(m => {
-      if (!m.date || !m.date.startsWith(monthStr)) return;
+      if (!m || !m.date) return;
+      const dateStr = typeof m.date === 'string' ? m.date : String(m.date || '');
+      if (!dateStr || !dateStr.startsWith(monthStr)) return;
       const exps = Array.isArray(m.expenses) ? m.expenses : [];
       exps.forEach((exp, idx) => {
-        const key = `${m.date}_${exp.id || idx}_${exp.amount}`;
-        list.push({ ...exp, date: m.date, itemKey: key });
+        if (!exp) return;
+        const key = `${dateStr}_${exp.id || idx}_${exp.amount || 0}`;
+        list.push({ ...exp, date: dateStr, itemKey: key });
       });
     });
     return list;
@@ -1718,10 +1726,20 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
   const SharedAppNavBlock = __comp.SharedAppNavBlock || __deps.SharedAppNavBlock;
   const ThreeLinesIcon = __comp.ThreeLinesIcon || __deps.ThreeLinesIcon;
   const WeatherBadge = __comp.WeatherBadge || __deps.WeatherBadge;
+  const CreateSettlementModalComp = __comp.CreateSettlementModal || CreateSettlementModal;
   const [isSettlementMenuOpen, setIsSettlementMenuOpen] = React.useState(false);
+  const [isCreateSettlementOpen, setIsCreateSettlementOpen] = React.useState(false);
   const sanitizeText = __deps.sanitizeText;
   const extractFirstUrl = __deps.extractFirstUrl;
   const formatChatHeaderTitle = __deps.formatChatHeaderTitle;
+
+  const handleOpenCreateSettlement = () => {
+    setIsSettlementMenuOpen(false);
+    if (typeof onOpenCreateSettlement === 'function') {
+      onOpenCreateSettlement();
+    }
+    setIsCreateSettlementOpen(true);
+  };
 
   const { isHeaderVisible, onScroll: handleSettlementScroll } = useScrollHideHeader();
   const [activeTab, setActiveTab] = React.useState('total');
@@ -2628,10 +2646,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
       React.createElement("button", {
         type: "button",
         className: "admin-side-menu-item",
-        onClick: () => {
-          setIsSettlementMenuOpen(false);
-          if (typeof onOpenCreateSettlement === 'function') onOpenCreateSettlement();
-        }
+        onClick: handleOpenCreateSettlement
       },
         React.createElement("span", { className: "admin-side-menu-item-icon" },
           React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.5", strokeLinecap: "round", strokeLinejoin: "round" },
@@ -2662,7 +2677,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
     typeof SharedAppNavBlock === 'function' && /*#__PURE__*/React.createElement(SharedAppNavBlock, {
       onClose: () => setIsSettlementMenuOpen(false),
       onChangeView: onChangeView,
-      onOpenCreateSettlement: onOpenCreateSettlement,
+      onOpenCreateSettlement: handleOpenCreateSettlement,
       chatCount: chatCount,
       settlementBadge: settlementBadge,
       galleryCount: galleryCount,
@@ -2680,8 +2695,23 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
       onOpenSettings: onOpenAppSettings,
       shareLabel: '공유'
     })
-  ))
-  ));
+  ))),
+
+  /* Create Settlement Layer Popup */
+  (isCreateSettlementOpen && React.createElement(CreateSettlementModalComp, {
+    calendar: calendar,
+    onClose: () => setIsCreateSettlementOpen(false),
+    onSave: (newCard) => {
+      if (calendar) {
+        if (!Array.isArray(calendar.settlementCards)) calendar.settlementCards = [];
+        calendar.settlementCards.unshift(newCard);
+      }
+      setIsCreateSettlementOpen(false);
+      if (showToast) showToast(`'${newCard.title}' 정산 카드가 생성되었습니다!`, 'success');
+    },
+    showToast: showToast
+  }))
+  );
 }
 
 export function PollModal({ calendar, poll, onSave, onClose, showToast, onRequestConfirm }) {
