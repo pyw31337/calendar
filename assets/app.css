@@ -727,8 +727,8 @@ body:has(.admin-login-gate) {
 .lightbox-nav-btn.is-pressing,
 .tap-target:active,
 .tap-target.is-pressing,
-[role="button"]:active,
-[role="button"].is-pressing,
+[role="button"]:not(.leaflet-marker-icon):not(.place-cluster-icon):not(.place-map-marker):active,
+[role="button"]:not(.leaflet-marker-icon):not(.place-cluster-icon):not(.place-map-marker).is-pressing,
 [role="tab"]:active,
 [role="tab"].is-pressing,
 [role="option"]:active,
@@ -750,6 +750,26 @@ summary.is-pressing,
   filter: brightness(0.96) !important;
   box-shadow: none !important;
   transition: transform 0.05s ease, opacity 0.05s ease, filter 0.05s ease !important;
+}
+.leaflet-marker-icon,
+.leaflet-marker-icon:hover,
+.leaflet-marker-icon:active,
+.leaflet-marker-icon.is-pressing,
+.marker-cluster,
+.marker-cluster:hover,
+.marker-cluster:active,
+.marker-cluster.is-pressing,
+.place-cluster-icon,
+.place-cluster-icon:hover,
+.place-cluster-icon:active,
+.place-cluster-icon.is-pressing,
+.place-map-marker,
+.place-map-marker:hover,
+.place-map-marker:active,
+.place-map-marker.is-pressing {
+  opacity: 1 !important;
+  filter: none !important;
+  box-shadow: none !important;
 }
 .place-card-row[data-no-press-feedback]:hover,
 .place-card-row[data-no-press-feedback]:active,

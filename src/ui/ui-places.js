@@ -786,15 +786,13 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
               L.DomEvent.stopPropagation(e.originalEvent);
             }
           } catch (err) {}
-          const currentZoom = typeof map.getZoom === 'function' ? map.getZoom() : 0;
-          const targetZoom = Math.min(currentZoom + 1, 15);
-          const clusterLatLng = typeof cluster.getLatLng === 'function' ? cluster.getLatLng() : null;
-          if (clusterLatLng && typeof map.setZoomAround === 'function') {
-            map.setZoomAround(clusterLatLng, targetZoom, { animate: true });
-            return;
-          }
-          if (clusterLatLng && typeof map.setView === 'function') {
-            map.setView(clusterLatLng, targetZoom, { animate: true });
+          if (typeof cluster.zoomToBounds === 'function') {
+            cluster.zoomToBounds({ padding: [40, 40] });
+          } else {
+            const bounds = typeof cluster.getBounds === 'function' ? cluster.getBounds() : null;
+            if (bounds && typeof map.fitBounds === 'function') {
+              map.fitBounds(bounds, { padding: [40, 40], maxZoom: 16, animate: true });
+            }
           }
         });
       }
