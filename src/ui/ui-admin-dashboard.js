@@ -2058,7 +2058,7 @@ export function AdminDashboard({ initialCalendars }) {
       type: "button",
       onClick: () => {
         const action = toast.onAction;
-        dismissToast();
+        if (typeof dismissToast === 'function') dismissToast();
         Promise.resolve(action()).catch(console.warn);
       },
       className: "toast-action"
