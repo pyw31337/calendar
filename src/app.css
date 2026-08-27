@@ -3994,6 +3994,14 @@ textarea.form-input {
   touch-action: pan-x pan-y;
   -webkit-tap-highlight-color: transparent;
 }
+.leaflet-tile-pane {
+  filter: grayscale(100%) opacity(88%) contrast(92%);
+  -webkit-filter: grayscale(100%) opacity(88%) contrast(92%);
+}
+:root[data-theme="dark"] .leaflet-tile-pane {
+  filter: grayscale(100%) invert(90%) hue-rotate(180deg) opacity(85%) contrast(90%);
+  -webkit-filter: grayscale(100%) invert(90%) hue-rotate(180deg) opacity(85%) contrast(90%);
+}
 
 
 /* Main side menu: unified row spacing + graphic manual banner */
