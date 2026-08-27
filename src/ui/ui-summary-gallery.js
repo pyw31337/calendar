@@ -1415,7 +1415,7 @@ export function SummaryList({
     })();
     return /*#__PURE__*/React.createElement("button", {
       key: d,
-      className: `date-item-btn ${isPast ? 'is-past' : 'is-confirmed'} confirmed-meeting-card`,
+      className: `date-item-btn ${isPast ? 'is-past' : 'is-confirmed'} confirmed-meeting-card confirmed-meeting-surface`,
       onClick: () => onSelectDate(d),
       style: {
         flexDirection: 'column',
@@ -1440,9 +1440,6 @@ export function SummaryList({
     }, formattedDateStr), /*#__PURE__*/React.createElement("span", {
       className: `date-item-badge dday-badge ${isPast ? 'is-past' : 'is-confirmed'}`,
       style: {
-        background: isPast ? '#E2E8F0' : '#FFFFFF',
-        color: isPast ? '#64748B' : '#EC4899',
-        border: isPast ? 'none' : '1px solid #FBCFE8',
         flexShrink: 0
       }
     }, ddayLabel)), memoEntries.length > 0 && /*#__PURE__*/React.createElement("div", {
@@ -1460,10 +1457,11 @@ export function SummaryList({
       if (!memoText) return null;
       return /*#__PURE__*/React.createElement("span", {
         key: e.participantId || p.id,
-        className: "memo-capsule-badge",
+        className: `memo-capsule-badge ${isPast ? 'is-past' : ''}`,
         style: isPast ? {
-          backgroundColor: 'var(--bg-primary)',
-          color: 'var(--text-muted)',
+          backgroundColor: 'transparent',
+          background: 'transparent',
+          color: p.color,
           border: `1px solid ${p.color}`,
           boxShadow: 'none'
         } : {

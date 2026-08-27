@@ -6137,7 +6137,7 @@ function App() {
       const memoEntries = getActiveAvailabilities(activeCal).filter(e => e.date === meeting.date && e.note && e.note.trim());
       return /*#__PURE__*/React.createElement("div", {
         key: meeting.date,
-        className: "confirmed-meeting-banner",
+        className: "confirmed-meeting-banner confirmed-meeting-surface",
         style: {
           background: isDarkTheme
             ? 'linear-gradient(90deg, #241B3D 0%, #4C1D95 55%, #9D174D 100%)'
