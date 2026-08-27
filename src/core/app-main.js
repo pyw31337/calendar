@@ -6147,52 +6147,44 @@ function App() {
     style: { display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }
     }, visibleConfirmedMeetings.map(meeting => {
       const memoEntries = getActiveAvailabilities(activeCal).filter(e => e.date === meeting.date && e.note && e.note.trim());
-      return /*#__PURE__*/React.createElement("div", {
+      return /*#__PURE__*/React.createElement("button", {
+        type: "button",
         key: meeting.date,
-        className: "confirmed-meeting-banner confirmed-meeting-surface",
+        className: "date-item-btn is-confirmed confirmed-meeting-card confirmed-meeting-surface",
+        onClick: () => {
+          if (!guardLoadedCalendar()) return;
+          setSelectedDate(meeting.date);
+          setIsModalOpen(true);
+        },
         style: {
-          background: isDarkTheme
-            ? 'linear-gradient(90deg, #241B3D 0%, #4C1D95 55%, #9D174D 100%)'
-            : 'linear-gradient(90deg, #5B4BEB 0%, #8B3BDE 54%, #EC4899 100%)',
-          border: 'none',
-          borderRadius: 'var(--radius-md)',
-          boxShadow: 'none',
-          padding: '10px 14px',
-          display: 'flex',
           flexDirection: 'column',
-          gap: '8px',
-          cursor: 'pointer',
-          color: '#FFFFFF',
-          position: 'relative',
-          overflow: 'hidden',
-          isolation: 'isolate'
-      },
-      onClick: () => {
-        if (!guardLoadedCalendar()) return;
-        setSelectedDate(meeting.date);
-        setIsModalOpen(true);
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }
-    }, /*#__PURE__*/React.createElement("span", {
-      className: "memo-capsule-badge confirmed-meeting-label-badge"
-    }, formatConfirmedMeetingLabel(meeting.date)), /*#__PURE__*/React.createElement("span", {
-      className: "dday-badge"
-    }, formatDDayLabel(meeting.date))), memoEntries.length > 0 && /*#__PURE__*/React.createElement("div", {
-      style: { display: 'flex', flexWrap: 'wrap', gap: '8px' }
-    }, memoEntries.map(entry => {
-      const p = getActiveParticipants(activeCal).find(part => part.id === entry.participantId);
-      if (!p) return null;
-      const entryUrl = extractFirstUrl(entry.note);
-      const noteTextOnly = entryUrl ? removeFirstUrl(entry.note) : entry.note.trim();
-      if (!noteTextOnly) return null;
-      return /*#__PURE__*/React.createElement("span", {
-        key: entry.participantId,
-        className: "memo-capsule-badge",
-        style: { backgroundColor: p.color, color: getContrastTextColor(p.color) },
-        title: `${p.name}: ${noteTextOnly}`
-      }, noteTextOnly);
-    })));
+          alignItems: 'flex-start',
+          width: '100%',
+          cursor: 'pointer'
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '8px' }
+      }, /*#__PURE__*/React.createElement("span", {
+        className: "confirmed-meeting-date",
+        style: { fontWeight: 800, color: '#FFFFFF', fontSize: '0.95rem', flexShrink: 0 }
+      }, formatConfirmedMeetingLabel(meeting.date)), /*#__PURE__*/React.createElement("span", {
+        className: "date-item-badge dday-badge is-confirmed",
+        style: { flexShrink: 0 }
+      }, formatDDayLabel(meeting.date))), memoEntries.length > 0 && /*#__PURE__*/React.createElement("div", {
+        style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginTop: '6px' }
+      }, memoEntries.map(entry => {
+        const p = getActiveParticipants(activeCal).find(part => part.id === entry.participantId);
+        if (!p) return null;
+        const entryUrl = extractFirstUrl(entry.note);
+        const noteTextOnly = entryUrl ? removeFirstUrl(entry.note) : entry.note.trim();
+        if (!noteTextOnly) return null;
+        return /*#__PURE__*/React.createElement("span", {
+          key: entry.participantId,
+          className: "memo-capsule-badge",
+          style: { backgroundColor: p.color, color: getContrastTextColor(p.color) },
+          title: `${p.name}: ${noteTextOnly}`
+        }, noteTextOnly);
+      })));
   })), /*#__PURE__*/React.createElement(CalendarGrid, {
     anniversaries: anniversaries,
     calendar: activeCal,

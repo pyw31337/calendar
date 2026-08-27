@@ -670,10 +670,13 @@ function getAnniversaryDisplayColor(...args) {
 
 export function SectionCountBadge({ count }) {
   const React = window.React;
+  const normalizedCount = Number(count || 0);
+
+  if (!Number.isFinite(normalizedCount) || normalizedCount <= 0) return null;
 
   return /*#__PURE__*/React.createElement("span", {
     className: "section-count-badge"
-  }, count);
+  }, normalizedCount);
 }
 
 export function SectionToggleButton({ collapsed, onToggle, label }) {
@@ -708,38 +711,56 @@ export function SectionToggleButton({ collapsed, onToggle, label }) {
   })));
 }
 
+function handleSectionHeaderKeyDown(event, onToggle) {
+  if (event.key !== 'Enter' && event.key !== ' ') return;
+  event.preventDefault();
+  onToggle();
+}
+
 export function SearchCategoryTabs({ tabs, activeKey, onSelect, containerStyle, tabPadding, tabTextStyle, countBadgeClassName, countBadgeStyle }) {
   const React = window.React;
 
   return /*#__PURE__*/React.createElement("div", {
     style: { display: 'grid', gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))`, overflow: 'hidden', borderBottom: '1px solid #E2E8F0', ...containerStyle }
-  }, tabs.map(tab => /*#__PURE__*/React.createElement("button", {
-    key: tab.key,
-    type: "button",
-    onClick: () => onSelect(tab.key),
-    style: {
-      minWidth: 0,
-      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-      padding: tabPadding || '10px 4px', fontSize: '0.82rem', fontWeight: 800,
-      background: 'none', border: 'none', cursor: 'pointer',
-      color: activeKey === tab.key ? '#2563EB' : '#64748B',
-      borderBottom: activeKey === tab.key ? '3px solid #2563EB' : '3px solid transparent',
-      marginBottom: '-1px',
-      whiteSpace: 'nowrap',
-      overflow: 'hidden',
-      ...tabTextStyle
-    }
-  }, tab.label, /*#__PURE__*/React.createElement("span", {
-      className: countBadgeClassName || undefined,
+  }, tabs.map(tab => {
+    const count = Number(tab.count || 0);
+    return /*#__PURE__*/React.createElement("button", {
+      key: tab.key,
+      type: "button",
+      onClick: () => onSelect(tab.key),
       style: {
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '18px', height: '18px',
-        borderRadius: '50%',
-        backgroundColor: (tab.count || 0) >= 1 ? '#2563EB' : '#E2E8F0',
-        color: (tab.count || 0) >= 1 ? '#FFFFFF' : '#475569',
-        fontSize: '0.68rem', fontWeight: 'bold', padding: '0 4px',
-        ...countBadgeStyle
+        minWidth: 0,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+        padding: tabPadding || '10px 4px', fontSize: '0.82rem', fontWeight: 800,
+        background: 'none', border: 'none', cursor: 'pointer',
+        color: activeKey === tab.key ? '#2563EB' : '#64748B',
+        borderBottom: activeKey === tab.key ? '3px solid #2563EB' : '3px solid transparent',
+        marginBottom: '-1px',
+        whiteSpace: 'nowrap',
+        overflow: 'hidden',
+        ...tabTextStyle
       }
-    }, tab.count))));
+    }, tab.label, count > 0 && /*#__PURE__*/React.createElement("span", {
+        className: countBadgeClassName || undefined,
+        style: {
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          verticalAlign: 'middle',
+          lineHeight: 1,
+          minWidth: '20px',
+          height: '18px',
+          borderRadius: '9999px',
+          backgroundColor: tab.color || tab.badgeColor || '#2563EB',
+          color: '#FFFFFF',
+          fontSize: '0.68rem',
+          fontWeight: 'bold',
+          padding: '0 6px',
+          boxSizing: 'border-box',
+          ...countBadgeStyle
+        }
+      }, count));
+  }));
 }
 
 export function SimpleBottomSheetPicker({ title, value, options, onSelect, placeholder, disabled, style, className = "form-select" }) {
@@ -769,7 +790,7 @@ export function SimpleBottomSheetPicker({ title, value, options, onSelect, place
         type: "button",
         className: "bottom-sheet-item",
         onClick: () => { onSelect(opt.value); setIsOpen(false); }
-      }, opt.label))
+      }, opt.color ? /*#__PURE__*/React.createElement("span", { style: { color: opt.color } }, opt.label) : opt.label))
     )
   ));
   return /*#__PURE__*/React.createElement(React.Fragment, null,
@@ -806,12 +827,47 @@ export function PhotoGallery({ chatMessages, calendar = null, totalGalleryCount,
   const __comp = window.GATHER_UI_COMPONENTS || {};
   const GalleryIcon = __deps.GalleryIcon;
   const Lightbox = __comp.Lightbox || __deps.Lightbox;
+  const MediaThumb = __comp.MediaThumb || __deps.MediaThumb;
   const resolveMeetingPhotoDisplay = __deps.resolveMeetingPhotoDisplay;
   const SectionCountBadge = __comp.SectionCountBadge;
   const SectionToggleButton = __comp.SectionToggleButton;
 
   const [collapsed, setCollapsed] = React.useState(false);
   const [lightbox, setLightbox] = React.useState(null);
+  const brokenPhotoKeysRef = React.useRef(new Set());
+  const brokenPhotoUrlsRef = React.useRef(new Set());
+  const [brokenPhotoRevision, setBrokenPhotoRevision] = React.useState(0);
+  const normalizeBrokenPhotoUrl = value => {
+    const url = String(value || '').trim();
+    if (!url) return '';
+    return url.split(/[?#]/)[0];
+  };
+  const isBrokenPhotoValue = value => {
+    const url = normalizeBrokenPhotoUrl(value);
+    return !!url && brokenPhotoUrlsRef.current.has(url);
+  };
+  const markBrokenPhoto = (photo, brokenInfo = {}) => {
+    const key = photo?.mediaKey || photo?.refKey || photo?.key;
+    const urls = [
+      photo?.full,
+      photo?.thumb,
+      brokenInfo?.src,
+      brokenInfo?.fallbackSrc,
+      brokenInfo?.currentSrc
+    ].map(normalizeBrokenPhotoUrl).filter(Boolean);
+    let changed = false;
+    if (key && !brokenPhotoKeysRef.current.has(key)) {
+      brokenPhotoKeysRef.current.add(key);
+      changed = true;
+    }
+    urls.forEach(url => {
+      if (!brokenPhotoUrlsRef.current.has(url)) {
+        brokenPhotoUrlsRef.current.add(url);
+        changed = true;
+      }
+    });
+    if (changed) setBrokenPhotoRevision(prev => prev + 1);
+  };
 
   const photoEntries = React.useMemo(() => {
     const sorted = [...(chatMessages || [])].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
@@ -821,7 +877,6 @@ export function PhotoGallery({ chatMessages, calendar = null, totalGalleryCount,
       return entries.map((entry, i) => ({
         ...entry,
         source: 'chat',
-        key: `${msg.id}_${entry.directMediaUrl ? 'direct' : i}`,
         timestamp: msg.timestamp
       }));
     });
@@ -836,6 +891,12 @@ export function PhotoGallery({ chatMessages, calendar = null, totalGalleryCount,
         const full = String(resolved?.imageUrl || photo?.imageUrl || photo?.full || '');
         const thumb = String(resolved?.thumbUrl || photo?.thumbUrl || photo?.thumb || full);
         if (!full && !thumb) return;
+        const mediaKey = resolved?.mediaKey
+          || photo?.mediaKey
+          || (photo?.sourceMessageId && Number.isInteger(photo?.sourceImageIndex)
+            ? `chat:${photo.sourceMessageId}:${photo.sourceImageIndex}`
+            : `meeting:${meeting.date || 'date'}:${photo?.id || index}`);
+        const refKey = resolved?.refKey || photo?.refKey || `meeting:${meeting.date || 'date'}:${photo?.id || index}`;
         meetingEntries.push({
           full: full || thumb,
           thumb: thumb || full,
@@ -849,7 +910,8 @@ export function PhotoGallery({ chatMessages, calendar = null, totalGalleryCount,
           directMediaUrl: '',
           source: 'meeting',
           meetingDate: meeting.date || '',
-          key: `meeting_${meeting.date || 'date'}_${photo?.id || index}`
+          mediaKey,
+          refKey
         });
       });
     });
@@ -859,13 +921,15 @@ export function PhotoGallery({ chatMessages, calendar = null, totalGalleryCount,
     // message) so this strip never shows the same photo twice.
     const byUrl = new Map();
     [...chatEntries, ...meetingEntries].forEach(entry => {
-      const key = entry.full || entry.thumb;
+      const key = entry.mediaKey || entry.refKey || entry.full || entry.thumb;
       if (!key) return;
       if (!byUrl.has(key)) {
         byUrl.set(key, { ...entry });
       } else {
         const existing = byUrl.get(key);
-        if (entry.meetingDate) existing.meetingDate = entry.meetingDate;
+        if (entry.meetingDate) {
+          existing.meetingDate = existing.meetingDate || entry.meetingDate;
+        }
         if (entry.photoId) existing.photoId = entry.photoId;
         if (entry.sourceMessageId) existing.sourceMessageId = entry.sourceMessageId;
         if (Number.isInteger(entry.sourceImageIndex)) existing.sourceImageIndex = entry.sourceImageIndex;
@@ -876,21 +940,57 @@ export function PhotoGallery({ chatMessages, calendar = null, totalGalleryCount,
     });
     return Array.from(byUrl.values()).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
   }, [chatMessages, calendar]);
+  const visibleEntries = React.useMemo(() => photoEntries.filter(entry => {
+    const key = entry.mediaKey || entry.refKey || entry.full || entry.thumb;
+    if (key && brokenPhotoKeysRef.current.has(key)) return false;
+    return !isBrokenPhotoValue(entry.full) && !isBrokenPhotoValue(entry.thumb);
+  }), [photoEntries, brokenPhotoRevision]);
+
+  const handleBrokenPhoto = (photo, brokenInfo = {}) => {
+    markBrokenPhoto(photo, brokenInfo);
+    if (typeof onDeletePhoto !== 'function') return;
+    const isMeetingReference = !!photo.sourceMessageId && Number.isInteger(photo.sourceImageIndex)
+      && (photo.source === 'meeting' || photo.uploadSource === 'meeting' || photo.meetingDate || photo.photoId);
+    const deletionMeta = {
+      source: isMeetingReference ? 'meeting' : (photo.source || 'chat'),
+      uploadSource: isMeetingReference ? 'meeting' : (photo.uploadSource || (photo.source === 'memo' ? 'memo' : 'chat')),
+      imageUrl: photo.full || photo.thumb || '',
+      thumbUrl: photo.thumb || photo.full || '',
+      messageId: isMeetingReference ? photo.sourceMessageId : (photo.messageId || photo.sourceMessageId || ''),
+      imageIndex: isMeetingReference
+        ? photo.sourceImageIndex
+        : (Number.isInteger(photo.imageIndex) ? photo.imageIndex : (Number.isInteger(photo.sourceImageIndex) ? photo.sourceImageIndex : 0)),
+      sourceMessageId: photo.sourceMessageId || '',
+      sourceImageIndex: Number.isInteger(photo.sourceImageIndex) ? photo.sourceImageIndex : null,
+      meetingDate: isMeetingReference ? (photo.meetingDate || '') : (photo.meetingDate || ''),
+      photoId: isMeetingReference ? (photo.photoId || '') : (photo.photoId || ''),
+      mediaKey: photo.mediaKey || '',
+      refKey: photo.refKey || ''
+    };
+    Promise.resolve(onDeletePhoto(deletionMeta)).catch(err => console.warn('Broken gallery preview cleanup failed:', err));
+  };
 
   const badgeCount = (typeof totalGalleryCount === 'number' && totalGalleryCount > 0)
-    ? Math.max(totalGalleryCount, photoEntries.length)
-    : photoEntries.length;
-  const displayedEntries = photoEntries
+    ? Math.max(totalGalleryCount, visibleEntries.length)
+    : visibleEntries.length;
+  const displayedEntries = visibleEntries
     .filter(e => (e && ((e.thumb && String(e.thumb)) || (e.full && String(e.full)))))
     .slice(0, 12);
   const openGalleryPage = () => { if (typeof onViewAll === 'function') onViewAll(); };
+  const handleGalleryTitleKeyDown = event => handleSectionHeaderKeyDown(event, () => setCollapsed(prev => !prev));
 
   if (photoEntries.length === 0 && !(typeof totalGalleryCount === 'number' && totalGalleryCount > 0)) return null;
 
   return /*#__PURE__*/React.createElement("section", { className: "summary-card" },
     /*#__PURE__*/React.createElement("div", {
-      className: `summary-title${collapsed ? ' is-collapsed' : ''}`,
-      style: { display: 'flex', alignItems: 'center', gap: '6px', width: '100%', color: '#2563EB' }
+      className: `summary-title is-toggleable${collapsed ? ' is-collapsed' : ''}`,
+      role: "button",
+      tabIndex: 0,
+      "aria-expanded": !collapsed,
+      "data-no-press-feedback": true,
+      onClick: () => setCollapsed(prev => !prev),
+      onKeyDown: handleGalleryTitleKeyDown,
+      style: { display: 'flex', alignItems: 'center', gap: '6px', width: '100%', color: '#2563EB', cursor: 'pointer' }
     },
       /*#__PURE__*/React.createElement("div", {
         style: { display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0, color: '#2563EB' }
@@ -917,18 +1017,20 @@ export function PhotoGallery({ chatMessages, calendar = null, totalGalleryCount,
       /*#__PURE__*/React.createElement("div", {
         style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(80px, 100%), 1fr))', gap: '6px', marginTop: '12px' }
       },
-        displayedEntries.map((entry, idx) => /*#__PURE__*/React.createElement("img", {
-          key: entry.key,
+        displayedEntries.map((entry, idx) => /*#__PURE__*/React.createElement(MediaThumb, {
+          key: entry.mediaKey || entry.refKey || entry.full || entry.thumb,
           src: (entry.thumb && String(entry.thumb)) || (entry.full && String(entry.full)) || '',
+          fallbackSrc: (entry.full && String(entry.full)) || (entry.thumb && String(entry.thumb)) || '',
           alt: "채팅에 첨부된 사진",
           loading: "lazy",
           decoding: "async",
           referrerPolicy: 'no-referrer',
           onClick: () => setLightbox({
             urls: displayedEntries.map(e => e.full),
-            meta: displayedEntries.map(e => ({ timestamp: e.timestamp, messageId: e.messageId, imageIndex: e.imageIndex, thumb: e.thumb, tags: e.tags, directMediaUrl: e.directMediaUrl, source: e.source, uploadSource: e.uploadSource, meetingDate: e.meetingDate, photoId: e.photoId, sourceMessageId: e.sourceMessageId, sourceImageIndex: e.sourceImageIndex })),
+            meta: displayedEntries.map(e => ({ timestamp: e.timestamp, messageId: e.messageId, imageIndex: e.imageIndex, thumb: e.thumb, tags: e.tags, directMediaUrl: e.directMediaUrl, source: e.source, uploadSource: e.uploadSource, meetingDate: e.meetingDate, photoId: e.photoId, sourceMessageId: e.sourceMessageId, sourceImageIndex: e.sourceImageIndex, mediaKey: e.mediaKey, refKey: e.refKey })),
             index: idx
           }),
+          onBroken: (e, brokenInfo) => handleBrokenPhoto(entry, brokenInfo),
           style: { width: '100%', aspectRatio: '1 / 1', objectFit: 'cover', borderRadius: 'var(--radius-sm)', cursor: 'pointer' }
         }))
       ),
@@ -939,7 +1041,7 @@ export function PhotoGallery({ chatMessages, calendar = null, totalGalleryCount,
           width: '100%',
           backgroundColor: 'color-mix(in srgb, var(--bg-primary) 96%, black)',
           border: 'none',
-          borderRadius: '8px',
+          borderRadius: 'var(--radius-md)',
           padding: '8px 0',
           marginTop: '10px',
           fontSize: '0.85rem',
@@ -1077,6 +1179,7 @@ export function SummaryList({
     "aria-expanded": !collapsedSections.partial,
     onClick: () => toggleSection('partial'),
     onKeyDown: event => handleSectionTitleKeyDown(event, 'partial'),
+    "data-no-press-feedback": true,
     style: {
       color: '#2563EB',
       marginBottom: '12px'
@@ -1144,8 +1247,8 @@ export function SummaryList({
         key: e.participantId || p.id,
         className: "memo-capsule-badge",
         style: isPast ? {
-          backgroundColor: 'var(--bg-primary)',
-          color: 'var(--text-muted)',
+          backgroundColor: 'transparent',
+          color: p.color,
           border: `1px solid ${p.color}`,
           boxShadow: 'none'
         } : {
@@ -1171,6 +1274,7 @@ export function SummaryList({
     "aria-expanded": !collapsedSections.all,
     onClick: () => toggleSection('all'),
     onKeyDown: event => handleSectionTitleKeyDown(event, 'all'),
+    "data-no-press-feedback": true,
     style: {
       color: '#10B981',
       marginBottom: '12px'
@@ -1276,7 +1380,7 @@ export function SummaryList({
         onClick: () => setAllListLimit(prev => prev + step),
         style: {
           width: '100%', marginTop: '4px', marginBottom: '6px', padding: '10px 0',
-          border: 'none', borderRadius: '8px',
+          border: 'none', borderRadius: 'var(--radius-md)',
           backgroundColor: 'color-mix(in srgb, var(--bg-primary) 96%, black)',
           color: 'var(--text-main)', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer', textAlign: 'center'
         }
@@ -1290,6 +1394,7 @@ export function SummaryList({
     "aria-expanded": !collapsedSections.confirmed,
     onClick: () => toggleSection('confirmed'),
     onKeyDown: event => handleSectionTitleKeyDown(event, 'confirmed'),
+    "data-no-press-feedback": true,
     style: {
       color: '#7C3AED',
       marginBottom: '12px'
@@ -1320,9 +1425,13 @@ export function SummaryList({
     const formattedDateStr = formatDateWithDayName(d);
     const memoEntries = dateEntries.filter(e => e.note && e.note.trim().length > 0);
     const isPast = d < todayStr;
+    const ddayLabel = isPast ? '지난 모임' : (() => {
+      const dday = calculateDday(d);
+      return dday <= 0 ? 'D-DAY' : `D-${dday}`;
+    })();
     return /*#__PURE__*/React.createElement("button", {
       key: d,
-      className: `date-item-btn ${isPast ? 'is-past' : 'is-confirmed'}`,
+      className: `date-item-btn ${isPast ? 'is-past' : 'is-confirmed'} confirmed-meeting-card confirmed-meeting-surface`,
       onClick: () => onSelectDate(d),
       style: {
         flexDirection: 'column',
@@ -1337,21 +1446,19 @@ export function SummaryList({
         gap: '8px'
       }
     }, /*#__PURE__*/React.createElement("span", {
+      className: "confirmed-meeting-date",
       style: {
         fontWeight: 800,
-        color: isPast ? '#94A3B8' : '#7C3AED',
+        color: isPast ? '#94A3B8' : '#FFFFFF',
         fontSize: '0.95rem',
         flexShrink: 0
       }
-    }, formattedDateStr), /*#__PURE__*/React.createElement("span", {
-      className: `date-item-badge ${isPast ? 'is-past' : 'is-confirmed'}`,
+    }, isPast ? formatDateWithDayName(d) : formatConfirmedMeetingLabel(d)), /*#__PURE__*/React.createElement("span", {
+      className: `date-item-badge dday-badge ${isPast ? 'is-past' : 'is-confirmed'}`,
       style: {
-        background: isPast ? '#E2E8F0' : '#F3E8FF',
-        color: isPast ? '#64748B' : '#7C3AED',
-        border: isPast ? 'none' : '1px solid #E9D5FF',
         flexShrink: 0
       }
-    }, isPast ? '지나간 모임' : '확정')), memoEntries.length > 0 && /*#__PURE__*/React.createElement("div", {
+    }, ddayLabel)), memoEntries.length > 0 && /*#__PURE__*/React.createElement("div", {
       style: {
         display: 'flex',
         alignItems: 'center',
@@ -1366,10 +1473,11 @@ export function SummaryList({
       if (!memoText) return null;
       return /*#__PURE__*/React.createElement("span", {
         key: e.participantId || p.id,
-        className: "memo-capsule-badge",
+        className: `memo-capsule-badge ${isPast ? 'is-past' : ''}`,
         style: isPast ? {
-          backgroundColor: 'var(--bg-primary)',
-          color: 'var(--text-muted)',
+          backgroundColor: 'transparent',
+          background: 'transparent',
+          color: p.color,
           border: `1px solid ${p.color}`,
           boxShadow: 'none'
         } : {
@@ -1389,7 +1497,7 @@ export function SummaryList({
         onClick: () => setConfirmedListLimit(prev => prev + step),
         style: {
           width: '100%', marginTop: '4px', marginBottom: '6px', padding: '10px 0',
-          border: 'none', borderRadius: '8px',
+          border: 'none', borderRadius: 'var(--radius-md)',
           backgroundColor: 'color-mix(in srgb, var(--bg-primary) 96%, black)',
           color: 'var(--text-main)', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer', textAlign: 'center'
         }

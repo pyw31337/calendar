@@ -7298,31 +7298,31 @@ function App() {
     style: { display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }
   }, visibleConfirmedMeetings.map(meeting => {
     const memoEntries = getActiveAvailabilities(activeCal).filter(e => e.date === meeting.date && e.note && e.note.trim());
-    return /*#__PURE__*/React.createElement("div", {
+    return /*#__PURE__*/React.createElement("button", {
+      type: "button",
       key: meeting.date,
-      style: {
-        background: 'linear-gradient(var(--bg-card), var(--bg-card)) padding-box, var(--accent-gradient) border-box',
-        border: '1px solid transparent',
-        borderRadius: 'var(--radius-md)',
-        padding: '10px 14px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '8px',
-        cursor: 'pointer'
-      },
+      className: "date-item-btn is-confirmed confirmed-meeting-card confirmed-meeting-surface",
       onClick: () => {
         if (!guardLoadedCalendar()) return;
         setSelectedDate(meeting.date);
         setIsModalOpen(true);
+      },
+      style: {
+        flexDirection: 'column',
+        alignItems: 'flex-start',
+        width: '100%',
+        cursor: 'pointer'
       }
     }, /*#__PURE__*/React.createElement("div", {
-      style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }
+      style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '8px' }
     }, /*#__PURE__*/React.createElement("span", {
-      className: "memo-capsule-badge confirmed-meeting-label-badge"
+      className: "confirmed-meeting-date",
+      style: { fontWeight: 800, color: '#FFFFFF', fontSize: '0.95rem', flexShrink: 0 }
     }, formatConfirmedMeetingLabel(meeting.date)), /*#__PURE__*/React.createElement("span", {
-      className: "dday-badge"
+      className: "date-item-badge dday-badge is-confirmed",
+      style: { flexShrink: 0 }
     }, formatDDayLabel(meeting.date))), memoEntries.length > 0 && /*#__PURE__*/React.createElement("div", {
-      style: { display: 'flex', flexWrap: 'wrap', gap: '8px' }
+      style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginTop: '6px' }
     }, memoEntries.map(entry => {
       const p = getActiveParticipants(activeCal).find(part => part.id === entry.participantId);
       if (!p) return null;

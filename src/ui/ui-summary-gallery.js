@@ -1453,7 +1453,7 @@ export function SummaryList({
         fontSize: '0.95rem',
         flexShrink: 0
       }
-    }, formattedDateStr), /*#__PURE__*/React.createElement("span", {
+    }, isPast ? formatDateWithDayName(d) : formatConfirmedMeetingLabel(d)), /*#__PURE__*/React.createElement("span", {
       className: `date-item-badge dday-badge ${isPast ? 'is-past' : 'is-confirmed'}`,
       style: {
         flexShrink: 0

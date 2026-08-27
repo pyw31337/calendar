@@ -2939,7 +2939,8 @@ select.form-select {
   position: relative;
   z-index: 1;
 }
-.date-item-btn.confirmed-meeting-card .confirmed-meeting-date {
+.date-item-btn.confirmed-meeting-card .confirmed-meeting-date,
+.confirmed-meeting-surface .confirmed-meeting-date {
   color: #FFFFFF !important;
   letter-spacing: -0.01em;
   text-shadow: 0 1px 1px rgba(0, 0, 0, 0.16);
