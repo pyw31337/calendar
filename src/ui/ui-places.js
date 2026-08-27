@@ -1849,14 +1849,20 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
               backgroundColor: 'var(--bg-card)',
               transition: 'border-color 0.15s ease, background-color 0.15s ease'
             },
-            onClick: () => handleSelectPlaceOnMap(place)
+            onClick: event => {
+              const target = event.target;
+              if (target && target.closest && target.closest('button, a, input, textarea, label, .place-card-actions, .place-card-action-btn')) return;
+              handleSelectPlaceOnMap(place);
+            }
           },
             /* Top-right absolute action buttons */
             /*#__PURE__*/React.createElement("div", {
               className: "place-card-actions",
-              style: { position: 'absolute', top: '8px', right: '8px', display: 'flex', alignItems: 'center', gap: '4px', zIndex: 4 },
-              onClick: event => event.stopPropagation(),
-              onPointerDown: event => event.stopPropagation()
+              style: { position: 'absolute', top: '6px', right: '6px', display: 'flex', alignItems: 'center', gap: '2px', zIndex: 20, pointerEvents: 'auto' },
+              onClick: event => { event.preventDefault(); event.stopPropagation(); },
+              onPointerDown: event => { event.stopPropagation(); },
+              onMouseDown: event => { event.stopPropagation(); },
+              onTouchStart: event => { event.stopPropagation(); }
             },
               /*#__PURE__*/React.createElement("button", {
                 type: "button",
