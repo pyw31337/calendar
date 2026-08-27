@@ -1406,15 +1406,22 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
         const safeId = (window.CSS && CSS.escape) ? CSS.escape(String(place.id)) : String(place.id).replace(/"/g, '');
         const row = container.querySelector('[data-place-id="' + safeId + '"]');
         if (!row) return;
-        // Align focused row to TOP of list scroll area (just under sticky category tabs)
+        // Keep the focused row inside the readable part of the list rather than pinning it
+        // directly to the top edge. Center-ish placement feels calmer on both desktop/mobile,
+        // and if the row is already visible we leave the scroll position alone.
         const cRect = container.getBoundingClientRect();
         const rRect = row.getBoundingClientRect();
-        const pad = 8;
-        const nextTop = container.scrollTop + (rRect.top - cRect.top) - pad;
+        const visibleTop = cRect.top + 12;
+        const visibleBottom = cRect.bottom - 12;
+        const alreadyVisible = rRect.top >= visibleTop && rRect.bottom <= visibleBottom;
+        if (alreadyVisible) return;
+        const anchor = Math.round(container.clientHeight * 0.28);
+        const maxTop = Math.max(0, container.scrollHeight - container.clientHeight);
+        const nextTop = Math.max(0, Math.min(maxTop, row.offsetTop - anchor));
         if (typeof container.scrollTo === 'function') {
-          container.scrollTo({ top: Math.max(0, nextTop), behavior: 'smooth' });
+          container.scrollTo({ top: nextTop, behavior: 'smooth' });
         } else {
-          container.scrollTop = Math.max(0, nextTop);
+          container.scrollTop = nextTop;
         }
       } catch (e) {}
     });
