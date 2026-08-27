@@ -727,8 +727,8 @@ body:has(.admin-login-gate) {
 .lightbox-nav-btn.is-pressing,
 .tap-target:active,
 .tap-target.is-pressing,
-[role="button"]:not(.leaflet-marker-icon):not(.place-cluster-icon):not(.place-map-marker):active,
-[role="button"]:not(.leaflet-marker-icon):not(.place-cluster-icon):not(.place-map-marker).is-pressing,
+[role="button"]:not(.leaflet-marker-icon):not(.place-cluster-icon):not(.place-map-marker):not(.summary-title):not(.section-toggle-btn):not(.date-item-btn):active,
+[role="button"]:not(.leaflet-marker-icon):not(.place-cluster-icon):not(.place-map-marker):not(.summary-title):not(.section-toggle-btn):not(.date-item-btn).is-pressing,
 [role="tab"]:active,
 [role="tab"].is-pressing,
 [role="option"]:active,
@@ -2174,14 +2174,26 @@ select.form-select {
     box-shadow: 0 0 0 4px rgba(15, 23, 42, 0.55);
   }
 }
-.summary-title.is-toggleable {
-  cursor: pointer;
-  user-select: none;
-}
+.summary-card,
+.summary-card:hover,
+.summary-card:active,
+.summary-card.is-pressing,
+.summary-card > div,
+.summary-card > div:hover,
+.summary-card > div:active,
+.summary-card > div.is-pressing,
+.summary-title,
+.summary-title:hover,
+.summary-title:active,
+.summary-title.is-pressing,
 .summary-title.is-toggleable,
 .summary-title.is-toggleable:hover,
 .summary-title.is-toggleable:active,
-.summary-title.is-toggleable.is-pressing {
+.summary-title.is-toggleable.is-pressing,
+.section-toggle-btn,
+.section-toggle-btn:hover,
+.section-toggle-btn:active,
+.section-toggle-btn.is-pressing {
   transform: none !important;
   filter: none !important;
   box-shadow: none !important;
@@ -2940,12 +2952,12 @@ select.form-select {
 }
 .date-item-btn.confirmed-meeting-card:hover {
   background: linear-gradient(90deg, #624DEB 0%, #9333EA 52%, #F43F5E 100%);
-  transform: translate3d(0, -2px, 0);
+  transform: none !important;
   box-shadow: none;
 }
 .date-item-btn.confirmed-meeting-card:active,
 .date-item-btn.confirmed-meeting-card.is-pressing {
-  transform: translate3d(0, 1px, 0) scale(0.992) !important;
+  transform: none !important;
   box-shadow: none !important;
   filter: none !important;
 }
