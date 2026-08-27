@@ -755,6 +755,14 @@ summary.is-pressing,
   box-shadow: none !important;
   transition: transform 0.05s ease, opacity 0.05s ease, filter 0.05s ease !important;
 }
+.place-card-row[data-no-press-feedback]:hover,
+.place-card-row[data-no-press-feedback]:active,
+.place-card-row[data-no-press-feedback].is-pressing {
+  transform: none !important;
+  opacity: 1 !important;
+  filter: none !important;
+  box-shadow: none !important;
+}
 .lightbox-nav-btn:active,
 .lightbox-nav-btn.is-pressing {
   transform: translateY(-50%) scale(0.95) !important;
