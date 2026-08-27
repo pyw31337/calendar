@@ -1038,27 +1038,6 @@ export function ChatGalleryModal({
 
   const handleBrokenPhoto = (photo, brokenInfo = {}) => {
     markBrokenPhoto(photo, brokenInfo);
-    if (typeof onDeletePhoto !== 'function') return;
-    const isMeetingReference = !!photo.sourceMessageId && Number.isInteger(photo.sourceImageIndex)
-      && (photo.source === 'meeting' || photo.uploadSource === 'meeting' || photo.meetingDate || photo.photoId);
-    const deletionMeta = {
-      source: isMeetingReference ? 'meeting' : (photo.source || 'chat'),
-      uploadSource: isMeetingReference ? 'meeting' : (photo.uploadSource || (photo.source === 'memo' ? 'memo' : 'chat')),
-      imageUrl: photo.full || photo.thumb || '',
-      thumbUrl: photo.thumb || photo.full || '',
-      messageId: isMeetingReference ? photo.sourceMessageId : (photo.messageId || photo.sourceMessageId || ''),
-      imageIndex: isMeetingReference
-        ? photo.sourceImageIndex
-        : (Number.isInteger(photo.imageIndex) ? photo.imageIndex : (Number.isInteger(photo.sourceImageIndex) ? photo.sourceImageIndex : 0)),
-      sourceMessageId: photo.sourceMessageId || '',
-      sourceImageIndex: Number.isInteger(photo.sourceImageIndex) ? photo.sourceImageIndex : null,
-      meetingDate: isMeetingReference ? (photo.meetingDate || '') : (photo.meetingDate || ''),
-      photoId: isMeetingReference ? (photo.photoId || '') : (photo.photoId || ''),
-      assetKey: photo.assetKey || photo.mediaKey || '',
-      mediaKey: photo.mediaKey || '',
-      refKey: photo.refKey || getPhotoKey(photo)
-    };
-    Promise.resolve(onDeletePhoto(deletionMeta)).catch(err => console.warn('Broken gallery photo cleanup failed:', err));
   };
 
   // Search must scan the full history: drain older chat pages (and memo pages) while a query is active.

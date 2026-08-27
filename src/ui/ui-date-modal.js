@@ -1327,29 +1327,6 @@ export function DateModal({
   );
   const handleBrokenMeetingPhoto = (photo, brokenInfo = {}) => {
     markBrokenMeetingPhoto(photo, brokenInfo);
-    const isMeetingReference = !!photo?.sourceMessageId && Number.isInteger(photo?.sourceImageIndex)
-      && (photo?.source === 'meeting' || photo?.uploadSource === 'meeting' || photo?.meetingDate || photo?.photoId);
-      const deletionMeta = {
-        source: isMeetingReference ? 'meeting' : (photo.source || 'meeting'),
-        uploadSource: isMeetingReference ? 'meeting' : (photo.uploadSource || (photo.source === 'chat-tag' ? 'chat' : 'meeting')),
-        imageUrl: photo.imageUrl || photo.thumbUrl || '',
-        thumbUrl: photo.thumbUrl || photo.imageUrl || '',
-        sourceMessageId: photo.sourceMessageId,
-        sourceImageIndex: photo.sourceImageIndex,
-        messageId: isMeetingReference ? photo.sourceMessageId : (photo.messageId || photo.sourceMessageId),
-        imageIndex: isMeetingReference ? photo.sourceImageIndex : (Number.isInteger(photo.imageIndex) ? photo.imageIndex : photo.sourceImageIndex),
-        meetingDate: isMeetingReference ? (photo.meetingDate || dateStr) : dateStr,
-        photoId: isMeetingReference ? (photo.photoId || photo.id) : photo.id,
-        assetKey: photo.assetKey || photo.mediaKey || '',
-        mediaKey: photo.mediaKey || '',
-        refKey: photo.refKey || photo.id || ''
-      };
-    const cleanup = typeof onDeletePhoto === 'function'
-      ? Promise.resolve(onDeletePhoto(deletionMeta))
-      : (typeof onDeleteMeetingPhoto === 'function'
-        ? Promise.resolve(onDeleteMeetingPhoto(dateStr, photo.id, deletionMeta.imageUrl))
-        : Promise.resolve(false));
-    cleanup.catch(err => console.warn('Broken meeting photo cleanup failed:', err));
   };
   const meetingPhotoInputRef = React.useRef(null);
   const [isSavingMeetingPhotos, setIsSavingMeetingPhotos] = React.useState(false);
