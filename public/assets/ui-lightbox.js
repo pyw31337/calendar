@@ -514,6 +514,10 @@ function getMessageDirectMediaEntry(...args) {
   const f = __gatherUiDeps().getMessageDirectMediaEntry || GATHER_APP_UTILS.getMessageDirectMediaEntry;
   return typeof f === 'function' ? f(...args) : undefined;
 }
+function getMediaIdentityKeys(...args) {
+  const f = __gatherUiDeps().getMediaIdentityKeys || GATHER_APP_UTILS.getMediaIdentityKeys;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
 function renderTextWithUrlBadge(...args) {
   const f = __gatherUiDeps().renderTextWithUrlBadge || GATHER_APP_UTILS.renderTextWithUrlBadge;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -671,8 +675,9 @@ function getAnniversaryDisplayColor(...args) {
 export function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSearchTag, showToast, sourceInfo = null, showZoomControls = false, zoomLevel = 100, zoomMin = 50, zoomMax = 300, onZoomIn, onZoomOut, onZoomReset }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
-  const SmallXIcon = __deps.SmallXIcon;
-  const LinkIcon = __deps.LinkIcon;
+  const SmallXIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SmallXIcon) || __deps.SmallXIcon;
+  const TrashIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.TrashIcon) || __deps.TrashIcon;
+  const LinkIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LinkIcon) || __deps.LinkIcon;
   const ConfirmDialog = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ConfirmDialog) || __deps.ConfirmDialog;
 
   const tagTokens = String(tags || '').split(/[,\s#]+/).map(t => t.trim()).filter(Boolean);
@@ -681,7 +686,7 @@ export function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSe
   const [confirmDeleteTag, setConfirmDeleteTag] = React.useState(null);
   const [isDeletingTag, setIsDeletingTag] = React.useState(false);
   React.useEffect(() => { setTagInput(''); }, [tags]);
-  if (!info.dateLabel && !info.typeLabel && !onSaveTags && !sourceInfo && !showZoomControls) return null;
+  if (!info.dateLabel && !info.typeLabel && !onSaveTags && !sourceInfo) return null;
   const MAX_TAGS = 10;
   const handleSaveTags = async () => {
     if (!onSaveTags || isSavingTags) return;
@@ -724,7 +729,7 @@ export function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSe
       position: 'absolute', left: 0, right: 0, bottom: 0, minWidth: '190px',
       padding: '34px 14px 12px',
       background: 'linear-gradient(to top, rgba(0,0,0,0.84) 0%, rgba(0,0,0,0.84) 55%, rgba(0,0,0,0.5) 82%, transparent)',
-      borderRadius: '0 0 12px 12px',
+      borderRadius: '0 0 var(--radius-md) var(--radius-md)',
       color: '#FFFFFF', fontSize: '0.76rem', lineHeight: 1.7,
       display: 'flex', flexDirection: 'column', gap: '4px',
       pointerEvents: 'auto'
@@ -748,7 +753,7 @@ export function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSe
         }, sourceInfo.label)
         : /*#__PURE__*/React.createElement("span", null, sourceInfo.label)
     ),
-    (info.typeLabel || showZoomControls) && /*#__PURE__*/React.createElement("div", {
+    info.typeLabel && /*#__PURE__*/React.createElement("div", {
       style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }
     },
       /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', minWidth: 0 } },
@@ -766,48 +771,6 @@ export function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSe
           /*#__PURE__*/React.createElement("span", null, info.dimensionLabel || '-')
         )
       ),
-      // PC-only zoom controls -- on the same line as 파일정보 (right-aligned) rather than its own
-      // row, so it doesn't leave an awkward gap between 파일정보 and 해시태그 below.
-      showZoomControls && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 } },
-        /*#__PURE__*/React.createElement("button", {
-          type: "button",
-          onClick: onZoomOut,
-          disabled: zoomLevel <= zoomMin,
-          "aria-label": "축소",
-          title: "축소",
-          style: {
-            width: '26px', height: '26px', borderRadius: '50%', border: 'none',
-            background: 'rgba(15,23,42,0.62)', color: '#FFFFFF', display: 'flex',
-            alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '0.72rem',
-            opacity: zoomLevel <= zoomMin ? 0.5 : 1
-          }
-        }, /*#__PURE__*/React.createElement(ZoomOutIcon, { size: 13 })),
-        /*#__PURE__*/React.createElement("button", {
-          type: "button",
-          onClick: onZoomReset,
-          disabled: zoomLevel === 100,
-          "aria-label": "100%로 초기화",
-          title: "100%로 초기화",
-          style: {
-            minWidth: '34px', textAlign: 'center', color: '#FFFFFF', fontSize: '0.7rem',
-            fontWeight: 700, padding: '3px 2px', borderRadius: '10px', border: 'none',
-            background: 'rgba(15,23,42,0.62)', cursor: zoomLevel === 100 ? 'default' : 'pointer'
-          }
-        }, `${zoomLevel}%`),
-        /*#__PURE__*/React.createElement("button", {
-          type: "button",
-          onClick: onZoomIn,
-          disabled: zoomLevel >= zoomMax,
-          "aria-label": "확대",
-          title: "확대",
-          style: {
-            width: '26px', height: '26px', borderRadius: '50%', border: 'none',
-            background: 'rgba(15,23,42,0.62)', color: '#FFFFFF', display: 'flex',
-            alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '0.72rem',
-            opacity: zoomLevel >= zoomMax ? 0.5 : 1
-          }
-        }, /*#__PURE__*/React.createElement(ZoomInIcon, { size: 13 }))
-      )
     ),
     /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' } },
       /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', minWidth: 0 } },
@@ -832,7 +795,7 @@ export function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSe
             alignItems: 'center', justifyContent: 'center', padding: 0, cursor: 'pointer',
             flexShrink: 0
           }
-        }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 12 }))))
+        }, /*#__PURE__*/React.createElement(TrashIcon, { size: 10 }))))
       ),
       /*#__PURE__*/React.createElement("button", {
         type: "button",
@@ -920,8 +883,9 @@ function ZoomOutIcon({ size = 15 } = {}) {
 export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, onPromoteImageUrl, onSaveImageTags, onSearchTag, onDeletePhoto, onReplacePhoto, onJumpToChatMessage, onJumpToMemo, onJumpToMeetingDate, onJumpToGallery, onGetChatMessageOrdinal, onGetGalleryPhotoOrdinal, onRequestConfirm }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
-  const SmallXIcon = __deps.SmallXIcon;
-  const PencilIcon = __deps.PencilIcon;
+  const SmallXIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SmallXIcon) || __deps.SmallXIcon;
+  const TrashIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.TrashIcon) || __deps.TrashIcon;
+  const PencilIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PencilIcon) || __deps.PencilIcon;
   const ImageUrlModal = __deps.ImageUrlModal;
   const LightboxInfoPanel = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LightboxInfoPanel;
   const buildLightboxImageInfo = __deps.buildLightboxImageInfo;
@@ -931,6 +895,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
   const [imageUrlModalOpen, setImageUrlModalOpen] = React.useState(false);
   const [imageDimensions, setImageDimensions] = React.useState({});
   const [displayUrls, setDisplayUrls] = React.useState(urls);
+  const [imageLoadFailed, setImageLoadFailed] = React.useState(false);
   // Zoom is PC-only -- mobile already has native pinch-to-zoom on the image, and a live
   // matchMedia listener (not a one-time read) so the buttons correctly appear/disappear if a
   // desktop window is resized narrow or a tablet is rotated while the lightbox is open.
@@ -1059,8 +1024,11 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
     onClose();
   };
   React.useEffect(() => { setDisplayUrls(urls); }, [urls]);
-  React.useEffect(() => { setShowInfo(false); }, [index]);
+  React.useEffect(() => { setShowInfo(false); setImageLoadFailed(false); }, [index]);
   const currentUrl = displayUrls[index] || urls[index];
+  React.useEffect(() => {
+    setImageLoadFailed(false);
+  }, [currentUrl]);
   const currentInfo = React.useMemo(
     () => {
       const base = buildLightboxImageInfo(currentUrl, meta && meta[index] && meta[index].timestamp);
@@ -1078,6 +1046,9 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
   // shows the result immediately instead of only after the Lightbox is closed and reopened.
   const [tagOverrides, setTagOverrides] = React.useState({});
   const currentMeta = meta && meta[index];
+  const currentIdentity = currentMeta
+    ? (getMediaIdentityKeys(currentMeta, { source: currentMeta.source, meetingDate: currentMeta.meetingDate }) || {})
+    : {};
   // 'meeting' entries never carry a messageId (they're archival copies stored on the
   // confirmedMeeting record, not a chat message -- see linkTaggedImageToMeetingDates in
   // app-main.js), so they need meetingDate+photoId to identify which photo instead. 'memo'
@@ -1097,17 +1068,20 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
     currentMeta.source === 'memo' ? false :
     currentMeta.messageId != null
   );
-  // Was `${messageId}_${directMediaUrl ? 'direct' : imageIndex}` -- the literal string 'direct'
-  // collapsed every directMediaUrl slide of the SAME message onto one shared key, so saving a tag
-  // on one external image in a multi-image-link message made the just-saved override show on
-  // every other image in that message too (until the Lightbox was closed and reopened and this
-  // stale local override was no longer consulted). Keying on the URL itself keeps each slide's
-  // optimistic override distinct, matching how the actual save (getDirectMediaTagKey) already
-  // keys directMediaTags per-URL in Firestore.
   const tagOverrideKey = currentMeta
-    ? (isMeetingPhoto ? `meeting_${currentMeta.meetingDate}_${currentMeta.photoId}` : `${currentMeta.messageId}_${currentMeta.directMediaUrl || currentMeta.imageIndex}`)
+    ? [
+        'lb',
+        currentMeta.messageId || currentMeta.sourceMessageId || '',
+        Number.isInteger(currentMeta.imageIndex)
+          ? currentMeta.imageIndex
+          : (Number.isInteger(currentMeta.sourceImageIndex) ? currentMeta.sourceImageIndex : ''),
+        currentUrl || currentMeta.directMediaUrl || currentMeta.thumb || '',
+        currentMeta.photoId || currentMeta.meetingDate || ''
+      ].join('::')
     : null;
-  const currentTags = (tagOverrideKey && tagOverrideKey in tagOverrides) ? tagOverrides[tagOverrideKey] : (currentMeta?.tags || '');
+  const currentTags = (tagOverrideKey && Object.prototype.hasOwnProperty.call(tagOverrides, tagOverrideKey))
+    ? tagOverrides[tagOverrideKey]
+    : (currentMeta?.tags || '');
   // Mirrors handleSaveImageTags' own parse/dedupe/limit rules so the optimistic override shown
   // here matches what actually got persisted, without needing the save call to round-trip it.
   const normalizeTagsForDisplay = text => Array.from(new Set(
@@ -1166,7 +1140,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
     if (typeof onGetGalleryPhotoOrdinal !== 'function') return;
     const messageId = currentMeta.messageId;
     if (!messageId) return;
-    const key = `${messageId}_${currentMeta.imageIndex || 0}`;
+    const key = currentIdentity.assetKey || currentIdentity.refKey || currentIdentity.mediaKey || `${messageId}_${currentMeta.imageIndex || 0}`;
     if (galleryOrdinalFetchedRef.current.has(key)) return;
     galleryOrdinalFetchedRef.current.add(key);
     let cancelled = false;
@@ -1286,8 +1260,6 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
     };
     if (typeof onRequestConfirm === 'function') {
       onRequestConfirm('사진 삭제', '이 사진을 삭제하시겠습니까?', confirmAction);
-    } else if (window.confirm('이 사진을 삭제하시겠습니까?')) {
-      confirmAction();
     }
   };
   const ensureCurrentShareUrl = async url => {
@@ -1323,9 +1295,39 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
   const isDraggingRef = React.useRef(false);
   const wasDraggedRef = React.useRef(false);
   const pendingNavRef = React.useRef(null);
+  const transitionTimerRef = React.useRef(null);
   const [dragPx, setDragPx] = React.useState(0);
   const [transitionOn, setTransitionOn] = React.useState(false);
   const [isDragging, setIsDragging] = React.useState(false);
+
+  const clearTransitionTimer = () => {
+    if (transitionTimerRef.current) {
+      clearTimeout(transitionTimerRef.current);
+      transitionTimerRef.current = null;
+    }
+  };
+
+  const commitPendingNav = React.useCallback(() => {
+    clearTransitionTimer();
+    if (pendingNavRef.current != null) {
+      const next = pendingNavRef.current;
+      pendingNavRef.current = null;
+      setTransitionOn(false);
+      setDragPx(0);
+      onNavigate(next);
+      return next;
+    }
+    return null;
+  }, [onNavigate]);
+
+  React.useEffect(() => {
+    clearTransitionTimer();
+    pendingNavRef.current = null;
+    setTransitionOn(false);
+    setDragPx(0);
+    isDraggingRef.current = false;
+    setIsDragging(false);
+  }, [index]);
 
   const goTo = i => {
     if (i < 0 || i >= total || i === index) return;
@@ -1336,11 +1338,21 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
   // moving between photos feels like the same carousel, not just the drag gesture.
   const animateToAdjacent = newIndex => {
     if (newIndex < 0 || newIndex >= total || newIndex === index) return;
+    if (pendingNavRef.current != null) {
+      commitPendingNav();
+      return;
+    }
     const el = imgAreaRef.current;
-    if (el) widthRef.current = el.getBoundingClientRect().width;
+    const width = (el && el.getBoundingClientRect().width) || window.innerWidth * 0.92 || 1;
+    widthRef.current = width;
     pendingNavRef.current = newIndex;
     setTransitionOn(true);
-    setDragPx(newIndex > index ? -widthRef.current : widthRef.current);
+    setDragPx(newIndex > index ? -width : width);
+
+    clearTransitionTimer();
+    transitionTimerRef.current = setTimeout(() => {
+      commitPendingNav();
+    }, 240);
   };
   React.useEffect(() => {
     const onKeyDown = e => {
@@ -1367,8 +1379,11 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
   };
   const handleDragStart = clientX => {
     if (total <= 1) return;
+    if (pendingNavRef.current != null) {
+      commitPendingNav();
+    }
     const el = imgAreaRef.current;
-    widthRef.current = el ? el.getBoundingClientRect().width : 0;
+    widthRef.current = el ? el.getBoundingClientRect().width : window.innerWidth * 0.92;
     dragStartXRef.current = clientX;
     isDraggingRef.current = true;
     wasDraggedRef.current = false;
@@ -1386,16 +1401,24 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
     isDraggingRef.current = false;
     setIsDragging(false);
     dragStartXRef.current = null;
-    const width = widthRef.current || 1;
+    const width = widthRef.current || window.innerWidth * 0.92 || 1;
     const threshold = width * SWIPE_THRESHOLD_RATIO;
     setTransitionOn(true);
     setDragPx(current => {
       if (current <= -threshold && index < total - 1) {
         pendingNavRef.current = index + 1;
+        clearTransitionTimer();
+        transitionTimerRef.current = setTimeout(() => {
+          commitPendingNav();
+        }, 240);
         return -width;
       }
       if (current >= threshold && index > 0) {
         pendingNavRef.current = index - 1;
+        clearTransitionTimer();
+        transitionTimerRef.current = setTimeout(() => {
+          commitPendingNav();
+        }, 240);
         return width;
       }
       pendingNavRef.current = null;
@@ -1426,12 +1449,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
   }, [index, total]);
   const handleTrackTransitionEnd = e => {
     if (e.target !== e.currentTarget || e.propertyName !== 'transform') return;
-    if (pendingNavRef.current == null) return;
-    const next = pendingNavRef.current;
-    pendingNavRef.current = null;
-    setTransitionOn(false);
-    setDragPx(0);
-    onNavigate(next);
+    commitPendingNav();
   };
   const handleOverlayClick = () => {
     if (wasDraggedRef.current) {
@@ -1440,91 +1458,218 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
     }
     closeLightbox();
   };
+  const handleCurrentImageError = () => {
+    const thumbUrl = String(currentMeta && currentMeta.thumb || '').trim();
+    const current = String(currentUrl || '').trim();
+    if (thumbUrl && thumbUrl !== current) {
+      setDisplayUrls(prev => prev.map((item, i) => i === index ? thumbUrl : item));
+      return;
+    }
+    setImageLoadFailed(true);
+  };
 
   // Shared by both the carousel's "current" slot and the single-image layout below --
-  // top-right pencil (교체)/X (삭제) buttons, reusing the same icons already used for editing
-  // elsewhere in the app (Places/Memo pencil, tag-delete X). Zoom controls used to live at the
-  // left end of this same row, but were moved into LightboxInfoPanel (directly above the URL
-  // button) per user request, so this row is gated on canEditPhoto alone again.
-  const renderPhotoActions = () => showInfo && canEditPhoto && /*#__PURE__*/React.createElement("div", {
-    style: { position: 'absolute', top: '8px', right: '8px', display: 'flex', alignItems: 'center', gap: '6px', zIndex: 10 },
+  // left-aligned edit/delete buttons plus centered zoom controls on the same row.
+  const renderPhotoActions = () => (showInfo && (canEditPhoto || isDesktop)) && /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: 'absolute',
+      top: '8px',
+      left: '8px',
+      right: '8px',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      zIndex: 10,
+      pointerEvents: 'none'
+    },
     onClick: e => e.stopPropagation()
   },
-    canEditPhoto && onReplacePhoto && /*#__PURE__*/React.createElement("button", {
-      type: "button",
-      onClick: () => replacePhotoInputRef.current && replacePhotoInputRef.current.click(),
-      disabled: isReplacingPhoto || isDeletingPhoto,
-      "aria-label": "사진 편집",
-      title: "사진 교체",
+    /*#__PURE__*/React.createElement("div", {
+      style: { display: 'flex', alignItems: 'center', gap: '6px', pointerEvents: 'auto' }
+    },
+      canEditPhoto && onDeletePhoto && /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: handleDeletePhotoClick,
+        disabled: isReplacingPhoto || isDeletingPhoto,
+        "aria-label": "사진 삭제",
+        title: "사진 삭제",
+        style: {
+          width: '30px', height: '30px', borderRadius: '50%', border: 'none',
+          background: 'rgba(15,23,42,0.62)', color: '#FFFFFF', display: 'flex',
+          alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '0.72rem',
+          opacity: (isReplacingPhoto || isDeletingPhoto) ? 0.5 : 1
+        }
+      }, isDeletingPhoto ? '...' : /*#__PURE__*/React.createElement(TrashIcon, { size: 15 })),
+      canEditPhoto && onReplacePhoto && /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: () => replacePhotoInputRef.current && replacePhotoInputRef.current.click(),
+        disabled: isReplacingPhoto || isDeletingPhoto,
+        "aria-label": "사진 편집",
+        title: "사진 교체",
+        style: {
+          width: '30px', height: '30px', borderRadius: '50%', border: 'none',
+          background: 'rgba(15,23,42,0.62)', color: '#FFFFFF', display: 'flex',
+          alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '0.72rem',
+          opacity: (isReplacingPhoto || isDeletingPhoto) ? 0.5 : 1
+        }
+      }, isReplacingPhoto ? '...' : /*#__PURE__*/React.createElement(PencilIcon, { size: 15 }))
+    ),
+    isDesktop && /*#__PURE__*/React.createElement("div", {
       style: {
-        width: '30px', height: '30px', borderRadius: '50%', border: 'none',
-        background: 'rgba(15,23,42,0.62)', color: '#FFFFFF', display: 'flex',
-        alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '0.72rem',
-        opacity: (isReplacingPhoto || isDeletingPhoto) ? 0.5 : 1
+        position: 'absolute',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '6px',
+        pointerEvents: 'auto'
       }
-    }, isReplacingPhoto ? '...' : /*#__PURE__*/React.createElement(PencilIcon, { size: 15 })),
-    canEditPhoto && onDeletePhoto && /*#__PURE__*/React.createElement("button", {
-      type: "button",
-      onClick: handleDeletePhotoClick,
-      disabled: isReplacingPhoto || isDeletingPhoto,
-      "aria-label": "사진 삭제",
-      title: "사진 삭제",
-      style: {
-        width: '30px', height: '30px', borderRadius: '50%', border: 'none',
-        background: 'rgba(15,23,42,0.62)', color: '#FFFFFF', display: 'flex',
-        alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '0.72rem',
-        opacity: (isReplacingPhoto || isDeletingPhoto) ? 0.5 : 1
-      }
-    }, isDeletingPhoto ? '...' : /*#__PURE__*/React.createElement(SmallXIcon, { size: 15 }))
+    },
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: handleZoomOut,
+        disabled: zoomLevel <= ZOOM_MIN,
+        "aria-label": "축소",
+        title: "축소",
+        style: {
+          width: '30px',
+          height: '30px',
+          borderRadius: '50%',
+          border: 'none',
+          background: 'rgba(15,23,42,0.62)',
+          color: '#FFFFFF',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          fontSize: '0.72rem',
+          opacity: zoomLevel <= ZOOM_MIN ? 0.5 : 1
+        }
+      }, /*#__PURE__*/React.createElement(ZoomOutIcon, { size: 14 })),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: handleZoomReset,
+        disabled: zoomLevel === ZOOM_DEFAULT,
+        "aria-label": "100%로 초기화",
+        title: "100%로 초기화",
+        style: {
+          width: '30px',
+          height: '30px',
+          borderRadius: '50%',
+          border: 'none',
+          background: 'rgba(15,23,42,0.62)',
+          color: '#FFFFFF',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: zoomLevel === ZOOM_DEFAULT ? 'default' : 'pointer',
+          fontSize: '0.62rem',
+          fontWeight: 900,
+          opacity: zoomLevel === ZOOM_DEFAULT ? 0.7 : 1
+        }
+      }, `${zoomLevel}%`),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: handleZoomIn,
+        disabled: zoomLevel >= ZOOM_MAX,
+        "aria-label": "확대",
+        title: "확대",
+        style: {
+          width: '30px',
+          height: '30px',
+          borderRadius: '50%',
+          border: 'none',
+          background: 'rgba(15,23,42,0.62)',
+          color: '#FFFFFF',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          fontSize: '0.72rem',
+          opacity: zoomLevel >= ZOOM_MAX ? 0.5 : 1
+        }
+      }, /*#__PURE__*/React.createElement(ZoomInIcon, { size: 14 }))
+    )
   );
 
-  const renderSlide = (url, slot) => /*#__PURE__*/React.createElement("div", {
-    style: { width: '33.3333%', flexShrink: 0, height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }
-  }, url && (slot === 'current' ? /*#__PURE__*/React.createElement("div", {
-    style: { position: 'relative', display: 'inline-flex', maxWidth: '100%', maxHeight: '100%' },
-    onClick: handleImageTap
-  }, /*#__PURE__*/React.createElement("img", {
-    ref: zoomedImgRef,
-    src: url,
-    alt: "원본 이미지",
-    "data-slide": slot,
-    draggable: false,
-    decoding: 'async',
-    referrerPolicy: 'no-referrer',
-    onLoad: e => recordImageDimensions(url, e),
-    onMouseDown: handleZoomedImageMouseDown,
-    style: {
-      maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: '12px',
-      display: 'block', ...zoomImageStyle
+  const renderSlide = (url, slot) => {
+    const wrapperStyle = { width: '33.3333%', flexShrink: 0, height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' };
+    if (!url) return /*#__PURE__*/React.createElement("div", { style: wrapperStyle });
+
+    if (slot === 'current') {
+      if (imageLoadFailed) {
+        return /*#__PURE__*/React.createElement("div", { style: wrapperStyle }, /*#__PURE__*/React.createElement("div", {
+          style: {
+            width: '100%',
+            maxWidth: '100%',
+            maxHeight: '100%',
+            aspectRatio: '1 / 1',
+            borderRadius: 'var(--radius-md)',
+            backgroundColor: 'var(--bg-card)',
+            border: '1px dashed var(--border-subtle)',
+            color: 'var(--text-muted)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '24px',
+            textAlign: 'center',
+            fontSize: '0.9rem',
+            fontWeight: 700
+          }
+        }, "이미지를 불러오지 못했습니다."));
+      }
+
+      return /*#__PURE__*/React.createElement("div", { style: wrapperStyle }, /*#__PURE__*/React.createElement("div", {
+        style: { position: 'relative', display: 'inline-flex', maxWidth: '100%', maxHeight: '100%' },
+        onClick: handleImageTap
+      }, /*#__PURE__*/React.createElement("img", {
+        ref: zoomedImgRef,
+        src: url,
+        alt: "원본 이미지",
+        "data-slide": slot,
+        draggable: false,
+        decoding: 'async',
+        referrerPolicy: 'no-referrer',
+        onLoad: e => recordImageDimensions(url, e),
+        onError: handleCurrentImageError,
+        onMouseDown: handleZoomedImageMouseDown,
+        style: {
+          maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: 'var(--radius-md)',
+          display: 'block', ...zoomImageStyle
+        }
+      }), renderPhotoActions(), showInfo && /*#__PURE__*/React.createElement(LightboxInfoPanel, {
+      key: tagOverrideKey || String(currentUrl || index),
+        info: currentInfo,
+        tags: currentTags,
+        onSaveTags: saveCurrentTags,
+        onSearchTag: onSearchTag,
+        onOpenUrl: () => setImageUrlModalOpen(true),
+        showToast: showToast,
+        sourceInfo: sourceInfo,
+        showZoomControls: isDesktop,
+        zoomLevel: zoomLevel,
+        zoomMin: ZOOM_MIN,
+        zoomMax: ZOOM_MAX,
+        onZoomIn: handleZoomIn,
+        onZoomOut: handleZoomOut,
+        onZoomReset: handleZoomReset
+      })));
     }
-  }), renderPhotoActions(), showInfo && /*#__PURE__*/React.createElement(LightboxInfoPanel, {
-    info: currentInfo,
-    tags: currentTags,
-    onSaveTags: saveCurrentTags,
-    onSearchTag: onSearchTag,
-    onOpenUrl: () => setImageUrlModalOpen(true),
-    showToast: showToast,
-    sourceInfo: sourceInfo,
-    showZoomControls: isDesktop,
-    zoomLevel: zoomLevel,
-    zoomMin: ZOOM_MIN,
-    zoomMax: ZOOM_MAX,
-    onZoomIn: handleZoomIn,
-    onZoomOut: handleZoomOut,
-    onZoomReset: handleZoomReset
-  })) : /*#__PURE__*/React.createElement("img", {
-    src: url,
-    alt: "원본 이미지",
-    "data-slide": slot,
-    draggable: false,
-    decoding: 'async',
-    referrerPolicy: 'no-referrer',
-    onLoad: e => recordImageDimensions(url, e),
-    onClick: e => e.stopPropagation(),
-    style: {
-      maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: '12px'
-    }
-  })));
+
+    return /*#__PURE__*/React.createElement("div", { style: wrapperStyle }, /*#__PURE__*/React.createElement("img", {
+      src: url,
+      alt: "원본 이미지",
+      "data-slide": slot,
+      draggable: false,
+      decoding: 'async',
+      referrerPolicy: 'no-referrer',
+      onLoad: e => recordImageDimensions(url, e),
+      onClick: e => e.stopPropagation(),
+      style: {
+        maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: 'var(--radius-md)'
+      }
+    }));
+  };
 
   const lightboxNode = /*#__PURE__*/React.createElement("div", {
     className: "lightbox-overlay",
@@ -1616,10 +1761,11 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
     onLoad: e => recordImageDimensions(currentUrl, e),
     onMouseDown: handleZoomedImageMouseDown,
     style: {
-      maxWidth: '92vw', maxHeight: '82vh', borderRadius: '12px', objectFit: 'contain',
+      maxWidth: '92vw', maxHeight: '82vh', borderRadius: 'var(--radius-md)', objectFit: 'contain',
       display: 'block', ...zoomImageStyle
     }
   }), renderPhotoActions(), showInfo && /*#__PURE__*/React.createElement(LightboxInfoPanel, {
+      key: tagOverrideKey || String(currentUrl || index),
     info: currentInfo,
     tags: currentTags,
     onSaveTags: saveCurrentTags,

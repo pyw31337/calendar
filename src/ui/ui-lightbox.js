@@ -1295,9 +1295,39 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
   const isDraggingRef = React.useRef(false);
   const wasDraggedRef = React.useRef(false);
   const pendingNavRef = React.useRef(null);
+  const transitionTimerRef = React.useRef(null);
   const [dragPx, setDragPx] = React.useState(0);
   const [transitionOn, setTransitionOn] = React.useState(false);
   const [isDragging, setIsDragging] = React.useState(false);
+
+  const clearTransitionTimer = () => {
+    if (transitionTimerRef.current) {
+      clearTimeout(transitionTimerRef.current);
+      transitionTimerRef.current = null;
+    }
+  };
+
+  const commitPendingNav = React.useCallback(() => {
+    clearTransitionTimer();
+    if (pendingNavRef.current != null) {
+      const next = pendingNavRef.current;
+      pendingNavRef.current = null;
+      setTransitionOn(false);
+      setDragPx(0);
+      onNavigate(next);
+      return next;
+    }
+    return null;
+  }, [onNavigate]);
+
+  React.useEffect(() => {
+    clearTransitionTimer();
+    pendingNavRef.current = null;
+    setTransitionOn(false);
+    setDragPx(0);
+    isDraggingRef.current = false;
+    setIsDragging(false);
+  }, [index]);
 
   const goTo = i => {
     if (i < 0 || i >= total || i === index) return;
@@ -1308,11 +1338,21 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
   // moving between photos feels like the same carousel, not just the drag gesture.
   const animateToAdjacent = newIndex => {
     if (newIndex < 0 || newIndex >= total || newIndex === index) return;
+    if (pendingNavRef.current != null) {
+      commitPendingNav();
+      return;
+    }
     const el = imgAreaRef.current;
-    if (el) widthRef.current = el.getBoundingClientRect().width;
+    const width = (el && el.getBoundingClientRect().width) || window.innerWidth * 0.92 || 1;
+    widthRef.current = width;
     pendingNavRef.current = newIndex;
     setTransitionOn(true);
-    setDragPx(newIndex > index ? -widthRef.current : widthRef.current);
+    setDragPx(newIndex > index ? -width : width);
+
+    clearTransitionTimer();
+    transitionTimerRef.current = setTimeout(() => {
+      commitPendingNav();
+    }, 240);
   };
   React.useEffect(() => {
     const onKeyDown = e => {
@@ -1339,8 +1379,11 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
   };
   const handleDragStart = clientX => {
     if (total <= 1) return;
+    if (pendingNavRef.current != null) {
+      commitPendingNav();
+    }
     const el = imgAreaRef.current;
-    widthRef.current = el ? el.getBoundingClientRect().width : 0;
+    widthRef.current = el ? el.getBoundingClientRect().width : window.innerWidth * 0.92;
     dragStartXRef.current = clientX;
     isDraggingRef.current = true;
     wasDraggedRef.current = false;
@@ -1358,16 +1401,24 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
     isDraggingRef.current = false;
     setIsDragging(false);
     dragStartXRef.current = null;
-    const width = widthRef.current || 1;
+    const width = widthRef.current || window.innerWidth * 0.92 || 1;
     const threshold = width * SWIPE_THRESHOLD_RATIO;
     setTransitionOn(true);
     setDragPx(current => {
       if (current <= -threshold && index < total - 1) {
         pendingNavRef.current = index + 1;
+        clearTransitionTimer();
+        transitionTimerRef.current = setTimeout(() => {
+          commitPendingNav();
+        }, 240);
         return -width;
       }
       if (current >= threshold && index > 0) {
         pendingNavRef.current = index - 1;
+        clearTransitionTimer();
+        transitionTimerRef.current = setTimeout(() => {
+          commitPendingNav();
+        }, 240);
         return width;
       }
       pendingNavRef.current = null;
@@ -1398,12 +1449,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
   }, [index, total]);
   const handleTrackTransitionEnd = e => {
     if (e.target !== e.currentTarget || e.propertyName !== 'transform') return;
-    if (pendingNavRef.current == null) return;
-    const next = pendingNavRef.current;
-    pendingNavRef.current = null;
-    setTransitionOn(false);
-    setDragPx(0);
-    onNavigate(next);
+    commitPendingNav();
   };
   const handleOverlayClick = () => {
     if (wasDraggedRef.current) {
