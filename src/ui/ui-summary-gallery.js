@@ -711,6 +711,12 @@ export function SectionToggleButton({ collapsed, onToggle, label }) {
   })));
 }
 
+function handleSectionHeaderKeyDown(event, onToggle) {
+  if (event.key !== 'Enter' && event.key !== ' ') return;
+  event.preventDefault();
+  onToggle();
+}
+
 export function SearchCategoryTabs({ tabs, activeKey, onSelect, containerStyle, tabPadding, tabTextStyle, countBadgeClassName, countBadgeStyle }) {
   const React = window.React;
 
@@ -971,13 +977,20 @@ export function PhotoGallery({ chatMessages, calendar = null, totalGalleryCount,
     .filter(e => (e && ((e.thumb && String(e.thumb)) || (e.full && String(e.full)))))
     .slice(0, 12);
   const openGalleryPage = () => { if (typeof onViewAll === 'function') onViewAll(); };
+  const handleGalleryTitleKeyDown = event => handleSectionHeaderKeyDown(event, () => setCollapsed(prev => !prev));
 
   if (photoEntries.length === 0 && !(typeof totalGalleryCount === 'number' && totalGalleryCount > 0)) return null;
 
   return /*#__PURE__*/React.createElement("section", { className: "summary-card" },
     /*#__PURE__*/React.createElement("div", {
-      className: `summary-title${collapsed ? ' is-collapsed' : ''}`,
-      style: { display: 'flex', alignItems: 'center', gap: '6px', width: '100%', color: '#2563EB' }
+      className: `summary-title is-toggleable${collapsed ? ' is-collapsed' : ''}`,
+      role: "button",
+      tabIndex: 0,
+      "aria-expanded": !collapsed,
+      "data-no-press-feedback": true,
+      onClick: () => setCollapsed(prev => !prev),
+      onKeyDown: handleGalleryTitleKeyDown,
+      style: { display: 'flex', alignItems: 'center', gap: '6px', width: '100%', color: '#2563EB', cursor: 'pointer' }
     },
       /*#__PURE__*/React.createElement("div", {
         style: { display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0, color: '#2563EB' }
@@ -1166,6 +1179,7 @@ export function SummaryList({
     "aria-expanded": !collapsedSections.partial,
     onClick: () => toggleSection('partial'),
     onKeyDown: event => handleSectionTitleKeyDown(event, 'partial'),
+    "data-no-press-feedback": true,
     style: {
       color: '#2563EB',
       marginBottom: '12px'
@@ -1260,6 +1274,7 @@ export function SummaryList({
     "aria-expanded": !collapsedSections.all,
     onClick: () => toggleSection('all'),
     onKeyDown: event => handleSectionTitleKeyDown(event, 'all'),
+    "data-no-press-feedback": true,
     style: {
       color: '#10B981',
       marginBottom: '12px'
@@ -1379,6 +1394,7 @@ export function SummaryList({
     "aria-expanded": !collapsedSections.confirmed,
     onClick: () => toggleSection('confirmed'),
     onKeyDown: event => handleSectionTitleKeyDown(event, 'confirmed'),
+    "data-no-press-feedback": true,
     style: {
       color: '#7C3AED',
       marginBottom: '12px'

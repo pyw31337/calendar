@@ -1168,6 +1168,11 @@ export function PlacesSection({ calendar, onViewAll }) {
   const [mapShouldMount, setMapShouldMount] = React.useState(false);
   const mapHostRef = React.useRef(null);
   const places = getCalendarPlaces(calendar);
+  const handleSectionTitleKeyDown = event => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    setCollapsed(prev => !prev);
+  };
 
   React.useEffect(() => {
     if (collapsed || mapShouldMount) return undefined;
@@ -1205,8 +1210,14 @@ export function PlacesSection({ calendar, onViewAll }) {
 
   return /*#__PURE__*/React.createElement("section", { className: "summary-card" },
     /*#__PURE__*/React.createElement("div", {
-      className: `summary-title${collapsed ? ' is-collapsed' : ''}`,
-      style: { display: 'flex', alignItems: 'center', gap: '6px', width: '100%', color: '#2563EB' }
+      className: `summary-title is-toggleable${collapsed ? ' is-collapsed' : ''}`,
+      role: "button",
+      tabIndex: 0,
+      "aria-expanded": !collapsed,
+      "data-no-press-feedback": true,
+      onClick: () => setCollapsed(prev => !prev),
+      onKeyDown: handleSectionTitleKeyDown,
+      style: { display: 'flex', alignItems: 'center', gap: '6px', width: '100%', color: '#2563EB', cursor: 'pointer' }
     },
       /*#__PURE__*/React.createElement("div", {
         style: { display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0, color: '#2563EB' }
@@ -1220,7 +1231,7 @@ export function PlacesSection({ calendar, onViewAll }) {
       },
         /*#__PURE__*/React.createElement("button", {
           type: "button",
-          onClick: onViewAll,
+          onClick: e => { e.stopPropagation(); onViewAll(); },
           style: { background: 'none', border: 'none', color: '#3B82F6', fontSize: '0.78rem', fontWeight: 800, cursor: 'pointer', padding: '4px 6px' }
         }, "전체보기"),
         /*#__PURE__*/React.createElement(SectionToggleButton, {
