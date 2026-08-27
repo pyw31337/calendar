@@ -1103,7 +1103,7 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
     if (!ready || !mapRef.current) return;
     const triggerInvalidate = () => {
       if (mapRef.current) {
-        try { mapRef.current.invalidateSize(); } catch (e) {}
+        try { mapRef.current.invalidateSize({ animate: false }); } catch (e) {}
       }
     };
     triggerInvalidate();
