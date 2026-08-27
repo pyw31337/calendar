@@ -1111,7 +1111,9 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
       map.setView(map.unproject(targetPoint, zoom), zoom, { animate: false });
       requestAnimationFrame(() => {
         try { marker.openPopup(); } catch (e) {}
-        panMapToFitMarkerPopup(map, marker, { pad: isMobileViewport ? 20 : 28, animate: true });
+        // Give mobile popups a little more breathing room so the popup doesn't end up
+        // visually glued to the header or the map edge after zooming into a single place.
+        panMapToFitMarkerPopup(map, marker, { pad: isMobileViewport ? 28 : 28, animate: true });
       });
     };
 
