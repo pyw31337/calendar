@@ -708,6 +708,9 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
           tapTolerance: 15
         })
         .setView(PLACE_MAP_DEFAULT_CENTER, PLACE_MAP_DEFAULT_ZOOM);
+      mapRef.current = map;
+      try { map.invalidateSize({ animate: false }); } catch (e) {}
+
       // MapTiler Official Positron Style (Clean, bright, monotone map with native Korean labels)
       const maptilerKey = (typeof window !== 'undefined' && (window.MAPTILER_API_KEY || (window.GATHER_APP_CONFIG && window.GATHER_APP_CONFIG.maptilerApiKey))) || 'b45noTvSyt7Z3EozaXIa';
       if (maptilerKey) {
@@ -725,6 +728,7 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
           attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(map);
       }
+      try { map.invalidateSize({ animate: false }); } catch (e) {}
 
       let clusterAvailable = false;
       try {
@@ -767,8 +771,8 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
         }
       }) : L.layerGroup();
       markersLayerRef.current.addTo(map);
-      mapRef.current = map;
       setReady(true);
+      try { map.invalidateSize({ animate: false }); } catch (e) {}
     }).catch(err => {
       console.error('Leaflet load failed:', err);
       if (!cancelled) setLoadError(true);
@@ -1100,7 +1104,6 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
   // Container size changes (the section's collapse/expand aspect-ratio toggle & window resize)
   // fire size changes. Leaflet's internal tile grid goes stale unless invalidateSize() is called.
   React.useEffect(() => {
-    if (!ready || !mapRef.current) return;
     const triggerInvalidate = () => {
       if (mapRef.current) {
         try { mapRef.current.invalidateSize({ animate: false }); } catch (e) {}
@@ -1108,8 +1111,9 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
     };
     triggerInvalidate();
     const t1 = setTimeout(triggerInvalidate, 50);
-    const t2 = setTimeout(triggerInvalidate, 260);
-    const t3 = setTimeout(triggerInvalidate, 650);
+    const t2 = setTimeout(triggerInvalidate, 200);
+    const t3 = setTimeout(triggerInvalidate, 500);
+    const t4 = setTimeout(triggerInvalidate, 1000);
     window.addEventListener('resize', triggerInvalidate);
     let observer = null;
     if (typeof ResizeObserver !== 'undefined' && containerRef.current) {
@@ -1122,6 +1126,7 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
       clearTimeout(t1);
       clearTimeout(t2);
       clearTimeout(t3);
+      clearTimeout(t4);
       window.removeEventListener('resize', triggerInvalidate);
       if (observer) observer.disconnect();
     };
