@@ -883,7 +883,36 @@ const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
     return { showToast: showToast, dismissToast: dismissToast, clearToastTimers: clearToastTimers };
   }
 
+  const BROKEN_PHOTO_CACHE_KEY = 'gather_broken_photo_urls_v1';
+
+  export function getPersistentBrokenPhotoUrls() {
+    try {
+      if (typeof localStorage === 'undefined') return new Set();
+      const raw = localStorage.getItem(BROKEN_PHOTO_CACHE_KEY);
+      if (!raw) return new Set();
+      const arr = JSON.parse(raw);
+      return new Set(Array.isArray(arr) ? arr : []);
+    } catch (e) {
+      return new Set();
+    }
+  }
+
+  export function savePersistentBrokenPhotoUrl(urlOrKey) {
+    if (!urlOrKey) return;
+    try {
+      if (typeof localStorage === 'undefined') return;
+      const url = String(urlOrKey || '').trim().split(/[?#]/)[0];
+      if (!url) return;
+      const set = getPersistentBrokenPhotoUrls();
+      set.add(url);
+      const arr = Array.from(set).slice(-500);
+      localStorage.setItem(BROKEN_PHOTO_CACHE_KEY, JSON.stringify(arr));
+    } catch (e) {}
+  }
+
   export const GATHER_APP_UTILS = Object.freeze({
+    getPersistentBrokenPhotoUrls,
+    savePersistentBrokenPhotoUrl,
     getContrastTextColor,
     formatDateWithDayName,
     formatShortDateWithDayName,

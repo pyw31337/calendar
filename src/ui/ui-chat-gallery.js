@@ -788,8 +788,8 @@ export function ChatGalleryModal({
   const uploadInputRef = React.useRef(null);
   const hasClipboardImage = useClipboardHasImage(true);
   const [pastePreview, setPastePreview] = React.useState(null); // { files, previewUrls } | null
-  const brokenPhotoKeysRef = React.useRef(new Set());
-  const brokenPhotoUrlsRef = React.useRef(new Set());
+  const brokenPhotoKeysRef = React.useRef((GATHER_APP_UTILS.getPersistentBrokenPhotoUrls || (window.GATHER_APP_UTILS && window.GATHER_APP_UTILS.getPersistentBrokenPhotoUrls) || (() => new Set()))());
+  const brokenPhotoUrlsRef = React.useRef((GATHER_APP_UTILS.getPersistentBrokenPhotoUrls || (window.GATHER_APP_UTILS && window.GATHER_APP_UTILS.getPersistentBrokenPhotoUrls) || (() => new Set()))());
   const [brokenPhotoRevision, setBrokenPhotoRevision] = React.useState(0);
   const getPhotoKey = photo => photo?.mediaKey || photo?.refKey || `${photo?.messageId || photo?.photoId || photo?.sourceMessageId || ''}_${photo?.imageIndex ?? photo?.sourceImageIndex ?? ''}`;
   const normalizeBrokenPhotoUrl = value => {
@@ -799,7 +799,13 @@ export function ChatGalleryModal({
   };
   const isBrokenPhotoValue = value => {
     const url = normalizeBrokenPhotoUrl(value);
-    return !!url && brokenPhotoUrlsRef.current.has(url);
+    if (!url) return false;
+    const persistent = (GATHER_APP_UTILS.getPersistentBrokenPhotoUrls || (window.GATHER_APP_UTILS && window.GATHER_APP_UTILS.getPersistentBrokenPhotoUrls) || (() => new Set()))();
+    return brokenPhotoUrlsRef.current.has(url) || persistent.has(url);
+  };
+  const saveBrokenUrl = urlOrKey => {
+    const saveFn = GATHER_APP_UTILS.savePersistentBrokenPhotoUrl || (window.GATHER_APP_UTILS && window.GATHER_APP_UTILS.savePersistentBrokenPhotoUrl);
+    if (typeof saveFn === 'function') saveFn(urlOrKey);
   };
   const markBrokenPhoto = (photo, brokenInfo = {}) => {
     const key = photo?.mediaKey || photo?.refKey || getPhotoKey(photo);
@@ -813,11 +819,13 @@ export function ChatGalleryModal({
     let changed = false;
     if (key && !brokenPhotoKeysRef.current.has(key)) {
       brokenPhotoKeysRef.current.add(key);
+      saveBrokenUrl(key);
       changed = true;
     }
     urls.forEach(url => {
       if (!brokenPhotoUrlsRef.current.has(url)) {
         brokenPhotoUrlsRef.current.add(url);
+        saveBrokenUrl(url);
         changed = true;
       }
     });

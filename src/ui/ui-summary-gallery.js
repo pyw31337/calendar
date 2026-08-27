@@ -838,8 +838,8 @@ export function PhotoGallery({ chatMessages, calendar = null, totalGalleryCount,
 
   const [collapsed, setCollapsed] = React.useState(false);
   const [lightbox, setLightbox] = React.useState(null);
-  const brokenPhotoKeysRef = React.useRef(new Set());
-  const brokenPhotoUrlsRef = React.useRef(new Set());
+  const brokenPhotoKeysRef = React.useRef((GATHER_APP_UTILS.getPersistentBrokenPhotoUrls || (window.GATHER_APP_UTILS && window.GATHER_APP_UTILS.getPersistentBrokenPhotoUrls) || (() => new Set()))());
+  const brokenPhotoUrlsRef = React.useRef((GATHER_APP_UTILS.getPersistentBrokenPhotoUrls || (window.GATHER_APP_UTILS && window.GATHER_APP_UTILS.getPersistentBrokenPhotoUrls) || (() => new Set()))());
   const [brokenPhotoRevision, setBrokenPhotoRevision] = React.useState(0);
   const normalizeBrokenPhotoUrl = value => {
     const url = String(value || '').trim();
@@ -848,7 +848,13 @@ export function PhotoGallery({ chatMessages, calendar = null, totalGalleryCount,
   };
   const isBrokenPhotoValue = value => {
     const url = normalizeBrokenPhotoUrl(value);
-    return !!url && brokenPhotoUrlsRef.current.has(url);
+    if (!url) return false;
+    const persistent = (GATHER_APP_UTILS.getPersistentBrokenPhotoUrls || (window.GATHER_APP_UTILS && window.GATHER_APP_UTILS.getPersistentBrokenPhotoUrls) || (() => new Set()))();
+    return brokenPhotoUrlsRef.current.has(url) || persistent.has(url);
+  };
+  const saveBrokenUrl = urlOrKey => {
+    const saveFn = GATHER_APP_UTILS.savePersistentBrokenPhotoUrl || (window.GATHER_APP_UTILS && window.GATHER_APP_UTILS.savePersistentBrokenPhotoUrl);
+    if (typeof saveFn === 'function') saveFn(urlOrKey);
   };
   const markBrokenPhoto = (photo, brokenInfo = {}) => {
     const key = photo?.mediaKey || photo?.refKey || photo?.key;
@@ -862,11 +868,13 @@ export function PhotoGallery({ chatMessages, calendar = null, totalGalleryCount,
     let changed = false;
     if (key && !brokenPhotoKeysRef.current.has(key)) {
       brokenPhotoKeysRef.current.add(key);
+      saveBrokenUrl(key);
       changed = true;
     }
     urls.forEach(url => {
       if (!brokenPhotoUrlsRef.current.has(url)) {
         brokenPhotoUrlsRef.current.add(url);
+        saveBrokenUrl(url);
         changed = true;
       }
     });
