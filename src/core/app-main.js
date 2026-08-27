@@ -718,11 +718,6 @@ function App() {
 
   const isSavingRef = React.useRef(false);
   const serverRevisionRef = React.useRef(loadLocalMeta());
-  // Tracks which calendar id the "서버 재연결 중" toast has already been shown for, so a stuck
-  // connection that keeps retrying every 3.5s (see runInitialLoad below) only surfaces it once
-  // instead of repeating it forever -- the cache-restored screen already told the user the data
-  // might be stale, repeating that same toast on every retry tick added noise without new information.
-  const reconnectToastShownForRef = React.useRef(null);
 
   const applyServerCalendars = (serverCalendars, lastModified = Date.now()) => {
     const normalized = cloneCalendarList(serverCalendars).map(normalizeCalendarForSave);
@@ -1621,33 +1616,23 @@ function App() {
       // refresh (see the fallbackTimeoutId branch below), most often right after the module-level
       // visibilitychange handler force-cycles disableNetwork/enableNetwork on returning from a
       // long background stint (see VISIBILITY_RECONNECT_THRESHOLD_MS), which can leave the
-      // onSnapshot listener briefly slow to redeliver. That's a routine reconnect the user already
-      // has working data for, not a "no data at all" emergency -- showing "N차 재시도 중" /
-      // "데이터 로딩 지연" toasts for it just alarms the user over something that resolves itself,
-      // sometimes repeatedly on every background/foreground cycle. Only escalate to the user when
-      // there was NO usable data to fall back on to begin with.
+      // onSnapshot listener briefly slow to redeliver. The app keeps the last usable data visible
+      // and quietly retries in the background instead of surfacing transient reconnect notices to
+      // the user.
       for (let attempt = 1; attempt <= FIREBASE_LOAD_MAX_ATTEMPTS && isMounted && !hasLoadedCloudCalendar; attempt += 1) {
         const result = await fetchSingleCloudCalendar(activeCalId, 1, FIREBASE_LOAD_TIMEOUT_MS);
         if (result?.calendar && applyLoadedCalendar(result.calendar, result.lastModified || Date.now())) {
-          if (attempt > 1 && !cacheHit) showToast('다시 불러옴', 'success', 3000);
-          reconnectToastShownForRef.current = null;
           return;
-        }
-        if (attempt < FIREBASE_LOAD_MAX_ATTEMPTS && isMounted && !hasLoadedCloudCalendar && !cacheHit) {
-          showToast(`${attempt + 1}차 재시도 중`, 'info', 3000);
         }
       }
       if (isMounted && !hasLoadedCloudCalendar) {
         const restored = restoreActiveCalendarFromCache();
         if (restored) {
           setIsInitialDataLoading(false);
-          if (!cacheHit && reconnectToastShownForRef.current !== activeCalId) {
-            reconnectToastShownForRef.current = activeCalId;
-            showToast('서버 재연결 중', 'info', 4000);
-          }
+          if (!cacheHit) console.warn(`Calendar ${activeCalId} refreshed from local state while waiting for Firestore.`);
         } else {
           setIsInitialDataLoading(true);
-          if (!cacheHit) showToast('데이터 로딩 지연, 재시도 중', 'error', 5000);
+          if (!cacheHit) console.warn(`Calendar ${activeCalId} data load is still pending; background retry continues.`);
         }
         retryTimeoutId = setTimeout(() => {
           if (isMounted) setCloudReloadToken(token => token + 1);
@@ -1725,18 +1710,9 @@ function App() {
 
   React.useEffect(() => {
     if (firebaseDb) return;
-    // Firing this immediately on the first failed attempt was itself the bug: a live report
-    // showed real-time chat sync working perfectly (a message sent from a phone appeared
-    // instantly on a PC browser) at the exact moment this toast was on screen saying "연결
-    // 오류" -- the background retry (app-firebase-data.js) had already quietly recovered
-    // firebaseDb by then, but this effect only ever checked its value once, at mount, so the
-    // toast kept reporting a failure that was no longer true. Poll instead: skip the toast
-    // entirely if firebaseDb resolves shortly after, and only show it once
-    // firebaseRetryExhausted is actually true (every retry genuinely gave up, ~10 minutes) --
-    // that is a real, final failure worth interrupting the user for.
     if (firebaseRetryExhausted) {
       const detail = firebaseInitError ? ` (${firebaseInitError})` : ' (원인 미상)';
-      showToast(`연결 오류${detail}`, 'error', 15000);
+      console.warn(`Firebase connection error${detail}`);
       return;
     }
     let cancelled = false;
@@ -1745,7 +1721,7 @@ function App() {
       if (firebaseRetryExhausted) {
         clearInterval(pollId);
         const detail = firebaseInitError ? ` (${firebaseInitError})` : ' (원인 미상)';
-        showToast(`연결 오류${detail}`, 'error', 15000);
+        console.warn(`Firebase connection error${detail}`);
       }
     }, 2000);
     return () => { cancelled = true; clearInterval(pollId); };
@@ -1773,65 +1749,7 @@ function App() {
     places: unionPlaces(rawActiveCal, placesSubcollection),
     confirmedMeeting: unionConfirmedMeetings(rawActiveCal, confirmedMeetingsSubcollection)
   }), [rawActiveCal, placesSubcollection, confirmedMeetingsSubcollection]);
-  const syncStatus = React.useMemo(() => {
-    const formatSyncTimeLabel = ts => {
-      const ms = Number(ts) || 0;
-      if (!ms) return '';
-      const d = new Date(ms);
-      if (Number.isNaN(d.getTime())) return '';
-      return `${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-    };
-    const lastSyncedAt = Number(syncDiag?.receivedAt || syncDiag?.docUpdatedAt || activeCal?.updatedAt || 0) || 0;
-    const lastSyncedText = formatSyncTimeLabel(lastSyncedAt);
-    if (!isBrowserOnline) {
-      const label = '오프라인';
-      const detail = '네트워크 연결이 끊긴 상태입니다.';
-      return {
-        status: 'offline',
-        label,
-        detail,
-        lastSyncedText,
-        title: [label, lastSyncedText ? `최근 ${lastSyncedText}` : '', detail].filter(Boolean).join(' · ')
-      };
-    }
-    if (!firebaseDb) {
-      if (firebaseRetryExhausted) {
-        const label = '연결 안 됨';
-        const detail = 'Firebase 연결이 복구되지 않았습니다.';
-        return {
-          status: 'offline',
-          label,
-          detail,
-          lastSyncedText,
-          title: [label, lastSyncedText ? `최근 ${lastSyncedText}` : '', detail].filter(Boolean).join(' · ')
-        };
-      }
-      return null;
-    }
-    if (syncDiag?.error) {
-      const label = '연결 지연';
-      const detail = '동기화 응답이 지연되고 있습니다.';
-      return {
-        status: 'error',
-        label,
-        detail,
-        lastSyncedText,
-        title: [label, lastSyncedText ? `최근 ${lastSyncedText}` : '', detail].filter(Boolean).join(' · ')
-      };
-    }
-    if (syncDiag?.hasPendingWrites) {
-      const label = '저장 대기';
-      const detail = '저장한 변경사항을 서버에 반영하는 중입니다.';
-      return {
-        status: 'saving',
-        label,
-        detail,
-        lastSyncedText,
-        title: [label, lastSyncedText ? `최근 ${lastSyncedText}` : '', detail].filter(Boolean).join(' · ')
-      };
-    }
-    return null;
-  }, [activeCal?.updatedAt, firebaseDb, firebaseRetryExhausted, isBrowserOnline, syncDiag]);
+  const syncStatus = null;
   React.useEffect(() => {
     if (!firebaseDb || !activeCalId) return undefined;
     let lastRefreshAt = 0;
