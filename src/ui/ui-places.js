@@ -1372,10 +1372,6 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
   // Wait, let's keep the smooth scroll to top of list container if list scrolls.
   const handleSelectPlaceOnMap = (place, options = {}) => {
     if (!place || !place.id) return;
-    if (focusPlace && focusPlace.id === place.id) {
-      setFocusPlace(null);
-      return;
-    }
     focusTokenRef.current += 1;
     const fromMap = !!(options && options.fromMap);
     setFocusPlace({ id: place.id, token: focusTokenRef.current, fromMap });
