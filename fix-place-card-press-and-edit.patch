@@ -1,0 +1,182 @@
+diff --git a/assets/app.css b/assets/app.css
+index 606c010..909c0c6 100644
+--- a/assets/app.css
++++ b/assets/app.css
+@@ -538,7 +538,6 @@ body:has(.admin-login-gate) {
+ .poll-voter-option:hover,
+ .search-result-row:hover,
+ .memo-card-hover:hover,
+-.place-card-row:hover,
+ .confirmed-meeting:hover,
+ .color-swatch-trigger:hover,
+ .admin-calendar-picker-btn:hover,
+@@ -629,8 +628,6 @@ body:has(.admin-login-gate) {
+ .main-menu-item.is-pressing,
+ .memo-card-hover:active,
+ .memo-card-hover.is-pressing,
+-.place-card-row:active,
+-.place-card-row.is-pressing,
+ .admin-side-menu-item:active,
+ .admin-side-menu-item.is-pressing,
+ .admin-side-menu-close-btn:active,
+@@ -4309,3 +4306,16 @@ textarea.form-input {
+   .manual-mobile-friendly article h3 { font-size: 0.95rem !important; }
+   .manual-mobile-friendly article p { font-size: 0.82rem !important; margin-top: 4px !important; }
+ }
++
++
++/* Place list cards: no press/scale — they are rows, not buttons */
++.place-card-row,
++.place-card-row:active,
++.place-card-row.is-pressing,
++.place-card-row:hover {
++  transform: none !important;
++}
++.place-card-row .place-card-action-btn {
++  position: relative;
++  z-index: 3;
++}
+diff --git a/public/assets/app.css b/public/assets/app.css
+index 606c010..909c0c6 100644
+--- a/public/assets/app.css
++++ b/public/assets/app.css
+@@ -538,7 +538,6 @@ body:has(.admin-login-gate) {
+ .poll-voter-option:hover,
+ .search-result-row:hover,
+ .memo-card-hover:hover,
+-.place-card-row:hover,
+ .confirmed-meeting:hover,
+ .color-swatch-trigger:hover,
+ .admin-calendar-picker-btn:hover,
+@@ -629,8 +628,6 @@ body:has(.admin-login-gate) {
+ .main-menu-item.is-pressing,
+ .memo-card-hover:active,
+ .memo-card-hover.is-pressing,
+-.place-card-row:active,
+-.place-card-row.is-pressing,
+ .admin-side-menu-item:active,
+ .admin-side-menu-item.is-pressing,
+ .admin-side-menu-close-btn:active,
+@@ -4309,3 +4306,16 @@ textarea.form-input {
+   .manual-mobile-friendly article h3 { font-size: 0.95rem !important; }
+   .manual-mobile-friendly article p { font-size: 0.82rem !important; margin-top: 4px !important; }
+ }
++
++
++/* Place list cards: no press/scale — they are rows, not buttons */
++.place-card-row,
++.place-card-row:active,
++.place-card-row.is-pressing,
++.place-card-row:hover {
++  transform: none !important;
++}
++.place-card-row .place-card-action-btn {
++  position: relative;
++  z-index: 3;
++}
+diff --git a/src/ui/ui-place-register.js b/src/ui/ui-place-register.js
+index 6a881f7..928957b 100644
+--- a/src/ui/ui-place-register.js
++++ b/src/ui/ui-place-register.js
+@@ -30,7 +30,15 @@ function useChatSendGuard(onSend, canSend) {
+   return typeof f === 'function' ? f(onSend, canSend) : onSend;
+ }
+ function useModalDirtyGuard(...args) {
+-  return __gatherUiDeps().useModalDirtyGuard(...args);
++  const f = (__gatherUiDeps() || {}).useModalDirtyGuard;
++  if (typeof f === 'function') return f(...args);
++  const onClose = args[0];
++  return {
++    requestClose: () => { if (typeof onClose === 'function') onClose(); },
++    overlayOnClick: (e) => {
++      if (e && e.target === e.currentTarget && typeof onClose === 'function') onClose();
++    }
++  };
+ }
+ function computeKoreanHolidaysForYear(year) {
+   const f = __gatherUiDeps().computeKoreanHolidaysForYear;
+@@ -683,7 +691,12 @@ export function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, on
+   const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon || function () { return '×'; };
+   const TrashIcon = __comp.TrashIcon || __deps.TrashIcon || function () { return '🗑'; };
+   const AutoGrowTextarea = __comp.AutoGrowTextarea || __deps.AutoGrowTextarea;
+-  const FormAddEditActionButtons = __comp.FormAddEditActionButtons || __deps.FormAddEditActionButtons;
++  const FormAddEditActionButtons = __comp.FormAddEditActionButtons || __deps.FormAddEditActionButtons || function FallbackActions({ isEditing, isSaving, onCancel, onSubmit, flexGrow }) {
++    return React.createElement('div', { style: { display: 'flex', gap: '8px', flex: flexGrow ? 1 : undefined } },
++      React.createElement('button', { type: 'button', onClick: onCancel, disabled: isSaving }, '취소'),
++      React.createElement('button', { type: 'button', onClick: onSubmit, disabled: isSaving }, isSaving ? '저장 중...' : (isEditing ? '수정' : '추가'))
++    );
++  };
+   const PlaceSectionIcon = __comp.PlaceSectionIcon || __deps.PlaceSectionIcon;
+   const SegmentedToggle = __comp.SegmentedToggle || __deps.SegmentedToggle;
+   const SimpleBottomSheetPicker = __comp.SimpleBottomSheetPicker || __deps.SimpleBottomSheetPicker;
+diff --git a/src/ui/ui-places.js b/src/ui/ui-places.js
+index b7106ac..292bc60 100644
+--- a/src/ui/ui-places.js
++++ b/src/ui/ui-places.js
+@@ -1834,7 +1834,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
+             // everywhere else in the app (see chat-search-focused-bubble/chat-search-shake).
+             className: "place-card-row" + (isPlaceFocused ? " chat-search-focused-bubble" : ""),
+             "data-place-id": place.id,
+-            role: "button",
++            "data-no-press-feedback": "1",
+             tabIndex: 0,
+             onKeyDown: (e) => {
+               if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'BUTTON')) return;
+@@ -1853,31 +1853,50 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
+           },
+             /* Top-right absolute action buttons */
+             /*#__PURE__*/React.createElement("div", {
+-              style: { position: 'absolute', top: '8px', right: '8px', display: 'flex', alignItems: 'center', gap: '4px' }
++              className: "place-card-actions",
++              style: { position: 'absolute', top: '8px', right: '8px', display: 'flex', alignItems: 'center', gap: '4px', zIndex: 4 },
++              onClick: event => event.stopPropagation(),
++              onPointerDown: event => event.stopPropagation()
+             },
+               /*#__PURE__*/React.createElement("button", {
+                 type: "button",
++                className: "place-card-action-btn",
+                 onClick: event => {
++                  event.preventDefault();
+                   event.stopPropagation();
+-                  window.open(getPlaceExternalMapUrl(place), '_blank', 'noopener,noreferrer');
++                  try {
++                    const url = typeof getPlaceExternalMapUrl === 'function' ? getPlaceExternalMapUrl(place) : (place && (place.url || place.mapUrl));
++                    if (url) window.open(url, '_blank', 'noopener,noreferrer');
++                    else if (showToast) showToast('연결된 업체 정보가 없습니다.', 'info');
++                  } catch (err) {
++                    console.error('place external map url', err);
++                    if (showToast) showToast('업체 정보를 열 수 없습니다.', 'error');
++                  }
+                 },
+                 title: "업체보기",
+                 style: {
+                   width: '28px', height: '28px',
+                   background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8',
+-                  display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0
++                  display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
++                  pointerEvents: 'auto'
+                 }
+-              }, /*#__PURE__*/React.createElement(BuildingIcon, { size: 14 })),
++              }, BuildingIcon ? /*#__PURE__*/React.createElement(BuildingIcon, { size: 14 }) : '🏢'),
+               /*#__PURE__*/React.createElement("button", {
+                 type: "button",
+-                onClick: event => { event.stopPropagation(); handleEditPlace(place); },
++                className: "place-card-action-btn",
++                onClick: event => {
++                  event.preventDefault();
++                  event.stopPropagation();
++                  handleEditPlace(place);
++                },
+                 title: "장소 수정",
+                 style: {
+                   width: '28px', height: '28px',
+                   background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8',
+-                  display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0
++                  display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
++                  pointerEvents: 'auto'
+                 }
+-              }, /*#__PURE__*/React.createElement(PencilIcon, { size: 14 }))
++              }, PencilIcon ? /*#__PURE__*/React.createElement(PencilIcon, { size: 14 }) : '✎')
+             ),
+             
+             /* Category Label Capsule and Visit Info */

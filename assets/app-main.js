@@ -6609,7 +6609,15 @@ function App() {
         setSelectedDate(d);
         setIsModalOpen(true);
         changeView('calendar');
-      }
+      },
+      onOpenShare: () => {
+        if (typeof setIsShareOpen === 'function') setIsShareOpen(true);
+      },
+      onOpenAppSettings: () => {
+        if (typeof setIsAppSettingsOpen === 'function') setIsAppSettingsOpen(true);
+      },
+      onChangeView: changeView,
+      showToast: showToast
     }));
   }
 

@@ -3121,5 +3121,6 @@ export function PollModal({ calendar, poll, onSave, onClose, showToast, onReques
     AnniversaryModal: AnniversaryModal,
     SettlementSummaryModal: SettlementSummaryModal,
     PollModal: PollModal,
+    CreateSettlementModal: CreateSettlementModal,
   });
 }
