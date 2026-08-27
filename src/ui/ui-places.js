@@ -712,10 +712,9 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
       // OSM tile style -- its muted greyscale/white basemap with minimal labels makes the
       // colored category pins the only thing that actually pops, unlike the default style's
       // busy roads/land-use colors competing with them for attention.
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-        maxZoom: 20,
-        subdomains: 'abcd',
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
       }).addTo(map);
 
       let clusterAvailable = false;
