@@ -3287,8 +3287,349 @@ function createCalendarBackupPayload(calendarsList, targetCalendarId = '') {
         lastModified: calendar.updatedAt || Date.now(),
         revision: calendar.revision || 0
       }
-    }))
+      }))
   };
+}
+
+const CALENDAR_BACKUP_COLLECTION_NAMES = [
+  'messages',
+  'memos',
+  'places',
+  'confirmedMeetings',
+  'activityLogs',
+  'anniversaries'
+];
+
+function cloneJsonSafe(value) {
+  if (value == null) return value;
+  try {
+    return JSON.parse(JSON.stringify(value));
+  } catch (_) {
+    return value;
+  }
+}
+
+function stripBackupCollectionsFromCalendar(calendar) {
+  const cloned = normalizeCalendarForSave(calendar);
+  if (!cloned || typeof cloned !== 'object') return cloned;
+  const cleaned = { ...cloned };
+  delete cleaned.activityLogs;
+  delete cleaned.places;
+  delete cleaned.confirmedMeeting;
+  delete cleaned.messages;
+  delete cleaned.memos;
+  delete cleaned.anniversaries;
+  delete cleaned.push_subscriptions;
+  return cleaned;
+}
+
+function normalizeBackupCollectionDoc(collectionName, doc, index = 0) {
+  if (!doc || typeof doc !== 'object') return null;
+  const rawData = doc.data && typeof doc.data === 'object'
+    ? doc.data
+    : (doc.document && typeof doc.document === 'object' ? doc.document : doc);
+  const docId = sanitizeText(doc.docId || doc.id || rawData.id || `${collectionName}_${index + 1}`, 180);
+  if (!docId) return null;
+  const data = cloneJsonSafe(rawData);
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return null;
+  return { docId, data };
+}
+
+function normalizeBackupCollectionDocs(collectionName, docs) {
+  if (!Array.isArray(docs)) return [];
+  return docs
+    .map((doc, index) => normalizeBackupCollectionDoc(collectionName, doc, index))
+    .filter(Boolean);
+}
+
+function normalizeBackupCollections(collections) {
+  if (!collections || typeof collections !== 'object' || Array.isArray(collections)) return null;
+  const normalized = {};
+  let hasAny = false;
+  CALENDAR_BACKUP_COLLECTION_NAMES.forEach(collectionName => {
+    if (!Object.prototype.hasOwnProperty.call(collections, collectionName)) return;
+    normalized[collectionName] = normalizeBackupCollectionDocs(collectionName, collections[collectionName]);
+    hasAny = true;
+  });
+  if (!hasAny) return null;
+  Object.keys(collections).forEach(collectionName => {
+    if (CALENDAR_BACKUP_COLLECTION_NAMES.includes(collectionName)) return;
+    const docs = normalizeBackupCollectionDocs(collectionName, collections[collectionName]);
+    if (docs.length > 0) normalized[collectionName] = docs;
+  });
+  return normalized;
+}
+
+function getCalendarBackupCollectionBasePath(calendarId, collectionName) {
+  return `calendars/cal_${calendarId}/${collectionName}`;
+}
+
+function compareBackupDocs(collectionName, a, b) {
+  const aData = a?.data || {};
+  const bData = b?.data || {};
+  switch (collectionName) {
+    case 'messages':
+      return (Number(bData.timestamp) || 0) - (Number(aData.timestamp) || 0) || String(a.docId || '').localeCompare(String(b.docId || ''));
+    case 'memos':
+      return (Number(bData.createdAt) || 0) - (Number(aData.createdAt) || 0) || String(a.docId || '').localeCompare(String(b.docId || ''));
+    case 'places':
+      return (Number(bData.updatedAt) || 0) - (Number(aData.updatedAt) || 0) || String(a.docId || '').localeCompare(String(b.docId || ''));
+    case 'confirmedMeetings':
+      return String(aData.date || '').localeCompare(String(bData.date || '')) || String(a.docId || '').localeCompare(String(b.docId || ''));
+    case 'activityLogs':
+      return (Number(aData.timestamp) || 0) - (Number(bData.timestamp) || 0) || String(a.docId || '').localeCompare(String(b.docId || ''));
+    case 'anniversaries':
+      return (Number(bData.createdAt) || 0) - (Number(aData.createdAt) || 0) || String(a.docId || '').localeCompare(String(b.docId || ''));
+    default:
+      return String(a.docId || '').localeCompare(String(b.docId || ''));
+  }
+}
+
+async function fetchCalendarCollectionDocs(calendarId, collectionName) {
+  const cleanCalId = sanitizeText(calendarId || '', 64);
+  const cleanCollection = sanitizeText(collectionName || '', 80);
+  if (!cleanCalId || !cleanCollection) return [];
+  const results = [];
+  if (firebaseDb) {
+    try {
+      const snap = await firebaseDb.collection('calendars').doc(`cal_${cleanCalId}`).collection(cleanCollection).get({ source: 'server' });
+      snap.forEach(doc => {
+        results.push({ docId: doc.id, data: cloneJsonSafe(doc.data() || {}) });
+      });
+    } catch (e) {
+      console.warn(`Failed to fetch ${cleanCollection} for ${cleanCalId} via SDK, trying REST:`, e);
+    }
+  }
+  if (results.length === 0) {
+    try {
+      let pageToken = '';
+      do {
+        const query = pageToken ? `?pageSize=300&pageToken=${encodeURIComponent(pageToken)}` : '?pageSize=300';
+        const res = await fetch(`https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/${getCalendarBackupCollectionBasePath(cleanCalId, cleanCollection)}${query}`);
+        if (!res.ok) break;
+        const data = await res.json();
+        const docs = data.documents || [];
+        docs.forEach(doc => {
+          results.push({
+            docId: String(doc.name || '').split('/').pop(),
+            data: cloneJsonSafe(firestoreDocumentToJs(doc) || {})
+          });
+        });
+        pageToken = data.nextPageToken || '';
+      } while (pageToken);
+    } catch (e) {
+      console.warn(`Failed to fetch ${cleanCollection} for ${cleanCalId} via REST:`, e);
+    }
+  }
+  results.sort((a, b) => compareBackupDocs(cleanCollection, a, b));
+  return results;
+}
+
+async function createCalendarDataBackupPayload(calendarsList, targetCalendarId = '') {
+  const selected = targetCalendarId
+    ? calendarsList.filter(calendar => calendar.id === targetCalendarId)
+    : calendarsList.filter(calendar => isValidCalendarId(calendar.id));
+  const bundle = {
+    type: 'gather-calendar-data-backup',
+    version: 2,
+    exportedAt: new Date().toISOString(),
+    projectId: firebaseConfig.projectId,
+    calendarIds: selected.map(calendar => calendar.id),
+    calendars: []
+  };
+  for (const calendar of selected) {
+    const sanitizedCalendar = stripBackupCollectionsFromCalendar(calendar);
+    const collections = {};
+    for (const collectionName of CALENDAR_BACKUP_COLLECTION_NAMES) {
+      collections[collectionName] = await fetchCalendarCollectionDocs(calendar.id, collectionName);
+    }
+    bundle.calendars.push({
+      docId: `cal_${calendar.id}`,
+      data: {
+        calendar: sanitizedCalendar,
+        lastModified: calendar.updatedAt || Date.now(),
+        revision: calendar.revision || 0
+      },
+      collections,
+      counts: Object.fromEntries(Object.entries(collections).map(([name, docs]) => [name, docs.length]))
+    });
+  }
+  return bundle;
+}
+
+function extractCalendarBackupEntries(payload) {
+  if (!payload) return [];
+  const rawItems = Array.isArray(payload)
+    ? payload
+    : Array.isArray(payload.calendars)
+      ? payload.calendars
+      : payload.calendar
+        ? [payload]
+        : payload.data?.calendar
+          ? [payload]
+          : [];
+  return rawItems.map((item) => {
+    const data = item?.data && typeof item.data === 'object' ? item.data : item;
+    const calendar = data?.calendar || item?.calendar || item;
+    const collections = item?.collections || data?.collections || null;
+    const backupEntry = {
+      docId: sanitizeText(item?.docId || (calendar?.id ? `cal_${calendar.id}` : ''), 180),
+      calendar: stripBackupCollectionsFromCalendar(calendar),
+      lastModified: Number(data?.lastModified || item?.lastModified || calendar?.updatedAt || 0) || 0,
+      revision: Number(data?.revision || item?.revision || calendar?.revision || 0) || 0,
+      collections: normalizeBackupCollections(collections)
+    };
+    return backupEntry.calendar && isValidCalendarId(backupEntry.calendar.id) ? backupEntry : null;
+  }).filter(Boolean);
+}
+
+function validateCalendarBackupEntries(entries) {
+  const normalized = Array.isArray(entries) ? entries.filter(Boolean) : [];
+  const calendars = normalized.map(entry => entry.calendar).filter(Boolean);
+  const baseValidation = validateBackupCalendars(calendars);
+  if (baseValidation.error) {
+    return { calendars: [], entries: [], error: baseValidation.error };
+  }
+  for (const entry of normalized) {
+    if (!entry || !entry.calendar || !isValidCalendarId(entry.calendar.id)) {
+      return { calendars: [], entries: [], error: '복구 가능한 데이터 없음' };
+    }
+    if (entry.collections && typeof entry.collections === 'object') {
+      for (const [collectionName, docs] of Object.entries(entry.collections)) {
+        if (!Array.isArray(docs)) {
+          return { calendars: [], entries: [], error: `${entry.calendar.id}: ${collectionName} 백업 형식 오류` };
+        }
+        for (const doc of docs) {
+          if (!doc || typeof doc !== 'object' || typeof doc.docId !== 'string' || !doc.docId.trim() || !doc.data || typeof doc.data !== 'object') {
+            return { calendars: [], entries: [], error: `${entry.calendar.id}: ${collectionName} 문서 형식 오류` };
+          }
+        }
+      }
+    }
+  }
+  return { calendars: baseValidation.calendars, entries: normalized, error: '' };
+}
+
+function splitIntoChunks(list, size) {
+  const chunks = [];
+  const input = Array.isArray(list) ? list : [];
+  const chunkSize = Math.max(1, Math.floor(size || 1));
+  for (let index = 0; index < input.length; index += chunkSize) {
+    chunks.push(input.slice(index, index + chunkSize));
+  }
+  return chunks;
+}
+
+async function applyCalendarCollectionDocs(calendarId, collectionName, docs) {
+  const cleanCalId = sanitizeText(calendarId || '', 64);
+  const cleanCollection = sanitizeText(collectionName || '', 80);
+  if (!cleanCalId || !cleanCollection) return false;
+  const normalizedDocs = normalizeBackupCollectionDocs(cleanCollection, docs);
+  const existingDocs = await fetchCalendarCollectionDocs(cleanCalId, cleanCollection);
+  const ops = [
+    ...existingDocs.map(doc => ({ type: 'delete', docId: doc.docId })),
+    ...normalizedDocs.map(doc => ({ type: 'set', docId: doc.docId, data: doc.data }))
+  ];
+  if (ops.length === 0) return true;
+  const chunks = splitIntoChunks(ops, 350);
+  const collectionPath = getCalendarBackupCollectionBasePath(cleanCalId, cleanCollection);
+
+  if (firebaseDb) {
+    try {
+      const colRef = firebaseDb.collection('calendars').doc(`cal_${cleanCalId}`).collection(cleanCollection);
+      for (const chunk of chunks) {
+        const batch = firebaseDb.batch();
+        chunk.forEach(op => {
+          const docRef = colRef.doc(op.docId);
+          if (op.type === 'delete') batch.delete(docRef);
+          else batch.set(docRef, cloneJsonSafe(op.data) || {});
+        });
+        await batch.commit();
+      }
+      return true;
+    } catch (e) {
+      console.warn(`Failed to apply ${cleanCollection} for ${cleanCalId} via SDK, trying REST:`, e);
+    }
+  }
+
+  try {
+    for (const chunk of chunks) {
+      const writes = chunk.map(op => {
+        const name = `projects/${firebaseConfig.projectId}/databases/(default)/documents/${collectionPath}/${op.docId}`;
+        if (op.type === 'delete') {
+          return { delete: name };
+        }
+        return {
+          update: {
+            name,
+            fields: Object.fromEntries(Object.entries(cloneJsonSafe(op.data) || {}).map(([key, value]) => [key, jsToFirestoreValue(value)]))
+          }
+        };
+      });
+      const res = await fetch(`https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents:commit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ writes })
+      });
+      if (!res.ok) {
+        console.warn(`Failed to apply ${cleanCollection} for ${cleanCalId} via REST:`, await res.text());
+        return false;
+      }
+    }
+    return true;
+  } catch (e) {
+    console.warn(`Failed to apply ${cleanCollection} for ${cleanCalId} via REST:`, e);
+    return false;
+  }
+}
+
+async function restoreCalendarBackupEntries(entries) {
+  const normalizedEntries = Array.isArray(entries) ? entries.filter(Boolean) : [];
+  const results = [];
+  const now = Date.now();
+  for (const entry of normalizedEntries) {
+    const calendar = stripBackupCollectionsFromCalendar(entry.calendar);
+    if (!calendar || !calendar.id) {
+      results.push({ id: '', saved: false, reason: 'invalid-calendar' });
+      continue;
+    }
+    const restoredCalendar = {
+      ...calendar,
+      updatedAt: now,
+      revision: (calendar.revision || 0) + 1
+    };
+    const saved = await pushSingleCloudCalendar(restoredCalendar, now, 18, null, 'restore');
+    if (!saved) {
+      results.push({ id: calendar.id, saved: false, reason: 'calendar-write-failed' });
+      continue;
+    }
+    if (entry.collections && typeof entry.collections === 'object') {
+      let collectionFailed = '';
+      for (const collectionName of CALENDAR_BACKUP_COLLECTION_NAMES) {
+        if (!Object.prototype.hasOwnProperty.call(entry.collections, collectionName)) continue;
+        const ok = await applyCalendarCollectionDocs(calendar.id, collectionName, entry.collections[collectionName]);
+        if (!ok) {
+          collectionFailed = collectionName;
+          break;
+        }
+      }
+      if (collectionFailed) {
+        results.push({ id: calendar.id, saved: false, reason: `${collectionFailed}-restore-failed` });
+        continue;
+      }
+    }
+    results.push({ id: calendar.id, saved: true, calendar: restoredCalendar });
+  }
+  const failed = results.filter(result => !result.saved);
+  if (failed.length > 0) {
+    return { ok: false, results, failed };
+  }
+  try {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('gather-firebase-state-change'));
+    }
+  } catch (_) {}
+  return { ok: true, results, failed: [] };
 }
 
 function downloadJsonFile(filename, payload) {
@@ -10552,6 +10893,16 @@ function bindGatherUiDeps() {
     SimpleBottomSheetPicker: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SimpleBottomSheetPicker) || (typeof SimpleBottomSheetPicker === 'function' ? SimpleBottomSheetPicker : null),
     SmallXIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SmallXIcon) || (typeof SmallXIcon === 'function' ? SmallXIcon : null),
     fetchSubcollectionCount: typeof fetchSubcollectionCount === 'function' ? fetchSubcollectionCount : null,
+    downloadJsonFile: typeof downloadJsonFile === 'function' ? downloadJsonFile : null,
+    downloadTextFile: typeof downloadTextFile === 'function' ? downloadTextFile : null,
+    exportCalendarConfirmedMeetingsToICS: typeof exportCalendarConfirmedMeetingsToICS === 'function' ? exportCalendarConfirmedMeetingsToICS : null,
+    createCalendarBackupPayload: typeof createCalendarBackupPayload === 'function' ? createCalendarBackupPayload : null,
+    createCalendarDataBackupPayload: typeof createCalendarDataBackupPayload === 'function' ? createCalendarDataBackupPayload : null,
+    extractCalendarsFromBackup: typeof extractCalendarsFromBackup === 'function' ? extractCalendarsFromBackup : null,
+    extractCalendarBackupEntries: typeof extractCalendarBackupEntries === 'function' ? extractCalendarBackupEntries : null,
+    validateBackupCalendars: typeof validateBackupCalendars === 'function' ? validateBackupCalendars : null,
+    validateCalendarBackupEntries: typeof validateCalendarBackupEntries === 'function' ? validateCalendarBackupEntries : null,
+    restoreCalendarBackupEntries: typeof restoreCalendarBackupEntries === 'function' ? restoreCalendarBackupEntries : null,
     AdminCreateCalendarModal: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AdminCreateCalendarModal) || (typeof AdminCreateCalendarModal === 'function' ? AdminCreateCalendarModal : null),
     AdminFilledMenuIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AdminFilledMenuIcon) || (typeof AdminFilledMenuIcon === 'function' ? AdminFilledMenuIcon : null),
     AdminRestorePhraseModal: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AdminRestorePhraseModal) || (typeof AdminRestorePhraseModal === 'function' ? AdminRestorePhraseModal : null),
