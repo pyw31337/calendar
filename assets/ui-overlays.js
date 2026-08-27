@@ -104,7 +104,54 @@ function EmojiPickerSheet({ onSelect, onClose }) {
   return ReactDOM.createPortal(sheet, document.body);
 }
 
+const ReactComponentBase = (typeof React !== 'undefined' && React.Component) ? React.Component : class {};
+class AppErrorBoundary extends ReactComponentBase {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, errorInfo) {
+    console.error('Uncaught UI Error captured by AppErrorBoundary:', error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return React.createElement('div', {
+        className: 'error-fallback-container',
+        style: {
+          padding: '24px',
+          textAlign: 'center',
+          margin: '20px auto',
+          maxWidth: '600px',
+          background: '#FFFFFF',
+          borderRadius: '16px',
+          border: '1px solid #E2E8F0',
+          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.08)'
+        }
+      },
+      React.createElement('div', { style: { fontSize: '2.5rem', marginBottom: '12px' } }, '⚠️'),
+      React.createElement('h3', { style: { marginBottom: '8px', color: '#0F172A', fontSize: '1.1rem', fontWeight: 700 } }, '화면 섹션을 불러오는 중 오류가 발생했습니다.'),
+      React.createElement('p', { style: { marginBottom: '16px', color: '#64748B', fontSize: '0.875rem', wordBreak: 'break-word' } }, (this.state.error && this.state.error.message) || '알 수 없는 오류가 발생했습니다.'),
+      React.createElement('div', { style: { display: 'flex', gap: '10px', justifyContent: 'center' } },
+        React.createElement('button', {
+          onClick: () => this.setState({ hasError: false, error: null }),
+          style: { padding: '8px 16px', background: '#F1F5F9', color: '#475569', border: '1px solid #CBD5E1', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem' }
+        }, '다시 시도'),
+        React.createElement('button', {
+          onClick: () => window.location.reload(),
+          style: { padding: '8px 16px', background: '#4F46E5', color: '#FFFFFF', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem' }
+        }, '새로고침')
+      )
+      );
+    }
+    return this.props.children;
+  }
+}
+
   window.GATHER_UI_COMPONENTS = Object.assign({}, window.GATHER_UI_COMPONENTS || {}, {
+    AppErrorBoundary: AppErrorBoundary,
     ImageUploadOverlay: ImageUploadOverlay,
     ImageProcessingOverlay: ImageProcessingOverlay,
     EmojiGridButton: EmojiGridButton,

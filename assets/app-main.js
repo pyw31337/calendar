@@ -11009,11 +11009,14 @@ try {
   if (rootElement) {
     const root = ReactDOM.createRoot(rootElement);
     const imageShareId = new URLSearchParams(window.location.search).get('image');
-    root.render(/*#__PURE__*/React.createElement(React.Fragment, null,
-      imageShareId
-        ? /*#__PURE__*/React.createElement(ImageShareViewer, { shareId: imageShareId })
-        : /*#__PURE__*/React.createElement(App, null),
-      /*#__PURE__*/React.createElement(UpdateAvailableBanner, null)
+    const EB = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AppErrorBoundary) || (typeof AppErrorBoundary !== 'undefined' ? AppErrorBoundary : React.Fragment);
+    root.render(/*#__PURE__*/React.createElement(EB, null,
+      /*#__PURE__*/React.createElement(React.Fragment, null,
+        imageShareId
+          ? /*#__PURE__*/React.createElement(ImageShareViewer, { shareId: imageShareId })
+          : /*#__PURE__*/React.createElement(App, null),
+        /*#__PURE__*/React.createElement(UpdateAvailableBanner, null)
+      )
     ));
   }
 } catch (e) {
