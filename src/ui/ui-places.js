@@ -742,11 +742,11 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
         chunkedLoading: true,
         showCoverageOnHover: false,
         spiderfyOnMaxZoom: true,
-        // Let the markercluster plugin handle click zooming to the cluster's bounds.
-        // The earlier custom flyTo(center, +1 zoom) path made clusters appear to "run away"
-        // because the cluster centroid can shift as membership is recomputed during the zoom
-        // animation. The built-in bounds zoom keeps the clicked cluster anchored much better.
-        zoomToBoundsOnClick: true,
+        // We handle clusterclick ourselves so we can keep the zoom anchored to the cluster's
+        // bounds while also adding a bit of padding. The earlier custom flyTo(center, +1 zoom)
+        // path made clusters appear to "run away" because the centroid shifts during reclustering;
+        // zooming to bounds avoids that, and the padding keeps the result from hugging the edge.
+        zoomToBoundsOnClick: false,
         disableClusteringAtZoom: 15,
         maxClusterRadius: 50,
         // Flat solid-color badge instead of the plugin's default ripple-ring style, to match the
@@ -775,6 +775,23 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
           });
         }
       }) : L.layerGroup();
+      if (clusterAvailable) {
+        markersLayerRef.current.on('clusterclick', e => {
+          const cluster = e && e.layer;
+          if (!cluster || typeof cluster.zoomToBounds !== 'function') return;
+          try {
+            if (e.originalEvent) {
+              L.DomEvent.preventDefault(e.originalEvent);
+              L.DomEvent.stopPropagation(e.originalEvent);
+            }
+          } catch (err) {}
+          const isMobileViewport = window.innerWidth <= 720;
+          cluster.zoomToBounds({
+            padding: isMobileViewport ? [44, 56] : [28, 28],
+            maxZoom: 15
+          });
+        });
+      }
       markersLayerRef.current.addTo(map);
       setReady(true);
       try { map.invalidateSize({ animate: false }); } catch (e) {}
