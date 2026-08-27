@@ -1236,7 +1236,6 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
   // only one entry across all place cards is in edit mode at a time.
   const [editingMemoEntryKey, setEditingMemoEntryKey] = React.useState(null);
   const [editingMemoEntryText, setEditingMemoEntryText] = React.useState('');
-  const placeCardClickForwardingRef = React.useRef(false);
 
   React.useEffect(() => {
     if (placesInitialQuery) {
@@ -1456,40 +1455,6 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
     }
     return true;
   });
-
-  const handlePlaceCardListClick = (event) => {
-    if (!event || event.target !== event.currentTarget) return;
-    if (placeCardClickForwardingRef.current) return;
-    if (typeof document === 'undefined' || typeof document.elementsFromPoint !== 'function') return;
-    const clientX = Number(event.clientX);
-    const clientY = Number(event.clientY);
-    if (!Number.isFinite(clientX) || !Number.isFinite(clientY)) return;
-    const hitElements = document.elementsFromPoint(clientX, clientY) || [];
-    const hitInteractive = hitElements.find(el => {
-      if (!el || typeof el.closest !== 'function') return false;
-      if (!el.closest('.place-card-row')) return false;
-      return el.tagName === 'BUTTON' || el.tagName === 'A';
-    });
-    if (hitInteractive) {
-      event.preventDefault();
-      event.stopPropagation();
-      placeCardClickForwardingRef.current = true;
-      try {
-        hitInteractive.click();
-      } finally {
-        placeCardClickForwardingRef.current = false;
-      }
-      return;
-    }
-    const hitRow = hitElements.find(el => el && el.classList && el.classList.contains('place-card-row'));
-    if (!hitRow) return;
-    const placeId = hitRow.getAttribute('data-place-id');
-    const place = filteredPlaces.find(p => String(p.id) === String(placeId));
-    if (!place) return;
-    event.preventDefault();
-    event.stopPropagation();
-    handleSelectPlaceOnMap(place);
-  };
 
   return /*#__PURE__*/React.createElement("div", {
     className: "places-view-container",
@@ -1848,7 +1813,6 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
     },
       /* Place cards list layout */
       /*#__PURE__*/React.createElement("div", {
-        onClick: handlePlaceCardListClick,
         style: {
           display: 'flex', flexDirection: 'column', gap: '6px', padding: '10px',
           border: 'none', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-card)',
@@ -1873,6 +1837,10 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
             "data-no-press-feedback": true,
             role: "button",
             tabIndex: 0,
+            onClickCapture: e => {
+              if (e.target && typeof e.target.closest === 'function' && e.target.closest('button, input, textarea, select')) return;
+              handleSelectPlaceOnMap(place);
+            },
             onKeyDown: (e) => {
               if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'BUTTON')) return;
               if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleSelectPlaceOnMap(place); }
