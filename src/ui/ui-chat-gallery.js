@@ -1054,6 +1054,7 @@ export function ChatGalleryModal({
       sourceImageIndex: Number.isInteger(photo.sourceImageIndex) ? photo.sourceImageIndex : null,
       meetingDate: isMeetingReference ? (photo.meetingDate || '') : (photo.meetingDate || ''),
       photoId: isMeetingReference ? (photo.photoId || '') : (photo.photoId || ''),
+      assetKey: photo.assetKey || photo.mediaKey || '',
       mediaKey: photo.mediaKey || '',
       refKey: photo.refKey || getPhotoKey(photo)
     };
@@ -1551,7 +1552,7 @@ export function ChatGalleryModal({
       onClick: () => setActiveLightbox && setActiveLightbox({
         urls: visiblePhotos.map(p => p.full),
         index: idx,
-          meta: visiblePhotos.map(p => ({ timestamp: p.timestamp, messageId: p.messageId, imageIndex: p.imageIndex, thumb: p.thumb, tags: p.tags, directMediaUrl: p.directMediaUrl, source: p.source, uploadSource: p.uploadSource, meetingDate: p.meetingDate, photoId: p.photoId, sourceMessageId: p.sourceMessageId, sourceImageIndex: p.sourceImageIndex, mediaKey: p.mediaKey, refKey: p.refKey }))
+          meta: visiblePhotos.map(p => ({ timestamp: p.timestamp, messageId: p.messageId, imageIndex: p.imageIndex, thumb: p.thumb, tags: p.tags, directMediaUrl: p.directMediaUrl, source: p.source, uploadSource: p.uploadSource, meetingDate: p.meetingDate, photoId: p.photoId, sourceMessageId: p.sourceMessageId, sourceImageIndex: p.sourceImageIndex, assetKey: p.assetKey, mediaKey: p.mediaKey, refKey: p.refKey }))
       }),
       onBroken: (e, brokenInfo) => handleBrokenPhoto(photo, brokenInfo),
       style: {

@@ -1809,6 +1809,7 @@ function getMessageImageEntries(msg) {
       messageId: msg.id,
       timestamp: msg.timestamp,
       tags: tags[i] || '',
+      assetKey: keys.assetKey,
       mediaKey: keys.mediaKey,
       refKey: keys.refKey,
       // Callers building non-chat entries (e.g. memo pseudo-messages) override `source`
@@ -1867,37 +1868,37 @@ function getMediaIdentityKeys(photo = {}, opts = {}) {
   if (directKey) {
     const ownerKey = messageId || opts.messageId || photoId || meetingDate || 'url';
     const key = `${baseSource}:${ownerKey}:direct:${directKey}`;
-    return { mediaKey: key, refKey: key };
+    return { assetKey: key, mediaKey: key, refKey: key };
   }
 
   if (isMeetingReference && photo?.sourceMessageId && Number.isInteger(photo?.sourceImageIndex)) {
     const mediaKey = `chat:${photo.sourceMessageId}:${photo.sourceImageIndex}`;
     const refKey = `meeting:${meetingDate || 'date'}:${photoId || photo.sourceMessageId}:${photo.sourceImageIndex}`;
-    return { mediaKey, refKey };
+    return { assetKey: mediaKey, mediaKey, refKey };
   }
 
   if (isMeetingReference) {
     const key = `meeting:${meetingDate || 'date'}:${photoId || messageId || 'photo'}`;
-    return { mediaKey: key, refKey: key };
+    return { assetKey: key, mediaKey: key, refKey: key };
   }
 
   if (messageId && Number.isInteger(imageIndex)) {
     const key = `${baseSource}:${messageId}:${imageIndex}`;
-    return { mediaKey: key, refKey: key };
+    return { assetKey: key, mediaKey: key, refKey: key };
   }
 
   if (messageId) {
     const key = `${baseSource}:${messageId}:0`;
-    return { mediaKey: key, refKey: key };
+    return { assetKey: key, mediaKey: key, refKey: key };
   }
 
   if (photoId || meetingDate) {
     const key = `${baseSource}:${photoId || meetingDate || 'photo'}`;
-    return { mediaKey: key, refKey: key };
+    return { assetKey: key, mediaKey: key, refKey: key };
   }
 
   const key = `${baseSource}:unknown`;
-  return { mediaKey: key, refKey: key };
+  return { assetKey: key, mediaKey: key, refKey: key };
 }
 
 function getMessageDirectMediaEntry(msg) {
@@ -1920,6 +1921,7 @@ function getMessageDirectMediaEntry(msg) {
     directMediaUrl: mediaInfo.url,
     source: sourceHint,
     uploadSource: msg.uploadSource || null,
+    assetKey: keys.assetKey,
     mediaKey: keys.mediaKey,
     refKey: keys.refKey
   };

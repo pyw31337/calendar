@@ -1140,7 +1140,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
     if (typeof onGetGalleryPhotoOrdinal !== 'function') return;
     const messageId = currentMeta.messageId;
     if (!messageId) return;
-    const key = currentIdentity.refKey || currentIdentity.mediaKey || `${messageId}_${currentMeta.imageIndex || 0}`;
+    const key = currentIdentity.assetKey || currentIdentity.refKey || currentIdentity.mediaKey || `${messageId}_${currentMeta.imageIndex || 0}`;
     if (galleryOrdinalFetchedRef.current.has(key)) return;
     galleryOrdinalFetchedRef.current.add(key);
     let cancelled = false;

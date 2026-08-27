@@ -1251,6 +1251,7 @@ export function DateModal({
           imageUrl: resolved.imageUrl || photo.imageUrl,
           thumbUrl: resolved.thumbUrl || photo.thumbUrl,
           tags: resolved.tags != null ? resolved.tags : photo.tags,
+          assetKey: resolved.assetKey || photo.assetKey || mediaKey,
           mediaKey,
           refKey
         };
@@ -1282,6 +1283,7 @@ export function DateModal({
                 sourceMessageId: msg.id,
                 sourceImageIndex: idx,
                 tags: tags,
+                assetKey: entry.assetKey || entry.mediaKey || key,
                 mediaKey: entry.mediaKey || key,
                 refKey: entry.refKey || `chat:${msg.id}:${idx}`
               });
@@ -1305,6 +1307,7 @@ export function DateModal({
             sourceMessageId: msg.id,
             sourceImageIndex: 0,
             tags: tags,
+            assetKey: fallbackKey,
             mediaKey: fallbackKey,
             refKey: fallbackKey
           });
@@ -1337,6 +1340,7 @@ export function DateModal({
         imageIndex: isMeetingReference ? photo.sourceImageIndex : (Number.isInteger(photo.imageIndex) ? photo.imageIndex : photo.sourceImageIndex),
         meetingDate: isMeetingReference ? (photo.meetingDate || dateStr) : dateStr,
         photoId: isMeetingReference ? (photo.photoId || photo.id) : photo.id,
+        assetKey: photo.assetKey || photo.mediaKey || '',
         mediaKey: photo.mediaKey || '',
         refKey: photo.refKey || photo.id || ''
       };
@@ -1476,7 +1480,8 @@ export function DateModal({
           messageId: photo.messageId || photo.sourceMessageId,
           imageIndex: Number.isInteger(photo.imageIndex) ? photo.imageIndex : photo.sourceImageIndex,
           meetingDate: dateStr,
-          photoId: photo.id
+          photoId: photo.id,
+          assetKey: photo.assetKey || photo.mediaKey || ''
         };
         const ok = typeof onDeletePhoto === 'function'
           ? await Promise.resolve(onDeletePhoto(deletionMeta))
@@ -2954,6 +2959,7 @@ export function DateModal({
                   sourceImageIndex: p.sourceImageIndex,
                   meetingDate: dateStr,
                   photoId: p.id,
+                  assetKey: p.assetKey,
                   mediaKey: p.mediaKey,
                   refKey: p.refKey
                 }))
