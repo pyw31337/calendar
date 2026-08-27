@@ -6142,7 +6142,7 @@ function App() {
           background: isDarkTheme
             ? 'linear-gradient(90deg, #241B3D 0%, #4C1D95 55%, #9D174D 100%)'
             : 'linear-gradient(90deg, #5B4BEB 0%, #8B3BDE 54%, #EC4899 100%)',
-          border: isDarkTheme ? '1px solid rgba(196, 181, 253, 0.22)' : '1px solid rgba(255, 255, 255, 0.18)',
+          border: 'none',
           borderRadius: 'var(--radius-md)',
           boxShadow: isDarkTheme ? '0 16px 30px rgba(3, 7, 18, 0.4)' : '0 14px 28px rgba(91, 75, 235, 0.22)',
           padding: '10px 14px',
