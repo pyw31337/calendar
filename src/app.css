@@ -2785,6 +2785,104 @@ select.form-select {
   :root[data-theme="dark"] .date-item-btn.is-all { border-color: #065F46; background: #0F2E22; }
 }
 
+.date-item-btn.confirmed-meeting-card {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  border-color: rgba(255, 255, 255, 0.12);
+  background: linear-gradient(90deg, #5B4BEB 0%, #8B3BDE 54%, #EC4899 100%);
+  color: #FFFFFF;
+  box-shadow: 0 14px 28px rgba(91, 75, 235, 0.22);
+}
+.date-item-btn.confirmed-meeting-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(120deg, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0.08) 18%, rgba(255, 255, 255, 0) 42%, rgba(255, 255, 255, 0) 72%, rgba(255, 255, 255, 0.12) 100%);
+  opacity: 0.65;
+}
+.date-item-btn.confirmed-meeting-card:hover {
+  background: linear-gradient(90deg, #624DEB 0%, #9333EA 52%, #F43F5E 100%);
+  border-color: rgba(255, 255, 255, 0.18);
+  transform: translate3d(0, -2px, 0);
+  box-shadow: 0 18px 34px rgba(91, 75, 235, 0.28);
+}
+.date-item-btn.confirmed-meeting-card:active,
+.date-item-btn.confirmed-meeting-card.is-pressing {
+  transform: translate3d(0, 1px, 0) scale(0.992) !important;
+  box-shadow: 0 10px 20px rgba(91, 75, 235, 0.18) !important;
+  filter: brightness(0.985) saturate(1.02) !important;
+}
+.date-item-btn.confirmed-meeting-card.is-past {
+  background: linear-gradient(90deg, #E2E8F0 0%, #F8FAFC 100%) !important;
+  border-color: rgba(148, 163, 184, 0.18) !important;
+  color: #475569;
+  box-shadow: 0 10px 18px rgba(148, 163, 184, 0.16);
+  opacity: 0.92;
+}
+:root[data-theme="dark"] .date-item-btn.confirmed-meeting-card {
+  background: linear-gradient(90deg, #241B3D 0%, #4C1D95 55%, #9D174D 100%);
+  border-color: rgba(196, 181, 253, 0.22);
+  box-shadow: 0 16px 30px rgba(3, 7, 18, 0.4);
+}
+:root[data-theme="dark"] .date-item-btn.confirmed-meeting-card:hover {
+  background: linear-gradient(90deg, #2A2250 0%, #5B21B6 55%, #BE185D 100%);
+}
+:root[data-theme="dark"] .date-item-btn.confirmed-meeting-card.is-past {
+  background: linear-gradient(90deg, #1B2540 0%, #22304F 100%) !important;
+  border-color: rgba(100, 116, 139, 0.25) !important;
+  color: #CBD5E1;
+  box-shadow: 0 10px 18px rgba(0, 0, 0, 0.24);
+  opacity: 0.92;
+}
+.date-item-btn.confirmed-meeting-card > div:first-child {
+  position: relative;
+  z-index: 1;
+}
+.date-item-btn.confirmed-meeting-card .confirmed-meeting-date {
+  color: #FFFFFF !important;
+  letter-spacing: -0.01em;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.16);
+}
+.date-item-btn.confirmed-meeting-card.is-past .confirmed-meeting-date {
+  color: #475569 !important;
+  text-shadow: none;
+}
+:root[data-theme="dark"] .date-item-btn.confirmed-meeting-card.is-past .confirmed-meeting-date {
+  color: #CBD5E1 !important;
+}
+.date-item-btn.confirmed-meeting-card .dday-badge:not(.is-past) {
+  background: rgba(255, 255, 255, 0.96) !important;
+  color: #EC4899 !important;
+  border: 1px solid rgba(255, 255, 255, 0.72) !important;
+  box-shadow: 0 8px 18px rgba(76, 29, 149, 0.16);
+}
+:root[data-theme="dark"] .date-item-btn.confirmed-meeting-card .dday-badge:not(.is-past) {
+  background: rgba(15, 23, 42, 0.82) !important;
+  color: #F472B6 !important;
+  border: 1px solid rgba(244, 114, 182, 0.24) !important;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.2);
+}
+.date-item-btn.confirmed-meeting-card .dday-badge.is-past {
+  background: #E2E8F0 !important;
+  color: #64748B !important;
+  border: none !important;
+  box-shadow: none;
+}
+:root[data-theme="dark"] .date-item-btn.confirmed-meeting-card .dday-badge.is-past {
+  background: #1B2540 !important;
+  color: #CBD5E1 !important;
+  border: 1px solid rgba(52, 64, 93, 0.9) !important;
+  box-shadow: none;
+}
+.date-item-btn.confirmed-meeting-card .memo-capsule-badge {
+  box-shadow: 0 8px 16px rgba(15, 23, 42, 0.10);
+}
+:root[data-theme="dark"] .date-item-btn.confirmed-meeting-card .memo-capsule-badge {
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.22);
+}
+
 /* Capsule Memo Badge */
 .memo-capsule-badge {
   display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px;

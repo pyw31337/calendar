@@ -1409,9 +1409,13 @@ export function SummaryList({
     const formattedDateStr = formatDateWithDayName(d);
     const memoEntries = dateEntries.filter(e => e.note && e.note.trim().length > 0);
     const isPast = d < todayStr;
+    const ddayLabel = isPast ? '지난 모임' : (() => {
+      const dday = calculateDday(d);
+      return dday <= 0 ? 'D-DAY' : `D-${dday}`;
+    })();
     return /*#__PURE__*/React.createElement("button", {
       key: d,
-      className: `date-item-btn ${isPast ? 'is-past' : 'is-confirmed'}`,
+      className: `date-item-btn ${isPast ? 'is-past' : 'is-confirmed'} confirmed-meeting-card`,
       onClick: () => onSelectDate(d),
       style: {
         flexDirection: 'column',
@@ -1426,21 +1430,22 @@ export function SummaryList({
         gap: '8px'
       }
     }, /*#__PURE__*/React.createElement("span", {
+      className: "confirmed-meeting-date",
       style: {
         fontWeight: 800,
-        color: isPast ? '#94A3B8' : '#7C3AED',
+        color: isPast ? '#94A3B8' : '#FFFFFF',
         fontSize: '0.95rem',
         flexShrink: 0
       }
     }, formattedDateStr), /*#__PURE__*/React.createElement("span", {
-      className: `date-item-badge ${isPast ? 'is-past' : 'is-confirmed'}`,
+      className: `date-item-badge dday-badge ${isPast ? 'is-past' : 'is-confirmed'}`,
       style: {
-        background: isPast ? '#E2E8F0' : '#F3E8FF',
-        color: isPast ? '#64748B' : '#7C3AED',
-        border: isPast ? 'none' : '1px solid #E9D5FF',
+        background: isPast ? '#E2E8F0' : '#FFFFFF',
+        color: isPast ? '#64748B' : '#EC4899',
+        border: isPast ? 'none' : '1px solid #FBCFE8',
         flexShrink: 0
       }
-    }, isPast ? '지나간 모임' : '확정')), memoEntries.length > 0 && /*#__PURE__*/React.createElement("div", {
+    }, ddayLabel)), memoEntries.length > 0 && /*#__PURE__*/React.createElement("div", {
       style: {
         display: 'flex',
         alignItems: 'center',
