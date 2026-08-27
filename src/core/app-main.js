@@ -652,112 +652,18 @@ function App() {
 
   React.useEffect(() => {
     const motionQuery = window.matchMedia?.('(prefers-reduced-motion: reduce)');
-    const interactiveSelector = [
-      'button',
-      'a[href]',
-      'a.btn',
-      'summary',
-      'select',
-      'input[type="button"]',
-      'input[type="submit"]',
-      'input[type="reset"]',
-      '[role="button"]',
-      '[role="tab"]',
-      '[role="option"]',
-      '[role="menuitem"]',
-      '[role="switch"]',
-      '.btn',
-      '.day-cell',
-      '.date-item-btn',
-      '.date-item-badge',
-      '.participant-badge',
-      '.section-toggle-btn',
-      '.form-select',
-      '.color-swatch-trigger',
-      '.admin-calendar-picker-btn',
-      '.main-menu-item',
-      '.admin-side-menu-item',
-      '.admin-menu-toggle-btn',
-      '.admin-side-menu-close-btn',
-      '.admin-side-menu-font-btn',
-      '.admin-side-menu-title',
-      '.places-list-item',
-      '.summary-title',
-      '.polls-panel-header',
-      '.poll-card',
-      '.poll-header',
-      '.poll-title',
-      '.poll-option-row',
-      '.poll-voter-option',
-      '.recent-log-row',
-      '.search-result-row',
-      '.bottom-sheet-item',
-      '.chat-msg-action',
-      '.modal-close-btn',
-      '.icon-btn',
-      '.chat-keyboard-reopen-btn',
-      '.calendar-card',
-      '.summary-card',
-      '.confirmed-meeting',
-      '.confirmed-meeting-label-badge',
-      '.main-side-menu-manual-banner',
-      '.participant-chip',
-      '.category-chip',
-      '.place-category-tab',
-      '.memo-card',
-      '.gallery-thumb',
-      '.media-thumb',
-      '.lightbox-nav-btn',
-      '.tap-target',
-      '[data-pressable]'
-    ].join(',');
-    // Large shells that must NEVER be the press target themselves (children still ok)
-    const blockShell = [
-      '.chat-composer', '.chat-room-header', '.memo-view-header',
-      '.places-view-header', '.gallery-page-header', '.inline-search-bar',
-      '.modal-overlay', '.admin-side-menu-overlay', '.app-container',
-      '.chat-room-container', '.memo-view-container', '.places-view-container',
-      '.admin-side-menu', '.admin-side-menu-list'
-    ].join(',');
+    const interactiveSelector = '.confirmed-meeting-banner';
     let pressedEl = null;
     const clearPress = () => {
       if (!pressedEl) return;
       try { pressedEl.classList.remove('is-pressing'); } catch (_) {}
       pressedEl = null;
     };
-    const isBlockShell = el => {
-      try { return el && el.matches && el.matches(blockShell); } catch (_) { return false; }
-    };
     const resolveTarget = raw => {
       if (!raw || typeof raw.closest !== 'function') return null;
       // Typing surfaces — no press scale
       if (raw.closest('input, textarea, select, [contenteditable="true"]')) return null;
-      // Prefer known interactive nodes
-      let target = raw.closest(interactiveSelector);
-      // Fallback: nearest reasonably sized cursor:pointer (covers inline-styled divs/spans)
-      if (!target) {
-        let el = raw.nodeType === 1 ? raw : raw.parentElement;
-        let depth = 0;
-        while (el && el !== document.body && el !== document.documentElement && depth < 12) {
-          depth += 1;
-          if (isBlockShell(el)) break;
-          if (el.tagName === 'LABEL') { el = el.parentElement; continue; }
-          try {
-            const st = window.getComputedStyle(el);
-            if (st && st.cursor === 'pointer' && st.pointerEvents !== 'none') {
-              const w = el.clientWidth || 0;
-              const h = el.clientHeight || 0;
-              // Skip full-width page-sized shells; keep chips/rows/cards
-              // Allow wider section headers / day cells; still skip full-page shells
-              if (w > 0 && h > 0 && w <= 900 && h <= 480) {
-                target = el;
-                break;
-              }
-            }
-          } catch (_) {}
-          el = el.parentElement;
-        }
-      }
+      const target = raw.closest(interactiveSelector);
       if (!target) return null;
       if (target.disabled || target.getAttribute('aria-disabled') === 'true') return null;
       if (target.closest('[data-no-press-feedback]')) return null;
@@ -1727,7 +1633,7 @@ function App() {
       }
     };
 
-    unsubscribe = firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).onSnapshot(doc => {
+    unsubscribe = firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).onSnapshot({ includeMetadataChanges: true }, doc => {
       // Hard evidence for the next "다른 기기에 실시간 반영 안 됨" report instead of another
       // guess: if this stays fromCache:true forever on an affected device, the listener's
       // connection to the server never actually came up (persistence keeps showing the last
@@ -1859,7 +1765,7 @@ function App() {
     const detail = syncDiag?.error
       ? '동기화 응답이 지연되고 있습니다.'
       : firebaseReconnectPending
-      ? (syncDiag?.fromCache || !syncDiag ? '캐시된 데이터를 먼저 보여주는 중이며 Firebase 연결을 다시 시도하는 중입니다.' : 'Firebase 연결을 다시 시도하는 중입니다.')
+      ? (syncDiag?.fromCache || !syncDiag ? '최신 데이터를 서버와 확인하는 중입니다.' : 'Firebase 연결을 다시 시도하는 중입니다.')
       : !firebaseDb
       ? 'Firebase 연결이 아직 확인되지 않았습니다.'
       : !isBrowserOnline
@@ -1869,7 +1775,7 @@ function App() {
       : syncDiag?.hasPendingWrites
       ? '저장한 변경사항을 서버에 반영하는 중입니다.'
       : syncDiag?.fromCache || !syncDiag
-      ? '캐시된 데이터를 먼저 보여주는 중입니다.'
+      ? '최신 데이터를 서버와 확인하는 중입니다.'
       : '실시간으로 반영되는 상태입니다.';
     let status = 'live';
     let label = '동기화됨';
@@ -1894,8 +1800,8 @@ function App() {
       status = 'saving';
       label = '저장 대기';
     } else if (syncDiag?.fromCache || !syncDiag) {
-      status = 'cache';
-      label = '캐시';
+      status = 'loading';
+      label = '동기화 확인 중';
     }
     return {
       status,
@@ -6201,14 +6107,15 @@ function App() {
     ref: calendarSectionRef
   }, visibleConfirmedMeetings.length > 0 && /*#__PURE__*/React.createElement("div", {
     style: { display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }
-  }, visibleConfirmedMeetings.map(meeting => {
-    const memoEntries = getActiveAvailabilities(activeCal).filter(e => e.date === meeting.date && e.note && e.note.trim());
-    return /*#__PURE__*/React.createElement("div", {
-      key: meeting.date,
-      style: {
-        background: 'linear-gradient(var(--bg-card), var(--bg-card)) padding-box, var(--accent-gradient) border-box',
-        border: '1px solid transparent',
-        borderRadius: 'var(--radius-md)',
+    }, visibleConfirmedMeetings.map(meeting => {
+      const memoEntries = getActiveAvailabilities(activeCal).filter(e => e.date === meeting.date && e.note && e.note.trim());
+      return /*#__PURE__*/React.createElement("div", {
+        key: meeting.date,
+        className: "confirmed-meeting-banner",
+        style: {
+          background: 'linear-gradient(var(--bg-card), var(--bg-card)) padding-box, var(--accent-gradient) border-box',
+          border: '1px solid transparent',
+          borderRadius: 'var(--radius-md)',
         padding: '10px 14px',
         display: 'flex',
         flexDirection: 'column',
