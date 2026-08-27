@@ -715,12 +715,27 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
       // CARTO Positron Basemap (Restored) -- clean light grayscale map with minimal labels
       const cartoKey = (typeof window !== 'undefined' && (window.CARTO_API_KEY || (window.GATHER_APP_CONFIG && window.GATHER_APP_CONFIG.cartoApiKey))) || '';
       const cartoUrl = `https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png${cartoKey ? `?api_key=${encodeURIComponent(cartoKey)}` : ''}`;
-      L.tileLayer(cartoUrl, {
+      const baseTileLayer = L.tileLayer(cartoUrl, {
         maxZoom: 19,
         maxNativeZoom: 19,
         subdomains: 'abcd',
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-      }).addTo(map);
+      });
+      let fallbackTriggered = false;
+      baseTileLayer.on('tileerror', () => {
+        if (fallbackTriggered) return;
+        fallbackTriggered = true;
+        try {
+          map.removeLayer(baseTileLayer);
+          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            maxNativeZoom: 19,
+            subdomains: 'abc',
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          }).addTo(map);
+        } catch (e) {}
+      });
+      baseTileLayer.addTo(map);
 
       let clusterAvailable = false;
       try {
