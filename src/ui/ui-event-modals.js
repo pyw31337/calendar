@@ -1024,7 +1024,7 @@ export function AnniversaryModal({
                 type: "button",
                 onClick: () => handleDeleteAnniversary(ann),
                 style: {
-                  background: 'none', border: '1px solid #FECACA', borderRadius: '6px',
+                  background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '6px',
                   padding: '4px 8px', fontSize: '0.72rem', color: '#EF4444', cursor: 'pointer'
                 }
               }, "삭제")

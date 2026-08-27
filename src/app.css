@@ -196,9 +196,9 @@
 :root[data-theme="dark"] .admin-scope .btn-secondary:hover,
 :root[data-theme="dark"] .admin-scope .btn-secondary:hover { background: #EEF2FF; }
 :root[data-theme="dark"] .admin-scope .btn-danger,
-:root[data-theme="dark"] .admin-scope .btn-danger { background: #FEF2F2; border-color: #FECACA; color: #DC2626; }
+:root[data-theme="dark"] .admin-scope .btn-danger { background: rgba(239, 68, 68, 0.12); border-color: rgba(239, 68, 68, 0.35); color: #F87171; }
 :root[data-theme="dark"] .admin-scope .btn-danger:hover,
-:root[data-theme="dark"] .admin-scope .btn-danger:hover { background: #FEE2E2; }
+:root[data-theme="dark"] .admin-scope .btn-danger:hover { background: rgba(239, 68, 68, 0.22); }
 :root[data-theme="dark"] .admin-scope .form-select,
 :root[data-theme="dark"] .admin-scope .form-input,
 :root[data-theme="dark"] .admin-scope .form-select,
