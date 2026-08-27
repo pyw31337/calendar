@@ -1626,7 +1626,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
             /* Live Link Preview Area inside input */
             extractFirstUrl(newText) && /*#__PURE__*/React.createElement("div", {
               style: { marginTop: '4px', marginBottom: '4px' }
-            }, /*#__PURE__*/React.createElement(LinkPreviewCard, { url: extractFirstUrl(newText) })),
+            }, /*#__PURE__*/React.createElement(LinkPreviewCard, { url: extractFirstUrl(newText), stretch: true })),
 
             /* Images previews list */
             newImages.length > 0 && /*#__PURE__*/React.createElement("div", {
@@ -2000,7 +2000,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
           const cachedData = (oldUrl === url) ? editingMemo?.linkPreview : null;
           return /*#__PURE__*/React.createElement("div", {
             style: { marginTop: '4px', marginBottom: '4px' }
-          }, /*#__PURE__*/React.createElement(LinkPreviewCard, { url: url, cachedData: cachedData }));
+          }, /*#__PURE__*/React.createElement(LinkPreviewCard, { url: url, cachedData: cachedData, stretch: true }));
         })(),
 
         /* Images previews list */

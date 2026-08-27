@@ -470,7 +470,7 @@ const MONTH_NAMES = GATHER_APP_CALENDAR_DATA.MONTH_NAMES || ['1월','2월','3월
 const PRESET_COLORS = GATHER_APP_CONSTANTS.PRESET_COLORS || [];
 const DEFAULT_EXPENSE_CATEGORIES = GATHER_APP_CONSTANTS.DEFAULT_EXPENSE_CATEGORIES || [];
 const DEFAULT_PLACE_CATEGORIES = GATHER_APP_CONSTANTS.DEFAULT_PLACE_CATEGORIES || GATHER_APP_UTILS.DEFAULT_PLACE_CATEGORIES || [];
-const EMOJI_CATEGORIES = GATHER_APP_CONSTANTS.EMOJI_CATEGORIES || [];
+const EMOJI_CATEGORIES = GATHER_APP_CHAT_DATA.EMOJI_CATEGORIES || [];
 const INCOME_EXPENSE_CATEGORY = GATHER_APP_UTILS.INCOME_EXPENSE_CATEGORY || { id: 'income', name: '수입', color: '#16A34A' };
 const PLACE_MAP_DEFAULT_CENTER = __gatherUiDeps().PLACE_MAP_DEFAULT_CENTER || [37.5665, 126.978];
 const PLACE_MAP_DEFAULT_ZOOM = __gatherUiDeps().PLACE_MAP_DEFAULT_ZOOM || 11;
@@ -964,7 +964,7 @@ export function ItemEditDeleteActions({ onEdit, onDelete, editTitle = '수정', 
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
   const PencilIcon = __comp.PencilIcon || __deps.PencilIcon;
-  const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
+  const TrashIcon = __comp.TrashIcon || __deps.TrashIcon;
 
   return /*#__PURE__*/React.createElement("div", {
     className: "item-edit-delete-actions",
@@ -990,7 +990,7 @@ export function ItemEditDeleteActions({ onEdit, onDelete, editTitle = '수정', 
         padding: 0, cursor: 'pointer', color: 'var(--text-muted)',
         display: 'flex', alignItems: 'center', justifyContent: 'center'
       }
-    }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 14 }))
+    }, /*#__PURE__*/React.createElement(TrashIcon, { size: 14 }))
   );
 }
 
@@ -1031,7 +1031,7 @@ export function GamifiedConfirmButtonContent({ label }) {
   );
 }
 
-export function LinkPreviewCard({ url, fallbackTitle, cachedData }) {
+export function LinkPreviewCard({ url, fallbackTitle, cachedData, stretch = false }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -1049,10 +1049,30 @@ export function LinkPreviewCard({ url, fallbackTitle, cachedData }) {
     className: 'link-preview-card',
     style: {
       display: 'flex',
+      // A fit-content chat bubble resolves its width to whichever child is widest -- once a
+      // longer caption line (rendered above this card) settles that width, a plain flex block
+      // with no width of its own stretches to fill it, leaving a blank gap next to this card's
+      // actual (much narrower) thumbnail+title content. width:fit-content makes the card hug its
+      // own content instead, regardless of what a sibling line established for the bubble; the
+      // maxWidth cap keeps that same fit-content from growing unbounded to fit a long title in
+      // one line now that the bubble's width no longer implicitly bounds it -- title/description
+      // below still truncate with ellipsis inside this width.
+      // Plain length, not min(100%, 280px) -- fit-content already includes "shrink to available
+      // space if narrower" in its own definition, so the min(100%, ...) was redundant. It's also
+      // the same pattern that, on a plain (non-fit-content) block elsewhere in this bug, was found
+      // to corrupt an ancestor's intrinsic-size calculation (percentage-in-min() resolves as
+      // indefinite there) -- removing it here too since there's no upside to keeping it.
+      // `stretch` opts out of all of the above: a vertical list of these cards (e.g. the gallery
+      // page's 링크 tab) wants every row the SAME width regardless of how long each one's own
+      // title/description happens to be, not each row shrinking to its own content -- the exact
+      // opposite of what a chat bubble wants.
+      width: stretch ? '100%' : 'fit-content',
+      maxWidth: stretch ? '100%' : '280px',
+      boxSizing: 'border-box',
       gap: '8px',
       marginTop: '6px',
       border: '1px solid var(--border-subtle)',
-      borderRadius: '8px',
+      borderRadius: 'var(--radius-md)',
       overflow: 'hidden',
       textDecoration: 'none',
       color: 'inherit',
@@ -1062,11 +1082,20 @@ export function LinkPreviewCard({ url, fallbackTitle, cachedData }) {
     image && /*#__PURE__*/React.createElement('img', {
       src: image,
       alt: '',
+      loading: 'lazy',
+      decoding: 'async',
       referrerPolicy: 'no-referrer',
       style: { width: '72px', height: '72px', objectFit: 'cover', flexShrink: 0, backgroundColor: 'var(--bg-primary)' }
     }),
     /*#__PURE__*/React.createElement('div', {
-      style: { padding: '6px 8px', minWidth: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '2px' }
+      // Explicit maxWidth (not just minWidth:0 + flex-shrink) so this column's OWN contribution
+      // to the card's fit-content sizing is already bounded to the card's 280px budget minus the
+      // thumbnail -- without it, an unclamped single-line title/description can still make the
+      // card's computed preferred width overshoot 280px pre-clamp, so the outer maxWidth clamp
+      // then shrinks the card back down independently, leaving a several-dozen-px gap between the
+      // (already-sized) bubble and the (separately re-clamped) card. Verified by measuring both
+      // ways in an isolated repro.
+      style: { padding: '6px 8px', minWidth: 0, maxWidth: stretch ? 'none' : (image ? '198px' : '270px'), flex: stretch ? '1 1 0' : '0 1 auto', overflow: 'hidden', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '2px' }
     },
       displayTitle && /*#__PURE__*/React.createElement('div', {
       style: { fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
@@ -1093,7 +1122,7 @@ export function LinkPreviewProgressOverlay({ progress, remainingSec }) {
     },
       /*#__PURE__*/React.createElement("div", {
         className: "modal-container",
-        style: { width: '100%', maxWidth: '360px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px', backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: '12px' }
+        style: { width: '100%', maxWidth: '360px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px', backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)' }
       },
         /*#__PURE__*/React.createElement("h3", { style: { fontSize: '1rem', fontWeight: 800, textAlign: 'center', margin: 0, color: 'var(--text-main)' } }, "링크 미리보기 가져오는 중"),
         /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.8rem', color: 'var(--text-muted)', textAlign: 'center' } }, "웹페이지 정보를 분석하고 있습니다."),
@@ -1151,7 +1180,7 @@ export function DeleteConfirmModal({
   }, /*#__PURE__*/React.createElement(ResizableModalContainer, {
     className: "modal-container",
     onClick: e => e.stopPropagation(),
-    style: { maxWidth: '320px', padding: '20px', borderRadius: '12px' }
+    style: { maxWidth: '320px', padding: '20px', borderRadius: 'var(--radius-md)' }
   }, /*#__PURE__*/React.createElement("div", {
     style: { textAlign: 'center', marginBottom: '20px' }
   }, /*#__PURE__*/React.createElement("h3", {
@@ -1226,7 +1255,7 @@ export function AdminLoginGate({ children }) {
     /*#__PURE__*/React.createElement("form", {
       onSubmit: handleSubmit,
       className: "modal-container",
-      style: { maxWidth: '320px', padding: '28px', borderRadius: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }
+      style: { maxWidth: '320px', padding: '28px', borderRadius: 'var(--radius-md)', display: 'flex', flexDirection: 'column', gap: '14px' }
     },
       /*#__PURE__*/React.createElement("div", { style: { fontSize: '1.1rem', fontWeight: 800, color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(LockIcon, null), "관리자 인증"),
       /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.82rem', color: 'var(--text-muted)' } }, "비밀번호를 입력해 주세요."),
@@ -1370,27 +1399,20 @@ const STICKY_VIDEO_CONTROLS_HEIGHT = 38;
 
 // The single persistent chat-video player: one <iframe> DOM node, kept alive (same React `key`)
 // for as long as `stickyVideo` is set, regardless of which app view is showing -- so playback is
-// genuinely uninterrupted once a video is promoted. Portals into `dockAnchorNode` (the owning
-// chat message's own placeholder box, registered via DirectChatMediaText's ref callback) when
-// that's available -- i.e. whenever the message is actually mounted in the chat room -- so the
-// video looks perfectly inline right there in the message flow; otherwise (any other view, or
-// scrolled out of the loaded chat window) it falls back to a small resizable floating PIP fixed
-// to the bottom-right corner.
+// genuinely uninterrupted once a video is promoted. Always renders as a small resizable floating
+// PIP fixed to the bottom-right corner, in every view including chat (the owning chat message
+// shows a "playing in PIP" placeholder instead -- see DirectChatMediaText's isThisSticky branch --
+// rather than a second, competing inline iframe).
 //
-// This is NOT the same "docking" an earlier version tried and abandoned: that version always
-// portaled into document.body and used position:fixed + a transform continuously recalculated
-// from the anchor's getBoundingClientRect() on every animation frame, to make the fixed box
-// visually track the anchor's position -- fragile, and the cross-origin iframe frequently failed
-// to actually paint under that constant re-transform. Here there is no position tracking at all:
-// the iframe becomes a genuine, normal-flow DOM child of the anchor box when docked -- sized by
-// plain CSS, laid out by the browser like any other element, nothing computed or reapplied every
-// frame. The portal itself always targets one stable, never-recreated host div (see hostRef
-// below); *that* node is what actually moves between the anchor and document.body, via plain DOM
-// appendChild rather than by ever changing what `ReactDOM.createPortal` is called with -- doing
-// it the other way (passing a differently-referenced container straight into createPortal) makes
-// React's own reconciliation treat every dock<->float switch as a non-matching portal fiber and
-// fully unmount+remount the iframe, which is both simpler and far more likely to actually render.
-export function StickyVideoBox({ stickyVideo, dockAnchorNode, onClose, onGoToChat }) {
+// An earlier version tried portaling into the owning chat message's own placeholder box while it
+// was mounted, so the video would look inline there instead of floating -- and before that, an
+// even earlier version always portaled into document.body but used position:fixed + a transform
+// continuously recalculated from the anchor's getBoundingClientRect() on every animation frame to
+// make the fixed box visually track the anchor's position. Both were abandoned: the cross-origin
+// iframe frequently failed to actually paint under the constant reparenting/re-transform. The
+// portal here always targets one stable, never-recreated host div (see hostRef below) appended
+// directly to document.body, so the iframe DOM node itself is never moved or recreated.
+export function StickyVideoBox({ stickyVideo, onClose, onGoToChat }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -1463,7 +1485,7 @@ export function StickyVideoBox({ stickyVideo, dockAnchorNode, onClose, onGoToCha
       width: `${effectiveFloatWidth}px`,
       height: `${effectiveFloatHeight + STICKY_VIDEO_CONTROLS_HEIGHT}px`,
       zIndex: 40000,
-      borderRadius: '12px',
+      borderRadius: 'var(--radius-md)',
       overflow: 'hidden',
       background: '#000',
       boxShadow: '0 12px 32px rgba(0,0,0,0.4)'
@@ -1515,7 +1537,7 @@ export function StickyVideoBox({ stickyVideo, dockAnchorNode, onClose, onGoToCha
       color: '#FFFFFF',
       backgroundColor: 'rgba(255,255,255,0.14)',
       border: 'none',
-      borderRadius: '8px',
+      borderRadius: 'var(--radius-md)',
       cursor: 'pointer'
     }
   }, '채팅으로 이동'), /*#__PURE__*/React.createElement('button', {
@@ -1532,7 +1554,7 @@ export function StickyVideoBox({ stickyVideo, dockAnchorNode, onClose, onGoToCha
       color: '#FFFFFF',
       backgroundColor: 'rgba(255,255,255,0.14)',
       border: 'none',
-      borderRadius: '8px',
+      borderRadius: 'var(--radius-md)',
       cursor: 'pointer'
     }
   }, '✕'))), hostRef.current);
@@ -1593,7 +1615,7 @@ export function OperationProgressOverlay({ title, detail, pct }) {
   return /*#__PURE__*/React.createElement('div', {
     style: { position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.48)', zIndex: 100000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }
   }, /*#__PURE__*/React.createElement('div', {
-    style: { backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: '16px', padding: '24px 28px', width: '300px', maxWidth: '100%', textAlign: 'center', boxShadow: '0 16px 42px rgba(0,0,0,0.28)' }
+    style: { backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '24px 28px', width: '300px', maxWidth: '100%', textAlign: 'center', boxShadow: '0 16px 42px rgba(0,0,0,0.28)' }
   },
     /*#__PURE__*/React.createElement('div', { style: { fontWeight: 900, fontSize: '1rem', color: 'var(--text-main)', marginBottom: '6px' } }, title || '작업 처리 중...'),
     /*#__PURE__*/React.createElement('div', { style: { fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '14px', lineHeight: 1.45 } }, detail || '서버 응답을 기다리고 있습니다.'),
@@ -1629,6 +1651,80 @@ export function ToggleSwitch({ checked, onChange, label }) {
   }));
 }
 
+function getSyncStatusMeta(syncStatus = null) {
+  const status = String(syncStatus?.status || 'live');
+  const label = String(syncStatus?.label || '동기화됨');
+  const lastSyncedText = String(syncStatus?.lastSyncedText || '').trim();
+  const detail = String(syncStatus?.detail || '').trim();
+  const title = [label, lastSyncedText ? `최근 ${lastSyncedText}` : '', detail].filter(Boolean).join(' · ') || label;
+  return { status, label, lastSyncedText, detail, title };
+}
+
+export function SyncStatusChip({ syncStatus = null, className = '', style = null }) {
+  const React = window.React;
+  const { status, label, lastSyncedText, title } = getSyncStatusMeta(syncStatus);
+  if (!syncStatus || !['offline', 'saving', 'error'].includes(status)) return null;
+  const mergedClassName = ['sync-status-chip', `is-${status}`, className].filter(Boolean).join(' ');
+
+  return /*#__PURE__*/React.createElement("span", {
+    role: "status",
+    className: mergedClassName,
+    title: title,
+    style: style || undefined
+  },
+    /*#__PURE__*/React.createElement("span", {
+      className: "sync-status-chip__dot",
+      "aria-hidden": "true"
+    }),
+    /*#__PURE__*/React.createElement("span", {
+      className: "sync-status-chip__text"
+    },
+      /*#__PURE__*/React.createElement("span", {
+        className: "sync-status-chip__label"
+      }, label),
+      lastSyncedText && /*#__PURE__*/React.createElement("span", {
+        className: "sync-status-chip__time"
+      }, `· ${lastSyncedText}`)
+    )
+  );
+}
+
+export function SyncStatusBanner({ syncStatus = null, className = '', style = null }) {
+  const React = window.React;
+  const { status, label, lastSyncedText, detail, title } = getSyncStatusMeta(syncStatus);
+  if (!syncStatus || !['offline', 'saving', 'error'].includes(status)) return null;
+  const mergedClassName = ['sync-status-banner', `is-${status}`, className].filter(Boolean).join(' ');
+
+  return /*#__PURE__*/React.createElement("div", {
+    role: "status",
+    className: mergedClassName,
+    title: title,
+    style: style || undefined
+  },
+    /*#__PURE__*/React.createElement("span", {
+      className: "sync-status-banner__dot",
+      "aria-hidden": "true"
+    }),
+    /*#__PURE__*/React.createElement("div", {
+      className: "sync-status-banner__content"
+    },
+      /*#__PURE__*/React.createElement("div", {
+        className: "sync-status-banner__headline"
+      },
+        /*#__PURE__*/React.createElement("span", {
+          className: "sync-status-banner__label"
+        }, label),
+        lastSyncedText && /*#__PURE__*/React.createElement("span", {
+          className: "sync-status-banner__time"
+        }, `최근 ${lastSyncedText}`)
+      ),
+      detail && /*#__PURE__*/React.createElement("div", {
+        className: "sync-status-banner__detail"
+      }, detail)
+    )
+  );
+}
+
 export function Footer() {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -1659,6 +1755,8 @@ export function Footer() {
     SegmentedToggle: SegmentedToggle,
     ItemEditDeleteActions: ItemEditDeleteActions,
     GamifiedConfirmButtonContent: GamifiedConfirmButtonContent,
+    SyncStatusChip: SyncStatusChip,
+    SyncStatusBanner: SyncStatusBanner,
     LinkPreviewCard: LinkPreviewCard,
     LinkPreviewProgressOverlay: LinkPreviewProgressOverlay,
     DeleteConfirmModal: DeleteConfirmModal,

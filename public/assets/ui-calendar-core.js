@@ -29,13 +29,8 @@ function useChatSendGuard(onSend, canSend) {
   const f = __gatherUiDeps().useChatSendGuard;
   return typeof f === 'function' ? f(onSend, canSend) : onSend;
 }
-function useModalDirtyGuard(onClose, onRequestConfirm, message) {
-  const f = __gatherUiDeps().useModalDirtyGuard;
-  return typeof f === 'function' ? f(onClose, onRequestConfirm, message) : {
-    requestClose: onClose,
-    overlayOnClick: e => { if (e.target === e.currentTarget) onClose(); },
-    markSaved: () => {}
-  };
+function useModalDirtyGuard(...args) {
+  return __gatherUiDeps().useModalDirtyGuard(...args);
 }
 function computeKoreanHolidaysForYear(year) {
   const f = __gatherUiDeps().computeKoreanHolidaysForYear;
@@ -1072,7 +1067,7 @@ export function CalendarGrid({
             MONTH_NAMES.map((name, idx) => /*#__PURE__*/React.createElement("button", {
               key: idx, type: "button", onClick: () => setPickerMonth(idx),
               style: {
-                padding: '6px 4px', borderRadius: '8px',
+                padding: '6px 4px', borderRadius: 'var(--radius-sm)',
                 border: pickerMonth === idx ? '2px solid var(--accent-primary)' : '1px solid var(--border-subtle)',
                 background: pickerMonth === idx ? 'rgba(99, 102, 241, 0.15)' : 'var(--bg-card)',
                 color: pickerMonth === idx ? 'var(--accent-primary)' : 'var(--text-main)',
@@ -1405,6 +1400,7 @@ export function CommentsSection({
   const ImageProcessingOverlay = __comp.ImageProcessingOverlay || __deps.ImageProcessingOverlay;
   const Lightbox = __comp.Lightbox || __deps.Lightbox;
   const SectionToggleButton = __comp.SectionToggleButton || __deps.SectionToggleButton;
+  const TrashIcon = __comp.TrashIcon || __deps.TrashIcon;
   const getActiveParticipants = __deps.getActiveParticipants;
   const autoGrowTextarea = __deps.autoGrowTextarea;
 
@@ -1466,6 +1462,27 @@ export function CommentsSection({
       return next;
     });
   };
+  const previewSourceMessages = React.useMemo(() => {
+    const liveMessages = Array.isArray(chatMessages) ? chatMessages.filter(Boolean) : [];
+    if (liveMessages.length > 0) return liveMessages;
+    return Array.isArray(recentMessages) ? recentMessages.filter(Boolean).slice().reverse() : [];
+  }, [chatMessages, recentMessages]);
+  const previewRecentMessages = React.useMemo(() => {
+    const visibleMessages = previewSourceMessages.filter(msg => msg.uploadSource !== 'meeting' && msg.uploadSource !== 'gallery');
+    if (visibleMessages.length > 0) return visibleMessages.slice(-5);
+    return previewSourceMessages.length > 0 ? [previewSourceMessages[previewSourceMessages.length - 1]] : [];
+  }, [previewSourceMessages]);
+  const hasAnyChat = totalChatCount > 0 || previewSourceMessages.length > 0;
+  const emptyChatMessage = totalChatCount > 0
+    ? '최근 채팅을 불러오는 중…'
+    : (hasAnyChat ? '표시할 최근 채팅이 없습니다.' : '등록된 채팅이 없습니다.');
+  const openFullChat = (event) => {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    if (typeof onMore === 'function') onMore();
+  };
 
   const [imageProcessing, setImageProcessing] = React.useState(null);
 
@@ -1516,11 +1533,9 @@ export function CommentsSection({
   // 일정탭('meeting')/갤러리페이지('gallery')에서 올린 사진은 참조용 실제 채팅 메시지
   // 문서로 저장되지만 채팅 피드에는 노출되지 않아야 함 -- ChatRoomView(ui-chat-room.js)의
   // 같은 필터를 이 메인화면 채팅 미리보기 위젯에도 동일하게 적용.
-  const visibleRecentMessages = recentMessages.filter(msg => msg.uploadSource !== 'meeting' && msg.uploadSource !== 'gallery');
-  const reversed = [...visibleRecentMessages].reverse();
   const messagesToShow = isCollapsed
-    ? (reversed.length > 0 ? [reversed[reversed.length - 1]] : [])
-    : reversed;
+    ? previewRecentMessages.slice(-1)
+    : previewRecentMessages;
 
   return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("section", {
     style: { textAlign: 'left' }
@@ -1532,6 +1547,7 @@ export function CommentsSection({
       justifyContent: 'space-between',
       alignItems: 'center',
       marginBottom: '10px',
+      gap: '8px',
       cursor: 'pointer'
     },
     onClick: toggleCommentsSection
@@ -1542,23 +1558,41 @@ export function CommentsSection({
     title: hasUnreadChat ? '읽지 않은 채팅이 있습니다' : '모두 읽었습니다',
     className: `main-menu-badge${hasUnreadChat ? ' is-unread' : ''}`
   }, totalChatCount)),
-  /*#__PURE__*/React.createElement(SectionToggleButton, {
-    collapsed: isCollapsed,
-    onToggle: toggleCommentsSection,
-    label: isCollapsed ? "채팅 펼치기" : "채팅 접기"
-  })),
+  /*#__PURE__*/React.createElement("div", {
+    style: { marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '2px', flexShrink: 0 }
+  },
+    /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: openFullChat,
+      style: {
+        background: 'none',
+        border: 'none',
+        color: '#3B82F6',
+        fontSize: '0.78rem',
+        fontWeight: 800,
+        cursor: 'pointer',
+        padding: '4px 6px',
+        whiteSpace: 'nowrap'
+      }
+    }, "전체보기"),
+    /*#__PURE__*/React.createElement(SectionToggleButton, {
+      collapsed: isCollapsed,
+      onToggle: toggleCommentsSection,
+      label: isCollapsed ? "채팅 펼치기" : "채팅 접기"
+    })
+  )),
   /* List Background Panel -- one continuous gray canvas the individual white message
      bubbles float on, instead of each message having its own separate gray card */
   /*#__PURE__*/React.createElement("div", {
     style: {
       backgroundColor: 'var(--bg-primary)',
-      borderRadius: '12px',
+      borderRadius: 'var(--radius-md)',
       padding: '12px',
       minHeight: '48px'
     }
-  }, visibleRecentMessages.length === 0 ? /*#__PURE__*/React.createElement("div", {
+  }, messagesToShow.length === 0 ? /*#__PURE__*/React.createElement("div", {
     style: { color: 'var(--text-muted)', fontSize: '0.85rem', padding: '8px 0', textAlign: 'center' }
-  }, "등록된 채팅이 없습니다.") : /*#__PURE__*/React.createElement("div", {
+  }, emptyChatMessage) : /*#__PURE__*/React.createElement("div", {
     style: { display: 'flex', flexDirection: 'column', gap: '10px' }
   }, messagesToShow.map(msg => {
     const p = participantsMap[msg.participantId];
@@ -1575,12 +1609,6 @@ export function CommentsSection({
       /*#__PURE__*/React.createElement('path', { d: 'M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4' }),
       /*#__PURE__*/React.createElement('path', { d: 'M13.5 6.5l4 4' })
     );
-    const deleteSvg = /*#__PURE__*/React.createElement('svg', { xmlns: 'http://www.w3.org/2000/svg', width: '14', height: '14', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '2', strokeLinecap: 'round', strokeLinejoin: 'round' },
-      /*#__PURE__*/React.createElement('path', { stroke: 'none', d: 'M0 0h24v24H0z', fill: 'none' }),
-      /*#__PURE__*/React.createElement('line', { x1: '18', y1: '6', x2: '6', y2: '18' }),
-      /*#__PURE__*/React.createElement('line', { x1: '6', y1: '6', x2: '18', y2: '18' })
-    );
-
     /* === UNIFIED CARD LAYOUT (badge + edit/delete on one header row, full-width bubble
        below, single-line timestamp bottom-right) === */
     return /*#__PURE__*/React.createElement('div', {
@@ -1620,7 +1648,7 @@ export function CommentsSection({
             /*#__PURE__*/React.createElement('button', {
               type: 'button', onClick: () => onDeleteMessage && onDeleteMessage(msg), title: '삭제',
               style: { width: '22px', height: '22px', border: 'none', background: 'none', padding: 0, cursor: 'pointer', color: '#94A3B8', display: 'flex', alignItems: 'center', justifyContent: 'center' }
-            }, deleteSvg)
+            }, /*#__PURE__*/React.createElement(TrashIcon, { size: 14 }))
           ) : null
         )
       ),
@@ -1636,21 +1664,22 @@ export function CommentsSection({
         }),
         /* Bubble container */
         /*#__PURE__*/React.createElement('div', {
-          style: { backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '10px 12px', fontSize: '0.85rem', lineHeight: '1.4', color: 'var(--text-main)', wordBreak: 'keep-all', overflowWrap: 'break-word', whiteSpace: 'pre-wrap', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', position: 'relative', zIndex: 1 }
+          style: { backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '10px 12px', fontSize: '0.85rem', lineHeight: '1.4', color: 'var(--text-main)', wordBreak: 'keep-all', overflowWrap: 'break-word', whiteSpace: 'pre-wrap', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', position: 'relative', zIndex: 1 }
         }, bubbleContent)
       )
     );
   }),
   /* Full Width "이전 채팅 더보기" Button at bottom of list */
-  recentMessages.length > 0 && /*#__PURE__*/React.createElement("button", {
+  (messagesToShow.length > 0 || (totalChatCountProp || 0) > 0) && typeof onMore === 'function' && /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: onMore,
     style: {
       width: '100%',
       backgroundColor: 'color-mix(in srgb, var(--bg-primary) 96%, black)',
       border: 'none',
-      borderRadius: '8px',
+      borderRadius: 'var(--radius-md)',
       padding: '8px 0',
+      marginTop: '4px',
       fontSize: '0.85rem',
       fontWeight: 'bold',
       color: 'var(--text-main)',
@@ -1661,16 +1690,19 @@ export function CommentsSection({
   )),
   /* Input row */
   /*#__PURE__*/React.createElement("div", {
+    "data-chat-input-panel": "1",
     style: {
       backgroundColor: 'var(--bg-card)',
       border: '1px solid var(--border-subtle)',
-      borderRadius: '12px',
+      borderRadius: 'var(--radius-md)',
       padding: '12px',
       marginTop: '12px',
       display: 'flex',
       flexDirection: 'column',
       gap: '10px',
-      boxSizing: 'border-box'
+      boxSizing: 'border-box',
+      position: 'relative',
+      zIndex: isEmojiPickerOpen ? 13050 : 'auto'
     }
   },
     /* Textarea at top */
@@ -1719,7 +1751,7 @@ export function CommentsSection({
         width: '60px',
         height: '60px',
         objectFit: 'cover',
-        borderRadius: '8px',
+        borderRadius: 'var(--radius-md)',
         display: 'block'
       }
     }), /*#__PURE__*/React.createElement("button", {
@@ -1921,6 +1953,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
   const PencilIcon = __comp.PencilIcon || __deps.PencilIcon;
   const ShareIcon = __comp.ShareIcon || __deps.ShareIcon;
   const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
+  const TrashIcon = __comp.TrashIcon || __deps.TrashIcon;
   const sanitizeText = __deps.sanitizeText;
   const extractFirstUrl = __deps.extractFirstUrl;
 
@@ -1980,18 +2013,22 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
       ? `${authorName}님의 '${snippet}' 댓글을 삭제하시겠습니까?`
       : `${authorName}님의 댓글을 삭제하시겠습니까?`;
     const doDelete = () => {
-      onCommentsChange(comments.filter(c => c.id !== commentId));
+      const previousComments = comments.slice();
+      onCommentsChange(previousComments.filter(c => c.id !== commentId));
       if (editingCommentId === commentId) {
         setEditingCommentId(null);
         setCommentText('');
         setIsCommentComposerOpen(false);
       }
-      if (typeof showToast === 'function') showToast('댓글이 삭제되었습니다', 'success');
+      if (typeof showToast === 'function') {
+        showToast('댓글이 삭제되었습니다', 'delete', 5000, () => {
+          onCommentsChange(previousComments);
+          if (typeof showToast === 'function') showToast('댓글 삭제를 되돌렸습니다', 'success', 3000);
+        });
+      }
     };
     if (typeof onRequestConfirm === 'function') {
       onRequestConfirm('댓글 삭제', message, doDelete);
-    } else if (window.confirm(message)) {
-      doDelete();
     }
   };
 
@@ -2057,7 +2094,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
     style: {
       backgroundColor: memo.color || 'var(--bg-card)',
       border: '0',
-      borderRadius: '12px',
+      borderRadius: 'var(--radius-md)',
       padding: '12px',
       cursor: 'pointer',
       boxShadow: '0 2px 5px rgba(0,0,0,0.03)',
@@ -2154,7 +2191,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
         marginTop: '8px',
         padding: '8px 12px',
         border: 'none',
-        borderRadius: '8px',
+        borderRadius: 'var(--radius-md)',
         background: 'var(--bg-primary)',
         color: 'var(--text-main)',
         fontSize: '0.78rem',
@@ -2167,7 +2204,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
     /* Link Preview Card under the card content if applicable */
     extractFirstUrl(memo.text) && /*#__PURE__*/React.createElement("div", {
       style: { marginTop: '8px' }
-    }, /*#__PURE__*/React.createElement(LinkPreviewCard, { url: extractFirstUrl(memo.text), cachedData: memo.linkPreview })),
+    }, /*#__PURE__*/React.createElement(LinkPreviewCard, { url: extractFirstUrl(memo.text), cachedData: memo.linkPreview, stretch: true })),
 
     /* Tags container if exists */
     /*#__PURE__*/React.createElement("div", {
@@ -2236,7 +2273,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
         onClick: e => e.stopPropagation(),
         style: {
           display: 'flex', alignItems: 'center', gap: '8px',
-          backgroundColor: 'rgba(148, 163, 184, 0.14)', borderRadius: '8px', padding: '6px 8px'
+          backgroundColor: 'rgba(148, 163, 184, 0.14)', borderRadius: 'var(--radius-sm)', padding: '6px 8px'
         }
       },
         /*#__PURE__*/React.createElement("span", {
@@ -2252,7 +2289,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
         /*#__PURE__*/React.createElement("button", {
           type: "button", onClick: e => handleDeleteComment(e, comment), title: "삭제", "aria-label": "댓글 삭제",
           style: { background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', color: '#64748B', flexShrink: 0 }
-        }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 12 }))
+        }, /*#__PURE__*/React.createElement(TrashIcon, { size: 12 }))
       );
     })),
 
@@ -2658,11 +2695,11 @@ export function GlobalSearchModal({
             value: t.key,
             label: /*#__PURE__*/React.createElement(React.Fragment, null, `${t.label} `, /*#__PURE__*/React.createElement("span", {
               style: {
-                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '18px', height: '18px',
-                borderRadius: '50%',
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '20px', height: '18px',
+                borderRadius: '9999px',
                 backgroundColor: hasCount ? '#2563EB' : '#E2E8F0',
                 color: hasCount ? '#FFFFFF' : '#475569',
-                fontSize: '0.72rem', fontWeight: 'bold', padding: '0 5px', marginLeft: '4px'
+                fontSize: '0.72rem', fontWeight: 'bold', padding: '0 6px', marginLeft: '4px'
               }
             }, t.count))
           };
@@ -2784,7 +2821,6 @@ export function EditMessageModal({
   const ResizableModalContainer = __comp.ResizableModalContainer || __deps.ResizableModalContainer;
   const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
   const autoGrowTextarea = __deps.autoGrowTextarea;
-  const { requestClose, overlayOnClick } = useModalDirtyGuard(onClose, onRequestConfirm);
 
   const [text, setText] = React.useState(message.text || '');
   const [participantId, setParticipantId] = React.useState(message.participantId || '');
@@ -2804,7 +2840,33 @@ export function EditMessageModal({
   const fileInputRefEdit = React.useRef(null);
   const [imageProcessingEdit, setImageProcessingEdit] = React.useState(null);
   const editTextareaRef = React.useRef(null);
-  React.useEffect(() => autoGrowTextarea(editTextareaRef.current, 5000), []);
+  React.useEffect(() => {
+    const grow = () => {
+      const el = editTextareaRef.current;
+      if (!el || typeof autoGrowTextarea !== 'function') return;
+      // Grow to fit existing message body on open (and after emoji/image changes).
+      // Cap is large; modal-body scroll handles viewport overflow.
+      autoGrowTextarea(el, 5000);
+    };
+    grow();
+    requestAnimationFrame(() => {
+      grow();
+      requestAnimationFrame(grow);
+    });
+  }, [text, images.length]);
+  const editMessageDirtySnapshot = () => JSON.stringify([
+    text,
+    participantId,
+    images.map(img => [img.original, img.thumbnail, img.isExisting ? 1 : 0])
+  ]);
+  const { requestClose, overlayOnClick } = useModalDirtyGuard(
+    onClose,
+    onRequestConfirm,
+    undefined,
+    true,
+    editMessageDirtySnapshot,
+    message?.id || 'new'
+  );
 
   const handleFileChangeEdit = async (e) => {
     const files = e.target.files;
@@ -2871,6 +2933,7 @@ export function EditMessageModal({
         textarea.focus();
         const pos = start + emoji.length;
         textarea.setSelectionRange(pos, pos);
+        if (typeof autoGrowTextarea === 'function') autoGrowTextarea(textarea, 5000);
       });
     }
   };
@@ -2906,10 +2969,18 @@ export function EditMessageModal({
   }, /*#__PURE__*/React.createElement(ResizableModalContainer, {
     className: "modal-container",
     onClick: e => e.stopPropagation(),
-    style: { width: '90%', maxWidth: '400px', borderRadius: '12px' }
+    style: {
+      width: '90%',
+      maxWidth: '400px',
+      borderRadius: 'var(--radius-md)',
+      // Grow with content; ResizableModalContainer also clamps to visualViewport
+      maxHeight: 'min(92vh, 100dvh)',
+      display: 'flex',
+      flexDirection: 'column'
+    }
   }, /*#__PURE__*/React.createElement("div", {
     className: "modal-header",
-    style: { padding: '16px', marginBottom: 0 }
+    style: { padding: '16px', marginBottom: 0, flexShrink: 0 }
   }, /*#__PURE__*/React.createElement("h3", {
     style: { fontSize: '1rem', fontWeight: 800, color: 'var(--text-main)', margin: 0 }
   }, "채팅 수정"), /*#__PURE__*/React.createElement("button", {
@@ -2924,7 +2995,15 @@ export function EditMessageModal({
   // pinned outside this scrolling region so the 취소/수정 buttons are never clipped off-screen.
   /*#__PURE__*/React.createElement("div", {
     className: "modal-body",
-    style: { padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }
+    style: {
+      padding: '16px',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '12px',
+      flex: '1 1 auto',
+      minHeight: 0,
+      overflowY: 'auto'
+    }
   },
   images.length > 0 ? /*#__PURE__*/React.createElement("div", {
     style: { display: 'flex', flexWrap: 'wrap', gap: '8px', alignSelf: 'flex-start' }
@@ -2939,7 +3018,7 @@ export function EditMessageModal({
       width: '80px',
       height: '80px',
       objectFit: 'cover',
-      borderRadius: '8px',
+      borderRadius: 'var(--radius-md)',
       display: 'block',
       border: '1px solid var(--border-subtle)'
     }
@@ -2951,7 +3030,7 @@ export function EditMessageModal({
       position: 'relative',
       backgroundColor: 'var(--bg-primary)',
       border: '1px solid var(--border-subtle)',
-      borderRadius: '12px',
+      borderRadius: 'var(--radius-md)',
       padding: '8px'
     }
   }, /*#__PURE__*/React.createElement("textarea", {
@@ -2960,9 +3039,7 @@ export function EditMessageModal({
     value: text,
     onChange: e => {
       setText(e.target.value);
-      // No practical cap here -- the textarea itself should keep growing with the message
-      // (matching how long the bubble's content actually is); .modal-body's own scroll (see
-      // above) is what takes over once the whole modal no longer fits the screen.
+      // Grow with content; modal-body scrolls if the popup would exceed the viewport.
       autoGrowTextarea(e.target, 5000);
     },
     onPaste: handlePasteImagesEdit,
@@ -2974,15 +3051,14 @@ export function EditMessageModal({
       border: 'none',
       backgroundColor: 'transparent',
       fontSize: '0.88rem',
-      lineHeight: '1.4',
+      lineHeight: '1.45',
       fontFamily: 'inherit',
       outline: 'none',
       boxSizing: 'border-box',
-      // Reserved so typed/pasted text never runs underneath the emoji/사진첨부 buttons floating
-      // over the bottom-right corner (see below) -- those buttons used to sit in their own flex
-      // column next to the textarea, permanently eating ~80px of its width even on short replies.
-      paddingRight: '76px',
-      paddingBottom: '4px'
+      // Full width — emoji/image actions sit on their own row below (no paddingRight reserved).
+      paddingRight: 0,
+      paddingBottom: '4px',
+      overflowY: 'hidden'
     }
   }), /*#__PURE__*/React.createElement("input", {
     ref: fileInputRefEdit,
@@ -2992,7 +3068,7 @@ export function EditMessageModal({
     style: { position: 'absolute', width: '1px', height: '1px', padding: 0, margin: '-1px', overflow: 'hidden', clip: 'rect(0,0,0,0)', border: 0 },
     onChange: handleFileChangeEdit
   }), /*#__PURE__*/React.createElement("div", {
-    style: { position: 'absolute', right: '8px', bottom: '8px', display: 'flex', gap: '6px' }
+    style: { display: 'flex', justifyContent: 'flex-end', gap: '6px', marginTop: '6px' }
   },
     /*#__PURE__*/React.createElement("button", {
       type: "button",

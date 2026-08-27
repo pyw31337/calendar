@@ -1,17 +1,687 @@
 /**
  * Memo view page (P4-15)
  */
-(function () {
-function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoadMoreMemos, onBack, showToast, isDarkTheme, onRequestConfirm, sharedMemo, onDismissSharedMemo, chatMessages, setActiveLightbox }) {
+
+/* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
+const GATHER_APP_CALENDAR_DATA = window.GATHER_APP_CALENDAR_DATA || {};
+const GATHER_APP_CHAT_DATA = window.GATHER_APP_CHAT_DATA || {};
+const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
+const GATHER_APP_CONSTANTS = window.GATHER_APP_CONSTANTS || {};
+const GATHER_APP_CONFIG = window.GATHER_APP_CONFIG || {};
+function __gatherUiDeps() { return window.GATHER_UI_DEPS || {}; }
+function getActiveAvailabilities(calendar) {
+  const f = __gatherUiDeps().getActiveAvailabilities || GATHER_APP_UTILS.getActiveAvailabilities;
+  return typeof f === 'function' ? f(calendar) : [];
+}
+function getActiveParticipants(calendar) {
+  const f = __gatherUiDeps().getActiveParticipants || GATHER_APP_UTILS.getActiveParticipants;
+  return typeof f === 'function' ? f(calendar) : [];
+}
+function getCalendarPolls(calendar) {
+  const f = __gatherUiDeps().getCalendarPolls || GATHER_APP_UTILS.getCalendarPolls;
+  return typeof f === 'function' ? f(calendar) : [];
+}
+function getCalendarPlaces(calendar) {
+  const f = __gatherUiDeps().getCalendarPlaces || GATHER_APP_UTILS.getCalendarPlaces;
+  return typeof f === 'function' ? f(calendar) : [];
+}
+function useChatSendGuard(onSend, canSend) {
+  const f = __gatherUiDeps().useChatSendGuard;
+  return typeof f === 'function' ? f(onSend, canSend) : onSend;
+}
+function useModalDirtyGuard(...args) {
+  return __gatherUiDeps().useModalDirtyGuard(...args);
+}
+function computeKoreanHolidaysForYear(year) {
+  const f = __gatherUiDeps().computeKoreanHolidaysForYear;
+  return typeof f === 'function' ? f(year) : [];
+}
+function getFooterFamilyLinks() {
+  return __gatherUiDeps().FOOTER_FAMILY_LINKS || [];
+}
+
+/* __fb() bridge */
+function __fb() {
+  const deps = __gatherUiDeps();
+  if (deps && typeof deps.getDb === 'function') {
+    try { const d = deps.getDb(); if (d) return d; } catch (e) {}
+  }
+  return (typeof window !== 'undefined' && window.__gatherFirebaseDb) || null;
+}
+
+function getStoredChatParticipantId(...args) {
+  const fn = (window.GATHER_APP_NOTIFICATIONS || {}).getStoredChatParticipantId;
+  return typeof fn === 'function' ? fn(...args) : '';
+}
+function setStoredChatParticipantId(...args) {
+  const fn = (window.GATHER_APP_NOTIFICATIONS || {}).setStoredChatParticipantId;
+  return typeof fn === 'function' ? fn(...args) : undefined;
+}
+
+function extractExpenseTimePrefix(...args) {
+  const f = __gatherUiDeps().extractExpenseTimePrefix || GATHER_APP_UTILS.extractExpenseTimePrefix;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function extractFirstUrl(...args) {
+  const f = __gatherUiDeps().extractFirstUrl || GATHER_APP_UTILS.extractFirstUrl;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function extractLeadingMemoDate(...args) {
+  const f = __gatherUiDeps().extractLeadingMemoDate || GATHER_APP_UTILS.extractLeadingMemoDate;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function formatChatDividerDate(...args) {
+  const f = __gatherUiDeps().formatChatDividerDate || GATHER_APP_UTILS.formatChatDividerDate;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function formatChatTime(...args) {
+  const f = __gatherUiDeps().formatChatTime || GATHER_APP_UTILS.formatChatTime;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function formatCommentDate(...args) {
+  const f = __gatherUiDeps().formatCommentDate || GATHER_APP_UTILS.formatCommentDate;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function formatDateWithDayName(...args) {
+  const f = __gatherUiDeps().formatDateWithDayName || GATHER_APP_UTILS.formatDateWithDayName;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function formatPlaceBadgeDate(...args) {
+  const f = __gatherUiDeps().formatPlaceBadgeDate || GATHER_APP_UTILS.formatPlaceBadgeDate;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function formatPollDeadline(...args) {
+  const f = __gatherUiDeps().formatPollDeadline || GATHER_APP_UTILS.formatPollDeadline;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function formatRegisteredAt(...args) {
+  const f = __gatherUiDeps().formatRegisteredAt || GATHER_APP_UTILS.formatRegisteredAt;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function formatShortDateWithDayName(...args) {
+  const f = __gatherUiDeps().formatShortDateWithDayName || GATHER_APP_UTILS.formatShortDateWithDayName;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getActivePollOptions(...args) {
+  const f = __gatherUiDeps().getActivePollOptions || GATHER_APP_UTILS.getActivePollOptions;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getActivityLogStamp(...args) {
+  const f = __gatherUiDeps().getActivityLogStamp || GATHER_APP_UTILS.getActivityLogStamp;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getContrastTextColor(...args) {
+  const f = __gatherUiDeps().getContrastTextColor || GATHER_APP_UTILS.getContrastTextColor;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getDisplayExpenseCategory(...args) {
+  const f = __gatherUiDeps().getDisplayExpenseCategory || GATHER_APP_UTILS.getDisplayExpenseCategory;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getDisplayPlaceAddress(...args) {
+  const f = __gatherUiDeps().getDisplayPlaceAddress || GATHER_APP_UTILS.getDisplayPlaceAddress;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getExpenseCategories(...args) {
+  const f = __gatherUiDeps().getExpenseCategories || GATHER_APP_UTILS.getExpenseCategories;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getExpenseCategory(...args) {
+  const f = __gatherUiDeps().getExpenseCategory || GATHER_APP_UTILS.getExpenseCategory;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getExpenseCategoryIcon(...args) {
+  const f = __gatherUiDeps().getExpenseCategoryIcon || GATHER_APP_UTILS.getExpenseCategoryIcon;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getExpenseCategoryLabel(...args) {
+  const f = __gatherUiDeps().getExpenseCategoryLabel || GATHER_APP_UTILS.getExpenseCategoryLabel;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getPlaceCategoryById(...args) {
+  const f = __gatherUiDeps().getPlaceCategoryById || GATHER_APP_UTILS.getPlaceCategoryById;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getPlaceCategoryIcon(...args) {
+  const f = __gatherUiDeps().getPlaceCategoryIcon || GATHER_APP_UTILS.getPlaceCategoryIcon;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getPlaceCategoryLabel(...args) {
+  const f = __gatherUiDeps().getPlaceCategoryLabel || GATHER_APP_UTILS.getPlaceCategoryLabel;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function isDomesticLatLng(...args) {
+  const f = __gatherUiDeps().isDomesticLatLng || GATHER_APP_UTILS.isDomesticLatLng;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function isExpenseIncomeEntry(...args) {
+  const f = __gatherUiDeps().isExpenseIncomeEntry || GATHER_APP_UTILS.isExpenseIncomeEntry;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function isInternalTestCalendarId(...args) {
+  const f = __gatherUiDeps().isInternalTestCalendarId || GATHER_APP_UTILS.isInternalTestCalendarId;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function isPollClosed(...args) {
+  const f = __gatherUiDeps().isPollClosed || GATHER_APP_UTILS.isPollClosed;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function isTombstone(...args) {
+  const f = __gatherUiDeps().isTombstone || GATHER_APP_UTILS.isTombstone;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function isValidCalendarId(...args) {
+  const f = __gatherUiDeps().isValidCalendarId || GATHER_APP_UTILS.isValidCalendarId;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function isValidDateString(...args) {
+  const f = __gatherUiDeps().isValidDateString || GATHER_APP_UTILS.isValidDateString;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function normalizeColorValue(...args) {
+  const f = __gatherUiDeps().normalizeColorValue || GATHER_APP_UTILS.normalizeColorValue;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function normalizeExpenseCategories(...args) {
+  const f = __gatherUiDeps().normalizeExpenseCategories || GATHER_APP_UTILS.normalizeExpenseCategories;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function normalizePlaceAddressForSave(...args) {
+  const f = __gatherUiDeps().normalizePlaceAddressForSave || GATHER_APP_UTILS.normalizePlaceAddressForSave;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function normalizePlaceCategories(...args) {
+  const f = __gatherUiDeps().normalizePlaceCategories || GATHER_APP_UTILS.normalizePlaceCategories;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function normalizePlaceDateForSort(...args) {
+  const f = __gatherUiDeps().normalizePlaceDateForSort || GATHER_APP_UTILS.normalizePlaceDateForSort;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function parseVisitEntriesFromMemo(...args) {
+  const f = __gatherUiDeps().parseVisitEntriesFromMemo || GATHER_APP_UTILS.parseVisitEntriesFromMemo;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function reformatMemoIntoDateLines(...args) {
+  const f = __gatherUiDeps().reformatMemoIntoDateLines || GATHER_APP_UTILS.reformatMemoIntoDateLines;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function removeFirstUrl(...args) {
+  const f = __gatherUiDeps().removeFirstUrl || GATHER_APP_UTILS.removeFirstUrl;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function sortVisitEntriesRecentFirst(...args) {
+  const f = __gatherUiDeps().sortVisitEntriesRecentFirst || GATHER_APP_UTILS.sortVisitEntriesRecentFirst;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function trimLatLngOutliers(...args) {
+  const f = __gatherUiDeps().trimLatLngOutliers || GATHER_APP_UTILS.trimLatLngOutliers;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+
+function appendChatImageFiles(...args) {
+  const f = __gatherUiDeps().appendChatImageFiles || GATHER_APP_UTILS.appendChatImageFiles;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function autoGrowTextarea(...args) {
+  const f = __gatherUiDeps().autoGrowTextarea || GATHER_APP_UTILS.autoGrowTextarea;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function buildActivityLogsFromAvailabilities(...args) {
+  const f = __gatherUiDeps().buildActivityLogsFromAvailabilities || GATHER_APP_UTILS.buildActivityLogsFromAvailabilities;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function buildAdminDashboardMetrics(...args) {
+  const f = __gatherUiDeps().buildAdminDashboardMetrics || GATHER_APP_UTILS.buildAdminDashboardMetrics;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function buildFieldChangeNote(...args) {
+  const f = __gatherUiDeps().buildFieldChangeNote || GATHER_APP_UTILS.buildFieldChangeNote;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function changeAdminPasswordRemote(...args) {
+  const f = __gatherUiDeps().changeAdminPasswordRemote || GATHER_APP_UTILS.changeAdminPasswordRemote;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function clearAdminSession(...args) {
+  const f = __gatherUiDeps().clearAdminSession || GATHER_APP_UTILS.clearAdminSession;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function cloneCalendarList(...args) {
+  const f = __gatherUiDeps().cloneCalendarList || GATHER_APP_UTILS.cloneCalendarList;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function computeCalendarSearchMatches(...args) {
+  const f = __gatherUiDeps().computeCalendarSearchMatches || GATHER_APP_UTILS.computeCalendarSearchMatches;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function createCalendarBackupPayload(...args) {
+  const f = __gatherUiDeps().createCalendarBackupPayload || GATHER_APP_UTILS.createCalendarBackupPayload;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function createDefaultCalendar(...args) {
+  const f = __gatherUiDeps().createDefaultCalendar || GATHER_APP_UTILS.createDefaultCalendar;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function createMemoActivityLog(...args) {
+  const f = __gatherUiDeps().createMemoActivityLog || GATHER_APP_UTILS.createMemoActivityLog;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function createPollActivityLog(...args) {
+  const f = __gatherUiDeps().createPollActivityLog || GATHER_APP_UTILS.createPollActivityLog;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function deleteActivityLogsAfterTimestamp(...args) {
+  const f = __gatherUiDeps().deleteActivityLogsAfterTimestamp || GATHER_APP_UTILS.deleteActivityLogsAfterTimestamp;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function deleteAllChatImagesFromStorage(...args) {
+  const f = __gatherUiDeps().deleteAllChatImagesFromStorage || GATHER_APP_UTILS.deleteAllChatImagesFromStorage;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function deleteMessageRest(...args) {
+  const f = __gatherUiDeps().deleteMessageRest || GATHER_APP_UTILS.deleteMessageRest;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function describeImageProcessingFailures(...args) {
+  const f = __gatherUiDeps().describeImageProcessingFailures || GATHER_APP_UTILS.describeImageProcessingFailures;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function doesPlaceMatchDate(...args) {
+  const f = __gatherUiDeps().doesPlaceMatchDate || GATHER_APP_UTILS.doesPlaceMatchDate;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function downloadJsonFile(...args) {
+  const f = __gatherUiDeps().downloadJsonFile || GATHER_APP_UTILS.downloadJsonFile;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function exportCalendarConfirmedMeetingsToICS(...args) {
+  const f = __gatherUiDeps().exportCalendarConfirmedMeetingsToICS || GATHER_APP_UTILS.exportCalendarConfirmedMeetingsToICS;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function extractCalendarsFromBackup(...args) {
+  const f = __gatherUiDeps().extractCalendarsFromBackup || GATHER_APP_UTILS.extractCalendarsFromBackup;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function fetchActivityLogsFromFirestore(...args) {
+  const f = __gatherUiDeps().fetchActivityLogsFromFirestore || GATHER_APP_UTILS.fetchActivityLogsFromFirestore;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function fetchChatMessagesRest(...args) {
+  const f = __gatherUiDeps().fetchChatMessagesRest || GATHER_APP_UTILS.fetchChatMessagesRest;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function fetchImageShareDocument(...args) {
+  const f = __gatherUiDeps().fetchImageShareDocument || GATHER_APP_UTILS.fetchImageShareDocument;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function fetchRecentMessagesRest(...args) {
+  const f = __gatherUiDeps().fetchRecentMessagesRest || GATHER_APP_UTILS.fetchRecentMessagesRest;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function fetchSingleCalendarWithRest(...args) {
+  const f = __gatherUiDeps().fetchSingleCalendarWithRest || GATHER_APP_UTILS.fetchSingleCalendarWithRest;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function fetchSubcollectionCount(...args) {
+  const f = __gatherUiDeps().fetchSubcollectionCount || GATHER_APP_UTILS.fetchSubcollectionCount;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function fetchWithTimeout(...args) {
+  const f = __gatherUiDeps().fetchWithTimeout || GATHER_APP_UTILS.fetchWithTimeout;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function formatLogTimestamp(...args) {
+  const f = __gatherUiDeps().formatLogTimestamp || GATHER_APP_UTILS.formatLogTimestamp;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getAdminSearchFilterFromUrl(...args) {
+  const f = __gatherUiDeps().getAdminSearchFilterFromUrl || GATHER_APP_UTILS.getAdminSearchFilterFromUrl;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getAdminSearchQueryFromUrl(...args) {
+  const f = __gatherUiDeps().getAdminSearchQueryFromUrl || GATHER_APP_UTILS.getAdminSearchQueryFromUrl;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getAdminSearchResultTargetUrl(...args) {
+  const f = __gatherUiDeps().getAdminSearchResultTargetUrl || GATHER_APP_UTILS.getAdminSearchResultTargetUrl;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getAdminSelectedCalendarIdFromUrl(...args) {
+  const f = __gatherUiDeps().getAdminSelectedCalendarIdFromUrl || GATHER_APP_UTILS.getAdminSelectedCalendarIdFromUrl;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getAdminSession(...args) {
+  const f = __gatherUiDeps().getAdminSession || GATHER_APP_UTILS.getAdminSession;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getImageFilesFromClipboardEvent(...args) {
+  const f = __gatherUiDeps().getImageFilesFromClipboardEvent || GATHER_APP_UTILS.getImageFilesFromClipboardEvent;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getKnownPlaceParticipantNames(...args) {
+  const f = __gatherUiDeps().getKnownPlaceParticipantNames || GATHER_APP_UTILS.getKnownPlaceParticipantNames;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getPlaceCategoryMarkerContent(...args) {
+  const f = __gatherUiDeps().getPlaceCategoryMarkerContent || GATHER_APP_UTILS.getPlaceCategoryMarkerContent;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getSolarFromLunar(...args) {
+  const f = __gatherUiDeps().getSolarFromLunar || GATHER_APP_UTILS.getSolarFromLunar;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getWeatherIcon(...args) {
+  const f = __gatherUiDeps().getWeatherIcon || GATHER_APP_UTILS.getWeatherIcon;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function isAdminRestoreRoute(...args) {
+  const f = __gatherUiDeps().isAdminRestoreRoute || GATHER_APP_UTILS.isAdminRestoreRoute;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function listAllCalendarsRemote(...args) {
+  const f = __gatherUiDeps().listAllCalendarsRemote || GATHER_APP_UTILS.listAllCalendarsRemote;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function mergeCalendarCollections(...args) {
+  const f = __gatherUiDeps().mergeCalendarCollections || GATHER_APP_UTILS.mergeCalendarCollections;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function mergePollRecord(...args) {
+  const f = __gatherUiDeps().mergePollRecord || GATHER_APP_UTILS.mergePollRecord;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function normalizeCalendarForSave(...args) {
+  const f = __gatherUiDeps().normalizeCalendarForSave || GATHER_APP_UTILS.normalizeCalendarForSave;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function normalizePollOptionInput(...args) {
+  const f = __gatherUiDeps().normalizePollOptionInput || GATHER_APP_UTILS.normalizePollOptionInput;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function processImageFilesSequentially(...args) {
+  const f = __gatherUiDeps().processImageFilesSequentially || GATHER_APP_UTILS.processImageFilesSequentially;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function pushSingleCloudCalendar(...args) {
+  const f = __gatherUiDeps().pushSingleCloudCalendar || GATHER_APP_UTILS.pushSingleCloudCalendar;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function resolveMemoImageBatch(...args) {
+  const f = __gatherUiDeps().resolveMemoImageBatch || GATHER_APP_UTILS.resolveMemoImageBatch;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function sanitizeMemoForFirestore(...args) {
+  const f = __gatherUiDeps().sanitizeMemoForFirestore || GATHER_APP_UTILS.sanitizeMemoForFirestore;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function setAdminSession(...args) {
+  const f = __gatherUiDeps().setAdminSession || GATHER_APP_UTILS.setAdminSession;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function sha256Hex(...args) {
+  const f = __gatherUiDeps().sha256Hex || GATHER_APP_UTILS.sha256Hex;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function subscribeUserToPushWithPermission(...args) {
+  const f = __gatherUiDeps().subscribeUserToPushWithPermission || GATHER_APP_UTILS.subscribeUserToPushWithPermission;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function translateKoreanToEnglish(...args) {
+  const f = __gatherUiDeps().translateKoreanToEnglish || GATHER_APP_UTILS.translateKoreanToEnglish;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function unsubscribeUserFromPush(...args) {
+  const f = __gatherUiDeps().unsubscribeUserFromPush || GATHER_APP_UTILS.unsubscribeUserFromPush;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function validateBackupCalendars(...args) {
+  const f = __gatherUiDeps().validateBackupCalendars || GATHER_APP_UTILS.validateBackupCalendars;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function validateCalendarShape(...args) {
+  const f = __gatherUiDeps().validateCalendarShape || GATHER_APP_UTILS.validateCalendarShape;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function verifyAdminPasswordRemote(...args) {
+  const f = __gatherUiDeps().verifyAdminPasswordRemote || GATHER_APP_UTILS.verifyAdminPasswordRemote;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+
+const ADMIN_MESSAGE_LIVE_LIMIT = (__gatherUiDeps().ADMIN_MESSAGE_LIVE_LIMIT
+  || (window.__GATHER_ADMIN_LIMITS && window.__GATHER_ADMIN_LIMITS.ADMIN_MESSAGE_LIVE_LIMIT)
+  || 50);
+const ADMIN_MEMO_LIVE_LIMIT = (__gatherUiDeps().ADMIN_MEMO_LIVE_LIMIT
+  || (window.__GATHER_ADMIN_LIMITS && window.__GATHER_ADMIN_LIMITS.ADMIN_MEMO_LIVE_LIMIT)
+  || 50);
+
+const PEEKALINK_HOUR_BUCKET_MS = Number.isFinite(GATHER_APP_CHAT_DATA.PEEKALINK_HOUR_BUCKET_MS) ? GATHER_APP_CHAT_DATA.PEEKALINK_HOUR_BUCKET_MS : 3600000;
+const PEEKALINK_FREE_HOURLY_LIMIT = Number.isFinite(GATHER_APP_CHAT_DATA.PEEKALINK_FREE_HOURLY_LIMIT) ? GATHER_APP_CHAT_DATA.PEEKALINK_FREE_HOURLY_LIMIT : 50;
+const ENABLE_FIRESTORE_WRITES = (window.GATHER_APP_CONFIG || {}).ENABLE_FIRESTORE_WRITES !== false;
+const GLOBAL_SEARCH_HISTORY_LIMIT = 100;
+const EXPENSE_ACTIVITY_ACTIONS = GATHER_APP_CONSTANTS.EXPENSE_ACTIVITY_ACTIONS || [];
+const IMAGE_TAG_ACTIVITY_ACTIONS = GATHER_APP_CONSTANTS.IMAGE_TAG_ACTIVITY_ACTIONS || [];
+const MEETING_ACTIVITY_ACTIONS = GATHER_APP_CONSTANTS.MEETING_ACTIVITY_ACTIONS || [];
+const PLACE_ACTIVITY_ACTIONS = GATHER_APP_CONSTANTS.PLACE_ACTIVITY_ACTIONS || [];
+const POLL_ACTIVITY_ACTIONS = GATHER_APP_CONSTANTS.POLL_ACTIVITY_ACTIONS || [];
+const KAKAO_CATEGORY_GROUP_TO_PLACE_CATEGORY = GATHER_APP_CONSTANTS.KAKAO_CATEGORY_GROUP_TO_PLACE_CATEGORY || {};
+const KOREAN_LUNAR_HOLIDAY_DATES = GATHER_APP_CALENDAR_DATA.KOREAN_LUNAR_HOLIDAY_DATES || {};
+const KOREAN_TEMPORARY_HOLIDAYS = GATHER_APP_CALENDAR_DATA.KOREAN_TEMPORARY_HOLIDAYS || [];
+const KOREAN_FIXED_HOLIDAYS = GATHER_APP_CALENDAR_DATA.KOREAN_FIXED_HOLIDAYS || [];
+const KOREAN_SOLAR_TERMS = GATHER_APP_CALENDAR_DATA.KOREAN_SOLAR_TERMS || [];
+const MONTH_NAMES = GATHER_APP_CALENDAR_DATA.MONTH_NAMES || ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+const PRESET_COLORS = GATHER_APP_CONSTANTS.PRESET_COLORS || [];
+const DEFAULT_EXPENSE_CATEGORIES = GATHER_APP_CONSTANTS.DEFAULT_EXPENSE_CATEGORIES || [];
+const DEFAULT_PLACE_CATEGORIES = GATHER_APP_CONSTANTS.DEFAULT_PLACE_CATEGORIES || GATHER_APP_UTILS.DEFAULT_PLACE_CATEGORIES || [];
+const EMOJI_CATEGORIES = GATHER_APP_CHAT_DATA.EMOJI_CATEGORIES || [];
+const INCOME_EXPENSE_CATEGORY = GATHER_APP_UTILS.INCOME_EXPENSE_CATEGORY || { id: 'income', name: '수입', color: '#16A34A' };
+const PLACE_MAP_DEFAULT_CENTER = __gatherUiDeps().PLACE_MAP_DEFAULT_CENTER || [37.5665, 126.978];
+const PLACE_MAP_DEFAULT_ZOOM = __gatherUiDeps().PLACE_MAP_DEFAULT_ZOOM || 11;
+const PLACE_MARKER_SIZE = __gatherUiDeps().PLACE_MARKER_SIZE || 28;
+const CONFETTI_Z_INDEX = 9999;
+const DEADLINE_PICKER_MONTH_NAMES = GATHER_APP_CALENDAR_DATA.MONTH_NAMES || ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+
+function getKoreanSolarTermsForYear(...args) {
+  const f = __gatherUiDeps().getKoreanSolarTermsForYear || GATHER_APP_UTILS.getKoreanSolarTermsForYear;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function useTapRevealedMsgId(...args) {
+  const f = __gatherUiDeps().useTapRevealedMsgId || GATHER_APP_UTILS.useTapRevealedMsgId;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getTrulyConfirmedMeetings(...args) {
+  const f = __gatherUiDeps().getTrulyConfirmedMeetings || GATHER_APP_UTILS.getTrulyConfirmedMeetings;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getConfirmedMeetings(...args) {
+  const f = __gatherUiDeps().getConfirmedMeetings || GATHER_APP_UTILS.getConfirmedMeetings;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getHolidayNamesForDate(...args) {
+  const f = __gatherUiDeps().getHolidayNamesForDate || GATHER_APP_UTILS.getHolidayNamesForDate;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getAnniversariesForDate(...args) {
+  const f = __gatherUiDeps().getAnniversariesForDate || GATHER_APP_UTILS.getAnniversariesForDate;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getPinnedNotices(...args) {
+  const f = __gatherUiDeps().getPinnedNotices || GATHER_APP_UTILS.getPinnedNotices;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getMessageImageEntries(...args) {
+  const f = __gatherUiDeps().getMessageImageEntries || GATHER_APP_UTILS.getMessageImageEntries;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getMessageDirectMediaEntry(...args) {
+  const f = __gatherUiDeps().getMessageDirectMediaEntry || GATHER_APP_UTILS.getMessageDirectMediaEntry;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function renderTextWithUrlBadge(...args) {
+  const f = __gatherUiDeps().renderTextWithUrlBadge || GATHER_APP_UTILS.renderTextWithUrlBadge;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function renderChatMessageBody(...args) {
+  const f = __gatherUiDeps().renderChatMessageBody || GATHER_APP_UTILS.renderChatMessageBody;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function parseTextWithLinks(...args) {
+  const f = __gatherUiDeps().parseTextWithLinks || GATHER_APP_UTILS.parseTextWithLinks;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function highlightKeyword(...args) {
+  const f = __gatherUiDeps().highlightKeyword || GATHER_APP_UTILS.highlightKeyword;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function highlightTextWithYellowMarker(...args) {
+  const f = __gatherUiDeps().highlightTextWithYellowMarker || GATHER_APP_UTILS.highlightTextWithYellowMarker;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function copyTextToClipboard(...args) {
+  const f = __gatherUiDeps().copyTextToClipboard || GATHER_APP_UTILS.copyTextToClipboard;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getCalendarShareUrl(...args) {
+  const f = __gatherUiDeps().getCalendarShareUrl || GATHER_APP_UTILS.getCalendarShareUrl;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getViewShareUrl(...args) {
+  const f = __gatherUiDeps().getViewShareUrl || GATHER_APP_UTILS.getViewShareUrl;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getMemoItemShareUrl(...args) {
+  const f = __gatherUiDeps().getMemoItemShareUrl || GATHER_APP_UTILS.getMemoItemShareUrl;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function buildLightboxImageInfo(...args) {
+  const f = __gatherUiDeps().buildLightboxImageInfo || GATHER_APP_UTILS.buildLightboxImageInfo;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function normalizeTagsForDisplay(...args) {
+  const f = __gatherUiDeps().normalizeTagsForDisplay || GATHER_APP_UTILS.normalizeTagsForDisplay;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getRecentEmojis(...args) {
+  const f = __gatherUiDeps().getRecentEmojis || GATHER_APP_UTILS.getRecentEmojis;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function addRecentEmoji(...args) {
+  const f = __gatherUiDeps().addRecentEmoji || GATHER_APP_UTILS.addRecentEmoji;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function fetchLinkPreview(...args) {
+  const f = __gatherUiDeps().fetchLinkPreview || GATHER_APP_UTILS.fetchLinkPreview;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function useLinkPreview(...args) {
+  const f = __gatherUiDeps().useLinkPreview || GATHER_APP_UTILS.useLinkPreview;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function useScrollHideHeader(...args) {
+  const f = __gatherUiDeps().useScrollHideHeader || GATHER_APP_UTILS.useScrollHideHeader;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function loadLeaflet(...args) {
+  const f = __gatherUiDeps().loadLeaflet || GATHER_APP_UTILS.loadLeaflet;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function loadLeafletMarkerCluster(...args) {
+  const f = __gatherUiDeps().loadLeafletMarkerCluster || GATHER_APP_UTILS.loadLeafletMarkerCluster;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function buildPlaceMarkerHtml(...args) {
+  const f = __gatherUiDeps().buildPlaceMarkerHtml || GATHER_APP_UTILS.buildPlaceMarkerHtml;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function panMapToFitMarkerPopup(...args) {
+  const f = __gatherUiDeps().panMapToFitMarkerPopup || GATHER_APP_UTILS.panMapToFitMarkerPopup;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getPlaceCategories(...args) {
+  const f = __gatherUiDeps().getPlaceCategories || GATHER_APP_UTILS.getPlaceCategories;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getPlaceSortDateKey(...args) {
+  const f = __gatherUiDeps().getPlaceSortDateKey || GATHER_APP_UTILS.getPlaceSortDateKey;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getPlaceExternalMapUrl(...args) {
+  const f = __gatherUiDeps().getPlaceExternalMapUrl || GATHER_APP_UTILS.getPlaceExternalMapUrl;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function extractKnownParticipantNames(...args) {
+  const f = __gatherUiDeps().extractKnownParticipantNames || GATHER_APP_UTILS.extractKnownParticipantNames;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getChatLastReadTimestamp(...args) {
+  const f = __gatherUiDeps().getChatLastReadTimestamp || GATHER_APP_UTILS.getChatLastReadTimestamp;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function setChatLastReadTimestamp(...args) {
+  const f = __gatherUiDeps().setChatLastReadTimestamp || GATHER_APP_UTILS.setChatLastReadTimestamp;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function isDateConfirmedMeeting(...args) {
+  const f = __gatherUiDeps().isDateConfirmedMeeting || GATHER_APP_UTILS.isDateConfirmedMeeting;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function calculateDday(...args) {
+  const f = __gatherUiDeps().calculateDday || GATHER_APP_UTILS.calculateDday;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function formatChatHeaderTitle(...args) {
+  const f = __gatherUiDeps().formatChatHeaderTitle || GATHER_APP_UTILS.formatChatHeaderTitle;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getShortTitleParts(...args) {
+  const f = __gatherUiDeps().getShortTitleParts || GATHER_APP_UTILS.getShortTitleParts;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function isEmojiOnlyChatText(...args) {
+  const f = __gatherUiDeps().isEmojiOnlyChatText || GATHER_APP_UTILS.isEmojiOnlyChatText;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function twemojiImageUrl(...args) {
+  const f = __gatherUiDeps().twemojiImageUrl || GATHER_APP_UTILS.twemojiImageUrl;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getDirectChatMediaInfo(...args) {
+  const f = __gatherUiDeps().getDirectChatMediaInfo || GATHER_APP_UTILS.getDirectChatMediaInfo;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getPollOptionVoterIds(...args) {
+  const f = __gatherUiDeps().getPollOptionVoterIds || GATHER_APP_UTILS.getPollOptionVoterIds;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getPollTotalVoteCount(...args) {
+  const f = __gatherUiDeps().getPollTotalVoteCount || GATHER_APP_UTILS.getPollTotalVoteCount;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getCalendarActivityLogs(...args) {
+  const f = __gatherUiDeps().getCalendarActivityLogs || GATHER_APP_UTILS.getCalendarActivityLogs;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getCalendarAccentColor(...args) {
+  const f = __gatherUiDeps().getCalendarAccentColor || GATHER_APP_UTILS.getCalendarAccentColor;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function getAnniversaryDisplayColor(...args) {
+  const f = __gatherUiDeps().getAnniversaryDisplayColor || GATHER_APP_UTILS.getAnniversaryDisplayColor;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+
+
+export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoadMoreMemos, onBack, showToast, isDarkTheme, onRequestConfirm, sharedMemo, onDismissSharedMemo, chatMessages, setActiveLightbox, onOpenShare, onOpenAppSettings, onChangeView, chatCount = 0, settlementBadge = null, galleryCount = 0, placeCount = 0, memoCount = 0, chatLastAuthor = null, settlementLastDate = null, galleryLastDate = null, placeLastName = null, memoLastTitleWord = null }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
-  const BackArrowIcon = __deps.BackArrowIcon;
-  const SmallXIcon = __deps.SmallXIcon;
+  const BackArrowIcon = __comp.BackArrowIcon || __deps.BackArrowIcon;
+  const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
+  const TrashIcon = __comp.TrashIcon || __deps.TrashIcon;
   const ResizableModalContainer = __deps.ResizableModalContainer;
   const ChatGalleryModal = __comp.ChatGalleryModal || __deps.ChatGalleryModal;
   const ChatParticipantSheet = __comp.ChatParticipantSheet || __deps.ChatParticipantSheet;
-  const EmojiPickerIcon = __deps.EmojiPickerIcon;
+  const EmojiPickerIcon = __comp.EmojiPickerIcon || __deps.EmojiPickerIcon;
   const EmojiPickerSheet = __comp.EmojiPickerSheet || __deps.EmojiPickerSheet;
   const ImageProcessingOverlay = __comp.ImageProcessingOverlay || __deps.ImageProcessingOverlay;
   const ImageThumbRemoveButton = __comp.ImageThumbRemoveButton || __deps.ImageThumbRemoveButton;
@@ -32,7 +702,12 @@ function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoadMoreMem
   const [selectedTag, setSelectedTag] = React.useState('');
   // Header hides on scroll-down / reappears on scroll-up, matching the chat room header exactly.
   const { isHeaderVisible, onScroll: handleMemoScroll } = useScrollHideHeader();
-  const [isSearchOpen, setIsSearchOpen] = React.useState(false);
+    const SharedSideMenuFooter = (__comp && __comp.SharedSideMenuFooter) || (window.GATHER_UI_DEPS || {}).SharedSideMenuFooter;
+  const SharedAppNavBlock = (__comp && __comp.SharedAppNavBlock) || (window.GATHER_UI_DEPS || {}).SharedAppNavBlock;
+  const ThreeLinesIcon = (__comp && __comp.ThreeLinesIcon) || (window.GATHER_UI_DEPS || {}).ThreeLinesIcon;
+  const WeatherBadge = (__comp && __comp.WeatherBadge) || (window.GATHER_UI_DEPS || {}).WeatherBadge;
+  const [isMemoMenuOpen, setIsMemoMenuOpen] = React.useState(false);
+const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   const memoSearchInputRef = React.useRef(null);
   React.useEffect(() => {
     if (isSearchOpen) memoSearchInputRef.current?.focus();
@@ -77,6 +752,27 @@ function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoadMoreMem
   const [isComposerPartOpen, setIsComposerPartOpen] = React.useState(false);
   const [editParticipantId, setEditParticipantId] = React.useState('');
   const [isEditPartOpen, setIsEditPartOpen] = React.useState(false);
+  const memoEditorDirtySnapshot = () => JSON.stringify([
+    editTitle,
+    editText,
+    editColor,
+    editIsPinned,
+    editTags,
+    editTagInput,
+    editParticipantId,
+    editImages.map(img => [img.original, img.thumbnail, img.isExisting ? 1 : 0])
+  ]);
+  // MemoView stays mounted while the inline editor is open, so pass the active flag and the
+  // current memo id as a baseline reset key to keep dirty tracking scoped to the memo being
+  // edited rather than the page's surrounding composer/search state.
+  const memoEditorDirtyGuard = useModalDirtyGuard(
+    () => setEditingMemo(null),
+    onRequestConfirm,
+    undefined,
+    !!editingMemo,
+    memoEditorDirtySnapshot,
+    editingMemo?.id || 'new'
+  );
 
   // Emoji Picker States
   const [isComposerEmojiOpen, setIsComposerEmojiOpen] = React.useState(false);
@@ -233,13 +929,13 @@ function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoadMoreMem
       };
       if (linkPreview) memoData.linkPreview = linkPreview;
 
-      await firebaseDb.collection('calendars').doc('cal_' + calendarId).collection('memos').doc(memoId).set(sanitizeMemoForFirestore(memoData));
+      await __fb().collection('calendars').doc('cal_' + calendarId).collection('memos').doc(memoId).set(sanitizeMemoForFirestore(memoData));
 
       // 3. Write Activity Log
       const logNote = newTitle.trim() ? `제목: ${newTitle.trim()}` : (newText.trim() ? newText.trim().slice(0, 30) + '...' : '사진 첨부');
       const activityLog = createMemoActivityLog(calendarId, 'memo_create', participantId, stamp, logNote);
       if (activityLog) {
-        await firebaseDb.collection('calendars').doc('cal_' + calendarId).collection('activityLogs').doc(activityLog.id).set(activityLog);
+        await __fb().collection('calendars').doc('cal_' + calendarId).collection('activityLogs').doc(activityLog.id).set(activityLog);
         
         const nextCal = {
           ...calendar,
@@ -327,7 +1023,7 @@ function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoadMoreMem
         linkPreview: linkPreview || null
       };
 
-      await firebaseDb.collection('calendars').doc('cal_' + calendarId).collection('memos').doc(editingMemo.id).set(sanitizeMemoForFirestore(memoData));
+      await __fb().collection('calendars').doc('cal_' + calendarId).collection('memos').doc(editingMemo.id).set(sanitizeMemoForFirestore(memoData));
 
       // Log Memo Update — before→after detail
       const logNote = buildFieldChangeNote(editTitle.trim() || '메모', [
@@ -338,7 +1034,7 @@ function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoadMoreMem
       ]) || (editTitle.trim() || (editText.trim().slice(0, 40) + '...'));
       const activityLog = createMemoActivityLog(calendarId, 'memo_update', participantId, stamp, logNote);
       if (activityLog) {
-        await firebaseDb.collection('calendars').doc('cal_' + calendarId).collection('activityLogs').doc(activityLog.id).set(activityLog);
+        await __fb().collection('calendars').doc('cal_' + calendarId).collection('activityLogs').doc(activityLog.id).set(activityLog);
         
         const nextCal = {
           ...calendar,
@@ -364,14 +1060,15 @@ function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoadMoreMem
         const calendarId = calendar.id;
         const stamp = Date.now();
         const participantId = getStoredChatParticipantId(calendarId, calendar) || 'anonymous';
+        const memoSnapshot = JSON.parse(JSON.stringify(memo));
 
-        await firebaseDb.collection('calendars').doc('cal_' + calendarId).collection('memos').doc(memo.id).delete();
+        await __fb().collection('calendars').doc('cal_' + calendarId).collection('memos').doc(memo.id).delete();
 
         // Log Memo Delete
         const logNote = memo.title ? `제목: ${memo.title}` : (memo.text.slice(0, 30) + '...');
         const activityLog = createMemoActivityLog(calendarId, 'memo_delete', participantId, stamp, logNote);
         if (activityLog) {
-          await firebaseDb.collection('calendars').doc('cal_' + calendarId).collection('activityLogs').doc(activityLog.id).set(activityLog);
+          await __fb().collection('calendars').doc('cal_' + calendarId).collection('activityLogs').doc(activityLog.id).set(activityLog);
           
           const nextCal = {
             ...calendar,
@@ -381,7 +1078,30 @@ function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoadMoreMem
           await pushSingleCloudCalendar(nextCal, stamp, 18, null, 'settings', [activityLog]);
         }
 
-        showToast('메모가 삭제되었습니다.', 'success');
+        showToast('메모가 삭제되었습니다.', 'delete', 5000, async () => {
+          try {
+            const restoreStamp = Date.now();
+            await __fb().collection('calendars').doc('cal_' + calendarId).collection('memos').doc(memo.id).set(sanitizeMemoForFirestore(memoSnapshot));
+            const restoreNote = memoSnapshot.title
+              ? `복원: 제목: ${memoSnapshot.title}`
+              : `복원: ${String(memoSnapshot.text || '').slice(0, 30)}...`;
+            const restoreActivityLog = createMemoActivityLog(calendarId, 'memo_update', participantId, restoreStamp, restoreNote);
+            if (restoreActivityLog) {
+              await __fb().collection('calendars').doc('cal_' + calendarId).collection('activityLogs').doc(restoreActivityLog.id).set(restoreActivityLog);
+              const nextCal = {
+                ...calendar,
+                updatedAt: restoreStamp,
+                revision: (calendar.revision || 0) + 1
+              };
+              await pushSingleCloudCalendar(nextCal, restoreStamp, 18, null, 'settings', [restoreActivityLog]);
+            }
+            setEditingMemo(null);
+            showToast('메모 삭제를 되돌렸습니다.', 'success', 3000);
+          } catch (err) {
+            console.error('Failed to restore deleted memo:', err);
+            showToast('메모 복원 실패', 'error', 4000);
+          }
+        });
         setEditingMemo(null);
       } catch (err) {
         console.error('Failed to delete memo:', err);
@@ -391,10 +1111,6 @@ function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoadMoreMem
 
     if (onRequestConfirm) {
       onRequestConfirm('메모 삭제', '이 메모를 삭제하시겠습니까?', action);
-    } else {
-      if (confirm('이 메모를 삭제하시겠습니까?')) {
-        action();
-      }
     }
   };
 
@@ -424,7 +1140,7 @@ function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoadMoreMem
 
   const handleTogglePin = async (memo) => {
     try {
-      await firebaseDb.collection('calendars').doc('cal_' + calendar.id).collection('memos').doc(memo.id).update({ isPinned: !memo.isPinned });
+      await __fb().collection('calendars').doc('cal_' + calendar.id).collection('memos').doc(memo.id).update({ isPinned: !memo.isPinned });
     } catch (err) {
       console.error('Failed to toggle memo pin:', err);
       showToast('고정 상태 변경 실패', 'error');
@@ -433,7 +1149,7 @@ function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoadMoreMem
 
   const handleMemoCommentsChange = async (memo, nextComments) => {
     try {
-      await firebaseDb.collection('calendars').doc('cal_' + calendar.id).collection('memos').doc(memo.id).update({ comments: nextComments });
+      await __fb().collection('calendars').doc('cal_' + calendar.id).collection('memos').doc(memo.id).update({ comments: nextComments });
     } catch (err) {
       console.error('Failed to update memo comments:', err);
       showToast('댓글 저장 실패', 'error');
@@ -504,7 +1220,7 @@ function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoadMoreMem
       try {
         const calendarId = calendar.id;
         const tagsArray = nextTags.map(t => t.startsWith('#') ? t : '#' + t);
-        await firebaseDb.collection('calendars').doc('cal_' + calendarId).collection('memos').doc(editingMemo.id).update({
+        await __fb().collection('calendars').doc('cal_' + calendarId).collection('memos').doc(editingMemo.id).update({
           tags: tagsArray
         });
       } catch (err) {
@@ -591,21 +1307,20 @@ function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoadMoreMem
       /*#__PURE__*/React.createElement("div", {
         style: { display: 'flex', alignItems: 'center', gap: '2px', flexShrink: 0 }
       },
-        /* Search button */
         /*#__PURE__*/React.createElement("button", {
           type: "button",
-          onClick: () => setIsSearchOpen(v => !v),
-          title: "검색",
-          "aria-label": "메모 검색",
+          onClick: () => setIsMemoMenuOpen(true),
+          title: "메뉴",
+          "aria-label": "메뉴",
           style: {
             background: 'none', border: 'none', cursor: 'pointer', padding: '6px',
-            color: isSearchOpen ? 'var(--accent-primary)' : 'var(--text-muted)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '8px'
+            color: 'var(--text-muted)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 'var(--radius-md)'
           }
-        }, /*#__PURE__*/React.createElement("svg", {
+        }, ThreeLinesIcon ? /*#__PURE__*/React.createElement(ThreeLinesIcon, { size: 20 }) : /*#__PURE__*/React.createElement("svg", {
           xmlns: "http://www.w3.org/2000/svg", width: "22", height: "22", viewBox: "0 0 24 24",
-          fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
-        }, /*#__PURE__*/React.createElement("circle", { cx: "11", cy: "11", r: "8" }), /*#__PURE__*/React.createElement("path", { d: "m21 21-4.3-4.3" })))
+          fill: "none", stroke: "currentColor", strokeWidth: "2"
+        }, /*#__PURE__*/React.createElement("path", { d: "M4 6h16" }), /*#__PURE__*/React.createElement("path", { d: "M4 12h16" }), /*#__PURE__*/React.createElement("path", { d: "M4 18h16" })))
       )
     ),
 
@@ -637,6 +1352,76 @@ function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoadMoreMem
       )
     }),
 
+    isMemoMenuOpen && /*#__PURE__*/React.createElement("div", {
+      className: "admin-side-menu-overlay",
+      style: { zIndex: 12000 },
+      onClick: () => setIsMemoMenuOpen(false)
+    }, /*#__PURE__*/React.createElement("nav", {
+      className: "admin-side-menu",
+      "aria-label": "메모",
+      onClick: e => e.stopPropagation()
+    },
+      /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-header" },
+        /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-brand" },
+          /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-copy" },
+            /*#__PURE__*/React.createElement("button", {
+              type: "button",
+              className: "admin-side-menu-title",
+              title: "메인 화면으로 이동",
+              "aria-label": "메인 화면으로 이동",
+              onClick: () => { setIsMemoMenuOpen(false); if (typeof onChangeView === 'function') onChangeView('calendar'); else if (typeof onBack === 'function') onBack(); },
+              style: {
+                background: 'none', border: 'none', padding: 0, margin: 0,
+                color: 'inherit',
+                cursor: 'pointer', textAlign: 'left'
+              }
+            }, "메모")
+          )
+        ),
+        /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 } },
+          WeatherBadge ? /*#__PURE__*/React.createElement(WeatherBadge, { weatherLocation: calendar && calendar.weatherLocation }) : null,
+          /*#__PURE__*/React.createElement("button", {
+            type: "button", className: "admin-side-menu-close-btn", onClick: () => setIsMemoMenuOpen(false), "aria-label": "닫기"
+          }, "✕")
+        )
+      ),
+      /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-list", style: { borderBottom: 'none', paddingTop: '6px' } },
+        /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          className: "admin-side-menu-item",
+          onClick: () => { setIsMemoMenuOpen(false); setIsSearchOpen(true); }
+        },
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", {
+            xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24",
+            fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
+          }, /*#__PURE__*/React.createElement("path", { d: "M10.7 20H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H20a2 2 0 0 1 2 2v4.1" }), /*#__PURE__*/React.createElement("path", { d: "m21 21-1.9-1.9" }), /*#__PURE__*/React.createElement("circle", { cx: "17", cy: "17", r: "3" }))),
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
+            /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "메모 검색")
+          )
+        )
+      ),
+      typeof SharedAppNavBlock === 'function' && /*#__PURE__*/React.createElement(SharedAppNavBlock, {
+        onClose: () => setIsMemoMenuOpen(false),
+        onChangeView: onChangeView,
+        chatCount: chatCount,
+        settlementBadge: settlementBadge,
+        galleryCount: galleryCount,
+        placeCount: placeCount,
+        memoCount: memoCount,
+        chatLastAuthor: chatLastAuthor,
+        settlementLastDate: settlementLastDate,
+        galleryLastDate: galleryLastDate,
+        placeLastName: placeLastName,
+        memoLastTitleWord: memoLastTitleWord
+      }),
+      typeof SharedSideMenuFooter === 'function' && /*#__PURE__*/React.createElement(SharedSideMenuFooter, {
+        onClose: () => setIsMemoMenuOpen(false),
+        onOpenShare: onOpenShare,
+        onOpenSettings: onOpenAppSettings,
+        shareLabel: '공유'
+      })
+    )),
+
     /* Main Scrollable Body */
     /*#__PURE__*/React.createElement("div", {
       style: { flex: 1, position: 'relative', minHeight: 0 }
@@ -650,9 +1435,14 @@ function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoadMoreMem
          as before below it. The memo may be older than the paginated `memos` window, hence the
          separate direct-by-id fetch (see sharedMemo in App()) rather than searching the list. */
       sharedMemo && /*#__PURE__*/React.createElement("div", {
+        // Same purple-border + up/down-shake "you were just brought here" treatment used
+        // everywhere else in the app (see chat-search-focused-bubble/chat-search-shake) --
+        // keyed by memo id so navigating between two different shared-memo links replays it.
+        key: sharedMemo.id,
+        className: "chat-search-focused-bubble",
         style: {
           width: '100%', maxWidth: '520px', margin: '0 auto', boxSizing: 'border-box',
-          border: '2px solid #4F46E5', borderRadius: '16px', padding: '10px',
+          borderRadius: 'var(--radius-md)', padding: '10px',
           boxShadow: '0 6px 18px rgba(79, 70, 229, 0.14)',
           display: 'flex', flexDirection: 'column', gap: '8px'
         }
@@ -695,7 +1485,7 @@ function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoadMoreMem
           margin: '0 auto',
           backgroundColor: newColor,
           border: '1px solid ' + getBorderColor(newColor),
-          borderRadius: '12px',
+          borderRadius: 'var(--radius-md)',
           padding: '12px',
           boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
           display: 'flex',
@@ -822,7 +1612,7 @@ function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoadMoreMem
                   /*#__PURE__*/React.createElement("input", {
                     type: "file",
                     multiple: true,
-                    accept: "image/*",
+                    accept: "image/jpeg, image/png, image/gif, image/webp, image/heic, image/heif, image/*",
                     onChange: handleComposerFileSelect,
                     style: { display: 'none' }
                   }),
@@ -836,7 +1626,7 @@ function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoadMoreMem
             /* Live Link Preview Area inside input */
             extractFirstUrl(newText) && /*#__PURE__*/React.createElement("div", {
               style: { marginTop: '4px', marginBottom: '4px' }
-            }, /*#__PURE__*/React.createElement(LinkPreviewCard, { url: extractFirstUrl(newText) })),
+            }, /*#__PURE__*/React.createElement(LinkPreviewCard, { url: extractFirstUrl(newText), stretch: true })),
 
             /* Images previews list */
             newImages.length > 0 && /*#__PURE__*/React.createElement("div", {
@@ -848,6 +1638,7 @@ function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoadMoreMem
               /* Image element */
               /*#__PURE__*/React.createElement("img", {
                 src: img.thumbnail,
+                decoding: 'async',
                 style: { width: '100%', height: '100%', objectFit: 'cover', borderRadius: '6px', border: '1px solid var(--border-subtle)' }
               }),
               /* Remove button (shared with chat's attachment thumbnail) */
@@ -930,7 +1721,7 @@ function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoadMoreMem
                     alignItems: 'center', justifyContent: 'center', padding: 0, cursor: 'pointer',
                     flexShrink: 0
                   }
-                }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 12 }))))
+                }, /*#__PURE__*/React.createElement(TrashIcon, { size: 12 }))))
               ),
 
               /* Save & Close buttons formatted using DateModal styles */
@@ -1039,7 +1830,7 @@ function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoadMoreMem
           width: '100%',
           backgroundColor: 'var(--bg-primary)',
           border: '1px solid var(--border-subtle)',
-          borderRadius: '8px',
+          borderRadius: 'var(--radius-md)',
           padding: '10px 0',
           fontSize: '0.85rem',
           fontWeight: 'bold',
@@ -1058,28 +1849,30 @@ function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoadMoreMem
 
     /* Memo Editor Modal Overlay */
     editingMemo && /*#__PURE__*/React.createElement("div", {
+      onClick: memoEditorDirtyGuard.overlayOnClick,
       style: {
         position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-        backgroundColor: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)',
+        backgroundColor: 'rgba(0,0,0,0.4)', WebkitBackdropFilter: 'blur(4px)', backdropFilter: 'blur(4px)',
         zIndex: 10000,
         display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px'
       }
     },
       /* Modal Container */
       /*#__PURE__*/React.createElement(ResizableModalContainer, {
+        className: "modal-container memo-edit-modal-container",
         style: {
           width: '100%', maxWidth: '520px',
           backgroundColor: editColor,
           border: '1px solid ' + getBorderColor(editColor),
-          borderRadius: '12px',
+          borderRadius: 'var(--radius-md)',
           boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04)',
           display: 'flex', flexDirection: 'column', gap: '12px',
           padding: '16px', boxSizing: 'border-box',
-          animation: 'modalFadeIn 0.2s ease'
         }
       },
         /* Header: Title & Pin */
         /*#__PURE__*/React.createElement("div", {
+          className: "memo-edit-modal-header",
           style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }
         },
           /* Title input - Styled precisely as user requested */
@@ -1129,6 +1922,9 @@ function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoadMoreMem
           )
         ),
 
+        /*#__PURE__*/React.createElement("div", {
+          className: "memo-edit-modal-body"
+        },
         /* Textarea wrapped relatively with bottom-right emoji & file picker icons - Styled precisely as user requested */
         /*#__PURE__*/React.createElement("div", {
           style: { position: 'relative', width: '100%' }
@@ -1136,6 +1932,7 @@ function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoadMoreMem
           /* Body Textarea */
           /*#__PURE__*/React.createElement("textarea", {
             ref: editMemoTextareaRef,
+            className: "memo-edit-textarea",
             placeholder: "메모 입력...",
             value: editText,
             onChange: e => { setEditText(e.target.value); autoGrowTextarea(e.target, 480); },
@@ -1149,7 +1946,7 @@ function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoadMoreMem
               borderImage: 'none',
               outline: 'none',
               resize: 'none',
-              fontSize: '0.88rem',
+              fontSize: '0.82rem',
               color: 'var(--text-main)',
               width: '100%',
               paddingBottom: '28px',
@@ -1185,7 +1982,7 @@ function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoadMoreMem
               /*#__PURE__*/React.createElement("input", {
                 type: "file",
                 multiple: true,
-                accept: "image/*",
+                accept: "image/jpeg, image/png, image/gif, image/webp, image/heic, image/heif, image/*",
                 onChange: handleEditFileSelect,
                 style: { display: 'none' }
               }),
@@ -1203,7 +2000,7 @@ function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoadMoreMem
           const cachedData = (oldUrl === url) ? editingMemo?.linkPreview : null;
           return /*#__PURE__*/React.createElement("div", {
             style: { marginTop: '4px', marginBottom: '4px' }
-          }, /*#__PURE__*/React.createElement(LinkPreviewCard, { url: url, cachedData: cachedData }));
+          }, /*#__PURE__*/React.createElement(LinkPreviewCard, { url: url, cachedData: cachedData, stretch: true }));
         })(),
 
         /* Images previews list */
@@ -1216,6 +2013,7 @@ function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoadMoreMem
           /* Image element */
           /*#__PURE__*/React.createElement("img", {
             src: img.thumbnail,
+            decoding: 'async',
             style: { width: '100%', height: '100%', objectFit: 'cover', borderRadius: '6px', border: '1px solid var(--border-subtle)' }
           }),
           /* Remove button (shared with chat's attachment thumbnail) */
@@ -1261,10 +2059,11 @@ function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoadMoreMem
               opacity: editTags.length >= 10 ? 0.45 : 1
             }
           }, "저장")
-        ),
+        )),
 
         /* Footer Controls: Participant button and Tag Badges row (Swatches dot menu removed completely) */
         /*#__PURE__*/React.createElement("div", {
+          className: "memo-edit-modal-footer",
           style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '8px', gap: '8px', flexWrap: 'wrap' }
         },
           /* Participant select box & tag badges list to its right */
@@ -1281,9 +2080,17 @@ function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoadMoreMem
             editTags.map(tag => /*#__PURE__*/React.createElement("span", {
               key: tag,
               style: {
-                display: 'inline-flex', alignItems: 'center', gap: '6px', borderRadius: 'var(--radius-full)',
-                padding: '3px 4px 3px 10px', fontSize: '0.72rem', fontWeight: 900, lineHeight: 1,
-                border: '1px solid var(--border-subtle)', color: 'var(--text-main)', background: 'var(--bg-primary)'
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                borderRadius: 'var(--radius-full)',
+                padding: '3px 4px 3px 10px',
+                fontSize: '0.72rem',
+                fontWeight: 900,
+                lineHeight: 1,
+                border: '1px solid var(--border-subtle)',
+                color: 'var(--text-main)',
+                background: 'var(--bg-primary)'
               }
             }, `#${tag}`, /*#__PURE__*/React.createElement("button", {
               type: "button",
@@ -1295,7 +2102,7 @@ function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoadMoreMem
                   try {
                     const calendarId = calendar.id;
                     const tagsArray = nextTags.map(t => t.startsWith('#') ? t : '#' + t);
-                    await firebaseDb.collection('calendars').doc('cal_' + calendarId).collection('memos').doc(editingMemo.id).update({
+                    await __fb().collection('calendars').doc('cal_' + calendarId).collection('memos').doc(editingMemo.id).update({
                       tags: tagsArray
                     });
                   } catch (err) {
@@ -1306,12 +2113,20 @@ function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoadMoreMem
                 setEditTags(nextTags);
               },
               style: {
-                width: '17px', height: '17px', border: 0, borderRadius: '50%',
-                background: 'var(--border-subtle)', color: 'var(--text-main)', display: 'inline-flex',
-                alignItems: 'center', justifyContent: 'center', padding: 0, cursor: 'pointer',
+                width: '17px',
+                height: '17px',
+                border: 0,
+                borderRadius: '50%',
+                background: 'var(--border-subtle)',
+                color: 'var(--text-main)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: 0,
+                cursor: 'pointer',
                 flexShrink: 0
               }
-            }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 12 }))))
+            }, /*#__PURE__*/React.createElement(TrashIcon, { size: 12 }))))
           ),
 
           /* Save / Delete / Cancel Actions using DateModal layout styles */
@@ -1327,15 +2142,18 @@ function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoadMoreMem
                 whiteSpace: 'nowrap',
                 cursor: 'pointer',
                 padding: '10px 20px',
-                marginRight: 'auto' // Align delete button to the left
+                marginRight: 'auto',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px'
               }
-            }, "삭제"),
+            }, /*#__PURE__*/React.createElement(TrashIcon, { size: 14 }), "삭제"),
             
             /* Cancel */
             /*#__PURE__*/React.createElement("button", {
               type: "button",
               className: "btn btn-secondary",
-              onClick: () => setEditingMemo(null),
+              onClick: memoEditorDirtyGuard.requestClose,
               style: {
                 whiteSpace: 'nowrap',
                 cursor: 'pointer',
@@ -1412,7 +2230,8 @@ function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoadMoreMem
   );
 }
 
+  if (typeof window !== 'undefined') {
   window.GATHER_UI_COMPONENTS = Object.assign({}, window.GATHER_UI_COMPONENTS || {}, {
-    MemoView: MemoView
+    MemoView: MemoView,
   });
-})();
+}

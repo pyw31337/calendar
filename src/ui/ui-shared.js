@@ -1068,6 +1068,7 @@ export function LinkPreviewCard({ url, fallbackTitle, cachedData, stretch = fals
       // opposite of what a chat bubble wants.
       width: stretch ? '100%' : 'fit-content',
       maxWidth: stretch ? '100%' : '280px',
+      boxSizing: 'border-box',
       gap: '8px',
       marginTop: '6px',
       border: '1px solid var(--border-subtle)',

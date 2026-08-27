@@ -2204,7 +2204,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
     /* Link Preview Card under the card content if applicable */
     extractFirstUrl(memo.text) && /*#__PURE__*/React.createElement("div", {
       style: { marginTop: '8px' }
-    }, /*#__PURE__*/React.createElement(LinkPreviewCard, { url: extractFirstUrl(memo.text), cachedData: memo.linkPreview })),
+    }, /*#__PURE__*/React.createElement(LinkPreviewCard, { url: extractFirstUrl(memo.text), cachedData: memo.linkPreview, stretch: true })),
 
     /* Tags container if exists */
     /*#__PURE__*/React.createElement("div", {
