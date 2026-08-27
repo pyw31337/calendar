@@ -712,15 +712,12 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
       // OSM tile style -- its muted greyscale/white basemap with minimal labels makes the
       // colored category pins the only thing that actually pops, unlike the default style's
       // busy roads/land-use colors competing with them for attention.
-      // Esri World Light Gray Base & Reference Labels: Clean minimal basemap + administrative region/city labels
-      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
-        maxZoom: 16,
-        attribution: '&copy; <a href="https://www.esri.com/">Esri</a> &copy; OpenStreetMap contributors'
-      }).addTo(map);
-
-      // Reference labels overlay (행정구역 / 시 / 군 / 구 / 동 지역명 라벨 표시)
-      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}', {
-        maxZoom: 16
+      // OpenStreetMap Standard Tiles (Native Korean place names, maxNativeZoom 19 to prevent missing tiles on zoom)
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        maxNativeZoom: 19,
+        subdomains: 'abc',
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
       }).addTo(map);
 
       let clusterAvailable = false;

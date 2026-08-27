@@ -3995,8 +3995,8 @@ textarea.form-input {
   -webkit-tap-highlight-color: transparent;
 }
 .leaflet-tile-pane {
-  filter: brightness(103%) contrast(96%);
-  -webkit-filter: brightness(103%) contrast(96%);
+  filter: saturate(30%) brightness(102%) contrast(93%);
+  -webkit-filter: saturate(30%) brightness(102%) contrast(93%);
 }
 :root[data-theme="dark"] .leaflet-tile-pane {
   filter: grayscale(100%) invert(90%) hue-rotate(180deg) opacity(85%) contrast(90%);
