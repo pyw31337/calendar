@@ -46,6 +46,7 @@ const requiredInUtils = [
   'isDomesticLatLng',
   'getPlaceExternalMapUrl',
   'formatPlaceBadgeDate',
+  'formatConfirmedMeetingLabel',
   'isExpenseIncomeEntry',
   'normalizePlaceCategories',
   'GATHER_APP_UTILS'

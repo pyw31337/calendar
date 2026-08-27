@@ -79,6 +79,10 @@ function formatCommentDate(...args) {
   const f = __gatherUiDeps().formatCommentDate || GATHER_APP_UTILS.formatCommentDate;
   return typeof f === 'function' ? f(...args) : undefined;
 }
+function formatConfirmedMeetingLabel(...args) {
+  const f = __gatherUiDeps().formatConfirmedMeetingLabel || GATHER_APP_UTILS.formatConfirmedMeetingLabel;
+  return typeof f === 'function' ? f(...args) : (args[0] ? formatDateWithDayName(args[0]) : '');
+}
 function formatDateWithDayName(...args) {
   const f = __gatherUiDeps().formatDateWithDayName || GATHER_APP_UTILS.formatDateWithDayName;
   return typeof f === 'function' ? f(...args) : undefined;
