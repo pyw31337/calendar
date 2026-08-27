@@ -893,6 +893,7 @@ export function ChatGalleryModal({
     (memos || []).forEach(memo => {
       const body = memo?.text || memo?.content || memo?.body || '';
       if (!body) return;
+      if (!body || isTombstone(memo)) return;
       let firstUrlSeen = false;
       extractAllUrlInfosLoose(body).forEach(info => {
         if (!info.url || seen.has(info.url) || getDirectChatMediaInfo(info.url)?.type === 'image') return;
@@ -907,8 +908,10 @@ export function ChatGalleryModal({
   const sharedPhotos = React.useMemo(() => {
     const list = [];
     (chatMessages || []).forEach(msg => {
+      if (!msg || isTombstone(msg)) return;
       const entries = [...getMessageImageEntries(msg), ...getAllDirectMediaImageEntries(msg)];
       entries.forEach(entry => {
+        if (!entry || isBrokenPhotoValue(entry.full) || isBrokenPhotoValue(entry.thumb)) return;
         list.push({
           ...entry,
           text: msg.text || '',
@@ -918,9 +921,7 @@ export function ChatGalleryModal({
       });
     });
     (memos || []).forEach(memo => {
-      // memo.tags is a whole-memo tag list (not per-image), so it's only readable here for
-      // display -- there's no single-photo target to write back to, which is why the tag
-      // editor below is gated off (source !== 'chat'/'meeting') for memo-sourced entries.
+      if (!memo || isTombstone(memo)) return;
       const memoTagsDisplay = Array.isArray(memo.tags) ? memo.tags.map(t => String(t || '').replace(/^#/, '')).filter(Boolean).join(' ') : '';
       const asMsg = {
         id: memo.id, text: memo.text || memo.content || memo.body || '',
@@ -930,6 +931,7 @@ export function ChatGalleryModal({
       };
       const entries = [...getMessageImageEntries(asMsg), ...getAllDirectMediaImageEntries(asMsg)];
       entries.forEach(entry => {
+        if (!entry || isBrokenPhotoValue(entry.full) || isBrokenPhotoValue(entry.thumb)) return;
         list.push({
           ...entry,
           tags: memoTagsDisplay,
@@ -942,14 +944,15 @@ export function ChatGalleryModal({
     getConfirmedMeetings(calendar).forEach(meeting => {
       const photos = Array.isArray(meeting?.photos) ? meeting.photos : [];
       photos.forEach((photo, index) => {
-        // Auto-linked entries (sourceMessageId set) are references to a real chat photo, not
-        // independent copies -- resolve the live imageUrl/thumbUrl/tags from that source
-        // message so this tile always matches the chat original exactly, including any tag
-        // edit made from anywhere else.
+        if (photo?.sourceMessageId) {
+          const sourceMsg = (chatMessages || []).find(m => m && m.id === photo.sourceMessageId);
+          if (!sourceMsg || isTombstone(sourceMsg)) return;
+        }
         const resolved = resolveMeetingPhotoDisplay ? resolveMeetingPhotoDisplay(photo, chatMessages) : null;
         const full = String(resolved?.imageUrl || photo?.imageUrl || photo?.full || '');
         const thumb = String(resolved?.thumbUrl || photo?.thumbUrl || photo?.thumb || full);
         if (!full && !thumb) return;
+        if (isBrokenPhotoValue(full) || isBrokenPhotoValue(thumb)) return;
         const mediaKey = resolved?.mediaKey
           || photo?.mediaKey
           || (photo?.sourceMessageId && Number.isInteger(photo?.sourceImageIndex)
@@ -966,6 +969,7 @@ export function ChatGalleryModal({
           sourceImageIndex: Number.isInteger(photo?.sourceImageIndex) ? photo.sourceImageIndex : null,
           timestamp: Number(photo?.createdAt || photo?.updatedAt || meeting?.confirmedAt || 0),
           tags: String(resolved?.tags ?? photo?.tags ?? ''),
+          directMediaUrl: '',
           text: `${meeting.date || ''} 일정 사진`,
           participantId: '',
           source: 'meeting',
@@ -975,18 +979,6 @@ export function ChatGalleryModal({
         });
       });
     });
-    // Tagging a photo with a date auto-links a copy of it onto that date's 일정(meeting) record
-    // (see linkTaggedImageToMeetingDates in app-main.js), so the same photo can legitimately
-    // appear twice in the raw lists above: once as the original chat/memo message, once as the
-    // meeting's archival copy. Collapse those down to one tile per photo URL so the gallery
-    // doesn't show duplicates -- keep the chat/memo copy when both exist (its tag editor writes
-    // back to a real message), falling back to the meeting copy only when it's the sole survivor
-    // (e.g. the original message hasn't been paginated into view yet).
-    // The winning (chat/memo) copy is best for tag editing (see above), but its own entry never
-    // carries meetingDate -- that only lives on the meeting-side archival copy being discarded
-    // here. Carry it over onto the winner so the Lightbox can still show "일정 YY.MM.DD" with a
-    // jump-to-date link for a photo that's genuinely both a real chat message AND linked to a
-    // meeting date, instead of falling back to the generic non-clickable "일정 사진으로 업로드됨".
     const byUrl = new Map();
     const sourceRank = { chat: 0, memo: 1, meeting: 2 };
     list.forEach(entry => {
@@ -1022,7 +1014,6 @@ export function ChatGalleryModal({
     const q = searchQuery.toLowerCase().trim();
     const qNoHash = q.replace(/^#/, '');
     return sharedPhotos.filter(item => {
-      // tags is stored as a space-separated string (e.g. "#영우생일 #말복"), not an array
       const tagsRaw = Array.isArray(item.tags) ? item.tags.join(' ') : String(item.tags || '');
       const tagsLower = tagsRaw.toLowerCase();
       const matchTags = tagsLower.includes(q) || tagsLower.includes(qNoHash) || tagsLower.replace(/#/g, '').includes(qNoHash);
@@ -1040,7 +1031,6 @@ export function ChatGalleryModal({
     markBrokenPhoto(photo, brokenInfo);
   };
 
-  // Search must scan the full history: drain older chat pages (and memo pages) while a query is active.
   React.useEffect(() => {
     if (!searchQuery.trim()) return;
     if (typeof onLoadOlderChat === 'function' && hasMoreOlderChat && !loadingOlderChat) {
@@ -1051,9 +1041,6 @@ export function ChatGalleryModal({
     }
   }, [searchQuery, hasMoreOlderChat, loadingOlderChat, hasMoreMemos, (chatMessages || []).length, (memos || []).length]);
 
-  // Keeps auto-loading older chat history while the 사진 tab is active and still short of a
-  // decent first page -- unaffected by the tab-aware effect below (which only targets link count
-  // once the 링크 tab is open).
   React.useEffect(() => {
     if (!asPage || (searchQuery || '').trim() || activeTab !== 'photos') return;
     if (typeof onLoadOlderChat !== 'function' || !hasMoreOlderChat || loadingOlderChat) return;
@@ -1061,12 +1048,6 @@ export function ChatGalleryModal({
     onLoadOlderChat();
   }, [asPage, searchQuery, activeTab, hasMoreOlderChat, loadingOlderChat, (visiblePhotos || []).length, (chatMessages || []).length]);
 
-  // Was missing entirely: the 사진 tab's auto-load above only ever watches photo count, so once
-  // it had loaded "enough" photos it stopped pulling in older chat/memo history for good --
-  // switching to the 링크 tab afterward saw whatever links happened to already be in that
-  // photo-sized window and nothing more, with no way to pull in additional history (그 tab had no
-  // "더보기" button of its own either -- see below). Links can come from BOTH chat and memos, so
-  // this drains both independently once the 링크 tab is actually open.
   React.useEffect(() => {
     if (!asPage || (searchQuery || '').trim() || activeTab !== 'links') return;
     if ((sharedLinks || []).length >= 50) return;
@@ -1074,9 +1055,7 @@ export function ChatGalleryModal({
     if (typeof onLoadMoreMemos === 'function' && hasMoreMemos) onLoadMoreMemos();
   }, [asPage, searchQuery, activeTab, hasMoreOlderChat, loadingOlderChat, hasMoreMemos, (sharedLinks || []).length, (chatMessages || []).length, (memos || []).length]);
 
-  const displayPhotoTabCount = (typeof totalGalleryCount === 'number' && totalGalleryCount > (visiblePhotos || []).length)
-    ? totalGalleryCount
-    : (visiblePhotos || []).length;
+  const displayPhotoTabCount = visiblePhotos.length;
 
   const handleUploadClick = () => {
     if (uploadInputRef.current) uploadInputRef.current.click();

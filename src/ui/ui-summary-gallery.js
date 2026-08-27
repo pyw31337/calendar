@@ -954,16 +954,14 @@ export function PhotoGallery({ chatMessages, calendar = null, totalGalleryCount,
     markBrokenPhoto(photo, brokenInfo);
   };
 
-  const badgeCount = (typeof totalGalleryCount === 'number' && totalGalleryCount > 0)
-    ? Math.max(totalGalleryCount, visibleEntries.length)
-    : visibleEntries.length;
+  const badgeCount = visibleEntries.length;
   const displayedEntries = visibleEntries
     .filter(e => (e && ((e.thumb && String(e.thumb)) || (e.full && String(e.full)))))
     .slice(0, 12);
   const openGalleryPage = () => { if (typeof onViewAll === 'function') onViewAll(); };
   const handleGalleryTitleKeyDown = event => handleSectionHeaderKeyDown(event, () => setCollapsed(prev => !prev));
 
-  if (photoEntries.length === 0 && !(typeof totalGalleryCount === 'number' && totalGalleryCount > 0)) return null;
+  if (visibleEntries.length === 0) return null;
 
   return /*#__PURE__*/React.createElement("section", { className: "summary-card" },
     /*#__PURE__*/React.createElement("div", {
