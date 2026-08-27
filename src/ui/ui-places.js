@@ -742,7 +742,11 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
         chunkedLoading: true,
         showCoverageOnHover: false,
         spiderfyOnMaxZoom: true,
-        zoomToBoundsOnClick: false,
+        // Let the markercluster plugin handle click zooming to the cluster's bounds.
+        // The earlier custom flyTo(center, +1 zoom) path made clusters appear to "run away"
+        // because the cluster centroid can shift as membership is recomputed during the zoom
+        // animation. The built-in bounds zoom keeps the clicked cluster anchored much better.
+        zoomToBoundsOnClick: true,
         disableClusteringAtZoom: 15,
         maxClusterRadius: 50,
         // Flat solid-color badge instead of the plugin's default ripple-ring style, to match the
@@ -771,22 +775,6 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
           });
         }
       }) : L.layerGroup();
-      if (clusterAvailable) {
-        markersLayerRef.current.on('clusterclick', e => {
-          const map = mapRef.current;
-          const cluster = e && e.layer;
-          if (!map || !cluster || typeof cluster.getLatLng !== 'function') return;
-          try {
-            if (e.originalEvent) {
-              L.DomEvent.preventDefault(e.originalEvent);
-              L.DomEvent.stopPropagation(e.originalEvent);
-            }
-          } catch (err) {}
-          const currentZoom = typeof map.getZoom === 'function' ? map.getZoom() : PLACE_MAP_DEFAULT_ZOOM;
-          const targetZoom = Math.min(currentZoom + 1, 15);
-          map.flyTo(cluster.getLatLng(), targetZoom, { animate: true, duration: 0.35 });
-        });
-      }
       markersLayerRef.current.addTo(map);
       setReady(true);
       try { map.invalidateSize({ animate: false }); } catch (e) {}
