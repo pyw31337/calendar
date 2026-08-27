@@ -1331,12 +1331,15 @@ function getCalendarMonthFromURL() {
   return { year, month };
 }
 
-function normalizeCalendarUrlParams() {
+function normalizeCalendarUrlParams(fallbackCalId = null) {
   try {
     const url = new URL(window.location.href);
-    const id = url.searchParams.get('id') || url.searchParams.get('cal');
+    if (url.pathname.includes('/share/')) return;
+    let id = url.searchParams.get('id') || url.searchParams.get('cal');
+    if (!id && fallbackCalId && isValidCalendarId(fallbackCalId)) {
+      id = fallbackCalId;
+    }
     if (id) {
-      url.searchParams.delete('id');
       url.searchParams.delete('cal');
       url.searchParams.set('id', id);
     }
