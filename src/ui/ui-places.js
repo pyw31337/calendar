@@ -708,13 +708,24 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
           tapTolerance: 15
         })
         .setView(PLACE_MAP_DEFAULT_CENTER, PLACE_MAP_DEFAULT_ZOOM);
-      // 100% Permanent Free OpenStreetMap Tiles (Native Korean place names, maxNativeZoom 19, no API keys, no 14-day trial)
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-        maxNativeZoom: 19,
-        subdomains: 'abc',
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-      }).addTo(map);
+      // Custom MapTiler style integration (Style ID: 01a040c1-ec60-7ed9-af9a-adb73a754755)
+      const maptilerKey = (typeof window !== 'undefined' && (window.MAPTILER_API_KEY || (window.GATHER_APP_CONFIG && window.GATHER_APP_CONFIG.maptilerApiKey))) || '';
+      const maptilerStyleId = '01a040c1-ec60-7ed9-af9a-adb73a754755';
+      if (maptilerKey) {
+        L.tileLayer(`https://api.maptiler.com/maps/${maptilerStyleId}/256/{z}/{x}/{y}.png?key=${encodeURIComponent(maptilerKey)}`, {
+          maxZoom: 19,
+          maxNativeZoom: 19,
+          attribution: '&copy; <a href="https://www.maptiler.com/copyright/">MapTiler</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+      } else {
+        // 100% Permanent Free OpenStreetMap Tiles (Native Korean place names, maxNativeZoom 19)
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19,
+          maxNativeZoom: 19,
+          subdomains: 'abc',
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+      }
 
       let clusterAvailable = false;
       try {
