@@ -1,0 +1,90 @@
+diff --git a/assets/app.css b/assets/app.css
+index 5c91d72..b79981a 100644
+--- a/assets/app.css
++++ b/assets/app.css
+@@ -3428,6 +3428,22 @@ textarea.form-input {
+   padding-top: 6px;
+   padding-bottom: 6px;
+ }
++
++/* Main side menu only: slightly looser row spacing (+8px). Subpage menus unchanged. */
++.admin-side-menu.main-side-menu .admin-side-menu-item {
++  min-height: 50px;
++  padding-top: 10px;
++  padding-bottom: 10px;
++}
++.admin-side-menu.main-side-menu .admin-side-menu-list {
++  padding-top: 10px;
++  padding-bottom: 10px;
++  gap: 4px;
++}
++.admin-side-menu.main-side-menu .admin-side-menu-list + .admin-side-menu-list,
++.admin-side-menu.main-side-menu .admin-side-menu-list + div.admin-side-menu-list {
++  margin-top: 4px;
++}
+ .admin-side-menu .main-side-menu-manual-banner {
+   position: relative;
+   overflow: hidden;
+diff --git a/public/assets/app.css b/public/assets/app.css
+index 5c91d72..b79981a 100644
+--- a/public/assets/app.css
++++ b/public/assets/app.css
+@@ -3428,6 +3428,22 @@ textarea.form-input {
+   padding-top: 6px;
+   padding-bottom: 6px;
+ }
++
++/* Main side menu only: slightly looser row spacing (+8px). Subpage menus unchanged. */
++.admin-side-menu.main-side-menu .admin-side-menu-item {
++  min-height: 50px;
++  padding-top: 10px;
++  padding-bottom: 10px;
++}
++.admin-side-menu.main-side-menu .admin-side-menu-list {
++  padding-top: 10px;
++  padding-bottom: 10px;
++  gap: 4px;
++}
++.admin-side-menu.main-side-menu .admin-side-menu-list + .admin-side-menu-list,
++.admin-side-menu.main-side-menu .admin-side-menu-list + div.admin-side-menu-list {
++  margin-top: 4px;
++}
+ .admin-side-menu .main-side-menu-manual-banner {
+   position: relative;
+   overflow: hidden;
+diff --git a/src/ui/ui-side-menu.js b/src/ui/ui-side-menu.js
+index f1f9b2e..f83f23e 100644
+--- a/src/ui/ui-side-menu.js
++++ b/src/ui/ui-side-menu.js
+@@ -1156,7 +1156,7 @@ export function MainSideMenu({
+     className: "admin-side-menu-overlay",
+     onClick: onClose
+   }, /*#__PURE__*/React.createElement("nav", {
+-    className: "admin-side-menu" + (isScrollingActive ? " scroll-active" : ""),
++    className: "admin-side-menu main-side-menu" + (isScrollingActive ? " scroll-active" : ""),
+     "aria-label": "메인 메뉴",
+     onClick: e => e.stopPropagation(),
+     onMouseMove: triggerScrollActive,
+diff --git a/src/ui/ui-weather.js b/src/ui/ui-weather.js
+index abcc456..38290a1 100644
+--- a/src/ui/ui-weather.js
++++ b/src/ui/ui-weather.js
+@@ -819,7 +819,17 @@ export function WeatherBadge({ weatherLocation }) {
+     className: "weather-badge-hover"
+   },
+     /* Region Name */
+-    /*#__PURE__*/React.createElement("span", { style: { maxWidth: '52px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, cleanName),
++    /*#__PURE__*/React.createElement("span", {
++      style: {
++        // Allow up to 5 Korean characters (e.g. 서울특별시) without ellipsis; longer names truncate.
++        maxWidth: (cleanName && cleanName.length > 5) ? '5.6em' : 'none',
++        overflow: 'hidden',
++        textOverflow: 'ellipsis',
++        whiteSpace: 'nowrap',
++        flexShrink: 1
++      },
++      title: cleanName
++    }, cleanName),
+     /* Weather Icon */
+     getWeatherIcon(weather.code),
+     /* Temperature */

@@ -1,0 +1,569 @@
+diff --git a/assets/app.css b/assets/app.css
+index 8c8db89..fb1c7a1 100644
+--- a/assets/app.css
++++ b/assets/app.css
+@@ -3938,3 +3938,14 @@ html.emoji-sheet-open [data-chat-input-panel="1"].emoji-sheet-lifted {
+   z-index: 12001;
+   position: relative;
+ }
++
++
++/* Side menu trailing meta pills (last author / date / place / memo word) */
++.admin-side-menu-item .admin-side-menu-item-copy {
++  flex: 1 1 auto;
++  min-width: 0;
++}
++.side-menu-meta-pill {
++  margin-left: auto;
++  flex-shrink: 0;
++}
+diff --git a/public/assets/app.css b/public/assets/app.css
+index 8c8db89..fb1c7a1 100644
+--- a/public/assets/app.css
++++ b/public/assets/app.css
+@@ -3938,3 +3938,14 @@ html.emoji-sheet-open [data-chat-input-panel="1"].emoji-sheet-lifted {
+   z-index: 12001;
+   position: relative;
+ }
++
++
++/* Side menu trailing meta pills (last author / date / place / memo word) */
++.admin-side-menu-item .admin-side-menu-item-copy {
++  flex: 1 1 auto;
++  min-width: 0;
++}
++.side-menu-meta-pill {
++  margin-left: auto;
++  flex-shrink: 0;
++}
+diff --git a/src/core/app-main.js b/src/core/app-main.js
+index fe2b494..5a0c244 100644
+--- a/src/core/app-main.js
++++ b/src/core/app-main.js
+@@ -5245,13 +5245,165 @@ function App() {
+   const navSettlementBadge = activeCal && typeof calculateSettlementBalance === 'function' && typeof formatBalanceBadge === 'function'
+     ? formatBalanceBadge(calculateSettlementBalance(activeCal))
+     : null;
++
++  // Side-menu trailing meta (latest activity snippets)
++  const formatMenuDate = (ts) => {
++    if (ts == null || ts === '') return null;
++    let d = null;
++    if (typeof ts === 'number') d = new Date(ts);
++    else if (typeof ts === 'string') {
++      // "2026-08-24" or ISO
++      const m = ts.match(/^(\d{4})-(\d{2})-(\d{2})/);
++      if (m) return `${m[2]}.${m[3]}`;
++      const parsed = Date.parse(ts);
++      if (!Number.isNaN(parsed)) d = new Date(parsed);
++    } else if (ts && typeof ts.toDate === 'function') {
++      try { d = ts.toDate(); } catch (_) {}
++    } else if (ts && typeof ts.seconds === 'number') {
++      d = new Date(ts.seconds * 1000);
++    }
++    if (!d || Number.isNaN(d.getTime())) return null;
++    const mm = String(d.getMonth() + 1).padStart(2, '0');
++    const dd = String(d.getDate()).padStart(2, '0');
++    return `${mm}.${dd}`;
++  };
++
++  const navChatLastAuthor = (() => {
++    const msgs = (typeof allChatMessages !== 'undefined' && allChatMessages && allChatMessages.length)
++      ? allChatMessages
++      : (chatMessages || []);
++    if (!msgs.length) return null;
++    const last = msgs[msgs.length - 1];
++    if (!last) return null;
++    const parts = (activeCal && Array.isArray(activeCal.participants)) ? activeCal.participants : [];
++    const p = parts.find(x => x && x.id === last.participantId);
++    const name = (p && p.name) || last.participantName || null;
++    if (!name) return null;
++    return { name: String(name), color: (p && p.color) || '#64748B' };
++  })();
++
++  const navSettlementLastDate = (() => {
++    let bestTs = 0;
++    let bestLabel = null;
++    const consider = (raw, fallbackDateStr) => {
++      let ts = 0;
++      if (typeof raw === 'number') ts = raw;
++      else if (raw && typeof raw.seconds === 'number') ts = raw.seconds * 1000;
++      else if (raw && typeof raw.toDate === 'function') {
++        try { ts = raw.toDate().getTime(); } catch (_) {}
++      } else if (typeof raw === 'string') {
++        const p = Date.parse(raw);
++        if (!Number.isNaN(p)) ts = p;
++      }
++      if (!ts && fallbackDateStr) {
++        const p = Date.parse(String(fallbackDateStr).slice(0, 10));
++        if (!Number.isNaN(p)) ts = p;
++      }
++      if (ts > bestTs) {
++        bestTs = ts;
++        bestLabel = formatMenuDate(ts) || formatMenuDate(fallbackDateStr);
++      }
++    };
++    const meetings = (activeCal && Array.isArray(activeCal.confirmedMeetings)) ? activeCal.confirmedMeetings : [];
++    meetings.forEach(m => {
++      if (!m || m.deletedAt) return;
++      (Array.isArray(m.expenses) ? m.expenses : []).forEach(e => {
++        if (!e || e.deletedAt) return;
++        consider(e.createdAt || e.timestamp || e.updatedAt, m.date || e.date);
++      });
++      (Array.isArray(m.incomes) ? m.incomes : []).forEach(e => {
++        if (!e || e.deletedAt) return;
++        consider(e.createdAt || e.timestamp || e.updatedAt, m.date || e.date);
++      });
++    });
++    const topExp = (activeCal && Array.isArray(activeCal.expenses)) ? activeCal.expenses : [];
++    topExp.forEach(e => {
++      if (!e || e.deletedAt) return;
++      consider(e.createdAt || e.timestamp || e.updatedAt, e.date);
++    });
++    return bestLabel;
++  })();
++
++  const navGalleryLastDate = (() => {
++    const msgs = (typeof allChatMessages !== 'undefined' && allChatMessages && allChatMessages.length)
++      ? allChatMessages
++      : (chatMessages || []);
++    for (let i = msgs.length - 1; i >= 0; i--) {
++      const msg = msgs[i];
++      if (!msg) continue;
++      const hasImg = !!(msg.imageUrl || msg.thumbUrl
++        || (Array.isArray(msg.imageUrls) && msg.imageUrls.length)
++        || (Array.isArray(msg.thumbUrls) && msg.thumbUrls.length));
++      if (!hasImg) continue;
++      return formatMenuDate(msg.timestamp || msg.createdAt);
++    }
++    return null;
++  })();
++
++  const navPlaceLastName = (() => {
++    const list = [];
++    if (activeCal && Array.isArray(activeCal.places)) {
++      activeCal.places.forEach(p => { if (p && !p.deletedAt) list.push(p); });
++    }
++    if (Array.isArray(placesSubcollection)) {
++      placesSubcollection.forEach(p => { if (p && !p.deletedAt) list.push(p); });
++    }
++    if (!list.length) return null;
++    const score = (p) => {
++      const raw = p.updatedAt || p.createdAt || p.timestamp || 0;
++      if (typeof raw === 'number') return raw;
++      if (raw && typeof raw.seconds === 'number') return raw.seconds * 1000;
++      if (raw && typeof raw.toDate === 'function') {
++        try { return raw.toDate().getTime(); } catch (_) { return 0; }
++      }
++      if (typeof raw === 'string') {
++        const n = Date.parse(raw);
++        return Number.isNaN(n) ? 0 : n;
++      }
++      return 0;
++    };
++    list.sort((a, b) => score(b) - score(a));
++    const top = list[0];
++    const name = (top.alias || top.name || top.placeName || top.title || '').trim();
++    return name || null;
++  })();
++
++  const navMemoLastTitleWord = (() => {
++    const list = Array.isArray(memos) ? memos.filter(m => m && !m.deletedAt) : [];
++    if (!list.length) return null;
++    const score = (m) => {
++      const raw = m.createdAt || m.timestamp || m.updatedAt || 0;
++      if (typeof raw === 'number') return raw;
++      if (raw && typeof raw.seconds === 'number') return raw.seconds * 1000;
++      if (raw && typeof raw.toDate === 'function') {
++        try { return raw.toDate().getTime(); } catch (_) { return 0; }
++      }
++      if (typeof raw === 'string') {
++        const n = Date.parse(raw);
++        return Number.isNaN(n) ? 0 : n;
++      }
++      return 0;
++    };
++    list.sort((a, b) => score(b) - score(a));
++    const top = list[0];
++    const title = String(top.title || top.text || top.content || '').trim();
++    if (!title) return null;
++    const word = title.split(/\s+/)[0];
++    return word ? word.slice(0, 12) : null;
++  })();
++
+   const navMenuProps = {
+     onChangeView: changeView,
+     chatCount: navChatCount,
+     settlementBadge: navSettlementBadge,
+     galleryCount: navGalleryCount,
+     placeCount: navPlaceCount,
+-    memoCount: navMemoCount
++    memoCount: navMemoCount,
++    chatLastAuthor: navChatLastAuthor,
++    settlementLastDate: navSettlementLastDate,
++    galleryLastDate: navGalleryLastDate,
++    placeLastName: navPlaceLastName,
++    memoLastTitleWord: navMemoLastTitleWord
+   };
+   const sharedAppOverlays = /*#__PURE__*/React.createElement(React.Fragment, null,
+     isAppSettingsOpen && /*#__PURE__*/React.createElement(AppSettingsModal, {
+@@ -5708,6 +5860,11 @@ function App() {
+     settlementBadge: activeCal && typeof calculateSettlementBalance === 'function' && typeof formatBalanceBadge === 'function'
+       ? formatBalanceBadge(calculateSettlementBalance(activeCal))
+       : null,
++    chatLastAuthor: navChatLastAuthor,
++    settlementLastDate: navSettlementLastDate,
++    galleryLastDate: navGalleryLastDate,
++    placeLastName: navPlaceLastName,
++    memoLastTitleWord: navMemoLastTitleWord,
+     onClose: () => setIsMainSideMenuOpen(false),
+     onOpenManual: () => {
+       setIsGuideOpen(true);
+diff --git a/src/ui/ui-chat-gallery.js b/src/ui/ui-chat-gallery.js
+index d4b8ab6..49995c5 100644
+--- a/src/ui/ui-chat-gallery.js
++++ b/src/ui/ui-chat-gallery.js
+@@ -1376,6 +1376,7 @@ export function ChatGalleryModal({
+       ),
+     ),
+     typeof SharedAppNavBlock === 'function' && /*#__PURE__*/React.createElement(SharedAppNavBlock, {
++        onClose: typeof SharedAppNavBlock === 'function' && /*#__PURE__*/React.createElement(SharedAppNavBlock, {
+       onClose: () => setIsMenuOpen(false),
+       onChangeView: onChangeView,
+       chatCount: chatCount,
+@@ -1384,6 +1385,18 @@ export function ChatGalleryModal({
+       placeCount: placeCount,
+       memoCount: memoCount
+     }),
++        onChangeView: () => setIsMenuOpen(false),
++        chatCount: chatCount,
++        settlementBadge: settlementBadge,
++        galleryCount: galleryCount,
++        placeCount: placeCount,
++        memoCount: memoCount,
++        chatLastAuthor: chatLastAuthor,
++        settlementLastDate: settlementLastDate,
++        galleryLastDate: galleryLastDate,
++        placeLastName: placeLastName,
++        memoLastTitleWord: memoLastTitleWord
++      }),
+     typeof SharedSideMenuFooter === 'function' && /*#__PURE__*/React.createElement(SharedSideMenuFooter, {
+       onClose: () => setIsMenuOpen(false),
+       onOpenShare: onOpenShare,
+diff --git a/src/ui/ui-event-modals.js b/src/ui/ui-event-modals.js
+index 39b4fed..c2d32f2 100644
+--- a/src/ui/ui-event-modals.js
++++ b/src/ui/ui-event-modals.js
+@@ -1367,7 +1367,7 @@ export function AnniversaryModal({
+   );
+ }
+ 
+-export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenShare, onOpenAppSettings, onChangeView, chatCount = 0, settlementBadge = null, galleryCount = 0, placeCount = 0, memoCount = 0 }) {
++export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenShare, onOpenAppSettings, onChangeView, chatCount = 0, settlementBadge = null, galleryCount = 0, placeCount = 0, memoCount = 0, chatLastAuthor = null, settlementLastDate = null, galleryLastDate = null, placeLastName = null, memoLastTitleWord = null }) {
+   const React = window.React;
+   const __deps = window.GATHER_UI_DEPS || {};
+   const __comp = window.GATHER_UI_COMPONENTS || {};
+@@ -2061,6 +2061,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
+       )
+     ),
+     typeof SharedAppNavBlock === 'function' && /*#__PURE__*/React.createElement(SharedAppNavBlock, {
++        onClose: typeof SharedAppNavBlock === 'function' && /*#__PURE__*/React.createElement(SharedAppNavBlock, {
+       onClose: () => setIsSettlementMenuOpen(false),
+       onChangeView: onChangeView,
+       chatCount: chatCount,
+@@ -2069,6 +2070,18 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
+       placeCount: placeCount,
+       memoCount: memoCount
+     }),
++        onChangeView: () => setIsSettlementMenuOpen(false),
++        chatCount: chatCount,
++        settlementBadge: settlementBadge,
++        galleryCount: galleryCount,
++        placeCount: placeCount,
++        memoCount: memoCount,
++        chatLastAuthor: chatLastAuthor,
++        settlementLastDate: settlementLastDate,
++        galleryLastDate: galleryLastDate,
++        placeLastName: placeLastName,
++        memoLastTitleWord: memoLastTitleWord
++      }),
+     typeof SharedSideMenuFooter === 'function' && /*#__PURE__*/React.createElement(SharedSideMenuFooter, {
+       onClose: () => setIsSettlementMenuOpen(false),
+       onOpenShare: onOpenShare,
+diff --git a/src/ui/ui-memo-view.js b/src/ui/ui-memo-view.js
+index 29ddc10..6fd040e 100644
+--- a/src/ui/ui-memo-view.js
++++ b/src/ui/ui-memo-view.js
+@@ -671,7 +671,7 @@ function getAnniversaryDisplayColor(...args) {
+ }
+ 
+ 
+-export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoadMoreMemos, onBack, showToast, isDarkTheme, onRequestConfirm, sharedMemo, onDismissSharedMemo, chatMessages, setActiveLightbox, onOpenShare, onOpenAppSettings, onChangeView, chatCount = 0, settlementBadge = null, galleryCount = 0, placeCount = 0, memoCount = 0 }) {
++export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoadMoreMemos, onBack, showToast, isDarkTheme, onRequestConfirm, sharedMemo, onDismissSharedMemo, chatMessages, setActiveLightbox, onOpenShare, onOpenAppSettings, onChangeView, chatCount = 0, settlementBadge = null, galleryCount = 0, placeCount = 0, memoCount = 0, chatLastAuthor = null, settlementLastDate = null, galleryLastDate = null, placeLastName = null, memoLastTitleWord = null }) {
+   const React = window.React;
+   const __deps = window.GATHER_UI_DEPS || {};
+   const __comp = window.GATHER_UI_COMPONENTS || {};
+@@ -1401,6 +1401,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
+         )
+       ),
+       typeof SharedAppNavBlock === 'function' && /*#__PURE__*/React.createElement(SharedAppNavBlock, {
++        onClose: typeof SharedAppNavBlock === 'function' && /*#__PURE__*/React.createElement(SharedAppNavBlock, {
+         onClose: () => setIsMemoMenuOpen(false),
+         onChangeView: onChangeView,
+         chatCount: chatCount,
+@@ -1408,6 +1409,18 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
+         galleryCount: galleryCount,
+         placeCount: placeCount,
+         memoCount: memoCount
++      }),
++        onChangeView: () => setIsMemoMenuOpen(false),
++        chatCount: chatCount,
++        settlementBadge: settlementBadge,
++        galleryCount: galleryCount,
++        placeCount: placeCount,
++        memoCount: memoCount,
++        chatLastAuthor: chatLastAuthor,
++        settlementLastDate: settlementLastDate,
++        galleryLastDate: galleryLastDate,
++        placeLastName: placeLastName,
++        memoLastTitleWord: memoLastTitleWord
+       }),
+       typeof SharedSideMenuFooter === 'function' && /*#__PURE__*/React.createElement(SharedSideMenuFooter, {
+         onClose: () => setIsMemoMenuOpen(false),
+diff --git a/src/ui/ui-misc.js b/src/ui/ui-misc.js
+index 4a4a27e..84861e2 100644
+--- a/src/ui/ui-misc.js
++++ b/src/ui/ui-misc.js
+@@ -1087,6 +1087,7 @@ export function ChatSideMenu({
+       )
+     ),
+     typeof SharedAppNavBlock === 'function' && /*#__PURE__*/React.createElement(SharedAppNavBlock, {
++        onClose: typeof SharedAppNavBlock === 'function' && /*#__PURE__*/React.createElement(SharedAppNavBlock, {
+       onClose: onClose,
+       onChangeView: onChangeView,
+       chatCount: chatCount,
+@@ -1095,6 +1096,18 @@ export function ChatSideMenu({
+       placeCount: placeCount,
+       memoCount: memoCount
+     }),
++        onChangeView: onClose,
++        chatCount: chatCount,
++        settlementBadge: settlementBadge,
++        galleryCount: galleryCount,
++        placeCount: placeCount,
++        memoCount: memoCount,
++        chatLastAuthor: chatLastAuthor,
++        settlementLastDate: settlementLastDate,
++        galleryLastDate: galleryLastDate,
++        placeLastName: placeLastName,
++        memoLastTitleWord: memoLastTitleWord
++      }),
+     typeof SharedSideMenuFooter === 'function' && /*#__PURE__*/React.createElement(SharedSideMenuFooter, {
+       onClose: onClose,
+       onOpenShare: onOpenShare,
+diff --git a/src/ui/ui-places.js b/src/ui/ui-places.js
+index fb7b39f..02b4ace 100644
+--- a/src/ui/ui-places.js
++++ b/src/ui/ui-places.js
+@@ -1118,7 +1118,7 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom
+ }
+ 
+ export function PlacesView({
+-  onOpenAppSettings, onChangeView, chatCount = 0, settlementBadge = null, galleryCount = 0, placeCount = 0, memoCount = 0, calendar, onBack, onSavePlace, onDeletePlace, showToast, onRequestConfirm, placesInitialQuery, setPlacesInitialQuery, isDarkTheme, onToggleTheme, fontScalePercent, onDecreaseFont, onIncreaseFont, isChatNotifyEnabled, onToggleChatNotifications, onSharePlaces, onSelectDate }) {
++  onOpenAppSettings, onChangeView, chatCount = 0, settlementBadge = null, galleryCount = 0, placeCount = 0, memoCount = 0, chatLastAuthor = null, settlementLastDate = null, galleryLastDate = null, placeLastName = null, memoLastTitleWord = null, calendar, onBack, onSavePlace, onDeletePlace, showToast, onRequestConfirm, placesInitialQuery, setPlacesInitialQuery, isDarkTheme, onToggleTheme, fontScalePercent, onDecreaseFont, onIncreaseFont, isChatNotifyEnabled, onToggleChatNotifications, onSharePlaces, onSelectDate }) {
+   const React = window.React;
+   const __deps = window.GATHER_UI_DEPS || {};
+   const __comp = window.GATHER_UI_COMPONENTS || {};
+@@ -2021,6 +2021,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
+         )
+       ),
+       typeof SharedAppNavBlock === 'function' && /*#__PURE__*/React.createElement(SharedAppNavBlock, {
++        onClose: typeof SharedAppNavBlock === 'function' && /*#__PURE__*/React.createElement(SharedAppNavBlock, {
+         onClose: () => setIsPlacesMenuOpen(false),
+         onChangeView: onChangeView,
+         chatCount: chatCount,
+@@ -2028,6 +2029,18 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
+         galleryCount: galleryCount,
+         placeCount: placeCount,
+         memoCount: memoCount
++      }),
++        onChangeView: () => setIsPlacesMenuOpen(false),
++        chatCount: chatCount,
++        settlementBadge: settlementBadge,
++        galleryCount: galleryCount,
++        placeCount: placeCount,
++        memoCount: memoCount,
++        chatLastAuthor: chatLastAuthor,
++        settlementLastDate: settlementLastDate,
++        galleryLastDate: galleryLastDate,
++        placeLastName: placeLastName,
++        memoLastTitleWord: memoLastTitleWord
+       }),
+       typeof SharedSideMenuFooter === 'function' && /*#__PURE__*/React.createElement(SharedSideMenuFooter, {
+         onClose: () => setIsPlacesMenuOpen(false),
+diff --git a/src/ui/ui-side-menu.js b/src/ui/ui-side-menu.js
+index 52b425f..ee900fa 100644
+--- a/src/ui/ui-side-menu.js
++++ b/src/ui/ui-side-menu.js
+@@ -1099,7 +1099,13 @@ export function SharedAppNavBlock({
+   settlementBadge = null,
+   galleryCount = 0,
+   placeCount = 0,
+-  memoCount = 0
++  memoCount = 0,
++  // Optional trailing meta pills (right edge of each row)
++  chatLastAuthor = null,       // { name, color }
++  settlementLastDate = null,   // "08.24"
++  galleryLastDate = null,      // "08.24"
++  placeLastName = null,        // "외룡캠핑장"
++  memoLastTitleWord = null     // "팽이버섯"
+ }) {
+   const React = window.React;
+   const go = (view) => {
+@@ -1113,6 +1119,43 @@ export function SharedAppNavBlock({
+       : { marginLeft: "4px" }
+   }, count) : null;
+ 
++  const metaPill = (text, styleExtra) => {
++    if (!text) return null;
++    const label = String(text).trim();
++    if (!label) return null;
++    return /*#__PURE__*/React.createElement("span", {
++      className: "side-menu-meta-pill",
++      title: label,
++      style: Object.assign({
++        marginLeft: "auto",
++        flexShrink: 0,
++        maxWidth: "7.2rem",
++        overflow: "hidden",
++        textOverflow: "ellipsis",
++        whiteSpace: "nowrap",
++        fontSize: "0.72rem",
++        fontWeight: 700,
++        lineHeight: 1.2,
++        padding: "3px 9px",
++        borderRadius: "999px",
++        backgroundColor: "var(--bg-card, #FFFFFF)",
++        border: "1px solid var(--border-subtle, #E2E8F0)",
++        color: "var(--text-muted, #64748B)",
++        boxSizing: "border-box"
++      }, styleExtra || {})
++    }, label);
++  };
++
++  const chatAuthorPill = () => {
++    if (!chatLastAuthor || !chatLastAuthor.name) return null;
++    const color = chatLastAuthor.color || "#64748B";
++    return metaPill(chatLastAuthor.name, {
++      border: `1.5px solid ${color}`,
++      color: color,
++      backgroundColor: "#FFFFFF"
++    });
++  };
++
+   return /*#__PURE__*/React.createElement("div", {
+     className: "admin-side-menu-list",
+     style: { borderTop: '1px solid var(--border-subtle, #E2E8F0)', borderBottom: 'none', paddingTop: '6px', marginTop: '2px' }
+@@ -1121,7 +1164,8 @@ export function SharedAppNavBlock({
+       /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2" }, /*#__PURE__*/React.createElement("path", { d: "M7.9 20A9 9 0 1 0 4 16.1L2 22Z" }))),
+       /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
+         /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title", style: { display: "flex", alignItems: "center", gap: "6px" } }, "채팅", badge(chatCount))
+-      )
++      ),
++      chatAuthorPill()
+     ),
+     /*#__PURE__*/React.createElement("button", { type: "button", className: "admin-side-menu-item", onClick: () => go("settlement") },
+       /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2" }, /*#__PURE__*/React.createElement("path", { d: "M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1" }), /*#__PURE__*/React.createElement("path", { d: "M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4" }))),
+@@ -1132,58 +1176,29 @@ export function SharedAppNavBlock({
+             style: { backgroundColor: settlementBadge.bgColor || "#64748B", color: "#FFFFFF", marginLeft: "4px" }
+           }, settlementBadge.text)
+         )
+-      )
++      ),
++      metaPill(settlementLastDate)
+     ),
+     /*#__PURE__*/React.createElement("button", { type: "button", className: "admin-side-menu-item", onClick: () => go("gallery") },
+       /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2" }, /*#__PURE__*/React.createElement("rect", { width: "18", height: "18", x: "3", y: "3", rx: "2", ry: "2" }), /*#__PURE__*/React.createElement("circle", { cx: "9", cy: "9", r: "2" }), /*#__PURE__*/React.createElement("path", { d: "m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" }))),
+       /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
+         /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title", style: { display: "flex", alignItems: "center", gap: "6px" } }, "갤러리", badge(galleryCount))
+-      )
++      ),
++      metaPill(galleryLastDate)
+     ),
+     /*#__PURE__*/React.createElement("button", { type: "button", className: "admin-side-menu-item", onClick: () => go("places") },
+       /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2" }, /*#__PURE__*/React.createElement("path", { d: "M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" }), /*#__PURE__*/React.createElement("circle", { cx: "12", cy: "10", r: "3" }))),
+       /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
+         /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title", style: { display: "flex", alignItems: "center", gap: "6px" } }, "장소", badge(placeCount))
+-      )
++      ),
++      metaPill(placeLastName)
+     ),
+     /*#__PURE__*/React.createElement("button", { type: "button", className: "admin-side-menu-item", onClick: () => go("memo") },
+       /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2" }, /*#__PURE__*/React.createElement("path", { d: "M12 20h9" }), /*#__PURE__*/React.createElement("path", { d: "M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" }))),
+       /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
+         /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title", style: { display: "flex", alignItems: "center", gap: "6px" } }, "메모", badge(memoCount))
+-      )
+-    )
+-  );
+-}
+-
+-export function SharedSideMenuFooter({ onClose, onOpenShare, onOpenSettings, shareLabel = '공유' }) {
+-  const React = window.React;
+-  const __deps = window.GATHER_UI_DEPS || {};
+-  const MenuIcon = __deps.MenuIcon;
+-  const handle = action => { if (typeof action === 'function') action(); };
+-  return /*#__PURE__*/React.createElement("div", {
+-    className: "admin-side-menu-list",
+-    style: { borderTop: '1px solid var(--border-subtle, #E2E8F0)', borderBottom: 'none', paddingTop: '6px', marginTop: '2px' }
+-  },
+-    typeof onOpenShare === 'function' && /*#__PURE__*/React.createElement("button", {
+-      type: "button", className: "admin-side-menu-item",
+-      onClick: () => { handle(onClose); handle(onOpenShare); }
+-    },
+-      /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, MenuIcon ? /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M3 12a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M15 6a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M15 18a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M8.7 10.7l6.6 -3.4", "M8.7 13.3l6.6 3.4"] }) : "↗"),
+-      /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
+-        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, shareLabel)
+-      )
+-    ),
+-    typeof onOpenSettings === 'function' && /*#__PURE__*/React.createElement("button", {
+-      type: "button", className: "admin-side-menu-item",
+-      onClick: () => { handle(onClose); handle(onOpenSettings); }
+-    },
+-      /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", {
+-        xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24",
+-        fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
+-      }, /*#__PURE__*/React.createElement("path", { d: "M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" }), /*#__PURE__*/React.createElement("circle", { cx: "12", cy: "12", r: "3" }))),
+-      /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
+-        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "설정")
+-      )
++      ),
++      metaPill(memoLastTitleWord)
+     )
+   );
+ }
+@@ -1250,6 +1265,11 @@ export function MainSideMenu({
+   memoCount = 0,
+   settlementCount = 0,
+   settlementBadge = null,
++  chatLastAuthor = null,
++  settlementLastDate = null,
++  galleryLastDate = null,
++  placeLastName = null,
++  memoLastTitleWord = null,
+   onClose,
+   onOpenManual,
+   onOpenSettings,
+@@ -1390,7 +1410,12 @@ export function MainSideMenu({
+       settlementBadge: settlementBadge,
+       galleryCount: galleryCount,
+       placeCount: placeCount,
+-      memoCount: memoCount
++      memoCount: memoCount,
++      chatLastAuthor: chatLastAuthor,
++      settlementLastDate: settlementLastDate,
++      galleryLastDate: galleryLastDate,
++      placeLastName: placeLastName,
++      memoLastTitleWord: memoLastTitleWord
+     }),
+ /* Group 3+4: 공유하기 + 설정 */
+     typeof SharedSideMenuFooter === 'function' && /*#__PURE__*/React.createElement(SharedSideMenuFooter, {

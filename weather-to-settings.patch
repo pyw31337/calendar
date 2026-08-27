@@ -1,0 +1,251 @@
+diff --git a/src/core/app-main.js b/src/core/app-main.js
+index 23856db..a025d7f 100644
+--- a/src/core/app-main.js
++++ b/src/core/app-main.js
+@@ -5120,6 +5120,11 @@ function App() {
+           setMainChatNotifyEnabled(!!(next && next.chat));
+         }
+       },
++      weatherLocation: activeCal && activeCal.weatherLocation,
++      recentLocations: (activeCal && activeCal.recentLocations) || [],
++      onUpdateWeatherLocation: handleUpdateWeatherLocation,
++      onDeleteRecentLocation: handleDeleteRecentWeatherLocation,
++      showToast: showToast,
+       helpSteps: typeof getNotificationPermissionHelpSteps === 'function' ? getNotificationPermissionHelpSteps() : []
+     }),
+     isNotifOnboardingOpen && /*#__PURE__*/React.createElement(NotificationOnboardingModal, {
+@@ -5210,6 +5215,11 @@ function App() {
+           setMainChatNotifyEnabled(!!(next && next.chat));
+         }
+       },
++      weatherLocation: activeCal && activeCal.weatherLocation,
++      recentLocations: (activeCal && activeCal.recentLocations) || [],
++      onUpdateWeatherLocation: handleUpdateWeatherLocation,
++      onDeleteRecentLocation: handleDeleteRecentWeatherLocation,
++      showToast: showToast,
+       helpSteps: typeof getNotificationPermissionHelpSteps === 'function' ? getNotificationPermissionHelpSteps() : []
+     }),
+     isNotifOnboardingOpen && /*#__PURE__*/React.createElement(NotificationOnboardingModal, {
+diff --git a/src/ui/ui-side-menu.js b/src/ui/ui-side-menu.js
+index a82dcff..c711d00 100644
+--- a/src/ui/ui-side-menu.js
++++ b/src/ui/ui-side-menu.js
+@@ -671,7 +671,8 @@ function getAnniversaryDisplayColor(...args) {
+ export function AppSettingsModal({
+   onClose, isDarkTheme, onToggleTheme, fontScalePercent, onDecreaseFont, onIncreaseFont,
+   isNotifPermissionGranted, isMasterNotifyEnabled, onToggleMasterNotify,
+-  notifyChannels, onToggleNotifyChannel, helpSteps
++  notifyChannels, onToggleNotifyChannel, helpSteps,
++  weatherLocation = null, recentLocations = [], onUpdateWeatherLocation, onDeleteRecentLocation, showToast
+ }) {
+   const React = window.React;
+   const __deps = window.GATHER_UI_DEPS || {};
+@@ -680,12 +681,76 @@ export function AppSettingsModal({
+   const MoonStarsIcon = __deps.MoonStarsIcon;
+   const TextResizeIcon = __deps.TextResizeIcon;
+   const BellIcon = __deps.BellIcon;
++  const MapCogIcon = __deps.MapCogIcon;
++  const translateKoreanToEnglish = __deps.translateKoreanToEnglish;
+   const channels = [
+     { key: 'chat', label: '채팅 알림' },
+     { key: 'memo', label: '메모 알림' },
+     { key: 'poll', label: '투표 알림' },
+     { key: 'schedule', label: '일정 알림' }
+   ];
++  const [weatherQuery, setWeatherQuery] = React.useState('');
++  const [weatherResults, setWeatherResults] = React.useState([]);
++  const [weatherLoading, setWeatherLoading] = React.useState(false);
++  const currentWeatherName = (weatherLocation && weatherLocation.name) || '서울';
++
++  const handleWeatherSearch = async (e) => {
++    if (e) e.preventDefault();
++    const cleanQuery = (weatherQuery || '').trim();
++    if (!cleanQuery) {
++      if (typeof showToast === 'function') showToast('검색할 지역 이름을 입력해 주세요.', 'error');
++      return;
++    }
++    setWeatherLoading(true);
++    try {
++      const translated = typeof translateKoreanToEnglish === 'function' ? translateKoreanToEnglish(cleanQuery) : cleanQuery;
++      let searchResults = [];
++      if (translated) {
++        const res = await fetch('https://geocoding-api.open-meteo.com/v1/search?name=' + encodeURIComponent(translated) + '&count=8&language=ko&format=json');
++        if (res.ok) {
++          const data = await res.json();
++          searchResults = data.results || [];
++        }
++      }
++      if (searchResults.length === 0) {
++        const res = await fetch('https://nominatim.openstreetmap.org/search?q=' + encodeURIComponent(cleanQuery) + '&format=json&limit=8&accept-language=ko');
++        if (res.ok) {
++          const data = await res.json();
++          searchResults = (data || []).map((item, idx) => ({
++            id: 'nominatim_' + (item.place_id || idx),
++            name: item.name || (item.display_name || '').split(',')[0],
++            latitude: parseFloat(item.lat),
++            longitude: parseFloat(item.lon),
++            country: (item.display_name || '').split(',').pop().trim(),
++            admin1: ''
++          }));
++        }
++      }
++      setWeatherResults(searchResults);
++      if (searchResults.length === 0 && typeof showToast === 'function') {
++        showToast('일치하는 지역이 없습니다.', 'info');
++      }
++    } catch (err) {
++      console.error(err);
++      if (typeof showToast === 'function') showToast('지역 검색에 실패했습니다.', 'error');
++    } finally {
++      setWeatherLoading(false);
++    }
++  };
++
++  const pickWeatherLocation = (loc) => {
++    if (!loc) return;
++    const normalized = {
++      name: loc.name || loc.admin1 || '선택한 지역',
++      lat: loc.latitude != null ? loc.latitude : loc.lat,
++      lon: loc.longitude != null ? loc.longitude : loc.lon
++    };
++    if (typeof onUpdateWeatherLocation === 'function') onUpdateWeatherLocation(normalized);
++    setWeatherQuery('');
++    setWeatherResults([]);
++    if (typeof showToast === 'function') showToast((normalized.name || '지역') + ' 날씨로 설정했습니다.', 'success');
++  };
++
+   return /*#__PURE__*/React.createElement("div", { className: "modal-overlay", onClick: onClose, style: { zIndex: 12000 } },
+     /*#__PURE__*/React.createElement("div", {
+       className: "modal-container", onClick: e => e.stopPropagation(),
+@@ -697,6 +762,74 @@ export function AppSettingsModal({
+           SmallXIcon ? /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }) : "✕")
+       ),
+       /*#__PURE__*/React.createElement("div", { style: { padding: '12px 16px 20px', display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '70vh', overflowY: 'auto' } },
++        /* Weather region — above dark mode */
++        /*#__PURE__*/React.createElement("div", { style: { padding: '6px 0 12px', display: 'flex', flexDirection: 'column', gap: '8px' } },
++          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
++            /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-icon", style: { display: 'inline-flex', color: 'var(--text-muted)' } },
++              MapCogIcon ? /*#__PURE__*/React.createElement(MapCogIcon, { size: 18 }) : null
++            ),
++            /*#__PURE__*/React.createElement("span", { style: { fontWeight: 800, fontSize: '0.9rem', color: 'var(--text-main)' } }, "날씨 지역")
++          ),
++          /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.78rem', color: 'var(--text-muted)' } },
++            "현재: ", /*#__PURE__*/React.createElement("strong", { style: { color: 'var(--text-main)' } }, currentWeatherName)
++          ),
++          /*#__PURE__*/React.createElement("form", {
++            onSubmit: handleWeatherSearch,
++            style: { display: 'flex', gap: '8px', alignItems: 'center' }
++          },
++            /*#__PURE__*/React.createElement("input", {
++              type: "text",
++              value: weatherQuery,
++              onChange: e => setWeatherQuery(e.target.value),
++              placeholder: "지역 이름 검색 (예: 구로구)",
++              style: {
++                flex: 1, minWidth: 0, padding: '10px 12px', borderRadius: '10px',
++                border: '1px solid var(--border-subtle)', background: 'var(--bg-primary)',
++                color: 'var(--text-main)', fontSize: '0.88rem', outline: 'none'
++              }
++            }),
++            /*#__PURE__*/React.createElement("button", {
++              type: "submit",
++              disabled: weatherLoading,
++              style: {
++                flexShrink: 0, padding: '10px 14px', borderRadius: '10px', border: 'none',
++                background: '#0f172a', color: '#fff', fontWeight: 700, fontSize: '0.82rem',
++                cursor: weatherLoading ? 'wait' : 'pointer'
++              }
++            }, weatherLoading ? '검색중' : '검색')
++          ),
++          recentLocations && recentLocations.length > 0 && /*#__PURE__*/React.createElement("div", {
++            style: { display: 'flex', flexWrap: 'wrap', gap: '6px' }
++          },
++            recentLocations.map((loc, idx) => /*#__PURE__*/React.createElement("button", {
++              key: idx,
++              type: "button",
++              onClick: () => pickWeatherLocation(loc),
++              style: {
++                padding: '5px 10px', fontSize: '0.72rem', borderRadius: '6px',
++                border: '1px solid var(--border-subtle)', background: 'var(--bg-primary)',
++                color: 'var(--text-main)', cursor: 'pointer'
++              }
++            }, loc.name))
++          ),
++          weatherResults && weatherResults.length > 0 && /*#__PURE__*/React.createElement("div", {
++            style: { display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '160px', overflowY: 'auto' }
++          },
++            weatherResults.map((loc, idx) => /*#__PURE__*/React.createElement("button", {
++              key: loc.id || idx,
++              type: "button",
++              onClick: () => pickWeatherLocation(loc),
++              style: {
++                textAlign: 'left', padding: '8px 10px', borderRadius: '8px',
++                border: '1px solid var(--border-subtle)', background: 'var(--bg-primary)',
++                color: 'var(--text-main)', cursor: 'pointer', fontSize: '0.82rem'
++              }
++            }, loc.name, loc.admin1 ? ' · ' + loc.admin1 : '', loc.country ? ' · ' + loc.country : ''))
++          )
++        ),
++        /*#__PURE__*/React.createElement("div", {
++          style: { height: '1px', background: 'var(--border-subtle)', margin: '4px 0 8px' }
++        }),
+         /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-setting-row", style: { padding: '10px 0' } },
+           /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-label" },
+             /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-icon" }, MoonStarsIcon && /*#__PURE__*/React.createElement(MoonStarsIcon, null)), "다크모드"),
+@@ -975,7 +1108,6 @@ export function MainSideMenu({
+   const WeatherBadge = __deps.WeatherBadge;
+   const WeatherLocationModal = __deps.WeatherLocationModal;
+ 
+-  const [isWeatherModalOpen, setIsWeatherModalOpen] = React.useState(false);
+   const handle = action => {
+     if (typeof action === 'function') action();
+   };
+@@ -1011,32 +1143,8 @@ export function MainSideMenu({
+         /*#__PURE__*/React.createElement("div", {
+           style: { display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }
+         },
+-          /* Weather Badge */
++          /* Weather Badge only (region settings moved to AppSettingsModal) */
+           /*#__PURE__*/React.createElement(WeatherBadge, { weatherLocation: calendar?.weatherLocation }),
+-          /* Weather Settings */
+-          /*#__PURE__*/React.createElement("button", {
+-            type: "button",
+-            className: "admin-side-menu-weather-settings-btn",
+-            title: "날씨 지역 설정",
+-            style: {
+-              width: '28px',
+-              height: '28px',
+-              border: 'none',
+-              borderRadius: '6px',
+-              background: 'transparent',
+-              color: '#64748B',
+-              display: 'inline-flex',
+-              alignItems: 'center',
+-              justifyContent: 'center',
+-              cursor: 'pointer',
+-              padding: 0,
+-              transition: 'background-color 0.16s ease, color 0.16s ease'
+-            },
+-            onClick: (e) => {
+-              e.stopPropagation();
+-              setIsWeatherModalOpen(true);
+-            }
+-          }, /*#__PURE__*/React.createElement(MapCogIcon, { size: 16 })),
+           /* Close Button */
+       /*#__PURE__*/React.createElement("button", {
+         type: "button",
+@@ -1121,13 +1229,7 @@ export function MainSideMenu({
+         )
+       )
+     )
+-  )), isWeatherModalOpen && /*#__PURE__*/React.createElement(WeatherLocationModal, {
+-    onClose: () => setIsWeatherModalOpen(false),
+-    onSelectLocation: onUpdateWeatherLocation,
+-    onDeleteRecentLocation: onDeleteRecentLocation,
+-    showToast: showToast,
+-    recentLocations: calendar?.recentLocations || []
+-  }));
++  )));
+ }
+ 
+   if (typeof window !== 'undefined') {

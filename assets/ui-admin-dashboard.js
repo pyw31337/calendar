@@ -554,10 +554,6 @@ function getMemoItemShareUrl(...args) {
   const f = __gatherUiDeps().getMemoItemShareUrl || GATHER_APP_UTILS.getMemoItemShareUrl;
   return typeof f === 'function' ? f(...args) : undefined;
 }
-function buildLightboxImageInfo(...args) {
-  const f = __gatherUiDeps().buildLightboxImageInfo || GATHER_APP_UTILS.buildLightboxImageInfo;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
 function normalizeTagsForDisplay(...args) {
   const f = __gatherUiDeps().normalizeTagsForDisplay || GATHER_APP_UTILS.normalizeTagsForDisplay;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -703,6 +699,7 @@ export function AdminDashboard({ initialCalendars }) {
   const SettingsIcon = __comp.SettingsIcon || __deps.SettingsIcon;
   const ShieldCheckIcon = __comp.ShieldCheckIcon || __deps.ShieldCheckIcon;
   const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
+  const TrashIcon = __comp.TrashIcon || __deps.TrashIcon;
   const TrophyIcon = __comp.TrophyIcon || __deps.TrophyIcon;
   const fetchSubcollectionCount = __deps.fetchSubcollectionCount;
   const sanitizeText = __deps.sanitizeText;
@@ -712,6 +709,10 @@ export function AdminDashboard({ initialCalendars }) {
   const [loadedAt, setLoadedAt] = React.useState(null);
   const [error, setError] = React.useState('');
   const [toast, setToast] = React.useState(null);
+  const toastControllerRef = React.useRef(null);
+  if (!toastControllerRef.current) {
+    toastControllerRef.current = GATHER_APP_UTILS.createToastLifecycle(setToast);
+  }
   const importInputRef = React.useRef(null);
   const isRestoreMode = isAdminRestoreRoute();
 
@@ -777,10 +778,13 @@ export function AdminDashboard({ initialCalendars }) {
 
   const lastSyncedRef = React.useRef(null);
 
-  const showAdminToast = (message, type = 'success', duration = 3000) => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), duration);
-  };
+  React.useEffect(() => {
+    return () => {
+      toastControllerRef.current.clearToastTimers();
+    };
+  }, []);
+
+  const showAdminToast = toastControllerRef.current.showToast;
 
   // Generic layer-popup confirm dialog (replaces window.confirm across this page)
   const [confirmDialog, setConfirmDialog] = React.useState(null);
@@ -1874,7 +1878,7 @@ export function AdminDashboard({ initialCalendars }) {
       color: isActive ? '#059669' : '#64748B',
       borderBottom: isActive ? '3px solid #059669' : '3px solid transparent',
       backgroundColor: isActive ? '#ECFDF5' : 'transparent',
-      borderRadius: '6px 6px 0 0',
+      borderRadius: 'var(--radius-md) var(--radius-md) 0 0',
       cursor: 'pointer',
       outline: 'none',
       transition: 'all 0.2s ease',
@@ -1960,7 +1964,7 @@ export function AdminDashboard({ initialCalendars }) {
       limit: `${PEEKALINK_FREE_HOURLY_LIMIT}건/시간`,
       remaining: `${peekalinkRemaining}건 (매 정시 초기화)`,
       percent: peekalinkUsagePercent,
-      note: '무료 요금제는 누적 소진이 아닌 시간당 rate limit이며, 캐시 응답은 집계에서 제외'
+      note: '무료 요금제는 누적 소진이 아닌 시간당 rate limit이며, 동일 URL의 반복 조회는 집계에서 제외'
     },
     {
       label: '카카오맵 지도 검색 (오늘)',
@@ -2010,14 +2014,18 @@ export function AdminDashboard({ initialCalendars }) {
   },
     /* Toast Alert */
     toast && /*#__PURE__*/React.createElement("div", {
-      className: "toast",
-      style: {
-        position: 'fixed', bottom: '32px', left: '50%', transform: 'translateX(-50%)', zIndex: 99999,
-        backgroundColor: toast.type === 'error' ? '#EF4444' : '#3ECF8E', color: toast.type === 'error' ? '#FFFFFF' : '#000000',
-        padding: '12px 24px', borderRadius: '12px', fontSize: '0.88rem', fontWeight: 'bold', boxShadow: '0 10px 25px -5px rgba(15,23,42,0.35)',
-        textAlign: 'center', wordBreak: 'break-all', whiteSpace: 'pre-wrap', maxWidth: '380px', width: '90%', boxSizing: 'border-box'
-      }
-    }, toast.message),
+      className: `toast ${toast.type === 'error' ? 'is-delete' : 'is-success'} ${toast.isExiting ? 'is-exiting' : ''}`
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "toast-message"
+    }, toast.message), toast.onAction && /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => {
+        const action = toast.onAction;
+        dismissToast();
+        Promise.resolve(action()).catch(console.warn);
+      },
+      className: "toast-action"
+    }, toast.actionLabel || "되돌리기")),
 
     /* Header + Tabs, attached into one flush top bar (no outer box/margin, like the main
        app's fixed header + .main-menu-bar underneath it) */
@@ -2222,7 +2230,7 @@ export function AdminDashboard({ initialCalendars }) {
         onSubmit: handleChangePassword,
         onClick: e => e.stopPropagation(),
         className: "modal-container",
-        style: { maxWidth: '340px', padding: '20px', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '12px' }
+        style: { maxWidth: '340px', padding: '20px', borderRadius: 'var(--radius-md)', display: 'flex', flexDirection: 'column', gap: '12px' }
       },
         /*#__PURE__*/React.createElement("h3", { style: { fontSize: '1.05rem', fontWeight: 800, color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(LockIcon, null), "관리자 비밀번호 변경"),
         /*#__PURE__*/React.createElement("input", {
@@ -2252,10 +2260,10 @@ export function AdminDashboard({ initialCalendars }) {
 
     /* Main Content Area */
     error && /*#__PURE__*/React.createElement("div", {
-      style: { color: '#EF4444', border: '1px solid #EF4444', backgroundColor: '#1A0B0B', marginBottom: '18px', padding: '14px', borderRadius: '8px', fontSize: '0.88rem', fontWeight: 'bold' }
+      style: { color: '#EF4444', border: '1px solid #EF4444', backgroundColor: '#1A0B0B', marginBottom: '18px', padding: '14px', borderRadius: 'var(--radius-md)', fontSize: '0.88rem', fontWeight: 'bold' }
     }, error),
     isAdminListLoading && !error && /*#__PURE__*/React.createElement("div", {
-      style: { color: '#64748B', border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)', marginBottom: '18px', padding: '14px', borderRadius: '8px', fontSize: '0.88rem', fontWeight: 700 }
+      style: { color: '#64748B', border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)', marginBottom: '18px', padding: '14px', borderRadius: 'var(--radius-md)', fontSize: '0.88rem', fontWeight: 700 }
     }, "관리자 캘린더 목록을 불러오는 중…"),
 
     /* ================================================================= */
@@ -2279,6 +2287,7 @@ export function AdminDashboard({ initialCalendars }) {
             { key: 'memo', label: '메모 일정 수', val: dashboard.memoCount, perCal: stat => stat.memoCount, unit: '건' },
             { key: 'confirmed', label: '확정 모임 수', val: dashboard.totalConfirmedMeetings, perCal: stat => stat.confirmedCount, unit: '건' },
             { key: 'chatMessages', label: '총 채팅 메시지', val: dashboard.calendarStats.reduce((sum, stat) => sum + (adminMsgTotal[stat.calendar.id] != null ? adminMsgTotal[stat.calendar.id] : (messagesMap[stat.calendar.id] || []).length), 0), perCal: stat => (adminMsgTotal[stat.calendar.id] != null ? adminMsgTotal[stat.calendar.id] : (messagesMap[stat.calendar.id] || []).length), unit: '건' },
+            { key: 'photoTotal', label: '총 일정 사진', val: dashboard.totalPhotos, perCal: stat => stat.photoCount, unit: '장' },
             { key: 'polls', label: '총 투표 수', val: dashboard.totalPolls, perCal: stat => stat.pollCount, unit: '건' },
             { key: 'pollVotes', label: '총 투표자 수', val: dashboard.totalPollVotes, perCal: stat => stat.pollVoteCount, unit: '명' }
           ].map(box => {
@@ -2297,49 +2306,6 @@ export function AdminDashboard({ initialCalendars }) {
               /*#__PURE__*/React.createElement("div", { style: styles.metricValue }, box.val)
             );
           })
-        )
-      ),
-
-      /* External service integration status -- service-wide (통합관리), not per-calendar.
-         Surfaces the Peekalink link-preview dependency's shared cache size and the client-side
-         API key exposure risk, per the admin transparency requirement for external services. */
-      /*#__PURE__*/React.createElement("section", { style: styles.card },
-        /*#__PURE__*/React.createElement("div", { style: styles.cardTitle, "data-collapse-anchor": "true", "data-collapse-key": "metrics-external-services", "data-collapse-label": "외부 서비스 연동 현황" },
-          /*#__PURE__*/React.createElement("span", { style: { display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(ExternalLinkIcon, null), "외부 서비스 연동 현황")
-        ),
-        /*#__PURE__*/React.createElement("div", { style: { border: '1px solid #E2E8F0', borderRadius: '10px', padding: '14px', backgroundColor: '#F8FAFC' } },
-          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' } },
-            /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.9rem', fontWeight: 'bold', color: '#0F172A' } }, "Peekalink (링크 미리보기 / OpenGraph)"),
-            /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.7rem', padding: '2px 8px', borderRadius: 'var(--radius-full)', backgroundColor: '#DCFCE7', color: '#16A34A', fontWeight: 'bold' } }, "통합 캐시 사용 중")
-          ),
-          /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.8rem', color: '#64748B', marginTop: '8px', lineHeight: 1.6 } },
-            "채팅/메모/정산에서 붙여넣은 링크의 제목·설명·이미지를 가져오는 데 사용됩니다. 이제 캘린더별로 각각 요청하지 않고, URL당 한 번만 조회한 뒤 결과를 ",
-            /*#__PURE__*/React.createElement("strong", null, "모든 캘린더가 공유하는 서버 캐시"),
-            "(Firestore linkPreviews 컬렉션)에 저장해 재사용합니다."
-          ),
-          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '16px', marginTop: '12px', flexWrap: 'wrap' } },
-            /*#__PURE__*/React.createElement("div", null,
-              /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.72rem', color: '#94A3B8', fontWeight: 700 } }, "누적 캐시된 링크 수(추정)"),
-              /*#__PURE__*/React.createElement("div", { style: { fontSize: '1.3rem', fontWeight: 900, color: '#0F172A' } },
-                linkPreviewStats ? `${linkPreviewStats.cachedCount || 0}건` : '—'
-              )
-            ),
-            /*#__PURE__*/React.createElement("div", null,
-              /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.72rem', color: '#94A3B8', fontWeight: 700 } }, "최근 갱신"),
-              /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.85rem', color: '#334155', marginTop: '4px' } },
-                linkPreviewStats && linkPreviewStats.updatedAt ? new Date(linkPreviewStats.updatedAt).toLocaleString('ko-KR') : '아직 없음'
-              )
-            )
-          ),
-          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'flex-start', gap: '8px', marginTop: '14px', padding: '10px', borderRadius: '8px', backgroundColor: '#F0FDF4', border: '1px solid #BBF7D0' } },
-            /*#__PURE__*/React.createElement(ShieldCheckIcon, null),
-            /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.78rem', color: '#166534', lineHeight: 1.6 } },
-              /*#__PURE__*/React.createElement("strong", null, "API 키 보호: "),
-              "이 서비스는 백엔드가 없는 정적 사이트라 Peekalink API 키가 브라우저 소스에 그대로 노출되는 문제가 있었습니다. 이제는 Cloud Function 프록시(peekalinkProxy)를 통해서만 Peekalink를 호출하도록 변경되어, 키는 서버(Functions 코드)에만 존재하고 브라우저에는 전혀 전송되지 않습니다. 무료 요금제 사용량(시간당 한도)은 아래 ",
-              /*#__PURE__*/React.createElement("strong", null, "데이터 사용량"),
-              " 섹션에서 확인할 수 있습니다."
-            )
-          )
         )
       ),
 
@@ -2433,7 +2399,7 @@ export function AdminDashboard({ initialCalendars }) {
                 /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.75rem', marginLeft: '6px', color: '#64748B' } }, item.count, "/", stat.participants.length, "명 가능")
               ),
               item.count >= stat.participants.length ? /*#__PURE__*/React.createElement("span", { className: "date-item-badge", style: { background: '#DCFCE7', color: '#16A34A', fontSize: '0.7rem', border: '1px solid #86EFAC' } }, "전원") :
-              /*#__PURE__*/React.createElement("span", { className: "date-item-badge", style: { fontSize: '0.7rem', backgroundColor: '#F1F5F9', color: '#64748B' } }, item.count, "명")
+              item.count > 0 ? /*#__PURE__*/React.createElement("span", { className: "date-item-badge", style: { fontSize: '0.7rem', backgroundColor: '#F1F5F9', color: '#64748B' } }, item.count, "명") : null
             ))
           ))
         ),
@@ -2585,7 +2551,7 @@ export function AdminDashboard({ initialCalendars }) {
                 /*#__PURE__*/React.createElement("button", {
                   type: "button", className: "btn btn-danger", style: { padding: '4px 10px', height: '44px', display: 'flex', alignItems: 'center' },
                   onClick: () => requestConfirm('참여자 삭제', `"${p.name}" 참여자를 삭제하시겠습니까?`, () => handleUpdatePart(p.id, { removedAt: Date.now() }))
-                }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 16 }))
+                }, /*#__PURE__*/React.createElement(TrashIcon, { size: 16 }))
               ))
 	            )
 	          ),
@@ -2640,7 +2606,7 @@ export function AdminDashboard({ initialCalendars }) {
 	                  className: "btn btn-danger",
 	                  style: { padding: '4px 10px', height: '44px', display: 'flex', alignItems: 'center' },
 	                  onClick: () => handleRemoveExpenseCategory(category.id)
-	                }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 16 }))
+                }, /*#__PURE__*/React.createElement(TrashIcon, { size: 16 }))
 	              ))
 	            )
 	          ),
@@ -2695,7 +2661,7 @@ export function AdminDashboard({ initialCalendars }) {
 	                  className: "btn btn-danger",
 	                  style: { padding: '4px 10px', height: '44px', display: 'flex', alignItems: 'center' },
 	                  onClick: () => handleRemovePlaceCategory(category.id)
-	                }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 16 }))
+                }, /*#__PURE__*/React.createElement(TrashIcon, { size: 16 }))
 	              ))
 	            )
 	          ),
@@ -2729,7 +2695,7 @@ export function AdminDashboard({ initialCalendars }) {
             },
               /* Left */
               /*#__PURE__*/React.createElement("div", { className: "admin-poll-row-main" },
-                /*#__PURE__*/React.createElement("span", { className: "admin-poll-row-title", style: { fontSize: '0.86rem', fontWeight: 'bold', color: '#0F172A' } }, poll.title),
+                /*#__PURE__*/React.createElement("span", { className: "admin-poll-row-title", style: { fontSize: '0.86rem', fontWeight: 'bold', color: 'var(--text-main)' } }, poll.title),
                 /*#__PURE__*/React.createElement("span", { className: "admin-poll-row-meta", style: { fontSize: '0.72rem', color: '#64748B' } }, `${getActivePollOptions(poll).length}개 선택 항목 · 총 ${getPollTotalVoteCount(poll)}표${poll.deadline ? ` · 마감 ${formatPollDeadline(poll.deadline)}${isPollClosed(poll) ? ' (마감됨)' : ''}` : ''}`)
               ),
               /* Right */
@@ -2741,9 +2707,9 @@ export function AdminDashboard({ initialCalendars }) {
                 }, "수정"),
                 /* Delete */
                 /*#__PURE__*/React.createElement("button", {
-                  type: "button", className: "btn btn-danger", title: "삭제", style: { padding: '4px 10px', fontSize: '0.75rem' },
+                  type: "button", className: "btn btn-danger", title: "삭제", style: { padding: '4px 10px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '4px' },
                   onClick: () => handleDeletePollFromAdminPage(selectedCalId, poll)
-                }, "삭제")
+                }, /*#__PURE__*/React.createElement(TrashIcon, { size: 14 }), "삭제")
               )
             ))
           )
@@ -2760,7 +2726,7 @@ export function AdminDashboard({ initialCalendars }) {
         /*#__PURE__*/React.createElement("section", { className: "recovery-timeline-card", style: styles.card },
           /* Warning banner */
           /*#__PURE__*/React.createElement("div", {
-            style: { backgroundColor: '#FEF2F2', border: '1px solid #FCA5A5', borderRadius: '8px', padding: '12px 14px', color: '#B91C1C', fontSize: '0.8rem', lineHeight: '1.5', marginBottom: '16px' }
+            style: { backgroundColor: '#FEF2F2', border: '1px solid #FCA5A5', borderRadius: 'var(--radius-md)', padding: '12px 14px', color: '#B91C1C', fontSize: '0.8rem', lineHeight: '1.5', marginBottom: '16px' }
           },
             /*#__PURE__*/React.createElement("span", { style: { fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '4px', verticalAlign: 'middle' } }, /*#__PURE__*/React.createElement(AlertTriangleIcon, null), "통합 시점 복구 경고: "),
             "캘린더의 일정, 투표 기록 뿐만 아니라 해당 캘린더에 전송된 채팅 로그를 포함하는 복구 타임라인입니다. 복구 지점 이후 변경된 데이터 롤백 및 시간 외 전송 메시지는 DB에서 실시간 삭제 처리됩니다."
@@ -2780,7 +2746,7 @@ export function AdminDashboard({ initialCalendars }) {
               marginBottom: '12px',
               padding: '12px',
               backgroundColor: '#F1F5F9',
-              borderRadius: '8px',
+              borderRadius: 'var(--radius-md)',
               border: '1px solid #E2E8F0'
             }
           },
@@ -2836,7 +2802,7 @@ export function AdminDashboard({ initialCalendars }) {
 
           /* Log list -- the page itself scrolls, so this doesn't need its own scrollbox */
           /*#__PURE__*/React.createElement("div", {
-            style: { border: '1px solid #E2E8F0', borderRadius: '8px', padding: '8px', backgroundColor: '#F8FAFC' }
+            style: { border: '1px solid #E2E8F0', borderRadius: 'var(--radius-md)', padding: '8px', backgroundColor: '#F8FAFC' }
           },
             filteredTimeline.length === 0 ?
             /*#__PURE__*/React.createElement("div", { style: { padding: '30px', color: '#64748B', fontSize: '0.82rem', textAlign: 'center' } }, "조건에 맞는 타임라인 로그가 존재하지 않습니다.") :
@@ -3001,7 +2967,7 @@ export function AdminDashboard({ initialCalendars }) {
 
         /* Message list -- the page itself scrolls, so this doesn't need its own scrollbox */
         /*#__PURE__*/React.createElement("div", {
-          style: { border: '1px solid #E2E8F0', borderRadius: '8px', padding: '8px', backgroundColor: '#F8FAFC' }
+          style: { border: '1px solid #E2E8F0', borderRadius: 'var(--radius-md)', padding: '8px', backgroundColor: '#F8FAFC' }
         },
           filteredMessages.length === 0 ? /*#__PURE__*/React.createElement("div", { style: { padding: '30px', color: '#64748B', fontSize: '0.82rem', textAlign: 'center' } }, "표시할 채팅 내역이 없습니다.") :
           filteredMessages.map(msg => {
@@ -3033,7 +2999,7 @@ export function AdminDashboard({ initialCalendars }) {
                   type: "button", className: "btn btn-danger", title: "삭제",
                   onClick: () => handleDeleteMessageDirect(msg.calId, msg),
                   style: { width: '26px', height: '26px', padding: 0, flexShrink: 0 }
-                }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 14 }))
+                }, /*#__PURE__*/React.createElement(TrashIcon, { size: 14 }))
               )
             );
           }),

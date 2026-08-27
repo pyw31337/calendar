@@ -29,13 +29,8 @@ function useChatSendGuard(onSend, canSend) {
   const f = __gatherUiDeps().useChatSendGuard;
   return typeof f === 'function' ? f(onSend, canSend) : onSend;
 }
-function useModalDirtyGuard(onClose, onRequestConfirm, message) {
-  const f = __gatherUiDeps().useModalDirtyGuard;
-  return typeof f === 'function' ? f(onClose, onRequestConfirm, message) : {
-    requestClose: onClose,
-    overlayOnClick: e => { if (e.target === e.currentTarget) onClose(); },
-    markSaved: () => {}
-  };
+function useModalDirtyGuard(...args) {
+  return __gatherUiDeps().useModalDirtyGuard(...args);
 }
 function computeKoreanHolidaysForYear(year) {
   const f = __gatherUiDeps().computeKoreanHolidaysForYear;
@@ -683,7 +678,8 @@ export function AnniversaryModal({
   showToast,
   onRequestConfirm,
   onBulkRegister,
-  isDarkTheme
+  isDarkTheme,
+  embedded = false
 }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -693,9 +689,8 @@ export function AnniversaryModal({
   const SegmentedToggle = __comp.SegmentedToggle || __deps.SegmentedToggle;
   const SimpleBottomSheetPicker = __comp.SimpleBottomSheetPicker || __deps.SimpleBottomSheetPicker;
   const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
+  const TrashIcon = __comp.TrashIcon || __deps.TrashIcon;
   const getActiveParticipants = __deps.getActiveParticipants;
-  const { requestClose, overlayOnClick, markSaved } = useModalDirtyGuard(onClose, onRequestConfirm);
-
   const [activeTab, setActiveTab] = React.useState('list'); // 'list', 'add', 'bulk'
   const [editingId, setEditingId] = React.useState(null); // null when registering a new anniversary
   
@@ -703,8 +698,8 @@ export function AnniversaryModal({
   const [newTitle, setNewTitle] = React.useState('');
   const [newType, setNewType] = React.useState('yearly'); // 'yearly', 'dday'
   // Yearly options
-  const [yearlyMonth, setYearlyMonth] = React.useState(1);
-  const [yearlyDay, setYearlyDay] = React.useState(1);
+  const [yearlyMonth, setYearlyMonth] = React.useState(() => new Date().getMonth() + 1);
+  const [yearlyDay, setYearlyDay] = React.useState(() => new Date().getDate());
   const [isLunar, setIsLunar] = React.useState(false);
   const [isLeap, setIsLeap] = React.useState(false);
   // D-Day options
@@ -716,6 +711,7 @@ export function AnniversaryModal({
 
   // Migrated bulk register availability states
   const [bulkParticipantId, setBulkParticipantId] = React.useState('');
+  const [isBulkParticipantSheetOpen, setIsBulkParticipantSheetOpen] = React.useState(false);
   const [bulkWeekday, setBulkWeekday] = React.useState(1);
   const [bulkNote, setBulkNote] = React.useState('');
   const [isBulkSubmitting, setIsBulkSubmitting] = React.useState(false);
@@ -728,25 +724,45 @@ export function AnniversaryModal({
     d.setDate(d.getDate() + 56); // 8 weeks ahead
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   });
+  const anniversaryDirtySnapshot = () => JSON.stringify([
+    newTitle,
+    newType,
+    yearlyMonth,
+    yearlyDay,
+    isLunar,
+    isLeap,
+    targetDate,
+    ddayMode,
+    bulkParticipantId,
+    bulkWeekday,
+    bulkNote,
+    bulkStartDate,
+    bulkEndDate
+  ]);
+  const { requestClose, overlayOnClick } = useModalDirtyGuard(
+    onClose,
+    onRequestConfirm,
+    undefined,
+    true,
+    anniversaryDirtySnapshot,
+    editingId || 'new'
+  );
 
   const participants = getActiveParticipants(calendar);
-
-  // Years option range
-  const months = Array.from({ length: 12 }, (_, i) => i + 1);
-  const days = Array.from({ length: 31 }, (_, i) => i + 1);
+  const bulkParticipant = participants.find(p => p.id === bulkParticipantId) || null;
 
   const handleEditClick = (ann) => {
     setEditingId(ann.id);
     setNewTitle(ann.title || '');
     setNewType(ann.type || 'yearly');
     if (ann.type === 'yearly') {
-      const parts = (ann.date || '01-01').split('-');
-      setYearlyMonth(Number(parts[0]) || 1);
-      setYearlyDay(Number(parts[1]) || 1);
+      const parts = (ann.date || `${new Date().getMonth() + 1}-${new Date().getDate()}`).split('-');
+      setYearlyMonth(Number(parts[0]) || (new Date().getMonth() + 1));
+      setYearlyDay(Number(parts[1]) || new Date().getDate());
       setIsLunar(!!ann.isLunar);
       setIsLeap(!!ann.isLeap);
     } else {
-      setTargetDate(ann.targetDate || '');
+      setTargetDate(ann.targetDate || `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}`);
       setDdayMode(ann.isCountDown ? 'countdown' : 'milestone');
     }
     setActiveTab('add');
@@ -786,12 +802,13 @@ export function AnniversaryModal({
 
       await __fb().collection('calendars').doc('cal_' + calendarId).collection('anniversaries').doc(anniversaryId).set(annData);
       showToast(editingId ? '기념일이 수정되었습니다.' : '기념일이 등록되었습니다.', 'success');
-      markSaved();
 
       // Reset form
       setNewTitle('');
       setIsLunar(false);
       setIsLeap(false);
+      setYearlyMonth(new Date().getMonth() + 1);
+      setYearlyDay(new Date().getDate());
       setEditingId(null);
       setActiveTab('list');
     } catch (err) {
@@ -804,8 +821,17 @@ export function AnniversaryModal({
     onRequestConfirm('기념일 삭제', `"${ann.title}" 기념일을 삭제하시겠습니까?`, async () => {
       try {
         const calendarId = calendar.id;
+        const annSnapshot = JSON.parse(JSON.stringify(ann));
         await __fb().collection('calendars').doc('cal_' + calendarId).collection('anniversaries').doc(ann.id).delete();
-        showToast('기념일이 삭제되었습니다.', 'success');
+        showToast('기념일이 삭제되었습니다.', 'delete', 5000, async () => {
+          try {
+            await __fb().collection('calendars').doc('cal_' + calendarId).collection('anniversaries').doc(ann.id).set(annSnapshot);
+            showToast('기념일 삭제를 되돌렸습니다.', 'success', 3000);
+          } catch (restoreErr) {
+            console.error('Anniversary restore error:', restoreErr);
+            showToast('기념일 복원 실패', 'error', 4000);
+          }
+        });
         if (editingId === ann.id) {
           setEditingId(null);
           setNewTitle('');
@@ -874,65 +900,40 @@ export function AnniversaryModal({
     const m = Number(parts[0]) || 1;
     const d = Number(parts[1]) || 1;
     const label = `${m}월 ${d}일`;
-    if (ann.isLunar) {
-      const typeStr = ann.isLeap ? '(윤달 음력)' : '(음력)';
-      // Calc dynamic solar equivalent date for current year
-      const curYear = new Date().getFullYear();
-      const solarDate = getSolarFromLunar(curYear, m, d, !!ann.isLeap);
-      const solarLabel = solarDate ? ` → 올해 ${Number(solarDate.slice(5, 7))}/${Number(solarDate.slice(8, 10))}` : '';
-      return `매년 ${label} ${typeStr}${solarLabel}`;
-    }
-    return `매년 ${label} (양력)`;
+    return ann.isLunar ? `음력 ${label}${ann.isLeap ? ' (윤달)' : ''}` : label;
   };
 
-  const getDdayDisplay = (ann) => {
-    if (!ann.targetDate) return '';
-    const diff = calculateDday(ann.targetDate);
-    const ddayLabel = diff === 0 ? 'D-Day' : diff > 0 ? `D-${diff}` : `D+${Math.abs(diff) + 1}`;
-    
+  const getDDayBadge = (ann) => {
+    if (!ann.targetDate) return null;
+    const target = new Date(`${ann.targetDate}T00:00:00`);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const diffDays = Math.round((target - today) / (1000 * 60 * 60 * 24));
+
     if (ann.isCountDown) {
-      return `${ann.targetDate} (${ddayLabel})`;
-    } else {
-      // Milestone auto progress label
-      const passed = Math.abs(diff) + 1;
-      return `${ann.targetDate} 기준 ${passed}일째`;
+      if (diffDays === 0) return 'D-Day';
+      if (diffDays > 0) return `D-${diffDays}`;
+      return `D+${Math.abs(diffDays)}`;
     }
+    const elapsed = Math.abs(diffDays) + 1;
+    return `${elapsed}일째`;
   };
 
-  const portalContent = /*#__PURE__*/React.createElement("div", {
-    className: "modal-overlay",
-    onClick: overlayOnClick,
-    style: { zIndex: 11000 }
-  }, /*#__PURE__*/React.createElement(ResizableModalContainer, {
-    className: "modal-container",
-    style: { maxWidth: '440px', width: '90%', animation: 'modalFadeIn 0.2s ease', backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)' },
-    onClick: e => e.stopPropagation()
-  },
-    /* Modal Header */
-    /*#__PURE__*/React.createElement("div", {
-      style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid var(--border-subtle)' }
-    },
-      /* Title */
-      /*#__PURE__*/React.createElement("span", {
-        style: { fontSize: '0.96rem', fontWeight: '900', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' }
-      }, /*#__PURE__*/React.createElement("svg", {
-        xmlns: "http://www.w3.org/2000/svg", width: "18", height: "18", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2"
-      }, /*#__PURE__*/React.createElement("circle", { cx: "12", cy: "12", r: "10" }), /*#__PURE__*/React.createElement("polyline", { points: "12 6 12 12 16 14" })), "기념일 & 반복 일정 설정"),
-
-      /* Close button */
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        onClick: requestClose,
-        style: { width: '30px', height: '30px', borderRadius: '50%', border: 'none', background: 'var(--border-subtle)', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }
-      }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 16 }))
-    ),
-
+  const anniversaryPanelInner = /*#__PURE__*/React.createElement(React.Fragment, null,
     /* Modal Navigation Tabs */
     /*#__PURE__*/React.createElement("div", {
-      style: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', borderBottom: '1px solid var(--border-subtle)' }
+      style: {
+        display: 'grid',
+        gridTemplateColumns: 'repeat(3, 1fr)',
+        gap: '6px',
+        width: '100%',
+        padding: '10px 12px 8px',
+        boxSizing: 'border-box',
+        flexShrink: 0
+      }
     },
-      /* Tab list */
-      [['list', '기념일 목록'], ['add', '기념일 등록'], ['bulk', '반복 일정']].map(([id, label]) => /*#__PURE__*/React.createElement("button", {
+      [['list', '목록'], ['add', '등록'], ['bulk', '반복']].map(([id, label]) => /*#__PURE__*/React.createElement("button", {
         key: id,
         type: "button",
         onClick: () => {
@@ -946,273 +947,301 @@ export function AnniversaryModal({
           }
         },
         style: {
-          padding: '12px 6px',
           border: 'none',
-          background: 'none',
-          fontSize: '0.82rem',
-          fontWeight: activeTab === id ? '900' : '600',
-          color: activeTab === id ? '#3B82F6' : 'var(--text-muted)',
-          borderBottom: activeTab === id ? '2px solid #3B82F6' : 'none',
-          cursor: 'pointer'
+          borderRadius: 'var(--radius-md)',
+          padding: '7px 4px',
+          background: activeTab === id ? 'var(--accent-primary)' : 'transparent',
+          color: activeTab === id ? '#FFFFFF' : 'var(--text-muted)',
+          fontWeight: 800,
+          fontSize: '0.8rem',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '4px'
         }
       }, label))
     ),
+    /*#__PURE__*/React.createElement("div", {
+      className: "anniversary-subtab-divider",
+      style: {
+        height: '1px',
+        width: '100%',
+        backgroundColor: 'var(--border-subtle)',
+        flexShrink: 0
+      }
+    }),
 
     /* Modal Scrollable Body */
-    /*#__PURE__*/React.createElement("div", {
-      style: { padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px', maxHeight: '60vh', overflowY: 'auto' }
-    },
-      /* TAB 1: Anniversaries List */
-      activeTab === 'list' && /*#__PURE__*/React.createElement("div", {
-        style: { display: 'flex', flexDirection: 'column', gap: '10px' }
-      },
-        anniversaries.length === 0 ? 
-          /*#__PURE__*/React.createElement("div", {
-            style: { padding: '40px 10px', color: 'var(--text-muted)', fontSize: '0.82rem', textAlign: 'center' }
-          }, "등록된 기념일이 없습니다. 매년 돌아오는 생일이나 D-Day를 등록해 보세요. 🎂")
-        :
-          anniversaries.map(ann => /*#__PURE__*/React.createElement("div", {
+
+      /* Modal Body */
+      /*#__PURE__*/React.createElement("div", { style: { padding: '16px', maxHeight: '65vh', overflowY: 'auto' } },
+        /* TAB 1: List */
+        activeTab === 'list' && /*#__PURE__*/React.createElement("div", {
+          style: { display: 'flex', flexDirection: 'column', gap: '8px' }
+        },
+          anniversaries.length > 0 ? anniversaries.map(ann => /*#__PURE__*/React.createElement("div", {
             key: ann.id,
-            onClick: () => handleEditClick(ann),
             style: {
-              padding: '10px 12px',
-              backgroundColor: 'var(--bg-primary)',
-              borderRadius: '10px',
-              border: '1px solid var(--border-subtle)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '8px',
-              cursor: 'pointer'
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '10px 12px', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)',
+              backgroundColor: 'var(--bg-primary)'
             }
           },
-            /* Left: text details */
-            /*#__PURE__*/React.createElement("div", { style: { minWidth: 0 } },
-              /* Title & Badge */
-              /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px', flexWrap: 'wrap' } },
-                /* Icon */
-                /*#__PURE__*/React.createElement("span", null, ann.type === 'yearly' ? '🎂' : '🎁'),
-                /* Title */
-                /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.84rem', fontWeight: 'bold', color: 'var(--text-main)' } }, ann.title),
-                /* Type Badge */
+            /* Left info */
+            /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 } },
+              /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px' } },
+                /*#__PURE__*/React.createElement("span", { style: { fontWeight: 800, fontSize: '0.86rem', color: 'var(--text-main)' } }, ann.title),
+                /* Badge */
                 /*#__PURE__*/React.createElement("span", {
                   style: {
-                    fontSize: '0.66rem',
-                    fontWeight: 700,
-                    padding: '1px 5px',
-                    borderRadius: '4px',
-                    backgroundColor: ann.type === 'yearly' ? 'rgba(239, 68, 68, 0.08)' : 'rgba(59, 130, 246, 0.08)',
-                    color: ann.type === 'yearly' ? '#EF4444' : '#3B82F6'
+                    fontSize: '0.68rem', padding: '1px 6px', borderRadius: '4px',
+                    backgroundColor: ann.type === 'yearly' ? 'rgba(59,130,246,0.1)' : 'rgba(245,158,11,0.1)',
+                    color: ann.type === 'yearly' ? '#3B82F6' : '#F59E0B',
+                    fontWeight: 700
                   }
-                }, ann.type === 'yearly' ? '매년 반복' : '디데이')
+                }, ann.type === 'yearly' ? '매년 반복' : getDDayBadge(ann))
               ),
-              /* Details descriptor */
-              /*#__PURE__*/React.createElement("div", {
-                style: { fontSize: '0.74rem', color: 'var(--text-muted)' }
-              }, ann.type === 'yearly' ? getYearlyDisplay(ann) : getDdayDisplay(ann))
+              /* Date details */
+              /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.72rem', color: 'var(--text-muted)' } },
+                ann.type === 'yearly' ? getYearlyDisplay(ann) : `기준일: ${ann.targetDate}`
+              )
             ),
-            /* Right: delete button */
-            /*#__PURE__*/React.createElement("button", {
-              type: "button",
-              className: "btn btn-danger",
-              onClick: (e) => {
-                e.stopPropagation();
-                handleDeleteAnniversary(ann);
-              },
-              style: { width: '28px', height: '28px', padding: 0, flexShrink: 0 }
-            }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 14 }))
-          ))
-      ),
 
-      /* TAB 2: Add Anniversary Form */
-      activeTab === 'add' && /*#__PURE__*/React.createElement("div", {
-        style: { display: 'flex', flexDirection: 'column', gap: '12px' }
-      },
-        /* Title input */
-        /*#__PURE__*/React.createElement("div", null,
-          /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.76rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '4px' } }, "기념일 이름"),
-          /*#__PURE__*/React.createElement("input", {
-            type: "text",
-            className: "form-input",
-            style: { width: '100%' },
-            placeholder: "예: 홍길동 생일, 커플 1주년",
-            value: newTitle,
-            onChange: e => setNewTitle(e.target.value),
-            maxLength: 50
-          })
-        ),
-
-        /* Type switcher */
-        /*#__PURE__*/React.createElement("div", null,
-          /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.76rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '4px' } }, "종류"),
-          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px' } },
-            [['yearly', '매년 특정일자 반복 (생일 등)'], ['dday', '기준일 D-Day (커플, 시험 등)']].map(([typeVal, label]) => /*#__PURE__*/React.createElement("label", {
-              key: typeVal,
-              style: {
-                flex: 1,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '8px 10px',
-                backgroundColor: newType === typeVal ? 'rgba(59,130,246,0.06)' : 'var(--bg-primary)',
-                border: '1px solid ' + (newType === typeVal ? '#3B82F6' : 'var(--border-subtle)'),
-                borderRadius: '8px',
-                fontSize: '0.76rem',
-                cursor: 'pointer',
-                fontWeight: newType === typeVal ? 'bold' : 'normal'
-              }
-            },
-              /*#__PURE__*/React.createElement("input", {
-                type: "radio",
-                name: "annType",
-                value: typeVal,
-                checked: newType === typeVal,
-                onChange: () => setNewType(typeVal),
-                style: { margin: 0 }
-              }),
-              label
-            ))
-          )
-        ),
-
-        /* Cond 1: Yearly details fields */
-        newType === 'yearly' && /*#__PURE__*/React.createElement("div", {
-          style: { display: 'flex', flexDirection: 'column', gap: '10px', padding: '10px', border: '1px solid var(--border-subtle)', borderRadius: '10px', backgroundColor: 'var(--bg-primary)' }
-        },
-          /* Month / Day Selectors Row */
-          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px' } },
-            /* Month */
-            /*#__PURE__*/React.createElement("div", { style: { flex: 1 } },
-              /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '3px' } }, "월"),
-              /*#__PURE__*/React.createElement("select", {
-                className: "form-input",
-                value: yearlyMonth,
-                onChange: e => setYearlyMonth(Number(e.target.value)),
-                style: { width: '100%' }
-              }, months.map(m => /*#__PURE__*/React.createElement("option", { key: m, value: m }, `${m}월`)))
-            ),
-            /* Day */
-            /*#__PURE__*/React.createElement("div", { style: { flex: 1 } },
-              /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '3px' } }, "일"),
-              /*#__PURE__*/React.createElement("select", {
-                className: "form-input",
-                value: yearlyDay,
-                onChange: e => setYearlyDay(Number(e.target.value)),
-                style: { width: '100%' }
-              }, days.map(d => /*#__PURE__*/React.createElement("option", { key: d, value: d }, `${d}일`)))
+            /* Action Buttons */
+            /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '6px', flexShrink: 0 } },
+              /* Edit button */
+              /*#__PURE__*/React.createElement("button", {
+                type: "button",
+                onClick: () => handleEditClick(ann),
+                style: {
+                  background: 'none', border: '1px solid var(--border-subtle)', borderRadius: '6px',
+                  padding: '4px 8px', fontSize: '0.72rem', color: 'var(--text-main)', cursor: 'pointer'
+                }
+              }, "수정"),
+              /* Delete button */
+              /*#__PURE__*/React.createElement("button", {
+                type: "button",
+                onClick: () => handleDeleteAnniversary(ann),
+                style: {
+                  background: 'none', border: '1px solid #FECACA', borderRadius: '6px',
+                  padding: '4px 8px', fontSize: '0.72rem', color: '#EF4444', cursor: 'pointer'
+                }
+              }, "삭제")
             )
-          ),
-          /* Lunar / Leap month settings */
-          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '14px', marginTop: '4px', flexWrap: 'wrap' } },
-            /* Solar/lunar toggle -- same SegmentedToggle used for 방문/예정 (PlaceRegisterModal) rather
-               than a native checkbox, so this is an exclusive A/B choice styled consistently with the
-               rest of the app instead of the odd-one-out checkbox it used to be. */
-            /*#__PURE__*/React.createElement(SegmentedToggle, {
-              ariaLabel: "양력/음력 전환",
-              value: isLunar ? 'lunar' : 'solar',
-              onChange: v => setIsLunar(v === 'lunar'),
-              options: [{ value: 'solar', label: '양력' }, { value: 'lunar', label: '음력' }]
-            }),
-            /* Leap month toggle (shows only if Lunar) -- standalone on/off button matching
-               SegmentedToggle's own per-segment sizing/style (padding, font, border-radius) rather
-               than a native checkbox, since this one has no second option to pair it with. */
-            isLunar && /*#__PURE__*/React.createElement("button", {
-              type: "button",
-              role: "switch",
-              "aria-checked": isLeap,
-              onClick: () => setIsLeap(!isLeap),
-              style: {
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
-                padding: '12px 16px', border: '1px solid var(--border-subtle)', cursor: 'pointer',
-                borderRadius: 'var(--radius-sm)', fontSize: '0.78rem', fontWeight: isLeap ? 900 : 500,
-                whiteSpace: 'nowrap', backgroundColor: isLeap ? 'var(--accent-primary)' : 'transparent',
-                color: isLeap ? '#FFFFFF' : 'var(--text-muted)'
-              }
-            }, "윤달")
-          )
+          ))
+          : /*#__PURE__*/React.createElement("div", {
+            style: {
+              textAlign: 'center', padding: '30px 10px', color: 'var(--text-muted)',
+              fontSize: '0.82rem', lineHeight: '1.5'
+            }
+          }, "등록된 기념일이 없습니다. 매년 돌아오는 생일이나 D-Day를 등록해 보세요. 🎂")
         ),
 
-        /* Cond 2: D-Day details fields */
-        newType === 'dday' && /*#__PURE__*/React.createElement("div", {
-          style: { display: 'flex', flexDirection: 'column', gap: '10px', padding: '10px', border: '1px solid var(--border-subtle)', borderRadius: '10px', backgroundColor: 'var(--bg-primary)' }
+        /* TAB 2: Register / Edit */
+        activeTab === 'add' && /*#__PURE__*/React.createElement("div", {
+          style: { display: 'flex', flexDirection: 'column', gap: '12px' }
         },
-          /* Target date picker */
+          /* Title Field */
           /*#__PURE__*/React.createElement("div", null,
-            /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '3px' } }, "시작일자 / 기준일자"),
-            /*#__PURE__*/React.createElement(DeadlineDateTimePicker, {
-              value: `${targetDate}T00:00`,
-              onChange: v => setTargetDate(v.slice(0, 10))
+            /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.76rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '4px' } }, "기념일 이름"),
+            /*#__PURE__*/React.createElement("input", {
+              type: "text",
+              className: "form-input",
+              style: { width: '100%' },
+              placeholder: "예: 홍길동 생일, 커플 1주년",
+              value: newTitle,
+              onChange: e => setNewTitle(e.target.value),
+              maxLength: 50
             })
           ),
-          /* Mode Selector Radio */
+
+          /* Type switcher */
           /*#__PURE__*/React.createElement("div", null,
-            /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '3px' } }, "디데이 표기방식"),
-            /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '6px' } },
-              [['countdown', 'D-Day 카운트다운 (D-100)'], ['milestone', '날짜수 자동경과 (100일째)']].map(([modeVal, modeLabel]) => /*#__PURE__*/React.createElement("label", {
-                key: modeVal,
+            /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.76rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '4px' } }, "종류"),
+            /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px' } },
+              [['yearly', '매년 특정일자 반복 (생일 등)'], ['dday', '기준일 D-Day (커플, 시험 등)']].map(([typeVal, label]) => /*#__PURE__*/React.createElement("label", {
+                key: typeVal,
+                className: "anniversary-type-option",
                 style: {
                   flex: 1,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  fontSize: '0.72rem',
-                  cursor: 'pointer'
+                  backgroundColor: newType === typeVal ? 'rgba(59,130,246,0.06)' : 'var(--bg-primary)',
+                  border: '1px solid ' + (newType === typeVal ? '#3B82F6' : 'var(--border-subtle)'),
+                  borderRadius: 'var(--radius-md)',
+                  padding: '8px 10px',
+                  fontSize: '0.76rem',
+                  cursor: 'pointer',
+                  fontWeight: newType === typeVal ? 'bold' : 'normal'
                 }
               },
                 /*#__PURE__*/React.createElement("input", {
                   type: "radio",
-                  name: "ddayMode",
-                  value: modeVal,
-                  checked: ddayMode === modeVal,
-                  onChange: () => setDdayMode(modeVal)
+                  name: "annType",
+                  value: typeVal,
+                  checked: newType === typeVal,
+                  onChange: () => setNewType(typeVal),
+                  style: { margin: 0 }
                 }),
-                modeLabel
+                label
               ))
             )
-          )
+          ),
+
+          /* Cond 1: Yearly details fields */
+          newType === 'yearly' && /*#__PURE__*/React.createElement("div", {
+            style: { display: 'flex', flexDirection: 'column', gap: '10px', padding: '10px', border: '1px solid var(--border-subtle)', borderRadius: '10px', backgroundColor: 'var(--bg-primary)' }
+          },
+            /* Month / Day picker */
+            /*#__PURE__*/React.createElement("div", null,
+              /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '3px' } }, "월 / 일"),
+              /*#__PURE__*/React.createElement(DeadlineDateTimePicker, {
+                dateOnly: true,
+                value: `${new Date().getFullYear()}-${String(yearlyMonth).padStart(2, '0')}-${String(yearlyDay).padStart(2, '0')}`,
+                onChange: v => {
+                  const [, mm, dd] = v.split('-');
+                  setYearlyMonth(Number(mm));
+                  setYearlyDay(Number(dd));
+                }
+              })
+            ),
+            /* Lunar / Leap month settings */
+            /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '14px', marginTop: '4px', flexWrap: 'wrap' } },
+              /* Solar/lunar toggle */
+              /*#__PURE__*/React.createElement(SegmentedToggle, {
+                ariaLabel: "양력/음력 전환",
+                value: isLunar ? 'lunar' : 'solar',
+                onChange: v => setIsLunar(v === 'lunar'),
+                options: [{ value: 'solar', label: '양력' }, { value: 'lunar', label: '음력' }]
+              }),
+              /* Leap month toggle */
+              isLunar && /*#__PURE__*/React.createElement("button", {
+                type: "button",
+                role: "switch",
+                "aria-checked": isLeap,
+                onClick: () => setIsLeap(!isLeap),
+                style: {
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
+                  padding: '12px 16px', border: '1px solid var(--border-subtle)', cursor: 'pointer',
+                  borderRadius: 'var(--radius-sm)', fontSize: '0.78rem', fontWeight: isLeap ? 900 : 500,
+                  whiteSpace: 'nowrap', backgroundColor: isLeap ? 'var(--accent-primary)' : 'transparent',
+                  color: isLeap ? '#FFFFFF' : 'var(--text-muted)'
+                }
+              }, "윤달")
+            )
+          ),
+
+          /* Cond 2: D-Day details fields */
+          newType === 'dday' && /*#__PURE__*/React.createElement("div", {
+            style: { display: 'flex', flexDirection: 'column', gap: '10px', padding: '10px', border: '1px solid var(--border-subtle)', borderRadius: '10px', backgroundColor: 'var(--bg-primary)' }
+          },
+            /* Target date picker */
+            /*#__PURE__*/React.createElement("div", null,
+              /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '3px' } }, "시작일자 / 기준일자"),
+              /*#__PURE__*/React.createElement(DeadlineDateTimePicker, {
+                value: `${targetDate}T00:00`,
+                onChange: v => setTargetDate(v.slice(0, 10))
+              })
+            ),
+            /* Mode Selector Radio */
+            /*#__PURE__*/React.createElement("div", null,
+              /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '3px' } }, "디데이 표기방식"),
+              /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px' } },
+                [['countdown', 'D-Day 카운트다운', '(D-100)'], ['milestone', '날짜수 자동경과', '(100일째)']].map(([modeVal, modeLabel, modeSub]) => /*#__PURE__*/React.createElement("label", {
+                  key: modeVal,
+                  className: "anniversary-type-option",
+                  style: {
+                    flex: 1,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    textAlign: 'center',
+                    gap: '4px',
+                    backgroundColor: ddayMode === modeVal ? 'rgba(59,130,246,0.06)' : 'var(--bg-primary)',
+                    border: '1px solid ' + (ddayMode === modeVal ? '#3B82F6' : 'var(--border-subtle)'),
+                    borderRadius: 'var(--radius-md)',
+                    padding: '8px 6px',
+                    fontSize: '0.76rem',
+                    cursor: 'pointer',
+                    fontWeight: ddayMode === modeVal ? 'bold' : 'normal'
+                  }
+                },
+                  /*#__PURE__*/React.createElement("input", {
+                    type: "radio",
+                    name: "ddayMode",
+                    value: modeVal,
+                    checked: ddayMode === modeVal,
+                    onChange: () => setDdayMode(modeVal),
+                    style: { margin: 0 }
+                  }),
+                  /*#__PURE__*/React.createElement("span", { style: { lineHeight: '1.25' } }, modeLabel, /*#__PURE__*/React.createElement("br"), modeSub)
+                ))
+              )
+            )
+          ),
+
+          /* Save Button */
+          /*#__PURE__*/React.createElement("button", {
+            type: "button",
+            className: "btn btn-primary",
+            onClick: handleSaveAnniversary,
+            style: { width: '100%', justifyContent: 'center', padding: '10px', fontSize: '0.82rem', marginTop: '6px' }
+          }, editingId ? "기념일 수정 완료" : "기념일 등록")
         ),
 
-        /* Save Button */
-        /*#__PURE__*/React.createElement("button", {
-          type: "button",
-          className: "btn btn-primary",
-          onClick: handleSaveAnniversary,
-          style: { width: '100%', justifyContent: 'center', padding: '10px', fontSize: '0.82rem', marginTop: '6px' }
-        }, editingId ? "기념일 수정 완료" : "기념일 등록")
-      ),
+        /* TAB 3: Bulk Repeating Schedule Register */
+        activeTab === 'bulk' && /*#__PURE__*/React.createElement("div", {
+          style: { display: 'flex', flexDirection: 'column', gap: '12px' }
+        },
+          /* User instructions */
+          /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.76rem', color: 'var(--text-muted)', lineHeight: '1.45', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '6px' } },
+            "매주 특정 요일에 반복되는 사용자의 스케줄을 한 번에 일괄 등록합니다."
+          ),
 
-      /* TAB 3: Bulk Repeating Schedule Register */
-      activeTab === 'bulk' && /*#__PURE__*/React.createElement("div", {
-        style: { display: 'flex', flexDirection: 'column', gap: '12px' }
-      },
-        /* User instructions */
-        /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.76rem', color: 'var(--text-muted)', lineHeight: '1.45', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '6px' } },
-          "매주 특정 요일에 반복되는 사용자의 스케줄을 한 번에 일괄 등록합니다."
-        ),
-
-        /* Participant & Weekday Select row */
-        /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } },
-          /* Participant picker */
-          /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
-            title: "참여자 선택",
-            placeholder: "참여자 선택",
-            value: bulkParticipantId,
-            disabled: isBulkSubmitting,
-            onSelect: setBulkParticipantId,
-            options: participants.map(p => ({ value: p.id, label: p.name })),
-            style: { flex: '1 1 140px' }
-          }),
-          /* Weekday picker */
-          /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
-            title: "요일 선택",
-            placeholder: "요일 선택",
-            value: bulkWeekday,
-            disabled: isBulkSubmitting,
-            onSelect: v => setBulkWeekday(Number(v)),
-            options: ['일', '월', '화', '수', '목', '금', '토'].map((label, idx) => ({ value: idx, label: `매주 ${label}요일` })),
-            style: { flex: '1 1 100px' }
-          })
-        ),
+          /* Participant & Weekday Select row */
+          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } },
+            /* Participant picker */
+            /*#__PURE__*/React.createElement("button", {
+              type: "button",
+              className: "form-select",
+              disabled: isBulkSubmitting,
+              style: {
+                flex: '0 0 115px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                gap: '4px', textAlign: 'left', cursor: isBulkSubmitting ? 'default' : 'pointer', padding: '10px 8px'
+              },
+              onClick: () => { if (!isBulkSubmitting) setIsBulkParticipantSheetOpen(true); }
+            },
+              /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, overflow: 'hidden' } },
+                bulkParticipant && /*#__PURE__*/React.createElement("span", {
+                  className: "form-select-color-indicator",
+                  style: { backgroundColor: bulkParticipant.color }
+                }),
+                /*#__PURE__*/React.createElement("span", {
+                  style: {
+                    fontWeight: 700, color: bulkParticipant ? 'var(--text-main)' : 'var(--text-muted)',
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.82rem'
+                  }
+                }, bulkParticipant ? bulkParticipant.name : '참여자')
+              ),
+              /*#__PURE__*/React.createElement("svg", {
+                xmlns: "http://www.w3.org/2000/svg", width: "16", height: "16", viewBox: "0 0 24 24",
+                fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round",
+                className: "form-select-chevron", "aria-hidden": "true"
+              }, /*#__PURE__*/React.createElement("path", { d: "M6 9l6 6l6 -6" }))
+            ),
+            /* Weekday picker */
+            /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
+              title: "요일 선택",
+              placeholder: "요일 선택",
+              value: bulkWeekday,
+              disabled: isBulkSubmitting,
+              onSelect: v => setBulkWeekday(Number(v)),
+              options: ['일', '월', '화', '수', '목', '금', '토'].map((label, idx) => ({
+                value: idx, label: `매주 ${label}요일`, color: idx === 0 ? '#EF4444' : undefined
+              })),
+              style: { flex: '1 1 0', minWidth: '120px' }
+            })
+          ),
 
         /* Start / End dates selectors */
         /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } },
@@ -1258,12 +1287,83 @@ export function AnniversaryModal({
         }, isBulkSubmitting ? "등록 진행 중..." : "반복 일정 일괄 등록")
       )
     )
+  );
+
+  const portalContent = embedded
+    ? /*#__PURE__*/React.createElement("div", {
+        style: { display: 'flex', flexDirection: 'column', minHeight: 0, width: '100%' }
+      }, anniversaryPanelInner)
+    : /*#__PURE__*/React.createElement("div", {
+        className: "modal-overlay",
+        onClick: overlayOnClick,
+        style: { zIndex: 11000 }
+      }, /*#__PURE__*/React.createElement(ResizableModalContainer, {
+        className: "modal-container",
+        style: { maxWidth: '440px', width: '90%', backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)' },
+        onClick: e => e.stopPropagation()
+      },
+        /*#__PURE__*/React.createElement("div", {
+          style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid var(--border-subtle)' }
+        },
+          /*#__PURE__*/React.createElement("span", {
+            style: { fontSize: '0.96rem', fontWeight: '900', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' }
+          }, /*#__PURE__*/React.createElement("svg", {
+            xmlns: "http://www.w3.org/2000/svg", width: "18", height: "18", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
+          }, /*#__PURE__*/React.createElement("path", { d: "M20 21v-8a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8" }), /*#__PURE__*/React.createElement("path", { d: "M4 16s.5-1 2-1 2.5 2 4 2 2.5-2 4-2 2.5 2 4 2 2-1 2-1" }), /*#__PURE__*/React.createElement("path", { d: "M2 21h20" }), /*#__PURE__*/React.createElement("path", { d: "M7 8v3" }), /*#__PURE__*/React.createElement("path", { d: "M12 8v3" }), /*#__PURE__*/React.createElement("path", { d: "M17 8v3" }), /*#__PURE__*/React.createElement("path", { d: "M7 4h.01" }), /*#__PURE__*/React.createElement("path", { d: "M12 4h.01" }), /*#__PURE__*/React.createElement("path", { d: "M17 4h.01" })), "기념일 & 반복 일정 설정"),
+          /*#__PURE__*/React.createElement("button", {
+            type: "button", onClick: requestClose,
+            style: { background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer', display: 'flex', alignItems: 'center' }
+          }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }))
+        ),
+        anniversaryPanelInner
+      ));
+
+  // Bottom-sheet rule: never nest under ResizableModalContainer (CSS transform traps fixed) --
+  // portaled as its own sibling rather than embedded inside portalContent's JSX tree.
+  const bulkParticipantSheet = isBulkParticipantSheetOpen && /*#__PURE__*/React.createElement("div", {
+    className: "bottom-sheet-overlay",
+    onClick: () => setIsBulkParticipantSheetOpen(false)
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bottom-sheet",
+    onClick: e => e.stopPropagation()
+  },
+    /*#__PURE__*/React.createElement("div", { className: "bottom-sheet-header" },
+      /*#__PURE__*/React.createElement("h4", null, "참여자 선택"),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        style: { background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '1.2rem', cursor: 'pointer' },
+        onClick: () => setIsBulkParticipantSheetOpen(false)
+      }, "✕")
+    ),
+    /*#__PURE__*/React.createElement("div", { className: "bottom-sheet-body" },
+      participants.map(p => /*#__PURE__*/React.createElement("button", {
+        key: p.id,
+        type: "button",
+        className: "bottom-sheet-item",
+        onClick: () => {
+          setBulkParticipantId(p.id);
+          setIsBulkParticipantSheetOpen(false);
+        }
+      }, /*#__PURE__*/React.createElement("span", {
+        className: "color-dot",
+        style: { backgroundColor: p.color, width: '12px', height: '12px' }
+      }), /*#__PURE__*/React.createElement("span", { style: { fontWeight: 700 } }, p.name)))
+    )
   ));
 
-  return ReactDOM.createPortal(portalContent, document.body);
+  return /*#__PURE__*/React.createElement(React.Fragment, null,
+    embedded
+      ? portalContent
+      : (typeof document !== 'undefined' && ReactDOM.createPortal
+        ? ReactDOM.createPortal(portalContent, document.body)
+        : portalContent),
+    bulkParticipantSheet && typeof document !== 'undefined' && ReactDOM.createPortal
+      ? ReactDOM.createPortal(bulkParticipantSheet, document.body)
+      : bulkParticipantSheet
+  );
 }
 
-export function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {
+export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenShare, onOpenAppSettings, onChangeView, chatCount = 0, settlementBadge = null, galleryCount = 0, placeCount = 0, memoCount = 0, chatLastAuthor = null, settlementLastDate = null, galleryLastDate = null, placeLastName = null, memoLastTitleWord = null }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -1277,6 +1377,11 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {
   const SectionToggleButton = __comp.SectionToggleButton || __deps.SectionToggleButton;
   const SegmentedToggle = __comp.SegmentedToggle || __deps.SegmentedToggle;
   const ShareIcon = __comp.ShareIcon || __deps.ShareIcon;
+  const SharedSideMenuFooter = __comp.SharedSideMenuFooter || __deps.SharedSideMenuFooter;
+  const SharedAppNavBlock = __comp.SharedAppNavBlock || __deps.SharedAppNavBlock;
+  const ThreeLinesIcon = __comp.ThreeLinesIcon || __deps.ThreeLinesIcon;
+  const WeatherBadge = __comp.WeatherBadge || __deps.WeatherBadge;
+  const [isSettlementMenuOpen, setIsSettlementMenuOpen] = React.useState(false);
   const sanitizeText = __deps.sanitizeText;
   const extractFirstUrl = __deps.extractFirstUrl;
   const formatChatHeaderTitle = __deps.formatChatHeaderTitle;
@@ -1538,7 +1643,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {
   const renderItemRow = (item, showDate = false) => /*#__PURE__*/React.createElement("div", {
     key: item.id || `${item.date}_${item.createdAt}_${item.amount}`,
     onClick: () => onSelectDate && onSelectDate(item.date),
-    style: { display: 'flex', flexDirection: 'column', gap: '5px', padding: '10px 12px', border: '0', borderRadius: '12px', backgroundColor: 'var(--bg-card)', cursor: onSelectDate ? 'pointer' : 'default' }
+    style: { display: 'flex', flexDirection: 'column', gap: '5px', padding: '10px 12px', border: '0', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-card)', cursor: onSelectDate ? 'pointer' : 'default' }
   }, /*#__PURE__*/React.createElement("div", {
     style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }
   }, /*#__PURE__*/React.createElement("div", {
@@ -1577,7 +1682,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {
   const totalContent = /*#__PURE__*/React.createElement("div", {
     style: { display: 'flex', flexDirection: 'column', gap: '12px' }
   }, /*#__PURE__*/React.createElement("section", {
-    style: { border: '1px solid var(--border-subtle)', borderRadius: '14px', padding: '12px', background: 'var(--bg-primary)' }
+    style: { border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '12px', background: 'var(--bg-primary)' }
   }, /*#__PURE__*/React.createElement("h4", {
     style: { margin: '0 0 10px', fontSize: '0.92rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '6px' }
   }, /*#__PURE__*/React.createElement(ChartBarIcon, null), "카테고리별 지출"), categoryTotals.length === 0 ? /*#__PURE__*/React.createElement("div", {
@@ -1594,7 +1699,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {
   }, item.total.toLocaleString(), "원")))), /*#__PURE__*/React.createElement("section", {
     style: { display: 'flex', flexDirection: 'column', gap: '8px' }
   }, baseBudget > 0 && /*#__PURE__*/React.createElement("div", {
-    className: 'settlement-base-budget-card', style: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: '10px', alignItems: 'center', padding: '10px 12px', border: '1px solid #BBF7D0', borderRadius: '12px', background: '#F0FDF4' }
+    className: 'settlement-base-budget-card', style: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: '10px', alignItems: 'center', padding: '10px 12px', border: '1px solid #BBF7D0', borderRadius: 'var(--radius-md)', background: '#F0FDF4' }
   }, /*#__PURE__*/React.createElement("div", {
     style: { display: 'flex', flexDirection: 'column', gap: '4px' }
   }, /*#__PURE__*/React.createElement("strong", {
@@ -1615,7 +1720,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {
     const isCollapsed = !!collapsedDailyRows[row.meeting.date];
     return /*#__PURE__*/React.createElement("section", {
       key: row.meeting.date,
-      style: { border: '0', borderRadius: '14px', padding: '12px', backgroundColor: 'var(--bg-primary)' }
+      style: { border: '0', borderRadius: 'var(--radius-md)', padding: '12px', backgroundColor: 'var(--bg-primary)' }
     }, /*#__PURE__*/React.createElement("div", {
       style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', marginBottom: isCollapsed ? 0 : '10px' }
     }, /*#__PURE__*/React.createElement("strong", {
@@ -1680,15 +1785,16 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {
     }
   }, formatChatHeaderTitle(calendar?.title), " 정산"), /*#__PURE__*/React.createElement("button", {
     type: "button",
-    onClick: handleGenerateShareImage,
-    title: "정산 결과 공유 이미지 생성",
+    onClick: () => setIsSettlementMenuOpen(true),
+    title: "메뉴",
+    "aria-label": "메뉴",
     style: {
       position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)',
       width: '32px', height: '32px', borderRadius: '50%', border: 'none',
       backgroundColor: 'transparent', cursor: 'pointer', display: 'flex',
       alignItems: 'center', justifyContent: 'center', color: '#64748B', padding: 0
     }
-  }, /*#__PURE__*/React.createElement(ShareIcon, { size: 16 }))), /*#__PURE__*/React.createElement("div", {
+  }, ThreeLinesIcon ? /*#__PURE__*/React.createElement(ThreeLinesIcon, { size: 20 }) : /*#__PURE__*/React.createElement(ShareIcon, { size: 16 }))), /*#__PURE__*/React.createElement("div", {
     className: "settlement-page-body",
     onScroll: handleSettlementScroll,
     style: { flex: '1 1 auto', overflowY: 'auto', padding: '72px 16px 16px', display: 'flex', flexDirection: 'column', gap: '14px' }
@@ -1858,7 +1964,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {
             monthNames.map((name, idx) => /*#__PURE__*/React.createElement("button", {
               key: idx, type: "button", onClick: () => setPickerMonth(idx),
               style: {
-                padding: '6px 4px', borderRadius: '8px',
+                padding: '6px 4px', borderRadius: 'var(--radius-sm)',
                 border: pickerMonth === idx ? '2px solid var(--accent-primary)' : '1px solid var(--border-subtle)',
                 background: pickerMonth === idx ? 'rgba(99, 102, 241, 0.15)' : 'var(--bg-card)',
                 color: pickerMonth === idx ? 'var(--accent-primary)' : 'var(--text-main)',
@@ -1901,6 +2007,75 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate }) {
         style: { flex: 1, textAlign: 'center', textDecoration: 'none' }
       }, "다운로드")
     )
+  )),
+  isSettlementMenuOpen && /*#__PURE__*/React.createElement("div", {
+    className: "admin-side-menu-overlay",
+    style: { zIndex: 12000 },
+    onClick: () => setIsSettlementMenuOpen(false)
+  }, /*#__PURE__*/React.createElement("nav", {
+    className: "admin-side-menu",
+    "aria-label": "정산",
+    onClick: e => e.stopPropagation()
+  },
+    /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-header" },
+      /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-brand" },
+        /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-copy" },
+          /*#__PURE__*/React.createElement("button", {
+            type: "button",
+            className: "admin-side-menu-title",
+            title: "메인 화면으로 이동",
+            "aria-label": "메인 화면으로 이동",
+            onClick: () => { setIsSettlementMenuOpen(false); if (typeof onChangeView === 'function') onChangeView('calendar'); else if (typeof onBack === 'function') onBack(); },
+            style: {
+              background: 'none', border: 'none', padding: 0, margin: 0,
+              color: 'inherit',
+              cursor: 'pointer', textAlign: 'left'
+            }
+          }, "정산")
+        )
+      ),
+      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 } },
+        WeatherBadge ? /*#__PURE__*/React.createElement(WeatherBadge, { weatherLocation: calendar && calendar.weatherLocation }) : null,
+        /*#__PURE__*/React.createElement("button", {
+          type: "button", className: "admin-side-menu-close-btn", onClick: () => setIsSettlementMenuOpen(false), "aria-label": "닫기"
+        }, "✕")
+      )
+    ),
+    /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-list", style: { borderBottom: 'none', paddingTop: '6px' } },
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "admin-side-menu-item",
+        onClick: () => { setIsSettlementMenuOpen(false); handleGenerateShareImage(); }
+      },
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", {
+          xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24",
+          fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
+        }, /*#__PURE__*/React.createElement("path", { d: "M3 11h3.75a2 2 0 0 1 1.6.8l.45.6a4 4 0 0 0 6.4 0l.45-.6a2 2 0 0 1 1.6-.8H21" }), /*#__PURE__*/React.createElement("path", { d: "M3 7h18" }), /*#__PURE__*/React.createElement("rect", { x: "3", y: "3", width: "18", height: "18", rx: "2" }))),
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "정산 카드")
+        )
+      )
+    ),
+    typeof SharedAppNavBlock === 'function' && /*#__PURE__*/React.createElement(SharedAppNavBlock, {
+      onClose: () => setIsSettlementMenuOpen(false),
+      onChangeView: onChangeView,
+      chatCount: chatCount,
+      settlementBadge: settlementBadge,
+      galleryCount: galleryCount,
+      placeCount: placeCount,
+      memoCount: memoCount,
+      chatLastAuthor: chatLastAuthor,
+      settlementLastDate: settlementLastDate,
+      galleryLastDate: galleryLastDate,
+      placeLastName: placeLastName,
+      memoLastTitleWord: memoLastTitleWord
+    }),
+    typeof SharedSideMenuFooter === 'function' && /*#__PURE__*/React.createElement(SharedSideMenuFooter, {
+      onClose: () => setIsSettlementMenuOpen(false),
+      onOpenShare: onOpenShare,
+      onOpenSettings: onOpenAppSettings,
+      shareLabel: '공유'
+    })
   ))
   ));
 }
@@ -1914,9 +2089,8 @@ export function PollModal({ calendar, poll, onSave, onClose, showToast, onReques
   const ResizableModalContainer = __comp.ResizableModalContainer || __deps.ResizableModalContainer;
   const SectionToggleButton = __comp.SectionToggleButton || __deps.SectionToggleButton;
   const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
+  const TrashIcon = __comp.TrashIcon || __deps.TrashIcon;
   const sanitizeText = __deps.sanitizeText;
-  const { requestClose, overlayOnClick, markSaved } = useModalDirtyGuard(onClose, onRequestConfirm);
-
   const now = Date.now();
   const isEditing = Boolean(poll?.id);
   // Once a poll's deadline has passed, adding new candidates no longer makes sense (voting is
@@ -1946,6 +2120,26 @@ export function PollModal({ calendar, poll, onSave, onClose, showToast, onReques
   const [dragOverOptionId, setDragOverOptionId] = React.useState('');
   const newOptionInputRef = React.useRef(null);
   const pointerSortRef = React.useRef({ sourceId: '', targetId: '', startX: 0, startY: 0, active: false });
+  const pollDirtySnapshot = () => JSON.stringify([
+    title,
+    description,
+    deadlineInput,
+    newOption,
+    options.map(option => [
+      option.id,
+      option.inputValue ?? `${option.text}${option.url ? ' ' + option.url : ''}`,
+      option.removedAt ? 1 : 0,
+      option.updatedAt || 0
+    ])
+  ]);
+  const { requestClose, overlayOnClick } = useModalDirtyGuard(
+    onClose,
+    onRequestConfirm,
+    undefined,
+    true,
+    pollDirtySnapshot,
+    poll?.id || 'new'
+  );
   const handleAddOption = e => {
     if (e) {
       e.preventDefault();
@@ -1954,7 +2148,10 @@ export function PollModal({ calendar, poll, onSave, onClose, showToast, onReques
     if (isSubmitting || isClosed) return;
     const latest = newOptionInputRef.current ? newOptionInputRef.current.value : newOption;
     const parsed = normalizePollOptionInput(latest);
-    if (!parsed.text) return;
+    if (!parsed.text) {
+      if (showToast) showToast('투표 항목 내용을 입력해 주세요.', 'error');
+      return;
+    }
     setOptions(prev => [...prev, {
       id: `${poll?.id || calendar.id + '_poll'}_opt_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
       text: parsed.text,
@@ -2062,8 +2259,12 @@ export function PollModal({ calendar, poll, onSave, onClose, showToast, onReques
       };
     }).filter(option => isTombstone(option) || sanitizeText(option.text, 120));
     const activeOptionCount = normalizedOptions.filter(option => !isTombstone(option)).length;
-    if (!cleanTitle || activeOptionCount === 0) {
-      if (showToast) showToast('투표명·옵션 필요', 'error'); else alert('투표명·옵션 필요');
+    if (!cleanTitle) {
+      if (showToast) showToast('투표 제목을 입력해 주세요.', 'error'); else alert('투표 제목을 입력해 주세요.');
+      return;
+    }
+    if (activeOptionCount === 0) {
+      if (showToast) showToast('투표 항목을 1개 이상 추가해 주세요.', 'error'); else alert('투표 항목을 1개 이상 추가해 주세요.');
       return;
     }
     setIsSubmitting(true);
@@ -2254,11 +2455,9 @@ export function PollModal({ calendar, poll, onSave, onClose, showToast, onReques
       const performDelete = () => setOptions(prev => prev.map(item => item.id === option.id ? { ...item, removedAt: Date.now(), updatedAt: Date.now() } : item));
       if (onRequestConfirm) {
         onRequestConfirm('투표 항목 삭제', `"${option.text || '빈 항목'}" 항목을 삭제하시겠습니까?`, performDelete);
-      } else if (window.confirm(`"${option.text || '빈 항목'}" 항목을 삭제하시겠습니까?`)) {
-        performDelete();
       }
     }
-  }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 })))))), /*#__PURE__*/React.createElement("div", {
+    }, /*#__PURE__*/React.createElement(TrashIcon, { size: 20 })))))), /*#__PURE__*/React.createElement("div", {
     className: "modal-footer"
   }, /*#__PURE__*/React.createElement("button", {
     type: "button",
@@ -2273,6 +2472,14 @@ export function PollModal({ calendar, poll, onSave, onClose, showToast, onReques
     disabled: isSubmitting,
     style: { opacity: isSubmitting ? 0.75 : 1, cursor: isSubmitting ? 'wait' : 'pointer' }
   }, isSubmitting ? "\uC800\uC7A5 \uC911..." : "\uD22C\uD45C \uC800\uC7A5")))));
+
+  // Portaled to document.body (like the other layer popups in this file) so this modal's own
+  // position:fixed dim overlay is never clipped/contained by an ancestor modal's
+  // ResizableModalContainer (e.g. AdminModal's admin-settings-modal, which sets overflow:hidden) --
+  // without this, opening PollModal from inside another modal made the outer modal collapse to
+  // just its border while this one rendered confined to the outer modal's box instead of covering
+  // the full viewport with its own dim.
+  return ReactDOM.createPortal(modalEl, document.body);
 }
 
   if (typeof window !== 'undefined') {

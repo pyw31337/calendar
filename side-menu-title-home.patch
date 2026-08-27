@@ -1,0 +1,185 @@
+diff --git a/src/ui/ui-chat-gallery.js b/src/ui/ui-chat-gallery.js
+index 095e840..93871a5 100644
+--- a/src/ui/ui-chat-gallery.js
++++ b/src/ui/ui-chat-gallery.js
+@@ -1257,7 +1257,7 @@ export function ChatGalleryModal({
+           /*#__PURE__*/React.createElement("button", {
+             type: "button",
+             onClick: () => setIsMenuOpen(true),
+-            title: "갤러리 메뉴", "aria-label": "갤러리 메뉴",
++            title: "갤러리 메뉴", "aria-label": "갤러리",
+             style: {
+               background: 'none', border: 'none', cursor: 'pointer', padding: '6px',
+               color: '#64748B', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+@@ -1303,7 +1303,18 @@ export function ChatGalleryModal({
+     /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-header" },
+       /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-brand" },
+         /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-copy" },
+-          /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-title" }, "갤러리 메뉴")
++          /*#__PURE__*/React.createElement("button", {
++            type: "button",
++            className: "admin-side-menu-title",
++            title: "메인 화면으로 이동",
++            "aria-label": "메인 화면으로 이동",
++            onClick: () => { setIsMenuOpen(false); if (typeof onChangeView === 'function') onChangeView('calendar'); else if (typeof onClose === 'function') onClose(); },
++            style: {
++              background: 'none', border: 'none', padding: 0, margin: 0,
++              font: 'inherit', fontWeight: 'inherit', color: 'inherit',
++              cursor: 'pointer', textAlign: 'left'
++            }
++          }, "갤러리")
+         )
+       ),
+       /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 } },
+diff --git a/src/ui/ui-event-modals.js b/src/ui/ui-event-modals.js
+index d180468..c4a7b2a 100644
+--- a/src/ui/ui-event-modals.js
++++ b/src/ui/ui-event-modals.js
+@@ -2018,13 +2018,24 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
+     onClick: () => setIsSettlementMenuOpen(false)
+   }, /*#__PURE__*/React.createElement("nav", {
+     className: "admin-side-menu",
+-    "aria-label": "정산 메뉴",
++    "aria-label": "정산",
+     onClick: e => e.stopPropagation()
+   },
+     /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-header" },
+       /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-brand" },
+         /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-copy" },
+-          /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-title" }, "정산 메뉴")
++          /*#__PURE__*/React.createElement("button", {
++            type: "button",
++            className: "admin-side-menu-title",
++            title: "메인 화면으로 이동",
++            "aria-label": "메인 화면으로 이동",
++            onClick: () => { setIsSettlementMenuOpen(false); if (typeof onChangeView === 'function') onChangeView('calendar'); else if (typeof onBack === 'function') onBack(); },
++            style: {
++              background: 'none', border: 'none', padding: 0, margin: 0,
++              font: 'inherit', fontWeight: 'inherit', color: 'inherit',
++              cursor: 'pointer', textAlign: 'left'
++            }
++          }, "정산")
+         )
+       ),
+       /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 } },
+diff --git a/src/ui/ui-memo-view.js b/src/ui/ui-memo-view.js
+index dd061d0..4e8c3aa 100644
+--- a/src/ui/ui-memo-view.js
++++ b/src/ui/ui-memo-view.js
+@@ -1358,13 +1358,24 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
+       onClick: () => setIsMemoMenuOpen(false)
+     }, /*#__PURE__*/React.createElement("nav", {
+       className: "admin-side-menu",
+-      "aria-label": "메모 메뉴",
++      "aria-label": "메모",
+       onClick: e => e.stopPropagation()
+     },
+       /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-header" },
+         /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-brand" },
+           /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-copy" },
+-            /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-title" }, "메모 메뉴")
++            /*#__PURE__*/React.createElement("button", {
++              type: "button",
++              className: "admin-side-menu-title",
++              title: "메인 화면으로 이동",
++              "aria-label": "메인 화면으로 이동",
++              onClick: () => { setIsMemoMenuOpen(false); if (typeof onChangeView === 'function') onChangeView('calendar'); else if (typeof onBack === 'function') onBack(); },
++              style: {
++                background: 'none', border: 'none', padding: 0, margin: 0,
++                font: 'inherit', fontWeight: 'inherit', color: 'inherit',
++                cursor: 'pointer', textAlign: 'left'
++              }
++            }, "메모")
+           )
+         ),
+         /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 } },
+diff --git a/src/ui/ui-misc.js b/src/ui/ui-misc.js
+index a6bc81a..c2b92e9 100644
+--- a/src/ui/ui-misc.js
++++ b/src/ui/ui-misc.js
+@@ -1023,7 +1023,7 @@ export function ChatSideMenu({
+     onClick: onClose
+   }, /*#__PURE__*/React.createElement("nav", {
+     className: "admin-side-menu" + (isScrollingActive ? " scroll-active" : ""),
+-    "aria-label": "채팅 메뉴",
++    "aria-label": "채팅",
+     onClick: e => e.stopPropagation(),
+     onMouseMove: triggerScrollActive,
+     onScroll: triggerScrollActive
+@@ -1031,7 +1031,18 @@ export function ChatSideMenu({
+     /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-header" },
+       /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-brand" },
+         /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-copy" },
+-          /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-title" }, "채팅 메뉴")
++          /*#__PURE__*/React.createElement("button", {
++            type: "button",
++            className: "admin-side-menu-title",
++            title: "메인 화면으로 이동",
++            "aria-label": "메인 화면으로 이동",
++            onClick: () => { onClose && onClose(); if (typeof onChangeView === 'function') onChangeView('calendar'); },
++            style: {
++              background: 'none', border: 'none', padding: 0, margin: 0,
++              font: 'inherit', fontWeight: 'inherit', color: 'inherit',
++              cursor: 'pointer', textAlign: 'left'
++            }
++          }, "채팅")
+         )
+       ),
+         /*#__PURE__*/React.createElement("div", {
+diff --git a/src/ui/ui-places.js b/src/ui/ui-places.js
+index d58543b..e3e92c2 100644
+--- a/src/ui/ui-places.js
++++ b/src/ui/ui-places.js
+@@ -1499,7 +1499,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
+           type: "button",
+           onClick: () => setIsPlacesMenuOpen(true),
+           title: "메뉴",
+-          "aria-label": "장소 메뉴",
++          "aria-label": "장소",
+           style: {
+             background: 'none', border: 'none', cursor: 'pointer', padding: '6px',
+             color: '#64748B', display: 'flex', alignItems: 'center', justifyContent: 'center'
+@@ -1958,7 +1958,18 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
+       /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-header" },
+         /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-brand" },
+           /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-copy" },
+-            /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-title" }, "장소 메뉴")
++            /*#__PURE__*/React.createElement("button", {
++              type: "button",
++              className: "admin-side-menu-title",
++              title: "메인 화면으로 이동",
++              "aria-label": "메인 화면으로 이동",
++              onClick: () => { setIsPlacesMenuOpen(false); if (typeof onChangeView === 'function') onChangeView('calendar'); else if (typeof onBack === 'function') onBack(); },
++              style: {
++                background: 'none', border: 'none', padding: 0, margin: 0,
++                font: 'inherit', fontWeight: 'inherit', color: 'inherit',
++                cursor: 'pointer', textAlign: 'left'
++              }
++            }, "장소")
+           )
+         ),
+         /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 } },
+diff --git a/src/ui/ui-side-menu.js b/src/ui/ui-side-menu.js
+index f83f23e..3833515 100644
+--- a/src/ui/ui-side-menu.js
++++ b/src/ui/ui-side-menu.js
+@@ -1165,7 +1165,18 @@ export function MainSideMenu({
+ 	    /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-header" },
+ 	      /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-brand" },
+ 	        /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-copy" },
+-	          /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-title" }, "메뉴")
++	          /*#__PURE__*/React.createElement("button", {
++	            type: "button",
++	            className: "admin-side-menu-title",
++	            title: "메인 화면",
++	            "aria-label": "메인 화면",
++	            onClick: () => { onClose && onClose(); if (typeof onChangeView === 'function') onChangeView('calendar'); },
++	            style: {
++	              background: 'none', border: 'none', padding: 0, margin: 0,
++	              font: 'inherit', fontWeight: 'inherit', color: 'inherit',
++	              cursor: 'pointer', textAlign: 'left'
++	            }
++	          }, "메뉴")
+ 	        )
+       ),
+         /* Right container: Weather badge + Settings Icon + Close Button */

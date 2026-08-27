@@ -29,13 +29,8 @@ function useChatSendGuard(onSend, canSend) {
   const f = __gatherUiDeps().useChatSendGuard;
   return typeof f === 'function' ? f(onSend, canSend) : onSend;
 }
-function useModalDirtyGuard(onClose, onRequestConfirm, message) {
-  const f = __gatherUiDeps().useModalDirtyGuard;
-  return typeof f === 'function' ? f(onClose, onRequestConfirm, message) : {
-    requestClose: onClose,
-    overlayOnClick: e => { if (e.target === e.currentTarget) onClose(); },
-    markSaved: () => {}
-  };
+function useModalDirtyGuard(...args) {
+  return __gatherUiDeps().useModalDirtyGuard(...args);
 }
 function computeKoreanHolidaysForYear(year) {
   const f = __gatherUiDeps().computeKoreanHolidaysForYear;
@@ -725,6 +720,8 @@ function getAnniversaryDisplayColor(...args) {
 
 export function AdminModal({
   anniversaries = [],
+  initialTab = 'settings',
+  onOpenAnniversarySettings,
   calendar,
   allCalendars,
   onSelectCalendar,
@@ -768,6 +765,8 @@ export function AdminModal({
   const ResizableModalContainer = __comp.ResizableModalContainer || __deps.ResizableModalContainer;
   const SettingsIcon = __comp.SettingsIcon || __deps.SettingsIcon;
   const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
+  const TrashIcon = __comp.TrashIcon || __deps.TrashIcon;
+  const AnniversaryModal = __comp.AnniversaryModal || __deps.AnniversaryModal;
   const getActiveParticipants = typeof __deps.getActiveParticipants === 'function'
     ? __deps.getActiveParticipants
     : (typeof GATHER_APP_UTILS !== 'undefined' && typeof GATHER_APP_UTILS.getActiveParticipants === 'function'
@@ -778,9 +777,23 @@ export function AdminModal({
     : (typeof GATHER_APP_UTILS !== 'undefined' && typeof GATHER_APP_UTILS.sanitizeText === 'function'
       ? GATHER_APP_UTILS.sanitizeText
       : function (s, n) { var v = String(s == null ? '' : s); return typeof n === 'number' ? v.slice(0, n) : v; });
-  const { requestClose, overlayOnClick, markSaved } = useModalDirtyGuard(onClose, onRequestConfirm);
+    const CakeTabIcon = ({ size = 18 }) => /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg", width: size, height: size, viewBox: "0 0 24 24",
+    fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true"
+  },
+    /*#__PURE__*/React.createElement("path", { d: "M20 21v-8a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8" }),
+    /*#__PURE__*/React.createElement("path", { d: "M4 16s.5-1 2-1 2.5 2 4 2 2.5-2 4-2 2.5 2 4 2 2-1 2-1" }),
+    /*#__PURE__*/React.createElement("path", { d: "M2 21h20" }),
+    /*#__PURE__*/React.createElement("path", { d: "M7 8v3" }),
+    /*#__PURE__*/React.createElement("path", { d: "M12 8v3" }),
+    /*#__PURE__*/React.createElement("path", { d: "M17 8v3" }),
+    /*#__PURE__*/React.createElement("path", { d: "M7 4h.01" }),
+    /*#__PURE__*/React.createElement("path", { d: "M12 4h.01" }),
+    /*#__PURE__*/React.createElement("path", { d: "M17 4h.01" })
+  );
 
-  const [activeTab, setActiveTab] = React.useState('settings'); // 'settings', 'recovery', 'logs'
+  const [activeTab, setActiveTab] = React.useState(initialTab === 'anniversary' ? 'anniversary' : (initialTab || 'settings'));
+  React.useEffect(() => { if (initialTab) setActiveTab(initialTab === 'anniversary' ? 'anniversary' : initialTab); }, [initialTab]);
 
   // recovery/logs only — avoid loading full activityLogs when opening 일반/설정
   React.useEffect(() => {
@@ -891,6 +904,20 @@ export function AdminModal({
   const [newName, setNewName] = React.useState('');
   const newNameInputRef = React.useRef(null);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const adminSettingsDirtySnapshot = () => JSON.stringify([
+    title,
+    description,
+    newName,
+    participants.map(p => [p.id, p.name, p.color, p.removedAt ? 1 : 0])
+  ]);
+  const { requestClose, overlayOnClick } = useModalDirtyGuard(
+    onClose,
+    onRequestConfirm,
+    undefined,
+    true,
+    adminSettingsDirtySnapshot,
+    calendar?.id || 'calendar'
+  );
 
   // Poll sub-modal states inside AdminModal
   const [editingPoll, setEditingPoll] = React.useState(null);
@@ -910,7 +937,10 @@ export function AdminModal({
     if (e && e.nativeEvent && e.nativeEvent.isComposing) return;
     const latestName = newNameInputRef.current ? newNameInputRef.current.value : newName;
     const trimmed = sanitizeText(latestName, 40);
-    if (!trimmed) return;
+    if (!trimmed) {
+      if (showToast) showToast('참여자 이름을 입력해 주세요.', 'error');
+      return;
+    }
     const newParticipant = {
       id: `${calendar.id}_p_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
       name: trimmed,
@@ -947,7 +977,7 @@ export function AdminModal({
 
     // Validate titles & names
     if (!title.trim()) {
-      if (showToast) showToast('캘린더명 필요', 'error'); else alert('캘린더명 필요');
+      if (showToast) showToast('캘린더 제목을 입력해 주세요.', 'error'); else alert('캘린더 제목을 입력해 주세요.');
       setIsSubmitting(false);
       return;
     }
@@ -955,7 +985,7 @@ export function AdminModal({
     const activeParticipantsList = participants.filter(p => !isTombstone(p));
     const activeNames = activeParticipantsList.map(p => p.name.trim().toLowerCase());
     if (new Set(activeNames).size !== activeNames.length) {
-      if (showToast) showToast('참여자 이름 중복', 'error'); else alert('참여자 이름 중복');
+      if (showToast) showToast('동일한 참여자 이름이 이미 존재합니다.', 'error'); else alert('동일한 참여자 이름이 이미 존재합니다.');
       setIsSubmitting(false);
       return;
     }
@@ -1112,7 +1142,7 @@ export function AdminModal({
   }, /*#__PURE__*/React.createElement(ResizableModalContainer, {
     className: "modal-container admin-settings-modal",
     onClick: e => e.stopPropagation(),
-    style: { maxWidth: '760px', width: '95vw', display: 'flex', flexDirection: 'column', height: 'min(90vh, 720px)', maxHeight: 'min(720px, calc(100svh - 24px), calc(100vh - 24px))', borderRadius: '16px', overflow: 'hidden' }
+    style: { maxWidth: '760px', width: '95vw', display: 'flex', flexDirection: 'column', height: 'min(90vh, 720px)', maxHeight: 'min(720px, calc(100svh - 24px), calc(100vh - 24px))', borderRadius: 'var(--radius-md)', overflow: 'hidden' }
   },
     /* Header */
     /*#__PURE__*/React.createElement("div", {
@@ -1131,7 +1161,7 @@ export function AdminModal({
 
     /* Tab Menu Bar */
     /*#__PURE__*/React.createElement("div", {
-      style: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', borderBottom: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)', flexShrink: 0, minWidth: 0 }
+      style: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', borderBottom: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)', flexShrink: 0, minWidth: 0 }
     },
       /* Tab 1: General settings */
       /*#__PURE__*/React.createElement("button", {
@@ -1145,6 +1175,17 @@ export function AdminModal({
           cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
         }
       }, /*#__PURE__*/React.createElement("span", { className: "admin-tab-icon" }, /*#__PURE__*/React.createElement(CalendarCogIcon, null)), "일반"),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: () => setActiveTab('anniversary'),
+        style: {
+          padding: '12px 6px', fontSize: '0.82rem', fontWeight: 'bold', whiteSpace: 'nowrap',
+          color: activeTab === 'anniversary' ? '#2563EB' : '#64748B',
+          border: 'none', background: 'none',
+          borderBottom: activeTab === 'anniversary' ? '3px solid #2563EB' : '3px solid transparent',
+          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px'
+        }
+      }, /*#__PURE__*/React.createElement("span", { className: "admin-tab-icon" }, /*#__PURE__*/React.createElement(CakeTabIcon, { size: 18 })), "기념일"),
       /* Tab 2: Log-based recovery */
       /*#__PURE__*/React.createElement("button", {
         type: "button",
@@ -1186,7 +1227,7 @@ export function AdminModal({
         },
           /* Section 1: Calendar Profile & Participants */
           /*#__PURE__*/React.createElement("div", {
-            style: { border: '1px solid var(--border-subtle)', borderRadius: '12px', padding: '16px', backgroundColor: 'var(--bg-card)' }
+            style: { border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '16px', backgroundColor: 'var(--bg-card)' }
           },
             /*#__PURE__*/React.createElement("h4", { style: { fontSize: '0.92rem', fontWeight: 800, color: 'var(--text-main)', margin: '0 0 14px 0', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(SettingsIcon, null), "프로필 설정"),
 
@@ -1266,7 +1307,7 @@ export function AdminModal({
                     type: "button", className: "btn btn-danger", disabled: isSubmitting, title: "삭제",
                     style: { width: '30px', height: '30px', padding: 0, flexShrink: 0 },
                     onClick: () => onRequestConfirm('참여자 삭제', `"${p.name}" 참여자를 삭제하시겠습니까?`, () => updateParticipant(p.id, { removedAt: Date.now() }))
-                  }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 16 }))
+                  }, /*#__PURE__*/React.createElement(TrashIcon, { size: 16 }))
                 ))
               )
             ),
@@ -1281,7 +1322,7 @@ export function AdminModal({
 
           /* Section 2: Polls Creation & List */
           /*#__PURE__*/React.createElement("div", {
-            style: { border: '1px solid var(--border-subtle)', borderRadius: '12px', padding: '16px', backgroundColor: 'var(--bg-card)' }
+            style: { border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '16px', backgroundColor: 'var(--bg-card)' }
           },
             /* Header */
             /*#__PURE__*/React.createElement("div", {
@@ -1303,7 +1344,7 @@ export function AdminModal({
               getCalendarPolls(calendar).map(poll => /*#__PURE__*/React.createElement("div", {
                 key: poll.id,
                 className: 'admin-log-row poll-list-row settings-poll-row',
-                style: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px 8px', borderRadius: '8px', padding: '10px 12px' }
+                style: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px 8px', borderRadius: 'var(--radius-md)', padding: '10px 12px' }
               },
                 /* Left info */
                 /*#__PURE__*/React.createElement("div", { className: "admin-poll-row-main", style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '2px', minWidth: 0, flex: '1 1 160px' } },
@@ -1318,7 +1359,7 @@ export function AdminModal({
                     onClick: () => { setEditingPoll(poll); setIsPollModalOpen(true); },
                     style: {
                       backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: '6px',
-                      padding: '4px 10px', fontSize: '0.75rem', cursor: 'pointer', color: '#334155'
+                      padding: '4px 10px', fontSize: '0.75rem', cursor: 'pointer', color: 'var(--text-main)'
                     }
                   }, "수정"),
                   /* Delete button */
@@ -1328,7 +1369,7 @@ export function AdminModal({
                     title: "삭제",
                     onClick: () => handleDeletePollFromAdmin(poll),
                     style: { width: '30px', height: '30px', padding: 0, flexShrink: 0 }
-                  }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 16 }))
+                  }, /*#__PURE__*/React.createElement(TrashIcon, { size: 16 }))
                 )
               ))
             )
@@ -1339,10 +1380,27 @@ export function AdminModal({
       /* ========================================== */
       /* TAB 3: POINT-IN-TIME LOG RECOVERY         */
       /* ========================================== */
+      activeTab === 'anniversary' && /*#__PURE__*/React.createElement("div", {
+        style: { display: 'flex', flexDirection: 'column', gap: '0', margin: '-20px', minHeight: '320px' }
+      },
+        AnniversaryModal
+          ? /*#__PURE__*/React.createElement(AnniversaryModal, {
+              calendar: calendar,
+              anniversaries: anniversaries || [],
+              embedded: true,
+              onClose: () => {},
+              showToast: showToast,
+              onRequestConfirm: onRequestConfirm,
+              onBulkRegister: onBulkRegister,
+              isDarkTheme: isDarkTheme
+            })
+          : /*#__PURE__*/React.createElement("div", { style: { padding: '20px', color: 'var(--text-muted)' } }, "기념일 모듈을 불러올 수 없습니다.")
+      ),
+
       activeTab === 'recovery' && /*#__PURE__*/React.createElement(React.Fragment, null,
         /* Info alert */
         /*#__PURE__*/React.createElement("div", {
-          style: { backgroundColor: '#FEF3C7', border: '1px solid #FDE68A', borderRadius: '8px', padding: '12px 14px', color: '#92400E', fontSize: '0.8rem', lineHeight: '1.5' }
+          style: { backgroundColor: '#FEF3C7', border: '1px solid #FDE68A', borderRadius: 'var(--radius-md)', padding: '12px 14px', color: '#92400E', fontSize: '0.8rem', lineHeight: '1.5' }
         },
           /*#__PURE__*/React.createElement("span", { style: { fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '4px', verticalAlign: 'middle' } }, /*#__PURE__*/React.createElement(AlertTriangleIcon, null), "데이터 유실 방지 경고: "),
           "특정 시점으로 데이터를 복구(롤백)하면, 그 시점 이후에 수행된 모든 일정 등록 및 변경 사항과 투표 기록이 되돌아갑니다. 복구하기 전 현재 상태의 백업이 필요하다면 백업 저장 기능을 이용해 주세요."
@@ -1363,7 +1421,7 @@ export function AdminModal({
 
         /* Log Timeline */
         /*#__PURE__*/React.createElement("div", {
-          style: { border: '1px solid var(--border-subtle)', borderRadius: '12px', padding: '16px', backgroundColor: 'var(--bg-card)', display: 'flex', flexDirection: 'column' }
+          style: { border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '16px', backgroundColor: 'var(--bg-card)', display: 'flex', flexDirection: 'column' }
         },
           /*#__PURE__*/React.createElement("h4", { style: { fontSize: '0.92rem', fontWeight: 800, color: 'var(--text-main)', margin: '0 0 12px 0', display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(HourglassIcon, null), "시점복구"),
 
@@ -1573,7 +1631,7 @@ export function AdminModal({
                 if (typeof onDeleteLog !== 'function') return;
                 onRequestConfirm('로그 삭제', confirmText, () => onDeleteLog(log));
               }
-            }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 16 }))));
+            }, /*#__PURE__*/React.createElement(TrashIcon, { size: 16 }))));
           }));
         })()
       )
@@ -1864,7 +1922,7 @@ export function AdminCreateCalendarModal({ onCreate, onClose }) {
       onSubmit: handleSubmit,
       onClick: e => e.stopPropagation(),
       className: "modal-container",
-      style: { maxWidth: '360px', padding: '20px', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '12px' }
+      style: { maxWidth: '360px', padding: '20px', borderRadius: 'var(--radius-md)', display: 'flex', flexDirection: 'column', gap: '12px' }
     },
       /*#__PURE__*/React.createElement("h3", { style: { fontSize: '1.05rem', fontWeight: 800, color: '#0F172A' } }, "+ 새 캘린더 생성"),
       /*#__PURE__*/React.createElement("div", null,
@@ -1919,7 +1977,7 @@ export function AdminRestorePhraseModal({ onConfirm, onClose }) {
       onSubmit: handleSubmit,
       onClick: e => e.stopPropagation(),
       className: "modal-container",
-      style: { maxWidth: '380px', padding: '20px', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '12px' }
+      style: { maxWidth: '380px', padding: '20px', borderRadius: 'var(--radius-md)', display: 'flex', flexDirection: 'column', gap: '12px' }
     },
       /*#__PURE__*/React.createElement("h3", { style: { fontSize: '1.05rem', fontWeight: 800, color: '#0F172A' } }, "운영 데이터 복구 확인"),
       /*#__PURE__*/React.createElement("p", { style: { fontSize: '0.85rem', color: '#475569', lineHeight: '1.5' } },

@@ -1,0 +1,344 @@
+diff --git a/assets/app.css b/assets/app.css
+index b79981a..04419f2 100644
+--- a/assets/app.css
++++ b/assets/app.css
+@@ -441,12 +441,22 @@ body:has(.admin-login-gate) {
+   }
+ }
+ /* ===== Global press feedback (universal) ===== */
++/*
++ * Any element that receives .is-pressing (via document pointer capture) scales down.
++ * Listed selectors get smooth transition; unlisted still animate via .is-pressing.
++ */
+ button:not(:disabled),
+ .btn,
+ [role="button"],
++[role="tab"],
++[role="option"],
++[role="menuitem"],
++[role="switch"],
+ a.btn,
++a[href],
+ .day-cell,
+ .date-item-btn,
++.date-item-badge,
+ .section-toggle-btn,
+ .main-menu-item,
+ .admin-side-menu-item,
+@@ -461,7 +471,19 @@ a.btn,
+ .bottom-sheet-item,
+ .chat-msg-action,
+ .modal-close-btn,
+-.icon-btn {
++.icon-btn,
++.chat-keyboard-reopen-btn,
++.admin-side-menu-close-btn,
++.admin-side-menu-font-btn,
++.main-side-menu-manual-banner,
++.participant-chip,
++.category-chip,
++.place-category-tab,
++.memo-card,
++.gallery-thumb,
++.lightbox-nav-btn,
++.tap-target,
++[data-pressable] {
+   -webkit-tap-highlight-color: transparent;
+   touch-action: manipulation;
+   transform-origin: center center;
+@@ -472,27 +494,8 @@ a.btn,
+     background-color 0.18s ease,
+     opacity 0.18s ease;
+ }
+-button.is-pressing:not(:disabled),
+-.btn.is-pressing,
+-[role="button"].is-pressing,
+-a.btn.is-pressing,
+-.day-cell.is-pressing,
+-.date-item-btn.is-pressing,
+-.section-toggle-btn.is-pressing,
+-.main-menu-item.is-pressing,
+-.admin-side-menu-item.is-pressing,
+-.admin-menu-toggle-btn.is-pressing,
+-.places-list-item.is-pressing,
+-.summary-title.is-toggleable.is-pressing,
+-.poll-card.is-pressing,
+-.poll-option-row.is-pressing,
+-.poll-voter-option.is-pressing,
+-.recent-log-row.is-pressing,
+-.search-result-row.is-pressing,
+-.bottom-sheet-item.is-pressing,
+-.chat-msg-action.is-pressing,
+-.modal-close-btn.is-pressing,
+-.icon-btn.is-pressing,
++
++/* Universal press visual — class alone is enough for any tappable node */
+ .is-pressing {
+   transform: translate3d(0, 1px, 0) scale(0.92) !important;
+   filter: brightness(0.92) !important;
+@@ -503,20 +506,32 @@ a.btn.is-pressing,
+   transform: scale(0.94) !important;
+   filter: brightness(0.94) !important;
+ }
++
+ button:not(:disabled):active,
+ .btn:active,
+ [role="button"]:active,
++[role="tab"]:active,
+ .day-cell:active,
+ .date-item-btn:active,
+ .main-menu-item:active,
+ .admin-side-menu-item:active,
+-.section-toggle-btn:active {
++.section-toggle-btn:active,
++[data-pressable]:active {
+   transform: translate3d(0, 1px, 0) scale(0.92);
+   filter: brightness(0.92);
+ }
++
+ @media (prefers-reduced-motion: reduce) {
+-  button:not(:disabled), .btn, [role="button"], .day-cell, .date-item-btn, .is-pressing {
+-    transition: none !important; transform: none !important; filter: none !important;
++  button:not(:disabled),
++  .btn,
++  [role="button"],
++  .day-cell,
++  .date-item-btn,
++  .is-pressing,
++  [data-pressable] {
++    transition: none !important;
++    transform: none !important;
++    filter: none !important;
+   }
+ }
+ 
+diff --git a/public/assets/app.css b/public/assets/app.css
+index b79981a..04419f2 100644
+--- a/public/assets/app.css
++++ b/public/assets/app.css
+@@ -441,12 +441,22 @@ body:has(.admin-login-gate) {
+   }
+ }
+ /* ===== Global press feedback (universal) ===== */
++/*
++ * Any element that receives .is-pressing (via document pointer capture) scales down.
++ * Listed selectors get smooth transition; unlisted still animate via .is-pressing.
++ */
+ button:not(:disabled),
+ .btn,
+ [role="button"],
++[role="tab"],
++[role="option"],
++[role="menuitem"],
++[role="switch"],
+ a.btn,
++a[href],
+ .day-cell,
+ .date-item-btn,
++.date-item-badge,
+ .section-toggle-btn,
+ .main-menu-item,
+ .admin-side-menu-item,
+@@ -461,7 +471,19 @@ a.btn,
+ .bottom-sheet-item,
+ .chat-msg-action,
+ .modal-close-btn,
+-.icon-btn {
++.icon-btn,
++.chat-keyboard-reopen-btn,
++.admin-side-menu-close-btn,
++.admin-side-menu-font-btn,
++.main-side-menu-manual-banner,
++.participant-chip,
++.category-chip,
++.place-category-tab,
++.memo-card,
++.gallery-thumb,
++.lightbox-nav-btn,
++.tap-target,
++[data-pressable] {
+   -webkit-tap-highlight-color: transparent;
+   touch-action: manipulation;
+   transform-origin: center center;
+@@ -472,27 +494,8 @@ a.btn,
+     background-color 0.18s ease,
+     opacity 0.18s ease;
+ }
+-button.is-pressing:not(:disabled),
+-.btn.is-pressing,
+-[role="button"].is-pressing,
+-a.btn.is-pressing,
+-.day-cell.is-pressing,
+-.date-item-btn.is-pressing,
+-.section-toggle-btn.is-pressing,
+-.main-menu-item.is-pressing,
+-.admin-side-menu-item.is-pressing,
+-.admin-menu-toggle-btn.is-pressing,
+-.places-list-item.is-pressing,
+-.summary-title.is-toggleable.is-pressing,
+-.poll-card.is-pressing,
+-.poll-option-row.is-pressing,
+-.poll-voter-option.is-pressing,
+-.recent-log-row.is-pressing,
+-.search-result-row.is-pressing,
+-.bottom-sheet-item.is-pressing,
+-.chat-msg-action.is-pressing,
+-.modal-close-btn.is-pressing,
+-.icon-btn.is-pressing,
++
++/* Universal press visual — class alone is enough for any tappable node */
+ .is-pressing {
+   transform: translate3d(0, 1px, 0) scale(0.92) !important;
+   filter: brightness(0.92) !important;
+@@ -503,20 +506,32 @@ a.btn.is-pressing,
+   transform: scale(0.94) !important;
+   filter: brightness(0.94) !important;
+ }
++
+ button:not(:disabled):active,
+ .btn:active,
+ [role="button"]:active,
++[role="tab"]:active,
+ .day-cell:active,
+ .date-item-btn:active,
+ .main-menu-item:active,
+ .admin-side-menu-item:active,
+-.section-toggle-btn:active {
++.section-toggle-btn:active,
++[data-pressable]:active {
+   transform: translate3d(0, 1px, 0) scale(0.92);
+   filter: brightness(0.92);
+ }
++
+ @media (prefers-reduced-motion: reduce) {
+-  button:not(:disabled), .btn, [role="button"], .day-cell, .date-item-btn, .is-pressing {
+-    transition: none !important; transform: none !important; filter: none !important;
++  button:not(:disabled),
++  .btn,
++  [role="button"],
++  .day-cell,
++  .date-item-btn,
++  .is-pressing,
++  [data-pressable] {
++    transition: none !important;
++    transform: none !important;
++    filter: none !important;
+   }
+ }
+ 
+diff --git a/src/core/app-main.js b/src/core/app-main.js
+index a025d7f..2f4ad7f 100644
+--- a/src/core/app-main.js
++++ b/src/core/app-main.js
+@@ -626,37 +626,87 @@ function App() {
+   React.useEffect(() => {
+     const motionQuery = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+     const interactiveSelector = [
+-      'button', 'a[href]', 'a.btn', '[role="button"]', '.btn',
+-      '.day-cell', '.date-item-btn', '.section-toggle-btn',
+-      '.main-menu-item', '.admin-side-menu-item', '.admin-menu-toggle-btn',
+-      '.places-list-item', '.summary-title.is-toggleable',
+-      '.poll-card', '.poll-option-row', '.poll-voter-option',
+-      '.recent-log-row', '.search-result-row', '.bottom-sheet-item',
+-      '.chat-msg-action', '.modal-close-btn', '.icon-btn'
++      'button',
++      'a[href]',
++      'a.btn',
++      '[role="button"]',
++      '[role="tab"]',
++      '[role="option"]',
++      '[role="menuitem"]',
++      '[role="switch"]',
++      '.btn',
++      '.day-cell',
++      '.date-item-btn',
++      '.date-item-badge',
++      '.section-toggle-btn',
++      '.main-menu-item',
++      '.admin-side-menu-item',
++      '.admin-menu-toggle-btn',
++      '.admin-side-menu-close-btn',
++      '.admin-side-menu-font-btn',
++      '.places-list-item',
++      '.summary-title.is-toggleable',
++      '.poll-card',
++      '.poll-option-row',
++      '.poll-voter-option',
++      '.recent-log-row',
++      '.search-result-row',
++      '.bottom-sheet-item',
++      '.chat-msg-action',
++      '.modal-close-btn',
++      '.icon-btn',
++      '.chat-keyboard-reopen-btn',
++      '.main-side-menu-manual-banner',
++      '.participant-chip',
++      '.category-chip',
++      '.place-category-tab',
++      '.memo-card',
++      '.gallery-thumb',
++      '.lightbox-nav-btn',
++      '.tap-target',
++      '[data-pressable]'
+     ].join(',');
++    // Large shells that must NEVER be the press target themselves (children still ok)
+     const blockShell = [
+       '.chat-composer', '.chat-room-header', '.memo-view-header',
+       '.places-view-header', '.gallery-page-header', '.inline-search-bar',
+-      '.modal-overlay', '.admin-side-menu-overlay'
++      '.modal-overlay', '.admin-side-menu-overlay', '.app-container',
++      '.chat-room-container', '.memo-view-container', '.places-view-container',
++      '.admin-side-menu', '.admin-side-menu-list'
+     ].join(',');
+     let pressedEl = null;
+     const clearPress = () => {
+       if (!pressedEl) return;
+-      pressedEl.classList.remove('is-pressing');
++      try { pressedEl.classList.remove('is-pressing'); } catch (_) {}
+       pressedEl = null;
+     };
++    const isBlockShell = el => {
++      try { return el && el.matches && el.matches(blockShell); } catch (_) { return false; }
++    };
+     const resolveTarget = raw => {
+       if (!raw || typeof raw.closest !== 'function') return null;
++      // Typing surfaces — no press scale
+       if (raw.closest('input, textarea, select, [contenteditable="true"]')) return null;
++      // Prefer known interactive nodes
+       let target = raw.closest(interactiveSelector);
++      // Fallback: nearest reasonably sized cursor:pointer (covers inline-styled divs/spans)
+       if (!target) {
+         let el = raw.nodeType === 1 ? raw : raw.parentElement;
+-        while (el && el !== document.body && el !== document.documentElement) {
++        let depth = 0;
++        while (el && el !== document.body && el !== document.documentElement && depth < 12) {
++          depth += 1;
++          if (isBlockShell(el)) break;
++          if (el.tagName === 'LABEL') { el = el.parentElement; continue; }
+           try {
+             const st = window.getComputedStyle(el);
+-            if (st && st.cursor === 'pointer' && el.tagName !== 'LABEL') {
+-              target = el;
+-              break;
++            if (st && st.cursor === 'pointer' && st.pointerEvents !== 'none') {
++              const w = el.clientWidth || 0;
++              const h = el.clientHeight || 0;
++              // Skip full-width page-sized shells; keep chips/rows/cards
++              if (w > 0 && h > 0 && w <= 720 && h <= 320) {
++                target = el;
++                break;
++              }
+             }
+           } catch (_) {}
+           el = el.parentElement;
+@@ -665,8 +715,8 @@ function App() {
+       if (!target) return null;
+       if (target.disabled || target.getAttribute('aria-disabled') === 'true') return null;
+       if (target.closest('[data-no-press-feedback]')) return null;
+-      if (target.classList.contains('poll-drag-handle')) return null;
+-      if (target.matches && target.matches(blockShell)) return null;
++      if (target.classList && target.classList.contains('poll-drag-handle')) return null;
++      if (isBlockShell(target)) return null;
+       return target;
+     };
+     const handlePointerDown = event => {

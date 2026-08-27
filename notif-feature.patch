@@ -1,0 +1,673 @@
+diff --git a/src/core/app-main.js b/src/core/app-main.js
+index c603a22..0164bc2 100644
+--- a/src/core/app-main.js
++++ b/src/core/app-main.js
+@@ -110,6 +110,10 @@ import {
+   classifyPushSubscribeError,
+   getBrowserLabelForNotifications,
+   getNotificationPermissionHelpSteps,
++  shouldShowNotifOnboarding,
++  setNotifGuideSeen,
++  getNotifyChannels,
++  setNotifyChannel,
+   isIOSDevice,
+   isInstalledStandalonePwa,
+   probeNotificationCapability,
+@@ -926,6 +930,17 @@ function App() {
+ 
+   const [mainNotifPermission, setMainNotifPermission] = React.useState(() => (isNotificationSupported() ? Notification.permission : 'unsupported'));
+   const [mainChatNotifyEnabled, setMainChatNotifyEnabled] = React.useState(() => isChatNotifyEnabledForCalendar(activeCalId));
++  React.useEffect(() => {
++    if (typeof shouldShowNotifOnboarding !== 'function') return;
++    let timer = null;
++    try {
++      if (shouldShowNotifOnboarding()) {
++        timer = setTimeout(() => setIsNotifOnboardingOpen(true), 900);
++      }
++    } catch (_) {}
++    return () => { if (timer) clearTimeout(timer); };
++  }, []);
++
+   React.useEffect(() => {
+     setMainChatNotifyEnabled(isChatNotifyEnabledForCalendar(activeCalId));
+     setMainNotifPermission(isNotificationSupported() ? Notification.permission : 'unsupported');
+@@ -1040,7 +1055,8 @@ function App() {
+       console.warn('Main chat notification subscribe failed:', subscribeResult.reason);
+       return;
+     }
+-    showToast('이 캘린더 채팅 알림 켜짐', 'success');
++    showToast('알림허용이 켜졌습니다', 'success');
++    if (typeof setNotifGuideSeen === 'function') setNotifGuideSeen(true);
+   };
+ 
+   const [adminActivityLogs, setAdminActivityLogs] = React.useState([]);
+@@ -1049,6 +1065,9 @@ function App() {
+   const [isPlacesShareOpen, setIsPlacesShareOpen] = React.useState(false);
+   const [isMainSideMenuOpen, setIsMainSideMenuOpen] = React.useState(false);
+   const [isNotificationHelpOpen, setIsNotificationHelpOpen] = React.useState(false);
++  const [isAppSettingsOpen, setIsAppSettingsOpen] = React.useState(false);
++  const [isNotifOnboardingOpen, setIsNotifOnboardingOpen] = React.useState(false);
++  const [notifyChannels, setNotifyChannelsState] = React.useState(() => (typeof getNotifyChannels === 'function' ? getNotifyChannels() : { chat: true, memo: true, poll: true, schedule: true }));
+   const [isPollModalOpen, setIsPollModalOpen] = React.useState(false);
+   const [editingPoll, setEditingPoll] = React.useState(null);
+   const [voteTarget, setVoteTarget] = React.useState(null);
+@@ -5075,6 +5094,53 @@ function App() {
+       },
+       className: "toast-action"
+     }, "되돌리기")),
++
++    isAppSettingsOpen && /*#__PURE__*/React.createElement(AppSettingsModal, {
++      onClose: () => setIsAppSettingsOpen(false),
++      isDarkTheme: isDarkTheme,
++      onToggleTheme: toggleTheme,
++      fontScalePercent: fontScalePercent,
++      onDecreaseFont: () => setFontScalePercent(prev => Math.max(80, prev - 10)),
++      onIncreaseFont: () => setFontScalePercent(prev => Math.min(130, prev + 10)),
++      isNotifPermissionGranted: mainNotifPermission === 'granted',
++      isMasterNotifyEnabled: mainNotifPermission === 'granted' && mainChatNotifyEnabled,
++      onToggleMasterNotify: async () => {
++        await handleMainToggleNotifications();
++        if (typeof setNotifGuideSeen === 'function') setNotifGuideSeen(true);
++        setMainNotifPermission(isNotificationSupported() ? Notification.permission : 'unsupported');
++        setMainChatNotifyEnabled(isChatNotifyEnabledForCalendar(activeCalId));
++      },
++      notifyChannels: notifyChannels,
++      onToggleNotifyChannel: (key) => {
++        if (typeof setNotifyChannel !== 'function') return;
++        const next = setNotifyChannel(key, !(notifyChannels && notifyChannels[key]));
++        setNotifyChannelsState(next);
++        if (key === 'chat' && typeof setChatNotifyEnabledForCalendar === 'function') {
++          setChatNotifyEnabledForCalendar(activeCalId, !!(next && next.chat));
++          setMainChatNotifyEnabled(!!(next && next.chat));
++        }
++      },
++      helpSteps: typeof getNotificationPermissionHelpSteps === 'function' ? getNotificationPermissionHelpSteps() : []
++    }),
++    isNotifOnboardingOpen && /*#__PURE__*/React.createElement(NotificationOnboardingModal, {
++      onClose: () => {
++        if (typeof setNotifGuideSeen === 'function') setNotifGuideSeen(true);
++        setIsNotifOnboardingOpen(false);
++      },
++      isMasterNotifyEnabled: mainNotifPermission === 'granted' && mainChatNotifyEnabled,
++      onToggleMasterNotify: async () => {
++        await handleMainToggleNotifications();
++        if (typeof setNotifGuideSeen === 'function') setNotifGuideSeen(true);
++        setMainNotifPermission(isNotificationSupported() ? Notification.permission : 'unsupported');
++        setMainChatNotifyEnabled(isChatNotifyEnabledForCalendar(activeCalId));
++        if (isNotificationSupported() && Notification.permission === 'granted') {
++          setIsNotifOnboardingOpen(false);
++        }
++      },
++      helpSteps: typeof getNotificationPermissionHelpSteps === 'function' ? getNotificationPermissionHelpSteps() : [],
++      browserLabel: typeof getBrowserLabelForNotifications === 'function' ? getBrowserLabelForNotifications() : '브라우저'
++    }),
++
+     isNotificationHelpOpen && /*#__PURE__*/React.createElement(NotificationPermissionHelpModal, {
+       onClose: () => setIsNotificationHelpOpen(false),
+       onRetry: handleMainToggleNotifications,
+@@ -5126,6 +5192,7 @@ function App() {
+       onIncreaseFont: () => setFontScalePercent(prev => Math.min(130, prev + 10)),
+       isChatNotifyEnabled: mainNotifPermission === 'granted' && mainChatNotifyEnabled,
+       onToggleChatNotifications: handleMainToggleNotifications,
++      onOpenAppSettings: () => setIsAppSettingsOpen(true),
+       stickyVideoKey: stickyVideo ? stickyVideo.key : null,
+       onActivateVideo: handleActivateChatVideo,
+       onDeletePhoto: handleDeletePhoto,
+@@ -5202,6 +5269,7 @@ function App() {
+         onIncreaseFont: () => setFontScalePercent(prev => Math.min(130, prev + 10)),
+         isChatNotifyEnabled: mainNotifPermission === 'granted' && mainChatNotifyEnabled,
+         onToggleChatNotifications: handleMainToggleNotifications,
++        onOpenAppSettings: () => setIsAppSettingsOpen(true),
+         showToast: showToast
+       }),
+       activeLightbox ? /*#__PURE__*/React.createElement(Lightbox, {
+@@ -5252,6 +5320,7 @@ function App() {
+         onIncreaseFont: () => setFontScalePercent(prev => Math.min(130, prev + 10)),
+         isChatNotifyEnabled: mainNotifPermission === 'granted' && mainChatNotifyEnabled,
+         onToggleChatNotifications: handleMainToggleNotifications,
++        onOpenAppSettings: () => setIsAppSettingsOpen(true),
+         onSharePlaces: () => setIsPlacesShareOpen(true)
+       }),
+       isPlacesShareOpen && activeCal && /*#__PURE__*/React.createElement(ShareModal, {
+@@ -5482,6 +5551,7 @@ function App() {
+     onIncreaseFont: () => setFontScalePercent(prev => Math.min(130, prev + 10)),
+     isChatNotifyEnabled: mainNotifPermission === 'granted' && mainChatNotifyEnabled,
+     onToggleChatNotifications: handleMainToggleNotifications,
++    onOpenAppSettings: () => setIsAppSettingsOpen(true),
+     onUpdateWeatherLocation: handleUpdateWeatherLocation,
+     onDeleteRecentLocation: handleDeleteRecentWeatherLocation,
+     showToast: showToast
+@@ -7820,7 +7890,16 @@ function ChatParticipantSheet(props) {
+   const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ChatParticipantSheet;
+   return typeof C === 'function' ? React.createElement(C, props) : null;
+ }
++function AppSettingsModal(props) {
++  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AppSettingsModal;
++  return C ? React.createElement(C, props) : null;
++}
++function NotificationOnboardingModal(props) {
++  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.NotificationOnboardingModal;
++  return C ? React.createElement(C, props) : null;
++}
+ function NotificationPermissionHelpModal(props) {
++
+   const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.NotificationPermissionHelpModal;
+   return typeof C === 'function' ? React.createElement(C, props) : null;
+ }
+diff --git a/src/core/app-notifications.js b/src/core/app-notifications.js
+index 4438c15..60f4f98 100644
+--- a/src/core/app-notifications.js
++++ b/src/core/app-notifications.js
+@@ -178,6 +178,41 @@ function isNotificationSupported() {
+     return 'push-subscribe-failed';
+   }
+ 
++
++  const NOTIF_GUIDE_SEEN_KEY = 'gather_notif_guide_seen_v1';
++  const NOTIF_CHANNELS_KEY = 'gather_notify_channels_v1';
++  function getNotifGuideSeen() {
++    try { return getLocalStorage().getItem(NOTIF_GUIDE_SEEN_KEY) === '1'; } catch (_) { return false; }
++  }
++  function setNotifGuideSeen(seen = true) {
++    try { getLocalStorage().setItem(NOTIF_GUIDE_SEEN_KEY, seen ? '1' : '0'); } catch (_) {}
++  }
++  function shouldShowNotifOnboarding() {
++    if (!isNotificationSupported()) return false;
++    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') return false;
++    if (getNotifGuideSeen()) return false;
++    return true;
++  }
++  function getDefaultNotifyChannels() {
++    return { chat: true, memo: true, poll: true, schedule: true };
++  }
++  function getNotifyChannels() {
++    try {
++      const raw = getLocalStorage().getItem(NOTIF_CHANNELS_KEY);
++      if (!raw) return getDefaultNotifyChannels();
++      const parsed = JSON.parse(raw);
++      return { ...getDefaultNotifyChannels(), ...(parsed && typeof parsed === 'object' ? parsed : {}) };
++    } catch (_) { return getDefaultNotifyChannels(); }
++  }
++  function setNotifyChannel(channel, enabled) {
++    const next = { ...getNotifyChannels(), [channel]: !!enabled };
++    try { getLocalStorage().setItem(NOTIF_CHANNELS_KEY, JSON.stringify(next)); } catch (_) {}
++    return next;
++  }
++  function isNotifyChannelEnabled(channel) {
++    return getNotifyChannels()[channel] !== false;
++  }
++
+   function getBrowserLabelForNotifications() {
+     if (typeof navigator === 'undefined') return '현재 브라우저';
+     const ua = navigator.userAgent || '';
+@@ -192,48 +227,77 @@ function isNotificationSupported() {
+ 
+   function getNotificationPermissionHelpSteps() {
+     const browser = getBrowserLabelForNotifications();
+-    // Checked first, ahead of every browser-specific branch below -- on iOS, none of those
+-    // "check your browser's notification settings" steps are the actual fix (iOS has no per-site
+-    // browser notification setting for a non-installed tab at all), so showing them here would
+-    // send the user down a dead end.
++    const isMobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '');
+     if (isIOSDevice() && !isInstalledStandalonePwa()) {
+       return [
+-        'iOS(아이폰/아이패드)는 Safari 브라우저 탭에서는 채팅알림을 받을 수 없습니다 -- Apple 정책상 홈 화면에 추가된 앱에서만 가능합니다.',
+-        'Safari 하단(또는 상단) 공유 버튼( ⬆️ )을 눌러 주세요.',
+-        '"홈 화면에 추가"를 선택해 주세요.',
+-        '홈 화면에 생긴 아이콘으로 앱을 다시 실행한 뒤, 채팅알림을 켜 주세요.'
++        '아이폰/아이패드는 Apple 정책상 일반 브라우저 탭에서는 알림을 받을 수 없습니다.',
++        'Safari에서 공유 버튼(□↑)을 누른 뒤 "홈 화면에 추가"를 선택하세요.',
++        '홈 화면 아이콘으로 다시 연 다음, 알림허용을 켜 주세요.',
++        '그래도 안 되면: 설정 앱 → 알림 → (이 앱)에서 알림을 허용해 주세요.'
++      ];
++    }
++    if (isIOSDevice() && isInstalledStandalonePwa()) {
++      return [
++        '홈 화면 앱으로 실행 중입니다. 아래에서 알림허용을 켜 주세요.',
++        '허용 팝업이 뜨면 "허용"을 선택하세요.',
++        '이미 거부했다면: 아이폰 설정 → 알림 → 해당 앱에서 알림을 다시 켜 주세요.'
+       ];
+     }
+     if (browser === '삼성 인터넷') {
++      return isMobile ? [
++        '아래 알림허용을 켠 뒤 팝업에서 "허용"을 선택하세요.',
++        '거부된 경우: 삼성 인터넷 메뉴 → 설정 → 사이트 권한 → 알림에서 이 사이트를 허용하세요.',
++        '기기 설정 → 알림 → 삼성 인터넷 알림도 확인해 주세요.'
++      ] : [
++        '아래 알림허용을 켠 뒤 "허용"을 선택하세요.',
++        '거부된 경우 주소창 사이트 설정 → 알림 → 허용으로 변경하세요.'
++      ];
++    }
++    if (browser === '네이버 웨일') {
+       return [
+-        '설정 → 사이트 및 다운로드 → 알림에서 pyw31337.github.io 알림을 허용하세요.',
+-        '휴대폰 설정 → 앱 → 삼성 인터넷 → 배터리 → 제한 없음. 절전이면 푸시가 막힙니다.',
+-        '휴대폰 설정 → 알림 → 삼성 인터넷 알림이 켜져 있는지 확인하세요.',
+-        '채팅에서 내 이름 선택 → 채팅알림 재설정 → 「알림 테스트」로 확인하세요.'
++        '아래 알림허용을 켠 뒤 "허용"을 선택하세요.',
++        isMobile ? '거부된 경우: 웨일 설정 → 사이트 설정 → 알림에서 허용하세요.' : '거부된 경우: 주소창 자물쇠 → 사이트 설정 → 알림 → 허용.',
++        '기기 알림 설정에서 웨일 알림이 꺼져 있지 않은지 확인하세요.'
+       ];
+     }
+     if (browser === 'Chrome') {
++      return isMobile ? [
++        '아래 알림허용을 켠 뒤 "허용"을 선택하세요.',
++        '거부된 경우: Chrome 메뉴 → 설정 → 사이트 설정 → 알림 → 이 사이트 허용.',
++        'Android 설정 → 앱 → Chrome → 알림도 확인해 주세요.'
++      ] : [
++        '아래 알림허용을 켠 뒤 "허용"을 선택하세요.',
++        '거부된 경우: 주소창 자물쇠 → 사이트 설정 → 알림 → 허용.',
++        'chrome://settings/content/notifications 에서 차단 여부를 확인하세요.'
++      ];
++    }
++    if (browser === 'Safari') {
+       return [
+-        '주소창 자물쇠 → 사이트 설정 → 알림 허용.',
+-        'PC: Windows 알림/집중지원에서 Chrome 알림이 막혀 있지 않은지 확인.',
+-        '모바일: 설정 → 앱 → Chrome → 알림 허용, 배터리 최적화 제한 없음.',
+-        '채팅에서 내 이름 선택 후 「알림 테스트」로 확인하세요.'
++        'Mac Safari: 아래 알림허용을 켠 뒤 "허용"을 선택하세요.',
++        '거부된 경우: Safari 설정 → 웹사이트 → 알림에서 허용으로 바꾸세요.',
++        '시스템 설정 → 알림 → Safari 알림도 확인해 주세요.'
+       ];
+     }
+-    if (browser === '네이버 웨일') {
++    if (browser === 'Firefox') {
++      return [
++        '아래 알림허용을 켠 뒤 "허용"을 선택하세요.',
++        '거부된 경우: 주소창 자물쇠 → 권한 → 알림 → 허용.'
++      ];
++    }
++    if (browser === 'Microsoft Edge') {
+       return [
+-        '주소창 왼쪽 자물쇠 아이콘 또는 브라우저 메뉴를 눌러 주세요.',
+-        '사이트 설정에서 알림 권한을 허용으로 변경해 주세요.',
+-        '페이지를 새로고침한 뒤 채팅알림을 다시 켜 주세요.'
++        '아래 알림허용을 켠 뒤 "허용"을 선택하세요.',
++        '거부된 경우: 주소창 자물쇠 → 사이트 권한 → 알림 → 허용.'
+       ];
+     }
+     return [
+-      '주소창의 자물쇠/사이트 정보 아이콘을 눌러 주세요.',
+-      '알림 권한을 허용으로 변경해 주세요.',
+-      '페이지를 새로고침한 뒤 채팅알림을 다시 켜 주세요.'
++      '아래 알림허용 스위치를 켠 뒤, 브라우저 팝업에서 "허용"을 선택하세요.',
++      (browser || '브라우저') + ' 설정에서 이 사이트의 알림이 차단되어 있지 않은지 확인해 주세요.',
++      '기기 시스템 알림 설정에서 해당 브라우저 알림이 꺼져 있지 않은지 확인해 주세요.'
+     ];
+   }
+ 
++
+   export const GATHER_APP_NOTIFICATIONS = Object.freeze({
+     isNotificationSupported,
+     requestChatNotificationPermission,
+@@ -247,6 +311,12 @@ function isNotificationSupported() {
+     describePushSubscribeFailure,
+     getNotificationDiagnostics,
+     classifyPushSubscribeError,
++    getNotifGuideSeen,
++    setNotifGuideSeen,
++    shouldShowNotifOnboarding,
++    getNotifyChannels,
++    setNotifyChannel,
++    isNotifyChannelEnabled,
+     getBrowserLabelForNotifications,
+     getNotificationPermissionHelpSteps,
+     isIOSDevice,
+diff --git a/src/ui/ui-chat-gallery.js b/src/ui/ui-chat-gallery.js
+index e3e23b4..719cea5 100644
+--- a/src/ui/ui-chat-gallery.js
++++ b/src/ui/ui-chat-gallery.js
+@@ -753,6 +753,7 @@ export function ChatGalleryModal({
+   const SmallXIcon = __deps.SmallXIcon;
+   const BackArrowIcon = __deps.BackArrowIcon;
+   const SharedSideMenuSettings = __comp.SharedSideMenuSettings || __deps.SharedSideMenuSettings;
++  const SharedSideMenuFooter = __comp.SharedSideMenuFooter || __deps.SharedSideMenuFooter;
+   const InlineSearchBar = __comp.InlineSearchBar || __deps.InlineSearchBar;
+   const LinkPreviewCard = __deps.LinkPreviewCard || __comp.LinkPreviewCard;
+   const MenuIcon = __deps.MenuIcon || __comp.MenuIcon;
+@@ -1363,14 +1364,11 @@ export function ChatGalleryModal({
+         )
+       )
+     ),
+-    /*#__PURE__*/React.createElement(SharedSideMenuSettings, {
+-      isDarkTheme: isDarkTheme,
+-      onToggleTheme: onToggleTheme,
+-      fontScalePercent: fontScalePercent,
+-      onDecreaseFont: onDecreaseFont,
+-      onIncreaseFont: onIncreaseFont,
+-      isChatNotifyEnabled: isChatNotifyEnabled,
+-      onToggleChatNotifications: onToggleChatNotifications
++    /*#__PURE__*/React.createElement(SharedSideMenuFooter, {
++      onClose: onClose,
++      onOpenShare: onOpenShare,
++      onOpenSettings: onOpenAppSettings,
++      shareLabel: '공유하기'
+     })
+   )),
+   isSearchOpen && /*#__PURE__*/React.createElement(InlineSearchBar, {
+diff --git a/src/ui/ui-chat-room.js b/src/ui/ui-chat-room.js
+index 15f9124..72f9075 100644
+--- a/src/ui/ui-chat-room.js
++++ b/src/ui/ui-chat-room.js
+@@ -721,6 +721,8 @@ export function ChatRoomView({
+   onGetGalleryPhotoOrdinal,
+   onRequestConfirm,
+   externalFocusMessageId = null
++,
++  onOpenAppSettings
+ }) {
+   const React = window.React;
+   const __deps = window.GATHER_UI_DEPS || {};
+@@ -1980,7 +1982,8 @@ export function ChatRoomView({
+     onDecreaseFont: onDecreaseFont,
+     onIncreaseFont: onIncreaseFont,
+     isChatNotifyEnabled: isChatNotifyEnabled,
+-    onToggleChatNotifications: onToggleChatNotifications
++    onToggleChatNotifications: onToggleChatNotifications,
++    onOpenAppSettings: onOpenAppSettings
+   }),
+   isChatGalleryOpen && /*#__PURE__*/React.createElement(ChatGalleryModal, {
+     chatMessages: chatMessages,
+diff --git a/src/ui/ui-misc.js b/src/ui/ui-misc.js
+index f63eb6e..ab5a497 100644
+--- a/src/ui/ui-misc.js
++++ b/src/ui/ui-misc.js
+@@ -982,6 +982,7 @@ export function MemoShareModal({ memo, calendarId, onClose, showToast }) {
+ }
+ 
+ export function ChatSideMenu({
++  onOpenAppSettings,
+   onClose,
+   onOpenSearch,
+   onOpenNoticeSettings,
+@@ -1001,6 +1002,7 @@ export function ChatSideMenu({
+   const SmallXIcon = __deps.SmallXIcon;
+   const MegaphoneIcon = __deps.MegaphoneIcon;
+   const SharedSideMenuSettings = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SharedSideMenuSettings) || __deps.SharedSideMenuSettings;
++  const SharedSideMenuFooter = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SharedSideMenuFooter) || __deps.SharedSideMenuFooter;
+ 
+   const handle = action => {
+     if (typeof action === 'function') action();
+@@ -1111,14 +1113,11 @@ export function ChatSideMenu({
+         )
+       )
+     ),
+-    /*#__PURE__*/React.createElement(SharedSideMenuSettings, {
+-      isDarkTheme: isDarkTheme,
+-      onToggleTheme: onToggleTheme,
+-      fontScalePercent: fontScalePercent,
+-      onDecreaseFont: onDecreaseFont,
+-      onIncreaseFont: onIncreaseFont,
+-      isChatNotifyEnabled: isChatNotifyEnabled,
+-      onToggleChatNotifications: onToggleChatNotifications
++    /*#__PURE__*/React.createElement(SharedSideMenuFooter, {
++      onClose: onClose,
++      onOpenShare: onOpenShare,
++      onOpenSettings: onOpenAppSettings,
++      shareLabel: '공유하기'
+     }),
+   )));
+ }
+diff --git a/src/ui/ui-places.js b/src/ui/ui-places.js
+index ec3cd3f..2c7fae7 100644
+--- a/src/ui/ui-places.js
++++ b/src/ui/ui-places.js
+@@ -1117,7 +1117,8 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom
+   }, "지도를 불러오는 중..."));
+ }
+ 
+-export function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showToast, onRequestConfirm, placesInitialQuery, setPlacesInitialQuery, isDarkTheme, onToggleTheme, fontScalePercent, onDecreaseFont, onIncreaseFont, isChatNotifyEnabled, onToggleChatNotifications, onSharePlaces, onSelectDate }) {
++export function PlacesView({
++  onOpenAppSettings, calendar, onBack, onSavePlace, onDeletePlace, showToast, onRequestConfirm, placesInitialQuery, setPlacesInitialQuery, isDarkTheme, onToggleTheme, fontScalePercent, onDecreaseFont, onIncreaseFont, isChatNotifyEnabled, onToggleChatNotifications, onSharePlaces, onSelectDate }) {
+   const React = window.React;
+   const __deps = window.GATHER_UI_DEPS || {};
+   const __comp = window.GATHER_UI_COMPONENTS || {};
+@@ -1128,6 +1129,7 @@ export function PlacesView({ calendar, onBack, onSavePlace, onDeletePlace, showT
+   const PlaceCategoryMarkerIcon = __deps.PlaceCategoryMarkerIcon;
+   const InlineSearchBar = __comp.InlineSearchBar || __deps.InlineSearchBar;
+   const SharedSideMenuSettings = __comp.SharedSideMenuSettings || __deps.SharedSideMenuSettings;
++  const SharedSideMenuFooter = __comp.SharedSideMenuFooter || __deps.SharedSideMenuFooter;
+   const BackArrowIcon = __deps.BackArrowIcon;
+   const BuildingIcon = __deps.BuildingIcon;
+   const PencilIcon = __deps.PencilIcon;
+@@ -2002,14 +2004,11 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
+           )
+         )
+       ),
+-      /*#__PURE__*/React.createElement(SharedSideMenuSettings, {
+-        isDarkTheme: isDarkTheme,
+-        onToggleTheme: onToggleTheme,
+-        fontScalePercent: fontScalePercent,
+-        onDecreaseFont: onDecreaseFont,
+-        onIncreaseFont: onIncreaseFont,
+-        isChatNotifyEnabled: isChatNotifyEnabled,
+-        onToggleChatNotifications: onToggleChatNotifications
++      /*#__PURE__*/React.createElement(SharedSideMenuFooter, {
++        onClose: onClose,
++        onOpenShare: onSharePlaces,
++        onOpenSettings: onOpenAppSettings,
++        shareLabel: '공유하기'
+       })
+     )),
+     isRegisterOpen && /*#__PURE__*/React.createElement(PlaceRegisterModal, {
+diff --git a/src/ui/ui-side-menu.js b/src/ui/ui-side-menu.js
+index 61e57f8..07fa4e8 100644
+--- a/src/ui/ui-side-menu.js
++++ b/src/ui/ui-side-menu.js
+@@ -668,6 +668,153 @@ function getAnniversaryDisplayColor(...args) {
+ }
+ 
+ 
++export function AppSettingsModal({
++  onClose, isDarkTheme, onToggleTheme, fontScalePercent, onDecreaseFont, onIncreaseFont,
++  isNotifPermissionGranted, isMasterNotifyEnabled, onToggleMasterNotify,
++  notifyChannels, onToggleNotifyChannel, helpSteps
++}) {
++  const React = window.React;
++  const __deps = window.GATHER_UI_DEPS || {};
++  const SmallXIcon = __deps.SmallXIcon;
++  const ToggleSwitch = __deps.ToggleSwitch;
++  const MoonStarsIcon = __deps.MoonStarsIcon;
++  const TextResizeIcon = __deps.TextResizeIcon;
++  const BellIcon = __deps.BellIcon;
++  const channels = [
++    { key: 'chat', label: '채팅 알림' },
++    { key: 'memo', label: '메모 알림' },
++    { key: 'poll', label: '투표 알림' },
++    { key: 'schedule', label: '일정 알림' }
++  ];
++  return /*#__PURE__*/React.createElement("div", { className: "modal-overlay", onClick: onClose, style: { zIndex: 12000 } },
++    /*#__PURE__*/React.createElement("div", {
++      className: "modal-container", onClick: e => e.stopPropagation(),
++      style: { maxWidth: '400px', width: '92%', backgroundColor: 'var(--bg-card)', borderRadius: '16px', border: '1px solid var(--border-subtle)', overflow: 'hidden' }
++    },
++      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid var(--border-subtle)' } },
++        /*#__PURE__*/React.createElement("span", { style: { fontWeight: 900, fontSize: '0.98rem' } }, "설정"),
++        /*#__PURE__*/React.createElement("button", { type: "button", onClick: onClose, style: { background: 'none', border: 'none', cursor: 'pointer', color: '#64748B', display: 'flex' } },
++          SmallXIcon ? /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }) : "✕")
++      ),
++      /*#__PURE__*/React.createElement("div", { style: { padding: '12px 16px 20px', display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '70vh', overflowY: 'auto' } },
++        /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-setting-row", style: { padding: '10px 0' } },
++          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-label" },
++            /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-icon" }, MoonStarsIcon && /*#__PURE__*/React.createElement(MoonStarsIcon, null)), "다크모드"),
++          ToggleSwitch && /*#__PURE__*/React.createElement(ToggleSwitch, { checked: !!isDarkTheme, onChange: onToggleTheme, label: "다크모드" })
++        ),
++        /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-setting-row", style: { padding: '10px 0' } },
++          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-label" },
++            /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-icon" }, TextResizeIcon && /*#__PURE__*/React.createElement(TextResizeIcon, null)), "글자크기"),
++          /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-font-controls" },
++            /*#__PURE__*/React.createElement("button", { type: "button", onClick: onDecreaseFont, className: "admin-side-menu-font-btn", "aria-label": "글자 크기 줄이기" }, "−"),
++            /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-font-value" }, (fontScalePercent || 100) + "%"),
++            /*#__PURE__*/React.createElement("button", { type: "button", onClick: onIncreaseFont, className: "admin-side-menu-font-btn", "aria-label": "글자 크기 늘리기" }, "+")
++          )
++        ),
++        /*#__PURE__*/React.createElement("div", { style: { height: '1px', background: 'var(--border-subtle)', margin: '8px 0' } }),
++        /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-setting-row", style: { padding: '10px 0' } },
++          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-label" },
++            /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-icon" }, BellIcon && /*#__PURE__*/React.createElement(BellIcon, null)), "알림허용"),
++          ToggleSwitch && /*#__PURE__*/React.createElement(ToggleSwitch, { checked: !!isMasterNotifyEnabled, onChange: onToggleMasterNotify, label: "알림허용" })
++        ),
++        /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.45, padding: '0 2px 8px' } },
++          isNotifPermissionGranted ? "브라우저 알림이 허용된 상태입니다. 아래에서 종류별로 켤 수 있습니다." : "스위치를 켜면 브라우저 알림 허용 요청이 표시됩니다."),
++        channels.map(ch => /*#__PURE__*/React.createElement("div", {
++          key: ch.key, className: "admin-side-menu-setting-row",
++          style: { padding: '8px 0 8px 8px', opacity: isMasterNotifyEnabled ? 1 : 0.45 }
++        },
++          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-label", style: { fontSize: '0.88rem' } }, ch.label),
++          ToggleSwitch && /*#__PURE__*/React.createElement(ToggleSwitch, {
++            checked: !!(notifyChannels && notifyChannels[ch.key]),
++            onChange: () => onToggleNotifyChannel && onToggleNotifyChannel(ch.key),
++            label: ch.label
++          })
++        )),
++        Array.isArray(helpSteps) && helpSteps.length > 0 && /*#__PURE__*/React.createElement("div", {
++          style: { marginTop: '12px', padding: '12px', borderRadius: '12px', background: 'var(--bg-primary)', border: '1px solid var(--border-subtle)', fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.5 }
++        },
++          /*#__PURE__*/React.createElement("div", { style: { fontWeight: 800, color: 'var(--text-main)', marginBottom: '6px' } }, "설정 안내"),
++          /*#__PURE__*/React.createElement("ol", { style: { margin: 0, paddingLeft: '18px' } },
++            helpSteps.map((step, i) => /*#__PURE__*/React.createElement("li", { key: i, style: { marginBottom: '4px' } }, step))
++          )
++        )
++      )
++    )
++  );
++}
++
++export function NotificationOnboardingModal({ onClose, isMasterNotifyEnabled, onToggleMasterNotify, helpSteps, browserLabel }) {
++  const React = window.React;
++  const __deps = window.GATHER_UI_DEPS || {};
++  const SmallXIcon = __deps.SmallXIcon;
++  const ToggleSwitch = __deps.ToggleSwitch;
++  const BellIcon = __deps.BellIcon;
++  return /*#__PURE__*/React.createElement("div", { className: "modal-overlay", style: { zIndex: 13000 } },
++    /*#__PURE__*/React.createElement("div", {
++      className: "modal-container", onClick: e => e.stopPropagation(),
++      style: { maxWidth: '400px', width: '92%', backgroundColor: 'var(--bg-card)', borderRadius: '16px', border: '1px solid var(--border-subtle)', overflow: 'hidden' }
++    },
++      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid var(--border-subtle)' } },
++        /*#__PURE__*/React.createElement("span", { style: { fontWeight: 900, fontSize: '0.98rem', display: 'flex', alignItems: 'center', gap: '6px' } },
++          BellIcon && /*#__PURE__*/React.createElement(BellIcon, null), "알림 허용 안내"),
++        /*#__PURE__*/React.createElement("button", { type: "button", onClick: onClose, style: { background: 'none', border: 'none', cursor: 'pointer', color: '#64748B', display: 'flex' } },
++          SmallXIcon ? /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }) : "✕")
++      ),
++      /*#__PURE__*/React.createElement("div", { style: { padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px' } },
++        /*#__PURE__*/React.createElement("div", {
++          className: "admin-side-menu-setting-row",
++          style: { padding: '14px 12px', borderRadius: '12px', background: 'var(--bg-primary)', border: '1px solid var(--border-subtle)' }
++        },
++          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-label", style: { fontWeight: 800 } }, "알림허용"),
++          ToggleSwitch && /*#__PURE__*/React.createElement(ToggleSwitch, { checked: !!isMasterNotifyEnabled, onChange: onToggleMasterNotify, label: "알림허용" })
++        ),
++        /*#__PURE__*/React.createElement("p", { style: { margin: 0, fontSize: '0.84rem', color: 'var(--text-main)', lineHeight: 1.55 } },
++          "채팅·메모·일정·투표 등 새 소식이 등록될 때 알림을 받으려면 알림허용이 필요합니다."),
++        /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.5 } },
++          /*#__PURE__*/React.createElement("div", { style: { fontWeight: 800, color: 'var(--text-main)', marginBottom: '6px' } }, (browserLabel || '브라우저') + " 설정 안내"),
++          /*#__PURE__*/React.createElement("ol", { style: { margin: 0, paddingLeft: '18px' } },
++            (helpSteps || []).map((step, i) => /*#__PURE__*/React.createElement("li", { key: i, style: { marginBottom: '4px' } }, step))
++          )
++        ),
++        /*#__PURE__*/React.createElement("button", { type: "button", className: "btn btn-action-dark btn-action", onClick: onClose, style: { width: '100%', marginTop: '4px' } }, "확인")
++      )
++    )
++  );
++}
++
++export function SharedSideMenuFooter({ onClose, onOpenShare, onOpenSettings, shareLabel = '공유하기' }) {
++  const React = window.React;
++  const __deps = window.GATHER_UI_DEPS || {};
++  const MenuIcon = __deps.MenuIcon;
++  const handle = action => { if (typeof action === 'function') action(); };
++  return /*#__PURE__*/React.createElement("div", {
++    className: "admin-side-menu-list",
++    style: { borderTop: '1px solid var(--border-subtle, #E2E8F0)', borderBottom: 'none', paddingTop: '6px', marginTop: '2px' }
++  },
++    typeof onOpenShare === 'function' && /*#__PURE__*/React.createElement("button", {
++      type: "button", className: "admin-side-menu-item",
++      onClick: () => { handle(onClose); handle(onOpenShare); }
++    },
++      /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, MenuIcon ? /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M3 12a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M15 6a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M15 18a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M8.7 10.7l6.6 -3.4", "M8.7 13.3l6.6 3.4"] }) : "↗"),
++      /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
++        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, shareLabel)
++      )
++    ),
++    typeof onOpenSettings === 'function' && /*#__PURE__*/React.createElement("button", {
++      type: "button", className: "admin-side-menu-item",
++      onClick: () => { handle(onClose); handle(onOpenSettings); }
++    },
++      /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", {
++        xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24",
++        fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
++      }, /*#__PURE__*/React.createElement("path", { d: "M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" }), /*#__PURE__*/React.createElement("circle", { cx: "12", cy: "12", r: "3" }))),
++      /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
++        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "설정")
++      )
++    )
++  );
++}
++
+ export function SharedSideMenuSettings({
+   isDarkTheme,
+   onToggleTheme,
+@@ -721,6 +868,7 @@ export function SharedSideMenuSettings({
+ }
+ 
+ export function MainSideMenu({
++  onOpenAppSettings,
+   calendar,
+   anniversaries = [],
+   galleryCount = 0,
+@@ -751,6 +899,7 @@ export function MainSideMenu({
+   const React = window.React;
+   const __deps = window.GATHER_UI_DEPS || {};
+   const SharedSideMenuSettings = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SharedSideMenuSettings) || __deps.SharedSideMenuSettings;
++  const SharedSideMenuFooter = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SharedSideMenuFooter) || __deps.SharedSideMenuFooter;
+   const SmallXIcon = __deps.SmallXIcon;
+   const MenuIcon = __deps.MenuIcon;
+   const CalendarCogIcon = __deps.CalendarCogIcon;
+@@ -896,29 +1045,13 @@ export function MainSideMenu({
+         /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" }, /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title", style: { display: "flex", alignItems: "center", gap: "6px" } }, "메모", memoCount > 0 && /*#__PURE__*/React.createElement("span", { className: "main-menu-badge", style: { backgroundColor: "var(--border-subtle)", color: "var(--text-muted)", marginLeft: "4px" } }, memoCount)))
+       )
+     ),
+-/* Group 3: theme / font / notify (divider owned by SharedSideMenuSettings) */
+-    /*#__PURE__*/React.createElement(SharedSideMenuSettings, {
+-      isDarkTheme: isDarkTheme,
+-      onToggleTheme: onToggleTheme,
+-      fontScalePercent: fontScalePercent,
+-      onDecreaseFont: onDecreaseFont,
+-      onIncreaseFont: onIncreaseFont,
+-      isChatNotifyEnabled: isChatNotifyEnabled,
+-      onToggleChatNotifications: onToggleChatNotifications
++/* Group 3+4: 공유하기 + 설정 */
++    /*#__PURE__*/React.createElement(SharedSideMenuFooter, {
++      onClose: onClose,
++      onOpenShare: onOpenShare,
++      onOpenSettings: onOpenAppSettings,
++      shareLabel: '공유하기'
+     }),
+-    /* Group 4: share + shortcut */
+-    /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-list", style: { borderTop: '1px solid var(--border-subtle, #E2E8F0)', borderBottom: 'none', paddingTop: '6px', marginTop: '2px' } },
+-      /*#__PURE__*/React.createElement("button", {
+-        type: "button",
+-        className: "admin-side-menu-item",
+-        onClick: () => handle(onOpenShare)
+-      },
+-        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M3 12a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M15 6a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M15 18a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M8.7 10.7l6.6 -3.4", "M8.7 13.3l6.6 3.4"] })),
+-        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
+-          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "공유하기")
+-        )
+-      )
+-    ),
+     /* Group 5: admin */
+     /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-list", style: { marginTop: 'auto', borderTop: '1px solid var(--border-subtle, #E2E8F0)', borderBottom: 'none', paddingTop: '6px' } },
+       /*#__PURE__*/React.createElement("button", {
+@@ -947,6 +1080,9 @@ export function MainSideMenu({
+   if (typeof window !== 'undefined') {
+   window.GATHER_UI_COMPONENTS = Object.assign({}, window.GATHER_UI_COMPONENTS || {}, {
+     SharedSideMenuSettings: SharedSideMenuSettings,
++    SharedSideMenuFooter: SharedSideMenuFooter,
++    AppSettingsModal: AppSettingsModal,
++    NotificationOnboardingModal: NotificationOnboardingModal,
+     MainSideMenu: MainSideMenu,
+   });
+ }

@@ -1,0 +1,310 @@
+diff --git a/src/ui/ui-chat-gallery.js b/src/ui/ui-chat-gallery.js
+index 321f7e8..095e840 100644
+--- a/src/ui/ui-chat-gallery.js
++++ b/src/ui/ui-chat-gallery.js
+@@ -762,6 +762,7 @@ export function ChatGalleryModal({
+   const SharedSideMenuSettings = __comp.SharedSideMenuSettings || __deps.SharedSideMenuSettings;
+   const SharedSideMenuFooter = __comp.SharedSideMenuFooter || __deps.SharedSideMenuFooter;
+   const SharedAppNavBlock = __comp.SharedAppNavBlock || __deps.SharedAppNavBlock;
++  const WeatherBadge = __comp.WeatherBadge || __deps.WeatherBadge;
+   const InlineSearchBar = __comp.InlineSearchBar || __deps.InlineSearchBar;
+   const LinkPreviewCard = __deps.LinkPreviewCard || __comp.LinkPreviewCard;
+   const MenuIcon = __deps.MenuIcon || __comp.MenuIcon;
+@@ -1305,12 +1306,15 @@ export function ChatGalleryModal({
+           /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-title" }, "갤러리 메뉴")
+         )
+       ),
+-      /*#__PURE__*/React.createElement("button", {
+-        type: "button",
+-        className: "admin-side-menu-close-btn",
+-        onClick: () => setIsMenuOpen(false),
+-        "aria-label": "메뉴 닫기"
+-      }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }))
++      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 } },
++        WeatherBadge ? /*#__PURE__*/React.createElement(WeatherBadge, { weatherLocation: calendar && calendar.weatherLocation }) : null,
++        /*#__PURE__*/React.createElement("button", {
++          type: "button",
++          className: "admin-side-menu-close-btn",
++          onClick: () => setIsMenuOpen(false),
++          "aria-label": "메뉴 닫기"
++        }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }))
++      )
+     ),
+     /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-list" },
+       /*#__PURE__*/React.createElement("button", {
+diff --git a/src/ui/ui-chat-room.js b/src/ui/ui-chat-room.js
+index 1ef3326..865eecb 100644
+--- a/src/ui/ui-chat-room.js
++++ b/src/ui/ui-chat-room.js
+@@ -1974,6 +1974,7 @@ export function ChatRoomView({
+     onClose: () => setIsEmojiPickerOpen(false)
+   }),
+   isChatSideMenuOpen && /*#__PURE__*/React.createElement(ChatSideMenu, {
++    weatherLocation: calendar && calendar.weatherLocation,
+     onClose: () => setIsChatSideMenuOpen(false),
+     onOpenSearch: () => { setIsSearchOpen(true); setSearchQuery(''); },
+     onOpenNoticeSettings: () => {
+diff --git a/src/ui/ui-event-modals.js b/src/ui/ui-event-modals.js
+index 6a3aba9..d180468 100644
+--- a/src/ui/ui-event-modals.js
++++ b/src/ui/ui-event-modals.js
+@@ -1384,6 +1384,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
+   const SharedSideMenuFooter = __comp.SharedSideMenuFooter || __deps.SharedSideMenuFooter;
+   const SharedAppNavBlock = __comp.SharedAppNavBlock || __deps.SharedAppNavBlock;
+   const ThreeLinesIcon = __comp.ThreeLinesIcon || __deps.ThreeLinesIcon;
++  const WeatherBadge = __comp.WeatherBadge || __deps.WeatherBadge;
+   const [isSettlementMenuOpen, setIsSettlementMenuOpen] = React.useState(false);
+   const sanitizeText = __deps.sanitizeText;
+   const extractFirstUrl = __deps.extractFirstUrl;
+@@ -2026,9 +2027,12 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
+           /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-title" }, "정산 메뉴")
+         )
+       ),
+-      /*#__PURE__*/React.createElement("button", {
+-        type: "button", className: "admin-side-menu-close-btn", onClick: () => setIsSettlementMenuOpen(false), "aria-label": "닫기"
+-      }, "✕")
++      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 } },
++        WeatherBadge ? /*#__PURE__*/React.createElement(WeatherBadge, { weatherLocation: calendar && calendar.weatherLocation }) : null,
++        /*#__PURE__*/React.createElement("button", {
++          type: "button", className: "admin-side-menu-close-btn", onClick: () => setIsSettlementMenuOpen(false), "aria-label": "닫기"
++        }, "✕")
++      )
+     ),
+     /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-list", style: { borderBottom: 'none', paddingTop: '6px' } },
+       /*#__PURE__*/React.createElement("button", {
+diff --git a/src/ui/ui-memo-view.js b/src/ui/ui-memo-view.js
+index 934c627..dd061d0 100644
+--- a/src/ui/ui-memo-view.js
++++ b/src/ui/ui-memo-view.js
+@@ -705,6 +705,7 @@ export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoad
+     const SharedSideMenuFooter = (__comp && __comp.SharedSideMenuFooter) || (window.GATHER_UI_DEPS || {}).SharedSideMenuFooter;
+   const SharedAppNavBlock = (__comp && __comp.SharedAppNavBlock) || (window.GATHER_UI_DEPS || {}).SharedAppNavBlock;
+   const ThreeLinesIcon = (__comp && __comp.ThreeLinesIcon) || (window.GATHER_UI_DEPS || {}).ThreeLinesIcon;
++  const WeatherBadge = (__comp && __comp.WeatherBadge) || (window.GATHER_UI_DEPS || {}).WeatherBadge;
+   const [isMemoMenuOpen, setIsMemoMenuOpen] = React.useState(false);
+ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
+   const memoSearchInputRef = React.useRef(null);
+@@ -1366,9 +1367,12 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
+             /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-title" }, "메모 메뉴")
+           )
+         ),
+-        /*#__PURE__*/React.createElement("button", {
+-          type: "button", className: "admin-side-menu-close-btn", onClick: () => setIsMemoMenuOpen(false), "aria-label": "닫기"
+-        }, "✕")
++        /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 } },
++          WeatherBadge ? /*#__PURE__*/React.createElement(WeatherBadge, { weatherLocation: calendar && calendar.weatherLocation }) : null,
++          /*#__PURE__*/React.createElement("button", {
++            type: "button", className: "admin-side-menu-close-btn", onClick: () => setIsMemoMenuOpen(false), "aria-label": "닫기"
++          }, "✕")
++        )
+       ),
+       /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-list", style: { borderBottom: 'none', paddingTop: '6px' } },
+         /*#__PURE__*/React.createElement("button", {
+diff --git a/src/ui/ui-misc.js b/src/ui/ui-misc.js
+index 4e14ea0..a6bc81a 100644
+--- a/src/ui/ui-misc.js
++++ b/src/ui/ui-misc.js
+@@ -993,11 +993,14 @@ export function ChatSideMenu({
+   settlementBadge = null,
+   galleryCount = 0,
+   placeCount = 0,
+-  memoCount = 0
++  memoCount = 0,
++  weatherLocation = null
+ }) {
+   const React = window.React;
+   const __deps = window.GATHER_UI_DEPS || {};
++  const __comp = window.GATHER_UI_COMPONENTS || {};
+   const SmallXIcon = __deps.SmallXIcon;
++  const WeatherBadge = __comp.WeatherBadge || __deps.WeatherBadge;
+   const MegaphoneIcon = __deps.MegaphoneIcon;
+   const SharedSideMenuSettings = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SharedSideMenuSettings) || __deps.SharedSideMenuSettings;
+   const SharedSideMenuFooter = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SharedSideMenuFooter) || __deps.SharedSideMenuFooter;
+@@ -1034,6 +1037,7 @@ export function ChatSideMenu({
+         /*#__PURE__*/React.createElement("div", {
+           style: { display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }
+         },
++          WeatherBadge ? /*#__PURE__*/React.createElement(WeatherBadge, { weatherLocation: weatherLocation }) : null,
+           /* Close Button */
+           /*#__PURE__*/React.createElement("button", {
+             type: "button",
+diff --git a/src/ui/ui-places.js b/src/ui/ui-places.js
+index 2744eed..d58543b 100644
+--- a/src/ui/ui-places.js
++++ b/src/ui/ui-places.js
+@@ -1131,6 +1131,7 @@ export function PlacesView({
+   const SharedSideMenuSettings = __comp.SharedSideMenuSettings || __deps.SharedSideMenuSettings;
+   const SharedSideMenuFooter = __comp.SharedSideMenuFooter || __deps.SharedSideMenuFooter;
+   const SharedAppNavBlock = __comp.SharedAppNavBlock || __deps.SharedAppNavBlock;
++  const WeatherBadge = __comp.WeatherBadge || __deps.WeatherBadge;
+   const BackArrowIcon = __deps.BackArrowIcon;
+   const BuildingIcon = __deps.BuildingIcon;
+   const PencilIcon = __deps.PencilIcon;
+@@ -1960,11 +1961,14 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
+             /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-title" }, "장소 메뉴")
+           )
+         ),
+-        /*#__PURE__*/React.createElement("button", {
+-          type: "button", className: "admin-side-menu-close-btn",
+-          title: "메뉴 닫기", "aria-label": "메뉴 닫기",
+-          onClick: () => setIsPlacesMenuOpen(false)
+-        }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }))
++        /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 } },
++          WeatherBadge ? /*#__PURE__*/React.createElement(WeatherBadge, { weatherLocation: calendar && calendar.weatherLocation }) : null,
++          /*#__PURE__*/React.createElement("button", {
++            type: "button", className: "admin-side-menu-close-btn",
++            title: "메뉴 닫기", "aria-label": "메뉴 닫기",
++            onClick: () => setIsPlacesMenuOpen(false)
++          }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }))
++        )
+       ),
+       /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-list" },
+         /*#__PURE__*/React.createElement("button", {
+diff --git a/src/ui/ui-side-menu.js b/src/ui/ui-side-menu.js
+index 72a99c0..f1f9b2e 100644
+--- a/src/ui/ui-side-menu.js
++++ b/src/ui/ui-side-menu.js
+@@ -845,7 +845,8 @@ export function AppSettingsModal({
+           )
+         ),
+         /*#__PURE__*/React.createElement("div", {
+-          style: { height: '1px', background: 'var(--border-subtle)', margin: '4px 0 8px' }
++          "aria-hidden": "true",
++          style: { height: '0', borderTop: '1px solid #E2E8F0', margin: '12px 0' }
+         }),
+         /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-setting-row", style: { padding: '10px 0' } },
+           /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-label" },
+@@ -861,7 +862,10 @@ export function AppSettingsModal({
+             /*#__PURE__*/React.createElement("button", { type: "button", onClick: onIncreaseFont, className: "admin-side-menu-font-btn", "aria-label": "글자 크기 늘리기" }, "+")
+           )
+         ),
+-        /*#__PURE__*/React.createElement("div", { style: { height: '1px', background: 'var(--border-subtle)', margin: '8px 0' } }),
++        /*#__PURE__*/React.createElement("div", {
++          "aria-hidden": "true",
++          style: { height: '0', borderTop: '1px solid #E2E8F0', margin: '12px 0' }
++        }),
+         /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-setting-row", style: { padding: '10px 0' } },
+           /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-label" },
+             /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-icon" }, BellIcon && /*#__PURE__*/React.createElement(BellIcon, null)), "알림허용"),
+@@ -889,7 +893,7 @@ export function AppSettingsModal({
+           ))
+         ),
+         Array.isArray(helpSteps) && helpSteps.length > 0 && /*#__PURE__*/React.createElement("div", {
+-          style: { marginTop: '12px', padding: '12px', borderRadius: '12px', background: 'var(--bg-primary)', border: '1px solid var(--border-subtle)', fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.5 }
++          style: { marginTop: '12px', padding: '12px', borderRadius: '12px', background: 'var(--bg-primary)', border: 'none', fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.5 }
+         },
+           /*#__PURE__*/React.createElement("div", { style: { fontWeight: 800, color: 'var(--text-main)', marginBottom: '6px' } }, "설정 안내"),
+           /*#__PURE__*/React.createElement("ol", { style: { margin: 0, paddingLeft: '18px' } },
+diff --git a/src/ui/ui-weather.js b/src/ui/ui-weather.js
+index 48c8413..abcc456 100644
+--- a/src/ui/ui-weather.js
++++ b/src/ui/ui-weather.js
+@@ -668,11 +668,61 @@ function getAnniversaryDisplayColor(...args) {
+ }
+ 
+ 
++const WEATHER_CACHE_LS_KEY = 'gather_weather_cache_v1';
++const WEATHER_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
++
++function weatherCacheKey(lat, lon) {
++  return String(Number(lat).toFixed(2)) + '_' + String(Number(lon).toFixed(2));
++}
++
++function readWeatherCache(lat, lon) {
++  try {
++    const all = JSON.parse(localStorage.getItem(WEATHER_CACHE_LS_KEY) || '{}');
++    const entry = all[weatherCacheKey(lat, lon)];
++    if (!entry || entry.temp == null || entry.ts == null) return null;
++    const age = Date.now() - Number(entry.ts);
++    return {
++      temp: entry.temp,
++      code: entry.code,
++      ts: entry.ts,
++      fresh: age >= 0 && age < WEATHER_CACHE_TTL_MS
++    };
++  } catch (_) {
++    return null;
++  }
++}
++
++function writeWeatherCache(lat, lon, temp, code) {
++  try {
++    const all = JSON.parse(localStorage.getItem(WEATHER_CACHE_LS_KEY) || '{}');
++    const key = weatherCacheKey(lat, lon);
++    all[key] = { temp: temp, code: code, ts: Date.now() };
++    // prune entries older than 24h to keep storage small
++    const cutoff = Date.now() - 24 * 60 * 60 * 1000;
++    Object.keys(all).forEach(k => {
++      if (!all[k] || Number(all[k].ts) < cutoff) delete all[k];
++    });
++    localStorage.setItem(WEATHER_CACHE_LS_KEY, JSON.stringify(all));
++  } catch (_) { /* ignore quota */ }
++}
++
+ export function WeatherBadge({ weatherLocation }) {
+   const React = window.React;
+ 
+-  const [weather, setWeather] = React.useState({ temp: null, code: null, loading: false, error: null });
+   const effectiveLocation = weatherLocation || { name: '서울', lat: 37.566, lon: 126.9784 };
++  const cached0 = (effectiveLocation?.lat != null && effectiveLocation?.lon != null)
++    ? readWeatherCache(effectiveLocation.lat, effectiveLocation.lon)
++    : null;
++  const [weather, setWeather] = React.useState(() => {
++    if (cached0 && cached0.fresh) {
++      return { temp: cached0.temp, code: cached0.code, loading: false, error: null };
++    }
++    // stale cache: show immediately, refresh in background without "로딩 중"
++    if (cached0) {
++      return { temp: cached0.temp, code: cached0.code, loading: false, error: null };
++    }
++    return { temp: null, code: null, loading: true, error: null };
++  });
+ 
+   React.useEffect(() => {
+     if (!effectiveLocation?.lat || !effectiveLocation?.lon) {
+@@ -681,23 +731,36 @@ export function WeatherBadge({ weatherLocation }) {
+     }
+ 
+     let active = true;
+-    setWeather({ temp: null, code: null, loading: true, error: null });
++    const cached = readWeatherCache(effectiveLocation.lat, effectiveLocation.lon);
++
++    // Within 1 hour: use cache only — no network
++    if (cached && cached.fresh) {
++      setWeather({ temp: cached.temp, code: cached.code, loading: false, error: null });
++      return () => { active = false; };
++    }
++
++    // Stale or missing: if we have stale, keep showing it; only show loading when nothing to show
++    if (!cached) {
++      setWeather({ temp: null, code: null, loading: true, error: null });
++    }
+ 
+     const fetchWeather = async () => {
+       try {
+-        const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${effectiveLocation.lat}&longitude=${effectiveLocation.lon}&current=temperature_2m,weather_code`);
++        const res = await fetch('https://api.open-meteo.com/v1/forecast?latitude=' + effectiveLocation.lat + '&longitude=' + effectiveLocation.lon + '&current=temperature_2m,weather_code');
+         if (!res.ok) throw new Error('날씨 정보 로드 실패');
+         const data = await res.json();
+         if (!active) return;
+-        setWeather({
+-          temp: data.current.temperature_2m,
+-          code: data.current.weather_code,
+-          loading: false,
+-          error: null
+-        });
++        const temp = data.current.temperature_2m;
++        const code = data.current.weather_code;
++        writeWeatherCache(effectiveLocation.lat, effectiveLocation.lon, temp, code);
++        setWeather({ temp: temp, code: code, loading: false, error: null });
+       } catch (err) {
+         console.error('Weather fetch error:', err);
+-        if (active) {
++        if (!active) return;
++        // keep stale cache on failure
++        if (cached) {
++          setWeather({ temp: cached.temp, code: cached.code, loading: false, error: null });
++        } else {
+           setWeather({ temp: null, code: null, loading: false, error: 'Fail' });
+         }
+       }
