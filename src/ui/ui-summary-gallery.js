@@ -825,7 +825,7 @@ export function SimpleBottomSheetPicker({ title, value, options, onSelect, place
   );
 }
 
-export function PhotoGallery({ chatMessages, calendar = null, totalGalleryCount, onViewAll, showToast, onPromoteImageUrl, onSaveImageTags, onSearchTag, onDeletePhoto, onReplacePhoto, onJumpToChatMessage, onJumpToMemo, onJumpToMeetingDate, onGetChatMessageOrdinal, onGetGalleryPhotoOrdinal, onRequestConfirm }) {
+export function PhotoGallery({ chatMessages, memos = [], calendar = null, totalGalleryCount, onViewAll, showToast, onPromoteImageUrl, onSaveImageTags, onSearchTag, onDeletePhoto, onReplacePhoto, onJumpToChatMessage, onJumpToMemo, onJumpToMeetingDate, onGetChatMessageOrdinal, onGetGalleryPhotoOrdinal, onRequestConfirm }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -884,6 +884,7 @@ export function PhotoGallery({ chatMessages, calendar = null, totalGalleryCount,
   const photoEntries = React.useMemo(() => {
     const sorted = [...(chatMessages || [])].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
     const chatEntries = sorted.flatMap(msg => {
+      if (!msg || isTombstone(msg)) return [];
       const directEntry = getMessageDirectMediaEntry(msg);
       const entries = directEntry ? [...getMessageImageEntries(msg), directEntry] : getMessageImageEntries(msg);
       return entries.map((entry, i) => ({
@@ -892,13 +893,28 @@ export function PhotoGallery({ chatMessages, calendar = null, totalGalleryCount,
         timestamp: msg.timestamp
       }));
     });
+    const memoEntries = (memos || []).flatMap(memo => {
+      if (!memo || isTombstone(memo)) return [];
+      const memoTagsDisplay = Array.isArray(memo.tags) ? memo.tags.map(t => String(t || '').replace(/^#/, '')).filter(Boolean).join(' ') : '';
+      const asMsg = {
+        id: memo.id, text: memo.text || memo.content || memo.body || '',
+        imageUrl: memo.imageUrl, imageUrls: memo.imageUrls, thumbUrl: memo.thumbUrl, thumbUrls: memo.thumbUrls,
+        timestamp: memo.updatedAt || memo.createdAt || 0, participantId: memo.participantId || '',
+        uploadSource: 'memo'
+      };
+      const directEntry = getMessageDirectMediaEntry(asMsg);
+      const entries = directEntry ? [...getMessageImageEntries(asMsg), directEntry] : getMessageImageEntries(asMsg);
+      return entries.map(entry => ({
+        ...entry,
+        tags: memoTagsDisplay,
+        source: 'memo',
+        timestamp: asMsg.timestamp
+      }));
+    });
     const meetingEntries = [];
     getConfirmedMeetings(calendar).forEach(meeting => {
       const photos = Array.isArray(meeting?.photos) ? meeting.photos : [];
       photos.forEach((photo, index) => {
-        // Auto-linked entries (sourceMessageId set) are references to a real chat photo --
-        // resolve the live imageUrl/thumbUrl/tags from that source message so this tile always
-        // matches the chat original exactly.
         const resolved = resolveMeetingPhotoDisplay ? resolveMeetingPhotoDisplay(photo, chatMessages) : null;
         const full = String(resolved?.imageUrl || photo?.imageUrl || photo?.full || '');
         const thumb = String(resolved?.thumbUrl || photo?.thumbUrl || photo?.thumb || full);
@@ -927,31 +943,22 @@ export function PhotoGallery({ chatMessages, calendar = null, totalGalleryCount,
         });
       });
     });
-    // Tagging a photo with a date auto-links a copy of it onto that date's meeting record (see
-    // linkTaggedImageToMeetingDates in app-main.js), so the same photo can appear in both lists
-    // above -- collapse by URL, preferring the chat copy (its tag editor writes back to a real
-    // message) so this strip never shows the same photo twice.
     const byUrl = new Map();
-    [...chatEntries, ...meetingEntries].forEach(entry => {
+    const sourceRank = { chat: 0, memo: 1, meeting: 2 };
+    [...chatEntries, ...memoEntries, ...meetingEntries].forEach(entry => {
       const key = entry.mediaKey || entry.refKey || entry.full || entry.thumb;
       if (!key) return;
-      if (!byUrl.has(key)) {
+      const existing = byUrl.get(key);
+      if (!existing) {
         byUrl.set(key, { ...entry });
-      } else {
-        const existing = byUrl.get(key);
-        if (entry.meetingDate) {
-          existing.meetingDate = existing.meetingDate || entry.meetingDate;
-        }
-        if (entry.photoId) existing.photoId = entry.photoId;
-        if (entry.sourceMessageId) existing.sourceMessageId = entry.sourceMessageId;
-        if (Number.isInteger(entry.sourceImageIndex)) existing.sourceImageIndex = entry.sourceImageIndex;
-        if (entry.source === 'meeting' && existing.source !== 'meeting' && !existing.messageId) {
-          byUrl.set(key, { ...existing, ...entry });
-        }
+      } else if ((sourceRank[entry.source] ?? 9) < (sourceRank[existing.source] ?? 9)) {
+        byUrl.set(key, { ...entry, meetingDate: entry.meetingDate || existing.meetingDate || '' });
+      } else if (!existing.meetingDate && entry.meetingDate) {
+        existing.meetingDate = entry.meetingDate;
       }
     });
     return Array.from(byUrl.values()).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-  }, [chatMessages, calendar]);
+  }, [chatMessages, memos, calendar]);
   const visibleEntries = React.useMemo(() => photoEntries.filter(entry => {
     const key = entry.mediaKey || entry.refKey || entry.full || entry.thumb;
     if (key && brokenPhotoKeysRef.current.has(key)) return false;

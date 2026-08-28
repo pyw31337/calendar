@@ -5338,25 +5338,9 @@ function App() {
   const navChatCount = (typeof totalChatCount === 'number' && totalChatCount >= 0)
     ? totalChatCount
     : visibleChatMessages.length;
-  const navGalleryCount = (() => {
-    if (typeof totalGalleryCount === 'number' && totalGalleryCount > 0) return totalGalleryCount;
-    // fallback while REST count is loading — count unique image urls in loaded messages
-    const seen = new Set();
-    let count = 0;
-    const msgs = (typeof allChatMessages !== 'undefined' && allChatMessages) ? allChatMessages : (chatMessages || []);
-    for (const msg of msgs) {
-      if (!msg) continue;
-      const list = [];
-      if (Array.isArray(msg.imageUrls)) list.push(...msg.imageUrls);
-      if (msg.imageUrl) list.push(msg.imageUrl);
-      if (Array.isArray(msg.thumbUrls)) list.push(...msg.thumbUrls);
-      if (msg.thumbUrl) list.push(msg.thumbUrl);
-      for (const u of list) {
-        if (u && typeof u === 'string' && !seen.has(u)) { seen.add(u); count++; }
-      }
-    }
-    return count;
-  })();
+  const navGalleryCount = (typeof localGalleryCount === 'number' && localGalleryCount > 0)
+    ? localGalleryCount
+    : ((typeof totalGalleryCount === 'number' && totalGalleryCount > 0) ? totalGalleryCount : 0);
   const navMemoCount = (typeof totalMemoCount === 'number' && totalMemoCount >= 0) ? totalMemoCount : (memos || []).length;
   const navPlaceCount = (activeCal && Array.isArray(activeCal.places)) ? activeCal.places.filter(p => p && !p.deletedAt).length : 0;
   const navSettlementBadge = canUseSettlement && activeCal && typeof calculateSettlementBalance === 'function' && typeof formatBalanceBadge === 'function'
@@ -5854,39 +5838,46 @@ function App() {
   const mainMenuChatLatestTimestamp = visibleChatMessages.length > 0 ? visibleChatMessages[visibleChatMessages.length - 1].timestamp : 0;
   const mainMenuChatHasUnread = mainMenuChatLatestTimestamp > getChatLastReadTimestamp(activeCalId);
   const localGalleryCount = (() => {
-    let count = 0;
     const directUrls = new Set();
-    (activeCal?.confirmedMeeting || []).forEach(m => {
-      (m.photos || []).forEach(p => {
-        const u = p && (p.imageUrl || p.thumbUrl || p.full || p.thumb);
-        if (u && !directUrls.has(u)) {
+    const persistentBroken = (window.GATHER_APP_UTILS && window.GATHER_APP_UTILS.getPersistentBrokenPhotoUrls)
+      ? window.GATHER_APP_UTILS.getPersistentBrokenPhotoUrls()
+      : new Set();
+    const isBroken = val => {
+      const u = String(val || '').trim().split(/[?#]/)[0];
+      return !u || persistentBroken.has(u);
+    };
+
+    getConfirmedMeetings(activeCal).forEach(meeting => {
+      const photos = Array.isArray(meeting?.photos) ? meeting.photos : [];
+      photos.forEach(photo => {
+        const u = photo?.imageUrl || photo?.full || photo?.thumbUrl || photo?.thumb;
+        if (u && !isBroken(u) && !directUrls.has(u)) {
           directUrls.add(u);
-          count++;
         }
       });
     });
     const allMsgs = (allChatMessages && allChatMessages.length > 0) ? allChatMessages : (chatMessages || []);
     allMsgs.forEach(msg => {
+      if (!msg || isTombstone(msg)) return;
       const getEntries = typeof getMessageImageEntries === 'function' ? getMessageImageEntries : null;
       const getDirect = typeof getAllDirectMediaImageEntries === 'function' ? getAllDirectMediaImageEntries : (typeof getMessageDirectMediaEntry === 'function' ? m => [getMessageDirectMediaEntry(m)].filter(Boolean) : () => []);
       const entries = getEntries ? [...getEntries(msg), ...getDirect(msg)] : [];
       if (entries.length > 0) {
         entries.forEach(e => {
           const u = e.full || e.thumb || e.imageUrl;
-          if (u && !directUrls.has(u)) {
+          if (u && !isBroken(u) && !directUrls.has(u)) {
             directUrls.add(u);
-            count++;
           }
         });
       } else {
         const u = msg.imageUrl || msg.thumbUrl;
-        if (u && !directUrls.has(u)) {
+        if (u && !isBroken(u) && !directUrls.has(u)) {
           directUrls.add(u);
-          count++;
         }
       }
     });
     (memos || []).forEach(memo => {
+      if (!memo || isTombstone(memo)) return;
       const asMsg = {
         id: memo.id, text: memo.text || memo.content || memo.body || '',
         imageUrl: memo.imageUrl, imageUrls: memo.imageUrls, thumbUrl: memo.thumbUrl, thumbUrls: memo.thumbUrls,
@@ -5897,21 +5888,20 @@ function App() {
       const entries = getEntries ? [...getEntries(asMsg), ...getDirect(asMsg)] : [];
       entries.forEach(e => {
         const u = e.full || e.thumb || e.imageUrl;
-        if (u && !directUrls.has(u)) {
+        if (u && !isBroken(u) && !directUrls.has(u)) {
           directUrls.add(u);
-          count++;
         }
       });
     });
-    return count;
+    return directUrls.size;
   })();
 
   const mainMenuMemoCount = (typeof totalMemoCount === 'number' && totalMemoCount >= 0)
     ? totalMemoCount
     : (memos || []).length;
-  const mainMenuGalleryCount = (typeof totalGalleryCount === 'number' && totalGalleryCount >= 0)
-    ? Math.max(totalGalleryCount, localGalleryCount)
-    : localGalleryCount;
+  const mainMenuGalleryCount = (localGalleryCount > 0)
+    ? localGalleryCount
+    : ((typeof totalGalleryCount === 'number' && totalGalleryCount >= 0) ? totalGalleryCount : localGalleryCount);
   const mainMenuPlaceCount = getCalendarPlaces(activeCal).length;
 
   // Each confirmed meeting gets its own banner bubble on the calendar, and stays up through
@@ -6242,6 +6232,7 @@ function App() {
     }
   }), /*#__PURE__*/React.createElement(PhotoGallery, {
     chatMessages: (galleryPreviewMessages && galleryPreviewMessages.length > 0) ? galleryPreviewMessages : allChatMessages,
+    memos: memos,
     calendar: activeCal,
     totalGalleryCount: mainMenuGalleryCount,
     onViewAll: () => changeView('gallery'),
