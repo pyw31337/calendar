@@ -8024,7 +8024,7 @@ async function resolveImageUrls(calendarId, compressed, index, onBytes, uploadFn
     }
   } catch (e) {
     if (options.requireStorage) {
-      throw new Error('이미지 저장소 연결에 실패했습니다. 네트워크를 확인한 뒤 다시 시도해 주세요.');
+      throw new Error('이미지 저장소 연결에 실패했습니다. 네트워크를 확인한 뒤 다시 시도해 주세요.', { cause: e });
     }
     console.warn('Image Storage upload attempt failed, falling back to base64 data URL:', e);
   }
