@@ -2663,20 +2663,17 @@ export function GlobalSearchModal({
 
   const q = query.trim().toLowerCase();
 
-  // chatMessages/memos are capped for display (chat: last 100 live; memos: paginated), so
-  // search would miss older items. First search of the session fetches a much deeper (but still
-  // bounded) history -- a truly unbounded .get() here would re-download every message/memo a
-  // calendar has ever had on every session's first search, which only gets more expensive as a
-  // calendar accumulates history. 2000 of each is comfortably beyond what any of this app's
-  // calendars have ever had, while still capping the worst case.
+  // chatMessages/memos are capped for display, so searching that array would miss older items.
+  // A deliberate search is a correctness operation: query the complete server collections with
+  // server source instead of silently returning a plausible-looking recent-only answer.
   const [fullHistory, setFullHistory] = React.useState(null);
   const [isLoadingFullHistory, setIsLoadingFullHistory] = React.useState(false);
   React.useEffect(() => {
     if (!q || fullHistory || isLoadingFullHistory || !calendar?.id || !__fb()) return;
     setIsLoadingFullHistory(true);
     Promise.all([
-      __fb().collection('calendars').doc(`cal_${calendar.id}`).collection('messages').orderBy('timestamp', 'desc').limit(GLOBAL_SEARCH_HISTORY_LIMIT).get(),
-      __fb().collection('calendars').doc(`cal_${calendar.id}`).collection('memos').orderBy('createdAt', 'desc').limit(GLOBAL_SEARCH_HISTORY_LIMIT).get()
+      __fb().collection('calendars').doc(`cal_${calendar.id}`).collection('messages').get({ source: 'server' }),
+      __fb().collection('calendars').doc(`cal_${calendar.id}`).collection('memos').get({ source: 'server' })
     ]).then(([messagesSnap, memosSnap]) => {
       setFullHistory({
         chatMessages: messagesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })),
@@ -2690,7 +2687,7 @@ export function GlobalSearchModal({
   }, [q, fullHistory, isLoadingFullHistory, calendar?.id]);
 
   const matches = React.useMemo(
-    () => computeCalendarSearchMatches(calendar, fullHistory?.chatMessages || chatMessages, fullHistory?.memos || memos, q, 30),
+    () => computeCalendarSearchMatches(calendar, fullHistory?.chatMessages || chatMessages, fullHistory?.memos || memos, q),
     [calendar, fullHistory, chatMessages, memos, q]
   );
 
