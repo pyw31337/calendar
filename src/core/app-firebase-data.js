@@ -50,11 +50,8 @@ import {
   mergeActivityLogs,
   extractFirstUrl,
   removeFirstUrl,
-  getDirectChatMediaInfo,
   withTimeout,
   getMessageImageEntries,
-  getDirectMediaTagKey,
-  getDirectMediaTagsForUrl,
   getMessageDirectMediaEntry,
   sanitizeMessageForFirestore,
   formatBytes,
@@ -155,7 +152,7 @@ function normalizePoll(calendarId, poll, participantIds = null) {
     const optionId = sanitizeText(option?.id || `${id}_opt_${index + 1}_${Date.now()}`, 140);
     if (!optionId || !optionText || optionIds.has(optionId)) return null;
     optionIds.add(optionId);
-    const { inputValue, ...storedOption } = option || {};
+    const { inputValue: _inputValue, ...storedOption } = option || {};
     return {
       ...storedOption,
       id: optionId,
@@ -1797,7 +1794,7 @@ function estimateCalendarDocWireBytes(calendar) {
 // stays embedded on the calendar document as before.
 function stripEmbeddedActivityLogsField(calendar) {
   if (!calendar || typeof calendar !== 'object') return calendar;
-  const { activityLogs, ...rest } = calendar;
+  const { activityLogs: _activityLogs, ...rest } = calendar;
   return rest;
 }
 
@@ -1931,7 +1928,7 @@ async function deleteActivityLogsAfterTimestamp(calendarId, logs, cutoffTimestam
 // keyed-by-own-id pattern as memos).
 function stripEmbeddedPlacesField(calendar) {
   if (!calendar || typeof calendar !== 'object') return calendar;
-  const { places, ...rest } = calendar;
+  const { places: _places, ...rest } = calendar;
   return rest;
 }
 async function writePlacesToFirestore(calendarId, places) {
@@ -1995,7 +1992,7 @@ async function fetchPlacesFromFirestore(calendarId) {
 // generated id.
 function stripEmbeddedConfirmedMeetingField(calendar) {
   if (!calendar || typeof calendar !== 'object') return calendar;
-  const { confirmedMeeting, ...rest } = calendar;
+  const { confirmedMeeting: _confirmedMeeting, ...rest } = calendar;
   return rest;
 }
 function normalizeConfirmedMeetingPhoto(photo) {
@@ -3120,23 +3117,6 @@ function buildCalendarConfirmedMeetingsICS(calendar, events) {
   });
   lines.push('END:VCALENDAR');
   return lines.join('\r\n');
-}
-
-function getPhotoFileTypeLabel(photo) {
-  const rawUrl = [photo?.imageUrl, photo?.thumbUrl, photo?.full, photo?.thumb]
-    .find(value => typeof value === 'string' && value.trim()) || '';
-  if (!rawUrl) return 'unknown';
-  if (/^data:image\//i.test(rawUrl)) {
-    const match = rawUrl.match(/^data:image\/([a-z0-9.+-]+);/i);
-    if (!match) return 'image';
-    const mimeType = match[1].toLowerCase().split('+')[0];
-    return mimeType === 'jpeg' ? 'jpg' : mimeType;
-  }
-  const cleaned = rawUrl.split('?')[0].split('#')[0];
-  const match = cleaned.match(/\.([a-z0-9]+)$/i);
-  if (!match) return 'unknown';
-  const ext = match[1].toLowerCase();
-  return ext === 'jpeg' ? 'jpg' : ext;
 }
 
 // Per-date description: the admin's own confirmation note plus every participant's memo for
