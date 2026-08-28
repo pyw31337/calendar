@@ -698,8 +698,6 @@ body:has(.admin-login-gate) {
 .main-menu-item.is-pressing,
 .memo-card-hover:active,
 .memo-card-hover.is-pressing,
-.place-card-row:active,
-.place-card-row.is-pressing,
 .admin-side-menu-item:active,
 .admin-side-menu-item.is-pressing,
 .admin-side-menu-close-btn:active,
@@ -708,8 +706,6 @@ body:has(.admin-login-gate) {
 .admin-side-menu-font-btn.is-pressing,
 .admin-side-menu-title:active,
 .admin-side-menu-title.is-pressing,
-.places-list-item:active,
-.places-list-item.is-pressing,
 .chat-msg-action:active,
 .chat-msg-action.is-pressing,
 .modal-close-btn:active,
@@ -742,8 +738,8 @@ body:has(.admin-login-gate) {
 .lightbox-nav-btn.is-pressing,
 .tap-target:active,
 .tap-target.is-pressing,
-[role="button"]:not(.leaflet-marker-icon):not(.place-cluster-icon):not(.place-map-marker):not(.summary-title):not(.section-toggle-btn):not(.date-item-btn):active,
-[role="button"]:not(.leaflet-marker-icon):not(.place-cluster-icon):not(.place-map-marker):not(.summary-title):not(.section-toggle-btn):not(.date-item-btn).is-pressing,
+[role="button"]:not(.leaflet-marker-icon):not(.place-cluster-icon):not(.place-map-marker):not(.summary-title):not(.section-toggle-btn):not(.date-item-btn):not(.place-card-row):not(.places-list-item):active,
+[role="button"]:not(.leaflet-marker-icon):not(.place-cluster-icon):not(.place-map-marker):not(.summary-title):not(.section-toggle-btn):not(.date-item-btn):not(.place-card-row):not(.places-list-item).is-pressing,
 [role="tab"]:active,
 [role="tab"].is-pressing,
 [role="option"]:active,
@@ -763,8 +759,17 @@ summary.is-pressing,
   transform: translate3d(0, 1px, 0) scale(0.96) !important;
   opacity: 0.9 !important;
   filter: brightness(0.96) !important;
-  box-shadow: none !important;
-  transition: transform 0.05s ease, opacity 0.05s ease, filter 0.05s ease !important;
+}
+
+.place-card-row:active,
+.place-card-row.is-pressing,
+.places-list-item:active,
+.places-list-item.is-pressing,
+[data-no-press-feedback]:active,
+[data-no-press-feedback].is-pressing {
+  transform: none !important;
+  opacity: 1 !important;
+  filter: none !important;
 }
 .leaflet-marker-icon,
 .leaflet-marker-icon:hover,
