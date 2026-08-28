@@ -10199,6 +10199,7 @@ function bindGatherUiDeps() {
     WeatherLocationModal: typeof WeatherLocationModal === 'function' ? WeatherLocationModal : null,
     ChatGalleryModal: typeof ChatGalleryModal === 'function' ? ChatGalleryModal : null,
     getMessageImageEntries: typeof getMessageImageEntries === 'function' ? getMessageImageEntries : null,
+    dateStrToHashtag: typeof dateStrToHashtag === 'function' ? dateStrToHashtag : null,
     getMediaIdentityKeys: typeof getMediaIdentityKeys === 'function' ? getMediaIdentityKeys : null,
     resolveMeetingPhotoDisplay: typeof resolveMeetingPhotoDisplay === 'function' ? resolveMeetingPhotoDisplay : null,
     MemoView: typeof MemoView === 'function' ? MemoView : null,
