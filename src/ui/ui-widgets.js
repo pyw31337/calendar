@@ -482,9 +482,10 @@ function getKoreanSolarTermsForYear(...args) {
   const f = __gatherUiDeps().getKoreanSolarTermsForYear || GATHER_APP_UTILS.getKoreanSolarTermsForYear;
   return typeof f === 'function' ? f(...args) : undefined;
 }
-function useTapRevealedMsgId(...args) {
-  const f = __gatherUiDeps().useTapRevealedMsgId || GATHER_APP_UTILS.useTapRevealedMsgId;
-  return typeof f === 'function' ? f(...args) : undefined;
+function useTapRevealedMsgId() {
+  const React = window.React;
+  const [tapRevealedMsgId, setTapRevealedMsgId] = React.useState(null);
+  return [tapRevealedMsgId, setTapRevealedMsgId];
 }
 function getTrulyConfirmedMeetings(...args) {
   const f = __gatherUiDeps().getTrulyConfirmedMeetings || GATHER_APP_UTILS.getTrulyConfirmedMeetings;
@@ -570,13 +571,49 @@ function fetchLinkPreview(...args) {
   const f = __gatherUiDeps().fetchLinkPreview || GATHER_APP_UTILS.fetchLinkPreview;
   return typeof f === 'function' ? f(...args) : undefined;
 }
-function useLinkPreview(...args) {
-  const f = __gatherUiDeps().useLinkPreview || GATHER_APP_UTILS.useLinkPreview;
-  return typeof f === 'function' ? f(...args) : undefined;
+function useLinkPreview(url, cachedData) {
+  const React = window.React;
+  const [state, setState] = React.useState(() => {
+    if (cachedData) return { status: 'success', data: cachedData };
+    return null;
+  });
+  React.useEffect(() => {
+    if (cachedData) {
+      setState({ status: 'success', data: cachedData });
+      return;
+    }
+    if (!url) return;
+    let cancelled = false;
+    setState({ status: 'loading' });
+    const f = __gatherUiDeps().fetchLinkPreview || (typeof fetchLinkPreview === 'function' ? fetchLinkPreview : null);
+    if (typeof f === 'function') {
+      f(url).then(result => {
+        if (!cancelled) setState(result);
+      });
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [url, cachedData]);
+  return state;
 }
-function useScrollHideHeader(...args) {
-  const f = __gatherUiDeps().useScrollHideHeader || GATHER_APP_UTILS.useScrollHideHeader;
-  return typeof f === 'function' ? f(...args) : undefined;
+function useScrollHideHeader() {
+  const React = window.React;
+  const [isHeaderVisible, setIsHeaderVisible] = React.useState(true);
+  const lastScrollTopRef = React.useRef(0);
+  const onScroll = React.useCallback((e) => {
+    const scrollTop = e && e.target ? e.target.scrollTop : 0;
+    const lastScrollTop = lastScrollTopRef.current;
+    if (scrollTop < 10) {
+      setIsHeaderVisible(true);
+    } else if (scrollTop > lastScrollTop && scrollTop > 56) {
+      setIsHeaderVisible(false);
+    } else if (scrollTop < lastScrollTop) {
+      setIsHeaderVisible(true);
+    }
+    lastScrollTopRef.current = scrollTop;
+  }, []);
+  return { isHeaderVisible, onScroll };
 }
 function loadLeaflet(...args) {
   const f = __gatherUiDeps().loadLeaflet || GATHER_APP_UTILS.loadLeaflet;

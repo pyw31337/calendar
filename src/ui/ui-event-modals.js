@@ -489,13 +489,10 @@ function getKoreanSolarTermsForYear(...args) {
   const f = __gatherUiDeps().getKoreanSolarTermsForYear || GATHER_APP_UTILS.getKoreanSolarTermsForYear;
   return typeof f === 'function' ? f(...args) : undefined;
 }
-function useTapRevealedMsgId(...args) {
-  const f = __gatherUiDeps().useTapRevealedMsgId || GATHER_APP_UTILS.useTapRevealedMsgId;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function getTrulyConfirmedMeetings(...args) {
-  const f = __gatherUiDeps().getTrulyConfirmedMeetings || GATHER_APP_UTILS.getTrulyConfirmedMeetings;
-  return typeof f === 'function' ? f(...args) : undefined;
+function useTapRevealedMsgId() {
+  const React = window.React;
+  const [tapRevealedMsgId, setTapRevealedMsgId] = React.useState(null);
+  return [tapRevealedMsgId, setTapRevealedMsgId];
 }
 function getConfirmedMeetings(...args) {
   const f = __gatherUiDeps().getConfirmedMeetings || GATHER_APP_UTILS.getConfirmedMeetings;
@@ -577,21 +574,31 @@ function fetchLinkPreview(...args) {
   const f = __gatherUiDeps().fetchLinkPreview || GATHER_APP_UTILS.fetchLinkPreview;
   return typeof f === 'function' ? f(...args) : undefined;
 }
-function useLinkPreview(...args) {
-  const f = __gatherUiDeps().useLinkPreview || GATHER_APP_UTILS.useLinkPreview;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function useScrollHideHeader(...args) {
-  const f = __gatherUiDeps().useScrollHideHeader || GATHER_APP_UTILS.useScrollHideHeader;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function loadLeaflet(...args) {
-  const f = __gatherUiDeps().loadLeaflet || GATHER_APP_UTILS.loadLeaflet;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function loadLeafletMarkerCluster(...args) {
-  const f = __gatherUiDeps().loadLeafletMarkerCluster || GATHER_APP_UTILS.loadLeafletMarkerCluster;
-  return typeof f === 'function' ? f(...args) : undefined;
+function useLinkPreview(url, cachedData) {
+  const React = window.React;
+  const [state, setState] = React.useState(() => {
+    if (cachedData) return { status: 'success', data: cachedData };
+    return null;
+  });
+  React.useEffect(() => {
+    if (cachedData) {
+      setState({ status: 'success', data: cachedData });
+      return;
+    }
+    if (!url) return;
+    let cancelled = false;
+    setState({ status: 'loading' });
+    const f = __gatherUiDeps().fetchLinkPreview || (typeof fetchLinkPreview === 'function' ? fetchLinkPreview : null);
+    if (typeof f === 'function') {
+      f(url).then(result => {
+        if (!cancelled) setState(result);
+      });
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [url, cachedData]);
+  return state;
 }
 function buildPlaceMarkerHtml(...args) {
   const f = __gatherUiDeps().buildPlaceMarkerHtml || GATHER_APP_UTILS.buildPlaceMarkerHtml;
