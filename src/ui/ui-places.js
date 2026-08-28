@@ -1489,11 +1489,39 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
   // Click on list item focuses marker. Since scrollBodyRef scrolls only the place list container
   // now, scrolling is focused on list container or we can ignore scrolling if map is fixed!
   // Wait, let's keep the smooth scroll to top of list container if list scrolls.
+  const animateListScrollTo = React.useCallback((container, targetTop, durationMs = 220) => {
+    if (!container) return;
+    const reduceMotion = typeof window !== 'undefined'
+      && window.matchMedia
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduceMotion || durationMs <= 0) {
+      container.scrollTop = targetTop;
+      return;
+    }
+    const startTop = container.scrollTop;
+    const delta = targetTop - startTop;
+    if (Math.abs(delta) < 4) {
+      container.scrollTop = targetTop;
+      return;
+    }
+    const token = ++listScrollAnimRef.current;
+    const startTime = performance.now();
+    const easeOutCubic = t => 1 - Math.pow(1 - t, 3);
+    const step = now => {
+      if (listScrollAnimRef.current !== token) return;
+      const progress = Math.min(1, (now - startTime) / durationMs);
+      container.scrollTop = startTop + (delta * easeOutCubic(progress));
+      if (progress < 1) {
+        requestAnimationFrame(step);
+      }
+    };
+    requestAnimationFrame(step);
+  }, []);
+
   const handleSelectPlaceOnMap = (place, options = {}) => {
     if (!place || !place.id) return;
     focusTokenRef.current += 1;
     const fromMap = !!(options && options.fromMap);
-    setFocusPlace({ id: place.id, token: focusTokenRef.current, fromMap });
 
     // When selected from map marker, un-filter so the place card is guaranteed to be rendered in list
     if (fromMap) {
@@ -1517,54 +1545,43 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
       }
     }
 
-    const animateListScrollTo = (container, targetTop, durationMs = 220) => {
-      if (!container) return;
-      const reduceMotion = typeof window !== 'undefined'
-        && window.matchMedia
-        && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      if (reduceMotion || durationMs <= 0) {
-        container.scrollTop = targetTop;
-        return;
-      }
-      const startTop = container.scrollTop;
-      const delta = targetTop - startTop;
-      if (Math.abs(delta) < 4) {
-        container.scrollTop = targetTop;
-        return;
-      }
-      const token = ++listScrollAnimRef.current;
-      const startTime = performance.now();
-      const easeOutCubic = t => 1 - Math.pow(1 - t, 3);
-      const step = now => {
-        if (listScrollAnimRef.current !== token) return;
-        const progress = Math.min(1, (now - startTime) / durationMs);
-        container.scrollTop = startTop + (delta * easeOutCubic(progress));
-        if (progress < 1) {
-          requestAnimationFrame(step);
-        }
-      };
-      requestAnimationFrame(step);
-    };
-
-    const scrollToTop = () => {
-      try {
-        const container = scrollBodyRef.current;
-        if (!container) return;
-        const safeId = (window.CSS && CSS.escape) ? CSS.escape(String(place.id)) : String(place.id).replace(/"/g, '');
-        const row = container.querySelector('[data-place-id="' + safeId + '"]');
-        if (!row) return;
-
-        // Position targetTop so the selected row moves flush to top of list container
-        const maxTop = Math.max(0, container.scrollHeight - container.clientHeight);
-        const nextTop = Math.max(0, Math.min(maxTop, row.offsetTop));
-        animateListScrollTo(container, nextTop, 220);
-      } catch (e) {}
-    };
-
-    requestAnimationFrame(() => {
-      requestAnimationFrame(scrollToTop);
-    });
+    setFocusPlace({ id: place.id, token: focusTokenRef.current, fromMap });
   };
+
+  // Scroll list container whenever focusPlace updates and DOM is rendered
+  React.useEffect(() => {
+    if (!focusPlace || !focusPlace.id) return;
+    const targetId = focusPlace.id;
+    let attempts = 0;
+
+    const tryScroll = () => {
+      const container = scrollBodyRef.current;
+      if (!container) return;
+      const safeId = (window.CSS && CSS.escape) ? CSS.escape(String(targetId)) : String(targetId).replace(/"/g, '');
+      const row = container.querySelector('[data-place-id="' + safeId + '"]');
+      if (!row) {
+        if (attempts < 10) {
+          attempts++;
+          setTimeout(tryScroll, 40);
+        }
+        return;
+      }
+
+      // Exact pixel position inside scroll container
+      const containerRect = container.getBoundingClientRect();
+      const rowRect = row.getBoundingClientRect();
+      const relativeTop = rowRect.top - containerRect.top + container.scrollTop;
+      // Target top leaves a comfortable 12px top margin inside the list container so top border & tags are 100% visible
+      const targetTop = Math.max(0, relativeTop - 12);
+      const maxTop = Math.max(0, container.scrollHeight - container.clientHeight);
+      const finalTop = Math.min(maxTop, targetTop);
+
+      animateListScrollTo(container, finalTop, 220);
+    };
+
+    const timer = setTimeout(tryScroll, 30);
+    return () => clearTimeout(timer);
+  }, [focusPlace, animateListScrollTo]);
   const handleCloseModal = () => {
     setIsRegisterOpen(false);
     setEditingPlace(null);
