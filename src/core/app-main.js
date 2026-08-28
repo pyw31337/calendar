@@ -1157,6 +1157,7 @@ function CalendarApp() {
   const [isChatShareOpen, setIsChatShareOpen] = React.useState(false);
   const [isPlacesShareOpen, setIsPlacesShareOpen] = React.useState(false);
   const [isMainSideMenuOpen, setIsMainSideMenuOpen] = React.useState(false);
+  const confirmedMeetingAnimationTimersRef = React.useRef(new Map());
   const [isNotificationHelpOpen, setIsNotificationHelpOpen] = React.useState(false);
   const [isAppSettingsOpen, setIsAppSettingsOpen] = React.useState(false);
   const [isNotifOnboardingOpen, setIsNotifOnboardingOpen] = React.useState(false);
@@ -6012,6 +6013,26 @@ function CalendarApp() {
     .sort((a, b) => a.date.localeCompare(b.date));
 
   const toggleConfirmedDateExpand = (dateStr) => {
+    const isCurrentlyExpanded = !!expandedConfirmedDates[dateStr];
+    if (isCurrentlyExpanded) {
+      const banner = document.querySelector(`[data-confirmed-meeting-date="${dateStr}"]`);
+      if (banner) {
+        banner.classList.add('is-closing');
+        const existingTimer = confirmedMeetingAnimationTimersRef.current.get(dateStr);
+        if (existingTimer) clearTimeout(existingTimer);
+        const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+        if (prefersReducedMotion) {
+          setExpandedConfirmedDates(prev => ({ ...prev, [dateStr]: false }));
+          return;
+        }
+        const timer = setTimeout(() => {
+          setExpandedConfirmedDates(prev => ({ ...prev, [dateStr]: false }));
+          confirmedMeetingAnimationTimersRef.current.delete(dateStr);
+        }, 260);
+        confirmedMeetingAnimationTimersRef.current.set(dateStr, timer);
+        return;
+      }
+    }
     setExpandedConfirmedDates(prev => ({
       ...prev,
       [dateStr]: !prev[dateStr]
@@ -6284,6 +6305,7 @@ function CalendarApp() {
       return /*#__PURE__*/React.createElement("div", {
         key: meeting.date,
         className: "confirmed-meeting-banner confirmed-meeting-surface",
+        "data-confirmed-meeting-date": meeting.date,
         role: "button",
         tabIndex: 0,
         onClick: () => toggleConfirmedDateExpand(meeting.date),

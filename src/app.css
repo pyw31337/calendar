@@ -394,6 +394,26 @@ body:has(.admin-login-gate) {
     color var(--motion-base) ease,
     opacity var(--motion-base) ease,
     filter var(--motion-base) ease;
+  animation: confirmed-meeting-expand 260ms var(--motion-ease-out) both;
+  transform-origin: top center;
+}
+.confirmed-meeting-banner.is-closing {
+  animation: confirmed-meeting-collapse 260ms ease-in both;
+  pointer-events: none;
+}
+@keyframes confirmed-meeting-expand {
+  from { opacity: 0; transform: translate3d(0, -6px, 0) scaleY(0.92); }
+  to { opacity: 1; transform: translate3d(0, 0, 0) scaleY(1); }
+}
+@keyframes confirmed-meeting-collapse {
+  from { opacity: 1; max-height: 120px; transform: translate3d(0, 0, 0) scaleY(1); }
+  to { opacity: 0; max-height: 0; padding-top: 0; padding-bottom: 0; transform: translate3d(0, -6px, 0) scaleY(0.92); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .confirmed-meeting-banner,
+  .confirmed-meeting-banner.is-closing {
+    animation: none;
+  }
 }
 .confirmed-meeting-surface .confirmed-meeting-label-badge {
   background: transparent !important;
