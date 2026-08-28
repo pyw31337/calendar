@@ -1048,7 +1048,6 @@ export function DateModal({
     }
     setIsSavingPlace(true);
     try {
-      const isConfirmed = isDateConfirmedMeeting(calendar, dateStr);
       const cleanName = sanitizeText(selectedPlace.name || '', 80);
       const cleanAddress = normalizePlaceAddressForSave(selectedPlace.address || '', selectedPlace.lat, selectedPlace.lng);
       const cleanMemo = sanitizeText(placeMemo.trim() || '', 2000);
@@ -1203,16 +1202,6 @@ export function DateModal({
         });
       }
       else showToast('삭제에 실패했습니다.', 'error');
-    });
-  };
-
-  const handleClearAllDate = () => {
-    if (!onDeleteDate) return;
-    onRequestConfirm('날짜 초기화', `${getDeleteDateLabel(dateStr)}의 모든 참석/장소/정산 내역을 삭제하고 선택 가능 날짜에서 제외하시겠습니까?`, async () => {
-      setIsSubmitting(true);
-      const ok = await onDeleteDate(dateStr);
-      setIsSubmitting(false);
-      if (ok !== false) onClose();
     });
   };
 
@@ -1450,7 +1439,6 @@ export function DateModal({
   const [expenseIsIncome, setExpenseIsIncome] = React.useState(false);
   const [editingExpenseId, setEditingExpenseId] = React.useState(null);
   const [isSavingExpense, setIsSavingExpense] = React.useState(false);
-  const [isSettlementCollapsed, setIsSettlementCollapsed] = React.useState(true);
   const [draggingExpenseId, setDraggingExpenseId] = React.useState('');
   const [dragOverExpenseId, setDragOverExpenseId] = React.useState('');
   const expensePointerSortRef = React.useRef({ sourceId: '', targetId: '', startX: 0, startY: 0, active: false });
@@ -1851,8 +1839,6 @@ export function DateModal({
     document.addEventListener('pointerup', expenseDragHandlersRef.current.onUp);
     document.addEventListener('pointercancel', expenseDragHandlersRef.current.onCancel);
   };
-  const updateExpensePointerSort = e => expenseDragHandlersRef.current.update(e);
-  const finishExpensePointerSort = e => expenseDragHandlersRef.current.finish(e);
   const resetExpensePointerSort = () => expenseDragHandlersRef.current.reset();
 
   // Close-confirm only when form differs from last committed baseline.
