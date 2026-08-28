@@ -28,6 +28,10 @@ jobs:
         run: GITHUB_PAGES=1 npm run build
       - name: Check Vite build output budget
         run: npm run check:dist-budget
+      - name: Install Chromium for browser smoke
+        run: npx playwright install --with-deps chromium
+      - name: Run browser smoke before publishing artifact
+        run: npm run smoke:browser
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v5
         with:
