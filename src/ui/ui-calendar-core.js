@@ -2544,6 +2544,7 @@ export function PollList({ calendar, onCreatePoll, onEditPoll, onVotePoll, onCan
       }
     }, /*#__PURE__*/React.createElement("div", {
       onClick: togglePollOptions,
+      "data-no-press-feedback": true,
       style: { cursor: isCollapsed ? 'pointer' : 'default', flex: 1 }
     }, /*#__PURE__*/React.createElement("div", {
       className: "poll-title",

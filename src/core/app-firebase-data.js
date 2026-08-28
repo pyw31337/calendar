@@ -1189,7 +1189,8 @@ async function fetchSingleCalendarWithRest(calId, timeoutMs = FIREBASE_LOAD_TIME
     if (decoded?.calendar?.id !== calId) return null;
     return {
       calendar: decoded.calendar,
-      lastModified: decoded.lastModified || decoded.calendar.updatedAt || 0
+      lastModified: decoded.lastModified || decoded.calendar.updatedAt || 0,
+      revision: Number(decoded.revision || decoded.calendar.revision || 0) || 0
     };
   } catch (error) {
     console.warn(`Firestore REST fetch notice for cal_${calId}:`, error);
@@ -1529,7 +1530,7 @@ function waitForTimeout(ms, message = 'timeout') {
   });
 }
 
-// Returns { calendar, lastModified } or null with 10s timeout, retries, and REST fallback.
+// Returns { calendar, lastModified, revision } or null with 10s timeout, retries, and REST fallback.
 async function fetchSingleCloudCalendar(calId, retryCount = FIREBASE_LOAD_MAX_ATTEMPTS, timeoutMs = FIREBASE_LOAD_TIMEOUT_MS) {
   if (!isAllowedCalendarId(calId)) return null;
   const attempts = Math.max(1, retryCount);
@@ -1546,7 +1547,8 @@ async function fetchSingleCloudCalendar(calId, retryCount = FIREBASE_LOAD_MAX_AT
             if (data && data.calendar && data.calendar.id === calId) {
               return {
                 calendar: data.calendar,
-                lastModified: data.lastModified || data.calendar.updatedAt || 0
+                lastModified: data.lastModified || data.calendar.updatedAt || 0,
+                revision: Number(data.revision || data.calendar.revision || 0) || 0
               };
             }
           }
@@ -1578,7 +1580,8 @@ function getCloudDocCalendar(doc, expectedCalendarId) {
   if (!isUsableCloudCalendarPayload(data, expectedCalendarId)) return null;
   return {
     calendar: data.calendar,
-    lastModified: data.lastModified || data.calendar.updatedAt || 0
+    lastModified: data.lastModified || data.calendar.updatedAt || 0,
+    revision: Number(data.revision || data.calendar.revision || 0) || 0
   };
 }
 
@@ -2352,17 +2355,19 @@ async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 18,
 function loadLocalMeta() {
   try {
     const ls = __gatherSafeLocalStorage();
-    if (!ls) return { lastModified: 0, byCalendar: {} };
+    if (!ls) return { lastModified: 0, byCalendar: {}, revision: 0, byCalendarRevision: {} };
     const raw = ls.getItem(GATHER_LOCAL_META_KEY);
-    if (!raw) return { lastModified: 0, byCalendar: {} };
+    if (!raw) return { lastModified: 0, byCalendar: {}, revision: 0, byCalendarRevision: {} };
     const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== 'object') return { lastModified: 0, byCalendar: {} };
+    if (!parsed || typeof parsed !== 'object') return { lastModified: 0, byCalendar: {}, revision: 0, byCalendarRevision: {} };
     return {
       lastModified: typeof parsed.lastModified === 'number' ? parsed.lastModified : 0,
-      byCalendar: parsed.byCalendar && typeof parsed.byCalendar === 'object' ? parsed.byCalendar : {}
+      byCalendar: parsed.byCalendar && typeof parsed.byCalendar === 'object' ? parsed.byCalendar : {},
+      revision: typeof parsed.revision === 'number' ? parsed.revision : 0,
+      byCalendarRevision: parsed.byCalendarRevision && typeof parsed.byCalendarRevision === 'object' ? parsed.byCalendarRevision : {}
     };
   } catch (_) {
-    return { lastModified: 0, byCalendar: {} };
+    return { lastModified: 0, byCalendar: {}, revision: 0, byCalendarRevision: {} };
   }
 }
 function saveLocalMeta(meta) {
@@ -2371,7 +2376,9 @@ function saveLocalMeta(meta) {
     if (!ls || !meta) return;
     ls.setItem(GATHER_LOCAL_META_KEY, JSON.stringify({
       lastModified: typeof meta.lastModified === 'number' ? meta.lastModified : 0,
-      byCalendar: meta.byCalendar && typeof meta.byCalendar === 'object' ? meta.byCalendar : {}
+      byCalendar: meta.byCalendar && typeof meta.byCalendar === 'object' ? meta.byCalendar : {},
+      revision: typeof meta.revision === 'number' ? meta.revision : 0,
+      byCalendarRevision: meta.byCalendarRevision && typeof meta.byCalendarRevision === 'object' ? meta.byCalendarRevision : {}
     }));
   } catch (e) {
     console.warn('saveLocalMeta notice:', e);
@@ -2395,6 +2402,27 @@ function updateMetaLastModified(meta, calendarId, lastModified) {
     }
   };
   if (calendarId) next.byCalendar[calendarId] = lastModified || 0;
+  return next;
+}
+
+function getMetaRevision(meta, calendarId) {
+  if (!meta) return 0;
+  if (calendarId && meta.byCalendarRevision && typeof meta.byCalendarRevision[calendarId] === 'number') {
+    return meta.byCalendarRevision[calendarId];
+  }
+  return typeof meta.revision === 'number' ? meta.revision : 0;
+}
+
+function updateMetaRevision(meta, calendarId, revision) {
+  const cleanRevision = Number.isFinite(Number(revision)) ? Math.max(0, Math.round(Number(revision))) : 0;
+  const next = {
+    ...(meta || {}),
+    revision: Math.max(getMetaRevision(meta), cleanRevision),
+    byCalendarRevision: {
+      ...((meta && meta.byCalendarRevision) || {})
+    }
+  };
+  if (calendarId) next.byCalendarRevision[calendarId] = cleanRevision;
   return next;
 }
 
@@ -3320,6 +3348,8 @@ export {
   saveLocalMeta,
   getMetaLastModified,
   updateMetaLastModified,
+  getMetaRevision,
+  updateMetaRevision,
   isAdminDashboardRoute,
   isAdminRestoreRoute,
   getAdminSelectedCalendarIdFromUrl,

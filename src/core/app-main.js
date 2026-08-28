@@ -447,11 +447,9 @@ import {
   subscribeMemos,
   subscribeAnniversaries,
   firebaseConfig,
-  firebaseDb,
   __setFirebaseDb,
   firebaseInitError,
   firebaseRetryExhausted,
-  firebaseStorage,
   isStorageDisabled,
   lastStorageHealthCheckAt,
   lastStorageHealthOk,
@@ -507,6 +505,8 @@ import {
   saveLocalMeta,
   getMetaLastModified,
   updateMetaLastModified,
+  getMetaRevision,
+  updateMetaRevision,
   isAdminDashboardRoute,
   isAdminRestoreRoute,
   getAdminSelectedCalendarIdFromUrl,
@@ -538,6 +538,9 @@ import {
   CALENDAR_ACCENT_PALETTE,
   getCalendarAccentColor
 } from './app-firebase-data.js';
+
+var firebaseDb = (typeof window !== 'undefined' && window.GATHER_APP_FIREBASE_DATA && window.GATHER_APP_FIREBASE_DATA.firebaseDb) || null;
+var firebaseStorage = (typeof window !== 'undefined' && window.GATHER_APP_FIREBASE_DATA && window.GATHER_APP_FIREBASE_DATA.firebaseStorage) || null;
 
 /* Small dependency-free donut chart: N segments as SVG stroke-dasharray arcs on a ring. */
 
@@ -594,14 +597,8 @@ function isNonChatUploadSource(uploadSource) {
 
 function getMeetingOwnedPhotoMessageIds(calendar) {
   const ids = new Set();
-  let getFn;
-  try {
-    if (typeof getConfirmedMeetings === 'function') getFn = getConfirmedMeetings;
-  } catch (e) {}
-  if (!getFn && typeof window !== 'undefined' && window.GATHER_APP_UTILS) {
-    getFn = window.GATHER_APP_UTILS.getConfirmedMeetings;
-  }
-  const meetings = typeof getFn === 'function' ? getFn(calendar) : [];
+  const fn = typeof getConfirmedMeetings === 'function' ? getConfirmedMeetings : (typeof window !== 'undefined' && window.GATHER_APP_UTILS ? window.GATHER_APP_UTILS.getConfirmedMeetings : null);
+  const meetings = typeof fn === 'function' ? fn(calendar) : [];
   meetings.forEach(meeting => {
     (Array.isArray(meeting?.photos) ? meeting.photos : []).forEach(photo => {
       const messageId = String(photo?.sourceMessageId || '').trim();
@@ -782,6 +779,7 @@ function App() {
     if (normalized.length === 0) return;
     normalized.forEach((calendar) => {
       serverRevisionRef.current = updateMetaLastModified(serverRevisionRef.current, calendar.id, lastModified);
+      serverRevisionRef.current = updateMetaRevision(serverRevisionRef.current, calendar.id, calendar.revision || 0);
     });
     setCalendarsState(normalized);
     saveLocalCache(normalized);
@@ -829,6 +827,7 @@ function App() {
       }
 
       serverRevisionRef.current = updateMetaLastModified(serverRevisionRef.current, currentCal.id, now);
+      serverRevisionRef.current = updateMetaRevision(serverRevisionRef.current, currentCal.id, currentCal.revision || 0);
       saveLocalCache(normalizedCalendars);
       saveLocalMeta(serverRevisionRef.current);
       if (toastMsg !== null && toastMsg !== undefined && toastMsg !== '') {
@@ -1220,11 +1219,6 @@ function App() {
     (chatMessages || []).forEach(m => { if (m && m.id) byId.set(m.id, m); });
     return Array.from(byId.values()).sort((a, b) => Number(a.timestamp || 0) - Number(b.timestamp || 0));
   }, [olderChatMessages, chatMessages]);
-  const meetingPhotoMessageIds = React.useMemo(() => getMeetingOwnedPhotoMessageIds(activeCal), [activeCal]);
-  const visibleChatMessages = React.useMemo(() => {
-    return allChatMessages.filter(msg => isChatRenderableMessage(msg, meetingPhotoMessageIds));
-  }, [allChatMessages, meetingPhotoMessageIds]);
-  const recentMessages = React.useMemo(() => visibleChatMessages.slice(-5).reverse(), [visibleChatMessages]);
   const [memos, setMemos] = React.useState([]);
   const [memosLimit, setMemosLimit] = React.useState(MEMOS_PAGE_SIZE);
   const [hasMoreMemos, setHasMoreMemos] = React.useState(false);
@@ -1603,9 +1597,14 @@ function App() {
     const cacheHit = restoredFromCache || (calendarsRef.current || []).some(c => c && c.id === activeCalId && isUsableCalendarRecord(c));
     setIsInitialDataLoading(!cacheHit);
 
-    const applyLoadedCalendar = (cloudCal, cloudLastMod = Date.now(), forceApply = false, markLoaded = true) => {
+    const applyLoadedCalendar = (cloudCal, cloudLastMod = Date.now(), cloudRevision = 0, forceApply = false, markLoaded = true) => {
       if (!isMounted || !cloudCal || cloudCal.id !== activeCalId) return false;
-      if (!forceApply && cloudLastMod < getMetaLastModified(serverRevisionRef.current, activeCalId)) return false;
+      const incomingRevision = Number(cloudRevision || 0) || 0;
+      const currentMetaRevision = getMetaRevision(serverRevisionRef.current, activeCalId);
+      if (!forceApply) {
+        if (incomingRevision > 0 && currentMetaRevision > 0 && incomingRevision < currentMetaRevision) return false;
+        if (incomingRevision <= 0 && cloudLastMod < getMetaLastModified(serverRevisionRef.current, activeCalId)) return false;
+      }
       if (markLoaded) hasLoadedCloudCalendar = true;
       setIsInitialDataLoading(false);
       setCalendarsState(prevCals => {
@@ -1614,8 +1613,11 @@ function App() {
           ? prevCals.map(c => c.id === activeCalId ? cloneCalendar(cloudCal) : c)
           : [cloneCalendar(cloudCal), ...prevCals];
         saveLocalCache(nextCals);
-        const targetMod = Math.max(cloudLastMod || 0, Date.now());
+        const targetMod = cloudLastMod || 0;
         serverRevisionRef.current = updateMetaLastModified(serverRevisionRef.current, activeCalId, targetMod);
+        if (incomingRevision > 0) {
+          serverRevisionRef.current = updateMetaRevision(serverRevisionRef.current, activeCalId, incomingRevision);
+        }
         saveLocalMeta(serverRevisionRef.current);
         return nextCals;
       });
@@ -1633,7 +1635,7 @@ function App() {
       // the user.
       for (let attempt = 1; attempt <= FIREBASE_LOAD_MAX_ATTEMPTS && isMounted && !hasLoadedCloudCalendar; attempt += 1) {
         const result = await fetchSingleCloudCalendar(activeCalId, 1, FIREBASE_LOAD_TIMEOUT_MS);
-        if (result?.calendar && applyLoadedCalendar(result.calendar, result.lastModified || Date.now())) {
+        if (result?.calendar && applyLoadedCalendar(result.calendar, result.lastModified || Date.now(), result.revision || result.calendar.revision || 0)) {
           return;
         }
       }
@@ -1671,13 +1673,13 @@ function App() {
         }
       } catch (_) {}
       const result = getCloudDocCalendar(doc, activeCalId);
-      if (result && !isSavingRef.current) {
-        if (doc.metadata.fromCache) {
-          applyLoadedCalendar(result.calendar, result.lastModified || Date.now(), false, false);
-        } else {
-          applyLoadedCalendar(result.calendar, result.lastModified || Date.now(), true);
+        if (result && !isSavingRef.current) {
+          if (doc.metadata.fromCache) {
+            applyLoadedCalendar(result.calendar, result.lastModified || Date.now(), result.revision || result.calendar.revision || 0, false, false);
+          } else {
+            applyLoadedCalendar(result.calendar, result.lastModified || Date.now(), result.revision || result.calendar.revision || 0, true);
+          }
         }
-      }
     }, err => {
       console.warn(`Firestore realtime sync notice for cal_${activeCalId}:`, err);
       try {
@@ -1765,6 +1767,11 @@ function App() {
     places: unionPlaces(rawActiveCal, placesSubcollection),
     confirmedMeeting: unionConfirmedMeetings(rawActiveCal, confirmedMeetingsSubcollection)
   }), [rawActiveCal, placesSubcollection, confirmedMeetingsSubcollection]);
+  const meetingPhotoMessageIds = React.useMemo(() => getMeetingOwnedPhotoMessageIds(activeCal), [activeCal]);
+  const visibleChatMessages = React.useMemo(() => {
+    return allChatMessages.filter(msg => isChatRenderableMessage(msg, meetingPhotoMessageIds));
+  }, [allChatMessages, meetingPhotoMessageIds]);
+  const recentMessages = React.useMemo(() => visibleChatMessages.slice(-5).reverse(), [visibleChatMessages]);
   const canUseSettlement = !!(activeCal && isSettlementEnabledCalendarId(activeCal.id || activeCalId));
   const syncStatus = null;
   React.useEffect(() => {
@@ -1786,7 +1793,7 @@ function App() {
       if (activeCalId && isAllowedCalendarId(activeCalId)) {
         try {
           const fresh = await fetchSingleCalendarWithRest(activeCalId, 5000);
-          if (fresh?.calendar && applyLoadedCalendar(fresh.calendar, fresh.lastModified || Date.now(), true)) {
+          if (fresh?.calendar && applyLoadedCalendar(fresh.calendar, fresh.lastModified || Date.now(), fresh.revision || fresh.calendar.revision || 0, true)) {
             if (activeView === 'calendar' || activeView === 'places' || activeView === 'settlement') {
               fetchPlacesFromFirestore(activeCalId).then(list => { if (isMounted) setPlacesSubcollection(list); }).catch(() => {});
               fetchConfirmedMeetingsFromFirestore(activeCalId).then(list => { if (isMounted) setConfirmedMeetingsSubcollection(list); }).catch(() => {});
@@ -7737,14 +7744,8 @@ async function migrateBase64ChatImagesForCalendar(calId, { maxMessages = 40 } = 
 
 async function backfillMeetingUploadSourcesForCalendar(calId, calendar, { maxMessages = 40 } = {}) {
   if (!calId) return { migrated: 0, failed: 0, scanned: 0 };
-  let getFn;
-  try {
-    if (typeof getConfirmedMeetings === 'function') getFn = getConfirmedMeetings;
-  } catch (e) {}
-  if (!getFn && typeof window !== 'undefined' && window.GATHER_APP_UTILS) {
-    getFn = window.GATHER_APP_UTILS.getConfirmedMeetings;
-  }
-  const meetings = typeof getFn === 'function' ? getFn(calendar) : [];
+  const fn = typeof getConfirmedMeetings === 'function' ? getConfirmedMeetings : (typeof window !== 'undefined' && window.GATHER_APP_UTILS ? window.GATHER_APP_UTILS.getConfirmedMeetings : null);
+  const meetings = typeof fn === 'function' ? fn(calendar) : [];
   const messageIds = [];
   const seen = new Set();
   meetings.forEach(meeting => {
