@@ -52,7 +52,7 @@ function withCacheBust(path) {
 
 function resolveAssetUrl(path, fallbackBase = baseUrl) {
   const normalized = String(path || '').replace(/^\/?\.\//, '').replace(/^\//, '');
-  return new URL(normalized.startsWith('assets/') ? normalized : path, fallbackBase).toString();
+  return new URL(normalized.startsWith('assets/') ? normalized : path, normalized.startsWith('assets/') ? baseUrl : fallbackBase).toString();
 }
 
 async function checkUrl(url, validate) {
