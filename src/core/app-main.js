@@ -10457,6 +10457,7 @@ function bindGatherUiDeps() {
     extractCalendarBackupEntries: typeof extractCalendarBackupEntries === 'function' ? extractCalendarBackupEntries : null,
     fetchActivityLogsFromFirestore: typeof fetchActivityLogsFromFirestore === 'function' ? fetchActivityLogsFromFirestore : null,
     fetchChatMessagesRest: typeof fetchChatMessagesRest === 'function' ? fetchChatMessagesRest : null,
+    fetchAllChatMessagesRest: typeof fetchAllChatMessagesRest === 'function' ? fetchAllChatMessagesRest : null,
     fetchImageShareDocument: typeof fetchImageShareDocument === 'function' ? fetchImageShareDocument : null,
     fetchRecentMessagesRest: typeof fetchRecentMessagesRest === 'function' ? fetchRecentMessagesRest : null,
     fetchSingleCalendarWithRest: typeof fetchSingleCalendarWithRest === 'function' ? fetchSingleCalendarWithRest : null,

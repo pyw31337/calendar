@@ -326,6 +326,10 @@ function fetchChatMessagesRest(...args) {
   const f = __gatherUiDeps().fetchChatMessagesRest || GATHER_APP_UTILS.fetchChatMessagesRest;
   return typeof f === 'function' ? f(...args) : undefined;
 }
+function fetchAllChatMessagesRest(...args) {
+  const f = __gatherUiDeps().fetchAllChatMessagesRest || GATHER_APP_UTILS.fetchAllChatMessagesRest;
+  return typeof f === 'function' ? f(...args) : [];
+}
 function fetchImageShareDocument(...args) {
   const f = __gatherUiDeps().fetchImageShareDocument || GATHER_APP_UTILS.fetchImageShareDocument;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -1144,7 +1148,7 @@ export function AdminDashboard({ initialCalendars }) {
 
     if (__fb()) {
       const unsub = __fb().collection('calendars').doc(`cal_${selectedCalId}`).collection('messages')
-        .orderBy('timestamp', 'desc').limit(adminMessageLimit)
+        .orderBy('timestamp', 'desc')
         .onSnapshot(snapshot => {
           const list = [];
           snapshot.forEach(doc => {
@@ -1162,22 +1166,21 @@ export function AdminDashboard({ initialCalendars }) {
     }
     (async () => {
       try {
-        const recent = await fetchRecentMessagesRest(selectedCalId);
-        const chat = await fetchChatMessagesRest(selectedCalId);
-        const combined = [...recent, ...chat].sort((a, b) => b.timestamp - a.timestamp);
+        const chat = await fetchAllChatMessagesRest(selectedCalId);
+        const combined = (Array.isArray(chat) ? chat : []).sort((a, b) => b.timestamp - a.timestamp);
         setMessagesMap(prev => ({ ...prev, [selectedCalId]: combined }));
       } catch (e) {
         console.error(`Failed REST message fetch for ${selectedCalId}:`, e);
       }
     })();
-  }, [selectedCalId, __fb(), activeTab, adminMessageLimit]);
+  }, [selectedCalId, __fb(), activeTab]);
 
   // 2b. Load memos (same live-listener pattern as messages above, same 2000 cap) -- powers the
   // 통합검색 메모 탭
   React.useEffect(() => {
     if (activeTab !== 'logs' || !selectedCalId || !__fb()) return;
     const unsub = __fb().collection('calendars').doc(`cal_${selectedCalId}`).collection('memos')
-      .orderBy('createdAt', 'desc').limit(adminMemoLimit)
+      .orderBy('createdAt', 'desc')
       .onSnapshot(snapshot => {
         const list = [];
         snapshot.forEach(doc => {
@@ -1189,7 +1192,7 @@ export function AdminDashboard({ initialCalendars }) {
         console.error(`Failed to load memos for ${selectedCalId}:`, err);
       });
     return () => unsub();
-  }, [selectedCalId, __fb(), activeTab, adminMemoLimit]);
+  }, [selectedCalId, __fb(), activeTab]);
 
   // Link-preview cache stats only on metrics tab (egress rule)
   React.useEffect(() => {
@@ -3086,8 +3089,7 @@ export function AdminDashboard({ initialCalendars }) {
             const loadedCount = (messagesMap[selectedCalId] || []).length;
             const totalKnown = adminMsgTotal[selectedCalId];
             const totalCount = (totalKnown != null && totalKnown >= 0) ? totalKnown : null;
-            const hasMore = (totalCount != null && totalCount > loadedCount)
-              || (loadedCount > 0 && loadedCount >= adminMessageLimit);
+            const hasMore = totalCount != null && totalCount > loadedCount;
             if (!hasMore) return null;
             const step = ADMIN_MESSAGE_LIVE_LIMIT;
             const totalLabel = totalCount != null ? String(totalCount) : (loadedCount + '+');
