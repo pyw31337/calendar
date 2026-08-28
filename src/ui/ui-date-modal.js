@@ -751,6 +751,7 @@ export function DateModal({
   onDeleteMeetingPhoto,
   onFindChatMessageById,
   onFetchDateTaggedMessages,
+  onFetchMeetingPhotoIndex,
   onLoadOlderChat,
   hasMoreOlderChat = false,
   loadingOlderChat = false,
@@ -1254,6 +1255,7 @@ export function DateModal({
   // Query the server by the date tag immediately. The date photo list must not depend on the
   // user opening Gallery or loading older chat pages first.
   const [fetchedTaggedMessages, setFetchedTaggedMessages] = React.useState([]);
+  const [indexedMeetingPhotos, setIndexedMeetingPhotos] = React.useState([]);
   const fetchedDateTagRef = React.useRef('');
   React.useEffect(() => {
     const targetTag = typeof dateStrToHashtag === 'function' ? dateStrToHashtag(dateStr) : '';
@@ -1265,6 +1267,14 @@ export function DateModal({
     }).catch(err => console.warn('date-tagged meeting photo fetch failed:', err));
     return () => { cancelled = true; };
   }, [dateStr, dateStrToHashtag, onFetchDateTaggedMessages]);
+  React.useEffect(() => {
+    if (typeof onFetchMeetingPhotoIndex !== 'function' || !dateStr) return;
+    let cancelled = false;
+    Promise.resolve(onFetchMeetingPhotoIndex(dateStr)).then(photos => {
+      if (!cancelled && Array.isArray(photos)) setIndexedMeetingPhotos(photos);
+    }).catch(err => console.warn('meeting photo index fetch failed:', err));
+    return () => { cancelled = true; };
+  }, [dateStr, onFetchMeetingPhotoIndex]);
   const allMeetingPhotoMessages = React.useMemo(() => {
     const byId = new Map();
     [...(chatMessagesWithFetchedSources || []), ...(fetchedTaggedMessages || [])].forEach(msg => {
@@ -1281,7 +1291,17 @@ export function DateModal({
     // already resolves the live values via resolveMeetingPhotoDisplay before displaying; this tab
     // didn't, so the exact same photo could show different tags depending on which page you
     // opened it from. Resolving here keeps this tab's thumbnails and Lightbox in sync with it.
-    const directPhotos = (Array.isArray(confirmedMeetingEntry?.photos) ? confirmedMeetingEntry.photos : [])
+    const indexedPhotos = (indexedMeetingPhotos || []).map(photo => ({
+      ...photo,
+      imageUrl: photo.imageUrl || photo.thumbUrl,
+      thumbUrl: photo.thumbUrl || photo.imageUrl,
+      sourceMessageId: photo.sourceMessageId,
+      sourceImageIndex: Number(photo.sourceImageIndex),
+      createdAt: photo.createdAt || 0,
+      mediaKey: `chat:${photo.sourceMessageId}:${photo.sourceImageIndex}`,
+      refKey: `meeting-index:${photo.id}`
+    }));
+    const directPhotos = [...indexedPhotos, ...(Array.isArray(confirmedMeetingEntry?.photos) ? confirmedMeetingEntry.photos : [])]
       .filter(photo => photo && (photo.imageUrl || photo.thumbUrl))
       .map(photo => {
         const resolved = resolveMeetingPhotoDisplay(photo, chatMessagesWithFetchedSources) || {};
@@ -1361,7 +1381,7 @@ export function DateModal({
     });
 
     return [...directPhotos, ...chatPhotos].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-  }, [confirmedMeetingEntry, chatMessages, allMeetingPhotoMessages, chatMessagesWithFetchedSources, dateStr]);
+  }, [confirmedMeetingEntry, chatMessages, allMeetingPhotoMessages, chatMessagesWithFetchedSources, indexedMeetingPhotos, dateStr]);
   const visibleMeetingPhotos = React.useMemo(
     () => meetingPhotos.filter(photo => {
       const key = photo.refKey || photo.mediaKey || photo.id || photo.imageUrl || photo.thumbUrl;

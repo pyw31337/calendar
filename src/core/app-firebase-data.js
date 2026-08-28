@@ -1253,6 +1253,14 @@ async function fetchMessagesByImageTag() {
   return [];
 }
 
+async function fetchMeetingPhotoIndex() {
+  const svc = window.GATHER_FIREBASE_SERVICES;
+  if (svc && typeof svc.fetchMeetingPhotoIndex === 'function' && !svc.isScaffold) {
+    return svc.fetchMeetingPhotoIndex.apply(null, arguments);
+  }
+  return [];
+}
+
 const CHAT_OLDER_PAGE_SIZE = readConfigNumber('CHAT_OLDER_PAGE_SIZE', 40);
 // olderChatMessages otherwise grows without any upper bound for the rest of the browser tab's
 // life -- every "load more" while scrolling up prepends another page and nothing ever trims it,
@@ -3381,6 +3389,7 @@ export {
   fetchRecentChatMessages,
   fetchRecentGalleryMessages,
   fetchMessagesByImageTag,
+  fetchMeetingPhotoIndex,
   CHAT_OLDER_PAGE_SIZE,
   MAX_OLDER_CHAT_MESSAGES,
   fetchSubcollectionCount,

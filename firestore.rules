@@ -164,6 +164,13 @@ service cloud.firestore {
         allow delete: if isCalendarDoc(calendarDocId);
       }
 
+      // Read-only denormalized index for date-specific meeting photos. It is maintained by the
+      // server-side message trigger; clients never write index rows directly.
+      match /meetingPhotoIndex/{photoId} {
+        allow read: if isCalendarDoc(calendarDocId);
+        allow write: if false;
+      }
+
       // Web Push subscriptions. Allows browsers to register their endpoints for offline/background
       // pushes -- write-only from the client (index.html never reads this collection, only
       // .set()/.delete()). Actually sending a push is done server-side via the Admin SDK in

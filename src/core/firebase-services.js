@@ -167,6 +167,34 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
     }
   }
 
+  async function fetchMeetingPhotoIndex(calId, date) {
+    if (!isValidCalId(calId) || !date) return [];
+    const db = getDb();
+    if (db) {
+      try {
+        const snap = await db.collection('calendars').doc('cal_' + calId).collection('meetingPhotoIndex')
+          .where('date', '==', String(date)).get({ source: 'server' });
+        const list = [];
+        snap.forEach(function (doc) { list.push({ id: doc.id, ...doc.data(), source: 'meeting-index' }); });
+        return list;
+      } catch (err) { console.warn('fetchMeetingPhotoIndex sdk', date, err); }
+    }
+    try {
+      const parent = 'projects/' + projectId() + '/databases/(default)/documents/calendars/cal_' + calId;
+      const res = await fetch('https://firestore.googleapis.com/v1/' + parent + ':runQuery', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, cache: 'no-store',
+        body: JSON.stringify({ structuredQuery: { from: [{ collectionId: 'meetingPhotoIndex' }], where: { fieldFilter: {
+          field: { fieldPath: 'date' }, op: 'EQUAL', value: { stringValue: String(date) }
+        }}}})
+      });
+      if (!res.ok) return [];
+      const rows = await res.json();
+      return (Array.isArray(rows) ? rows : []).filter(function (row) { return row && row.document; }).map(function (row) {
+        return { id: row.document.name.split('/').pop(), ...docToJs(row.document), source: 'meeting-index' };
+      });
+    } catch (err) { console.warn('fetchMeetingPhotoIndex rest', date, err); return []; }
+  }
+
   async function countMessagesByUploadSource(calId, uploadSource) {
     if (!isValidCalId(calId) || !uploadSource) return null;
     const firebaseDb = getDb();
@@ -636,6 +664,7 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
     fetchRecentChatMessages: fetchRecentChatMessages,
     fetchRecentGalleryMessages: fetchRecentGalleryMessages,
     fetchMessagesByImageTag: fetchMessagesByImageTag,
+    fetchMeetingPhotoIndex: fetchMeetingPhotoIndex,
     fetchSubcollectionCount: fetchSubcollectionCount,
     fetchOlderChatMessages: fetchOlderChatMessages,
     fetchMessageOrdinal: fetchMessageOrdinal,
