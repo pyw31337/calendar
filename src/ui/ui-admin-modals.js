@@ -799,7 +799,7 @@ export function AdminModal({
   const MenuIcon = __comp.MenuIcon || __deps.MenuIcon;
   const PollModal = __comp.PollModal || __deps.PollModal;
   const PollSectionIcon = __comp.PollSectionIcon || __deps.PollSectionIcon;
-  const ResizableModalContainer = __comp.ResizableModalContainer || __deps.ResizableModalContainer;
+  const ResizableModalContainer = __comp.ResizableModalContainer || __deps.ResizableModalContainer || (function Shell(p) { return React.createElement('div', p, p.children); });
   const SettingsIcon = __comp.SettingsIcon || __deps.SettingsIcon;
   const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
   const TrashIcon = __comp.TrashIcon || __deps.TrashIcon;
@@ -2158,7 +2158,7 @@ export function AdminUnifiedSearchModal({ onClose, onSearch }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
-  const ResizableModalContainer = __comp.ResizableModalContainer || __deps.ResizableModalContainer;
+  const ResizableModalContainer = __comp.ResizableModalContainer || __deps.ResizableModalContainer || (function Shell(p) { return React.createElement('div', p, p.children); });
   const SearchIcon = __comp.SearchIcon || __deps.SearchIcon;
   const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
 

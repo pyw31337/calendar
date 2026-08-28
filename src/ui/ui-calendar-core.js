@@ -2624,7 +2624,7 @@ export function GlobalSearchModal({
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
-  const ResizableModalContainer = __comp.ResizableModalContainer || __deps.ResizableModalContainer;
+  const ResizableModalContainer = __comp.ResizableModalContainer || __deps.ResizableModalContainer || (function Shell(p) { return React.createElement('div', p, p.children); });
   const SearchCategoryTabs = __comp.SearchCategoryTabs || __deps.SearchCategoryTabs;
   const SearchIcon = __comp.SearchIcon || __deps.SearchIcon;
   const SearchResultLogRow = __comp.SearchResultLogRow || __deps.SearchResultLogRow;
@@ -2861,7 +2861,7 @@ export function EditMessageModal({
   const ImageProcessingOverlay = __comp.ImageProcessingOverlay || __deps.ImageProcessingOverlay;
   const ImageThumbRemoveButton = __comp.ImageThumbRemoveButton || __deps.ImageThumbRemoveButton;
   const ParticipantPickerButton = __comp.ParticipantPickerButton || __deps.ParticipantPickerButton;
-  const ResizableModalContainer = __comp.ResizableModalContainer || __deps.ResizableModalContainer;
+  const ResizableModalContainer = __comp.ResizableModalContainer || __deps.ResizableModalContainer || (function Shell(p) { return React.createElement('div', p, p.children); });
   const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
   const autoGrowTextarea = __deps.autoGrowTextarea;
 

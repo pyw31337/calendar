@@ -946,7 +946,8 @@ export function WeatherBadge({ weatherLocation }) {
 export function WeatherLocationModal({ onClose, onSelectLocation, onDeleteRecentLocation, showToast, recentLocations = [] }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
-  const ResizableModalContainer = __deps.ResizableModalContainer;
+  const __comp = window.GATHER_UI_COMPONENTS || {};
+  const ResizableModalContainer = __comp.ResizableModalContainer || __deps.ResizableModalContainer || (function Shell(p) { return React.createElement('div', p, p.children); });
   const SmallXIcon = __deps.SmallXIcon;
   const TrashIcon = __deps.TrashIcon;
   const SettingsIcon = __deps.SettingsIcon;

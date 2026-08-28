@@ -1197,7 +1197,7 @@ export function DeleteConfirmModal({
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
-  const ResizableModalContainer = __comp.ResizableModalContainer || __deps.ResizableModalContainer;
+  const ResizableModalContainer = __comp.ResizableModalContainer || __deps.ResizableModalContainer || (function Shell(p) { return React.createElement('div', p, p.children); });
 
   const participants = getActiveParticipants(calendar);
   const p = participants.find(part => part.id === message.participantId);

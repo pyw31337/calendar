@@ -956,7 +956,8 @@ export function InlineSearchBar({
 export function MemoShareModal({ memo, calendarId, onClose, showToast }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
-  const ResizableModalContainer = __deps.ResizableModalContainer;
+  const __comp = window.GATHER_UI_COMPONENTS || {};
+  const ResizableModalContainer = __comp.ResizableModalContainer || __deps.ResizableModalContainer || (function Shell(p) { return React.createElement('div', p, p.children); });
   const SmallXIcon = __deps.SmallXIcon;
   const getMemoItemShareUrl = __deps.getMemoItemShareUrl;
   const copyTextToClipboard = __deps.copyTextToClipboard;

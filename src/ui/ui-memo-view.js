@@ -715,7 +715,7 @@ export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoad
   const BackArrowIcon = __comp.BackArrowIcon || __deps.BackArrowIcon;
   const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
   const TrashIcon = __comp.TrashIcon || __deps.TrashIcon;
-  const ResizableModalContainer = __deps.ResizableModalContainer;
+  const ResizableModalContainer = __comp.ResizableModalContainer || __deps.ResizableModalContainer || (function Shell(p) { return React.createElement('div', p, p.children); });
   const ChatGalleryModal = __comp.ChatGalleryModal || __deps.ChatGalleryModal;
   const ChatParticipantSheet = __comp.ChatParticipantSheet || __deps.ChatParticipantSheet;
   const EmojiPickerIcon = __comp.EmojiPickerIcon || __deps.EmojiPickerIcon;
