@@ -1431,14 +1431,10 @@ export function AdminModal({
           },
             activityLogsSorted.length === 0 ? /*#__PURE__*/React.createElement("div", { style: { padding: '30px', color: '#94A3B8', fontSize: '0.82rem', textAlign: 'center' } }, "기록된 활동 로그가 없어 복구 기능을 이용할 수 없습니다.") :
             activityLogsSorted.map(log => {
-              const p = participantsMap[log.participantId] || {
-                name: EXPENSE_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '정산' :
-                      IMAGE_TAG_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '태그' :
-                      POLL_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '투표' :
-                      PLACE_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '장소' :
-                      MEETING_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '정산' : '알수없음',
-                color: '#94A3B8'
-              };
+              const resolveParticipant = __deps.resolveLogParticipant || (window.GATHER_APP_UTILS && window.GATHER_APP_UTILS.resolveLogParticipant) || ((l, map) => (map && map[l.participantId]) || { name: '시스템', color: '#94A3B8' });
+              const formatNote = __deps.formatDetailedLogNote || (window.GATHER_APP_UTILS && window.GATHER_APP_UTILS.formatDetailedLogNote) || (l => l.note || '');
+              const p = resolveParticipant(log, participantsMap);
+              const detailedNote = formatNote(log);
               const actionLabel = {
                 create: '일정 추가', update: '일정 변경', delete: '일정 삭제',
                 poll_create: '투표 생성', poll_vote: '투표 진행', poll_cancel: '투표 취소',
@@ -1458,15 +1454,8 @@ export function AdminModal({
                 memo_create: '#6366F1', memo_update: '#F59E0B', memo_delete: '#EF4444',
                 place_create: '#10B981', place_update: '#2563EB', place_delete: '#EF4444'
               }[log.action] || '#64748B';
-              // A translucent tint of the badge's own color (instead of a fixed pastel hex)
-              // stays readable on both light and dark modal backgrounds -- a solid light pastel
-              // like #EFF6FF would look washed-out/too-bright against the dark theme's card bg.
               const actionBadgeBg = `${actionBadgeColor}1F`;
 
-              // On PC, this lines up on a single row exactly like the 로그 tab's rows do (reusing
-              // the same recent-log-row/left/right classes): badge/user/description on the far
-              // left, registered-at timestamp + restore button on the far right. Below 640px the
-              // shared media query stacks it into a column automatically.
               return /*#__PURE__*/React.createElement("div", {
                 key: log.id,
                 className: "recent-log-row",
@@ -1492,10 +1481,10 @@ export function AdminModal({
                     style: { fontSize: '0.78rem' }
                   }, formatShortDateWithDayName(log.date)),
                   /* Description text, wrapped rather than truncated */
-                  log.note && /*#__PURE__*/React.createElement("span", {
+                  detailedNote && /*#__PURE__*/React.createElement("span", {
                     className: "recent-log-note",
                     style: { fontSize: '0.78rem' }
-                  }, log.note)
+                  }, detailedNote)
                 ),
                 /* Right: registered-at timestamp + rollback button */
                 /*#__PURE__*/React.createElement("div", { className: "recent-log-right recovery-restore-footer" },
@@ -1579,17 +1568,12 @@ export function AdminModal({
             className: "recent-log-list",
             style: { display: 'flex', flexDirection: 'column', gap: '8px' }
           }, logs.map(log => {
-            const participant = participantsMap[log.participantId] || {
-              name: EXPENSE_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '정산' :
-                    IMAGE_TAG_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '태그' :
-                    POLL_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '투표' :
-                    PLACE_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '장소' :
-                    MEETING_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '정산' : '알 수 없음',
-              color: '#94A3B8'
-            };
+            const resolveParticipant = __deps.resolveLogParticipant || (window.GATHER_APP_UTILS && window.GATHER_APP_UTILS.resolveLogParticipant) || ((l, map) => (map && map[l.participantId]) || { name: '시스템', color: '#94A3B8' });
+            const formatNote = __deps.formatDetailedLogNote || (window.GATHER_APP_UTILS && window.GATHER_APP_UTILS.formatDetailedLogNote) || (l => l.note || '');
+            const participant = resolveParticipant(log, participantsMap);
             const actionLabel = actionLabels[log.action] || '기록';
             const actionColor = actionColors[log.action] || '#64748B';
-            const noteText = sanitizeText(log.note || '', 120);
+            const noteText = sanitizeText(formatNote(log) || '', 160);
             const logDateText = log.date ? formatShortDateWithDayName(log.date) : '';
             const logTitleText = [participant.name, `[${actionLabel}]`, logDateText].filter(Boolean).join(' ');
             const confirmText = `${logTitleText} 로그 데이터를 삭제하시겠습니까?`;

@@ -1633,6 +1633,85 @@ function buildFieldChangeNote(label, changes, maxLen = 300) {
   return sanitizeText(head ? `${head} · ${parts.join(' · ')}` : parts.join(' · '), maxLen);
 }
 
+function resolveLogParticipant(log, participantsMap) {
+  if (log?.participantId && participantsMap && participantsMap[log.participantId]) {
+    return participantsMap[log.participantId];
+  }
+  const action = log?.action || '';
+  if (log?.type === 'chat') return { name: '메시지', color: '#0369A1' };
+  if (PLACE_ACTIVITY_ACTIONS.includes(action)) return { name: '장소', color: '#2563EB' };
+  if (IMAGE_TAG_ACTIVITY_ACTIONS.includes(action)) return { name: '사진 태그', color: '#6366F1' };
+  if (EXPENSE_ACTIVITY_ACTIONS.includes(action)) return { name: '정산', color: '#F59E0B' };
+  if (POLL_ACTIVITY_ACTIONS.includes(action)) return { name: '투표', color: '#8B5CF6' };
+  if (MEETING_ACTIVITY_ACTIONS.includes(action)) return { name: '모임 확정', color: '#8B5CF6' };
+  if (MEMO_ACTIVITY_ACTIONS.includes(action)) return { name: '메모', color: '#6366F1' };
+  return { name: '시스템', color: '#64748B' };
+}
+
+function formatDetailedLogNote(log) {
+  let rawNote = String(log?.note || '').trim();
+  if (!rawNote && log?.date) {
+    rawNote = `${log.date} 일정`;
+  }
+  const action = log?.action || '';
+  const dateStr = log?.date ? formatShortDateWithDayName(log.date) : '';
+
+  if (action === 'place_update' || action === 'place_create' || action === 'place_delete') {
+    const cleanNote = rawNote.replace(/^"|"$/g, '').trim();
+    if (action === 'place_update') {
+      return (cleanNote.includes('수정') || cleanNote.includes('→'))
+        ? cleanNote
+        : `'${cleanNote || '장소'}' 장소 정보 수정`;
+    }
+    if (action === 'place_create') {
+      return cleanNote.includes('등록')
+        ? cleanNote
+        : `'${cleanNote || '장소'}' 신규 장소 등록`;
+    }
+    if (action === 'place_delete') {
+      return cleanNote.includes('삭제')
+        ? cleanNote
+        : `'${cleanNote || '장소'}' 장소 삭제`;
+    }
+  }
+
+  if (action === 'tag_add' || action === 'tag_remove') {
+    const isAdd = action === 'tag_add';
+    const tagStr = rawNote.startsWith('#') ? rawNote : `#${rawNote}`;
+    const datePrefix = dateStr ? `'${dateStr}' 일정 ` : '';
+    return `${datePrefix}사진에 태그 ${tagStr} ${isAdd ? '추가' : '삭제'}`;
+  }
+
+  if (action === 'photo_create' || action === 'photo_delete') {
+    const isAdd = action === 'photo_create';
+    const datePrefix = dateStr ? `'${dateStr}' 일정 ` : '';
+    return `${datePrefix}사진 ${isAdd ? '등록' : '삭제'}${rawNote ? ` (${rawNote})` : ''}`;
+  }
+
+  if (action === 'expense_create' || action === 'expense_update' || action === 'expense_delete') {
+    const actMap = { expense_create: '등록', expense_update: '수정', expense_delete: '삭제' };
+    return `정산 내역 ${actMap[action] || ''}${rawNote ? `: ${rawNote}` : ''}`;
+  }
+
+  if (action === 'memo_create' || action === 'memo_update' || action === 'memo_delete') {
+    const actMap = { memo_create: '작성', memo_update: '수정', memo_delete: '삭제' };
+    return `메모 ${actMap[action] || ''}${rawNote ? `: ${rawNote}` : ''}`;
+  }
+
+  if (action === 'poll_create' || action === 'poll_vote' || action === 'poll_cancel') {
+    const actMap = { poll_create: '생성', poll_vote: '참여', poll_cancel: '취소' };
+    return `투표 ${actMap[action] || ''}${rawNote ? `: ${rawNote}` : ''}`;
+  }
+
+  if (action === 'meeting_confirm' || action === 'meeting_cancel') {
+    const isConfirm = action === 'meeting_confirm';
+    const datePrefix = dateStr ? `'${dateStr}' 일정 ` : '';
+    return `${datePrefix}모임 확정 ${isConfirm ? '완료' : '취소'}${rawNote ? ` (${rawNote})` : ''}`;
+  }
+
+  return rawNote;
+}
+
 function createActivityLog(calendarId, action, dateStr, participantId, timestamp = Date.now(), note = '') {
   let richNote = sanitizeText(note, 2000);
   if (dateStr && richNote && !richNote.includes('[일자:')) {
@@ -2166,6 +2245,8 @@ export {
   ACTIVITY_ACTIONS,
   normalizeActivityLog,
   mergeActivityLogs,
+  resolveLogParticipant,
+  formatDetailedLogNote,
   buildFieldChangeNote,
   createActivityLog,
   createPollActivityLog,

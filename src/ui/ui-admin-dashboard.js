@@ -1706,18 +1706,12 @@ export function AdminDashboard({ initialCalendars }) {
       if (timelineSearchQuery.trim()) {
         const query = timelineSearchQuery.toLowerCase().trim();
         
-        // Find participant name
+        const resolveParticipant = __deps.resolveLogParticipant || (window.GATHER_APP_UTILS && window.GATHER_APP_UTILS.resolveLogParticipant) || ((l, map) => (map && map[l.participantId]) || { name: '시스템', color: '#94A3B8' });
+        const formatNote = __deps.formatDetailedLogNote || (window.GATHER_APP_UTILS && window.GATHER_APP_UTILS.formatDetailedLogNote) || (l => l.note || '');
         const pMap = (selectedCal?.participants || []).reduce((acc, p) => { acc[p.id] = p; return acc; }, {});
-        const p = pMap[log.participantId] || {
-          name: log.type === 'chat' ? '메시지' :
-                EXPENSE_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '정산' :
-                IMAGE_TAG_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '태그' :
-                POLL_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '투표' :
-                PLACE_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '장소' :
-                MEETING_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '정산' : '알수없음'
-        };
+        const p = resolveParticipant(log, pMap);
         const participantName = (p.name || '').toLowerCase();
-        const note = (log.note || '').toLowerCase();
+        const note = (formatNote(log) || '').toLowerCase();
         
         const actLabel = log.type === 'chat' ? '채팅 전송' :
                          {
@@ -2845,16 +2839,11 @@ export function AdminDashboard({ initialCalendars }) {
             /*#__PURE__*/React.createElement("div", { style: { padding: '30px', color: '#64748B', fontSize: '0.82rem', textAlign: 'center' } }, "조건에 맞는 타임라인 로그가 존재하지 않습니다.") :
             /*#__PURE__*/React.createElement(React.Fragment, null,
               filteredTimeline.slice(0, timelineLimit).map(log => {
+                const resolveParticipant = __deps.resolveLogParticipant || (window.GATHER_APP_UTILS && window.GATHER_APP_UTILS.resolveLogParticipant) || ((l, map) => (map && map[l.participantId]) || { name: '시스템', color: '#94A3B8' });
+                const formatNote = __deps.formatDetailedLogNote || (window.GATHER_APP_UTILS && window.GATHER_APP_UTILS.formatDetailedLogNote) || (l => l.note || '');
                 const pMap = (selectedCal.participants || []).reduce((acc, p) => { acc[p.id] = p; return acc; }, {});
-                const p = pMap[log.participantId] || {
-                  name: log.type === 'chat' ? '메시지' :
-                        EXPENSE_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '정산' :
-                        IMAGE_TAG_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '태그' :
-                        POLL_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '투표' :
-                        PLACE_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '장소' :
-                        MEETING_ACTIVITY_ACTIONS.includes(log.action) && !log.participantId ? '정산' : '알수없음',
-                  color: '#94A3B8'
-                };
+                const p = resolveParticipant(log, pMap);
+                const detailedNoteText = formatNote(log);
 
                 const actLabel = log.type === 'chat' ? '채팅 전송' :
                                  {
@@ -2907,7 +2896,7 @@ export function AdminDashboard({ initialCalendars }) {
                   ),
 
                   /* Middle: memo, ellipsized on wide screens like admin-chat-text, wraps on narrow */
-                  log.note && log.note !== (log.date ? formatShortDateWithDayName(log.date) : '') && /*#__PURE__*/React.createElement("span", { className: "admin-chat-text", title: log.note || '' }, log.note || ''),
+                  detailedNoteText && detailedNoteText !== (log.date ? formatShortDateWithDayName(log.date) : '') && /*#__PURE__*/React.createElement("span", { className: "admin-chat-text", title: detailedNoteText || '' }, detailedNoteText || ''),
 
                   /* Right: timestamp + restore button -- the button drops to its own full-width
                      row on mobile (recovery-restore-footer) rather than squeezing onto the
