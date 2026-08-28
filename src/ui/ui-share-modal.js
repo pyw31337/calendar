@@ -823,7 +823,7 @@ function getDeps() { return window.GATHER_UI_DEPS || {}; }
         const ok = await copyTextToClipboard(shareUrl);
         const message = ok ? 'URL이 복사되었습니다!' : '복사에 실패했습니다. URL을 직접 선택해 복사해 주세요.';
         if (showToast) showToast(message, ok ? 'success' : 'error');
-        else alert(message);
+        else console.warn(message);
       }
     }, 'URL 복사하기'),
     qrDataUrl && React.createElement('div', {

@@ -2019,6 +2019,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
   const LinkPreviewCard = __comp.LinkPreviewCard || __deps.LinkPreviewCard;
   const MessageCommentIcon = __comp.MessageCommentIcon || __deps.MessageCommentIcon;
   const ParticipantPickerButton = __comp.ParticipantPickerButton || __deps.ParticipantPickerButton;
+  const MediaThumb = __comp.MediaThumb || __deps.MediaThumb;
   const PencilIcon = __comp.PencilIcon || __deps.PencilIcon;
   const ShareIcon = __comp.ShareIcon || __deps.ShareIcon;
   const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
@@ -2105,8 +2106,10 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
   const renderMemoCardImages = () => {
     if (imageUrls.length === 0) return null;
     if (imageUrls.length === 1) {
-      return /*#__PURE__*/React.createElement("img", {
+      return /*#__PURE__*/React.createElement(MediaThumb, {
         src: thumbUrls[0] || imageUrls[0],
+        fallbackSrc: imageUrls[0] || thumbUrls[0],
+        alt: "메모 첨부 이미지",
         loading: 'lazy',
         decoding: 'async',
         style: { width: '100%', maxHeight: '140px', objectFit: 'cover', borderRadius: '6px', marginBottom: '8px' }
@@ -2124,9 +2127,11 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
         maxWidth: maxW,
         marginBottom: '8px'
       }
-    }, thumbUrls.slice(0, 6).map((thumb, idx) => /*#__PURE__*/React.createElement("img", {
+    }, thumbUrls.slice(0, 6).map((thumb, idx) => /*#__PURE__*/React.createElement(MediaThumb, {
       key: idx,
       src: thumb || imageUrls[idx],
+      fallbackSrc: imageUrls[idx] || thumb,
+      alt: `메모 첨부 이미지 ${idx + 1}`,
       loading: 'lazy',
       decoding: 'async',
       style: {
@@ -2963,13 +2968,13 @@ export function EditMessageModal({
         console.error('Image compression failed for:', failed.map(f => f.fileName));
         const message = describeImageProcessingFailures(failed);
         if (showToast) showToast(message, 'error', 5000);
-        else alert(message);
+        else console.warn(message);
       }
     } catch (err) {
       console.error('handleFileChangeEdit unexpected error:', err);
       const message = '사진 첨부 중 오류';
       if (showToast) showToast(message, 'error', 5000);
-      else alert(message);
+      else console.warn(message);
     } finally {
       setImageProcessingEdit(null);
       e.target.value = '';

@@ -1091,7 +1091,7 @@ export function AdminModal({
 
     // Validate titles & names
     if (!title.trim()) {
-      if (showToast) showToast('캘린더 제목을 입력해 주세요.', 'error'); else alert('캘린더 제목을 입력해 주세요.');
+      if (showToast) showToast('캘린더 제목을 입력해 주세요.', 'error'); else console.warn('캘린더 제목을 입력해 주세요.');
       setIsSubmitting(false);
       return;
     }
@@ -1099,7 +1099,7 @@ export function AdminModal({
     const activeParticipantsList = participants.filter(p => !isTombstone(p));
     const activeNames = activeParticipantsList.map(p => p.name.trim().toLowerCase());
     if (new Set(activeNames).size !== activeNames.length) {
-      if (showToast) showToast('동일한 참여자 이름이 이미 존재합니다.', 'error'); else alert('동일한 참여자 이름이 이미 존재합니다.');
+      if (showToast) showToast('동일한 참여자 이름이 이미 존재합니다.', 'error'); else console.warn('동일한 참여자 이름이 이미 존재합니다.');
       setIsSubmitting(false);
       return;
     }

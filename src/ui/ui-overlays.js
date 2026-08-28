@@ -810,8 +810,13 @@ export function MediaThumb({
   ...rest
 }) {
   const React = window.React;
-  const primarySrc = String(src || '').trim();
-  const secondarySrc = String(fallbackSrc || '').trim();
+  const isSafeMediaSrc = value => {
+    const candidate = String(value || '').trim();
+    const validator = GATHER_APP_UTILS.isRenderableImageUrl;
+    return typeof validator === 'function' && validator(candidate) ? candidate : '';
+  };
+  const primarySrc = isSafeMediaSrc(src);
+  const secondarySrc = isSafeMediaSrc(fallbackSrc);
   const [currentSrc, setCurrentSrc] = React.useState(() => primarySrc || secondarySrc || '');
   const [isBroken, setIsBroken] = React.useState(false);
 

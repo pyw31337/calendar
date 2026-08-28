@@ -78,6 +78,9 @@ const pad2 = GATHER_APP_UTILS.pad2 || function pad2(value) {
 const isDataUrl = GATHER_APP_UTILS.isDataUrl || function isDataUrl(value) {
   return typeof value === 'string' && value.startsWith('data:');
 };
+const isRenderableImageUrl = GATHER_APP_UTILS.isRenderableImageUrl || function isRenderableImageUrl(value) {
+  return typeof value === 'string' && /^https?:\/\//i.test(value.trim());
+};
 const isHttpUrl = GATHER_APP_UTILS.isHttpUrl || function isHttpUrl(value) {
   return typeof value === 'string' && /^https?:\/\//i.test(value);
 };
@@ -1889,8 +1892,14 @@ function getMessageImageEntries(msg) {
   if (count === 0) return [];
   const entries = [];
   for (let i = 0; i < count; i++) {
-    const full = urls[i] || thumbs[i];
-    const thumb = thumbs[i] || urls[i];
+    const fullCandidate = urls[i] || thumbs[i];
+    const thumbCandidate = thumbs[i] || urls[i];
+    // Legacy records can contain an empty, relative, or otherwise malformed value. Never pass
+    // those through to <img src>; Chromium treats some of them as navigation requests and can
+    // fail the whole page's boot/smoke check. Keep valid data/http URLs only and let the caller
+    // render its normal empty/failed-photo state when both variants are unusable.
+    const full = isRenderableImageUrl(fullCandidate) ? fullCandidate.trim() : '';
+    const thumb = isRenderableImageUrl(thumbCandidate) ? thumbCandidate.trim() : '';
     if (!full && !thumb) continue;
     const keys = getMediaIdentityKeys({
       messageId: msg.id,

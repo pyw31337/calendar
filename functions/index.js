@@ -429,9 +429,11 @@ async function checkProxyRateLimit(bucketKey, ip, windowMs, maxRequests) {
     });
     return allowed;
   } catch (err) {
-    // Fail open -- a rate-limiter outage shouldn't take down the underlying feature.
-    console.warn(`checkProxyRateLimit(${bucketKey}) failed, allowing request:`, err);
-    return true;
+    // Fail closed when the limiter itself is unavailable. These endpoints proxy paid/quota-
+    // limited services; allowing traffic through during a Firestore outage would turn a safety
+    // failure into an unbounded abuse/billing event. The caller returns a normal 429 response.
+    console.error(`checkProxyRateLimit(${bucketKey}) unavailable; denying request:`, err);
+    return false;
   }
 }
 

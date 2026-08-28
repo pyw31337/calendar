@@ -1434,7 +1434,7 @@ export function ImageUrlModal({ imageUrl, onClose, showToast, onEnsureShareUrl }
       const ok = await copyTextToClipboard(resolvedUrl || '');
       const message = ok ? '이미지 URL이 복사되었습니다.' : '복사에 실패했습니다. URL을 직접 선택해 복사해 주세요.';
       if (showToast) showToast(message, ok ? 'success' : 'error');
-      else alert(message);
+        else console.warn(message);
     }
   }, isGenerating ? "URL 생성 중..." : "URL 복사하기"))));
 }

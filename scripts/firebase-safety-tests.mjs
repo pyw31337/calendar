@@ -23,6 +23,14 @@ assert(/const handleMainToggleNotifications[\s\S]{0,1800}subscribeUserToPush/.te
 assert(!/await\s+subscription\.unsubscribe\(/.test(script), 'calendar-level notification mute must not unsubscribe the origin-wide PushSubscription');
 assert(/if \(thumbs\.length === 1\)[\s\S]{0,260}src: displayUrls\[0\] \|\| thumbs\[0\][\s\S]{0,420}objectFit: 'contain'/.test(script), 'single chat image must render the full media without cropping');
 assert(/thumbs\.map\(\(thumb, idx\)[\s\S]{0,520}objectFit: 'cover'/.test(script), 'multi-image chat grid should keep cropped square thumbnails');
+const domainHelpers = fs.readFileSync('src/core/app-domain-helpers.js', 'utf8');
+const sharedUi = fs.readFileSync('src/ui/ui-shared.js', 'utf8');
+const overlaysUi = fs.readFileSync('src/ui/ui-overlays.js', 'utf8');
+assert(domainHelpers.includes('const isRenderableImageUrl = GATHER_APP_UTILS.isRenderableImageUrl') && fs.readFileSync('src/core/app-utils.js', 'utf8').includes('function isRenderableImageUrl'), 'chat image entries must reject malformed/non-http image URLs');
+assert(sharedUi.includes('const imageSrc = (() =>') && sharedUi.includes('imageSrc && /*#__PURE__*/React.createElement'), 'link preview cards must reject malformed cached image URLs');
+assert(overlaysUi.includes('const isSafeMediaSrc = value =>') && overlaysUi.includes('const primarySrc = isSafeMediaSrc(src);'), 'shared media thumbnails must reject malformed image URLs');
+assert(/async function persistLegacySubcollections[\s\S]{0,700}Promise\.all\(jobs\)/.test(firebaseDataScript), 'legacy subcollection writes must be awaited as one save operation');
+assert(!/checkProxyRateLimit\(\$\{bucketKey\}\) failed, allowing request[\s\S]{0,160}return true/.test(fs.readFileSync('functions/index.js', 'utf8')), 'proxy limiter must not fail open');
 const setChatNotifyPrefBody = script.match(/function setChatNotifyEnabledForCalendar\(calId, enabled\) \{([\s\S]*?)\n\}/)?.[1] || '';
 assert(!setChatNotifyPrefBody.includes('gather_chat_notify_pref_global_v1'), 'new chat notification writes must be calendar-scoped, not global');
 assert(/directMediaTags/.test(script), 'direct URL image tags must be persisted on chat messages');

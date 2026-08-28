@@ -1087,6 +1087,14 @@ export function LinkPreviewCard({ url, fallbackTitle, cachedData, stretch = fals
   if (!preview || preview.status === 'loading' || preview.status === 'error' || preview.status === 'empty' || !preview.data) return null;
 
   const { title, description, image, siteName } = preview.data;
+  // Cached OpenGraph data is user/content supplied and older records may contain a malformed
+  // image value. Do not let it become an invalid <img src>, which produces noisy browser errors
+  // and can break page smoke checks. Valid network/data URLs still use the normal thumbnail.
+  const imageSrc = (() => {
+    const candidate = typeof image === 'string' ? image.trim() : '';
+    const validator = GATHER_APP_UTILS.isRenderableImageUrl;
+    return typeof validator === 'function' && validator(candidate) ? candidate : '';
+  })();
   const isGenericTitle = !title || title === 'map.naver.com' || title === 'naver.me' || title.startsWith('map.naver');
   const displayTitle = (isGenericTitle && fallbackTitle) ? fallbackTitle : (title || siteName);
   const displayHost = (siteName && siteName !== displayTitle) ? siteName : '';
@@ -1116,8 +1124,8 @@ export function LinkPreviewCard({ url, fallbackTitle, cachedData, stretch = fals
       backgroundColor: 'var(--bg-card)'
     }
   },
-    image && /*#__PURE__*/React.createElement('img', {
-      src: image,
+      imageSrc && /*#__PURE__*/React.createElement('img', {
+      src: imageSrc,
       alt: '',
       loading: 'lazy',
       decoding: 'async',
@@ -1133,9 +1141,9 @@ export function LinkPreviewCard({ url, fallbackTitle, cachedData, stretch = fals
     }),
     /*#__PURE__*/React.createElement('div', {
       style: {
-        padding: image ? '8px 10px 8px 0' : '8px 10px',
+        padding: imageSrc ? '8px 10px 8px 0' : '8px 10px',
         minWidth: 0,
-        maxWidth: stretch ? 'none' : (image ? '198px' : '270px'),
+        maxWidth: stretch ? 'none' : (imageSrc ? '198px' : '270px'),
         flex: stretch ? '1 1 0' : '0 1 auto',
         overflow: 'visible',
         display: 'flex',
@@ -1143,7 +1151,7 @@ export function LinkPreviewCard({ url, fallbackTitle, cachedData, stretch = fals
         justifyContent: 'flex-start',
         alignSelf: 'stretch',
         gap: '4px',
-        minHeight: image ? '72px' : 'auto'
+        minHeight: imageSrc ? '72px' : 'auto'
       }
     },
       displayTitle && /*#__PURE__*/React.createElement('div', {

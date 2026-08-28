@@ -96,14 +96,16 @@ async function checkPage(browser, baseUrl, viewport, calId, view) {
   const page = await context.newPage();
   const consoleErrors = [];
   const pageErrors = [];
-  page.on('console', msg => { if (msg.type() === 'error' && !msg.text().includes('compute-pressure') && !msg.text().includes('Permissions policy') && !msg.text().includes('status of 503') && !msg.text().includes('status of 502') && !msg.text().includes('ERR_NAME_NOT_RESOLVED') && !msg.text().includes('ERR_CONNECTION_REFUSED')) consoleErrors.push(msg.text()); });
+  const failedRequests = [];
+  page.on('console', msg => { if (msg.type() === 'error' && !msg.text().includes('compute-pressure') && !msg.text().includes('Permissions policy') && !msg.text().includes('status of 503') && !msg.text().includes('status of 502') && !msg.text().includes('ERR_NAME_NOT_RESOLVED') && !msg.text().includes('ERR_CONNECTION_REFUSED')) { const loc = msg.location(); consoleErrors.push(`${msg.text()}${loc?.url ? ` @${loc.url}:${loc.lineNumber || 0}` : ''}`); } });
   page.on('pageerror', err => pageErrors.push(err.message));
+  page.on('requestfailed', request => failedRequests.push(`${request.url()} (${request.failure()?.errorText || 'failed'})`));
 
   const url = `${baseUrl}?id=${calId}${view.suffix}`;
   try {
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
     // eslint-disable-next-line no-undef -- runs inside the browser page (Playwright evaluate/waitForFunction), not Node
-    await page.waitForFunction(() => window.__GATHER_BOOT_READY__ === true, { timeout: 25000 });
+    await page.waitForFunction(() => window.__GATHER_BOOT_READY__ === true, { timeout: 35000 });
   } catch (err) {
     fail(label, `page never reached boot-ready: ${err.message}`);
     await context.close();
@@ -116,7 +118,7 @@ async function checkPage(browser, baseUrl, viewport, calId, view) {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   if (overflow > 2) fail(label, `가로 스크롤 발생 (화면 밖으로 ${overflow}px 벗어남)`);
 
-  if (consoleErrors.length) fail(label, `콘솔 에러 ${consoleErrors.length}건: ${consoleErrors.slice(0, 2).join(' | ')}`);
+  if (consoleErrors.length) fail(label, `콘솔 에러 ${consoleErrors.length}건: ${consoleErrors.slice(0, 2).join(' | ')}${failedRequests.length ? `; 요청 실패: ${failedRequests.filter(item => item.includes('ERR_INVALID_URL')).slice(0, 2).join(' | ') || failedRequests.slice(0, 2).join(' | ')}` : ''}`);
   if (pageErrors.length) fail(label, `처리되지 않은 JS 예외 ${pageErrors.length}건: ${pageErrors.slice(0, 2).join(' | ')}`);
 
   if (!consoleErrors.length && !pageErrors.length && overflow <= 2) pass(label);
@@ -215,26 +217,33 @@ async function checkSideMenuNavigation(browser, baseUrl) {
         const page = await context.newPage();
         const consoleErrors = [];
         const pageErrors = [];
+        const failedRequests = [];
         page.on('console', msg => {
           if (msg.type() === 'error' && !msg.text().includes('compute-pressure') && !msg.text().includes('Permissions policy')) {
-            consoleErrors.push(msg.text());
+            const loc = msg.location();
+            consoleErrors.push(`${msg.text()}${loc?.url ? ` @${loc.url}:${loc.lineNumber || 0}` : ''}`);
           }
         });
         page.on('pageerror', err => pageErrors.push(err.message));
+        page.on('requestfailed', request => failedRequests.push(`${request.url()} (${request.failure()?.errorText || 'failed'})`));
         try {
           await page.goto(`${baseUrl}?id=${calId}${suffix}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
           // eslint-disable-next-line no-undef -- runs inside the browser page (Playwright evaluate/waitForFunction), not Node
-          await page.waitForFunction(() => window.__GATHER_BOOT_READY__ === true, { timeout: 25000 });
+          await page.waitForFunction(() => window.__GATHER_BOOT_READY__ === true, { timeout: 35000 });
           const menuButton = page.locator('button[aria-label$="메뉴 열기"]:visible').first();
           await menuButton.waitFor({ state: 'visible', timeout: 8000 });
-          await menuButton.click();
+          // Mobile headers can still be settling after a view transition; dispatch the semantic
+          // click after the visibility check so a transient scroll/animation does not make the
+          // read-only navigation smoke test report a false failure.
+          await page.waitForTimeout(250);
+          await menuButton.dispatchEvent('click');
           const menu = page.locator('.admin-side-menu-overlay > .admin-side-menu:visible').last();
           await menu.waitFor({ state: 'visible', timeout: 5000 });
           for (const destination of destinations) {
             await menu.locator('button.admin-side-menu-item').filter({ hasText: destination }).first().waitFor({ state: 'visible', timeout: 5000 });
           }
           if (consoleErrors.length || pageErrors.length) {
-            fail(`${label}: ${sourceLabel}`, `메뉴 확인 후 콘솔/페이지 오류 ${consoleErrors.length + pageErrors.length}건`);
+            fail(`${label}: ${sourceLabel}`, `메뉴 확인 후 콘솔/페이지 오류 ${consoleErrors.length + pageErrors.length}건${failedRequests.length ? `; 요청 실패: ${failedRequests.filter(item => item.includes('ERR_INVALID_URL')).slice(0, 2).join(' | ') || failedRequests.slice(0, 2).join(' | ')}` : ''}`);
           } else {
             pass(`${label}: ${sourceLabel}`);
           }

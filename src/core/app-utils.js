@@ -366,6 +366,28 @@ const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
     return typeof value === 'string' && /^https?:\/\//i.test(value);
   }
 
+  function isRenderableImageUrl(value) {
+    if (typeof value !== 'string' || !value.trim()) return false;
+    const candidate = value.trim();
+    if (/^data:image\//i.test(candidate)) {
+      const match = candidate.match(/^data:image\/[a-z0-9.+-]+;base64,([a-z0-9+/]*={0,2})$/i);
+      if (!match || !match[1] || match[1].length % 4 === 1) return false;
+      try {
+        if (typeof atob === 'function') atob(match[1]);
+        return true;
+      } catch (e) {
+        return false;
+      }
+    }
+    if (!/^https?:\/\//i.test(candidate)) return false;
+    try {
+      const parsed = new URL(candidate);
+      return Boolean(parsed.protocol && parsed.hostname);
+    } catch (e) {
+      return false;
+    }
+  }
+
   const DEFAULT_PLACE_CATEGORIES = [
     { id: 'restaurant', name: '식당', color: '#F97316' },
     { id: 'cafe', name: '카페', color: '#8B5CF6' },
@@ -956,6 +978,7 @@ const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
     pad2,
     isDataUrl,
     isHttpUrl,
+    isRenderableImageUrl,
     DEFAULT_PLACE_CATEGORIES,
     PLACE_CATEGORY_ICONS,
     normalizePlaceCategories,

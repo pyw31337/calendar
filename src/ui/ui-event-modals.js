@@ -3415,11 +3415,11 @@ export function PollModal({ calendar, poll, onSave, onClose, showToast, onReques
     }).filter(option => isTombstone(option) || sanitizeText(option.text, 120));
     const activeOptionCount = normalizedOptions.filter(option => !isTombstone(option)).length;
     if (!cleanTitle) {
-      if (showToast) showToast('투표 제목을 입력해 주세요.', 'error'); else alert('투표 제목을 입력해 주세요.');
+      if (showToast) showToast('투표 제목을 입력해 주세요.', 'error'); else console.warn('투표 제목을 입력해 주세요.');
       return;
     }
     if (activeOptionCount === 0) {
-      if (showToast) showToast('투표 항목을 1개 이상 추가해 주세요.', 'error'); else alert('투표 항목을 1개 이상 추가해 주세요.');
+      if (showToast) showToast('투표 항목을 1개 이상 추가해 주세요.', 'error'); else console.warn('투표 항목을 1개 이상 추가해 주세요.');
       return;
     }
     setIsSubmitting(true);

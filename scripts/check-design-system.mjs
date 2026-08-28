@@ -10,6 +10,8 @@ const shared = read('src/ui/ui-shared.js');
 const picker = read('src/ui/ui-summary-gallery.js');
 const confirm = read('src/ui/ui-confirm-dialog.js');
 const sideMenu = read('src/ui/ui-side-menu.js');
+const uiSources = ['ui-calendar-core.js', 'ui-misc.js', 'ui-remaining.js', 'ui-admin-modals.js', 'ui-share-modal.js', 'ui-event-modals.js']
+  .map(file => read(`src/ui/${file}`)).join('\n');
 
 const failures = [];
 const requireText = (text, pattern, message) => { if (!pattern.test(text)) failures.push(message); };
@@ -21,6 +23,7 @@ requireText(picker, /export function ParticipantBackdrop/, 'participant backdrop
 requireText(picker, /SimpleBottomSheetPicker: SimpleBottomSheetPicker/, 'shared picker must be registered');
 requireText(confirm, /height: '44px'[\s\S]*minHeight: '44px'/, 'confirm actions must use 44px targets');
 if (/window\.confirm\s*\(/.test(sideMenu)) failures.push('settings must not use native window.confirm');
+if (/\balert\s*\(/.test(uiSources)) failures.push('shared UI flows must use toast/dialog primitives instead of native alert');
 
 if (failures.length) {
   failures.forEach(message => console.error('[check-design-system]', message));
