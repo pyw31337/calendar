@@ -716,6 +716,7 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
   const loadLeafletMarkerCluster = __deps.loadLeafletMarkerCluster;
   const buildPlaceMarkerHtml = __deps.buildPlaceMarkerHtml;
   const panMapToFitMarkerPopup = __deps.panMapToFitMarkerPopup;
+  const centerMapOnMarkerAndPopup = __deps.centerMapOnMarkerAndPopup;
   const PLACE_MAP_DEFAULT_CENTER = __deps.PLACE_MAP_DEFAULT_CENTER;
   const PLACE_MAP_DEFAULT_ZOOM = __deps.PLACE_MAP_DEFAULT_ZOOM;
   const getPlaceExternalMapUrl = __deps.getPlaceExternalMapUrl;
@@ -788,12 +789,17 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
       markersLayerRef.current = clusterAvailable ? L.markerClusterGroup({
         chunkedLoading: true,
         showCoverageOnHover: false,
-        spiderfyOnMaxZoom: true,
         // We handle clusterclick ourselves so we can keep the zoom anchored to the cluster's
         // bounds while also adding a bit of padding. The earlier custom flyTo(center, +1 zoom)
         // path made clusters appear to "run away" because the centroid shifts during reclustering;
         // zooming to bounds avoids that, and the padding keeps the result from hugging the edge.
+        // Both zoomToBoundsOnClick AND spiderfyOnMaxZoom must stay false here: the plugin binds
+        // its own built-in _zoomOrSpiderfy click handler whenever EITHER is truthy, and that
+        // handler would then run in parallel with the one registered below on every cluster
+        // click -- e.g. spiderfying a cluster the same moment our handler also zooms/re-fits it,
+        // leaving a spiderfied fan of markers on screen next to a freshly re-clustered icon.
         zoomToBoundsOnClick: false,
+        spiderfyOnMaxZoom: false,
         disableClusteringAtZoom: 18,
         maxClusterRadius: zoom => {
           const z = typeof zoom === 'number' ? zoom : 0;
@@ -831,8 +837,9 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
       if (clusterAvailable) {
         markersLayerRef.current.on('clusterclick', e => {
           const cluster = e && e.layer;
+          const group = markersLayerRef.current;
           const map = mapRef.current;
-          if (!cluster || !map) return;
+          if (!cluster || !map || !group) return;
           try {
             if (e.originalEvent) {
               L.DomEvent.preventDefault(e.originalEvent);
@@ -840,32 +847,31 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
             }
           } catch (err) {}
 
-          const bounds = typeof cluster.getBounds === 'function' ? cluster.getBounds() : null;
-          const currentZoom = map.getZoom();
-          const maxAllowedZoom = 16;
+          // Re-derive leaflet.markercluster's own "are we as deep as clustering ever goes"
+          // check (normally done inside its _zoomOrSpiderfy, which we intentionally left
+          // unbound above) instead of a same-coordinates heuristic: a cluster of markers a few
+          // meters apart never satisfies "same location" and previously fell through to
+          // fitBounds capped at zoom 16 -- below disableClusteringAtZoom (18), so it stayed
+          // clustered forever with clicks doing nothing once that bound was reached.
+          let bottomCluster = cluster;
+          while (bottomCluster._childClusters && bottomCluster._childClusters.length === 1) {
+            bottomCluster = bottomCluster._childClusters[0];
+          }
+          const atDeepestClusterLevel = typeof group._maxZoom === 'number'
+            && bottomCluster._zoom === group._maxZoom
+            && bottomCluster._childCount === cluster._childCount;
 
-          if (bounds && typeof bounds.isValid === 'function' && bounds.isValid()) {
-            const sw = bounds.getSouthWest();
-            const ne = bounds.getNorthEast();
-            const latDiff = Math.abs(sw.lat - ne.lat);
-            const lngDiff = Math.abs(sw.lng - ne.lng);
-            const isSameLocation = latDiff < 0.0001 && lngDiff < 0.0001;
+          if (atDeepestClusterLevel) {
+            if (typeof cluster.spiderfy === 'function') cluster.spiderfy();
+            return;
+          }
 
-            if (isSameLocation) {
-              const targetZoom = Math.min(maxAllowedZoom, Math.max(currentZoom + 2, 15));
-              map.setView([sw.lat, sw.lng], targetZoom, { animate: true });
-              if (typeof cluster.spiderfy === 'function') {
-                setTimeout(() => {
-                  try { cluster.spiderfy(); } catch (err) {}
-                }, 150);
-              }
-            } else {
-              map.fitBounds(bounds, { padding: [50, 50], maxZoom: maxAllowedZoom, animate: true });
-            }
-          } else if (typeof cluster.zoomToBounds === 'function') {
-            cluster.zoomToBounds({ padding: [50, 50] });
-          } else {
-            map.setZoom(Math.min(maxAllowedZoom, currentZoom + 2), { animate: true });
+          // Not yet as deep as clustering goes -- zoomToBounds() reuses the plugin's own
+          // step-zoom logic (zooms in by whole levels toward the bounds, and forces at least
+          // one level of advance even if the bounds already fit the current view), so a click
+          // always visibly does something instead of silently no-op'ing.
+          if (typeof cluster.zoomToBounds === 'function') {
+            cluster.zoomToBounds({ padding: [50, 50], animate: true });
           }
         });
       }
@@ -1106,10 +1112,13 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
         minWidth: 220,
         maxWidth: isMobileViewport ? Math.round(window.innerWidth * 0.82) : 460,
         maxHeight: isMobileViewport ? 220 : 320,
-        autoPan: true,
-        autoPanPadding: isMobileViewport ? [14, 20] : [24, 36],
-        autoPanPaddingTopLeft: isMobileViewport ? [14, 20] : [24, 36],
-        autoPanPaddingBottomRight: isMobileViewport ? [14, 20] : [24, 36],
+        // Leaflet's own autoPan and our panMapToFitMarkerPopup/centerMapOnMarkerAndPopup calls
+        // (fired right after every openPopup()) both try to keep the popup on screen -- leaving
+        // autoPan on let the two race, each measuring the popup mid-way through the other's
+        // pan and sometimes settling in a visibly wrong spot. Disabling it makes our own
+        // functions, which account for the marker's position too (not just the popup's), the
+        // single source of truth for where the map ends up.
+        autoPan: false,
         keepInView: false
       });
       if (onSelectPlace) marker.on('click', () => onSelectPlace(place, { fromMap: true }));
@@ -1171,26 +1180,25 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
     const marker = markersByIdRef.current.get(focusPlace.id);
     if (!marker) return;
     if (focusPlace.fromMap) {
+      // Clicked directly on a pin that's already on screen -- just open its popup and nudge
+      // the view only if that popup would otherwise clip against the map edge, rather than
+      // re-centering the whole map around a marker the user can already see.
       try { marker.openPopup(); } catch (e) {}
+      requestAnimationFrame(() => panMapToFitMarkerPopup(mapRef.current, marker, { animate: true }));
       return;
     }
-    const isMobileViewport = window.innerWidth <= 720;
-    
     const performFocus = () => {
       if (!mapRef.current) return;
       const map = mapRef.current;
       const zoom = 16;
-      const latlng = marker.getLatLng();
-      const size = map.getSize();
-      const targetPoint = map.project(latlng, zoom);
-      const offsetY = Math.min(Math.round(size.y * 0.28), isMobileViewport ? 90 : 140);
-      targetPoint.y += offsetY;
-      map.setView(map.unproject(targetPoint, zoom), zoom, { animate: false });
+      map.setView(marker.getLatLng(), zoom, { animate: false });
       requestAnimationFrame(() => {
         try { marker.openPopup(); } catch (e) {}
-        // Give mobile popups a little more breathing room so the popup doesn't end up
-        // visually glued to the header or the map edge after zooming into a single place.
-        panMapToFitMarkerPopup(map, marker, { pad: isMobileViewport ? 28 : 28, animate: true });
+        // Re-center on the marker+popup as one combined block (not just the marker's own
+        // point) once the popup has actually rendered and its real size is known -- a plain
+        // marker-centered setView above would leave the popup, which opens upward from the
+        // pin, pushed off toward one edge instead of the whole pin+bubble sitting mid-screen.
+        centerMapOnMarkerAndPopup(map, marker, { animate: true });
       });
     };
 

@@ -6202,7 +6202,13 @@ function CalendarApp() {
     "data-confirmed-count": visibleConfirmedMeetings.length === 1 ? 'one' : visibleConfirmedMeetings.length === 2 ? 'two' : 'three-plus',
     style: { display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: '8px', marginBottom: '12px', alignItems: 'center', width: '100%' }
   }, visibleConfirmedMeetings.map(meeting => {
-    const isExpanded = visibleConfirmedMeetings.length === 1 || !!expandedConfirmedDates[meeting.date];
+    // A lone confirmed meeting defaults to the expanded banner (no need to tap to see it), but
+    // once the user has explicitly toggled it, that explicit choice always wins -- otherwise the
+    // forced-expanded default fights the collapse animation started by toggleConfirmedDateExpand
+    // and the card gets stuck mid-collapse instead of settling back into the small icon state.
+    const isExpanded = meeting.date in expandedConfirmedDates
+      ? expandedConfirmedDates[meeting.date]
+      : visibleConfirmedMeetings.length === 1;
     const memoEntries = getActiveAvailabilities(activeCal).filter(e => e.date === meeting.date && e.note && e.note.trim());
     const [y, m, d] = meeting.date.split('-');
     const dateObj = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
@@ -9930,38 +9936,55 @@ function buildPlaceMarkerHtml(category, visitStatus = 'visited') {
 // (a fixed emoji from a controlled lookup table), never raw user text, so that stays safe as a
 // string template.
 
-// After opening a Leaflet popup, pan so the full popup+marker stays inside the map pane.
-// Previous panBy([0, -h]) pushed the pin toward the bottom edge on desktop, clipping tall
-// visit-history popups under the map grip / category tabs.
+// Shared by panMapToFitMarkerPopup and centerMapOnMarkerAndPopup below: the on-screen rect of
+// the marker icon plus its open popup (if any), unioned into one box -- "the marker+popup as one
+// visual chunk" that both functions position relative to the map container.
+function getMarkerPopupUnionRect(marker) {
+  const markerEl = marker && marker.getElement && marker.getElement();
+  if (!markerEl) return null;
+  const markerRect = markerEl.getBoundingClientRect();
+  const popup = marker.getPopup && marker.getPopup();
+  const popupEl = popup && popup.isOpen && popup.isOpen() && popup.getElement && popup.getElement();
+  if (!popupEl) return markerRect;
+  const popupRect = popupEl.getBoundingClientRect();
+  const left = Math.min(markerRect.left, popupRect.left);
+  const top = Math.min(markerRect.top, popupRect.top);
+  const right = Math.max(markerRect.right, popupRect.right);
+  const bottom = Math.max(markerRect.bottom, popupRect.bottom);
+  return { left, top, right, bottom, width: right - left, height: bottom - top };
+}
+
+// After opening a Leaflet popup, pan just enough to keep the full popup+marker inside the map
+// pane -- a minimal nudge, not a re-center, so clicking a marker that's already on screen doesn't
+// jump the view around. Previous panBy([0, -h]) pushed the pin toward the bottom edge on desktop,
+// clipping tall visit-history popups under the map grip / category tabs.
 function panMapToFitMarkerPopup(map, marker, opts) {
   if (!map || !marker) return;
   const pad = (opts && opts.pad) || 16;
   const tryPan = () => {
-    if (!map) return;
-    const popup = marker.getPopup && marker.getPopup();
-    const el = popup && popup.getElement && popup.getElement();
-    if (!el || !map.getContainer()) return;
+    if (!map || !map.getContainer()) return;
+    const unionRect = getMarkerPopupUnionRect(marker);
+    if (!unionRect) return;
     const mapRect = map.getContainer().getBoundingClientRect();
-    const popupRect = el.getBoundingClientRect();
     if (mapRect.height <= 0 || mapRect.width <= 0) return;
     let dx = 0;
     let dy = 0;
-    // If popup is taller than or close to map height, anchor top to top + pad and stop bouncing
-    if (popupRect.height >= mapRect.height - pad * 2) {
-      if (popupRect.top < mapRect.top + pad) {
-        dy = popupRect.top - (mapRect.top + pad);
+    // If the chunk is taller than or close to map height, anchor top to top + pad and stop bouncing
+    if (unionRect.height >= mapRect.height - pad * 2) {
+      if (unionRect.top < mapRect.top + pad) {
+        dy = unionRect.top - (mapRect.top + pad);
       }
     } else {
-      if (popupRect.top < mapRect.top + pad) {
-        dy = popupRect.top - (mapRect.top + pad);
-      } else if (popupRect.bottom > mapRect.bottom - pad) {
-        dy = popupRect.bottom - (mapRect.bottom - pad);
+      if (unionRect.top < mapRect.top + pad) {
+        dy = unionRect.top - (mapRect.top + pad);
+      } else if (unionRect.bottom > mapRect.bottom - pad) {
+        dy = unionRect.bottom - (mapRect.bottom - pad);
       }
     }
-    if (popupRect.left < mapRect.left + pad) {
-      dx = popupRect.left - (mapRect.left + pad);
-    } else if (popupRect.right > mapRect.right - pad) {
-      dx = popupRect.right - (mapRect.right - pad);
+    if (unionRect.left < mapRect.left + pad) {
+      dx = unionRect.left - (mapRect.left + pad);
+    } else if (unionRect.right > mapRect.right - pad) {
+      dx = unionRect.right - (mapRect.right - pad);
     }
     // Limit max single pan shift to 35% of map container height to prevent pushing marker off screen
     const maxShiftY = mapRect.height * 0.35;
@@ -9971,6 +9994,31 @@ function panMapToFitMarkerPopup(map, marker, opts) {
     }
   };
   requestAnimationFrame(() => requestAnimationFrame(tryPan));
+}
+
+// Deliberate jump-to-place navigation (picking a row in the place list): unlike the minimal nudge
+// above, this always re-centers so the marker+popup chunk -- as one combined block, not just the
+// marker's own point -- lands in the middle of the map pane, regardless of where it happened to
+// render after the zoom/pan that opened the popup.
+function centerMapOnMarkerAndPopup(map, marker, opts) {
+  if (!map || !marker) return;
+  const tryCenter = () => {
+    if (!map || !map.getContainer()) return;
+    const unionRect = getMarkerPopupUnionRect(marker);
+    if (!unionRect) return;
+    const mapRect = map.getContainer().getBoundingClientRect();
+    if (mapRect.height <= 0 || mapRect.width <= 0) return;
+    const unionCenterX = (unionRect.left + unionRect.right) / 2;
+    const unionCenterY = (unionRect.top + unionRect.bottom) / 2;
+    const mapCenterX = mapRect.left + mapRect.width / 2;
+    const mapCenterY = mapRect.top + mapRect.height / 2;
+    const dx = unionCenterX - mapCenterX;
+    const dy = unionCenterY - mapCenterY;
+    if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
+      map.panBy([dx, dy], { animate: opts && opts.animate !== false });
+    }
+  };
+  requestAnimationFrame(() => requestAnimationFrame(tryCenter));
 }
 
 function PlaceMapView(props) {
@@ -10235,6 +10283,7 @@ function bindGatherUiDeps() {
     loadLeafletMarkerCluster: typeof loadLeafletMarkerCluster === 'function' ? loadLeafletMarkerCluster : null,
     buildPlaceMarkerHtml: typeof buildPlaceMarkerHtml === 'function' ? buildPlaceMarkerHtml : null,
     panMapToFitMarkerPopup: typeof panMapToFitMarkerPopup === 'function' ? panMapToFitMarkerPopup : null,
+    centerMapOnMarkerAndPopup: typeof centerMapOnMarkerAndPopup === 'function' ? centerMapOnMarkerAndPopup : null,
     PLACE_MAP_DEFAULT_CENTER: typeof PLACE_MAP_DEFAULT_CENTER !== 'undefined' ? PLACE_MAP_DEFAULT_CENTER : null,
     PLACE_MAP_DEFAULT_ZOOM: typeof PLACE_MAP_DEFAULT_ZOOM !== 'undefined' ? PLACE_MAP_DEFAULT_ZOOM : null,
     GalleryIcon: typeof GalleryIcon === 'function' ? GalleryIcon : null,
