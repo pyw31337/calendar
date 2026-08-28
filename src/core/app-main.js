@@ -3213,12 +3213,12 @@ function CalendarApp() {
       showToast('지원하지 않는 캘린더', 'error', 5000);
       return;
     }
-    if (requestedId && !calendars.some(c => c.id === requestedId)) {
+    if (requestedId && !(calendarsRef.current || []).some(c => c.id === requestedId)) {
       const resolveRequestedCalendar = async () => {
         const existing = await fetchSingleCloudCalendar(requestedId, 1);
         if (cancelled) return;
         if (existing?.calendar) {
-          applyServerCalendars(mergeCalendarCollections(calendars, [existing.calendar], {
+          applyServerCalendars(mergeCalendarCollections(calendarsRef.current || [], [existing.calendar], {
             replaceMatchingId: true
           }), existing.lastModified || Date.now());
           setActiveCalId(requestedId);

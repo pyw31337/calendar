@@ -1769,6 +1769,32 @@ function stripEmbeddedActivityLogsField(calendar) {
   return rest;
 }
 
+// Retries a fire-and-forget legacy subcollection migration write (activityLogs/places/
+// confirmedMeetings) a few times before giving up. These calls run detached from the calendar
+// save that triggered them -- the caller never awaits them -- so a single transient failure
+// used to just log a warning and silently drop that batch of legacy data for good, since it had
+// already been stripped from the calendar document by the time this write was attempted. Each
+// underlying write function is idempotent (documents are keyed by their own id), so retrying is
+// always safe.
+async function retryLegacySubcollectionWrite(writeFn, calendarId, items, label, attempts = 3) {
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      const ok = await writeFn(calendarId, items);
+      if (ok) return true;
+    } catch (e) {
+      if (attempt === attempts) {
+        console.error(`${label} persist failed for ${calendarId} after ${attempts} attempts:`, e);
+        return false;
+      }
+    }
+    if (attempt < attempts) {
+      await new Promise(resolve => setTimeout(resolve, 400 * attempt));
+    }
+  }
+  console.error(`${label} persist failed for ${calendarId} after ${attempts} attempts`);
+  return false;
+}
+
 // Writes a batch of activity log entries as individual documents, keyed by each log's own
 // `id` so retries/re-copies of the same entry are idempotent no-ops rather than duplicates.
 async function writeActivityLogsToFirestore(calendarId, logs) {
@@ -2246,13 +2272,13 @@ async function pushSingleCalendarWithRest(normalizedCal, lastModified, saveMode,
       if (commitRes.ok) {
         const logsToPersist = [...legacyActivityLogs, ...(Array.isArray(newActivityLogs) ? newActivityLogs : [])];
         if (logsToPersist.length) {
-          writeActivityLogsToFirestore(normalizedCal.id, logsToPersist).catch(e => console.warn('Activity log persist failed:', e));
+          retryLegacySubcollectionWrite(writeActivityLogsToFirestore, normalizedCal.id, logsToPersist, 'Activity log').catch(() => {});
         }
         if (legacyPlaces.length) {
-          writePlacesToFirestore(normalizedCal.id, legacyPlaces).catch(e => console.warn('Places persist failed:', e));
+          retryLegacySubcollectionWrite(writePlacesToFirestore, normalizedCal.id, legacyPlaces, 'Places').catch(() => {});
         }
         if (legacyConfirmedMeetings.length) {
-          writeConfirmedMeetingsToFirestore(normalizedCal.id, legacyConfirmedMeetings).catch(e => console.warn('Confirmed meetings persist failed:', e));
+          retryLegacySubcollectionWrite(writeConfirmedMeetingsToFirestore, normalizedCal.id, legacyConfirmedMeetings, 'Confirmed meetings').catch(() => {});
         }
         return true;
       }
@@ -2364,17 +2390,37 @@ async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 18,
 	      ]);
 	      const logsToPersist = [...legacyActivityLogs, ...(Array.isArray(newActivityLogs) ? newActivityLogs : [])];
 	      if (logsToPersist.length) {
-	        writeActivityLogsToFirestore(normalizedCal.id, logsToPersist).catch(e => console.warn('Activity log persist failed:', e));
+	        retryLegacySubcollectionWrite(writeActivityLogsToFirestore, normalizedCal.id, logsToPersist, 'Activity log').catch(() => {});
 	      }
 	      if (legacyPlaces.length) {
-	        writePlacesToFirestore(normalizedCal.id, legacyPlaces).catch(e => console.warn('Places persist failed:', e));
+	        retryLegacySubcollectionWrite(writePlacesToFirestore, normalizedCal.id, legacyPlaces, 'Places').catch(() => {});
 	      }
 	      if (legacyConfirmedMeetings.length) {
-	        writeConfirmedMeetingsToFirestore(normalizedCal.id, legacyConfirmedMeetings).catch(e => console.warn('Confirmed meetings persist failed:', e));
+	        retryLegacySubcollectionWrite(writeConfirmedMeetingsToFirestore, normalizedCal.id, legacyConfirmedMeetings, 'Confirmed meetings').catch(() => {});
 	      }
 	      return true;
     } catch (e) {
       console.warn(`Firestore push notice for cal_${normalizedCal.id}:`, e);
+      // The transaction above has no cancellation hook, so on a timeout it can still land after
+      // we've moved on. Give it a brief grace period, then check whether it actually committed
+      // before starting a second, independent REST write -- avoids the common case of both
+      // writes landing and double-bumping revision when the transaction was merely slow, not
+      // actually stuck offline.
+      if (raceLost) {
+        try {
+          await new Promise(resolve => setTimeout(resolve, 1500));
+          const docPath = `projects/metro-live-2918e/databases/(default)/documents/calendars/cal_${normalizedCal.id}`;
+          const checkRes = await fetch(`https://firestore.googleapis.com/v1/${docPath}`);
+          if (checkRes.ok) {
+            const checkData = firestoreDocumentToJs(await checkRes.json());
+            if ((checkData?.calendar?.updatedAt || 0) >= (lastModified || 0) && (checkData?.lastModified || 0) >= (lastModified || 0)) {
+              return true;
+            }
+          }
+        } catch (checkErr) {
+          console.warn(`Firestore push timeout follow-up check failed for cal_${normalizedCal.id}:`, checkErr);
+        }
+      }
     }
   }
   return pushSingleCalendarWithRest(normalizedCal, lastModified, saveMode, retryCount, newActivityLogs);
