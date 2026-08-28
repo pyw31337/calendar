@@ -5335,10 +5335,69 @@ function App() {
     operationProgress && !chatUploadProgress && /*#__PURE__*/React.createElement(OperationProgressOverlay, operationProgress),
     chatUploadProgress && /*#__PURE__*/React.createElement(ImageUploadOverlay, chatUploadProgress)
   );
+  const localGalleryCount = (() => {
+    const directUrls = new Set();
+    const persistentBroken = (window.GATHER_APP_UTILS && window.GATHER_APP_UTILS.getPersistentBrokenPhotoUrls)
+      ? window.GATHER_APP_UTILS.getPersistentBrokenPhotoUrls()
+      : new Set();
+    const isBroken = val => {
+      const u = String(val || '').trim().split(/[?#]/)[0];
+      return !u || persistentBroken.has(u);
+    };
+
+    getConfirmedMeetings(activeCal).forEach(meeting => {
+      const photos = Array.isArray(meeting?.photos) ? meeting.photos : [];
+      photos.forEach(photo => {
+        const u = photo?.imageUrl || photo?.full || photo?.thumbUrl || photo?.thumb;
+        if (u && !isBroken(u) && !directUrls.has(u)) {
+          directUrls.add(u);
+        }
+      });
+    });
+    const allMsgs = (allChatMessages && allChatMessages.length > 0) ? allChatMessages : (chatMessages || []);
+    allMsgs.forEach(msg => {
+      if (!msg || isTombstone(msg)) return;
+      const getEntries = typeof getMessageImageEntries === 'function' ? getMessageImageEntries : null;
+      const getDirect = typeof getAllDirectMediaImageEntries === 'function' ? getAllDirectMediaImageEntries : (typeof getMessageDirectMediaEntry === 'function' ? m => [getMessageDirectMediaEntry(m)].filter(Boolean) : () => []);
+      const entries = getEntries ? [...getEntries(msg), ...getDirect(msg)] : [];
+      if (entries.length > 0) {
+        entries.forEach(e => {
+          const u = e.full || e.thumb || e.imageUrl;
+          if (u && !isBroken(u) && !directUrls.has(u)) {
+            directUrls.add(u);
+          }
+        });
+      } else {
+        const u = msg.imageUrl || msg.thumbUrl;
+        if (u && !isBroken(u) && !directUrls.has(u)) {
+          directUrls.add(u);
+        }
+      }
+    });
+    (memos || []).forEach(memo => {
+      if (!memo || isTombstone(memo)) return;
+      const asMsg = {
+        id: memo.id, text: memo.text || memo.content || memo.body || '',
+        imageUrl: memo.imageUrl, imageUrls: memo.imageUrls, thumbUrl: memo.thumbUrl, thumbUrls: memo.thumbUrls,
+        timestamp: memo.updatedAt || memo.createdAt || 0, participantId: memo.participantId || ''
+      };
+      const getEntries = typeof getMessageImageEntries === 'function' ? getMessageImageEntries : null;
+      const getDirect = typeof getAllDirectMediaImageEntries === 'function' ? getAllDirectMediaImageEntries : () => [];
+      const entries = getEntries ? [...getEntries(asMsg), ...getDirect(asMsg)] : [];
+      entries.forEach(e => {
+        const u = e.full || e.thumb || e.imageUrl;
+        if (u && !isBroken(u) && !directUrls.has(u)) {
+          directUrls.add(u);
+        }
+      });
+    });
+    return directUrls.size;
+  })();
+
   const navChatCount = (typeof totalChatCount === 'number' && totalChatCount >= 0)
     ? totalChatCount
     : visibleChatMessages.length;
-  const navGalleryCount = (typeof localGalleryCount === 'number' && localGalleryCount > 0)
+  const navGalleryCount = (localGalleryCount > 0)
     ? localGalleryCount
     : ((typeof totalGalleryCount === 'number' && totalGalleryCount > 0) ? totalGalleryCount : 0);
   const navMemoCount = (typeof totalMemoCount === 'number' && totalMemoCount >= 0) ? totalMemoCount : (memos || []).length;
@@ -5837,64 +5896,6 @@ function App() {
     : visibleChatMessages.length;
   const mainMenuChatLatestTimestamp = visibleChatMessages.length > 0 ? visibleChatMessages[visibleChatMessages.length - 1].timestamp : 0;
   const mainMenuChatHasUnread = mainMenuChatLatestTimestamp > getChatLastReadTimestamp(activeCalId);
-  const localGalleryCount = (() => {
-    const directUrls = new Set();
-    const persistentBroken = (window.GATHER_APP_UTILS && window.GATHER_APP_UTILS.getPersistentBrokenPhotoUrls)
-      ? window.GATHER_APP_UTILS.getPersistentBrokenPhotoUrls()
-      : new Set();
-    const isBroken = val => {
-      const u = String(val || '').trim().split(/[?#]/)[0];
-      return !u || persistentBroken.has(u);
-    };
-
-    getConfirmedMeetings(activeCal).forEach(meeting => {
-      const photos = Array.isArray(meeting?.photos) ? meeting.photos : [];
-      photos.forEach(photo => {
-        const u = photo?.imageUrl || photo?.full || photo?.thumbUrl || photo?.thumb;
-        if (u && !isBroken(u) && !directUrls.has(u)) {
-          directUrls.add(u);
-        }
-      });
-    });
-    const allMsgs = (allChatMessages && allChatMessages.length > 0) ? allChatMessages : (chatMessages || []);
-    allMsgs.forEach(msg => {
-      if (!msg || isTombstone(msg)) return;
-      const getEntries = typeof getMessageImageEntries === 'function' ? getMessageImageEntries : null;
-      const getDirect = typeof getAllDirectMediaImageEntries === 'function' ? getAllDirectMediaImageEntries : (typeof getMessageDirectMediaEntry === 'function' ? m => [getMessageDirectMediaEntry(m)].filter(Boolean) : () => []);
-      const entries = getEntries ? [...getEntries(msg), ...getDirect(msg)] : [];
-      if (entries.length > 0) {
-        entries.forEach(e => {
-          const u = e.full || e.thumb || e.imageUrl;
-          if (u && !isBroken(u) && !directUrls.has(u)) {
-            directUrls.add(u);
-          }
-        });
-      } else {
-        const u = msg.imageUrl || msg.thumbUrl;
-        if (u && !isBroken(u) && !directUrls.has(u)) {
-          directUrls.add(u);
-        }
-      }
-    });
-    (memos || []).forEach(memo => {
-      if (!memo || isTombstone(memo)) return;
-      const asMsg = {
-        id: memo.id, text: memo.text || memo.content || memo.body || '',
-        imageUrl: memo.imageUrl, imageUrls: memo.imageUrls, thumbUrl: memo.thumbUrl, thumbUrls: memo.thumbUrls,
-        timestamp: memo.updatedAt || memo.createdAt || 0, participantId: memo.participantId || ''
-      };
-      const getEntries = typeof getMessageImageEntries === 'function' ? getMessageImageEntries : null;
-      const getDirect = typeof getAllDirectMediaImageEntries === 'function' ? getAllDirectMediaImageEntries : () => [];
-      const entries = getEntries ? [...getEntries(asMsg), ...getDirect(asMsg)] : [];
-      entries.forEach(e => {
-        const u = e.full || e.thumb || e.imageUrl;
-        if (u && !isBroken(u) && !directUrls.has(u)) {
-          directUrls.add(u);
-        }
-      });
-    });
-    return directUrls.size;
-  })();
 
   const mainMenuMemoCount = (typeof totalMemoCount === 'number' && totalMemoCount >= 0)
     ? totalMemoCount
