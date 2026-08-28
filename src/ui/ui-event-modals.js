@@ -1482,9 +1482,15 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
   const TrashIcon = __comp.TrashIcon || __deps.TrashIcon || (() => '🗑');
   const PencilIcon = __comp.PencilIcon || __deps.PencilIcon || (() => '✎');
   const ParticipantBackdrop = __comp.ParticipantBackdrop || __deps.ParticipantBackdrop;
-  const ChevronLeftIcon = __comp.ChevronLeftIcon || __deps.ChevronLeftIcon || (() => '‹');
-  const ChevronRightIcon = __comp.ChevronRightIcon || __deps.ChevronRightIcon || (() => '›');
   const FormAddEditActionButtons = __comp.FormAddEditActionButtons || __deps.FormAddEditActionButtons;
+  const MainCalendarArrow = ({ direction }) => React.createElement('svg', {
+    xmlns: 'http://www.w3.org/2000/svg', width: '20', height: '20', viewBox: '0 0 24 24',
+    fill: 'none', stroke: 'currentColor', strokeWidth: '2', strokeLinecap: 'round', strokeLinejoin: 'round',
+    style: { transform: direction === 'left' ? 'rotate(90deg)' : 'rotate(-90deg)' }
+  },
+    React.createElement('path', { stroke: 'none', d: 'M0 0h24v24H0z', fill: 'none' }),
+    React.createElement('path', { d: 'M6 9l6 6l6 -6' })
+  );
 
   const cardToEdit = initialData || null;
   const isEditing = !!cardToEdit;
@@ -2061,7 +2067,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
               React.createElement('button', {
                 type: 'button', className: 'btn btn-secondary calendar-month-nav-btn', style: { width: '32px', height: '32px', padding: '6px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' },
                 onClick: handlePrevMonth
-              }, React.createElement(ChevronLeftIcon, { size: 20 })),
+              }, React.createElement(MainCalendarArrow, { direction: 'left' })),
               React.createElement('div', {
                 className: 'month-display',
                 style: { cursor: 'default', userSelect: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: '48px', height: '32px', fontSize: '0.86rem', fontWeight: 800 }
@@ -2069,7 +2075,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
               React.createElement('button', {
                 type: 'button', className: 'btn btn-secondary calendar-month-nav-btn', style: { width: '32px', height: '32px', padding: '6px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' },
                 onClick: handleNextMonth
-              }, React.createElement(ChevronRightIcon, { size: 20 }))
+              }, React.createElement(MainCalendarArrow, { direction: 'right' }))
             )
           ),
           React.createElement('div', {
