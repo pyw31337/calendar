@@ -2081,7 +2081,6 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
             style: { display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '2px' }
           },
             personalParticipantPickerOptions.map(option => {
-              const total = personalExpenseTotals.get(option.value) || 0;
               const individualSettlement = getIndividualSettlementAmount(option.value);
               const participant = activeParticipants.find(p => (typeof p === 'string' ? p : (p?.name || p?.id)) === option.value) || { name: option.value, color: option.color };
               return React.createElement('div', {
