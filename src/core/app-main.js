@@ -1219,26 +1219,6 @@ function CalendarApp() {
     (chatMessages || []).forEach(m => { if (m && m.id) byId.set(m.id, m); });
     return Array.from(byId.values()).sort((a, b) => Number(a.timestamp || 0) - Number(b.timestamp || 0));
   }, [olderChatMessages, chatMessages]);
-  const [fullChatHistoryByCalendar, setFullChatHistoryByCalendar] = React.useState({});
-  const fullChatMessages = fullChatHistoryByCalendar[activeCalId] || null;
-  const displayChatMessages = React.useMemo(() => {
-    if (!Array.isArray(fullChatMessages)) return allChatMessages;
-    const byId = new Map(fullChatMessages.filter(m => m?.id).map(m => [m.id, m]));
-    allChatMessages.forEach(m => { if (m?.id) byId.set(m.id, m); });
-    return Array.from(byId.values()).sort((a, b) => Number(a.timestamp || 0) - Number(b.timestamp || 0));
-  }, [allChatMessages, fullChatMessages]);
-  React.useEffect(() => {
-    if (!activeCalId || (activeView !== 'chat' && activeView !== 'gallery') || fullChatHistoryByCalendar[activeCalId] !== undefined) return;
-    if (!firebaseDb) return;
-    let cancelled = false;
-    firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages').get({ source: 'server' }).then(snapshot => {
-      if (cancelled) return;
-      const list = snapshot.docs.map(doc => slimMessageForClient({ id: doc.id, ...doc.data() }));
-      setFullChatHistoryByCalendar(prev => ({ ...prev, [activeCalId]: list }));
-      setHasMoreOlderChat(false);
-    }).catch(err => console.warn('full chat history load failed:', err));
-    return () => { cancelled = true; };
-  }, [activeCalId, activeView, fullChatHistoryByCalendar]);
   const [memos, setMemos] = React.useState([]);
   const [memosLimit, setMemosLimit] = React.useState(MEMOS_PAGE_SIZE);
   const [hasMoreMemos, setHasMoreMemos] = React.useState(false);
@@ -1331,6 +1311,26 @@ function CalendarApp() {
     return params.get('view') || 'calendar';
   };
   const [activeView, setActiveView] = React.useState(getActiveViewFromURL);
+  const [fullChatHistoryByCalendar, setFullChatHistoryByCalendar] = React.useState({});
+  const fullChatMessages = fullChatHistoryByCalendar[activeCalId] || null;
+  const displayChatMessages = React.useMemo(() => {
+    if (!Array.isArray(fullChatMessages)) return allChatMessages;
+    const byId = new Map(fullChatMessages.filter(m => m?.id).map(m => [m.id, m]));
+    allChatMessages.forEach(m => { if (m?.id) byId.set(m.id, m); });
+    return Array.from(byId.values()).sort((a, b) => Number(a.timestamp || 0) - Number(b.timestamp || 0));
+  }, [allChatMessages, fullChatMessages]);
+  React.useEffect(() => {
+    if (!activeCalId || (activeView !== 'chat' && activeView !== 'gallery') || fullChatHistoryByCalendar[activeCalId] !== undefined) return;
+    if (!firebaseDb) return;
+    let cancelled = false;
+    firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages').get({ source: 'server' }).then(snapshot => {
+      if (cancelled) return;
+      const list = snapshot.docs.map(doc => slimMessageForClient({ id: doc.id, ...doc.data() }));
+      setFullChatHistoryByCalendar(prev => ({ ...prev, [activeCalId]: list }));
+      setHasMoreOlderChat(false);
+    }).catch(err => console.warn('full chat history load failed:', err));
+    return () => { cancelled = true; };
+  }, [activeCalId, activeView, fullChatHistoryByCalendar]);
   // The chat embed the user tapped play on -- { key, embedUrl, provider, orientation, title } |
   // null. Once set, it's rendered through a SINGLE always-mounted portal iframe (StickyVideoBox)
   // that never unmounts across view/tab switches, so playback genuinely never stops -- only its
