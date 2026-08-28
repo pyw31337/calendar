@@ -1754,6 +1754,28 @@ function CalendarApp() {
     };
   }, [activeCalId, cloudReloadToken, restoreActiveCalendarFromCache, applyCalendarSnapshot]);
 
+  // Mobile browsers routinely freeze a tab while it is backgrounded. Firestore can then
+  // resume with a cached snapshot without promptly reopening its listen stream. Recreating
+  // this calendar listener on return to the foreground also runs the existing source:'server'
+  // fallback, so a user never needs DevTools/Clear Storage just to recover a fresh document.
+  React.useEffect(() => {
+    if (typeof document === 'undefined' || !activeCalId) return undefined;
+    let lastVisibleAt = 0;
+    const refreshOnForeground = () => {
+      if (document.visibilityState !== 'visible' || isSavingRef.current) return;
+      const now = Date.now();
+      if (now - lastVisibleAt < 1200) return;
+      lastVisibleAt = now;
+      setCloudReloadToken(token => token + 1);
+    };
+    document.addEventListener('visibilitychange', refreshOnForeground);
+    window.addEventListener('pageshow', refreshOnForeground);
+    return () => {
+      document.removeEventListener('visibilitychange', refreshOnForeground);
+      window.removeEventListener('pageshow', refreshOnForeground);
+    };
+  }, [activeCalId]);
+
   React.useEffect(() => {
     if (firebaseDb) return;
     if (firebaseRetryExhausted) {

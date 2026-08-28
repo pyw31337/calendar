@@ -549,6 +549,15 @@ function mergeCalendarAvailabilityDelta(serverCalendar, incomingCalendar, change
     activityLogs: mergeActivityLogs(base.activityLogs || [], incoming.activityLogs || [], base.id || incoming.id, participantIds),
     polls: base.polls || [],
     deletedActivityLogIds: mergeDeletedActivityLogIds(base.deletedActivityLogIds || [], incoming.deletedActivityLogIds || []),
+    // Preserve unrelated calendar-document fields when an availability-only write is
+    // performed. These fields used to disappear from the merged write payload, which was
+    // especially damaging for settlement cards because the next realtime snapshot then
+    // legitimately contained the previous/empty card set on other devices.
+    expenseCategories: incoming.expenseCategories !== undefined ? incoming.expenseCategories : base.expenseCategories,
+    settlementCards: incoming.settlementCards !== undefined ? incoming.settlementCards : base.settlementCards,
+    places: incoming.places !== undefined ? incoming.places : base.places,
+    placeCategories: incoming.placeCategories !== undefined ? incoming.placeCategories : base.placeCategories,
+    settlementBaseBudget: incoming.settlementBaseBudget !== undefined ? incoming.settlementBaseBudget : base.settlementBaseBudget,
     updatedAt: Math.max(base.updatedAt || 0, incoming.updatedAt || 0, changedAt || 0),
     revision: Math.max(base.revision || 0, incoming.revision || 0)
   };
@@ -736,67 +745,24 @@ function __gatherSafeLocalStorage() {
 }
 
 function loadLocalCache() {
-  // Instant paint from last successful cloud snapshot. Firestore remains source of truth
-  // and replaces this via onSnapshot (revision/lastModified gated).
+  // Deliberately disabled. Calendar data is collaborative and must never render from a
+  // previous browser session before the server snapshot arrives. Remove the old keys once so
+  // an upgrade also stops retaining the legacy full-calendar payload on the device.
   try {
     const ls = __gatherSafeLocalStorage();
     if (!ls) return [];
-    ['v1', 'cache_v1', 'cache_v2', 'cache_v3', 'cache_v4'].forEach(v => {
+    ['v1', 'cache_v1', 'cache_v2', 'cache_v3', 'cache_v4', 'cache_v5'].forEach(v => {
       try { ls.removeItem(`gather_calendars_${v}`); } catch (_) {}
     });
-    const raw = ls.getItem(GATHER_LOCAL_CACHE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed
-      .filter(c => c && typeof c.id === 'string' && isAllowedCalendarId(c.id))
-      .map(c => cloneCalendar(c))
-      .filter(Boolean);
   } catch (e) {
-    console.warn('loadLocalCache notice:', e);
-    return [];
+    // Storage may be unavailable in private browsing; that is fine because the cache is not
+    // required for the server-first loading path.
   }
+  return [];
 }
 
 function saveLocalCache(list) {
-  try {
-    const ls = __gatherSafeLocalStorage();
-    if (!ls || !Array.isArray(list)) return;
-    const slim = list
-      .filter(c => c && isAllowedCalendarId(c.id))
-      .map(c => {
-        const next = cloneCalendar(c);
-        if (!next) return null;
-        if (Array.isArray(next.activityLogs) && next.activityLogs.length > 80) {
-          next.activityLogs = next.activityLogs.slice(-80);
-        }
-        return next;
-      })
-      .filter(Boolean);
-    if (slim.length === 0) return;
-    ls.setItem(GATHER_LOCAL_CACHE_KEY, JSON.stringify(slim));
-  } catch (e) {
-    try {
-      const ls = __gatherSafeLocalStorage();
-      if (!ls || !Array.isArray(list)) return;
-      const tiny = list.filter(c => c && isAllowedCalendarId(c.id)).slice(0, 3).map(c => ({
-        id: c.id,
-        title: c.title,
-        description: c.description,
-        participants: c.participants,
-        availabilities: c.availabilities,
-        polls: c.polls,
-        places: c.places,
-        confirmedMeeting: c.confirmedMeeting,
-        revision: c.revision,
-        updatedAt: c.updatedAt
-      }));
-      if (tiny.length === 0) return;
-      ls.setItem(GATHER_LOCAL_CACHE_KEY, JSON.stringify(tiny));
-    } catch (e2) {
-      console.warn('saveLocalCache notice:', e2);
-    }
-  }
+  // Intentionally no-op: localStorage is not a source of truth for collaborative calendar data.
 }
 
 function isLoadingCalendarShell(calendar) {
@@ -1029,13 +995,10 @@ function attemptFirebaseInit() {
     } catch (settingsErr) {
       console.warn('Firestore settings init notice:', settingsErr);
     }
-    try {
-      firebase.firestore().enablePersistence({ synchronizeTabs: true }).catch(function (err) {
-        console.warn('Firestore persistence notice:', err && err.code || err);
-      });
-    } catch (persistErr) {
-      console.warn('Firestore persistence init notice:', persistErr);
-    }
+    // Do not enable Firestore IndexedDB persistence. A stale persistent snapshot can survive
+    // browser restarts and keep a broken/restricted realtime transport looking healthy while
+    // displaying old collaborative data. This app prioritizes server freshness over offline
+    // calendar access; Firestore still keeps its normal in-memory state for the live listener.
     bindGatherFirebaseDeps();
   } catch (e) {
     const detail = (e && (e.code || e.message)) ? String(e.code || e.message) : String(e);
@@ -1217,7 +1180,10 @@ async function fetchSingleCalendarWithRest(calId, timeoutMs = FIREBASE_LOAD_TIME
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const docUrl = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/calendars/cal_${calId}`;
-    const response = await fetch(docUrl, { signal: controller.signal });
+    // This endpoint is our last-resort server-truth path. Explicitly bypass the browser HTTP
+    // cache: a normal tab must not be able to replay an older Firestore REST response while an
+    // incognito tab sees the current document.
+    const response = await fetch(docUrl, { signal: controller.signal, cache: 'no-store' });
     if (!response.ok) return null;
     const decoded = firestoreDocumentToJs(await response.json());
     if (decoded?.calendar?.id !== calId) return null;
@@ -1570,6 +1536,13 @@ async function fetchSingleCloudCalendar(calId, retryCount = FIREBASE_LOAD_MAX_AT
   const attempts = Math.max(1, retryCount);
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     try {
+      // Prefer the uncached REST read for the initial/foreground refresh. Firestore's SDK
+      // listener is still the realtime transport, but when a browser's persistent SDK cache or
+      // transport is unhealthy, returning its first value here can permanently bless stale data
+      // and prevent the REST fallback from ever running. The REST read is also the same server
+      // truth that makes the private/incognito comparison useful during diagnosis.
+      const restResult = await fetchSingleCalendarWithRest(calId, timeoutMs);
+      if (restResult) return restResult;
       if (firebaseDb) {
         try {
           const doc = await Promise.race([
@@ -1590,8 +1563,6 @@ async function fetchSingleCloudCalendar(calId, retryCount = FIREBASE_LOAD_MAX_AT
           console.warn(`Firestore SDK server fetch notice for cal_${calId}, trying REST fallback:`, e);
         }
       }
-      const restResult = await fetchSingleCalendarWithRest(calId, timeoutMs);
-      if (restResult) return restResult;
     } catch (e) {
       console.warn(`Firestore fetch notice for cal_${calId}, attempt ${attempt}/${attempts}:`, e);
       const restResult = await fetchSingleCalendarWithRest(calId, timeoutMs);
@@ -2470,36 +2441,16 @@ async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 18,
   return pushSingleCalendarWithRest(normalizedCal, lastModified, saveMode, retryCount, newActivityLogs);
 }
 function loadLocalMeta() {
+  // Revision metadata must not outlive the page that received it. Persistent metadata can
+  // reject a valid server snapshot after a restore/import or data migration.
   try {
     const ls = __gatherSafeLocalStorage();
-    if (!ls) return { lastModified: 0, byCalendar: {}, revision: 0, byCalendarRevision: {} };
-    const raw = ls.getItem(GATHER_LOCAL_META_KEY);
-    if (!raw) return { lastModified: 0, byCalendar: {}, revision: 0, byCalendarRevision: {} };
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== 'object') return { lastModified: 0, byCalendar: {}, revision: 0, byCalendarRevision: {} };
-    return {
-      lastModified: typeof parsed.lastModified === 'number' ? parsed.lastModified : 0,
-      byCalendar: parsed.byCalendar && typeof parsed.byCalendar === 'object' ? parsed.byCalendar : {},
-      revision: typeof parsed.revision === 'number' ? parsed.revision : 0,
-      byCalendarRevision: parsed.byCalendarRevision && typeof parsed.byCalendarRevision === 'object' ? parsed.byCalendarRevision : {}
-    };
-  } catch (_) {
-    return { lastModified: 0, byCalendar: {}, revision: 0, byCalendarRevision: {} };
-  }
+    if (ls) ls.removeItem(GATHER_LOCAL_META_KEY);
+  } catch (_) {}
+  return { lastModified: 0, byCalendar: {}, revision: 0, byCalendarRevision: {} };
 }
 function saveLocalMeta(meta) {
-  try {
-    const ls = __gatherSafeLocalStorage();
-    if (!ls || !meta) return;
-    ls.setItem(GATHER_LOCAL_META_KEY, JSON.stringify({
-      lastModified: typeof meta.lastModified === 'number' ? meta.lastModified : 0,
-      byCalendar: meta.byCalendar && typeof meta.byCalendar === 'object' ? meta.byCalendar : {},
-      revision: typeof meta.revision === 'number' ? meta.revision : 0,
-      byCalendarRevision: meta.byCalendarRevision && typeof meta.byCalendarRevision === 'object' ? meta.byCalendarRevision : {}
-    }));
-  } catch (e) {
-    console.warn('saveLocalMeta notice:', e);
-  }
+  // Intentionally no-op: revision guards are session-local only.
 }
 
 function getMetaLastModified(meta, calendarId) {
