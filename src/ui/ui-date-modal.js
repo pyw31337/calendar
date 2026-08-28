@@ -1320,6 +1320,10 @@ export function DateModal({
           mediaKey,
           refKey
         };
+      })
+      .filter((photo, index, photos) => {
+        const key = photo.mediaKey || photo.refKey || photo.id || photo.imageUrl || photo.thumbUrl;
+        return photos.findIndex(candidate => (candidate.mediaKey || candidate.refKey || candidate.id || candidate.imageUrl || candidate.thumbUrl) === key) === index;
       });
 
     const directKeys = new Set(directPhotos.map(p => p.mediaKey || p.refKey || p.id).filter(Boolean));
