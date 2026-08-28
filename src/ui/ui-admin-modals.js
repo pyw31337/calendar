@@ -269,6 +269,10 @@ function createCalendarBackupPayload(...args) {
   const f = __gatherUiDeps().createCalendarBackupPayload || GATHER_APP_UTILS.createCalendarBackupPayload;
   return typeof f === 'function' ? f(...args) : undefined;
 }
+function createCalendarDataBackupPayload(...args) {
+  const f = __gatherUiDeps().createCalendarDataBackupPayload || GATHER_APP_UTILS.createCalendarDataBackupPayload;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
 function createDefaultCalendar(...args) {
   const f = __gatherUiDeps().createDefaultCalendar || GATHER_APP_UTILS.createDefaultCalendar;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -846,7 +850,7 @@ export function AdminModal({
   const [logCategoryFilter, setLogCategoryFilter] = React.useState('all');
   const [logSearchQuery, setLogSearchQuery] = React.useState('');
 
-  const handleExportSelectedData = () => {
+  const handleExportSelectedData = async () => {
     if (!calendar) return;
     if (exportCategory === 'calendar') {
       if (getTrulyConfirmedMeetings(calendar).length === 0) {
@@ -862,7 +866,7 @@ export function AdminModal({
     let categoryName = '전체 데이터';
 
     if (exportCategory === 'full') {
-      exportData = calendar;
+      exportData = await createCalendarDataBackupPayload([calendar], calendar.id);
       categoryName = '전체 데이터';
     } else if (exportCategory === 'memo') {
       exportData = Array.isArray(calendar.memos) ? calendar.memos : [];

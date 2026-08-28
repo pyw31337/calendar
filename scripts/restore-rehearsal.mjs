@@ -128,6 +128,33 @@ ${script}
   }
   if (getActiveAvailabilities(merged).length !== 2) throw new Error('active availability restore count failed');
   if (validateCalendarShape(merged)) throw new Error('merged rehearsal calendar failed shape validation');
+
+  // Exercise the v2 payload shape used by the user/admin backup controls. Collections are
+  // intentionally kept as independent documents so restoring one calendar replaces stale
+  // subcollection records instead of silently falling back to embedded legacy fields.
+  const collectionNames = ['messages', 'memos', 'places', 'confirmedMeetings', 'activityLogs', 'anniversaries'];
+  const collectionPayload = Object.fromEntries(collectionNames.map((name, index) => [name, [
+    { docId: 'kkot_rehearsal_' + name + '_1', data: { id: 'kkot_rehearsal_' + name + '_1', kind: name, index } }
+  ]]));
+  const fullBackup = {
+    type: 'gather-calendar-data-backup',
+    version: 2,
+    projectId: 'metro-live-2918e',
+    calendars: [{
+      docId: 'cal_kkot',
+      data: { calendar: restoredCalendar, lastModified: restoredCalendar.updatedAt, revision: restoredCalendar.revision },
+      collections: collectionPayload
+    }]
+  };
+  const fullEntries = extractCalendarBackupEntries(fullBackup);
+  const fullValidation = validateCalendarBackupEntries(fullEntries);
+  if (fullValidation.error || fullValidation.entries.length !== 1) throw new Error('full backup validation failed');
+  const restoredCollections = fullValidation.entries[0].collections || {};
+  for (const name of collectionNames) {
+    if (restoredCollections[name]?.[0]?.data?.kind !== name) {
+      throw new Error(name + ' collection restore shape failed');
+    }
+  }
   globalThis.__restoreRehearsalResult = {
     calendarId: merged.id,
     restoredTitle: merged.title,
@@ -135,6 +162,7 @@ ${script}
     activeAvailabilities: getActiveAvailabilities(merged).length,
     preservedRemovedParticipants: merged.participants.filter((item) => item.removedAt).length,
     preservedDeletedAvailabilities: merged.availabilities.filter((item) => item.deletedAt).length,
+    restoredCollections: Object.fromEntries(collectionNames.map((name) => [name, restoredCollections[name].length])),
     backupBytes: JSON.stringify(backup).length
   };
 `, context);

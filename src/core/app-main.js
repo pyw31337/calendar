@@ -698,9 +698,13 @@ function CalendarApp() {
   const showRetryableUploadToast = (message, onRetry, duration = 5000) => {
     return showToast(message, 'error', duration, onRetry, null, '다시 시도');
   };
-  const firebaseConnectionVersion = typeof React.useSyncExternalStore === 'function'
-    ? React.useSyncExternalStore(subscribeFirebaseStateChange, getFirebaseStateVersion, getFirebaseStateVersion)
-    : 0;
+  // React 18 is bundled by the app. Calling this hook unconditionally keeps CalendarApp's hook
+  // order stable when switching between the calendar, chat, gallery, and settlement views.
+  const firebaseConnectionVersion = React.useSyncExternalStore(
+    subscribeFirebaseStateChange,
+    getFirebaseStateVersion,
+    getFirebaseStateVersion
+  );
 
   const runWithOperationProgress = async ({ title, detail, delay = 1000 } = {}, task) => {
     if (typeof task !== 'function') return undefined;

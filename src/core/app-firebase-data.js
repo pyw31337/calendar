@@ -826,7 +826,9 @@ function bindGatherFirebaseDeps() {
       return typeof getMessageDirectMediaEntry === 'function' ? getMessageDirectMediaEntry(msg) : null;
     },
     CHAT_LIVE_MESSAGE_LIMIT: typeof CHAT_LIVE_MESSAGE_LIMIT !== 'undefined' ? CHAT_LIVE_MESSAGE_LIMIT : 30,
-    CHAT_OLDER_PAGE_SIZE: typeof CHAT_OLDER_PAGE_SIZE !== 'undefined' ? CHAT_OLDER_PAGE_SIZE : 40
+    // This binding runs before the module-level page-size constant is initialized. Read the
+    // config directly here instead of touching the later lexical binding (which is in TDZ).
+    CHAT_OLDER_PAGE_SIZE: readConfigNumber('CHAT_OLDER_PAGE_SIZE', 40)
   };
 }
 
