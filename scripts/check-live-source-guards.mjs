@@ -169,6 +169,9 @@ if (!/function invalidateGalleryItemCount\(calId\)/.test(firebaseData)
 if ((appMain.match(/invalidateGalleryItemCount\(activeCalId\)/g) || []).length < 3) {
   fail('gallery count cache must be invalidated for realtime, add, and delete message paths.');
 }
+if (!/orderBy\('timestamp', 'desc'\)\.limit\(80\);[\s\S]{0,120}const snap = await q\.get\(\{ source: 'server' \}\)/.test(firebaseServices)) {
+  fail('gallery count pages must read from the Firestore server, not the persistent SDK cache.');
+}
 
 for (const manifestFile of ['manifest.json', 'manifest-kkot.json', 'manifest-cw.json', 'manifest-jhair.json']) {
   if (!copyStatic.includes(manifestFile)) {

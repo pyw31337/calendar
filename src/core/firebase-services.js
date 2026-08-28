@@ -610,7 +610,7 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
         let q = firebaseDb.collection('calendars').doc('cal_' + calId).collection('messages')
           .orderBy('timestamp', 'desc').limit(80);
         if (lastDoc) q = q.startAfter(lastDoc);
-        const snap = await q.get();
+        const snap = await q.get({ source: 'server' });
         if (snap.empty) break;
         snap.forEach(function (doc) {
           const msg = { id: doc.id, ...doc.data() };
