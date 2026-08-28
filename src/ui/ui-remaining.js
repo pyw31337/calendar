@@ -1198,7 +1198,7 @@ export function DeadlineDateTimePicker({ value, onChange, disabled, dateOnly = f
             /*#__PURE__*/React.createElement('label', { style: { fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '6px' } }, '시간'),
             /*#__PURE__*/React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
               /*#__PURE__*/React.createElement('input', {
-                type: 'number', className: 'form-input', style: { flex: '1 1 0%', minWidth: 0, textAlign: 'center' },
+                type: 'number', inputMode: 'numeric', className: 'form-input', style: { flex: '1 1 0%', minWidth: 0, textAlign: 'center' },
                 min: 0, max: 23, value: Number(pTime.slice(0, 2)),
                 onChange: e => {
                   const h = Math.min(23, Math.max(0, Number(e.target.value) || 0));
@@ -1207,7 +1207,7 @@ export function DeadlineDateTimePicker({ value, onChange, disabled, dateOnly = f
               }),
               /*#__PURE__*/React.createElement('span', { style: { fontWeight: 800, color: 'var(--text-muted)' } }, ':'),
               /*#__PURE__*/React.createElement('input', {
-                type: 'number', className: 'form-input', style: { flex: '1 1 0%', minWidth: 0, textAlign: 'center' },
+                type: 'number', inputMode: 'numeric', className: 'form-input', style: { flex: '1 1 0%', minWidth: 0, textAlign: 'center' },
                 min: 0, max: 59, value: Number(pTime.slice(3, 5)),
                 onChange: e => {
                   const m = Math.min(59, Math.max(0, Number(e.target.value) || 0));

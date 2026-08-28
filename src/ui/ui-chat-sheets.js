@@ -750,6 +750,7 @@ function getAnniversaryDisplayColor(...args) {
 export function ChatParticipantSheet({ calendar, selectedId, onSelect, onClose }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
+  const ParticipantBackdrop = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ParticipantBackdrop) || __deps.ParticipantBackdrop;
   const SmallXIcon = __deps.SmallXIcon;
 
   const participants = getActiveParticipants(calendar);
@@ -794,15 +795,9 @@ export function ChatParticipantSheet({ calendar, selectedId, onSelect, onClose }
           }
         },
           /* Left content: dot + name */
-          /*#__PURE__*/React.createElement("span", {
-            style: { display: 'inline-flex', alignItems: 'center', gap: '10px' }
-          },
-            /*#__PURE__*/React.createElement("span", {
-              className: "color-dot",
-              style: { backgroundColor: participant.color }
-            }),
-            participant.name
-          ),
+          ParticipantBackdrop ? /*#__PURE__*/React.createElement(ParticipantBackdrop, { participant: participant, name: participant.name, dotSize: 10, style: { gap: '10px' } }) : /*#__PURE__*/React.createElement("span", {
+            style: { display: 'inline-flex', alignItems: 'center', gap: '10px', color: participant.color, fontWeight: 700 }
+          }, /*#__PURE__*/React.createElement("span", { className: "color-dot", style: { backgroundColor: participant.color } }), participant.name),
           /* Right content: checkmark if selected */
           selectedId === participant.id && /*#__PURE__*/React.createElement("span", {
             style: { color: '#2563EB', fontWeight: 900 }

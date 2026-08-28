@@ -766,6 +766,7 @@ export function DateModal({
 }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
+  const ParticipantBackdrop = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ParticipantBackdrop) || __deps.ParticipantBackdrop;
   const __comp = window.GATHER_UI_COMPONENTS || {};
   const ResizableModalContainer = __comp.ResizableModalContainer || __deps.ResizableModalContainer || (function Shell(p) { return React.createElement('div', p, p.children); });
   const AutoGrowTextarea = __deps.AutoGrowTextarea;
@@ -2228,7 +2229,7 @@ export function DateModal({
                 style: {
                   fontWeight: 800,
                   fontSize: '0.85rem',
-                  color: 'var(--text-main)',
+                  color: part.color || 'var(--text-main)',
                   minWidth: 0,
                   cursor: 'pointer',
                   lineHeight: 1.35,
@@ -2702,6 +2703,7 @@ export function DateModal({
           /*#__PURE__*/React.createElement("div", { className: "date-modal-field-with-actions", style: { display: 'flex', gap: '8px' } },
           /*#__PURE__*/React.createElement("input", {
             type: "text",
+            inputMode: "numeric",
             className: "form-input",
             style: { flex: '1 1 0%', minWidth: 0 },
             placeholder: expenseIsIncome ? "수입금액 (원)" : "지출금액 (원)",
@@ -3023,10 +3025,7 @@ export function DateModal({
           setNote(getExistingNoteForParticipant(p.id));
           setIsSheetOpen(false);
         }
-      }, /*#__PURE__*/React.createElement("span", {
-        className: "color-dot",
-        style: { backgroundColor: p.color, width: '12px', height: '12px' }
-      }), /*#__PURE__*/React.createElement("span", { style: { fontWeight: 700 } }, p.name)))
+      }, ParticipantBackdrop ? /*#__PURE__*/React.createElement(ParticipantBackdrop, { participant: p, name: p.name, dotSize: 12 }) : /*#__PURE__*/React.createElement("span", { style: { display: 'inline-flex', alignItems: 'center', gap: '8px', color: p.color, fontWeight: 700 } }, /*#__PURE__*/React.createElement("span", { className: "color-dot", style: { backgroundColor: p.color, width: '12px', height: '12px' } }), p.name)))
     )
   )) : null;
 

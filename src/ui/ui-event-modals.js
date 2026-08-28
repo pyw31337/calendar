@@ -723,6 +723,7 @@ export function AnniversaryModal({
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
+  const ParticipantBackdrop = __comp.ParticipantBackdrop || __deps.ParticipantBackdrop;
   const DeadlineDateTimePicker = __comp.DeadlineDateTimePicker || __deps.DeadlineDateTimePicker || (function () { return null; });
   const ResizableModalContainer = __comp.ResizableModalContainer || __deps.ResizableModalContainer || (function Shell(p) { return React.createElement('div', p, p.children); });
   const SegmentedToggle = __comp.SegmentedToggle || __deps.SegmentedToggle || (function Shell(p) { return React.createElement('div', p, p.children); });
@@ -1391,10 +1392,7 @@ export function AnniversaryModal({
           setBulkParticipantId(p.id);
           setIsBulkParticipantSheetOpen(false);
         }
-      }, /*#__PURE__*/React.createElement("span", {
-        className: "color-dot",
-        style: { backgroundColor: p.color, width: '12px', height: '12px' }
-      }), /*#__PURE__*/React.createElement("span", { style: { fontWeight: 700 } }, p.name)))
+      }, ParticipantBackdrop ? /*#__PURE__*/React.createElement(ParticipantBackdrop, { participant: p, name: p.name, dotSize: 12 }) : /*#__PURE__*/React.createElement("span", { style: { display: 'inline-flex', alignItems: 'center', gap: '8px', color: p.color, fontWeight: 700 } }, /*#__PURE__*/React.createElement("span", { className: "color-dot", style: { backgroundColor: p.color, width: '12px', height: '12px' } }), p.name)))
     )
   ));
 
@@ -1534,6 +1532,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
   const [bankName, setBankName] = React.useState(() => cardToEdit?.bankName || '토스뱅크');
   const [depositorName, setDepositorName] = React.useState(() => cardToEdit?.depositorName || '');
   const [accountNumber, setAccountNumber] = React.useState(() => cardToEdit?.accountNumber || '');
+  const [activeTab, setActiveTab] = React.useState('general');
 
   const [personalExpenses, setPersonalExpenses] = React.useState(() => {
     if (Array.isArray(cardToEdit?.personalExpenses) && cardToEdit.personalExpenses.length > 0) {
@@ -1804,6 +1803,24 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
       }, React.createElement(SmallXIcon, { size: 20 }))
     ),
     React.createElement('div', {
+      role: 'tablist',
+      'aria-label': '정산 수정 탭',
+      style: { display: 'grid', gridTemplateColumns: '1fr 1fr', borderBottom: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-card)' }
+    },
+      ['general', 'settlement'].map(tab => React.createElement('button', {
+        key: tab,
+        type: 'button',
+        role: 'tab',
+        'aria-selected': activeTab === tab,
+        onClick: () => setActiveTab(tab),
+        style: {
+          height: '46px', border: 'none', borderBottom: activeTab === tab ? '2px solid #2563EB' : '2px solid transparent',
+          background: 'transparent', color: activeTab === tab ? '#2563EB' : 'var(--text-muted)',
+          fontSize: '0.84rem', fontWeight: 800, cursor: 'pointer'
+        }
+      }, tab === 'general' ? '일반' : '정산'))
+    ),
+    React.createElement('div', {
       className: 'modal-body',
       style: { overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }
     },
@@ -1843,6 +1860,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
             }, participantOptions.map(p => React.createElement('option', { key: p, value: p }, p))),
             React.createElement('input', {
               type: 'text',
+              inputMode: 'numeric',
               className: 'form-input',
               value: formattedVal,
               onChange: e => {
@@ -1905,7 +1923,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
         React.createElement('label', { style: { fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)' } }, '계좌번호'),
         React.createElement('div', { style: { position: 'relative', width: '100%' } },
           React.createElement('input', {
-            type: 'text', className: 'form-input', value: accountNumber,
+            type: 'text', inputMode: 'numeric', className: 'form-input', value: accountNumber,
             onChange: handleAccountNumberChange, placeholder: '계좌번호 입력 (숫자만 입력 시 하이픈 자동생성)',
             style: { width: '100%', height: '44px', borderRadius: '8px', fontSize: '0.82rem', paddingRight: isAccountValid ? '36px' : '12px' }
           }),
@@ -1920,7 +1938,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
         )
       ),
       /* Lower Section Container with subtle background separating it from top inputs */
-      React.createElement('div', {
+      activeTab === 'settlement' && React.createElement('div', {
         style: {
           display: 'flex', flexDirection: 'column', gap: '12px',
           backgroundColor: 'var(--bg-primary)', padding: '14px',
@@ -2017,6 +2035,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
 
             React.createElement('input', {
               type: 'text',
+              inputMode: 'numeric',
               className: 'form-input',
               value: peAmountInput,
               onChange: e => setPeAmountInput(formatCommaNumber(e.target.value)),

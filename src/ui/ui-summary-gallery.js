@@ -814,6 +814,22 @@ export function SearchCategoryTabs({ tabs, activeKey, onSelect, containerStyle, 
   }));
 }
 
+export function ParticipantBackdrop({ participant, name, dotSize = 10, style = {}, className }) {
+  const React = window.React;
+  const color = participant?.color || '#94A3B8';
+  const label = name || participant?.name || '참여자';
+  return React.createElement('span', {
+    className,
+    style: { display: 'inline-flex', alignItems: 'center', gap: '8px', color, fontWeight: 700, ...style }
+  },
+    React.createElement('span', {
+      'aria-hidden': 'true',
+      style: { display: 'inline-block', width: `${dotSize}px`, height: `${dotSize}px`, borderRadius: '50%', backgroundColor: color, flexShrink: 0 }
+    }),
+    label
+  );
+}
+
 export function SimpleBottomSheetPicker({ title, value, options, onSelect, placeholder, disabled, style, className = "form-select" }) {
   const React = window.React;
 
@@ -841,14 +857,7 @@ export function SimpleBottomSheetPicker({ title, value, options, onSelect, place
         type: "button",
         className: "bottom-sheet-item",
         onClick: () => { onSelect(opt.value); setIsOpen(false); }
-      }, opt.color ? /*#__PURE__*/React.createElement("span", {
-        style: { display: 'inline-flex', alignItems: 'center', gap: '8px', color: opt.color, fontWeight: 700 }
-      },
-        /*#__PURE__*/React.createElement("span", {
-          style: { display: 'inline-block', width: '10px', height: '10px', borderRadius: '50%', backgroundColor: opt.color, flexShrink: 0 }
-        }),
-        opt.label
-      ) : opt.label))
+      }, opt.color ? /*#__PURE__*/React.createElement(ParticipantBackdrop, { participant: opt, name: opt.label }) : opt.label))
     )
   ));
   return /*#__PURE__*/React.createElement(React.Fragment, null,
@@ -859,7 +868,7 @@ export function SimpleBottomSheetPicker({ title, value, options, onSelect, place
       style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', cursor: disabled ? 'default' : 'pointer', textAlign: 'left', width: '100%', ...style },
       onClick: () => setIsOpen(true)
     },
-      /*#__PURE__*/React.createElement("span", { style: { minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, selected ? selected.label : placeholder),
+      selected?.color ? /*#__PURE__*/React.createElement(ParticipantBackdrop, { participant: selected, name: selected.label, style: { minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }) : /*#__PURE__*/React.createElement("span", { style: { minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, selected ? selected.label : placeholder),
       /*#__PURE__*/React.createElement("svg", {
         xmlns: "http://www.w3.org/2000/svg",
         width: "18",
@@ -1562,6 +1571,7 @@ export function SummaryList({
     SectionToggleButton: SectionToggleButton,
     SearchCategoryTabs: SearchCategoryTabs,
     SimpleBottomSheetPicker: SimpleBottomSheetPicker,
+    ParticipantBackdrop: ParticipantBackdrop,
     PhotoGallery: PhotoGallery,
     SummaryList: SummaryList,
   });
