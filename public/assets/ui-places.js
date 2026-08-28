@@ -1625,15 +1625,14 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
           strokeWidth: "2",
           strokeLinecap: "round",
           strokeLinejoin: "round",
-          className: "icon icon-tabler icons-tabler-outline icon-tabler-viewport-short"
+          className: "icon icon-tabler icons-tabler-outline icon-tabler-fold-up"
         },
           /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }),
-          /*#__PURE__*/React.createElement("path", { d: "M12 3v7l3 -3" }),
-          /*#__PURE__*/React.createElement("path", { d: "M9 7l3 3" }),
-          /*#__PURE__*/React.createElement("path", { d: "M12 21v-7l3 3" }),
-          /*#__PURE__*/React.createElement("path", { d: "M9 17l3 -3" }),
-          /*#__PURE__*/React.createElement("path", { d: "M18 9h1a2 2 0 0 1 2 2v2a2 2 0 0 1 -2 2h-1" }),
-          /*#__PURE__*/React.createElement("path", { d: "M6 9h-1a2 2 0 0 0 -2 2v2a2 2 0 0 0 2 2h1" })
+          /*#__PURE__*/React.createElement("path", { d: "M12 13v-8l-3 3m6 0l-3 -3" }),
+          /*#__PURE__*/React.createElement("path", { d: "M9 17l1 0" }),
+          /*#__PURE__*/React.createElement("path", { d: "M14 17l1 0" }),
+          /*#__PURE__*/React.createElement("path", { d: "M19 17l1 0" }),
+          /*#__PURE__*/React.createElement("path", { d: "M4 17l1 0" })
         ) : /*#__PURE__*/React.createElement("svg", {
           xmlns: "http://www.w3.org/2000/svg",
           width: "16",
@@ -1644,15 +1643,14 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
           strokeWidth: "2",
           strokeLinecap: "round",
           strokeLinejoin: "round",
-          className: "icon icon-tabler icons-tabler-outline icon-tabler-viewport-tall"
+          className: "icon icon-tabler icons-tabler-outline icon-tabler-fold-down"
         },
           /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }),
-          /*#__PURE__*/React.createElement("path", { d: "M12 10v-7l3 3" }),
-          /*#__PURE__*/React.createElement("path", { d: "M9 6l3 -3" }),
-          /*#__PURE__*/React.createElement("path", { d: "M12 14v7l3 -3" }),
-          /*#__PURE__*/React.createElement("path", { d: "M9 18l3 3" }),
-          /*#__PURE__*/React.createElement("path", { d: "M18 3h1a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-1" }),
-          /*#__PURE__*/React.createElement("path", { d: "M6 3h-1a2 2 0 0 0 -2 2v14a2 2 0 0 0 2 2h1" })
+          /*#__PURE__*/React.createElement("path", { d: "M12 11v8l3 -3m-6 0l3 3" }),
+          /*#__PURE__*/React.createElement("path", { d: "M9 7l1 0" }),
+          /*#__PURE__*/React.createElement("path", { d: "M14 7l1 0" }),
+          /*#__PURE__*/React.createElement("path", { d: "M19 7l1 0" }),
+          /*#__PURE__*/React.createElement("path", { d: "M4 7l1 0" })
         )),
         
         /* Right drag resizer handle (only shown when map is not fullscreen expanded) */
@@ -1675,12 +1673,12 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
             stroke: "currentColor",
             strokeWidth: "2",
             strokeLinecap: "round",
-            strokeLinejoin: "round"
+            strokeLinejoin: "round",
+            className: "icon icon-tabler icons-tabler-outline icon-tabler-selector"
           },
-            /*#__PURE__*/React.createElement("path", { d: "M15 3h6v6" }),
-            /*#__PURE__*/React.createElement("path", { d: "M9 21H3v-6" }),
-            /*#__PURE__*/React.createElement("path", { d: "M21 3l-7 7" }),
-            /*#__PURE__*/React.createElement("path", { d: "M3 21l7-7" })
+            /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }),
+            /*#__PURE__*/React.createElement("path", { d: "M8 9l4 -4l4 4" }),
+            /*#__PURE__*/React.createElement("path", { d: "M16 15l-4 4l-4 -4" })
           )
         ) : /*#__PURE__*/React.createElement("div", { style: { width: '32px' } })
       )
