@@ -2850,12 +2850,19 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
           const cardPersonalTotals = new Map();
           (Array.isArray(card.personalExpenses) ? card.personalExpenses : []).forEach(item => {
             const name = item?.participantId || '참여자';
-            cardPersonalTotals.set(name, (cardPersonalTotals.get(name) || 0) + (Number(item?.amount) || 0));
+            // New records persist the explicit sign; legacy records represented every personal
+            // expense as a positive amount and therefore remain a subtraction. Keep this exact
+            // convention aligned with the settlement editor's personalExpenseTotals calculation
+            // so the card and popup cannot show different balances.
+            const signedAmount = item?.signedAmount
+              ? (Number(item.amount) || 0)
+              : -Math.abs(Number(item?.amount) || 0);
+            cardPersonalTotals.set(name, (cardPersonalTotals.get(name) || 0) + signedAmount);
           });
           const cardPerPerson = Math.round((Number(card.amount) || allTimeExpense) / Math.max(1, cardParticipantNames.length));
           const cardParticipantRows = cardParticipantNames.map(name => ({
             name,
-            amount: cardPerPerson - (cardPersonalTotals.get(name) || 0)
+            amount: cardPerPerson + (cardPersonalTotals.get(name) || 0)
           }));
 
           return React.createElement("div", {
