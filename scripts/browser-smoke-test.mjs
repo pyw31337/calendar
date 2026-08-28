@@ -220,6 +220,7 @@ async function checkSideMenuNavigation(browser, baseUrl) {
       page.on('pageerror', err => pageErrors.push(err.message));
       try {
         await page.goto(`${baseUrl}?id=${calId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+        // eslint-disable-next-line no-undef -- runs inside the browser page (Playwright evaluate/waitForFunction), not Node
         await page.waitForFunction(() => window.__GATHER_BOOT_READY__ === true, { timeout: 25000 });
         for (const [view, viewLabel] of destinations) {
           const menuButton = page.locator('button[aria-label$="메뉴 열기"]').first();
@@ -230,7 +231,9 @@ async function checkSideMenuNavigation(browser, baseUrl) {
           const item = menu.locator('button.admin-side-menu-item').filter({ hasText: viewLabel }).first();
           await item.waitFor({ state: 'visible', timeout: 5000 });
           await item.click();
+          // eslint-disable-next-line no-undef -- runs inside the browser page (Playwright evaluate/waitForFunction), not Node
           await page.waitForFunction(expected => new URL(window.location.href).searchParams.get('view') === expected, view, { timeout: 8000 });
+          // eslint-disable-next-line no-undef -- runs inside the browser page (Playwright evaluate/waitForFunction), not Node
           await page.waitForFunction(() => window.__GATHER_BOOT_READY__ === true, { timeout: 8000 });
           // The app swaps an entire early-return tree for each view. Give React one paint to
           // mount that view's own header before querying its menu button.
