@@ -1321,16 +1321,17 @@ function CalendarApp() {
   }, [allChatMessages, fullChatMessages]);
   React.useEffect(() => {
     if (!activeCalId || (activeView !== 'chat' && activeView !== 'gallery') || fullChatHistoryByCalendar[activeCalId] !== undefined) return;
-    if (!firebaseDb) return;
+    const liveFirebaseDb = (typeof window !== 'undefined' && window.__gatherFirebaseDb) || firebaseDb;
+    if (!liveFirebaseDb) return;
     let cancelled = false;
-    firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages').get({ source: 'server' }).then(snapshot => {
+    liveFirebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages').get({ source: 'server' }).then(snapshot => {
       if (cancelled) return;
       const list = snapshot.docs.map(doc => slimMessageForClient({ id: doc.id, ...doc.data() }));
       setFullChatHistoryByCalendar(prev => ({ ...prev, [activeCalId]: list }));
       setHasMoreOlderChat(false);
     }).catch(err => console.warn('full chat history load failed:', err));
     return () => { cancelled = true; };
-  }, [activeCalId, activeView, firebaseDb, fullChatHistoryByCalendar]);
+  }, [activeCalId, activeView, firebaseDb, firebaseConnectionVersion, fullChatHistoryByCalendar]);
   // The chat embed the user tapped play on -- { key, embedUrl, provider, orientation, title } |
   // null. Once set, it's rendered through a SINGLE always-mounted portal iframe (StickyVideoBox)
   // that never unmounts across view/tab switches, so playback genuinely never stops -- only its
