@@ -168,6 +168,26 @@ function loadManualUi() {
 }
 window.__gatherLoadManualUi = loadManualUi;
 
+let chatUiLoadPromise = null;
+function loadChatUi() {
+  const components = window.GATHER_UI_COMPONENTS || {};
+  if (typeof components.ChatRoomView === 'function' && typeof components.ChatGalleryModal === 'function') {
+    return Promise.resolve();
+  }
+  if (!chatUiLoadPromise) {
+    chatUiLoadPromise = Promise.all([
+      import('./ui/ui-chat-sheets.js'),
+      import('./ui/ui-chat-gallery.js'),
+      import('./ui/ui-chat-room.js')
+    ]).catch(err => {
+      chatUiLoadPromise = null;
+      throw err;
+    });
+  }
+  return chatUiLoadPromise;
+}
+window.__gatherLoadChatUi = loadChatUi;
+
 async function boot() {
   try {
     showBootStatus('모여라 캘린더 불러오는 중…');
@@ -193,19 +213,16 @@ async function boot() {
       import('./ui/ui-share-modal.js'),
       import('./ui/ui-overlays.js'),
       import('./ui/ui-widgets.js'),
-      import('./ui/ui-chat-sheets.js'),
       import('./ui/ui-weather.js'),
       import('./ui/ui-side-menu.js'),
       import('./ui/ui-misc.js'),
       import('./ui/ui-place-register.js'),
       import('./ui/ui-lightbox.js'),
-      import('./ui/ui-chat-gallery.js'),
       import('./ui/ui-remaining.js'),
       import('./ui/ui-summary-gallery.js'),
       import('./ui/ui-shared.js'),
       import('./ui/ui-places.js'),
       import('./ui/ui-memo-view.js'),
-      import('./ui/ui-chat-room.js'),
       import('./ui/ui-date-modal.js'),
       import('./ui/ui-event-modals.js'),
       import('./ui/ui-calendar-core.js')
@@ -214,6 +231,10 @@ async function boot() {
     // screen can also request AdminModal from its side menu; that path uses loadAdminUi above.
     const params = new URLSearchParams(window.location.search);
     const isAdminRoute = params.get('admin') === '1' || params.get('mode') === 'admin';
+    const initialView = params.get('view') || 'calendar';
+    if (initialView === 'chat' || initialView === 'gallery') {
+      await loadChatUi();
+    }
     if (isAdminRoute) {
       await loadAdminUi();
     }

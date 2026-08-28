@@ -1543,6 +1543,18 @@ function CalendarApp() {
   }, []);
 
   const changeView = (view) => {
+    if ((view === 'chat' || view === 'gallery')
+      && !(window.GATHER_UI_COMPONENTS
+        && typeof window.GATHER_UI_COMPONENTS.ChatRoomView === 'function'
+        && typeof window.GATHER_UI_COMPONENTS.ChatGalleryModal === 'function')) {
+      if (typeof window.__gatherLoadChatUi === 'function') {
+        window.__gatherLoadChatUi().then(() => changeView(view)).catch(error => {
+          console.error('Chat UI load failed:', error);
+          showToast('채팅 화면을 불러오지 못했습니다. 다시 시도해 주세요.', 'error');
+        });
+      }
+      return;
+    }
     // No sticky-video promotion needed here anymore -- stickyVideo (once set by actually pressing
     // play in chat, see handleActivateChatVideo) stays active across every view by itself, always
     // floating as PIP (see StickyVideoBox).
