@@ -134,7 +134,9 @@ if (mode === 'vite') {
   let totalBytes = jsBody.length;
   for (const cu of chunkUrls.slice(0, 40)) {
     try {
-      const body = await (await fetch(cu, { redirect: 'follow' })).text();
+      const response = await fetch(cu, { redirect: 'follow' });
+      if (!response.ok) throw new Error(`${response.status} ${cu}`);
+      const body = await response.text();
       if (body && body.length) {
         combined += body;
         totalBytes += body.length;
