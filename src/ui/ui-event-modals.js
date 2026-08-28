@@ -1661,7 +1661,10 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
         list.push({ ...exp, date: dateStr, itemKey: key, isIncome: Number(exp.amount || 0) < 0 });
       });
     });
-    return list;
+    // The settlement editor selects shared expenses only. Income entries
+    // (shown with a `+` amount) must not appear here or participate in the
+    // editor's checked-item state.
+    return list.filter(item => !item.isIncome);
   }, [confirmed, monthStr]);
 
   React.useEffect(() => {
