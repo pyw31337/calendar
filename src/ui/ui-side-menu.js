@@ -1129,65 +1129,6 @@ export function AppSettingsModal({
             }, "삭제")
           ))
         ),
-        /*#__PURE__*/React.createElement("div", {
-          style: {
-            marginTop: '10px',
-            padding: '12px 14px',
-            borderRadius: '12px',
-            background: 'var(--bg-primary)',
-            border: '1px solid var(--border-subtle)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '10px'
-          }
-        },
-          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', flexWrap: 'wrap' } },
-            /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '2px' } },
-              /*#__PURE__*/React.createElement("div", { style: { fontWeight: 900, fontSize: '0.86rem', color: 'var(--text-main)' } }, "백업 / 복구"),
-              /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.4 } },
-                currentCalendarId ? `${currentCalendarId} 캘린더의 채팅·메모·장소·사진·투표·정산·로그를 함께 다룹니다.` : '현재 캘린더를 불러오지 못해 백업 기능을 사용할 수 없습니다.'
-              )
-            ),
-            /*#__PURE__*/React.createElement("span", {
-              style: {
-                fontSize: '0.68rem',
-                fontWeight: 800,
-                padding: '4px 10px',
-                borderRadius: '10px',
-                background: '#EEF2FF',
-                color: '#4F46E5',
-                border: '1px solid #C7D2FE',
-                whiteSpace: 'nowrap'
-              }
-            }, "현재 캘린더 전용")
-          ),
-          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } },
-            /*#__PURE__*/React.createElement("button", {
-              type: "button",
-              className: "btn btn-secondary",
-              onClick: handleDownloadBackup,
-              disabled: backupBusy || !canUseBackup,
-              style: { flex: '1 1 150px', minWidth: 0, fontSize: '0.8rem', fontWeight: 800 }
-            }, backupBusy ? '생성 중' : '현재 캘린더 백업'),
-            /*#__PURE__*/React.createElement("button", {
-              type: "button",
-              className: "btn btn-danger",
-              onClick: () => backupFileInputRef.current?.click(),
-              disabled: backupBusy || !canUseBackup,
-              style: { flex: '1 1 150px', minWidth: 0, fontSize: '0.8rem', fontWeight: 800 }
-            }, backupBusy ? '처리 중' : '백업 파일 복구')
-          ),
-          /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.72rem', color: 'var(--text-muted)', lineHeight: 1.55 } },
-            "복구 시 현재 캘린더의 서버 데이터가 백업 내용으로 교체됩니다. 파일은 채팅·메모·장소·사진·투표·정산·로그를 함께 포함합니다."
-          ),
-          /*#__PURE__*/React.createElement("input", {
-            ref: backupFileInputRef,
-            type: "file",
-            accept: "application/json,.json",
-            onChange: handleRestoreBackupFile,
-            style: { display: 'none' }
-          })
-        ),
         Array.isArray(helpSteps) && helpSteps.length > 0 && /*#__PURE__*/React.createElement("div", {
           style: { marginTop: '10px', padding: '12px', borderRadius: '12px', background: 'var(--bg-primary)', border: 'none', fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.5 }
         },

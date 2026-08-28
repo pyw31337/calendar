@@ -795,6 +795,69 @@ export function AdminModal({
   const [activeTab, setActiveTab] = React.useState(initialTab === 'anniversary' ? 'anniversary' : (initialTab || 'settings'));
   React.useEffect(() => { if (initialTab) setActiveTab(initialTab === 'anniversary' ? 'anniversary' : initialTab); }, [initialTab]);
 
+  const [exportCategory, setExportCategory] = React.useState('full');
+  const [logCategoryFilter, setLogCategoryFilter] = React.useState('all');
+  const [logSearchQuery, setLogSearchQuery] = React.useState('');
+
+  const handleExportSelectedData = () => {
+    if (!calendar) return;
+    if (exportCategory === 'calendar') {
+      if (getTrulyConfirmedMeetings(calendar).length === 0) {
+        if (showToast) showToast('확정된 모임이 없습니다', 'error');
+        return;
+      }
+      exportCalendarConfirmedMeetingsToICS(calendar);
+      if (showToast) showToast('캘린더 일정 (.ics) 내보내기가 완료되었습니다.', 'success');
+      return;
+    }
+
+    let exportData = null;
+    let categoryName = '전체 데이터';
+
+    if (exportCategory === 'full') {
+      exportData = calendar;
+      categoryName = '전체 데이터';
+    } else if (exportCategory === 'memo') {
+      exportData = Array.isArray(calendar.memos) ? calendar.memos : [];
+      categoryName = '메모 데이터';
+    } else if (exportCategory === 'gallery') {
+      exportData = {
+        chatMessagesWithImages: (calendar.chatMessages || []).filter(m => m && (m.imageUrl || m.thumbUrl || (Array.isArray(m.imageUrls) && m.imageUrls.length))),
+        memosWithImages: (calendar.memos || []).filter(m => m && (m.imageUrl || m.thumbUrl || (Array.isArray(m.imageUrls) && m.imageUrls.length))),
+        meetingPhotos: (calendar.confirmedMeetings || []).flatMap(m => m.photos || [])
+      };
+      categoryName = '갤러리 사진';
+    } else if (exportCategory === 'places') {
+      exportData = Array.isArray(calendar.places) ? calendar.places : [];
+      categoryName = '장소 데이터';
+    } else if (exportCategory === 'expenses') {
+      exportData = {
+        expenses: Array.isArray(calendar.expenses) ? calendar.expenses : [],
+        settlementCards: Array.isArray(calendar.settlementCards) ? calendar.settlementCards : []
+      };
+      categoryName = '정산 데이터';
+    } else if (exportCategory === 'polls') {
+      exportData = Array.isArray(calendar.polls) ? calendar.polls : [];
+      categoryName = '투표 데이터';
+    }
+
+    if (!exportData) {
+      if (showToast) showToast('내보낼 데이터가 없습니다.', 'warning');
+      return;
+    }
+
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${calendar.title || calendar.id}_${exportCategory}_${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    if (showToast) showToast(`'${categoryName}' 내보내기가 완료되었습니다!`, 'success');
+  };
+
   // recovery/logs only — avoid loading full activityLogs when opening 일반/설정
   React.useEffect(() => {
     if (activeTab === 'recovery' || activeTab === 'logs') {
@@ -1397,33 +1460,69 @@ export function AdminModal({
           : /*#__PURE__*/React.createElement("div", { style: { padding: '20px', color: 'var(--text-muted)' } }, "기념일 모듈을 불러올 수 없습니다.")
       ),
 
-      activeTab === 'recovery' && /*#__PURE__*/React.createElement(React.Fragment, null,
+      activeTab === 'recovery' && /*#__PURE__*/React.createElement("div", {
+        style: { flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }
+      },
         /* Info alert */
         /*#__PURE__*/React.createElement("div", {
           style: { backgroundColor: '#FEF3C7', border: '1px solid #FDE68A', borderRadius: 'var(--radius-md)', padding: '12px 14px', color: '#92400E', fontSize: '0.8rem', lineHeight: '1.5' }
         },
-          /*#__PURE__*/React.createElement("span", { style: { fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '4px', verticalAlign: 'middle' } }, /*#__PURE__*/React.createElement(AlertTriangleIcon, null), "데이터 유실 방지 경고: "),
-          "특정 시점으로 데이터를 복구(롤백)하면, 그 시점 이후에 수행된 모든 일정 등록 및 변경 사항과 투표 기록이 되돌아갑니다. 복구하기 전 현재 상태의 백업이 필요하다면 백업 저장 기능을 이용해 주세요."
+          /*#__PURE__*/React.createElement("span", { style: { fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '4px', verticalAlign: 'middle' } }, /*#__PURE__*/React.createElement(AlertTriangleIcon, null), "시점 복구 안내 (데이터 롤백): "),
+          "선택한 마일스톤 시점으로 캘린더 데이터를 되돌립니다. 지정한 복구 시점 이후에 수행된 변경 사항이 해당 상태로 복원됩니다."
         ),
 
-        /*#__PURE__*/React.createElement("button", {
-          type: "button",
-          className: "btn btn-secondary",
-          style: { width: '100%', justifyContent: 'center', padding: '24px' },
-          onClick: () => {
-            if (getTrulyConfirmedMeetings(calendar).length === 0) {
-              if (showToast) showToast('확정된 모임이 없습니다', 'error');
-              return;
+        /* Export Bar: '전체 데이터 내보내기' + Category Select Box + Mobile Responsive */
+        /*#__PURE__*/React.createElement("div", {
+          style: { display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }
+        },
+          /*#__PURE__*/React.createElement("button", {
+            type: "button",
+            className: "btn btn-primary",
+            style: { flex: '1 1 180px', justifyContent: 'center', padding: '12px 16px', fontWeight: 800, fontSize: '0.84rem' },
+            onClick: () => {
+              const blob = new Blob([JSON.stringify(calendar, null, 2)], { type: 'application/json' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `${calendar.title || calendar.id}_full_backup_${new Date().toISOString().slice(0, 10)}.json`;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              URL.revokeObjectURL(url);
+              if (showToast) showToast('전체 데이터 백업 파일이 다운로드되었습니다!', 'success');
             }
-            exportCalendarConfirmedMeetingsToICS(calendar);
-          }
-        }, /*#__PURE__*/React.createElement(CalendarExportIcon, null), "캘린더 내보내기 (.ics)"),
+          }, /*#__PURE__*/React.createElement(CalendarExportIcon, null), "전체 데이터 내보내기"),
+          /*#__PURE__*/React.createElement("div", {
+            style: { display: 'flex', gap: '6px', flex: '1 1 200px', minWidth: 0 }
+          },
+            /*#__PURE__*/React.createElement("select", {
+              className: "form-select",
+              value: exportCategory,
+              onChange: e => setExportCategory(e.target.value),
+              style: { flex: 1, minWidth: 0, fontSize: '0.82rem', borderRadius: '8px', padding: '10px' }
+            },
+              /*#__PURE__*/React.createElement("option", { value: "full" }, "전체 데이터 (JSON)"),
+              /*#__PURE__*/React.createElement("option", { value: "calendar" }, "캘린더 일정 (.ics)"),
+              /*#__PURE__*/React.createElement("option", { value: "memo" }, "메모 데이터 (JSON)"),
+              /*#__PURE__*/React.createElement("option", { value: "gallery" }, "갤러리 사진 (JSON)"),
+              /*#__PURE__*/React.createElement("option", { value: "places" }, "장소 데이터 (JSON)"),
+              /*#__PURE__*/React.createElement("option", { value: "expenses" }, "정산 데이터 (JSON)"),
+              /*#__PURE__*/React.createElement("option", { value: "polls" }, "투표 데이터 (JSON)")
+            ),
+            /*#__PURE__*/React.createElement("button", {
+              type: "button",
+              className: "btn btn-secondary",
+              onClick: handleExportSelectedData,
+              style: { fontSize: '0.82rem', fontWeight: 800, whiteSpace: 'nowrap', borderRadius: '8px', padding: '10px 14px' }
+            }, "내보내기")
+          )
+        ),
 
-        /* Log Timeline */
+        /* Log Timeline for Point-in-Time Rollback */
         /*#__PURE__*/React.createElement("div", {
           style: { border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '16px', backgroundColor: 'var(--bg-card)', display: 'flex', flexDirection: 'column' }
         },
-          /*#__PURE__*/React.createElement("h4", { style: { fontSize: '0.92rem', fontWeight: 800, color: 'var(--text-main)', margin: '0 0 12px 0', display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(HourglassIcon, null), "시점복구"),
+          /*#__PURE__*/React.createElement("h4", { style: { fontSize: '0.92rem', fontWeight: 800, color: 'var(--text-main)', margin: '0 0 12px 0', display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(HourglassIcon, null), "시점 복구 타임라인"),
 
           /* Timeline scroll container */
           /*#__PURE__*/React.createElement("div", {
@@ -1480,7 +1579,7 @@ export function AdminModal({
                     className: "recent-log-date",
                     style: { fontSize: '0.78rem' }
                   }, formatShortDateWithDayName(log.date)),
-                  /* Description text, wrapped rather than truncated */
+                  /* Description text */
                   detailedNote && /*#__PURE__*/React.createElement("span", {
                     className: "recent-log-note",
                     style: { fontSize: '0.78rem' }
@@ -1503,71 +1602,104 @@ export function AdminModal({
             })
           )
         )
-      )
-    ),
+      ),
 
     /* ========================================== */
-    /* TAB 4: CHAT/SCHEDULE ACTIVITY LOG LIST       */
+    /* TAB 4: CHAT/SCHEDULE ACTIVITY AUDIT LOG    */
     /* ========================================== */
     activeTab === 'logs' && /*#__PURE__*/React.createElement("div", {
       style: { flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', padding: '16px' }
     },
       /*#__PURE__*/React.createElement("div", {
-        style: { display: 'flex', flexDirection: 'column', gap: '10px' }
+        style: { display: 'flex', flexDirection: 'column', gap: '12px' }
       },
+        /* Module Filter Chips Bar */
+        /*#__PURE__*/React.createElement("div", {
+          style: { display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '4px' }
+        },
+          [
+            { id: 'all', label: '전체' },
+            { id: 'schedule', label: '일정' },
+            { id: 'place', label: '장소' },
+            { id: 'tag', label: '사진태그' },
+            { id: 'expense', label: '정산' },
+            { id: 'poll', label: '투표' },
+            { id: 'memo', label: '메모' }
+          ].map(chip => /*#__PURE__*/React.createElement("button", {
+            key: chip.id,
+            type: "button",
+            onClick: () => setLogCategoryFilter(chip.id),
+            style: {
+              padding: '5px 12px', borderRadius: '999px', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap',
+              border: logCategoryFilter === chip.id ? '1px solid #0F172A' : '1px solid var(--border-subtle)',
+              backgroundColor: logCategoryFilter === chip.id ? '#0F172A' : 'var(--bg-card)',
+              color: logCategoryFilter === chip.id ? '#FFFFFF' : 'var(--text-muted)'
+            }
+          }, chip.label))
+        ),
+
+        /* Search Input Box */
+        /*#__PURE__*/React.createElement("input", {
+          type: "text",
+          className: "form-input",
+          value: logSearchQuery,
+          onChange: e => setLogSearchQuery(e.target.value),
+          placeholder: "활동 로그 검색 (참여자, 내용, 일자 등)",
+          style: { width: '100%', borderRadius: '8px', fontSize: '0.8rem' }
+        }),
+
         (() => {
           const actionLabels = {
-            create: '등록',
-            update: '수정',
-            delete: '삭제',
-            poll_create: '투표 생성',
-            poll_vote: '투표',
-            poll_cancel: '투표 취소',
-            expense_create: '지출/수입 등록',
-            expense_update: '지출/수입 수정',
-            expense_delete: '지출/수입 삭제',
-            tag_add: '사진 태그 추가',
-            tag_remove: '사진 태그 삭제',
-            meeting_confirm: '모임 확정',
-            meeting_cancel: '모임 확정 취소',
-            memo_create: '메모 추가',
-            memo_update: '메모 변경',
-            memo_delete: '메모 삭제',
-            place_create: '장소 등록',
-            place_update: '장소 수정',
-            place_delete: '장소 삭제'
+            create: '등록', update: '수정', delete: '삭제',
+            poll_create: '투표 생성', poll_vote: '투표', poll_cancel: '투표 취소',
+            expense_create: '지출/수입 등록', expense_update: '지출/수입 수정', expense_delete: '지출/수입 삭제',
+            tag_add: '사진 태그 추가', tag_remove: '사진 태그 삭제',
+            meeting_confirm: '모임 확정', meeting_cancel: '모임 확정 취소',
+            memo_create: '메모 추가', memo_update: '메모 변경', memo_delete: '메모 삭제',
+            place_create: '장소 등록', place_update: '장소 수정', place_delete: '장소 삭제'
           };
           const actionColors = {
-            create: '#2563EB',
-            update: '#7C3AED',
-            delete: '#DC2626',
-            poll_create: '#0F172A',
-            poll_vote: '#2563EB',
-            poll_cancel: '#DC2626',
-            expense_create: '#B45309',
-            expense_update: '#B45309',
-            expense_delete: '#C2410C',
-            tag_add: '#4338CA',
-            tag_remove: '#B91C1C',
-            meeting_confirm: '#7E22CE',
-            meeting_cancel: '#B91C1C',
-            memo_create: '#4338CA',
-            memo_update: '#B45309',
-            memo_delete: '#B91C1C',
-            place_create: '#2563EB',
-            place_update: '#7C3AED',
-            place_delete: '#DC2626'
+            create: '#2563EB', update: '#7C3AED', delete: '#DC2626',
+            poll_create: '#0F172A', poll_vote: '#2563EB', poll_cancel: '#DC2626',
+            expense_create: '#B45309', expense_update: '#B45309', expense_delete: '#C2410C',
+            tag_add: '#4338CA', tag_remove: '#B91C1C',
+            meeting_confirm: '#7E22CE', meeting_cancel: '#B91C1C',
+            memo_create: '#4338CA', memo_update: '#B45309', memo_delete: '#B91C1C',
+            place_create: '#2563EB', place_update: '#7C3AED', place_delete: '#DC2626'
           };
           const logs = buildActivityLogsFromAvailabilities(calendar || {});
-          if (logs.length === 0) {
+
+          const filteredLogs = logs.filter(log => {
+            if (logCategoryFilter !== 'all') {
+              const act = log.action || '';
+              if (logCategoryFilter === 'schedule' && !['create', 'update', 'delete', 'meeting_confirm', 'meeting_cancel'].includes(act)) return false;
+              if (logCategoryFilter === 'place' && !['place_create', 'place_update', 'place_delete'].includes(act)) return false;
+              if (logCategoryFilter === 'tag' && !['tag_add', 'tag_remove'].includes(act)) return false;
+              if (logCategoryFilter === 'expense' && !['expense_create', 'expense_update', 'expense_delete'].includes(act)) return false;
+              if (logCategoryFilter === 'poll' && !['poll_create', 'poll_vote', 'poll_cancel'].includes(act)) return false;
+              if (logCategoryFilter === 'memo' && !['memo_create', 'memo_update', 'memo_delete'].includes(act)) return false;
+            }
+            if (logSearchQuery.trim()) {
+              const q = logSearchQuery.toLowerCase().trim();
+              const resolveParticipant = __deps.resolveLogParticipant || (window.GATHER_APP_UTILS && window.GATHER_APP_UTILS.resolveLogParticipant) || ((l, map) => (map && map[l.participantId]) || { name: '시스템', color: '#94A3B8' });
+              const formatNote = __deps.formatDetailedLogNote || (window.GATHER_APP_UTILS && window.GATHER_APP_UTILS.formatDetailedLogNote) || (l => l.note || '');
+              const participant = resolveParticipant(log, participantsMap);
+              const noteText = formatNote(log) || '';
+              const searchTarget = `${participant.name} ${log.action} ${log.date || ''} ${noteText}`.toLowerCase();
+              if (!searchTarget.includes(q)) return false;
+            }
+            return true;
+          });
+
+          if (filteredLogs.length === 0) {
             return /*#__PURE__*/React.createElement("div", {
               style: { textAlign: 'center', color: '#94A3B8', fontSize: '0.85rem', padding: '24px 0' }
-            }, "기록된 일정 로그가 없습니다.");
+            }, "조건에 해당되는 활동 로그가 없습니다.");
           }
           return /*#__PURE__*/React.createElement("div", {
             className: "recent-log-list",
             style: { display: 'flex', flexDirection: 'column', gap: '8px' }
-          }, logs.map(log => {
+          }, filteredLogs.map(log => {
             const resolveParticipant = __deps.resolveLogParticipant || (window.GATHER_APP_UTILS && window.GATHER_APP_UTILS.resolveLogParticipant) || ((l, map) => (map && map[l.participantId]) || { name: '시스템', color: '#94A3B8' });
             const formatNote = __deps.formatDetailedLogNote || (window.GATHER_APP_UTILS && window.GATHER_APP_UTILS.formatDetailedLogNote) || (l => l.note || '');
             const participant = resolveParticipant(log, participantsMap);
@@ -1619,7 +1751,8 @@ export function AdminModal({
           }));
         })()
       )
-    ),
+    )
+  ),
 
     /* ========================================== */
     /* TAB 5: CALENDAR-BASED SCHEDULE DELETION      */

@@ -1367,8 +1367,64 @@ export function AnniversaryModal({
   );
 }
 
-/* CreateSettlementModal (정산 생성 / 정산 수정 Layer Popup) */
-export function CreateSettlementModal({ calendar, initialData = null, initialCard = null, onClose, onSave, showToast }) {
+/* Bank account number formatting helper */
+function formatBankAccountNumber(bankName, value) {
+  if (!value) return '';
+  const digits = String(value).replace(/\D/g, '');
+  if (!digits) return '';
+  const bank = String(bankName || '').trim();
+
+  if (bank.includes('신한')) {
+    if (digits.length <= 3) return digits;
+    if (digits.length <= 5) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+    return `${digits.slice(0, 3)}-${digits.slice(3, 5)}-${digits.slice(5, 14)}`;
+  }
+  if (bank.includes('우리')) {
+    if (digits.length <= 4) return digits;
+    if (digits.length <= 7) return `${digits.slice(0, 4)}-${digits.slice(4)}`;
+    return `${digits.slice(0, 4)}-${digits.slice(4, 7)}-${digits.slice(7, 14)}`;
+  }
+  if (bank.includes('국민') || bank.includes('KB')) {
+    if (digits.length <= 6) return digits;
+    if (digits.length <= 8) return `${digits.slice(0, 6)}-${digits.slice(6)}`;
+    return `${digits.slice(0, 6)}-${digits.slice(6, 8)}-${digits.slice(8, 14)}`;
+  }
+  if (bank.includes('카카오뱅크')) {
+    if (digits.length <= 4) return digits;
+    if (digits.length <= 6) return `${digits.slice(0, 4)}-${digits.slice(4)}`;
+    return `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6, 13)}`;
+  }
+  if (bank.includes('토스')) {
+    if (digits.length <= 4) return digits;
+    if (digits.length <= 8) return `${digits.slice(0, 4)}-${digits.slice(4)}`;
+    return `${digits.slice(0, 4)}-${digits.slice(4, 8)}-${digits.slice(8, 12)}`;
+  }
+  if (bank.includes('농협') || bank.includes('NH')) {
+    if (digits.length <= 3) return digits;
+    if (digits.length <= 7) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+    if (digits.length <= 11) return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
+    return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7, 11)}-${digits.slice(11, 13)}`;
+  }
+  if (bank.includes('하나')) {
+    if (digits.length <= 3) return digits;
+    if (digits.length <= 9) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+    return `${digits.slice(0, 3)}-${digits.slice(3, 9)}-${digits.slice(9, 14)}`;
+  }
+  if (bank.includes('기업') || bank.includes('IBK')) {
+    if (digits.length <= 3) return digits;
+    if (digits.length <= 9) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+    if (digits.length <= 11) return `${digits.slice(0, 3)}-${digits.slice(3, 9)}-${digits.slice(9)}`;
+    return `${digits.slice(0, 3)}-${digits.slice(3, 9)}-${digits.slice(9, 11)}-${digits.slice(11, 14)}`;
+  }
+
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 7) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+  if (digits.length <= 11) return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
+  return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7, 11)}-${digits.slice(11, 14)}`;
+}
+
+/* CreateSettlementModal (정산 생성 / 정산 수정 Layer Popup 공용 모듈) */
+export function CreateSettlementModal({ calendar, initialData = null, initialCard = null, onClose, onSave, onDeleteCard, onToggleStatus, showToast }) {
   const cardToEdit = initialData || initialCard;
   const isEditing = !!cardToEdit;
   const React = window.React;
@@ -1380,22 +1436,43 @@ export function CreateSettlementModal({ calendar, initialData = null, initialCar
   const getConfirmedMeetings = __deps.getConfirmedMeetings || (c => Array.isArray(c?.confirmedMeetings) ? c.confirmedMeetings : []);
 
   const activeParticipants = getActiveParticipants(calendar);
+  const participantOptions = React.useMemo(() => {
+    if (!Array.isArray(activeParticipants) || activeParticipants.length === 0) return ['참여자'];
+    return activeParticipants.map(p => typeof p === 'string' ? p : (p?.name || p?.id || '참여자')).filter(Boolean);
+  }, [activeParticipants]);
+
   const today = new Date();
   const [title, setTitle] = React.useState(() => cardToEdit?.title || '1/N 간편 송금');
-  const [selectedParticipantIds, setSelectedParticipantIds] = React.useState(() => {
-    if (Array.isArray(cardToEdit?.participants) && cardToEdit.participants.length > 0) {
-      return cardToEdit.participants;
+
+  // Dynamic participant rows [{ id, participantId, amount }]
+  const [participantRows, setParticipantRows] = React.useState(() => {
+    if (Array.isArray(cardToEdit?.participantRows) && cardToEdit.participantRows.length > 0) {
+      return cardToEdit.participantRows;
     }
-    if (!Array.isArray(activeParticipants) || activeParticipants.length === 0) return ['참여자'];
-    const names = activeParticipants.map(p => typeof p === 'string' ? p : (p?.name || p?.id || '참여자')).filter(Boolean);
-    return names.length > 0 ? names : ['참여자'];
+    if (Array.isArray(cardToEdit?.participants) && cardToEdit.participants.length > 0) {
+      const perAmt = cardToEdit.perPersonAmount || (cardToEdit.participants.length > 0 ? Math.round((cardToEdit.amount || 0) / cardToEdit.participants.length) : 0);
+      return cardToEdit.participants.map((pName, idx) => ({
+        id: `pr_${idx}_${Date.now()}`,
+        participantId: pName,
+        amount: perAmt
+      }));
+    }
+    const defaultP = participantOptions[0] || '참여자';
+    return [{ id: `pr_0_${Date.now()}`, participantId: defaultP, amount: 0 }];
   });
+
   const [bankName, setBankName] = React.useState(() => cardToEdit?.bankName || '토스뱅크');
   const [depositorName, setDepositorName] = React.useState(() => cardToEdit?.depositorName || '');
   const [accountNumber, setAccountNumber] = React.useState(() => cardToEdit?.accountNumber || '');
-  const [isAddingParticipant, setIsAddingParticipant] = React.useState(false);
-  const [newParticipantName, setNewParticipantName] = React.useState('');
-  
+
+  // Personal expenses block [{ id, participantId, amount, description }]
+  const [personalExpenses, setPersonalExpenses] = React.useState(() => {
+    if (Array.isArray(cardToEdit?.personalExpenses) && cardToEdit.personalExpenses.length > 0) {
+      return cardToEdit.personalExpenses;
+    }
+    return [];
+  });
+
   // Month navigation
   const [year, setYear] = React.useState(() => {
     if (cardToEdit?.monthStr && cardToEdit.monthStr.includes('-')) {
@@ -1411,7 +1488,7 @@ export function CreateSettlementModal({ calendar, initialData = null, initialCar
     }
     return today.getMonth();
   });
-  
+
   // Selected transactions map { itemKey -> item }
   const [checkedItems, setCheckedItems] = React.useState(() => {
     if (cardToEdit?.checkedItems && typeof cardToEdit.checkedItems === 'object') {
@@ -1419,7 +1496,7 @@ export function CreateSettlementModal({ calendar, initialData = null, initialCar
     }
     return {};
   });
-  
+
   const BANK_OPTIONS = ['토스뱅크', '카카오뱅크', '신한은행', 'KB국민은행', 'NH농협은행', '우리은행', '하나은행', 'IBK기업은행', '카카오페이', '네이버페이', '기타'];
 
   const monthStr = `${year}-${String(month + 1).padStart(2, '0')}`;
@@ -1458,19 +1535,33 @@ export function CreateSettlementModal({ calendar, initialData = null, initialCar
     }
   }, [monthlyExpenses, cardToEdit]);
 
-  // Dynamically calculate income, expense, 1/N per person
-  const { totalIncome, totalExpense, settlementPerPerson } = React.useMemo(() => {
-    let inc = 0;
+  // Dynamically calculate total expense and per-person settlement amount
+  const { totalExpense, settlementPerPerson } = React.useMemo(() => {
     let exp = 0;
     Object.values(checkedItems).forEach(item => {
       const amt = Number(item.amount || 0);
-      if (item.isIncome || amt > 0) inc += Math.abs(amt);
-      else exp += Math.abs(amt);
+      exp += Math.abs(amt);
     });
-    const count = Math.max(1, selectedParticipantIds.length);
+    const count = Math.max(1, participantRows.length);
     const perPerson = Math.round(exp / count);
-    return { totalIncome: inc, totalExpense: exp, settlementPerPerson: perPerson };
-  }, [checkedItems, selectedParticipantIds.length]);
+    return { totalExpense: exp, settlementPerPerson: perPerson };
+  }, [checkedItems, participantRows.length]);
+
+  // Handle Bank Account Auto Hyphen Formatting
+  const handleAccountNumberChange = (e) => {
+    const val = e.target.value;
+    const formatted = formatBankAccountNumber(bankName, val);
+    setAccountNumber(formatted);
+  };
+
+  // Re-format account number if bank changes
+  const handleBankNameChange = (e) => {
+    const newBank = e.target.value;
+    setBankName(newBank);
+    if (accountNumber) {
+      setAccountNumber(formatBankAccountNumber(newBank, accountNumber));
+    }
+  };
 
   const toggleCheckItem = (item) => {
     setCheckedItems(prev => {
@@ -1481,24 +1572,41 @@ export function CreateSettlementModal({ calendar, initialData = null, initialCar
     });
   };
 
-  const toggleParticipant = (id) => {
-    setSelectedParticipantIds(prev => {
-      if (prev.includes(id)) {
-        if (prev.length <= 1) return prev;
-        return prev.filter(x => x !== id);
-      }
-      return [...prev, id];
+  // Participant row handlers
+  const handleAddParticipantRow = () => {
+    const defaultP = participantOptions[0] || '참여자';
+    setParticipantRows(prev => [
+      ...prev,
+      { id: `pr_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`, participantId: defaultP, amount: settlementPerPerson }
+    ]);
+  };
+
+  const handleUpdateParticipantRow = (rowId, key, value) => {
+    setParticipantRows(prev => prev.map(r => r.id === rowId ? { ...r, [key]: value } : r));
+  };
+
+  const handleRemoveParticipantRow = (rowId) => {
+    setParticipantRows(prev => {
+      if (prev.length <= 1) return prev;
+      return prev.filter(r => r.id !== rowId);
     });
   };
 
-  const handleAddCustomParticipant = () => {
-    if (!newParticipantName.trim()) return;
-    const name = newParticipantName.trim();
-    if (!selectedParticipantIds.includes(name)) {
-      setSelectedParticipantIds(prev => [...prev, name]);
-    }
-    setNewParticipantName('');
-    setIsAddingParticipant(false);
+  // Personal expense row handlers
+  const handleAddPersonalExpense = () => {
+    const defaultP = participantOptions[0] || '참여자';
+    setPersonalExpenses(prev => [
+      ...prev,
+      { id: `pe_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`, participantId: defaultP, amount: 0, description: '' }
+    ]);
+  };
+
+  const handleUpdatePersonalExpense = (id, key, value) => {
+    setPersonalExpenses(prev => prev.map(item => item.id === id ? { ...item, [key]: value } : item));
+  };
+
+  const handleRemovePersonalExpense = (id) => {
+    setPersonalExpenses(prev => prev.filter(item => item.id !== id));
   };
 
   const handlePrevMonth = () => {
@@ -1516,17 +1624,19 @@ export function CreateSettlementModal({ calendar, initialData = null, initialCar
       if (showToast) showToast('정산 타이틀을 입력해주세요.', 'warning');
       return;
     }
+    const participantNames = participantRows.map(r => r.participantId).filter(Boolean);
     const newCard = {
       id: cardToEdit?.id || `sc_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
       title: title.trim(),
       status: cardToEdit?.status || 'active',
       createdAt: cardToEdit?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      participants: selectedParticipantIds,
-      participantCount: selectedParticipantIds.length,
+      participants: participantNames,
+      participantCount: participantNames.length,
+      participantRows: participantRows,
+      personalExpenses: personalExpenses,
       amount: totalExpense,
       perPersonAmount: settlementPerPerson,
-      totalIncome: totalIncome,
       bankName: bankName,
       depositorName: depositorName.trim(),
       accountNumber: accountNumber.trim(),
@@ -1552,7 +1662,7 @@ export function CreateSettlementModal({ calendar, initialData = null, initialCar
       className: 'modal-header',
       style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 18px', borderBottom: '1px solid var(--border-subtle)' }
     },
-      React.createElement('h3', { style: { fontSize: '1.05rem', fontWeight: 800, margin: 0 } }, isEditing ? '정산 수정' : '정산 생성'),
+      React.createElement('h3', { style: { fontSize: '1.05rem', fontWeight: 800, margin: 0, color: 'var(--text-main)' } }, isEditing ? '정산 수정' : '정산 생성'),
       React.createElement('button', {
         type: 'button', onClick: onClose,
         style: { background: 'none', border: 'none', color: '#64748B', cursor: 'pointer' }
@@ -1563,61 +1673,6 @@ export function CreateSettlementModal({ calendar, initialData = null, initialCar
       className: 'modal-body',
       style: { overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }
     },
-      React.createElement('div', {
-        style: {
-          background: 'linear-gradient(90deg, var(--settlement-hero-start), var(--settlement-hero-end))',
-          borderRadius: '16px',
-          padding: '14px',
-          color: 'var(--settlement-hero-text)',
-          boxShadow: '0 12px 24px rgba(91, 75, 235, 0.18)',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '10px'
-        }
-      },
-        React.createElement('div', {
-          style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }
-        },
-          React.createElement('strong', {
-            style: { fontSize: '0.96rem', fontWeight: 900, color: 'var(--settlement-hero-text)' }
-          }, calendar?.title || '정산'),
-          React.createElement('span', {
-            style: {
-              fontSize: '0.72rem',
-              fontWeight: 800,
-              padding: '4px 8px',
-              borderRadius: '999px',
-              backgroundColor: 'rgba(255,255,255,0.16)',
-              color: 'var(--settlement-hero-text)'
-            }
-          }, `${year}년 ${month + 1}월`)
-        ),
-        React.createElement('div', {
-          style: {
-            display: 'grid',
-            gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-            gap: '8px',
-            background: 'var(--settlement-hero-surface)',
-            borderRadius: '14px',
-            padding: '10px 12px',
-            color: 'var(--settlement-hero-surface-text)'
-          }
-        },
-          React.createElement('div', { style: { textAlign: 'center' } },
-            React.createElement('div', { style: { fontSize: '0.68rem', fontWeight: 800, color: 'var(--settlement-hero-surface-muted)' } }, '총 수입'),
-            React.createElement('div', { style: { fontSize: '0.9rem', fontWeight: 900, color: '#16A34A' } }, `${totalIncome.toLocaleString()}원`)
-          ),
-          React.createElement('div', { style: { textAlign: 'center' } },
-            React.createElement('div', { style: { fontSize: '0.68rem', fontWeight: 800, color: 'var(--settlement-hero-surface-muted)' } }, '총 지출'),
-            React.createElement('div', { style: { fontSize: '0.9rem', fontWeight: 900, color: '#DC2626' } }, `${totalExpense.toLocaleString()}원`)
-          ),
-          React.createElement('div', { style: { textAlign: 'center' } },
-            React.createElement('div', { style: { fontSize: '0.68rem', fontWeight: 800, color: 'var(--settlement-hero-surface-muted)' } }, '1인당'),
-            React.createElement('div', { style: { fontSize: '0.9rem', fontWeight: 900, color: '#E247A1' } }, `${settlementPerPerson.toLocaleString()}원`)
-          )
-        )
-      ),
-
       /* 1. Title Input */
       React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '4px' } },
         React.createElement('label', { style: { fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-main)' } }, '타이틀 입력'),
@@ -1628,73 +1683,66 @@ export function CreateSettlementModal({ calendar, initialData = null, initialCar
         })
       ),
 
-      /* 2. Participants Select + Expense Amount Row */
-      React.createElement('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' } },
-        React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '4px' } },
+      /* 2. Participant Rows List & Individual Amount Inputs */
+      React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px' } },
+        React.createElement('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr 32px', gap: '8px', alignItems: 'center' } },
           React.createElement('label', { style: { fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-main)' } }, '참여자 선택'),
-          React.createElement('div', {
-            style: {
-              display: 'flex', flexWrap: 'wrap', gap: '4px', padding: '6px',
-              border: '1px solid var(--border-subtle)', borderRadius: '8px', maxHeight: '90px', overflowY: 'auto', backgroundColor: 'var(--bg-primary)'
-            }
-          },
-            selectedParticipantIds.map(pName => {
-              return React.createElement('button', {
-                key: pName, type: 'button',
-                onClick: () => toggleParticipant(pName),
-                style: {
-                  padding: '3px 8px', borderRadius: '999px', fontSize: '0.72rem', fontWeight: 700,
-                  border: '1px solid #2563EB', backgroundColor: 'rgba(59, 130, 246, 0.15)',
-                  color: '#2563EB', cursor: 'pointer'
-                }
-              }, '✓ ' + pName);
-            })
-          )
+          React.createElement('label', { style: { fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-main)' } }, '개별 정산금액'),
+          React.createElement('span', null)
         ),
-        React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '4px' } },
-          React.createElement('label', { style: { fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-main)' } }, '총 지출 금액'),
-          React.createElement('input', {
-            type: 'text', className: 'form-input', readOnly: true,
-            value: `${totalExpense.toLocaleString()}원`,
-            style: { width: '100%', borderRadius: '8px', backgroundColor: 'var(--bg-primary)', fontWeight: 800, color: '#DC2626' }
-          })
-        )
+        participantRows.map(row => {
+          return React.createElement('div', {
+            key: row.id,
+            style: { display: 'grid', gridTemplateColumns: '1fr 1fr 32px', gap: '8px', alignItems: 'center' }
+          },
+            /* Participant Select Dropdown */
+            React.createElement('select', {
+              className: 'form-select',
+              value: row.participantId,
+              onChange: e => handleUpdateParticipantRow(row.id, 'participantId', e.target.value),
+              style: { width: '100%', borderRadius: '8px', fontSize: '0.82rem' }
+            }, participantOptions.map(p => React.createElement('option', { key: p, value: p }, p))),
+            /* Individual Amount Input (black text, normal weight, no bold) */
+            React.createElement('input', {
+              type: 'text',
+              className: 'form-input',
+              value: row.amount != null ? row.amount : settlementPerPerson,
+              onChange: e => {
+                const num = parseInt(e.target.value.replace(/\D/g, ''), 10);
+                handleUpdateParticipantRow(row.id, 'amount', isNaN(num) ? '' : num);
+              },
+              placeholder: `${settlementPerPerson.toLocaleString()}원`,
+              style: { width: '100%', borderRadius: '8px', color: '#0F172A', fontWeight: 400, fontSize: '0.84rem' }
+            }),
+            /* Delete Row Button */
+            React.createElement('button', {
+              type: 'button',
+              className: 'btn btn-secondary',
+              title: '참여자 삭제',
+              onClick: () => handleRemoveParticipantRow(row.id),
+              style: { width: '32px', height: '32px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '8px', color: '#EF4444' }
+            }, '×')
+          );
+        })
       ),
 
       /* 3. Add Participant Button */
-      React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '4px' } },
-        !isAddingParticipant ? React.createElement('button', {
-          type: 'button',
-          className: 'btn',
-          onClick: () => setIsAddingParticipant(true),
-          style: {
-            padding: '6px 12px', borderRadius: '6px', backgroundColor: 'var(--bg-primary)',
-            border: '1px dashed var(--border-subtle)', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-main)', cursor: 'pointer', textAlign: 'center'
-          }
-        }, '+ 참여자 추가')
-        : React.createElement('div', { style: { display: 'flex', gap: '6px' } },
-          React.createElement('input', {
-            type: 'text', className: 'form-input', value: newParticipantName,
-            onChange: e => setNewParticipantName(e.target.value), placeholder: '추가할 이름 입력',
-            style: { flex: 1, borderRadius: '6px', fontSize: '0.8rem' }
-          }),
-          React.createElement('button', {
-            type: 'button', className: 'btn btn-primary', onClick: handleAddCustomParticipant,
-            style: { padding: '4px 10px', fontSize: '0.78rem', borderRadius: '6px' }
-          }, '추가'),
-          React.createElement('button', {
-            type: 'button', className: 'btn btn-secondary', onClick: () => setIsAddingParticipant(false),
-            style: { padding: '4px 10px', fontSize: '0.78rem', borderRadius: '6px' }
-          }, '취소')
-        )
-      ),
+      React.createElement('button', {
+        type: 'button',
+        className: 'btn',
+        onClick: handleAddParticipantRow,
+        style: {
+          padding: '8px 12px', borderRadius: '8px', backgroundColor: 'var(--bg-primary)',
+          border: '1px dashed var(--border-subtle)', fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-main)', cursor: 'pointer', textAlign: 'center'
+        }
+      }, '+ 참여자 추가'),
 
       /* 4. Bank Select & Depositor Input */
       React.createElement('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' } },
         React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '4px' } },
           React.createElement('label', { style: { fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)' } }, '송금 받을 은행'),
           React.createElement('select', {
-            className: 'form-select', value: bankName, onChange: e => setBankName(e.target.value),
+            className: 'form-select', value: bankName, onChange: handleBankNameChange,
             style: { width: '100%', borderRadius: '6px', fontSize: '0.82rem' }
           }, BANK_OPTIONS.map(b => React.createElement('option', { key: b, value: b }, b)))
         ),
@@ -1708,12 +1756,12 @@ export function CreateSettlementModal({ calendar, initialData = null, initialCar
         )
       ),
 
-      /* 5. Account Number Input */
+      /* 5. Account Number Input with Auto Hyphen */
       React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '4px' } },
         React.createElement('label', { style: { fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)' } }, '계좌번호'),
         React.createElement('input', {
           type: 'text', className: 'form-input', value: accountNumber,
-          onChange: e => setAccountNumber(e.target.value), placeholder: '계좌번호 입력',
+          onChange: handleAccountNumberChange, placeholder: '계좌번호 입력 (숫자만 입력 시 하이픈 자동생성)',
           style: { width: '100%', borderRadius: '6px', fontSize: '0.82rem' }
         })
       ),
@@ -1721,24 +1769,20 @@ export function CreateSettlementModal({ calendar, initialData = null, initialCar
       /* Divider */
       React.createElement('hr', { style: { border: 'none', borderTop: '1px solid var(--border-subtle)', margin: '4px 0' } }),
 
-      /* 6. Summary Calculation Box: 총 수입 | 총 지출 | 정산(1/N) */
+      /* 6. Summary Calculation Box: 총 지출 | 개별 정산 (총 지출 ÷ 참여자 수) */
       React.createElement('div', {
         style: {
-          display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px', padding: '10px 12px',
-          borderRadius: '8px', backgroundColor: 'rgba(59, 130, 246, 0.08)', border: '1px solid rgba(59, 130, 246, 0.2)', textAlign: 'center'
+          display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', padding: '12px 14px',
+          borderRadius: '10px', backgroundColor: 'rgba(15, 23, 42, 0.04)', border: '1px solid var(--border-subtle)', textAlign: 'center'
         }
       },
         React.createElement('div', null,
-          React.createElement('div', { style: { fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700 } }, '총 수입'),
-          React.createElement('div', { style: { fontSize: '0.88rem', fontWeight: 800, color: '#16A34A' } }, `+${totalIncome.toLocaleString()}원`)
+          React.createElement('div', { style: { fontSize: '0.74rem', color: 'var(--text-muted)', fontWeight: 700 } }, '총 지출'),
+          React.createElement('div', { style: { fontSize: '0.96rem', fontWeight: 800, color: '#0F172A' } }, `${totalExpense.toLocaleString()}원`)
         ),
         React.createElement('div', null,
-          React.createElement('div', { style: { fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700 } }, '총 지출'),
-          React.createElement('div', { style: { fontSize: '0.88rem', fontWeight: 800, color: '#DC2626' } }, `-${totalExpense.toLocaleString()}원`)
-        ),
-        React.createElement('div', null,
-          React.createElement('div', { style: { fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700 } }, `정산 (1인당 / ${selectedParticipantIds.length}명)`),
-          React.createElement('div', { style: { fontSize: '0.92rem', fontWeight: 900, color: '#2563EB' } }, `${settlementPerPerson.toLocaleString()}원`)
+          React.createElement('div', { style: { fontSize: '0.74rem', color: 'var(--text-muted)', fontWeight: 700 } }, `개별 정산 (1인당 / ${participantRows.length}명)`),
+          React.createElement('div', { style: { fontSize: '0.96rem', fontWeight: 800, color: '#2563EB' } }, `${settlementPerPerson.toLocaleString()}원`)
         )
       ),
 
@@ -1746,7 +1790,7 @@ export function CreateSettlementModal({ calendar, initialData = null, initialCar
       React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px' } },
         /* Month Nav Header */
         React.createElement('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
-          React.createElement('label', { style: { fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-main)' } }, '일자별 지출/수입 항목 선택'),
+          React.createElement('label', { style: { fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-main)' } }, '일자별 지출 항목 선택'),
           React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '6px' } },
             React.createElement('button', {
               type: 'button', onClick: handlePrevMonth,
@@ -1762,7 +1806,7 @@ export function CreateSettlementModal({ calendar, initialData = null, initialCar
         /* Checkbox List */
         React.createElement('div', {
           style: {
-            maxHeight: '180px', overflowY: 'auto', border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '6px', display: 'flex', flexDirection: 'column', gap: '4px'
+            maxHeight: '160px', overflowY: 'auto', border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '6px', display: 'flex', flexDirection: 'column', gap: '4px'
           }
         },
           monthlyExpenses.length === 0 ? React.createElement('div', { style: { padding: '16px', textAlign: 'center', fontSize: '0.78rem', color: 'var(--text-muted)' } }, '해당 월에 등록된 내역이 없습니다.')
@@ -1787,20 +1831,115 @@ export function CreateSettlementModal({ calendar, initialData = null, initialCar
               );
             })
         )
+      ),
+
+      /* 8. NEW Personal Expense Block ('개인 지출') */
+      React.createElement('div', {
+        style: { display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid var(--border-subtle)', paddingTop: '10px' }
+      },
+        React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
+          React.createElement('label', { style: { fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-main)' } }, '개인 지출 등록'),
+          React.createElement('span', { style: { fontSize: '0.75rem', color: 'var(--text-muted)' } },
+            `합계: ${(personalExpenses.reduce((s, x) => s + (Number(x.amount) || 0), 0)).toLocaleString()}원`
+          )
+        ),
+        personalExpenses.map(item => {
+          return React.createElement('div', {
+            key: item.id,
+            style: {
+              padding: '8px', borderRadius: '8px', backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column', gap: '6px'
+            }
+          },
+            /* Row 1: Participant Select + Amount Input */
+            React.createElement('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' } },
+              React.createElement('select', {
+                className: 'form-select',
+                value: item.participantId,
+                onChange: e => handleUpdatePersonalExpense(item.id, 'participantId', e.target.value),
+                style: { width: '100%', borderRadius: '6px', fontSize: '0.8rem' }
+              }, participantOptions.map(p => React.createElement('option', { key: p, value: p }, p))),
+              React.createElement('input', {
+                type: 'text',
+                className: 'form-input',
+                value: item.amount || '',
+                onChange: e => {
+                  const num = parseInt(e.target.value.replace(/\D/g, ''), 10);
+                  handleUpdatePersonalExpense(item.id, 'amount', isNaN(num) ? '' : num);
+                },
+                placeholder: '금액 입력 (원)',
+                style: { width: '100%', borderRadius: '6px', fontSize: '0.8rem', color: '#0F172A' }
+              })
+            ),
+            /* Row 2: Description + Delete Button */
+            React.createElement('div', { style: { display: 'flex', gap: '6px', alignItems: 'center' } },
+              React.createElement('input', {
+                type: 'text',
+                className: 'form-input',
+                value: item.description || '',
+                onChange: e => handleUpdatePersonalExpense(item.id, 'description', e.target.value),
+                placeholder: '지출 명목 (예: 개인 음료, 교통비)',
+                style: { flex: 1, borderRadius: '6px', fontSize: '0.8rem' }
+              }),
+              React.createElement('button', {
+                type: 'button',
+                className: 'btn btn-secondary',
+                onClick: () => handleRemovePersonalExpense(item.id),
+                style: { padding: '4px 10px', fontSize: '0.78rem', borderRadius: '6px', color: '#EF4444' }
+              }, '삭제')
+            )
+          );
+        }),
+        React.createElement('button', {
+          type: 'button',
+          className: 'btn',
+          onClick: handleAddPersonalExpense,
+          style: {
+            padding: '6px 10px', borderRadius: '6px', backgroundColor: 'var(--bg-primary)',
+            border: '1px dashed var(--border-subtle)', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-main)', cursor: 'pointer', textAlign: 'center'
+          }
+        }, '+ 개인 지출 추가')
       )
     ),
 
     /* Modal Footer */
     React.createElement('div', {
       className: 'modal-footer',
-      style: { padding: '12px 18px', borderTop: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'flex-end', gap: '8px' }
+      style: { padding: '12px 18px', borderTop: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }
     },
-      React.createElement('button', {
-        type: 'button', className: 'btn btn-secondary', onClick: onClose, style: { borderRadius: '8px' }
-      }, '취소'),
-      React.createElement('button', {
-        type: 'button', className: 'btn btn-primary', onClick: handleSave, style: { borderRadius: '8px', fontWeight: 800 }
-      }, '정산 생성하기')
+      /* Left footer actions: Delete & Close Status */
+      React.createElement('div', { style: { display: 'flex', gap: '6px', alignItems: 'center' } },
+        isEditing && React.createElement('button', {
+          type: 'button', className: 'btn btn-danger',
+          onClick: () => {
+            if (typeof onDeleteCard === 'function') onDeleteCard(cardToEdit.id);
+            if (onClose) onClose();
+          },
+          style: { borderRadius: '8px', fontSize: '0.8rem', fontWeight: 800 }
+        }, '삭제'),
+        isEditing && React.createElement('button', {
+          type: 'button', className: 'btn btn-secondary',
+          onClick: () => {
+            if (typeof onToggleStatus === 'function') onToggleStatus(cardToEdit.id);
+            if (onClose) onClose();
+          },
+          style: { borderRadius: '8px', fontSize: '0.8rem', fontWeight: 800 }
+        }, cardToEdit?.status === 'closed' ? '마감 해제' : '마감')
+      ),
+      /* Right footer actions: Cancel & Save (Black background, white text) */
+      React.createElement('div', { style: { display: 'flex', gap: '8px', alignItems: 'center' } },
+        React.createElement('button', {
+          type: 'button', className: 'btn btn-secondary', onClick: onClose, style: { borderRadius: '8px', fontSize: '0.8rem' }
+        }, '취소'),
+        React.createElement('button', {
+          type: 'button',
+          className: 'btn',
+          onClick: handleSave,
+          style: {
+            borderRadius: '8px', fontWeight: 800, fontSize: '0.84rem',
+            backgroundColor: '#0F172A', color: '#FFFFFF', border: 'none', padding: '8px 20px', cursor: 'pointer'
+          }
+        }, isEditing ? '수정' : '생성')
+      )
     )
   ));
 }
@@ -2843,6 +2982,14 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
     calendar: calendar,
     initialData: editingSettlementCard,
     onClose: () => setEditingSettlementCard(null),
+    onDeleteCard: (cardId) => {
+      if (typeof onDeleteSettlementCard === 'function') onDeleteSettlementCard(cardId);
+      setEditingSettlementCard(null);
+    },
+    onToggleStatus: (cardId) => {
+      if (typeof onToggleSettlementCardStatus === 'function') onToggleSettlementCardStatus(cardId);
+      setEditingSettlementCard(null);
+    },
     onSave: (updatedCard) => {
       if (typeof onSaveSettlementCard === 'function') {
         onSaveSettlementCard(updatedCard);
