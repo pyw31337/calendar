@@ -2045,16 +2045,25 @@ function normalizeConfirmedMeetingsForSave(meetings) {
 }
 async function writeConfirmedMeetingsToFirestore(calendarId, meetings) {
   const validMeetings = normalizeConfirmedMeetingsForSave(meetings);
-  if (!validMeetings.length) return true;
   try {
     const configuredProjectId = firebaseConfig.projectId;
     if (!configuredProjectId) throw new Error('Firebase project id is unavailable');
+    const collectionUrl = `https://firestore.googleapis.com/v1/projects/${configuredProjectId}/databases/(default)/documents/calendars/cal_${calendarId}/confirmedMeetings`;
+    const existingResponse = await fetch(`${collectionUrl}?pageSize=500`);
+    const existingDocuments = existingResponse.ok ? ((await existingResponse.json()).documents || []) : [];
+    const validDates = new Set(validMeetings.map(meeting => meeting.date));
     const writes = validMeetings.map(meeting => ({
       update: {
         name: `projects/${configuredProjectId}/databases/(default)/documents/calendars/cal_${calendarId}/confirmedMeetings/${meeting.date}`,
         fields: Object.fromEntries(Object.entries(meeting).map(([key, value]) => [key, jsToFirestoreValue(value)]))
       }
     }));
+    existingDocuments.forEach(document => {
+      const documentName = typeof document?.name === 'string' ? document.name : '';
+      const date = documentName.split('/').pop();
+      if (date && !validDates.has(date)) writes.push({ delete: documentName });
+    });
+    if (writes.length === 0) return true;
     const res = await fetch(`https://firestore.googleapis.com/v1/projects/${configuredProjectId}/databases/(default)/documents:commit`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -2070,6 +2079,11 @@ async function writeConfirmedMeetingsToFirestore(calendarId, meetings) {
       const colRef = firebaseDb.collection('calendars').doc(`cal_${calendarId}`).collection('confirmedMeetings');
       const batch = firebaseDb.batch();
       validMeetings.forEach(meeting => batch.set(colRef.doc(meeting.date), meeting));
+      const existingSnapshot = await colRef.get({ source: 'server' });
+      const validDates = new Set(validMeetings.map(meeting => meeting.date));
+      existingSnapshot.forEach(document => {
+        if (!validDates.has(document.id)) batch.delete(document.ref);
+      });
       await batch.commit();
       return true;
     } catch (e) {
