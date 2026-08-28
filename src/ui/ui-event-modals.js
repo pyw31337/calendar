@@ -2000,16 +2000,16 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
           style: { display: 'flex', flexDirection: 'column', gap: '6px', padding: '8px', backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border-subtle)', borderRadius: '8px' }
         }, participantRows.map(row => React.createElement('div', {
           key: row.id,
-          style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', minHeight: '44px', padding: '7px 10px', border: '1px solid var(--border-subtle)', borderRadius: '8px', backgroundColor: 'var(--bg-card)' }
+          style: { display: 'flex', flexDirection: 'column', gap: '4px', minHeight: '44px', padding: '7px 10px', border: '1px solid var(--border-subtle)', borderRadius: '8px', backgroundColor: 'var(--bg-card)' }
         },
-          React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '9px', minWidth: 0, overflow: 'hidden', cursor: 'pointer' }, onClick: () => handleEditParticipantRow(row) },
+          React.createElement('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', width: '100%', minWidth: 0 } },
+            React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '9px', minWidth: 0, overflow: 'hidden', cursor: 'pointer' }, onClick: () => handleEditParticipantRow(row) },
             ParticipantBackdrop ? React.createElement(ParticipantBackdrop, {
               participant: participantPickerOptions.find(option => option.value === row.participantId) || { name: row.participantId, color: '#3B82F6' },
               name: row.participantId || '참여자', dotSize: 9, style: { fontSize: '0.82rem', flexShrink: 0 }
-            }) : React.createElement('span', { style: { fontSize: '0.84rem', fontWeight: 800, color: 'var(--text-main)' } }, row.participantId || '참여자'),
-            row.memo ? React.createElement('span', { style: { padding: '3px 8px', borderRadius: '999px', backgroundColor: '#E2E8F0', color: '#64748B', fontSize: '0.72rem', fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, row.memo) : null
-          ),
-          React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0 } },
+            }) : React.createElement('span', { style: { fontSize: '0.84rem', fontWeight: 800, color: 'var(--text-main)' } }, row.participantId || '참여자')
+            ),
+            React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0 } },
             React.createElement('span', { style: { fontSize: '0.82rem', color: 'var(--text-main)', whiteSpace: 'nowrap', marginRight: '2px' } }, `${getIndividualSettlementAmount(row.participantId).toLocaleString()} 원`),
             React.createElement('button', {
               type: 'button', title: '참여자 메모 편집', 'aria-label': '참여자 메모 편집', onClick: () => handleEditParticipantRow(row),
@@ -2019,7 +2019,9 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
               type: 'button', title: '참여자 삭제', 'aria-label': '참여자 삭제', onClick: () => handleRemoveParticipantRow(row.id),
               style: { width: '24px', height: '24px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px', color: '#64748B', backgroundColor: 'transparent', border: 'none', flexShrink: 0 }
             }, React.createElement(TrashIcon, { size: 14, style: { stroke: '#64748B' } }))
-          )
+            )
+          ),
+          row.memo ? React.createElement('div', { style: { alignSelf: 'flex-start', maxWidth: '100%', padding: '3px 8px', borderRadius: '999px', backgroundColor: '#E2E8F0', color: '#64748B', fontSize: '0.72rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer' }, onClick: () => handleEditParticipantRow(row) }, row.memo) : null
         )))
       ),
       React.createElement('div', { className: 'settlement-bank-grid', style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' } },
