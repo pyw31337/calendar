@@ -1,8 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
-const PROJECT_ID = 'metro-live-2918e';
-
 async function main() {
   // Find the latest backup file in ops-backups
   const backupDir = path.resolve('ops-backups');

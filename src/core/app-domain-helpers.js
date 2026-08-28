@@ -716,7 +716,6 @@ async function copyTextToClipboard(text) {
   }
 }
 
-const GATHER_APP_NOTIFICATIONS = window.GATHER_APP_NOTIFICATIONS || {};
 function isNotificationSupported(...args) {
   const f = (window.GATHER_APP_NOTIFICATIONS || {}).isNotificationSupported;
   return typeof f === 'function' ? f(...args) : undefined;
