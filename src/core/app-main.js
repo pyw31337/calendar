@@ -3201,7 +3201,20 @@ function CalendarApp() {
     )).slice(0, 10);
     const cleanTags = sanitizeText(parseTagTokens(tagsText).join(' '), 100);
     const nextPhotos = photos.map((p, i) => i === photoIndex ? { ...p, tags: cleanTags } : p);
-    return commitConfirmedMeetings(existingMeetings.map(m => m.date === meetingDate ? { ...meeting, photos: nextPhotos } : m), '태그 저장완료');
+    const saved = await commitConfirmedMeetings(existingMeetings.map(m => m.date === meetingDate ? { ...meeting, photos: nextPhotos } : m), '태그 저장완료');
+    if (!saved) return false;
+    // Confirm the subcollection write before reporting success. The calendar document and its
+    // confirmedMeetings mirror can briefly diverge when a fallback request races a realtime
+    // snapshot; silently keeping the optimistic local tag makes it disappear on re-entry.
+    const serverMeetings = await fetchConfirmedMeetingsFromFirestore(activeCal.id).catch(() => null);
+    const serverPhoto = Array.isArray(serverMeetings)
+      ? (serverMeetings.find(m => m.date === meetingDate)?.photos || []).find(p => p?.id === photoId || p?.refKey === photoId || p?.mediaKey === photoId)
+      : null;
+    if (!serverPhoto || String(serverPhoto.tags || '') !== cleanTags) {
+      showToast('태그 저장 확인에 실패했습니다. 다시 시도해 주세요.', 'error', 5000);
+      return false;
+    }
+    return true;
   };
 
   const handleSaveImageTags = async (messageId, imageIndex, tagsText, meta = {}) => {
@@ -3262,6 +3275,16 @@ function CalendarApp() {
     try {
       const ok = await writeCollectionDocumentWithFallback('messages', activeCalId, messageId, data, 'update', '이미지 태그 저장');
       if (!ok) throw new Error('Image tags update failed');
+      // Read the just-written message back from the server and update every local message
+      // snapshot. This prevents a stale onSnapshot/fetched-source snapshot from overwriting a
+      // tag that was successfully saved, especially for meeting photos opened from a modal.
+      const verifiedMessage = await fetchMessageRest(activeCalId, messageId);
+      if (!verifiedMessage) throw new Error('Image tags verification read failed');
+      const verifiedTags = isDirectMedia
+        ? getDirectMediaTagsForUrl(verifiedMessage, meta.directMediaUrl)
+        : (Array.isArray(verifiedMessage.imageTags) ? verifiedMessage.imageTags[imageIndex] : '');
+      if (String(verifiedTags || '') !== cleanTags) throw new Error('Image tags verification mismatch');
+      upsertLocalChatMessage(verifiedMessage);
       const now = Date.now();
       const added = nextTokens.filter(t => !prevTokens.includes(t));
       const removed = prevTokens.filter(t => !nextTokens.includes(t));
