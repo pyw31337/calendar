@@ -735,57 +735,6 @@ function CalendarApp() {
     }
   };
 
-  React.useEffect(() => {
-    const motionQuery = window.matchMedia?.('(prefers-reduced-motion: reduce)');
-    const interactiveSelector = '.confirmed-meeting-banner';
-    let pressedEl = null;
-    const clearPress = () => {
-      if (!pressedEl) return;
-      try { pressedEl.classList.remove('is-pressing'); } catch (_) {}
-      pressedEl = null;
-    };
-    const resolveTarget = raw => {
-      if (!raw || typeof raw.closest !== 'function') return null;
-      // Typing surfaces — no press scale
-      if (raw.closest('input, textarea, select, [contenteditable="true"]')) return null;
-    const target = raw.closest(interactiveSelector);
-    if (!target) return null;
-    if (target.disabled || target.getAttribute('aria-disabled') === 'true') return null;
-    if (target.closest('[data-no-press-feedback]')) return null;
-    if (target.classList && target.classList.contains('poll-drag-handle')) return null;
-    return target;
-  };
-    const handlePointerDown = event => {
-      if (event.pointerType === 'mouse' && event.button !== 0) return;
-      const target = resolveTarget(event.target);
-      if (!target) return;
-      clearPress();
-      pressedEl = target;
-      target.classList.add('is-pressing');
-      try {
-        if (typeof target.setPointerCapture === 'function' && event.pointerId != null) {
-          target.setPointerCapture(event.pointerId);
-        }
-      } catch (_) {}
-    };
-    const handlePointerEnd = () => clearPress();
-    document.addEventListener('pointerdown', handlePointerDown, { capture: true, passive: true });
-    document.addEventListener('pointerup', handlePointerEnd, { capture: true, passive: true });
-    document.addEventListener('pointercancel', handlePointerEnd, { capture: true, passive: true });
-    document.addEventListener('lostpointercapture', handlePointerEnd, { capture: true, passive: true });
-    document.addEventListener('touchend', handlePointerEnd, { capture: true, passive: true });
-    window.addEventListener('blur', handlePointerEnd);
-    return () => {
-      clearPress();
-      document.removeEventListener('pointerdown', handlePointerDown, { capture: true });
-      document.removeEventListener('pointerup', handlePointerEnd, { capture: true });
-      document.removeEventListener('pointercancel', handlePointerEnd, { capture: true });
-      document.removeEventListener('lostpointercapture', handlePointerEnd, { capture: true });
-      document.removeEventListener('touchend', handlePointerEnd, { capture: true });
-      window.removeEventListener('blur', handlePointerEnd);
-    };
-  }, []);
-
   // ---- Generic Confirm Dialog ----
   const [confirmDialog, setConfirmDialog] = React.useState(null);
   const showConfirmDialog = (title, message, onConfirm, showPasswordInput = false) => {
@@ -6354,7 +6303,7 @@ function CalendarApp() {
           border: 'none',
           cursor: 'pointer',
           gap: '12px',
-          boxShadow: '0 3px 12px rgba(168, 85, 247, 0.3)',
+          boxShadow: 'none',
           textAlign: 'left',
           userSelect: 'none',
           WebkitTapHighlightColor: 'transparent'
