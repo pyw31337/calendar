@@ -6229,15 +6229,16 @@ function App() {
               const entryUrl = extractFirstUrl(entry.note);
               const noteTextOnly = entryUrl ? removeFirstUrl(entry.note) : entry.note.trim();
               if (!noteTextOnly) return null;
+              const pColor = (p && p.color) ? p.color : '#6366F1';
               return /*#__PURE__*/React.createElement("span", {
                 key: entry.participantId,
                 className: "memo-capsule-badge",
                 style: {
-                  backgroundColor: '#EF4444',
+                  backgroundColor: pColor,
                   color: '#FFFFFF',
                   fontWeight: 700,
                   fontSize: '0.75rem',
-                  padding: '2px 10px',
+                  padding: '4px 10px',
                   borderRadius: '999px',
                   boxShadow: '0 1px 3px rgba(0,0,0,0.15)'
                 },
@@ -6267,8 +6268,8 @@ function App() {
             justifyContent: 'center',
             cursor: 'pointer',
             flexShrink: 0,
-            boxShadow: '0 2px 6px rgba(0,0,0,0.25)',
-            border: '1px solid rgba(255,255,255,0.1)'
+            boxShadow: 'none',
+            border: 'none'
           }
         },
           /*#__PURE__*/React.createElement("span", {

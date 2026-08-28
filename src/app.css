@@ -3102,6 +3102,13 @@ select.form-select {
   border-radius: var(--radius-full); font-size: 0.75rem; font-weight: 700;
   box-shadow: 0 1px 3px rgba(0,0,0,0.1); line-height: 1;
 }
+.confirmed-meeting-banner .memo-capsule-badge,
+.confirmed-meeting-surface .memo-capsule-badge {
+  padding: 4px 10px !important;
+}
+.btn-view-schedule {
+  box-shadow: none !important;
+}
 .confirmed-meeting-label-badge {
   background-color: var(--bg-card);
   color: #4F46E5;
