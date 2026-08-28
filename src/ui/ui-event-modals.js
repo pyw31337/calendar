@@ -1971,19 +1971,18 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
                 const isChecked = !!checkedItems[item.itemKey];
                 return React.createElement('label', {
                   key: item.itemKey,
-                  style: {
-                    display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px', borderRadius: '6px',
-                    backgroundColor: isChecked ? 'rgba(59, 130, 246, 0.06)' : 'transparent', cursor: 'pointer', fontSize: '0.78rem'
-                  }
+                  className: `settlement-expense-option${isChecked ? ' is-checked' : ''}`
                 },
                   React.createElement('input', {
                     type: 'checkbox', checked: isChecked, onChange: () => toggleCheckItem(item),
-                    style: { width: '16px', height: '16px', cursor: 'pointer' }
+                    className: 'settlement-expense-checkbox'
                   }),
-                  React.createElement('span', { style: { color: 'var(--text-muted)', fontWeight: 600 } }, formatShortDateWithDay(item.date)),
-                  React.createElement('span', { style: { flex: 1, fontWeight: 700, color: 'var(--text-main)' } }, item.label || '지출 내역'),
-                  React.createElement('strong', { style: { color: item.isIncome ? '#16A34A' : '#DC2626', fontWeight: 800 } },
-                    (item.isIncome ? '+' : '-') + Math.abs(item.amount).toLocaleString() + '원'
+                  React.createElement('span', { className: 'settlement-expense-option-copy' },
+                    React.createElement('span', { className: 'settlement-expense-option-date' }, formatShortDateWithDay(item.date)),
+                    React.createElement('span', { className: 'settlement-expense-option-label' }, item.label || '지출 내역')
+                  ),
+                  React.createElement('strong', { className: `settlement-expense-option-amount${item.isIncome ? ' is-income' : ''}` },
+                    `${item.isIncome ? '+' : '-'}${Math.abs(item.amount).toLocaleString()}원`
                   )
                 );
               })
@@ -2566,7 +2565,17 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
       fontSize: '1.05rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '8px', margin: 0, color: 'var(--text-main)',
       position: 'absolute', left: '50%', transform: 'translateX(-50%)', pointerEvents: 'none'
     }
-  }, formatChatHeaderTitle(calendar?.title), " 정산"), /*#__PURE__*/React.createElement("button", {
+  }, formatChatHeaderTitle(calendar?.title), " 정산"), /*#__PURE__*/React.createElement("div", {
+    className: "settlement-view-tabs",
+    "aria-label": "정산 보기 방식",
+    style: { marginLeft: 'auto', marginRight: '8px' }
+  }, /*#__PURE__*/React.createElement(SegmentedToggle, {
+    ariaLabel: "누적 또는 일별 정산 보기",
+    value: activeTab,
+    onChange: v => setActiveTab(v),
+    options: [{ value: 'total', label: '누적' }, { value: 'daily', label: '일별' }],
+    style: { width: '92px', padding: '2px', borderRadius: '10px' }
+  })), /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: () => setIsSettlementMenuOpen(true),
     title: "메뉴",
@@ -2589,7 +2598,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
       const getCalendarSettlementCards = __deps.getCalendarSettlementCards || (c => Array.isArray(c?.settlementCards) ? c.settlementCards : []);
       const activeParticipants = getActiveParticipants(calendar);
       const participantCount = Math.max(1, activeParticipants.length);
-      const perPersonExpense = Math.round(displayExpense / participantCount);
+      const perPersonExpense = Math.round(allTimeExpense / participantCount);
 
       const customCards = getCalendarSettlementCards(calendar);
 
@@ -2615,6 +2624,15 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
           const isClosed = card.status === 'closed';
           const bankInfoText = [card.bankName, card.accountNumber, card.depositorName].filter(Boolean).join(' ');
           const isMenuOpen = openMenuCardId === card.id;
+          const cardParticipantRows = (Array.isArray(card.participantRows) && card.participantRows.length > 0
+            ? card.participantRows.map(row => ({
+              name: row.participantId || '참여자',
+              amount: Number(row.amount) || Number(card.perPersonAmount) || perPersonExpense
+            }))
+            : (Array.isArray(card.participants) && card.participants.length > 0
+              ? card.participants.map(name => ({ name, amount: Number(card.perPersonAmount) || perPersonExpense }))
+              : activeParticipants.map(participant => ({ name: participant.name, amount: Number(card.perPersonAmount) || perPersonExpense }))))
+            .slice(0, 4);
 
           return React.createElement("div", {
             key: card.id,
@@ -2642,8 +2660,8 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
                 React.createElement("span", {
                   style: {
                     fontSize: '0.68rem', fontWeight: 800, padding: '2px 6px', borderRadius: '4px',
-                    backgroundColor: isClosed ? 'rgba(255,255,255,0.18)' : 'rgba(34, 197, 94, 0.22)',
-                    color: '#FFFFFF'
+                    backgroundColor: isClosed ? 'rgba(255,255,255,0.18)' : '#22C55E',
+                    color: isClosed ? '#FFFFFF' : '#5B4BEB'
                   }
                 }, isClosed ? "마감됨" : "진행중")
               ),
@@ -2724,52 +2742,30 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
               )
             ),
 
-            /* Member & Amount Row: (좌측끝) (퍼스널 컬러 Circle) 박영우 -------------- (우측끝) 404,150원 */
+            /* One fixed-width person card per participant, up to four cards per row. */
             React.createElement("div", {
-              style: {
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                backgroundColor: 'var(--settlement-hero-surface)', padding: '12px 14px', borderRadius: '14px',
-                boxShadow: '0 6px 18px rgba(15, 23, 42, 0.06)'
-              }
-            },
-              /* Left End: Personal Color Circle + Participant Name */
-              React.createElement("div", {
-                style: { display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }
+              className: "settlement-person-grid"
+            }, cardParticipantRows.length === 0
+              ? React.createElement("div", { className: "settlement-person-card settlement-person-card-empty" }, "참여 멤버 없음")
+              : cardParticipantRows.map((row, index) => React.createElement("div", {
+                key: `${card.id}_${row.name}_${index}`,
+                className: "settlement-person-card"
               },
-                activeParticipants.length === 0 ? React.createElement("span", { style: { fontSize: '0.8rem', color: 'var(--settlement-hero-surface-muted)' } }, "참여 멤버 없음")
-                  : activeParticipants.map(p => React.createElement("div", {
-                    key: p.id || p.name,
-                    style: { display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '0.82rem', fontWeight: 800, color: 'var(--settlement-hero-surface-text)' }
-                  },
-                    React.createElement("span", {
-                      style: { width: '10px', height: '10px', borderRadius: '50%', backgroundColor: p.color || '#3B82F6', display: 'inline-block', flexShrink: 0 }
-                    }),
-                    p.name
-                  ))
-              ),
-
-              /* Right End: 1인당 정산 금액 */
-              React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-end' } },
-                React.createElement("span", { style: { fontSize: '0.68rem', color: 'var(--settlement-hero-surface-muted)' } }, "1인당 정산 금액"),
-                React.createElement("strong", { style: { fontSize: '1.1rem', color: '#E247A1', fontWeight: 900 } }, `${(card.perPersonAmount || perPersonExpense).toLocaleString()}원`)
-              )
-            ),
+                React.createElement("div", { className: "settlement-person-name" },
+                  React.createElement("span", {
+                    className: "settlement-person-dot",
+                    style: { backgroundColor: activeParticipants[index]?.color || '#3B82F6' }
+                  }), row.name
+                ),
+                React.createElement("strong", { className: "settlement-person-amount" }, `${row.amount.toLocaleString()}원`)
+              )))
 
           );
         })
       );
     })(),
 
-    /* 2. SegmentedToggle (누적보기 / 일자별보기) - Positioned ABOVE Metric Grid */
-    /*#__PURE__*/React.createElement(SegmentedToggle, {
-      ariaLabel: "누적보기/일자별보기 전환",
-      value: activeTab,
-      onChange: v => setActiveTab(v),
-      style: { width: '100%', flexShrink: 0 },
-      options: [{ value: 'total', label: '누적보기' }, { value: 'daily', label: '일자별보기' }]
-    }),
-
-    /* 3. Metric Grid (총수입 / 총지출 / 현재잔액) */
+    /* Metric Grid (총수입 / 총지출 / 현재잔액) */
     /*#__PURE__*/React.createElement("div", {
       className: "settlement-metric-grid"
     }, metricCards.map(card => /*#__PURE__*/React.createElement("div", {
