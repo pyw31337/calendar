@@ -578,6 +578,37 @@ function mergeConfirmedMeetings(serverList = [], incomingList = []) {
   return Array.from(byDate.values());
 }
 
+// Unlike confirmedMeeting/activityLogs/polls (already keyed-merged above), settlementCards used
+// to be carried through mergeCalendarSettingsDelta as a single blind "incoming wins if present"
+// value -- fine for the settlement-card handlers themselves, but every OTHER 'settings'-mode save
+// (title/description, weather region, notices, places, admin settings, ...) also sends the whole
+// activeCal object, settlementCards included. A device whose local settlementCards snapshot was
+// even slightly stale (e.g. it hadn't yet received someone else's settlement edit over the
+// realtime listener) would silently stomp that edit back to the old value the next time it saved
+// anything else in 'settings' mode -- a plausible root cause for "정산 수정이 다른 기기에 반영 안
+//됨" reports that recur across unrelated devices/browsers rather than a connectivity issue.
+// Merged by id instead, newest `updatedAt` (or `deletedAt` for a tombstoned card -- see
+// getCalendarSettlementCards' isTombstone filter) wins per card, same pattern as
+// mergeConfirmedMeetings below.
+function mergeSettlementCards(serverList = [], incomingList = []) {
+  const byId = new Map();
+  (Array.isArray(serverList) ? serverList : []).forEach(card => {
+    if (card?.id) byId.set(card.id, card);
+  });
+  (Array.isArray(incomingList) ? incomingList : []).forEach(card => {
+    if (!card?.id) return;
+    const existing = byId.get(card.id);
+    if (!existing) {
+      byId.set(card.id, card);
+      return;
+    }
+    const existingStamp = Number(existing.updatedAt || existing.deletedAt || existing.createdAt || 0) || 0;
+    const incomingStamp = Number(card.updatedAt || card.deletedAt || card.createdAt || 0) || 0;
+    byId.set(card.id, incomingStamp >= existingStamp ? card : existing);
+  });
+  return Array.from(byId.values());
+}
+
 function mergeCalendarSettingsDelta(serverCalendar, incomingCalendar) {
   const server = cloneCalendar(serverCalendar) || {};
   const incoming = cloneCalendar(incomingCalendar) || {};
@@ -618,7 +649,7 @@ function mergeCalendarSettingsDelta(serverCalendar, incomingCalendar) {
     deletedActivityLogIds: mergeDeletedActivityLogIds(server.deletedActivityLogIds || [], incoming.deletedActivityLogIds || []),
     confirmedMeeting: mergeConfirmedMeetings(server.confirmedMeeting || [], incoming.confirmedMeeting || []),
     expenseCategories: incoming.expenseCategories !== undefined ? incoming.expenseCategories : server.expenseCategories,
-    settlementCards: incoming.settlementCards !== undefined ? incoming.settlementCards : server.settlementCards,
+    settlementCards: mergeSettlementCards(server.settlementCards || [], incoming.settlementCards || []),
     places: incoming.places !== undefined ? incoming.places : server.places,
     placeCategories: incoming.placeCategories !== undefined ? incoming.placeCategories : server.placeCategories,
     settlementBaseBudget: incoming.settlementBaseBudget !== undefined ? incoming.settlementBaseBudget : server.settlementBaseBudget

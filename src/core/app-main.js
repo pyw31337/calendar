@@ -4919,7 +4919,11 @@ function CalendarApp() {
     if (!guardLoadedCalendar('Firebase 데이터를 불러온 뒤 삭제해 주세요.')) return false;
     const now = Date.now();
     const existingCards = getCalendarSettlementCards(activeCal);
-    const nextCards = existingCards.filter(item => item.id !== cardId);
+    // Tombstoned (deletedAt set) instead of filtered out, so mergeSettlementCards' by-id merge
+    // (see its comment in app-firebase-data.js) carries the delete through instead of a stale
+    // 'settings' save from another device silently resurrecting this card by not knowing it was
+    // removed. getCalendarSettlementCards already filters tombstones out of every read path.
+    const nextCards = existingCards.map(item => item.id === cardId ? { ...item, deletedAt: now, updatedAt: now } : item);
     const updatedCal = {
       ...activeCal,
       updatedAt: now,
