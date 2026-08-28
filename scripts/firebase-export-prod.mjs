@@ -3,7 +3,7 @@ import path from 'node:path';
 
 const PROJECT_ID = 'metro-live-2918e';
 const DATABASE = '(default)';
-const PRODUCTION_DOC_IDS = ['cal_kkot', 'cal_cw'];
+const PRODUCTION_DOC_IDS = ['cal_kkot', 'cal_cw', 'cal_jhair'];
 const DOCUMENT_LIMIT_BYTES = 1048576;
 
 function parseArgs(argv) {
