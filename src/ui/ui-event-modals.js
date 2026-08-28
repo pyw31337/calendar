@@ -1557,18 +1557,26 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
   const [participantMemoInput, setParticipantMemoInput] = React.useState('');
   const [editingParticipantRowId, setEditingParticipantRowId] = React.useState(null);
   const availableParticipantPickerOptions = React.useMemo(() => {
-    const selected = new Set(participantRows.map(row => row?.participantId).filter(Boolean));
+    const selected = new Set(participantRows
+      .filter(row => row?.id !== editingParticipantRowId)
+      .map(row => row?.participantId)
+      .filter(Boolean));
     return participantPickerOptions.filter(option => !selected.has(option.value));
-  }, [participantPickerOptions, participantRows]);
+  }, [participantPickerOptions, participantRows, editingParticipantRowId]);
   const participantPickerOptionsWithSelectionState = React.useMemo(() => {
-    const selected = new Set(participantRows.map(row => row?.participantId).filter(Boolean));
+    const selected = new Set(participantRows
+      .filter(row => row?.id !== editingParticipantRowId)
+      .map(row => row?.participantId)
+      .filter(Boolean));
     return participantPickerOptions.map(option => ({ ...option, disabled: selected.has(option.value) }));
-  }, [participantPickerOptions, participantRows]);
+  }, [participantPickerOptions, participantRows, editingParticipantRowId]);
   React.useEffect(() => {
-    if (participantToAdd && !availableParticipantPickerOptions.some(option => option.value === participantToAdd)) {
+    const editingRow = participantRows.find(row => row?.id === editingParticipantRowId);
+    const isCurrentEditingValue = Boolean(editingRow && participantToAdd === editingRow.participantId);
+    if (participantToAdd && !isCurrentEditingValue && !availableParticipantPickerOptions.some(option => option.value === participantToAdd)) {
       setParticipantToAdd(availableParticipantPickerOptions[0]?.value || '');
     }
-  }, [availableParticipantPickerOptions, participantToAdd]);
+  }, [availableParticipantPickerOptions, participantRows, editingParticipantRowId, participantToAdd]);
   // 개인 지출은 캘린더 전체 참여자가 아니라, 이 정산 카드의 일반 탭에
   // 등록된 참여자만 선택할 수 있어야 한다. 일반 탭의 행이 단일 기준(source of truth)이다.
   const personalParticipantPickerOptions = React.useMemo(() => {
@@ -1718,6 +1726,10 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
 
   const handleAccountNumberChange = (e) => {
     const val = e.target.value;
+    if (bankName === '기타') {
+      setAccountNumber(String(val).replace(/[^0-9-]/g, ''));
+      return;
+    }
     const formatted = formatBankAccountNumber(bankName, val);
     setAccountNumber(formatted);
   };
@@ -1725,7 +1737,9 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
   const handleBankNameChange = (newBank) => {
     setBankName(newBank);
     if (accountNumber) {
-      setAccountNumber(formatBankAccountNumber(newBank, accountNumber));
+      setAccountNumber(newBank === '기타'
+        ? String(accountNumber).replace(/[^0-9-]/g, '')
+        : formatBankAccountNumber(newBank, accountNumber));
     }
   };
 
@@ -2042,10 +2056,10 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
         React.createElement('div', { style: { position: 'relative', width: '100%' } },
           React.createElement('input', {
             type: 'text', inputMode: 'numeric', className: 'form-input', value: accountNumber,
-            onChange: handleAccountNumberChange, placeholder: '계좌번호 입력 (숫자만 입력 시 하이픈 자동생성)',
-            style: { width: '100%', height: '44px', borderRadius: '8px', fontSize: '0.82rem', paddingRight: isAccountValid ? '36px' : '12px' }
+            onChange: handleAccountNumberChange, placeholder: bankName === '기타' ? '계좌번호 입력 (숫자와 - 직접 입력)' : '계좌번호 입력 (숫자만 입력 시 하이픈 자동생성)',
+            style: { width: '100%', height: '44px', borderRadius: '8px', fontSize: '0.82rem', paddingRight: bankName !== '기타' && isAccountValid ? '36px' : '12px' }
           }),
-          isAccountValid && React.createElement('div', {
+          bankName !== '기타' && isAccountValid && React.createElement('div', {
             style: {
               position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
