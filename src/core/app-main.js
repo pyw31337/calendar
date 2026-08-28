@@ -750,6 +750,15 @@ function CalendarApp() {
   };
 
   const isSavingRef = React.useRef(false);
+  // A realtime snapshot that arrived while this device was mid-save (see the onSnapshot handler
+  // below) is stashed here instead of being dropped outright. A save can legitimately take
+  // several seconds (retries, REST fallback), and any change another device pushes to Firestore
+  // during that window used to be silently discarded with no way to recover it short of that
+  // other device pushing again -- this device would otherwise just sit on stale data until the
+  // next unrelated write happened to trigger another onSnapshot event. Replayed once the save
+  // finishes (see updateCalendars' finally block), still gated by applyCalendarSnapshot's own
+  // revision check so it can't clobber whatever this device's own save just committed.
+  const pendingRemoteSnapshotRef = React.useRef(null);
   const serverRevisionRef = React.useRef(loadLocalMeta());
 
   const applyServerCalendars = (serverCalendars, lastModified = Date.now()) => {
@@ -819,6 +828,11 @@ function CalendarApp() {
       return false;
     } finally {
       isSavingRef.current = false;
+      const pending = pendingRemoteSnapshotRef.current;
+      pendingRemoteSnapshotRef.current = null;
+      if (pending && pending.calendar && pending.calendar.id === targetCalId) {
+        applyCalendarSnapshot(pending.calendar, pending.lastModified, pending.revision, false);
+      }
     }
   };
 
@@ -1663,7 +1677,20 @@ function CalendarApp() {
         }
       } catch (_) {}
       const result = getCloudDocCalendar(doc, activeCalId);
-        if (result && !isSavingRef.current) {
+        if (result && isSavingRef.current) {
+          // Don't apply mid-save (this device's own optimistic local state already reflects its
+          // in-flight edit, and a forced apply here could stomp it with a partial/pending write
+          // echo) -- but a server-confirmed change from another device is stashed instead of
+          // dropped, so it can be replayed the moment this save finishes instead of being lost
+          // until some unrelated future write happens to trigger another onSnapshot event.
+          if (!doc.metadata.fromCache && !doc.metadata.hasPendingWrites) {
+            pendingRemoteSnapshotRef.current = {
+              calendar: result.calendar,
+              lastModified: result.lastModified || Date.now(),
+              revision: result.revision || result.calendar.revision || 0
+            };
+          }
+        } else if (result) {
           if (doc.metadata.fromCache) {
             applyLoadedCalendar(result.calendar, result.lastModified || Date.now(), result.revision || result.calendar.revision || 0, false, false);
           } else {
