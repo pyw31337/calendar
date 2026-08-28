@@ -464,6 +464,7 @@ import {
   fetchChatMessagesRest,
   fetchRecentChatMessages,
   fetchRecentGalleryMessages,
+  fetchMessagesByImageTag,
   CHAT_OLDER_PAGE_SIZE,
   MAX_OLDER_CHAT_MESSAGES,
   fetchSubcollectionCount,
@@ -5220,6 +5221,7 @@ function CalendarApp() {
       onDeletePhoto: handleDeletePhoto,
       onDeleteMeetingPhoto: handleDeleteMeetingPhoto,
       onFindChatMessageById: findChatMessageById,
+      onFetchDateTaggedMessages: (tag) => fetchMessagesByImageTag(activeCalId, tag),
       onLoadOlderChat: loadOlderChatMessages,
       hasMoreOlderChat: hasMoreOlderChat,
       loadingOlderChat: loadingOlderChat,
@@ -6181,7 +6183,19 @@ function CalendarApp() {
     },
     onOpenSettings: () => {
       setIsMainSideMenuOpen(false);
-      if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 설정을 수정해 주세요.')) { setAdminInitialTab('settings'); setIsAdminOpen(true); }
+      if (!guardLoadedCalendar('Firebase 데이터를 불러온 뒤 설정을 수정해 주세요.')) return;
+      const openSettings = () => {
+        setAdminInitialTab('settings');
+        setIsAdminOpen(true);
+      };
+      if (typeof window.__gatherLoadAdminUi === 'function') {
+        window.__gatherLoadAdminUi().then(openSettings).catch(err => {
+          console.error('Calendar settings UI load failed:', err);
+          showToast('캘린더 설정을 불러오지 못했습니다. 다시 시도해 주세요.', 'error');
+        });
+      } else {
+        openSettings();
+      }
     },
     onOpenAnniversaries: () => {
       setIsMainSideMenuOpen(false);

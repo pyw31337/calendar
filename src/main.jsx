@@ -123,6 +123,27 @@ async function loadFirebaseSdk() {
   await loadScriptWithRetry('vendor/firebase-storage-compat.js', 15000);
 }
 
+// Admin UI is not needed for the initial calendar view, but it is also reachable from
+// the main screen's side menu. Keep it lazy while exposing the same loader to app-main so
+// opening "캘린더 설정" can load the modal before rendering it.
+let adminUiLoadPromise = null;
+function loadAdminUi() {
+  if (window.GATHER_UI_COMPONENTS && typeof window.GATHER_UI_COMPONENTS.AdminModal === 'function') {
+    return Promise.resolve();
+  }
+  if (!adminUiLoadPromise) {
+    adminUiLoadPromise = Promise.all([
+      import('./ui/ui-admin-modals.js'),
+      import('./ui/ui-admin-dashboard.js')
+    ]).catch(err => {
+      adminUiLoadPromise = null;
+      throw err;
+    });
+  }
+  return adminUiLoadPromise;
+}
+window.__gatherLoadAdminUi = loadAdminUi;
+
 async function boot() {
   try {
     showBootStatus('모여라 캘린더 불러오는 중…');
@@ -166,19 +187,12 @@ async function boot() {
       import('./ui/ui-event-modals.js'),
       import('./ui/ui-calendar-core.js')
     ]);
-    // Admin dashboard/modals are only ever reached via a direct ?admin=1 (or &mode=admin) page
-    // load -- there's no in-app link that switches into admin via client-side navigation (see
-    // app-main.js's App(), which reads this once at initial render) -- so a non-admin visitor
-    // never needs this bundle at all. app-main.js's AdminDashboard/AdminModal/etc. wrappers
-    // already read window.GATHER_UI_COMPONENTS lazily at render time and no-op when it's missing
-    // (see docs/module-map.md), so it's safe to only await this import on the admin route itself.
+    // Admin dashboard/modals are normally loaded only for a direct admin route. The main
+    // screen can also request AdminModal from its side menu; that path uses loadAdminUi above.
     const params = new URLSearchParams(window.location.search);
     const isAdminRoute = params.get('admin') === '1' || params.get('mode') === 'admin';
     if (isAdminRoute) {
-      await Promise.all([
-        import('./ui/ui-admin-modals.js'),
-        import('./ui/ui-admin-dashboard.js')
-      ]);
+      await loadAdminUi();
     }
     const root = document.getElementById('root');
     if (root) root.dataset.booted = '1';
