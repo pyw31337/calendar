@@ -464,7 +464,6 @@ import {
   fetchChatMessagesRest,
   fetchRecentChatMessages,
   fetchRecentGalleryMessages,
-  fetchMessagesByImageTag,
   CHAT_OLDER_PAGE_SIZE,
   MAX_OLDER_CHAT_MESSAGES,
   fetchSubcollectionCount,
@@ -5221,7 +5220,6 @@ function CalendarApp() {
       onDeletePhoto: handleDeletePhoto,
       onDeleteMeetingPhoto: handleDeleteMeetingPhoto,
       onFindChatMessageById: findChatMessageById,
-      onFetchDateTaggedMessages: (tag) => fetchMessagesByImageTag(activeCalId, tag),
       onLoadOlderChat: loadOlderChatMessages,
       hasMoreOlderChat: hasMoreOlderChat,
       loadingOlderChat: loadingOlderChat,
@@ -6325,7 +6323,7 @@ function CalendarApp() {
       },
         /* Date YY.MM.DD */
         /*#__PURE__*/React.createElement("span", {
-          style: { fontSize: '0.8rem', fontWeight: 800, color: '#FFFFFF', lineHeight: 1.1, textShadow: '0 1px 2px rgba(0,0,0,0.15)' }
+          style: { fontSize: '0.7rem', fontWeight: 800, color: '#FFFFFF', lineHeight: 1.1, textShadow: '0 1px 2px rgba(0,0,0,0.15)' }
         }, yyMMdd),
         /* Day Name */
         /*#__PURE__*/React.createElement("span", {
