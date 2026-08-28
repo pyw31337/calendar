@@ -931,6 +931,16 @@ function ZoomOutIcon({ size = 15 } = {}) {
   );
 }
 
+// Must match the `transform ${LIGHTBOX_TRANSITION_MS}ms ease` set on the slide track below.
+// handleTrackTransitionEnd already commits the pending nav exactly when that CSS transition
+// finishes -- the setTimeout fallbacks (for the rare case a transitionend event never fires,
+// e.g. the element is hidden mid-transition) used to fire at a shorter, unrelated 240ms, which
+// beat transitionend every time and cut the slide animation short by ~40ms on every single
+// navigation. Giving the timeout a safety margin past the real duration means transitionend
+// normally wins and the timeout is only ever a backstop.
+const LIGHTBOX_TRANSITION_MS = 280;
+const LIGHTBOX_TRANSITION_FALLBACK_MS = LIGHTBOX_TRANSITION_MS + 80;
+
 export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, onPromoteImageUrl, onSaveImageTags, onSearchTag, onDeletePhoto, onReplacePhoto, onJumpToChatMessage, onJumpToMemo, onJumpToMeetingDate, onJumpToGallery, onGetChatMessageOrdinal, onGetGalleryPhotoOrdinal, onRequestConfirm }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -1388,22 +1398,30 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
   // motion as a completed drag -- used by the arrow buttons and arrow keys so every way of
   // moving between photos feels like the same carousel, not just the drag gesture.
   const animateToAdjacent = newIndex => {
-    if (newIndex < 0 || newIndex >= total || newIndex === index) return;
+    // While a transition is already in flight, `index` (the last *committed* photo) is stale --
+    // pendingNavRef already holds the photo this is animating toward, so that's the real
+    // "current position" a second rapid click should be measured against. Used to just commit
+    // whatever was already pending and drop the new click's target entirely, which made fast
+    // repeated taps (exactly the "빠르게 작동하는 환경" case) feel like every other press did
+    // nothing.
+    const from = pendingNavRef.current != null ? pendingNavRef.current : index;
+    if (newIndex < 0 || newIndex >= total || newIndex === from) return;
     if (pendingNavRef.current != null) {
+      // Commit the in-flight nav immediately (skipping its remaining animation) so the new one
+      // starts from a clean, consistent state instead of stacking on top of it.
       commitPendingNav();
-      return;
     }
     const el = imgAreaRef.current;
     const width = (el && el.getBoundingClientRect().width) || window.innerWidth * 0.92 || 1;
     widthRef.current = width;
     pendingNavRef.current = newIndex;
     setTransitionOn(true);
-    setDragPx(newIndex > index ? -width : width);
+    setDragPx(newIndex > from ? -width : width);
 
     clearTransitionTimer();
     transitionTimerRef.current = setTimeout(() => {
       commitPendingNav();
-    }, 240);
+    }, LIGHTBOX_TRANSITION_FALLBACK_MS);
   };
   React.useEffect(() => {
     const onKeyDown = e => {
@@ -1461,7 +1479,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
         clearTransitionTimer();
         transitionTimerRef.current = setTimeout(() => {
           commitPendingNav();
-        }, 240);
+        }, LIGHTBOX_TRANSITION_FALLBACK_MS);
         return -width;
       }
       if (current >= threshold && index > 0) {
@@ -1469,7 +1487,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
         clearTransitionTimer();
         transitionTimerRef.current = setTimeout(() => {
           commitPendingNav();
-        }, 240);
+        }, LIGHTBOX_TRANSITION_FALLBACK_MS);
         return width;
       }
       pendingNavRef.current = null;
@@ -1757,6 +1775,15 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
     type: "button",
     onClick: e => { e.stopPropagation(); animateToAdjacent(index - 1); },
     "aria-label": "이전 이미지",
+    // The shared global press-scale rule (button:active { transform: translate3d(...) scale(...) })
+    // overrides this button's own inline `transform: translateY(-50%)` centering with !important,
+    // so pressing it used to yank it out from its vertically-centered position toward the bottom
+    // of the overlay -- by the time the finger/cursor lifts, it's no longer over the button, so
+    // the click (or worse, a synthetic click on whatever's now underneath) misses it and can close
+    // the lightbox instead of navigating. data-no-press-feedback opts this button out of that
+    // rule entirely (see app.css) rather than trying to keep patching the override to also apply
+    // here.
+    "data-no-press-feedback": true,
     style: {
       position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)',
       background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.25)',
@@ -1771,6 +1798,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
     type: "button",
     onClick: e => { e.stopPropagation(); animateToAdjacent(index + 1); },
     "aria-label": "다음 이미지",
+    "data-no-press-feedback": true,
     style: {
       position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)',
       background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.25)',
@@ -1796,7 +1824,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
     style: {
       display: 'flex', width: '300%', height: '100%',
       transform: `translateX(calc(-33.3333% + ${dragPx}px))`,
-      transition: transitionOn ? 'transform 280ms ease' : 'none'
+      transition: transitionOn ? `transform ${LIGHTBOX_TRANSITION_MS}ms ease` : 'none'
     }
   }, renderSlide(index > 0 ? displayUrls[index - 1] : null, 'prev'), renderSlide(currentUrl, 'current'), renderSlide(index < total - 1 ? displayUrls[index + 1] : null, 'next')))
     : /*#__PURE__*/React.createElement("div", {
