@@ -2095,7 +2095,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
         ),
         React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px' } },
           React.createElement('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', minHeight: '36px' } },
-            React.createElement('label', { style: { ...settlementSectionLabelStyle, marginBottom: 0 } }, '일자별 지출 항목 선택'),
+            React.createElement('label', { style: { ...settlementSectionLabelStyle, marginBottom: 0 } }, '지출 항목'),
             React.createElement('div', {
               className: 'calendar-nav',
               style: { display: 'flex', alignItems: 'center', gap: '6px', height: '36px', marginBottom: 0 }
@@ -2154,7 +2154,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
 
           React.createElement('div', {
             className: 'settlement-personal-expense-summary',
-            style: { display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '2px' }
+            style: { display: 'flex', flexDirection: 'column', gap: '6px', overflowX: 'hidden', paddingBottom: '2px' }
           },
             personalParticipantPickerOptions.map(option => {
               const total = personalExpenseTotals.get(option.value) || 0;
@@ -2162,18 +2162,18 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
               return React.createElement('div', {
                 key: option.value,
                 style: {
-                  minWidth: '92px', flex: '0 0 auto', padding: '8px 10px', borderRadius: '9px', textAlign: 'center',
-                  backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)'
+                  width: '100%', minWidth: 0, padding: '8px 10px', borderRadius: '9px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px',
+                  backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', boxSizing: 'border-box'
                 }
               },
-                ParticipantBackdrop ? React.createElement(ParticipantBackdrop, { participant, name: option.value, dotSize: 9, style: { width: '100%', justifyContent: 'center', fontSize: '0.72rem' } }) : React.createElement('span', { style: { color: option.color, fontWeight: 800, fontSize: '0.72rem' } }, `● ${option.value}`),
-                React.createElement('strong', { style: { display: 'block', marginTop: '4px', color: '#2563EB', fontSize: '0.78rem' } }, `${total.toLocaleString()}원`)
+                ParticipantBackdrop ? React.createElement(ParticipantBackdrop, { participant, name: option.value, dotSize: 9, style: { fontSize: '0.72rem', flex: '0 1 auto', minWidth: 0 } }) : React.createElement('span', { style: { color: option.color, fontWeight: 800, fontSize: '0.72rem' } }, `● ${option.value}`),
+                React.createElement('strong', { style: { color: '#2563EB', fontSize: '0.78rem', whiteSpace: 'nowrap' } }, `${total.toLocaleString()}원`)
               );
             })
           ),
 
-          /* Input Controls: Row 1 (Participant Select & Auto Comma Amount Input) */
-          React.createElement('div', { className: 'settlement-personal-input-grid', style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' } },
+          /* Personal expense fields: participant, description, then amount/action. */
+          React.createElement('div', { style: { width: '100%' } },
             SimpleBottomSheetPicker ? React.createElement(SimpleBottomSheetPicker, {
               title: "개인 지출 참여자 선택",
               placeholder: "참여자 선택",
@@ -2187,7 +2187,16 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
               onChange: e => setPeParticipantId(e.target.value),
               style: { width: '100%', height: '44px', borderRadius: '8px', fontSize: '0.82rem' }
             }, personalParticipantPickerOptions.map(option => React.createElement('option', { key: option.value, value: option.value }, option.label))),
-
+          ),
+          React.createElement('div', { style: { width: '100%' } },
+            React.createElement('input', {
+              type: 'text', className: 'form-input', value: peDescriptionInput,
+              onChange: e => setPeDescriptionInput(e.target.value), placeholder: '지출 명목 (예: 개인 음료, 교통비)',
+              style: { width: '100%', height: '44px', borderRadius: '8px', fontSize: '0.84rem' },
+              onKeyDown: e => { if (e.key === 'Enter') { e.preventDefault(); handleSaveOrUpdatePersonalExpense(); } }
+            })
+          ),
+          React.createElement('div', { style: { display: 'flex', gap: '8px', alignItems: 'center', width: '100%' } },
             React.createElement('input', {
               type: 'text',
               inputMode: 'numeric',
@@ -2195,29 +2204,22 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
               value: peAmountInput,
               onChange: e => setPeAmountInput(formatCommaNumber(e.target.value)),
               placeholder: '금액 입력 (원)',
-              style: { width: '100%', height: '44px', borderRadius: '8px', fontSize: '0.84rem', color: '#0F172A', fontWeight: 400 }
-            })
+              style: { flex: 1, minWidth: 0, width: '100%', height: '44px', borderRadius: '8px', fontSize: '0.84rem', color: '#0F172A', fontWeight: 400 }
+            }),
+            !editingPeId && React.createElement('button', {
+              type: 'button', className: 'btn btn-secondary', onClick: handleSaveOrUpdatePersonalExpense,
+              style: { width: '60px', height: '44px', flexShrink: 0 }
+            }, '추가')
           ),
 
-          /* Input Controls: Row 2 (Description Input & FormAddEditActionButtons) */
-          React.createElement('div', { style: { display: 'flex', gap: '8px', alignItems: 'center' } },
-            React.createElement('input', {
-              type: 'text',
-              className: 'form-input',
-              value: peDescriptionInput,
-              onChange: e => setPeDescriptionInput(e.target.value),
-              placeholder: '지출 명목 (예: 개인 음료, 교통비)',
-              style: { flex: 1, height: '44px', borderRadius: '8px', fontSize: '0.84rem' },
-              onKeyDown: e => { if (e.key === 'Enter') { e.preventDefault(); handleSaveOrUpdatePersonalExpense(); } }
-            }),
-            FormAddEditActionButtons ? React.createElement(FormAddEditActionButtons, {
-              isEditing: !!editingPeId,
-              isSaving: false,
-              onCancel: handleCancelPersonalExpenseEdit,
-              onSubmit: handleSaveOrUpdatePersonalExpense
-            }) : React.createElement('button', {
-              type: 'button', className: 'btn btn-secondary', style: { height: '44px' },
-              onClick: handleSaveOrUpdatePersonalExpense
+          editingPeId && React.createElement('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', width: '100%' } },
+            React.createElement('button', {
+              type: 'button', className: 'btn btn-secondary', onClick: handleCancelPersonalExpenseEdit,
+              style: { width: '100%', height: '44px' }
+            }, '취소'),
+            React.createElement('button', {
+              type: 'button', className: 'btn btn-secondary', onClick: handleSaveOrUpdatePersonalExpense,
+              style: { width: '100%', height: '44px' }
             }, editingPeId ? '수정' : '추가')
           ),
 
@@ -2240,12 +2242,20 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
               },
                 React.createElement('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', minHeight: '20px' } },
                   ParticipantBackdrop ? React.createElement(ParticipantBackdrop, { participant, name: item.participantId || '참여자', dotSize: 9 }) : React.createElement('span', { style: { color: participant.color || '#2563EB', fontWeight: 800 } }, `● ${item.participantId || '참여자'}`),
+                  React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '5px' } },
+                  React.createElement('button', {
+                    type: 'button',
+                    onClick: (e) => { e.stopPropagation(); handleSelectPersonalExpenseItem(item); },
+                    title: '개인 지출 편집', 'aria-label': '개인 지출 편집',
+                    style: { background: 'none', border: '1px solid #CBD5E1', borderRadius: '6px', color: '#64748B', cursor: 'pointer', padding: '2px 4px', display: 'inline-flex', alignItems: 'center' }
+                  }, React.createElement(PencilIcon, { size: 13 })),
                   React.createElement('button', {
                     type: 'button',
                     onClick: (e) => handleDeletePersonalExpenseItem(item.id, e),
                     title: '항목 삭제',
                     style: { background: 'none', border: 'none', color: '#94A3B8', cursor: 'pointer', padding: '2px 4px' }
                   }, React.createElement(TrashIcon, { size: 14 }))
+                  )
                 ),
                 item.description ? React.createElement('div', { style: { color: 'var(--text-main)', fontWeight: 700, fontSize: '0.8rem', overflowWrap: 'anywhere' } }, item.description) : null,
                 React.createElement('strong', { style: { alignSelf: 'flex-start', color: '#DC2626', fontWeight: 800, fontSize: '0.86rem', marginTop: '1px' } }, `-${(Number(item.amount) || 0).toLocaleString()}원`)

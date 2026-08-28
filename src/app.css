@@ -2868,8 +2868,8 @@ select.form-select {
 }
 .settlement-expense-option {
   display: grid;
-  grid-template-columns: 20px minmax(0, 1fr) auto;
-  align-items: center;
+  grid-template-columns: 20px minmax(0, 1fr);
+  align-items: start;
   gap: 8px;
   padding: 8px;
   border-radius: 8px;
@@ -2902,6 +2902,9 @@ select.form-select {
   overflow-wrap: anywhere;
 }
 .settlement-expense-option-amount {
+  grid-column: 2;
+  justify-self: start;
+  align-self: start;
   color: #DC2626;
   font-weight: 800;
   white-space: nowrap;
@@ -2921,8 +2924,8 @@ select.form-select {
     font-size: 0.92rem;
   }
   .settlement-expense-option {
-    grid-template-columns: 20px minmax(0, 1fr) auto;
-    align-items: center;
+    grid-template-columns: 20px minmax(0, 1fr);
+    align-items: start;
   }
   .settlement-expense-option-amount {
     font-size: 0.76rem;
