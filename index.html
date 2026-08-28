@@ -113,9 +113,9 @@
        below) once parsing finishes. The app's own data-loading logic already awaits
        firebase.apps.length/firebaseDb being ready, so nothing here depends on these executing
        synchronously during head-parse. -->
-  <script src="vendor/firebase-app-compat.js?v=20260828-storage-fix1" defer></script>
-  <script src="vendor/firebase-firestore-compat.js?v=20260828-storage-fix1" defer></script>
-  <script src="vendor/firebase-storage-compat.js?v=20260828-storage-fix1" defer></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js" defer></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js" defer></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js" defer></script>
 
   <!-- Confetti/lunar calendar/QR code are only used from user-triggered interactions or after
        async data has loaded (never at initial script-parse time -- see the typeof guards around

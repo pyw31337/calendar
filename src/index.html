@@ -39,6 +39,11 @@
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet" />
+    <!-- Same-origin Firebase SDK preload. main.jsx skips these when they are already ready, so
+         mobile browsers do not depend on a third-party CDN or duplicate the SDK scripts. -->
+    <script src="vendor/firebase-app-compat.js?v=20260828-storage-fix2" defer></script>
+    <script src="vendor/firebase-firestore-compat.js?v=20260828-storage-fix2" defer></script>
+    <script src="vendor/firebase-storage-compat.js?v=20260828-storage-fix2" defer></script>
     <!-- Firebase SDK scripts are loaded from main.jsx (loadFirebaseSdk), vendored under
          vendor/ (same origin) instead of from www.gstatic.com -- a real device consistently got
          `window.firebase undefined` even after every retry/timeout adjustment tried, tracing back
