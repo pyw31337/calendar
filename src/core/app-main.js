@@ -1162,6 +1162,7 @@ function CalendarApp() {
   const [isNotifOnboardingOpen, setIsNotifOnboardingOpen] = React.useState(false);
   const [notifyChannels, setNotifyChannelsState] = React.useState(() => (typeof getNotifyChannels === 'function' ? getNotifyChannels() : { chat: true, memo: true, poll: true, schedule: true }));
   const [isPollModalOpen, setIsPollModalOpen] = React.useState(false);
+  const [expandedConfirmedDates, setExpandedConfirmedDates] = React.useState({});
   const [isCreateSettlementOpen, setIsCreateSettlementOpen] = React.useState(false);
   const [editingPoll, setEditingPoll] = React.useState(null);
   const [voteTarget, setVoteTarget] = React.useState(null);
@@ -6010,7 +6011,6 @@ function CalendarApp() {
     .filter(m => isValidDateString(m?.date) && m.date >= todayDateStrForBanner)
     .sort((a, b) => a.date.localeCompare(b.date));
 
-  const [expandedConfirmedDates, setExpandedConfirmedDates] = React.useState({});
   const toggleConfirmedDateExpand = (dateStr) => {
     setExpandedConfirmedDates(prev => ({
       ...prev,
@@ -10356,7 +10356,10 @@ function __gatherStartApp() {
 try {
   const rootElement = document.getElementById('root');
   if (rootElement) {
-    const root = ReactDOM.createRoot(rootElement);
+    // app-main.js can be imported after boot has already completed, while main.jsx also calls
+    // this entry point explicitly. Reuse one root instead of calling createRoot twice; the second
+    // root attached to the same DOM node caused React #300 during view transitions.
+    const root = window.__GATHER_REACT_ROOT__ || (window.__GATHER_REACT_ROOT__ = ReactDOM.createRoot(rootElement));
     const imageShareId = new URLSearchParams(window.location.search).get('image');
     const EB = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AppErrorBoundary) || React.Fragment;
     root.render(/*#__PURE__*/React.createElement(EB, null,
@@ -10375,6 +10378,3 @@ try {
 }
 
 window.__gatherStartApp = __gatherStartApp;
-if (window.__GATHER_BOOT_READY__) {
-  __gatherStartApp();
-}
