@@ -1529,6 +1529,24 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
     const defaultP = participantOptions[0] || '참여자';
     return [{ id: `pr_0_${Date.now()}`, participantId: defaultP, amount: 0 }];
   });
+  // 개인 지출은 캘린더 전체 참여자가 아니라, 이 정산 카드의 일반 탭에
+  // 등록된 참여자만 선택할 수 있어야 한다. 일반 탭의 행이 단일 기준(source of truth)이다.
+  const personalParticipantPickerOptions = React.useMemo(() => {
+    const activeByName = new Map(activeParticipants.map((p, idx) => {
+      const name = typeof p === 'string' ? p : (p?.name || p?.id || '참여자');
+      return [name, { name, color: (typeof p === 'object' && p?.color) || ['#EF4444', '#F97316', '#10B981', '#3B82F6', '#6366F1'][idx % 5] }];
+    }));
+    const seen = new Set();
+    const options = [];
+    participantRows.forEach(row => {
+      const name = String(row?.participantId || '').trim();
+      if (!name || seen.has(name)) return;
+      seen.add(name);
+      const person = activeByName.get(name) || { name, color: '#3B82F6' };
+      options.push({ value: name, label: name, color: person.color });
+    });
+    return options.length > 0 ? options : [{ value: '참여자', label: '참여자', color: '#3B82F6' }];
+  }, [activeParticipants, participantRows]);
 
   const [bankName, setBankName] = React.useState(() => cardToEdit?.bankName || '토스뱅크');
   const [depositorName, setDepositorName] = React.useState(() => cardToEdit?.depositorName || '');
@@ -1546,6 +1564,11 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
   const [peAmountInput, setPeAmountInput] = React.useState('');
   const [peDescriptionInput, setPeDescriptionInput] = React.useState('');
   const [editingPeId, setEditingPeId] = React.useState(null);
+  React.useEffect(() => {
+    if (!personalParticipantPickerOptions.some(option => option.value === peParticipantId)) {
+      setPeParticipantId(personalParticipantPickerOptions[0]?.value || '참여자');
+    }
+  }, [personalParticipantPickerOptions, peParticipantId]);
 
   const [year, setYear] = React.useState(() => {
     if (cardToEdit?.monthStr && cardToEdit.monthStr.includes('-')) {
@@ -1906,7 +1929,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
         style: {
           width: '100%', height: '44px', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 800,
           color: 'var(--text-main)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-card)'
+          border: '1px solid #CBD5E1', backgroundColor: '#F1F5F9'
         }
       }, '+ 참여자 추가'),
       React.createElement('div', { className: 'settlement-bank-grid', style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' } },
@@ -2036,7 +2059,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
             className: 'settlement-personal-expense-summary',
             style: { display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '2px' }
           },
-            participantPickerOptions.map(option => {
+            personalParticipantPickerOptions.map(option => {
               const total = personalExpenseTotals.get(option.value) || 0;
               const participant = activeParticipants.find(p => (typeof p === 'string' ? p : (p?.name || p?.id)) === option.value) || { name: option.value, color: option.color };
               return React.createElement('div', {
@@ -2058,7 +2081,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
               title: "개인 지출 참여자 선택",
               placeholder: "참여자 선택",
               value: peParticipantId,
-              options: participantPickerOptions,
+              options: personalParticipantPickerOptions,
               onSelect: setPeParticipantId,
               style: { width: '100%', height: '44px', borderRadius: '8px', fontSize: '0.82rem' }
             }) : React.createElement('select', {
@@ -2066,7 +2089,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
               value: peParticipantId,
               onChange: e => setPeParticipantId(e.target.value),
               style: { width: '100%', height: '44px', borderRadius: '8px', fontSize: '0.82rem' }
-            }, participantOptions.map(p => React.createElement('option', { key: p, value: p }, p))),
+            }, personalParticipantPickerOptions.map(option => React.createElement('option', { key: option.value, value: option.value }, option.label))),
 
             React.createElement('input', {
               type: 'text',
@@ -2112,15 +2135,14 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
                 key: item.id,
                 onClick: () => handleSelectPersonalExpenseItem(item),
                 style: {
-                  padding: '10px 12px', borderRadius: '10px',
+                  padding: '10px 12px 11px', borderRadius: '10px',
                   backgroundColor: isItemEditing ? 'rgba(59, 130, 246, 0.08)' : 'var(--bg-card)',
                   border: isItemEditing ? '1px solid #2563EB' : '1px solid var(--border-subtle)',
                   display: 'flex', flexDirection: 'column', gap: '5px', cursor: 'pointer'
                 }
               },
-                React.createElement('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' } },
+                React.createElement('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', minHeight: '20px' } },
                   ParticipantBackdrop ? React.createElement(ParticipantBackdrop, { participant, name: item.participantId || '참여자', dotSize: 9 }) : React.createElement('span', { style: { color: participant.color || '#2563EB', fontWeight: 800 } }, `● ${item.participantId || '참여자'}`),
-                  React.createElement('strong', { style: { color: '#DC2626', fontWeight: 800 } }, `-${(Number(item.amount) || 0).toLocaleString()}원`),
                   React.createElement('button', {
                     type: 'button',
                     onClick: (e) => handleDeletePersonalExpenseItem(item.id, e),
@@ -2128,7 +2150,8 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
                     style: { background: 'none', border: 'none', color: '#94A3B8', cursor: 'pointer', padding: '2px 4px' }
                   }, React.createElement(TrashIcon, { size: 14 }))
                 ),
-                item.description ? React.createElement('div', { style: { color: 'var(--text-main)', fontWeight: 700, fontSize: '0.8rem' } }, item.description) : null
+                item.description ? React.createElement('div', { style: { color: 'var(--text-main)', fontWeight: 700, fontSize: '0.8rem', overflowWrap: 'anywhere' } }, item.description) : null,
+                React.createElement('strong', { style: { alignSelf: 'flex-start', color: '#DC2626', fontWeight: 800, fontSize: '0.86rem', marginTop: '1px' } }, `-${(Number(item.amount) || 0).toLocaleString()}원`)
               );
             })
           )
