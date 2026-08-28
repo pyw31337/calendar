@@ -938,8 +938,9 @@ function ZoomOutIcon({ size = 15 } = {}) {
 // beat transitionend every time and cut the slide animation short by ~40ms on every single
 // navigation. Giving the timeout a safety margin past the real duration means transitionend
 // normally wins and the timeout is only ever a backstop.
-const LIGHTBOX_TRANSITION_MS = 280;
-const LIGHTBOX_TRANSITION_FALLBACK_MS = LIGHTBOX_TRANSITION_MS + 80;
+const LIGHTBOX_TRANSITION_MS = 230;
+const LIGHTBOX_TRANSITION_FALLBACK_MS = LIGHTBOX_TRANSITION_MS + 90;
+const LIGHTBOX_TRANSITION_EASING = 'cubic-bezier(0.22, 0.61, 0.36, 1)';
 
 export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, onPromoteImageUrl, onSaveImageTags, onSearchTag, onDeletePhoto, onReplacePhoto, onJumpToChatMessage, onJumpToMemo, onJumpToMeetingDate, onJumpToGallery, onGetChatMessageOrdinal, onGetGalleryPhotoOrdinal, onRequestConfirm }) {
   const React = window.React;
@@ -995,11 +996,13 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
   React.useEffect(() => { setZoomLevel(ZOOM_DEFAULT); setPanOffset({ x: 0, y: 0 }); }, [index]);
   const handleZoomIn = e => {
     e.stopPropagation();
+    setShowInfo(false);
     setPanOffset({ x: 0, y: 0 });
     setZoomLevel(prev => Math.min(ZOOM_MAX, prev + ZOOM_STEP));
   };
   const handleZoomOut = e => {
     e.stopPropagation();
+    setShowInfo(false);
     setPanOffset({ x: 0, y: 0 });
     setZoomLevel(prev => Math.max(ZOOM_MIN, prev - ZOOM_STEP));
   };
@@ -1009,6 +1012,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
     e.stopPropagation();
     setPanOffset({ x: 0, y: 0 });
     setZoomLevel(ZOOM_DEFAULT);
+    setShowInfo(true);
   };
   // Clamped so the image can't be dragged entirely off-screen -- bounds come from the actual
   // rendered (post-scale) image box vs. the lightbox's own viewport cap (92vw / 82vh, matching
@@ -1017,7 +1021,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
   // below 100% the photo is smaller than its frame with nothing to pan to, so panning only makes
   // sense once zoomed in past fit-view.
   const handlePanStart = (clientX, clientY) => {
-    if (!isDesktop || zoomLevel <= ZOOM_DEFAULT) return;
+    if (zoomLevel <= ZOOM_DEFAULT) return;
     panStartRef.current = { x: clientX, y: clientY, startX: panOffset.x, startY: panOffset.y };
     isPanningRef.current = true;
     wasDraggedRef.current = false;
@@ -1032,8 +1036,10 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
     }
     const el = zoomedImgRef.current;
     const rect = el ? el.getBoundingClientRect() : null;
-    const maxOffsetX = rect ? Math.max(0, (rect.width - window.innerWidth * 0.92) / 2) : 0;
-    const maxOffsetY = rect ? Math.max(0, (rect.height - window.innerHeight * 0.82) / 2) : 0;
+    const area = imgAreaRef.current;
+    const areaRect = area ? area.getBoundingClientRect() : null;
+    const maxOffsetX = rect ? Math.max(0, (rect.width - (areaRect?.width || window.innerWidth * 0.92)) / 2) : 0;
+    const maxOffsetY = rect ? Math.max(0, (rect.height - (areaRect?.height || window.innerHeight * 0.82)) / 2) : 0;
     const rawX = panStartRef.current.startX + (clientX - panStartRef.current.x);
     const rawY = panStartRef.current.startY + (clientY - panStartRef.current.y);
     setPanOffset({
@@ -1052,7 +1058,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
     e.stopPropagation();
     handlePanStart(e.clientX, e.clientY);
   };
-  const zoomImageStyle = isDesktop && zoomLevel !== ZOOM_DEFAULT
+  const zoomImageStyle = zoomLevel !== ZOOM_DEFAULT
     ? {
         transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoomLevel / 100})`,
         transition: isPanning ? 'none' : 'transform 150ms ease',
@@ -1357,6 +1363,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
   const wasDraggedRef = React.useRef(false);
   const pendingNavRef = React.useRef(null);
   const transitionTimerRef = React.useRef(null);
+  const touchGestureRef = React.useRef(null);
   const [dragPx, setDragPx] = React.useState(0);
   const [transitionOn, setTransitionOn] = React.useState(false);
   const [isDragging, setIsDragging] = React.useState(false);
@@ -1384,14 +1391,20 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
   React.useEffect(() => {
     clearTransitionTimer();
     pendingNavRef.current = null;
+    touchGestureRef.current = null;
+    isPanningRef.current = false;
+    panStartRef.current = null;
     setTransitionOn(false);
     setDragPx(0);
+    setPanOffset({ x: 0, y: 0 });
+    setIsPanning(false);
     isDraggingRef.current = false;
     setIsDragging(false);
   }, [index]);
 
   const goTo = i => {
     if (i < 0 || i >= total || i === index) return;
+    setShowInfo(false);
     onNavigate(i);
   };
   // Adjacent (±1) navigation slides the track by exactly one container-width, same visual
@@ -1406,6 +1419,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
     // nothing.
     const from = pendingNavRef.current != null ? pendingNavRef.current : index;
     if (newIndex < 0 || newIndex >= total || newIndex === from) return;
+    setShowInfo(false);
     if (pendingNavRef.current != null) {
       // Commit the in-flight nav immediately (skipping its remaining animation) so the new one
       // starts from a clean, consistent state instead of stacking on top of it.
@@ -1472,6 +1486,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
     dragStartXRef.current = null;
     const width = widthRef.current || window.innerWidth * 0.92 || 1;
     const threshold = width * SWIPE_THRESHOLD_RATIO;
+    if (Math.abs(dragPx) >= threshold) setShowInfo(false);
     setTransitionOn(true);
     setDragPx(current => {
       if (current <= -threshold && index < total - 1) {
@@ -1493,6 +1508,102 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
       pendingNavRef.current = null;
       return 0;
     });
+  };
+  const getTouchDistance = touches => {
+    const a = touches[0];
+    const b = touches[1];
+    return Math.max(1, Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY));
+  };
+  const getTouchCenter = touches => ({
+    x: (touches[0].clientX + touches[1].clientX) / 2,
+    y: (touches[0].clientY + touches[1].clientY) / 2
+  });
+  const clampPanOffset = (x, y) => {
+    const image = zoomedImgRef.current;
+    const area = imgAreaRef.current;
+    const imageRect = image ? image.getBoundingClientRect() : null;
+    const areaRect = area ? area.getBoundingClientRect() : null;
+    const maxX = imageRect ? Math.max(0, (imageRect.width - (areaRect?.width || window.innerWidth)) / 2) : 0;
+    const maxY = imageRect ? Math.max(0, (imageRect.height - (areaRect?.height || window.innerHeight)) / 2) : 0;
+    return {
+      x: Math.min(maxX, Math.max(-maxX, x)),
+      y: Math.min(maxY, Math.max(-maxY, y))
+    };
+  };
+  // On mobile, one finger swipes the carousel at 100%, while a pinch enters a
+  // zoom-and-pan mode. This avoids native image gestures competing with the carousel.
+  const handleTouchStart = e => {
+    if (e.touches.length >= 2) {
+      e.preventDefault();
+      if (isDraggingRef.current) {
+        isDraggingRef.current = false;
+        dragStartXRef.current = null;
+        setIsDragging(false);
+        setDragPx(0);
+      }
+      touchGestureRef.current = {
+        mode: 'pinch',
+        distance: getTouchDistance(e.touches),
+        center: getTouchCenter(e.touches),
+        zoom: Math.max(ZOOM_DEFAULT, zoomLevel),
+        pan: { ...panOffset }
+      };
+      isPanningRef.current = true;
+      setIsPanning(true);
+      wasDraggedRef.current = true;
+      setShowInfo(false);
+      return;
+    }
+    const touch = e.touches[0];
+    if (!touch) return;
+    if (zoomLevel > ZOOM_DEFAULT) {
+      e.preventDefault();
+      touchGestureRef.current = { mode: 'pan' };
+      handlePanStart(touch.clientX, touch.clientY);
+      return;
+    }
+    touchGestureRef.current = { mode: 'carousel' };
+    handleDragStart(touch.clientX);
+  };
+  const handleTouchMove = e => {
+    const gesture = touchGestureRef.current;
+    if (!gesture) return;
+    if (e.touches.length >= 2) {
+      e.preventDefault();
+      const distance = getTouchDistance(e.touches);
+      const center = getTouchCenter(e.touches);
+      const nextZoom = Math.min(ZOOM_MAX, Math.max(ZOOM_DEFAULT, gesture.zoom * distance / gesture.distance));
+      setZoomLevel(nextZoom);
+      setPanOffset(clampPanOffset(
+        gesture.pan.x + center.x - gesture.center.x,
+        gesture.pan.y + center.y - gesture.center.y
+      ));
+      wasDraggedRef.current = true;
+      return;
+    }
+    const touch = e.touches[0];
+    if (!touch) return;
+    if (gesture.mode === 'pan') {
+      e.preventDefault();
+      handlePanMove(touch.clientX, touch.clientY);
+    } else if (gesture.mode === 'carousel') {
+      e.preventDefault();
+      handleDragMove(touch.clientX);
+    }
+  };
+  const handleTouchEnd = e => {
+    const gesture = touchGestureRef.current;
+    if (!gesture || e.touches.length >= 2) return;
+    if (gesture.mode === 'pinch' && e.touches.length === 1 && zoomLevel > ZOOM_DEFAULT) {
+      const touch = e.touches[0];
+      touchGestureRef.current = { mode: 'pan' };
+      handlePanStart(touch.clientX, touch.clientY);
+      return;
+    }
+    touchGestureRef.current = null;
+    if (gesture.mode === 'pan') handlePanEnd();
+    else if (gesture.mode === 'pinch') handlePanEnd();
+    else if (gesture.mode === 'carousel') handleDragEnd();
   };
   // Mouse move/up are tracked at the document level (unlike touchmove/touchend, which keep
   // firing on their original target even once the finger leaves it) so the drag keeps working
@@ -1539,7 +1650,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
 
   // Shared by both the carousel's "current" slot and the single-image layout below --
   // left-aligned edit/delete buttons plus centered zoom controls on the same row.
-  const renderPhotoActions = () => (showInfo && (canEditPhoto || isDesktop)) && /*#__PURE__*/React.createElement("div", {
+  const renderPhotoActions = () => (showInfo && zoomLevel === ZOOM_DEFAULT && (canEditPhoto || isDesktop)) && /*#__PURE__*/React.createElement("div", {
     style: {
       position: 'absolute',
       top: '8px',
@@ -1706,7 +1817,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
           maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: 'var(--radius-md)',
           display: 'block', ...zoomImageStyle
         }
-      }), renderPhotoActions(), showInfo && /*#__PURE__*/React.createElement(LightboxInfoPanel, {
+      }), renderPhotoActions(), showInfo && zoomLevel === ZOOM_DEFAULT && /*#__PURE__*/React.createElement(LightboxInfoPanel, {
       key: tagOverrideKey || String(currentUrl || index),
         info: currentInfo,
         tags: currentTags,
@@ -1814,23 +1925,30 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
   total > 1 ? /*#__PURE__*/React.createElement("div", {
     ref: imgAreaRef,
     onMouseDown: e => handleDragStart(e.clientX),
-    onTouchStart: e => handleDragStart(e.touches[0].clientX),
-    onTouchMove: e => handleDragMove(e.touches[0].clientX),
-    onTouchEnd: handleDragEnd,
+    onTouchStart: handleTouchStart,
+    onTouchMove: handleTouchMove,
+    onTouchEnd: handleTouchEnd,
+    onTouchCancel: handleTouchEnd,
     style: {
       width: '92vw', height: '82vh', overflow: 'hidden',
-      cursor: isDragging ? 'grabbing' : 'grab'
+      cursor: isDragging ? 'grabbing' : 'grab',
+      touchAction: 'none'
     }
   }, /*#__PURE__*/React.createElement("div", {
     onTransitionEnd: handleTrackTransitionEnd,
     style: {
       display: 'flex', width: '300%', height: '100%',
       transform: `translateX(calc(-33.3333% + ${dragPx}px))`,
-      transition: transitionOn ? `transform ${LIGHTBOX_TRANSITION_MS}ms ease` : 'none'
+      transition: transitionOn ? `transform ${LIGHTBOX_TRANSITION_MS}ms ${LIGHTBOX_TRANSITION_EASING}` : 'none',
+      willChange: 'transform'
     }
   }, renderSlide(index > 0 ? displayUrls[index - 1] : null, 'prev'), renderSlide(currentUrl, 'current'), renderSlide(index < total - 1 ? displayUrls[index + 1] : null, 'next')))
     : /*#__PURE__*/React.createElement("div", {
-    style: { position: 'relative', display: 'inline-flex', maxWidth: '92vw', maxHeight: '82vh' },
+    style: { position: 'relative', display: 'inline-flex', maxWidth: '92vw', maxHeight: '82vh', touchAction: 'none' },
+    onTouchStart: handleTouchStart,
+    onTouchMove: handleTouchMove,
+    onTouchEnd: handleTouchEnd,
+    onTouchCancel: handleTouchEnd,
     onClick: handleImageTap
   }, /*#__PURE__*/React.createElement("img", {
     ref: zoomedImgRef,
@@ -1845,7 +1963,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
       maxWidth: '92vw', maxHeight: '82vh', borderRadius: 'var(--radius-md)', objectFit: 'contain',
       display: 'block', ...zoomImageStyle
     }
-  }), renderPhotoActions(), showInfo && /*#__PURE__*/React.createElement(LightboxInfoPanel, {
+  }), renderPhotoActions(), showInfo && zoomLevel === ZOOM_DEFAULT && /*#__PURE__*/React.createElement(LightboxInfoPanel, {
       key: tagOverrideKey || String(currentUrl || index),
     info: currentInfo,
     tags: currentTags,
