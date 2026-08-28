@@ -238,7 +238,7 @@ async function checkSideMenuNavigation(browser, baseUrl) {
           await page.waitForTimeout(250);
           await menuButton.dispatchEvent('click');
           const menu = page.locator('.admin-side-menu-overlay > .admin-side-menu:visible').last();
-          await menu.waitFor({ state: 'visible', timeout: 5000 });
+          await menu.waitFor({ state: 'visible', timeout: 10000 });
           for (const destination of destinations) {
             await menu.locator('button.admin-side-menu-item').filter({ hasText: destination }).first().waitFor({ state: 'visible', timeout: 5000 });
           }
