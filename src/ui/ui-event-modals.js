@@ -1640,6 +1640,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
     }
     return {};
   });
+  const checkedItemsHydratedRef = React.useRef(false);
 
   const monthStr = `${year}-${String(month + 1).padStart(2, '0')}`;
   const confirmed = getConfirmedMeetings(calendar);
@@ -1664,16 +1665,19 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
   }, [confirmed, monthStr]);
 
   React.useEffect(() => {
-    if (cardToEdit?.checkedItemKeys && Array.isArray(cardToEdit.checkedItemKeys) && cardToEdit.checkedItemKeys.length > 0) {
-      const initialChecked = {};
-      monthlyExpenses.forEach(item => {
-        if (cardToEdit.checkedItemKeys.includes(item.itemKey)) {
-          initialChecked[item.itemKey] = item;
-        }
-      });
-      if (Object.keys(initialChecked).length > 0) {
-        setCheckedItems(prev => ({ ...initialChecked, ...prev }));
-      }
+    // `confirmed` can be recreated while the modal is open. Hydrating on
+    // every render would re-add an item immediately after the user unchecks
+    // it, making persisted checked items impossible to turn off.
+    if (checkedItemsHydratedRef.current || monthlyExpenses.length === 0) return;
+    checkedItemsHydratedRef.current = true;
+    const savedKeys = Array.isArray(cardToEdit?.checkedItemKeys) ? cardToEdit.checkedItemKeys : [];
+    if (savedKeys.length === 0) return;
+    const initialChecked = {};
+    monthlyExpenses.forEach(item => {
+      if (savedKeys.includes(item.itemKey)) initialChecked[item.itemKey] = item;
+    });
+    if (Object.keys(initialChecked).length > 0) {
+      setCheckedItems(prev => ({ ...initialChecked, ...prev }));
     }
   }, [monthlyExpenses, cardToEdit]);
 
@@ -2176,7 +2180,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
 
           React.createElement('div', {
             className: 'settlement-personal-expense-summary',
-            style: { display: 'flex', flexDirection: 'column', gap: '6px', overflowX: 'hidden', padding: '8px 6px', backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border-subtle)', borderRadius: '10px', boxSizing: 'border-box' }
+            style: { display: 'flex', flexDirection: 'column', gap: '6px', overflowX: 'hidden', padding: '8px 6px', backgroundColor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '10px', boxSizing: 'border-box' }
           },
             personalParticipantPickerOptions.map(option => {
               const total = personalExpenseTotals.get(option.value) || 0;
@@ -2185,7 +2189,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
                 key: option.value,
                 style: {
                   width: '100%', minWidth: 0, minHeight: '36px', padding: '6px 10px', borderRadius: '9px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px',
-                  backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', boxSizing: 'border-box'
+                  backgroundColor: '#F8FAFC', border: 'none', boxSizing: 'border-box'
                 }
               },
                 ParticipantBackdrop ? React.createElement(ParticipantBackdrop, { participant, name: option.value, dotSize: 9, style: { fontSize: '0.72rem', flex: '0 1 auto', minWidth: 0 } }) : React.createElement('span', { style: { color: option.color, fontWeight: 800, fontSize: '0.72rem' } }, `● ${option.value}`),
