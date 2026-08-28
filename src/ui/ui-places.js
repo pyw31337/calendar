@@ -1772,8 +1772,8 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
           }
         }, mapExpanded ? /*#__PURE__*/React.createElement("svg", {
           xmlns: "http://www.w3.org/2000/svg",
-          width: "16",
-          height: "16",
+          width: "20",
+          height: "20",
           viewBox: "0 0 24 24",
           fill: "none",
           stroke: "currentColor",
@@ -1790,8 +1790,8 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
           /*#__PURE__*/React.createElement("path", { d: "M4 17l1 0" })
         ) : /*#__PURE__*/React.createElement("svg", {
           xmlns: "http://www.w3.org/2000/svg",
-          width: "16",
-          height: "16",
+          width: "20",
+          height: "20",
           viewBox: "0 0 24 24",
           fill: "none",
           stroke: "currentColor",
@@ -1821,8 +1821,8 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
           /* Lucide-style split diagonal resizing arrows */
           /*#__PURE__*/React.createElement("svg", {
             xmlns: "http://www.w3.org/2000/svg",
-            width: "16",
-            height: "16",
+            width: "20",
+            height: "20",
             viewBox: "0 0 24 24",
             fill: "none",
             stroke: "currentColor",
