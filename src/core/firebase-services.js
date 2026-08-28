@@ -594,7 +594,9 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
 
   async function fetchGalleryItemCount(calId, maxPages) {
     if (!isValidCalId(calId)) return null;
-    if (maxPages == null) maxPages = 8;
+    // This is an exact count, not a display preview. A caller may pass maxPages for an
+    // explicitly bounded diagnostic, but normal UI calls must scan until Firestore is exhausted.
+    if (maxPages == null) maxPages = Infinity;
     const cached = galleryItemCountCache[calId];
     if (cached && (Date.now() - cached.at) < GALLERY_COUNT_CACHE_MS && typeof cached.n === 'number') {
       return cached.n;
