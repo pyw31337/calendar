@@ -2800,11 +2800,11 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
           },
             /* Card Header: status top-left, settings top-right, title/account below. */
             React.createElement("div", {
-              style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '6px', position: 'relative', paddingRight: '34px' }
+              style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '6px', position: 'relative' }
             },
               React.createElement("span", {
                 style: {
-                  alignSelf: 'flex-start', fontSize: '0.68rem', fontWeight: 800, padding: '2px 6px', borderRadius: '4px',
+                  alignSelf: 'flex-start', fontSize: '0.68rem', fontWeight: 600, padding: '2px 6px', borderRadius: '4px',
                   backgroundColor: isClosed ? 'rgba(255,255,255,0.18)' : '#22C55E',
                   color: isClosed ? '#FFFFFF' : '#5B4BEB'
                 }
@@ -2825,7 +2825,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
                 card.bankName && React.createElement("span", null, card.bankName),
                 card.accountNumber && React.createElement("span", {
                   style: {
-                    display: 'inline-flex', alignItems: 'center', padding: '2px 8px', margin: '0 4px',
+                    display: 'inline-flex', alignItems: 'center', padding: '2px 10px', margin: '0 4px',
                     borderRadius: '10px', backgroundColor: '#666', mixBlendMode: 'hard-light', color: 'var(--settlement-hero-text)'
                   }
                 }, card.accountNumber),
@@ -2844,7 +2844,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
                     background: 'transparent', border: 'none', borderRadius: '0',
                     width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center',
                     color: 'var(--settlement-hero-action-text)', cursor: 'pointer', padding: 0,
-                    position: 'absolute', top: 0, right: 0
+                    position: 'absolute', top: '-4px', right: 0
                   }
                 },
                   React.createElement("svg", {
