@@ -1107,10 +1107,17 @@ export function LinkPreviewCard({ url, fallbackTitle, cachedData, stretch = fals
   const __comp = window.GATHER_UI_COMPONENTS || {};
 
   const preview = useLinkPreview(url, cachedData);
-  if (!preview || preview.status === 'loading' || preview.status === 'error' || preview.status === 'empty') return null;
-  const { title, description, image, siteName } = preview.data;
+  const data = preview?.data || {};
+  const { title, description, image, siteName } = data;
+  if (!stretch && (!preview || preview.status === 'loading' || preview.status === 'error' || preview.status === 'empty')) return null;
+
+  const parsedHost = (function() {
+    try { return new URL(url).hostname; } catch(e) { return url; }
+  })();
   const isGenericTitle = !title || title === 'map.naver.com' || title === 'naver.me' || title.startsWith('map.naver');
-  const displayTitle = (isGenericTitle && fallbackTitle) ? fallbackTitle : (title || siteName);
+  const displayTitle = (isGenericTitle && fallbackTitle) ? fallbackTitle : (title || fallbackTitle || parsedHost);
+  const displayHost = siteName || parsedHost;
+
   return /*#__PURE__*/React.createElement('a', {
     href: url,
     target: '_blank',
@@ -1119,11 +1126,6 @@ export function LinkPreviewCard({ url, fallbackTitle, cachedData, stretch = fals
     className: 'link-preview-card',
     style: {
       display: 'flex',
-      // A fit-content chat bubble resolves its width to whichever child is widest -- once a
-      // longer caption line (rendered above this card) settles that width, a plain flex block
-      // with no width of its own stretches to fill it, leaving a blank gap next to this card's
-      // actual (much narrower) thumbnail+title content. width:fit-content makes the card hug its
-      // own content instead, regardless of what a sibling line established for the bubble; the
       // maxWidth cap keeps that same fit-content from growing unbounded to fit a long title in
       // one line now that the bubble's width no longer implicitly bounds it -- title/description
       // below still truncate with ellipsis inside this width.
@@ -1173,9 +1175,9 @@ export function LinkPreviewCard({ url, fallbackTitle, cachedData, stretch = fals
       description && /*#__PURE__*/React.createElement('div', {
       style: { fontSize: '0.7rem', color: 'var(--text-muted)', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }
       }, description),
-      siteName && /*#__PURE__*/React.createElement('div', {
+      displayHost && /*#__PURE__*/React.createElement('div', {
         style: { fontSize: '0.65rem', color: 'var(--text-light)' }
-      }, siteName)
+      }, displayHost)
     )
   );
 }

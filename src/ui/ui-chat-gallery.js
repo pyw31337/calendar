@@ -1513,16 +1513,19 @@ export function ChatGalleryModal({
       padding: asPage
         ? ((isSearchOpen ? '168px' : '120px') + ' 20px 16px 20px')
         : '16px 20px',
-      display: 'flex', flexDirection: 'column', gap: '12px', boxSizing: 'border-box',
+      display: 'flex', flexDirection: 'column', gap: activeTab === 'links' ? '8px' : '12px', boxSizing: 'border-box',
       minWidth: 0
     }
   }, activeTab === 'links' ? /*#__PURE__*/React.createElement(React.Fragment, null,
     filteredLinks.length === 0 ? /*#__PURE__*/React.createElement("div", {
       style: { textAlign: 'center', color: 'var(--text-muted)', padding: '40px 0', fontSize: '0.88rem' }
-    }, searchQuery ? "검색 결과가 없습니다." : "공유된 링크가 없습니다.") : filteredLinks.map(item => /*#__PURE__*/React.createElement("div", {
-      key: item.messageId,
-      style: { width: '100%' }
-    }, /*#__PURE__*/React.createElement(LinkPreviewCard, { url: item.url, fallbackTitle: item.text ? removeFirstUrl(item.text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : '', cachedData: item.linkPreview, stretch: true }))),
+    }, searchQuery ? "검색 결과가 없습니다." : "공유된 링크가 없습니다.") : filteredLinks.map(item => /*#__PURE__*/React.createElement(LinkPreviewCard, {
+      key: item.messageId || item.url,
+      url: item.url,
+      fallbackTitle: item.text ? removeFirstUrl(item.text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : '',
+      cachedData: item.linkPreview,
+      stretch: true
+    })),
     (hasMoreOlderChat || hasMoreMemos) && !(searchQuery || '').trim() && /*#__PURE__*/React.createElement("button", {
       type: "button",
       onClick: () => {
