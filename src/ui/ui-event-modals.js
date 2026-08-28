@@ -2062,7 +2062,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
             React.createElement('label', { style: { ...settlementSectionLabelStyle, marginBottom: 0 } }, '일자별 지출 항목 선택'),
             React.createElement('div', {
               className: 'calendar-nav',
-              style: { display: 'flex', alignItems: 'center', gap: '6px', height: '36px' }
+              style: { display: 'flex', alignItems: 'center', gap: '6px', height: '36px', marginBottom: 0 }
             },
               React.createElement('button', {
                 type: 'button', className: 'btn btn-secondary calendar-month-nav-btn', style: { width: '32px', height: '32px', padding: '6px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' },
