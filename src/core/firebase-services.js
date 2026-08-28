@@ -43,7 +43,7 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
   async function fetchChatMessagesRest(calId) {
     try {
       const url = 'https://firestore.googleapis.com/v1/projects/' + projectId() + '/databases/(default)/documents/calendars/cal_' + calId + '/messages?orderBy=timestamp%20desc&pageSize=' + liveLimit();
-      const res = await fetch(url);
+      const res = await fetch(url, { cache: 'no-store' });
       if (!res.ok) return [];
       const data = await res.json();
       return (data.documents || []).map(function (doc) {
@@ -98,7 +98,7 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
     }
     try {
       const url = 'https://firestore.googleapis.com/v1/projects/' + projectId() + '/databases/(default)/documents/calendars/cal_' + calId + '/messages?orderBy=timestamp%20desc&pageSize=' + pageSize;
-      const res = await fetch(url);
+      const res = await fetch(url, { cache: 'no-store' });
       if (!res.ok) return [];
       const data = await res.json();
       return (data.documents || []).map(function (doc) {
