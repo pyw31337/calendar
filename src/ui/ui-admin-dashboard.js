@@ -2099,7 +2099,9 @@ export function AdminDashboard({ initialCalendars }) {
       type: "button",
       onClick: () => {
         const action = toast.onAction;
-        if (typeof dismissToast === 'function') dismissToast();
+        if (toastControllerRef.current && typeof toastControllerRef.current.dismissToast === 'function') {
+          toastControllerRef.current.dismissToast();
+        }
         Promise.resolve(action()).catch(console.warn);
       },
       className: "toast-action"

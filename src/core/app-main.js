@@ -64,6 +64,10 @@ import {
   getNaverMapPlaceUrl,
   getGoogleMapPlaceUrl,
   getPlaceExternalMapUrl,
+  getPlaceKakaoRouteUrl,
+  getPlaceNaverRouteUrl,
+  getPlaceGoogleRouteUrl,
+  getCalendarSettlementCards,
   readConfigNumber,
   readConfigObject,
   ENABLE_FIRESTORE_SYNC,
@@ -570,6 +574,15 @@ function AdminRestorePhraseModal(props) {
 function AdminUnifiedSearchModal(props) {
   const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AdminUnifiedSearchModal;
   return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function CreateSettlementModal(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CreateSettlementModal;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+
+function getAllDirectMediaImageEntries(message) {
+  const direct = getMessageDirectMediaEntry(message);
+  return direct ? [direct] : [];
 }
 
 function getFirebaseStateVersion() {
@@ -1587,6 +1600,35 @@ function CalendarApp() {
     return restored || true;
   }, [activeCalId]);
 
+  // Shared by the realtime listener and the visibility-resume refresh. Keeping this update
+  // outside either effect prevents a resume callback from closing over an unrelated effect's
+  // `isMounted`/`applyLoadedCalendar` locals.
+  const applyCalendarSnapshot = React.useCallback((cloudCal, cloudLastMod = Date.now(), cloudRevision = 0, forceApply = false) => {
+    if (!cloudCal || cloudCal.id !== activeCalId) return false;
+    const incomingRevision = Number(cloudRevision || 0) || 0;
+    const currentMetaRevision = getMetaRevision(serverRevisionRef.current, activeCalId);
+    if (!forceApply) {
+      if (incomingRevision > 0 && currentMetaRevision > 0 && incomingRevision < currentMetaRevision) return false;
+      if (incomingRevision <= 0 && cloudLastMod < getMetaLastModified(serverRevisionRef.current, activeCalId)) return false;
+    }
+    setIsInitialDataLoading(false);
+    setCalendarsState(prevCals => {
+      const list = Array.isArray(prevCals) ? prevCals : [];
+      const hasExisting = list.some(c => c && c.id === activeCalId);
+      const nextCals = hasExisting
+        ? list.map(c => c && c.id === activeCalId ? cloneCalendar(cloudCal) : c)
+        : [cloneCalendar(cloudCal), ...list];
+      saveLocalCache(nextCals);
+      serverRevisionRef.current = updateMetaLastModified(serverRevisionRef.current, activeCalId, cloudLastMod || 0);
+      if (incomingRevision > 0) {
+        serverRevisionRef.current = updateMetaRevision(serverRevisionRef.current, activeCalId, incomingRevision);
+      }
+      saveLocalMeta(serverRevisionRef.current);
+      return nextCals;
+    });
+    return true;
+  }, [activeCalId]);
+
   // Firebase Firestore Real-Time Listener (ISOLATED per activeCalId)
   React.useEffect(() => {
     if (!firebaseDb || !activeCalId) {
@@ -1610,22 +1652,7 @@ function CalendarApp() {
         if (incomingRevision <= 0 && cloudLastMod < getMetaLastModified(serverRevisionRef.current, activeCalId)) return false;
       }
       if (markLoaded) hasLoadedCloudCalendar = true;
-      setIsInitialDataLoading(false);
-      setCalendarsState(prevCals => {
-        const hasExisting = prevCals.some(c => c.id === activeCalId);
-        const nextCals = hasExisting
-          ? prevCals.map(c => c.id === activeCalId ? cloneCalendar(cloudCal) : c)
-          : [cloneCalendar(cloudCal), ...prevCals];
-        saveLocalCache(nextCals);
-        const targetMod = cloudLastMod || 0;
-        serverRevisionRef.current = updateMetaLastModified(serverRevisionRef.current, activeCalId, targetMod);
-        if (incomingRevision > 0) {
-          serverRevisionRef.current = updateMetaRevision(serverRevisionRef.current, activeCalId, incomingRevision);
-        }
-        saveLocalMeta(serverRevisionRef.current);
-        return nextCals;
-      });
-      return true;
+      return applyCalendarSnapshot(cloudCal, cloudLastMod, cloudRevision, forceApply);
     };
 
     const runInitialLoad = async () => {
@@ -1728,7 +1755,7 @@ function CalendarApp() {
       if (retryTimeoutId) clearTimeout(retryTimeoutId);
       if (unsubscribe) unsubscribe();
     };
-  }, [activeCalId, cloudReloadToken, restoreActiveCalendarFromCache]);
+  }, [activeCalId, cloudReloadToken, restoreActiveCalendarFromCache, applyCalendarSnapshot]);
 
   React.useEffect(() => {
     if (firebaseDb) return;
@@ -1797,17 +1824,15 @@ function CalendarApp() {
       if (activeCalId && isAllowedCalendarId(activeCalId)) {
         try {
           const fresh = await fetchSingleCalendarWithRest(activeCalId, 5000);
-          if (fresh?.calendar && applyLoadedCalendar(fresh.calendar, fresh.lastModified || Date.now(), fresh.revision || fresh.calendar.revision || 0, true)) {
+          if (fresh?.calendar && applyCalendarSnapshot(fresh.calendar, fresh.lastModified || Date.now(), fresh.revision || fresh.calendar.revision || 0, true)) {
             if (activeView === 'calendar' || activeView === 'places' || activeView === 'settlement') {
-              fetchPlacesFromFirestore(activeCalId).then(list => { if (isMounted) setPlacesSubcollection(list); }).catch(() => {});
-              fetchConfirmedMeetingsFromFirestore(activeCalId).then(list => { if (isMounted) setConfirmedMeetingsSubcollection(list); }).catch(() => {});
+              fetchPlacesFromFirestore(activeCalId).then(list => { setPlacesSubcollection(list); }).catch(() => {});
+              fetchConfirmedMeetingsFromFirestore(activeCalId).then(list => { setConfirmedMeetingsSubcollection(list); }).catch(() => {});
             }
             if (activeView === 'memo') {
               fetchMemosRest(activeCalId, memosLimit).then(list => {
-                if (isMounted) {
-                  setMemos(list);
-                  setHasMoreMemos(list.length >= memosLimit);
-                }
+                setMemos(list);
+                setHasMoreMemos(list.length >= memosLimit);
               }).catch(() => {});
             }
             return;
@@ -10095,11 +10120,11 @@ function bindGatherUiDeps() {
     ResizableModalContainer: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ResizableModalContainer) || (typeof ResizableModalContainer === 'function' ? ResizableModalContainer : null),
     SearchResultLogRow: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SearchResultLogRow) || (typeof SearchResultLogRow === 'function' ? SearchResultLogRow : null),
     SettlementSummaryModal: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SettlementSummaryModal) || (typeof SettlementSummaryModal === 'function' ? SettlementSummaryModal : null),
-    CreateSettlementModal: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CreateSettlementModal) || (typeof CreateSettlementModal === 'function' ? CreateSettlementModal : null),
-    getCalendarSettlementCards: typeof getCalendarSettlementCards === 'function' ? getCalendarSettlementCards : (window.GATHER_APP_UTILS || {}).getCalendarSettlementCards,
-    getPlaceKakaoRouteUrl: typeof getPlaceKakaoRouteUrl === 'function' ? getPlaceKakaoRouteUrl : (window.GATHER_APP_UTILS || {}).getPlaceKakaoRouteUrl,
-    getPlaceNaverRouteUrl: typeof getPlaceNaverRouteUrl === 'function' ? getPlaceNaverRouteUrl : (window.GATHER_APP_UTILS || {}).getPlaceNaverRouteUrl,
-    getPlaceGoogleRouteUrl: typeof getPlaceGoogleRouteUrl === 'function' ? getPlaceGoogleRouteUrl : (window.GATHER_APP_UTILS || {}).getPlaceGoogleRouteUrl,
+    CreateSettlementModal: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CreateSettlementModal) || CreateSettlementModal,
+    getCalendarSettlementCards,
+    getPlaceKakaoRouteUrl,
+    getPlaceNaverRouteUrl,
+    getPlaceGoogleRouteUrl,
     fetchSubcollectionCount: typeof fetchSubcollectionCount === 'function' ? fetchSubcollectionCount : null,
     AdminCreateCalendarModal: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AdminCreateCalendarModal) || (typeof AdminCreateCalendarModal === 'function' ? AdminCreateCalendarModal : null),
     AdminFilledMenuIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AdminFilledMenuIcon) || (typeof AdminFilledMenuIcon === 'function' ? AdminFilledMenuIcon : null),
@@ -10318,7 +10343,7 @@ try {
   if (rootElement) {
     const root = ReactDOM.createRoot(rootElement);
     const imageShareId = new URLSearchParams(window.location.search).get('image');
-    const EB = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AppErrorBoundary) || (typeof AppErrorBoundary !== 'undefined' ? AppErrorBoundary : React.Fragment);
+    const EB = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AppErrorBoundary) || React.Fragment;
     root.render(/*#__PURE__*/React.createElement(EB, null,
       /*#__PURE__*/React.createElement(React.Fragment, null,
         imageShareId
