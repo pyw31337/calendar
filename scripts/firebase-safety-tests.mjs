@@ -24,6 +24,7 @@ assert(!/await\s+subscription\.unsubscribe\(/.test(script), 'calendar-level noti
 assert(/if \(thumbs\.length === 1\)[\s\S]{0,260}src: displayUrls\[0\] \|\| thumbs\[0\][\s\S]{0,420}objectFit: 'contain'/.test(script), 'single chat image must render the full media without cropping');
 assert(/thumbs\.map\(\(thumb, idx\)[\s\S]{0,520}objectFit: 'cover'/.test(script), 'multi-image chat grid should keep cropped square thumbnails');
 const domainHelpers = fs.readFileSync('src/core/app-domain-helpers.js', 'utf8');
+assert(/const appBasePath = window\.location\.pathname\.includes\('\/calendar\/'\) \? '\/calendar\/' : '\/'[\s\S]{0,180}serviceWorker\.register\(`\$\{appBasePath\}sw\.js`\)/.test(domainHelpers), 'service worker registration must resolve from the app base path on share URLs');
 const sharedUi = fs.readFileSync('src/ui/ui-shared.js', 'utf8');
 const overlaysUi = fs.readFileSync('src/ui/ui-overlays.js', 'utf8');
 assert(domainHelpers.includes('const isRenderableImageUrl = GATHER_APP_UTILS.isRenderableImageUrl') && fs.readFileSync('src/core/app-utils.js', 'utf8').includes('function isRenderableImageUrl'), 'chat image entries must reject malformed/non-http image URLs');

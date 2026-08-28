@@ -1052,7 +1052,8 @@ function notifyMeetingReminder(calendar, meeting, whenLabel) {
 // register unconditionally: browsers without service worker support simply skip this.
 if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js').then(reg => {
+    const appBasePath = window.location.pathname.includes('/calendar/') ? '/calendar/' : '/';
+    navigator.serviceWorker.register(`${appBasePath}sw.js`).then(reg => {
       try { reg.update(); } catch (_) {}
     }).catch(e => console.warn('Service worker registration failed:', e));
   });
