@@ -2154,7 +2154,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
 
           React.createElement('div', {
             className: 'settlement-personal-expense-summary',
-            style: { display: 'flex', flexDirection: 'column', gap: '6px', overflowX: 'hidden', paddingBottom: '2px' }
+            style: { display: 'flex', flexDirection: 'column', gap: '6px', overflowX: 'hidden', padding: '8px 6px', backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border-subtle)', borderRadius: '10px', boxSizing: 'border-box' }
           },
             personalParticipantPickerOptions.map(option => {
               const total = personalExpenseTotals.get(option.value) || 0;
@@ -2162,7 +2162,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
               return React.createElement('div', {
                 key: option.value,
                 style: {
-                  width: '100%', minWidth: 0, padding: '8px 10px', borderRadius: '9px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px',
+                  width: '100%', minWidth: 0, minHeight: '36px', padding: '6px 10px', borderRadius: '9px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px',
                   backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', boxSizing: 'border-box'
                 }
               },

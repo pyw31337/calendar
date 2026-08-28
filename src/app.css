@@ -2871,14 +2871,14 @@ select.form-select {
   grid-template-columns: 20px minmax(0, 1fr);
   align-items: start;
   gap: 8px;
-  padding: 8px;
+  padding: 8px 8px 8px 4px;
   border-radius: 8px;
   background: transparent;
   cursor: pointer;
   font-size: 0.78rem;
 }
 .settlement-expense-option.is-checked {
-  background: rgba(59, 130, 246, 0.06);
+  background: rgba(239, 246, 255, 0.92);
 }
 .settlement-expense-checkbox {
   width: 16px;
@@ -2908,7 +2908,6 @@ select.form-select {
   color: #DC2626;
   font-weight: 800;
   white-space: nowrap;
-  align-self: center;
 }
 .settlement-expense-option-amount.is-income {
   color: #16A34A;
@@ -2967,9 +2966,9 @@ select.form-select {
   flex-direction: column;
   align-items: center;
   text-align: center;
-  gap: 8px;
+  gap: 4px;
   min-width: 0;
-  padding: 14px 12px;
+  padding: 10px 8px;
   border-right: 1px solid var(--border-subtle);
   background-color: transparent;
   box-sizing: border-box;
