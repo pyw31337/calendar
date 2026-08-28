@@ -3826,7 +3826,7 @@ function CalendarApp() {
     try {
       const resolvedImages = await resolveChatImageBatch(activeCal.id, compressed, progress => {
         setChatUploadProgress({ ...progress, label: '일정 사진 업로드 중...' });
-      });
+      }, { requireStorage: true });
       const chunks = chunkResolvedImagesForMessages(resolvedImages);
       const now = Date.now();
       const fallbackParticipantId = chatParticipantId || getActiveParticipants(activeCal)[0]?.id || '';
@@ -8015,7 +8015,7 @@ async function readClipboardImageFiles(showToast) {
 // Resolves the {imageUrl, thumbUrl} pair a message/memo should store: uploaded Storage
 // download URLs when possible, the original compressed base64 data URLs otherwise. uploadFn
 // is uploadChatImageAssets or uploadMemoImageAssets, keeping each feature's Storage path.
-async function resolveImageUrls(calendarId, compressed, index, onBytes, uploadFn) {
+async function resolveImageUrls(calendarId, compressed, index, onBytes, uploadFn, options = {}) {
   try {
     const uploaded = await uploadFn(calendarId, compressed, index, onBytes);
     if (uploaded && uploaded.imageUrl && uploaded.thumbUrl) {
@@ -8023,7 +8023,13 @@ async function resolveImageUrls(calendarId, compressed, index, onBytes, uploadFn
       return uploaded;
     }
   } catch (e) {
+    if (options.requireStorage) {
+      throw new Error('이미지 저장소 연결에 실패했습니다. 네트워크를 확인한 뒤 다시 시도해 주세요.');
+    }
     console.warn('Image Storage upload attempt failed, falling back to base64 data URL:', e);
+  }
+  if (options.requireStorage) {
+    throw new Error('이미지 저장소를 사용할 수 없어 사진을 저장하지 않았습니다.');
   }
   let original = compressed && compressed.original;
   let thumbnail = compressed && compressed.thumbnail;
@@ -8056,7 +8062,7 @@ async function resolveImageUrls(calendarId, compressed, index, onBytes, uploadFn
 // while reporting combined byte-level progress across every upload in the batch as
 // { pct, remainingSec }. Falls back to compressed.isExisting entries as-is (no re-upload).
 // Shared by chat and memo attachments; uploadFn picks which Storage path each uses.
-async function resolveImageBatch(calendarId, compressedList, onProgress, uploadFn) {
+async function resolveImageBatch(calendarId, compressedList, onProgress, uploadFn, options = {}) {
   const uploadIndexes = compressedList
     .map((c, idx) => ({ c, idx }))
     .filter(({ c }) => !c.isExisting);
@@ -8117,7 +8123,7 @@ async function resolveImageBatch(calendarId, compressedList, onProgress, uploadF
         reportCompressionProgress();
         results[idx] = { imageUrl: c.original, thumbUrl: c.thumbnail };
       } else {
-        const result = await resolveImageUrls(calendarId, c, idx, onBytes, uploadFn);
+        const result = await resolveImageUrls(calendarId, c, idx, onBytes, uploadFn, options);
         compressionDone++;
         reportCompressionProgress();
         results[idx] = result;
@@ -8130,8 +8136,8 @@ async function resolveImageBatch(calendarId, compressedList, onProgress, uploadF
   return results;
 }
 
-async function resolveChatImageBatch(calendarId, compressedList, onProgress) {
-  return resolveImageBatch(calendarId, compressedList, onProgress, uploadChatImageAssets);
+async function resolveChatImageBatch(calendarId, compressedList, onProgress, options = {}) {
+  return resolveImageBatch(calendarId, compressedList, onProgress, uploadChatImageAssets, options);
 }
 
 async function resolveMemoImageBatch(calendarId, compressedList, onProgress) {

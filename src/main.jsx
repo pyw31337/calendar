@@ -118,9 +118,18 @@ async function loadScriptWithRetry(src, timeoutMs, attempts = 3, delayMs = 700) 
 // (not one flat value) since firebase-firestore-compat.js is ~340KB, about 8-12x the other two
 // files (~29KB / ~40KB).
 async function loadFirebaseSdk() {
-  await loadScriptWithRetry('vendor/firebase-app-compat.js', 12000);
-  await loadScriptWithRetry('vendor/firebase-firestore-compat.js', 30000);
-  await loadScriptWithRetry('vendor/firebase-storage-compat.js', 15000);
+  // index.html preloads these same-origin files with defer. Only load a missing piece here;
+  // injecting every file again used to race the deferred tags and could replace window.firebase
+  // while app-firebase-data.js was initializing, leaving some browsers with no usable SDK.
+  if (typeof window.firebase === 'undefined') {
+    await loadScriptWithRetry('vendor/firebase-app-compat.js', 12000);
+  }
+  if (typeof window.firebase === 'undefined' || typeof window.firebase.firestore !== 'function') {
+    await loadScriptWithRetry('vendor/firebase-firestore-compat.js', 30000);
+  }
+  if (typeof window.firebase === 'undefined' || typeof window.firebase.storage !== 'function') {
+    await loadScriptWithRetry('vendor/firebase-storage-compat.js', 15000);
+  }
 }
 
 // Admin UI is not needed for the initial calendar view, but it is also reachable from
