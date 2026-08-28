@@ -1378,7 +1378,7 @@ async function writeCollectionDocumentRest(collectionName, calId, docId, data, m
     const cleanDeletePaths = Array.isArray(deletePaths)
       ? [...new Set(deletePaths.map(path => sanitizeText(path || '', 120)).filter(Boolean))]
       : [];
-    if (!cleanCollection || !isValidCalId(cleanCalId)) return false;
+    if (!cleanCollection || !isValidCalendarId(cleanCalId)) return false;
     const baseUrl = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/calendars/cal_${cleanCalId}/${cleanCollection}`;
     if (method === 'delete') {
       if (!cleanDocId) return false;
