@@ -110,23 +110,19 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
     }
   }
 
-  // Unlike fetchRecentChatMessages (which grabs the newest N messages regardless of content),
-  // this keeps paging through message history until at least minPhotoCount photos have been
-  // seen (or maxPages is hit) -- so a text-heavy recent stretch of chat doesn't starve the main
-  // screen's gallery widget of thumbnails even though the total photo count (fetchGalleryItemCount,
-  // same maxPages default) is much higher. Falls back to fetchRecentChatMessages when the SDK
-  // (needed for cursor-based startAfter pagination) isn't available.
-  async function fetchRecentGalleryMessages(calId, minPhotoCount, maxPages) {
+  // Unlike fetchRecentChatMessages (which deliberately serves a recent chat window), this is a
+  // correctness path for gallery media. The gallery must not silently omit an older photo just
+  // because many text messages were posted after it, so page through the complete collection.
+  // The caller still limits how many thumbnails it renders; this function only guarantees that
+  // the source set used for choosing those thumbnails is exhaustive.
+  async function fetchRecentGalleryMessages(calId) {
     if (!isValidCalId(calId)) return [];
-    const targetCount = Math.max(1, Number(minPhotoCount) || 12);
-    const pages = Math.max(1, Number(maxPages) || 8);
     const firebaseDb = getDb();
-    if (!firebaseDb) return fetchRecentChatMessages(calId, 60);
+    if (!firebaseDb) return fetchAllChatMessagesRest(calId);
     try {
       const collected = [];
-      let photoCount = 0;
       let lastDoc = null;
-      for (let page = 0; page < pages && photoCount < targetCount; page++) {
+      while (true) {
         let q = firebaseDb.collection('calendars').doc('cal_' + calId).collection('messages')
           .orderBy('timestamp', 'desc').limit(80);
         if (lastDoc) q = q.startAfter(lastDoc);
@@ -135,7 +131,6 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
         snap.forEach(function (doc) {
           const msg = slimMessage({ id: doc.id, ...doc.data() });
           collected.push(msg);
-          photoCount += imageEntries(msg).length + (directEntry(msg) ? 1 : 0);
         });
         lastDoc = snap.docs[snap.docs.length - 1];
         if (snap.size < 80) break;
@@ -143,7 +138,7 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
       return collected.reverse();
     } catch (err) {
       console.warn('fetchRecentGalleryMessages sdk', err);
-      return fetchRecentChatMessages(calId, 60);
+      return fetchAllChatMessagesRest(calId);
     }
   }
 
