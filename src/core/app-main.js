@@ -805,7 +805,11 @@ function CalendarApp() {
       }
 
       serverRevisionRef.current = updateMetaLastModified(serverRevisionRef.current, currentCal.id, now);
-      serverRevisionRef.current = updateMetaRevision(serverRevisionRef.current, currentCal.id, currentCal.revision || 0);
+      // saved.revision is the doc-level revision Firestore actually committed -- record that, not
+      // currentCal.revision (the nested calendar.revision field, bumped client-side per edit and
+      // liable to run ahead of it), or every later genuine update looks "older" by comparison and
+      // gets silently rejected by applyCalendarSnapshot's revision gate. See pushSingleCloudCalendar.
+      serverRevisionRef.current = updateMetaRevision(serverRevisionRef.current, currentCal.id, (saved && saved.revision) || currentCal.revision || 0);
       saveLocalCache(normalizedCalendars);
       saveLocalMeta(serverRevisionRef.current);
       if (toastMsg !== null && toastMsg !== undefined && toastMsg !== '') {

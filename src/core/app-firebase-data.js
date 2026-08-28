@@ -2280,7 +2280,7 @@ async function pushSingleCalendarWithRest(normalizedCal, lastModified, saveMode,
         if (legacyConfirmedMeetings.length) {
           retryLegacySubcollectionWrite(writeConfirmedMeetingsToFirestore, normalizedCal.id, legacyConfirmedMeetings, 'Confirmed meetings').catch(() => {});
         }
-        return true;
+        return { ok: true, revision: nextDocRevision };
       }
       const errorText = await commitRes.text();
       if (!isRetryableFirestoreConflict(errorText) || attempt === retryCount) {
@@ -2304,6 +2304,14 @@ async function pushSingleCalendarWithRest(normalizedCal, lastModified, saveMode,
 }
 
 // Pushes isolated calendar data to the durable master store and Firestore when available.
+// Returns `false` on failure; on success returns `{ ok: true, revision }` where `revision` is the
+// doc-level revision Firestore actually committed -- NOT the same number as normalizedCal.revision
+// (the nested calendar.revision field), which the caller bumps client-side once per local edit and
+// which can run well ahead of how many writes have actually landed. updateCalendars must record
+// this doc-level value as its "last known good" revision, because that's the same number every
+// future onSnapshot/get() delivers for comparison -- recording the nested counter instead made a
+// device's local revision permanently outrun the server's, so the local revision-gate rejected
+// every later genuine update (a plain refresh included) as "older" than what it already had.
 async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 18, allCalendars = null, saveMode = 'availability', newActivityLogs = []) {
   const normalizedCal = normalizeCalendarForSave(targetCal);
   if (!normalizedCal || !normalizedCal.id) return false;
@@ -2317,6 +2325,10 @@ async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 18,
     let legacyActivityLogs = [];
     let legacyPlaces = [];
     let legacyConfirmedMeetings = [];
+    // Set by the transaction below to the doc-level `revision` it actually committed, so the
+    // caller can record the real server-confirmed value instead of guessing from its own
+    // optimistic calendar.revision counter (see the note above pushSingleCloudCalendar's return).
+    let committedRevision = null;
     // Set the instant the 8s timeout below fires, so a transaction that's still stuck on a slow
     // tx.get() (rather than genuinely offline) bails out cleanly instead of committing anyway
     // sometime after we've already moved on to the REST fallback below -- without this, both
@@ -2347,6 +2359,7 @@ async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 18,
 	          }
 	          const mergedCalendar = normalizeCalendarForSave(nextCalendar);
 	          const nextDocRevision = (currentData?.revision || 0) + 1;
+	          committedRevision = nextDocRevision;
 	          mergedCalendar.revision = Math.max(serverCalendar?.revision || 0, normalizedCal.revision || 0) + 1;
 	          mergedCalendar.updatedAt = Math.max(mergedCalendar.updatedAt || 0, lastModified || 0);
 	          // activityLogs lives in its own subcollection now -- see writeActivityLogsToFirestore
@@ -2398,7 +2411,7 @@ async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 18,
 	      if (legacyConfirmedMeetings.length) {
 	        retryLegacySubcollectionWrite(writeConfirmedMeetingsToFirestore, normalizedCal.id, legacyConfirmedMeetings, 'Confirmed meetings').catch(() => {});
 	      }
-	      return true;
+	      return { ok: true, revision: committedRevision };
     } catch (e) {
       console.warn(`Firestore push notice for cal_${normalizedCal.id}:`, e);
       // The transaction above has no cancellation hook, so on a timeout it can still land after
@@ -2414,7 +2427,7 @@ async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 18,
           if (checkRes.ok) {
             const checkData = firestoreDocumentToJs(await checkRes.json());
             if ((checkData?.calendar?.updatedAt || 0) >= (lastModified || 0) && (checkData?.lastModified || 0) >= (lastModified || 0)) {
-              return true;
+              return { ok: true, revision: checkData?.revision || null };
             }
           }
         } catch (checkErr) {
