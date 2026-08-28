@@ -2820,6 +2820,8 @@ select.form-select {
   display: flex;
   align-items: center;
   width: 100%;
+  position: relative;
+  top: -10px;
 }
 .settlement-person-grid {
   display: grid;
