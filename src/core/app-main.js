@@ -1219,6 +1219,26 @@ function CalendarApp() {
     (chatMessages || []).forEach(m => { if (m && m.id) byId.set(m.id, m); });
     return Array.from(byId.values()).sort((a, b) => Number(a.timestamp || 0) - Number(b.timestamp || 0));
   }, [olderChatMessages, chatMessages]);
+  const [fullChatHistoryByCalendar, setFullChatHistoryByCalendar] = React.useState({});
+  const fullChatMessages = fullChatHistoryByCalendar[activeCalId] || null;
+  const displayChatMessages = React.useMemo(() => {
+    if (!Array.isArray(fullChatMessages)) return allChatMessages;
+    const byId = new Map(fullChatMessages.filter(m => m?.id).map(m => [m.id, m]));
+    allChatMessages.forEach(m => { if (m?.id) byId.set(m.id, m); });
+    return Array.from(byId.values()).sort((a, b) => Number(a.timestamp || 0) - Number(b.timestamp || 0));
+  }, [allChatMessages, fullChatMessages]);
+  React.useEffect(() => {
+    if (!activeCalId || (activeView !== 'chat' && activeView !== 'gallery') || fullChatHistoryByCalendar[activeCalId] !== undefined) return;
+    if (!firebaseDb) return;
+    let cancelled = false;
+    firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages').get({ source: 'server' }).then(snapshot => {
+      if (cancelled) return;
+      const list = snapshot.docs.map(doc => slimMessageForClient({ id: doc.id, ...doc.data() }));
+      setFullChatHistoryByCalendar(prev => ({ ...prev, [activeCalId]: list }));
+      setHasMoreOlderChat(false);
+    }).catch(err => console.warn('full chat history load failed:', err));
+    return () => { cancelled = true; };
+  }, [activeCalId, activeView, fullChatHistoryByCalendar]);
   const [memos, setMemos] = React.useState([]);
   const [memosLimit, setMemosLimit] = React.useState(MEMOS_PAGE_SIZE);
   const [hasMoreMemos, setHasMoreMemos] = React.useState(false);
@@ -5210,7 +5230,7 @@ function CalendarApp() {
       anniversaries: anniversaries,
       dateStr: selectedDate,
       calendar: activeCal,
-      chatMessages: allChatMessages,
+      chatMessages: displayChatMessages,
       onSave: handleSaveAvailability,
       onDelete: handleDeleteAvailability,
       onDeleteDate: handleDeleteAllForDate,
@@ -5801,7 +5821,7 @@ function CalendarApp() {
   if (activeView === 'chat') {
     return withStickyVideo(/*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", { className: "chat-view-container" }, /*#__PURE__*/React.createElement(ChatRoomView, {
       calendar: activeCal,
-      chatMessages: allChatMessages,
+      chatMessages: displayChatMessages,
       loadingOlderChat: loadingOlderChat,
       hasMoreOlderChat: hasMoreOlderChat,
       onLoadOlderChat: loadOlderChatMessages,
@@ -5924,7 +5944,7 @@ function CalendarApp() {
     return withStickyVideo(/*#__PURE__*/React.createElement(React.Fragment, null,
       /*#__PURE__*/React.createElement(ChatGalleryModal, {
         calendar: activeCal,
-        chatMessages: allChatMessages,
+        chatMessages: displayChatMessages,
         memos: memos,
         asPage: true,
         onClose: () => changeView('calendar'),
