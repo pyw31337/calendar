@@ -1541,13 +1541,17 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
     const defaultP = participantOptions[0] || '참여자';
     return [{ id: `pr_0_${Date.now()}`, participantId: defaultP, amount: 0 }];
   });
-  const [participantToAdd, setParticipantToAdd] = React.useState(() => participantOptions[1] || participantOptions[0] || '');
+  const [participantToAdd, setParticipantToAdd] = React.useState('');
   const availableParticipantPickerOptions = React.useMemo(() => {
     const selected = new Set(participantRows.map(row => row?.participantId).filter(Boolean));
     return participantPickerOptions.filter(option => !selected.has(option.value));
   }, [participantPickerOptions, participantRows]);
+  const participantPickerOptionsWithSelectionState = React.useMemo(() => {
+    const selected = new Set(participantRows.map(row => row?.participantId).filter(Boolean));
+    return participantPickerOptions.map(option => ({ ...option, disabled: selected.has(option.value) }));
+  }, [participantPickerOptions, participantRows]);
   React.useEffect(() => {
-    if (!availableParticipantPickerOptions.some(option => option.value === participantToAdd)) {
+    if (participantToAdd && !availableParticipantPickerOptions.some(option => option.value === participantToAdd)) {
       setParticipantToAdd(availableParticipantPickerOptions[0]?.value || '');
     }
   }, [availableParticipantPickerOptions, participantToAdd]);
@@ -1691,6 +1695,12 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
     return totals;
   }, [personalExpenses]);
 
+  const hasSharedExpenses = Object.keys(checkedItems || {}).length > 0;
+  const getIndividualSettlementAmount = (participantId) => {
+    if (!hasSharedExpenses) return 0;
+    return settlementPerPerson - (personalExpenseTotals.get(participantId) || 0);
+  };
+
   const handleAccountNumberChange = (e) => {
     const val = e.target.value;
     const formatted = formatBankAccountNumber(bankName, val);
@@ -1720,8 +1730,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
       ...prev,
       { id: `pr_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`, participantId: defaultP }
     ]);
-    const nextOption = availableParticipantPickerOptions.find(option => option.value !== defaultP);
-    setParticipantToAdd(nextOption?.value || '');
+    setParticipantToAdd('');
   };
 
   const handleRemoveParticipantRow = (rowId) => {
@@ -1883,7 +1892,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
       activeTab === 'general' && React.createElement('div', {
         style: { display: 'flex', flexDirection: 'column', gap: '14px' }
       },
-      React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '4px' } },
+      React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px' } },
         React.createElement('label', { style: { fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-main)' } }, '타이틀 입력'),
         React.createElement('input', {
           type: 'text', className: 'form-input', value: title,
@@ -1903,22 +1912,28 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
             borderRadius: '8px', backgroundColor: 'var(--bg-card)'
           }
         },
-          React.createElement('span', { style: { fontSize: '0.84rem', fontWeight: 800, color: 'var(--text-main)' } }, row.participantId || '참여자'),
-          React.createElement('button', {
-            type: 'button', className: 'btn btn-secondary', title: '참여자 삭제',
-            onClick: () => handleRemoveParticipantRow(row.id),
-            style: {
-              width: '32px', height: '32px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              borderRadius: '8px', color: '#EF4444', backgroundColor: '#FEF2F2', border: '1px solid #FCA5A5', flexShrink: 0
-            }
-          }, React.createElement(TrashIcon, { size: 16, style: { stroke: '#EF4444' } }))
+          ParticipantBackdrop ? React.createElement(ParticipantBackdrop, {
+            participant: participantPickerOptions.find(option => option.value === row.participantId) || { name: row.participantId, color: '#3B82F6' },
+            name: row.participantId || '참여자', dotSize: 9, style: { fontSize: '0.82rem' }
+          }) : React.createElement('span', { style: { fontSize: '0.84rem', fontWeight: 800, color: 'var(--text-main)' } }, row.participantId || '참여자'),
+          React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 } },
+            React.createElement('span', { style: { fontSize: '0.82rem', color: 'var(--text-main)', whiteSpace: 'nowrap' } }, `${getIndividualSettlementAmount(row.participantId).toLocaleString()} 원`),
+            React.createElement('button', {
+              type: 'button', className: 'btn btn-secondary', title: '참여자 삭제',
+              onClick: () => handleRemoveParticipantRow(row.id),
+              style: {
+                width: '28px', height: '28px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                borderRadius: '7px', color: '#64748B', backgroundColor: 'transparent', border: 'none', flexShrink: 0
+              }
+            }, React.createElement(TrashIcon, { size: 15, style: { stroke: '#64748B' } }))
+          )
         ))),
         React.createElement('div', { style: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 64px', gap: '8px', alignItems: 'center' } },
           SimpleBottomSheetPicker ? React.createElement(SimpleBottomSheetPicker, {
             title: "참여자 선택",
-            placeholder: "참여자 선택",
+            placeholder: "참여할 이름을 골라주세요",
             value: participantToAdd,
-            options: availableParticipantPickerOptions,
+            options: participantPickerOptionsWithSelectionState,
             onSelect: setParticipantToAdd,
             disabled: availableParticipantPickerOptions.length === 0,
             style: { width: '100%', height: '44px', borderRadius: '8px', fontSize: '0.84rem' }
@@ -1926,7 +1941,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
             className: 'form-select', value: participantToAdd, disabled: availableParticipantPickerOptions.length === 0,
             onChange: e => setParticipantToAdd(e.target.value),
             style: { width: '100%', height: '44px', borderRadius: '8px', fontSize: '0.84rem' }
-          }, availableParticipantPickerOptions.map(option => React.createElement('option', { key: option.value, value: option.value }, option.label))),
+          }, [React.createElement('option', { key: '__placeholder', value: '' }, '참여할 이름을 골라주세요'), ...availableParticipantPickerOptions.map(option => React.createElement('option', { key: option.value, value: option.value }, option.label))]),
           React.createElement('button', {
             type: 'button', className: 'btn btn-secondary', onClick: handleAddParticipantRow,
             disabled: availableParticipantPickerOptions.length === 0,
@@ -2067,7 +2082,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
           },
             personalParticipantPickerOptions.map(option => {
               const total = personalExpenseTotals.get(option.value) || 0;
-              const individualSettlement = settlementPerPerson - total;
+              const individualSettlement = getIndividualSettlementAmount(option.value);
               const participant = activeParticipants.find(p => (typeof p === 'string' ? p : (p?.name || p?.id)) === option.value) || { name: option.value, color: option.color };
               return React.createElement('div', {
                 key: option.value,

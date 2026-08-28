@@ -856,8 +856,11 @@ export function SimpleBottomSheetPicker({ title, value, options, onSelect, place
         key: opt.value,
         type: "button",
         className: "bottom-sheet-item",
-        onClick: () => { onSelect(opt.value); setIsOpen(false); }
-      }, opt.color ? /*#__PURE__*/React.createElement(ParticipantBackdrop, { participant: opt, name: opt.label }) : opt.label))
+        disabled: !!opt.disabled,
+        onClick: () => { if (!opt.disabled) { onSelect(opt.value); setIsOpen(false); } },
+        style: opt.disabled ? { opacity: 0.45, cursor: 'not-allowed' } : undefined
+      }, opt.color ? /*#__PURE__*/React.createElement(ParticipantBackdrop, { participant: opt, name: opt.label }) : opt.label,
+        opt.disabled ? /*#__PURE__*/React.createElement("span", { style: { marginLeft: 'auto', fontSize: '0.72rem', color: '#94A3B8' } }, "추가됨") : null))
     )
   ));
   return /*#__PURE__*/React.createElement(React.Fragment, null,
