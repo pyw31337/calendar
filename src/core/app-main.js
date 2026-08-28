@@ -3550,7 +3550,7 @@ function CalendarApp() {
     ...meeting,
     photos: Array.isArray(meeting.photos) ? meeting.photos.map(photo => ({ ...photo })) : []
   }));
-  const commitConfirmedMeetings = (nextConfirmedMeetings, toastMessage = null, activityLogs = [], warnLabel = 'write', toastType = 'success') => {
+  const commitConfirmedMeetings = async (nextConfirmedMeetings, toastMessage = null, activityLogs = [], warnLabel = 'write', toastType = 'success') => {
     const updatedCal = {
       ...activeCal,
       confirmedMeeting: nextConfirmedMeetings,
@@ -3559,9 +3559,16 @@ function CalendarApp() {
       activityLogs: activityLogs.length > 0 ? [...getCalendarActivityLogs(activeCal), ...activityLogs] : getCalendarActivityLogs(activeCal)
     };
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
+    const calendarSaved = await updateCalendars(nextCalendars, toastMessage, toastType, updatedCal.id, 'settings', activityLogs);
+    if (!calendarSaved) return false;
+    const subcollectionSaved = await writeConfirmedMeetingsToFirestore(activeCal.id, nextConfirmedMeetings);
+    if (!subcollectionSaved) {
+      console.warn(`Subcollection confirmedMeetings ${warnLabel} failed after calendar save.`);
+      showToast('일정 데이터 동기화 실패. 다시 시도해 주세요.', 'error', 6000);
+      return false;
+    }
     setConfirmedMeetingsSubcollection(nextConfirmedMeetings);
-    writeConfirmedMeetingsToFirestore(activeCal.id, nextConfirmedMeetings).catch(err => console.warn(`Subcollection confirmedMeetings ${warnLabel} failed:`, err));
-    return updateCalendars(nextCalendars, toastMessage, toastType, updatedCal.id, 'settings', activityLogs);
+    return true;
   };
   const handleConfirmMeeting = (dateStr, note) => {
     if (!activeCal || !isValidDateString(dateStr)) return false;
