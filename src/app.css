@@ -2881,6 +2881,8 @@ select.form-select {
   background: rgba(239, 246, 255, 0.92);
 }
 .settlement-expense-checkbox {
+  grid-row: 1 / -1;
+  align-self: center;
   width: 16px;
   height: 16px;
   cursor: pointer;
@@ -4843,9 +4845,6 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
   .settlement-participant-grid > .btn,
   .settlement-participant-grid > button {
     width: 100% !important;
-  }
-  .settlement-metric-grid {
-    grid-template-columns: 1fr !important;
   }
   .settlement-page-body > .settlement-metric-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
