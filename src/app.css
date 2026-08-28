@@ -4845,6 +4845,9 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
   .settlement-metric-grid {
     grid-template-columns: 1fr !important;
   }
+  .settlement-page-body > .settlement-metric-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
   .date-modal-field-with-actions {
     flex-direction: column !important;
     align-items: stretch !important;

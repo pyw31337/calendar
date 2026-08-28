@@ -2304,6 +2304,12 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
     }
   };
 
+  const handleCopySettlementBankInfo = async (bankInfoText) => {
+    if (!bankInfoText) return;
+    const copied = await copyTextToClipboard(bankInfoText);
+    if (showToast) showToast(copied ? '계좌번호가 클립보드에 복사되었습니다.' : '계좌번호 복사에 실패했습니다.', copied ? 'success' : 'error');
+  };
+
   const { isHeaderVisible, onScroll: handleSettlementScroll } = useScrollHideHeader();
   const [activeTab, setActiveTab] = React.useState('total');
   const [openMenuCardId, setOpenMenuCardId] = React.useState(null);
@@ -2811,7 +2817,15 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
               /* Right End: Account Info Text + Cog Settings Button */
               React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px', marginLeft: 'auto', position: 'relative' } },
                 bankInfoText && React.createElement("span", {
-                  style: { fontSize: '0.78rem', color: 'var(--settlement-hero-muted)', fontWeight: 600 }
+                  role: 'button', tabIndex: 0, title: '계좌정보 복사', 'aria-label': '계좌정보 복사',
+                  onClick: () => handleCopySettlementBankInfo(bankInfoText),
+                  onKeyDown: e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleCopySettlementBankInfo(bankInfoText); } },
+                  style: {
+                    display: 'inline-flex', alignItems: 'center', maxWidth: '100%', padding: '2px 8px',
+                    margin: '0 4px', borderRadius: '10px', backgroundColor: '#666', mixBlendMode: 'hard-light',
+                    fontSize: '0.78rem', color: 'var(--settlement-hero-text)', fontWeight: 700,
+                    cursor: 'pointer', userSelect: 'none'
+                  }
                 }, bankInfoText),
                 
                 /* Cog Settings Button */
