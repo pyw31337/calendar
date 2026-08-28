@@ -819,6 +819,10 @@ function CalendarApp() {
         return false;
       }
 
+      if (saved.auxiliaryPersistenceFailed) {
+        showToast('저장은 완료되었지만 일부 보조 데이터 동기화가 지연되고 있습니다.', 'info', 6000);
+      }
+
       serverRevisionRef.current = updateMetaLastModified(serverRevisionRef.current, currentCal.id, now);
       // saved.revision is the doc-level revision Firestore actually committed -- record that, not
       // currentCal.revision (the nested calendar.revision field, bumped client-side per edit and
@@ -2084,11 +2088,10 @@ function CalendarApp() {
     let isMounted = true;
 
     // Instant REST fetch on boot guarantees zero-lag server truth across all devices and browsers
-    fetchConfirmedMeetingsFromFirestore(activeCalId).then(list => {
-      if (isMounted && Array.isArray(list) && list.length > 0) {
-        setConfirmedMeetingsSubcollection(list);
-      }
+    const refreshConfirmedMeetings = () => fetchConfirmedMeetingsFromFirestore(activeCalId).then(list => {
+      if (isMounted && Array.isArray(list)) setConfirmedMeetingsSubcollection(list);
     }).catch(() => {});
+    refreshConfirmedMeetings();
 
     fetchPlacesFromFirestore(activeCalId).then(list => {
       if (isMounted && Array.isArray(list) && list.length > 0) {
@@ -2096,7 +2099,13 @@ function CalendarApp() {
       }
     }).catch(() => {});
 
-    if (!firebaseDb) return undefined;
+    // REST is a request/response fallback, not a realtime transport. Poll only when the SDK
+    // channel is unavailable so an open popup still sees another device's completed meeting
+    // photo upload without requiring a manual refresh.
+    if (!firebaseDb) {
+      const refreshTimer = setInterval(refreshConfirmedMeetings, 6000);
+      return () => { isMounted = false; clearInterval(refreshTimer); };
+    }
 
     const unsubPlaces = subscribePlaces(activeCalId, snapshot => {
         if (!isMounted) return;

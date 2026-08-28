@@ -1275,10 +1275,22 @@ export function DateModal({
     if (!targetTag || typeof onFetchDateTaggedMessages !== 'function' || fetchedDateTagRef.current === targetTag) return;
     fetchedDateTagRef.current = targetTag;
     let cancelled = false;
-    Promise.resolve(onFetchDateTaggedMessages(targetTag)).then(messages => {
-      if (!cancelled && Array.isArray(messages)) setFetchedTaggedMessages(messages);
-    }).catch(err => console.warn('date-tagged meeting photo fetch failed:', err));
-    return () => { cancelled = true; };
+    let refreshInFlight = false;
+    const refresh = () => {
+      if (cancelled || refreshInFlight) return;
+      refreshInFlight = true;
+      Promise.resolve(onFetchDateTaggedMessages(targetTag)).then(messages => {
+        if (!cancelled && Array.isArray(messages)) setFetchedTaggedMessages(messages);
+      }).catch(err => console.warn('date-tagged meeting photo fetch failed:', err))
+        .finally(() => { refreshInFlight = false; });
+    };
+    refresh();
+    // A browser without the Firestore SDK has no onSnapshot channel. Keep an open date modal
+    // fresh by rechecking only this date's tagged messages; this is bounded to the modal lifetime
+    // and stops immediately on close, so another device's completed upload appears without a
+    // manual refresh while normal SDK clients still get their push update instantly.
+    const refreshTimer = setInterval(refresh, 6000);
+    return () => { cancelled = true; clearInterval(refreshTimer); };
   }, [dateStr, dateStrToHashtag, onFetchDateTaggedMessages]);
   React.useEffect(() => {
     if (typeof onFetchMeetingPhotoIndex !== 'function' || !dateStr) return;
