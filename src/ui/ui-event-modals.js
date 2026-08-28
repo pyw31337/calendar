@@ -600,6 +600,24 @@ function useLinkPreview(url, cachedData) {
   }, [url, cachedData]);
   return state;
 }
+function useScrollHideHeader() {
+  const React = window.React;
+  const [isHeaderVisible, setIsHeaderVisible] = React.useState(true);
+  const lastScrollTopRef = React.useRef(0);
+  const onScroll = React.useCallback((e) => {
+    const scrollTop = e && e.target ? e.target.scrollTop : 0;
+    const lastScrollTop = lastScrollTopRef.current;
+    if (scrollTop < 10) {
+      setIsHeaderVisible(true);
+    } else if (scrollTop > lastScrollTop && scrollTop > 56) {
+      setIsHeaderVisible(false);
+    } else if (scrollTop < lastScrollTop) {
+      setIsHeaderVisible(true);
+    }
+    lastScrollTopRef.current = scrollTop;
+  }, []);
+  return { isHeaderVisible, onScroll };
+}
 function buildPlaceMarkerHtml(...args) {
   const f = __gatherUiDeps().buildPlaceMarkerHtml || GATHER_APP_UTILS.buildPlaceMarkerHtml;
   return typeof f === 'function' ? f(...args) : undefined;
