@@ -1677,16 +1677,22 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
     }
   }, [monthlyExpenses, cardToEdit]);
 
-  const formatCommaNumber = (val) => {
+  // Personal expenses are signed adjustments: negative values reduce the
+  // participant's settlement and positive values increase it. New entries
+  // default to a negative sign when the user enters digits without one.
+  const formatSignedCommaNumber = (val) => {
     if (val === null || val === undefined || val === '') return '';
-    const digits = String(val).replace(/[^0-9]/g, '');
-    return digits ? Number(digits).toLocaleString() : '';
+    const raw = String(val).trim();
+    const sign = raw.startsWith('+') ? '+' : '-';
+    const digits = raw.replace(/[^0-9]/g, '');
+    return digits ? `${sign}${Number(digits).toLocaleString()}` : sign;
   };
 
-  const parseCommaNumber = (val) => {
-    if (!val) return 0;
-    const digits = String(val).replace(/[^0-9]/g, '');
-    return digits ? Number(digits) : 0;
+  const parseSignedCommaNumber = (val) => {
+    const raw = String(val || '').trim();
+    const digits = raw.replace(/[^0-9]/g, '');
+    if (!digits) return 0;
+    return (raw.startsWith('+') ? 1 : -1) * Number(digits);
   };
 
   const formatShortDateWithDay = (dateStr) => {
@@ -1713,7 +1719,13 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
     const totals = new Map();
     personalExpenses.forEach(item => {
       const participantId = item?.participantId || '참여자';
-      totals.set(participantId, (totals.get(participantId) || 0) + (Number(item?.amount) || 0));
+      // Older records stored a positive number for a negative personal
+      // expense. Keep those records compatible while new records use signed
+      // amounts explicitly.
+      const amount = item?.signedAmount
+        ? (Number(item.amount) || 0)
+        : -Math.abs(Number(item?.amount) || 0);
+      totals.set(participantId, (totals.get(participantId) || 0) + amount);
     });
     return totals;
   }, [personalExpenses]);
@@ -1721,7 +1733,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
   const hasSharedExpenses = Object.keys(checkedItems || {}).length > 0;
   const getIndividualSettlementAmount = (participantId) => {
     if (!hasSharedExpenses) return 0;
-    return settlementPerPerson - (personalExpenseTotals.get(participantId) || 0);
+    return settlementPerPerson + (personalExpenseTotals.get(participantId) || 0);
   };
 
   const handleAccountNumberChange = (e) => {
@@ -1795,7 +1807,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
   };
 
   const handleSaveOrUpdatePersonalExpense = () => {
-    const amt = parseCommaNumber(peAmountInput);
+    const amt = parseSignedCommaNumber(peAmountInput);
     const desc = peDescriptionInput.trim();
     if (!amt && !desc) {
       if (showToast) showToast('금액 또는 지출 명목을 입력해주세요.', 'warning');
@@ -1806,6 +1818,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
         ...item,
         participantId: peParticipantId,
         amount: amt,
+        signedAmount: true,
         description: desc
       } : item));
       if (showToast) showToast('개인 지출이 수정되었습니다.', 'success');
@@ -1816,6 +1829,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
           id: `pe_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
           participantId: peParticipantId,
           amount: amt,
+          signedAmount: true,
           description: desc
         }
       ]);
@@ -1829,7 +1843,9 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
   const handleSelectPersonalExpenseItem = (item) => {
     setEditingPeId(item.id);
     setPeParticipantId(item.participantId || participantOptions[0] || '참여자');
-    setPeAmountInput(formatCommaNumber(item.amount || 0));
+    setPeAmountInput(item?.signedAmount
+      ? formatSignedCommaNumber(item.amount || 0)
+      : formatSignedCommaNumber(-(Math.abs(Number(item.amount) || 0))));
     setPeDescriptionInput(item.description || '');
   };
 
@@ -2127,7 +2143,10 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
                   className: `settlement-expense-option${isChecked ? ' is-checked' : ''}`
                 },
                   React.createElement('input', {
-                    type: 'checkbox', checked: isChecked, onChange: () => toggleCheckItem(item),
+                    type: 'checkbox', checked: isChecked,
+                    onClick: e => e.stopPropagation(),
+                    onChange: e => { e.stopPropagation(); toggleCheckItem(item); },
+                    'aria-label': `${formatShortDateWithDay(item.date)} ${item.label || '지출 내역'} 선택`,
                     className: 'settlement-expense-checkbox'
                   }),
                   React.createElement('span', { className: 'settlement-expense-option-copy' },
@@ -2148,7 +2167,10 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
           React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
             React.createElement('label', { style: { ...settlementSectionLabelStyle, marginBottom: 0 } }, '개인 지출 등록'),
             React.createElement('span', { style: { fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)' } },
-              `합계: ${(personalExpenses.reduce((s, x) => s + (Number(x.amount) || 0), 0)).toLocaleString()}원`
+              `합계: ${Math.abs(personalExpenses.reduce((s, x) => {
+                const amount = x?.signedAmount ? (Number(x.amount) || 0) : -Math.abs(Number(x?.amount) || 0);
+                return s + amount;
+              }, 0)).toLocaleString()}원`
             )
           ),
 
@@ -2167,7 +2189,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
                 }
               },
                 ParticipantBackdrop ? React.createElement(ParticipantBackdrop, { participant, name: option.value, dotSize: 9, style: { fontSize: '0.72rem', flex: '0 1 auto', minWidth: 0 } }) : React.createElement('span', { style: { color: option.color, fontWeight: 800, fontSize: '0.72rem' } }, `● ${option.value}`),
-                React.createElement('strong', { style: { color: '#2563EB', fontSize: '0.78rem', whiteSpace: 'nowrap' } }, `${total.toLocaleString()}원`)
+                React.createElement('strong', { style: { color: '#2563EB', fontSize: '0.78rem', whiteSpace: 'nowrap' } }, `${Math.abs(total).toLocaleString()}원`)
               );
             })
           ),
@@ -2199,10 +2221,10 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
           React.createElement('div', { style: { display: 'flex', gap: '8px', alignItems: 'center', width: '100%' } },
             React.createElement('input', {
               type: 'text',
-              inputMode: 'numeric',
+              inputMode: 'tel',
               className: 'form-input',
               value: peAmountInput,
-              onChange: e => setPeAmountInput(formatCommaNumber(e.target.value)),
+              onChange: e => setPeAmountInput(formatSignedCommaNumber(e.target.value)),
               placeholder: '금액 입력 (원)',
               style: { flex: 1, minWidth: 0, width: '100%', height: '44px', borderRadius: '8px', fontSize: '0.84rem', color: '#0F172A', fontWeight: 400 }
             }),
@@ -2258,7 +2280,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
                   )
                 ),
                 item.description ? React.createElement('div', { style: { color: 'var(--text-main)', fontWeight: 700, fontSize: '0.8rem', overflowWrap: 'anywhere' } }, item.description) : null,
-                React.createElement('strong', { style: { alignSelf: 'flex-start', color: '#DC2626', fontWeight: 800, fontSize: '0.86rem', marginTop: '1px' } }, `-${(Number(item.amount) || 0).toLocaleString()}원`)
+                React.createElement('strong', { style: { alignSelf: 'flex-start', color: item?.signedAmount && Number(item.amount) > 0 ? '#16A34A' : '#DC2626', fontWeight: 800, fontSize: '0.86rem', marginTop: '1px' } }, `${item?.signedAmount && Number(item.amount) > 0 ? '+' : '-'}${Math.abs(Number(item.amount) || 0).toLocaleString()}원`)
               );
             })
           )
