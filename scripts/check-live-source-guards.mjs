@@ -80,6 +80,8 @@ if (!mainEntry.includes('window.__gatherStartApp()')) {
 }
 
 const appMain = readFileSync(join(ROOT, 'src/core/app-main.js'), 'utf8');
+const firebaseServices = readFileSync(join(ROOT, 'src/core/firebase-services.js'), 'utf8');
+const firebaseData = readFileSync(join(ROOT, 'src/core/app-firebase-data.js'), 'utf8');
 // app-main.js was split into these two in a later refactor (each has its own manualChunks entry
 // in vite.config.js), so which file a given piece of core logic lives in has shifted and can
 // shift again -- appMainAndData covers the whole split for "must contain" checks below.
@@ -145,7 +147,6 @@ if (/BACKGROUND_NETWORK_PAUSE_MS|networkPausedForBackground|Firestore background
   fail('app-main must not disable Firestore while a browser tab is hidden; it can make resumed tabs look empty.');
 }
 
-const firebaseData = readFileSync(join(ROOT, 'src/core/app-firebase-data.js'), 'utf8');
 const localCacheLoader = firebaseData.match(/function loadLocalCache\(\)\s*\{([\s\S]*?)\n\}/);
 const localCacheSaver = firebaseData.match(/function saveLocalCache\(list\)\s*\{([\s\S]*?)\n\}/);
 if (!localCacheLoader || !/return \[\];/.test(localCacheLoader[1])) {
@@ -156,6 +157,17 @@ if (!localCacheSaver || !/Intentionally no-op/.test(localCacheSaver[1])) {
 }
 if (!/if \(isDocument\) \{[\s\S]{0,180}fetch\(req, \{ cache: 'no-store' \}\)/.test(serviceWorker)) {
   fail('service worker document navigations must bypass browser HTTP cache.');
+}
+if (!/function invalidateGalleryItemCount\(calId\)/.test(firebaseServices)
+  || !/invalidateGalleryItemCount: invalidateGalleryItemCount/.test(firebaseServices)) {
+  fail('gallery count cache invalidation must remain available from Firebase services.');
+}
+if (!/function invalidateGalleryItemCount\(calId\)/.test(firebaseData)
+  || !/invalidateGalleryItemCount,/.test(firebaseData)) {
+  fail('gallery count cache invalidation must remain bridged to app-main.');
+}
+if ((appMain.match(/invalidateGalleryItemCount\(activeCalId\)/g) || []).length < 3) {
+  fail('gallery count cache must be invalidated for realtime, add, and delete message paths.');
 }
 
 for (const manifestFile of ['manifest.json', 'manifest-kkot.json', 'manifest-cw.json', 'manifest-jhair.json']) {
