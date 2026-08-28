@@ -2166,6 +2166,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
   const WeatherBadge = __comp.WeatherBadge || __deps.WeatherBadge || (function () { return null; });
   const CreateSettlementModalComp = __comp.CreateSettlementModal || CreateSettlementModal;
   const [isSettlementMenuOpen, setIsSettlementMenuOpen] = React.useState(false);
+  const [isSettlementListOpen, setIsSettlementListOpen] = React.useState(false);
   const [isCreateSettlementOpen, setIsCreateSettlementOpen] = React.useState(false);
   const [editingSettlementCard, setEditingSettlementCard] = React.useState(null);
   const sanitizeText = __deps.sanitizeText;
@@ -2272,6 +2273,32 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
   const allTimeItems = allTimeRows.flatMap(row => row.items.map(item => ({ ...item, date: row.meeting.date, meetingNote: row.meeting.note || '' })));
   const allTimeIncome = baseBudget + allTimeItems.filter(item => item.isIncome).reduce((sum, item) => sum + Math.abs(item.amount), 0);
   const allTimeExpense = allTimeItems.filter(item => !item.isIncome).reduce((sum, item) => sum + Math.abs(item.amount), 0);
+  const settlementParticipants = getActiveParticipants(calendar);
+  const getCalendarSettlementCards = __deps.getCalendarSettlementCards || (c => Array.isArray(c?.settlementCards) ? c.settlementCards : []);
+  const customSettlementCards = getCalendarSettlementCards(calendar);
+  const allSettlementCards = customSettlementCards.length > 0 ? customSettlementCards : [{
+    id: 'default_settlement_card',
+    title: '1/N 간편 송금',
+    status: 'active',
+    participantCount: Math.max(1, settlementParticipants.length),
+    perPersonAmount: Math.round(allTimeExpense / Math.max(1, settlementParticipants.length)),
+    amount: allTimeExpense,
+    bankName: '토스뱅크',
+    depositorName: '',
+    accountNumber: ''
+  }];
+  const getSettlementCardTime = card => {
+    const value = card?.updatedAt || card?.createdAt || 0;
+    const numeric = Number(value);
+    return Number.isFinite(numeric) && numeric > 0 ? numeric : (Date.parse(value) || 0);
+  };
+  const sortedSettlementCards = allSettlementCards.slice().sort((a, b) => {
+    const aClosed = a?.status === 'closed';
+    const bClosed = b?.status === 'closed';
+    if (aClosed !== bClosed) return aClosed ? 1 : -1;
+    return getSettlementCardTime(b) - getSettlementCardTime(a);
+  });
+  const visibleSettlementCards = sortedSettlementCards.filter(card => card?.status !== 'closed');
   const overallBalance = allTimeIncome - allTimeExpense;
 
   const targetPrefix = `${year}-${String(month + 1).padStart(2, '0')}-`;
@@ -2604,28 +2631,10 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
   },
     /* 1. Settlement Cards (Positioned ABOVE metrics grid) */
     (() => {
-      const getActiveParticipants = __deps.getActiveParticipants || (c => Array.isArray(c?.participants) ? c.participants.filter(p => !p.deletedAt && !p.removedAt) : []);
-      const getCalendarSettlementCards = __deps.getCalendarSettlementCards || (c => Array.isArray(c?.settlementCards) ? c.settlementCards : []);
-      const activeParticipants = getActiveParticipants(calendar);
+      const activeParticipants = settlementParticipants;
       const participantCount = Math.max(1, activeParticipants.length);
       const perPersonExpense = Math.round(allTimeExpense / participantCount);
-
-      const customCards = getCalendarSettlementCards(calendar);
-
-      // If no custom cards exist yet, generate a default overall 1/N card
-      const displayCards = customCards.length > 0 ? customCards : [
-        {
-          id: 'default_settlement_card',
-          title: '1/N 간편 송금',
-          status: 'active',
-          participantCount: participantCount,
-          perPersonAmount: perPersonExpense,
-          amount: displayExpense,
-          bankName: '토스뱅크',
-          depositorName: '',
-          accountNumber: ''
-        }
-      ];
+      const displayCards = visibleSettlementCards;
 
       return React.createElement("div", {
         style: { display: 'flex', flexDirection: 'column', gap: '10px' }
@@ -3058,6 +3067,20 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
         React.createElement("span", { className: "admin-side-menu-item-copy" },
           React.createElement("span", { className: "admin-side-menu-item-title" }, "정산 카드")
         )
+      ),
+      /* 3. 정산 목록 */
+      React.createElement("button", {
+        type: "button",
+        className: "admin-side-menu-item",
+        onClick: () => { setIsSettlementMenuOpen(false); setIsSettlementListOpen(true); }
+      },
+        React.createElement("span", { className: "admin-side-menu-item-icon" }, React.createElement("svg", {
+          xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24",
+          fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
+        }, React.createElement("rect", { x: "4", y: "4", width: "16", height: "16", rx: "2" }), React.createElement("line", { x1: "8", y1: "9", x2: "16", y2: "9" }), React.createElement("line", { x1: "8", y1: "13", x2: "16", y2: "13" }), React.createElement("line", { x1: "8", y1: "17", x2: "13", y2: "17" }))),
+        React.createElement("span", { className: "admin-side-menu-item-copy" },
+          React.createElement("span", { className: "admin-side-menu-item-title" }, "정산 목록")
+        )
       )
     ),
     typeof SharedAppNavBlock === 'function' && /*#__PURE__*/React.createElement(SharedAppNavBlock, {
@@ -3082,6 +3105,55 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
       onOpenSettings: onOpenAppSettings,
       shareLabel: '공유'
     })
+  ))),
+
+  /* Settlement list Layer Popup */
+  (isSettlementListOpen && canUseSettlement && React.createElement("div", {
+    className: "modal-overlay",
+    onClick: () => setIsSettlementListOpen(false),
+    style: { zIndex: 12000 }
+  }, React.createElement(ResizableModalContainer, {
+    className: "modal-container",
+    onClick: e => e.stopPropagation(),
+    style: { maxWidth: '520px', width: '92%', maxHeight: '82vh', display: 'flex', flexDirection: 'column' }
+  },
+    React.createElement("div", {
+      className: "modal-header",
+      style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: '1px solid var(--border-subtle)' }
+    },
+      React.createElement("h3", { style: { margin: 0, fontSize: '1.02rem', fontWeight: 900, color: 'var(--text-main)' } }, "정산 목록"),
+      React.createElement("button", { type: "button", onClick: () => setIsSettlementListOpen(false), style: { background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '1.2rem' } }, "✕")
+    ),
+    React.createElement("div", {
+      className: "modal-body",
+      style: { overflowY: 'auto', padding: '14px', display: 'flex', flexDirection: 'column', gap: '10px' }
+    },
+      sortedSettlementCards.map(card => {
+        const isClosed = card?.status === 'closed';
+        const cardTime = getSettlementCardTime(card);
+        const participantNames = Array.isArray(card?.participantRows) && card.participantRows.length > 0
+          ? card.participantRows.map(row => row.participantId).filter(Boolean)
+          : (Array.isArray(card?.participants) ? card.participants : []);
+        return React.createElement("button", {
+          key: card.id,
+          type: "button",
+          onClick: () => { setIsSettlementListOpen(false); setEditingSettlementCard(card); },
+          style: {
+            display: 'flex', flexDirection: 'column', gap: '7px', width: '100%', padding: '12px 14px', textAlign: 'left',
+            border: '1px solid var(--border-subtle)', borderRadius: '10px', backgroundColor: 'var(--bg-card)', cursor: 'pointer', opacity: isClosed ? 0.72 : 1
+          }
+        },
+          React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' } },
+            React.createElement("strong", { style: { color: 'var(--text-main)', fontSize: '0.88rem' } }, card.title || '1/N 간편 송금'),
+            React.createElement("span", { style: { color: isClosed ? 'var(--text-muted)' : '#16A34A', fontSize: '0.7rem', fontWeight: 800 } }, isClosed ? '마감됨' : '진행중')
+          ),
+          React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', color: 'var(--text-muted)', fontSize: '0.74rem' } },
+            React.createElement("span", null, participantNames.length > 0 ? `${participantNames.length}명 참여` : '참여자 없음'),
+            React.createElement("span", null, cardTime ? new Date(cardTime).toLocaleDateString('ko-KR') : '날짜 없음')
+          )
+        );
+      })
+    )
   ))),
 
   /* Create Settlement Layer Popup */
