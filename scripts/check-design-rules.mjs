@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const css = readFileSync(resolve(root, 'src/app.css'), 'utf8');
 const shareModal = readFileSync(resolve(root, 'src/ui/ui-share-modal.js'), 'utf8');
+const places = readFileSync(resolve(root, 'src/ui/ui-places.js'), 'utf8');
 const main = readFileSync(resolve(root, 'src/core/app-main.js'), 'utf8');
 const utils = readFileSync(resolve(root, 'src/core/app-utils.js'), 'utf8');
 
@@ -27,6 +28,10 @@ if (!/font-size:\s*(0\.88rem|1rem|16px)/.test(css)) {
 if (!shareModal.includes('URL 복사하기')) fail('ShareModal missing copy button label');
 if (!shareModal.includes('createDataURL')) fail('ShareModal missing QR createDataURL');
 else ok('ShareModal has copy + QR structure');
+
+if (places.includes('장소 페이지 URL 복사') || places.includes('"공유하기"')) {
+  fail('Places side menu must not expose the removed 공유하기 item');
+} else ok('Places side menu does not expose the removed 공유하기 item');
 
 if (!utils.includes('share/')) fail('utils missing /share/ path helpers');
 else ok('share path helpers in utils');

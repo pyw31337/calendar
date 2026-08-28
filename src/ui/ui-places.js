@@ -2271,21 +2271,6 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
             /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "새 장소 추가하기")
           )
         ),
-        typeof onSharePlaces === 'function' && /*#__PURE__*/React.createElement("button", {
-          type: "button", className: "admin-side-menu-item",
-          onClick: () => {
-            setIsPlacesMenuOpen(false);
-            if (typeof onSharePlaces === 'function') onSharePlaces();
-          }
-        },
-          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", {
-            xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
-          }, /*#__PURE__*/React.createElement("path", { d: "M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" }), /*#__PURE__*/React.createElement("polyline", { points: "16 6 12 2 8 6" }), /*#__PURE__*/React.createElement("line", { x1: "12", x2: "12", y1: "2", y2: "15" }))),
-          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
-            /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "공유하기"),
-            /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "장소 페이지 URL 복사")
-          )
-        )
       ),
       typeof SharedAppNavBlock === 'function' && /*#__PURE__*/React.createElement(SharedAppNavBlock, {
         onClose: () => setIsPlacesMenuOpen(false),
