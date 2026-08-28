@@ -26,9 +26,42 @@ function getCalendarPlaces(calendar) {
   const f = __gatherUiDeps().getCalendarPlaces || GATHER_APP_UTILS.getCalendarPlaces;
   return typeof f === 'function' ? f(calendar) : [];
 }
-function useChatSendGuard(onSend, canSend) {
-  const f = __gatherUiDeps().useChatSendGuard;
-  return typeof f === 'function' ? f(onSend, canSend) : onSend;
+function useChatSendGuard(onSend, canSend = true) {
+  const React = window.React;
+  const [isSending, setIsSending] = React.useState(false);
+  const isMountedRef = React.useRef(true);
+
+  React.useEffect(() => {
+    isMountedRef.current = true;
+    return () => { isMountedRef.current = false; };
+  }, []);
+
+  const triggerSend = React.useCallback((...args) => {
+    if (isSending || canSend === false) return false;
+    if (typeof onSend !== 'function') return false;
+    setIsSending(true);
+    let result;
+    try {
+      result = onSend(...args);
+    } catch (err) {
+      if (isMountedRef.current) setIsSending(false);
+      throw err;
+    }
+    if (result && typeof result.then === 'function') {
+      return result.then(res => {
+        if (isMountedRef.current) setIsSending(false);
+        return res;
+      }).catch(err => {
+        if (isMountedRef.current) setIsSending(false);
+        throw err;
+      });
+    } else {
+      if (isMountedRef.current) setIsSending(false);
+      return result;
+    }
+  }, [onSend, canSend, isSending]);
+
+  return triggerSend;
 }
 function computeKoreanHolidaysForYear(year) {
   const f = __gatherUiDeps().computeKoreanHolidaysForYear;
