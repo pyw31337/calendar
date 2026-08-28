@@ -164,10 +164,22 @@ async function boot() {
       import('./ui/ui-chat-room.js'),
       import('./ui/ui-date-modal.js'),
       import('./ui/ui-event-modals.js'),
-      import('./ui/ui-calendar-core.js'),
-      import('./ui/ui-admin-modals.js'),
-      import('./ui/ui-admin-dashboard.js')
+      import('./ui/ui-calendar-core.js')
     ]);
+    // Admin dashboard/modals are only ever reached via a direct ?admin=1 (or &mode=admin) page
+    // load -- there's no in-app link that switches into admin via client-side navigation (see
+    // app-main.js's App(), which reads this once at initial render) -- so a non-admin visitor
+    // never needs this bundle at all. app-main.js's AdminDashboard/AdminModal/etc. wrappers
+    // already read window.GATHER_UI_COMPONENTS lazily at render time and no-op when it's missing
+    // (see docs/module-map.md), so it's safe to only await this import on the admin route itself.
+    const params = new URLSearchParams(window.location.search);
+    const isAdminRoute = params.get('admin') === '1' || params.get('mode') === 'admin';
+    if (isAdminRoute) {
+      await Promise.all([
+        import('./ui/ui-admin-modals.js'),
+        import('./ui/ui-admin-dashboard.js')
+      ]);
+    }
     const root = document.getElementById('root');
     if (root) root.dataset.booted = '1';
     window.__GATHER_BOOT_READY__ = true;

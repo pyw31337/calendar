@@ -18,6 +18,7 @@ booking_checker.log
 screenshots/
 screenshots_test/
 ops-backups/
+*.patch
 *.png
 !history/*.png
 !icons/*.png
