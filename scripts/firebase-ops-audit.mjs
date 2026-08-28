@@ -1,6 +1,7 @@
 const PROJECT_ID = 'metro-live-2918e';
 const DATABASE = '(default)';
-const CALENDARS_URL = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/${DATABASE}/documents/calendars?pageSize=300`;
+const CALENDAR_IDS = (process.env.AUDIT_CALENDAR_IDS || 'kkot,cw,jhair')
+  .split(',').map((value) => value.trim()).filter(Boolean);
 const DOCUMENT_LIMIT_BYTES = 1048576;
 const WARNING_RATIO = 0.75;
 
@@ -29,11 +30,16 @@ function isDeleted(item) {
 }
 
 async function fetchAllCalendarDocs() {
-  const response = await fetch(CALENDARS_URL);
-  if (!response.ok) {
-    throw new Error(`Firestore audit failed: ${response.status} ${await response.text()}`);
+  const documents = [];
+  for (const calendarId of CALENDAR_IDS) {
+    const response = await fetch(`https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/${DATABASE}/documents/calendars/cal_${encodeURIComponent(calendarId)}`);
+    if (response.status === 404) continue;
+    if (!response.ok) {
+      throw new Error(`Firestore audit failed for ${calendarId}: ${response.status} ${await response.text()}`);
+    }
+    documents.push(await response.json());
   }
-  return (await response.json()).documents || [];
+  return documents;
 }
 
 const docs = await fetchAllCalendarDocs();
@@ -89,6 +95,7 @@ if (unexpectedDocs.length > 0) {
 
 console.log(JSON.stringify({
   ok: warnings.length === 0,
+  scope: CALENDAR_IDS,
   production,
   stressDocCount: stressDocs.length,
   stressDocs: stressDocs.map((item) => item.docId),

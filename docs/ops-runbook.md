@@ -1,12 +1,13 @@
 # 운영 런북 (P7)
 
-최종 갱신: 2026-08-21 (Vite Pages 운영 기준)
+최종 갱신: 2026-08-28 (Vite Pages 운영 기준)
 
 ## 1. 배포
 1. 로컬 검증: `npm run check:all`, `npm run safety:test`, `npm run build`
 2. main push → `Deploy Vite Pages` + `Verify Calendar`
 3. 배포 후: `npm run smoke:live`
 4. Firebase Functions 변경이 포함된 경우 GitHub Pages 배포와 별도로 functions 배포 여부를 확인
+5. 운영 데이터 점검: `npm run ops:audit`, `npm run ops:media-audit`
 
 ## 2. 안전 태그
 현재 주요 태그:
@@ -86,6 +87,8 @@ console.cloud.google.com → 결제 → 예산 및 알림 (월 5~10달러 권장
 - Share URL guard: 공유 모달과 공식 공유 페이지가 `/share/{id}/`를 유지하는지 운영 소스와 라이브 URL 기준으로 검사
 - Tab wiring guard: 운영 소스의 탭/모드 버튼과 렌더링 분기가 서로 어긋나지 않는지 검사
 - Vite dist budget: `npm run build` 후 `npm run check:dist-budget`로 실제 배포 청크 크기 검증
+- Media integrity audit: `npm run ops:media-audit`가 이미지 URL과 확정 모임 사진까지 읽기 전용으로 점검한다. `invalidCount`가 있으면 자동 삭제 대신 백업·수동 확인을 먼저 한다.
+- Firebase write E2E: `npm run e2e:firebase-write`는 운영 캘린더와 분리된 `stress_*` 문서로 동시 저장·수정·삭제 흐름을 재현한다. 익명 삭제 규칙에 막힐 수 있으므로 실행 뒤 `npm run ops:clean-stress` 결과를 확인한다.
 
 ## 7. 다음 큰 단계
 1. `src/core/app-main.js`를 route/view 단위로 더 분리

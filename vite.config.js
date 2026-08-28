@@ -41,10 +41,10 @@ export default defineConfig({
             id.includes('/ui/ui-places')
           ) return 'ui-views-calendar';
           if (
-            id.includes('/ui/ui-date-modal') ||
             id.includes('/ui/ui-memo-view') ||
             id.includes('/ui/ui-event-modals')
           ) return 'ui-views-modals';
+          if (id.includes('/ui/ui-date-modal')) return 'ui-date-modal';
           // app-domain-helpers/app-firebase-data are only ever imported by app-main.js, but each
           // is given its own chunk explicitly (Rollup's default heuristic would otherwise inline
           // a single-importer module straight back into its importer's chunk) so splitting them

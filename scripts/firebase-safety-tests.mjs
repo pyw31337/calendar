@@ -29,6 +29,7 @@ const overlaysUi = fs.readFileSync('src/ui/ui-overlays.js', 'utf8');
 assert(domainHelpers.includes('const isRenderableImageUrl = GATHER_APP_UTILS.isRenderableImageUrl') && fs.readFileSync('src/core/app-utils.js', 'utf8').includes('function isRenderableImageUrl'), 'chat image entries must reject malformed/non-http image URLs');
 assert(sharedUi.includes('const imageSrc = (() =>') && sharedUi.includes('imageSrc && /*#__PURE__*/React.createElement'), 'link preview cards must reject malformed cached image URLs');
 assert(overlaysUi.includes('const isSafeMediaSrc = value =>') && overlaysUi.includes('const primarySrc = isSafeMediaSrc(src);'), 'shared media thumbnails must reject malformed image URLs');
+assert(fs.readFileSync('scripts/firebase-media-audit.mjs', 'utf8').includes('invalidCount'), 'media audit must report invalid image data without mutating production records');
 assert(/async function persistLegacySubcollections[\s\S]{0,700}Promise\.all\(jobs\)/.test(firebaseDataScript), 'legacy subcollection writes must be awaited as one save operation');
 assert(!/checkProxyRateLimit\(\$\{bucketKey\}\) failed, allowing request[\s\S]{0,160}return true/.test(fs.readFileSync('functions/index.js', 'utf8')), 'proxy limiter must not fail open');
 const setChatNotifyPrefBody = script.match(/function setChatNotifyEnabledForCalendar\(calId, enabled\) \{([\s\S]*?)\n\}/)?.[1] || '';

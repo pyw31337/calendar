@@ -1,8 +1,13 @@
 const PROJECT_ID = 'metro-live-2918e';
 const DATABASE = '(default)';
 const COLLECTION_URL = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/${DATABASE}/documents/calendars?pageSize=300`;
+const EXPLICIT_IDS = (process.env.STRESS_CALENDAR_IDS || '')
+  .split(',').map((value) => value.trim()).filter((value) => /^cal_(stress|test)_/.test(value));
 
 async function listStressDocs() {
+  if (EXPLICIT_IDS.length > 0) {
+    return EXPLICIT_IDS.map((id) => `projects/${PROJECT_ID}/databases/${DATABASE}/documents/calendars/${id}`);
+  }
   const response = await fetch(COLLECTION_URL);
   if (!response.ok) {
     throw new Error(`Failed to list calendars: ${response.status} ${await response.text()}`);

@@ -15,7 +15,9 @@
     "check:size-budget": "node scripts/check-size-budget.mjs",
     "check:tab-wiring": "node scripts/check-tab-wiring.mjs",
     "stress:firebase": "node scripts/firebase-live-stress-tests.mjs",
+    "e2e:firebase-write": "node scripts/firebase-live-stress-tests.mjs",
     "ops:audit": "node scripts/firebase-ops-audit.mjs",
+    "ops:media-audit": "node scripts/firebase-media-audit.mjs",
     "ops:export": "node scripts/firebase-export-prod.mjs",
     "ops:import": "node scripts/firebase-import-prod.mjs",
     "ops:clean-stress": "node scripts/firebase-clean-stress-docs.mjs",
@@ -31,7 +33,8 @@
     "check:dist-budget": "node scripts/check-dist-budget.mjs",
     "check:workflow-scope": "node scripts/check-workflow-scope.mjs",
     "check:helper-calls": "node scripts/audit-helper-calls.mjs",
-    "check:all": "npm run lint && npm run check:required-symbols && npm run check:helper-calls && npm run check:asset-mirrors && npm run check:isolation && npm run check:share-urls && npm run check:design-rules && npm run check:design-system && npm run check:live-source && npm run check:size-budget && npm run check:tab-wiring && npm run check:workflow-scope",
+    "lint:changed": "node scripts/lint-changed.mjs",
+    "check:all": "npm run lint && npm run lint:changed && npm run check:required-symbols && npm run check:helper-calls && npm run check:asset-mirrors && npm run check:isolation && npm run check:share-urls && npm run check:design-rules && npm run check:design-system && npm run check:live-source && npm run check:size-budget && npm run check:tab-wiring && npm run check:workflow-scope",
     "predeploy": "npm run check:all && npm run safety:test && npm run build && npm run check:dist-budget"
   },
   "dependencies": {

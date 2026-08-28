@@ -35,14 +35,18 @@ npm run ops:export
 npm run ops:clean-stress
 npm run restore:rehearsal
 npm run smoke:live
+npm run ops:media-audit
 ```
 
 - 운영 캘린더 ID는 `kkot`, `cw`, `jhair`를 포함한 안전한 ID 형식을 사용합니다.
 - `ops:audit`는 Firestore의 운영 문서 크기, 참여자 수, 일정 수, 테스트 문서 잔여 여부를 점검합니다.
 - `ops:export`는 운영 문서들을 `ops-backups/`에 JSON으로 백업합니다. 이 폴더는 Git에 커밋하지 않습니다.
 - `ops:clean-stress`는 `cal_stress_*`, `cal_test_*` 문서 삭제를 시도합니다. Firestore 규칙상 익명 삭제가 막히면 Firebase Console 또는 인증된 Firebase CLI/Admin SDK로 삭제해야 합니다.
+- 목록 조회 권한이 없는 환경에서는 `STRESS_CALENDAR_IDS=cal_stress_x,cal_test_y npm run ops:clean-stress`처럼 테스트 문서 ID를 직접 지정할 수 있습니다.
 - `restore:rehearsal`은 운영 Firestore에 쓰지 않고, 백업 생성/파싱/검증/병합/삭제 이력 보존 흐름을 로컬 격리 환경에서 리허설합니다.
 - `npm run stress:firebase`는 실제 Firestore에 테스트 문서를 생성하는 부하 테스트입니다. 운영 점검 목적이 아니라 저장 충돌 재현이 필요할 때만 실행하세요.
+- `npm run e2e:firebase-write`는 위 쓰기 부하 테스트의 명시적인 E2E 별칭입니다. `stress_*` 격리 캘린더만 사용하며, 실행 후 `ops:clean-stress` 결과를 확인합니다.
+- `npm run ops:media-audit`는 캘린더·메시지·메모·확정 모임 사진의 이미지 URL을 읽기 전용으로 검사합니다. 손상 데이터를 자동 삭제하지 않고 JSON 감사 결과만 남깁니다.
 - 데이터베이스가 비었거나 손상되면 관리자 대시보드의 `데이터 불러오기`에서 미리 받아둔 백업 JSON을 선택해 복구합니다.
 - 백업 JSON 복구는 관리자 주소에 `restore=1`을 붙이고 확인 문구를 정확히 입력한 뒤 실행합니다.
 
