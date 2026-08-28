@@ -77,9 +77,9 @@ exports.onMessageCreate = functions.runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).
     const calendarDocId = context.params.calendarDocId;
     const message = snapshot.data();
 
-    // 일정 레이어팝업 사진탭('meeting')/갤러리 페이지('gallery')에서 올린 사진은 태그
-    // 편집·삭제 등을 위해 실제 채팅 메시지 문서로 저장되지만, 채팅 활동이 아니므로
-    // 채팅방에도 노출되지 않고(ChatRoomView 렌더 필터 참고) 푸시 알림도 보내지 않아야 함.
+    // 일정 레이어팝업 사진탭('meeting')/갤러리 페이지('gallery')에서 올린 사진은 메시지
+    // 문서에 저장되더라도 채팅 활동으로 취급하지 않는다. 채팅방 노출과 채팅 푸시는
+    // 모두 uploadSource 기준으로 제외한다.
     if (message.uploadSource === 'meeting' || message.uploadSource === 'gallery') {
       console.log('Skipping push for non-chat photo upload:', message.uploadSource);
       return;

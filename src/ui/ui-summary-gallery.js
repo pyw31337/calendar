@@ -27,40 +27,17 @@ function getCalendarPlaces(calendar) {
 }
 function useChatSendGuard(onSend, canSend = true) {
   const React = window.React;
-  const [isSending, setIsSending] = React.useState(false);
-  const isMountedRef = React.useRef(true);
-
-  React.useEffect(() => {
-    isMountedRef.current = true;
-    return () => { isMountedRef.current = false; };
-  }, []);
-
-  const triggerSend = React.useCallback((...args) => {
-    if (isSending || canSend === false) return false;
-    if (typeof onSend !== 'function') return false;
-    setIsSending(true);
-    let result;
-    try {
-      result = onSend(...args);
-    } catch (err) {
-      if (isMountedRef.current) setIsSending(false);
-      throw err;
-    }
-    if (result && typeof result.then === 'function') {
-      return result.then(res => {
-        if (isMountedRef.current) setIsSending(false);
-        return res;
-      }).catch(err => {
-        if (isMountedRef.current) setIsSending(false);
-        throw err;
-      });
-    } else {
-      if (isMountedRef.current) setIsSending(false);
-      return result;
-    }
-  }, [onSend, canSend, isSending]);
-
-  return triggerSend;
+  const lockRef = React.useRef(false);
+  return React.useCallback((...args) => {
+    const isAllowed = typeof canSend === 'function' ? canSend(...args) : Boolean(canSend);
+    if (!isAllowed || lockRef.current) return;
+    lockRef.current = true;
+    Promise.resolve(onSend && onSend(...args)).finally(() => {
+      setTimeout(() => {
+        lockRef.current = false;
+      }, 250);
+    });
+  }, [onSend, canSend]);
 }
 function computeKoreanHolidaysForYear(year) {
   const f = __gatherUiDeps().computeKoreanHolidaysForYear;
@@ -902,7 +879,7 @@ export function SimpleBottomSheetPicker({ title, value, options, onSelect, place
   );
 }
 
-export function PhotoGallery({ chatMessages, memos = [], calendar = null, totalGalleryCount, onViewAll, showToast, onPromoteImageUrl, onSaveImageTags, onSearchTag, onDeletePhoto, onReplacePhoto, onJumpToChatMessage, onJumpToMemo, onJumpToMeetingDate, onGetChatMessageOrdinal, onGetGalleryPhotoOrdinal, onRequestConfirm }) {
+export function PhotoGallery({ chatMessages, memos = [], calendar = null, totalGalleryCount, onViewAll, showToast, onPromoteImageUrl, onSaveImageTags, onSearchTag, onDeletePhoto, onReplacePhoto, onJumpToChatMessage, onJumpToMemo, onJumpToMeetingDate, onJumpToGallery, onGetChatMessageOrdinal, onGetGalleryPhotoOrdinal, onRequestConfirm }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};

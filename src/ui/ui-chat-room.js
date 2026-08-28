@@ -27,40 +27,17 @@ function getCalendarPlaces(calendar) {
 }
 function useChatSendGuard(onSend, canSend = true) {
   const React = window.React;
-  const [isSending, setIsSending] = React.useState(false);
-  const isMountedRef = React.useRef(true);
-
-  React.useEffect(() => {
-    isMountedRef.current = true;
-    return () => { isMountedRef.current = false; };
-  }, []);
-
-  const triggerSend = React.useCallback((...args) => {
-    if (isSending || canSend === false) return false;
-    if (typeof onSend !== 'function') return false;
-    setIsSending(true);
-    let result;
-    try {
-      result = onSend(...args);
-    } catch (err) {
-      if (isMountedRef.current) setIsSending(false);
-      throw err;
-    }
-    if (result && typeof result.then === 'function') {
-      return result.then(res => {
-        if (isMountedRef.current) setIsSending(false);
-        return res;
-      }).catch(err => {
-        if (isMountedRef.current) setIsSending(false);
-        throw err;
-      });
-    } else {
-      if (isMountedRef.current) setIsSending(false);
-      return result;
-    }
-  }, [onSend, canSend, isSending]);
-
-  return triggerSend;
+  const lockRef = React.useRef(false);
+  return React.useCallback((...args) => {
+    const isAllowed = typeof canSend === 'function' ? canSend(...args) : Boolean(canSend);
+    if (!isAllowed || lockRef.current) return;
+    lockRef.current = true;
+    Promise.resolve(onSend && onSend(...args)).finally(() => {
+      setTimeout(() => {
+        lockRef.current = false;
+      }, 250);
+    });
+  }, [onSend, canSend]);
 }
 function computeKoreanHolidaysForYear(year) {
   const f = __gatherUiDeps().computeKoreanHolidaysForYear;
@@ -833,6 +810,22 @@ export function ChatRoomView({
   const appendChatImageFiles = __deps.appendChatImageFiles;
   const confetti = __deps.confetti || window.confetti;
   const CONFETTI_Z_INDEX = __deps.CONFETTI_Z_INDEX;
+  const meetingPhotoMessageIds = React.useMemo(() => {
+    const ids = new Set();
+    const meetings = typeof getConfirmedMeetings === 'function' ? getConfirmedMeetings(calendar) : [];
+    meetings.forEach(meeting => {
+      (Array.isArray(meeting?.photos) ? meeting.photos : []).forEach(photo => {
+        const messageId = String(photo?.sourceMessageId || '').trim();
+        if (!messageId) return;
+        const mediaKey = String(photo?.mediaKey || photo?.assetKey || '').trim().toLowerCase();
+        const uploadSource = String(photo?.uploadSource || '').trim().toLowerCase();
+        const source = String(photo?.source || '').trim().toLowerCase();
+        if (!(mediaKey.startsWith('meeting:') || uploadSource === 'meeting' || source === 'meeting')) return;
+        ids.add(messageId);
+      });
+    });
+    return ids;
+  }, [calendar]);
 
   const [viewportBottom, setViewportBottom] = React.useState(0);
   const [isInputFocused, setIsInputFocused] = React.useState(false);
@@ -846,9 +839,9 @@ export function ChatRoomView({
   const [searchFocusIndex, setSearchFocusIndex] = React.useState(0);
   const visibleChatMessages = React.useMemo(() => {
     return Array.isArray(chatMessages)
-      ? chatMessages.filter(msg => msg && msg.uploadSource !== 'meeting' && msg.uploadSource !== 'gallery')
+      ? chatMessages.filter(msg => msg && msg.uploadSource !== 'meeting' && msg.uploadSource !== 'gallery' && !meetingPhotoMessageIds.has(msg.id))
       : [];
-  }, [chatMessages]);
+  }, [chatMessages, meetingPhotoMessageIds]);
 
   // Ordered list of message IDs matching the current search query (for ▲▼ navigation)
   const searchMatchIds = React.useMemo(() => {

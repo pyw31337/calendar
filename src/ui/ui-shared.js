@@ -27,40 +27,17 @@ function getCalendarPlaces(calendar) {
 }
 function useChatSendGuard(onSend, canSend = true) {
   const React = window.React;
-  const [isSending, setIsSending] = React.useState(false);
-  const isMountedRef = React.useRef(true);
-
-  React.useEffect(() => {
-    isMountedRef.current = true;
-    return () => { isMountedRef.current = false; };
-  }, []);
-
-  const triggerSend = React.useCallback((...args) => {
-    if (isSending || canSend === false) return false;
-    if (typeof onSend !== 'function') return false;
-    setIsSending(true);
-    let result;
-    try {
-      result = onSend(...args);
-    } catch (err) {
-      if (isMountedRef.current) setIsSending(false);
-      throw err;
-    }
-    if (result && typeof result.then === 'function') {
-      return result.then(res => {
-        if (isMountedRef.current) setIsSending(false);
-        return res;
-      }).catch(err => {
-        if (isMountedRef.current) setIsSending(false);
-        throw err;
-      });
-    } else {
-      if (isMountedRef.current) setIsSending(false);
-      return result;
-    }
-  }, [onSend, canSend, isSending]);
-
-  return triggerSend;
+  const lockRef = React.useRef(false);
+  return React.useCallback((...args) => {
+    const isAllowed = typeof canSend === 'function' ? canSend(...args) : Boolean(canSend);
+    if (!isAllowed || lockRef.current) return;
+    lockRef.current = true;
+    Promise.resolve(onSend && onSend(...args)).finally(() => {
+      setTimeout(() => {
+        lockRef.current = false;
+      }, 250);
+    });
+  }, [onSend, canSend]);
 }
 function computeKoreanHolidaysForYear(year) {
   const f = __gatherUiDeps().computeKoreanHolidaysForYear;
@@ -1107,16 +1084,14 @@ export function LinkPreviewCard({ url, fallbackTitle, cachedData, stretch = fals
   const __comp = window.GATHER_UI_COMPONENTS || {};
 
   const preview = useLinkPreview(url, cachedData);
-  const data = preview?.data || {};
-  const { title, description, image, siteName } = data;
-  if (!stretch && (!preview || preview.status === 'loading' || preview.status === 'error' || preview.status === 'empty')) return null;
+  if (!preview || preview.status === 'loading' || preview.status === 'error' || preview.status === 'empty' || !preview.data) return null;
 
-  const parsedHost = (function() {
-    try { return new URL(url).hostname; } catch(e) { return url; }
-  })();
+  const { title, description, image, siteName } = preview.data;
   const isGenericTitle = !title || title === 'map.naver.com' || title === 'naver.me' || title.startsWith('map.naver');
-  const displayTitle = (isGenericTitle && fallbackTitle) ? fallbackTitle : (title || fallbackTitle || parsedHost);
-  const displayHost = siteName || parsedHost;
+  const displayTitle = (isGenericTitle && fallbackTitle) ? fallbackTitle : (title || siteName);
+  const displayHost = (siteName && siteName !== displayTitle) ? siteName : '';
+
+  if (!displayTitle && !description) return null;
 
   return /*#__PURE__*/React.createElement('a', {
     href: url,
@@ -1126,23 +1101,11 @@ export function LinkPreviewCard({ url, fallbackTitle, cachedData, stretch = fals
     className: 'link-preview-card',
     style: {
       display: 'flex',
-      // maxWidth cap keeps that same fit-content from growing unbounded to fit a long title in
-      // one line now that the bubble's width no longer implicitly bounds it -- title/description
-      // below still truncate with ellipsis inside this width.
-      // Plain length, not min(100%, 280px) -- fit-content already includes "shrink to available
-      // space if narrower" in its own definition, so the min(100%, ...) was redundant. It's also
-      // the same pattern that, on a plain (non-fit-content) block elsewhere in this bug, was found
-      // to corrupt an ancestor's intrinsic-size calculation (percentage-in-min() resolves as
-      // indefinite there) -- removing it here too since there's no upside to keeping it.
-      // `stretch` opts out of all of the above: a vertical list of these cards (e.g. the gallery
-      // page's 링크 tab) wants every row the SAME width regardless of how long each one's own
-      // title/description happens to be, not each row shrinking to its own content -- the exact
-      // opposite of what a chat bubble wants.
       width: stretch ? '100%' : 'fit-content',
       maxWidth: stretch ? '100%' : '280px',
       boxSizing: 'border-box',
       gap: '8px',
-      marginTop: '6px',
+      marginTop: stretch ? '0px' : '6px',
       border: '1px solid var(--border-subtle)',
       borderRadius: 'var(--radius-md)',
       overflow: 'hidden',
@@ -1160,20 +1123,13 @@ export function LinkPreviewCard({ url, fallbackTitle, cachedData, stretch = fals
       style: { width: '72px', height: '72px', objectFit: 'cover', flexShrink: 0, backgroundColor: 'var(--bg-primary)' }
     }),
     /*#__PURE__*/React.createElement('div', {
-      // Explicit maxWidth (not just minWidth:0 + flex-shrink) so this column's OWN contribution
-      // to the card's fit-content sizing is already bounded to the card's 280px budget minus the
-      // thumbnail -- without it, an unclamped single-line title/description can still make the
-      // card's computed preferred width overshoot 280px pre-clamp, so the outer maxWidth clamp
-      // then shrinks the card back down independently, leaving a several-dozen-px gap between the
-      // (already-sized) bubble and the (separately re-clamped) card. Verified by measuring both
-      // ways in an isolated repro.
       style: { padding: '6px 8px', minWidth: 0, maxWidth: stretch ? 'none' : (image ? '198px' : '270px'), flex: stretch ? '1 1 0' : '0 1 auto', overflow: 'hidden', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '2px' }
     },
       displayTitle && /*#__PURE__*/React.createElement('div', {
-      style: { fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
+        style: { fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
       }, displayTitle),
       description && /*#__PURE__*/React.createElement('div', {
-      style: { fontSize: '0.7rem', color: 'var(--text-muted)', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }
+        style: { fontSize: '0.7rem', color: 'var(--text-muted)', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }
       }, description),
       displayHost && /*#__PURE__*/React.createElement('div', {
         style: { fontSize: '0.65rem', color: 'var(--text-light)' }

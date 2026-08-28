@@ -592,13 +592,24 @@ function isNonChatUploadSource(uploadSource) {
   return NON_CHAT_UPLOAD_SOURCES.has(String(uploadSource || '').trim().toLowerCase());
 }
 
-function getMeetingPhotoMessageIds(calendar) {
+function getMeetingOwnedPhotoMessageIds(calendar) {
   const ids = new Set();
-  const meetings = typeof getConfirmedMeetings === 'function' ? getConfirmedMeetings(calendar) : [];
+  let getFn;
+  try {
+    if (typeof getConfirmedMeetings === 'function') getFn = getConfirmedMeetings;
+  } catch (e) {}
+  if (!getFn && typeof window !== 'undefined' && window.GATHER_APP_UTILS) {
+    getFn = window.GATHER_APP_UTILS.getConfirmedMeetings;
+  }
+  const meetings = typeof getFn === 'function' ? getFn(calendar) : [];
   meetings.forEach(meeting => {
     (Array.isArray(meeting?.photos) ? meeting.photos : []).forEach(photo => {
       const messageId = String(photo?.sourceMessageId || '').trim();
       if (!messageId) return;
+      const mediaKey = String(photo?.mediaKey || photo?.assetKey || '').trim().toLowerCase();
+      const uploadSource = String(photo?.uploadSource || '').trim().toLowerCase();
+      const source = String(photo?.source || '').trim().toLowerCase();
+      if (!(mediaKey.startsWith('meeting:') || uploadSource === 'meeting' || source === 'meeting')) return;
       ids.add(messageId);
     });
   });
@@ -1209,9 +1220,10 @@ function App() {
     (chatMessages || []).forEach(m => { if (m && m.id) byId.set(m.id, m); });
     return Array.from(byId.values()).sort((a, b) => Number(a.timestamp || 0) - Number(b.timestamp || 0));
   }, [olderChatMessages, chatMessages]);
+  const meetingPhotoMessageIds = React.useMemo(() => getMeetingOwnedPhotoMessageIds(activeCal), [activeCal]);
   const visibleChatMessages = React.useMemo(() => {
-    return allChatMessages.filter(msg => msg && msg.uploadSource !== 'meeting' && msg.uploadSource !== 'gallery');
-  }, [allChatMessages]);
+    return allChatMessages.filter(msg => isChatRenderableMessage(msg, meetingPhotoMessageIds));
+  }, [allChatMessages, meetingPhotoMessageIds]);
   const recentMessages = React.useMemo(() => visibleChatMessages.slice(-5).reverse(), [visibleChatMessages]);
   const [memos, setMemos] = React.useState([]);
   const [memosLimit, setMemosLimit] = React.useState(MEMOS_PAGE_SIZE);
@@ -2182,6 +2194,15 @@ function App() {
           const result = await migrateBase64ChatImagesForCalendar(activeCalId, { maxMessages: 20 });
           if (!cancelled && result && (result.failed || 0) === 0) window.__gatherB64MigDone[activeCalId] = true;
           if (result && result.migrated > 0) console.info('base64→Storage migrated', activeCalId, result);
+        }
+        if (!window.__gatherMeetingUploadSourceMigDone) window.__gatherMeetingUploadSourceMigDone = Object.create(null);
+        if (!window.__gatherMeetingUploadSourceMigDone[activeCalId]) {
+          const result = await backfillMeetingUploadSourcesForCalendar(activeCalId, activeCal, { maxMessages: 100 });
+          if (!cancelled && result && (result.failed || 0) === 0) window.__gatherMeetingUploadSourceMigDone[activeCalId] = true;
+          if (!cancelled && result && result.migrated > 0) {
+            setTotalChatCount(prev => (typeof prev === 'number' ? Math.max(0, prev - result.migrated) : prev));
+            console.info('meeting uploadSource backfilled', activeCalId, result);
+          }
         }
       } catch (e) { console.warn('base64 migration skipped', e); }
     })();
@@ -3678,12 +3699,10 @@ function App() {
     return commitConfirmedMeetings(nextConfirmedMeetings, '지출 순서 저장완료');
   };
 
-  // Uploaded through the exact same chat-message pipeline as every other photo in the app (see
-  // handleUploadGalleryImages) -- this is a real chat message (uploadSource: 'meeting'), not an
-  // independent copy, so it shows up in the chat room/gallery/main gallery too. confirmedMeeting
-  // .photos below only stores a REFERENCE to it (sourceMessageId + sourceImageIndex, tags set to
-  // the meeting date), matching linkTaggedImageToMeetingDates' identity model -- one photo, one
-  // Storage file, shared everywhere it's tagged.
+  // 일정 사진은 메시지 컬렉션에 저장해서 이미지 편집/교체/태그 공유를 한 곳에서
+  // 처리하지만, `uploadSource: 'meeting'` 규칙으로 채팅과는 완전히 분리한다. 아래
+  // confirmedMeeting.photos 는 실제 본문이 아니라 이 메시지를 가리키는 참조만
+  // 남기므로, 화면에서는 갤러리/일정에만 보이고 채팅 카운트에는 포함되지 않는다.
   const handleAddMeetingPhotos = async (dateStr, files) => {
     if (!activeCal || !isValidDateString(dateStr)) {
       showToast('일정 정보를 확인할 수 없습니다.', 'error');
@@ -6211,11 +6230,18 @@ function App() {
       );
     } else {
       /* Expanded Banner State (Matching Image 2) */
-      return /*#__PURE__*/React.createElement("button", {
-        type: "button",
+      return /*#__PURE__*/React.createElement("div", {
         key: meeting.date,
         className: "confirmed-meeting-banner confirmed-meeting-surface",
+        role: "button",
+        tabIndex: 0,
         onClick: () => toggleConfirmedDateExpand(meeting.date),
+        onKeyDown: (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            toggleConfirmedDateExpand(meeting.date);
+          }
+        },
         title: "클릭하여 접기",
         style: {
           display: 'flex',
@@ -6283,6 +6309,15 @@ function App() {
             if (!guardLoadedCalendar()) return;
             setSelectedDate(meeting.date);
             setIsModalOpen(true);
+          },
+          onKeyDown: (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.stopPropagation();
+              e.preventDefault();
+              if (!guardLoadedCalendar()) return;
+              setSelectedDate(meeting.date);
+              setIsModalOpen(true);
+            }
           },
           style: {
             backgroundColor: 'rgba(26, 16, 47, 0.88)',
@@ -7700,6 +7735,58 @@ async function migrateBase64ChatImagesForCalendar(calId, { maxMessages = 40 } = 
   return { migrated, failed, scanned };
 }
 
+async function backfillMeetingUploadSourcesForCalendar(calId, calendar, { maxMessages = 40 } = {}) {
+  if (!calId) return { migrated: 0, failed: 0, scanned: 0 };
+  let getFn;
+  try {
+    if (typeof getConfirmedMeetings === 'function') getFn = getConfirmedMeetings;
+  } catch (e) {}
+  if (!getFn && typeof window !== 'undefined' && window.GATHER_APP_UTILS) {
+    getFn = window.GATHER_APP_UTILS.getConfirmedMeetings;
+  }
+  const meetings = typeof getFn === 'function' ? getFn(calendar) : [];
+  const messageIds = [];
+  const seen = new Set();
+  meetings.forEach(meeting => {
+    (Array.isArray(meeting?.photos) ? meeting.photos : []).forEach(photo => {
+      const messageId = String(photo?.sourceMessageId || '').trim();
+      if (!messageId || seen.has(messageId)) return;
+      const mediaKey = String(photo?.mediaKey || photo?.assetKey || '').trim().toLowerCase();
+      const uploadSource = String(photo?.uploadSource || '').trim().toLowerCase();
+      const source = String(photo?.source || '').trim().toLowerCase();
+      if (!(mediaKey.startsWith('meeting:') || uploadSource === 'meeting' || source === 'meeting')) return;
+      seen.add(messageId);
+      messageIds.push(messageId);
+    });
+  });
+  if (messageIds.length === 0) return { migrated: 0, failed: 0, scanned: 0 };
+  let migrated = 0, failed = 0, scanned = 0;
+  try {
+    for (const messageId of messageIds) {
+      if (migrated + failed >= maxMessages) break;
+      scanned += 1;
+      try {
+        const msg = await fetchMessageRest(calId, messageId);
+        if (!msg) continue;
+        const currentSource = String(msg.uploadSource || '').trim().toLowerCase();
+        if (currentSource === 'meeting' || currentSource === 'gallery') continue;
+        const updated = await writeCollectionDocumentWithFallback('messages', calId, messageId, {
+          uploadSource: 'meeting'
+        }, 'update', '일정 사진 메타 복구');
+        if (!updated) throw new Error('Meeting uploadSource update failed');
+        migrated += 1;
+      } catch (e) {
+        console.warn('backfillMeetingUploadSourcesForCalendar failed', messageId, e);
+        failed += 1;
+      }
+    }
+  } catch (e) {
+    console.warn('backfillMeetingUploadSourcesForCalendar', e);
+    return { migrated, failed, scanned, reason: String(e && e.message || e) };
+  }
+  return { migrated, failed, scanned };
+}
+
 
 async function readClipboardImageFiles(showToast) {
   if (typeof navigator === 'undefined' || !navigator.clipboard) {
@@ -8478,12 +8565,13 @@ function useModalDirtyGuard(onClose, onRequestConfirm, message, active = true, g
 // same message -- extracted from ChatRoomView (see its own history of this exact bug) so
 // CommentsSection's independent Send button/Ctrl+Enter shortcut get the same protection instead
 // of quietly missing it.
-function useChatSendGuard(onSend, canSend) {
+function useChatSendGuard(onSend, canSend = true) {
   const lockRef = React.useRef(false);
-  return () => {
-    if (!canSend() || lockRef.current) return;
+  return (...args) => {
+    const isAllowed = typeof canSend === 'function' ? canSend(...args) : Boolean(canSend);
+    if (!isAllowed || lockRef.current) return;
     lockRef.current = true;
-    Promise.resolve(onSend && onSend()).finally(() => {
+    Promise.resolve(onSend && onSend(...args)).finally(() => {
       setTimeout(() => {
         lockRef.current = false;
       }, 250);

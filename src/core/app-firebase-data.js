@@ -1507,6 +1507,7 @@ async function updateMessageRest(calId, messageId, data, deletePaths = []) {
     if (data.directMediaTags !== undefined && !cleanDeletePaths.has('directMediaTags')) fields.directMediaTags = jsToFirestoreValue(data.directMediaTags);
     if (data.linkPreview !== undefined && !cleanDeletePaths.has('linkPreview')) fields.linkPreview = jsToFirestoreValue(data.linkPreview);
     if (data.participantId !== undefined && !cleanDeletePaths.has('participantId')) fields.participantId = jsToFirestoreValue(data.participantId);
+    if (data.uploadSource !== undefined && !cleanDeletePaths.has('uploadSource')) fields.uploadSource = jsToFirestoreValue(data.uploadSource);
     if (Object.keys(fields).length === 0) return false;
     const updateMask = Array.from(new Set([...Object.keys(fields), ...cleanDeletePaths])).map(k => `updateMask.fieldPaths=${encodeURIComponent(k)}`).join('&');
     const url = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/calendars/cal_${calId}/messages/${messageId}?${updateMask}`;
