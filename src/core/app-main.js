@@ -5915,6 +5915,14 @@ function App() {
     .filter(m => isValidDateString(m?.date) && m.date >= todayDateStrForBanner)
     .sort((a, b) => a.date.localeCompare(b.date));
 
+  const [expandedConfirmedDates, setExpandedConfirmedDates] = React.useState({});
+  const toggleConfirmedDateExpand = (dateStr) => {
+    setExpandedConfirmedDates(prev => ({
+      ...prev,
+      [dateStr]: !prev[dateStr]
+    }));
+  };
+
   return withStickyVideo(/*#__PURE__*/React.createElement("div", {
     className: "app-container",
     style: { paddingTop: `${mainHeaderHeight}px` }
@@ -6113,47 +6121,165 @@ function App() {
   }), /*#__PURE__*/React.createElement("div", {
     ref: calendarSectionRef
   }, visibleConfirmedMeetings.length > 0 && /*#__PURE__*/React.createElement("div", {
-    style: { display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }
-    }, visibleConfirmedMeetings.map(meeting => {
-      const memoEntries = getActiveAvailabilities(activeCal).filter(e => e.date === meeting.date && e.note && e.note.trim());
+    style: { display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: '8px', marginBottom: '12px', alignItems: 'center', width: '100%' }
+  }, visibleConfirmedMeetings.map(meeting => {
+    const isExpanded = !!expandedConfirmedDates[meeting.date];
+    const memoEntries = getActiveAvailabilities(activeCal).filter(e => e.date === meeting.date && e.note && e.note.trim());
+    const [y, m, d] = meeting.date.split('-');
+    const dateObj = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
+    const dayNamesFull = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'];
+    const dayNamesShort = ['일', '월', '화', '수', '목', '금', '토'];
+    const fullDayName = dayNamesFull[dateObj.getDay()];
+    const shortDayName = dayNamesShort[dateObj.getDay()];
+    const ddayText = formatDDayLabel(meeting.date);
+    const yyMMdd = `${y.slice(2)}.${m}.${d}`;
+
+    if (!isExpanded) {
+      /* Collapsed Icon State (Matching Image 1) */
       return /*#__PURE__*/React.createElement("button", {
         type: "button",
         key: meeting.date,
-        className: "date-item-btn is-confirmed confirmed-meeting-card confirmed-meeting-surface",
-        onClick: () => {
-          if (!guardLoadedCalendar()) return;
-          setSelectedDate(meeting.date);
-          setIsModalOpen(true);
-        },
+        className: "confirmed-meeting-icon-btn confirmed-meeting-surface",
+        onClick: () => toggleConfirmedDateExpand(meeting.date),
+        title: `${formatConfirmedMeetingLabel(meeting.date)} (클릭하여 펼치기)`,
         style: {
+          display: 'inline-flex',
           flexDirection: 'column',
-          alignItems: 'flex-start',
-          width: '100%',
-          cursor: 'pointer'
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '8px 10px',
+          minWidth: '70px',
+          minHeight: '66px',
+          borderRadius: '12px',
+          background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%)',
+          color: '#FFFFFF',
+          border: 'none',
+          cursor: 'pointer',
+          boxShadow: '0 2px 8px rgba(168, 85, 247, 0.25)',
+          userSelect: 'none',
+          WebkitTapHighlightColor: 'transparent'
         }
-      }, /*#__PURE__*/React.createElement("div", {
-        style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '8px' }
-      }, /*#__PURE__*/React.createElement("span", {
-        className: "confirmed-meeting-date",
-        style: { fontWeight: 800, color: '#FFFFFF', fontSize: '0.95rem', flexShrink: 0 }
-      }, formatConfirmedMeetingLabel(meeting.date)), /*#__PURE__*/React.createElement("span", {
-        className: "date-item-badge dday-badge is-confirmed",
-        style: { flexShrink: 0 }
-      }, formatDDayLabel(meeting.date))), memoEntries.length > 0 && /*#__PURE__*/React.createElement("div", {
-        style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginTop: '6px' }
-      }, memoEntries.map(entry => {
-        const p = getActiveParticipants(activeCal).find(part => part.id === entry.participantId);
-        if (!p) return null;
-        const entryUrl = extractFirstUrl(entry.note);
-        const noteTextOnly = entryUrl ? removeFirstUrl(entry.note) : entry.note.trim();
-        if (!noteTextOnly) return null;
-        return /*#__PURE__*/React.createElement("span", {
-          key: entry.participantId,
-          className: "memo-capsule-badge",
-          style: { backgroundColor: p.color, color: getContrastTextColor(p.color) },
-          title: `${p.name}: ${noteTextOnly}`
-        }, noteTextOnly);
-      })));
+      },
+        /* Date YY.MM.DD */
+        /*#__PURE__*/React.createElement("span", {
+          style: { fontSize: '0.8rem', fontWeight: 800, color: '#FFFFFF', lineHeight: 1.1, textShadow: '0 1px 2px rgba(0,0,0,0.15)' }
+        }, yyMMdd),
+        /* Day Name */
+        /*#__PURE__*/React.createElement("span", {
+          style: { fontSize: '0.86rem', fontWeight: 800, color: '#FFFFFF', marginTop: '2px', lineHeight: 1.1, textShadow: '0 1px 2px rgba(0,0,0,0.15)' }
+        }, fullDayName),
+        /* D-day Pill Badge */
+        /*#__PURE__*/React.createElement("span", {
+          style: {
+            backgroundColor: 'rgba(26, 16, 47, 0.85)',
+            color: '#F472B6',
+            padding: '2px 8px',
+            borderRadius: '999px',
+            fontSize: '0.68rem',
+            fontWeight: 800,
+            marginTop: '4px',
+            whiteSpace: 'nowrap',
+            letterSpacing: '0.02em',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
+          }
+        }, ddayText)
+      );
+    } else {
+      /* Expanded Banner State (Matching Image 2) */
+      return /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        key: meeting.date,
+        className: "confirmed-meeting-banner confirmed-meeting-surface",
+        onClick: () => toggleConfirmedDateExpand(meeting.date),
+        title: "클릭하여 접기",
+        style: {
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          width: '100%',
+          flex: '1 1 100%',
+          padding: '10px 14px',
+          borderRadius: '12px',
+          background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%)',
+          color: '#FFFFFF',
+          border: 'none',
+          cursor: 'pointer',
+          gap: '12px',
+          boxShadow: '0 3px 12px rgba(168, 85, 247, 0.3)',
+          textAlign: 'left',
+          userSelect: 'none',
+          WebkitTapHighlightColor: 'transparent'
+        }
+      },
+        /* Left Column: Title & Notes */
+        /*#__PURE__*/React.createElement("div", {
+          style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '5px', minWidth: 0, flex: 1 }
+        },
+          /* Line 1: [모임확정] YY.MM.DD (요일) */
+          /*#__PURE__*/React.createElement("span", {
+            style: { fontWeight: 800, color: '#FFFFFF', fontSize: '0.9rem', letterSpacing: '-0.01em', textShadow: '0 1px 2px rgba(0,0,0,0.15)' }
+          }, `[모임확정] ${yyMMdd} (${shortDayName})`),
+          /* Line 2: Note Summary Capsules */
+          memoEntries.length > 0 && /*#__PURE__*/React.createElement("div", {
+            style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }
+          },
+            memoEntries.map(entry => {
+              const p = getActiveParticipants(activeCal).find(part => part.id === entry.participantId);
+              if (!p) return null;
+              const entryUrl = extractFirstUrl(entry.note);
+              const noteTextOnly = entryUrl ? removeFirstUrl(entry.note) : entry.note.trim();
+              if (!noteTextOnly) return null;
+              return /*#__PURE__*/React.createElement("span", {
+                key: entry.participantId,
+                className: "memo-capsule-badge",
+                style: {
+                  backgroundColor: '#EF4444',
+                  color: '#FFFFFF',
+                  fontWeight: 700,
+                  fontSize: '0.75rem',
+                  padding: '2px 10px',
+                  borderRadius: '999px',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.15)'
+                },
+                title: `${p.name}: ${noteTextOnly}`
+              }, noteTextOnly);
+            })
+          )
+        ),
+        /* Right Column: "일정보기" & D-day Button */
+        /*#__PURE__*/React.createElement("div", {
+          className: "btn-view-schedule",
+          role: "button",
+          tabIndex: 0,
+          onClick: (e) => {
+            e.stopPropagation();
+            if (!guardLoadedCalendar()) return;
+            setSelectedDate(meeting.date);
+            setIsModalOpen(true);
+          },
+          style: {
+            backgroundColor: 'rgba(26, 16, 47, 0.88)',
+            borderRadius: '10px',
+            padding: '6px 14px',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            flexShrink: 0,
+            boxShadow: '0 2px 6px rgba(0,0,0,0.25)',
+            border: '1px solid rgba(255,255,255,0.1)'
+          }
+        },
+          /*#__PURE__*/React.createElement("span", {
+            style: { color: '#F472B6', fontSize: '0.7rem', fontWeight: 800, lineHeight: 1.2 }
+          }, ddayText),
+          /*#__PURE__*/React.createElement("span", {
+            style: { color: '#FFFFFF', fontSize: '0.76rem', fontWeight: 800, lineHeight: 1.2, marginTop: '1px' }
+          }, "일정보기")
+        )
+      );
+    }
   })), /*#__PURE__*/React.createElement(CalendarGrid, {
     anniversaries: anniversaries,
     calendar: activeCal,

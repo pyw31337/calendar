@@ -428,6 +428,21 @@ body:has(.admin-login-gate) {
   box-shadow: none !important;
   filter: none !important;
 }
+.confirmed-meeting-icon-btn {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  transition: transform var(--motion-base) var(--motion-ease-out), box-shadow var(--motion-base) var(--motion-ease-out);
+}
+.confirmed-meeting-icon-btn:hover {
+  transform: translate3d(0, -1px, 0);
+  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.35) !important;
+}
+.confirmed-meeting-icon-btn:active {
+  transform: translate3d(0, 1px, 0) scale(0.96) !important;
+}
 .confirmed-meeting-banner .confirmed-meeting-label-badge {
   background: transparent !important;
   color: #FFFFFF !important;
