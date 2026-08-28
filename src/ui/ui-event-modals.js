@@ -1589,6 +1589,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
   }, [activeParticipants, participantRows]);
 
   const [bankName, setBankName] = React.useState(() => cardToEdit?.bankName || '토스뱅크');
+  const [otherBankName, setOtherBankName] = React.useState(() => cardToEdit?.otherBankName || '');
   const [depositorName, setDepositorName] = React.useState(() => cardToEdit?.depositorName || '');
   const [accountNumber, setAccountNumber] = React.useState(() => cardToEdit?.accountNumber || '');
   const [activeTab, setActiveTab] = React.useState('general');
@@ -1874,6 +1875,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
       amount: totalExpense,
       perPersonAmount: settlementPerPerson,
       bankName: bankName,
+      otherBankName: bankName === '기타' ? otherBankName.trim() : '',
       depositorName: depositorName.trim(),
       accountNumber: accountNumber.trim(),
       monthStr: monthStr,
@@ -1932,7 +1934,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
       activeTab === 'general' && React.createElement('div', {
         style: { display: 'flex', flexDirection: 'column', gap: '14px' }
       },
-      React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px' } },
+      React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
         React.createElement('label', { style: settlementSectionLabelStyle }, '타이틀 입력'),
         React.createElement('input', {
           type: 'text', className: 'form-input', value: title,
@@ -1951,20 +1953,33 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
           disabled: availableParticipantPickerOptions.length === 0 && !editingParticipantRowId,
           style: { width: '100%', height: '44px', borderRadius: '8px', fontSize: '0.84rem' }
         }),
-        React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '4px' } },
-          React.createElement('label', { style: settlementSectionLabelStyle }, '메모 입력 (선택)'),
-          React.createElement('div', { style: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 60px', gap: '8px', alignItems: 'center' } },
+          React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '4px' } },
+            React.createElement('label', { style: settlementSectionLabelStyle }, '메모 입력 (선택)'),
+          React.createElement('div', { style: { display: 'flex', flexDirection: editingParticipantRowId ? 'column' : 'row', gap: '8px', alignItems: editingParticipantRowId ? 'stretch' : 'center' } },
             React.createElement('input', {
               type: 'text', className: 'form-input', value: participantMemoInput,
               maxLength: 500, onChange: e => setParticipantMemoInput(e.target.value),
               placeholder: '일정 메모를 남길 수 있습니다 (최대 500자)',
               style: { width: '100%', height: '44px', borderRadius: '8px', fontSize: '0.82rem' }
             }),
-            React.createElement('button', {
-              type: 'button', className: 'btn btn-secondary', onClick: handleAddParticipantRow,
-              disabled: !participantToAdd,
-              style: { width: '60px', height: '44px', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-main)', cursor: participantToAdd ? 'pointer' : 'not-allowed', border: '1px solid #CBD5E1', backgroundColor: '#F1F5F9' }
-            }, editingParticipantRowId ? '수정' : '추가')
+            editingParticipantRowId
+              ? React.createElement('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', width: '100%' } },
+                React.createElement('button', {
+                  type: 'button', className: 'btn btn-secondary', onClick: () => {
+                    setParticipantToAdd(''); setParticipantMemoInput(''); setEditingParticipantRowId(null);
+                  }, style: { width: '100%', height: '44px', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 800 }
+                }, '취소'),
+                React.createElement('button', {
+                  type: 'button', className: 'btn btn-secondary', onClick: handleAddParticipantRow,
+                  disabled: !participantToAdd,
+                  style: { width: '100%', height: '44px', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-main)', cursor: participantToAdd ? 'pointer' : 'not-allowed', border: '1px solid #CBD5E1', backgroundColor: '#F1F5F9' }
+                }, '수정')
+              )
+              : React.createElement('button', {
+                type: 'button', className: 'btn btn-secondary', onClick: handleAddParticipantRow,
+                disabled: !participantToAdd,
+                style: { width: '60px', height: '44px', flexShrink: 0, borderRadius: '8px', fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-main)', cursor: participantToAdd ? 'pointer' : 'not-allowed', border: '1px solid #CBD5E1', backgroundColor: '#F1F5F9' }
+              }, '추가')
           )
         ),
         participantRows.length > 0 && React.createElement('div', {
@@ -1973,7 +1988,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
           key: row.id,
           style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', minHeight: '44px', padding: '7px 10px', border: '1px solid var(--border-subtle)', borderRadius: '8px', backgroundColor: 'var(--bg-card)' }
         },
-          React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '9px', minWidth: 0, overflow: 'hidden' } },
+          React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '9px', minWidth: 0, overflow: 'hidden', cursor: 'pointer' }, onClick: () => handleEditParticipantRow(row) },
             ParticipantBackdrop ? React.createElement(ParticipantBackdrop, {
               participant: participantPickerOptions.find(option => option.value === row.participantId) || { name: row.participantId, color: '#3B82F6' },
               name: row.participantId || '참여자', dotSize: 9, style: { fontSize: '0.82rem', flexShrink: 0 }
@@ -1994,8 +2009,8 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
         )))
       ),
       React.createElement('div', { className: 'settlement-bank-grid', style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' } },
-        React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '4px' } },
-          React.createElement('label', { style: { fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)' } }, '송금 받을 은행'),
+          React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '4px' } },
+            React.createElement('label', { style: { fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)' } }, '송금 받을 은행'),
           SimpleBottomSheetPicker ? React.createElement(SimpleBottomSheetPicker, {
             title: "송금 받을 은행 선택",
             placeholder: "은행 선택",
@@ -2006,7 +2021,12 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
           }) : React.createElement('select', {
             className: 'form-select', value: bankName, onChange: e => handleBankNameChange(e.target.value),
             style: { width: '100%', height: '44px', borderRadius: '8px', fontSize: '0.82rem' }
-          }, BANK_OPTIONS.map(b => React.createElement('option', { key: b, value: b }, b)))
+          }, BANK_OPTIONS.map(b => React.createElement('option', { key: b, value: b }, b))),
+          bankName === '기타' && React.createElement('input', {
+            type: 'text', className: 'form-input', value: otherBankName,
+            onChange: e => setOtherBankName(e.target.value), placeholder: '은행 이름 입력', maxLength: 40,
+            style: { width: '100%', height: '44px', borderRadius: '8px', fontSize: '0.82rem' }
+          })
         ),
         React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '4px' } },
           React.createElement('label', { style: { fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)' } }, '예금자명'),
@@ -2223,7 +2243,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
     /* Modal Footer */
     React.createElement('div', {
       className: 'modal-footer',
-      style: { padding: '12px 18px', borderTop: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }
+        style: { padding: '12px 18px', borderTop: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', flexWrap: 'nowrap' }
     },
       /* Left footer actions: Delete & Close Status */
       React.createElement('div', { style: { display: 'flex', gap: '6px', alignItems: 'center' } },
@@ -2247,7 +2267,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
       /* Right footer actions: Cancel & Save (Black background, white text) */
       React.createElement('div', { style: { display: 'flex', gap: '8px', alignItems: 'center' } },
         React.createElement('button', {
-          type: 'button', className: 'btn btn-secondary', onClick: onClose, style: { borderRadius: '8px', fontSize: '0.8rem' }
+          type: 'button', className: 'btn btn-secondary', onClick: onClose, style: { borderRadius: '8px', fontSize: '0.8rem', background: 'none', border: 0 }
         }, '취소'),
         React.createElement('button', {
           type: 'button',
@@ -2762,7 +2782,8 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
       },
         displayCards.map(card => {
           const isClosed = card.status === 'closed';
-          const bankInfoText = [card.bankName, card.accountNumber, card.depositorName].filter(Boolean).join(' ');
+          const displayBankName = card.bankName === '기타' && card.otherBankName ? card.otherBankName : card.bankName;
+          const bankInfoText = [displayBankName, card.accountNumber, card.depositorName].filter(Boolean).join(' ');
           const isMenuOpen = openMenuCardId === card.id;
           const cardParticipantNames = Array.from(new Set(
             Array.isArray(card.participantRows) && card.participantRows.length > 0
@@ -2822,7 +2843,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
                   fontWeight: 700, cursor: 'pointer', userSelect: 'none'
                 }
               },
-                card.bankName && React.createElement("span", null, card.bankName),
+                displayBankName && React.createElement("span", null, displayBankName),
                 card.accountNumber && React.createElement("span", {
                   style: {
                     display: 'inline-flex', alignItems: 'center', padding: '2px 10px', margin: '0 4px',
