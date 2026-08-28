@@ -2047,19 +2047,21 @@ async function writeConfirmedMeetingsToFirestore(calendarId, meetings) {
   const validMeetings = normalizeConfirmedMeetingsForSave(meetings);
   if (!validMeetings.length) return true;
   try {
+    const configuredProjectId = firebaseConfig.projectId;
+    if (!configuredProjectId) throw new Error('Firebase project id is unavailable');
     const writes = validMeetings.map(meeting => ({
       update: {
-        name: `projects/metro-live-2918e/databases/(default)/documents/calendars/cal_${calendarId}/confirmedMeetings/${meeting.date}`,
+        name: `projects/${configuredProjectId}/databases/(default)/documents/calendars/cal_${calendarId}/confirmedMeetings/${meeting.date}`,
         fields: Object.fromEntries(Object.entries(meeting).map(([key, value]) => [key, jsToFirestoreValue(value)]))
       }
     }));
-    const res = await fetch('https://firestore.googleapis.com/v1/projects/metro-live-2918e/databases/(default)/documents:commit', {
+    const res = await fetch(`https://firestore.googleapis.com/v1/projects/${configuredProjectId}/databases/(default)/documents:commit`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ writes })
     });
-    if (!res.ok) console.warn(`Confirmed meetings REST write failed for ${calendarId}:`, await res.text());
-    return res.ok;
+    if (res.ok) return true;
+    console.warn(`Confirmed meetings REST write failed for ${calendarId}:`, await res.text());
   } catch (e) {
     console.warn(`Failed to write confirmed meetings for ${calendarId} via REST:`, e);
   }
