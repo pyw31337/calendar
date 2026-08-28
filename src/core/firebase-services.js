@@ -587,6 +587,11 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
   const galleryItemCountCache = Object.create(null);
   const GALLERY_COUNT_CACHE_MS = 5 * 60 * 1000;
 
+  function invalidateGalleryItemCount(calId) {
+    if (!isValidCalId(calId)) return;
+    delete galleryItemCountCache[calId];
+  }
+
   async function fetchGalleryItemCount(calId, maxPages) {
     if (!isValidCalId(calId)) return null;
     // This is an exact count, not a display preview. A caller may pass maxPages for an
@@ -694,6 +699,7 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
     fetchMessageOrdinal: fetchMessageOrdinal,
     fetchGalleryPhotoOrdinal: fetchGalleryPhotoOrdinal,
     fetchGalleryItemCount: fetchGalleryItemCount,
+    invalidateGalleryItemCount: invalidateGalleryItemCount,
     subscribeCalSubcollection: subscribeCalSubcollection,
     subscribeMessages: subscribeMessages,
     subscribePlaces: subscribePlaces,

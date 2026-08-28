@@ -474,6 +474,7 @@ import {
   fetchMessageOrdinal,
   fetchGalleryPhotoOrdinal,
   fetchGalleryItemCount,
+  invalidateGalleryItemCount,
   fetchMemosRest,
   fetchAnniversariesRest,
   sendChatMessageRest,
@@ -1219,6 +1220,7 @@ function CalendarApp() {
   const [totalChatCount, setTotalChatCount] = React.useState(null);
   const [totalMemoCount, setTotalMemoCount] = React.useState(null);
   const [totalGalleryCount, setTotalGalleryCount] = React.useState(null);
+  const [galleryCountRefreshToken, setGalleryCountRefreshToken] = React.useState(0);
   const [galleryPreviewMessages, setGalleryPreviewMessages] = React.useState([]);
   const loadingOlderChatRef = React.useRef(false);
   const allChatMessages = React.useMemo(() => {
@@ -2077,6 +2079,8 @@ function CalendarApp() {
         });
         list.reverse();
         setChatMessages(list);
+        invalidateGalleryItemCount(activeCalId);
+        setGalleryCountRefreshToken(token => token + 1);
 
         // Browser notification for a genuinely new incoming message from someone else --
         // skip the very first snapshot (that's just the existing history loading, not a
@@ -2361,7 +2365,7 @@ function CalendarApp() {
       } catch (e) { console.warn('base64 migration skipped', e); }
     })();
     return () => { cancelled = true; };
-  }, [activeCalId, isInitialDataLoading]);
+  }, [activeCalId, isInitialDataLoading, galleryCountRefreshToken]);
 
   // Main-screen chat preview safety net:
   // if the count says chat history exists but the live recent window is still empty,
@@ -2478,12 +2482,16 @@ function CalendarApp() {
     setChatMessages(upsertMessage);
     setOlderChatMessages(upsertMessage);
     setGalleryPreviewMessages(upsertMessage);
+    invalidateGalleryItemCount(activeCalId);
+    setGalleryCountRefreshToken(token => token + 1);
   };
   const removeLocalChatMessage = messageId => {
     const dropMessage = prev => prev.filter(m => m.id !== messageId);
     setChatMessages(dropMessage);
     setOlderChatMessages(dropMessage);
     setGalleryPreviewMessages(dropMessage);
+    invalidateGalleryItemCount(activeCalId);
+    setGalleryCountRefreshToken(token => token + 1);
   };
 
   React.useEffect(() => {

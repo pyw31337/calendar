@@ -1327,6 +1327,13 @@ async function fetchGalleryItemCount() {
   return null;
 }
 
+function invalidateGalleryItemCount(calId) {
+  const svc = window.GATHER_FIREBASE_SERVICES;
+  if (svc && typeof svc.invalidateGalleryItemCount === 'function' && !svc.isScaffold) {
+    return svc.invalidateGalleryItemCount(calId);
+  }
+}
+
 async function fetchMemosRest(calId, recentLimit = null) {
   try {
     const pageSizePart = recentLimit ? `&pageSize=${recentLimit}` : '';
@@ -3389,6 +3396,7 @@ export {
   fetchMessageOrdinal,
   fetchGalleryPhotoOrdinal,
   fetchGalleryItemCount,
+  invalidateGalleryItemCount,
   fetchMemosRest,
   fetchAnniversariesRest,
   sendChatMessageRest,
