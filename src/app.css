@@ -2554,6 +2554,11 @@ select.form-select {
   background-color: rgba(124, 58, 237, 0.06) !important;
   animation: chat-search-shake 0.72s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
 }
+.place-card-row.is-focused {
+  border: 2px solid #8B5CF6 !important;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.25), 0 2px 8px rgba(139, 92, 246, 0.15) !important;
+  background-color: rgba(139, 92, 246, 0.08) !important;
+}
 .chat-search-match-bubble {
   border: 1px solid rgba(124, 58, 237, 0.35) !important;
   background-color: rgba(124, 58, 237, 0.03) !important;

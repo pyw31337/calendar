@@ -784,8 +784,8 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
         // path made clusters appear to "run away" because the centroid shifts during reclustering;
         // zooming to bounds avoids that, and the padding keeps the result from hugging the edge.
         zoomToBoundsOnClick: false,
-        disableClusteringAtZoom: 15,
-        maxClusterRadius: 50,
+        disableClusteringAtZoom: 18,
+        maxClusterRadius: 45,
         // Flat solid-color badge instead of the plugin's default ripple-ring style, to match the
         // rest of the app's flat/minimal look rather than pulling in its default CSS theme too.
         iconCreateFunction: cluster => {
@@ -823,13 +823,33 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
               L.DomEvent.stopPropagation(e.originalEvent);
             }
           } catch (err) {}
-          if (typeof cluster.zoomToBounds === 'function') {
-            cluster.zoomToBounds({ padding: [40, 40] });
-          } else {
-            const bounds = typeof cluster.getBounds === 'function' ? cluster.getBounds() : null;
-            if (bounds && typeof map.fitBounds === 'function') {
-              map.fitBounds(bounds, { padding: [40, 40], maxZoom: 16, animate: true });
+
+          const bounds = typeof cluster.getBounds === 'function' ? cluster.getBounds() : null;
+          const currentZoom = map.getZoom();
+          const maxAllowedZoom = 16;
+
+          if (bounds && typeof bounds.isValid === 'function' && bounds.isValid()) {
+            const sw = bounds.getSouthWest();
+            const ne = bounds.getNorthEast();
+            const latDiff = Math.abs(sw.lat - ne.lat);
+            const lngDiff = Math.abs(sw.lng - ne.lng);
+            const isSameLocation = latDiff < 0.0001 && lngDiff < 0.0001;
+
+            if (isSameLocation) {
+              const targetZoom = Math.min(maxAllowedZoom, Math.max(currentZoom + 2, 15));
+              map.setView([sw.lat, sw.lng], targetZoom, { animate: true });
+              if (typeof cluster.spiderfy === 'function') {
+                setTimeout(() => {
+                  try { cluster.spiderfy(); } catch (err) {}
+                }, 150);
+              }
+            } else {
+              map.fitBounds(bounds, { padding: [50, 50], maxZoom: maxAllowedZoom, animate: true });
             }
+          } else if (typeof cluster.zoomToBounds === 'function') {
+            cluster.zoomToBounds({ padding: [50, 50] });
+          } else {
+            map.setZoom(Math.min(maxAllowedZoom, currentZoom + 2), { animate: true });
           }
         });
       }
@@ -1441,7 +1461,30 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
     focusTokenRef.current += 1;
     const fromMap = !!(options && options.fromMap);
     setFocusPlace({ id: place.id, token: focusTokenRef.current, fromMap });
-    const animateListScrollTo = (container, targetTop, durationMs = 180) => {
+
+    // When selected from map marker, un-filter so the place card is guaranteed to be rendered in list
+    if (fromMap) {
+      if (categoryFilter !== 'all' && place.categoryId !== categoryFilter) {
+        setCategoryFilter('all');
+      }
+      if (visitFilter === 'planned' && place.visitStatus !== 'planned') {
+        setVisitFilter('all');
+      } else if (visitFilter === 'visited' && place.visitStatus === 'planned') {
+        setVisitFilter('all');
+      }
+      if (listSearchQuery.trim()) {
+        const queryLower = listSearchQuery.toLowerCase().trim();
+        const matchName = place.name && place.name.toLowerCase().includes(queryLower);
+        const matchAlias = place.alias && place.alias.toLowerCase().includes(queryLower);
+        const matchAddress = place.address && place.address.toLowerCase().includes(queryLower);
+        const matchMemo = place.memo && place.memo.toLowerCase().includes(queryLower);
+        if (!matchName && !matchAlias && !matchAddress && !matchMemo) {
+          setListSearchQuery('');
+        }
+      }
+    }
+
+    const animateListScrollTo = (container, targetTop, durationMs = 220) => {
       if (!container) return;
       const reduceMotion = typeof window !== 'undefined'
         && window.matchMedia
@@ -1469,27 +1512,24 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
       };
       requestAnimationFrame(step);
     };
-    requestAnimationFrame(() => {
+
+    const scrollToTop = () => {
       try {
         const container = scrollBodyRef.current;
         if (!container) return;
         const safeId = (window.CSS && CSS.escape) ? CSS.escape(String(place.id)) : String(place.id).replace(/"/g, '');
         const row = container.querySelector('[data-place-id="' + safeId + '"]');
         if (!row) return;
-        // Keep the focused row inside the readable part of the list rather than pinning it
-        // directly to the top edge. Center-ish placement feels calmer on both desktop/mobile,
-        // and if the row is already visible we leave the scroll position alone.
-        const cRect = container.getBoundingClientRect();
-        const rRect = row.getBoundingClientRect();
-        const visibleTop = cRect.top + 12;
-        const visibleBottom = cRect.bottom - 12;
-        const alreadyVisible = rRect.top >= visibleTop && rRect.bottom <= visibleBottom;
-        if (alreadyVisible) return;
-        const anchor = Math.round(container.clientHeight * 0.28);
+
+        // Position targetTop so the selected row moves straight to the top of list container
         const maxTop = Math.max(0, container.scrollHeight - container.clientHeight);
-        const nextTop = Math.max(0, Math.min(maxTop, row.offsetTop - anchor));
-        animateListScrollTo(container, nextTop, 180);
+        const nextTop = Math.max(0, Math.min(maxTop, row.offsetTop - 6));
+        animateListScrollTo(container, nextTop, 220);
       } catch (e) {}
+    };
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(scrollToTop);
     });
   };
   const handleCloseModal = () => {
@@ -1914,7 +1954,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
             key: place.id,
             // Same purple-border + up/down-shake "you were just brought here" treatment used
             // everywhere else in the app (see chat-search-focused-bubble/chat-search-shake).
-            className: "place-card-row" + (isPlaceFocused ? " chat-search-focused-bubble" : ""),
+            className: "place-card-row" + (isPlaceFocused ? " is-focused chat-search-focused-bubble" : ""),
             "data-place-id": place.id,
             "data-no-press-feedback": true,
             role: "button",
@@ -1930,11 +1970,12 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
             style: {
               display: 'flex', flexDirection: 'column', gap: '4px',
               padding: '10px 12px', position: 'relative',
-              border: '1px solid var(--border-subtle)',
+              border: isPlaceFocused ? '2px solid #8B5CF6' : '1px solid var(--border-subtle)',
+              boxShadow: isPlaceFocused ? '0 0 0 3px rgba(139, 92, 246, 0.25), 0 2px 8px rgba(139, 92, 246, 0.15)' : 'none',
               borderRadius: 'var(--radius-md)',
               cursor: 'pointer',
-              backgroundColor: 'var(--bg-card)',
-              transition: 'border-color 0.15s ease, background-color 0.15s ease'
+              backgroundColor: isPlaceFocused ? 'rgba(139, 92, 246, 0.08)' : 'var(--bg-card)',
+              transition: 'border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease'
             }
           },
             /* Top-right absolute action buttons */
