@@ -732,7 +732,6 @@ export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoad
   const extractFirstUrl = __deps.extractFirstUrl;
   const autoGrowTextarea = __deps.autoGrowTextarea;
   const getActiveParticipants = __deps.getActiveParticipants;
-  const useScrollHideHeader = __deps.useScrollHideHeader;
   const formatChatHeaderTitle = __deps.formatChatHeaderTitle;
 
   const [searchQuery, setSearchQuery] = React.useState('');

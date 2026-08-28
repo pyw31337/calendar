@@ -816,7 +816,6 @@ export function ChatGalleryModal({
   const resolveMeetingPhotoDisplay = __deps.resolveMeetingPhotoDisplay;
   const removeFirstUrl = __deps.removeFirstUrl;
   const formatChatHeaderTitle = __deps.formatChatHeaderTitle;
-  const useScrollHideHeader = __deps.useScrollHideHeader;
 
   const [activeTab, setActiveTab] = React.useState('photos'); // 'photos' | 'links'
   const [searchQuery, setSearchQuery] = React.useState('');

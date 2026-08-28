@@ -795,14 +795,8 @@ export function ChatRoomView({
   const getActiveParticipants = __deps.getActiveParticipants;
   const extractFirstUrl = __deps.extractFirstUrl;
   const autoGrowTextarea = __deps.autoGrowTextarea;
-  const formatChatHeaderTitle = __deps.formatChatHeaderTitle;
-  const useScrollHideHeader = __deps.useScrollHideHeader;
-  const getPinnedNotices = __deps.getPinnedNotices;
-  const getMessageImageEntries = __deps.getMessageImageEntries;
   const getChatLastReadTimestamp = __deps.getChatLastReadTimestamp;
   const setChatLastReadTimestamp = __deps.setChatLastReadTimestamp;
-  const useTapRevealedMsgId = __deps.useTapRevealedMsgId;
-  const useChatSendGuard = __deps.useChatSendGuard;
   const appendChatImageFiles = __deps.appendChatImageFiles;
   const confetti = __deps.confetti || window.confetti;
   const CONFETTI_Z_INDEX = __deps.CONFETTI_Z_INDEX;
