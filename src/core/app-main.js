@@ -6351,10 +6351,15 @@ function CalendarApp() {
           )
         ),
         /* Right Column: "일정보기" & D-day Button */
-        /*#__PURE__*/React.createElement("div", {
+        /*#__PURE__*/React.createElement("button", {
+          type: "button",
           className: "btn-view-schedule",
-          role: "button",
-          tabIndex: 0,
+          "aria-label": `${formatConfirmedMeetingLabel(meeting.date)} 일정 보기`,
+          "data-no-press-feedback": true,
+          onPointerDown: (e) => {
+            // Keep the nested action independent from the banner's collapse handler on touch.
+            e.stopPropagation();
+          },
           onClick: (e) => {
             e.stopPropagation();
             if (!guardLoadedCalendar()) return;
