@@ -1880,6 +1880,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
 
   const cleanAccountDigits = (accountNumber || '').replace(/[^0-9]/g, '');
   const isAccountValid = cleanAccountDigits.length >= 8;
+  const settlementSectionLabelStyle = { display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '6px', color: 'var(--text-muted)' };
 
   return React.createElement('div', {
     className: 'modal-overlay',
@@ -1926,7 +1927,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
         style: { display: 'flex', flexDirection: 'column', gap: '14px' }
       },
       React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px' } },
-        React.createElement('label', { style: { fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-main)' } }, '타이틀 입력'),
+        React.createElement('label', { style: settlementSectionLabelStyle }, '타이틀 입력'),
         React.createElement('input', {
           type: 'text', className: 'form-input', value: title,
           onChange: e => setTitle(e.target.value), placeholder: '예: 1/N 간편 송금',
@@ -1934,7 +1935,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
         })
       ),
       React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px' } },
-        React.createElement('label', { style: { fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-main)' } }, '참여자 선택'),
+        React.createElement('label', { style: settlementSectionLabelStyle }, '참여자 선택'),
         React.createElement(SimpleBottomSheetPicker, {
           title: "참여자 선택",
           placeholder: "참여할 이름을 골라주세요",
@@ -1945,7 +1946,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
           style: { width: '100%', height: '44px', borderRadius: '8px', fontSize: '0.84rem' }
         }),
         React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '4px' } },
-          React.createElement('label', { style: { fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-main)' } }, '메모 입력 (선택)'),
+          React.createElement('label', { style: settlementSectionLabelStyle }, '메모 입력 (선택)'),
           React.createElement('div', { style: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 60px', gap: '8px', alignItems: 'center' } },
             React.createElement('input', {
               type: 'text', className: 'form-input', value: participantMemoInput,
@@ -2051,24 +2052,24 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
           )
         ),
         React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px' } },
-          React.createElement('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
-            React.createElement('label', { style: { fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-main)', margin: 0 } }, '일자별 지출 항목 선택'),
+          React.createElement('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', minHeight: '36px' } },
+            React.createElement('label', { style: { ...settlementSectionLabelStyle, marginBottom: 0 } }, '일자별 지출 항목 선택'),
             React.createElement('div', {
               className: 'calendar-nav',
-              style: { display: 'flex', alignItems: 'center', gap: '6px' }
+              style: { display: 'flex', alignItems: 'center', gap: '6px', height: '36px' }
             },
               React.createElement('button', {
-                type: 'button', className: 'btn btn-icon nav-btn', style: { width: '28px', height: '28px', padding: 0 },
+                type: 'button', className: 'btn btn-secondary calendar-month-nav-btn', style: { width: '32px', height: '32px', padding: '6px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' },
                 onClick: handlePrevMonth
-              }, React.createElement(ChevronLeftIcon, { size: 16 })),
+              }, React.createElement(ChevronLeftIcon, { size: 20 })),
               React.createElement('div', {
                 className: 'month-display',
-                style: { cursor: 'default', userSelect: 'none', display: 'flex', alignItems: 'center', fontSize: '0.86rem', fontWeight: 800 }
+                style: { cursor: 'default', userSelect: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: '48px', height: '32px', fontSize: '0.86rem', fontWeight: 800 }
               }, `${String(year).slice(2)}.${String(month + 1).padStart(2, '0')}`),
               React.createElement('button', {
-                type: 'button', className: 'btn btn-icon nav-btn', style: { width: '28px', height: '28px', padding: 0 },
+                type: 'button', className: 'btn btn-secondary calendar-month-nav-btn', style: { width: '32px', height: '32px', padding: '6px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' },
                 onClick: handleNextMonth
-              }, React.createElement(ChevronRightIcon, { size: 16 }))
+              }, React.createElement(ChevronRightIcon, { size: 20 }))
             )
           ),
           React.createElement('div', {
@@ -2100,10 +2101,10 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
         ),
         /* Personal Expense Editor Block */
         React.createElement('div', {
-          style: { display: 'flex', flexDirection: 'column', gap: '10px', borderTop: '1px solid var(--border-subtle)', paddingTop: '10px' }
+          style: { display: 'flex', flexDirection: 'column', gap: '10px' }
         },
           React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
-            React.createElement('label', { style: { fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-main)' } }, '개인 지출 등록'),
+            React.createElement('label', { style: { ...settlementSectionLabelStyle, marginBottom: 0 } }, '개인 지출 등록'),
             React.createElement('span', { style: { fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)' } },
               `합계: ${(personalExpenses.reduce((s, x) => s + (Number(x.amount) || 0), 0)).toLocaleString()}원`
             )
@@ -2114,17 +2115,17 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
             style: { display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '2px' }
           },
             personalParticipantPickerOptions.map(option => {
-              const individualSettlement = getIndividualSettlementAmount(option.value);
+              const total = personalExpenseTotals.get(option.value) || 0;
               const participant = activeParticipants.find(p => (typeof p === 'string' ? p : (p?.name || p?.id)) === option.value) || { name: option.value, color: option.color };
               return React.createElement('div', {
                 key: option.value,
                 style: {
-                  minWidth: '92px', flex: '0 0 auto', padding: '8px 10px', borderRadius: '9px',
+                  minWidth: '92px', flex: '0 0 auto', padding: '8px 10px', borderRadius: '9px', textAlign: 'center',
                   backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)'
                 }
               },
-                ParticipantBackdrop ? React.createElement(ParticipantBackdrop, { participant, name: option.value, dotSize: 9, style: { fontSize: '0.72rem' } }) : React.createElement('span', { style: { color: option.color, fontWeight: 800, fontSize: '0.72rem' } }, `● ${option.value}`),
-                React.createElement('strong', { style: { display: 'block', marginTop: '4px', color: individualSettlement < 0 ? '#DC2626' : '#2563EB', fontSize: '0.78rem' } }, `${individualSettlement.toLocaleString()}원`)
+                ParticipantBackdrop ? React.createElement(ParticipantBackdrop, { participant, name: option.value, dotSize: 9, style: { width: '100%', justifyContent: 'center', fontSize: '0.72rem' } }) : React.createElement('span', { style: { color: option.color, fontWeight: 800, fontSize: '0.72rem' } }, `● ${option.value}`),
+                React.createElement('strong', { style: { display: 'block', marginTop: '4px', color: '#2563EB', fontSize: '0.78rem' } }, `${total.toLocaleString()}원`)
               );
             })
           ),
