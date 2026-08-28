@@ -6282,7 +6282,14 @@ function CalendarApp() {
         }, yyMMdd),
         /* Day Name */
         /*#__PURE__*/React.createElement("span", {
-          style: { fontSize: '0.86rem', fontWeight: 800, color: '#FFFFFF', marginTop: '2px', lineHeight: 1.1, textShadow: '0 1px 2px rgba(0,0,0,0.15)' }
+          style: {
+            fontSize: '0.86rem',
+            fontWeight: 800,
+            color: shortDayName === '일' ? '#B7F34A' : '#FFFFFF',
+            marginTop: '2px',
+            lineHeight: 1.1,
+            textShadow: '0 1px 2px rgba(0,0,0,0.15)'
+          }
         }, fullDayName),
         /* D-day Pill Badge */
         /*#__PURE__*/React.createElement("span", {
@@ -6308,7 +6315,11 @@ function CalendarApp() {
         "data-confirmed-meeting-date": meeting.date,
         role: "button",
         tabIndex: 0,
-        onClick: () => toggleConfirmedDateExpand(meeting.date),
+        onClick: (e) => {
+          // Keep action clicks from collapsing the banner even if bubbling reaches this handler.
+          if (e.target?.closest?.('.btn-view-schedule')) return;
+          toggleConfirmedDateExpand(meeting.date);
+        },
         onKeyDown: (e) => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
@@ -6382,6 +6393,7 @@ function CalendarApp() {
             // Keep the nested action independent from the banner's collapse handler on touch.
             e.stopPropagation();
           },
+          onMouseDown: (e) => e.stopPropagation(),
           onClick: (e) => {
             e.stopPropagation();
             if (!guardLoadedCalendar()) return;
