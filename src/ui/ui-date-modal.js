@@ -816,6 +816,19 @@ export function DateModal({
     const url = normalizeBrokenMeetingPhotoUrl(value);
     return !!url && brokenMeetingPhotoUrlsRef.current.has(url);
   };
+  // A failed Storage upload used to leave a data URL truncated at the Firestore safety limit.
+  // It still looks non-empty to a simple `imageUrl || thumbUrl` check, so it inflated the tab
+  // badge even though the browser could not render it. Treat that known truncated shape as
+  // unavailable until the orphaned reference is replaced.
+  const isRenderableMeetingPhotoValue = value => {
+    const url = String(value || '').trim();
+    if (!url) return false;
+    if (/^https?:\/\//i.test(url)) return true;
+    if (/^data:image\/(?:jpeg|jpg|png|webp|gif|avif|bmp);base64,/i.test(url)) {
+      return url.length > 64 && url.length !== 2000;
+    }
+    return false;
+  };
   const markBrokenMeetingPhoto = (photo, brokenInfo = {}) => {
     const key = photo?.refKey || photo?.mediaKey || photo?.id || photo?.imageUrl || photo?.thumbUrl;
     const urls = [
@@ -1390,7 +1403,9 @@ export function DateModal({
     () => meetingPhotos.filter(photo => {
       const key = photo.refKey || photo.mediaKey || photo.id || photo.imageUrl || photo.thumbUrl;
       if (key && brokenMeetingPhotoKeysRef.current.has(key)) return false;
-      return !isBrokenMeetingPhotoValue(photo.imageUrl) && !isBrokenMeetingPhotoValue(photo.thumbUrl);
+      return !isBrokenMeetingPhotoValue(photo.imageUrl)
+        && !isBrokenMeetingPhotoValue(photo.thumbUrl)
+        && (isRenderableMeetingPhotoValue(photo.imageUrl) || isRenderableMeetingPhotoValue(photo.thumbUrl));
     }),
     [meetingPhotos, brokenMeetingPhotoRevision]
   );
@@ -2077,7 +2092,7 @@ export function DateModal({
       }
       },
       "사진",
-      /*#__PURE__*/React.createElement(SectionCountBadge, { count: meetingPhotos.length })
+      /*#__PURE__*/React.createElement(SectionCountBadge, { count: visibleMeetingPhotos.length })
     )
   )), /*#__PURE__*/React.createElement("form", {
     onSubmit: e => {
