@@ -430,22 +430,11 @@ function extractKnownParticipantNames(memo, knownNames) {
 // Normalizes either date shape a place can carry -- the structured 'YYYY-MM-DD' visitDate field,
 // or a memo-embedded 'YY.MM.DD' -- into a single comparable 'YYYY-MM-DD' string so the list can
 // be sorted by actual visit recency regardless of which source the date came from.
-const normalizePlaceDateForSort = GATHER_APP_UTILS.normalizePlaceDateForSort || function normalizePlaceDateForSort(dateStr) {
-  if (!dateStr) return null;
-  const str = String(dateStr).trim();
-  if (isValidDateString(str)) return str;
-  const match = str.match(/(\d{4}|\d{2})[.-](\d{2})[.-](\d{2})/);
-  if (!match) return null;
-  let [, y, m, d] = match;
-  if (y.length === 2) y = '20' + y;
-  const mm = Number(m), dd = Number(d);
-  if (mm < 1 || mm > 12 || dd < 1 || dd > 31) return null;
-  return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
-};
-const formatPlaceBadgeDate = GATHER_APP_UTILS.formatPlaceBadgeDate || function formatPlaceBadgeDate(dateStr) {
-  const normalized = normalizePlaceDateForSort(dateStr);
-  return normalized ? formatShortDateWithDayName(normalized) : null;
-};
+// app-utils.js is always loaded and its GATHER_APP_UTILS frozen before app-main.js statically
+// imports this module (see docs/module-map.md), so these always resolve from GATHER_APP_UTILS --
+// no local fallback implementation to keep in sync with app-utils.js's copy.
+const normalizePlaceDateForSort = GATHER_APP_UTILS.normalizePlaceDateForSort;
+const formatPlaceBadgeDate = GATHER_APP_UTILS.formatPlaceBadgeDate;
 
 function getPlaceSortDateKey(place) {
   const structured = normalizePlaceDateForSort(place && place.visitDate);
