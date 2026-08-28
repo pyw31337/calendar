@@ -2794,42 +2794,46 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
               gap: '12px',
               opacity: isClosed ? 0.75 : 1,
               position: 'relative',
-              boxShadow: '0 14px 28px rgba(91, 75, 235, 0.22)',
+              boxShadow: 'none',
               color: 'var(--settlement-hero-text)'
             }
           },
-            /* Card Header: (좌측끝) 1/N 간편 송금 [진행중] -------------- (우측끝) 우리은행 689-12-002245 박영우 [⚙️] */
+            /* Card Header: status top-left, settings top-right, title/account below. */
             React.createElement("div", {
-              style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px' }
+              style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '6px', position: 'relative', paddingRight: '34px' }
             },
-              /* Left End: Title + Status Badge */
-              React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px' } },
-                React.createElement("strong", { style: { fontSize: '0.92rem', color: 'var(--settlement-hero-text)', fontWeight: 900 } }, card.title || "1/N 간편 송금"),
-                React.createElement("span", {
+              React.createElement("span", {
+                style: {
+                  alignSelf: 'flex-start', fontSize: '0.68rem', fontWeight: 800, padding: '2px 6px', borderRadius: '4px',
+                  backgroundColor: isClosed ? 'rgba(255,255,255,0.18)' : '#22C55E',
+                  color: isClosed ? '#FFFFFF' : '#5B4BEB'
+                }
+              }, isClosed ? "마감됨" : "진행중"),
+              React.createElement("strong", { style: { fontSize: '0.92rem', color: 'var(--settlement-hero-text)', fontWeight: 900, lineHeight: 1.25, textAlign: 'left' } }, card.title || "1/N 간편 송금"),
+
+              /* Account info remains one copyable left-aligned row; only the account number is a capsule. */
+              bankInfoText && React.createElement("span", {
+                role: 'button', tabIndex: 0, title: '계좌정보 복사', 'aria-label': '계좌정보 복사',
+                onClick: () => handleCopySettlementBankInfo(bankInfoText),
+                onKeyDown: e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleCopySettlementBankInfo(bankInfoText); } },
+                style: {
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-start', flexWrap: 'wrap',
+                  maxWidth: '100%', textAlign: 'left', fontSize: '0.78rem', color: 'var(--settlement-hero-text)',
+                  fontWeight: 700, cursor: 'pointer', userSelect: 'none'
+                }
+              },
+                card.bankName && React.createElement("span", null, card.bankName),
+                card.accountNumber && React.createElement("span", {
                   style: {
-                    fontSize: '0.68rem', fontWeight: 800, padding: '2px 6px', borderRadius: '4px',
-                    backgroundColor: isClosed ? 'rgba(255,255,255,0.18)' : '#22C55E',
-                    color: isClosed ? '#FFFFFF' : '#5B4BEB'
+                    display: 'inline-flex', alignItems: 'center', padding: '2px 8px', margin: '0 4px',
+                    borderRadius: '10px', backgroundColor: '#666', mixBlendMode: 'hard-light', color: 'var(--settlement-hero-text)'
                   }
-                }, isClosed ? "마감됨" : "진행중")
+                }, card.accountNumber),
+                card.depositorName && React.createElement("span", null, card.depositorName)
               ),
 
-              /* Right End: Account Info Text + Cog Settings Button */
-              React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px', marginLeft: 'auto', position: 'relative' } },
-                bankInfoText && React.createElement("span", {
-                  role: 'button', tabIndex: 0, title: '계좌정보 복사', 'aria-label': '계좌정보 복사',
-                  onClick: () => handleCopySettlementBankInfo(bankInfoText),
-                  onKeyDown: e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleCopySettlementBankInfo(bankInfoText); } },
-                  style: {
-                    display: 'inline-flex', alignItems: 'center', maxWidth: '100%', padding: '2px 8px',
-                    margin: '0 4px', borderRadius: '10px', backgroundColor: '#666', mixBlendMode: 'hard-light',
-                    fontSize: '0.78rem', color: 'var(--settlement-hero-text)', fontWeight: 700,
-                    cursor: 'pointer', userSelect: 'none'
-                  }
-                }, bankInfoText),
-                
-                /* Cog Settings Button */
-                React.createElement("button", {
+              /* Cog Settings Button */
+              React.createElement("button", {
                   type: "button",
                   title: "정산 수정",
                   onClick: () => {
@@ -2837,9 +2841,10 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
                     setEditingSettlementCard(card);
                   },
                   style: {
-                    background: 'var(--settlement-hero-action-bg)', border: '1px solid var(--settlement-hero-action-border)', borderRadius: '10px',
+                    background: 'transparent', border: 'none', borderRadius: '0',
                     width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    color: 'var(--settlement-hero-action-text)', cursor: 'pointer', padding: 0
+                    color: 'var(--settlement-hero-action-text)', cursor: 'pointer', padding: 0,
+                    position: 'absolute', top: 0, right: 0
                   }
                 },
                   React.createElement("svg", {
@@ -2851,8 +2856,8 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
                   )
                 ),
 
-                /* Dropdown Settings Menu */
-                isMenuOpen && React.createElement("div", {
+              /* Dropdown Settings Menu */
+              isMenuOpen && React.createElement("div", {
                   style: {
                     position: 'absolute', right: 0, top: '34px', backgroundColor: 'var(--bg-card)',
                     border: '1px solid var(--border-subtle)', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
@@ -2895,7 +2900,6 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
                     }
                   }, "삭제")
                 )
-              )
             ),
 
             /* One fixed-width person card per participant, up to four cards per row. */
