@@ -2570,10 +2570,10 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
     "aria-label": "정산 보기 방식",
     style: { marginLeft: 'auto', marginRight: '8px' }
   }, /*#__PURE__*/React.createElement(SegmentedToggle, {
-    ariaLabel: "누적 또는 일별 정산 보기",
+    ariaLabel: "누적 또는 월별 정산 보기",
     value: activeTab,
     onChange: v => setActiveTab(v),
-    options: [{ value: 'total', label: '누적' }, { value: 'daily', label: '일별' }],
+    options: [{ value: 'total', label: '누적' }, { value: 'daily', label: '월별' }],
     style: { width: '92px', padding: '2px', borderRadius: '10px' }
   })), /*#__PURE__*/React.createElement("button", {
     type: "button",
