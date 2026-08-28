@@ -548,6 +548,9 @@ import {
 
 var firebaseDb = (typeof window !== 'undefined' && window.GATHER_APP_FIREBASE_DATA && window.GATHER_APP_FIREBASE_DATA.firebaseDb) || null;
 var firebaseStorage = (typeof window !== 'undefined' && window.GATHER_APP_FIREBASE_DATA && window.GATHER_APP_FIREBASE_DATA.firebaseStorage) || null;
+function getLiveFirebaseStorage() {
+  return (typeof window !== 'undefined' && window.__gatherFirebaseStorage) || firebaseStorage;
+}
 
 /* Small dependency-free donut chart: N segments as SVG stroke-dasharray arcs on a ring. */
 
@@ -3034,7 +3037,7 @@ function CalendarApp() {
         return { shareUrl, imageUrl: null };
       }
 
-      if (!firebaseStorage) throw new Error('Firebase Storage is not available');
+      if (!getLiveFirebaseStorage()) throw new Error('Firebase Storage is not available');
       const uploaded = await uploadInlineChatImageToStorage(activeCalId, url, meta?.thumb || url, index, updateProgress, 12000);
       if (!uploaded?.imageUrl) throw new Error('Image upload failed');
       setChatUploadProgress({ pct: 100, remainingSec: 0, label: 'URL 생성완료' });
@@ -7767,7 +7770,8 @@ function getUploadImageBlobMeta(blob, fallbackExt = 'jpg') {
 // total)` is called as each upload progresses so a caller can aggregate progress across a batch.
 function uploadChatImageAssets(calendarId, compressed, index, onBytes, timeoutMs = 45000) {
   return new Promise((resolve) => {
-    if (!firebaseStorage || !compressed?.originalBlob || !compressed?.thumbnailBlob) {
+    const storage = getLiveFirebaseStorage();
+    if (!storage || !compressed?.originalBlob || !compressed?.thumbnailBlob) {
       resolve(null);
       return;
     }
@@ -7781,8 +7785,8 @@ function uploadChatImageAssets(calendarId, compressed, index, onBytes, timeoutMs
     // Pages host) is silently blocked by the browser and would never work.
     const originalMeta = getUploadImageBlobMeta(compressed.originalBlob, 'jpg');
     const thumbMeta = getUploadImageBlobMeta(compressed.thumbnailBlob, originalMeta.ext === 'png' ? 'png' : 'jpg');
-    const originalRef = firebaseStorage.ref(`${basePath}_original_${compressed.originalBlob.size}b.${originalMeta.ext}`);
-    const thumbRef = firebaseStorage.ref(`${basePath}_thumb_${compressed.thumbnailBlob.size}b.${thumbMeta.ext}`);
+    const originalRef = storage.ref(`${basePath}_original_${compressed.originalBlob.size}b.${originalMeta.ext}`);
+    const thumbRef = storage.ref(`${basePath}_thumb_${compressed.thumbnailBlob.size}b.${thumbMeta.ext}`);
 
     // On a flaky mobile connection, a stalled upload can go silent with no error/complete event
     // ever firing (the SDK is still waiting on a dead connection) -- without a bound here, the
@@ -7851,7 +7855,7 @@ async function dataUrlToBlob(dataUrl) {
 }
 
 async function uploadInlineChatImageToStorage(calendarId, imageUrl, thumbUrl, index = 0, onBytes, timeoutMs = 45000) {
-  if (!firebaseStorage) return null;
+  if (!getLiveFirebaseStorage()) return null;
   if (onBytes) onBytes(`${index}-prepare`, 1, 10);
   const originalBlob = await dataUrlToBlob(imageUrl);
   if (onBytes) onBytes(`${index}-prepare`, 5, 10);
@@ -7867,7 +7871,7 @@ async function uploadInlineChatImageToStorage(calendarId, imageUrl, thumbUrl, in
 }
 
 async function migrateBase64ChatImagesForCalendar(calId, { maxMessages = 40 } = {}) {
-  if (!calId || !firebaseDb || !firebaseStorage) return { migrated: 0, failed: 0, scanned: 0 };
+  if (!calId || !firebaseDb || !getLiveFirebaseStorage()) return { migrated: 0, failed: 0, scanned: 0 };
   const storageOk = await checkFirebaseStorageHealth();
   if (!storageOk) return { migrated: 0, failed: 0, scanned: 0, reason: 'storage-unavailable' };
   let migrated = 0, failed = 0, scanned = 0;
@@ -8141,9 +8145,10 @@ function isStorageDownloadUrl(url) {
 }
 
 async function deleteChatImageFromStorage(url) {
-  if (!firebaseStorage || !isStorageDownloadUrl(url)) return;
+  const storage = getLiveFirebaseStorage();
+  if (!storage || !isStorageDownloadUrl(url)) return;
   try {
-    await firebaseStorage.refFromURL(url).delete();
+    await storage.refFromURL(url).delete();
   } catch (e) {
     console.warn('Failed to delete chat image from Storage:', e);
   }
@@ -9495,7 +9500,8 @@ function createMemoActivityLog(calendarId, action, participantId = '', timestamp
 // REST fallback helper for uploading memo image assets to Firebase Storage
 function uploadMemoImageAssets(calendarId, compressed, index, onBytes, timeoutMs = 45000) {
   return new Promise((resolve) => {
-    if (!firebaseStorage || !compressed?.originalBlob || !compressed?.thumbnailBlob) {
+    const storage = getLiveFirebaseStorage();
+    if (!storage || !compressed?.originalBlob || !compressed?.thumbnailBlob) {
       resolve(null);
       return;
     }
@@ -9505,8 +9511,8 @@ function uploadMemoImageAssets(calendarId, compressed, index, onBytes, timeoutMs
     // Byte size embedded in the filename -- see the matching comment in uploadChatImageAssets.
     const originalMeta = getUploadImageBlobMeta(compressed.originalBlob, 'jpg');
     const thumbMeta = getUploadImageBlobMeta(compressed.thumbnailBlob, originalMeta.ext === 'png' ? 'png' : 'jpg');
-    const originalRef = firebaseStorage.ref(`${basePath}_original_${compressed.originalBlob.size}b.${originalMeta.ext}`);
-    const thumbRef = firebaseStorage.ref(`${basePath}_thumb_${compressed.thumbnailBlob.size}b.${thumbMeta.ext}`);
+    const originalRef = storage.ref(`${basePath}_original_${compressed.originalBlob.size}b.${originalMeta.ext}`);
+    const thumbRef = storage.ref(`${basePath}_thumb_${compressed.thumbnailBlob.size}b.${thumbMeta.ext}`);
 
     const runUploadOnce = (blob, ref, taskKey, contentType) => {
       let settled = false;

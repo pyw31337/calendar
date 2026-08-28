@@ -1014,6 +1014,10 @@ function attemptFirebaseInit() {
     if (!firebaseStorage && firebase.apps.length) {
       firebaseStorage = firebase.storage();
     }
+    if (firebaseStorage && typeof window !== 'undefined') {
+      window.__gatherFirebaseStorage = firebaseStorage;
+      notifyFirebaseStateChange();
+    }
   } catch (e) {
     console.warn('Firebase Storage init notice (falling back to inline base64 images):', e);
   }
