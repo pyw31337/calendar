@@ -1356,8 +1356,8 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
         /*#__PURE__*/React.createElement("button", {
           type: "button",
           onClick: () => setIsMemoMenuOpen(true),
-          title: "메뉴",
-          "aria-label": "메뉴",
+          title: "메모 메뉴",
+          "aria-label": "메모 메뉴 열기",
           style: {
             background: 'none', border: 'none', cursor: 'pointer', padding: '6px',
             color: 'var(--text-muted)',

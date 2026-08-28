@@ -192,6 +192,65 @@ async function checkLightboxZoomControls(browser, baseUrl) {
   }
 }
 
+async function checkSideMenuNavigation(browser, baseUrl) {
+  const destinations = [
+    ['chat', '채팅'],
+    ['gallery', '갤러리'],
+    ['places', '장소'],
+    ['memo', '메모']
+  ];
+  for (const viewport of VIEWPORTS) {
+    for (const [calId] of CALENDARS) {
+      const label = `[${viewport.name}] ${calId} 사이드메뉴 전환`;
+      const context = await browser.newContext({
+        viewport: { width: viewport.width, height: viewport.height },
+        isMobile: viewport.isMobile,
+        hasTouch: viewport.hasTouch,
+        deviceScaleFactor: viewport.deviceScaleFactor || 1,
+        userAgent: viewport.userAgent
+      });
+      const page = await context.newPage();
+      const consoleErrors = [];
+      const pageErrors = [];
+      page.on('console', msg => {
+        if (msg.type() === 'error' && !msg.text().includes('compute-pressure') && !msg.text().includes('Permissions policy')) {
+          consoleErrors.push(msg.text());
+        }
+      });
+      page.on('pageerror', err => pageErrors.push(err.message));
+      try {
+        await page.goto(`${baseUrl}?id=${calId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+        await page.waitForFunction(() => window.__GATHER_BOOT_READY__ === true, { timeout: 25000 });
+        for (const [view, viewLabel] of destinations) {
+          const menuButton = page.locator('button[aria-label$="메뉴 열기"]').first();
+          await menuButton.waitFor({ state: 'visible', timeout: 8000 });
+          await menuButton.click();
+          const menu = page.locator('.admin-side-menu-overlay nav.admin-side-menu').last();
+          await menu.waitFor({ state: 'visible', timeout: 5000 });
+          const item = menu.locator('button.admin-side-menu-item').filter({ hasText: viewLabel }).first();
+          await item.waitFor({ state: 'visible', timeout: 5000 });
+          await item.click();
+          await page.waitForFunction(expected => new URL(window.location.href).searchParams.get('view') === expected, view, { timeout: 8000 });
+          await page.waitForFunction(() => window.__GATHER_BOOT_READY__ === true, { timeout: 8000 });
+          // The app swaps an entire early-return tree for each view. Give React one paint to
+          // mount that view's own header before querying its menu button.
+          await page.waitForTimeout(350);
+          const visibleText = await page.locator('body').innerText();
+          if (visibleText.trim().length < 20) throw new Error(`${viewLabel} 화면 내용이 비어 있음`);
+          pass(`${label}: ${viewLabel}`);
+        }
+        if (consoleErrors.length || pageErrors.length) {
+          fail(label, `전환 후 콘솔/페이지 오류 ${consoleErrors.length + pageErrors.length}건`);
+        }
+      } catch (err) {
+        fail(label, err.message);
+      } finally {
+        await context.close();
+      }
+    }
+  }
+}
+
 async function checkThrottledBoot(browser, baseUrl) {
   const label = '저속 네트워크(슬로우 3G급) 모바일 부팅';
   const context = await browser.newContext({
@@ -266,6 +325,7 @@ async function main() {
     console.log('\n-- 상호작용 스모크 (읽기 전용) --');
     await checkEmojiCategories(browser, baseUrl);
     await checkLightboxZoomControls(browser, baseUrl);
+    await checkSideMenuNavigation(browser, baseUrl);
 
     console.log('\n-- 저속 네트워크 부팅 경쟁 상태 --');
     await checkThrottledBoot(browser, baseUrl);

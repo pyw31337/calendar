@@ -1561,7 +1561,7 @@ export function ChatGalleryModal({
             /*#__PURE__*/React.createElement("button", {
               type: "button",
               onClick: () => setIsMenuOpen(true),
-              title: "갤러리 메뉴", "aria-label": "갤러리",
+              title: "갤러리 메뉴", "aria-label": "갤러리 메뉴 열기",
               style: {
                 background: 'none', border: 'none', cursor: 'pointer', padding: '6px',
                 color: '#64748B', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0

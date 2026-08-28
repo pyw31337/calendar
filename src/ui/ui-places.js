@@ -1706,8 +1706,8 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
         /*#__PURE__*/React.createElement("button", {
           type: "button",
           onClick: () => setIsPlacesMenuOpen(true),
-          title: "메뉴",
-          "aria-label": "장소",
+          title: "장소 메뉴",
+          "aria-label": "장소 메뉴 열기",
           style: {
             background: 'none', border: 'none', cursor: 'pointer', padding: '6px',
             color: '#64748B', display: 'flex', alignItems: 'center', justifyContent: 'center'
