@@ -73,51 +73,6 @@ exports.onMessageMeetingPhotoIndexWrite = functions.firestore
   .document('calendars/{calendarDocId}/messages/{messageId}')
   .onWrite((change, context) => syncMeetingPhotoIndex(change, context));
 
-// One-time/backfill endpoint for the pre-existing message history. It is protected by the
-// Functions config token and is intended to be removed after the initial migration is complete.
-exports.rebuildMeetingPhotoIndex = functions.runWith({ secrets: ['MEETING_INDEX_TOKEN'] }).https.onRequest(async (req, res) => {
-  const suppliedToken = req.get('x-meeting-index-token') || req.query.token || req.body?.token;
-  const configuredToken = process.env.MEETING_INDEX_TOKEN;
-  if (req.method !== 'POST' || suppliedToken !== configuredToken) {
-    res.status(403).send('forbidden');
-    return;
-  }
-  const ids = Array.isArray(req.body?.calendarIds) && req.body.calendarIds.length
-    ? req.body.calendarIds : ['kkot', 'cw', 'jhair'];
-  const db = admin.firestore();
-  const result = {};
-  try {
-    for (const calendarId of ids) {
-      if (!/^[A-Za-z0-9_-]{1,64}$/.test(calendarId)) continue;
-      const snap = await db.collection('calendars').doc(`cal_${calendarId}`).collection('messages').get();
-      const writes = [];
-      snap.forEach(doc => {
-        const message = doc.data() || {};
-        getMessageImageEntriesForIndex(message).forEach(entry => {
-          parseMeetingDateTags(entry.tags).forEach(date => {
-            const id = `${date}_${doc.id}_${entry.index}`.replace(/[^A-Za-z0-9_-]/g, '_');
-            writes.push({ ref: db.collection('calendars').doc(`cal_${calendarId}`).collection('meetingPhotoIndex').doc(id), data: {
-              date, sourceMessageId: doc.id, sourceImageIndex: entry.index,
-              imageUrl: entry.imageUrl, thumbUrl: entry.thumbUrl, tags: entry.tags,
-              createdAt: Number(message.timestamp) || 0, updatedAt: Date.now()
-            }});
-          });
-        });
-      });
-      for (let i = 0; i < writes.length; i += 450) {
-        const batch = db.batch();
-        writes.slice(i, i + 450).forEach(write => batch.set(write.ref, write.data));
-        await batch.commit();
-      }
-      result[calendarId] = { messages: snap.size, indexed: writes.length };
-    }
-    res.json(result);
-  } catch (err) {
-    console.error('rebuildMeetingPhotoIndex failed:', err);
-    res.status(500).json({ error: 'index rebuild failed' });
-  }
-});
-
 // Public VAPID key is meant to be public (also embedded client-side in index.html, where the
 // browser's pushManager.subscribe() needs it) -- only the private key is a secret. Configuring
 // web-push happens lazily inside ensureVapidConfigured() rather than here at module scope,
