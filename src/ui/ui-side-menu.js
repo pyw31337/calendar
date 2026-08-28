@@ -749,8 +749,10 @@ export function AppSettingsModal({
 }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
+  const __comp = window.GATHER_UI_COMPONENTS || {};
   const SmallXIcon = __deps.SmallXIcon;
   const ToggleSwitch = __deps.ToggleSwitch;
+  const ConfirmDialog = __comp.ConfirmDialog || __deps.ConfirmDialog;
   const MoonStarsIcon = __deps.MoonStarsIcon;
   const TextResizeIcon = __deps.TextResizeIcon;
   const BellIcon = __deps.BellIcon;
@@ -776,6 +778,7 @@ export function AppSettingsModal({
   const [pushStatus, setPushStatus] = React.useState(null); // { ok, reason, subId }
   const [deviceRows, setDeviceRows] = React.useState([]);
   const [backupBusy, setBackupBusy] = React.useState(false);
+  const [localConfirmDialog, setLocalConfirmDialog] = React.useState(null);
   const backupFileInputRef = React.useRef(null);
   const myDeviceId = React.useMemo(() => (typeof getOrCreateDeviceId === 'function' ? getOrCreateDeviceId() : null), []);
   const currentCalendar = calendar && typeof calendar === 'object' ? calendar : null;
@@ -856,15 +859,22 @@ export function AppSettingsModal({
 
   const handleDeleteDevice = async (row) => {
     if (!row || !calendarId) return;
-    try {
-      const db = window.__gatherFirebaseDb;
-      if (!db) return;
-      await db.collection('calendars').doc('cal_' + calendarId).collection('push_subscriptions').doc(row.id).delete();
-      if (typeof showToast === 'function') showToast('기기 구독을 삭제했습니다.', 'success');
-      await refreshPushMeta();
-    } catch (e) {
-      if (typeof showToast === 'function') showToast('삭제 실패', 'error');
-    }
+    const executeDelete = async () => {
+      try {
+        const db = window.__gatherFirebaseDb;
+        if (!db) return;
+        await db.collection('calendars').doc('cal_' + calendarId).collection('push_subscriptions').doc(row.id).delete();
+        if (typeof showToast === 'function') showToast('기기 구독을 삭제했습니다.', 'success');
+        await refreshPushMeta();
+      } catch (e) {
+        if (typeof showToast === 'function') showToast('삭제 실패', 'error');
+      }
+    };
+    const confirm = typeof onRequestConfirm === 'function' ? onRequestConfirm : (title, message, onConfirm) => {
+      if (typeof ConfirmDialog !== 'function') return;
+      setLocalConfirmDialog({ title, message, onConfirm });
+    };
+    confirm('기기 구독 삭제', `${row.deviceLabel || '이 기기'}의 알림 구독을 삭제할까요?`, executeDelete);
   };
 
   const handleDownloadBackup = async () => {
@@ -940,7 +950,7 @@ export function AppSettingsModal({
       const confirmFn = typeof onRequestConfirm === 'function'
         ? onRequestConfirm
         : (title, message, onConfirm) => {
-            if (window.confirm(`${title}\n\n${message}`)) onConfirm();
+            if (typeof ConfirmDialog === 'function') setLocalConfirmDialog({ title, message, onConfirm });
           };
       confirmFn('백업 복구 확인', confirmMessage, executeRestore);
     } catch (err) {
@@ -1187,7 +1197,13 @@ export function AppSettingsModal({
           )
         )
       )
-    )
+    ),
+    localConfirmDialog && ConfirmDialog && /*#__PURE__*/React.createElement(ConfirmDialog, {
+      title: localConfirmDialog.title,
+      message: localConfirmDialog.message,
+      onConfirm: () => { const action = localConfirmDialog.onConfirm; setLocalConfirmDialog(null); action(); },
+      onCancel: () => setLocalConfirmDialog(null)
+    })
   );
 }
 

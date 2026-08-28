@@ -779,11 +779,11 @@ function getDeps() { return window.GATHER_UI_DEPS || {}; }
     React.createElement('div', { className: 'confirm-dialog-actions', style: { display: 'flex', gap: '10px', justifyContent: 'center' } },
       React.createElement('button', {
         type: 'button', className: 'btn btn-secondary', onClick: onCancel,
-        style: { flex: 1, height: '36px', fontSize: '0.85rem' }
+        style: { flex: 1, height: '44px', minHeight: '44px', fontSize: '0.85rem' }
       }, '취소'),
       React.createElement('button', {
         type: 'button', className: 'btn btn-danger', onClick: handleConfirmClick,
-        style: { flex: 1, height: '36px', fontSize: '0.85rem', backgroundColor: '#EF4444', color: '#FFFFFF', border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' }
+        style: { flex: 1, height: '44px', minHeight: '44px', fontSize: '0.85rem', backgroundColor: '#EF4444', color: '#FFFFFF', border: 'none', borderRadius: 'var(--radius-md)', fontWeight: 'bold', cursor: 'pointer' }
       }, '확인')
     )));
   }

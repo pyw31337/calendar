@@ -1340,7 +1340,7 @@ button, input, textarea, select {
   input[type="search"],
   input[type="number"],
   textarea {
-    font-size: 0.88rem !important;
+    font-size: 1rem !important;
   }
 }
 html {
@@ -4833,6 +4833,18 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
 .date-modal-attendance-note { max-width: 100%; }
 
 @media (max-width: 480px) {
+  .settlement-participant-grid,
+  .settlement-bank-grid,
+  .settlement-personal-input-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .settlement-participant-grid > .btn,
+  .settlement-participant-grid > button {
+    width: 100% !important;
+  }
+  .settlement-metric-grid {
+    grid-template-columns: 1fr !important;
+  }
   .date-modal-field-with-actions {
     flex-direction: column !important;
     align-items: stretch !important;

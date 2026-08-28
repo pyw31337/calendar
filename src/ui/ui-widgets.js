@@ -834,28 +834,24 @@ export function ParticipantPickerButton({ participant, onClick }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
+  const ParticipantBackdrop = __comp.ParticipantBackdrop || __deps.ParticipantBackdrop;
 
   return /*#__PURE__*/React.createElement("button", {
     type: "button",
+    className: "form-select participant-picker-button",
     onClick,
     style: {
-      backgroundColor: participant?.color || '#94A3B8',
-      color: '#FFFFFF',
-      border: 'none',
-      borderRadius: 'var(--radius-full)',
-      padding: '6px 14px',
-      fontSize: '0.8rem',
-      fontWeight: 'bold',
-      cursor: 'pointer',
-      whiteSpace: 'nowrap',
+      padding: '10px 14px',
+      fontSize: '0.84rem',
       display: 'flex',
       alignItems: 'center',
-      gap: '6px',
-      height: '32px',
+      justifyContent: 'space-between',
+      gap: '8px',
+      height: '44px',
       boxSizing: 'border-box',
       flexShrink: 0
     }
-  }, participant?.name || '작성자 선택', /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.6rem' } }, "▼"));
+  }, ParticipantBackdrop ? /*#__PURE__*/React.createElement(ParticipantBackdrop, { participant, name: participant?.name || '작성자 선택', dotSize: 9 }) : /*#__PURE__*/React.createElement("span", { style: { color: participant?.color || 'var(--text-muted)', fontWeight: 800 } }, participant?.name || '작성자 선택'), /*#__PURE__*/React.createElement("span", { className: "form-select-chevron", "aria-hidden": "true" }, "⌄"));
 }
 
 export function DateCapsuleBadge({ date, style = null }) {

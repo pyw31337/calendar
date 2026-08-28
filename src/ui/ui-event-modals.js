@@ -1846,7 +1846,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
         })
       ),
       React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px' } },
-        React.createElement('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr 44px', gap: '8px', alignItems: 'center' } },
+        React.createElement('div', { className: 'settlement-participant-grid', style: { display: 'grid', gridTemplateColumns: '1fr 1fr 44px', gap: '8px', alignItems: 'center' } },
           React.createElement('label', { style: { fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-main)' } }, '참여자 선택'),
           React.createElement('label', { style: { fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-main)' } }, '개별 정산금액'),
           React.createElement('span', null)
@@ -1856,6 +1856,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
           const formattedVal = formatCommaNumber(rawVal);
           return React.createElement('div', {
             key: row.id,
+            className: 'settlement-participant-grid',
             style: { display: 'grid', gridTemplateColumns: '1fr 1fr 44px', gap: '8px', alignItems: 'center' }
           },
             SimpleBottomSheetPicker ? React.createElement(SimpleBottomSheetPicker, {
@@ -1908,7 +1909,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
           border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-card)'
         }
       }, '+ 참여자 추가'),
-      React.createElement('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' } },
+      React.createElement('div', { className: 'settlement-bank-grid', style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' } },
         React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '4px' } },
           React.createElement('label', { style: { fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)' } }, '송금 받을 은행'),
           SimpleBottomSheetPicker ? React.createElement(SimpleBottomSheetPicker, {
@@ -2052,7 +2053,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
           ),
 
           /* Input Controls: Row 1 (Participant Select & Auto Comma Amount Input) */
-          React.createElement('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' } },
+          React.createElement('div', { className: 'settlement-personal-input-grid', style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' } },
             SimpleBottomSheetPicker ? React.createElement(SimpleBottomSheetPicker, {
               title: "개인 지출 참여자 선택",
               placeholder: "참여자 선택",
