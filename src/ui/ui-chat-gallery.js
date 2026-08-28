@@ -1110,6 +1110,44 @@ export function ChatGalleryModal({
   }, [asPage, searchQuery, activeTab, hasMoreOlderChat, loadingOlderChat, hasMoreMemos, (sharedLinks || []).length, (chatMessages || []).length, (memos || []).length]);
 
   const displayPhotoTabCount = visiblePhotos.length;
+  const [galleryViewMode, setGalleryViewMode] = React.useState('all'); // 'all' | 'date'
+  const getGalleryItemDateKey = item => {
+    const meetingDate = String(item?.meetingDate || '').trim();
+    if (meetingDate && isValidDateString(meetingDate)) return meetingDate;
+    const timestamp = Number(item?.timestamp || 0);
+    if (!Number.isFinite(timestamp) || timestamp <= 0) return '';
+    const date = new Date(timestamp);
+    if (Number.isNaN(date.getTime())) return '';
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+  const groupedGallerySections = React.useMemo(() => {
+    if (galleryViewMode !== 'date') return [];
+    const sourceItems = activeTab === 'links' ? filteredLinks : visiblePhotos;
+    const groups = new Map();
+    (sourceItems || []).forEach((item, idx) => {
+      const key = getGalleryItemDateKey(item) || '__unknown__';
+      const next = groups.get(key) || [];
+      next.push({ item, idx });
+      groups.set(key, next);
+    });
+    return Array.from(groups.entries())
+      .sort((a, b) => {
+        if (a[0] === '__unknown__') return 1;
+        if (b[0] === '__unknown__') return -1;
+        return b[0].localeCompare(a[0]);
+      })
+      .map(([dateKey, entries]) => ({
+        dateKey,
+        label: dateKey === '__unknown__' ? '날짜 미상' : (formatShortDateWithDayName(dateKey) || dateKey),
+        items: entries
+          .slice()
+          .sort((a, b) => (Number(b.item?.timestamp || 0) - Number(a.item?.timestamp || 0)) || (a.idx - b.idx))
+          .map(entry => entry.item)
+      }));
+  }, [galleryViewMode, activeTab, filteredLinks, visiblePhotos]);
 
   const handleUploadClick = () => {
     if (uploadInputRef.current) uploadInputRef.current.click();
@@ -1244,6 +1282,169 @@ export function ChatGalleryModal({
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
     position: 'relative', overflow: 'hidden'
   };
+  const renderGalleryPhotoGrid = (items, lightboxItems = visiblePhotos) => /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'grid',
+      gridTemplateColumns: `repeat(${gridCols}, minmax(0, 1fr))`,
+      gap: '6px',
+      width: '100%',
+      alignContent: 'start'
+    }
+  }, (items || []).map((photo, idx) => {
+    const photoKey = getPhotoKey(photo);
+    const lightboxIndex = (lightboxItems || []).findIndex(entry => getPhotoKey(entry) === photoKey);
+    return /*#__PURE__*/React.createElement(MediaThumb, {
+      key: photo.mediaKey || photo.refKey || `${photo.messageId || photo.source || 'photo'}-${photo.meetingDate || ''}-${photo.directMediaUrl ? 'direct' : photo.imageIndex}-${photo.timestamp || idx}`,
+      "data-photo-url": photo.full || photo.thumb,
+      "data-message-id": photo.messageId || photo.sourceMessageId,
+      src: (photo.thumb && String(photo.thumb)) || (photo.full && String(photo.full)) || '',
+      fallbackSrc: (photo.full && String(photo.full)) || (photo.thumb && String(photo.thumb)) || '',
+      alt: "공유사진",
+      loading: "lazy",
+      decoding: "async",
+      referrerPolicy: 'no-referrer',
+      onClick: () => setActiveLightbox && setActiveLightbox({
+        urls: (lightboxItems || []).map(p => p.full),
+        index: lightboxIndex >= 0 ? lightboxIndex : idx,
+        meta: (lightboxItems || []).map(p => ({ timestamp: p.timestamp, messageId: p.messageId, imageIndex: p.imageIndex, thumb: p.thumb, tags: p.tags, directMediaUrl: p.directMediaUrl, source: p.source, uploadSource: p.uploadSource, meetingDate: p.meetingDate, photoId: p.photoId, sourceMessageId: p.sourceMessageId, sourceImageIndex: p.sourceImageIndex, assetKey: p.assetKey, mediaKey: p.mediaKey, refKey: p.refKey }))
+      }),
+      onBroken: (e, brokenInfo) => handleBrokenPhoto(photo, brokenInfo),
+      style: {
+        width: '100%',
+        maxWidth: '100%',
+        aspectRatio: '1 / 1',
+        objectFit: 'cover',
+        borderRadius: '6px',
+        cursor: 'pointer',
+        backgroundColor: 'var(--bg-primary)',
+        display: 'block'
+      }
+    });
+  }));
+  const renderGalleryLinkList = items => /*#__PURE__*/React.createElement(React.Fragment, null,
+    (items || []).map(item => /*#__PURE__*/React.createElement(LinkPreviewCard, {
+      key: item.messageId || item.url,
+      url: item.url,
+      fallbackTitle: item.text ? removeFirstUrl(item.text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : '',
+      cachedData: item.linkPreview,
+      stretch: true
+    }))
+  );
+  const renderGalleryLoadMoreButton = ({ loadingLabel, label, onClick, disabled }) => /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: onClick,
+    disabled: !!disabled,
+    style: {
+      width: '100%',
+      marginTop: '4px',
+      padding: '12px 0',
+      border: 'none',
+      borderRadius: 'var(--radius-md)',
+      backgroundColor: 'color-mix(in srgb, var(--bg-primary) 96%, black)',
+      color: 'var(--text-main)',
+      fontSize: '0.85rem',
+      fontWeight: 700,
+      cursor: disabled ? 'wait' : 'pointer',
+      textAlign: 'center'
+    }
+  }, disabled ? loadingLabel : label);
+  const renderGalleryContent = () => {
+    if (galleryViewMode === 'date') {
+      const isLinkMode = activeTab === 'links';
+      const showLoadMore = isLinkMode
+        ? (hasMoreOlderChat || hasMoreMemos)
+        : (hasMoreOlderChat || loadingOlderChat);
+      const loadMoreNode = showLoadMore && !(searchQuery || '').trim() && (
+        isLinkMode
+          ? renderGalleryLoadMoreButton({
+              label: '이전 링크 더 보기',
+              loadingLabel: '이전 링크를 불러오는 중…',
+              disabled: !!loadingOlderChat,
+              onClick: () => {
+                if (typeof onLoadOlderChat === 'function' && hasMoreOlderChat && !loadingOlderChat) onLoadOlderChat();
+                if (typeof onLoadMoreMemos === 'function' && hasMoreMemos) onLoadMoreMemos();
+              }
+            })
+          : renderGalleryLoadMoreButton({
+              label: '이전 사진·링크 더 보기',
+              loadingLabel: '이전 사진을 불러오는 중…',
+              disabled: !!loadingOlderChat,
+              onClick: () => { if (typeof onLoadOlderChat === 'function' && !loadingOlderChat) onLoadOlderChat(); }
+            })
+      );
+      return /*#__PURE__*/React.createElement(React.Fragment, null,
+        groupedGallerySections.length === 0 ? /*#__PURE__*/React.createElement("div", {
+          style: { textAlign: 'center', color: 'var(--text-muted)', padding: '40px 0', fontSize: '0.88rem' }
+        }, searchQuery
+          ? "검색 결과가 없습니다."
+          : (isLinkMode
+            ? "공유된 링크가 없습니다."
+            : ((hasMoreOlderChat || loadingOlderChat)
+              ? "이전 사진을 불러오는 중…"
+              : ((typeof totalGalleryCount === 'number' && totalGalleryCount > 0)
+                ? "사진 데이터를 아직 불러오지 못했습니다. 아래 더보기를 눌러 주세요."
+                : "공유된 사진이 없습니다."))))
+        : groupedGallerySections.map(section => /*#__PURE__*/React.createElement("section", {
+          key: section.dateKey,
+          style: { display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }
+        },
+          /*#__PURE__*/React.createElement("div", {
+            style: {
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              color: 'var(--text-main)',
+              fontSize: '0.88rem',
+              fontWeight: 800,
+              padding: '2px 2px 0 2px'
+            }
+          },
+            /*#__PURE__*/React.createElement("span", null, section.label),
+            /*#__PURE__*/React.createElement("span", { className: "section-count-badge" }, section.items.length),
+            /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.74rem', fontWeight: 800, color: 'var(--text-muted)' } }, "건")
+          ),
+          isLinkMode
+            ? renderGalleryLinkList(section.items)
+            : renderGalleryPhotoGrid(section.items, visiblePhotos)
+        )),
+        loadMoreNode
+      );
+    }
+    if (activeTab === 'links') {
+      return /*#__PURE__*/React.createElement(React.Fragment, null,
+        filteredLinks.length === 0 ? /*#__PURE__*/React.createElement("div", {
+          style: { textAlign: 'center', color: 'var(--text-muted)', padding: '40px 0', fontSize: '0.88rem' }
+        }, searchQuery ? "검색 결과가 없습니다." : "공유된 링크가 없습니다.") : renderGalleryLinkList(filteredLinks),
+        (hasMoreOlderChat || hasMoreMemos) && !(searchQuery || '').trim() && renderGalleryLoadMoreButton({
+          label: '이전 링크 더 보기',
+          loadingLabel: '이전 링크를 불러오는 중…',
+          disabled: !!loadingOlderChat,
+          onClick: () => {
+            if (typeof onLoadOlderChat === 'function' && hasMoreOlderChat && !loadingOlderChat) onLoadOlderChat();
+            if (typeof onLoadMoreMemos === 'function' && hasMoreMemos) onLoadMoreMemos();
+          }
+        })
+      );
+    }
+    return /*#__PURE__*/React.createElement(React.Fragment, null,
+      visiblePhotos.length === 0 ? /*#__PURE__*/React.createElement("div", {
+        style: { textAlign: 'center', color: 'var(--text-muted)', padding: '40px 0', fontSize: '0.88rem' }
+      }, searchQuery
+        ? "검색 결과가 없습니다."
+        : ((hasMoreOlderChat || loadingOlderChat)
+          ? "이전 사진을 불러오는 중…"
+          : ((typeof totalGalleryCount === 'number' && totalGalleryCount > 0)
+            ? "사진 데이터를 아직 불러오지 못했습니다. 아래 더보기를 눌러 주세요."
+            : "공유된 사진이 없습니다.")))
+      : renderGalleryPhotoGrid(visiblePhotos, visiblePhotos),
+      (hasMoreOlderChat || loadingOlderChat) && !(searchQuery || '').trim() && renderGalleryLoadMoreButton({
+        label: '이전 사진·링크 더 보기',
+        loadingLabel: '이전 사진을 불러오는 중…',
+        disabled: !!loadingOlderChat,
+        onClick: () => { if (typeof onLoadOlderChat === 'function' && !loadingOlderChat) onLoadOlderChat(); }
+      })
+    );
+  };
 
   const galleryTree = /*#__PURE__*/React.createElement("div", {
     className: asPage ? "gallery-page-container" : "modal-overlay",
@@ -1275,15 +1476,53 @@ export function ChatGalleryModal({
               textOverflow: 'ellipsis', maxWidth: 'calc(100vw - 120px)', pointerEvents: 'none'
             }
           }, formatChatHeaderTitle(calendar?.title) ? formatChatHeaderTitle(calendar?.title) + " 갤러리" : "갤러리"),
-          /*#__PURE__*/React.createElement("button", {
-            type: "button",
-            onClick: () => setIsMenuOpen(true),
-            title: "갤러리 메뉴", "aria-label": "갤러리",
-            style: {
-              background: 'none', border: 'none', cursor: 'pointer', padding: '6px',
-              color: '#64748B', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
-            }
-          }, renderMenuIcon())
+          /*#__PURE__*/React.createElement("div", {
+            style: { display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }
+          },
+            /*#__PURE__*/React.createElement("div", {
+              style: {
+                display: 'flex',
+                alignItems: 'center',
+                gap: '2px',
+                padding: '3px',
+                borderRadius: 'var(--radius-md)',
+                border: '1px solid var(--border-subtle)',
+                backgroundColor: 'var(--bg-primary)',
+                flexShrink: 0
+              }
+            },
+              [
+                { key: 'all', label: '전체' },
+                { key: 'date', label: '일자' }
+              ].map(tab => /*#__PURE__*/React.createElement("button", {
+                key: tab.key,
+                type: "button",
+                onClick: () => setGalleryViewMode(tab.key),
+                style: {
+                  border: 'none',
+                  borderRadius: 'var(--radius-sm)',
+                  padding: '4px 10px',
+                  fontSize: '0.72rem',
+                  fontWeight: 800,
+                  lineHeight: 1,
+                  backgroundColor: galleryViewMode === tab.key ? '#4F46E5' : 'transparent',
+                  color: galleryViewMode === tab.key ? '#FFFFFF' : 'var(--text-muted)',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0
+                }
+              }, tab.label))
+            ),
+            /*#__PURE__*/React.createElement("button", {
+              type: "button",
+              onClick: () => setIsMenuOpen(true),
+              title: "갤러리 메뉴", "aria-label": "갤러리",
+              style: {
+                background: 'none', border: 'none', cursor: 'pointer', padding: '6px',
+                color: '#64748B', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+              }
+            }, renderMenuIcon())
+          )
         )
       : /*#__PURE__*/React.createElement(React.Fragment, null,
           /*#__PURE__*/React.createElement("h3", {
@@ -1493,101 +1732,7 @@ export function ChatGalleryModal({
       display: 'flex', flexDirection: 'column', gap: activeTab === 'links' ? '8px' : '12px', boxSizing: 'border-box',
       minWidth: 0
     }
-  }, activeTab === 'links' ? /*#__PURE__*/React.createElement(React.Fragment, null,
-    filteredLinks.length === 0 ? /*#__PURE__*/React.createElement("div", {
-      style: { textAlign: 'center', color: 'var(--text-muted)', padding: '40px 0', fontSize: '0.88rem' }
-    }, searchQuery ? "검색 결과가 없습니다." : "공유된 링크가 없습니다.") : filteredLinks.map(item => /*#__PURE__*/React.createElement(LinkPreviewCard, {
-      key: item.messageId || item.url,
-      url: item.url,
-      fallbackTitle: item.text ? removeFirstUrl(item.text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : '',
-      cachedData: item.linkPreview,
-      stretch: true
-    })),
-    (hasMoreOlderChat || hasMoreMemos) && !(searchQuery || '').trim() && /*#__PURE__*/React.createElement("button", {
-      type: "button",
-      onClick: () => {
-        if (typeof onLoadOlderChat === 'function' && hasMoreOlderChat && !loadingOlderChat) onLoadOlderChat();
-        if (typeof onLoadMoreMemos === 'function' && hasMoreMemos) onLoadMoreMemos();
-      },
-      disabled: !!loadingOlderChat,
-      style: {
-        width: '100%',
-        marginTop: '4px',
-        padding: '12px 0',
-        border: 'none',
-        borderRadius: 'var(--radius-md)',
-        backgroundColor: 'color-mix(in srgb, var(--bg-primary) 96%, black)',
-        color: 'var(--text-main)',
-        fontSize: '0.85rem',
-        fontWeight: 700,
-        cursor: loadingOlderChat ? 'wait' : 'pointer',
-        textAlign: 'center'
-      }
-    }, loadingOlderChat ? '이전 링크를 불러오는 중…' : '이전 링크 더 보기')
-  ) : /*#__PURE__*/React.createElement(React.Fragment, null,
-    visiblePhotos.length === 0 ? /*#__PURE__*/React.createElement("div", {
-      style: { textAlign: 'center', color: 'var(--text-muted)', padding: '40px 0', fontSize: '0.88rem' }
-    }, searchQuery
-      ? "검색 결과가 없습니다."
-      : ((hasMoreOlderChat || loadingOlderChat)
-        ? "이전 사진을 불러오는 중…"
-        : ((typeof totalGalleryCount === 'number' && totalGalleryCount > 0)
-          ? "사진 데이터를 아직 불러오지 못했습니다. 아래 더보기를 눌러 주세요."
-          : "공유된 사진이 없습니다.")))
-    : /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: 'grid',
-        gridTemplateColumns: `repeat(${gridCols}, minmax(0, 1fr))`,
-        gap: '6px',
-        width: '100%',
-        alignContent: 'start'
-      }
-    }, visiblePhotos.map((photo, idx) => /*#__PURE__*/React.createElement(MediaThumb, {
-      key: photo.mediaKey || photo.refKey || `${photo.messageId || photo.source || 'photo'}-${photo.meetingDate || ''}-${photo.directMediaUrl ? 'direct' : photo.imageIndex}-${photo.timestamp || idx}`,
-      "data-photo-url": photo.full || photo.thumb,
-      "data-message-id": photo.messageId || photo.sourceMessageId,
-      src: (photo.thumb && String(photo.thumb)) || (photo.full && String(photo.full)) || '',
-      fallbackSrc: (photo.full && String(photo.full)) || (photo.thumb && String(photo.thumb)) || '',
-      alt: "공유사진",
-      loading: "lazy",
-      decoding: "async",
-      referrerPolicy: 'no-referrer',
-      onClick: () => setActiveLightbox && setActiveLightbox({
-        urls: visiblePhotos.map(p => p.full),
-        index: idx,
-          meta: visiblePhotos.map(p => ({ timestamp: p.timestamp, messageId: p.messageId, imageIndex: p.imageIndex, thumb: p.thumb, tags: p.tags, directMediaUrl: p.directMediaUrl, source: p.source, uploadSource: p.uploadSource, meetingDate: p.meetingDate, photoId: p.photoId, sourceMessageId: p.sourceMessageId, sourceImageIndex: p.sourceImageIndex, assetKey: p.assetKey, mediaKey: p.mediaKey, refKey: p.refKey }))
-      }),
-      onBroken: (e, brokenInfo) => handleBrokenPhoto(photo, brokenInfo),
-      style: {
-        width: '100%',
-        maxWidth: '100%',
-        aspectRatio: '1 / 1',
-        objectFit: 'cover',
-        borderRadius: '6px',
-        cursor: 'pointer',
-        backgroundColor: 'var(--bg-primary)',
-        display: 'block'
-      }
-    }))),
-    (hasMoreOlderChat || loadingOlderChat) && !(searchQuery || '').trim() && /*#__PURE__*/React.createElement("button", {
-      type: "button",
-      onClick: () => { if (typeof onLoadOlderChat === 'function' && !loadingOlderChat) onLoadOlderChat(); },
-      disabled: !!loadingOlderChat,
-      style: {
-        width: '100%',
-        marginTop: '4px',
-        padding: '12px 0',
-        border: 'none',
-        borderRadius: 'var(--radius-md)',
-        backgroundColor: 'color-mix(in srgb, var(--bg-primary) 96%, black)',
-        color: 'var(--text-main)',
-        fontSize: '0.85rem',
-        fontWeight: 700,
-        cursor: loadingOlderChat ? 'wait' : 'pointer',
-        textAlign: 'center'
-      }
-    }, loadingOlderChat ? '이전 사진을 불러오는 중…' : '이전 사진·링크 더 보기')
-  ))));
+  }, renderGalleryContent())));
   return pastePreviewModal ? /*#__PURE__*/React.createElement(React.Fragment, null, galleryTree, pastePreviewModal) : galleryTree;
 }
 

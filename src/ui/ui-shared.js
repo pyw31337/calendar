@@ -1098,6 +1098,7 @@ export function LinkPreviewCard({ url, fallbackTitle, cachedData, stretch = fals
     target: '_blank',
     rel: 'noopener noreferrer',
     onClick: e => e.stopPropagation(),
+    'data-no-press-feedback': true,
     className: 'link-preview-card',
     style: {
       display: 'flex',
@@ -1136,7 +1137,7 @@ export function LinkPreviewCard({ url, fallbackTitle, cachedData, stretch = fals
         minWidth: 0,
         maxWidth: stretch ? 'none' : (image ? '198px' : '270px'),
         flex: stretch ? '1 1 0' : '0 1 auto',
-        overflow: 'hidden',
+        overflow: 'visible',
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'flex-start',

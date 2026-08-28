@@ -4458,6 +4458,13 @@ a.link-preview-card.is-pressing {
   filter: none !important;
   box-shadow: none !important;
 }
+a.link-preview-card[data-no-press-feedback]:active,
+a.link-preview-card[data-no-press-feedback].is-pressing {
+  transform: none !important;
+  opacity: 1 !important;
+  filter: none !important;
+  box-shadow: none !important;
+}
 
 
 /* ===== P6-58 side menu dark + dim + font btn ===== */
