@@ -1800,18 +1800,43 @@ function CalendarApp() {
   React.useEffect(() => {
     if (typeof document === 'undefined' || !activeCalId) return undefined;
     let lastVisibleAt = 0;
-    const refreshOnForeground = () => {
+    let deferredRefreshId = null;
+    const refreshOnForeground = (eventName = 'foreground') => {
       if (document.visibilityState !== 'visible' || isSavingRef.current) return;
       const now = Date.now();
+      // Mobile browsers can emit visibilitychange, pageshow, and online together after
+      // suspending a tab. Coalesce those signals so recovery never creates a reconnect burst.
       if (now - lastVisibleAt < 1200) return;
       lastVisibleAt = now;
+      if (firebaseDb && typeof firebaseDb.enableNetwork === 'function') {
+        firebaseDb.enableNetwork().catch(error => {
+          console.warn(`Firestore network resume notice (${eventName}):`, error);
+        });
+      }
       setCloudReloadToken(token => token + 1);
     };
-    document.addEventListener('visibilitychange', refreshOnForeground);
-    window.addEventListener('pageshow', refreshOnForeground);
+    const handleVisibilityChange = () => refreshOnForeground('visibilitychange');
+    const handlePageShow = () => refreshOnForeground('pageshow');
+    const handleOnline = () => refreshOnForeground('online');
+    const scheduleDeferredRefresh = () => {
+      if (deferredRefreshId) clearTimeout(deferredRefreshId);
+      deferredRefreshId = setTimeout(() => {
+        deferredRefreshId = null;
+        refreshOnForeground('deferred-resume');
+      }, 1800);
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('pageshow', handlePageShow);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('pageshow', scheduleDeferredRefresh);
+    window.addEventListener('online', scheduleDeferredRefresh);
     return () => {
-      document.removeEventListener('visibilitychange', refreshOnForeground);
-      window.removeEventListener('pageshow', refreshOnForeground);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('pageshow', handlePageShow);
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('pageshow', scheduleDeferredRefresh);
+      window.removeEventListener('online', scheduleDeferredRefresh);
+      if (deferredRefreshId) clearTimeout(deferredRefreshId);
     };
   }, [activeCalId]);
 
