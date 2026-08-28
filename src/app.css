@@ -2916,6 +2916,9 @@ select.form-select {
   color: #16A34A;
 }
 @media (max-width: 640px) {
+  .settlement-person-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   .settlement-person-card {
     padding: 10px 9px;
   }

@@ -2565,22 +2565,13 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
       fontSize: '1.05rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '8px', margin: 0, color: 'var(--text-main)',
       position: 'absolute', left: '50%', transform: 'translateX(-50%)', pointerEvents: 'none'
     }
-  }, formatChatHeaderTitle(calendar?.title), " 정산"), /*#__PURE__*/React.createElement("div", {
-    className: "settlement-view-tabs",
-    "aria-label": "정산 보기 방식",
-    style: { marginLeft: 'auto', marginRight: '8px' }
-  }, /*#__PURE__*/React.createElement(SegmentedToggle, {
-    ariaLabel: "누적 또는 월별 정산 보기",
-    value: activeTab,
-    onChange: v => setActiveTab(v),
-    options: [{ value: 'total', label: '누적' }, { value: 'daily', label: '월별' }],
-    style: { width: '92px', padding: '2px', borderRadius: '10px' }
-  })), /*#__PURE__*/React.createElement("button", {
+  }, formatChatHeaderTitle(calendar?.title), " 정산"), /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: () => setIsSettlementMenuOpen(true),
     title: "메뉴",
     "aria-label": "메뉴",
     style: {
+      marginLeft: 'auto',
       width: '32px', height: '32px', borderRadius: '50%', border: 'none',
       backgroundColor: 'transparent', cursor: 'pointer', display: 'flex',
       alignItems: 'center', justifyContent: 'center', color: '#64748B', padding: 0
@@ -2764,6 +2755,19 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
         })
       );
     })(),
+
+    /* 누적/월별 toggle -- moved here from the header, right under the settlement card(s) */
+    /*#__PURE__*/React.createElement("div", {
+      className: "settlement-view-tabs",
+      "aria-label": "정산 보기 방식",
+      style: { display: 'flex', justifyContent: 'center' }
+    }, /*#__PURE__*/React.createElement(SegmentedToggle, {
+      ariaLabel: "누적 또는 월별 정산 보기",
+      value: activeTab,
+      onChange: v => setActiveTab(v),
+      options: [{ value: 'total', label: '누적' }, { value: 'daily', label: '월별' }],
+      style: { width: '92px', padding: '2px', borderRadius: '10px' }
+    })),
 
     /* Metric Grid (총수입 / 총지출 / 현재잔액) */
     /*#__PURE__*/React.createElement("div", {

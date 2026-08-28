@@ -4874,7 +4874,7 @@ function CalendarApp() {
       settlementCards: nextCards
     };
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-    return updateCalendars(nextCalendars, '정산 카드 저장완료', 'success', updatedCal.id, 'settlementCards');
+    return updateCalendars(nextCalendars, '정산 카드 저장완료', 'success', updatedCal.id, 'settings');
   };
 
   const handleDeleteSettlementCard = cardId => {
@@ -4889,7 +4889,7 @@ function CalendarApp() {
       settlementCards: nextCards
     };
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-    return updateCalendars(nextCalendars, '정산 카드가 삭제되었습니다.', 'info', updatedCal.id, 'settlementCards');
+    return updateCalendars(nextCalendars, '정산 카드가 삭제되었습니다.', 'info', updatedCal.id, 'settings');
   };
 
   const handleToggleSettlementCardStatus = cardId => {
@@ -4910,7 +4910,7 @@ function CalendarApp() {
       settlementCards: nextCards
     };
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-    return updateCalendars(nextCalendars, '정산 상태가 변경되었습니다.', 'info', updatedCal.id, 'settlementCards');
+    return updateCalendars(nextCalendars, '정산 상태가 변경되었습니다.', 'info', updatedCal.id, 'settings');
   };
   const handleOpenVoteSheet = (poll, option) => {
     if (!guardLoadedCalendar('Firebase 데이터를 불러온 뒤 투표해 주세요.')) return false;
