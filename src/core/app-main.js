@@ -1328,7 +1328,10 @@ function CalendarApp() {
     return Array.from(byId.values()).sort((a, b) => Number(a.timestamp || 0) - Number(b.timestamp || 0));
   }, [allChatMessages, fullChatMessages]);
   React.useEffect(() => {
-    if (!activeCalId || (activeView !== 'chat' && activeView !== 'gallery') || fullChatHistoryByCalendar[activeCalId] !== undefined) return;
+    // Search results must be complete even when the search modal is opened from the calendar
+    // view. Previously the full-history hydration only ran for chat/gallery routes, so a search
+    // opened from the main page silently searched the bounded realtime window instead.
+    if (!activeCalId || (activeView !== 'chat' && activeView !== 'gallery' && !isGlobalSearchOpen) || fullChatHistoryByCalendar[activeCalId] !== undefined) return;
     const liveFirebaseDb = (typeof window !== 'undefined' && window.__gatherFirebaseDb) || firebaseDb;
     if (!liveFirebaseDb) {
       let cancelled = false;
@@ -1347,7 +1350,7 @@ function CalendarApp() {
       setHasMoreOlderChat(false);
     }).catch(err => console.warn('full chat history load failed:', err));
     return () => { cancelled = true; };
-  }, [activeCalId, activeView, firebaseDb, firebaseConnectionVersion, fullChatHistoryByCalendar]);
+  }, [activeCalId, activeView, isGlobalSearchOpen, firebaseDb, firebaseConnectionVersion, fullChatHistoryByCalendar]);
   // The chat embed the user tapped play on -- { key, embedUrl, provider, orientation, title } |
   // null. Once set, it's rendered through a SINGLE always-mounted portal iframe (StickyVideoBox)
   // that never unmounts across view/tab switches, so playback genuinely never stops -- only its
@@ -5361,7 +5364,7 @@ function CalendarApp() {
       onLoadActivityLogs: loadAdminActivityLogs,
       onSave: handleSaveAdmin,
       recentMessages: recentMessages,
-      chatMessages: chatMessages,
+      chatMessages: displayChatMessages,
       onDeleteMessage: handleDeleteMessage,
       onDeleteAvailability: handleDeleteAvailability,
       onDeleteAllForDate: handleDeleteAllForDate,
@@ -5401,7 +5404,7 @@ function CalendarApp() {
     }),
     isGlobalSearchOpen && /*#__PURE__*/React.createElement(GlobalSearchModal, {
       calendar: activeCal,
-      chatMessages: chatMessages,
+      chatMessages: displayChatMessages,
       memos: memos,
       initialQuery: globalSearchInitialQuery,
       onClose: () => setIsGlobalSearchOpen(false),
