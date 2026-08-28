@@ -145,6 +145,19 @@ if (/BACKGROUND_NETWORK_PAUSE_MS|networkPausedForBackground|Firestore background
   fail('app-main must not disable Firestore while a browser tab is hidden; it can make resumed tabs look empty.');
 }
 
+const firebaseData = readFileSync(join(ROOT, 'src/core/app-firebase-data.js'), 'utf8');
+const localCacheLoader = firebaseData.match(/function loadLocalCache\(\)\s*\{([\s\S]*?)\n\}/);
+const localCacheSaver = firebaseData.match(/function saveLocalCache\(list\)\s*\{([\s\S]*?)\n\}/);
+if (!localCacheLoader || !/return \[\];/.test(localCacheLoader[1])) {
+  fail('calendar local cache loader must remain disabled and return an empty list.');
+}
+if (!localCacheSaver || !/Intentionally no-op/.test(localCacheSaver[1])) {
+  fail('calendar local cache saver must remain a no-op.');
+}
+if (!/if \(isDocument\) \{[\s\S]{0,180}fetch\(req, \{ cache: 'no-store' \}\)/.test(serviceWorker)) {
+  fail('service worker document navigations must bypass browser HTTP cache.');
+}
+
 for (const manifestFile of ['manifest.json', 'manifest-kkot.json', 'manifest-cw.json', 'manifest-jhair.json']) {
   if (!copyStatic.includes(manifestFile)) {
     fail(`copy-static-to-dist must copy ${manifestFile} into dist.`);
