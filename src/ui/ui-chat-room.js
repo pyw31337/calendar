@@ -599,7 +599,7 @@ function useLinkPreview(url, cachedData) {
     if (typeof f === 'function') {
       f(url).then(result => {
         if (!cancelled) setState(result);
-      });
+      }).catch(() => {});
     }
     return () => {
       cancelled = true;

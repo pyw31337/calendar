@@ -589,6 +589,30 @@ function fetchLinkPreview(...args) {
   const f = __gatherUiDeps().fetchLinkPreview || GATHER_APP_UTILS.fetchLinkPreview;
   return typeof f === 'function' ? f(...args) : undefined;
 }
+
+const CHAT_LINK_PREVIEW_SKIP_HOSTS = new Set([
+  'leisure-web.yanolja.com',
+  'naver.me',
+  'nid.naver.com'
+]);
+
+function getChatLinkPreviewHost(url) {
+  try {
+    return new URL(url).hostname.toLowerCase().replace(/^www\./, '');
+  } catch (_) {
+    return '';
+  }
+}
+
+function shouldRenderChatLinkPreview(url) {
+  if (!url) return false;
+  const mediaInfo = getDirectChatMediaInfo(url);
+  if (mediaInfo) return false;
+  const host = getChatLinkPreviewHost(url);
+  if (host && CHAT_LINK_PREVIEW_SKIP_HOSTS.has(host)) return false;
+  return true;
+}
+
 function useLinkPreview(url, cachedData) {
   const React = window.React;
   const [state, setState] = React.useState(() => {
@@ -607,7 +631,7 @@ function useLinkPreview(url, cachedData) {
     if (typeof f === 'function') {
       f(url).then(result => {
         if (!cancelled) setState(result);
-      });
+      }).catch(() => {});
     }
     return () => {
       cancelled = true;
@@ -754,6 +778,10 @@ export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox,
     });
     return list;
   }, [text, firstUrl]);
+  const previewUrls = React.useMemo(
+    () => allPreviewUrls.filter(url => shouldRenderChatLinkPreview(url)),
+    [allPreviewUrls]
+  );
   const [failed, setFailed] = React.useState(false);
   React.useEffect(() => {
     setFailed(false);
@@ -872,7 +900,7 @@ export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox,
       : textNode;
     return /*#__PURE__*/React.createElement(React.Fragment, null,
       cappedTextNode,
-      allPreviewUrls.map((url, idx) => /*#__PURE__*/React.createElement(LinkPreviewCard, {
+      previewUrls.map((url, idx) => /*#__PURE__*/React.createElement(LinkPreviewCard, {
         key: url,
         url,
         fallbackTitle: (idx === 0 && text) ? removeFirstUrl(text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : '',
@@ -1034,7 +1062,7 @@ export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox,
             borderRadius: '10px',
             backgroundColor: 'var(--bg-primary)'
           }
-        }), /*#__PURE__*/React.createElement(LinkPreviewCard, {
+        }), shouldRenderChatLinkPreview(firstUrl) && /*#__PURE__*/React.createElement(LinkPreviewCard, {
           url: firstUrl,
           fallbackTitle: text ? removeFirstUrl(text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : '',
           cachedData: linkPreview

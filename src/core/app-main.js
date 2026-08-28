@@ -621,6 +621,18 @@ function isChatRenderableMessage(message, meetingPhotoMessageIds = null) {
 }
 
 function App() {
+  if (isAdminDashboardRoute()) {
+    const initialCalendars = loadLocalCache();
+    return /*#__PURE__*/React.createElement(AdminLoginGate, null,
+      /*#__PURE__*/React.createElement(AdminDashboard, {
+        initialCalendars
+      })
+    );
+  }
+  return /*#__PURE__*/React.createElement(CalendarApp, null);
+}
+
+function CalendarApp() {
   const [activeCalId, setActiveCalId] = React.useState(() => {
     const requestedId = getCalendarIdFromURL();
     if (requestedId && isAllowedCalendarId(requestedId)) return requestedId;
@@ -1555,14 +1567,6 @@ function App() {
     setCurrentMonthDate(nextDate);
     syncCurrentMonthInUrl(nextDate);
   };
-  if (isAdminDashboardRoute()) {
-    return /*#__PURE__*/React.createElement(AdminLoginGate, null,
-      /*#__PURE__*/React.createElement(AdminDashboard, {
-        initialCalendars: calendars
-      })
-    );
-  }
-
   const restoreActiveCalendarFromCache = React.useCallback(() => {
     if (!isAllowedCalendarId(activeCalId)) return false;
     const cached = loadLocalCache();
@@ -6901,7 +6905,7 @@ function useLinkPreview(url, cachedData) {
     setState({ status: 'loading' });
     fetchLinkPreview(url).then(result => {
       if (!cancelled) setState(result);
-    });
+    }).catch(() => {});
     return () => {
       cancelled = true;
     };
@@ -6910,9 +6914,27 @@ function useLinkPreview(url, cachedData) {
 }
 
 
+const CHAT_LINK_PREVIEW_SKIP_HOSTS = new Set([
+  'leisure-web.yanolja.com',
+  'naver.me',
+  'nid.naver.com'
+]);
+
+function getUrlHostname(url) {
+  try {
+    return new URL(url).hostname.toLowerCase().replace(/^www\./, '');
+  } catch (_) {
+    return '';
+  }
+}
+
 function shouldFetchLinkPreviewForChatUrl(url) {
+  if (!url) return false;
   const mediaInfo = getDirectChatMediaInfo(url);
-  return !mediaInfo || mediaInfo.type === 'embed';
+  if (mediaInfo) return false;
+  const host = getUrlHostname(url);
+  if (host && CHAT_LINK_PREVIEW_SKIP_HOSTS.has(host)) return false;
+  return true;
 }
 
 

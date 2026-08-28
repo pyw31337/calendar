@@ -599,7 +599,7 @@ function useLinkPreview(url, cachedData) {
     if (typeof f === 'function') {
       f(url).then(result => {
         if (!cancelled) setState(result);
-      });
+      }).catch(() => {});
     }
     return () => {
       cancelled = true;
@@ -1101,14 +1101,15 @@ export function LinkPreviewCard({ url, fallbackTitle, cachedData, stretch = fals
     className: 'link-preview-card',
     style: {
       display: 'flex',
+      alignItems: 'flex-start',
       width: stretch ? '100%' : 'fit-content',
       maxWidth: stretch ? '100%' : '280px',
       boxSizing: 'border-box',
-      gap: '8px',
+      gap: '10px',
       marginTop: stretch ? '0px' : '6px',
       border: '1px solid var(--border-subtle)',
       borderRadius: 'var(--radius-md)',
-      overflow: 'hidden',
+      overflow: 'visible',
       textDecoration: 'none',
       color: 'inherit',
       backgroundColor: 'var(--bg-card)'
@@ -1120,19 +1121,58 @@ export function LinkPreviewCard({ url, fallbackTitle, cachedData, stretch = fals
       loading: 'lazy',
       decoding: 'async',
       referrerPolicy: 'no-referrer',
-      style: { width: '72px', height: '72px', objectFit: 'cover', flexShrink: 0, backgroundColor: 'var(--bg-primary)' }
+      style: {
+        width: '72px',
+        height: '72px',
+        objectFit: 'cover',
+        flexShrink: 0,
+        backgroundColor: 'var(--bg-primary)',
+        borderRadius: 'calc(var(--radius-md) - 1px) 0 0 calc(var(--radius-md) - 1px)'
+      }
     }),
     /*#__PURE__*/React.createElement('div', {
-      style: { padding: '6px 8px', minWidth: 0, maxWidth: stretch ? 'none' : (image ? '198px' : '270px'), flex: stretch ? '1 1 0' : '0 1 auto', overflow: 'hidden', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '2px' }
+      style: {
+        padding: image ? '8px 10px 8px 0' : '8px 10px',
+        minWidth: 0,
+        maxWidth: stretch ? 'none' : (image ? '198px' : '270px'),
+        flex: stretch ? '1 1 0' : '0 1 auto',
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'flex-start',
+        alignSelf: 'stretch',
+        gap: '4px',
+        minHeight: image ? '72px' : 'auto'
+      }
     },
       displayTitle && /*#__PURE__*/React.createElement('div', {
-        style: { fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
+        style: {
+          fontSize: '0.8rem',
+          fontWeight: 700,
+          lineHeight: 1.25,
+          color: 'var(--text-main)',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap'
+        }
       }, displayTitle),
       description && /*#__PURE__*/React.createElement('div', {
-        style: { fontSize: '0.7rem', color: 'var(--text-muted)', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }
+        style: {
+          fontSize: '0.72rem',
+          lineHeight: 1.3,
+          color: 'var(--text-muted)',
+          overflow: 'hidden',
+          display: '-webkit-box',
+          WebkitLineClamp: 2,
+          WebkitBoxOrient: 'vertical'
+        }
       }, description),
       displayHost && /*#__PURE__*/React.createElement('div', {
-        style: { fontSize: '0.65rem', color: 'var(--text-light)' }
+        style: {
+          fontSize: '0.66rem',
+          lineHeight: 1.2,
+          color: 'var(--text-light)'
+        }
       }, displayHost)
     )
   );

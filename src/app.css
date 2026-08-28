@@ -4451,6 +4451,13 @@ textarea.form-input {
 :root[data-theme="dark"] a.link-preview-card {
   border-color: var(--border-subtle) !important;
 }
+a.link-preview-card:active,
+a.link-preview-card.is-pressing {
+  transform: none !important;
+  opacity: 1 !important;
+  filter: none !important;
+  box-shadow: none !important;
+}
 
 
 /* ===== P6-58 side menu dark + dim + font btn ===== */

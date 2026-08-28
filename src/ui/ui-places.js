@@ -795,7 +795,13 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
         // zooming to bounds avoids that, and the padding keeps the result from hugging the edge.
         zoomToBoundsOnClick: false,
         disableClusteringAtZoom: 18,
-        maxClusterRadius: 45,
+        maxClusterRadius: zoom => {
+          const z = typeof zoom === 'number' ? zoom : 0;
+          if (z >= 17) return 42;
+          if (z >= 15) return 54;
+          if (z >= 13) return 66;
+          return 78;
+        },
         // Flat solid-color badge instead of the plugin's default ripple-ring style, to match the
         // rest of the app's flat/minimal look rather than pulling in its default CSS theme too.
         iconCreateFunction: cluster => {
