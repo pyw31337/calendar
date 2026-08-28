@@ -1933,6 +1933,9 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
     style: { zIndex: 11000 }
   }, React.createElement(ResizableModalContainer, {
     className: 'modal-container',
+    role: 'dialog',
+    'aria-modal': 'true',
+    'aria-labelledby': 'settlement-modal-title',
     style: { maxWidth: '520px', width: '92%', maxHeight: '90vh', display: 'flex', flexDirection: 'column' },
     onClick: e => e.stopPropagation()
   },
@@ -1940,7 +1943,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
       className: 'modal-header',
       style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 18px', borderBottom: '1px solid var(--border-subtle)' }
     },
-      React.createElement('h3', { style: { fontSize: '1.05rem', fontWeight: 800, margin: 0, color: 'var(--text-main)' } }, isEditing ? '정산 수정' : '정산 생성'),
+      React.createElement('h3', { id: 'settlement-modal-title', style: { fontSize: '1.05rem', fontWeight: 800, margin: 0, color: 'var(--text-main)' } }, isEditing ? '정산 수정' : '정산 생성'),
       React.createElement('button', {
         type: 'button', onClick: onClose,
         style: { background: 'none', border: 'none', color: '#64748B', cursor: 'pointer' }
