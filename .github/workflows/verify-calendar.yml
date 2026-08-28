@@ -23,6 +23,8 @@ jobs:
         run: npm ci
       - name: Run safety tests
         run: npm run safety:test
+      - name: Run restore rehearsal
+        run: npm run restore:rehearsal
       - name: Static design and isolation guards
         run: npm run check:all
       - name: Build
