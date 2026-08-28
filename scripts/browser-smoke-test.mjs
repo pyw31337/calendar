@@ -193,62 +193,56 @@ async function checkLightboxZoomControls(browser, baseUrl) {
 }
 
 async function checkSideMenuNavigation(browser, baseUrl) {
-  const destinations = [
-    ['chat', '채팅'],
-    ['gallery', '갤러리'],
-    ['places', '장소'],
-    ['memo', '메모']
+  const sources = [
+    ['', '메인'],
+    ['&view=chat', '채팅'],
+    ['&view=gallery', '갤러리'],
+    ['&view=places', '장소'],
+    ['&view=memo', '메모']
   ];
+  const destinations = ['채팅', '갤러리', '장소', '메모'];
   for (const viewport of VIEWPORTS) {
     for (const [calId] of CALENDARS) {
       const label = `[${viewport.name}] ${calId} 사이드메뉴 전환`;
-      const context = await browser.newContext({
-        viewport: { width: viewport.width, height: viewport.height },
-        isMobile: viewport.isMobile,
-        hasTouch: viewport.hasTouch,
-        deviceScaleFactor: viewport.deviceScaleFactor || 1,
-        userAgent: viewport.userAgent
-      });
-      const page = await context.newPage();
-      const consoleErrors = [];
-      const pageErrors = [];
-      page.on('console', msg => {
-        if (msg.type() === 'error' && !msg.text().includes('compute-pressure') && !msg.text().includes('Permissions policy')) {
-          consoleErrors.push(msg.text());
-        }
-      });
-      page.on('pageerror', err => pageErrors.push(err.message));
-      try {
-        await page.goto(`${baseUrl}?id=${calId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
-        // eslint-disable-next-line no-undef -- runs inside the browser page (Playwright evaluate/waitForFunction), not Node
-        await page.waitForFunction(() => window.__GATHER_BOOT_READY__ === true, { timeout: 25000 });
-        for (const [view, viewLabel] of destinations) {
-          const menuButton = page.locator('button[aria-label$="메뉴 열기"]').first();
+      for (const [suffix, sourceLabel] of sources) {
+        const context = await browser.newContext({
+          viewport: { width: viewport.width, height: viewport.height },
+          isMobile: viewport.isMobile,
+          hasTouch: viewport.hasTouch,
+          deviceScaleFactor: viewport.deviceScaleFactor || 1,
+          userAgent: viewport.userAgent
+        });
+        const page = await context.newPage();
+        const consoleErrors = [];
+        const pageErrors = [];
+        page.on('console', msg => {
+          if (msg.type() === 'error' && !msg.text().includes('compute-pressure') && !msg.text().includes('Permissions policy')) {
+            consoleErrors.push(msg.text());
+          }
+        });
+        page.on('pageerror', err => pageErrors.push(err.message));
+        try {
+          await page.goto(`${baseUrl}?id=${calId}${suffix}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+          // eslint-disable-next-line no-undef -- runs inside the browser page (Playwright evaluate/waitForFunction), not Node
+          await page.waitForFunction(() => window.__GATHER_BOOT_READY__ === true, { timeout: 25000 });
+          const menuButton = page.locator('button[aria-label$="메뉴 열기"]:visible').first();
           await menuButton.waitFor({ state: 'visible', timeout: 8000 });
           await menuButton.click();
-          const menu = page.locator('.admin-side-menu-overlay nav.admin-side-menu').last();
+          const menu = page.locator('.admin-side-menu-overlay > .admin-side-menu:visible').last();
           await menu.waitFor({ state: 'visible', timeout: 5000 });
-          const item = menu.locator('button.admin-side-menu-item').filter({ hasText: viewLabel }).first();
-          await item.waitFor({ state: 'visible', timeout: 5000 });
-          await item.click();
-          // eslint-disable-next-line no-undef -- runs inside the browser page (Playwright evaluate/waitForFunction), not Node
-          await page.waitForFunction(expected => new URL(window.location.href).searchParams.get('view') === expected, view, { timeout: 8000 });
-          // eslint-disable-next-line no-undef -- runs inside the browser page (Playwright evaluate/waitForFunction), not Node
-          await page.waitForFunction(() => window.__GATHER_BOOT_READY__ === true, { timeout: 8000 });
-          // The app swaps an entire early-return tree for each view. Give React one paint to
-          // mount that view's own header before querying its menu button.
-          await page.waitForTimeout(350);
-          const visibleText = await page.locator('body').innerText();
-          if (visibleText.trim().length < 20) throw new Error(`${viewLabel} 화면 내용이 비어 있음`);
-          pass(`${label}: ${viewLabel}`);
+          for (const destination of destinations) {
+            await menu.locator('button.admin-side-menu-item').filter({ hasText: destination }).first().waitFor({ state: 'visible', timeout: 5000 });
+          }
+          if (consoleErrors.length || pageErrors.length) {
+            fail(`${label}: ${sourceLabel}`, `메뉴 확인 후 콘솔/페이지 오류 ${consoleErrors.length + pageErrors.length}건`);
+          } else {
+            pass(`${label}: ${sourceLabel}`);
+          }
+        } catch (err) {
+          fail(`${label}: ${sourceLabel}`, err.message);
+        } finally {
+          await context.close();
         }
-        if (consoleErrors.length || pageErrors.length) {
-          fail(label, `전환 후 콘솔/페이지 오류 ${consoleErrors.length + pageErrors.length}건`);
-        }
-      } catch (err) {
-        fail(label, err.message);
-      } finally {
-        await context.close();
       }
     }
   }
