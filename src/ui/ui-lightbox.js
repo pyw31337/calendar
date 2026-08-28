@@ -1772,6 +1772,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
     fill: "none", stroke: "currentColor", strokeWidth: "2.5", strokeLinecap: "round", strokeLinejoin: "round"
   }, /*#__PURE__*/React.createElement("line", { x1: "18", y1: "6", x2: "6", y2: "18" }), /*#__PURE__*/React.createElement("line", { x1: "6", y1: "6", x2: "18", y2: "18" }))),
   total > 1 && index > 0 && /*#__PURE__*/React.createElement("button", {
+    className: "lightbox-nav-btn",
     type: "button",
     onClick: e => { e.stopPropagation(); animateToAdjacent(index - 1); },
     "aria-label": "이전 이미지",
@@ -1795,6 +1796,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
     fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
   }, /*#__PURE__*/React.createElement("path", { d: "M15 6l-6 6l6 6" }))),
   total > 1 && index < total - 1 && /*#__PURE__*/React.createElement("button", {
+    className: "lightbox-nav-btn",
     type: "button",
     onClick: e => { e.stopPropagation(); animateToAdjacent(index + 1); },
     "aria-label": "다음 이미지",

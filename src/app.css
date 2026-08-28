@@ -848,6 +848,10 @@ summary.is-pressing,
 .lightbox-nav-btn.is-pressing {
   transform: translateY(-50%) scale(0.95) !important;
 }
+.lightbox-nav-btn:hover {
+  /* Keep absolute vertical centering when the generic button hover lift applies. */
+  transform: translateY(-50%) !important;
+}
 .motion-ripple {
   position: absolute;
   left: var(--ripple-x, 50%);

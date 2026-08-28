@@ -121,6 +121,52 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
     }
   }
 
+  // DateModal uses this server scan instead of depending on the paginated chat/gallery window.
+  // imageTags values can contain several human-readable tags in one string, so Firestore's
+  // array-contains exact-match query cannot safely find every date-tagged photo.
+  async function fetchMessagesByImageTag(calId, imageTag) {
+    if (!isValidCalId(calId) || !imageTag) return [];
+    const needle = String(imageTag);
+    const hasTag = function (msg) {
+      const values = Array.isArray(msg.imageTags) ? msg.imageTags : [msg.tags];
+      return values.some(function (value) { return typeof value === 'string' && value.includes(needle); });
+    };
+    const firebaseDb = getDb();
+    if (firebaseDb) {
+      try {
+        const snap = await firebaseDb.collection('calendars').doc('cal_' + calId).collection('messages').get({ source: 'server' });
+        const list = [];
+        snap.forEach(function (doc) {
+          const msg = slimMessage({ id: doc.id, ...doc.data() });
+          if (hasTag(msg)) list.push(msg);
+        });
+        return list;
+      } catch (err) {
+        console.warn('fetchMessagesByImageTag sdk', imageTag, err);
+      }
+    }
+    try {
+      const parent = 'projects/' + projectId() + '/databases/(default)/documents/calendars/cal_' + calId;
+      const list = [];
+      let pageToken = '';
+      do {
+        const query = '?pageSize=1000' + (pageToken ? '&pageToken=' + encodeURIComponent(pageToken) : '');
+        const res = await fetch('https://firestore.googleapis.com/v1/' + parent + '/messages' + query, { cache: 'no-store' });
+        if (!res.ok) return list;
+        const data = await res.json();
+        (data.documents || []).forEach(function (doc) {
+          const msg = slimMessage({ id: doc.name.split('/').pop(), ...docToJs(doc) });
+          if (hasTag(msg)) list.push(msg);
+        });
+        pageToken = data.nextPageToken || '';
+      } while (pageToken);
+      return list;
+    } catch (err) {
+      console.warn('fetchMessagesByImageTag rest', imageTag, err);
+      return [];
+    }
+  }
+
   async function countMessagesByUploadSource(calId, uploadSource) {
     if (!isValidCalId(calId) || !uploadSource) return null;
     const firebaseDb = getDb();
@@ -589,6 +635,7 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
     fetchChatMessagesRest: fetchChatMessagesRest,
     fetchRecentChatMessages: fetchRecentChatMessages,
     fetchRecentGalleryMessages: fetchRecentGalleryMessages,
+    fetchMessagesByImageTag: fetchMessagesByImageTag,
     fetchSubcollectionCount: fetchSubcollectionCount,
     fetchOlderChatMessages: fetchOlderChatMessages,
     fetchMessageOrdinal: fetchMessageOrdinal,

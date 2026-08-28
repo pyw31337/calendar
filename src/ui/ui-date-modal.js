@@ -750,6 +750,7 @@ export function DateModal({
   onDeletePhoto,
   onDeleteMeetingPhoto,
   onFindChatMessageById,
+  onFetchDateTaggedMessages,
   onLoadOlderChat,
   hasMoreOlderChat = false,
   loadingOlderChat = false,
@@ -1249,31 +1250,27 @@ export function DateModal({
     return extra.length === 0 ? chatMessages : [...(chatMessages || []), ...extra];
   }, [chatMessages, fetchedSourceMessages]);
 
-  // meetingPhotos below also finds photos purely by scanning chatMessages for this date's
-  // hashtag (no sourceMessageId to fetch by, unlike the archival-copy case above) -- but outside
-  // the 채팅/갤러리 view, the live chat listener only keeps the most recent ~10 messages loaded
-  // (see app-main.js's chatLimit), so a tagged photo sitting further back than that was silently
-  // invisible here even though the exact same tag scan on the Gallery page (which keeps a much
-  // wider window, and pages further back on its own) found it. Page back through chat history,
-  // same "이전 채팅 더보기" mechanism Gallery already uses, until either there's nothing older
-  // left or the oldest loaded message is already older than this date -- at that point every
-  // message that could possibly carry this date's hashtag has been loaded.
-  //
-  // Runs as soon as the modal opens, not gated on activeTab === 'photo': the 사진 tab's own count
-  // badge reads meetingPhotos.length too, so if this only fired once the user actually clicked
-  // into that tab, the badge would show a too-low count (whatever fit in the narrow initial
-  // window) right up until the click, then visibly jump once the wider scan finished -- exactly
-  // the "숫자뱃지가 1로 나왔다가 누르면 12로 바뀐다" bug report. olderChatMessages is cached at
-  // the app level (app-main.js), so this only pays real Firestore-read cost once per date range
-  // per session, not on every single date click.
+  // Query the server by the date tag immediately. The date photo list must not depend on the
+  // user opening Gallery or loading older chat pages first.
+  const [fetchedTaggedMessages, setFetchedTaggedMessages] = React.useState([]);
+  const fetchedDateTagRef = React.useRef('');
   React.useEffect(() => {
-    if (typeof onLoadOlderChat !== 'function' || !hasMoreOlderChat || loadingOlderChat) return;
-    const oldestLoadedTs = chatMessages && chatMessages.length > 0 ? Number(chatMessages[0].timestamp || 0) : 0;
-    const targetDayStartTs = new Date(`${dateStr}T00:00:00`).getTime();
-    if (!oldestLoadedTs || !Number.isFinite(targetDayStartTs) || oldestLoadedTs > targetDayStartTs) {
-      onLoadOlderChat();
-    }
-  }, [dateStr, hasMoreOlderChat, loadingOlderChat, onLoadOlderChat, chatMessages]);
+    const targetTag = typeof dateStrToHashtag === 'function' ? dateStrToHashtag(dateStr) : '';
+    if (!targetTag || typeof onFetchDateTaggedMessages !== 'function' || fetchedDateTagRef.current === targetTag) return;
+    fetchedDateTagRef.current = targetTag;
+    let cancelled = false;
+    Promise.resolve(onFetchDateTaggedMessages(targetTag)).then(messages => {
+      if (!cancelled && Array.isArray(messages)) setFetchedTaggedMessages(messages);
+    }).catch(err => console.warn('date-tagged meeting photo fetch failed:', err));
+    return () => { cancelled = true; };
+  }, [dateStr, dateStrToHashtag, onFetchDateTaggedMessages]);
+  const allMeetingPhotoMessages = React.useMemo(() => {
+    const byId = new Map();
+    [...(chatMessagesWithFetchedSources || []), ...(fetchedTaggedMessages || [])].forEach(msg => {
+      if (msg?.id) byId.set(msg.id, msg);
+    });
+    return Array.from(byId.values());
+  }, [chatMessagesWithFetchedSources, fetchedTaggedMessages]);
 
   const meetingPhotos = React.useMemo(() => {
     // An auto-linked 일정 사진 (sourceMessageId set) is only a reference/archival copy of a real
@@ -1308,7 +1305,7 @@ export function DateModal({
     const targetTag = typeof dateStrToHashtag === 'function' ? dateStrToHashtag(dateStr) : (dateStr ? dateStr.replace(/-/g, '').slice(2) : '');
 
     const chatPhotos = [];
-    (chatMessages || []).forEach(msg => {
+    allMeetingPhotoMessages.forEach(msg => {
       const getEntries = typeof getMessageImageEntries === 'function' ? getMessageImageEntries : null;
       const entries = getEntries ? getEntries(msg) : [];
       if (entries.length > 0) {
@@ -1363,7 +1360,7 @@ export function DateModal({
     });
 
     return [...directPhotos, ...chatPhotos].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-  }, [confirmedMeetingEntry, chatMessages, chatMessagesWithFetchedSources, dateStr]);
+  }, [confirmedMeetingEntry, chatMessages, allMeetingPhotoMessages, chatMessagesWithFetchedSources, dateStr]);
   const visibleMeetingPhotos = React.useMemo(
     () => meetingPhotos.filter(photo => {
       const key = photo.refKey || photo.mediaKey || photo.id || photo.imageUrl || photo.thumbUrl;
