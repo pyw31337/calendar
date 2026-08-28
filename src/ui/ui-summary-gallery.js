@@ -831,7 +831,14 @@ export function SimpleBottomSheetPicker({ title, value, options, onSelect, place
         type: "button",
         className: "bottom-sheet-item",
         onClick: () => { onSelect(opt.value); setIsOpen(false); }
-      }, opt.color ? /*#__PURE__*/React.createElement("span", { style: { color: opt.color } }, opt.label) : opt.label))
+      }, opt.color ? /*#__PURE__*/React.createElement("span", {
+        style: { display: 'inline-flex', alignItems: 'center', gap: '8px', color: opt.color, fontWeight: 700 }
+      },
+        /*#__PURE__*/React.createElement("span", {
+          style: { display: 'inline-block', width: '10px', height: '10px', borderRadius: '50%', backgroundColor: opt.color, flexShrink: 0 }
+        }),
+        opt.label
+      ) : opt.label))
     )
   ));
   return /*#__PURE__*/React.createElement(React.Fragment, null,
