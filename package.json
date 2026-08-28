@@ -35,9 +35,10 @@
     "check:architecture-budget": "node scripts/check-architecture-budget.mjs",
     "check:lint-budget": "node scripts/check-lint-budget.mjs",
     "check:rules-safety": "node scripts/check-rules-safety.mjs",
+    "check:egress-safety": "node scripts/check-egress-safety.mjs",
     "check:helper-calls": "node scripts/audit-helper-calls.mjs",
     "lint:changed": "node scripts/lint-changed.mjs",
-    "check:all": "npm run lint && npm run lint:changed && npm run check:lint-budget && npm run check:rules-safety && npm run check:required-symbols && npm run check:helper-calls && npm run check:asset-mirrors && npm run check:isolation && npm run check:share-urls && npm run check:design-rules && npm run check:design-system && npm run check:live-source && npm run check:size-budget && npm run check:tab-wiring && npm run check:workflow-scope && npm run check:architecture-budget",
+    "check:all": "npm run lint && npm run lint:changed && npm run check:lint-budget && npm run check:rules-safety && npm run check:egress-safety && npm run check:required-symbols && npm run check:helper-calls && npm run check:asset-mirrors && npm run check:isolation && npm run check:share-urls && npm run check:design-rules && npm run check:design-system && npm run check:live-source && npm run check:size-budget && npm run check:tab-wiring && npm run check:workflow-scope && npm run check:architecture-budget",
     "predeploy": "npm run check:all && npm run safety:test && npm run build && npm run check:dist-budget"
   },
   "dependencies": {
