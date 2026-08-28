@@ -5704,6 +5704,7 @@ function App() {
         onOpenAppSettings: () => setIsAppSettingsOpen(true),
         onToggleSettlementCardStatus: handleToggleSettlementCardStatus,
         onDeleteSettlementCard: handleDeleteSettlementCard,
+        onSaveSettlementCard: handleSaveSettlementCard,
         showToast: showToast,
         ...navMenuProps,
         onOpenCreateSettlement: undefined

@@ -1367,8 +1367,10 @@ export function AnniversaryModal({
   );
 }
 
-/* CreateSettlementModal (정산 생성 Layer Popup) */
-export function CreateSettlementModal({ calendar, onClose, onSave, showToast }) {
+/* CreateSettlementModal (정산 생성 / 정산 수정 Layer Popup) */
+export function CreateSettlementModal({ calendar, initialData = null, initialCard = null, onClose, onSave, showToast }) {
+  const cardToEdit = initialData || initialCard;
+  const isEditing = !!cardToEdit;
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -1379,24 +1381,44 @@ export function CreateSettlementModal({ calendar, onClose, onSave, showToast }) 
 
   const activeParticipants = getActiveParticipants(calendar);
   const today = new Date();
-  const [title, setTitle] = React.useState('1/N 간편 송금');
+  const [title, setTitle] = React.useState(() => cardToEdit?.title || '1/N 간편 송금');
   const [selectedParticipantIds, setSelectedParticipantIds] = React.useState(() => {
+    if (Array.isArray(cardToEdit?.participants) && cardToEdit.participants.length > 0) {
+      return cardToEdit.participants;
+    }
     if (!Array.isArray(activeParticipants) || activeParticipants.length === 0) return ['참여자'];
     const names = activeParticipants.map(p => typeof p === 'string' ? p : (p?.name || p?.id || '참여자')).filter(Boolean);
     return names.length > 0 ? names : ['참여자'];
   });
-  const [bankName, setBankName] = React.useState('토스뱅크');
-  const [depositorName, setDepositorName] = React.useState('');
-  const [accountNumber, setAccountNumber] = React.useState('');
+  const [bankName, setBankName] = React.useState(() => cardToEdit?.bankName || '토스뱅크');
+  const [depositorName, setDepositorName] = React.useState(() => cardToEdit?.depositorName || '');
+  const [accountNumber, setAccountNumber] = React.useState(() => cardToEdit?.accountNumber || '');
   const [isAddingParticipant, setIsAddingParticipant] = React.useState(false);
   const [newParticipantName, setNewParticipantName] = React.useState('');
   
   // Month navigation
-  const [year, setYear] = React.useState(today.getFullYear());
-  const [month, setMonth] = React.useState(today.getMonth()); // 0..11
+  const [year, setYear] = React.useState(() => {
+    if (cardToEdit?.monthStr && cardToEdit.monthStr.includes('-')) {
+      const y = parseInt(cardToEdit.monthStr.split('-')[0], 10);
+      if (!isNaN(y)) return y;
+    }
+    return today.getFullYear();
+  });
+  const [month, setMonth] = React.useState(() => {
+    if (cardToEdit?.monthStr && cardToEdit.monthStr.includes('-')) {
+      const m = parseInt(cardToEdit.monthStr.split('-')[1], 10) - 1;
+      if (!isNaN(m) && m >= 0 && m <= 11) return m;
+    }
+    return today.getMonth();
+  });
   
   // Selected transactions map { itemKey -> item }
-  const [checkedItems, setCheckedItems] = React.useState({});
+  const [checkedItems, setCheckedItems] = React.useState(() => {
+    if (cardToEdit?.checkedItems && typeof cardToEdit.checkedItems === 'object') {
+      return cardToEdit.checkedItems;
+    }
+    return {};
+  });
   
   const BANK_OPTIONS = ['토스뱅크', '카카오뱅크', '신한은행', 'KB국민은행', 'NH농협은행', '우리은행', '하나은행', 'IBK기업은행', '카카오페이', '네이버페이', '기타'];
 
@@ -1420,6 +1442,21 @@ export function CreateSettlementModal({ calendar, onClose, onSave, showToast }) 
     });
     return list;
   }, [confirmed, monthStr]);
+
+  // Pre-populate checkedItems from cardToEdit.checkedItemKeys if editing
+  React.useEffect(() => {
+    if (cardToEdit?.checkedItemKeys && Array.isArray(cardToEdit.checkedItemKeys) && cardToEdit.checkedItemKeys.length > 0) {
+      const initialChecked = {};
+      monthlyExpenses.forEach(item => {
+        if (cardToEdit.checkedItemKeys.includes(item.itemKey)) {
+          initialChecked[item.itemKey] = item;
+        }
+      });
+      if (Object.keys(initialChecked).length > 0) {
+        setCheckedItems(prev => ({ ...initialChecked, ...prev }));
+      }
+    }
+  }, [monthlyExpenses, cardToEdit]);
 
   // Dynamically calculate income, expense, 1/N per person
   const { totalIncome, totalExpense, settlementPerPerson } = React.useMemo(() => {
@@ -1480,10 +1517,11 @@ export function CreateSettlementModal({ calendar, onClose, onSave, showToast }) 
       return;
     }
     const newCard = {
-      id: `sc_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+      id: cardToEdit?.id || `sc_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
       title: title.trim(),
-      status: 'active',
-      createdAt: new Date().toISOString(),
+      status: cardToEdit?.status || 'active',
+      createdAt: cardToEdit?.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
       participants: selectedParticipantIds,
       participantCount: selectedParticipantIds.length,
       amount: totalExpense,
@@ -1496,7 +1534,7 @@ export function CreateSettlementModal({ calendar, onClose, onSave, showToast }) 
       checkedItemKeys: Object.keys(checkedItems)
     };
     if (typeof onSave === 'function') onSave(newCard);
-    if (showToast) showToast(`'${title}' 정산 카드가 생성되었습니다!`, 'success');
+    if (showToast) showToast(isEditing ? `'${title}' 정산 정보가 수정되었습니다!` : `'${title}' 정산 카드가 생성되었습니다!`, 'success');
     if (onClose) onClose();
   };
 
@@ -1514,7 +1552,7 @@ export function CreateSettlementModal({ calendar, onClose, onSave, showToast }) 
       className: 'modal-header',
       style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 18px', borderBottom: '1px solid var(--border-subtle)' }
     },
-      React.createElement('h3', { style: { fontSize: '1.05rem', fontWeight: 800, margin: 0 } }, '정산 생성'),
+      React.createElement('h3', { style: { fontSize: '1.05rem', fontWeight: 800, margin: 0 } }, isEditing ? '정산 수정' : '정산 생성'),
       React.createElement('button', {
         type: 'button', onClick: onClose,
         style: { background: 'none', border: 'none', color: '#64748B', cursor: 'pointer' }
@@ -1767,7 +1805,7 @@ export function CreateSettlementModal({ calendar, onClose, onSave, showToast }) 
   ));
 }
 
-export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenShare, onOpenAppSettings, onChangeView, onOpenCreateSettlement, onToggleSettlementCardStatus, onDeleteSettlementCard, chatCount = 0, settlementBadge = null, galleryCount = 0, placeCount = 0, memoCount = 0, chatLastAuthor = null, settlementLastDate = null, galleryLastDate = null, placeLastName = null, memoLastTitleWord = null, showToast }) {
+export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenShare, onOpenAppSettings, onChangeView, onOpenCreateSettlement, onToggleSettlementCardStatus, onDeleteSettlementCard, onSaveSettlementCard, chatCount = 0, settlementBadge = null, galleryCount = 0, placeCount = 0, memoCount = 0, chatLastAuthor = null, settlementLastDate = null, galleryLastDate = null, placeLastName = null, memoLastTitleWord = null, showToast }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -1788,6 +1826,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
   const CreateSettlementModalComp = __comp.CreateSettlementModal || CreateSettlementModal;
   const [isSettlementMenuOpen, setIsSettlementMenuOpen] = React.useState(false);
   const [isCreateSettlementOpen, setIsCreateSettlementOpen] = React.useState(false);
+  const [editingSettlementCard, setEditingSettlementCard] = React.useState(null);
   const sanitizeText = __deps.sanitizeText;
   const extractFirstUrl = __deps.extractFirstUrl;
   const formatChatHeaderTitle = __deps.formatChatHeaderTitle;
@@ -2331,8 +2370,11 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
                 /* Cog Settings Button */
                 React.createElement("button", {
                   type: "button",
-                  title: "정산 설정",
-                  onClick: () => setOpenMenuCardId(prev => prev === card.id ? null : card.id),
+                  title: "정산 수정",
+                  onClick: () => {
+                    setOpenMenuCardId(null);
+                    setEditingSettlementCard(card);
+                  },
                   style: {
                     background: 'var(--settlement-hero-action-bg)', border: '1px solid var(--settlement-hero-action-border)', borderRadius: '10px',
                     width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -2356,6 +2398,18 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
                     zIndex: 100, display: 'flex', flexDirection: 'column', minWidth: '110px', overflow: 'hidden'
                   }
                 },
+                  React.createElement("button", {
+                    type: "button",
+                    onClick: () => {
+                      setOpenMenuCardId(null);
+                      setEditingSettlementCard(card);
+                    },
+                    style: {
+                      padding: '8px 12px', background: 'none', border: 'none', textAlign: 'left',
+                      fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-main)', cursor: 'pointer',
+                      borderBottom: '1px solid var(--border-subtle)'
+                    }
+                  }, "정산 수정"),
                   React.createElement("button", {
                     type: "button",
                     onClick: () => {
@@ -2772,12 +2826,33 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
     calendar: calendar,
     onClose: () => setIsCreateSettlementOpen(false),
     onSave: (newCard) => {
-      if (calendar) {
+      if (typeof onSaveSettlementCard === 'function') {
+        onSaveSettlementCard(newCard);
+      } else if (calendar) {
         if (!Array.isArray(calendar.settlementCards)) calendar.settlementCards = [];
         calendar.settlementCards.unshift(newCard);
       }
       setIsCreateSettlementOpen(false);
       if (showToast) showToast(`'${newCard.title}' 정산 카드가 생성되었습니다!`, 'success');
+    },
+    showToast: showToast
+  })),
+
+  /* Edit Settlement Layer Popup */
+  (editingSettlementCard && canUseSettlement && React.createElement(CreateSettlementModalComp, {
+    calendar: calendar,
+    initialData: editingSettlementCard,
+    onClose: () => setEditingSettlementCard(null),
+    onSave: (updatedCard) => {
+      if (typeof onSaveSettlementCard === 'function') {
+        onSaveSettlementCard(updatedCard);
+      } else if (calendar) {
+        if (!Array.isArray(calendar.settlementCards)) calendar.settlementCards = [];
+        const idx = calendar.settlementCards.findIndex(c => c.id === updatedCard.id);
+        if (idx >= 0) calendar.settlementCards[idx] = updatedCard;
+        else calendar.settlementCards.unshift(updatedCard);
+      }
+      setEditingSettlementCard(null);
     },
     showToast: showToast
   }))
