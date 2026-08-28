@@ -456,6 +456,29 @@ body:has(.admin-login-gate) {
   isolation: isolate;
   transition: transform var(--motion-base) var(--motion-ease-out), box-shadow var(--motion-base) var(--motion-ease-out);
 }
+@media (max-width: 600px) {
+  .confirmed-meeting-list[data-confirmed-count="three-plus"] {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: stretch;
+  }
+  .confirmed-meeting-list[data-confirmed-count="two"] {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: stretch;
+  }
+  .confirmed-meeting-list[data-confirmed-count="one"] {
+    display: block !important;
+  }
+  .confirmed-meeting-list .confirmed-meeting-icon-btn {
+    width: 100%;
+    min-width: 0 !important;
+  }
+  .confirmed-meeting-list .confirmed-meeting-banner {
+    grid-column: 1 / -1;
+    width: auto !important;
+  }
+}
 .confirmed-meeting-icon-btn:hover {
   transform: translate3d(0, -1px, 0);
   box-shadow: 0 4px 12px rgba(168, 85, 247, 0.35) !important;

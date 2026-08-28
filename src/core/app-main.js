@@ -1538,6 +1538,9 @@ function CalendarApp() {
     // play in chat, see handleActivateChatVideo) stays active across every view by itself, always
     // floating as PIP (see StickyVideoBox).
     setActiveView(view);
+    // Each view owns its header. Restore it before mounting the next view so a hidden main
+    // header cannot leave the new view's menu button translated outside the viewport.
+    setIsHeaderVisible(true);
     if (view !== 'chat') {
       setIsMainHeaderVisible(true);
       lastMainScrollTopRef.current = 0;
@@ -6237,9 +6240,11 @@ function CalendarApp() {
   }), /*#__PURE__*/React.createElement("div", {
     ref: calendarSectionRef
   }, visibleConfirmedMeetings.length > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "confirmed-meeting-list",
+    "data-confirmed-count": visibleConfirmedMeetings.length === 1 ? 'one' : visibleConfirmedMeetings.length === 2 ? 'two' : 'three-plus',
     style: { display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: '8px', marginBottom: '12px', alignItems: 'center', width: '100%' }
   }, visibleConfirmedMeetings.map(meeting => {
-    const isExpanded = !!expandedConfirmedDates[meeting.date];
+    const isExpanded = visibleConfirmedMeetings.length === 1 || !!expandedConfirmedDates[meeting.date];
     const memoEntries = getActiveAvailabilities(activeCal).filter(e => e.date === meeting.date && e.note && e.note.trim());
     const [y, m, d] = meeting.date.split('-');
     const dateObj = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
@@ -6373,6 +6378,7 @@ function CalendarApp() {
                   color: '#FFFFFF',
                   fontWeight: 700,
                   fontSize: '0.75rem',
+                  lineHeight: '140%',
                   padding: '4px 10px',
                   borderRadius: '999px',
                   boxShadow: '0 1px 3px rgba(0,0,0,0.15)',
@@ -6389,6 +6395,8 @@ function CalendarApp() {
           className: "btn-view-schedule",
           "aria-label": `${formatConfirmedMeetingLabel(meeting.date)} 일정 보기`,
           "data-no-press-feedback": true,
+          onPointerDownCapture: (e) => e.stopPropagation(),
+          onClickCapture: (e) => e.stopPropagation(),
           onPointerDown: (e) => {
             // Keep the nested action independent from the banner's collapse handler on touch.
             e.stopPropagation();
