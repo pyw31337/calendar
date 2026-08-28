@@ -104,7 +104,6 @@ async function checkPage(browser, baseUrl, viewport, calId, view) {
   const url = `${baseUrl}?id=${calId}${view.suffix}`;
   try {
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
-    // eslint-disable-next-line no-undef -- runs inside the browser page (Playwright evaluate/waitForFunction), not Node
     await page.waitForFunction(() => window.__GATHER_BOOT_READY__ === true, { timeout: 35000 });
   } catch (err) {
     fail(label, `page never reached boot-ready: ${err.message}`);
@@ -114,7 +113,6 @@ async function checkPage(browser, baseUrl, viewport, calId, view) {
   // give React a beat to settle any post-boot-ready fetches before measuring layout
   await page.waitForTimeout(500);
 
-  // eslint-disable-next-line no-undef -- runs inside the browser page (Playwright evaluate/waitForFunction), not Node
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   if (overflow > 2) fail(label, `가로 스크롤 발생 (화면 밖으로 ${overflow}px 벗어남)`);
 
@@ -152,7 +150,6 @@ async function checkEmojiCategories(browser, baseUrl) {
   const page = await context.newPage();
   try {
     await page.goto(`${baseUrl}?id=kkot&view=chat`, { waitUntil: 'domcontentloaded', timeout: 30000 });
-    // eslint-disable-next-line no-undef -- runs inside the browser page (Playwright evaluate/waitForFunction), not Node
     await page.waitForFunction(() => window.__GATHER_BOOT_READY__ === true, { timeout: 25000 });
     const emojiButton = page.locator('button[title="이모티콘"]').first();
     await emojiButton.waitFor({ state: 'visible', timeout: 10000 });
@@ -177,7 +174,6 @@ async function checkLightboxZoomControls(browser, baseUrl) {
   const page = await context.newPage();
   try {
     await page.goto(`${baseUrl}?id=kkot`, { waitUntil: 'domcontentloaded', timeout: 30000 });
-    // eslint-disable-next-line no-undef -- runs inside the browser page (Playwright evaluate/waitForFunction), not Node
     await page.waitForFunction(() => window.__GATHER_BOOT_READY__ === true, { timeout: 25000 });
     const thumb = page.locator('img[alt="채팅에 첨부된 사진"]').first();
     const hasThumb = await thumb.count();
@@ -250,7 +246,6 @@ async function checkSideMenuNavigation(browser, baseUrl) {
         page.on('requestfailed', request => failedRequests.push(`${request.url()} (${request.failure()?.errorText || 'failed'})`));
         try {
           await page.goto(`${baseUrl}?id=${calId}${suffix}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
-          // eslint-disable-next-line no-undef -- runs inside the browser page (Playwright evaluate/waitForFunction), not Node
           await page.waitForFunction(() => window.__GATHER_BOOT_READY__ === true, { timeout: 35000 });
           const menuButton = page.locator('button[aria-label$="메뉴 열기"]:visible').first();
           await menuButton.waitFor({ state: 'visible', timeout: 8000 });
@@ -299,7 +294,6 @@ async function checkThrottledBoot(browser, baseUrl) {
     });
     const start = Date.now();
     await page.goto(`${baseUrl}?id=kkot`, { waitUntil: 'domcontentloaded', timeout: 60000 });
-    // eslint-disable-next-line no-undef -- runs inside the browser page (Playwright evaluate/waitForFunction), not Node
     await page.waitForFunction(() => window.__GATHER_BOOT_READY__ === true, { timeout: 55000 });
     pass(`${label} (${Date.now() - start}ms)`);
   } catch (err) {

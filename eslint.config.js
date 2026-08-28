@@ -67,7 +67,9 @@ export default [
     languageOptions: {
       ecmaVersion: 'latest',
       sourceType: 'module',
-      globals: globals.node
+      // Browser smoke scripts execute assertions inside Playwright page callbacks;
+      // keep Node globals while recognizing the browser globals used there.
+      globals: { ...globals.node, ...globals.browser }
     },
     rules: {
       'no-unused-vars': ['warn', { args: 'none', varsIgnorePattern: '^_', caughtErrors: 'none' }],
