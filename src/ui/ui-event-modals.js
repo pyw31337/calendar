@@ -1480,6 +1480,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
     return React.createElement('option', { key: String(item.value), value: item.value }, item.label ?? item.value);
   })));
   const TrashIcon = __comp.TrashIcon || __deps.TrashIcon || (() => '🗑');
+  const ParticipantBackdrop = __comp.ParticipantBackdrop || __deps.ParticipantBackdrop;
   const ChevronLeftIcon = __comp.ChevronLeftIcon || __deps.ChevronLeftIcon || (() => '‹');
   const ChevronRightIcon = __comp.ChevronRightIcon || __deps.ChevronRightIcon || (() => '›');
   const FormAddEditActionButtons = __comp.FormAddEditActionButtons || __deps.FormAddEditActionButtons;
@@ -1584,7 +1585,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
         const textToTest = (exp.label || exp.title || exp.note || exp.category || '').toLowerCase();
         if (textToTest.includes('이월') || textToTest.includes('전년이월') || textToTest.includes('전월이월')) return;
         const key = `${dateStr}_${exp.id || idx}_${exp.amount || 0}`;
-        list.push({ ...exp, date: dateStr, itemKey: key });
+        list.push({ ...exp, date: dateStr, itemKey: key, isIncome: Number(exp.amount || 0) < 0 });
       });
     });
     return list;
@@ -1629,12 +1630,21 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
     let exp = 0;
     Object.values(checkedItems).forEach(item => {
       const amt = Number(item.amount || 0);
-      exp += Math.abs(amt);
+      if (!item.isIncome) exp += Math.abs(amt);
     });
     const count = Math.max(1, participantRows.length);
     const perPerson = Math.round(exp / count);
     return { totalExpense: exp, settlementPerPerson: perPerson };
   }, [checkedItems, participantRows.length]);
+
+  const personalExpenseTotals = React.useMemo(() => {
+    const totals = new Map();
+    personalExpenses.forEach(item => {
+      const participantId = item?.participantId || '참여자';
+      totals.set(participantId, (totals.get(participantId) || 0) + (Number(item?.amount) || 0));
+    });
+    return totals;
+  }, [personalExpenses]);
 
   const handleAccountNumberChange = (e) => {
     const val = e.target.value;
@@ -2017,6 +2027,26 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
             )
           ),
 
+          React.createElement('div', {
+            className: 'settlement-personal-expense-summary',
+            style: { display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '2px' }
+          },
+            participantPickerOptions.map(option => {
+              const total = personalExpenseTotals.get(option.value) || 0;
+              const participant = activeParticipants.find(p => (typeof p === 'string' ? p : (p?.name || p?.id)) === option.value) || { name: option.value, color: option.color };
+              return React.createElement('div', {
+                key: option.value,
+                style: {
+                  minWidth: '92px', flex: '0 0 auto', padding: '8px 10px', borderRadius: '9px',
+                  backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)'
+                }
+              },
+                ParticipantBackdrop ? React.createElement(ParticipantBackdrop, { participant, name: option.value, dotSize: 9, style: { fontSize: '0.72rem' } }) : React.createElement('span', { style: { color: option.color, fontWeight: 800, fontSize: '0.72rem' } }, `● ${option.value}`),
+                React.createElement('strong', { style: { display: 'block', marginTop: '4px', color: total > 0 ? '#DC2626' : 'var(--text-muted)', fontSize: '0.78rem' } }, `${total > 0 ? '-' : ''}${total.toLocaleString()}원`)
+              );
+            })
+          ),
+
           /* Input Controls: Row 1 (Participant Select & Auto Comma Amount Input) */
           React.createElement('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' } },
             SimpleBottomSheetPicker ? React.createElement(SimpleBottomSheetPicker, {
@@ -2068,26 +2098,23 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
 
           /* Saved Personal Expenses List */
           personalExpenses.length > 0 && React.createElement('div', {
-            style: { display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '4px' }
+            style: { display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '4px' }
           },
             personalExpenses.map(item => {
               const isItemEditing = editingPeId === item.id;
+              const participant = activeParticipants.find(p => (typeof p === 'string' ? p : (p?.name || p?.id)) === item.participantId) || { name: item.participantId || '참여자' };
               return React.createElement('div', {
                 key: item.id,
                 onClick: () => handleSelectPersonalExpenseItem(item),
                 style: {
-                  padding: '8px 12px', borderRadius: '8px',
+                  padding: '10px 12px', borderRadius: '10px',
                   backgroundColor: isItemEditing ? 'rgba(59, 130, 246, 0.08)' : 'var(--bg-card)',
                   border: isItemEditing ? '1px solid #2563EB' : '1px solid var(--border-subtle)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  cursor: 'pointer', fontSize: '0.8rem'
+                  display: 'flex', flexDirection: 'column', gap: '5px', cursor: 'pointer'
                 }
               },
-                React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
-                  React.createElement('span', { style: { fontWeight: 800, color: '#2563EB' } }, item.participantId || '참여자'),
-                  item.description ? React.createElement('span', { style: { color: 'var(--text-main)', fontWeight: 600 } }, item.description) : null
-                ),
-                React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
+                React.createElement('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' } },
+                  ParticipantBackdrop ? React.createElement(ParticipantBackdrop, { participant, name: item.participantId || '참여자', dotSize: 9 }) : React.createElement('span', { style: { color: participant.color || '#2563EB', fontWeight: 800 } }, `● ${item.participantId || '참여자'}`),
                   React.createElement('strong', { style: { color: '#DC2626', fontWeight: 800 } }, `-${(Number(item.amount) || 0).toLocaleString()}원`),
                   React.createElement('button', {
                     type: 'button',
@@ -2095,7 +2122,8 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
                     title: '항목 삭제',
                     style: { background: 'none', border: 'none', color: '#94A3B8', cursor: 'pointer', padding: '2px 4px' }
                   }, React.createElement(TrashIcon, { size: 14 }))
-                )
+                ),
+                item.description ? React.createElement('div', { style: { color: 'var(--text-main)', fontWeight: 700, fontSize: '0.8rem' } }, item.description) : null
               );
             })
           )
