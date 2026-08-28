@@ -1555,6 +1555,17 @@ function CalendarApp() {
       }
       return;
     }
+    if ((view === 'memo' || view === 'places')
+      && !(window.GATHER_UI_COMPONENTS
+        && typeof window.GATHER_UI_COMPONENTS[view === 'memo' ? 'MemoView' : 'PlacesView'] === 'function')) {
+      if (typeof window.__gatherLoadViewUi === 'function') {
+        window.__gatherLoadViewUi(view).then(() => changeView(view)).catch(error => {
+          console.error(`${view} UI load failed:`, error);
+          showToast(`${view === 'memo' ? '메모' : '장소'} 화면을 불러오지 못했습니다. 다시 시도해 주세요.`, 'error');
+        });
+      }
+      return;
+    }
     // No sticky-video promotion needed here anymore -- stickyVideo (once set by actually pressing
     // play in chat, see handleActivateChatVideo) stays active across every view by itself, always
     // floating as PIP (see StickyVideoBox).

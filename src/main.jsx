@@ -188,6 +188,28 @@ function loadChatUi() {
 }
 window.__gatherLoadChatUi = loadChatUi;
 
+const viewUiLoaders = {
+  memo: () => import('./ui/ui-memo-view.js'),
+  places: () => import('./ui/ui-places.js')
+};
+const viewUiLoadPromises = new Map();
+function loadViewUi(view) {
+  const loader = viewUiLoaders[view];
+  if (!loader) return Promise.resolve();
+  const componentName = view === 'memo' ? 'MemoView' : 'PlacesView';
+  if (window.GATHER_UI_COMPONENTS && typeof window.GATHER_UI_COMPONENTS[componentName] === 'function') {
+    return Promise.resolve();
+  }
+  if (!viewUiLoadPromises.has(view)) {
+    viewUiLoadPromises.set(view, loader().catch(err => {
+      viewUiLoadPromises.delete(view);
+      throw err;
+    }));
+  }
+  return viewUiLoadPromises.get(view);
+}
+window.__gatherLoadViewUi = loadViewUi;
+
 async function boot() {
   try {
     showBootStatus('모여라 캘린더 불러오는 중…');
@@ -221,8 +243,6 @@ async function boot() {
       import('./ui/ui-remaining.js'),
       import('./ui/ui-summary-gallery.js'),
       import('./ui/ui-shared.js'),
-      import('./ui/ui-places.js'),
-      import('./ui/ui-memo-view.js'),
       import('./ui/ui-date-modal.js'),
       import('./ui/ui-event-modals.js'),
       import('./ui/ui-calendar-core.js')
@@ -234,6 +254,9 @@ async function boot() {
     const initialView = params.get('view') || 'calendar';
     if (initialView === 'chat' || initialView === 'gallery') {
       await loadChatUi();
+    }
+    if (initialView === 'memo' || initialView === 'places') {
+      await loadViewUi(initialView);
     }
     if (isAdminRoute) {
       await loadAdminUi();
