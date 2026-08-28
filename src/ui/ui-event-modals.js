@@ -1834,6 +1834,9 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
       className: 'modal-body',
       style: { overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }
     },
+      activeTab === 'general' && React.createElement('div', {
+        style: { display: 'flex', flexDirection: 'column', gap: '14px' }
+      },
       React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '4px' } },
         React.createElement('label', { style: { fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-main)' } }, '타이틀 입력'),
         React.createElement('input', {
@@ -1946,6 +1949,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
             }
           }, '✓')
         )
+      ),
       ),
       /* Lower Section Container with subtle background separating it from top inputs */
       activeTab === 'settlement' && React.createElement('div', {
