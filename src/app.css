@@ -3105,6 +3105,7 @@ select.form-select {
 .confirmed-meeting-banner .memo-capsule-badge,
 .confirmed-meeting-surface .memo-capsule-badge {
   padding: 4px 10px !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
 }
 .btn-view-schedule {
   box-shadow: none !important;

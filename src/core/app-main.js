@@ -586,6 +586,32 @@ function subscribeFirebaseStateChange(onStoreChange) {
 
 
 
+const NON_CHAT_UPLOAD_SOURCES = new Set(['meeting', 'gallery']);
+
+function isNonChatUploadSource(uploadSource) {
+  return NON_CHAT_UPLOAD_SOURCES.has(String(uploadSource || '').trim().toLowerCase());
+}
+
+function getMeetingPhotoMessageIds(calendar) {
+  const ids = new Set();
+  const meetings = typeof getConfirmedMeetings === 'function' ? getConfirmedMeetings(calendar) : [];
+  meetings.forEach(meeting => {
+    (Array.isArray(meeting?.photos) ? meeting.photos : []).forEach(photo => {
+      const messageId = String(photo?.sourceMessageId || '').trim();
+      if (!messageId) return;
+      ids.add(messageId);
+    });
+  });
+  return ids;
+}
+
+function isChatRenderableMessage(message, meetingPhotoMessageIds = null) {
+  if (!message || typeof message !== 'object') return false;
+  if (isNonChatUploadSource(message.uploadSource)) return false;
+  if (meetingPhotoMessageIds && meetingPhotoMessageIds.has(message.id)) return false;
+  return true;
+}
+
 function App() {
   const [activeCalId, setActiveCalId] = React.useState(() => {
     const requestedId = getCalendarIdFromURL();
@@ -685,14 +711,13 @@ function App() {
       if (!raw || typeof raw.closest !== 'function') return null;
       // Typing surfaces — no press scale
       if (raw.closest('input, textarea, select, [contenteditable="true"]')) return null;
-      const target = raw.closest(interactiveSelector);
-      if (!target) return null;
-      if (target.disabled || target.getAttribute('aria-disabled') === 'true') return null;
-      if (target.closest('[data-no-press-feedback]')) return null;
-      if (target.classList && target.classList.contains('poll-drag-handle')) return null;
-      if (isBlockShell(target)) return null;
-      return target;
-    };
+    const target = raw.closest(interactiveSelector);
+    if (!target) return null;
+    if (target.disabled || target.getAttribute('aria-disabled') === 'true') return null;
+    if (target.closest('[data-no-press-feedback]')) return null;
+    if (target.classList && target.classList.contains('poll-drag-handle')) return null;
+    return target;
+  };
     const handlePointerDown = event => {
       if (event.pointerType === 'mouse' && event.button !== 0) return;
       const target = resolveTarget(event.target);
@@ -6240,7 +6265,8 @@ function App() {
                   fontSize: '0.75rem',
                   padding: '4px 10px',
                   borderRadius: '999px',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.15)'
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.15)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)'
                 },
                 title: `${p.name}: ${noteTextOnly}`
               }, noteTextOnly);
