@@ -50,6 +50,11 @@ function withCacheBust(path) {
   return new URL(`${path}${sep}_v=${cacheBust}`, baseUrl).toString();
 }
 
+function resolveAssetUrl(path, fallbackBase = baseUrl) {
+  const normalized = String(path || '').replace(/^\/?\.\//, '').replace(/^\//, '');
+  return new URL(normalized.startsWith('assets/') ? normalized : path, fallbackBase).toString();
+}
+
 async function checkUrl(url, validate) {
   const response = await fetch(url, { redirect: 'follow' });
   const text = await response.text();
@@ -127,8 +132,8 @@ if (mode === 'vite') {
   });
 
   const chunkUrls = [...new Set([
-    ...[...indexText.matchAll(/["']([^"']*assets\/[^"']+\.js)["']/g)].map(m => new URL(m[1], baseUrl).toString()),
-    ...[...jsBody.matchAll(/["']([^"']*assets\/[^"']+\.js)["']/g)].map(m => new URL(m[1], jsUrl).toString())
+    ...[...indexText.matchAll(/["']([^"']*assets\/[^"']+\.js)["']/g)].map(m => resolveAssetUrl(m[1], baseUrl)),
+    ...[...jsBody.matchAll(/["']([^"']*assets\/[^"']+\.js)["']/g)].map(m => resolveAssetUrl(m[1], jsUrl))
   ])];
   let combined = jsBody;
   let totalBytes = jsBody.length;
