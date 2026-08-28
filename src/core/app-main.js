@@ -1643,7 +1643,14 @@ function CalendarApp() {
       // the user.
       for (let attempt = 1; attempt <= FIREBASE_LOAD_MAX_ATTEMPTS && isMounted && !hasLoadedCloudCalendar; attempt += 1) {
         const result = await fetchSingleCloudCalendar(activeCalId, 1, FIREBASE_LOAD_TIMEOUT_MS);
-        if (result?.calendar && applyLoadedCalendar(result.calendar, result.lastModified || Date.now(), result.revision || result.calendar.revision || 0)) {
+        // fetchSingleCloudCalendar always does a genuine network round-trip (.get({source:'server'})
+        // or, failing that, an uncached REST fetch) -- never a local/cache read -- so this result
+        // deserves the same unconditional trust (forceApply=true) as the onSnapshot listener's own
+        // fromCache:false case below. Without this, a device whose locally stored revision was ever
+        // corrupted (see the fix in pushSingleCloudCalendar/updateCalendars) stayed stuck rejecting
+        // this explicit fetch's genuinely fresh result too, on every load, until its realtime
+        // listener happened to deliver a live update on its own.
+        if (result?.calendar && applyLoadedCalendar(result.calendar, result.lastModified || Date.now(), result.revision || result.calendar.revision || 0, true)) {
           return;
         }
       }
