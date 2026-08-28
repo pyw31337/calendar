@@ -726,7 +726,15 @@ export function AnniversaryModal({
   const DeadlineDateTimePicker = __comp.DeadlineDateTimePicker || __deps.DeadlineDateTimePicker || (function () { return null; });
   const ResizableModalContainer = __comp.ResizableModalContainer || __deps.ResizableModalContainer || (function Shell(p) { return React.createElement('div', p, p.children); });
   const SegmentedToggle = __comp.SegmentedToggle || __deps.SegmentedToggle || (function Shell(p) { return React.createElement('div', p, p.children); });
-  const SimpleBottomSheetPicker = __comp.SimpleBottomSheetPicker || __deps.SimpleBottomSheetPicker;
+  const SimpleBottomSheetPicker = __comp.SimpleBottomSheetPicker || __deps.SimpleBottomSheetPicker || ((props) => React.createElement('select', {
+    value: props.value ?? '',
+    onChange: event => props.onSelect?.(event.target.value),
+    disabled: props.disabled,
+    style: props.style
+  }, (props.options || []).map(option => {
+    const item = typeof option === 'object' ? option : { value: option, label: option };
+    return React.createElement('option', { key: String(item.value), value: item.value }, item.label ?? item.value);
+  })));
   const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon || (function () { return '×'; });
   const TrashIcon = __comp.TrashIcon || __deps.TrashIcon || (function () { return '🗑'; });
   const getActiveParticipants = __deps.getActiveParticipants;
@@ -1462,6 +1470,21 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
+  const ResizableModalContainer = __comp.ResizableModalContainer || __deps.ResizableModalContainer || ((props) => React.createElement('div', props, props.children));
+  const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon || (() => '×');
+  const SimpleBottomSheetPicker = __comp.SimpleBottomSheetPicker || __deps.SimpleBottomSheetPicker || ((props) => React.createElement('select', {
+    value: props.value ?? '',
+    onChange: event => props.onSelect?.(event.target.value),
+    disabled: props.disabled,
+    style: props.style
+  }, (props.options || []).map(option => {
+    const item = typeof option === 'object' ? option : { value: option, label: option };
+    return React.createElement('option', { key: String(item.value), value: item.value }, item.label ?? item.value);
+  })));
+  const TrashIcon = __comp.TrashIcon || __deps.TrashIcon || (() => '🗑');
+  const ChevronLeftIcon = __comp.ChevronLeftIcon || __deps.ChevronLeftIcon || (() => '‹');
+  const ChevronRightIcon = __comp.ChevronRightIcon || __deps.ChevronRightIcon || (() => '›');
+  const FormAddEditActionButtons = __comp.FormAddEditActionButtons || __deps.FormAddEditActionButtons;
 
   const cardToEdit = initialData || null;
   const isEditing = !!cardToEdit;

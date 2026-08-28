@@ -2265,7 +2265,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
             /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "새 장소 추가하기")
           )
         ),
-        false && /*#__PURE__*/React.createElement("button", {
+        typeof onSharePlaces === 'function' && /*#__PURE__*/React.createElement("button", {
           type: "button", className: "admin-side-menu-item",
           onClick: () => {
             setIsPlacesMenuOpen(false);

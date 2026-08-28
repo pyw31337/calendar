@@ -1815,6 +1815,7 @@ function CalendarApp() {
   }, [activeView, activeCalId, canUseSettlement, changeView, showToast]);
   React.useEffect(() => {
     if (!firebaseDb || !activeCalId) return undefined;
+    let isMounted = true;
     let lastRefreshAt = 0;
     const refreshFromResume = async () => {
       if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
@@ -1824,15 +1825,17 @@ function CalendarApp() {
       if (activeCalId && isAllowedCalendarId(activeCalId)) {
         try {
           const fresh = await fetchSingleCalendarWithRest(activeCalId, 5000);
-          if (fresh?.calendar && applyCalendarSnapshot(fresh.calendar, fresh.lastModified || Date.now(), fresh.revision || fresh.calendar.revision || 0, true)) {
+          if (isMounted && fresh?.calendar && applyCalendarSnapshot(fresh.calendar, fresh.lastModified || Date.now(), fresh.revision || fresh.calendar.revision || 0, true)) {
             if (activeView === 'calendar' || activeView === 'places' || activeView === 'settlement') {
-              fetchPlacesFromFirestore(activeCalId).then(list => { setPlacesSubcollection(list); }).catch(() => {});
-              fetchConfirmedMeetingsFromFirestore(activeCalId).then(list => { setConfirmedMeetingsSubcollection(list); }).catch(() => {});
+              fetchPlacesFromFirestore(activeCalId).then(list => { if (isMounted) setPlacesSubcollection(list); }).catch(() => {});
+              fetchConfirmedMeetingsFromFirestore(activeCalId).then(list => { if (isMounted) setConfirmedMeetingsSubcollection(list); }).catch(() => {});
             }
             if (activeView === 'memo') {
               fetchMemosRest(activeCalId, memosLimit).then(list => {
-                setMemos(list);
-                setHasMoreMemos(list.length >= memosLimit);
+                if (isMounted) {
+                  setMemos(list);
+                  setHasMoreMemos(list.length >= memosLimit);
+                }
               }).catch(() => {});
             }
             return;
@@ -1843,10 +1846,10 @@ function CalendarApp() {
       }
       if (!activeCalLoaded) {
         const restored = restoreActiveCalendarFromCache();
-        if (!restored) {
+        if (isMounted && !restored) {
           setIsInitialDataLoading(true);
         }
-        setCloudReloadToken(token => token + 1);
+        if (isMounted) setCloudReloadToken(token => token + 1);
       }
     };
     const onVisible = () => {
@@ -1864,12 +1867,13 @@ function CalendarApp() {
     window.addEventListener('online', refreshFromResume);
     window.addEventListener('pageshow', refreshFromResume);
     return () => {
+      isMounted = false;
       document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('focus', refreshFromResume);
       window.removeEventListener('online', refreshFromResume);
       window.removeEventListener('pageshow', refreshFromResume);
     };
-  }, [activeCalId, activeCalLoaded, restoreActiveCalendarFromCache]);
+  }, [activeCalId, activeCalLoaded, activeView, applyCalendarSnapshot, memosLimit, restoreActiveCalendarFromCache]);
   // The chat message listener below only re-subscribes on [activeCalId], so without this ref it
   // would keep using the activeCal snapshot from whenever that effect last ran -- meaning a
   // participant added (or the calendar renamed) mid-session wouldn't be reflected in incoming

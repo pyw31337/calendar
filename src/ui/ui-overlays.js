@@ -8,6 +8,7 @@ const GATHER_APP_CHAT_DATA = window.GATHER_APP_CHAT_DATA || {};
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
 const GATHER_APP_CONSTANTS = window.GATHER_APP_CONSTANTS || {};
 const GATHER_APP_CONFIG = window.GATHER_APP_CONFIG || {};
+const React = window.React;
 function __gatherUiDeps() { return window.GATHER_UI_DEPS || {}; }
 function getActiveAvailabilities(calendar) {
   const f = __gatherUiDeps().getActiveAvailabilities || GATHER_APP_UTILS.getActiveAvailabilities;

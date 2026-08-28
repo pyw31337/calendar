@@ -30,7 +30,7 @@
     "check:dist-budget": "node scripts/check-dist-budget.mjs",
     "check:workflow-scope": "node scripts/check-workflow-scope.mjs",
     "check:helper-calls": "node scripts/audit-helper-calls.mjs",
-    "check:all": "npm run check:required-symbols && npm run check:helper-calls && npm run check:asset-mirrors && npm run check:isolation && npm run check:share-urls && npm run check:design-rules && npm run check:live-source && npm run check:size-budget && npm run check:tab-wiring && npm run check:workflow-scope",
+    "check:all": "npm run lint && npm run check:required-symbols && npm run check:helper-calls && npm run check:asset-mirrors && npm run check:isolation && npm run check:share-urls && npm run check:design-rules && npm run check:live-source && npm run check:size-budget && npm run check:tab-wiring && npm run check:workflow-scope",
     "predeploy": "npm run check:all && npm run safety:test && npm run build && npm run check:dist-budget"
   },
   "dependencies": {

@@ -25,6 +25,10 @@ function getCalendarPlaces(calendar) {
   const f = __gatherUiDeps().getCalendarPlaces || GATHER_APP_UTILS.getCalendarPlaces;
   return typeof f === 'function' ? f(calendar) : [];
 }
+function getTodayYmd() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+}
 function useChatSendGuard(onSend, canSend = true) {
   const React = window.React;
   const lockRef = React.useRef(false);

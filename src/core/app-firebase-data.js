@@ -889,7 +889,7 @@ let firebaseDb = null;
 if (typeof window !== 'undefined' && window.__GATHER_FIREBASE_STATE_VERSION == null) window.__GATHER_FIREBASE_STATE_VERSION = 0;
 function getFirebaseSdkVersion() {
   if (typeof window !== 'undefined' && window.__GATHER_FIREBASE_SDK_VERSION) return window.__GATHER_FIREBASE_SDK_VERSION;
-  let version = '';
+  let version;
   try {
     const url = new URL(import.meta.url, window.location.href);
     version = `${url.pathname.split('/').pop() || ''}${url.search || ''}`;

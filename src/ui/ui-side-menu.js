@@ -760,6 +760,8 @@ export function AppSettingsModal({
     || (window.GATHER_APP_DOMAIN_HELPERS || {}).getNotificationDiagnostics;
   const getOrCreateDeviceId = (window.GATHER_APP_NOTIFICATIONS || {}).getOrCreateDeviceId
     || (window.GATHER_APP_DOMAIN_HELPERS || {}).getOrCreateDeviceId;
+  const getDeviceLabel = (window.GATHER_APP_NOTIFICATIONS || {}).getDeviceLabel
+    || (window.GATHER_APP_DOMAIN_HELPERS || {}).getDeviceLabel;
   const channels = [
     { key: 'chat', label: '채팅 알림' },
     { key: 'memo', label: '메모 알림' },
@@ -782,7 +784,7 @@ export function AppSettingsModal({
 
   const refreshPushMeta = React.useCallback(async () => {
     const diag = typeof getNotificationDiagnostics === 'function' ? getNotificationDiagnostics() : null;
-    let status = { ok: false, reason: 'unknown', diag };
+    let status;
     try {
       if (typeof Notification === 'undefined' || Notification.permission !== 'granted') {
         status = { ok: false, reason: 'permission', diag };
