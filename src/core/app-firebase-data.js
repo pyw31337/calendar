@@ -2081,11 +2081,19 @@ async function writeConfirmedMeetingsToFirestore(calendarId, meetings) {
       const colRef = firebaseDb.collection('calendars').doc(`cal_${calendarId}`).collection('confirmedMeetings');
       const batch = firebaseDb.batch();
       validMeetings.forEach(meeting => batch.set(colRef.doc(meeting.date), meeting));
-      const existingSnapshot = await colRef.get({ source: 'server' });
-      const validDates = new Set(validMeetings.map(meeting => meeting.date));
-      existingSnapshot.forEach(document => {
-        if (!validDates.has(document.id)) batch.delete(document.ref);
-      });
+      // A stale Firestore persistence session can fail while reading the collection even though
+      // a write batch is still usable. Do not let that cleanup-only read block the actual meeting
+      // update; the next successful sync will remove any stale documents.
+      try {
+        const existingSnapshot = await colRef.get({ source: 'server' });
+        const validDates = new Set(validMeetings.map(meeting => meeting.date));
+        existingSnapshot.forEach(document => {
+          if (!validDates.has(document.id)) batch.delete(document.ref);
+        });
+      } catch (readError) {
+        console.warn(`Failed to inspect stale confirmed meetings for ${calendarId}; applying valid writes only:`, readError);
+        if (validMeetings.length === 0) return false;
+      }
       await batch.commit();
       return true;
     } catch (e) {
