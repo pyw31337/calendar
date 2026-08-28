@@ -1521,9 +1521,9 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
         const row = container.querySelector('[data-place-id="' + safeId + '"]');
         if (!row) return;
 
-        // Position targetTop so the selected row moves straight to the top of list container
+        // Position targetTop so the selected row moves flush to top of list container
         const maxTop = Math.max(0, container.scrollHeight - container.clientHeight);
-        const nextTop = Math.max(0, Math.min(maxTop, row.offsetTop - 6));
+        const nextTop = Math.max(0, Math.min(maxTop, row.offsetTop));
         animateListScrollTo(container, nextTop, 220);
       } catch (e) {}
     };
@@ -1970,43 +1970,52 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
             style: {
               display: 'flex', flexDirection: 'column', gap: '4px',
               padding: '10px 12px', position: 'relative',
-              border: isPlaceFocused ? '2px solid #8B5CF6' : '1px solid var(--border-subtle)',
-              boxShadow: isPlaceFocused ? '0 0 0 3px rgba(139, 92, 246, 0.25), 0 2px 8px rgba(139, 92, 246, 0.15)' : 'none',
+              border: isPlaceFocused ? '1px solid #8B5CF6' : '1px solid var(--border-subtle)',
+              boxShadow: 'none',
               borderRadius: 'var(--radius-md)',
               cursor: 'pointer',
               backgroundColor: isPlaceFocused ? 'rgba(139, 92, 246, 0.08)' : 'var(--bg-card)',
-              transition: 'border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease'
+              transition: 'border-color 0.15s ease, background-color 0.15s ease'
             }
           },
             /* Top-right absolute action buttons */
             /*#__PURE__*/React.createElement("div", {
-              style: { position: 'absolute', top: '8px', right: '8px', display: 'flex', alignItems: 'center', gap: '4px', zIndex: 2 }
+              style: { position: 'absolute', top: '8px', right: '8px', display: 'flex', alignItems: 'center', gap: '4px', zIndex: 10 },
+              onClick: e => { e.preventDefault(); e.stopPropagation(); },
+              onMouseDown: e => e.stopPropagation(),
+              onTouchStart: e => e.stopPropagation()
             },
               /*#__PURE__*/React.createElement("button", {
                 type: "button",
                 onClick: event => {
+                  event.preventDefault();
                   event.stopPropagation();
-                  window.open(getPlaceExternalMapUrl(place), '_blank', 'noopener,noreferrer');
+                  const url = getPlaceExternalMapUrl(place);
+                  if (url) window.open(url, '_blank', 'noopener,noreferrer');
                 },
                 title: "업체보기",
                 style: {
                   width: '28px', height: '28px',
                   background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
-                  position: 'relative', zIndex: 3, touchAction: 'manipulation'
+                  position: 'relative', zIndex: 11
                 }
-              }, /*#__PURE__*/React.createElement(BuildingIcon, { size: 14 })),
+              }, /*#__PURE__*/React.createElement(BuildingIcon, { size: 14, style: { pointerEvents: 'none' } })),
               /*#__PURE__*/React.createElement("button", {
                 type: "button",
-                onClick: event => { event.stopPropagation(); handleEditPlace(place); },
+                onClick: event => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  handleEditPlace(place);
+                },
                 title: "장소 수정",
                 style: {
                   width: '28px', height: '28px',
                   background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
-                  position: 'relative', zIndex: 3, touchAction: 'manipulation'
+                  position: 'relative', zIndex: 11
                 }
-              }, /*#__PURE__*/React.createElement(PencilIcon, { size: 14 }))
+              }, /*#__PURE__*/React.createElement(PencilIcon, { size: 14, style: { pointerEvents: 'none' } }))
             ),
             
             /* Category Label Capsule and Visit Info */
@@ -2047,46 +2056,6 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
               /*#__PURE__*/React.createElement("span", { style: { fontWeight: 800, fontSize: '0.88rem', color: 'var(--text-main)' } }, (place.alias || place.name || '이름 없음')),
               place.alias && place.name && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.72rem', color: 'var(--text-muted)' } }, place.name),
               place.address && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.74rem', color: 'var(--text-muted)' } }, getDisplayPlaceAddress(place))
-            ),
-
-            /* Route Navigation Action Buttons Bar */
-            /*#__PURE__*/React.createElement("div", {
-              style: { display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px', flexWrap: 'wrap' },
-              onClick: e => e.stopPropagation()
-            },
-              /* Kakao Route Button */
-              /*#__PURE__*/React.createElement("a", {
-                href: getPlaceKakaoRouteUrl ? getPlaceKakaoRouteUrl(place) : getPlaceExternalMapUrl(place),
-                target: "_blank",
-                rel: "noopener noreferrer",
-                style: {
-                  display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 9px', borderRadius: '6px',
-                  backgroundColor: 'rgba(245, 158, 11, 0.12)', color: '#D97706', border: '1px solid rgba(245, 158, 11, 0.3)',
-                  fontSize: '0.72rem', fontWeight: 700, textDecoration: 'none', cursor: 'pointer'
-                }
-              }, "🧭 카카오 길찾기"),
-              /* Naver Route Button */
-              /*#__PURE__*/React.createElement("a", {
-                href: getPlaceNaverRouteUrl ? getPlaceNaverRouteUrl(place) : getPlaceExternalMapUrl(place),
-                target: "_blank",
-                rel: "noopener noreferrer",
-                style: {
-                  display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 9px', borderRadius: '6px',
-                  backgroundColor: 'rgba(16, 185, 129, 0.12)', color: '#059669', border: '1px solid rgba(16, 185, 129, 0.3)',
-                  fontSize: '0.72rem', fontWeight: 700, textDecoration: 'none', cursor: 'pointer'
-                }
-              }, "🧭 네이버 길찾기"),
-              /* Google Route Button */
-              /*#__PURE__*/React.createElement("a", {
-                href: getPlaceGoogleRouteUrl ? getPlaceGoogleRouteUrl(place) : getPlaceExternalMapUrl(place),
-                target: "_blank",
-                rel: "noopener noreferrer",
-                style: {
-                  display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 9px', borderRadius: '6px',
-                  backgroundColor: 'rgba(59, 130, 246, 0.12)', color: '#2563EB', border: '1px solid rgba(59, 130, 246, 0.3)',
-                  fontSize: '0.72rem', fontWeight: 700, textDecoration: 'none', cursor: 'pointer'
-                }
-              }, "구글 지도")
             ),
             
             /* Visits history log (one row per date, newest first) or plain dateless memo --
