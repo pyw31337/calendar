@@ -7883,9 +7883,15 @@ function uploadChatImageAssets(calendarId, compressed, index, onBytes, timeoutMs
     Promise.all([
       runUpload(compressed.originalBlob, originalRef, `${index}-orig`, originalMeta.contentType),
       runUpload(compressed.thumbnailBlob, thumbRef, `${index}-thumb`, thumbMeta.contentType)
-    ]).then(([imageUrl, thumbUrl]) => {
+    ]).then(async ([imageUrl, thumbUrl]) => {
       if (imageUrl && thumbUrl) resolve({ imageUrl, thumbUrl });
       else {
+        // Treat the pair as one atomic asset: if either upload fails, remove the successful
+        // half so an orphaned original/thumbnail cannot accumulate in Storage.
+        await Promise.allSettled([
+          originalRef.delete().catch(() => {}),
+          thumbRef.delete().catch(() => {})
+        ]);
         console.warn('Chat image Storage upload failed (no base64 fallback)');
         resolve(null);
       }
@@ -9608,9 +9614,14 @@ function uploadMemoImageAssets(calendarId, compressed, index, onBytes, timeoutMs
     Promise.all([
       runUpload(compressed.originalBlob, originalRef, `${index}-orig`, originalMeta.contentType),
       runUpload(compressed.thumbnailBlob, thumbRef, `${index}-thumb`, thumbMeta.contentType)
-    ]).then(([imageUrl, thumbUrl]) => {
+    ]).then(async ([imageUrl, thumbUrl]) => {
       if (imageUrl && thumbUrl) resolve({ imageUrl, thumbUrl });
       else {
+        // Keep memo media atomic as well; a partial pair must never be considered reusable.
+        await Promise.allSettled([
+          originalRef.delete().catch(() => {}),
+          thumbRef.delete().catch(() => {})
+        ]);
         console.warn('Memo image Storage upload failed');
         resolve(null);
       }
