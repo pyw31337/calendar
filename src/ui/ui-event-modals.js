@@ -2608,42 +2608,6 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
         }
       ];
 
-      const copyTextToClipboard = __deps.copyTextToClipboard || (async text => {
-        try {
-          if (navigator.clipboard && navigator.clipboard.writeText) {
-            await navigator.clipboard.writeText(text);
-            return true;
-          }
-        } catch (e) {}
-        return false;
-      });
-
-      const handleRemittanceAction = async (card, service) => {
-        const bank = card.bankName || '토스뱅크';
-        const account = card.accountNumber || '';
-        const name = card.depositorName || '';
-        const amount = card.perPersonAmount || perPersonExpense;
-        const cardTitle = card.title || '1/N 간편 송금';
-
-        const copyText = `[${calendar?.title || '모아엘가'} ${cardTitle}]\n• 1인당 입금 금액: ${amount.toLocaleString()}원\n• 입금 계좌: ${bank} ${account}${name ? ` (${name})` : ''}`;
-        
-        await copyTextToClipboard(copyText);
-
-        if (service === 'toss') {
-          const tossUrl = `supertoss://send?amount=${amount}&bank=${encodeURIComponent(bank)}&account=${encodeURIComponent(account)}`;
-          window.location.href = tossUrl;
-          if (showToast) showToast(`토스 앱으로 이동합니다! 계좌 정보가 복사되었습니다. (${amount.toLocaleString()}원)`, 'success');
-        } else if (service === 'kakao') {
-          const kakaoUrl = `kakaotalk://`;
-          window.location.href = kakaoUrl;
-          if (showToast) showToast(`카카오톡으로 이동합니다! 계좌/금액 복사 완료. (${amount.toLocaleString()}원)`, 'success');
-        } else if (service === 'naver') {
-          const naverUrl = `naverpay://`;
-          window.location.href = naverUrl;
-          if (showToast) showToast(`네이버 페이로 이동합니다! 계좌/금액 복사 완료. (${amount.toLocaleString()}원)`, 'success');
-        }
-      };
-
       return React.createElement("div", {
         style: { display: 'flex', flexDirection: 'column', gap: '10px' }
       },
@@ -2791,49 +2755,6 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
               )
             ),
 
-            /* 3 Remittance Buttons: Toss / Kakao / Naver */
-            React.createElement("div", {
-              style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginTop: '2px' }
-            },
-              /* Toss Button */
-              React.createElement("button", {
-                type: "button",
-                className: "btn",
-                onClick: () => handleRemittanceAction(card, 'toss'),
-                style: {
-                  flex: '1 1 100px', height: '36px', borderRadius: '8px',
-                  backgroundColor: 'var(--settlement-hero-action-bg)', color: 'var(--settlement-hero-action-text)', border: '1px solid var(--settlement-hero-action-border)',
-                  fontSize: '0.78rem', fontWeight: 800, cursor: 'pointer',
-                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px'
-                }
-              }, "🔵 토스로 송금"),
-
-              /* Kakao Remittance Button */
-              React.createElement("button", {
-                type: "button",
-                className: "btn",
-                onClick: () => handleRemittanceAction(card, 'kakao'),
-                style: {
-                  flex: '1 1 100px', height: '36px', borderRadius: '8px',
-                  backgroundColor: 'var(--settlement-hero-action-bg)', color: 'var(--settlement-hero-action-text)', border: '1px solid var(--settlement-hero-action-border)',
-                  fontSize: '0.78rem', fontWeight: 800, cursor: 'pointer',
-                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px'
-                }
-              }, "🟡 카카오로 송금"),
-
-              /* Naver Remittance Button */
-              React.createElement("button", {
-                type: "button",
-                className: "btn",
-                onClick: () => handleRemittanceAction(card, 'naver'),
-                style: {
-                  flex: '1 1 100px', height: '36px', borderRadius: '8px',
-                  backgroundColor: 'var(--settlement-hero-action-bg)', color: 'var(--settlement-hero-action-text)', border: '1px solid var(--settlement-hero-action-border)',
-                  fontSize: '0.78rem', fontWeight: 800, cursor: 'pointer',
-                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px'
-                }
-              }, "🟢 네이버로 송금")
-            )
           );
         })
       );

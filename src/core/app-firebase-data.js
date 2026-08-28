@@ -618,6 +618,7 @@ function mergeCalendarSettingsDelta(serverCalendar, incomingCalendar) {
     deletedActivityLogIds: mergeDeletedActivityLogIds(server.deletedActivityLogIds || [], incoming.deletedActivityLogIds || []),
     confirmedMeeting: mergeConfirmedMeetings(server.confirmedMeeting || [], incoming.confirmedMeeting || []),
     expenseCategories: incoming.expenseCategories !== undefined ? incoming.expenseCategories : server.expenseCategories,
+    settlementCards: incoming.settlementCards !== undefined ? incoming.settlementCards : server.settlementCards,
     places: incoming.places !== undefined ? incoming.places : server.places,
     placeCategories: incoming.placeCategories !== undefined ? incoming.placeCategories : server.placeCategories,
     settlementBaseBudget: incoming.settlementBaseBudget !== undefined ? incoming.settlementBaseBudget : server.settlementBaseBudget
