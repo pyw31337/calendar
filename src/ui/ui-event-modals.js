@@ -2756,17 +2756,17 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
       );
     })(),
 
-    /* 누적/월별 toggle -- moved here from the header, right under the settlement card(s) */
+    /* 누적/월별 toggle -- moved here from the header, right under the settlement card(s), full width like the other sections */
     /*#__PURE__*/React.createElement("div", {
       className: "settlement-view-tabs",
       "aria-label": "정산 보기 방식",
-      style: { display: 'flex', justifyContent: 'center' }
+      style: { display: 'flex', width: '100%' }
     }, /*#__PURE__*/React.createElement(SegmentedToggle, {
       ariaLabel: "누적 또는 월별 정산 보기",
       value: activeTab,
       onChange: v => setActiveTab(v),
-      options: [{ value: 'total', label: '누적' }, { value: 'daily', label: '월별' }],
-      style: { width: '92px', padding: '2px', borderRadius: '10px' }
+      options: [{ value: 'total', label: '누적보기' }, { value: 'daily', label: '월별보기' }],
+      style: { width: '100%', padding: '2px', borderRadius: '10px' }
     })),
 
     /* Metric Grid (총수입 / 총지출 / 현재잔액) */
