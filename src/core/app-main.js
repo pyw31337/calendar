@@ -462,6 +462,7 @@ import {
   fetchSingleCalendarWithRest,
   fetchRecentMessagesRest,
   fetchChatMessagesRest,
+  fetchAllChatMessagesRest,
   fetchRecentChatMessages,
   fetchRecentGalleryMessages,
   fetchMessagesByImageTag,
@@ -1322,7 +1323,15 @@ function CalendarApp() {
   React.useEffect(() => {
     if (!activeCalId || (activeView !== 'chat' && activeView !== 'gallery') || fullChatHistoryByCalendar[activeCalId] !== undefined) return;
     const liveFirebaseDb = (typeof window !== 'undefined' && window.__gatherFirebaseDb) || firebaseDb;
-    if (!liveFirebaseDb) return;
+    if (!liveFirebaseDb) {
+      let cancelled = false;
+      fetchAllChatMessagesRest(activeCalId).then(list => {
+        if (cancelled) return;
+        setFullChatHistoryByCalendar(prev => ({ ...prev, [activeCalId]: Array.isArray(list) ? list : [] }));
+        setHasMoreOlderChat(false);
+      }).catch(err => console.warn('full REST chat history load failed:', err));
+      return () => { cancelled = true; };
+    }
     let cancelled = false;
     liveFirebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages').get({ source: 'server' }).then(snapshot => {
       if (cancelled) return;

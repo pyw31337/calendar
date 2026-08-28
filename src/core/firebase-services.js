@@ -55,6 +55,32 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
     }
   }
 
+  // Deliberate full-history read for views whose correctness depends on every message
+  // (chat history and gallery). The live preview above remains bounded, but this path follows
+  // Firestore REST page tokens until the collection is exhausted.
+  async function fetchAllChatMessagesRest(calId) {
+    if (!isValidCalId(calId)) return [];
+    try {
+      var all = [];
+      var pageToken = '';
+      do {
+        var url = 'https://firestore.googleapis.com/v1/projects/' + projectId() + '/databases/(default)/documents/calendars/cal_' + calId + '/messages?pageSize=300';
+        if (pageToken) url += '&pageToken=' + encodeURIComponent(pageToken);
+        var res = await fetch(url, { cache: 'no-store' });
+        if (!res.ok) return all;
+        var data = await res.json();
+        (data.documents || []).forEach(function (doc) {
+          all.push(slimMessage({ id: doc.name.split('/').pop(), ...docToJs(doc) }));
+        });
+        pageToken = data.nextPageToken || '';
+      } while (pageToken);
+      return all.sort(function (a, b) { return (Number(a.timestamp) || 0) - (Number(b.timestamp) || 0); });
+    } catch (err) {
+      console.warn('fetchAllChatMessagesRest error:', err);
+      return [];
+    }
+  }
+
   async function fetchRecentChatMessages(calId, limit) {
     if (!isValidCalId(calId)) return [];
     const pageSize = Math.max(1, Math.min(100, Number(limit) || 60));
@@ -661,6 +687,7 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
     ready: true,
     isScaffold: false,
     fetchChatMessagesRest: fetchChatMessagesRest,
+    fetchAllChatMessagesRest: fetchAllChatMessagesRest,
     fetchRecentChatMessages: fetchRecentChatMessages,
     fetchRecentGalleryMessages: fetchRecentGalleryMessages,
     fetchMessagesByImageTag: fetchMessagesByImageTag,

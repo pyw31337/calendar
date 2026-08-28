@@ -1226,6 +1226,15 @@ async function fetchChatMessagesRest() {
   return [];
 }
 
+async function fetchAllChatMessagesRest() {
+  const svc = window.GATHER_FIREBASE_SERVICES;
+  if (svc && typeof svc.fetchAllChatMessagesRest === 'function' && !svc.isScaffold) {
+    return svc.fetchAllChatMessagesRest.apply(null, arguments);
+  }
+  console.warn('fetchAllChatMessagesRest: GATHER_FIREBASE_SERVICES missing');
+  return [];
+}
+
 async function fetchRecentChatMessages() {
   const svc = window.GATHER_FIREBASE_SERVICES;
   if (svc && typeof svc.fetchRecentChatMessages === 'function' && !svc.isScaffold) {
@@ -3386,6 +3395,7 @@ export {
   fetchSingleCalendarWithRest,
   fetchRecentMessagesRest,
   fetchChatMessagesRest,
+  fetchAllChatMessagesRest,
   fetchRecentChatMessages,
   fetchRecentGalleryMessages,
   fetchMessagesByImageTag,
