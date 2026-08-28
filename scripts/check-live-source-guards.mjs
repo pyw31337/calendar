@@ -158,6 +158,11 @@ if (!localCacheSaver || !/Intentionally no-op/.test(localCacheSaver[1])) {
 if (!/if \(isDocument\) \{[\s\S]{0,180}fetch\(req, \{ cache: 'no-store' \}\)/.test(serviceWorker)) {
   fail('service worker document navigations must bypass browser HTTP cache.');
 }
+const appUtils = readFileSync(join(ROOT, 'src/core/app-utils.js'), 'utf8');
+if (!/function getPersistentBrokenPhotoUrls\(\)\s*\{[\s\S]{0,500}return new Set\(\);[\s\S]{0,120}\}/.test(appUtils)
+  || !/function savePersistentBrokenPhotoUrl\(urlOrKey\)\s*\{[\s\S]{0,180}Intentionally no-op/.test(appUtils)) {
+  fail('broken-photo URL persistence must remain disabled so transient failures do not hide repaired media.');
+}
 if (!/function invalidateGalleryItemCount\(calId\)/.test(firebaseServices)
   || !/invalidateGalleryItemCount: invalidateGalleryItemCount/.test(firebaseServices)) {
   fail('gallery count cache invalidation must remain available from Firebase services.');

@@ -908,28 +908,17 @@ const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
   const BROKEN_PHOTO_CACHE_KEY = 'gather_broken_photo_urls_v1';
 
   export function getPersistentBrokenPhotoUrls() {
+    // A transient image/CDN failure must never become a permanent cross-device display rule.
+    // Keep broken-image suppression in the current component session only; remove the legacy
+    // browser list once so repaired/replaced Storage URLs can render on the next visit.
     try {
-      if (typeof localStorage === 'undefined') return new Set();
-      const raw = localStorage.getItem(BROKEN_PHOTO_CACHE_KEY);
-      if (!raw) return new Set();
-      const arr = JSON.parse(raw);
-      return new Set(Array.isArray(arr) ? arr : []);
-    } catch (e) {
-      return new Set();
-    }
+      if (typeof localStorage !== 'undefined') localStorage.removeItem(BROKEN_PHOTO_CACHE_KEY);
+    } catch (e) {}
+    return new Set();
   }
 
   export function savePersistentBrokenPhotoUrl(urlOrKey) {
-    if (!urlOrKey) return;
-    try {
-      if (typeof localStorage === 'undefined') return;
-      const url = String(urlOrKey || '').trim().split(/[?#]/)[0];
-      if (!url) return;
-      const set = getPersistentBrokenPhotoUrls();
-      set.add(url);
-      const arr = Array.from(set).slice(-500);
-      localStorage.setItem(BROKEN_PHOTO_CACHE_KEY, JSON.stringify(arr));
-    } catch (e) {}
+    // Intentionally no-op: image failures are recoverable and must be retried on a later visit.
   }
 
   export const GATHER_APP_UTILS = Object.freeze({
