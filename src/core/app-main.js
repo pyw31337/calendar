@@ -1538,6 +1538,7 @@ function CalendarApp() {
     // play in chat, see handleActivateChatVideo) stays active across every view by itself, always
     // floating as PIP (see StickyVideoBox).
     setActiveView(view);
+    if (view === 'chat') chatHeaderRevealUntilRef.current = Date.now() + 900;
     // Each view owns its header. Restore it before mounting the next view so a hidden main
     // header cannot leave the new view's menu button translated outside the viewport.
     setIsHeaderVisible(true);
@@ -2395,6 +2396,7 @@ function CalendarApp() {
 
   const [isHeaderVisible, setIsHeaderVisible] = React.useState(true);
   const lastScrollTopRef = React.useRef(0);
+  const chatHeaderRevealUntilRef = React.useRef(0);
 
   // Cross-browser virtual keyboard detection.
   // Strategy:
@@ -2494,6 +2496,13 @@ function CalendarApp() {
     );
     const hasComposerDraft = !!(String(chatInput || '').trim() || (chatImages && chatImages.length > 0));
     const scrollTop = e.target.scrollTop;
+    // Chat mounts by scrolling its list to the newest message. Do not treat that programmatic
+    // scroll as the user's downward scroll and hide the fresh header.
+    if (activeView === 'chat' && Date.now() < chatHeaderRevealUntilRef.current) {
+      setIsHeaderVisible(true);
+      lastScrollTopRef.current = scrollTop;
+      return;
+    }
     if (scrollTop < 120 && hasMoreOlderChat && !loadingOlderChatRef.current) {
       loadOlderChatMessages();
     }
@@ -6396,7 +6405,6 @@ function CalendarApp() {
           "aria-label": `${formatConfirmedMeetingLabel(meeting.date)} 일정 보기`,
           "data-no-press-feedback": true,
           onPointerDownCapture: (e) => e.stopPropagation(),
-          onClickCapture: (e) => e.stopPropagation(),
           onPointerDown: (e) => {
             // Keep the nested action independent from the banner's collapse handler on touch.
             e.stopPropagation();
