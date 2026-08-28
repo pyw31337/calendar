@@ -1330,7 +1330,7 @@ function CalendarApp() {
       setHasMoreOlderChat(false);
     }).catch(err => console.warn('full chat history load failed:', err));
     return () => { cancelled = true; };
-  }, [activeCalId, activeView, fullChatHistoryByCalendar]);
+  }, [activeCalId, activeView, firebaseDb, fullChatHistoryByCalendar]);
   // The chat embed the user tapped play on -- { key, embedUrl, provider, orientation, title } |
   // null. Once set, it's rendered through a SINGLE always-mounted portal iframe (StickyVideoBox)
   // that never unmounts across view/tab switches, so playback genuinely never stops -- only its
