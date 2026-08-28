@@ -737,7 +737,6 @@ export function AnniversaryModal({
     return React.createElement('option', { key: String(item.value), value: item.value }, item.label ?? item.value);
   })));
   const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon || (function () { return '×'; });
-  const TrashIcon = __comp.TrashIcon || __deps.TrashIcon || (function () { return '🗑'; });
   const getActiveParticipants = __deps.getActiveParticipants;
   const [activeTab, setActiveTab] = React.useState('list'); // 'list', 'add', 'bulk'
   const [editingId, setEditingId] = React.useState(null); // null when registering a new anniversary
@@ -1482,7 +1481,6 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
   const TrashIcon = __comp.TrashIcon || __deps.TrashIcon || (() => '🗑');
   const PencilIcon = __comp.PencilIcon || __deps.PencilIcon || (() => '✎');
   const ParticipantBackdrop = __comp.ParticipantBackdrop || __deps.ParticipantBackdrop;
-  const FormAddEditActionButtons = __comp.FormAddEditActionButtons || __deps.FormAddEditActionButtons;
   const MainCalendarArrow = ({ direction }) => React.createElement('svg', {
     xmlns: 'http://www.w3.org/2000/svg', width: '20', height: '20', viewBox: '0 0 24 24',
     fill: 'none', stroke: 'currentColor', strokeWidth: '2', strokeLinecap: 'round', strokeLinejoin: 'round',
