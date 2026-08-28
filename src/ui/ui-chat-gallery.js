@@ -1111,6 +1111,9 @@ export function ChatGalleryModal({
 
   const displayPhotoTabCount = visiblePhotos.length;
   const [galleryViewMode, setGalleryViewMode] = React.useState('all'); // 'all' | 'date'
+  const [galleryMonthDate, setGalleryMonthDate] = React.useState(() => new Date());
+  const [collapsedGalleryDates, setCollapsedGalleryDates] = React.useState(() => new Set());
+  const galleryMonthKey = `${galleryMonthDate.getFullYear()}-${String(galleryMonthDate.getMonth() + 1).padStart(2, '0')}`;
   const getGalleryItemDateKey = item => {
     const meetingDate = String(item?.meetingDate || '').trim();
     if (meetingDate && isValidDateString(meetingDate)) return meetingDate;
@@ -1129,6 +1132,7 @@ export function ChatGalleryModal({
     const groups = new Map();
     (sourceItems || []).forEach((item, idx) => {
       const key = getGalleryItemDateKey(item) || '__unknown__';
+      if (key !== '__unknown__' && !key.startsWith(galleryMonthKey)) return;
       const next = groups.get(key) || [];
       next.push({ item, idx });
       groups.set(key, next);
@@ -1147,7 +1151,41 @@ export function ChatGalleryModal({
           .sort((a, b) => (Number(b.item?.timestamp || 0) - Number(a.item?.timestamp || 0)) || (a.idx - b.idx))
           .map(entry => entry.item)
       }));
-  }, [galleryViewMode, activeTab, filteredLinks, visiblePhotos]);
+  }, [galleryViewMode, activeTab, filteredLinks, visiblePhotos, galleryMonthKey]);
+
+  const toggleGalleryDate = dateKey => {
+    setCollapsedGalleryDates(prev => {
+      const next = new Set(prev);
+      if (next.has(dateKey)) next.delete(dateKey);
+      else next.add(dateKey);
+      return next;
+    });
+  };
+  const moveGalleryMonth = offset => {
+    setGalleryMonthDate(prev => new Date(prev.getFullYear(), prev.getMonth() + offset, 1));
+    setCollapsedGalleryDates(new Set());
+  };
+  const renderGalleryMonthNavigator = () => /*#__PURE__*/React.createElement("div", {
+    className: "gallery-date-month-nav",
+    role: "group",
+    "aria-label": "갤러리 월 이동"
+  },
+    /*#__PURE__*/React.createElement("div", { className: "gallery-date-month-label" },
+      `${galleryMonthDate.getFullYear()}년 ${galleryMonthDate.getMonth() + 1}월`,
+      /*#__PURE__*/React.createElement("span", { className: "gallery-date-month-caret", "aria-hidden": "true" }, "⌄")
+    ),
+    /*#__PURE__*/React.createElement("div", { className: "gallery-date-month-actions" },
+      /*#__PURE__*/React.createElement("button", {
+        type: "button", onClick: () => moveGalleryMonth(-1),
+        className: "gallery-date-month-button", "aria-label": "이전 달"
+      }, "‹"),
+      /*#__PURE__*/React.createElement("span", { className: "gallery-date-month-calendar-icon", "aria-hidden": "true" }, "▣"),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button", onClick: () => moveGalleryMonth(1),
+        className: "gallery-date-month-button", "aria-label": "다음 달"
+      }, "›")
+    )
+  );
 
   const handleUploadClick = () => {
     if (uploadInputRef.current) uploadInputRef.current.click();
@@ -1373,6 +1411,7 @@ export function ChatGalleryModal({
             })
       );
       return /*#__PURE__*/React.createElement(React.Fragment, null,
+        renderGalleryMonthNavigator(),
         groupedGallerySections.length === 0 ? /*#__PURE__*/React.createElement("div", {
           style: { textAlign: 'center', color: 'var(--text-muted)', padding: '40px 0', fontSize: '0.88rem' }
         }, searchQuery
@@ -1384,29 +1423,35 @@ export function ChatGalleryModal({
               : ((typeof totalGalleryCount === 'number' && totalGalleryCount > 0)
                 ? "사진 데이터를 아직 불러오지 못했습니다. 아래 더보기를 눌러 주세요."
                 : "공유된 사진이 없습니다."))))
-        : groupedGallerySections.map(section => /*#__PURE__*/React.createElement("section", {
+        : groupedGallerySections.map(section => {
+          const isCollapsed = collapsedGalleryDates.has(section.dateKey);
+          return /*#__PURE__*/React.createElement("section", {
           key: section.dateKey,
-          style: { display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }
+          className: `gallery-date-section${isCollapsed ? ' is-collapsed' : ''}`
         },
-          /*#__PURE__*/React.createElement("div", {
-            style: {
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              color: 'var(--text-main)',
-              fontSize: '0.88rem',
-              fontWeight: 800,
-              padding: '2px 2px 0 2px'
-            }
-          },
-            /*#__PURE__*/React.createElement("span", null, section.label),
-            /*#__PURE__*/React.createElement("span", { className: "section-count-badge" }, section.items.length),
-            /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.74rem', fontWeight: 800, color: 'var(--text-muted)' } }, "건")
-          ),
-          isLinkMode
-            ? renderGalleryLinkList(section.items)
-            : renderGalleryPhotoGrid(section.items, visiblePhotos)
-        )),
+            /*#__PURE__*/React.createElement("button", {
+              type: "button",
+              className: "gallery-date-section-header",
+              onClick: () => toggleGalleryDate(section.dateKey),
+              "aria-expanded": !isCollapsed,
+              "aria-controls": `gallery-date-items-${section.dateKey}`
+            },
+              /*#__PURE__*/React.createElement("span", { className: "gallery-date-section-title" },
+                /*#__PURE__*/React.createElement("span", { className: "gallery-date-calendar-icon", "aria-hidden": "true" }, "▣"),
+                section.label
+              ),
+              /*#__PURE__*/React.createElement("span", { className: "gallery-date-section-trailing" },
+                /*#__PURE__*/React.createElement("span", { className: "gallery-date-section-count" }, section.items.length),
+                /*#__PURE__*/React.createElement("span", { className: "gallery-date-section-count-label" }, "건"),
+                /*#__PURE__*/React.createElement("span", { className: "gallery-date-section-chevron", "aria-hidden": "true" }, isCollapsed ? '⌄' : '⌃')
+              )
+            ),
+            !isCollapsed && /*#__PURE__*/React.createElement("div", {
+              id: `gallery-date-items-${section.dateKey}`,
+              className: "gallery-date-section-items"
+            }, isLinkMode ? renderGalleryLinkList(section.items) : renderGalleryPhotoGrid(section.items, visiblePhotos))
+          );
+        }),
         loadMoreNode
       );
     }
