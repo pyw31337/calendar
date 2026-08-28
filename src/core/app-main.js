@@ -6269,12 +6269,20 @@ function CalendarApp() {
     settlementLastDate: navSettlementLastDate,
     galleryLastDate: navGalleryLastDate,
       placeLastName: navPlaceLastName,
-      memoLastTitleWord: navMemoLastTitleWord,
-      showSettlement: canUseSettlement,
+    memoLastTitleWord: navMemoLastTitleWord,
+    showSettlement: canUseSettlement,
       onClose: () => setIsMainSideMenuOpen(false),
     onOpenManual: () => {
-      setIsGuideOpen(true);
       setIsMainSideMenuOpen(false);
+      const openManual = () => setIsGuideOpen(true);
+      if (typeof window.__gatherLoadManualUi === 'function') {
+        window.__gatherLoadManualUi().then(openManual).catch(err => {
+          console.error('User manual UI load failed:', err);
+          showToast('사용자 매뉴얼을 불러오지 못했습니다. 다시 시도해 주세요.', 'error');
+        });
+      } else {
+        openManual();
+      }
     },
     onOpenSettings: () => {
       setIsMainSideMenuOpen(false);

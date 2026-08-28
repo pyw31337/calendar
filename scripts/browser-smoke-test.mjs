@@ -194,6 +194,28 @@ async function checkLightboxZoomControls(browser, baseUrl) {
   }
 }
 
+async function checkDeferredManual(browser, baseUrl) {
+  const label = '사용자 매뉴얼 지연 chunk 로딩';
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  const page = await context.newPage();
+  try {
+    await page.goto(`${baseUrl}?id=kkot`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await page.waitForFunction(() => window.__GATHER_BOOT_READY__ === true, { timeout: 35000 });
+    const menuButton = page.locator('button[aria-label$="메뉴 열기"]:visible').first();
+    await menuButton.waitFor({ state: 'visible', timeout: 8000 });
+    await menuButton.dispatchEvent('click');
+    const menu = page.locator('.admin-side-menu-overlay > .admin-side-menu:visible').last();
+    await menu.waitFor({ state: 'visible', timeout: 8000 });
+    await menu.locator('text=사용자 매뉴얼').first().click();
+    await page.locator('.manual-panel:visible').waitFor({ state: 'visible', timeout: 10000 });
+    pass(label);
+  } catch (err) {
+    fail(label, err.message);
+  } finally {
+    await context.close();
+  }
+}
+
 async function checkSideMenuNavigation(browser, baseUrl) {
   const sources = [
     ['', '메인'],
@@ -331,6 +353,7 @@ async function main() {
     console.log('\n-- 상호작용 스모크 (읽기 전용) --');
     await checkEmojiCategories(browser, baseUrl);
     await checkLightboxZoomControls(browser, baseUrl);
+    await checkDeferredManual(browser, baseUrl);
     await checkSideMenuNavigation(browser, baseUrl);
 
     console.log('\n-- 저속 네트워크 부팅 경쟁 상태 --');

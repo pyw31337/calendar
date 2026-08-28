@@ -153,6 +153,21 @@ function loadAdminUi() {
 }
 window.__gatherLoadAdminUi = loadAdminUi;
 
+let manualUiLoadPromise = null;
+function loadManualUi() {
+  if (window.GATHER_UI_COMPONENTS && typeof window.GATHER_UI_COMPONENTS.UserManualOverlay === 'function') {
+    return Promise.resolve();
+  }
+  if (!manualUiLoadPromise) {
+    manualUiLoadPromise = import('./ui/ui-user-manual.js').catch(err => {
+      manualUiLoadPromise = null;
+      throw err;
+    });
+  }
+  return manualUiLoadPromise;
+}
+window.__gatherLoadManualUi = loadManualUi;
+
 async function boot() {
   try {
     showBootStatus('모여라 캘린더 불러오는 중…');
@@ -179,7 +194,6 @@ async function boot() {
       import('./ui/ui-overlays.js'),
       import('./ui/ui-widgets.js'),
       import('./ui/ui-chat-sheets.js'),
-      import('./ui/ui-user-manual.js'),
       import('./ui/ui-weather.js'),
       import('./ui/ui-side-menu.js'),
       import('./ui/ui-misc.js'),
