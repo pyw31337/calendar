@@ -1599,6 +1599,8 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
   const [depositorName, setDepositorName] = React.useState(() => cardToEdit?.depositorName || '');
   const [accountNumber, setAccountNumber] = React.useState(() => cardToEdit?.accountNumber || '');
   const [activeTab, setActiveTab] = React.useState('general');
+  const [expenseListHeight, setExpenseListHeight] = React.useState(160);
+  const expenseResizeRef = React.useRef(null);
 
   const [personalExpenses, setPersonalExpenses] = React.useState(() => {
     if (Array.isArray(cardToEdit?.personalExpenses) && cardToEdit.personalExpenses.length > 0) {
@@ -1639,6 +1641,30 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
     return {};
   });
   const checkedItemsHydratedRef = React.useRef(false);
+
+  const clampExpenseListHeight = (height) => Math.min(480, Math.max(96, height));
+  const handleExpenseResizeStart = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    expenseResizeRef.current = { pointerId: event.pointerId, startY: event.clientY, startHeight: expenseListHeight };
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+  };
+  const handleExpenseResizeMove = (event) => {
+    const resize = expenseResizeRef.current;
+    if (!resize || resize.pointerId !== event.pointerId) return;
+    event.preventDefault();
+    setExpenseListHeight(clampExpenseListHeight(resize.startHeight + event.clientY - resize.startY));
+  };
+  const handleExpenseResizeEnd = (event) => {
+    if (expenseResizeRef.current?.pointerId === event.pointerId) expenseResizeRef.current = null;
+  };
+  const handleExpenseResizeKeyDown = (event) => {
+    const step = event.shiftKey ? 48 : 24;
+    if (!['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+    const nextHeight = event.key === 'Home' ? 96 : event.key === 'End' ? 480 : expenseListHeight + (event.key === 'ArrowDown' ? step : -step);
+    setExpenseListHeight(clampExpenseListHeight(nextHeight));
+  };
 
   const monthStr = `${year}-${String(month + 1).padStart(2, '0')}`;
   const confirmed = getConfirmedMeetings(calendar);
@@ -2140,7 +2166,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
           ),
           React.createElement('div', {
             style: {
-              maxHeight: '160px', overflowY: 'auto', border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '6px', display: 'flex', flexDirection: 'column', gap: '4px', backgroundColor: 'var(--bg-card)'
+              height: `${expenseListHeight}px`, minHeight: '96px', maxHeight: '480px', overflowY: 'auto', border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '6px', display: 'flex', flexDirection: 'column', gap: '4px', backgroundColor: 'var(--bg-card)', transition: expenseResizeRef.current ? 'none' : 'height 120ms ease'
             }
           },
             monthlyExpenses.length === 0 ? React.createElement('div', { style: { padding: '16px', textAlign: 'center', fontSize: '0.78rem', color: 'var(--text-muted)' } }, '해당 월에 등록된 내역이 없습니다.')
@@ -2166,6 +2192,27 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
                   )
                 );
               })
+          ),
+          React.createElement('div', {
+            className: 'settlement-expense-resize-row',
+            style: { display: 'flex', justifyContent: 'flex-end', height: '20px', marginTop: '-2px' }
+          },
+            React.createElement('button', {
+              type: 'button',
+              className: 'settlement-expense-resize-handle',
+              title: '드래그하여 지출 항목 높이 조절',
+              'aria-label': '지출 항목 목록 높이 조절',
+              onPointerDown: handleExpenseResizeStart,
+              onPointerMove: handleExpenseResizeMove,
+              onPointerUp: handleExpenseResizeEnd,
+              onPointerCancel: handleExpenseResizeEnd,
+              onKeyDown: handleExpenseResizeKeyDown
+            },
+              React.createElement('svg', { width: '18', height: '18', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '2', strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': 'true' },
+                React.createElement('path', { d: 'M8 9l4-4 4 4' }),
+                React.createElement('path', { d: 'M16 15l-4 4-4-4' })
+              )
+            )
           )
         ),
         /* Personal Expense Editor Block */
