@@ -731,7 +731,7 @@ function CalendarApp() {
       shown = true;
       setOperationProgress({ id, title: title || '작업 처리 중...', detail: detail || '서버에 반영하고 있습니다.', pct });
       operationTimersRef.current.interval = setInterval(() => {
-        pct = Math.min(92, pct + (pct < 55 ? 9 : pct < 80 ? 5 : 2));
+        pct = Math.min(96, pct + (pct < 55 ? 9 : pct < 80 ? 5 : 2));
         setOperationProgress(prev => prev?.id === id ? { ...prev, pct } : prev);
       }, 650);
     }, delay);
@@ -780,7 +780,7 @@ function CalendarApp() {
     saveLocalMeta(serverRevisionRef.current);
   };
 
-  const updateCalendars = async (nextCalendars, toastMsg = '저장완료', toastType = 'success', targetCalId = activeCalId, saveMode = 'availability', newActivityLogs = []) => {
+  const updateCalendars = async (nextCalendars, toastMsg = '저장완료', toastType = 'success', targetCalId = activeCalId, saveMode = 'availability', newActivityLogs = [], auxiliaryData = {}) => {
     let previousCalendars = null;
     try {
       if (!isAllowedCalendarId(targetCalId)) {
@@ -812,7 +812,7 @@ function CalendarApp() {
       const saved = await runWithOperationProgress({
         title: progressTitle,
         detail: `${currentCal.title || currentCal.id} 데이터를 Firebase에 반영하고 있습니다.`
-      }, () => pushSingleCloudCalendar(currentCal, now, 18, normalizedCalendars, saveMode, newActivityLogs));
+      }, () => pushSingleCloudCalendar(currentCal, now, 4, normalizedCalendars, saveMode, newActivityLogs, auxiliaryData));
       if (!saved) {
         console.warn('Cloud save failed for calendar:', currentCal.id);
         if (previousCalendars) setCalendarsState(previousCalendars);
@@ -3704,6 +3704,13 @@ function CalendarApp() {
     photos: Array.isArray(meeting.photos) ? meeting.photos.map(photo => ({ ...photo })) : []
   }));
   const commitConfirmedMeetings = async (nextConfirmedMeetings, toastMessage = null, activityLogs = [], warnLabel = 'write', toastType = 'success') => {
+    const previousMeetings = getConfirmedMeetings(activeCal);
+    const previousByDate = new Map(previousMeetings.map(meeting => [meeting.date, JSON.stringify(meeting)]));
+    // The subcollection is keyed by date. Persist only dates changed by this action instead of
+    // rewriting every confirmed meeting whenever one expense/photo/note is edited.
+    const changedConfirmedMeetings = nextConfirmedMeetings.filter(meeting => {
+      return previousByDate.get(meeting.date) !== JSON.stringify(meeting);
+    });
     const updatedCal = {
       ...activeCal,
       confirmedMeeting: nextConfirmedMeetings,
@@ -3712,14 +3719,16 @@ function CalendarApp() {
       activityLogs: activityLogs.length > 0 ? [...getCalendarActivityLogs(activeCal), ...activityLogs] : getCalendarActivityLogs(activeCal)
     };
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-    const calendarSaved = await updateCalendars(nextCalendars, toastMessage, toastType, updatedCal.id, 'settings', activityLogs);
+    const calendarSaved = await updateCalendars(
+      nextCalendars,
+      toastMessage,
+      toastType,
+      updatedCal.id,
+      'settings',
+      activityLogs,
+      { confirmedMeetings: changedConfirmedMeetings }
+    );
     if (!calendarSaved) return false;
-    const subcollectionSaved = await writeConfirmedMeetingsToFirestore(activeCal.id, nextConfirmedMeetings);
-    if (!subcollectionSaved) {
-      console.warn(`Subcollection confirmedMeetings ${warnLabel} failed after calendar save.`);
-      showToast('일정 데이터 동기화 실패. 다시 시도해 주세요.', 'error', 6000);
-      return false;
-    }
     setConfirmedMeetingsSubcollection(nextConfirmedMeetings);
     return true;
   };
@@ -3787,24 +3796,15 @@ function CalendarApp() {
 	    const cleanAmount = Number.isFinite(expense?.amount) && expense.amount !== 0 ? Math.round(expense.amount) : 0;
     if ((!cleanLabel && !cleanUrl) || !cleanAmount) return false;
     
+    // Link previews are display metadata, not part of the settlement write. Never block the
+    // user's save on a third-party scraper; an existing preview is retained on same-URL edits,
+    // while the normal link-preview component can hydrate a missing preview after rendering.
     let linkPreview = null;
-    if (cleanUrl) {
-      if (expense?.id) {
-        const meeting = existingMeetings[meetingIndex];
-        const existingExp = meeting?.expenses?.find(e => e.id === expense.id);
-        if (existingExp && existingExp.url === cleanUrl && existingExp.linkPreview) {
-          linkPreview = existingExp.linkPreview;
-        }
-      }
-      if (!linkPreview) {
-        try {
-          const res = await fetchLinkPreview(cleanUrl);
-          if (res && res.status === 'success') {
-            linkPreview = res.data;
-          }
-        } catch (e) {
-          console.warn("Failed to fetch link preview on expense save:", e);
-        }
+    if (cleanUrl && expense?.id) {
+      const meeting = existingMeetings[meetingIndex];
+      const existingExp = meeting?.expenses?.find(e => e.id === expense.id);
+      if (existingExp && existingExp.url === cleanUrl && existingExp.linkPreview) {
+        linkPreview = existingExp.linkPreview;
       }
     }
 
@@ -4936,8 +4936,16 @@ function CalendarApp() {
     };
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
     setPlacesSubcollection(nextPlaces);
-    writePlacesToFirestore(activeCal.id, nextPlaces).catch(e => console.warn('Subcollection places write failed:', e));
-    return updateCalendars(nextCalendars, isEditing ? '장소 수정완료' : '장소 등록완료', 'success', updatedCal.id, 'settings', placeActivityLog ? [placeActivityLog] : []);
+    const savedPlace = nextPlaces.find(place => place.id === (placeData.id || nextPlaces[nextPlaces.length - 1]?.id));
+    return updateCalendars(
+      nextCalendars,
+      isEditing ? '장소 수정완료' : '장소 등록완료',
+      'success',
+      updatedCal.id,
+      'settings',
+      placeActivityLog ? [placeActivityLog] : [],
+      { places: savedPlace ? [savedPlace] : [] }
+    );
   };
   const handleDeletePlace = async (placeId) => {
     if (!activeCal || !placeId) return false;
@@ -7895,7 +7903,10 @@ function uploadChatImageAssets(calendarId, compressed, index, onBytes, timeoutMs
       let settled = false;
       return new Promise((resolveOne) => {
         const settle = value => { if (settled) return; settled = true; resolveOne(value); };
-        const timeoutId = setTimeout(() => settle(null), timeoutMs);
+      const timeoutId = setTimeout(() => {
+        try { task.cancel(); } catch (_) {}
+        settle(null);
+      }, timeoutMs);
         const task = ref.put(blob, { contentType });
         task.on('state_changed', snapshot => {
           if (onBytes) onBytes(taskKey, snapshot.bytesTransferred, snapshot.totalBytes);
@@ -9629,7 +9640,10 @@ function uploadMemoImageAssets(calendarId, compressed, index, onBytes, timeoutMs
       let settled = false;
       return new Promise((resolveOne) => {
         const settle = value => { if (settled) return; settled = true; resolveOne(value); };
-        const timeoutId = setTimeout(() => settle(null), timeoutMs);
+        const timeoutId = setTimeout(() => {
+          try { task.cancel(); } catch (_) {}
+          settle(null);
+        }, timeoutMs);
         const task = ref.put(blob, { contentType });
         task.on('state_changed', snapshot => {
           if (onBytes) onBytes(taskKey, snapshot.bytesTransferred, snapshot.totalBytes);

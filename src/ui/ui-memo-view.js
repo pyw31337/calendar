@@ -59,6 +59,13 @@ function __fb() {
   return (typeof window !== 'undefined' && window.__gatherFirebaseDb) || null;
 }
 
+function withMemoFirestoreTimeout(promise, timeoutMs = 12000) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error('메모 저장 시간이 초과되었습니다.')), timeoutMs))
+  ]);
+}
+
 function getStoredChatParticipantId(...args) {
   const fn = (window.GATHER_APP_NOTIFICATIONS || {}).getStoredChatParticipantId;
   return typeof fn === 'function' ? fn(...args) : '';
@@ -945,19 +952,9 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
 
       const participantId = composerParticipantId || 'anonymous';
 
-      // Check for link preview
-      const url = extractFirstUrl(newText);
-      let linkPreview = null;
-      if (url) {
-        try {
-          const res = await fetchLinkPreview(url);
-          if (res && res.status === 'success') {
-            linkPreview = res.data;
-          }
-        } catch (e) {
-          console.error('Failed to fetch link preview on memo save:', e);
-        }
-      }
+      // Link previews are hydrated by the rendered card; a third-party scraper must not delay
+      // the user's memo save.
+      const linkPreview = null;
 
       // 2. Write to Firestore
       const memoData = {
@@ -975,20 +972,18 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
       };
       if (linkPreview) memoData.linkPreview = linkPreview;
 
-      await __fb().collection('calendars').doc('cal_' + calendarId).collection('memos').doc(memoId).set(sanitizeMemoForFirestore(memoData));
+      await withMemoFirestoreTimeout(__fb().collection('calendars').doc('cal_' + calendarId).collection('memos').doc(memoId).set(sanitizeMemoForFirestore(memoData)));
 
       // 3. Write Activity Log
       const logNote = newTitle.trim() ? `제목: ${newTitle.trim()}` : (newText.trim() ? newText.trim().slice(0, 30) + '...' : '사진 첨부');
       const activityLog = createMemoActivityLog(calendarId, 'memo_create', participantId, stamp, logNote);
       if (activityLog) {
-        await __fb().collection('calendars').doc('cal_' + calendarId).collection('activityLogs').doc(activityLog.id).set(activityLog);
-        
         const nextCal = {
           ...calendar,
           updatedAt: stamp,
           revision: (calendar.revision || 0) + 1
         };
-        await pushSingleCloudCalendar(nextCal, stamp, 18, null, 'settings', [activityLog]);
+        await pushSingleCloudCalendar(nextCal, stamp, 4, null, 'settings', [activityLog]);
       }
 
       showToast('메모가 저장되었습니다.', 'success');
@@ -1036,24 +1031,10 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
 
       const participantId = editParticipantId || 'anonymous';
 
-      // Check for link preview
-      const url = extractFirstUrl(editText);
       let linkPreview = null;
-      if (url) {
-        const oldUrl = extractFirstUrl(editingMemo.text);
-        if (oldUrl === url && editingMemo.linkPreview) {
-          linkPreview = editingMemo.linkPreview;
-        } else {
-          try {
-            const res = await fetchLinkPreview(url);
-            if (res && res.status === 'success') {
-              linkPreview = res.data;
-            }
-          } catch (e) {
-            console.error('Failed to fetch link preview on memo update:', e);
-          }
-        }
-      }
+      const url = extractFirstUrl(editText);
+      const oldUrl = extractFirstUrl(editingMemo.text);
+      if (url && oldUrl === url && editingMemo.linkPreview) linkPreview = editingMemo.linkPreview;
 
       const memoData = {
         ...editingMemo,
@@ -1069,7 +1050,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
         linkPreview: linkPreview || null
       };
 
-      await __fb().collection('calendars').doc('cal_' + calendarId).collection('memos').doc(editingMemo.id).set(sanitizeMemoForFirestore(memoData));
+      await withMemoFirestoreTimeout(__fb().collection('calendars').doc('cal_' + calendarId).collection('memos').doc(editingMemo.id).set(sanitizeMemoForFirestore(memoData)));
 
       // Log Memo Update — before→after detail
       const logNote = buildFieldChangeNote(editTitle.trim() || '메모', [
@@ -1080,14 +1061,12 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
       ]) || (editTitle.trim() || (editText.trim().slice(0, 40) + '...'));
       const activityLog = createMemoActivityLog(calendarId, 'memo_update', participantId, stamp, logNote);
       if (activityLog) {
-        await __fb().collection('calendars').doc('cal_' + calendarId).collection('activityLogs').doc(activityLog.id).set(activityLog);
-        
         const nextCal = {
           ...calendar,
           updatedAt: stamp,
           revision: (calendar.revision || 0) + 1
         };
-        await pushSingleCloudCalendar(nextCal, stamp, 18, null, 'settings', [activityLog]);
+        await pushSingleCloudCalendar(nextCal, stamp, 4, null, 'settings', [activityLog]);
       }
 
       showToast('메모가 수정되었습니다.', 'success');
@@ -1108,38 +1087,35 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
         const participantId = getStoredChatParticipantId(calendarId, calendar) || 'anonymous';
         const memoSnapshot = JSON.parse(JSON.stringify(memo));
 
-        await __fb().collection('calendars').doc('cal_' + calendarId).collection('memos').doc(memo.id).delete();
+        await withMemoFirestoreTimeout(__fb().collection('calendars').doc('cal_' + calendarId).collection('memos').doc(memo.id).delete());
 
         // Log Memo Delete
         const logNote = memo.title ? `제목: ${memo.title}` : (memo.text.slice(0, 30) + '...');
         const activityLog = createMemoActivityLog(calendarId, 'memo_delete', participantId, stamp, logNote);
         if (activityLog) {
-          await __fb().collection('calendars').doc('cal_' + calendarId).collection('activityLogs').doc(activityLog.id).set(activityLog);
-          
           const nextCal = {
             ...calendar,
             updatedAt: stamp,
             revision: (calendar.revision || 0) + 1
           };
-          await pushSingleCloudCalendar(nextCal, stamp, 18, null, 'settings', [activityLog]);
+          await pushSingleCloudCalendar(nextCal, stamp, 4, null, 'settings', [activityLog]);
         }
 
         showToast('메모가 삭제되었습니다.', 'delete', 5000, async () => {
           try {
             const restoreStamp = Date.now();
-            await __fb().collection('calendars').doc('cal_' + calendarId).collection('memos').doc(memo.id).set(sanitizeMemoForFirestore(memoSnapshot));
+            await withMemoFirestoreTimeout(__fb().collection('calendars').doc('cal_' + calendarId).collection('memos').doc(memo.id).set(sanitizeMemoForFirestore(memoSnapshot)));
             const restoreNote = memoSnapshot.title
               ? `복원: 제목: ${memoSnapshot.title}`
               : `복원: ${String(memoSnapshot.text || '').slice(0, 30)}...`;
             const restoreActivityLog = createMemoActivityLog(calendarId, 'memo_update', participantId, restoreStamp, restoreNote);
             if (restoreActivityLog) {
-              await __fb().collection('calendars').doc('cal_' + calendarId).collection('activityLogs').doc(restoreActivityLog.id).set(restoreActivityLog);
               const nextCal = {
                 ...calendar,
                 updatedAt: restoreStamp,
                 revision: (calendar.revision || 0) + 1
               };
-              await pushSingleCloudCalendar(nextCal, restoreStamp, 18, null, 'settings', [restoreActivityLog]);
+              await pushSingleCloudCalendar(nextCal, restoreStamp, 4, null, 'settings', [restoreActivityLog]);
             }
             setEditingMemo(null);
             showToast('메모 삭제를 되돌렸습니다.', 'success', 3000);

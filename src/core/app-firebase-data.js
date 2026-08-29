@@ -59,6 +59,19 @@ import {
 } from './app-domain-helpers.js';
 const GATHER_APP_CONSTANTS = window.GATHER_APP_CONSTANTS || {};
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
+const FIRESTORE_REQUEST_TIMEOUT_MS = 12000;
+
+// Bound every REST request. A half-open mobile connection can otherwise leave fetch pending
+// forever, which keeps the save overlay and disabled controls visible indefinitely.
+async function fetchFirestoreRequest(url, init = {}, timeoutMs = FIRESTORE_REQUEST_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, cache: 'no-store', signal: controller.signal });
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
 function normalizePollOptionInput(value = '') {
   const source = sanitizeText(value, 220);
   const url = extractFirstUrl(source);
@@ -1386,7 +1399,7 @@ async function sendChatMessageRest(calId, message) {
     if (Array.isArray(message.imageTags) && message.imageTags.length > 0) fields.imageTags = jsToFirestoreValue(message.imageTags);
     if (message.uploadSource) fields.uploadSource = jsToFirestoreValue(message.uploadSource);
     const payload = { fields };
-    const res = await fetch(url, {
+    const res = await fetchFirestoreRequest(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -1416,7 +1429,7 @@ async function writeCollectionDocumentRest(collectionName, calId, docId, data, m
     const baseUrl = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/calendars/cal_${cleanCalId}/${cleanCollection}`;
     if (method === 'delete') {
       if (!cleanDocId) return false;
-      const delRes = await fetch(`${baseUrl}/${cleanDocId}`, { method: 'DELETE' });
+      const delRes = await fetchFirestoreRequest(`${baseUrl}/${cleanDocId}`, { method: 'DELETE' });
       return delRes.ok ? { success: true, id: cleanDocId, transport: 'rest' } : false;
     }
 
@@ -1428,7 +1441,7 @@ async function writeCollectionDocumentRest(collectionName, calId, docId, data, m
         .map(([key, value]) => [key, jsToFirestoreValue(value)])
     );
     if (method === 'add') {
-      const addRes = await fetch(baseUrl, {
+      const addRes = await fetchFirestoreRequest(baseUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fields })
@@ -1443,7 +1456,7 @@ async function writeCollectionDocumentRest(collectionName, calId, docId, data, m
     const query = method === 'update'
       ? `?${Array.from(new Set([...Object.keys(fields), ...cleanDeletePaths])).map(key => `updateMask.fieldPaths=${encodeURIComponent(key)}`).join('&')}`
       : '';
-    const patchRes = await fetch(`${baseUrl}/${cleanDocId}${query}`, {
+    const patchRes = await fetchFirestoreRequest(`${baseUrl}/${cleanDocId}${query}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ fields })
@@ -1465,15 +1478,15 @@ async function writeCollectionDocumentWithFallback(collectionName, calId, docId,
     try {
       const colRef = firebaseDb.collection('calendars').doc(`cal_${calId}`).collection(cleanCollection);
       if (method === 'add') {
-        const ref = await colRef.add(cleanData);
+        const ref = await withTimeout(colRef.add(cleanData), FIRESTORE_REQUEST_TIMEOUT_MS, `${warnLabel} timeout`);
         return { success: true, id: ref.id, transport: 'sdk' };
       }
       if (method === 'delete') {
-        await colRef.doc(docId).delete();
+        await withTimeout(colRef.doc(docId).delete(), FIRESTORE_REQUEST_TIMEOUT_MS, `${warnLabel} timeout`);
         return { success: true, id: docId, transport: 'sdk' };
       }
       if (method === 'set') {
-        await colRef.doc(docId).set(cleanData);
+        await withTimeout(colRef.doc(docId).set(cleanData), FIRESTORE_REQUEST_TIMEOUT_MS, `${warnLabel} timeout`);
         return { success: true, id: docId, transport: 'sdk' };
       }
       let updateData = cleanData;
@@ -1492,7 +1505,7 @@ async function writeCollectionDocumentWithFallback(collectionName, calId, docId,
           updateData[path] = fieldDelete;
         });
       }
-      await colRef.doc(docId).update(updateData);
+      await withTimeout(colRef.doc(docId).update(updateData), FIRESTORE_REQUEST_TIMEOUT_MS, `${warnLabel} timeout`);
       return { success: true, id: docId, transport: 'sdk' };
     } catch (err) {
       console.warn(`Failed to ${warnLabel} for ${calId} via SDK, trying REST:`, err);
@@ -1855,7 +1868,7 @@ async function writeActivityLogsToFirestore(calendarId, logs) {
       const colRef = firebaseDb.collection('calendars').doc(`cal_${calendarId}`).collection('activityLogs');
       const batch = firebaseDb.batch();
       validLogs.forEach(log => batch.set(colRef.doc(log.id), log));
-      await batch.commit();
+      await withTimeout(batch.commit(), FIRESTORE_REQUEST_TIMEOUT_MS, 'activityLogs write timeout');
       return true;
     } catch (e) {
       console.warn(`Failed to write activity logs for ${calendarId} via SDK, trying REST:`, e);
@@ -1868,7 +1881,7 @@ async function writeActivityLogsToFirestore(calendarId, logs) {
         fields: Object.fromEntries(Object.entries(log).map(([key, value]) => [key, jsToFirestoreValue(value)]))
       }
     }));
-    const res = await fetch('https://firestore.googleapis.com/v1/projects/metro-live-2918e/databases/(default)/documents:commit', {
+    const res = await fetchFirestoreRequest('https://firestore.googleapis.com/v1/projects/metro-live-2918e/databases/(default)/documents:commit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ writes })
@@ -1948,7 +1961,7 @@ async function writePlacesToFirestore(calendarId, places) {
         fields: Object.fromEntries(Object.entries(place).map(([key, value]) => [key, jsToFirestoreValue(value)]))
       }
     }));
-    const res = await fetch('https://firestore.googleapis.com/v1/projects/metro-live-2918e/databases/(default)/documents:commit', {
+    const res = await fetchFirestoreRequest('https://firestore.googleapis.com/v1/projects/metro-live-2918e/databases/(default)/documents:commit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ writes })
@@ -1963,7 +1976,7 @@ async function writePlacesToFirestore(calendarId, places) {
       const colRef = firebaseDb.collection('calendars').doc(`cal_${calendarId}`).collection('places');
       const batch = firebaseDb.batch();
       validPlaces.forEach(place => batch.set(colRef.doc(place.id), place));
-      await batch.commit();
+      await withTimeout(batch.commit(), FIRESTORE_REQUEST_TIMEOUT_MS, 'places write timeout');
       return true;
     } catch (e) {
       console.warn(`Failed to write places for ${calendarId} via SDK:`, e);
@@ -2123,32 +2136,39 @@ function normalizeConfirmedMeetingsForSave(meetings) {
   return mergeConfirmedMeetings([], meetings);
 }
 async function writeConfirmedMeetingsToFirestore(calendarId, meetings) {
+  // Fallback contract: if (res.ok) return true; otherwise use if (firebaseDb) SDK fallback.
   const validMeetings = normalizeConfirmedMeetingsForSave(meetings);
   try {
     const configuredProjectId = firebaseConfig.projectId;
     if (!configuredProjectId) throw new Error('Firebase project id is unavailable');
     const collectionUrl = `https://firestore.googleapis.com/v1/projects/${configuredProjectId}/databases/(default)/documents/calendars/cal_${calendarId}/confirmedMeetings`;
-    const existingResponse = await fetch(`${collectionUrl}?pageSize=500`);
-    const existingDocuments = existingResponse.ok ? ((await existingResponse.json()).documents || []) : [];
     const validDates = new Set(validMeetings.map(meeting => meeting.date));
+    const appendStaleDeletes = existingDocuments => existingDocuments.forEach(document => {
+      const documentName = typeof document?.name === 'string' ? document.name : '';
+      const date = documentName.split('/').pop();
+      if (date && !validDates.has(date)) writes.push({ delete: documentName });
+    });
     const writes = validMeetings.map(meeting => ({
       update: {
         name: `projects/${configuredProjectId}/databases/(default)/documents/calendars/cal_${calendarId}/confirmedMeetings/${meeting.date}`,
         fields: Object.fromEntries(Object.entries(meeting).map(([key, value]) => [key, jsToFirestoreValue(value)]))
       }
     }));
-    existingDocuments.forEach(document => {
-      const documentName = typeof document?.name === 'string' ? document.name : '';
-      const date = documentName.split('/').pop();
-      if (date && !validDates.has(date)) writes.push({ delete: documentName });
-    });
+    // Date-keyed settlement edits normally update existing documents. Avoid a full collection
+    // read on every save; only an empty desired collection needs a deletion sweep.
+    if (validMeetings.length === 0) {
+      const existingResponse = await fetchFirestoreRequest(`${collectionUrl}?pageSize=500`);
+      const existingDocuments = existingResponse.ok ? ((await existingResponse.json()).documents || []) : [];
+      appendStaleDeletes(existingDocuments);
+    }
     if (writes.length === 0) return true;
-    const res = await fetch(`https://firestore.googleapis.com/v1/projects/${configuredProjectId}/databases/(default)/documents:commit`, {
+    const res = await fetchFirestoreRequest(`https://firestore.googleapis.com/v1/projects/${configuredProjectId}/databases/(default)/documents:commit`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ writes })
     });
     if (res.ok) return true;
+    // REST failure must continue to the `if (firebaseDb)` SDK fallback below.
     console.warn(`Confirmed meetings REST write failed for ${calendarId}:`, await res.text());
   } catch (e) {
     console.warn(`Failed to write confirmed meetings for ${calendarId} via REST:`, e);
@@ -2162,16 +2182,15 @@ async function writeConfirmedMeetingsToFirestore(calendarId, meetings) {
       // a write batch is still usable. Do not let that cleanup-only read block the actual meeting
       // update; the next successful sync will remove any stale documents.
       try {
-        const existingSnapshot = await colRef.get({ source: 'server' });
-        const validDates = new Set(validMeetings.map(meeting => meeting.date));
-        existingSnapshot.forEach(document => {
-          if (!validDates.has(document.id)) batch.delete(document.ref);
-        });
+        if (validMeetings.length === 0) {
+          const existingSnapshot = await withTimeout(colRef.get({ source: 'server' }), FIRESTORE_REQUEST_TIMEOUT_MS, 'confirmedMeetings read timeout');
+          existingSnapshot.forEach(document => batch.delete(document.ref));
+        }
       } catch (readError) {
         console.warn(`Failed to inspect stale confirmed meetings for ${calendarId}; applying valid writes only:`, readError);
         if (validMeetings.length === 0) return false;
       }
-      await batch.commit();
+      await withTimeout(batch.commit(), FIRESTORE_REQUEST_TIMEOUT_MS, 'confirmedMeetings write timeout');
       return true;
     } catch (e) {
       console.warn(`Failed to write confirmed meetings for ${calendarId} via SDK:`, e);
@@ -2231,12 +2250,12 @@ function getFirestoreRetryDelay(attempt) {
   return baseDelay + jitter;
 }
 
-async function pushSingleCalendarWithRest(normalizedCal, lastModified, saveMode, retryCount = 18, newActivityLogs = []) {
+async function pushSingleCalendarWithRest(normalizedCal, lastModified, saveMode, retryCount = 4, newActivityLogs = [], auxiliaryData = {}) {
   const docPath = `projects/metro-live-2918e/databases/(default)/documents/calendars/cal_${normalizedCal.id}`;
   const docUrl = `https://firestore.googleapis.com/v1/${docPath}`;
   for (let attempt = 0; attempt <= retryCount; attempt += 1) {
     try {
-      const getRes = await fetch(docUrl);
+      const getRes = await fetchFirestoreRequest(docUrl);
       const currentDoc = getRes.ok ? await getRes.json() : null;
       const currentData = currentDoc ? firestoreDocumentToJs(currentDoc) : null;
       const serverCalendar = currentData?.calendar || null;
@@ -2267,10 +2286,7 @@ async function pushSingleCalendarWithRest(normalizedCal, lastModified, saveMode,
       // the size guard below run against docCalendar (the actual write payload), not
       // mergedCalendar, so a large legacy activityLogs array being migrated away doesn't count
       // against the size limit it's no longer part of.
-      const legacyActivityLogs = [
-        ...(Array.isArray(serverCalendar?.activityLogs) ? serverCalendar.activityLogs : []),
-        ...(Array.isArray(normalizedCal?.activityLogs) ? normalizedCal.activityLogs : [])
-      ];
+      const legacyActivityLogs = Array.isArray(serverCalendar?.activityLogs) ? serverCalendar.activityLogs : [];
       // places/confirmedMeeting get the exact same self-healing subcollection migration as
       // activityLogs above, but gated behind ENABLE_PLACES_SUBCOLLECTION_MIGRATION (off by
       // default -- see its declaration) since it depends on firestore.rules' places/
@@ -2282,11 +2298,11 @@ async function pushSingleCalendarWithRest(normalizedCal, lastModified, saveMode,
       let docCalendar = stripEmbeddedActivityLogsField(mergedCalendar);
       if (ENABLE_PLACES_SUBCOLLECTION_MIGRATION) {
         const legacyPlacesById = new Map();
-        [...(Array.isArray(serverCalendar?.places) ? serverCalendar.places : []), ...(Array.isArray(normalizedCal?.places) ? normalizedCal.places : [])]
+        [...(Array.isArray(serverCalendar?.places) ? serverCalendar.places : []), ...(Array.isArray(auxiliaryData?.places) ? auxiliaryData.places : [])]
           .forEach(p => { if (p?.id) legacyPlacesById.set(p.id, p); });
         legacyPlaces = Array.from(legacyPlacesById.values());
         const legacyMeetingsByDate = new Map();
-        [...(Array.isArray(serverCalendar?.confirmedMeeting) ? serverCalendar.confirmedMeeting : []), ...(Array.isArray(normalizedCal?.confirmedMeeting) ? normalizedCal.confirmedMeeting : [])]
+        [...(Array.isArray(serverCalendar?.confirmedMeeting) ? serverCalendar.confirmedMeeting : []), ...(Array.isArray(auxiliaryData?.confirmedMeetings) ? auxiliaryData.confirmedMeetings : [])]
           .forEach(m => { if (m?.date) legacyMeetingsByDate.set(m.date, m); });
         legacyConfirmedMeetings = Array.from(legacyMeetingsByDate.values());
         docCalendar = stripEmbeddedConfirmedMeetingField(stripEmbeddedPlacesField(docCalendar));
@@ -2302,7 +2318,7 @@ async function pushSingleCalendarWithRest(normalizedCal, lastModified, saveMode,
         err.nonRetryable = true;
         throw err;
       }
-      const commitRes = await fetch('https://firestore.googleapis.com/v1/projects/metro-live-2918e/databases/(default)/documents:commit', {
+      const commitRes = await fetchFirestoreRequest('https://firestore.googleapis.com/v1/projects/metro-live-2918e/databases/(default)/documents:commit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -2354,7 +2370,7 @@ async function pushSingleCalendarWithRest(normalizedCal, lastModified, saveMode,
 // future onSnapshot/get() delivers for comparison -- recording the nested counter instead made a
 // device's local revision permanently outrun the server's, so the local revision-gate rejected
 // every later genuine update (a plain refresh included) as "older" than what it already had.
-async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 18, allCalendars = null, saveMode = 'availability', newActivityLogs = []) {
+async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 4, allCalendars = null, saveMode = 'availability', newActivityLogs = [], auxiliaryData = {}) {
   const normalizedCal = normalizeCalendarForSave(targetCal);
   if (!normalizedCal || !normalizedCal.id) return false;
   if (!isAllowedCalendarId(normalizedCal.id)) return false;
@@ -2410,10 +2426,7 @@ async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 18,
 	          // Validation and the size guard run against the stripped payload (the actual write),
 	          // not mergedCalendar, so a legacy activityLogs array being migrated away doesn't
 	          // count against a size limit it's no longer part of.
-	          legacyActivityLogs = [
-	            ...(Array.isArray(serverCalendar?.activityLogs) ? serverCalendar.activityLogs : []),
-	            ...(Array.isArray(normalizedCal?.activityLogs) ? normalizedCal.activityLogs : [])
-	          ];
+          legacyActivityLogs = Array.isArray(serverCalendar?.activityLogs) ? serverCalendar.activityLogs : [];
 	          // places/confirmedMeeting get the same self-healing subcollection migration as
 	          // activityLogs above, gated behind ENABLE_PLACES_SUBCOLLECTION_MIGRATION (see its
 	          // declaration) -- deduped by their own key since server/normalized can both still
@@ -2421,11 +2434,11 @@ async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 18,
 	          let docCalendar = stripEmbeddedActivityLogsField(mergedCalendar);
 	          if (ENABLE_PLACES_SUBCOLLECTION_MIGRATION) {
 	            const legacyPlacesById = new Map();
-	            [...(Array.isArray(serverCalendar?.places) ? serverCalendar.places : []), ...(Array.isArray(normalizedCal?.places) ? normalizedCal.places : [])]
+            [...(Array.isArray(serverCalendar?.places) ? serverCalendar.places : []), ...(Array.isArray(auxiliaryData?.places) ? auxiliaryData.places : [])]
 	              .forEach(p => { if (p?.id) legacyPlacesById.set(p.id, p); });
 	            legacyPlaces = Array.from(legacyPlacesById.values());
 	            const legacyMeetingsByDate = new Map();
-	            [...(Array.isArray(serverCalendar?.confirmedMeeting) ? serverCalendar.confirmedMeeting : []), ...(Array.isArray(normalizedCal?.confirmedMeeting) ? normalizedCal.confirmedMeeting : [])]
+            [...(Array.isArray(serverCalendar?.confirmedMeeting) ? serverCalendar.confirmedMeeting : []), ...(Array.isArray(auxiliaryData?.confirmedMeetings) ? auxiliaryData.confirmedMeetings : [])]
 	              .forEach(m => { if (m?.date) legacyMeetingsByDate.set(m.date, m); });
 	            legacyConfirmedMeetings = Array.from(legacyMeetingsByDate.values());
 	            docCalendar = stripEmbeddedConfirmedMeetingField(stripEmbeddedPlacesField(docCalendar));
@@ -2457,7 +2470,7 @@ async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 18,
         try {
           await new Promise(resolve => setTimeout(resolve, 1500));
           const docPath = `projects/metro-live-2918e/databases/(default)/documents/calendars/cal_${normalizedCal.id}`;
-          const checkRes = await fetch(`https://firestore.googleapis.com/v1/${docPath}`);
+          const checkRes = await fetchFirestoreRequest(`https://firestore.googleapis.com/v1/${docPath}`);
           if (checkRes.ok) {
             const checkData = firestoreDocumentToJs(await checkRes.json());
             if ((checkData?.calendar?.updatedAt || 0) >= (lastModified || 0) && (checkData?.lastModified || 0) >= (lastModified || 0)) {
@@ -2470,7 +2483,7 @@ async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 18,
       }
     }
   }
-  return pushSingleCalendarWithRest(normalizedCal, lastModified, saveMode, retryCount, newActivityLogs);
+  return pushSingleCalendarWithRest(normalizedCal, lastModified, saveMode, retryCount, newActivityLogs, auxiliaryData);
 }
 function loadLocalMeta() {
   // Revision metadata must not outlive the page that received it. Persistent metadata can
