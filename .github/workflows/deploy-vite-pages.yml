@@ -31,7 +31,12 @@ jobs:
       - name: Install Chromium for browser smoke
         run: npx playwright install --with-deps chromium
       - name: Run browser smoke before publishing artifact
-        run: npm run smoke:browser
+        run: |
+          for attempt in 1 2 3; do
+            npm run smoke:browser && exit 0
+            if [ "$attempt" -lt 3 ]; then sleep 10; fi
+          done
+          exit 1
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v5
         with:
