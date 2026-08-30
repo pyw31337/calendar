@@ -13,6 +13,7 @@ const memoScript = fs.readFileSync('src/ui/ui-memo-view.js', 'utf8');
 const eventModalScript = fs.readFileSync('src/ui/ui-event-modals.js', 'utf8');
 const weatherScript = fs.readFileSync('src/ui/ui-weather.js', 'utf8');
 const sideMenuScript = fs.readFileSync('src/ui/ui-side-menu.js', 'utf8');
+const calendarCoreScript = fs.readFileSync('src/ui/ui-calendar-core.js', 'utf8');
 const domainHelpersScript = fs.readFileSync('src/core/app-domain-helpers.js', 'utf8');
 const adminDashboardScript = fs.readFileSync('src/ui/ui-admin-dashboard.js', 'utf8');
 const sharedScript = fs.readFileSync('src/ui/ui-shared.js', 'utf8');
@@ -43,6 +44,7 @@ assert(/merge: Boolean\(options\?\.merge\)/.test(firebaseDataScript) && /Boolean
 assert(/writeRootCollectionDocumentWithFallback[\s\S]{0,900}FIRESTORE_WRITE_DEADLINE_MS/.test(firebaseDataScript), 'root collection writes must use the bounded write deadline');
 assert(/withWeatherTimeout/.test(weatherScript) && /WEATHER_FIRESTORE_TIMEOUT_MS/.test(weatherScript), 'weather cache reads and writes must be bounded');
 assert(firebaseServicesScript.includes('FIRESTORE_REST_TIMEOUT_MS = 9000') && firebaseServicesScript.includes('fetchWithTimeout') && firebaseServicesScript.includes('withSdkTimeout'), 'Firebase SDK and REST reads must have bounded timeouts');
+assert(calendarCoreScript.includes('withFirestoreReadTimeout') && calendarCoreScript.includes('Firestore search read timed out'), 'full-history search reads must have a bounded timeout');
 assert(/writeSharedCollection/.test(sideMenuScript) && /기기 구독 삭제/.test(sideMenuScript), 'device subscription deletes must use the bounded collection write path');
 assert(/writeSharedCollection/.test(domainHelpersScript) && /기기 구독 등록/.test(domainHelpersScript) && /기기 구독 해제/.test(domainHelpersScript), 'push subscription registration and removal must use the bounded collection write path');
 assert(/writeAdminCollection/.test(adminDashboardScript) && /관리자 채팅 삭제/.test(adminDashboardScript), 'manual admin message deletes must use the bounded collection write path');

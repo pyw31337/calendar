@@ -58,6 +58,13 @@ function __fb() {
   }
   return (typeof window !== 'undefined' && window.__gatherFirebaseDb) || null;
 }
+function withFirestoreReadTimeout(promise, timeoutMs = 9000) {
+  let timer = null;
+  const deadline = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error('Firestore search read timed out')), timeoutMs);
+  });
+  return Promise.race([promise, deadline]).finally(() => { if (timer) clearTimeout(timer); });
+}
 
 function getStoredChatParticipantId(...args) {
   const fn = (window.GATHER_APP_NOTIFICATIONS || {}).getStoredChatParticipantId;
@@ -2677,8 +2684,8 @@ export function GlobalSearchModal({
     if (!q || fullHistory || isLoadingFullHistory || !calendar?.id || !__fb()) return;
     setIsLoadingFullHistory(true);
     Promise.all([
-      __fb().collection('calendars').doc(`cal_${calendar.id}`).collection('messages').get({ source: 'server' }),
-      __fb().collection('calendars').doc(`cal_${calendar.id}`).collection('memos').get({ source: 'server' })
+      withFirestoreReadTimeout(__fb().collection('calendars').doc(`cal_${calendar.id}`).collection('messages').get({ source: 'server' })),
+      withFirestoreReadTimeout(__fb().collection('calendars').doc(`cal_${calendar.id}`).collection('memos').get({ source: 'server' }))
     ]).then(([messagesSnap, memosSnap]) => {
       setFullHistory({
         chatMessages: messagesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })),
