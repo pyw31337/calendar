@@ -1,7 +1,6 @@
 /** P6 ESM adapter for app-main — live assets/app-main.js unchanged */
 import './../react-globals.js';
 import { uploadBlobWithWatchdog } from './app-media-upload.js';
-import { CreateSettlementModal as SettlementEditorModal } from '../ui/ui-event-modals.js';
 const React = window.React;
 const ReactDOM = window.ReactDOM;
 if (!React || !ReactDOM || typeof ReactDOM.createRoot !== 'function') {
@@ -5963,7 +5962,7 @@ function CalendarApp() {
       onClose: () => setIsCreateSettlementOpen(false),
       onSave: handleSaveSettlementCard
     }),
-    editingSettlementCard && activeCal && /*#__PURE__*/React.createElement(SettlementEditorModal, {
+    editingSettlementCard && activeCal && /*#__PURE__*/React.createElement(CreateSettlementModal, {
       calendar: activeCal,
       initialData: editingSettlementCard,
       showToast: showToast,
