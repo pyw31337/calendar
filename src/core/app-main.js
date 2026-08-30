@@ -622,8 +622,7 @@ function AdminUnifiedSearchModal(props) {
   return typeof C === 'function' ? React.createElement(C, props) : null;
 }
 function CreateSettlementModal(props) {
-  const C = window.__GATHER_CREATE_SETTLEMENT_MODAL__
-    || (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CreateSettlementModal);
+  const C = window.__GATHER_CREATE_SETTLEMENT_MODAL__ || (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CreateSettlementModal);
   return typeof C === 'function' ? React.createElement(C, props) : null;
 }
 function getAllDirectMediaImageEntries(message) {
@@ -813,10 +812,8 @@ function CalendarApp() {
   // finishes (see updateCalendars' finally block), still gated by applyCalendarSnapshot's own
   // revision check so it can't clobber whatever this device's own save just committed.
   const pendingRemoteSnapshotRef = React.useRef(null);
-  // Prevent a foreground response that started before a save from overwriting the save.
   const localWriteStartedAtRef = React.useRef({});
   const serverRevisionRef = React.useRef(loadLocalMeta());
-
   const applyServerCalendars = (serverCalendars, lastModified = Date.now()) => {
     const normalized = cloneCalendarList(serverCalendars).map(normalizeCalendarForSave);
     if (normalized.length === 0) return;
@@ -873,7 +870,6 @@ function CalendarApp() {
         showToast('오프라인 저장 대기열을 사용할 수 없습니다.', 'error', 6000);
         return false;
       }
-
       isSavingRef.current = true;
       localWriteStartedAtRef.current[targetCalId] = now;
       previousCalendars = calendars;
@@ -1737,9 +1733,6 @@ function CalendarApp() {
     return restored || true;
   }, [activeCalId]);
 
-  // Shared by the realtime listener and the visibility-resume refresh. Keeping this update
-  // outside either effect prevents a resume callback from closing over an unrelated effect's
-  // `isMounted`/`applyLoadedCalendar` locals.
   const applyCalendarSnapshot = React.useCallback((cloudCal, cloudLastMod = Date.now(), cloudRevision = 0, forceApply = false) => {
     if (!cloudCal || cloudCal.id !== activeCalId) return false;
     if (forceApply && isSavingRef.current) return false;
@@ -1748,9 +1741,7 @@ function CalendarApp() {
     if (!forceApply) {
       if (incomingRevision > 0 && currentMetaRevision > 0 && incomingRevision < currentMetaRevision) return false;
       if (incomingRevision <= 0 && cloudLastMod < getMetaLastModified(serverRevisionRef.current, activeCalId)) return false;
-    } else if (cloudLastMod < (localWriteStartedAtRef.current[activeCalId] || 0)) {
-      return false;
-    }
+    } else if (cloudLastMod < (localWriteStartedAtRef.current[activeCalId] || 0)) return false;
     setIsInitialDataLoading(false);
     setCalendarsState(prevCals => {
       const list = Array.isArray(prevCals) ? prevCals : [];
@@ -4935,10 +4926,6 @@ function CalendarApp() {
 
   const handleSavePlace = (placeData) => {
     if (!activeCal || !Number.isFinite(placeData?.lat) || !Number.isFinite(placeData?.lng)) return false;
-    // A date modal can save two places back-to-back before the parent render has
-    // received the first state update. Always merge against the latest calendar
-    // ref so the second save cannot rebuild the places array from a stale snapshot
-    // and silently discard the first place.
     const latestCal = calendarsRef.current.find(c => c.id === activeCal.id) || activeCal;
     const cleanName = sanitizeText(placeData?.name || '', 80);
     if (!cleanName) return false;
