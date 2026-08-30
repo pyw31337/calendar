@@ -2546,9 +2546,13 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
 
   const handleOpenSettlementEditor = (card) => {
     setOpenMenuCardId(null);
-    // Keep the editor in this component's React tree. The old parent callback and
-    // independent-root fallback could update state in one tree while the modal was
-    // rendered (or not rendered) by another lazy UI registry.
+    // The page owner already renders the editor alongside this summary. Use that
+    // callback first so the card action and the modal always share one React tree;
+    // the local state remains a fallback for standalone consumers of this component.
+    if (typeof onOpenSettlementEditor === 'function') {
+      onOpenSettlementEditor(card, CreateSettlementModalComp);
+      return;
+    }
     setIsCreateSettlementOpen(true);
     setEditingSettlementCard({ ...card });
   };
@@ -3576,31 +3580,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
           key: card.id,
           className: "settlement-list-card",
           type: "button",
-          onMouseDown: event => {
-            event.preventDefault();
-            event.stopPropagation();
-            setIsSettlementListOpen(false);
-            handleOpenSettlementEditor(card);
-          },
-          onPointerUp: event => {
-            event.preventDefault();
-            event.stopPropagation();
-            setIsSettlementListOpen(false);
-            handleOpenSettlementEditor(card);
-          },
           onClick: event => {
-            event.preventDefault();
-            event.stopPropagation();
-            setIsSettlementListOpen(false);
-            handleOpenSettlementEditor(card);
-          },
-          onMouseUp: event => {
-            event.preventDefault();
-            event.stopPropagation();
-            setIsSettlementListOpen(false);
-            handleOpenSettlementEditor(card);
-          },
-          onTouchEnd: event => {
             event.preventDefault();
             event.stopPropagation();
             setIsSettlementListOpen(false);
