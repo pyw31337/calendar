@@ -31,7 +31,8 @@ assert(domainHelpers.includes('const isRenderableImageUrl = GATHER_APP_UTILS.isR
 assert(sharedUi.includes('const imageSrc = (() =>') && sharedUi.includes('imageSrc && /*#__PURE__*/React.createElement'), 'link preview cards must reject malformed cached image URLs');
 assert(overlaysUi.includes('const isSafeMediaSrc = value =>') && overlaysUi.includes('const primarySrc = isSafeMediaSrc(src);'), 'shared media thumbnails must reject malformed image URLs');
 assert(fs.readFileSync('scripts/firebase-media-audit.mjs', 'utf8').includes('invalidCount'), 'media audit must report invalid image data without mutating production records');
-assert(/async function persistLegacySubcollections[\s\S]{0,700}Promise\.all\(jobs\)/.test(firebaseDataScript), 'legacy subcollection writes must be awaited as one save operation');
+assert(/void persistLegacySubcollections\([\s\S]{0,260}\.catch\(/.test(firebaseDataScript), 'legacy subcollection writes must be detached from the primary save and handled in the background');
+assert(/options\?\.documentId[\s\S]{0,260}colRef\.doc\(options\.documentId\)\.set/.test(firebaseDataScript), 'retryable collection adds must support deterministic document ids');
 assert(!/checkProxyRateLimit\(\$\{bucketKey\}\) failed, allowing request[\s\S]{0,160}return true/.test(fs.readFileSync('functions/index.js', 'utf8')), 'proxy limiter must not fail open');
 const setChatNotifyPrefBody = script.match(/function setChatNotifyEnabledForCalendar\(calId, enabled\) \{([\s\S]*?)\n\}/)?.[1] || '';
 assert(!setChatNotifyPrefBody.includes('gather_chat_notify_pref_global_v1'), 'new chat notification writes must be calendar-scoped, not global');

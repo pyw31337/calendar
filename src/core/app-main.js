@@ -2655,53 +2655,15 @@ function CalendarApp() {
     });
 
     try {
+      // Link preview scraping is deliberately post-save. A third-party preview endpoint can
+      // take several seconds or fail on a weak mobile network; it must never hold the user's
+      // message/photo write hostage.
+      const chatLinkUrl = hasText ? extractFirstUrl(chatInput) : '';
       let linkPreview = null;
-      if (hasText) {
-        const url = extractFirstUrl(chatInput);
-        if (url && shouldFetchLinkPreviewForChatUrl(url)) {
-          setChatUploadProgress({
-            pct: 8,
-            remainingSec: 5,
-            label: '링크 미리보기 생성 중...',
-            current: imageCount > 0 ? 1 : undefined,
-            total: imageCount > 0 ? imageCount : undefined
-          });
-          const startTime = Date.now();
-          const targetDuration = 5000;
-          const pInterval = setInterval(() => {
-            const elapsed = Date.now() - startTime;
-            const displayPercent = Math.min(84, 8 + Math.round(76 * (1 - Math.exp(-elapsed / 2200))));
-            const remaining = Math.max(1, Math.round((targetDuration - elapsed) / 1000));
-            setChatUploadProgress({
-              pct: displayPercent,
-              remainingSec: remaining,
-              label: '링크 미리보기 생성 중...',
-              current: imageCount > 0 ? 1 : undefined,
-              total: imageCount > 0 ? imageCount : undefined
-            });
-          }, 100);
-          try {
-            const res = await fetchLinkPreview(url);
-            if (res && res.status === 'success') {
-              linkPreview = res.data;
-            }
-          } catch (e) {
-            console.error('Failed to fetch link preview on chat send:', e);
-          } finally {
-            clearInterval(pInterval);
-            setChatUploadProgress({
-              pct: imageCount > 0 ? 25 : 86,
-              remainingSec: null,
-              label: imageCount > 0 ? '사진 전송 준비 중...' : '채팅 저장 중...',
-              current: imageCount > 0 ? 1 : undefined,
-              total: imageCount > 0 ? imageCount : undefined
-            });
-          }
-        }
-      }
-
+      let firstSentMessageId = null;
       let ok = false;
       if (imageCount === 0) {
+        const messageOperationId = `chat_${activeCalId}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
         const messageData = {
           participantId: chatParticipantId,
           text: chatInput.trim(),
@@ -2710,7 +2672,8 @@ function CalendarApp() {
         if (linkPreview) messageData.linkPreview = linkPreview;
         setChatUploadProgress({ pct: 90, remainingSec: 1, label: '채팅 저장 중...' });
         ok = await (async () => {
-          const sent = await writeCollectionDocumentWithFallback('messages', activeCalId, '', messageData, 'add', '채팅 저장');
+          const sent = await writeCollectionDocumentWithFallback('messages', activeCalId, '', messageData, 'add', '채팅 저장', { documentId: messageOperationId });
+          firstSentMessageId = sent?.id || null;
           return Boolean(sent);
         })();
         if (ok) setChatUploadProgress({ pct: 100, remainingSec: 0, label: '전송 완료' });
@@ -2732,6 +2695,7 @@ function CalendarApp() {
             total: imageCount
           });
           const chunkImages = chunks[i];
+          const messageOperationId = `chat_${activeCalId}_${baseTimestamp}_${i}_${Math.random().toString(36).slice(2, 8)}`;
           const messageData = {
             participantId: chatParticipantId,
             text: i === 0 ? chatInput.trim() : '',
@@ -2742,14 +2706,23 @@ function CalendarApp() {
             timestamp: baseTimestamp + i
           };
           if (i === 0 && linkPreview) messageData.linkPreview = linkPreview;
-          const sent = await writeCollectionDocumentWithFallback('messages', activeCalId, '', messageData, 'add', '채팅 저장');
+          const sent = await writeCollectionDocumentWithFallback('messages', activeCalId, '', messageData, 'add', '채팅 저장', { documentId: messageOperationId });
           if (!sent) throw new Error(`Chat send failed for chunk ${i + 1}/${chunks.length}`);
+          if (i === 0) firstSentMessageId = sent.id || null;
         }
         ok = true;
         setChatUploadProgress({ pct: 100, remainingSec: 0, label: '전송 완료', current: imageCount, total: imageCount });
       }
 
       if (ok) {
+        if (firstSentMessageId && chatLinkUrl && shouldFetchLinkPreviewForChatUrl(chatLinkUrl)) {
+          void fetchLinkPreview(chatLinkUrl).then(async result => {
+            if (result?.status !== 'success') return;
+            await writeCollectionDocumentWithFallback('messages', activeCalId, firstSentMessageId, {
+              linkPreview: result.data
+            }, 'update', '채팅 링크 미리보기 후처리');
+          }).catch(error => console.warn('Background chat link preview failed:', error));
+        }
         setChatInput('');
         setChatImages([]);
         if (chatTextareaRef.current) {
@@ -2817,6 +2790,7 @@ function CalendarApp() {
       const fallbackParticipantId = chatParticipantId || getActiveParticipants(activeCal)[0]?.id || '';
       for (let i = 0; i < chunks.length; i += 1) {
         const chunkImages = chunks[i];
+        const messageOperationId = `gallery_${activeCal.id}_${now}_${i}_${Math.random().toString(36).slice(2, 8)}`;
         setChatUploadProgress({
           pct: Math.min(99, 90 + Math.round((i / Math.max(1, chunks.length)) * 9)),
           remainingSec: Math.max(1, chunks.length - i),
@@ -2836,7 +2810,7 @@ function CalendarApp() {
           // Lightbox info panel can show "갤러리에서 업로드됨" instead of "채팅방에서 업로드됨".
           uploadSource: 'gallery'
         };
-        const sent = await writeCollectionDocumentWithFallback('messages', activeCal.id, '', messageData, 'add', '갤러리 저장');
+        const sent = await writeCollectionDocumentWithFallback('messages', activeCal.id, '', messageData, 'add', '갤러리 저장', { documentId: messageOperationId });
         if (!sent) throw new Error(`Gallery upload save failed ${i + 1}/${chunks.length}`);
       }
       setChatUploadProgress({ pct: 100, remainingSec: 0, label: '갤러리 업로드 완료' });
@@ -3924,6 +3898,7 @@ function CalendarApp() {
       const newRefs = [];
       for (let i = 0; i < chunks.length; i += 1) {
         const chunkImages = chunks[i];
+        const messageOperationId = `meeting_${activeCal.id}_${dateStr}_${now}_${i}_${Math.random().toString(36).slice(2, 8)}`;
         setChatUploadProgress({
           pct: Math.min(99, 90 + Math.round((i / Math.max(1, chunks.length)) * 9)),
           remainingSec: Math.max(1, chunks.length - i),
@@ -3942,7 +3917,7 @@ function CalendarApp() {
           timestamp: now + i,
           uploadSource: 'meeting'
         };
-        const sent = await writeCollectionDocumentWithFallback('messages', activeCal.id, '', messageData, 'add', '일정 사진 저장');
+        const sent = await writeCollectionDocumentWithFallback('messages', activeCal.id, '', messageData, 'add', '일정 사진 저장', { documentId: messageOperationId });
         if (!sent || !sent.id) throw new Error(`Meeting photo save failed ${i + 1}/${chunks.length}`);
         const newMessageId = sent.id;
         const photoIdPrefix = `photo_${activeCal.id}_${dateStr}_${now}_${i}`;
@@ -4956,7 +4931,7 @@ function CalendarApp() {
     const calId = activeCal.id;
     if (firebaseDb) {
       try {
-        await firebaseDb.collection('calendars').doc(`cal_${calId}`).collection('places').doc(placeId).delete();
+        await writeCollectionDocumentWithFallback('places', calId, placeId, null, 'delete', '장소 삭제');
       } catch (e) {
         console.warn('Failed to delete place from Firestore:', e);
       }
@@ -4977,7 +4952,7 @@ function CalendarApp() {
           const restoreNow = Date.now();
           if (firebaseDb) {
             const { id: _pid, ...placeBody } = placeSnapshot;
-            await firebaseDb.collection('calendars').doc(`cal_${calId}`).collection('places').doc(placeId).set({ ...placeBody, updatedAt: restoreNow });
+            await writeCollectionDocumentWithFallback('places', calId, placeId, { ...placeBody, updatedAt: restoreNow }, 'set', '장소 복원');
           }
           const latestCal = calendarsRef.current.find(c => c.id === calId) || updatedCal;
           const currentPlaces = getCalendarPlaces(latestCal);

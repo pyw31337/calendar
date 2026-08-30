@@ -1478,6 +1478,13 @@ async function writeCollectionDocumentWithFallback(collectionName, calId, docId,
     try {
       const colRef = firebaseDb.collection('calendars').doc(`cal_${calId}`).collection(cleanCollection);
       if (method === 'add') {
+        // Callers that can derive a stable operation id must use a deterministic document id.
+        // Falling back from a timed-out SDK add() to REST add() otherwise creates two records
+        // when the original request eventually succeeds on a slow mobile connection.
+        if (options?.documentId) {
+          await withTimeout(colRef.doc(options.documentId).set(cleanData), FIRESTORE_REQUEST_TIMEOUT_MS, `${warnLabel} timeout`);
+          return { success: true, id: options.documentId, transport: 'sdk' };
+        }
         const ref = await withTimeout(colRef.add(cleanData), FIRESTORE_REQUEST_TIMEOUT_MS, `${warnLabel} timeout`);
         return { success: true, id: ref.id, transport: 'sdk' };
       }
@@ -1511,7 +1518,9 @@ async function writeCollectionDocumentWithFallback(collectionName, calId, docId,
       console.warn(`Failed to ${warnLabel} for ${calId} via SDK, trying REST:`, err);
     }
   }
-  return writeCollectionDocumentRest(cleanCollection, calId, docId, data, method, cleanDeletePaths);
+  const restMethod = method === 'add' && options?.documentId ? 'set' : method;
+  const restDocId = method === 'add' && options?.documentId ? options.documentId : docId;
+  return writeCollectionDocumentRest(cleanCollection, calId, restDocId, data, restMethod, cleanDeletePaths);
 }
 
 async function deleteMessageRest(calId, messageId) {
@@ -2337,8 +2346,12 @@ async function pushSingleCalendarWithRest(normalizedCal, lastModified, saveMode,
       });
       if (commitRes.ok) {
         const logsToPersist = [...legacyActivityLogs, ...(Array.isArray(newActivityLogs) ? newActivityLogs : [])];
-        const auxiliaryFailures = await persistLegacySubcollections(normalizedCal.id, logsToPersist, legacyPlaces, legacyConfirmedMeetings);
-        return { ok: true, revision: nextDocRevision, auxiliaryPersistenceFailed: auxiliaryFailures.length > 0 };
+        // The primary calendar document is the user-visible save. Legacy subcollections are
+        // migration/backfill work and must not hold a slow mobile save open for several more
+        // 12-second attempts. They are idempotent and can safely finish in the background.
+        void persistLegacySubcollections(normalizedCal.id, logsToPersist, legacyPlaces, legacyConfirmedMeetings)
+          .catch(error => console.warn(`Background auxiliary sync failed for ${normalizedCal.id}:`, error));
+        return { ok: true, revision: nextDocRevision, auxiliaryPersistenceFailed: false };
       }
       const errorText = await commitRes.text();
       if (!isRetryableFirestoreConflict(errorText) || attempt === retryCount) {
@@ -2457,8 +2470,9 @@ async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 4, 
 	        new Promise((_, reject) => setTimeout(() => { raceLost = true; reject(new Error('Firestore push timeout')); }, 8000))
 	      ]);
       const logsToPersist = [...legacyActivityLogs, ...(Array.isArray(newActivityLogs) ? newActivityLogs : [])];
-      const auxiliaryFailures = await persistLegacySubcollections(normalizedCal.id, logsToPersist, legacyPlaces, legacyConfirmedMeetings);
-      return { ok: true, revision: committedRevision, auxiliaryPersistenceFailed: auxiliaryFailures.length > 0 };
+      void persistLegacySubcollections(normalizedCal.id, logsToPersist, legacyPlaces, legacyConfirmedMeetings)
+        .catch(error => console.warn(`Background auxiliary sync failed for ${normalizedCal.id}:`, error));
+      return { ok: true, revision: committedRevision, auxiliaryPersistenceFailed: false };
     } catch (e) {
       console.warn(`Firestore push notice for cal_${normalizedCal.id}:`, e);
       // The transaction above has no cancellation hook, so on a timeout it can still land after
@@ -2467,6 +2481,7 @@ async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 4, 
       // writes landing and double-bumping revision when the transaction was merely slow, not
       // actually stuck offline.
       if (raceLost) {
+        let checkError = null;
         try {
           await new Promise(resolve => setTimeout(resolve, 1500));
           const docPath = `projects/metro-live-2918e/databases/(default)/documents/calendars/cal_${normalizedCal.id}`;
@@ -2478,8 +2493,15 @@ async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 4, 
             }
           }
         } catch (checkErr) {
+          checkError = checkErr;
           console.warn(`Firestore push timeout follow-up check failed for cal_${normalizedCal.id}:`, checkErr);
         }
+        // Do not start an independent REST write when the SDK transaction may still be alive.
+        // The caller can retry safely after this explicit unknown-state result; launching a
+        // second read-modify-write here is what used to create late duplicate revisions.
+        const statusError = new Error('저장 상태를 확인하지 못했습니다. 잠시 후 다시 확인해 주세요.');
+        if (checkError) statusError.cause = checkError;
+        throw statusError;
       }
     }
   }

@@ -1162,7 +1162,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
 
   const handleTogglePin = async (memo) => {
     try {
-      await __fb().collection('calendars').doc('cal_' + calendar.id).collection('memos').doc(memo.id).update({ isPinned: !memo.isPinned });
+      await withMemoFirestoreTimeout(__fb().collection('calendars').doc('cal_' + calendar.id).collection('memos').doc(memo.id).update({ isPinned: !memo.isPinned }));
     } catch (err) {
       console.error('Failed to toggle memo pin:', err);
       showToast('고정 상태 변경 실패', 'error');
@@ -1171,7 +1171,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
 
   const handleMemoCommentsChange = async (memo, nextComments) => {
     try {
-      await __fb().collection('calendars').doc('cal_' + calendar.id).collection('memos').doc(memo.id).update({ comments: nextComments });
+      await withMemoFirestoreTimeout(__fb().collection('calendars').doc('cal_' + calendar.id).collection('memos').doc(memo.id).update({ comments: nextComments }));
     } catch (err) {
       console.error('Failed to update memo comments:', err);
       showToast('댓글 저장 실패', 'error');
@@ -1242,9 +1242,9 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
       try {
         const calendarId = calendar.id;
         const tagsArray = nextTags.map(t => t.startsWith('#') ? t : '#' + t);
-        await __fb().collection('calendars').doc('cal_' + calendarId).collection('memos').doc(editingMemo.id).update({
+        await withMemoFirestoreTimeout(__fb().collection('calendars').doc('cal_' + calendarId).collection('memos').doc(editingMemo.id).update({
           tags: tagsArray
-        });
+        }));
       } catch (err) {
         console.error('Failed to update tags in Firestore:', err);
         showToast('태그 저장 실패', 'error');
@@ -2124,9 +2124,9 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
                   try {
                     const calendarId = calendar.id;
                     const tagsArray = nextTags.map(t => t.startsWith('#') ? t : '#' + t);
-                    await __fb().collection('calendars').doc('cal_' + calendarId).collection('memos').doc(editingMemo.id).update({
+                    await withMemoFirestoreTimeout(__fb().collection('calendars').doc('cal_' + calendarId).collection('memos').doc(editingMemo.id).update({
                       tags: tagsArray
-                    });
+                    }));
                   } catch (err) {
                     console.error('Failed to delete tag in Firestore:', err);
                     showToast('태그 삭제 실패', 'error');
