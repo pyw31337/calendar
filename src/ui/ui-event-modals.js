@@ -3086,7 +3086,13 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
                   title: "정산 수정",
                   'aria-label': '정산 수정',
                   'data-settlement-edit-button': 'true',
-                  onClick: event => {
+                  onPointerUp: event => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    handleOpenSettlementEditor(card);
+                  },
+                  onKeyDown: event => {
+                    if (event.key !== 'Enter' && event.key !== ' ') return;
                     event.preventDefault();
                     event.stopPropagation();
                     handleOpenSettlementEditor(card);
@@ -3117,7 +3123,16 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
                 },
                   React.createElement("button", {
                     type: "button",
-                    onClick: () => {
+                    onPointerUp: event => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      setOpenMenuCardId(null);
+                      handleOpenSettlementEditor(card);
+                    },
+                    onKeyDown: event => {
+                      if (event.key !== 'Enter' && event.key !== ' ') return;
+                      event.preventDefault();
+                      event.stopPropagation();
                       setOpenMenuCardId(null);
                       handleOpenSettlementEditor(card);
                     },
@@ -3523,7 +3538,19 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
           key: card.id,
           className: "settlement-list-card",
           type: "button",
-          onClick: () => { setIsSettlementListOpen(false); handleOpenSettlementEditor(card); },
+          onPointerUp: event => {
+            event.preventDefault();
+            event.stopPropagation();
+            setIsSettlementListOpen(false);
+            handleOpenSettlementEditor(card);
+          },
+          onKeyDown: event => {
+            if (event.key !== 'Enter' && event.key !== ' ') return;
+            event.preventDefault();
+            event.stopPropagation();
+            setIsSettlementListOpen(false);
+            handleOpenSettlementEditor(card);
+          },
           style: {
             display: 'flex', flexDirection: 'column', gap: '7px', width: '100%', padding: '12px 14px', textAlign: 'left',
             border: '1px solid var(--border-subtle)', borderRadius: '10px', backgroundColor: 'var(--bg-card)', cursor: 'pointer', opacity: isClosed ? 0.72 : 1
