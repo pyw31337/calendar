@@ -481,7 +481,7 @@ body:has(.admin-login-gate) {
   box-shadow: 0 4px 12px rgba(168, 85, 247, 0.35) !important;
 }
 .confirmed-meeting-icon-btn:active {
-  transform: translate3d(0, 1px, 0) scale(0.96) !important;
+  transform: none !important;
 }
 .confirmed-meeting-banner .confirmed-meeting-label-badge {
   background: transparent !important;
@@ -796,7 +796,9 @@ summary:active,
 summary.is-pressing,
 [data-pressable]:active,
 [data-pressable].is-pressing {
-  transform: translate3d(0, 1px, 0) scale(0.96) !important;
+  /* Keep the pressed feedback paint-only. Transforming a live control can move its
+     hit area during pointer activation and make nearby/overlapping controls win the hit test. */
+  transform: none !important;
   opacity: 0.9 !important;
   filter: brightness(0.96) !important;
 }
@@ -857,7 +859,7 @@ summary.is-pressing,
 }
 .lightbox-nav-btn:active,
 .lightbox-nav-btn.is-pressing {
-  transform: translateY(-50%) scale(0.95) !important;
+  transform: translateY(-50%) !important;
 }
 .lightbox-nav-btn:hover {
   /* Keep absolute vertical centering when the generic button hover lift applies. */
