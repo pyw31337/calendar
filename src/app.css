@@ -2920,6 +2920,12 @@ select.form-select {
   font-weight: 600;
   line-height: 1.2;
   white-space: nowrap;
+  background: rgba(0, 0, 0, 0.04);
+  padding: 8px 12px;
+  border-radius: 10px 0 0 0;
+  margin-right: -12px;
+  margin-bottom: -12px;
+  opacity: 0.8;
 }
 @media (max-width: 767px) {
   .settlement-running-balance {
