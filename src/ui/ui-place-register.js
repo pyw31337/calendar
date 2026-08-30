@@ -25,6 +25,10 @@ function getCalendarPlaces(calendar) {
   const f = __gatherUiDeps().getCalendarPlaces || GATHER_APP_UTILS.getCalendarPlaces;
   return typeof f === 'function' ? f(calendar) : [];
 }
+function arePlacesSameLocation(a, b) {
+  const f = __gatherUiDeps().arePlacesSameLocation || GATHER_APP_UTILS.arePlacesSameLocation;
+  return typeof f === 'function' ? f(a, b) : false;
+}
 function useChatSendGuard(onSend, canSend = true) {
   const React = window.React;
   const lockRef = React.useRef(false);
@@ -902,6 +906,11 @@ export function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, on
       .slice(0, 8);
   }, [query, selected, calendar, editingPlace]);
 
+  const duplicatePlace = React.useMemo(() => {
+    if (!selected || selected.isExistingPlace || selected.mergeTargetId || selected.duplicateDismissed || editingPlace) return null;
+    return getCalendarPlaces(calendar).find(place => place.id !== editingPlace?.id && arePlacesSameLocation(place, selected)) || null;
+  }, [selected, calendar, editingPlace]);
+
   const handleSelectExistingPlace = place => {
     const name = place.alias || place.name;
     setSelected({
@@ -909,7 +918,9 @@ export function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, on
       name,
       address: getDisplayPlaceAddress(place) || place.name || '',
       lat: place.lat,
-      lng: place.lng
+      lng: place.lng,
+      duplicateDismissed: true,
+      isExistingPlace: true
     });
     setQuery(name);
     setResults([]);
@@ -931,7 +942,8 @@ export function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, on
   const handleSelectResult = result => {
     setSelected({
       name: result.name, address: result.address, lat: result.lat, lng: result.lng,
-      categoryLabel: result.categoryLabel || '', phone: result.phone || '', url: result.url || ''
+      categoryLabel: result.categoryLabel || '', phone: result.phone || '', url: result.url || '',
+      duplicateDismissed: false, mergeTargetId: '', isExistingPlace: false
     });
     setQuery(result.name);
     setResults([]);
@@ -959,7 +971,7 @@ export function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, on
         memo: memo.trim(),
         visitStatus,
         visitDate: visitStatus === 'visited' ? visitDate : '',
-        sourcePlaceId: selected.id || ''
+        sourcePlaceId: selected.mergeTargetId || selected.id || ''
       });
       if (ok !== false) onClose();
     } catch (err) {
@@ -1131,6 +1143,15 @@ export function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, on
         ),
         selected.address && /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.76rem', color: 'var(--text-muted)' } }, selected.address),
         selected.phone && /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.76rem', color: 'var(--text-muted)' } }, `☎ ${selected.phone}`),
+        duplicatePlace && /*#__PURE__*/React.createElement("div", {
+          style: { marginTop: '6px', padding: '9px 10px', borderRadius: '8px', backgroundColor: 'rgba(245, 158, 11, 0.12)', border: '1px solid rgba(245, 158, 11, 0.35)' }
+        },
+          /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.78rem', fontWeight: 700, color: '#92400E', lineHeight: 1.45 } }, `기존 ${duplicatePlace.alias || duplicatePlace.name} 과 동일한 업체입니다. 병합하시겠습니까?`),
+          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '6px', marginTop: '7px' } },
+            /*#__PURE__*/React.createElement("button", { type: 'button', onClick: () => setSelected(prev => ({ ...prev, mergeTargetId: duplicatePlace.id })), style: { border: 0, borderRadius: '6px', padding: '5px 10px', background: 'var(--accent-primary)', color: '#fff', fontSize: '0.74rem', fontWeight: 700, cursor: 'pointer' } }, '병합'),
+            /*#__PURE__*/React.createElement("button", { type: 'button', onClick: () => setSelected(prev => ({ ...prev, duplicateDismissed: true })), style: { border: '1px solid var(--border-subtle)', borderRadius: '6px', padding: '5px 10px', background: 'var(--bg-card)', color: 'var(--text-muted)', fontSize: '0.74rem', cursor: 'pointer' } }, '별도 등록')
+          )
+        ),
         selected.url && /*#__PURE__*/React.createElement("button", {
           type: "button",
           title: selected.url,

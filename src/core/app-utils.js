@@ -497,6 +497,34 @@ const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
     return normalizePlaceAddressForSave(place?.address || '', place?.lat, place?.lng);
   }
 
+  function normalizePlaceIdentityAddress(address, lat, lng) {
+    return normalizePlaceAddressForSave(address, lat, lng)
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}]/gu, '');
+  }
+
+  function getPlaceDistanceMeters(a, b) {
+    const lat1 = Number(a?.lat), lng1 = Number(a?.lng);
+    const lat2 = Number(b?.lat), lng2 = Number(b?.lng);
+    if (![lat1, lng1, lat2, lng2].every(Number.isFinite)) return null;
+    const rad = Math.PI / 180;
+    const dLat = (lat2 - lat1) * rad;
+    const dLng = (lng2 - lng1) * rad;
+    const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * rad) * Math.cos(lat2 * rad) * Math.sin(dLng / 2) ** 2;
+    return 6371000 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+  }
+
+  // Provider names and IDs are not stable. Address equality or a tight coordinate match is a
+  // stronger identity signal for duplicate-place suggestions than comparing display names.
+  function arePlacesSameLocation(a, b) {
+    if (!a || !b) return false;
+    const addressA = normalizePlaceIdentityAddress(a.address, a.lat, a.lng);
+    const addressB = normalizePlaceIdentityAddress(b.address, b.lat, b.lng);
+    if (addressA && addressB && addressA === addressB) return true;
+    const distance = getPlaceDistanceMeters(a, b);
+    return distance !== null && distance <= 80;
+  }
+
   function normalizePlaceDateForSort(dateStr) {
     if (!dateStr) return null;
     const str = String(dateStr).trim();
@@ -981,6 +1009,9 @@ const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
     normalizeDomesticKoreanAddress,
     normalizePlaceAddressForSave,
     getDisplayPlaceAddress,
+    normalizePlaceIdentityAddress,
+    getPlaceDistanceMeters,
+    arePlacesSameLocation,
     normalizePlaceDateForSort,
     formatPlaceBadgeDate,
     getNaverMapSearchRegionHint,
