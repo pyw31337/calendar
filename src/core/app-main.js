@@ -2245,6 +2245,8 @@ function CalendarApp() {
 
     const unsubPlaces = subscribePlaces(activeCalId, snapshot => {
         if (!isMounted) return;
+        // Ignore an older snapshot that races the calendar-document and places writes.
+        if (isSavingRef.current) return;
         const list = [];
         snapshot.forEach(doc => list.push(doc.data()));
         setPlacesSubcollection(list);
