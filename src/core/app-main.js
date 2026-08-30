@@ -5972,7 +5972,9 @@ function CalendarApp() {
       onClose: () => setIsCreateSettlementOpen(false),
       onSave: handleSaveSettlementCard
     }),
-    editingSettlementCard && activeCal && canUseSettlement && /*#__PURE__*/React.createElement(CreateSettlementModal, {
+    // An already-rendered settlement card is an explicit capability signal. Do not let a
+    // transient/stale feature-gate calculation hide the editor after the user selected it.
+    editingSettlementCard && activeCal && /*#__PURE__*/React.createElement(CreateSettlementModal, {
       calendar: activeCal,
       initialData: editingSettlementCard,
       showToast: showToast,
