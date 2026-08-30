@@ -15,6 +15,7 @@ const weatherScript = fs.readFileSync('src/ui/ui-weather.js', 'utf8');
 const sideMenuScript = fs.readFileSync('src/ui/ui-side-menu.js', 'utf8');
 const domainHelpersScript = fs.readFileSync('src/core/app-domain-helpers.js', 'utf8');
 const adminDashboardScript = fs.readFileSync('src/ui/ui-admin-dashboard.js', 'utf8');
+const sharedScript = fs.readFileSync('src/ui/ui-shared.js', 'utf8');
 const firebaseDataScript = fs.readFileSync('src/core/app-firebase-data.js', 'utf8');
 const utilsScript = fs.readFileSync('assets/app-utils.js', 'utf8');
 const notificationScript = fs.readFileSync('assets/app-notifications.js', 'utf8');
@@ -41,6 +42,7 @@ assert(/writeAdminCollection/.test(adminDashboardScript) && /관리자 채팅 �
 assert(/PITR message delete timeout/.test(adminDashboardScript) && /logDeleteResult\?\.failed/.test(adminDashboardScript), 'PITR must bound message deletes and reject partial activity-log cleanup');
 assert(/activity log delete timeout/.test(firebaseDataScript) && /return \{ attempted:/.test(firebaseDataScript), 'PITR activity-log deletes must be bounded and report failures');
 assert(/FIRESTORE_WRITE_DEADLINE_MS = 7000/.test(firebaseDataScript) && /remainingWriteTime/.test(firebaseDataScript) && /attemptTimeout/.test(firebaseDataScript), 'collection writes must use one bounded SDK+REST deadline');
+assert(/role: 'status'/.test(sharedScript) && /pointerEvents: 'none'/.test(sharedScript) && !/position: 'fixed', inset: 0, backgroundColor: 'rgba\(15,23,42,0\.48\)'/.test(sharedScript), 'save progress must not block the entire application');
 assert(/async function writeConfirmedMeetingsToFirestore[\s\S]{0,1800}if \(res\.ok\) return true;[\s\S]{0,700}if \(firebaseDb\)/.test(firebaseDataScript), 'confirmed meeting writes must fall back to SDK after a REST failure');
 assert(/writeConfirmedMeetingsToFirestore[\s\S]{0,2600}validDates[\s\S]{0,700}writes\.push\(\{ delete: documentName \}\)/.test(firebaseDataScript), 'confirmed meeting writes must remove stale subcollection documents');
 assert(/Failed to inspect stale confirmed meetings[\s\S]{0,260}validMeetings\.length === 0/.test(firebaseDataScript), 'confirmed meeting writes must not block valid updates on cleanup-read failure');

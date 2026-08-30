@@ -1690,16 +1690,18 @@ export function OperationProgressOverlay({ title, detail, pct }) {
 
   const clamped = Math.max(0, Math.min(100, pct || 0));
   return /*#__PURE__*/React.createElement('div', {
-    style: { position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.48)', zIndex: 100000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }
+    role: 'status',
+    'aria-live': 'polite',
+    style: { position: 'fixed', top: 'calc(env(safe-area-inset-top, 0px) + 16px)', right: '16px', zIndex: 100000, width: '300px', maxWidth: 'calc(100vw - 32px)', pointerEvents: 'none' }
   }, /*#__PURE__*/React.createElement('div', {
-    style: { backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '24px 28px', width: '300px', maxWidth: '100%', textAlign: 'center', boxShadow: '0 16px 42px rgba(0,0,0,0.28)' }
+    style: { backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '16px 18px', width: '100%', textAlign: 'left', boxShadow: '0 10px 30px rgba(0,0,0,0.2)' }
   },
-    /*#__PURE__*/React.createElement('div', { style: { fontWeight: 900, fontSize: '1rem', color: 'var(--text-main)', marginBottom: '6px' } }, title || '작업 처리 중...'),
-    /*#__PURE__*/React.createElement('div', { style: { fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '14px', lineHeight: 1.45 } }, detail || '서버 응답을 기다리고 있습니다.'),
+    /*#__PURE__*/React.createElement('div', { style: { fontWeight: 900, fontSize: '0.9rem', color: 'var(--text-main)', marginBottom: '4px' } }, title || '작업 처리 중...'),
+    /*#__PURE__*/React.createElement('div', { style: { fontSize: '0.76rem', color: 'var(--text-muted)', marginBottom: '10px', lineHeight: 1.4 } }, detail || '서버에 반영하고 있습니다.'),
     /*#__PURE__*/React.createElement('div', { style: { height: '9px', borderRadius: 'var(--radius-full)', backgroundColor: 'var(--border-subtle)', overflow: 'hidden' } },
       /*#__PURE__*/React.createElement('div', { style: { height: '100%', width: `${clamped}%`, background: 'linear-gradient(90deg, #4F46E5, #EC4899)', transition: 'width 0.35s ease', borderRadius: 'var(--radius-full)' } })
     ),
-    /*#__PURE__*/React.createElement('div', { style: { marginTop: '8px', color: 'var(--text-muted)', fontSize: '0.72rem', fontWeight: 800 } }, `${Math.round(clamped)}%`)
+    /*#__PURE__*/React.createElement('div', { style: { marginTop: '6px', color: 'var(--text-muted)', fontSize: '0.7rem', fontWeight: 800 } }, `${Math.round(clamped)}% · 다른 화면은 계속 사용할 수 있습니다.`)
   ));
 }
 
