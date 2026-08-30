@@ -718,6 +718,10 @@ function getAnniversaryDisplayColor(...args) {
 const WEATHER_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 /** In-memory L1 so multiple badges on the same page share one result without extra reads. */
 const __weatherMem = typeof Map !== 'undefined' ? new Map() : null;
+const WEATHER_FIRESTORE_TIMEOUT_MS = 7000;
+function withWeatherTimeout(promise, timeoutMs = WEATHER_FIRESTORE_TIMEOUT_MS) {
+  return Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new Error('weather cache timeout')), timeoutMs))]);
+}
 
 function weatherCacheKey(lat, lon) {
   return String(Number(lat).toFixed(2)) + '_' + String(Number(lon).toFixed(2));
@@ -756,7 +760,7 @@ async function readServerWeather(lat, lon) {
   const db = getFirebaseDb();
   if (!db) return null;
   try {
-    const snap = await db.collection('weatherCache').doc(weatherCacheKey(lat, lon)).get();
+    const snap = await withWeatherTimeout(db.collection('weatherCache').doc(weatherCacheKey(lat, lon)).get());
     if (!snap || !snap.exists) return null;
     const d = snap.data() || {};
     if (d.temp == null || d.fetchedAt == null) return null;
@@ -778,14 +782,14 @@ async function writeServerWeather(lat, lon, temp, code, name) {
   if (!db) return;
   try {
     const fetchedAt = Date.now();
-    await db.collection('weatherCache').doc(weatherCacheKey(lat, lon)).set({
+    await withWeatherTimeout(db.collection('weatherCache').doc(weatherCacheKey(lat, lon)).set({
       temp: temp,
       code: code,
       lat: Number(Number(lat).toFixed(2)),
       lon: Number(Number(lon).toFixed(2)),
       fetchedAt: fetchedAt,
       name: name ? String(name).slice(0, 80) : null
-    }, { merge: true });
+    }, { merge: true }));
     writeMemWeather(lat, lon, temp, code, fetchedAt);
   } catch (err) {
     console.warn('weather server write failed', err);
