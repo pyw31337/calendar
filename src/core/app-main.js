@@ -9103,12 +9103,13 @@ function doesPlaceMatchDate(place, dateStr) {
   const normalizedTarget = normalizePlaceDateForSort(dateStr);
   if (!normalizedTarget) return false;
   if (place.visitDate && normalizePlaceDateForSort(place.visitDate) === normalizedTarget) return true;
-  const visitEntries = parseVisitEntriesFromMemo(place.memo);
+  // 장소 페이지와 일정 팝업은 같은 장소 메모를 같은 날짜 기준으로 보여줘야 한다.
+  // 구형 parseVisitEntriesFromMemo는 날짜가 2개 이상일 때만 동작해 단일 날짜 메모나
+  // 일부 레거시 형식을 놓칠 수 있으므로, 장소 페이지가 사용하는 정규 파서를 단일 기준으로 쓴다.
+  const visitEntries = parsePlaceMemoEntries(place.memo);
   for (const entry of visitEntries) {
     if (normalizePlaceDateForSort(entry.date) === normalizedTarget) return true;
   }
-  const memoDate = extractLeadingMemoDate(place.memo);
-  if (memoDate && normalizePlaceDateForSort(memoDate) === normalizedTarget) return true;
   return false;
 }
 
