@@ -3096,6 +3096,11 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
                     event.stopPropagation();
                     handleOpenSettlementEditor(card);
                   },
+                  onClick: event => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    handleOpenSettlementEditor(card);
+                  },
                   onMouseUp: event => {
                     event.preventDefault();
                     event.stopPropagation();
@@ -3139,6 +3144,12 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
                   React.createElement("button", {
                     type: "button",
                     onPointerUp: event => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      setOpenMenuCardId(null);
+                      handleOpenSettlementEditor(card);
+                    },
+                    onClick: event => {
                       event.preventDefault();
                       event.stopPropagation();
                       setOpenMenuCardId(null);
@@ -3566,6 +3577,12 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
           className: "settlement-list-card",
           type: "button",
           onPointerUp: event => {
+            event.preventDefault();
+            event.stopPropagation();
+            setIsSettlementListOpen(false);
+            handleOpenSettlementEditor(card);
+          },
+          onClick: event => {
             event.preventDefault();
             event.stopPropagation();
             setIsSettlementListOpen(false);
