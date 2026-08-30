@@ -179,6 +179,25 @@ async function releaseFlushLease(owner) {
   }
 }
 
+async function renewFlushLease(owner) {
+  if (!owner) return;
+  const db = await openQueueDb();
+  if (!db || !db.objectStoreNames.contains(LOCK_STORE_NAME)) return;
+  try {
+    const tx = db.transaction(LOCK_STORE_NAME, 'readwrite');
+    const store = tx.objectStore(LOCK_STORE_NAME);
+    const current = await requestToPromise(store.get('write-queue'));
+    if (current?.owner === owner) store.put({ ...current, expiresAt: Date.now() + 30000 });
+    await new Promise((resolve, reject) => {
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error || new Error('write queue lease renewal failed'));
+      tx.onabort = () => reject(tx.error || new Error('write queue lease renewal aborted'));
+    });
+  } catch (error) {
+    console.warn('[write-queue] lease renewal failed:', error);
+  }
+}
+
 export async function flushWriteQueue(handler) {
   if (typeof handler !== 'function') return { processed: 0, remaining: 0 };
   if (flushPromise) return flushPromise;
@@ -186,6 +205,7 @@ export async function flushWriteQueue(handler) {
     const leaseOwner = await acquireFlushLease();
     if (!leaseOwner) return { processed: 0, remaining: await getPendingWriteCount() };
     let processed = 0;
+    const renewalTimer = setInterval(() => { void renewFlushLease(leaseOwner); }, 10000);
     try {
       const operations = await getAllOperations();
       for (const operation of operations) {
@@ -215,6 +235,7 @@ export async function flushWriteQueue(handler) {
       }
       return { processed, remaining: Math.max(0, operations.length - processed) };
     } finally {
+      clearInterval(renewalTimer);
       await releaseFlushLease(leaseOwner);
     }
   })().finally(() => {
