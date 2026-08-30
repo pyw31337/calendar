@@ -801,6 +801,14 @@ summary.is-pressing,
   filter: brightness(0.96) !important;
 }
 
+/* Settlement list rows navigate to the editor and should not visually shrink while pressed. */
+.settlement-list-card:active,
+.settlement-list-card.is-pressing {
+  transform: none !important;
+  opacity: 1 !important;
+  filter: none !important;
+}
+
 .place-card-row:active,
 .place-card-row.is-pressing,
 .places-list-item:active,

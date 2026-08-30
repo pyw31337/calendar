@@ -3474,6 +3474,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
           : (Array.isArray(card?.participants) ? card.participants : []);
         return React.createElement("button", {
           key: card.id,
+          className: "settlement-list-card",
           type: "button",
           onClick: () => { setIsSettlementListOpen(false); handleOpenSettlementEditor(card); },
           style: {
