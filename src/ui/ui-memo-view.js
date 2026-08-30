@@ -1728,6 +1728,13 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
             /*#__PURE__*/React.createElement("div", {
               style: { display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }
             },
+              /* Participant selection capsule button sits to the left of the tag input row
+                 (shared with the memo edit modal + chat edit modal) -- restored here after an
+                 unrelated refactor moved it down into its own actions row. */
+              /*#__PURE__*/React.createElement(ParticipantPickerButton, {
+                participant: composerPart,
+                onClick: () => setIsComposerPartOpen(true)
+              }),
               /*#__PURE__*/React.createElement("span", {
                 style: { fontSize: '0.74rem', fontWeight: 800, color: 'var(--text-muted)', flexShrink: 0 }
               }, "태그입력"),
@@ -1763,20 +1770,15 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
               }, "저장")
             ),
 
-            /* Actions Row: swatches completely removed, shows writer and tags side-by-side */
+            /* Actions Row: swatches completely removed; the participant button now lives inline
+               with the tag input above -- see the restored layout there */
             /*#__PURE__*/React.createElement("div", {
               style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '6px', gap: '8px', flexWrap: 'wrap' }
             },
-              /* Participant select box & tag badges list to its right */
+              /* Tag badges list */
               /*#__PURE__*/React.createElement("div", {
                 style: { display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }
               },
-                /* Participant selection capsule button (shared with memo edit + chat edit modal) */
-                /*#__PURE__*/React.createElement(ParticipantPickerButton, {
-                  participant: composerPart,
-                  onClick: () => setIsComposerPartOpen(true)
-                }),
-
                 /* Active tag capsule badges (Responsive white background style: (#레시피 (✕))) */
                 newTags.map(tag => /*#__PURE__*/React.createElement("span", {
                   key: tag,
@@ -2103,6 +2105,13 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
         /*#__PURE__*/React.createElement("div", {
           style: { display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }
         },
+          /* Participant selection capsule button sits to the left of the tag input row (shared
+             with the new-memo composer + chat edit modal) -- restored here after an unrelated
+             refactor moved it down into its own footer row. */
+          /*#__PURE__*/React.createElement(ParticipantPickerButton, {
+            participant: editPart,
+            onClick: () => setIsEditPartOpen(true)
+          }),
           /*#__PURE__*/React.createElement("span", {
             style: { fontSize: '0.74rem', fontWeight: 800, color: 'var(--text-muted)', flexShrink: 0 }
           }, "태그입력"),
@@ -2138,21 +2147,16 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
           }, "저장")
         )),
 
-        /* Footer Controls: Participant button and Tag Badges row (Swatches dot menu removed completely) */
+        /* Footer Controls: Tag Badges row (Swatches dot menu removed completely; the participant
+           button now lives inline with the tag input above -- see the restored layout there) */
         /*#__PURE__*/React.createElement("div", {
           className: "memo-edit-modal-footer",
           style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '8px', gap: '8px', flexWrap: 'wrap' }
         },
-          /* Participant select box & tag badges list to its right */
+          /* Tag badges list */
           /*#__PURE__*/React.createElement("div", {
             style: { display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }
           },
-            /* Participant selection capsule button (shared with memo composer + chat edit modal) */
-            /*#__PURE__*/React.createElement(ParticipantPickerButton, {
-              participant: editPart,
-              onClick: () => setIsEditPartOpen(true)
-            }),
-
             /* Active tag capsule badges (Responsive white background style: (#레시피 (✕))) */
             editTags.map(tag => /*#__PURE__*/React.createElement("span", {
               key: tag,
