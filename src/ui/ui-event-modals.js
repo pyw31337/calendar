@@ -3643,7 +3643,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
     // A card is only rendered in this view when it is already an allowed, visible
     // settlement record. Do not re-apply the create-flow feature gate here: a stale
     // gate value used to swallow the editor after the card button had handled the click.
-    const editor = isCreateSettlementOpen && editingSettlementCard && React.createElement(CreateSettlementModal, {
+    const editor = editingSettlementCard && React.createElement(CreateSettlementModal, {
     calendar: calendar,
     initialData: editingSettlementCard,
     onClose: () => { setEditingSettlementCard(null); setIsCreateSettlementOpen(false); },
