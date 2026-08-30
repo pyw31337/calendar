@@ -3100,27 +3100,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
                   title: "정산 수정",
                   'aria-label': '정산 수정',
                   'data-settlement-edit-button': 'true',
-                  onMouseDown: event => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    handleOpenSettlementEditor(card);
-                  },
-                  onPointerUp: event => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    handleOpenSettlementEditor(card);
-                  },
                   onClick: event => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    handleOpenSettlementEditor(card);
-                  },
-                  onMouseUp: event => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    handleOpenSettlementEditor(card);
-                  },
-                  onTouchEnd: event => {
                     event.preventDefault();
                     event.stopPropagation();
                     handleOpenSettlementEditor(card);
