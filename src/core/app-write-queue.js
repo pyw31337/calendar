@@ -6,8 +6,9 @@
  * must survive a mobile tab being suspended without blocking the main thread.
  */
 const DB_NAME = 'gather-calendar-write-queue';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_NAME = 'operations';
+const LOCK_STORE_NAME = 'locks';
 const MAX_PENDING_OPERATIONS = 100;
 const MAX_OPERATION_PAYLOAD_BYTES = 8 * 1024 * 1024;
 const RETRY_BACKOFF_BASE_MS = 3000;
@@ -45,6 +46,7 @@ function openQueueDb() {
         store.createIndex('queuedAt', 'queuedAt', { unique: false });
         store.createIndex('calendarId', 'calendarId', { unique: false });
       }
+      if (!db.objectStoreNames.contains(LOCK_STORE_NAME)) db.createObjectStore(LOCK_STORE_NAME, { keyPath: 'id' });
     };
     request.onsuccess = () => {
       const db = request.result;
@@ -135,38 +137,86 @@ async function removeOperation(id) {
   }
 }
 
+async function acquireFlushLease() {
+  const db = await openQueueDb();
+  if (!db || !db.objectStoreNames.contains(LOCK_STORE_NAME)) return null;
+  const owner = `flush_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+  const now = Date.now();
+  try {
+    const tx = db.transaction(LOCK_STORE_NAME, 'readwrite');
+    const store = tx.objectStore(LOCK_STORE_NAME);
+    const current = await requestToPromise(store.get('write-queue'));
+    if (current && Number(current.expiresAt) > now) return null;
+    store.put({ id: 'write-queue', owner, expiresAt: now + 30000 });
+    await new Promise((resolve, reject) => {
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error || new Error('write queue lease failed'));
+      tx.onabort = () => reject(tx.error || new Error('write queue lease aborted'));
+    });
+    return owner;
+  } catch (error) {
+    console.warn('[write-queue] lease acquire failed:', error);
+    return null;
+  }
+}
+
+async function releaseFlushLease(owner) {
+  if (!owner) return;
+  const db = await openQueueDb();
+  if (!db || !db.objectStoreNames.contains(LOCK_STORE_NAME)) return;
+  try {
+    const tx = db.transaction(LOCK_STORE_NAME, 'readwrite');
+    const store = tx.objectStore(LOCK_STORE_NAME);
+    const current = await requestToPromise(store.get('write-queue'));
+    if (current?.owner === owner) store.delete('write-queue');
+    await new Promise((resolve, reject) => {
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error || new Error('write queue lease release failed'));
+      tx.onabort = () => reject(tx.error || new Error('write queue lease release aborted'));
+    });
+  } catch (error) {
+    console.warn('[write-queue] lease release failed:', error);
+  }
+}
+
 export async function flushWriteQueue(handler) {
   if (typeof handler !== 'function') return { processed: 0, remaining: 0 };
   if (flushPromise) return flushPromise;
   flushPromise = (async () => {
+    const leaseOwner = await acquireFlushLease();
+    if (!leaseOwner) return { processed: 0, remaining: await getPendingWriteCount() };
     let processed = 0;
-    const operations = await getAllOperations();
-    for (const operation of operations) {
-      if (typeof navigator !== 'undefined' && navigator.onLine === false) break;
-      if ((Number(operation.nextAttemptAt) || 0) > Date.now()) continue;
-      try {
-        const success = await handler(operation);
-        if (success) {
-          await removeOperation(operation.id);
-          processed += 1;
-        } else {
+    try {
+      const operations = await getAllOperations();
+      for (const operation of operations) {
+        if (typeof navigator !== 'undefined' && navigator.onLine === false) break;
+        if ((Number(operation.nextAttemptAt) || 0) > Date.now()) continue;
+        try {
+          const success = await handler(operation);
+          if (success) {
+            await removeOperation(operation.id);
+            processed += 1;
+          } else {
+            break;
+          }
+        } catch (error) {
+          const next = {
+            ...operation,
+            attempts: (Number(operation.attempts) || 0) + 1,
+            lastError: String(error?.message || error || '').slice(0, 240),
+            nextAttemptAt: Date.now() + Math.min(
+              RETRY_BACKOFF_MAX_MS,
+              RETRY_BACKOFF_BASE_MS * (2 ** Math.min(6, Number(operation.attempts) || 0))
+            )
+          };
+          await enqueueWriteOperation(next);
           break;
         }
-      } catch (error) {
-        const next = {
-          ...operation,
-          attempts: (Number(operation.attempts) || 0) + 1,
-          lastError: String(error?.message || error || '').slice(0, 240),
-          nextAttemptAt: Date.now() + Math.min(
-            RETRY_BACKOFF_MAX_MS,
-            RETRY_BACKOFF_BASE_MS * (2 ** Math.min(6, Number(operation.attempts) || 0))
-          )
-        };
-        await enqueueWriteOperation(next);
-        break;
       }
+      return { processed, remaining: Math.max(0, operations.length - processed) };
+    } finally {
+      await releaseFlushLease(leaseOwner);
     }
-    return { processed, remaining: Math.max(0, operations.length - processed) };
   })().finally(() => {
     flushPromise = null;
   });
