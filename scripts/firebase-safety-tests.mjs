@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import vm from 'node:vm';
 import { omitUndefinedDeep } from '../src/core/app-utils.js';
+import { calculateSettlementRows } from '../src/core/settlement-calculator.js';
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -9,6 +10,19 @@ function assert(condition, message) {
 const undefinedProbe = omitUndefinedDeep({ description: undefined, nested: { keep: 'ok', drop: undefined }, list: [1, undefined] });
 assert(!('description' in undefinedProbe) && !('drop' in undefinedProbe.nested), 'Firestore payload sanitizer must omit undefined object fields');
 assert(undefinedProbe.list.length === 2 && undefinedProbe.list[1] === null, 'Firestore payload sanitizer must preserve array positions');
+
+const settlementSimulation = calculateSettlementRows(
+  536000,
+  ['박영우', '김현석', '조광석'],
+  new Map([['박영우', -300000]]),
+  '박영우'
+);
+assert(JSON.stringify(settlementSimulation.map(row => [row.name, row.share, row.amount])) === JSON.stringify([
+  ['박영우', 178666, -357334],
+  ['김현석', 178667, 178667],
+  ['조광석', 178667, 178667]
+]), 'settlement calculation must treat personal prepayments as part of total expense and credit the owner remainder');
+assert(settlementSimulation.reduce((sum, row) => sum + row.amount, 0) === 0, 'settlement participant balances must sum to zero');
 
 // The app's main logic lives in assets/app-main.js (externalized from index.html's inline
 // <script> -- see check-tab-wiring.mjs for the rationale).
