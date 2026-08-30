@@ -1,6 +1,6 @@
 /** P6 ESM adapter for app-main — live assets/app-main.js unchanged */
 import './../react-globals.js';
-import { uploadBlobWithWatchdog } from './app-media-upload.js';
+import { uploadBlobWithWatchdog, retryMediaTask, getAdaptiveMediaUploadConcurrency } from './app-media-upload.js';
 const React = window.React;
 const ReactDOM = window.ReactDOM;
 if (!React || !ReactDOM || typeof ReactDOM.createRoot !== 'function') {
@@ -4014,21 +4014,11 @@ function CalendarApp() {
     try {
       const resolvedImages = await resolveChatImageBatch(activeCal.id, compressed, progress => {
         setChatUploadProgress({ ...progress, label: '일정 사진 업로드 중...' });
-      }, {
-        requireStorage: true,
-        continueOnError: true,
-        onItemError: ({ index }) => {
-          setChatUploadProgress(prev => prev ? { ...prev, label: `${index + 1}번 사진 재시도 대기 중...` } : prev);
-        }
-      });
-      const failedCount = Array.isArray(resolvedImages.failed) ? resolvedImages.failed.length : 0;
-      const failedFiles = Array.isArray(resolvedImages.failed)
-        ? resolvedImages.failed.map(({ index }) => files?.[index]).filter(Boolean)
-        : [];
+      }, { requireStorage: true, continueOnError: true });
+      const failedCount = (resolvedImages.failed || []).length;
+      const failedFiles = (resolvedImages.failed || []).map(({ index }) => files?.[index]).filter(Boolean);
       const successfulImages = resolvedImages.filter(Boolean);
-      if (successfulImages.length === 0) {
-        throw new Error('모든 일정 사진 업로드에 실패했습니다. 네트워크를 확인한 뒤 다시 시도해 주세요.');
-      }
+      if (successfulImages.length === 0) throw new Error('모든 일정 사진 업로드에 실패했습니다. 네트워크를 확인한 뒤 다시 시도해 주세요.');
       const chunks = chunkResolvedImagesForMessages(successfulImages);
       const now = Date.now();
       const fallbackParticipantId = chatParticipantId || getActiveParticipants(activeCal)[0]?.id || '';
@@ -4093,13 +4083,7 @@ function CalendarApp() {
       const photoLog = createActivityLog(activeCal.id, 'photo_create', dateStr, '', now, `${newRefs.length}장 일정 사진 추가`);
       const ok = await commitConfirmedMeetings(nextConfirmedMeetings, '일정 사진 저장완료', photoLog ? [photoLog] : []);
       setChatUploadProgress({ pct: 100, remainingSec: 0, label: '일정 사진 저장 완료' });
-      if (failedCount > 0) {
-        showRetryableUploadToast(
-          `${successfulImages.length}장 저장 완료, ${failedCount}장은 실패했습니다. 실패한 사진만 다시 시도할 수 있습니다.`,
-          () => handleAddMeetingPhotos(dateStr, failedFiles),
-          7000
-        );
-      }
+      if (failedCount > 0) showRetryableUploadToast(`${successfulImages.length}장 저장 완료, ${failedCount}장은 실패했습니다. 실패한 사진만 다시 시도할 수 있습니다.`, () => handleAddMeetingPhotos(dateStr, failedFiles), 7000);
       return ok;
     } catch (err) {
       console.error('handleAddMeetingPhotos failed:', err);
@@ -8240,21 +8224,7 @@ async function readClipboardImageFiles(showToast) {
 // is uploadChatImageAssets or uploadMemoImageAssets, keeping each feature's Storage path.
 async function resolveImageUrls(calendarId, compressed, index, onBytes, uploadFn, options = {}) {
   try {
-    const maxAttempts = options.requireStorage ? 3 : 1;
-    let uploaded = null;
-    for (let attempt = 0; attempt < maxAttempts && !uploaded; attempt += 1) {
-      if (attempt > 0) {
-        // A failed pair is cleaned up by uploadChatImageAssets. A short exponential delay gives
-        // mobile radio/NAT connections time to recover without blocking the other photos.
-        await new Promise(resolve => setTimeout(resolve, Math.min(4000, 700 * (2 ** (attempt - 1)))));
-      }
-      try {
-        uploaded = await uploadFn(calendarId, compressed, index, onBytes);
-      } catch (error) {
-        if (attempt === maxAttempts - 1) throw error;
-        console.warn(`Image upload retry ${attempt + 1}/${maxAttempts - 1}:`, error);
-      }
-    }
+    const uploaded = await retryMediaTask(() => uploadFn(calendarId, compressed, index, onBytes), options.requireStorage ? 3 : 1);
     if (uploaded && uploaded.imageUrl && uploaded.thumbUrl) {
       revokeCompressedObjectUrls(compressed);
       return uploaded;
@@ -8295,10 +8265,6 @@ async function resolveImageUrls(calendarId, compressed, index, onBytes, uploadFn
   throw new Error('이미지 처리 중 오류가 발생했습니다.');
 }
 
-// Resolves a whole batch of images (upload + fallback per image, same as resolveImageUrls)
-// while reporting combined byte-level progress across every upload in the batch as
-// { pct, remainingSec }. Falls back to compressed.isExisting entries as-is (no re-upload).
-// Shared by chat and memo attachments; uploadFn picks which Storage path each uses.
 async function resolveImageBatch(calendarId, compressedList, onProgress, uploadFn, options = {}) {
   const uploadIndexes = compressedList
     .map((c, idx) => ({ c, idx }))
@@ -8312,8 +8278,6 @@ async function resolveImageBatch(calendarId, compressedList, onProgress, uploadF
     ));
   }
 
-  // Progress split: compression = 0~45%, upload = 45~99%
-  // This ensures the bar visibly moves during the (previously silent) compression phase.
   const startedAt = Date.now();
   const total = compressedList.length;
   let compressionDone = 0;
@@ -8347,16 +8311,7 @@ async function resolveImageBatch(calendarId, compressedList, onProgress, uploadF
 
   const results = new Array(compressedList.length);
   let uploadCursor = 0;
-  const nav = typeof navigator !== 'undefined' ? navigator : {};
-  const connection = nav.connection || nav.mozConnection || nav.webkitConnection || {};
-  const effectiveType = String(connection.effectiveType || '').toLowerCase();
-  const isConstrained = Boolean(connection.saveData) || effectiveType === 'slow-2g' || effectiveType === '2g';
-  const deviceCores = Number(nav.hardwareConcurrency) || 8;
-  // Each image consists of original + thumbnail uploads. Three image workers means at most
-  // six Storage tasks, which is materially faster on Wi-Fi/4G while remaining conservative on
-  // low-memory phones and metered/slow connections.
-  const preferredConcurrency = isConstrained ? 1 : (deviceCores <= 4 ? 2 : 3);
-  const UPLOAD_CONCURRENCY = Math.min(preferredConcurrency, Math.max(1, compressedList.length));
+  const UPLOAD_CONCURRENCY = getAdaptiveMediaUploadConcurrency(compressedList.length, typeof navigator !== 'undefined' ? navigator : {});
   const failed = [];
 
   async function uploadWorker() {
@@ -8373,11 +8328,7 @@ async function resolveImageBatch(calendarId, compressedList, onProgress, uploadF
         let result = null;
         try {
           result = await resolveImageUrls(calendarId, c, idx, onBytes, uploadFn, options);
-        } catch (error) {
-          if (!options.continueOnError) throw error;
-          failed.push({ index: idx, error });
-          if (typeof options.onItemError === 'function') options.onItemError({ index: idx, error, item: c });
-        }
+        } catch (error) { if (!options.continueOnError) throw error; failed.push({ index: idx, error }); if (typeof options.onItemError === 'function') options.onItemError({ index: idx, error, item: c }); }
         compressionDone++;
         reportCompressionProgress();
         results[idx] = result;
@@ -8387,8 +8338,6 @@ async function resolveImageBatch(calendarId, compressedList, onProgress, uploadF
 
   await Promise.all(Array.from({ length: UPLOAD_CONCURRENCY }, () => uploadWorker()));
   if (onProgress) onProgress({ pct: 100, remainingSec: 0, current: total, total });
-  // Keep the return value backwards-compatible (callers expect an array), while exposing
-  // per-photo failures to a resumable caller that opts into partial success.
   Object.defineProperty(results, 'failed', { value: failed, enumerable: false, configurable: true });
   return results;
 }
@@ -8655,8 +8604,6 @@ function DicesIcon(props) {
   const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.DicesIcon;
   return typeof C === 'function' ? React.createElement(C, props) : null;
 }
-
-
 // Matches MenuIcon's exact svg wrapper (16x16, stroke 2, round caps) but needs a <rect> child
 // alongside its <path>s, which MenuIcon's paths-only prop can't express.
 
@@ -8778,8 +8725,6 @@ function resolveMeetingPhotoDisplay(photo, chatMessages) {
     refKey: fallbackKeys.refKey
   };
 }
-
-
 
 
 // Renders a chat message's attached image(s): a single thumbnail for legacy/one-image
@@ -8926,8 +8871,6 @@ function buildLightboxImageInfo(url, timestamp) {
     typeLabel: ext.toUpperCase()
   };
 }
-
-
 
 // Black-gradient info panel shown at the bottom of the active photo when the Lightbox's
 // tap-to-toggle info mode is on. Fixed 4-line layout: 업로드 date, 파일정보 (format/size/

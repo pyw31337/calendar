@@ -1,6 +1,28 @@
 /* Shared Firebase Storage upload watchdog. The Firebase compat UploadTask is cancellable,
  * so a stalled mobile transfer can be stopped without leaving a promise hanging forever. */
 
+export async function retryMediaTask(task, attempts = 1, delayBaseMs = 700) {
+  let lastError = null;
+  for (let attempt = 0; attempt < Math.max(1, attempts); attempt += 1) {
+    if (attempt > 0) await new Promise(resolve => setTimeout(resolve, Math.min(4000, delayBaseMs * (2 ** (attempt - 1)))));
+    try {
+      const result = await task();
+      if (result) return result;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  if (lastError) throw lastError;
+  return null;
+}
+
+export function getAdaptiveMediaUploadConcurrency(count, nav = {}) {
+  const connection = nav.connection || nav.mozConnection || nav.webkitConnection || {};
+  const type = String(connection.effectiveType || '').toLowerCase();
+  const constrained = Boolean(connection.saveData) || type === 'slow-2g' || type === '2g';
+  return Math.min(constrained ? 1 : ((Number(nav.hardwareConcurrency) || 8) <= 4 ? 2 : 3), Math.max(1, count));
+}
+
 export function uploadBlobWithWatchdog({
   ref,
   blob,
