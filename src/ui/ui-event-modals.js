@@ -1602,6 +1602,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
   const [depositorName, setDepositorName] = React.useState(() => cardToEdit?.depositorName || '');
   const [accountNumber, setAccountNumber] = React.useState(() => cardToEdit?.accountNumber || '');
   const [activeTab, setActiveTab] = React.useState('general');
+  const [isSettlementCardPreviewOpen, setIsSettlementCardPreviewOpen] = React.useState(false);
   const [expenseListHeight, setExpenseListHeight] = React.useState(160);
   const expenseResizeRef = React.useRef(null);
 
@@ -1970,11 +1971,19 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
       className: 'modal-header',
       style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 18px', borderBottom: '1px solid var(--border-subtle)' }
     },
-      React.createElement('h3', { id: 'settlement-modal-title', style: { fontSize: '1.05rem', fontWeight: 800, margin: 0, color: 'var(--text-main)' } }, isEditing ? '정산 수정' : '정산 생성'),
-      React.createElement('button', {
-        type: 'button', onClick: onClose,
-        style: { background: 'none', border: 'none', color: '#64748B', cursor: 'pointer' }
-      }, React.createElement(SmallXIcon, { size: 20 }))
+      React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 } },
+        React.createElement('h3', { id: 'settlement-modal-title', style: { fontSize: '1.05rem', fontWeight: 800, margin: 0, color: 'var(--text-main)' } }, isEditing ? '정산 수정' : '정산 생성')
+      ),
+      React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '6px' } },
+        isEditing && React.createElement('button', {
+          type: 'button', onClick: () => setIsSettlementCardPreviewOpen(true),
+          style: { border: '1px solid var(--border-subtle)', borderRadius: '7px', background: 'var(--bg-card)', color: 'var(--text-main)', padding: '5px 9px', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap' }
+        }, '정산 카드'),
+        React.createElement('button', {
+          type: 'button', onClick: onClose,
+          style: { background: 'none', border: 'none', color: '#64748B', cursor: 'pointer' }
+        }, React.createElement(SmallXIcon, { size: 20 }))
+      )
     ),
     React.createElement('div', {
       role: 'tablist',
@@ -2390,7 +2399,60 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
         }, isEditing ? '수정' : '생성')
       )
     )
-  ));
+  )),
+  isSettlementCardPreviewOpen && React.createElement('div', {
+    className: 'modal-overlay',
+    onClick: () => setIsSettlementCardPreviewOpen(false),
+    style: { zIndex: 12000 }
+  }, React.createElement(ResizableModalContainer, {
+    className: 'modal-container',
+    onClick: e => e.stopPropagation(),
+    style: { width: '92%', maxWidth: '430px', maxHeight: '88vh', display: 'flex', flexDirection: 'column' }
+  },
+    React.createElement('div', { className: 'modal-header', style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: '1px solid var(--border-subtle)' } },
+      React.createElement('h3', { style: { margin: 0, fontSize: '1rem', fontWeight: 900, color: 'var(--text-main)' } }, '정산 카드 미리보기'),
+      React.createElement('button', { type: 'button', onClick: () => setIsSettlementCardPreviewOpen(false), style: { border: 0, background: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '1.2rem' } }, '✕')
+    ),
+    React.createElement('div', { className: 'modal-body', style: { overflowY: 'auto', padding: '14px', display: 'flex', flexDirection: 'column', gap: '12px', background: 'linear-gradient(145deg, #EEF2FF, #FDF2F8)' } },
+      React.createElement('div', { style: { padding: '16px', borderRadius: '14px', background: 'linear-gradient(135deg, #4F46E5, #DB2777)', color: '#FFFFFF', boxShadow: '0 8px 20px rgba(79,70,229,0.18)' } },
+        React.createElement('div', { style: { fontSize: '0.72rem', opacity: 0.82, marginBottom: '4px' } }, cardToEdit?.status === 'closed' ? '마감된 정산' : '진행중인 정산'),
+        React.createElement('div', { style: { fontSize: '1.08rem', fontWeight: 900, marginBottom: '12px' } }, title || '1/N 간편 송금'),
+        React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'end', gap: '8px' } },
+          React.createElement('span', { style: { fontSize: '0.8rem', fontWeight: 700 } }, '총 지출'),
+          React.createElement('strong', { style: { fontSize: '1.25rem', color: '#F0ABFC' } }, `${totalExpense.toLocaleString()}원`)
+        )
+      ),
+      React.createElement('div', { style: { padding: '12px', borderRadius: '10px', background: 'var(--bg-card)', border: '1px solid var(--border-subtle)' } },
+        React.createElement('div', { style: { fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-muted)', marginBottom: '8px' } }, `개별 분담금: ${settlementPerPerson.toLocaleString()}원 (총 지출 ÷ ${Math.max(1, participantRows.length)}명)`),
+        participantRows.length === 0
+          ? React.createElement('div', { style: { fontSize: '0.78rem', color: 'var(--text-muted)' } }, '등록된 참여자가 없습니다.')
+          : participantRows.map(row => {
+            const amount = getIndividualSettlementAmount(row.participantId);
+            return React.createElement('div', { key: `preview_${row.id}`, style: { display: 'flex', justifyContent: 'space-between', gap: '8px', padding: '7px 0', borderTop: '1px solid var(--border-subtle)', fontSize: '0.8rem' } },
+              React.createElement('span', null, `${row.participantId}님은 개별 분담금 ${settlementPerPerson.toLocaleString()}원`),
+              React.createElement('strong', { style: { color: amount < 0 ? '#16A34A' : '#DC2626', whiteSpace: 'nowrap' } }, `${amount < 0 ? '환급금 -' : '분담금 '}${Math.abs(amount).toLocaleString()}원`)
+            );
+          })
+      ),
+      React.createElement('div', { style: { padding: '12px', borderRadius: '10px', background: 'var(--bg-card)', border: '1px solid var(--border-subtle)' } },
+        React.createElement('div', { style: { fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-muted)', marginBottom: '7px' } }, '송금계좌 정보'),
+        React.createElement('div', { style: { fontSize: '0.86rem', fontWeight: 800, color: 'var(--text-main)' } }, `${bankName === '기타' ? otherBankName || '기타' : bankName} ${accountNumber || '계좌번호 미입력'}`),
+        depositorName && React.createElement('div', { style: { marginTop: '3px', fontSize: '0.78rem', color: 'var(--text-muted)' } }, `예금주: ${depositorName}`)
+      ),
+      React.createElement('div', { style: { padding: '12px', borderRadius: '10px', background: 'var(--bg-card)', border: '1px solid var(--border-subtle)' } },
+        React.createElement('div', { style: { fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-muted)', marginBottom: '7px' } }, `정산목록 (${Object.keys(checkedItems).length}건)`),
+        Object.values(checkedItems).length === 0
+          ? React.createElement('div', { style: { fontSize: '0.78rem', color: 'var(--text-muted)' } }, '선택된 지출 항목이 없습니다.')
+          : Object.values(checkedItems).map((item, index) => React.createElement('div', { key: item.itemKey || index, style: { display: 'flex', justifyContent: 'space-between', gap: '8px', padding: '7px 0', borderTop: '1px solid var(--border-subtle)', fontSize: '0.78rem' } },
+            React.createElement('span', { style: { minWidth: 0, overflowWrap: 'anywhere' } }, `${formatShortDateWithDay(item.date)} · ${item.label || '정산 항목'}`),
+            React.createElement('strong', { style: { color: '#DC2626', whiteSpace: 'nowrap' } }, `-${Math.abs(Number(item.amount) || 0).toLocaleString()}원`)
+          ))
+      )
+    ),
+    React.createElement('div', { className: 'modal-footer', style: { display: 'flex', justifyContent: 'flex-end', padding: '10px 14px', borderTop: '1px solid var(--border-subtle)' } },
+      React.createElement('button', { type: 'button', className: 'btn btn-secondary', onClick: () => setIsSettlementCardPreviewOpen(false) }, '닫기')
+    )
+  )));
 }
 
 export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenShare, onOpenAppSettings, onChangeView, onOpenCreateSettlement, onToggleSettlementCardStatus, onDeleteSettlementCard, onSaveSettlementCard, chatCount = 0, settlementBadge = null, galleryCount = 0, placeCount = 0, memoCount = 0, chatLastAuthor = null, settlementLastDate = null, galleryLastDate = null, placeLastName = null, memoLastTitleWord = null, showToast }) {
@@ -3323,7 +3385,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
         }, "✕")
       )
     ),
-    /* Group 1: 정산 생성 + 정산 카드 */
+    /* Group 1: 정산 생성 + 정산 목록 */
     React.createElement("div", { className: "admin-side-menu-list", style: { borderBottom: 'none', paddingTop: '6px' } },
       /* 1. 정산 생성 */
       React.createElement("button", {
@@ -3342,21 +3404,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
         )
       ),
 
-      /* 2. 정산 카드 */
-      React.createElement("button", {
-        type: "button",
-        className: "admin-side-menu-item",
-        onClick: () => { setIsSettlementMenuOpen(false); handleGenerateShareImage(); }
-      },
-        React.createElement("span", { className: "admin-side-menu-item-icon" }, React.createElement("svg", {
-          xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24",
-          fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
-        }, React.createElement("path", { d: "M3 11h3.75a2 2 0 0 1 1.6.8l.45.6a4 4 0 0 0 6.4 0l.45-.6a2 2 0 0 1 1.6-.8H21" }), React.createElement("path", { d: "M3 7h18" }), React.createElement("rect", { x: "3", y: "3", width: "18", height: "18", rx: "2" }))),
-        React.createElement("span", { className: "admin-side-menu-item-copy" },
-          React.createElement("span", { className: "admin-side-menu-item-title" }, "정산 카드")
-        )
-      ),
-      /* 3. 정산 목록 */
+      /* 2. 정산 목록 */
       React.createElement("button", {
         type: "button",
         className: "admin-side-menu-item",
