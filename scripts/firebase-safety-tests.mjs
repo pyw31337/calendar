@@ -43,6 +43,8 @@ assert(/writeRootCollectionDocumentWithFallback/.test(firebaseDataScript) && /ro
 assert(/merge: Boolean\(options\?\.merge\)/.test(firebaseDataScript) && /Boolean\(payload\.merge\)/.test(mediaOutboxScript), 'queued root writes must preserve merge semantics during replay');
 assert(/writeRootCollectionDocumentWithFallback[\s\S]{0,900}FIRESTORE_WRITE_DEADLINE_MS/.test(firebaseDataScript), 'root collection writes must use the bounded write deadline');
 assert(/withWeatherTimeout/.test(weatherScript) && /WEATHER_FIRESTORE_TIMEOUT_MS/.test(weatherScript), 'weather cache reads and writes must be bounded');
+assert(/withWeatherTimeout\(fetch\(/.test(weatherScript), 'weather external requests must be bounded');
+assert(/withSideMenuTimeout/.test(sideMenuScript) && /push_subscriptions.*get\(\)/s.test(sideMenuScript), 'push device reads must be bounded');
 assert(firebaseServicesScript.includes('FIRESTORE_REST_TIMEOUT_MS = 9000') && firebaseServicesScript.includes('fetchWithTimeout') && firebaseServicesScript.includes('withSdkTimeout'), 'Firebase SDK and REST reads must have bounded timeouts');
 assert(calendarCoreScript.includes('withFirestoreReadTimeout') && calendarCoreScript.includes('Firestore search read timed out'), 'full-history search reads must have a bounded timeout');
 assert(/writeSharedCollection/.test(sideMenuScript) && /기기 구독 삭제/.test(sideMenuScript), 'device subscription deletes must use the bounded collection write path');

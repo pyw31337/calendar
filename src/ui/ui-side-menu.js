@@ -55,6 +55,16 @@ function __fb() {
   }
   return (typeof window !== 'undefined' && window.__gatherFirebaseDb) || null;
 }
+const SIDE_MENU_REQUEST_TIMEOUT_MS = 7000;
+function withSideMenuTimeout(promise, timeoutMs = SIDE_MENU_REQUEST_TIMEOUT_MS) {
+  let timer = null;
+  const deadline = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error('사이드 메뉴 요청 시간이 초과되었습니다.')), timeoutMs);
+  });
+  return Promise.race([promise, deadline]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
+}
 function writeSharedCollection(...args) {
   const f = __gatherUiDeps().writeCollectionDocumentWithFallback;
   return typeof f === 'function' ? f(...args) : null;
@@ -812,7 +822,7 @@ export function AppSettingsModal({
     try {
       const db = typeof window !== 'undefined' ? window.__gatherFirebaseDb : null;
       if (db && calendarId) {
-        const snap = await db.collection('calendars').doc('cal_' + calendarId).collection('push_subscriptions').get();
+        const snap = await withSideMenuTimeout(db.collection('calendars').doc('cal_' + calendarId).collection('push_subscriptions').get());
         const rows = [];
         snap.forEach(doc => {
           const d = doc.data() || {};
@@ -985,14 +995,14 @@ export function AppSettingsModal({
       let searchResults = [];
       // Domestic only: countryCode=KR (open-meteo) / countrycodes=kr (nominatim)
       if (translated) {
-        const res = await fetch('https://geocoding-api.open-meteo.com/v1/search?name=' + encodeURIComponent(translated) + '&count=12&language=ko&format=json&countryCode=KR');
+        const res = await withSideMenuTimeout(fetch('https://geocoding-api.open-meteo.com/v1/search?name=' + encodeURIComponent(translated) + '&count=12&language=ko&format=json&countryCode=KR'));
         if (res.ok) {
           const data = await res.json();
           searchResults = (data.results || []).filter(isKoreaResult);
         }
       }
       if (searchResults.length === 0) {
-        const res = await fetch('https://nominatim.openstreetmap.org/search?q=' + encodeURIComponent(cleanQuery) + '&format=json&limit=12&accept-language=ko&countrycodes=kr');
+        const res = await withSideMenuTimeout(fetch('https://nominatim.openstreetmap.org/search?q=' + encodeURIComponent(cleanQuery) + '&format=json&limit=12&accept-language=ko&countrycodes=kr'));
         if (res.ok) {
           const data = await res.json();
           searchResults = (data || []).map((item, idx) => ({

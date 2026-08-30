@@ -797,9 +797,9 @@ async function writeServerWeather(lat, lon, temp, code, name) {
 }
 
 async function fetchOpenMeteo(lat, lon) {
-  const res = await fetch(
+  const res = await withWeatherTimeout(fetch(
     'https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon + '&current=temperature_2m,weather_code'
-  );
+  ));
   if (!res.ok) throw new Error('날씨 정보 로드 실패');
   const data = await res.json();
   return {
@@ -983,7 +983,7 @@ export function WeatherLocationModal({ onClose, onSelectLocation, onDeleteRecent
       let searchResults = [];
 
       if (translated) {
-        const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(translated)}&count=10&language=ko&format=json`);
+        const res = await withWeatherTimeout(fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(translated)}&count=10&language=ko&format=json`));
         if (res.ok) {
           const data = await res.json();
           searchResults = data.results || [];
@@ -991,7 +991,7 @@ export function WeatherLocationModal({ onClose, onSelectLocation, onDeleteRecent
       }
 
       if (searchResults.length === 0) {
-        const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(cleanQuery)}&format=json&limit=10&accept-language=ko`);
+        const res = await withWeatherTimeout(fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(cleanQuery)}&format=json&limit=10&accept-language=ko`));
         if (res.ok) {
           const data = await res.json();
           searchResults = (data || []).map((item, idx) => ({
