@@ -9,6 +9,9 @@ const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
 const GATHER_APP_CONSTANTS = window.GATHER_APP_CONSTANTS || {};
 const GATHER_APP_CONFIG = window.GATHER_APP_CONFIG || {};
 function __gatherUiDeps() { return window.GATHER_UI_DEPS || {}; }
+function maskSettlementAccountNumber(value) {
+  return String(value || '').replace(/\d/g, '*');
+}
 function getActiveAvailabilities(calendar) {
   const f = __gatherUiDeps().getActiveAvailabilities || GATHER_APP_UTILS.getActiveAvailabilities;
   return typeof f === 'function' ? f(calendar) : [];
@@ -2890,7 +2893,8 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
         displayCards.map(card => {
           const isClosed = card.status === 'closed';
           const displayBankName = card.bankName === '기타' && card.otherBankName ? card.otherBankName : card.bankName;
-          const bankInfoText = [displayBankName, card.accountNumber, card.depositorName].filter(Boolean).join(' ');
+          const displayAccountNumber = isClosed ? maskSettlementAccountNumber(card.accountNumber) : card.accountNumber;
+          const bankInfoText = [displayBankName, displayAccountNumber, card.depositorName].filter(Boolean).join(' ');
           const isMenuOpen = openMenuCardId === card.id;
           const cardParticipantNames = Array.from(new Set(
             Array.isArray(card.participantRows) && card.participantRows.length > 0
@@ -2958,12 +2962,12 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
                 }
               },
                 displayBankName && React.createElement("span", null, displayBankName),
-                card.accountNumber && React.createElement("span", {
+                displayAccountNumber && React.createElement("span", {
                   style: {
                     display: 'inline-flex', alignItems: 'center', padding: '2px 10px', margin: '0 4px',
                     borderRadius: '10px', backgroundColor: '#666', mixBlendMode: 'hard-light', color: 'var(--settlement-hero-text)'
                   }
-                }, card.accountNumber),
+                }, displayAccountNumber),
                 card.depositorName && React.createElement("span", { style: { fontWeight: 500 } }, card.depositorName)
               ),
 
