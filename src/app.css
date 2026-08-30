@@ -2866,6 +2866,26 @@ select.form-select {
   font-weight: 900;
   white-space: nowrap;
 }
+.settlement-person-settlement-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: rgba(220, 38, 38, 0.12);
+  color: #DC2626;
+  font-size: 0.66rem;
+  font-weight: 900;
+  line-height: 1;
+  white-space: nowrap;
+}
+.settlement-person-settlement-badge.is-refund {
+  background: rgba(22, 163, 74, 0.14);
+  color: #16A34A;
+}
+.settlement-person-amount .settlement-person-settlement-badge {
+  margin-right: 5px;
+  vertical-align: middle;
+}
 .settlement-expense-option {
   display: grid;
   grid-template-columns: 20px minmax(0, 1fr);
