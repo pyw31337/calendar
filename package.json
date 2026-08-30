@@ -16,6 +16,7 @@
     "check:tab-wiring": "node scripts/check-tab-wiring.mjs",
     "stress:firebase": "node scripts/firebase-live-stress-tests.mjs",
     "e2e:firebase-write": "node scripts/firebase-live-stress-tests.mjs",
+    "e2e:settlement-write": "node scripts/firebase-settlement-write-test.mjs",
     "ops:audit": "node scripts/firebase-ops-audit.mjs",
     "ops:media-audit": "node scripts/firebase-media-audit.mjs",
     "ops:export": "node scripts/firebase-export-prod.mjs",
