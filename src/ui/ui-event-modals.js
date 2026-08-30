@@ -1418,6 +1418,18 @@ export function AnniversaryModal({
 }
 
 /* Bank account number formatting helper */
+function calculateSettlementRows(totalExpense, participantNames, personalTotals = new Map()) {
+  const names = Array.from(new Set((participantNames || []).map(name => String(name || '').trim()).filter(Boolean)));
+  if (names.length === 0) return [];
+  const total = Math.max(0, Math.round(Number(totalExpense) || 0));
+  const baseShare = Math.floor(total / names.length);
+  const remainder = total % names.length;
+  return names.map((name, index) => ({
+    name,
+    amount: baseShare + (index < remainder ? 1 : 0) + (Number(personalTotals.get(name)) || 0)
+  }));
+}
+
 function formatBankAccountNumber(bankName, value) {
   if (!value) return '';
   const digits = String(value).replace(/\D/g, '');
@@ -1773,9 +1785,14 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
   }, [personalExpenses]);
 
   const hasSharedExpenses = Object.keys(checkedItems || {}).length > 0;
+  const settlementRows = React.useMemo(() => calculateSettlementRows(
+    totalExpense,
+    participantRows.map(row => row?.participantId),
+    personalExpenseTotals
+  ), [totalExpense, participantRows, personalExpenseTotals]);
   const getIndividualSettlementAmount = (participantId) => {
     if (!hasSharedExpenses) return 0;
-    return settlementPerPerson + (personalExpenseTotals.get(participantId) || 0);
+    return settlementRows.find(row => row.name === participantId)?.amount || 0;
   };
 
   const handleAccountNumberChange = (e) => {
@@ -2244,6 +2261,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
         },
           React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
             React.createElement('label', { style: { ...settlementSectionLabelStyle, marginBottom: 0 } }, '개인 지출 등록'),
+            React.createElement('span', { style: { fontSize: '0.72rem', color: 'var(--text-muted)' } }, '총 지출에 포함된 개인 선납액만 입력하세요.'),
             React.createElement('span', { style: { fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)' } },
               `합계: ${Math.abs(personalExpenses.reduce((s, x) => {
                 const amount = x?.signedAmount ? (Number(x.amount) || 0) : -Math.abs(Number(x?.amount) || 0);
@@ -3034,11 +3052,11 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
               : -Math.abs(Number(item?.amount) || 0);
             cardPersonalTotals.set(name, (cardPersonalTotals.get(name) || 0) + signedAmount);
           });
-          const cardPerPerson = Math.round((Number(card.amount) || allTimeExpense) / Math.max(1, cardParticipantNames.length));
-          const cardParticipantRows = cardParticipantNames.map(name => ({
-            name,
-            amount: cardPerPerson + (cardPersonalTotals.get(name) || 0)
-          }));
+          const cardParticipantRows = calculateSettlementRows(
+            Number(card.amount) || allTimeExpense,
+            cardParticipantNames,
+            cardPersonalTotals
+          );
 
           return React.createElement("div", {
             key: card.id,
