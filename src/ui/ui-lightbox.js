@@ -1881,19 +1881,18 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
     fill: "none", stroke: "currentColor", strokeWidth: "2.5", strokeLinecap: "round", strokeLinejoin: "round"
   }, /*#__PURE__*/React.createElement("line", { x1: "18", y1: "6", x2: "6", y2: "18" }), /*#__PURE__*/React.createElement("line", { x1: "6", y1: "6", x2: "18", y2: "18" }))),
   total > 1 && index > 0 && /*#__PURE__*/React.createElement("button", {
-    className: "lightbox-nav-btn",
     type: "button",
     onClick: e => { e.stopPropagation(); animateToAdjacent(index - 1); },
     "aria-label": "이전 이미지",
-    // The shared global press-scale rule (button:active { transform: translate3d(...) scale(...) })
-    // overrides this button's own inline `transform: translateY(-50%)` centering with !important,
-    // so pressing it used to yank it out from its vertically-centered position toward the bottom
-    // of the overlay -- by the time the finger/cursor lifts, it's no longer over the button, so
-    // the click (or worse, a synthetic click on whatever's now underneath) misses it and can close
-    // the lightbox instead of navigating. data-no-press-feedback opts this button out of that
-    // rule entirely (see app.css) rather than trying to keep patching the override to also apply
-    // here.
-    "data-no-press-feedback": true,
+    // The shared global press/hover rules (button:active, [data-no-press-feedback]:hover, ...)
+    // all set their own `transform` value, which -- being the same CSS property as this button's
+    // own centering `transform: translateY(-50%)` -- replaces it outright rather than combining
+    // with it. That used to yank the button away from its vertically-centered position on press
+    // (and, with the data-no-press-feedback attempt at a fix, on hover too), so by release the
+    // pointer was no longer over the button and the click could miss it entirely. .lightbox-nav-arrow
+    // (app.css) pins `transform: translateY(-50%) !important` across every state instead, so no
+    // interaction ever moves it.
+    className: "lightbox-nav-arrow",
     style: {
       position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)',
       background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.25)',
@@ -1905,11 +1904,10 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
     fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
   }, /*#__PURE__*/React.createElement("path", { d: "M15 6l-6 6l6 6" }))),
   total > 1 && index < total - 1 && /*#__PURE__*/React.createElement("button", {
-    className: "lightbox-nav-btn",
     type: "button",
     onClick: e => { e.stopPropagation(); animateToAdjacent(index + 1); },
     "aria-label": "다음 이미지",
-    "data-no-press-feedback": true,
+    className: "lightbox-nav-arrow",
     style: {
       position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)',
       background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.25)',

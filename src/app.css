@@ -857,12 +857,15 @@ summary.is-pressing,
 [data-no-press-feedback] {
   cursor: pointer !important;
 }
-.lightbox-nav-btn:active,
-.lightbox-nav-btn.is-pressing {
-  transform: translateY(-50%) !important;
-}
-.lightbox-nav-btn:hover {
-  /* Keep absolute vertical centering when the generic button hover lift applies. */
+/* Lightbox prev/next arrows center themselves with transform: translateY(-50%). Every shared
+   press/hover rule above also sets `transform` -- the same property -- so any of them matching
+   these buttons replaces that centering outright instead of combining with it, moving the button
+   out from under the pointer mid-interaction. Pinning the same value !important across every
+   state here means no hover/press/pressing rule can ever displace it again. */
+.lightbox-nav-arrow,
+.lightbox-nav-arrow:hover,
+.lightbox-nav-arrow:active,
+.lightbox-nav-arrow.is-pressing {
   transform: translateY(-50%) !important;
 }
 .motion-ripple {
