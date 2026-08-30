@@ -2502,6 +2502,11 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
     if (showToast) showToast(copied ? '계좌번호가 클립보드에 복사되었습니다.' : '계좌번호 복사에 실패했습니다.', copied ? 'success' : 'error');
   };
 
+  const handleOpenSettlementEditor = (card) => {
+    setOpenMenuCardId(null);
+    setEditingSettlementCard({ ...card });
+  };
+
   const { isHeaderVisible, onScroll: handleSettlementScroll } = useScrollHideHeader();
   const [activeTab, setActiveTab] = React.useState('total');
   const [openMenuCardId, setOpenMenuCardId] = React.useState(null);
@@ -3037,10 +3042,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
               React.createElement("button", {
                   type: "button",
                   title: "정산 수정",
-                  onClick: () => {
-                    setOpenMenuCardId(null);
-                    setEditingSettlementCard(card);
-                  },
+                  onClick: () => handleOpenSettlementEditor(card),
                   style: {
                     background: 'transparent', border: 'none', borderRadius: '0',
                     width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -3069,7 +3071,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
                     type: "button",
                     onClick: () => {
                       setOpenMenuCardId(null);
-                      setEditingSettlementCard(card);
+                      handleOpenSettlementEditor(card);
                     },
                     style: {
                       padding: '8px 12px', background: 'none', border: 'none', textAlign: 'left',
@@ -3473,7 +3475,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
         return React.createElement("button", {
           key: card.id,
           type: "button",
-          onClick: () => { setIsSettlementListOpen(false); setEditingSettlementCard(card); },
+          onClick: () => { setIsSettlementListOpen(false); handleOpenSettlementEditor(card); },
           style: {
             display: 'flex', flexDirection: 'column', gap: '7px', width: '100%', padding: '12px 14px', textAlign: 'left',
             border: '1px solid var(--border-subtle)', borderRadius: '10px', backgroundColor: 'var(--bg-card)', cursor: 'pointer', opacity: isClosed ? 0.72 : 1
@@ -3521,7 +3523,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
   })),
 
   /* Edit Settlement Layer Popup */
-  (editingSettlementCard && canUseSettlement && React.createElement(CreateSettlementModalComp, {
+  (editingSettlementCard && React.createElement(CreateSettlementModalComp, {
     calendar: calendar,
     initialData: editingSettlementCard,
     onClose: () => setEditingSettlementCard(null),
