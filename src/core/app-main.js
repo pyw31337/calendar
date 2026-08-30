@@ -1,6 +1,7 @@
 /** P6 ESM adapter for app-main — live assets/app-main.js unchanged */
 import './../react-globals.js';
 import { uploadBlobWithWatchdog } from './app-media-upload.js';
+import { CreateSettlementModal as SettlementEditorModal } from '../ui/ui-event-modals.js';
 const React = window.React;
 const ReactDOM = window.ReactDOM;
 if (!React || !ReactDOM || typeof ReactDOM.createRoot !== 'function') {
@@ -216,7 +217,6 @@ const GATHER_APP_CONSTANTS = window.GATHER_APP_CONSTANTS || {};
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
 const GATHER_APP_NOTIFICATIONS = window.GATHER_APP_NOTIFICATIONS || {};
 
-
 // 입력필드 규칙: 멀티라인 텍스트는 값(로드/입력/붙여넣기)에 맞춰 세로로 자동 확장
 function ResizableModalContainer(props) {
   const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ResizableModalContainer;
@@ -318,7 +318,6 @@ function DateCapsuleBadge(props) {
 
 
 
-
 // 입력필드 표시 규칙: 일반 텍스트 / YY.MM.DD 날짜 / URL 분리
 function tokenizeRichFieldText(text) {
   const source = String(text || '');
@@ -411,7 +410,6 @@ function renderTextWithUrlBadge(text, options = null) {
 }
 
 // Shared add/edit action row: 추가 | (edit) 취소 + 수정 — DateModal 참여자/장소/정산 공통 모듈
-
 
 import {
   normalizePollOptionInput,
@@ -5967,7 +5965,7 @@ function CalendarApp() {
       onClose: () => setIsCreateSettlementOpen(false),
       onSave: handleSaveSettlementCard
     }),
-    editingSettlementCard && activeCal && /*#__PURE__*/React.createElement(CreateSettlementModal, {
+    editingSettlementCard && activeCal && /*#__PURE__*/React.createElement(SettlementEditorModal, {
       calendar: activeCal,
       initialData: editingSettlementCard,
       showToast: showToast,
@@ -7061,7 +7059,6 @@ function EditMessageModal(props) {
   return typeof C === 'function' ? React.createElement(C, props) : null;
 }
 
-
 // Comments / Chat Icons & Utilities
 const getLocalStorage = () => {
   return window['local' + 'Storage'];
@@ -7296,7 +7293,6 @@ function useLinkPreview(url, cachedData) {
   return state;
 }
 
-
 const CHAT_LINK_PREVIEW_SKIP_HOSTS = new Set([
   'leisure-web.yanolja.com',
   'naver.me',
@@ -7319,7 +7315,6 @@ function shouldFetchLinkPreviewForChatUrl(url) {
   if (host && CHAT_LINK_PREVIEW_SKIP_HOSTS.has(host)) return false;
   return true;
 }
-
 
 // Detects when chat message TEXT contains several pasted image links (typed/pasted as plain
 // URLs, e.g. one per line) rather than a single embedded link, so DirectChatMediaText can show
