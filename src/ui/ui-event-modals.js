@@ -2546,7 +2546,6 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
 
   const handleOpenSettlementEditor = (card) => {
     setOpenMenuCardId(null);
-    if (typeof window !== 'undefined') window.__gatherSettlementEditorOpenCount = (window.__gatherSettlementEditorOpenCount || 0) + 1;
     // Keep the editor in this summary's render tree. The settlement page has an
     // early return path, so routing this action through the page owner can lose
     // the modal even though the click handler itself ran.
@@ -3584,6 +3583,12 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
           key: card.id,
           className: "settlement-list-card",
           type: "button",
+          onPointerUp: event => {
+            event.preventDefault();
+            event.stopPropagation();
+            setIsSettlementListOpen(false);
+            handleOpenSettlementEditor(card);
+          },
           onClick: event => {
             event.preventDefault();
             event.stopPropagation();
