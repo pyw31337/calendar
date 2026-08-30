@@ -1337,10 +1337,10 @@ function CalendarApp() {
     (async () => {
       try {
         if (firebaseDb) {
-          const doc = await firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('memos').doc(memoParam).get();
+          const doc = await withTimeout(firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('memos').doc(memoParam).get(), 9000, 'shared memo read');
           if (isMounted && doc.exists) setSharedMemo({ id: doc.id, ...doc.data() });
         } else {
-          const res = await fetch(`https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/calendars/cal_${activeCalId}/memos/${memoParam}`);
+          const res = await withTimeout(fetch(`https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/calendars/cal_${activeCalId}/memos/${memoParam}`), 9000, 'shared memo REST read');
           if (res.ok && isMounted) setSharedMemo({ id: memoParam, ...firestoreDocumentToJs(await res.json()) });
         }
       } catch (e) {
@@ -1434,7 +1434,7 @@ function CalendarApp() {
       return () => { cancelled = true; };
     }
     let cancelled = false;
-    liveFirebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages').get({ source: 'server' }).then(snapshot => {
+    withTimeout(liveFirebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages').get({ source: 'server' }), 9000, 'full chat history read').then(snapshot => {
       if (cancelled) return;
       const list = snapshot.docs.map(doc => slimMessageForClient({ id: doc.id, ...doc.data() }));
       setFullChatHistoryByCalendar(prev => ({ ...prev, [activeCalId]: list }));
