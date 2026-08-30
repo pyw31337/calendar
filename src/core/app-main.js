@@ -1223,6 +1223,7 @@ function CalendarApp() {
   const [isPollModalOpen, setIsPollModalOpen] = React.useState(false);
   const [expandedConfirmedDates, setExpandedConfirmedDates] = React.useState({});
   const [isCreateSettlementOpen, setIsCreateSettlementOpen] = React.useState(false);
+  const [editingSettlementCard, setEditingSettlementCard] = React.useState(null);
   const [editingPoll, setEditingPoll] = React.useState(null);
   const [voteTarget, setVoteTarget] = React.useState(null);
   const [isGuideOpen, setIsGuideOpen] = React.useState(false);
@@ -5948,7 +5949,10 @@ function CalendarApp() {
 
   const navMenuProps = {
     onChangeView: changeView,
-    onOpenCreateSettlement: () => setIsCreateSettlementOpen(true),
+    onOpenCreateSettlement: () => {
+      setEditingSettlementCard(null);
+      setIsCreateSettlementOpen(true);
+    },
     showSettlement: canUseSettlement,
     chatCount: navChatCount,
     settlementBadge: navSettlementBadge,
@@ -5962,11 +5966,29 @@ function CalendarApp() {
     memoLastTitleWord: navMemoLastTitleWord
   };
   const sharedAppOverlays = /*#__PURE__*/React.createElement(React.Fragment, null,
-    isCreateSettlementOpen && activeCal && canUseSettlement && /*#__PURE__*/React.createElement(CreateSettlementModal, {
+    isCreateSettlementOpen && !editingSettlementCard && activeCal && canUseSettlement && /*#__PURE__*/React.createElement(CreateSettlementModal, {
       calendar: activeCal,
       showToast: showToast,
       onClose: () => setIsCreateSettlementOpen(false),
       onSave: handleSaveSettlementCard
+    }),
+    editingSettlementCard && activeCal && canUseSettlement && /*#__PURE__*/React.createElement(CreateSettlementModal, {
+      calendar: activeCal,
+      initialData: editingSettlementCard,
+      showToast: showToast,
+      onClose: () => setEditingSettlementCard(null),
+      onDeleteCard: cardId => {
+        handleDeleteSettlementCard(cardId);
+        setEditingSettlementCard(null);
+      },
+      onToggleStatus: cardId => {
+        handleToggleSettlementCardStatus(cardId);
+        setEditingSettlementCard(null);
+      },
+      onSave: card => {
+        handleSaveSettlementCard(card);
+        setEditingSettlementCard(null);
+      }
     }),
     isAppSettingsOpen && /*#__PURE__*/React.createElement(AppSettingsModal, {
       onClose: () => setIsAppSettingsOpen(false),
@@ -6110,6 +6132,10 @@ function CalendarApp() {
         onToggleSettlementCardStatus: handleToggleSettlementCardStatus,
         onDeleteSettlementCard: handleDeleteSettlementCard,
         onSaveSettlementCard: handleSaveSettlementCard,
+        onOpenSettlementEditor: card => {
+          setIsCreateSettlementOpen(false);
+          setEditingSettlementCard(card ? { ...card } : null);
+        },
         showToast: showToast,
         ...navMenuProps,
         onOpenCreateSettlement: undefined

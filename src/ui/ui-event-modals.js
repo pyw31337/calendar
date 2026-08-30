@@ -2546,6 +2546,11 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
 
   const handleOpenSettlementEditor = (card) => {
     setOpenMenuCardId(null);
+    if (typeof onOpenSettlementEditor === 'function') {
+      onOpenSettlementEditor(card);
+      setIsSettlementListOpen(false);
+      return;
+    }
     // Keep the editor in this summary's render tree. The settlement page has an
     // early return path, so routing this action through the page owner can lose
     // the modal even though the click handler itself ran.
