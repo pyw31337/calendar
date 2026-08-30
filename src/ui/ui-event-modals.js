@@ -1429,6 +1429,15 @@ function calculateSettlementRows(totalExpense, participantNames, personalTotals 
   }));
 }
 
+function isCarryoverSettlementItem(item) {
+  const label = String(item?.label || item?.title || item?.note || '').toLowerCase();
+  return label.includes('이월') || label.includes('전년이월') || label.includes('전월이월');
+}
+
+function orderSettlementItemsForDisplay(items) {
+  return items.slice().sort((a, b) => Number(isCarryoverSettlementItem(a)) - Number(isCarryoverSettlementItem(b)));
+}
+
 function formatBankAccountNumber(bankName, value) {
   if (!value) return '';
   const digits = String(value).replace(/\D/g, '');
@@ -2599,7 +2608,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
 
   const allTimeRows = getConfirmedMeetings(calendar).slice().sort((a, b) => b.date.localeCompare(a.date))
     .map(meeting => {
-      const items = (Array.isArray(meeting.expenses) ? meeting.expenses : [])
+      const items = orderSettlementItemsForDisplay((Array.isArray(meeting.expenses) ? meeting.expenses : [])
         .filter(expense => Number.isFinite(Number(expense.amount)) && Number(expense.amount) !== 0)
         .map((expense, index) => {
           const amount = Number(expense.amount || 0);
@@ -2613,7 +2622,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
             url: getExpenseUrl(expense),
             ledgerKey: `${meeting.date}|${expense.id || index}|${expense.createdAt || ''}|${amount}`
           };
-        });
+        }));
       const expenseTotal = items.filter(item => !item.isIncome).reduce((sum, item) => sum + Math.abs(item.amount), 0);
       const incomeTotal = items.filter(item => item.isIncome).reduce((sum, item) => sum + Math.abs(item.amount), 0);
       return { meeting, items, expenseTotal, incomeTotal, net: incomeTotal - expenseTotal };
@@ -2622,11 +2631,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
   const allTimeItems = allTimeRows.flatMap(row => row.items.map(item => ({ ...item, date: row.meeting.date, meetingNote: row.meeting.note || '' })));
   const settlementBalanceByKey = new Map();
   let runningSettlementBalance = baseBudget;
-  allTimeItems.slice().sort((a, b) => {
-    const dateOrder = String(a.date || '').localeCompare(String(b.date || ''));
-    if (dateOrder !== 0) return dateOrder;
-    return (Number(a.createdAt) || 0) - (Number(b.createdAt) || 0);
-  }).forEach(item => {
+  allTimeItems.slice().reverse().forEach(item => {
     runningSettlementBalance += item.isIncome ? Math.abs(item.amount) : -Math.abs(item.amount);
     settlementBalanceByKey.set(item.ledgerKey, runningSettlementBalance);
   });
@@ -2664,7 +2669,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
   const rows = getConfirmedMeetings(calendar).slice().sort((a, b) => b.date.localeCompare(a.date))
     .filter(meeting => activeTab === 'total' || meeting.date.startsWith(targetPrefix))
     .map(meeting => {
-      const items = (Array.isArray(meeting.expenses) ? meeting.expenses : [])
+      const items = orderSettlementItemsForDisplay((Array.isArray(meeting.expenses) ? meeting.expenses : [])
         .filter(expense => Number.isFinite(Number(expense.amount)) && Number(expense.amount) !== 0)
         .sort((a, b) => {
           const aOrder = Number.isFinite(Number(a.order)) ? Number(a.order) : Number.POSITIVE_INFINITY;
@@ -2684,7 +2689,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
             url: getExpenseUrl(expense),
             ledgerKey: `${meeting.date}|${expense.id || index}|${expense.createdAt || ''}|${amount}`
           };
-        });
+        }));
       const expenseTotal = items.filter(item => !item.isIncome).reduce((sum, item) => sum + Math.abs(item.amount), 0);
       const incomeTotal = items.filter(item => item.isIncome).reduce((sum, item) => sum + Math.abs(item.amount), 0);
       return { meeting, items, expenseTotal, incomeTotal, net: incomeTotal - expenseTotal };
