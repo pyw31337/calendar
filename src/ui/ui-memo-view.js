@@ -434,6 +434,10 @@ function sanitizeMemoForFirestore(...args) {
   const f = __gatherUiDeps().sanitizeMemoForFirestore || GATHER_APP_UTILS.sanitizeMemoForFirestore;
   return typeof f === 'function' ? f(...args) : undefined;
 }
+function writeMemoDocument(...args) {
+  const f = __gatherUiDeps().writeCollectionDocumentWithFallback;
+  return typeof f === 'function' ? f(...args) : null;
+}
 function memoImagesCanBeQueued(images) {
   return Array.isArray(images) && images.length > 0 && images.every(image => image?.isExisting || (image?.originalBlob && image?.thumbnailBlob));
 }
@@ -995,7 +999,8 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
       };
       if (linkPreview) memoData.linkPreview = linkPreview;
 
-      await withMemoFirestoreTimeout(__fb().collection('calendars').doc('cal_' + calendarId).collection('memos').doc(memoId).set(sanitizeMemoForFirestore(memoData)));
+      const saved = await writeMemoDocument('memos', calendarId, memoId, sanitizeMemoForFirestore(memoData), 'set', '메모 저장');
+      if (!saved?.success) throw new Error('Memo save failed');
 
       // 3. Write Activity Log
       const logNote = newTitle.trim() ? `제목: ${newTitle.trim()}` : (newText.trim() ? newText.trim().slice(0, 30) + '...' : '사진 첨부');
@@ -1096,7 +1101,8 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
         linkPreview: linkPreview || null
       };
 
-      await withMemoFirestoreTimeout(__fb().collection('calendars').doc('cal_' + calendarId).collection('memos').doc(editingMemo.id).set(sanitizeMemoForFirestore(memoData)));
+      const saved = await writeMemoDocument('memos', calendarId, editingMemo.id, sanitizeMemoForFirestore(memoData), 'set', '메모 수정');
+      if (!saved?.success) throw new Error('Memo update failed');
 
       // Log Memo Update — before→after detail
       const logNote = buildFieldChangeNote(editTitle.trim() || '메모', [
@@ -1133,7 +1139,8 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
         const participantId = getStoredChatParticipantId(calendarId, calendar) || 'anonymous';
         const memoSnapshot = JSON.parse(JSON.stringify(memo));
 
-        await withMemoFirestoreTimeout(__fb().collection('calendars').doc('cal_' + calendarId).collection('memos').doc(memo.id).delete());
+        const deleted = await writeMemoDocument('memos', calendarId, memo.id, null, 'delete', '메모 삭제');
+        if (!deleted?.success) throw new Error('Memo delete failed');
 
         // Log Memo Delete
         const logNote = memo.title ? `제목: ${memo.title}` : (memo.text.slice(0, 30) + '...');
@@ -1150,7 +1157,8 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
         showToast('메모가 삭제되었습니다.', 'delete', 5000, async () => {
           try {
             const restoreStamp = Date.now();
-            await withMemoFirestoreTimeout(__fb().collection('calendars').doc('cal_' + calendarId).collection('memos').doc(memo.id).set(sanitizeMemoForFirestore(memoSnapshot)));
+            const restored = await writeMemoDocument('memos', calendarId, memo.id, sanitizeMemoForFirestore(memoSnapshot), 'set', '메모 복원');
+            if (!restored?.success) throw new Error('Memo restore failed');
             const restoreNote = memoSnapshot.title
               ? `복원: 제목: ${memoSnapshot.title}`
               : `복원: ${String(memoSnapshot.text || '').slice(0, 30)}...`;
@@ -1208,7 +1216,8 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
 
   const handleTogglePin = async (memo) => {
     try {
-      await withMemoFirestoreTimeout(__fb().collection('calendars').doc('cal_' + calendar.id).collection('memos').doc(memo.id).update({ isPinned: !memo.isPinned }));
+      const updated = await writeMemoDocument('memos', calendar.id, memo.id, { isPinned: !memo.isPinned }, 'update', '메모 고정 변경');
+      if (!updated?.success) throw new Error('Memo pin update failed');
     } catch (err) {
       console.error('Failed to toggle memo pin:', err);
       showToast('고정 상태 변경 실패', 'error');
@@ -1217,7 +1226,8 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
 
   const handleMemoCommentsChange = async (memo, nextComments) => {
     try {
-      await withMemoFirestoreTimeout(__fb().collection('calendars').doc('cal_' + calendar.id).collection('memos').doc(memo.id).update({ comments: nextComments }));
+      const updated = await writeMemoDocument('memos', calendar.id, memo.id, { comments: nextComments }, 'update', '메모 댓글 저장');
+      if (!updated?.success) throw new Error('Memo comment update failed');
     } catch (err) {
       console.error('Failed to update memo comments:', err);
       showToast('댓글 저장 실패', 'error');
@@ -1288,9 +1298,8 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
       try {
         const calendarId = calendar.id;
         const tagsArray = nextTags.map(t => t.startsWith('#') ? t : '#' + t);
-        await withMemoFirestoreTimeout(__fb().collection('calendars').doc('cal_' + calendarId).collection('memos').doc(editingMemo.id).update({
-          tags: tagsArray
-        }));
+        const updated = await writeMemoDocument('memos', calendarId, editingMemo.id, { tags: tagsArray }, 'update', '태그 저장');
+        if (!updated?.success) throw new Error('Memo tag update failed');
       } catch (err) {
         console.error('Failed to update tags in Firestore:', err);
         showToast('태그 저장 실패', 'error');
@@ -2170,9 +2179,8 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
                   try {
                     const calendarId = calendar.id;
                     const tagsArray = nextTags.map(t => t.startsWith('#') ? t : '#' + t);
-                    await withMemoFirestoreTimeout(__fb().collection('calendars').doc('cal_' + calendarId).collection('memos').doc(editingMemo.id).update({
-                      tags: tagsArray
-                    }));
+                    const updated = await writeMemoDocument('memos', calendarId, editingMemo.id, { tags: tagsArray }, 'update', '태그 삭제');
+                    if (!updated?.success) throw new Error('Memo tag delete failed');
                   } catch (err) {
                     console.error('Failed to delete tag in Firestore:', err);
                     showToast('태그 삭제 실패', 'error');

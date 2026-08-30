@@ -10443,6 +10443,7 @@ function bindGatherUiDeps() {
     useTapRevealedMsgId: typeof useTapRevealedMsgId === 'function' ? useTapRevealedMsgId : null,
     useChatSendGuard: typeof useChatSendGuard === 'function' ? useChatSendGuard : null,
     useModalDirtyGuard: typeof useModalDirtyGuard === 'function' ? useModalDirtyGuard : null,
+    writeCollectionDocumentWithFallback: typeof writeCollectionDocumentWithFallback === 'function' ? writeCollectionDocumentWithFallback : null,
     appendChatImageFiles: typeof appendChatImageFiles === 'function' ? appendChatImageFiles : null,
     confetti: typeof confetti === 'function' ? confetti : (typeof window !== 'undefined' ? window.confetti : null),
     CONFETTI_Z_INDEX: typeof CONFETTI_Z_INDEX !== 'undefined' ? CONFETTI_Z_INDEX : 9999,
