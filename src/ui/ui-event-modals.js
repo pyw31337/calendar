@@ -2546,13 +2546,9 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
 
   const handleOpenSettlementEditor = (card) => {
     setOpenMenuCardId(null);
-    // The page owner already renders the editor alongside this summary. Use that
-    // callback first so the card action and the modal always share one React tree;
-    // the local state remains a fallback for standalone consumers of this component.
-    if (typeof onOpenSettlementEditor === 'function') {
-      onOpenSettlementEditor(card, CreateSettlementModalComp);
-      return;
-    }
+    // Keep the editor in this summary's render tree. The settlement page has an
+    // early return path, so routing this action through the page owner can lose
+    // the modal even though the click handler itself ran.
     setIsCreateSettlementOpen(true);
     setEditingSettlementCard({ ...card });
   };
