@@ -2551,24 +2551,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
       if (settlementEditorRootRef.current?.root === root) settlementEditorRootRef.current = null;
     };
     settlementEditorRootRef.current = { root, host };
-    class SettlementEditorErrorBoundary extends React.Component {
-      constructor(props) {
-        super(props);
-        this.state = { error: null };
-      }
-      static getDerivedStateFromError(error) {
-        return { error };
-      }
-      componentDidCatch(error) {
-        host.setAttribute('data-settlement-editor-error', String(error?.message || error));
-      }
-      render() {
-        return this.state.error
-          ? React.createElement('div', { className: 'modal-overlay' }, React.createElement('div', { className: 'modal-container' }, '정산 수정 화면을 불러오지 못했습니다.'))
-          : this.props.children;
-      }
-    }
-    root.render(React.createElement(SettlementEditorErrorBoundary, null, React.createElement(CreateSettlementModal, {
+    const editorProps = {
       calendar: calendar,
       initialData: { ...card },
       onClose: closeEditor,
@@ -2591,7 +2574,16 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
         closeEditor();
       },
       showToast: showToast
-    })));
+    };
+    const recordEditorError = (error) => {
+      host.setAttribute('data-settlement-editor-error', String(error?.message || error));
+    };
+    window.addEventListener('error', event => recordEditorError(event.error || event.message), { once: true });
+    try {
+      root.render(React.createElement(CreateSettlementModal, editorProps));
+    } catch (error) {
+      recordEditorError(error);
+    }
   };
 
   const { isHeaderVisible, onScroll: handleSettlementScroll } = useScrollHideHeader();
