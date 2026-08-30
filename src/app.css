@@ -2884,6 +2884,9 @@ select.form-select {
   font-weight: 900;
   white-space: nowrap;
 }
+.settlement-person-amount.is-refund {
+  color: #16A34A;
+}
 .settlement-person-settlement-badge {
   display: inline-flex;
   align-items: center;
