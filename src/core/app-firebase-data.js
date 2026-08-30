@@ -1230,7 +1230,7 @@ async function fetchSingleCalendarWithRest(calId, timeoutMs = FIREBASE_LOAD_TIME
 async function fetchRecentMessagesRest(calId) {
   try {
     const url = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/calendars/cal_${calId}/messages?orderBy=timestamp%20desc&pageSize=5`;
-    const res = await fetch(url);
+    const res = await fetchFirestoreRequest(url);
     if (!res.ok) return [];
     const data = await res.json();
     const docs = data.documents || [];
@@ -1364,7 +1364,7 @@ async function fetchMemosRest(calId, recentLimit = null) {
   try {
     const pageSizePart = recentLimit ? `&pageSize=${recentLimit}` : '';
     const url = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/calendars/cal_${calId}/memos?orderBy=createdAt%20desc${pageSizePart}`;
-    const res = await fetch(url);
+    const res = await fetchFirestoreRequest(url);
     if (!res.ok) return [];
     const data = await res.json();
     const docs = data.documents || [];
@@ -1381,7 +1381,7 @@ async function fetchMemosRest(calId, recentLimit = null) {
 async function fetchAnniversariesRest(calId) {
   try {
     const url = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/calendars/cal_${calId}/anniversaries`;
-    const res = await fetch(url);
+    const res = await fetchFirestoreRequest(url);
     if (!res.ok) return [];
     const data = await res.json();
     const docs = data.documents || [];
@@ -1570,7 +1570,7 @@ function shouldQueueCollectionWrite(...errors) {
 async function deleteMessageRest(calId, messageId) {
   try {
     const url = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/calendars/cal_${calId}/messages/${messageId}`;
-    const res = await fetch(url, { method: 'DELETE' });
+    const res = await fetchFirestoreRequest(url, { method: 'DELETE' });
     return res.ok;
   } catch (err) {
     console.warn('deleteMessageRest error:', err);
@@ -1582,7 +1582,7 @@ async function fetchMessageRest(calId, messageId) {
   try {
     if (!calId || !messageId) return null;
     const url = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/calendars/cal_${calId}/messages/${messageId}`;
-    const res = await fetch(url);
+    const res = await fetchFirestoreRequest(url);
     if (!res.ok) return null;
     const doc = await res.json();
     return { ...firestoreDocumentToJs(doc), id: messageId };
@@ -1612,7 +1612,7 @@ async function updateMessageRest(calId, messageId, data, deletePaths = []) {
     if (Object.keys(fields).length === 0) return false;
     const updateMask = Array.from(new Set([...Object.keys(fields), ...cleanDeletePaths])).map(k => `updateMask.fieldPaths=${encodeURIComponent(k)}`).join('&');
     const url = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/calendars/cal_${calId}/messages/${messageId}?${updateMask}`;
-    const res = await fetch(url, {
+    const res = await fetchFirestoreRequest(url, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ fields })
@@ -1822,10 +1822,10 @@ async function fetchImageShareDocument(shareId) {
     if (!share || share.imageUrl || share.source !== 'message' || !share.calendarId || !share.messageId) return share;
     let msg;
     if (firebaseDb) {
-      const snap = await firebaseDb.collection('calendars').doc(`cal_${share.calendarId}`).collection('messages').doc(share.messageId).get();
+      const snap = await withTimeout(firebaseDb.collection('calendars').doc(`cal_${share.calendarId}`).collection('messages').doc(share.messageId).get(), FIRESTORE_REQUEST_TIMEOUT_MS, 'image share message read timeout');
       msg = snap.exists ? snap.data() : null;
     } else {
-      const res = await fetch(`https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/calendars/cal_${share.calendarId}/messages/${share.messageId}`);
+      const res = await fetchFirestoreRequest(`https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/calendars/cal_${share.calendarId}/messages/${share.messageId}`);
       msg = res.ok ? firestoreDocumentToJs(await res.json()) : null;
     }
     if (!msg) return share;
@@ -1840,10 +1840,10 @@ async function fetchImageShareDocument(shareId) {
     };
   };
   if (firebaseDb) {
-    const snap = await firebaseDb.collection('imageShares').doc(shareId).get();
+    const snap = await withTimeout(firebaseDb.collection('imageShares').doc(shareId).get(), FIRESTORE_REQUEST_TIMEOUT_MS, 'image share read timeout');
     return snap.exists ? resolveMessageShare(snap.data()) : null;
   }
-  const res = await fetch(`https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/imageShares/${shareId}`);
+  const res = await fetchFirestoreRequest(`https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/imageShares/${shareId}`);
   if (!res.ok) return null;
   return resolveMessageShare(firestoreDocumentToJs(await res.json()));
 }
@@ -1962,7 +1962,7 @@ async function fetchActivityLogsFromFirestore(calendarId, recentLimit = null) {
     if (firebaseDb) {
       let query = firebaseDb.collection('calendars').doc(`cal_${calendarId}`).collection('activityLogs');
       if (recentLimit) query = query.orderBy('timestamp', 'desc').limit(recentLimit);
-      const snap = await query.get();
+      const snap = await withTimeout(query.get(), FIRESTORE_REQUEST_TIMEOUT_MS, 'activity logs read timeout');
       return snap.docs.map(doc => doc.data());
     }
   } catch (e) {
@@ -1970,7 +1970,7 @@ async function fetchActivityLogsFromFirestore(calendarId, recentLimit = null) {
   }
   try {
     const orderPart = recentLimit ? '?orderBy=timestamp%20desc&pageSize=' + recentLimit : '?pageSize=1000';
-    const res = await fetch(`https://firestore.googleapis.com/v1/projects/metro-live-2918e/databases/(default)/documents/${basePath}${orderPart}`);
+    const res = await fetchFirestoreRequest(`https://firestore.googleapis.com/v1/projects/metro-live-2918e/databases/(default)/documents/${basePath}${orderPart}`);
     if (!res.ok) return [];
     const data = await res.json();
     const docs = data.documents || [];
@@ -2051,14 +2051,14 @@ async function fetchPlacesFromFirestore(calendarId) {
   const basePath = `calendars/cal_${calendarId}/places`;
   try {
     if (firebaseDb) {
-      const snap = await firebaseDb.collection('calendars').doc(`cal_${calendarId}`).collection('places').get({ source: 'server' });
+      const snap = await withTimeout(firebaseDb.collection('calendars').doc(`cal_${calendarId}`).collection('places').get({ source: 'server' }), FIRESTORE_REQUEST_TIMEOUT_MS, 'places read timeout');
       return snap.docs.map(doc => doc.data());
     }
   } catch (e) {
     console.warn(`Failed to fetch places for ${calendarId} via SDK, trying REST:`, e);
   }
   try {
-    const res = await fetch(`https://firestore.googleapis.com/v1/projects/metro-live-2918e/databases/(default)/documents/${basePath}?pageSize=500`);
+    const res = await fetchFirestoreRequest(`https://firestore.googleapis.com/v1/projects/metro-live-2918e/databases/(default)/documents/${basePath}?pageSize=500`);
     if (!res.ok) return [];
     const data = await res.json();
     const docs = data.documents || [];
@@ -2265,14 +2265,14 @@ async function fetchConfirmedMeetingsFromFirestore(calendarId) {
   const basePath = `calendars/cal_${calendarId}/confirmedMeetings`;
   try {
     if (firebaseDb) {
-      const snap = await firebaseDb.collection('calendars').doc(`cal_${calendarId}`).collection('confirmedMeetings').get({ source: 'server' });
+      const snap = await withTimeout(firebaseDb.collection('calendars').doc(`cal_${calendarId}`).collection('confirmedMeetings').get({ source: 'server' }), FIRESTORE_REQUEST_TIMEOUT_MS, 'confirmed meetings read timeout');
       return snap.docs.map(doc => doc.data());
     }
   } catch (e) {
     console.warn(`Failed to fetch confirmed meetings for ${calendarId} via SDK, trying REST:`, e);
   }
   try {
-    const res = await fetch(`https://firestore.googleapis.com/v1/projects/metro-live-2918e/databases/(default)/documents/${basePath}?pageSize=500`);
+    const res = await fetchFirestoreRequest(`https://firestore.googleapis.com/v1/projects/metro-live-2918e/databases/(default)/documents/${basePath}?pageSize=500`);
     if (!res.ok) return [];
     const data = await res.json();
     const docs = data.documents || [];
@@ -2899,7 +2899,7 @@ async function fetchCalendarCollectionDocs(calendarId, collectionName) {
   const results = [];
   if (firebaseDb) {
     try {
-      const snap = await firebaseDb.collection('calendars').doc(`cal_${cleanCalId}`).collection(cleanCollection).get({ source: 'server' });
+      const snap = await withTimeout(firebaseDb.collection('calendars').doc(`cal_${cleanCalId}`).collection(cleanCollection).get({ source: 'server' }), FIRESTORE_REQUEST_TIMEOUT_MS, `${cleanCollection} read timeout`);
       snap.forEach(doc => {
         results.push({ docId: doc.id, data: cloneJsonSafe(doc.data() || {}) });
       });
@@ -2912,7 +2912,7 @@ async function fetchCalendarCollectionDocs(calendarId, collectionName) {
       let pageToken = '';
       do {
         const query = pageToken ? `?pageSize=300&pageToken=${encodeURIComponent(pageToken)}` : '?pageSize=300';
-        const res = await fetch(`https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/${getCalendarBackupCollectionBasePath(cleanCalId, cleanCollection)}${query}`);
+        const res = await fetchFirestoreRequest(`https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/${getCalendarBackupCollectionBasePath(cleanCalId, cleanCollection)}${query}`);
         if (!res.ok) break;
         const data = await res.json();
         const docs = data.documents || [];
@@ -3073,7 +3073,7 @@ async function applyCalendarCollectionDocs(calendarId, collectionName, docs) {
           }
         };
       });
-      const res = await fetch(`https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents:commit`, {
+      const res = await fetchFirestoreRequest(`https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents:commit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ writes })
