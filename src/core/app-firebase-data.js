@@ -1754,13 +1754,13 @@ async function writeRootCollectionDocumentWithFallback(collectionName, docId, da
   if (!cleanCollection || !cleanDocId) return false;
   try {
     if (firebaseDb) {
-      await withTimeout(firebaseDb.collection(cleanCollection).doc(cleanDocId).set(data, options?.merge ? { merge: true } : undefined), FIRESTORE_REQUEST_TIMEOUT_MS, `${warnLabel} timeout`);
+      await withTimeout(firebaseDb.collection(cleanCollection).doc(cleanDocId).set(data, options?.merge ? { merge: true } : undefined), FIRESTORE_WRITE_DEADLINE_MS, `${warnLabel} timeout`);
       return { success: true, id: cleanDocId, transport: 'sdk' };
     }
     const res = await fetchFirestoreRequest(`https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/${cleanCollection}/${cleanDocId}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ fields: Object.fromEntries(Object.entries(data || {}).map(([key, value]) => [key, jsToFirestoreValue(value)])) })
-    });
+    }, FIRESTORE_WRITE_DEADLINE_MS);
     if (res.ok) return { success: true, id: cleanDocId, transport: 'rest' };
     return false;
   } catch (error) {

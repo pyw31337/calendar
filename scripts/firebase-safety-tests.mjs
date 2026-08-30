@@ -38,6 +38,7 @@ assert(/replayQueuedMemoSave/.test(sourceScript) && /imageUrls/.test(mediaOutbox
 assert(/writeSharedCollection/.test(eventModalScript) && /기념일 저장/.test(eventModalScript), 'anniversary writes must use the bounded collection write path');
 assert(/writeRootCollectionDocumentWithFallback/.test(firebaseDataScript) && /root-collection-write/.test(firebaseDataScript), 'root image-share writes must have a bounded offline replay path');
 assert(/merge: Boolean\(options\?\.merge\)/.test(firebaseDataScript) && /Boolean\(payload\.merge\)/.test(mediaOutboxScript), 'queued root writes must preserve merge semantics during replay');
+assert(/writeRootCollectionDocumentWithFallback[\s\S]{0,900}FIRESTORE_WRITE_DEADLINE_MS/.test(firebaseDataScript), 'root collection writes must use the bounded write deadline');
 assert(/withWeatherTimeout/.test(weatherScript) && /WEATHER_FIRESTORE_TIMEOUT_MS/.test(weatherScript), 'weather cache reads and writes must be bounded');
 assert(/writeSharedCollection/.test(sideMenuScript) && /기기 구독 삭제/.test(sideMenuScript), 'device subscription deletes must use the bounded collection write path');
 assert(/writeSharedCollection/.test(domainHelpersScript) && /기기 구독 등록/.test(domainHelpersScript) && /기기 구독 해제/.test(domainHelpersScript), 'push subscription registration and removal must use the bounded collection write path');
