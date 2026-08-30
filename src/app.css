@@ -2869,12 +2869,12 @@ select.form-select {
 .settlement-person-settlement-badge {
   display: inline-flex;
   align-items: center;
-  padding: 3px 7px;
+  padding: 4px 8px;
   border-radius: 999px;
   background: rgba(220, 38, 38, 0.12);
   color: #DC2626;
-  font-size: 0.66rem;
-  font-weight: 900;
+  font-size: 0.8rem;
+  font-weight: 600;
   line-height: 1;
   white-space: nowrap;
 }
@@ -2930,6 +2930,7 @@ select.form-select {
   color: #DC2626;
   font-weight: 800;
   white-space: nowrap;
+  transform: translateY(-6px);
 }
 .settlement-expense-option-amount.is-income {
   color: #16A34A;

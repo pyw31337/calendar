@@ -2064,7 +2064,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
               const amount = getIndividualSettlementAmount(row.participantId);
               return amount < 0 ? '환급금' : amount > 0 ? '분담금' : '정산 없음';
             })()),
-            getIndividualSettlementAmount(row.participantId) !== 0 && React.createElement('span', { style: { fontSize: '0.78rem', color: 'var(--text-main)', whiteSpace: 'nowrap', marginRight: '2px', fontWeight: 800 } }, `${Math.abs(getIndividualSettlementAmount(row.participantId)).toLocaleString()}원`),
+            getIndividualSettlementAmount(row.participantId) !== 0 && React.createElement('span', { style: { fontSize: '0.78rem', color: 'var(--text-main)', whiteSpace: 'nowrap', marginRight: '2px', fontWeight: 800 } }, `${getIndividualSettlementAmount(row.participantId) < 0 ? '-' : ''}${Math.abs(getIndividualSettlementAmount(row.participantId)).toLocaleString()}원`),
             React.createElement('button', {
               type: 'button', title: '참여자 메모 편집', 'aria-label': '참여자 메모 편집', onClick: () => handleEditParticipantRow(row),
               style: { width: '24px', height: '24px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px', color: '#64748B', backgroundColor: 'transparent', border: '1px solid #CBD5E1', flexShrink: 0 }
@@ -2170,7 +2170,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
           ),
           React.createElement('div', {
             style: {
-              height: `${expenseListHeight}px`, minHeight: '96px', maxHeight: '480px', overflowY: 'auto', border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '6px', display: 'flex', flexDirection: 'column', gap: '4px', backgroundColor: 'var(--bg-card)', transition: expenseResizeRef.current ? 'none' : 'height 120ms ease'
+              height: `${expenseListHeight}px`, minHeight: '96px', maxHeight: '480px', overflowY: 'auto', border: '1px solid var(--border-subtle)', borderRadius: '8px 8px 0 0', padding: '6px', display: 'flex', flexDirection: 'column', gap: '4px', backgroundColor: 'var(--bg-card)', transition: expenseResizeRef.current ? 'none' : 'height 120ms ease'
             }
           },
             monthlyExpenses.length === 0 ? React.createElement('div', { style: { padding: '16px', textAlign: 'center', fontSize: '0.78rem', color: 'var(--text-muted)' } }, '해당 월에 등록된 내역이 없습니다.')
@@ -2199,7 +2199,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
           ),
           React.createElement('div', {
             className: 'settlement-expense-resize-row',
-            style: { display: 'flex', justifyContent: 'flex-end', height: '20px', marginTop: '-2px' }
+            style: { display: 'flex', justifyContent: 'center', height: '20px', marginTop: '-8px', backgroundColor: 'rgba(0, 0, 0, 0.04)', borderRadius: '0 0 6px 6px', marginBottom: '8px' }
           },
             React.createElement('button', {
               type: 'button',
@@ -2269,7 +2269,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
               style: { width: '100%', height: '44px', borderRadius: '8px', fontSize: '0.82rem' }
             }, personalParticipantPickerOptions.map(option => React.createElement('option', { key: option.value, value: option.value }, option.label))),
           ),
-          React.createElement('div', { style: { width: '100%' } },
+          React.createElement('div', { style: { width: '100%', marginTop: '-6px', marginBottom: '-6px' } },
             React.createElement('input', {
               type: 'text', className: 'form-input', value: peDescriptionInput,
               onChange: e => setPeDescriptionInput(e.target.value), placeholder: '지출 명목 (예: 개인 음료, 교통비)',
@@ -2964,7 +2964,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
                     borderRadius: '10px', backgroundColor: '#666', mixBlendMode: 'hard-light', color: 'var(--settlement-hero-text)'
                   }
                 }, card.accountNumber),
-                card.depositorName && React.createElement("span", null, card.depositorName)
+                card.depositorName && React.createElement("span", { style: { fontWeight: 500 } }, card.depositorName)
               ),
 
               /* Cog Settings Button */
@@ -3054,7 +3054,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
                 ),
                 React.createElement("strong", { className: "settlement-person-amount", title: row.amount < 0 ? '공금에서 받을 환급금' : row.amount > 0 ? '공금에 납부할 분담금' : '정산할 금액 없음' },
                   React.createElement('span', { className: `settlement-person-settlement-badge${row.amount < 0 ? ' is-refund' : ''}` }, row.amount < 0 ? '환급금' : row.amount > 0 ? '분담금' : '정산 없음'),
-                  row.amount !== 0 && React.createElement('span', null, `${Math.abs(row.amount).toLocaleString()}원`)
+                  row.amount !== 0 && React.createElement('span', null, `${row.amount < 0 ? '-' : ''}${Math.abs(row.amount).toLocaleString()}원`)
                 )
               )))
 
