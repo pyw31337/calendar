@@ -2502,7 +2502,6 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
   const [isSettlementListOpen, setIsSettlementListOpen] = React.useState(false);
   const [isCreateSettlementOpen, setIsCreateSettlementOpen] = React.useState(false);
   const [editingSettlementCard, setEditingSettlementCard] = React.useState(null);
-  const settlementEditorRootRef = React.useRef(null);
   const sanitizeText = __deps.sanitizeText;
   const extractFirstUrl = __deps.extractFirstUrl;
   const formatChatHeaderTitle = __deps.formatChatHeaderTitle;
@@ -2529,73 +2528,11 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
 
   const handleOpenSettlementEditor = (card) => {
     setOpenMenuCardId(null);
-    if (typeof onOpenSettlementEditor === 'function') {
-      // Pass the loaded editor component with the card. The app shell may still be
-      // assembling its lazy UI registry when this callback runs; relying on that
-      // registry alone can update state successfully but render a null wrapper.
-      onOpenSettlementEditor({ ...card }, CreateSettlementModal);
-      return;
-    }
-    if (typeof document === 'undefined' || typeof ReactDOM === 'undefined' || typeof ReactDOM.createRoot !== 'function') {
-      setIsCreateSettlementOpen(true);
-      setEditingSettlementCard({ ...card });
-      return;
-    }
-    const existingRoot = settlementEditorRootRef.current;
-    if (existingRoot) {
-      existingRoot.root.unmount();
-      existingRoot.host.remove();
-      settlementEditorRootRef.current = null;
-    }
-    const host = document.createElement('div');
-    host.setAttribute('data-settlement-editor-root', 'true');
-    document.body.appendChild(host);
-    const root = typeof ReactDOM.render === 'function'
-      ? {
-        render: element => ReactDOM.render(element, host),
-        unmount: () => ReactDOM.unmountComponentAtNode(host)
-      }
-      : ReactDOM.createRoot(host);
-    const closeEditor = () => {
-      root.unmount();
-      host.remove();
-      if (settlementEditorRootRef.current?.root === root) settlementEditorRootRef.current = null;
-    };
-    settlementEditorRootRef.current = { root, host };
-    const editorProps = {
-      calendar: calendar,
-      initialData: { ...card },
-      onClose: closeEditor,
-      onDeleteCard: (cardId) => {
-        if (typeof onDeleteSettlementCard === 'function') onDeleteSettlementCard(cardId);
-        closeEditor();
-      },
-      onToggleStatus: (cardId) => {
-        if (typeof onToggleSettlementCardStatus === 'function') onToggleSettlementCardStatus(cardId);
-        closeEditor();
-      },
-      onSave: (updatedCard) => {
-        if (typeof onSaveSettlementCard === 'function') onSaveSettlementCard(updatedCard);
-        else if (calendar) {
-          if (!Array.isArray(calendar.settlementCards)) calendar.settlementCards = [];
-          const idx = calendar.settlementCards.findIndex(item => item.id === updatedCard.id);
-          if (idx >= 0) calendar.settlementCards[idx] = updatedCard;
-          else calendar.settlementCards.unshift(updatedCard);
-        }
-        closeEditor();
-      },
-      showToast: showToast
-    };
-    const recordEditorError = (error) => {
-      host.setAttribute('data-settlement-editor-error', String(error?.message || error));
-    };
-    window.addEventListener('error', event => recordEditorError(event.error || event.message), { once: true });
-    try {
-      const EditorComponent = __comp.CreateSettlementModal || CreateSettlementModal;
-      root.render(React.createElement(EditorComponent, editorProps));
-    } catch (error) {
-      recordEditorError(error);
-    }
+    // Keep the editor in this component's React tree. The old parent callback and
+    // independent-root fallback could update state in one tree while the modal was
+    // rendered (or not rendered) by another lazy UI registry.
+    setIsCreateSettlementOpen(true);
+    setEditingSettlementCard({ ...card });
   };
 
   const { isHeaderVisible, onScroll: handleSettlementScroll } = useScrollHideHeader();
