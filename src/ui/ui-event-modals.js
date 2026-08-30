@@ -2530,7 +2530,10 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
   const handleOpenSettlementEditor = (card) => {
     setOpenMenuCardId(null);
     if (typeof onOpenSettlementEditor === 'function') {
-      onOpenSettlementEditor({ ...card });
+      // Pass the loaded editor component with the card. The app shell may still be
+      // assembling its lazy UI registry when this callback runs; relying on that
+      // registry alone can update state successfully but render a null wrapper.
+      onOpenSettlementEditor({ ...card }, CreateSettlementModal);
       return;
     }
     if (typeof document === 'undefined' || typeof ReactDOM === 'undefined' || typeof ReactDOM.createRoot !== 'function') {
@@ -2902,7 +2905,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
     style: { fontSize: '0.86rem', color: 'var(--text-main)', fontWeight: 500, overflowWrap: 'anywhere' }
   }, item.label), /*#__PURE__*/React.createElement("span", {
     className: "settlement-running-balance"
-  }, `잔액 ${Number(settlementBalanceByKey.get(item.ledgerKey) || 0).toLocaleString()}원`), item.url && /*#__PURE__*/React.createElement("button", {
+  }, `잔액\u00a0\u00a0\u00a0${Number(settlementBalanceByKey.get(item.ledgerKey) || 0).toLocaleString()}원`), item.url && /*#__PURE__*/React.createElement("button", {
     type: "button",
     title: item.url,
     style: {

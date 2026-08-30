@@ -5962,15 +5962,18 @@ function CalendarApp() {
       onClose: () => setIsCreateSettlementOpen(false),
       onSave: handleSaveSettlementCard
     }),
-    editingSettlementCard && activeCal && /*#__PURE__*/React.createElement(CreateSettlementModal, {
+    editingSettlementCard && activeCal && /*#__PURE__*/React.createElement(
+      editingSettlementCard.Component || CreateSettlementModal,
+      {
       calendar: activeCal,
-      initialData: editingSettlementCard,
+      initialData: editingSettlementCard.card,
       showToast: showToast,
       onClose: () => setEditingSettlementCard(null),
       onDeleteCard: cardId => { handleDeleteSettlementCard(cardId); setEditingSettlementCard(null); },
       onToggleStatus: cardId => { handleToggleSettlementCardStatus(cardId); setEditingSettlementCard(null); },
       onSave: updatedCard => { handleSaveSettlementCard(updatedCard); setEditingSettlementCard(null); }
-    }),
+      }
+    ),
     isAppSettingsOpen && /*#__PURE__*/React.createElement(AppSettingsModal, {
       onClose: () => setIsAppSettingsOpen(false),
       isDarkTheme: isDarkTheme,
@@ -6110,7 +6113,7 @@ function CalendarApp() {
           if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 공유 정보를 확인해 주세요.')) setIsShareOpen(true);
         },
         onOpenAppSettings: () => setIsAppSettingsOpen(true),
-        onOpenSettlementEditor: card => setEditingSettlementCard(card),
+        onOpenSettlementEditor: (card, Component) => setEditingSettlementCard({ card, Component }),
         onToggleSettlementCardStatus: handleToggleSettlementCardStatus,
         onDeleteSettlementCard: handleDeleteSettlementCard,
         onSaveSettlementCard: handleSaveSettlementCard,
