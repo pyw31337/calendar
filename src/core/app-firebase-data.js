@@ -61,6 +61,8 @@ import { enqueueWriteOperation } from './app-write-queue.js';
 const GATHER_APP_CONSTANTS = window.GATHER_APP_CONSTANTS || {};
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
 const FIRESTORE_REQUEST_TIMEOUT_MS = 12000;
+const FIRESTORE_WRITE_DEADLINE_MS = 7000;
+const FIRESTORE_WRITE_ATTEMPT_TIMEOUT_MS = 4000;
 
 // Bound every REST request. A half-open mobile connection can otherwise leave fetch pending
 // forever, which keeps the save overlay and disabled controls visible indefinitely.
@@ -1428,7 +1430,7 @@ async function sendChatMessageRest(calId, message) {
   }
 }
 
-async function writeCollectionDocumentRest(collectionName, calId, docId, data, method = 'update', deletePaths = []) {
+async function writeCollectionDocumentRest(collectionName, calId, docId, data, method = 'update', deletePaths = [], timeoutMs = FIRESTORE_REQUEST_TIMEOUT_MS) {
   try {
     const cleanCollection = sanitizeText(collectionName || '', 80);
     const cleanCalId = sanitizeText(calId || '', 64);
@@ -1440,7 +1442,7 @@ async function writeCollectionDocumentRest(collectionName, calId, docId, data, m
     const baseUrl = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/calendars/cal_${cleanCalId}/${cleanCollection}`;
     if (method === 'delete') {
       if (!cleanDocId) return false;
-      const delRes = await fetchFirestoreRequest(`${baseUrl}/${cleanDocId}`, { method: 'DELETE' });
+      const delRes = await fetchFirestoreRequest(`${baseUrl}/${cleanDocId}`, { method: 'DELETE' }, timeoutMs);
       return delRes.ok ? { success: true, id: cleanDocId, transport: 'rest' } : false;
     }
 
@@ -1456,7 +1458,7 @@ async function writeCollectionDocumentRest(collectionName, calId, docId, data, m
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fields })
-      });
+      }, timeoutMs);
       if (!addRes.ok) return false;
       const addData = await addRes.json().catch(() => null);
       const id = typeof addData?.name === 'string' ? addData.name.split('/').pop() : '';
@@ -1471,7 +1473,7 @@ async function writeCollectionDocumentRest(collectionName, calId, docId, data, m
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ fields })
-    });
+    }, timeoutMs);
     return patchRes.ok ? { success: true, id: cleanDocId, transport: 'rest' } : false;
   } catch (err) {
     console.warn('writeCollectionDocumentRest error:', err);
@@ -1482,6 +1484,9 @@ async function writeCollectionDocumentRest(collectionName, calId, docId, data, m
 async function writeCollectionDocumentWithFallback(collectionName, calId, docId, data, method = 'update', warnLabel = 'write', options = {}) {
   const cleanCollection = sanitizeText(collectionName || '', 80);
   const cleanData = method === 'delete' ? null : sanitizeMessageForFirestore(data);
+  const writeStartedAt = Date.now();
+  const remainingWriteTime = () => Math.max(250, FIRESTORE_WRITE_DEADLINE_MS - (Date.now() - writeStartedAt));
+  const attemptTimeout = () => Math.min(FIRESTORE_WRITE_ATTEMPT_TIMEOUT_MS, remainingWriteTime());
   let sdkError = null;
   const cleanDeletePaths = Array.isArray(options?.deletePaths)
     ? [...new Set(options.deletePaths.map(path => sanitizeText(path || '', 120)).filter(Boolean))]
@@ -1494,18 +1499,18 @@ async function writeCollectionDocumentWithFallback(collectionName, calId, docId,
         // Falling back from a timed-out SDK add() to REST add() otherwise creates two records
         // when the original request eventually succeeds on a slow mobile connection.
         if (options?.documentId) {
-          await withTimeout(colRef.doc(options.documentId).set(cleanData), FIRESTORE_REQUEST_TIMEOUT_MS, `${warnLabel} timeout`);
+          await withTimeout(colRef.doc(options.documentId).set(cleanData), attemptTimeout(), `${warnLabel} timeout`);
           return { success: true, id: options.documentId, transport: 'sdk' };
         }
-        const ref = await withTimeout(colRef.add(cleanData), FIRESTORE_REQUEST_TIMEOUT_MS, `${warnLabel} timeout`);
+        const ref = await withTimeout(colRef.add(cleanData), attemptTimeout(), `${warnLabel} timeout`);
         return { success: true, id: ref.id, transport: 'sdk' };
       }
       if (method === 'delete') {
-        await withTimeout(colRef.doc(docId).delete(), FIRESTORE_REQUEST_TIMEOUT_MS, `${warnLabel} timeout`);
+        await withTimeout(colRef.doc(docId).delete(), attemptTimeout(), `${warnLabel} timeout`);
         return { success: true, id: docId, transport: 'sdk' };
       }
       if (method === 'set') {
-        await withTimeout(colRef.doc(docId).set(cleanData), FIRESTORE_REQUEST_TIMEOUT_MS, `${warnLabel} timeout`);
+        await withTimeout(colRef.doc(docId).set(cleanData), attemptTimeout(), `${warnLabel} timeout`);
         return { success: true, id: docId, transport: 'sdk' };
       }
       let updateData = cleanData;
@@ -1524,7 +1529,7 @@ async function writeCollectionDocumentWithFallback(collectionName, calId, docId,
           updateData[path] = fieldDelete;
         });
       }
-      await withTimeout(colRef.doc(docId).update(updateData), FIRESTORE_REQUEST_TIMEOUT_MS, `${warnLabel} timeout`);
+      await withTimeout(colRef.doc(docId).update(updateData), attemptTimeout(), `${warnLabel} timeout`);
       return { success: true, id: docId, transport: 'sdk' };
     } catch (err) {
       sdkError = err;
@@ -1533,7 +1538,7 @@ async function writeCollectionDocumentWithFallback(collectionName, calId, docId,
   }
   const restMethod = method === 'add' && options?.documentId ? 'set' : method;
   const restDocId = method === 'add' && options?.documentId ? options.documentId : docId;
-  const restResult = await writeCollectionDocumentRest(cleanCollection, calId, restDocId, data, restMethod, cleanDeletePaths);
+  const restResult = await writeCollectionDocumentRest(cleanCollection, calId, restDocId, data, restMethod, cleanDeletePaths, remainingWriteTime());
   if (restResult?.success || options?.skipQueue || !shouldQueueCollectionWrite(restResult?.error || null, sdkError)) {
     return restResult?.success ? restResult : false;
   }
