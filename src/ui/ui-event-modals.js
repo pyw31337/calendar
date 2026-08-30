@@ -2585,7 +2585,8 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
     };
     window.addEventListener('error', event => recordEditorError(event.error || event.message), { once: true });
     try {
-      root.render(React.createElement(CreateSettlementModal, editorProps));
+      const EditorComponent = __comp.CreateSettlementModal || CreateSettlementModal;
+      root.render(React.createElement(EditorComponent, editorProps));
     } catch (error) {
       recordEditorError(error);
     }
