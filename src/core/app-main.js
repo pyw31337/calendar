@@ -7941,6 +7941,8 @@ function getUploadImageBlobMeta(blob, fallbackExt = 'jpg') {
 // if Storage isn't available/the upload fails -- callers should fall back to the base64 data
 // URLs already produced by compressImageToDataUrls in that case. `onBytes(taskKey, transferred,
 // total)` is called as each upload progresses so a caller can aggregate progress across a batch.
+const UPLOAD_STALL_TIMEOUT_MS = 20000;
+
 function uploadChatImageAssets(calendarId, compressed, index, onBytes, timeoutMs = 45000) {
   return new Promise((resolve) => {
     const storage = getLiveFirebaseStorage();
@@ -7967,17 +7969,33 @@ function uploadChatImageAssets(calendarId, compressed, index, onBytes, timeoutMs
     // fall back to inline base64 for that image instead.
     const runUploadOnce = (blob, ref, taskKey, contentType) => {
       let settled = false;
+      let task = null;
+      let stallTimeoutId = null;
       return new Promise((resolveOne) => {
-        const settle = value => { if (settled) return; settled = true; resolveOne(value); };
-      const timeoutId = setTimeout(() => {
-        try { task.cancel(); } catch (_) {}
-        settle(null);
-      }, timeoutMs);
-        const task = ref.put(blob, { contentType });
-        task.on('state_changed', snapshot => {
-          if (onBytes) onBytes(taskKey, snapshot.bytesTransferred, snapshot.totalBytes);
-        }, () => { clearTimeout(timeoutId); settle(null); }, async () => {
+        const timeoutId = setTimeout(() => {
+          try { task?.cancel(); } catch (_) {}
+          settle(null);
+        }, timeoutMs);
+        const resetStallTimeout = () => {
+          clearTimeout(stallTimeoutId);
+          stallTimeoutId = setTimeout(() => {
+            try { task?.cancel(); } catch (_) {}
+            settle(null);
+          }, UPLOAD_STALL_TIMEOUT_MS);
+        };
+        const settle = value => {
+          if (settled) return;
+          settled = true;
           clearTimeout(timeoutId);
+          clearTimeout(stallTimeoutId);
+          resolveOne(value);
+        };
+        task = ref.put(blob, { contentType });
+        resetStallTimeout();
+        task.on('state_changed', snapshot => {
+          resetStallTimeout();
+          if (onBytes) onBytes(taskKey, snapshot.bytesTransferred, snapshot.totalBytes);
+        }, () => { settle(null); }, async () => {
           try {
             settle(await task.snapshot.ref.getDownloadURL());
           } catch (e) {
@@ -9705,17 +9723,33 @@ function uploadMemoImageAssets(calendarId, compressed, index, onBytes, timeoutMs
 
     const runUploadOnce = (blob, ref, taskKey, contentType) => {
       let settled = false;
+      let task = null;
+      let stallTimeoutId = null;
       return new Promise((resolveOne) => {
-        const settle = value => { if (settled) return; settled = true; resolveOne(value); };
         const timeoutId = setTimeout(() => {
-          try { task.cancel(); } catch (_) {}
+          try { task?.cancel(); } catch (_) {}
           settle(null);
         }, timeoutMs);
-        const task = ref.put(blob, { contentType });
-        task.on('state_changed', snapshot => {
-          if (onBytes) onBytes(taskKey, snapshot.bytesTransferred, snapshot.totalBytes);
-        }, () => { clearTimeout(timeoutId); settle(null); }, async () => {
+        const resetStallTimeout = () => {
+          clearTimeout(stallTimeoutId);
+          stallTimeoutId = setTimeout(() => {
+            try { task?.cancel(); } catch (_) {}
+            settle(null);
+          }, UPLOAD_STALL_TIMEOUT_MS);
+        };
+        const settle = value => {
+          if (settled) return;
+          settled = true;
           clearTimeout(timeoutId);
+          clearTimeout(stallTimeoutId);
+          resolveOne(value);
+        };
+        task = ref.put(blob, { contentType });
+        resetStallTimeout();
+        task.on('state_changed', snapshot => {
+          resetStallTimeout();
+          if (onBytes) onBytes(taskKey, snapshot.bytesTransferred, snapshot.totalBytes);
+        }, () => { settle(null); }, async () => {
           try {
             settle(await task.snapshot.ref.getDownloadURL());
           } catch (e) {
