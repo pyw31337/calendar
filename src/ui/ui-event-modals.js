@@ -1587,6 +1587,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
   const [participantToAdd, setParticipantToAdd] = React.useState('');
   const [participantMemoInput, setParticipantMemoInput] = React.useState('');
   const [editingParticipantRowId, setEditingParticipantRowId] = React.useState(null);
+  const [isSavingSettlementCard, setIsSavingSettlementCard] = React.useState(false);
   const availableParticipantPickerOptions = React.useMemo(() => {
     const selected = new Set(participantRows
       .filter(row => row?.id !== editingParticipantRowId)
@@ -1960,12 +1961,35 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
     });
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (isSavingSettlementCard) return;
     if (!title.trim()) {
       if (showToast) showToast('정산 타이틀을 입력해주세요.', 'warning');
       return;
     }
-    const participantNames = Array.from(new Set(participantRows.map(r => r.participantId).filter(Boolean)));
+
+    // A participant memo is edited in a small row-level form. Previously the main
+    // "수정" button serialized participantRows without first applying that pending
+    // form state, so the old memo was saved unless the user happened to press the
+    // row-level "수정" button as an extra step. Treat the visible form as the latest
+    // value when the card itself is saved.
+    let participantRowsForSave = participantRows;
+    if (editingParticipantRowId) {
+      const pendingParticipantId = String(participantToAdd || '').trim();
+      if (!pendingParticipantId) {
+        if (showToast) showToast('참여자를 선택해주세요.', 'warning');
+        return;
+      }
+      if (participantRows.some(row => row.id !== editingParticipantRowId && row.participantId === pendingParticipantId)) {
+        if (showToast) showToast('이미 등록된 참여자입니다.', 'warning');
+        return;
+      }
+      participantRowsForSave = participantRows.map(row => row.id === editingParticipantRowId
+        ? { ...row, participantId: pendingParticipantId, memo: String(participantMemoInput || '').trim().slice(0, 500) }
+        : row);
+    }
+
+    const participantNames = Array.from(new Set(participantRowsForSave.map(r => r.participantId).filter(Boolean)));
     const newCard = {
       id: cardToEdit?.id || `set_${Date.now()}`,
       title: title.trim(),
@@ -1976,7 +2000,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
       participantCount: participantNames.length,
       // Individual amounts are derived at render time from total expense and personal
       // expenses; never persist a manually editable per-participant amount.
-      participantRows: participantRows.map(row => ({ id: row.id, participantId: row.participantId, memo: row.memo || '' })),
+      participantRows: participantRowsForSave.map(row => ({ id: row.id, participantId: row.participantId, memo: row.memo || '' })),
       personalExpenses: personalExpenses,
       amount: totalExpense,
       perPersonAmount: settlementPerPersonWithPersonal,
@@ -1987,9 +2011,18 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
       monthStr: monthStr,
       checkedItemKeys: Object.keys(checkedItems)
     };
-    if (typeof onSave === 'function') onSave(newCard);
-    if (showToast) showToast(isEditing ? `'${title}' 정산 정보가 수정되었습니다!` : `'${title}' 정산 카드가 생성되었습니다!`, 'success');
-    if (onClose) onClose();
+    setIsSavingSettlementCard(true);
+    try {
+      const saved = typeof onSave === 'function' ? await onSave(newCard) : false;
+      if (saved === false) throw new Error('Settlement card save rejected');
+      if (showToast) showToast(isEditing ? `'${title}' 정산 정보가 수정되었습니다!` : `'${title}' 정산 카드가 생성되었습니다!`, 'success');
+      if (onClose) onClose();
+    } catch (error) {
+      console.error('Failed to save settlement card:', error);
+      if (showToast) showToast('정산 카드 저장에 실패했습니다. 다시 시도해 주세요.', 'error');
+    } finally {
+      setIsSavingSettlementCard(false);
+    }
   };
 
   const cleanAccountDigits = (accountNumber || '').replace(/[^0-9]/g, '');
@@ -2435,11 +2468,13 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
           type: 'button',
           className: 'btn',
           onClick: handleSave,
+          disabled: isSavingSettlementCard,
           style: {
             borderRadius: '8px', fontWeight: 800, fontSize: '0.84rem',
-            backgroundColor: '#0F172A', color: '#FFFFFF', border: 'none', padding: '8px 20px', cursor: 'pointer'
+            backgroundColor: '#0F172A', color: '#FFFFFF', border: 'none', padding: '8px 20px',
+            cursor: isSavingSettlementCard ? 'wait' : 'pointer', opacity: isSavingSettlementCard ? 0.7 : 1
           }
-        }, isEditing ? '수정' : '생성')
+        }, isSavingSettlementCard ? '저장 중...' : (isEditing ? '수정' : '생성'))
       )
     )
   )),

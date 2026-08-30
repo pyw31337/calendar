@@ -79,6 +79,10 @@ function isIgnorableConsoleError(text, url = '') {
     knownExternalWarningCount += 1;
     return true;
   }
+  if (BROWSER_NAME === 'webkit' && url.includes('gstatic.com/youtube/') && text.includes('access control checks')) {
+    knownExternalWarningCount += 1;
+    return true;
+  }
   return ['compute-pressure', 'Permissions policy', 'status of 503', 'status of 502',
     'ERR_NAME_NOT_RESOLVED', 'ERR_CONNECTION_REFUSED', 'downloadable font: download failed',
     'has been rejected because it is in a cross-site context', 'inline-speculation-rules']
@@ -250,6 +254,32 @@ async function checkDeferredManual(browser, baseUrl) {
     await menu.waitFor({ state: 'visible', timeout: 8000 });
     await menu.locator('text=사용자 매뉴얼').first().click();
     await page.locator('.manual-panel:visible').waitFor({ state: 'visible', timeout: 10000 });
+    pass(label);
+  } catch (err) {
+    fail(label, err.message);
+  } finally {
+    await context.close();
+  }
+}
+
+async function checkMemoTagInput(browser, baseUrl) {
+  const label = '메모 작성 태그입력 모듈';
+  const context = await browser.newContext(mobileContextOptions());
+  const page = await context.newPage();
+  try {
+    await gotoBootReady(page, `${baseUrl}?id=kkot&view=memo`);
+    await page.getByText('새로운 메모를 남겨보세요...', { exact: true }).click();
+
+    const participantButton = page.getByRole('button', { name: '작성자 선택' });
+    const tagInput = page.getByPlaceholder('태그 입력 (0/10)', { exact: true });
+    await participantButton.waitFor({ state: 'visible', timeout: 5000 });
+    await tagInput.waitFor({ state: 'visible', timeout: 5000 });
+    await tagInput.fill('회귀검사');
+    await tagInput.locator('..').getByRole('button', { name: '저장', exact: true }).click();
+    await page.getByText('#회귀검사', { exact: true }).waitFor({ state: 'visible', timeout: 5000 });
+
+    // Close without saving the memo: this check exercises only the local composer state.
+    await page.getByRole('button', { name: '닫기', exact: true }).click();
     pass(label);
   } catch (err) {
     fail(label, err.message);
@@ -448,6 +478,7 @@ async function main() {
     await checkEmojiCategories(browser, baseUrl);
     await checkLightboxZoomControls(browser, baseUrl);
     await checkDeferredManual(browser, baseUrl);
+    await checkMemoTagInput(browser, baseUrl);
     await checkSettlementModalEntryPoints(browser, baseUrl);
     await checkSideMenuNavigation(browser, baseUrl);
 

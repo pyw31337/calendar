@@ -82,6 +82,8 @@ assert(sharedUi.includes('const imageSrc = (() =>') && sharedUi.includes('imageS
 assert(overlaysUi.includes('const isSafeMediaSrc = value =>') && overlaysUi.includes('const primarySrc = isSafeMediaSrc(src);'), 'shared media thumbnails must reject malformed image URLs');
 assert(fs.readFileSync('scripts/firebase-media-audit.mjs', 'utf8').includes('invalidCount'), 'media audit must report invalid image data without mutating production records');
 assert(/void persistLegacySubcollections\([\s\S]{0,260}\.catch\(/.test(firebaseDataScript), 'legacy subcollection writes must be detached from the primary save and handled in the background');
+assert(/participantRowsForSave = participantRows\.map[\s\S]{0,420}participantMemoInput[\s\S]{0,900}participantRows: participantRowsForSave\.map/.test(eventModalScript), 'settlement card save must commit a pending participant memo edit');
+assert(/const saved = typeof onSave === 'function' \? await onSave\(newCard\) : false[\s\S]{0,220}saved === false/.test(eventModalScript), 'settlement card modal must await persistence before reporting success or closing');
 assert(firebaseDataScript.includes("const addDocumentId = method === 'add'") && firebaseDataScript.includes('colRef.doc(addDocumentId).set'), 'collection adds must share one id across SDK and REST retries');
 assert(/const restMethod = method === 'add' \? 'set' : method/.test(firebaseDataScript), 'collection add REST fallback must use the shared document id');
 assert(/const updateCalendars = async[\s\S]{0,420}if \(isSavingRef\.current\) return false/.test(sourceScript), 'calendar saves must reject duplicate in-flight submissions');
