@@ -7783,7 +7783,8 @@ async function processImageFilesSequentially(files, onProgress) {
   const startedAt = Date.now();
   let completed = 0;
   let cursor = 0;
-  const CONCURRENCY = Math.min(2, Math.max(1, list.length));
+  const nav = typeof navigator !== 'undefined' ? navigator : {};
+  const CONCURRENCY = /Mobi|Android|iPhone|iPad/i.test(nav.userAgent || '') || (nav.hardwareConcurrency || 8) <= 4 ? 1 : Math.min(2, Math.max(1, list.length));
 
   const report = (fileName) => {
     if (!onProgress) return;
@@ -7808,7 +7809,9 @@ async function processImageFilesSequentially(files, onProgress) {
       const file = list[i];
       report(file && file.name);
       try {
+        await new Promise(resolve => setTimeout(resolve, 0));
         succeeded[i] = await compressImageToDataUrls(file);
+        await new Promise(resolve => setTimeout(resolve, 0));
       } catch (err) {
         failed.push({ fileName: file && file.name, error: err });
         succeeded[i] = null;
@@ -8601,9 +8604,6 @@ function DicesIcon(props) {
 
 // Matches MenuIcon's exact svg wrapper (16x16, stroke 2, round caps) but needs a <rect> child
 // alongside its <path>s, which MenuIcon's paths-only prop can't express.
-
-
-
 
 function highlightTextWithYellowMarker(text, keyword) {
   if (!text) return '';
