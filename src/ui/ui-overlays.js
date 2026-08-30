@@ -724,9 +724,11 @@ export function ImageUploadOverlay({ pct, remainingSec, label, current, total })
   const queueText = hasQueue ? `대기열 ${Math.min(current || 1, total)}/${total}` : '';
   const remainingText = typeof remainingSec === 'number' ? `약 ${remainingSec}초 남음` : '';
   return /*#__PURE__*/React.createElement('div', {
-    style: { position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.45)', zIndex: 100000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }
+    role: 'status',
+    'aria-live': 'polite',
+    style: { position: 'fixed', top: 'calc(env(safe-area-inset-top, 0px) + 16px)', right: '16px', zIndex: 100000, width: '292px', maxWidth: 'calc(100vw - 32px)', pointerEvents: 'none' }
   }, /*#__PURE__*/React.createElement('div', {
-    style: { backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '22px 24px', width: '292px', maxWidth: '100%', textAlign: 'left', boxShadow: '0 10px 30px rgba(0,0,0,0.25)', display: 'flex', flexDirection: 'column', gap: '10px' }
+    style: { backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '16px 18px', width: '100%', textAlign: 'left', boxShadow: '0 10px 30px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', gap: '8px' }
   },
     /*#__PURE__*/React.createElement('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' } },
       /*#__PURE__*/React.createElement('div', { style: { fontWeight: 900, fontSize: '0.95rem', color: 'var(--text-main)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, label || '사진 전송 중...'),
@@ -763,9 +765,11 @@ export function ImageProcessingOverlay({ current, total, fileName, pct, remainin
   const queueText = total > 1 ? `파일 ${Math.min(current || 1, total)}/${total}` : '';
   const remainingText = typeof remainingSec === 'number' ? `약 ${remainingSec}초 남음` : '';
   return /*#__PURE__*/React.createElement('div', {
-    style: { position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.45)', zIndex: 100000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }
+    role: 'status',
+    'aria-live': 'polite',
+    style: { position: 'fixed', top: 'calc(env(safe-area-inset-top, 0px) + 16px)', right: '16px', zIndex: 100000, width: '292px', maxWidth: 'calc(100vw - 32px)', pointerEvents: 'none' }
   }, /*#__PURE__*/React.createElement('div', {
-    style: { backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '22px 24px', width: '292px', maxWidth: '100%', textAlign: 'left', boxShadow: '0 10px 30px rgba(0,0,0,0.25)', display: 'flex', flexDirection: 'column', gap: '10px' }
+    style: { backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '16px 18px', width: '100%', textAlign: 'left', boxShadow: '0 10px 30px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', gap: '8px' }
   },
     /*#__PURE__*/React.createElement('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' } },
       /*#__PURE__*/React.createElement('div', { style: { fontWeight: 900, fontSize: '0.95rem', color: 'var(--text-main)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, '사진 변환 중...'),
