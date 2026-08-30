@@ -1,5 +1,6 @@
 /** P6 ESM adapter for app-main — live assets/app-main.js unchanged */
 import './../react-globals.js';
+import { uploadBlobWithWatchdog } from './app-media-upload.js';
 const React = window.React;
 const ReactDOM = window.ReactDOM;
 if (!React || !ReactDOM || typeof ReactDOM.createRoot !== 'function') {
@@ -7941,8 +7942,6 @@ function getUploadImageBlobMeta(blob, fallbackExt = 'jpg') {
 // if Storage isn't available/the upload fails -- callers should fall back to the base64 data
 // URLs already produced by compressImageToDataUrls in that case. `onBytes(taskKey, transferred,
 // total)` is called as each upload progresses so a caller can aggregate progress across a batch.
-const UPLOAD_STALL_TIMEOUT_MS = 20000;
-
 function uploadChatImageAssets(calendarId, compressed, index, onBytes, timeoutMs = 45000) {
   return new Promise((resolve) => {
     const storage = getLiveFirebaseStorage();
@@ -7967,43 +7966,9 @@ function uploadChatImageAssets(calendarId, compressed, index, onBytes, timeoutMs
     // ever firing (the SDK is still waiting on a dead connection) -- without a bound here, the
     // whole send/edit flow would hang forever with no way for the user to recover. Time out and
     // fall back to inline base64 for that image instead.
-    const runUploadOnce = (blob, ref, taskKey, contentType) => {
-      let settled = false;
-      let task = null;
-      let stallTimeoutId = null;
-      return new Promise((resolveOne) => {
-        const timeoutId = setTimeout(() => {
-          try { task?.cancel(); } catch (_) {}
-          settle(null);
-        }, timeoutMs);
-        const resetStallTimeout = () => {
-          clearTimeout(stallTimeoutId);
-          stallTimeoutId = setTimeout(() => {
-            try { task?.cancel(); } catch (_) {}
-            settle(null);
-          }, UPLOAD_STALL_TIMEOUT_MS);
-        };
-        const settle = value => {
-          if (settled) return;
-          settled = true;
-          clearTimeout(timeoutId);
-          clearTimeout(stallTimeoutId);
-          resolveOne(value);
-        };
-        task = ref.put(blob, { contentType });
-        resetStallTimeout();
-        task.on('state_changed', snapshot => {
-          resetStallTimeout();
-          if (onBytes) onBytes(taskKey, snapshot.bytesTransferred, snapshot.totalBytes);
-        }, () => { settle(null); }, async () => {
-          try {
-            settle(await task.snapshot.ref.getDownloadURL());
-          } catch (e) {
-            settle(null);
-          }
-        });
-      });
-    };
+    const runUploadOnce = (blob, ref, taskKey, contentType) => uploadBlobWithWatchdog({
+      ref, blob, contentType, taskKey, onBytes, timeoutMs
+    });
     // One retry before giving up -- a single failed/timed-out attempt (a brief mobile network
     // hiccup) used to permanently drop that photo to the low-quality ~600px/48KB base64 fallback
     // with no second chance, which is exactly what produced reports of meeting/gallery photos
@@ -9721,43 +9686,9 @@ function uploadMemoImageAssets(calendarId, compressed, index, onBytes, timeoutMs
     const originalRef = storage.ref(`${basePath}_original_${compressed.originalBlob.size}b.${originalMeta.ext}`);
     const thumbRef = storage.ref(`${basePath}_thumb_${compressed.thumbnailBlob.size}b.${thumbMeta.ext}`);
 
-    const runUploadOnce = (blob, ref, taskKey, contentType) => {
-      let settled = false;
-      let task = null;
-      let stallTimeoutId = null;
-      return new Promise((resolveOne) => {
-        const timeoutId = setTimeout(() => {
-          try { task?.cancel(); } catch (_) {}
-          settle(null);
-        }, timeoutMs);
-        const resetStallTimeout = () => {
-          clearTimeout(stallTimeoutId);
-          stallTimeoutId = setTimeout(() => {
-            try { task?.cancel(); } catch (_) {}
-            settle(null);
-          }, UPLOAD_STALL_TIMEOUT_MS);
-        };
-        const settle = value => {
-          if (settled) return;
-          settled = true;
-          clearTimeout(timeoutId);
-          clearTimeout(stallTimeoutId);
-          resolveOne(value);
-        };
-        task = ref.put(blob, { contentType });
-        resetStallTimeout();
-        task.on('state_changed', snapshot => {
-          resetStallTimeout();
-          if (onBytes) onBytes(taskKey, snapshot.bytesTransferred, snapshot.totalBytes);
-        }, () => { settle(null); }, async () => {
-          try {
-            settle(await task.snapshot.ref.getDownloadURL());
-          } catch (e) {
-            settle(null);
-          }
-        });
-      });
-    };
+    const runUploadOnce = (blob, ref, taskKey, contentType) => uploadBlobWithWatchdog({
+      ref, blob, contentType, taskKey, onBytes, timeoutMs
+    });
     // One retry before giving up -- see the matching comment in uploadChatImageAssets.
     const runUpload = async (blob, ref, taskKey, contentType) => {
       const first = await runUploadOnce(blob, ref, taskKey, contentType);
