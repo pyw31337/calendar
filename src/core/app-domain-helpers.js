@@ -10,6 +10,10 @@ const GATHER_APP_CONSTANTS = window.GATHER_APP_CONSTANTS || {};
 // __setFirebaseDb once Firestore finishes loading) -- both mirror to these window globals in
 // lockstep there, so this module reads through window instead of importing live bindings back.
 const getLocalStorage = () => window['local' + 'Storage'];
+function writeSharedCollection(...args) {
+  const writer = (window.GATHER_UI_DEPS || {}).writeCollectionDocumentWithFallback;
+  return typeof writer === 'function' ? writer(...args) : null;
+}
 const PRESET_COLORS = Array.isArray(GATHER_APP_CONSTANTS.PRESET_COLORS) ? GATHER_APP_CONSTANTS.PRESET_COLORS : ['#EF4444', '#F97316', '#F59E0B', '#10B981', '#06B6D4', '#3B82F6', '#6366F1', '#8B5CF6', '#EC4899', '#14B8A6'];
 const DEFAULT_EXPENSE_CATEGORIES = Array.isArray(GATHER_APP_CONSTANTS.DEFAULT_EXPENSE_CATEGORIES) ? GATHER_APP_CONSTANTS.DEFAULT_EXPENSE_CATEGORIES : [
   { id: 'food', name: '식품', color: '#F97316' },
@@ -899,7 +903,7 @@ async function subscribeUserToPush(calendarId, activeParticipantId, options = {}
       } catch (_) {}
       const deviceId = typeof getOrCreateDeviceId === 'function' ? getOrCreateDeviceId() : ('dev_' + String(nowTs));
       const deviceLabel = typeof getDeviceLabel === 'function' ? getDeviceLabel() : '이 기기';
-      await window.__gatherFirebaseDb.collection('calendars').doc('cal_' + calendarId).collection('push_subscriptions').doc(subId).set({
+      const saved = await writeSharedCollection('push_subscriptions', calendarId, subId, {
         endpoint: subscription.endpoint,
         keys: {
           auth: arrayBufferToBase64(subscription.getKey('auth')),
@@ -918,7 +922,8 @@ async function subscribeUserToPush(calendarId, activeParticipantId, options = {}
           poll: channelPrefs.poll !== false,
           schedule: channelPrefs.schedule !== false
         }
-      }, { merge: true });
+      }, 'set', '기기 구독 등록', { merge: true });
+      if (!saved?.success) throw new Error('Push subscription save failed');
       try {
         getLocalStorage().setItem('gather_push_health_' + calendarId, JSON.stringify({
           subId: subId,
@@ -991,9 +996,8 @@ async function unsubscribeUserFromPush(calendarId) {
     const subscription = await registration.pushManager.getSubscription();
     if (subscription) {
       const subId = getSubscriptionHashId(subscription.endpoint);
-      if (window.__gatherFirebaseDb) {
-        await window.__gatherFirebaseDb.collection('calendars').doc('cal_' + calendarId).collection('push_subscriptions').doc(subId).delete();
-      }
+      const deleted = await writeSharedCollection('push_subscriptions', calendarId, subId, null, 'delete', '기기 구독 해제');
+      if (!deleted?.success) throw new Error('Push subscription delete failed');
       // PushSubscription is origin-wide, not calendar-wide. Calling subscription.unsubscribe()
       // while muting a single calendar invalidates the same endpoint used by every other
       // calendar tab on pyw31337.github.io, leaving stale Firestore subscription docs and
