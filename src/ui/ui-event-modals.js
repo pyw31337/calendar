@@ -3042,7 +3042,13 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
               React.createElement("button", {
                   type: "button",
                   title: "정산 수정",
-                  onClick: () => handleOpenSettlementEditor(card),
+                  'aria-label': '정산 수정',
+                  'data-settlement-edit-button': 'true',
+                  onClick: event => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    handleOpenSettlementEditor(card);
+                  },
                   style: {
                     background: 'transparent', border: 'none', borderRadius: '0',
                     width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center',
