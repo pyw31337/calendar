@@ -316,8 +316,6 @@ function DateCapsuleBadge(props) {
   return typeof C === 'function' ? React.createElement(C, props) : null;
 }
 
-
-
 // 입력필드 표시 규칙: 일반 텍스트 / YY.MM.DD 날짜 / URL 분리
 function tokenizeRichFieldText(text) {
   const source = String(text || '');
@@ -7330,13 +7328,11 @@ function extractDirectImageUrls(text) {
 // onFailed fires if no player iframe shows up in time, so the caller can fall back to the
 // link-preview card.
 
-
 // Floating video player kept alive via a document.body portal so it survives App()'s
 // activeView-based tab switches without unmounting (see the withStickyVideo wrapper around
 // every one of App()'s 5 return branches). zIndex 40000 sits above regular modals (up to
 // ~30000) so it stays visible while browsing other tabs, but below toast (99999) and confirm
 // dialogs (100000) so those never get obscured by it.
-
 
 function DirectChatMediaText(props) {
   const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.DirectChatMediaText;
@@ -7354,7 +7350,6 @@ function ImageUrlModal(props) {
   const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ImageUrlModal;
   return typeof C === 'function' ? React.createElement(C, props) : null;
 }
-
 
 function renderChatMessageBody(msg, setActiveLightbox, singleImageStyle = {}, searchQuery = '', stickyVideoKey = null, onActivateVideo = null) {
   const msgImages = renderChatMessageImages(msg, setActiveLightbox, singleImageStyle);
@@ -7932,8 +7927,6 @@ async function appendChatImageFiles({
 
   return { handled: true, succeeded: succeeded.length, failed: failed.length };
 }
-
-
 
 function ImageUploadOverlay(props) {
   const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ImageUploadOverlay;
