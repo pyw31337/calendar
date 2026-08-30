@@ -4014,8 +4014,22 @@ function CalendarApp() {
     try {
       const resolvedImages = await resolveChatImageBatch(activeCal.id, compressed, progress => {
         setChatUploadProgress({ ...progress, label: '일정 사진 업로드 중...' });
-      }, { requireStorage: true });
-      const chunks = chunkResolvedImagesForMessages(resolvedImages);
+      }, {
+        requireStorage: true,
+        continueOnError: true,
+        onItemError: ({ index }) => {
+          setChatUploadProgress(prev => prev ? { ...prev, label: `${index + 1}번 사진 재시도 대기 중...` } : prev);
+        }
+      });
+      const failedCount = Array.isArray(resolvedImages.failed) ? resolvedImages.failed.length : 0;
+      const failedFiles = Array.isArray(resolvedImages.failed)
+        ? resolvedImages.failed.map(({ index }) => files?.[index]).filter(Boolean)
+        : [];
+      const successfulImages = resolvedImages.filter(Boolean);
+      if (successfulImages.length === 0) {
+        throw new Error('모든 일정 사진 업로드에 실패했습니다. 네트워크를 확인한 뒤 다시 시도해 주세요.');
+      }
+      const chunks = chunkResolvedImagesForMessages(successfulImages);
       const now = Date.now();
       const fallbackParticipantId = chatParticipantId || getActiveParticipants(activeCal)[0]?.id || '';
       const newRefs = [];
@@ -4026,8 +4040,8 @@ function CalendarApp() {
           pct: Math.min(99, 90 + Math.round((i / Math.max(1, chunks.length)) * 9)),
           remainingSec: Math.max(1, chunks.length - i),
           label: '일정 사진 저장 중...',
-          current: Math.min(resolvedImages.length, i + 1),
-          total: resolvedImages.length
+          current: Math.min(successfulImages.length, i + 1),
+          total: successfulImages.length
         });
         const messageData = {
           participantId: fallbackParticipantId,
@@ -4079,6 +4093,13 @@ function CalendarApp() {
       const photoLog = createActivityLog(activeCal.id, 'photo_create', dateStr, '', now, `${newRefs.length}장 일정 사진 추가`);
       const ok = await commitConfirmedMeetings(nextConfirmedMeetings, '일정 사진 저장완료', photoLog ? [photoLog] : []);
       setChatUploadProgress({ pct: 100, remainingSec: 0, label: '일정 사진 저장 완료' });
+      if (failedCount > 0) {
+        showRetryableUploadToast(
+          `${successfulImages.length}장 저장 완료, ${failedCount}장은 실패했습니다. 실패한 사진만 다시 시도할 수 있습니다.`,
+          () => handleAddMeetingPhotos(dateStr, failedFiles),
+          7000
+        );
+      }
       return ok;
     } catch (err) {
       console.error('handleAddMeetingPhotos failed:', err);
@@ -8219,7 +8240,21 @@ async function readClipboardImageFiles(showToast) {
 // is uploadChatImageAssets or uploadMemoImageAssets, keeping each feature's Storage path.
 async function resolveImageUrls(calendarId, compressed, index, onBytes, uploadFn, options = {}) {
   try {
-    const uploaded = await uploadFn(calendarId, compressed, index, onBytes);
+    const maxAttempts = options.requireStorage ? 3 : 1;
+    let uploaded = null;
+    for (let attempt = 0; attempt < maxAttempts && !uploaded; attempt += 1) {
+      if (attempt > 0) {
+        // A failed pair is cleaned up by uploadChatImageAssets. A short exponential delay gives
+        // mobile radio/NAT connections time to recover without blocking the other photos.
+        await new Promise(resolve => setTimeout(resolve, Math.min(4000, 700 * (2 ** (attempt - 1)))));
+      }
+      try {
+        uploaded = await uploadFn(calendarId, compressed, index, onBytes);
+      } catch (error) {
+        if (attempt === maxAttempts - 1) throw error;
+        console.warn(`Image upload retry ${attempt + 1}/${maxAttempts - 1}:`, error);
+      }
+    }
     if (uploaded && uploaded.imageUrl && uploaded.thumbUrl) {
       revokeCompressedObjectUrls(compressed);
       return uploaded;
@@ -8269,7 +8304,7 @@ async function resolveImageBatch(calendarId, compressedList, onProgress, uploadF
     .map((c, idx) => ({ c, idx }))
     .filter(({ c }) => !c.isExisting);
 
-  const isStorageWorking = await checkFirebaseStorageHealth().catch(() => false);
+  await checkFirebaseStorageHealth().catch(() => false);
   if (uploadIndexes.length === 0) {
     if (onProgress) onProgress({ pct: 100, remainingSec: 0, current: compressedList.length, total: compressedList.length });
     return Promise.all(compressedList.map((c) =>
@@ -8312,7 +8347,17 @@ async function resolveImageBatch(calendarId, compressedList, onProgress, uploadF
 
   const results = new Array(compressedList.length);
   let uploadCursor = 0;
-  const UPLOAD_CONCURRENCY = Math.min(2, Math.max(1, compressedList.length));
+  const nav = typeof navigator !== 'undefined' ? navigator : {};
+  const connection = nav.connection || nav.mozConnection || nav.webkitConnection || {};
+  const effectiveType = String(connection.effectiveType || '').toLowerCase();
+  const isConstrained = Boolean(connection.saveData) || effectiveType === 'slow-2g' || effectiveType === '2g';
+  const deviceCores = Number(nav.hardwareConcurrency) || 8;
+  // Each image consists of original + thumbnail uploads. Three image workers means at most
+  // six Storage tasks, which is materially faster on Wi-Fi/4G while remaining conservative on
+  // low-memory phones and metered/slow connections.
+  const preferredConcurrency = isConstrained ? 1 : (deviceCores <= 4 ? 2 : 3);
+  const UPLOAD_CONCURRENCY = Math.min(preferredConcurrency, Math.max(1, compressedList.length));
+  const failed = [];
 
   async function uploadWorker() {
     while (true) {
@@ -8325,7 +8370,14 @@ async function resolveImageBatch(calendarId, compressedList, onProgress, uploadF
         reportCompressionProgress();
         results[idx] = { imageUrl: c.original, thumbUrl: c.thumbnail };
       } else {
-        const result = await resolveImageUrls(calendarId, c, idx, onBytes, uploadFn, options);
+        let result = null;
+        try {
+          result = await resolveImageUrls(calendarId, c, idx, onBytes, uploadFn, options);
+        } catch (error) {
+          if (!options.continueOnError) throw error;
+          failed.push({ index: idx, error });
+          if (typeof options.onItemError === 'function') options.onItemError({ index: idx, error, item: c });
+        }
         compressionDone++;
         reportCompressionProgress();
         results[idx] = result;
@@ -8335,6 +8387,9 @@ async function resolveImageBatch(calendarId, compressedList, onProgress, uploadF
 
   await Promise.all(Array.from({ length: UPLOAD_CONCURRENCY }, () => uploadWorker()));
   if (onProgress) onProgress({ pct: 100, remainingSec: 0, current: total, total });
+  // Keep the return value backwards-compatible (callers expect an array), while exposing
+  // per-photo failures to a resumable caller that opts into partial success.
+  Object.defineProperty(results, 'failed', { value: failed, enumerable: false, configurable: true });
   return results;
 }
 
