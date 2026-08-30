@@ -2511,7 +2511,11 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
 
   const handleOpenSettlementEditor = (card) => {
     setOpenMenuCardId(null);
-    setEditingSettlementCard({ ...card });
+    const selectedCard = { ...card };
+    // Defer the editor mount until after the originating pointer/click event has completed.
+    // This prevents the newly mounted modal overlay from being treated as the closing target
+    // on touch browsers.
+    setTimeout(() => setEditingSettlementCard(selectedCard), 0);
   };
 
   const { isHeaderVisible, onScroll: handleSettlementScroll } = useScrollHideHeader();
