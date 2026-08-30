@@ -8,6 +8,7 @@ function assert(condition, message) {
 // The app's main logic lives in assets/app-main.js (externalized from index.html's inline
 // <script> -- see check-tab-wiring.mjs for the rationale).
 const script = fs.readFileSync('assets/app-main.js', 'utf8');
+const sourceScript = fs.readFileSync('src/core/app-main.js', 'utf8');
 const firebaseDataScript = fs.readFileSync('src/core/app-firebase-data.js', 'utf8');
 const utilsScript = fs.readFileSync('assets/app-utils.js', 'utf8');
 const notificationScript = fs.readFileSync('assets/app-notifications.js', 'utf8');
@@ -20,6 +21,7 @@ assert(writeQueueScript.includes('MAX_OPERATION_PAYLOAD_BYTES') && writeQueueScr
 assert(writeQueueScript.includes('nextAttemptAt') && writeQueueScript.includes('RETRY_BACKOFF_MAX_MS'), 'write queue must back off repeated failures');
 assert(!/localStorage\s*(?:\.|\[)/.test(writeQueueScript), 'write queue must not reintroduce localStorage persistence');
 assert(/type: 'collection-write'/.test(firebaseDataScript) && /skipQueue/.test(firebaseDataScript), 'collection writes must support bounded offline replay without recursive queueing');
+assert(/media-chat-send/.test(sourceScript) && /originalBlob: image\.originalBlob/.test(sourceScript), 'offline chat images must be queued with their original and thumbnail blobs');
 assert(/async function writeConfirmedMeetingsToFirestore[\s\S]{0,1800}if \(res\.ok\) return true;[\s\S]{0,700}if \(firebaseDb\)/.test(firebaseDataScript), 'confirmed meeting writes must fall back to SDK after a REST failure');
 assert(/writeConfirmedMeetingsToFirestore[\s\S]{0,2600}validDates[\s\S]{0,700}writes\.push\(\{ delete: documentName \}\)/.test(firebaseDataScript), 'confirmed meeting writes must remove stale subcollection documents');
 assert(/Failed to inspect stale confirmed meetings[\s\S]{0,260}validMeetings\.length === 0/.test(firebaseDataScript), 'confirmed meeting writes must not block valid updates on cleanup-read failure');

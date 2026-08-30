@@ -560,8 +560,28 @@ function shouldQueueCalendarWriteFailure(error) {
   const message = String(error?.message || error || '').toLowerCase();
   return /timeout|network|fetch|offline|연결|상태를 확인/.test(message);
 }
-
 async function replayQueuedCalendarWrite(operation) {
+  if (operation?.type === 'media-chat-send' && operation.payload) {
+    const payload = operation.payload;
+    const compressed = (Array.isArray(payload.images) ? payload.images : []).map(image => ({ original: '', thumbnail: '', originalBlob: image.originalBlob, thumbnailBlob: image.thumbnailBlob }));
+    if (compressed.length === 0) return false;
+    const resolvedImages = await resolveChatImageBatch(operation.calendarId, compressed);
+    const chunks = chunkResolvedImagesForMessages(resolvedImages);
+    for (let i = 0; i < chunks.length; i += 1) {
+      const chunkImages = chunks[i];
+      const result = await writeCollectionDocumentWithFallback('messages', operation.calendarId, '', {
+        participantId: payload.participantId,
+        text: i === 0 ? payload.text : '',
+        imageUrl: chunkImages[0].imageUrl,
+        thumbUrl: chunkImages[0].thumbUrl,
+        imageUrls: chunkImages.map(image => image.imageUrl),
+        thumbUrls: chunkImages.map(image => image.thumbUrl),
+        timestamp: payload.timestamp + i
+      }, 'add', '사진 대기 저장', { documentId: `${operation.id}_${i}`, skipQueue: true });
+      if (!result?.success) return false;
+    }
+    return true;
+  }
   if (operation?.type === 'collection-write' && operation.payload) {
     const payload = operation.payload;
     const result = await writeCollectionDocumentWithFallback(
@@ -590,14 +610,10 @@ async function replayQueuedCalendarWrite(operation) {
 }
 
 /* Small dependency-free donut chart: N segments as SVG stroke-dasharray arcs on a ring. */
-
-
 function AdminDashboard(props) {
   const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AdminDashboard;
   return typeof C === 'function' ? React.createElement(C, props) : null;
 }
-
-
 function AdminModal(props) {
   const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AdminModal;
   return typeof C === 'function' ? React.createElement(C, props) : null;
@@ -639,8 +655,6 @@ function subscribeFirebaseStateChange(onStoreChange) {
   window.addEventListener('gather-firebase-state-change', handler);
   return () => window.removeEventListener('gather-firebase-state-change', handler);
 }
-
-
 
 
 
@@ -2754,6 +2768,25 @@ function CalendarApp() {
       let linkPreview = null;
       let firstSentMessageId = null;
       let ok = false;
+      if (imageCount > 0 && typeof navigator !== 'undefined' && navigator.onLine === false
+        && chatImages.every(image => image?.originalBlob && image?.thumbnailBlob)) {
+        const queued = await enqueueWriteOperation({
+          id: `chat_media_${activeCalId}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+          type: 'media-chat-send',
+          calendarId: activeCalId,
+          payload: {
+            participantId: chatParticipantId,
+            text: chatInput.trim(),
+            timestamp: Date.now(),
+            images: chatImages.map(image => ({ originalBlob: image.originalBlob, thumbnailBlob: image.thumbnailBlob }))
+          }
+        });
+        if (!queued) throw new Error('사진 오프라인 저장 공간이 부족합니다.');
+        setChatInput('');
+        setChatImages([]);
+        showToast('오프라인입니다. 사진은 연결되면 자동 전송됩니다.', 'info', 5000);
+        return;
+      }
       if (imageCount === 0) {
         const messageOperationId = `chat_${activeCalId}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
         const messageData = {
