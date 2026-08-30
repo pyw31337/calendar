@@ -1907,7 +1907,7 @@ async function persistLegacySubcollections(calendarId, activityLogs, places, con
     jobs.push(retryLegacySubcollectionWrite(writeActivityLogsToFirestore, calendarId, activityLogs, 'Activity log'));
   }
   if (Array.isArray(places) && places.length) {
-    jobs.push(retryLegacySubcollectionWrite(writePlacesToFirestore, calendarId, places, 'Places'));
+    jobs.push(persistPlacesSubcollection(calendarId, places));
   }
   if (Array.isArray(confirmedMeetings) && confirmedMeetings.length) {
     jobs.push(retryLegacySubcollectionWrite(writeConfirmedMeetingsToFirestore, calendarId, confirmedMeetings, 'Confirmed meetings'));
@@ -1915,6 +1915,15 @@ async function persistLegacySubcollections(calendarId, activityLogs, places, con
   if (!jobs.length) return [];
   const results = await Promise.all(jobs);
   return results.map((ok, index) => ok ? null : index).filter(index => index !== null);
+}
+
+// Place reads are merged from this subcollection on every page load. A place save therefore
+// cannot report success while this write is still running: a refresh in that window would merge
+// the previous memo back into the UI. Activity logs may remain best-effort, but places are part
+// of the user-visible source of truth and must be confirmed before the save resolves.
+async function persistPlacesSubcollection(calendarId, places) {
+  if (!Array.isArray(places) || !places.length) return true;
+  return retryLegacySubcollectionWrite(writePlacesToFirestore, calendarId, places, 'Places');
 }
 
 // Writes a batch of activity log entries as individual documents, keyed by each log's own
@@ -2400,10 +2409,12 @@ async function pushSingleCalendarWithRest(normalizedCal, lastModified, saveMode,
       });
       if (commitRes.ok) {
         const logsToPersist = [...legacyActivityLogs, ...(Array.isArray(newActivityLogs) ? newActivityLogs : [])];
-        // Auxiliary legacy collections must never hold the primary save open.
-        void persistLegacySubcollections(normalizedCal.id, logsToPersist, legacyPlaces, legacyConfirmedMeetings)
+        // Places are merged into the live UI on read, so confirm this write before reporting
+        // success. Activity logs and meetings remain best-effort auxiliary writes.
+        const placesPersisted = await persistPlacesSubcollection(normalizedCal.id, legacyPlaces);
+        void persistLegacySubcollections(normalizedCal.id, logsToPersist, [], legacyConfirmedMeetings)
           .catch(error => console.warn(`Auxiliary sync failed for ${normalizedCal.id}:`, error));
-        return { ok: true, revision: nextDocRevision, auxiliaryPersistenceFailed: false };
+        return { ok: placesPersisted, revision: nextDocRevision, auxiliaryPersistenceFailed: !placesPersisted };
       }
       const errorText = await commitRes.text();
       if (!isRetryableFirestoreConflict(errorText) || attempt === retryCount) {
@@ -2522,9 +2533,12 @@ async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 4, 
 	        new Promise((_, reject) => setTimeout(() => { raceLost = true; reject(new Error('Firestore push timeout')); }, 8000))
 	      ]);
       const logsToPersist = [...legacyActivityLogs, ...(Array.isArray(newActivityLogs) ? newActivityLogs : [])];
-      void persistLegacySubcollections(normalizedCal.id, logsToPersist, legacyPlaces, legacyConfirmedMeetings)
+      // Places are merged into the live UI on read, so confirm this write before reporting
+      // success. Activity logs and meetings remain best-effort auxiliary writes.
+      const placesPersisted = await persistPlacesSubcollection(normalizedCal.id, legacyPlaces);
+      void persistLegacySubcollections(normalizedCal.id, logsToPersist, [], legacyConfirmedMeetings)
         .catch(error => console.warn(`Auxiliary sync failed for ${normalizedCal.id}:`, error));
-      return { ok: true, revision: committedRevision, auxiliaryPersistenceFailed: false };
+      return { ok: placesPersisted, revision: committedRevision, auxiliaryPersistenceFailed: !placesPersisted };
     } catch (e) {
       console.warn(`Firestore push notice for cal_${normalizedCal.id}:`, e);
       // The transaction above has no cancellation hook, so on a timeout it can still land after
