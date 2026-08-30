@@ -2823,7 +2823,7 @@ select.form-select {
 }
 .settlement-person-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 10px;
 }
 .settlement-person-card {
@@ -2841,6 +2841,16 @@ select.form-select {
   grid-column: 1 / -1;
   color: var(--settlement-hero-surface-muted);
   font-size: 0.8rem;
+}
+.settlement-total-card {
+  background: rgba(15, 23, 42, 0.78);
+  color: var(--settlement-hero-text);
+}
+.settlement-total-card .settlement-person-name {
+  color: inherit;
+}
+.settlement-total-card .settlement-person-amount {
+  color: #F0ABFC;
 }
 .settlement-person-name {
   display: flex;
@@ -2964,6 +2974,12 @@ select.form-select {
   .settlement-person-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+  .settlement-total-card {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
   .settlement-person-card {
     padding: 10px 9px;
   }
@@ -2976,6 +2992,11 @@ select.form-select {
   }
   .settlement-expense-option-amount {
     font-size: 0.76rem;
+  }
+}
+@media (min-width: 641px) and (max-width: 1100px) {
+  .settlement-person-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
 .admin-metric-card {

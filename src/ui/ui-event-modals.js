@@ -3037,10 +3037,13 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
                 )
             ),
 
-            /* One fixed-width person card per participant, up to four cards per row. */
+            /* Total expense is the first card; participant cards follow it in the responsive grid. */
             React.createElement("div", {
               className: "settlement-person-grid"
-            }, cardParticipantRows.length === 0
+            }, React.createElement("div", { className: "settlement-person-card settlement-total-card" },
+              React.createElement("div", { className: "settlement-person-name" }, "총 지출"),
+              React.createElement("strong", { className: "settlement-person-amount" }, `${(Number(card.amount) || allTimeExpense).toLocaleString()}원`)
+            ), cardParticipantRows.length === 0
               ? React.createElement("div", { className: "settlement-person-card settlement-person-card-empty" }, "참여 멤버 없음")
               : cardParticipantRows.map((row, index) => React.createElement("div", {
                 key: `${card.id}_${row.name}_${index}`,
