@@ -23,3 +23,24 @@ export async function replayQueuedMediaMessage(operation, { resolveImages, chunk
   }
   return true;
 }
+
+export async function replayQueuedMemoSave(operation, { resolveImages, writeMemo } = {}) {
+  const payload = operation?.payload;
+  if (!payload?.memoData || !Array.isArray(payload.images) || typeof resolveImages !== 'function' || typeof writeMemo !== 'function') return false;
+  const pending = payload.images.filter(image => !image.isExisting);
+  const resolved = pending.length > 0
+    ? await resolveImages(operation.calendarId, pending.map(image => ({ original: '', thumbnail: '', originalBlob: image.originalBlob, thumbnailBlob: image.thumbnailBlob })))
+    : [];
+  let next = 0;
+  const imageUrls = payload.images.map(image => image.isExisting ? image.original : resolved[next++]?.imageUrl).filter(Boolean);
+  next = 0;
+  const thumbUrls = payload.images.map(image => image.isExisting ? (image.thumbnail || image.original) : resolved[next++]?.thumbUrl).filter(Boolean);
+  const result = await writeMemo(operation.calendarId, payload.memoId, {
+    ...payload.memoData,
+    imageUrls,
+    thumbUrls,
+    imageUrl: imageUrls[0] || null,
+    thumbUrl: thumbUrls[0] || null
+  });
+  return Boolean(result?.success ?? result);
+}

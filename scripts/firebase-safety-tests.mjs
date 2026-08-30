@@ -9,10 +9,12 @@ function assert(condition, message) {
 // <script> -- see check-tab-wiring.mjs for the rationale).
 const script = fs.readFileSync('assets/app-main.js', 'utf8');
 const sourceScript = fs.readFileSync('src/core/app-main.js', 'utf8');
+const memoScript = fs.readFileSync('src/ui/ui-memo-view.js', 'utf8');
 const firebaseDataScript = fs.readFileSync('src/core/app-firebase-data.js', 'utf8');
 const utilsScript = fs.readFileSync('assets/app-utils.js', 'utf8');
 const notificationScript = fs.readFileSync('assets/app-notifications.js', 'utf8');
 const writeQueueScript = fs.readFileSync('src/core/app-write-queue.js', 'utf8');
+const mediaOutboxScript = fs.readFileSync('src/core/app-media-outbox.js', 'utf8');
 const firestoreRules = fs.existsSync('firestore.rules') ? fs.readFileSync('firestore.rules', 'utf8') : '';
 assert(script, 'assets/app-main.js not found');
 assert(writeQueueScript.includes("indexedDB.open(DB_NAME, DB_VERSION)") && writeQueueScript.includes("const DB_NAME = 'gather-calendar-write-queue'"), 'write queue must use a versioned IndexedDB store');
@@ -23,6 +25,8 @@ assert(!/localStorage\s*(?:\.|\[)/.test(writeQueueScript), 'write queue must not
 assert(/type: 'collection-write'/.test(firebaseDataScript) && /skipQueue/.test(firebaseDataScript), 'collection writes must support bounded offline replay without recursive queueing');
 assert(/media-chat-send/.test(sourceScript) && /originalBlob: image\.originalBlob/.test(sourceScript), 'offline chat images must be queued with their original and thumbnail blobs');
 assert(/uploadSource: 'gallery'/.test(sourceScript) && /갤러리 사진은 연결되면 자동 등록됩니다/.test(sourceScript), 'offline gallery images must use the media outbox');
+assert(/media-memo-save/.test(memoScript) && /메모와 사진을 자동 저장합니다/.test(memoScript), 'offline memo images must be queued with the memo payload');
+assert(/replayQueuedMemoSave/.test(sourceScript) && /imageUrls/.test(mediaOutboxScript), 'queued memo images must be replayed into the memo document');
 assert(/async function writeConfirmedMeetingsToFirestore[\s\S]{0,1800}if \(res\.ok\) return true;[\s\S]{0,700}if \(firebaseDb\)/.test(firebaseDataScript), 'confirmed meeting writes must fall back to SDK after a REST failure');
 assert(/writeConfirmedMeetingsToFirestore[\s\S]{0,2600}validDates[\s\S]{0,700}writes\.push\(\{ delete: documentName \}\)/.test(firebaseDataScript), 'confirmed meeting writes must remove stale subcollection documents');
 assert(/Failed to inspect stale confirmed meetings[\s\S]{0,260}validMeetings\.length === 0/.test(firebaseDataScript), 'confirmed meeting writes must not block valid updates on cleanup-read failure');

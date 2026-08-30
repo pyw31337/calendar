@@ -2,6 +2,8 @@
  * Memo view page (P4-15)
  */
 
+import { enqueueWriteOperation } from '../core/app-write-queue.js';
+
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_CALENDAR_DATA = window.GATHER_APP_CALENDAR_DATA || {};
 const GATHER_APP_CHAT_DATA = window.GATHER_APP_CHAT_DATA || {};
@@ -431,6 +433,13 @@ function resolveMemoImageBatch(...args) {
 function sanitizeMemoForFirestore(...args) {
   const f = __gatherUiDeps().sanitizeMemoForFirestore || GATHER_APP_UTILS.sanitizeMemoForFirestore;
   return typeof f === 'function' ? f(...args) : undefined;
+}
+function memoImagesCanBeQueued(images) {
+  return Array.isArray(images) && images.length > 0 && images.every(image => image?.isExisting || (image?.originalBlob && image?.thumbnailBlob));
+}
+function enqueueMemoMediaSave(...args) {
+  const f = __gatherUiDeps().enqueueMemoMediaSave || GATHER_APP_UTILS.enqueueMemoMediaSave;
+  return typeof f === 'function' ? f(...args) : enqueueWriteOperation(...args);
 }
 function setAdminSession(...args) {
   const f = __gatherUiDeps().setAdminSession || GATHER_APP_UTILS.setAdminSession;
@@ -935,6 +944,25 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
       const calendarId = calendar.id;
       const stamp = Date.now();
       const memoId = 'memo_' + stamp + '_' + Math.random().toString(36).slice(2, 8);
+      const tagsArray = newTags.map(t => t.startsWith('#') ? t : '#' + t);
+      const participantId = composerParticipantId || 'anonymous';
+      if (typeof navigator !== 'undefined' && navigator.onLine === false && memoImagesCanBeQueued(newImages)) {
+        const queued = await enqueueMemoMediaSave({
+          id: `memo_media_${calendarId}_${memoId}`,
+          type: 'media-memo-save',
+          calendarId,
+          payload: {
+            memoId,
+            memoData: sanitizeMemoForFirestore({ id: memoId, participantId, title: newTitle.trim(), text: newText.trim(), imageUrls: [], thumbUrls: [], color: newColor, isPinned: newIsPinned, tags: tagsArray, createdAt: stamp, updatedAt: stamp }),
+            images: newImages.map(image => ({ originalBlob: image.originalBlob, thumbnailBlob: image.thumbnailBlob }))
+          }
+        });
+        if (queued) {
+          showToast('오프라인입니다. 연결되면 메모와 사진을 자동 저장합니다.', 'info', 5000);
+          setNewTitle(''); setNewText(''); setNewColor('var(--bg-card)'); setNewIsPinned(false); setNewTags([]); setNewTagInput(''); setNewImages([]); setIsComposerExpanded(false);
+          return;
+        }
+      }
 
       // 1. Upload attachments (Storage upload with inline-base64 fallback + progress,
       // exactly the same module chat uses -- see resolveMemoImageBatch/resolveImageBatch)
@@ -946,11 +974,6 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
         uploadedUrls = resolved.map(r => r.imageUrl);
         uploadedThumbs = resolved.map(r => r.thumbUrl);
       }
-
-      // Save tags formatted back to database (prepend '#' prefix if needed)
-      const tagsArray = newTags.map(t => t.startsWith('#') ? t : '#' + t);
-
-      const participantId = composerParticipantId || 'anonymous';
 
       // Link previews are hydrated by the rendered card; a third-party scraper must not delay
       // the user's memo save.
@@ -1014,6 +1037,29 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
     try {
       const calendarId = calendar.id;
       const stamp = Date.now();
+      const hasNewEditImages = editImages.some(image => !image.isExisting);
+      if (typeof navigator !== 'undefined' && navigator.onLine === false && hasNewEditImages && memoImagesCanBeQueued(editImages)) {
+        const tagsArray = editTags.map(t => t.startsWith('#') ? t : '#' + t);
+        const participantId = editParticipantId || 'anonymous';
+        const url = extractFirstUrl(editText);
+        const oldUrl = extractFirstUrl(editingMemo.text);
+        const linkPreview = url && oldUrl === url && editingMemo.linkPreview ? editingMemo.linkPreview : null;
+        const queued = await enqueueMemoMediaSave({
+          id: `memo_media_${calendarId}_${editingMemo.id}_${stamp}`,
+          type: 'media-memo-save',
+          calendarId,
+          payload: {
+            memoId: editingMemo.id,
+            memoData: sanitizeMemoForFirestore({ ...editingMemo, participantId, title: editTitle.trim(), text: editText.trim(), imageUrls: [], thumbUrls: [], color: editColor, isPinned: editIsPinned, tags: tagsArray, updatedAt: stamp, linkPreview: linkPreview || null }),
+            images: editImages.map(image => ({ original: image.original, thumbnail: image.thumbnail, isExisting: !!image.isExisting, originalBlob: image.originalBlob, thumbnailBlob: image.thumbnailBlob }))
+          }
+        });
+        if (queued) {
+          showToast('오프라인입니다. 연결되면 메모 수정을 자동 저장합니다.', 'info', 5000);
+          setEditingMemo(null);
+          return;
+        }
+      }
 
       // Kept photos carry isExisting (pass through as-is) and new ones get uploaded, same
       // module chat's edit flow uses (see resolveMemoImageBatch/resolveImageBatch).

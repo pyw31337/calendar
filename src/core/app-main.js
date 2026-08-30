@@ -548,20 +548,24 @@ import {
   getCalendarAccentColor
 } from './app-firebase-data.js';
 import { enqueueWriteOperation, flushWriteQueue } from './app-write-queue.js';
-import { replayQueuedMediaMessage } from './app-media-outbox.js';
-
+import { replayQueuedMediaMessage, replayQueuedMemoSave } from './app-media-outbox.js';
 var firebaseDb = (typeof window !== 'undefined' && window.GATHER_APP_FIREBASE_DATA && window.GATHER_APP_FIREBASE_DATA.firebaseDb) || null;
 var firebaseStorage = (typeof window !== 'undefined' && window.GATHER_APP_FIREBASE_DATA && window.GATHER_APP_FIREBASE_DATA.firebaseStorage) || null;
 function getLiveFirebaseStorage() {
   return (typeof window !== 'undefined' && window.__gatherFirebaseStorage) || firebaseStorage;
 }
-
 function shouldQueueCalendarWriteFailure(error) {
   if (typeof navigator !== 'undefined' && navigator.onLine === false) return true;
   const message = String(error?.message || error || '').toLowerCase();
   return /timeout|network|fetch|offline|연결|상태를 확인/.test(message);
 }
 async function replayQueuedCalendarWrite(operation) {
+  if (operation?.type === 'media-memo-save' && operation.payload) {
+    return replayQueuedMemoSave(operation, {
+      resolveImages: resolveMemoImageBatch,
+      writeMemo: (calendarId, memoId, data) => writeCollectionDocumentWithFallback('memos', calendarId, memoId, data, 'set', '메모 사진 대기 저장', { skipQueue: true })
+    });
+  }
   if (operation?.type === 'media-chat-send' && operation.payload) {
     return replayQueuedMediaMessage(operation, {
       resolveImages: resolveChatImageBatch,
@@ -595,7 +599,6 @@ async function replayQueuedCalendarWrite(operation) {
   );
   return Boolean(result?.ok);
 }
-
 /* Small dependency-free donut chart: N segments as SVG stroke-dasharray arcs on a ring. */
 function AdminDashboard(props) {
   const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AdminDashboard;
@@ -625,12 +628,10 @@ function CreateSettlementModal(props) {
   const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CreateSettlementModal;
   return typeof C === 'function' ? React.createElement(C, props) : null;
 }
-
 function getAllDirectMediaImageEntries(message) {
   const direct = getMessageDirectMediaEntry(message);
   return direct ? [direct] : [];
 }
-
 function getFirebaseStateVersion() {
   if (typeof window === 'undefined') return 0;
   return Number(window.__GATHER_FIREBASE_STATE_VERSION || 0) || 0;
@@ -642,10 +643,6 @@ function subscribeFirebaseStateChange(onStoreChange) {
   window.addEventListener('gather-firebase-state-change', handler);
   return () => window.removeEventListener('gather-firebase-state-change', handler);
 }
-
-
-
-
 const NON_CHAT_UPLOAD_SOURCES = new Set(['meeting', 'gallery']);
 
 function isNonChatUploadSource(uploadSource) {
