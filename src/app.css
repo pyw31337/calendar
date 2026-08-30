@@ -2863,6 +2863,14 @@ select.form-select {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.settlement-person-name-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.settlement-person-mobile-badge {
+  display: none;
+}
 .settlement-person-dot {
   width: 9px;
   height: 9px;
@@ -2985,6 +2993,22 @@ select.form-select {
   }
   .settlement-person-amount {
     font-size: 0.92rem;
+  }
+  .settlement-person-name {
+    gap: 4px;
+  }
+  .settlement-person-name-text {
+    flex: 1 1 auto;
+  }
+  .settlement-person-mobile-badge {
+    display: inline-flex;
+    flex: 0 0 auto;
+    padding: 2px 5px;
+    font-size: 0.62rem;
+    font-weight: 600;
+  }
+  .settlement-person-desktop-badge {
+    display: none;
   }
   .settlement-expense-option {
     grid-template-columns: 20px minmax(0, 1fr);

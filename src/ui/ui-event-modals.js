@@ -3053,10 +3053,12 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
                   React.createElement("span", {
                     className: "settlement-person-dot",
                     style: { backgroundColor: activeParticipants[index]?.color || '#3B82F6' }
-                  }), row.name
+                  }),
+                  React.createElement("span", { className: "settlement-person-name-text" }, row.name),
+                  React.createElement('span', { className: `settlement-person-settlement-badge settlement-person-mobile-badge${row.amount < 0 ? ' is-refund' : ''}` }, row.amount < 0 ? '환급금' : row.amount > 0 ? '분담금' : '정산 없음')
                 ),
                 React.createElement("strong", { className: "settlement-person-amount", title: row.amount < 0 ? '공금에서 받을 환급금' : row.amount > 0 ? '공금에 납부할 분담금' : '정산할 금액 없음' },
-                  React.createElement('span', { className: `settlement-person-settlement-badge${row.amount < 0 ? ' is-refund' : ''}` }, row.amount < 0 ? '환급금' : row.amount > 0 ? '분담금' : '정산 없음'),
+                  React.createElement('span', { className: `settlement-person-settlement-badge settlement-person-desktop-badge${row.amount < 0 ? ' is-refund' : ''}` }, row.amount < 0 ? '환급금' : row.amount > 0 ? '분담금' : '정산 없음'),
                   row.amount !== 0 && React.createElement('span', null, `${row.amount < 0 ? '-' : ''}${Math.abs(row.amount).toLocaleString()}원`)
                 )
               )))
