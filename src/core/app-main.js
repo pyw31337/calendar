@@ -546,11 +546,33 @@ import {
   CALENDAR_ACCENT_PALETTE,
   getCalendarAccentColor
 } from './app-firebase-data.js';
+import { enqueueWriteOperation, flushWriteQueue } from './app-write-queue.js';
 
 var firebaseDb = (typeof window !== 'undefined' && window.GATHER_APP_FIREBASE_DATA && window.GATHER_APP_FIREBASE_DATA.firebaseDb) || null;
 var firebaseStorage = (typeof window !== 'undefined' && window.GATHER_APP_FIREBASE_DATA && window.GATHER_APP_FIREBASE_DATA.firebaseStorage) || null;
 function getLiveFirebaseStorage() {
   return (typeof window !== 'undefined' && window.__gatherFirebaseStorage) || firebaseStorage;
+}
+
+function shouldQueueCalendarWriteFailure(error) {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return true;
+  const message = String(error?.message || error || '').toLowerCase();
+  return /timeout|network|fetch|offline|연결|상태를 확인/.test(message);
+}
+
+async function replayQueuedCalendarWrite(operation) {
+  if (operation?.type !== 'calendar-snapshot' || !operation.payload?.calendar) return false;
+  const payload = operation.payload;
+  const result = await pushSingleCloudCalendar(
+    payload.calendar,
+    payload.lastModified,
+    4,
+    null,
+    payload.saveMode || 'availability',
+    Array.isArray(payload.newActivityLogs) ? payload.newActivityLogs : [],
+    payload.auxiliaryData || {}
+  );
+  return Boolean(result?.ok);
 }
 
 /* Small dependency-free donut chart: N segments as SVG stroke-dasharray arcs on a ring. */
@@ -705,6 +727,21 @@ function CalendarApp() {
   const showRetryableUploadToast = (message, onRetry, duration = 5000) => {
     return showToast(message, 'error', duration, onRetry, null, '다시 시도');
   };
+  const flushPendingWrites = React.useCallback(async () => {
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+    try {
+      const result = await flushWriteQueue(replayQueuedCalendarWrite);
+      if (result.processed > 0) showToast(`${result.processed}건의 대기 저장을 동기화했습니다.`, 'success', 3000);
+    } catch (error) {
+      console.warn('Pending write queue flush notice:', error);
+    }
+  }, [showToast]);
+  React.useEffect(() => {
+    void flushPendingWrites();
+    const handleOnline = () => { void flushPendingWrites(); };
+    window.addEventListener('online', handleOnline);
+    return () => window.removeEventListener('online', handleOnline);
+  }, [flushPendingWrites]);
   // React 18 is bundled by the app. Calling this hook unconditionally keeps CalendarApp's hook
   // order stable when switching between the calendar, chat, gallery, and settlement views.
   const firebaseConnectionVersion = React.useSyncExternalStore(
@@ -782,18 +819,45 @@ function CalendarApp() {
 
   const updateCalendars = async (nextCalendars, toastMsg = '저장완료', toastType = 'success', targetCalId = activeCalId, saveMode = 'availability', newActivityLogs = [], auxiliaryData = {}) => {
     let previousCalendars = null;
+    let normalizedCalendars = null;
+    let queueOperationId = '';
+    let queuePayload = null;
     try {
       if (!isAllowedCalendarId(targetCalId)) {
         showToast('캘린더 ID 오류', 'error');
         return false;
       }
       const now = Date.now();
-      const normalizedCalendars = cloneCalendarList(nextCalendars).map(normalizeCalendarForSave);
+      normalizedCalendars = cloneCalendarList(nextCalendars).map(normalizeCalendarForSave);
 
       const currentCal = normalizedCalendars.find(c => c.id === targetCalId) || null;
       if (!currentCal) {
         console.warn('Active calendar not found during save:', targetCalId);
         showToast('캘린더 없음', 'error');
+        return false;
+      }
+
+      queueOperationId = `calendar_${targetCalId}_${now}_${Math.random().toString(36).slice(2, 8)}`;
+      queuePayload = {
+        calendar: currentCal,
+        lastModified: now,
+        saveMode,
+        newActivityLogs,
+        auxiliaryData
+      };
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+        const queued = await enqueueWriteOperation({
+          id: queueOperationId,
+          type: 'calendar-snapshot',
+          calendarId: targetCalId,
+          payload: queuePayload
+        });
+        if (queued) {
+          setCalendarsState(normalizedCalendars);
+          showToast('오프라인입니다. 연결되면 자동으로 저장합니다.', 'info', 5000);
+          return true;
+        }
+        showToast('오프라인 저장 대기열을 사용할 수 없습니다.', 'error', 6000);
         return false;
       }
 
@@ -838,6 +902,20 @@ function CalendarApp() {
       return true;
     } catch (err) {
       console.error('updateCalendars failed:', err);
+      if (shouldQueueCalendarWriteFailure(err)) {
+        const queued = await enqueueWriteOperation({
+          id: queueOperationId,
+          type: 'calendar-snapshot',
+          calendarId: targetCalId,
+          payload: queuePayload,
+          lastError: err?.message || String(err)
+        });
+        if (queued) {
+          if (previousCalendars) setCalendarsState(normalizedCalendars);
+          showToast('네트워크가 불안정합니다. 저장을 대기하고 연결되면 자동 재시도합니다.', 'info', 6000);
+          return true;
+        }
+      }
       if (previousCalendars) setCalendarsState(previousCalendars);
       showToast(describeUpdateCalendarsFailure(err), 'error', 6000);
       return false;
