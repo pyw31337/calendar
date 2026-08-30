@@ -1,5 +1,17 @@
 const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
 
+  // Firestore rejects `undefined` anywhere in an SDK payload, while the REST encoder used by
+  // this app previously converted it to null (which can also violate field type rules).
+  export function omitUndefinedDeep(value) {
+    if (Array.isArray(value)) return value.map(item => item === undefined ? null : omitUndefinedDeep(item));
+    if (!value || typeof value !== 'object') return value;
+    const prototype = Object.getPrototypeOf(value);
+    if (prototype !== Object.prototype && prototype !== null) return value;
+    return Object.fromEntries(Object.entries(value)
+      .filter(([, item]) => item !== undefined)
+      .map(([key, item]) => [key, omitUndefinedDeep(item)]));
+  }
+
   function getContrastTextColor(hexColor) {
     if (!hexColor) return '#FFFFFF';
     const hex = hexColor.replace('#', '');
@@ -950,6 +962,7 @@ const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
   }
 
   export const GATHER_APP_UTILS = Object.freeze({
+    omitUndefinedDeep,
     getPersistentBrokenPhotoUrls,
     savePersistentBrokenPhotoUrl,
     getContrastTextColor,

@@ -18,7 +18,7 @@ globalThis.window = {
 await import('../src/core/app-constants.js');
 await import('../src/core/app-config.js');
 await import('../src/core/app-utils.js');
-const { pushSingleCalendarWithRest, firestoreDocumentToJs } = await import('../src/core/app-firebase-data.js');
+const { pushSingleCalendarWithRest, firestoreDocumentToJs, normalizeCalendarForSave } = await import('../src/core/app-firebase-data.js');
 
 const base = {
   id: calendarId,
@@ -29,6 +29,13 @@ const base = {
   updatedAt: Date.now(),
   revision: 1
 };
+const sdkPayloadProbe = normalizeCalendarForSave({
+  ...base,
+  description: undefined,
+  settlementCards: [{ ...base.settlementCards[0], optionalNote: undefined }]
+});
+assert(!('description' in sdkPayloadProbe), 'calendar normalization retained an undefined top-level field');
+assert(!('optionalNote' in sdkPayloadProbe.settlementCards[0]), 'calendar normalization retained a nested undefined field');
 const firstAt = Date.now();
 const updated = { ...base, settlementCards: [{ ...base.settlementCards[0], title: '저장 후 제목', totalAmount: 12500, updatedAt: firstAt + 100 }], updatedAt: firstAt + 100 };
 const stale = { ...base, settlementCards: [{ ...base.settlementCards[0], title: '오래된 응답', totalAmount: 1, updatedAt: firstAt - 100 }], updatedAt: firstAt - 100 };

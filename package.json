@@ -25,6 +25,7 @@
     "restore:rehearsal": "node scripts/restore-rehearsal.mjs",
     "smoke:live": "node scripts/live-smoke-check.mjs",
     "smoke:browser": "node scripts/browser-smoke-test.mjs",
+    "smoke:browser:all": "npm run smoke:browser && CALENDAR_SMOKE_BROWSER=firefox npm run smoke:browser && CALENDAR_SMOKE_BROWSER=webkit npm run smoke:browser",
     "check:required-symbols": "node scripts/check-required-symbols.mjs",
     "check:isolation": "node scripts/check-calendar-isolation.mjs",
     "check:share-urls": "node scripts/check-share-urls.mjs",

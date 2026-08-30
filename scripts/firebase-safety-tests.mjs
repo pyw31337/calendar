@@ -1,9 +1,14 @@
 import fs from 'node:fs';
 import vm from 'node:vm';
+import { omitUndefinedDeep } from '../src/core/app-utils.js';
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
+
+const undefinedProbe = omitUndefinedDeep({ description: undefined, nested: { keep: 'ok', drop: undefined }, list: [1, undefined] });
+assert(!('description' in undefinedProbe) && !('drop' in undefinedProbe.nested), 'Firestore payload sanitizer must omit undefined object fields');
+assert(undefinedProbe.list.length === 2 && undefinedProbe.list[1] === null, 'Firestore payload sanitizer must preserve array positions');
 
 // The app's main logic lives in assets/app-main.js (externalized from index.html's inline
 // <script> -- see check-tab-wiring.mjs for the rationale).
@@ -44,6 +49,8 @@ assert(/merge: Boolean\(options\?\.merge\)/.test(firebaseDataScript) && /Boolean
 assert(/writeRootCollectionDocumentWithFallback[\s\S]{0,900}FIRESTORE_WRITE_DEADLINE_MS/.test(firebaseDataScript), 'root collection writes must use the bounded write deadline');
 assert(/withWeatherTimeout/.test(weatherScript) && /WEATHER_FIRESTORE_TIMEOUT_MS/.test(weatherScript), 'weather cache reads and writes must be bounded');
 assert(/withWeatherTimeout\(fetch\(/.test(weatherScript), 'weather external requests must be bounded');
+assert(/hadServiceWorkerControllerAtStartup[\s\S]{0,900}controllerchange[\s\S]{0,180}hadServiceWorkerControllerAtStartup/.test(domainHelpersScript), 'first service worker install must not reload and destroy the app boot');
+assert(/isAppleWebKit/.test(firebaseDataScript) && /experimentalAutoDetectLongPolling: isAppleWebKit/.test(firebaseDataScript), 'Safari/WebKit must avoid forced Firestore long polling');
 assert(/withSideMenuTimeout/.test(sideMenuScript) && /push_subscriptions.*get\(\)/s.test(sideMenuScript), 'push device reads must be bounded');
 assert(firebaseServicesScript.includes('FIRESTORE_REST_TIMEOUT_MS = 9000') && firebaseServicesScript.includes('fetchWithTimeout') && firebaseServicesScript.includes('withSdkTimeout'), 'Firebase SDK and REST reads must have bounded timeouts');
 assert(/fetchFirestoreRequest/.test(firebaseDataScript) && /image share read timeout/.test(firebaseDataScript), 'Firestore fallback and share reads must have bounded timeouts');

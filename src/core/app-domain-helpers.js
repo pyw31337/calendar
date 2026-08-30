@@ -5,6 +5,7 @@
  * 청크로 분리해 app-main 청크의 번들 예산 압박을 줄이는 것이 이 분리의 목적.
  */
 import { GATHER_APP_UTILS } from './app-utils.js';
+const omitUndefinedDeep = GATHER_APP_UTILS.omitUndefinedDeep;
 const GATHER_APP_CONSTANTS = window.GATHER_APP_CONSTANTS || {};
 // firebaseConfig/firebaseDb live in app-main.js (firebaseDb is mutable, reassigned by
 // __setFirebaseDb once Firestore finishes loading) -- both mirror to these window globals in
@@ -579,7 +580,7 @@ function sanitizeMessageForFirestore(messageData) {
     if (typeof lp.image === 'string' && lp.image.startsWith('data:') && lp.image.length > 2000) delete lp.image;
     out.linkPreview = lp;
   }
-  return out;
+  return omitUndefinedDeep(out);
 }
 function sanitizeMemoForFirestore(memoData) {
   return sanitizeMessageForFirestore(memoData);
@@ -1055,6 +1056,7 @@ function notifyMeetingReminder(calendar, meeting, whenLabel) {
 // itself, since this app deliberately serves its HTML as no-cache (see sw.js for why). Safe to
 // register unconditionally: browsers without service worker support simply skip this.
 if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+  const hadServiceWorkerControllerAtStartup = Boolean(navigator.serviceWorker.controller);
   window.addEventListener('load', () => {
     const appBasePath = window.location.pathname.includes('/calendar/') ? '/calendar/' : '/';
     navigator.serviceWorker.register(`${appBasePath}sw.js`).then(reg => {
@@ -1074,7 +1076,9 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 
   let swRefreshing = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (!swRefreshing) {
+    // A first-ever install also emits controllerchange after clients.claim(). Reloading there
+    // destroys the freshly booted app in Firefox/WebKit. Reload only for a real SW update.
+    if (hadServiceWorkerControllerAtStartup && !swRefreshing) {
       swRefreshing = true;
       if (typeof window !== 'undefined' && window.location) {
         window.location.reload();
@@ -2136,6 +2140,7 @@ export {
   getTodayString,
   derivePlaceVisitStatus,
   countPlaceVisits,
+  omitUndefinedDeep,
   sanitizeMessageForFirestore,
   sanitizeMemoForFirestore,
   slimMessageForClient,

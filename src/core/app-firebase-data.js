@@ -56,6 +56,7 @@ import {
   sanitizeMessageForFirestore,
   formatBytes,
   getDataUrlInfo,
+  omitUndefinedDeep,
 } from './app-domain-helpers.js';
 import { enqueueWriteOperation } from './app-write-queue.js';
 const GATHER_APP_CONSTANTS = window.GATHER_APP_CONSTANTS || {};
@@ -408,7 +409,7 @@ function normalizeCalendarForSave(calendar) {
   const normalizedConfirmedMeetings = normalizeConfirmedMeetingsForSave(cloned.confirmedMeeting || []);
   const deletedActivityLogIds = getDeletedActivityLogIds(cloned);
 
-  return {
+  return omitUndefinedDeep({
     ...cloned,
 	    participants: normalizedParticipants,
 	    availabilities: Array.from(availabilityMap.values()),
@@ -420,7 +421,7 @@ function normalizeCalendarForSave(calendar) {
 	    placeCategories: normalizePlaceCategories(cloned.placeCategories),
 	    settlementBaseBudget: Number.isFinite(Number(cloned.settlementBaseBudget)) ? Math.max(0, Math.round(Number(cloned.settlementBaseBudget))) : 0,
 	    deletedActivityLogIds
-	  };
+	  });
 	}
 
 function assertCalendarLinks(calendar) {
@@ -1002,7 +1003,16 @@ function attemptFirebaseInit() {
       // PC Whale didn't). Passing both flags explicitly, without merge, is what actually applies
       // forced long-polling instead of just failing quietly.
       if (!firestoreSettingsApplied) {
-        firebase.firestore().settings({ experimentalForceLongPolling: true, experimentalAutoDetectLongPolling: false });
+        // Safari/WebKit intermittently rejects the forced WebChannel XHR as an access-control
+        // failure on image-heavy pages. Let its SDK select the transport automatically; keep the
+        // proven forced-long-polling workaround for Whale/Chromium and Firefox.
+        const userAgent = typeof navigator !== 'undefined' ? String(navigator.userAgent || '') : '';
+        const isAppleWebKit = /AppleWebKit/i.test(userAgent)
+          && !/(Chrome|Chromium|Edg|OPR|Whale|SamsungBrowser)/i.test(userAgent);
+        firebase.firestore().settings({
+          experimentalForceLongPolling: !isAppleWebKit,
+          experimentalAutoDetectLongPolling: isAppleWebKit
+        });
         firestoreSettingsApplied = true;
       }
     } catch (settingsErr) {

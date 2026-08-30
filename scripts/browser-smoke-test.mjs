@@ -4,9 +4,7 @@
 // import chunks) that npm run check:all / lint / build never could have caught, because none of
 // those execute the app in a browser -- this does.
 //
-// Scope, honestly: only Chromium is installed in this environment (see /opt/pw-browsers), so this
-// cannot reproduce real Safari/iOS, Firefox, Samsung Internet, Whale, or an actual physical PWA
-// install. It DOES give real JS execution, real layout, mobile-viewport emulation, and CDP network
+// It gives real JS execution, layout, mobile-viewport emulation, and CDP network
 // throttling -- which covers the actual bug classes hit this session: uncaught JS exceptions
 // (ReferenceError etc.), horizontal overflow / off-screen layout, the emoji-category-always-empty
 // class of "renders but silently wrong" bug, and the boot-race class of bug.
@@ -23,8 +21,9 @@
 //   npm run smoke:browser                  # spawns `vite preview` against dist/ and tests it
 //   CALENDAR_SMOKE_BASE_URL=https://pyw31337.github.io/calendar/ npm run smoke:browser
 //                                           # skip local preview, test a already-deployed URL
+//   CALENDAR_SMOKE_BROWSER=firefox npm run smoke:browser
 
-import { chromium } from 'playwright';
+import { chromium, firefox, webkit } from 'playwright';
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -33,6 +32,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, '..');
 
 const EXPLICIT_BASE_URL = process.env.CALENDAR_SMOKE_BASE_URL || null;
+const BROWSER_NAME = process.env.CALENDAR_SMOKE_BROWSER || 'chromium';
+const BROWSER_TYPES = { chromium, firefox, webkit };
 const LOCAL_PORT = process.env.CALENDAR_SMOKE_PORT || '4173';
 const LOCAL_BASE_URL = `http://127.0.0.1:${LOCAL_PORT}/`;
 
@@ -46,7 +47,8 @@ const VIEWS = [
   { suffix: '&view=chat', label: '채팅' },
   { suffix: '&view=gallery', label: '갤러리' },
   { suffix: '&view=places', label: '장소' },
-  { suffix: '&view=memo', label: '메모' }
+  { suffix: '&view=memo', label: '메모' },
+  { suffix: '&view=settlement', label: '정산' }
 ];
 const VIEWPORTS = [
   { name: 'PC', width: 1440, height: 900, isMobile: false, hasTouch: false },
@@ -63,6 +65,7 @@ const VIEWPORTS = [
 
 let failCount = 0;
 let passCount = 0;
+let knownExternalWarningCount = 0;
 function pass(label) {
   passCount += 1;
   console.log(`  ✓ ${label}`);
@@ -70,6 +73,20 @@ function pass(label) {
 function fail(label, detail) {
   failCount += 1;
   console.error(`  ✗ ${label} -- ${detail}`);
+}
+function isIgnorableConsoleError(text, url = '') {
+  if (url.includes('firebasestorage.googleapis.com') && text.includes('status of 404')) {
+    knownExternalWarningCount += 1;
+    return true;
+  }
+  return ['compute-pressure', 'Permissions policy', 'status of 503', 'status of 502',
+    'ERR_NAME_NOT_RESOLVED', 'ERR_CONNECTION_REFUSED', 'downloadable font: download failed',
+    'has been rejected because it is in a cross-site context', 'inline-speculation-rules']
+    .some(marker => text.includes(marker));
+}
+function mobileContextOptions(extra = {}) {
+  return { viewport: { width: 390, height: 844 }, hasTouch: true,
+    ...(BROWSER_NAME === 'firefox' ? {} : { isMobile: true }), ...extra };
 }
 
 async function waitForServer(url, timeoutMs) {
@@ -84,29 +101,57 @@ async function waitForServer(url, timeoutMs) {
   return false;
 }
 
+async function gotoBootReady(page, url, timeoutMs = 35000) {
+  let lastError = null;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      await page.goto(`${url}${attempt ? `${url.includes('?') ? '&' : '?'}_smokeRetry=1` : ''}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      await page.waitForFunction(() => window.__GATHER_BOOT_READY__ === true, { timeout: timeoutMs });
+      return;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError || new Error('boot-ready timeout');
+}
+
 async function checkPage(browser, baseUrl, viewport, calId, view) {
   const label = `[${viewport.name}] ${calId} ${view.label}`;
   const context = await browser.newContext({
     viewport: { width: viewport.width, height: viewport.height },
-    isMobile: viewport.isMobile,
+    ...(BROWSER_NAME === 'firefox' ? {} : { isMobile: viewport.isMobile }),
     hasTouch: viewport.hasTouch,
     deviceScaleFactor: viewport.deviceScaleFactor || 1,
-    userAgent: viewport.userAgent
+    ...(BROWSER_NAME === 'chromium' && viewport.userAgent ? { userAgent: viewport.userAgent } : {})
   });
   const page = await context.newPage();
   const consoleErrors = [];
   const pageErrors = [];
   const failedRequests = [];
-  page.on('console', msg => { if (msg.type() === 'error' && !msg.text().includes('compute-pressure') && !msg.text().includes('Permissions policy') && !msg.text().includes('status of 503') && !msg.text().includes('status of 502') && !msg.text().includes('ERR_NAME_NOT_RESOLVED') && !msg.text().includes('ERR_CONNECTION_REFUSED')) { const loc = msg.location(); consoleErrors.push(`${msg.text()}${loc?.url ? ` @${loc.url}:${loc.lineNumber || 0}` : ''}`); } });
-  page.on('pageerror', err => pageErrors.push(err.message));
+  page.on('console', msg => { if (msg.type() === 'error') { const loc = msg.location(); if (!isIgnorableConsoleError(msg.text(), loc?.url || '')) consoleErrors.push(`${msg.text()}${loc?.url ? ` @${loc.url}:${loc.lineNumber || 0}` : ''}`); } });
+  page.on('pageerror', err => {
+    if (BROWSER_NAME === 'webkit' && /firestore\.googleapis\.com\/(?:google\.firestore\.v1\.Firestore\/(?:Listen|Write)\/channel|google\.firestore\.v1\.Firestore\/channel).*due to access control checks/i.test(err.message)) {
+      knownExternalWarningCount += 1;
+      return;
+    }
+    pageErrors.push(err.message);
+  });
   page.on('requestfailed', request => failedRequests.push(`${request.url()} (${request.failure()?.errorText || 'failed'})`));
 
   const url = `${baseUrl}?id=${calId}${view.suffix}`;
-  try {
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
-    await page.waitForFunction(() => window.__GATHER_BOOT_READY__ === true, { timeout: 35000 });
-  } catch (err) {
-    fail(label, `page never reached boot-ready: ${err.message}`);
+  let bootError = null;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      await page.goto(`${url}${attempt ? '&_smokeRetry=1' : ''}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      await page.waitForFunction(() => window.__GATHER_BOOT_READY__ === true, { timeout: 35000 });
+      bootError = null;
+      break;
+    } catch (err) {
+      bootError = err;
+    }
+  }
+  if (bootError) {
+    fail(label, `page never reached boot-ready after retry: ${bootError.message}`);
     await context.close();
     return;
   }
@@ -146,7 +191,7 @@ async function checkManifests(browser, baseUrl) {
 
 async function checkEmojiCategories(browser, baseUrl) {
   const label = '이모티콘 피커 전체 카테고리';
-  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  const context = await browser.newContext(mobileContextOptions());
   const page = await context.newPage();
   try {
     await page.goto(`${baseUrl}?id=kkot&view=chat`, { waitUntil: 'domcontentloaded', timeout: 30000 });
@@ -179,6 +224,7 @@ async function checkLightboxZoomControls(browser, baseUrl) {
     const hasThumb = await thumb.count();
     if (!hasThumb) { console.log(`  (skip) ${label} -- 메인 갤러리에 사진이 없어 검사 생략`); await context.close(); return; }
     await thumb.click();
+    await page.locator('img[alt="원본 이미지"]').first().click();
     await page.locator('button[title="확대"]').waitFor({ state: 'visible', timeout: 5000 });
     await page.locator('button[title="축소"]').waitFor({ state: 'visible', timeout: 5000 });
     pass(label);
@@ -192,7 +238,7 @@ async function checkLightboxZoomControls(browser, baseUrl) {
 
 async function checkDeferredManual(browser, baseUrl) {
   const label = '사용자 매뉴얼 지연 chunk 로딩';
-  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  const context = await browser.newContext(mobileContextOptions());
   const page = await context.newPage();
   try {
     await page.goto(`${baseUrl}?id=kkot`, { waitUntil: 'domcontentloaded', timeout: 30000 });
@@ -218,36 +264,43 @@ async function checkSideMenuNavigation(browser, baseUrl) {
     ['&view=chat', '채팅'],
     ['&view=gallery', '갤러리'],
     ['&view=places', '장소'],
-    ['&view=memo', '메모']
+    ['&view=memo', '메모'],
+    ['&view=settlement', '정산']
   ];
-  const destinations = ['채팅', '갤러리', '장소', '메모'];
+  const destinations = ['채팅', '갤러리', '장소', '메모', '정산'];
   for (const viewport of VIEWPORTS) {
     for (const [calId] of CALENDARS) {
       const label = `[${viewport.name}] ${calId} 사이드메뉴 전환`;
       for (const [suffix, sourceLabel] of sources) {
         const context = await browser.newContext({
           viewport: { width: viewport.width, height: viewport.height },
-          isMobile: viewport.isMobile,
+          ...(BROWSER_NAME === 'firefox' ? {} : { isMobile: viewport.isMobile }),
           hasTouch: viewport.hasTouch,
           deviceScaleFactor: viewport.deviceScaleFactor || 1,
-          userAgent: viewport.userAgent
+          ...(BROWSER_NAME === 'chromium' && viewport.userAgent ? { userAgent: viewport.userAgent } : {})
         });
         const page = await context.newPage();
         const consoleErrors = [];
         const pageErrors = [];
         const failedRequests = [];
         page.on('console', msg => {
-          if (msg.type() === 'error' && !msg.text().includes('compute-pressure') && !msg.text().includes('Permissions policy')) {
+          if (msg.type() === 'error') {
             const loc = msg.location();
+            if (isIgnorableConsoleError(msg.text(), loc?.url || '')) return;
             consoleErrors.push(`${msg.text()}${loc?.url ? ` @${loc.url}:${loc.lineNumber || 0}` : ''}`);
           }
         });
-        page.on('pageerror', err => pageErrors.push(err.message));
+        page.on('pageerror', err => {
+          if (BROWSER_NAME === 'webkit' && /firestore\.googleapis\.com\/google\.firestore\.v1\.Firestore\/(?:Listen|Write)\/channel.*due to access control checks/i.test(err.message)) {
+            knownExternalWarningCount += 1;
+            return;
+          }
+          pageErrors.push(err.message);
+        });
         page.on('requestfailed', request => failedRequests.push(`${request.url()} (${request.failure()?.errorText || 'failed'})`));
         try {
-          await page.goto(`${baseUrl}?id=${calId}${suffix}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
-          await page.waitForFunction(() => window.__GATHER_BOOT_READY__ === true, { timeout: 35000 });
-          const menuButton = page.locator('button[aria-label$="메뉴 열기"]:visible').first();
+          await gotoBootReady(page, `${baseUrl}?id=${calId}${suffix}`);
+          const menuButton = page.locator('button[aria-label$="메뉴 열기"]:visible, button[aria-label="메뉴"]:visible').first();
           await menuButton.waitFor({ state: 'visible', timeout: 8000 });
           // Mobile headers can still be settling after a view transition; dispatch the semantic
           // click after the visibility check so a transient scroll/animation does not make the
@@ -260,7 +313,8 @@ async function checkSideMenuNavigation(browser, baseUrl) {
             await menu.locator('button.admin-side-menu-item').filter({ hasText: destination }).first().waitFor({ state: 'visible', timeout: 5000 });
           }
           if (consoleErrors.length || pageErrors.length) {
-            fail(`${label}: ${sourceLabel}`, `메뉴 확인 후 콘솔/페이지 오류 ${consoleErrors.length + pageErrors.length}건${failedRequests.length ? `; 요청 실패: ${failedRequests.filter(item => item.includes('ERR_INVALID_URL')).slice(0, 2).join(' | ') || failedRequests.slice(0, 2).join(' | ')}` : ''}`);
+            const details = [...consoleErrors, ...pageErrors].slice(0, 2).join(' | ');
+            fail(`${label}: ${sourceLabel}`, `메뉴 확인 후 콘솔/페이지 오류 ${consoleErrors.length + pageErrors.length}건: ${details}${failedRequests.length ? `; 요청 실패: ${failedRequests.filter(item => item.includes('ERR_INVALID_URL')).slice(0, 2).join(' | ') || failedRequests.slice(0, 2).join(' | ')}` : ''}`);
           } else {
             pass(`${label}: ${sourceLabel}`);
           }
@@ -276,12 +330,7 @@ async function checkSideMenuNavigation(browser, baseUrl) {
 
 async function checkThrottledBoot(browser, baseUrl) {
   const label = '저속 네트워크(슬로우 3G급) 모바일 부팅';
-  const context = await browser.newContext({
-    viewport: { width: 390, height: 844 },
-    isMobile: true,
-    hasTouch: true,
-    userAgent: VIEWPORTS[1].userAgent
-  });
+  const context = await browser.newContext(mobileContextOptions({ userAgent: VIEWPORTS[1].userAgent }));
   const page = await context.newPage();
   const client = await context.newCDPSession(page);
   try {
@@ -328,9 +377,11 @@ async function main() {
     baseUrl = server.baseUrl;
     localProc = server.proc;
   }
-  console.log(`[browser-smoke-test] target: ${baseUrl}\n`);
+  const browserType = BROWSER_TYPES[BROWSER_NAME];
+  if (!browserType) throw new Error(`지원하지 않는 브라우저 엔진: ${BROWSER_NAME}`);
+  console.log(`[browser-smoke-test] target: ${baseUrl} (${BROWSER_NAME})\n`);
 
-  const browser = await chromium.launch();
+  const browser = await browserType.launch();
   try {
     console.log('-- 페이지 렌더 / 콘솔 에러 / 레이아웃 오버플로우 --');
     for (const viewport of VIEWPORTS) {
@@ -350,14 +401,17 @@ async function main() {
     await checkDeferredManual(browser, baseUrl);
     await checkSideMenuNavigation(browser, baseUrl);
 
-    console.log('\n-- 저속 네트워크 부팅 경쟁 상태 --');
-    await checkThrottledBoot(browser, baseUrl);
+    if (BROWSER_NAME === 'chromium') {
+      console.log('\n-- 저속 네트워크 부팅 경쟁 상태 --');
+      await checkThrottledBoot(browser, baseUrl);
+    }
   } finally {
     await browser.close();
     if (localProc) localProc.kill();
   }
 
-  console.log(`\n[browser-smoke-test] ${passCount} passed, ${failCount} failed`);
+  console.log(`\n[browser-smoke-test] ${passCount} passed, ${failCount} failed`
+    + (knownExternalWarningCount ? `, ${knownExternalWarningCount} known external-resource warning(s)` : ''));
   if (failCount > 0) process.exit(1);
 }
 

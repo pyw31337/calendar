@@ -641,7 +641,6 @@ function subscribeFirebaseStateChange(onStoreChange) {
   return () => window.removeEventListener('gather-firebase-state-change', handler);
 }
 const NON_CHAT_UPLOAD_SOURCES = new Set(['meeting', 'gallery']);
-
 function isNonChatUploadSource(uploadSource) {
   return NON_CHAT_UPLOAD_SOURCES.has(String(uploadSource || '').trim().toLowerCase());
 }
@@ -751,8 +750,6 @@ function CalendarApp() {
     window.addEventListener('online', handleOnline);
     return () => window.removeEventListener('online', handleOnline);
   }, [flushPendingWrites]);
-  // React 18 is bundled by the app. Calling this hook unconditionally keeps CalendarApp's hook
-  // order stable when switching between the calendar, chat, gallery, and settlement views.
   const firebaseConnectionVersion = React.useSyncExternalStore(
     subscribeFirebaseStateChange,
     getFirebaseStateVersion,
@@ -891,10 +888,6 @@ function CalendarApp() {
       }
 
       serverRevisionRef.current = updateMetaLastModified(serverRevisionRef.current, currentCal.id, now);
-      // saved.revision is the doc-level revision Firestore actually committed -- record that, not
-      // currentCal.revision (the nested calendar.revision field, bumped client-side per edit and
-      // liable to run ahead of it), or every later genuine update looks "older" by comparison and
-      // gets silently rejected by applyCalendarSnapshot's revision gate. See pushSingleCloudCalendar.
       serverRevisionRef.current = updateMetaRevision(serverRevisionRef.current, currentCal.id, (saved && saved.revision) || currentCal.revision || 0);
       saveLocalCache(normalizedCalendars);
       saveLocalMeta(serverRevisionRef.current);
@@ -2246,7 +2239,6 @@ function CalendarApp() {
 
     const unsubPlaces = subscribePlaces(activeCalId, snapshot => {
         if (!isMounted) return;
-        // Ignore an older snapshot that races the calendar-document and places writes.
         if (isSavingRef.current) return;
         const list = [];
         snapshot.forEach(doc => list.push(doc.data()));
@@ -4987,9 +4979,6 @@ function CalendarApp() {
       categoryId: mp('categoryId', cleanCategoryId),
       memo: nextMemo,
       visitStatus: derivePlaceVisitStatus({ memo: nextMemo }),
-      // An explicit empty visitDate is used when a date is removed from a place.
-      // Do not fall back to the previous date in that case, or the deleted date
-      // remains the place's primary date and can reappear after the next snapshot.
       visitDate: placeData.visitDate !== undefined ? cleanVisitDate : mp('visitDate', ''),
       sourcePlaceId: mp('sourcePlaceId', sourcePlaceIdForSave || (isEditing && !mergeTargetPlace ? (existingPlaces.find(p => p.id === placeData.id) || {}).sourcePlaceId : '') || ''),
       updatedAt: now
@@ -5972,8 +5961,6 @@ function CalendarApp() {
       onClose: () => setIsCreateSettlementOpen(false),
       onSave: handleSaveSettlementCard
     }),
-    // An already-rendered settlement card is an explicit capability signal. Do not let a
-    // transient/stale feature-gate calculation hide the editor after the user selected it.
     editingSettlementCard && activeCal && /*#__PURE__*/React.createElement(CreateSettlementModal, {
       calendar: activeCal,
       initialData: editingSettlementCard,
