@@ -480,6 +480,7 @@ import {
   fetchAnniversariesRest,
   sendChatMessageRest,
   writeCollectionDocumentWithFallback,
+  writeRootCollectionDocumentWithFallback,
   deleteMessageRest,
   fetchMessageRest,
   updateMessageRest,
@@ -548,7 +549,7 @@ import {
   getCalendarAccentColor
 } from './app-firebase-data.js';
 import { enqueueWriteOperation, flushWriteQueue } from './app-write-queue.js';
-import { replayQueuedMediaMessage, replayQueuedMemoSave } from './app-media-outbox.js';
+import { replayQueuedMediaMessage, replayQueuedMemoSave, replayQueuedRootCollectionWrite } from './app-media-outbox.js';
 var firebaseDb = (typeof window !== 'undefined' && window.GATHER_APP_FIREBASE_DATA && window.GATHER_APP_FIREBASE_DATA.firebaseDb) || null;
 var firebaseStorage = (typeof window !== 'undefined' && window.GATHER_APP_FIREBASE_DATA && window.GATHER_APP_FIREBASE_DATA.firebaseStorage) || null;
 function getLiveFirebaseStorage() {
@@ -560,6 +561,7 @@ function shouldQueueCalendarWriteFailure(error) {
   return /timeout|network|fetch|offline|연결|상태를 확인/.test(message);
 }
 async function replayQueuedCalendarWrite(operation) {
+  if (operation?.type === 'root-collection-write' && operation.payload) return replayQueuedRootCollectionWrite(operation, { writeDocument: (collectionName, docId, data, label) => writeRootCollectionDocumentWithFallback(collectionName, docId, data, label, { skipQueue: true }) });
   if (operation?.type === 'media-memo-save' && operation.payload) {
     return replayQueuedMemoSave(operation, {
       resolveImages: resolveMemoImageBatch,

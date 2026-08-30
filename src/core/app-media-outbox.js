@@ -44,3 +44,10 @@ export async function replayQueuedMemoSave(operation, { resolveImages, writeMemo
   });
   return Boolean(result?.success ?? result);
 }
+
+export async function replayQueuedRootCollectionWrite(operation, { writeDocument } = {}) {
+  const payload = operation?.payload;
+  if (!payload?.collectionName || !payload.docId || typeof writeDocument !== 'function') return false;
+  const result = await writeDocument(payload.collectionName, payload.docId, payload.data, payload.warnLabel || '대기 저장');
+  return Boolean(result?.success ?? result);
+}

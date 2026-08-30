@@ -29,6 +29,7 @@ assert(/uploadSource: 'gallery'/.test(sourceScript) && /갤러리 사진은 연�
 assert(/media-memo-save/.test(memoScript) && /메모와 사진을 자동 저장합니다/.test(memoScript), 'offline memo images must be queued with the memo payload');
 assert(/replayQueuedMemoSave/.test(sourceScript) && /imageUrls/.test(mediaOutboxScript), 'queued memo images must be replayed into the memo document');
 assert(/writeSharedCollection/.test(eventModalScript) && /기념일 저장/.test(eventModalScript), 'anniversary writes must use the bounded collection write path');
+assert(/writeRootCollectionDocumentWithFallback/.test(firebaseDataScript) && /root-collection-write/.test(firebaseDataScript), 'root image-share writes must have a bounded offline replay path');
 assert(/async function writeConfirmedMeetingsToFirestore[\s\S]{0,1800}if \(res\.ok\) return true;[\s\S]{0,700}if \(firebaseDb\)/.test(firebaseDataScript), 'confirmed meeting writes must fall back to SDK after a REST failure');
 assert(/writeConfirmedMeetingsToFirestore[\s\S]{0,2600}validDates[\s\S]{0,700}writes\.push\(\{ delete: documentName \}\)/.test(firebaseDataScript), 'confirmed meeting writes must remove stale subcollection documents');
 assert(/Failed to inspect stale confirmed meetings[\s\S]{0,260}validMeetings\.length === 0/.test(firebaseDataScript), 'confirmed meeting writes must not block valid updates on cleanup-read failure');

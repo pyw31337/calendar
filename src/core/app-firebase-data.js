@@ -1742,6 +1742,28 @@ function sanitizeShareIdPart(value, fallback = 'item') {
   return clean || fallback;
 }
 
+async function writeRootCollectionDocumentWithFallback(collectionName, docId, data, warnLabel = 'write', options = {}) {
+  const cleanCollection = sanitizeText(collectionName || '', 80);
+  const cleanDocId = sanitizeText(docId || '', 180);
+  if (!cleanCollection || !cleanDocId) return false;
+  try {
+    if (firebaseDb) {
+      await withTimeout(firebaseDb.collection(cleanCollection).doc(cleanDocId).set(data, options?.merge ? { merge: true } : undefined), FIRESTORE_REQUEST_TIMEOUT_MS, `${warnLabel} timeout`);
+      return { success: true, id: cleanDocId, transport: 'sdk' };
+    }
+    const res = await fetchFirestoreRequest(`https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/${cleanCollection}/${cleanDocId}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fields: Object.fromEntries(Object.entries(data || {}).map(([key, value]) => [key, jsToFirestoreValue(value)])) })
+    });
+    if (res.ok) return { success: true, id: cleanDocId, transport: 'rest' };
+    return false;
+  } catch (error) {
+    if (options?.skipQueue || !shouldQueueCollectionWrite(error)) return false;
+    const queued = await enqueueWriteOperation({ id: `root_${cleanCollection}_${cleanDocId}`, type: 'root-collection-write', calendarId: '', payload: { collectionName: cleanCollection, docId: cleanDocId, data, warnLabel } });
+    return queued ? { success: true, queued: true, id: cleanDocId, transport: 'queue' } : false;
+  }
+}
+
 async function createImageShareDocument(calendarId, imageUrl, meta = {}) {
   const messageId = sanitizeText(meta?.messageId || '', 180);
   const imageIndex = Number.isFinite(Number(meta?.imageIndex)) ? Math.max(0, Math.round(Number(meta.imageIndex))) : 0;
@@ -1762,16 +1784,8 @@ async function createImageShareDocument(calendarId, imageUrl, meta = {}) {
     } catch (e) {
       console.warn('Image share cache lookup skipped:', e);
     }
-    if (firebaseDb) {
-      await withTimeout(firebaseDb.collection('imageShares').doc(shareId).set(payload, { merge: true }), 9000, 'image share pointer write');
-    } else {
-      const res = await withTimeout(fetch(`https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/imageShares/${shareId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fields: Object.fromEntries(Object.entries(payload).map(([key, value]) => [key, jsToFirestoreValue(value)])) })
-      }), 9000, 'image share pointer REST write');
-      if (!res.ok) throw new Error(`Image share REST write failed: ${res.status}`);
-    }
+    const saved = await writeRootCollectionDocumentWithFallback('imageShares', shareId, payload, 'image share pointer write', { merge: true });
+    if (!saved?.success) throw new Error('Image share pointer write failed');
     return getImageSharePageUrl(shareId);
   }
 
@@ -1792,16 +1806,8 @@ async function createImageShareDocument(calendarId, imageUrl, meta = {}) {
     imageIndex,
     createdAt: Date.now()
   };
-  if (firebaseDb) {
-    await withTimeout(firebaseDb.collection('imageShares').doc(shareId).set(payload), 9000, 'image share fallback write');
-  } else {
-    const res = await withTimeout(fetch(`https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/imageShares/${shareId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fields: Object.fromEntries(Object.entries(payload).map(([key, value]) => [key, jsToFirestoreValue(value)])) })
-    }), 9000, 'image share fallback REST write');
-    if (!res.ok) throw new Error(`Image share REST write failed: ${res.status}`);
-  }
+  const saved = await writeRootCollectionDocumentWithFallback('imageShares', shareId, payload, 'image share fallback write');
+  if (!saved?.success) throw new Error('Image share fallback write failed');
   return getImageSharePageUrl(shareId);
 }
 
@@ -3475,6 +3481,7 @@ export {
   fetchAnniversariesRest,
   sendChatMessageRest,
   writeCollectionDocumentWithFallback,
+  writeRootCollectionDocumentWithFallback,
   deleteMessageRest,
   fetchMessageRest,
   updateMessageRest,
