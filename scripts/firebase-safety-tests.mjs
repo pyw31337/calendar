@@ -43,7 +43,7 @@ assert(/withWeatherTimeout/.test(weatherScript) && /WEATHER_FIRESTORE_TIMEOUT_MS
 assert(/writeSharedCollection/.test(sideMenuScript) && /기기 구독 삭제/.test(sideMenuScript), 'device subscription deletes must use the bounded collection write path');
 assert(/writeSharedCollection/.test(domainHelpersScript) && /기기 구독 등록/.test(domainHelpersScript) && /기기 구독 해제/.test(domainHelpersScript), 'push subscription registration and removal must use the bounded collection write path');
 assert(/writeAdminCollection/.test(adminDashboardScript) && /관리자 채팅 삭제/.test(adminDashboardScript), 'manual admin message deletes must use the bounded collection write path');
-assert(/PITR message delete timeout/.test(adminDashboardScript) && /logDeleteResult\?\.failed/.test(adminDashboardScript), 'PITR must bound message deletes and reject partial activity-log cleanup');
+assert(/writeAdminCollection\('messages', calId, mToDelete\.id, null, 'delete', 'PITR 메시지 삭제'\)/.test(adminDashboardScript) && /logDeleteResult\?\.failed/.test(adminDashboardScript), 'PITR must bound message deletes and reject partial activity-log cleanup');
 assert(/activity log delete timeout/.test(firebaseDataScript) && /return \{ attempted:/.test(firebaseDataScript), 'PITR activity-log deletes must be bounded and report failures');
 assert(/FIRESTORE_WRITE_DEADLINE_MS = 7000/.test(firebaseDataScript) && /remainingWriteTime/.test(firebaseDataScript) && /attemptTimeout/.test(firebaseDataScript), 'collection writes must use one bounded SDK+REST deadline');
 assert(/role: 'status'/.test(sharedScript) && /pointerEvents: 'none'/.test(sharedScript) && !/position: 'fixed', inset: 0, backgroundColor: 'rgba\(15,23,42,0\.48\)'/.test(sharedScript), 'save progress must not block the entire application');

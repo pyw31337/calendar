@@ -1620,15 +1620,8 @@ export function AdminDashboard({ initialCalendars }) {
         const messagesToDelete = messages.filter(m => m.timestamp > log.timestamp);
         for (const mToDelete of messagesToDelete) {
           let deleted = false;
-          if (__fb()) {
-            try {
-              await Promise.race([
-                __fb().collection('calendars').doc(`cal_${calId}`).collection('messages').doc(mToDelete.id).delete(),
-                new Promise((_, reject) => setTimeout(() => reject(new Error('PITR message delete timeout')), 15000))
-              ]);
-              deleted = true;
-            } catch (_) {}
-          }
+          const deletedResult = await writeAdminCollection('messages', calId, mToDelete.id, null, 'delete', 'PITR 메시지 삭제');
+          deleted = Boolean(deletedResult?.success);
           if (!deleted) deleted = await deleteMessageRest(calId, mToDelete.id);
           if (!deleted) throw new Error(`PITR message delete failed: ${mToDelete.id}`);
         }
