@@ -1980,17 +1980,21 @@ async function fetchActivityLogsFromFirestore(calendarId, recentLimit = null) {
 // recovery to match the "future" chat messages it already deletes on restore.
 async function deleteActivityLogsAfterTimestamp(calendarId, logs, cutoffTimestamp) {
   const toDelete = (logs || []).filter(log => getActivityLogStamp(log) > cutoffTimestamp && log.id);
+  const failed = [];
   for (const log of toDelete) {
     try {
       if (firebaseDb) {
-        await firebaseDb.collection('calendars').doc(`cal_${calendarId}`).collection('activityLogs').doc(log.id).delete();
+        await withTimeout(firebaseDb.collection('calendars').doc(`cal_${calendarId}`).collection('activityLogs').doc(log.id).delete(), FIRESTORE_REQUEST_TIMEOUT_MS, 'activity log delete timeout');
       } else {
-        await fetch(`https://firestore.googleapis.com/v1/projects/metro-live-2918e/databases/(default)/documents/calendars/cal_${calendarId}/activityLogs/${log.id}`, { method: 'DELETE' });
+        const response = await withTimeout(fetch(`https://firestore.googleapis.com/v1/projects/metro-live-2918e/databases/(default)/documents/calendars/cal_${calendarId}/activityLogs/${log.id}`, { method: 'DELETE' }), FIRESTORE_REQUEST_TIMEOUT_MS, 'activity log REST delete timeout');
+        if (!response.ok) throw new Error(`activity log REST delete failed (${response.status})`);
       }
     } catch (e) {
       console.warn(`Failed to delete activity log ${log.id} for ${calendarId}:`, e);
+      failed.push(log.id);
     }
   }
+  return { attempted: toDelete.length, deleted: toDelete.length - failed.length, failed };
 }
 
 // --- Places subcollection (calendars/cal_{id}/places/{placeId}) ---

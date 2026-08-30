@@ -1619,15 +1619,25 @@ export function AdminDashboard({ initialCalendars }) {
         const messages = messagesMap[calId] || [];
         const messagesToDelete = messages.filter(m => m.timestamp > log.timestamp);
         for (const mToDelete of messagesToDelete) {
+          let deleted = false;
           if (__fb()) {
-            await __fb().collection('calendars').doc(`cal_${calId}`).collection('messages').doc(mToDelete.id).delete();
-          } else {
-            await deleteMessageRest(calId, mToDelete.id);
+            try {
+              await Promise.race([
+                __fb().collection('calendars').doc(`cal_${calId}`).collection('messages').doc(mToDelete.id).delete(),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('PITR message delete timeout')), 15000))
+              ]);
+              deleted = true;
+            } catch (_) {}
           }
+          if (!deleted) deleted = await deleteMessageRest(calId, mToDelete.id);
+          if (!deleted) throw new Error(`PITR message delete failed: ${mToDelete.id}`);
         }
 
         // Delete activity log entries recorded after log.timestamp, matching the message cleanup above
-        await deleteActivityLogsAfterTimestamp(calId, fullLogs, log.timestamp);
+        const logDeleteResult = await deleteActivityLogsAfterTimestamp(calId, fullLogs, log.timestamp);
+        if (logDeleteResult?.failed?.length) {
+          throw new Error(`PITR activity log delete failed: ${logDeleteResult.failed.join(', ')}`);
+        }
 
         // Sync local state
         setServerCalendars(prev => prev.map(c => c.id === calId ? restoredCal : c));
